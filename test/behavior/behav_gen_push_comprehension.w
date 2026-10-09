@@ -32,7 +32,7 @@ gen fn maybe(n: i32) -> Option[i32]:
     for i in 0..n:
         yield if i % 2 == 1: Some(i * 2) else: None
 
-fn join(v: &Vec[i32]) -> str:
+fn join(v: &List[i32]) -> str:
     var s = ""
     for x in v:
         s = s ++ f" {x}"

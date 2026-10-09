@@ -1,10 +1,10 @@
 //! expect-stdout: ok
 
-// Behavior test: Vec operations
-// Tests: push, get, len (testing the built-in Vec type used throughout)
+// Behavior test: List operations
+// Tests: push, get, len (testing the built-in List type used throughout)
 
-fn test_vec_basic:
-    var v = Vec[i32].new()
+fn test_list_basic:
+    var v = List[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)
@@ -13,12 +13,12 @@ fn test_vec_basic:
     assert(v[1] == 20)
     assert(v[2] == 30)
 
-fn test_vec_empty:
-    var v = Vec[i32].new()
+fn test_list_empty:
+    var v = List[i32].new()
     assert(v.len() == 0)
 
-fn test_vec_large:
-    var v = Vec[i32].new()
+fn test_list_large:
+    var v = List[i32].new()
     for i in 0..100:
         v.push(i)
     assert(v.len() == 100)
@@ -26,9 +26,9 @@ fn test_vec_large:
     assert(v[50] == 50)
     assert(v[99] == 99)
 
-fn test_vec_push_pop_pattern:
-    // Simulate stack behavior with Vec
-    var stack = Vec[i32].new()
+fn test_list_push_pop_pattern:
+    // Simulate stack behavior with List
+    var stack = List[i32].new()
     stack.push(1)
     stack.push(2)
     stack.push(3)
@@ -36,8 +36,8 @@ fn test_vec_push_pop_pattern:
     assert(stack[2] == 3)  // top of stack
 
 fn main:
-    test_vec_basic()
-    test_vec_empty()
-    test_vec_large()
-    test_vec_push_pop_pattern()
+    test_list_basic()
+    test_list_empty()
+    test_list_large()
+    test_list_push_pop_pattern()
     print("ok")

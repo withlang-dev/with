@@ -83,8 +83,8 @@ pub fn target_spec_os() -> str:
 // The variants of std.os's OsKind and ArchKind, one per target the compiler
 // has and no other (§17.5): the names a module-level `comptime match` on
 // `Target.os` or `Target.arch` must cover.
-pub fn target_spec_os_kinds() -> Vec[str]: ["Macos", "Linux", "Windows", "Wasi"]
-pub fn target_spec_arch_kinds() -> Vec[str]: ["Aarch64", "X86_64", "Wasm32", "Wasm64"]
+pub fn target_spec_os_kinds() -> List[str]: ["Macos", "Linux", "Windows", "Wasi"]
+pub fn target_spec_arch_kinds() -> List[str]: ["Aarch64", "X86_64", "Wasm32", "Wasm64"]
 
 // The active target's ArchKind variant.
 pub fn target_spec_arch_kind() -> str:

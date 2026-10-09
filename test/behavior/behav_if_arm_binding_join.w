@@ -31,11 +31,11 @@ fn main:
     let s = if c: b else: "none" ++ ""
     print(f"[{s}] [{a}]")
 
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(1)
-    var ys: Vec[i32] = Vec.new()
+    var ys: List[i32] = List.new()
     for i in 0..3: ys.push(i)
-    let v = if c: ys else: Vec.new()
+    let v = if c: ys else: List.new()
     print(f"{v.len()} {xs.len()}")
 
     // a block-local tail is the block's own value; the outer binding stays

@@ -5,7 +5,7 @@
 // at build (check was silent). The method takes one range.
 
 fn main:
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     v.push(1)
     v.push(2)
     let r = v.range(0, 1)

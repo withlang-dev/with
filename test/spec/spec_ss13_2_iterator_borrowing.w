@@ -46,7 +46,7 @@ fn consume_owned(iter: OwnedIter, cb: fn(i32) -> i32) -> i32:
     sum
 
 fn test_stdlib_iterator_next_twice:
-    let names: Vec[str] = Vec.new()
+    let names: List[str] = List.new()
     names.push("alice")
     names.push("bob")
     names.push("charlie")
@@ -66,7 +66,7 @@ fn test_for_loop_with_custom_owned_iterator:
 
 fn test_collect_owned_tokens_from_custom_iterator:
     let stream = TokenStream { index: 0 }
-    let tokens = with Vec.new() as mut toks:
+    let tokens = with List.new() as mut toks:
         for tok in stream:
             toks.push(tok)
     assert(tokens.len() == 2)

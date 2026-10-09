@@ -3,7 +3,7 @@
 // Usage:
 //   @[bench]
 //   fn bench_my_thing():
-//       let v = Vec.from([3, 1, 4, 1, 5])
+//       let v = List.from([3, 1, 4, 1, 5])
 //       v.sort()
 //
 // The harness calls the function repeatedly, auto-calibrating

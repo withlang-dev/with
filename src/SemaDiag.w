@@ -161,7 +161,13 @@ impl Sema:
             return "unknown type 'string'; use 'str' or 'String'"
         if name == "void":
             return "unknown type 'void'; With uses Unit for no value and c_void for C void pointers"
+        if name == "Vec":
+            return self.vec_is_list_message()
         "unknown type '" ++ name ++ "'"
+
+    // D118: `Vec` names no type; the growable sequence is `List`. One message
+    // in type and value position, so old code always learns the new name.
+    fn vec_is_list_message(): "'Vec' names no type: the growable sequence is 'List' (D118)"
 
     // An omitted c_import symbol, in value or type position, names the import
     // gap (§16.2 structured manifest: "location|category|reason") instead of

@@ -1,7 +1,7 @@
 use issue37.core
 
 type State {
-    values: Vec[Value],
+    values: List[Value],
 }
 
 fn len_i32(state: State) -> i32:

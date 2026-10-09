@@ -3,8 +3,8 @@
 // ESCAPE by tail-position return — the origin outlives the returned container.
 type View ephemeral { p: &i32 }
 
-fn leak() -> Vec[View]:
-    var v = Vec.new()
+fn leak() -> List[View]:
+    var v = List.new()
     let x = 5
     v.push(View { p: &x })
     v

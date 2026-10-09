@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// #607/D32: vacating a transitive-Drop field (Vec[W]) with the explicit
+// #607/D32: vacating a transitive-Drop field (List[W]) with the explicit
 // `move` — via let, bare tail, explicit return, and whole destructuring. The
 // binding takes sole ownership of the moved field; the owner's partial drop
 // still frees the sibling field exactly once (§2.2, §2.5.1).
@@ -11,19 +11,19 @@ impl Drop for W:
         unsafe:
             *self.slot = *self.slot + self.id
 
-type Holder { a: Vec[W], b: W }
+type Holder { a: List[W], b: W }
 
 fn mk(s: *mut i32) -> Holder:
-    let v: Vec[W] = Vec.new()
+    let v: List[W] = List.new()
     v.push(W { id: 1, slot: s })
     v.push(W { id: 2, slot: s })
     Holder { a: v, b: W { id: 4, slot: s } }
 
-fn take_tail(h: Holder) -> Vec[W]:
+fn take_tail(h: Holder) -> List[W]:
     var owned = h
     move owned.a
 
-fn take_return(h: Holder) -> Vec[W]:
+fn take_return(h: Holder) -> List[W]:
     var owned = h
     return move owned.a
 

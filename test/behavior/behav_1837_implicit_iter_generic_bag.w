@@ -16,9 +16,9 @@ type Tok { name: str }
 impl Drop for Tok:
     move fn drop(): print(f"drop {self.name}")
 
-type Bag[T] { items: Vec[T] }
+type Bag[T] { items: List[T] }
 
-type BagIter[T] = ephemeral { items: &Vec[T], i: i32 }
+type BagIter[T] = ephemeral { items: &List[T], i: i32 }
 
 impl[T] BagIter[T]:
     mut fn next() -> Option[&T]:
@@ -38,7 +38,7 @@ fn shout(b: &Bag[Tok]) -> str:
     out
 
 fn main:
-    var toks: Vec[Tok] = Vec.new()
+    var toks: List[Tok] = List.new()
     toks.push(Tok { name: "a" })
     toks.push(Tok { name: "b" })
     toks.push(Tok { name: "c" })
@@ -48,7 +48,7 @@ fn main:
         out = if out.len() == 0: t.name else: out ++ " " ++ t.name
     print(out)
     print(shout(&bag))
-    var nums: Vec[i32] = Vec.new()
+    var nums: List[i32] = List.new()
     nums.push(1)
     nums.push(2)
     nums.push(3)

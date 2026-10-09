@@ -24,7 +24,7 @@ fn test_width_and_methods:
     assert((0 as UInt).ctz() == 64)
 
 fn test_generic_arguments:
-    let xs: Vec[Int] = Vec.new()
+    let xs: List[Int] = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)

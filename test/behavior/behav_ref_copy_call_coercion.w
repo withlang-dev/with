@@ -28,7 +28,7 @@ fn main:
     let pair = Pair { x: 20, y: 22 }
     assert(take_pair(&pair) == 42)
 
-    let values: Vec[i32] = Vec.new()
+    let values: List[i32] = List.new()
     values.push(value)
     assert(values[0] == 42)
     print("ok")

@@ -7,7 +7,7 @@
 type KV { key: str, n: i32 }
 
 fn main:
-    var xs: Vec[KV] = Vec.new()
+    var xs: List[KV] = List.new()
     xs.push(KV { key: "a".clone(), n: 1 })
     for e in xs:
         if e.n == 1:

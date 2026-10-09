@@ -33,9 +33,9 @@ pub type Diagnostic {
     origin_line: i32,
     origin_node: i32,
     primary: Span,
-    labels: Vec[DiagnosticLabel],
-    notes: Vec[str],
-    helps: Vec[str],
+    labels: List[DiagnosticLabel],
+    notes: List[str],
+    helps: List[str],
 }
 
 fn diagnostic_sorts_before(a: &Diagnostic, b: &Diagnostic) -> bool:
@@ -58,9 +58,9 @@ fn diagnostic_error(message: &str, primary: Span) -> Diagnostic:
         origin_line: 0,
         origin_node: 0,
         primary,
-        labels: Vec.new(),
-        notes: Vec.new(),
-        helps: Vec.new(),
+        labels: List.new(),
+        notes: List.new(),
+        helps: List.new(),
     }
 
 fn diagnostic_warning(message: &str, primary: Span) -> Diagnostic:
@@ -73,9 +73,9 @@ fn diagnostic_warning(message: &str, primary: Span) -> Diagnostic:
         origin_line: 0,
         origin_node: 0,
         primary,
-        labels: Vec.new(),
-        notes: Vec.new(),
-        helps: Vec.new(),
+        labels: List.new(),
+        notes: List.new(),
+        helps: List.new(),
     }
 
 fn Diagnostic.err(message: &str, span: Span) -> Diagnostic:
@@ -101,8 +101,8 @@ impl Diagnostic:
     mut fn add_help(text: &str): self.helps.push(diagnostic_owned_text(text))
 
     fn render(source: &Source):
-        let no_paths: Vec[str] = Vec.new()
-        let no_texts: Vec[str] = Vec.new()
+        let no_paths: List[str] = List.new()
+        let no_texts: List[str] = List.new()
         self.render_with_label_sources(source, &no_paths, &no_texts)
 
     // Render with the primary span shifted back into an original file's
@@ -110,17 +110,17 @@ impl Diagnostic:
     // mutated copy: copying a Diagnostic out of a stored list aliases its
     // label/note buffers and double-frees on drop (#715 class).
     fn render_at_offset(source: &Source, gen_start: i32):
-        let no_paths: Vec[str] = Vec.new()
-        let no_texts: Vec[str] = Vec.new()
+        let no_paths: List[str] = List.new()
+        let no_texts: List[str] = List.new()
         self.render_with_label_sources_at_offset(source, &no_paths, &no_texts, gen_start)
 
     // #670: a label whose span lives in another file must resolve line/col
     // against THAT file's text and say which file it is. label_paths/label_texts
     // are parallel to labels; an empty path means "same file as the primary".
-    fn render_with_label_sources(source: &Source, label_paths: &Vec[str], label_texts: &Vec[str]):
+    fn render_with_label_sources(source: &Source, label_paths: &List[str], label_texts: &List[str]):
         self.render_with_label_sources_at_offset(source, label_paths, label_texts, 0)
 
-    fn render_with_label_sources_at_offset(source: &Source, label_paths: &Vec[str], label_texts: &Vec[str], gen_start: i32):
+    fn render_with_label_sources_at_offset(source: &Source, label_paths: &List[str], label_texts: &List[str], gen_start: i32):
         var pstart = self.primary.start - gen_start
         if pstart < 0:
             pstart = 0
@@ -161,12 +161,12 @@ impl Diagnostic:
             with_eprint(render_diag_help_line(help))
 
 pub type DiagnosticList {
-    items: Vec[Diagnostic],
+    items: List[Diagnostic],
 }
 
 fn DiagnosticList.init -> DiagnosticList:
     DiagnosticList {
-        items: Vec.new(),
+        items: List.new(),
     }
 
 // No-op: reserved for future manual memory management.
@@ -196,7 +196,7 @@ impl DiagnosticList:
     // work order is not the program's (bodies checked callee first, or in
     // parallel) reports in the program's order.
     mut fn sort_from(start: i32):
-        var rest: Vec[Diagnostic] = Vec.new()
+        var rest: List[Diagnostic] = List.new()
         while self.items.len() as i32 > start:
             rest.push(self.items.remove(start))
         while rest.len() > 0:

@@ -118,7 +118,7 @@ enum ComptimeControlKind: i32:
 // stopped it when that is not a value.
 type ComptimeComprehension {
     signal: ComptimeControl,
-    elems: Vec[ComptimeValue],
+    elems: List[ComptimeValue],
 }
 
 type ComptimeControl {
@@ -136,15 +136,15 @@ type ComptimeCapabilityRecord {
     project_root: str,
     workspace_id: i32,
     target_name: str,
-    inputs: Vec[str],
-    outputs: Vec[str],
-    args: Vec[str],
-    write_scope: Vec[str],
+    inputs: List[str],
+    outputs: List[str],
+    args: List[str],
+    write_scope: List[str],
     write_scoped: i32,
     scratch_path: str,
     timeout_ms: i32,
     cwd: str,
-    env: Vec[str],
+    env: List[str],
     network: i32,
 }
 
@@ -157,16 +157,16 @@ type ComptimeArchiveEntry {
 
 type ComptimeWorkspaceRecord {
     name: str,
-    files: Vec[str],
-    string_names: Vec[str],
-    string_sources: Vec[str],
+    files: List[str],
+    string_names: List[str],
+    string_sources: List[str],
     options: ComptimeValue,
     migrate_options: ComptimeValue,
     intercept_active: i32,
     intercept_terminal: i32,
     generation: i32,
     intercept_phase: i32,
-    messages: Vec[ComptimeValue],
+    messages: List[ComptimeValue],
     message_cursor: i32,
     intercept_started: i32,
     pending_link_active: i32,
@@ -180,7 +180,7 @@ type ComptimeWorkspaceRecord {
 
 type ComptimeWorkspaceCompileResult {
     result: ComptimeValue,
-    messages: Vec[ComptimeValue],
+    messages: List[ComptimeValue],
 }
 
 type ComptimeWorkspaceCompilePlan {
@@ -191,12 +191,12 @@ type ComptimeWorkspaceCompilePlan {
     absolute_output: str,
     output_kind: i32,
     has_strings: i32,
-    source_paths: Vec[str],
-    source_texts: Vec[str],
+    source_paths: List[str],
+    source_texts: List[str],
     absolute_source: str,
-    include_paths: Vec[str],
-    defines: Vec[str],
-    link_libs: Vec[str],
+    include_paths: List[str],
+    defines: List[str],
+    link_libs: List[str],
     opt_level: i32,
     no_std: bool,
     alloc_mode: bool,
@@ -207,9 +207,9 @@ type ComptimeWorkspaceCompilePlan {
     overflow_mode: i32,
     migrate_is_dir: i32,
     migrate_source: str,
-    migrate_include_paths: Vec[str],
-    migrate_forced_includes: Vec[str],
-    migrate_defines: Vec[str],
+    migrate_include_paths: List[str],
+    migrate_forced_includes: List[str],
+    migrate_defines: List[str],
     migrate_exclude_basenames: str,
     migrate_no_c_export: bool,
     migrate_c_export_functions: bool,
@@ -234,37 +234,37 @@ type ComptimeLineColumn {
 }
 
 type ComptimeGenericSubstSnapshot {
-    tp_syms: Vec[i32],
-    saved_named_had: Vec[i32],
-    saved_named_tys: Vec[i32],
-    saved_subst_syms: Vec[i32],
-    saved_subst_tys: Vec[i32],
+    tp_syms: List[i32],
+    saved_named_had: List[i32],
+    saved_named_tys: List[i32],
+    saved_subst_syms: List[i32],
+    saved_subst_tys: List[i32],
 }
 
 type ComptimeGenericResolvedArgs {
     ok: i32,
-    tp_syms: Vec[i32],
-    tp_tys: Vec[i32],
+    tp_syms: List[i32],
+    tp_tys: List[i32],
 }
 
 type ComptimeEvaluator {
     sema: Sema,
     ast: AstPool,
     pool: InternPool,
-    slot_syms: Vec[i32],
-    slot_values: Vec[ComptimeValue],
-    slot_muts: Vec[i32],
-    scope_starts: Vec[i32],
-    loop_labels: Vec[i32],
-    extra_values: Vec[ComptimeValue],
-    active_global_syms: Vec[i32],
-    active_fn_syms: Vec[i32],
-    capability_records: Vec[ComptimeCapabilityRecord],
+    slot_syms: List[i32],
+    slot_values: List[ComptimeValue],
+    slot_muts: List[i32],
+    scope_starts: List[i32],
+    loop_labels: List[i32],
+    extra_values: List[ComptimeValue],
+    active_global_syms: List[i32],
+    active_fn_syms: List[i32],
+    capability_records: List[ComptimeCapabilityRecord],
     // #679: decl_node -> decl index, precomputed once — every interpreted
     // call resolved its module context via an O(decls) linear scan (3-4
     // per call), the dominant cost of action-heavy comptime evaluation.
     decl_index_by_node: HashMap[i32, i32],
-    workspace_records: Vec[ComptimeWorkspaceRecord],
+    workspace_records: List[ComptimeWorkspaceRecord],
     current_workspace_id: i32,
     next_capability_generation: i32,
     steps: i32,
@@ -275,7 +275,7 @@ type ComptimeEvaluator {
     // its index from the value header (#1944): a push appends in place and a
     // read never clones the contents. A chunk-per-push chain cost three
     // allocations per byte and never released one until the evaluator did.
-    builders: Vec[StringBuilder],
+    builders: List[StringBuilder],
     source_text_cache_path: str,
     source_text_cache: str,
     recursion_limit: i32,
@@ -285,11 +285,11 @@ type ComptimeEvaluator {
     last_error_msg: str,
     runtime_exit_code: i32,
     runtime_stderr: str,
-    runtime_env_names: Vec[str],
-    runtime_env_values: Vec[str],
-    effect_records: Vec[str],
-    tool_identity_paths: Vec[str],
-    tool_identity_values: Vec[str],
+    runtime_env_names: List[str],
+    runtime_env_values: List[str],
+    effect_records: List[str],
+    tool_identity_paths: List[str],
+    tool_identity_values: List[str],
     strict_effects: i32,
     // >0 while a D21 Unit-returning mutator pipeline stage is evaluating.
     // Collection evaluators still perform their ordinary rebind, but expose
@@ -297,9 +297,9 @@ type ComptimeEvaluator {
     pipeline_receiver_carrier_depth: i32,
     // #2220: the type a site demands of the expression being evaluated (Law
     // 2's demand, in the evaluator). Top-level folding runs before Sema, so
-    // typed_expr_types is empty and `Vec.new()` under `var v: Vec[i32] =`
+    // typed_expr_types is empty and `List.new()` under `var v: List[i32] =`
     // saw only the generic base; the annotation is the demand that binds it.
-    expected_types: Vec[i32],
+    expected_types: List[i32],
     // Top-level comptime folding precedes Sema, so D21 carrier roots cannot
     // rely only on Sema.pipeline_carrier_kinds. Record the root established by
     // each evaluated carrier stage for the next stage in the same chain.
@@ -322,11 +322,11 @@ type ComptimeEvaluator {
 
 pub type ComptimeEvalResult {
     value: ComptimeValue,
-    extras: Vec[ComptimeValue],
+    extras: List[ComptimeValue],
     error_msg: str,
     runtime_exit_code: i32,
     runtime_stderr: str,
-    effect_records: Vec[str],
+    effect_records: List[str],
 }
 
 type ComptimeSourceLoc {
@@ -365,24 +365,24 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
         sema,
         ast,
         pool,
-        slot_syms: Vec.new(),
-        slot_values: Vec.new(),
-        slot_muts: Vec.new(),
-        scope_starts: Vec.new(),
-        loop_labels: Vec.new(),
-        extra_values: Vec.new(),
-        active_global_syms: Vec.new(),
-        active_fn_syms: Vec.new(),
-        capability_records: Vec.new(),
+        slot_syms: List.new(),
+        slot_values: List.new(),
+        slot_muts: List.new(),
+        scope_starts: List.new(),
+        loop_labels: List.new(),
+        extra_values: List.new(),
+        active_global_syms: List.new(),
+        active_fn_syms: List.new(),
+        capability_records: List.new(),
         decl_index_by_node,
-        workspace_records: Vec.new(),
+        workspace_records: List.new(),
         current_workspace_id: -1,
         next_capability_generation: 1,
         steps: 0,
         step_budget: COMPTIME_STEP_LIMIT,
         string_bytes_allocated: 0,
         string_byte_budget: comptime_configured_string_budget(COMPTIME_STRING_BYTE_BUDGET),
-        builders: Vec.new(),
+        builders: List.new(),
         source_text_cache_path: "",
         source_text_cache: "",
         recursion_limit: COMPTIME_RECURSION_LIMIT,
@@ -392,14 +392,14 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
         last_error_msg: "",
         runtime_exit_code: 0,
         runtime_stderr: "",
-        runtime_env_names: Vec.new(),
-        runtime_env_values: Vec.new(),
-        effect_records: Vec.new(),
-        tool_identity_paths: Vec.new(),
-        tool_identity_values: Vec.new(),
+        runtime_env_names: List.new(),
+        runtime_env_values: List.new(),
+        effect_records: List.new(),
+        tool_identity_paths: List.new(),
+        tool_identity_values: List.new(),
         strict_effects: 0,
         pipeline_receiver_carrier_depth: 0,
-        expected_types: Vec.new(),
+        expected_types: List.new(),
         pipeline_receiver_carrier_roots: HashMap.new(),
         last_call_has_mut_receiver: 0,
         last_call_mut_receiver: comptime_value_invalid(),
@@ -521,7 +521,7 @@ fn comptime_tool_join(root: &str, path: &str) -> str:
         return root ++ path
     root ++ "/" ++ path
 
-fn comptime_tool_path_push_part(parts: Vec[str], part: &str, is_absolute: bool, root_parts: i32) -> Vec[str]:
+fn comptime_tool_path_push_part(parts: List[str], part: &str, is_absolute: bool, root_parts: i32) -> List[str]:
     var out = parts
     if part == ".":
         return out
@@ -538,7 +538,7 @@ fn comptime_tool_path_push_part(parts: Vec[str], part: &str, is_absolute: bool, 
 fn comptime_tool_path_normalize(path: &str) -> str:
     if path.len() == 0:
         return "."
-    var parts: Vec[str] = Vec.new()
+    var parts: List[str] = List.new()
     var start = 0
     let is_absolute = runtime_path_is_absolute(path)
     let root_parts = runtime_path_root_part_count(path)
@@ -581,8 +581,8 @@ fn comptime_os_error_message(code: i32) -> str:
     let text = unsafe { strerror(code) }
     with_str_from_cstr(text as *const u8) ++ f" (os error {code})"
 
-fn comptime_tool_split_nonempty_lines(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn comptime_tool_split_nonempty_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     var start = 0
     for i in 0..text.len() as i32:
         if text[i] == 10:
@@ -672,7 +672,7 @@ fn comptime_tar_sum(data: &str) -> i64:
 // it (#1915: the evaluator wrote stored blocks, a 157 MB Windows toolchain
 // where the runner wrote 22.5 MB). "" when zlib fails.
 fn comptime_gzip_deflate(data: &str) -> str:
-    let bytes: Vec[u8] = Vec.with_capacity(data.len())
+    let bytes: List[u8] = List.with_capacity(data.len())
     for i in 0..data.len(): bytes.push(data[i] as u8)
     match compress_gzip(&bytes):
         .Ok(packed) =>
@@ -1050,8 +1050,8 @@ unsafe fn comptime_tar_extract_file_payload(fd: i32, resolved_file: &str, output
         return comptime_tar_extract_fail("could not close file entry: " ++ output_path)
     0
 
-fn comptime_glob_split_by_slash(path: &str) -> Vec[str]:
-    let parts: Vec[str] = Vec.new()
+fn comptime_glob_split_by_slash(path: &str) -> List[str]:
+    let parts: List[str] = List.new()
     var start = 0
     for i in 0..path.len() as i32:
         let ch = path[i]
@@ -1084,7 +1084,7 @@ fn comptime_glob_segment_matches(pattern: &str, name: &str) -> bool:
             return false
     true
 
-fn comptime_glob_segments_match(pat_segs: &Vec[str], pi: i32, file_segs: &Vec[str], fi: i32) -> bool:
+fn comptime_glob_segments_match(pat_segs: &List[str], pi: i32, file_segs: &List[str], fi: i32) -> bool:
     if pi >= pat_segs.len() as i32:
         return fi >= file_segs.len() as i32
     let seg = pat_segs[pi]
@@ -1116,12 +1116,12 @@ fn comptime_glob_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
-fn comptime_glob_sort(items: &Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
+fn comptime_glob_sort(items: &List[str]) -> List[str]:
+    var sorted: List[str] = List.new()
     for i in 0..items.len() as i32:
         let item = items[i]
         var inserted = false
-        var out: Vec[str] = Vec.new()
+        var out: List[str] = List.new()
         for j in 0..sorted.len() as i32:
             let existing = sorted[j]
             if not inserted and comptime_glob_str_compare(item, existing) < 0:
@@ -1136,11 +1136,11 @@ fn comptime_glob_sort(items: &Vec[str]) -> Vec[str]:
 fn comptime_eval_result_invalid() -> ComptimeEvalResult:
     ComptimeEvalResult {
         value: comptime_value_invalid(),
-        extras: Vec.new(),
+        extras: List.new(),
         error_msg: "",
         runtime_exit_code: 0,
         runtime_stderr: "",
-        effect_records: Vec.new(),
+        effect_records: List.new(),
     }
 
 // Consumes the evaluator: this drains its owned state (extras, effect
@@ -1178,15 +1178,15 @@ fn comptime_capability_record(kind: i32, package_name: &str, package_version: &s
         project_root: with_str_clone_ref(project_root),
         workspace_id: -1,
         target_name: "",
-        inputs: Vec.new(),
-        outputs: Vec.new(),
-        args: Vec.new(),
-        write_scope: Vec.new(),
+        inputs: List.new(),
+        outputs: List.new(),
+        args: List.new(),
+        write_scope: List.new(),
         write_scoped: 0,
         scratch_path: "",
         timeout_ms: 0,
         cwd: "",
-        env: Vec.new(),
+        env: List.new(),
         network: 0,
     }
 
@@ -1206,13 +1206,13 @@ fn comptime_safe_label(text: &str) -> str:
 fn comptime_action_scratch_dir(target_name: &str) -> str:
     "out/tmp/action-scratch/" ++ comptime_safe_label(target_name)
 
-fn ce_clone_str_vec(values: &Vec[str]) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ce_clone_str_list(values: &List[str]) -> List[str]:
+    let out: List[str] = List.new()
     for i in 0..values.len() as i32:
         out.push(with_str_clone_ref(values[i]))
     out
 
-// A record read out of capability_records is a bitwise copy: its five Vec[str]
+// A record read out of capability_records is a bitwise copy: its five List[str]
 // fields alias the stored element's buffers. Anything that RETAINS a record
 // (mint_capability, workspace minting) must own an independent copy.
 fn ce_clone_capability_record(r: &ComptimeCapabilityRecord) -> ComptimeCapabilityRecord:
@@ -1224,26 +1224,26 @@ fn ce_clone_capability_record(r: &ComptimeCapabilityRecord) -> ComptimeCapabilit
         project_root: with_str_clone_ref(r.project_root),
         workspace_id: r.workspace_id,
         target_name: with_str_clone_ref(r.target_name),
-        inputs: ce_clone_str_vec(&r.inputs),
-        outputs: ce_clone_str_vec(&r.outputs),
-        args: ce_clone_str_vec(&r.args),
-        write_scope: ce_clone_str_vec(&r.write_scope),
+        inputs: ce_clone_str_list(&r.inputs),
+        outputs: ce_clone_str_list(&r.outputs),
+        args: ce_clone_str_list(&r.args),
+        write_scope: ce_clone_str_list(&r.write_scope),
         write_scoped: r.write_scoped,
         scratch_path: with_str_clone_ref(r.scratch_path),
         timeout_ms: r.timeout_ms,
         cwd: with_str_clone_ref(r.cwd),
-        env: ce_clone_str_vec(&r.env),
+        env: ce_clone_str_list(&r.env),
         network: r.network,
     }
 
-fn ce_clone_value_vec(values: &Vec[ComptimeValue]) -> Vec[ComptimeValue]:
-    let out: Vec[ComptimeValue] = Vec.new()
+fn ce_clone_value_list(values: &List[ComptimeValue]) -> List[ComptimeValue]:
+    let out: List[ComptimeValue] = List.new()
     for i in 0..values.len() as i32:
         out.push(comptime_value_clone(values[i]))
     out
 
-fn ce_clone_link_env_vec(values: &Vec[LinkStageEnvVar]) -> Vec[LinkStageEnvVar]:
-    let out: Vec[LinkStageEnvVar] = Vec.new()
+fn ce_clone_link_env_list(values: &List[LinkStageEnvVar]) -> List[LinkStageEnvVar]:
+    let out: List[LinkStageEnvVar] = List.new()
     for i in 0..values.len() as i32:
         let e = &values[i]
         out.push(LinkStageEnvVar { name: with_str_clone_ref(e.name), value: with_str_clone_ref(e.value) })
@@ -1252,12 +1252,12 @@ fn ce_clone_link_env_vec(values: &Vec[LinkStageEnvVar]) -> Vec[LinkStageEnvVar]:
 fn ce_clone_link_command(c: &LinkStageCommand) -> LinkStageCommand:
     LinkStageCommand {
         linker: with_str_clone_ref(c.linker),
-        args: ce_clone_str_vec(&c.args),
+        args: ce_clone_str_list(&c.args),
         cwd: with_str_clone_ref(c.cwd),
-        env: ce_clone_link_env_vec(&c.env),
-        inputs: ce_clone_str_vec(&c.inputs),
-        outputs: ce_clone_str_vec(&c.outputs),
-        cleanup_files: ce_clone_str_vec(&c.cleanup_files),
+        env: ce_clone_link_env_list(&c.env),
+        inputs: ce_clone_str_list(&c.inputs),
+        outputs: ce_clone_str_list(&c.outputs),
+        cleanup_files: ce_clone_str_list(&c.cleanup_files),
     }
 
 // Independent deep clone: every workspace-record read below goes through
@@ -1266,16 +1266,16 @@ fn ce_clone_link_command(c: &LinkStageCommand) -> LinkStageCommand:
 fn ce_clone_workspace_record(r: &ComptimeWorkspaceRecord) -> ComptimeWorkspaceRecord:
     ComptimeWorkspaceRecord {
         name: with_str_clone_ref(r.name),
-        files: ce_clone_str_vec(&r.files),
-        string_names: ce_clone_str_vec(&r.string_names),
-        string_sources: ce_clone_str_vec(&r.string_sources),
+        files: ce_clone_str_list(&r.files),
+        string_names: ce_clone_str_list(&r.string_names),
+        string_sources: ce_clone_str_list(&r.string_sources),
         options: comptime_value_clone(r.options),
         migrate_options: comptime_value_clone(r.migrate_options),
         intercept_active: r.intercept_active,
         intercept_terminal: r.intercept_terminal,
         generation: r.generation,
         intercept_phase: r.intercept_phase,
-        messages: ce_clone_value_vec(&r.messages),
+        messages: ce_clone_value_list(&r.messages),
         message_cursor: r.message_cursor,
         intercept_started: r.intercept_started,
         pending_link_active: r.pending_link_active,
@@ -1288,7 +1288,7 @@ fn ce_clone_workspace_record(r: &ComptimeWorkspaceRecord) -> ComptimeWorkspaceRe
     }
 
 // Independent deep clone: thread jobs and the consuming executor own
-// their plan; a bare element copy would share every Vec buffer with the
+// their plan; a bare element copy would share every List buffer with the
 // plans vec still held by the results loop (parallel-multi double free).
 fn ce_clone_compile_plan(p: &ComptimeWorkspaceCompilePlan) -> ComptimeWorkspaceCompilePlan:
     ComptimeWorkspaceCompilePlan {
@@ -1299,12 +1299,12 @@ fn ce_clone_compile_plan(p: &ComptimeWorkspaceCompilePlan) -> ComptimeWorkspaceC
         absolute_output: with_str_clone_ref(p.absolute_output),
         output_kind: p.output_kind,
         has_strings: p.has_strings,
-        source_paths: ce_clone_str_vec(&p.source_paths),
-        source_texts: ce_clone_str_vec(&p.source_texts),
+        source_paths: ce_clone_str_list(&p.source_paths),
+        source_texts: ce_clone_str_list(&p.source_texts),
         absolute_source: with_str_clone_ref(p.absolute_source),
-        include_paths: ce_clone_str_vec(&p.include_paths),
-        defines: ce_clone_str_vec(&p.defines),
-        link_libs: ce_clone_str_vec(&p.link_libs),
+        include_paths: ce_clone_str_list(&p.include_paths),
+        defines: ce_clone_str_list(&p.defines),
+        link_libs: ce_clone_str_list(&p.link_libs),
         opt_level: p.opt_level,
         no_std: p.no_std,
         alloc_mode: p.alloc_mode,
@@ -1315,9 +1315,9 @@ fn ce_clone_compile_plan(p: &ComptimeWorkspaceCompilePlan) -> ComptimeWorkspaceC
         overflow_mode: p.overflow_mode,
         migrate_is_dir: p.migrate_is_dir,
         migrate_source: with_str_clone_ref(p.migrate_source),
-        migrate_include_paths: ce_clone_str_vec(&p.migrate_include_paths),
-        migrate_forced_includes: ce_clone_str_vec(&p.migrate_forced_includes),
-        migrate_defines: ce_clone_str_vec(&p.migrate_defines),
+        migrate_include_paths: ce_clone_str_list(&p.migrate_include_paths),
+        migrate_forced_includes: ce_clone_str_list(&p.migrate_forced_includes),
+        migrate_defines: ce_clone_str_list(&p.migrate_defines),
         migrate_exclude_basenames: with_str_clone_ref(p.migrate_exclude_basenames),
         migrate_no_c_export: p.migrate_no_c_export,
         migrate_c_export_functions: p.migrate_c_export_functions,
@@ -1354,7 +1354,7 @@ fn cpp_put_int(out: &str, v: i32) -> str: out ++ f"{v}\n"
 
 fn cpp_put_str(out: &str, s: &str) -> str: out ++ f"{s.len()}\n" ++ s ++ "\n"
 
-fn cpp_put_vec(out: &str, v: &Vec[str]) -> str:
+fn cpp_put_list(out: &str, v: &List[str]) -> str:
     var acc = out ++ f"{v.len() as i32}\n"
     for i in 0..v.len() as i32:
         acc = cpp_put_str(acc, v[i])
@@ -1374,12 +1374,12 @@ fn comptime_plan_serialize(p: &ComptimeWorkspaceCompilePlan) -> str:
     out = cpp_put_str(out, p.absolute_output)
     out = cpp_put_int(out, p.output_kind)
     out = cpp_put_int(out, p.has_strings)
-    out = cpp_put_vec(out, &p.source_paths)
-    out = cpp_put_vec(out, &p.source_texts)
+    out = cpp_put_list(out, &p.source_paths)
+    out = cpp_put_list(out, &p.source_texts)
     out = cpp_put_str(out, p.absolute_source)
-    out = cpp_put_vec(out, &p.include_paths)
-    out = cpp_put_vec(out, &p.defines)
-    out = cpp_put_vec(out, &p.link_libs)
+    out = cpp_put_list(out, &p.include_paths)
+    out = cpp_put_list(out, &p.defines)
+    out = cpp_put_list(out, &p.link_libs)
     out = cpp_put_int(out, p.opt_level)
     out = cpp_put_bool(out, p.no_std)
     out = cpp_put_bool(out, p.alloc_mode)
@@ -1390,9 +1390,9 @@ fn comptime_plan_serialize(p: &ComptimeWorkspaceCompilePlan) -> str:
     out = cpp_put_int(out, p.overflow_mode)
     out = cpp_put_int(out, p.migrate_is_dir)
     out = cpp_put_str(out, p.migrate_source)
-    out = cpp_put_vec(out, &p.migrate_include_paths)
-    out = cpp_put_vec(out, &p.migrate_forced_includes)
-    out = cpp_put_vec(out, &p.migrate_defines)
+    out = cpp_put_list(out, &p.migrate_include_paths)
+    out = cpp_put_list(out, &p.migrate_forced_includes)
+    out = cpp_put_list(out, &p.migrate_defines)
     out = cpp_put_str(out, p.migrate_exclude_basenames)
     out = cpp_put_bool(out, p.migrate_no_c_export)
     out = cpp_put_bool(out, p.migrate_c_export_functions)
@@ -1435,8 +1435,8 @@ impl CppCursor:
         self.pos = self.pos + want as i64 + 1
         s
 
-    mut fn next_vec() -> Vec[str]:
-        let out: Vec[str] = Vec.new()
+    mut fn next_list() -> List[str]:
+        let out: List[str] = List.new()
         let count = self.next_int()
         for i in 0..count:
             out.push(self.next_str())
@@ -1453,12 +1453,12 @@ unsafe fn comptime_plan_deserialize(plan_out: *mut ComptimeWorkspaceCompilePlan,
     let absolute_output = c.next_str()
     let output_kind = c.next_int()
     let has_strings = c.next_int()
-    let source_paths = c.next_vec()
-    let source_texts = c.next_vec()
+    let source_paths = c.next_list()
+    let source_texts = c.next_list()
     let absolute_source = c.next_str()
-    let include_paths = c.next_vec()
-    let defines = c.next_vec()
-    let link_libs = c.next_vec()
+    let include_paths = c.next_list()
+    let defines = c.next_list()
+    let link_libs = c.next_list()
     let opt_level = c.next_int()
     let no_std = c.next_bool()
     let alloc_mode = c.next_bool()
@@ -1469,9 +1469,9 @@ unsafe fn comptime_plan_deserialize(plan_out: *mut ComptimeWorkspaceCompilePlan,
     let overflow_mode = c.next_int()
     let migrate_is_dir = c.next_int()
     let migrate_source = c.next_str()
-    let migrate_include_paths = c.next_vec()
-    let migrate_forced_includes = c.next_vec()
-    let migrate_defines = c.next_vec()
+    let migrate_include_paths = c.next_list()
+    let migrate_forced_includes = c.next_list()
+    let migrate_defines = c.next_list()
     let migrate_exclude_basenames = c.next_str()
     let migrate_no_c_export = c.next_bool()
     let migrate_c_export_functions = c.next_bool()
@@ -1547,22 +1547,22 @@ pub fn comptime_workspace_compile_subprocess(plan_path: &str, result_path: &str)
         return 1
     0
 
-fn comptime_action_outputs(output: &str, extra_outputs: &Vec[str]) -> Vec[str]:
-    let outputs: Vec[str] = Vec.new()
+fn comptime_action_outputs(output: &str, extra_outputs: &List[str]) -> List[str]:
+    let outputs: List[str] = List.new()
     if output.len() > 0:
         outputs.push(with_str_clone_ref(output))
     for i in 0..extra_outputs.len() as i32:
         outputs.push(with_str_clone_ref(extra_outputs[i]))
     outputs
 
-fn comptime_action_write_scope(output: &str, extra_outputs: &Vec[str], write_scopes: &Vec[str], scratch_path: &str) -> Vec[str]:
+fn comptime_action_write_scope(output: &str, extra_outputs: &List[str], write_scopes: &List[str], scratch_path: &str) -> List[str]:
     let scopes = comptime_action_outputs(output, extra_outputs)
     for i in 0..write_scopes.len() as i32:
         scopes.push(with_str_clone_ref(write_scopes[i]))
     scopes.push(with_str_clone_ref(scratch_path))
     scopes
 
-fn comptime_action_capability_record(package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: Vec[str], output: &str, extra_outputs: &Vec[str], args: Vec[str], write_scopes: &Vec[str], timeout_ms: i32, cwd: &str, env: Vec[str], network: i32) -> ComptimeCapabilityRecord:
+fn comptime_action_capability_record(package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: List[str], output: &str, extra_outputs: &List[str], args: List[str], write_scopes: &List[str], timeout_ms: i32, cwd: &str, env: List[str], network: i32) -> ComptimeCapabilityRecord:
     let scratch_path = comptime_action_scratch_dir(target_name)
     ComptimeCapabilityRecord {
         kind: CapabilityKind.CK_BUILD_ACTION_CTX,
@@ -1672,7 +1672,7 @@ pub unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool,
         return comptime_eval_finish(sema_ptr, evaluator, comptime_value_invalid())
     let ctx_record = comptime_capability_record(CapabilityKind.CK_BUILD_CTX, package_name, package_version, project_root)
     let ctx_value = evaluator.mint_capability(ctx_type, move ctx_record)
-    let args: Vec[ComptimeValue] = Vec.new()
+    let args: List[ComptimeValue] = List.new()
     args.push(ctx_value)
     var signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
     evaluator.check_workspace_intercepts_finished()
@@ -1684,7 +1684,7 @@ pub unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool,
             comptime_value_invalid()
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-pub unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: Vec[str], output: &str, extra_outputs: &Vec[str], args_values: Vec[str], write_scopes: &Vec[str], timeout_ms: i32, cwd: &str, env: Vec[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
+pub unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: List[str], output: &str, extra_outputs: &List[str], args_values: List[str], write_scopes: &List[str], timeout_ms: i32, cwd: &str, env: List[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
@@ -1699,7 +1699,7 @@ pub unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool
         return comptime_eval_finish(sema_ptr, evaluator, comptime_value_invalid())
     let ctx_record = comptime_action_capability_record(package_name, package_version, project_root, target_name, move inputs, output, extra_outputs, move args_values, write_scopes, timeout_ms, cwd, move env, network)
     let ctx_value = evaluator.mint_capability(ctx_type, move ctx_record)
-    let args: Vec[ComptimeValue] = Vec.new()
+    let args: List[ComptimeValue] = List.new()
     args.push(ctx_value)
     var signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
     evaluator.check_workspace_intercepts_finished()
@@ -1802,14 +1802,14 @@ impl ComptimeEvaluator:
             return 0
         tid
 
-    mut fn empty_vec_for_field(owner_type: i32, field_name: &str, node: i32) -> ComptimeValue:
+    mut fn empty_list_for_field(owner_type: i32, field_name: &str, node: i32) -> ComptimeValue:
         let field_sym = self.pool.intern(field_name) as i32
         let field_index = self.struct_field_index(owner_type, field_sym)
         if field_index < 0:
             let _ = self.fail(node, "missing field '" ++ field_name ++ "' while constructing comptime struct")
             return comptime_value_invalid()
         let field_type = self.sema.type_reflection_field_type(owner_type, field_index)
-        comptime_value_vec(field_type, self.extra_values.len() as i32, 0)
+        comptime_value_list(field_type, self.extra_values.len() as i32, 0)
 
     mut fn unsupported_default_value(type_id: i32, node: i32) -> ComptimeValue:
         let _ = self.fail(node, "implicit default return for " ++ self.sema.type_name(type_id) ++ " is not comptime-evaluable yet")
@@ -1855,8 +1855,8 @@ impl ComptimeEvaluator:
             let base = self.sema.get_generic_inst_base(resolved as i32)
             if base == self.sema.syms.option:
                 return comptime_value_enum(resolved as i32, self.sema.syms.none, self.extra_values.len() as i32, 0)
-            if base == self.sema.syms.vec:
-                return comptime_value_vec(resolved as i32, self.extra_values.len() as i32, 0)
+            if base == self.sema.syms.list:
+                return comptime_value_list(resolved as i32, self.extra_values.len() as i32, 0)
             if base == self.sema.syms.hashmap or base == self.sema.syms.hashset:
                 return comptime_value_map(resolved as i32, self.extra_values.len() as i32, 0)
             let arg_count = self.sema.get_generic_inst_arg_count(resolved as i32)
@@ -1870,7 +1870,7 @@ impl ComptimeEvaluator:
                 return comptime_value_enum(resolved as i32, self.sema.syms.ok, start, 1)
         self.unsupported_default_value(resolved as i32, node)
 
-    fn comptime_fn_return_type(fn_sym: i32, tp_syms: &Vec[i32], tp_tys: &Vec[i32]) -> i32:
+    fn comptime_fn_return_type(fn_sym: i32, tp_syms: &List[i32], tp_tys: &List[i32]) -> i32:
         let sig_idx = self.sema.get_sig(fn_sym)
         if sig_idx < 0:
             return 0
@@ -1879,8 +1879,8 @@ impl ComptimeEvaluator:
             return ret_type
         // Local copies: Sema.substitute_type takes its substitution vectors by
         // value, and the borrowed params must stay usable at the call sites.
-        let subst_syms: Vec[i32] = Vec.new()
-        let subst_tys: Vec[i32] = Vec.new()
+        let subst_syms: List[i32] = List.new()
+        let subst_tys: List[i32] = List.new()
         for i in 0..tp_syms.len() as i32:
             subst_syms.push(tp_syms[i])
             subst_tys.push(tp_tys[i])
@@ -1930,10 +1930,10 @@ impl ComptimeEvaluator:
         let package = self.eval_package_value(record, node)
         if package.kind == ComptimeValueKind.CV_INVALID:
             return package
-        let targets = self.empty_vec_for_field(build_type, "targets", node)
+        let targets = self.empty_list_for_field(build_type, "targets", node)
         if targets.kind == ComptimeValueKind.CV_INVALID:
             return targets
-        let generated_sources = self.empty_vec_for_field(build_type, "generated_sources", node)
+        let generated_sources = self.empty_list_for_field(build_type, "generated_sources", node)
         if generated_sources.kind == ComptimeValueKind.CV_INVALID:
             return generated_sources
         let start = self.extra_values.len() as i32
@@ -1952,9 +1952,9 @@ impl ComptimeEvaluator:
         let target_type = self.named_type_id("BuildTarget", node)
         if output_kind_type == 0 or prelude_mode_type == 0 or target_type == 0:
             return comptime_value_invalid()
-        let include_paths = self.empty_vec_for_field(options_type, "include_paths", node)
-        let defines = self.empty_vec_for_field(options_type, "defines", node)
-        let link_libs = self.empty_vec_for_field(options_type, "link_libs", node)
+        let include_paths = self.empty_list_for_field(options_type, "include_paths", node)
+        let defines = self.empty_list_for_field(options_type, "defines", node)
+        let link_libs = self.empty_list_for_field(options_type, "link_libs", node)
         if include_paths.kind == ComptimeValueKind.CV_INVALID or defines.kind == ComptimeValueKind.CV_INVALID or link_libs.kind == ComptimeValueKind.CV_INVALID:
             return comptime_value_invalid()
         let start = self.extra_values.len() as i32
@@ -1978,10 +1978,10 @@ impl ComptimeEvaluator:
         let options_type = self.named_type_id("MigrateOptions", node)
         if options_type == 0:
             return comptime_value_invalid()
-        let include_paths = self.empty_vec_for_field(options_type, "include_paths", node)
-        let forced_includes = self.empty_vec_for_field(options_type, "forced_includes", node)
-        let defines = self.empty_vec_for_field(options_type, "defines", node)
-        let exclude_basenames = self.empty_vec_for_field(options_type, "exclude_basenames", node)
+        let include_paths = self.empty_list_for_field(options_type, "include_paths", node)
+        let forced_includes = self.empty_list_for_field(options_type, "forced_includes", node)
+        let defines = self.empty_list_for_field(options_type, "defines", node)
+        let exclude_basenames = self.empty_list_for_field(options_type, "exclude_basenames", node)
         if include_paths.kind == ComptimeValueKind.CV_INVALID or forced_includes.kind == ComptimeValueKind.CV_INVALID or defines.kind == ComptimeValueKind.CV_INVALID or exclude_basenames.kind == ComptimeValueKind.CV_INVALID:
             return comptime_value_invalid()
         let start = self.extra_values.len() as i32
@@ -2008,16 +2008,16 @@ impl ComptimeEvaluator:
     mut fn new_workspace_record(name: &str, node: i32) -> ComptimeWorkspaceRecord:
         ComptimeWorkspaceRecord {
             name: with_str_clone_ref(name),
-            files: Vec.new(),
-            string_names: Vec.new(),
-            string_sources: Vec.new(),
+            files: List.new(),
+            string_names: List.new(),
+            string_sources: List.new(),
             options: self.default_build_options_value(node),
             migrate_options: self.default_migrate_options_value(node),
             intercept_active: 0,
             intercept_terminal: 0,
             generation: 0,
             intercept_phase: -1,
-            messages: Vec.new(),
+            messages: List.new(),
             message_cursor: 0,
             intercept_started: 0,
             pending_link_active: 0,
@@ -2135,14 +2135,14 @@ impl ComptimeEvaluator:
     // (build_cache_record). A read inside the action's own write scope is of
     // what it wrote, and build(ctx)'s reads (no write scope, or a worker's
     // graph reconstruction) are the graph's. The path is recorded unescaped:
-    // records reach the driver as a Vec, never as lines. Twin of
+    // records reach the driver as a List, never as lines. Twin of
     // ToolFs.record_read in lib/std/build.w.
     mut fn record_read_effect(record: &ComptimeCapabilityRecord, resolved: &str):
         if record.write_scoped == 0 or self.suppress_toolfs_writes != 0: return
         if self.capability_write_file_allowed(record, self.capability_project_relative_path(record, resolved)): return
         self.record_effect("read\t" ++ resolved)
 
-fn comptime_effect_join_argv_parts(parts: &Vec[str]) -> str:
+fn comptime_effect_join_argv_parts(parts: &List[str]) -> str:
     var out = ""
     for i in 0..parts.len() as i32:
         if i > 0:
@@ -2163,9 +2163,9 @@ fn comptime_process_requires_network(exe: &str) -> bool:
     name == "curl" or name == "curl.exe" or name == "wget" or name == "wget.exe" or name == "https_fetch" or name == "https_fetch.exe"
 
 impl ComptimeEvaluator:
-    fn effect_argv_parts_from_value(value: &ComptimeValue) -> Vec[str]:
-        let parts: Vec[str] = Vec.new()
-        if value.kind != ComptimeValueKind.CV_VEC and value.kind != ComptimeValueKind.CV_ARRAY:
+    fn effect_argv_parts_from_value(value: &ComptimeValue) -> List[str]:
+        let parts: List[str] = List.new()
+        if value.kind != ComptimeValueKind.CV_LIST and value.kind != ComptimeValueKind.CV_ARRAY:
             return parts
         for i in 0..value.extra_count:
             let item = self.extra_value_at((value.extra_start + i) as i64)
@@ -2173,7 +2173,7 @@ impl ComptimeEvaluator:
                 parts.push(with_str_clone_ref(item.text))
         parts
 
-    fn effect_tool_identity(parts: &Vec[str]) -> str:
+    fn effect_tool_identity(parts: &List[str]) -> str:
         if parts.len() == 0:
             return ""
         let exe = parts[0]
@@ -2223,7 +2223,7 @@ impl ComptimeEvaluator:
         if value.kind != ComptimeValueKind.CV_STRUCT:
             return ""
         let vars = self.struct_field_value_by_name(value, "vars")
-        if vars.kind != ComptimeValueKind.CV_VEC and vars.kind != ComptimeValueKind.CV_ARRAY:
+        if vars.kind != ComptimeValueKind.CV_LIST and vars.kind != ComptimeValueKind.CV_ARRAY:
             return ""
         var out = ""
         for i in 0..vars.extra_count:
@@ -2236,7 +2236,7 @@ impl ComptimeEvaluator:
                 out = out ++ comptime_effect_escape(name.text) ++ ":" ++ comptime_sha256_text(env_value.text)
         out
 
-    mut fn record_process_effect(record: &ComptimeCapabilityRecord, method: &str, parts: &Vec[str], cwd: &str, timeout_ms: i32, stdin_path: &str, stdout_path: &str, stderr_path: &str, env_text: &str):
+    mut fn record_process_effect(record: &ComptimeCapabilityRecord, method: &str, parts: &List[str], cwd: &str, timeout_ms: i32, stdin_path: &str, stdout_path: &str, stderr_path: &str, env_text: &str):
         if self.strict_effects != 0 and record.inputs.len() == 0 and record.outputs.len() == 0:
             let _ = self.fail(0, "ProcessRunner." ++ method ++ " affects build output but has no declared action inputs or outputs in strict mode")
             return
@@ -2254,7 +2254,7 @@ impl ComptimeEvaluator:
         line = line ++ "\ttool=" ++ self.effect_tool_identity(parts)
         self.record_effect(line)
 
-    mut fn require_network_tool_allowed(record: &ComptimeCapabilityRecord, method: &str, parts: &Vec[str], node: i32) -> i32:
+    mut fn require_network_tool_allowed(record: &ComptimeCapabilityRecord, method: &str, parts: &List[str], node: i32) -> i32:
         if parts.len() == 0:
             return 0
         let exe = parts[0]
@@ -2460,7 +2460,7 @@ impl ComptimeEvaluator:
             self.extra_values.push(self.extra_snapshot_value_at((start + i) as i64))
         new_start
 
-    fn copy_vec_snapshot(value: &ComptimeValue) -> i32:
+    fn copy_list_snapshot(value: &ComptimeValue) -> i32:
         self.copy_extra_slice(value.extra_start, value.extra_count)
 
     fn copy_map_snapshot(value: &ComptimeValue) -> i32:
@@ -2515,15 +2515,15 @@ impl ComptimeEvaluator:
             return comptime_control_error()
         comptime_control_value(comptime_value_str(lhs ++ rhs))
 
-    mut fn concat_comptime_string_parts(node: i32, parts: &Vec[str]) -> ComptimeControl:
+    mut fn concat_comptime_string_parts(node: i32, parts: &List[str]) -> ComptimeControl:
         var total: i64 = 0
         for i in 0..parts.len() as i32:
             total = total + parts[i].len()
         if self.reserve_string_bytes(node, total) == 0:
             return comptime_control_error()
-        // Vec's fields are std's (D100): the runtime hands back the first
+        // List's fields are std's (D100): the runtime hands back the first
         // element's address, bounds-checked.
-        let parts_ptr = if parts.len() == 0: 0 as *const str else: with_vec_get_ptr(parts as *const Vec[str] as *mut u8, 0) as *const str
+        let parts_ptr = if parts.len() == 0: 0 as *const str else: with_vec_get_ptr(parts as *const List[str] as *mut u8, 0) as *const str
         comptime_control_value(comptime_value_str(with_str_concat_n(parts_ptr, parts.len())))
 
     mut fn is_string_builder_type(type_id: i32) -> bool:
@@ -2543,7 +2543,7 @@ impl ComptimeEvaluator:
         let field_type = self.sema.resolve_alias(self.sema.type_reflection_field_type(type_id, field_index) as TypeId)
         if self.sema.get_type_kind(field_type) != TypeKind.TY_GENERIC_INST:
             return false
-        if self.sema.get_generic_inst_base(field_type as i32) != self.sema.syms.vec:
+        if self.sema.get_generic_inst_base(field_type as i32) != self.sema.syms.list:
             return false
         self.sema.get_generic_inst_arg(field_type as i32, 0) == self.sema.ty_u8 as i32
 
@@ -2578,7 +2578,7 @@ impl ComptimeEvaluator:
         if bytes_value.kind == ComptimeValueKind.CV_BYTES:
             let builder = self.empty_string_builder_value(value.type_id, bytes_value.text.len())
             return self.string_builder_append_chunk(builder, bytes_value.text, node)
-        if bytes_value.kind == ComptimeValueKind.CV_VEC:
+        if bytes_value.kind == ComptimeValueKind.CV_LIST:
             if self.reserve_string_bytes(node, bytes_value.extra_count) == 0:
                 return comptime_value_invalid()
             let builder = self.empty_string_builder_value(value.type_id, bytes_value.extra_count)
@@ -2945,7 +2945,7 @@ impl ComptimeEvaluator:
             let arg1 = self.static_type_expr(self.ast.get_data1(node))
             if arg1 == 0:
                 return 0
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             args.push(arg1)
             var arg_count = 1
             if self.ast.get_data2(node) != 0:
@@ -3004,7 +3004,7 @@ impl ComptimeEvaluator:
         let array_tid = self.sema.ensure_exact_type(TypeKind.TY_ARRAY, self.sema.ty_field_info as i32, field_count, 0) as i32
         let arr_start = self.extra_values.len() as i32
         let payload_start = arr_start + field_count
-        let payload_values: Vec[ComptimeValue] = Vec.new()
+        let payload_values: List[ComptimeValue] = List.new()
         for fi in 0..field_count:
             let row_start = payload_start + payload_values.len() as i32
             self.extra_values.push(comptime_value_struct(self.sema.ty_field_info as i32, row_start, 5))
@@ -3024,7 +3024,7 @@ impl ComptimeEvaluator:
         let array_tid = self.sema.ensure_exact_type(TypeKind.TY_ARRAY, self.sema.ty_variant_info as i32, variant_count, 0) as i32
         let arr_start = self.extra_values.len() as i32
         let payload_start = arr_start + variant_count
-        let payload_values: Vec[ComptimeValue] = Vec.new()
+        let payload_values: List[ComptimeValue] = List.new()
         for vi in 0..variant_count:
             let row_start = payload_start + payload_values.len() as i32
             self.extra_values.push(comptime_value_struct(self.sema.ty_variant_info as i32, row_start, 4))
@@ -3048,8 +3048,8 @@ impl ComptimeEvaluator:
             return self.fail(node, "collection.new() has no element type here: comptime folding runs before Sema types the uses, so write the binding's type (`var v: " ++ self.sema.type_name(resolved) ++ "[…] = …`)")
         let type_name = self.sema.type_name(result_type)
         let empty_start = self.extra_values.len() as i32
-        if comptime_type_name_has_base(type_name, "Vec") != 0:
-            return comptime_control_value(comptime_value_vec(result_type, empty_start, 0))
+        if comptime_type_name_has_base(type_name, "List") != 0:
+            return comptime_control_value(comptime_value_list(result_type, empty_start, 0))
         if comptime_type_name_has_base(type_name, "HashMap") != 0:
             return comptime_control_value(comptime_value_map(result_type, empty_start, 0))
         self.fail(node, "static method is not comptime-evaluable yet")
@@ -3058,16 +3058,16 @@ impl ComptimeEvaluator:
         let method = self.pool.resolve(field)
         if method == "len":
             if arg_count != 0:
-                return self.fail(node, "Vec[u8].len() takes no arguments")
+                return self.fail(node, "List[u8].len() takes no arguments")
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), recv_value.text.len()))
         if method == "push":
             if arg_count != 1:
-                return self.fail(node, "Vec[u8].push() expects exactly one argument")
+                return self.fail(node, "List[u8].push() expects exactly one argument")
             let arg_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return arg_signal
             if comptime_value_is_intlike(arg_signal.value) == 0:
-                return self.fail(node, "Vec[u8].push() argument must be an integer")
+                return self.fail(node, "List[u8].push() argument must be an integer")
             let byte_val = comptime_value_intlike(arg_signal.value) as i32
             if self.reserve_string_bytes(node, recv_value.text.len() + 1) == 0:
                 return comptime_control_error()
@@ -3076,12 +3076,12 @@ impl ComptimeEvaluator:
             return self.rebind_collection_receiver(recv_node, updated, node)
         if method == "contains":
             if arg_count != 1:
-                return self.fail(node, "Vec[u8].contains() expects exactly one argument")
+                return self.fail(node, "List[u8].contains() expects exactly one argument")
             let needle_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if needle_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return needle_signal
             if comptime_value_is_intlike(needle_signal.value) == 0:
-                return self.fail(node, "Vec[u8].contains() argument must be an integer")
+                return self.fail(node, "List[u8].contains() argument must be an integer")
             let needle_byte = comptime_value_intlike(needle_signal.value) as i32
             for i in 0..recv_value.text.len():
                 if recv_value.text[i] as i32 == needle_byte:
@@ -3089,10 +3089,10 @@ impl ComptimeEvaluator:
             return comptime_control_value(comptime_value_bool(0))
         if method == "pop":
             if arg_count != 0:
-                return self.fail(node, "Vec[u8].pop() takes no arguments")
-            let pop_opt_tid = self.vec_option_result_tid(recv_value, node)
+                return self.fail(node, "List[u8].pop() takes no arguments")
+            let pop_opt_tid = self.list_option_result_tid(recv_value, node)
             if pop_opt_tid == 0:
-                return self.fail(node, "Vec[u8].pop() needs a resolved Option type in comptime")
+                return self.fail(node, "List[u8].pop() needs a resolved Option type in comptime")
             if recv_value.text.len() <= 0:
                 return comptime_control_value(comptime_value_enum(pop_opt_tid, self.sema.syms.none, self.extra_values.len() as i32, 0))
             let last_byte = recv_value.text[recv_value.text.len() - 1] as i32
@@ -3108,20 +3108,20 @@ impl ComptimeEvaluator:
             return comptime_control_value(comptime_value_enum(pop_opt_tid, self.sema.syms.some, some_start, 1))
         if method == "clear":
             if arg_count != 0:
-                return self.fail(node, "Vec[u8].clear() takes no arguments")
+                return self.fail(node, "List[u8].clear() takes no arguments")
             let updated = comptime_value_bytes(recv_value.type_id, "")
             return self.rebind_collection_receiver(recv_node, updated, node)
         if method == "remove":
             if arg_count != 1:
-                return self.fail(node, "Vec[u8].remove() expects exactly one argument")
+                return self.fail(node, "List[u8].remove() expects exactly one argument")
             let index_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if index_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return index_signal
             if comptime_value_is_intlike(index_signal.value) == 0:
-                return self.fail(node, "Vec[u8].remove() index must be an integer")
+                return self.fail(node, "List[u8].remove() index must be an integer")
             let index = comptime_value_intlike(index_signal.value)
             if index < 0 or index >= recv_value.text.len():
-                return self.fail(node, "Vec[u8].remove() index out of bounds in comptime")
+                return self.fail(node, "List[u8].remove() index out of bounds in comptime")
             let removed_byte = recv_value.text[index] as i32
             let prefix = with_str_slice_ref(recv_value.text, 0, index)
             let suffix = with_str_slice_ref(recv_value.text, index + 1, recv_value.text.len())
@@ -3133,14 +3133,14 @@ impl ComptimeEvaluator:
             if rebind.kind != ComptimeControlKind.CTL_VALUE:
                 return rebind
             return comptime_control_value(comptime_value_int(self.sema.ty_u8 as i32, removed_byte as i64))
-        self.fail(node, "Vec[u8] method '" ++ method ++ "' is not comptime-evaluable yet")
+        self.fail(node, "List[u8] method '" ++ method ++ "' is not comptime-evaluable yet")
 
-    mut fn eval_vec_method_call(recv_node: i32, recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    mut fn eval_list_method_call(recv_node: i32, recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
         let method = self.pool.resolve(field)
 
         if method == "push":
             if arg_count != 1:
-                return self.fail(node, "Vec.push() expects exactly one argument")
+                return self.fail(node, "List.push() expects exactly one argument")
             var arg_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return arg_signal
@@ -3155,19 +3155,19 @@ impl ComptimeEvaluator:
             if recv_value.extra_start + recv_value.extra_count == self.extra_values.len() as i32:
                 self.extra_values.push(move arg_signal.value)
             else:
-                new_start = self.copy_vec_snapshot(recv_value)
+                new_start = self.copy_list_snapshot(recv_value)
                 self.extra_values.push(move arg_signal.value)
-            let updated = comptime_value_vec(recv_value.type_id, new_start, recv_value.extra_count + 1)
+            let updated = comptime_value_list(recv_value.type_id, new_start, recv_value.extra_count + 1)
             return self.rebind_collection_receiver(recv_node, updated, node)
 
         if method == "len":
             if arg_count != 0:
-                return self.fail(node, "Vec.len() takes no arguments")
+                return self.fail(node, "List.len() takes no arguments")
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), recv_value.extra_count as i64))
 
         if method == "contains":
             if arg_count != 1:
-                return self.fail(node, "Vec.contains() expects exactly one argument")
+                return self.fail(node, "List.contains() expects exactly one argument")
             let needle_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if needle_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return needle_signal
@@ -3179,35 +3179,35 @@ impl ComptimeEvaluator:
 
         if method == "get":
             if arg_count != 1:
-                return self.fail(node, "Vec.get() expects exactly one argument")
+                return self.fail(node, "List.get() expects exactly one argument")
             let index_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if index_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return index_signal
             if comptime_value_is_intlike(index_signal.value) == 0:
-                return self.fail(node, "Vec.get() index must be an integer")
+                return self.fail(node, "List.get() index must be an integer")
             let index = comptime_value_intlike(index_signal.value)
             if index < 0 or index >= recv_value.extra_count as i64:
-                return self.fail(node, "Vec.get() index out of bounds in comptime")
+                return self.fail(node, "List.get() index out of bounds in comptime")
             return comptime_control_value(self.extra_value_at((recv_value.extra_start + index as i32) as i64))
 
         if method == "clear":
             if arg_count != 0:
-                return self.fail(node, "Vec.clear() takes no arguments")
-            let updated = comptime_value_vec(recv_value.type_id, self.extra_values.len() as i32, 0)
+                return self.fail(node, "List.clear() takes no arguments")
+            let updated = comptime_value_list(recv_value.type_id, self.extra_values.len() as i32, 0)
             return self.rebind_collection_receiver(recv_node, updated, node)
 
         if method == "pop":
             if arg_count != 0:
-                return self.fail(node, "Vec.pop() takes no arguments")
-            let pop_opt_tid = self.vec_option_result_tid(recv_value, node)
+                return self.fail(node, "List.pop() takes no arguments")
+            let pop_opt_tid = self.list_option_result_tid(recv_value, node)
             if pop_opt_tid == 0:
-                return self.fail(node, "Vec.pop() needs a resolved Option type in comptime")
+                return self.fail(node, "List.pop() needs a resolved Option type in comptime")
             if recv_value.extra_count <= 0:
                 return comptime_control_value(comptime_value_enum(pop_opt_tid, self.sema.syms.none, self.extra_values.len() as i32, 0))
             let removed = self.extra_value_at((recv_value.extra_start + recv_value.extra_count - 1) as i64)
             // (start, count-1) is already a frozen prefix view of the existing
             // slice — no copy needed; arena elements are immutable.
-            let updated = comptime_value_vec(recv_value.type_id, recv_value.extra_start, recv_value.extra_count - 1)
+            let updated = comptime_value_list(recv_value.type_id, recv_value.extra_start, recv_value.extra_count - 1)
             let rebind = self.rebind_collection_receiver(recv_node, updated, node)
             if rebind.kind != ComptimeControlKind.CTL_VALUE:
                 return rebind
@@ -3217,28 +3217,28 @@ impl ComptimeEvaluator:
 
         if method == "remove":
             if arg_count != 1:
-                return self.fail(node, "Vec.remove() expects exactly one argument")
+                return self.fail(node, "List.remove() expects exactly one argument")
             let index_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if index_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return index_signal
             if comptime_value_is_intlike(index_signal.value) == 0:
-                return self.fail(node, "Vec.remove() index must be an integer")
+                return self.fail(node, "List.remove() index must be an integer")
             let index = comptime_value_intlike(index_signal.value) as i32
             if index < 0 or index >= recv_value.extra_count:
-                return self.fail(node, "Vec.remove() index out of bounds in comptime")
+                return self.fail(node, "List.remove() index out of bounds in comptime")
             let removed = self.extra_value_at((recv_value.extra_start + index) as i64)
             let new_start = self.extra_values.len() as i32
             for i in 0..recv_value.extra_count:
                 if i == index:
                     continue
                 self.extra_values.push(self.extra_value_at((recv_value.extra_start + i) as i64))
-            let updated = comptime_value_vec(recv_value.type_id, new_start, recv_value.extra_count - 1)
+            let updated = comptime_value_list(recv_value.type_id, new_start, recv_value.extra_count - 1)
             let rebind = self.rebind_collection_receiver(recv_node, updated, node)
             if rebind.kind != ComptimeControlKind.CTL_VALUE:
                 return rebind
             return comptime_control_value(removed)
 
-        self.fail(node, "Vec method is not comptime-evaluable yet")
+        self.fail(node, "List method is not comptime-evaluable yet")
 
     mut fn eval_map_method_call(recv_node: i32, recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
         let method = self.pool.resolve(field)
@@ -3354,7 +3354,7 @@ impl ComptimeEvaluator:
 
         self.fail(node, "HashMap method is not comptime-evaluable yet")
 
-    mut fn vec_option_result_tid(recv_value: &ComptimeValue, node: i32) -> i32:
+    mut fn list_option_result_tid(recv_value: &ComptimeValue, node: i32) -> i32:
         let typed = self.node_type_or(node, 0)
         if typed != 0:
             return typed
@@ -3527,7 +3527,7 @@ impl ComptimeEvaluator:
             let start = self.extra_values.len() as i32
             for i in 0..pieces.len() as i32:
                 self.extra_values.push(comptime_value_str(pieces[i]))
-            return comptime_control_value(comptime_value_vec(self.node_type_or(node, 0), start, pieces.len() as i32))
+            return comptime_control_value(comptime_value_list(self.node_type_or(node, 0), start, pieces.len() as i32))
         if method == "clone" or method == "to_owned":
             if arg_count != 0:
                 return self.fail(node, "str." ++ method ++ "() takes no arguments")
@@ -3571,8 +3571,8 @@ impl ComptimeEvaluator:
         self.eval_user_method_value(0, &typed_recv, field, extra_start, arg_count, node, 0)
 
     mut fn concrete_method_comptime_type_args(fn_sym: i32, concrete_sig: i32, node: i32) -> ComptimeGenericResolvedArgs:
-        let out_syms: Vec[i32] = Vec.new()
-        let out_tys: Vec[i32] = Vec.new()
+        let out_syms: List[i32] = List.new()
+        let out_tys: List[i32] = List.new()
         let fn_node = self.find_fn_decl_node(fn_sym)
         let meta = self.ast.find_fn_meta(fn_node)
         if fn_node == 0 or meta < 0:
@@ -3611,8 +3611,8 @@ impl ComptimeEvaluator:
         ComptimeGenericResolvedArgs { ok: 1, tp_syms: out_syms, tp_tys: out_tys }
 
     mut fn eval_user_method_value(recv_node: i32, recv_value: &ComptimeValue, method: i32, extra_start: i32, arg_count: i32, node: i32, carry_receiver: i32) -> ComptimeControl:
-        let arg_values: Vec[ComptimeValue] = Vec.new()
-        let arg_types: Vec[i32] = Vec.new()
+        let arg_values: List[ComptimeValue] = List.new()
+        let arg_types: List[i32] = List.new()
         for i in 0..arg_count:
             var arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
             if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
@@ -3627,7 +3627,7 @@ impl ComptimeEvaluator:
 
         var fn_sym = self.sema.lookup_generic_method_fn(owner, method)
         var concrete_sig = -1
-        var type_args = ComptimeGenericResolvedArgs { ok: 1, tp_syms: Vec.new(), tp_tys: Vec.new() }
+        var type_args = ComptimeGenericResolvedArgs { ok: 1, tp_syms: List.new(), tp_tys: List.new() }
         if fn_sym != 0:
             let ret_ty = self.sema.check_generic_method_call(owner, resolved_recv as i32, fn_sym, 0, recv_node, arg_types, extra_start, arg_count, node)
             let resolved_sig = self.sema.resolved_call_sigs.get(node)
@@ -3647,7 +3647,7 @@ impl ComptimeEvaluator:
             self.sema.resolved_call_mono_syms.insert(node, fn_sym)
             self.sema.typed_expr_types.insert(node, self.sema.sig_return_type(concrete_sig))
 
-        let call_args: Vec[ComptimeValue] = Vec.new()
+        let call_args: List[ComptimeValue] = List.new()
         call_args.push(comptime_value_clone(recv_value))
         for ai in 0..arg_values.len() as i32:
             call_args.push(comptime_value_clone(arg_values[ai]))
@@ -3747,11 +3747,11 @@ impl ComptimeEvaluator:
         if threads_receiver != 0:
             self.pipeline_receiver_carrier_depth = self.pipeline_receiver_carrier_depth + 1
         let recv_node = if threads_receiver != 0: self.pipeline_receiver_root_node(lhs) else: lhs
-        let result = if recv.kind == ComptimeValueKind.CV_VEC or recv.kind == ComptimeValueKind.CV_BYTES:
+        let result = if recv.kind == ComptimeValueKind.CV_LIST or recv.kind == ComptimeValueKind.CV_BYTES:
             if recv.kind == ComptimeValueKind.CV_BYTES:
                 self.eval_bytes_method_call(recv_node, recv, method, extra_start, arg_count, node)
             else:
-                self.eval_vec_method_call(recv_node, recv, method, extra_start, arg_count, node)
+                self.eval_list_method_call(recv_node, recv, method, extra_start, arg_count, node)
         else if recv.kind == ComptimeValueKind.CV_MAP:
             self.eval_map_method_call(recv_node, recv, method, extra_start, arg_count, node)
         else if self.is_string_builder_value(recv):
@@ -3814,7 +3814,7 @@ impl ComptimeEvaluator:
         if comptime_pipeline_builtin_method(self.pool.resolve(fn_sym)) != 0:
             var stage_recv = comptime_value_clone(lhs_signal.value)
             var stage_vk = stage_recv.kind
-            if stage_vk != ComptimeValueKind.CV_VEC and stage_vk != ComptimeValueKind.CV_BYTES and stage_vk != ComptimeValueKind.CV_MAP:
+            if stage_vk != ComptimeValueKind.CV_LIST and stage_vk != ComptimeValueKind.CV_BYTES and stage_vk != ComptimeValueKind.CV_MAP:
                 // D21 mutator chain: a Unit-returning inner stage mutates the
                 // chain root in place, so this stage's receiver is the ROOT's
                 // current binding value, not the inner stage's Unit result.
@@ -3824,9 +3824,9 @@ impl ComptimeEvaluator:
                     if root_signal.kind == ComptimeControlKind.CTL_VALUE:
                         stage_recv = comptime_value_clone(root_signal.value)
                         stage_vk = stage_recv.kind
-            if stage_vk == ComptimeValueKind.CV_VEC or stage_vk == ComptimeValueKind.CV_BYTES or stage_vk == ComptimeValueKind.CV_MAP:
+            if stage_vk == ComptimeValueKind.CV_LIST or stage_vk == ComptimeValueKind.CV_BYTES or stage_vk == ComptimeValueKind.CV_MAP:
                 return self.eval_pipeline_method_value(lhs, stage_recv, fn_sym, args_start, arg_count, node)
-        let args: Vec[ComptimeValue] = Vec.new()
+        let args: List[ComptimeValue] = List.new()
         args.push(move lhs_signal.value)
         for i in 0..arg_count:
             var arg_signal = self.eval_expr(self.ast.get_extra(args_start + i))
@@ -3912,7 +3912,7 @@ impl ComptimeEvaluator:
         false
 
     mut fn capability_args(extra_start: i32, arg_count: i32) -> ComptimeControl:
-        var values: Vec[ComptimeValue] = Vec.new()
+        var values: List[ComptimeValue] = List.new()
         for i in 0..arg_count:
             var arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
             if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
@@ -3998,21 +3998,21 @@ fn comptime_sha256_text(data: &str) -> str:
     sha256_hex(&digest[0] as *const u8)
 
 impl ComptimeEvaluator:
-    mut fn str_vec_value(values: &Vec[str], node: i32) -> ComptimeValue:
-        let vec_type = self.node_type_or(node, 0)
-        if vec_type == 0:
+    mut fn str_list_value(values: &List[str], node: i32) -> ComptimeValue:
+        let list_type = self.node_type_or(node, 0)
+        if list_type == 0:
             let _ = self.fail(node, "string vector result type is unknown")
             return comptime_value_invalid()
         let start = self.extra_values.len() as i32
         for i in 0..values.len() as i32:
             self.extra_values.push(comptime_value_str(values[i]))
-        comptime_value_vec(vec_type, start, values.len() as i32)
+        comptime_value_list(list_type, start, values.len() as i32)
 
-    fn str_vec_value_with_type(vec_type: i32, values: &Vec[str]) -> ComptimeValue:
+    fn str_list_value_with_type(list_type: i32, values: &List[str]) -> ComptimeValue:
         let start = self.extra_values.len() as i32
         for i in 0..values.len() as i32:
             self.extra_values.push(comptime_value_str(values[i]))
-        comptime_value_vec(vec_type, start, values.len() as i32)
+        comptime_value_list(list_type, start, values.len() as i32)
 
     fn struct_field_value_by_name(value: &ComptimeValue, field_name: &str) -> ComptimeValue:
         if value.kind != ComptimeValueKind.CV_STRUCT:
@@ -4023,20 +4023,20 @@ impl ComptimeEvaluator:
             return comptime_value_invalid()
         self.extra_value_at((value.extra_start + index) as i64)
 
-    mut fn vec_str_to_argv(value: &ComptimeValue, method: &str, node: i32) -> str:
-        if value.kind != ComptimeValueKind.CV_VEC and value.kind != ComptimeValueKind.CV_ARRAY:
-            let _ = self.fail(node, "ProcessRunner." ++ method ++ "() expects Vec[str] args")
+    mut fn list_str_to_argv(value: &ComptimeValue, method: &str, node: i32) -> str:
+        if value.kind != ComptimeValueKind.CV_LIST and value.kind != ComptimeValueKind.CV_ARRAY:
+            let _ = self.fail(node, "ProcessRunner." ++ method ++ "() expects List[str] args")
             return ""
         var out = ""
         for i in 0..value.extra_count:
             let item = self.extra_value_at((value.extra_start + i) as i64)
             if item.kind != ComptimeValueKind.CV_STR:
-                let _ = self.fail(node, "ProcessRunner." ++ method ++ "() expects Vec[str] args")
+                let _ = self.fail(node, "ProcessRunner." ++ method ++ "() expects List[str] args")
                 return ""
             out = out ++ item.text ++ "\0"
         out
 
-    fn vec_str_to_argv_from_parts(parts: &Vec[str], method: &str, node: i32) -> str:
+    fn list_str_to_argv_from_parts(parts: &List[str], method: &str, node: i32) -> str:
         var out = ""
         for i in 0..parts.len() as i32:
             out = out ++ parts[i] ++ "\0"
@@ -4050,7 +4050,7 @@ impl ComptimeEvaluator:
             let _ = self.fail(node, "ProcessRunner env argument must be ProcessEnv")
             return comptime_value_invalid()
         let vars = self.struct_field_value_by_name(value, "vars")
-        if vars.kind != ComptimeValueKind.CV_VEC and vars.kind != ComptimeValueKind.CV_ARRAY:
+        if vars.kind != ComptimeValueKind.CV_LIST and vars.kind != ComptimeValueKind.CV_ARRAY:
             let _ = self.fail(node, "ProcessEnv.vars is not a vector")
             return comptime_value_invalid()
         for i in 0..vars.extra_count:
@@ -4076,7 +4076,7 @@ impl ComptimeEvaluator:
         self.extra_values.push(comptime_value_str(tool_token))
         self.extra_values.push(comptime_value_str("WITH_BUILD_ACTION_NAME"))
         self.extra_values.push(comptime_value_str(action_name))
-        comptime_value_vec(env_type, saved_start, vars.extra_count * 2 + 4)
+        comptime_value_list(env_type, saved_start, vars.extra_count * 2 + 4)
 
     mut fn process_driver_env_clear(node: i32) -> ComptimeValue:
         let env_type = self.named_type_id("ProcessEnv", node)
@@ -4089,10 +4089,10 @@ impl ComptimeEvaluator:
         self.extra_values.push(comptime_value_str(with_getenv_str("WITH_BUILD_ACTION_NAME") ++ ""))
         let _clear_tool_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", "")
         let _clear_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", "")
-        comptime_value_vec(env_type, saved_start, 4)
+        comptime_value_list(env_type, saved_start, 4)
 
     fn process_env_restore(saved: &ComptimeValue):
-        if saved.kind != ComptimeValueKind.CV_VEC and saved.kind != ComptimeValueKind.CV_ARRAY:
+        if saved.kind != ComptimeValueKind.CV_LIST and saved.kind != ComptimeValueKind.CV_ARRAY:
             return
         var i = 0
         while i + 1 < saved.extra_count:
@@ -4132,10 +4132,10 @@ impl ComptimeEvaluator:
         let clean_root = if root.ends_with("/"): root.slice(0, root.len() - 1) else: with_str_clone_ref(root)
         clean_root ++ "/" ++ path
 
-    fn workspace_str_vec_field(options: &ComptimeValue, field_name: &str) -> Vec[str]:
-        let out: Vec[str] = Vec.new()
+    fn workspace_str_list_field(options: &ComptimeValue, field_name: &str) -> List[str]:
+        let out: List[str] = List.new()
         let value = self.struct_field_value_by_name(options, field_name)
-        if value.kind != ComptimeValueKind.CV_VEC and value.kind != ComptimeValueKind.CV_ARRAY:
+        if value.kind != ComptimeValueKind.CV_LIST and value.kind != ComptimeValueKind.CV_ARRAY:
             return out
         for i in 0..value.extra_count:
             let item = self.extra_value_at((value.extra_start + i) as i64)
@@ -4169,15 +4169,15 @@ impl ComptimeEvaluator:
             return value.data0 != 0
         default_value
 
-    fn workspace_path_vec_field(root: &str, options: &ComptimeValue, field_name: &str) -> Vec[str]:
-        let raw = self.workspace_str_vec_field(options, field_name)
-        let out: Vec[str] = Vec.new()
+    fn workspace_path_list_field(root: &str, options: &ComptimeValue, field_name: &str) -> List[str]:
+        let raw = self.workspace_str_list_field(options, field_name)
+        let out: List[str] = List.new()
         for i in 0..raw.len() as i32:
             out.push(self.workspace_path(root, raw[i]))
         out
 
     fn workspace_exclude_basenames_field(options: &ComptimeValue) -> str:
-        let excludes = self.workspace_str_vec_field(options, "exclude_basenames")
+        let excludes = self.workspace_str_list_field(options, "exclude_basenames")
         var out = ""
         for i in 0..excludes.len() as i32:
             out = out ++ "|" ++ excludes[i] ++ "|"
@@ -4198,35 +4198,35 @@ impl ComptimeEvaluator:
         let artifact_kind_type = self.named_type_id("ArtifactKind", node)
         if result_type == 0 or artifact_type == 0 or build_status_type == 0 or artifact_kind_type == 0:
             return comptime_value_invalid()
-        let artifact_vec = self.empty_vec_for_field(result_type, "artifacts", node)
-        let diagnostic_vec = self.empty_vec_for_field(result_type, "diagnostics", node)
-        if artifact_vec.kind == ComptimeValueKind.CV_INVALID or diagnostic_vec.kind == ComptimeValueKind.CV_INVALID:
+        let artifact_list = self.empty_list_for_field(result_type, "artifacts", node)
+        let diagnostic_list = self.empty_list_for_field(result_type, "diagnostics", node)
+        if artifact_list.kind == ComptimeValueKind.CV_INVALID or diagnostic_list.kind == ComptimeValueKind.CV_INVALID:
             return comptime_value_invalid()
 
-        let artifact_vec_type = artifact_vec.type_id
-        var artifacts = artifact_vec
+        let artifact_list_type = artifact_list.type_id
+        var artifacts = artifact_list
         if rc == 0 and artifact_path.len() > 0:
             let artifact_start = self.extra_values.len() as i32
             self.extra_values.push(comptime_value_int(artifact_kind_type, artifact_kind as i64))
             self.extra_values.push(comptime_value_str(artifact_path))
             let artifact = comptime_value_struct(artifact_type, artifact_start, 2)
-            let vec_start = self.extra_values.len() as i32
+            let list_start = self.extra_values.len() as i32
             self.extra_values.push(artifact)
-            artifacts = comptime_value_vec(artifact_vec_type, vec_start, 1)
+            artifacts = comptime_value_list(artifact_list_type, list_start, 1)
 
         let result_start = self.extra_values.len() as i32
         self.extra_values.push(comptime_value_int(build_status_type, if rc == 0: 0 else: 1))
         self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, rc as i64))
         self.extra_values.push(comptime_value_str(workspace_name))
         self.extra_values.push(artifacts)
-        self.extra_values.push(diagnostic_vec)
+        self.extra_values.push(diagnostic_list)
         comptime_value_struct(result_type, result_start, 5)
 
-fn comptime_workspace_compile_result(result: ComptimeValue, messages: Vec[ComptimeValue]) -> ComptimeWorkspaceCompileResult:
+fn comptime_workspace_compile_result(result: ComptimeValue, messages: List[ComptimeValue]) -> ComptimeWorkspaceCompileResult:
     ComptimeWorkspaceCompileResult { result, messages }
 
 fn comptime_workspace_compile_invalid() -> ComptimeWorkspaceCompileResult:
-    let messages: Vec[ComptimeValue] = Vec.new()
+    let messages: List[ComptimeValue] = List.new()
     comptime_workspace_compile_result(comptime_value_invalid(), move messages)
 
 fn comptime_module_name_for_path(root: &str, path: &str) -> str:
@@ -4273,15 +4273,15 @@ impl ComptimeEvaluator:
         self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, loc.column as i64))
         comptime_value_struct(span_type, span_start, 5)
 
-    mut fn decl_summary_vec_type(node: i32) -> i32:
+    mut fn decl_summary_list_type(node: i32) -> i32:
         let decl_type = self.named_type_id("DeclSummary", node)
         if decl_type == 0:
             return 0
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(decl_type)
-        let tid = self.sema.find_generic_inst_type(self.sema.syms.vec, args, 1) as i32
+        let tid = self.sema.find_generic_inst_type(self.sema.syms.list, args, 1) as i32
         if tid == 0:
-            let _ = self.fail(node, "Vec[DeclSummary] type is not visible to comptime evaluator")
+            let _ = self.fail(node, "List[DeclSummary] type is not visible to comptime evaluator")
         tid
 
 fn comptime_decl_kind_for_function(name: &str) -> i32:
@@ -4315,7 +4315,7 @@ impl ComptimeEvaluator:
         let summary_source = self.source_span_value(path, source.text, ast_pool.get_start(decl), ast_pool.get_end(decl), node)
         if summary_source.kind == ComptimeValueKind.CV_INVALID:
             return summary_source
-        let notes = self.empty_vec_for_field(decl_type, "notes", node)
+        let notes = self.empty_list_for_field(decl_type, "notes", node)
         if notes.kind == ComptimeValueKind.CV_INVALID:
             return notes
         let start = self.extra_values.len() as i32
@@ -4351,7 +4351,7 @@ impl ComptimeEvaluator:
         let summary_source = self.source_span_value(path, source.text, ast_pool.get_start(decl), ast_pool.get_end(decl), node)
         if summary_source.kind == ComptimeValueKind.CV_INVALID:
             return summary_source
-        let notes = self.empty_vec_for_field(decl_type, "notes", node)
+        let notes = self.empty_list_for_field(decl_type, "notes", node)
         if notes.kind == ComptimeValueKind.CV_INVALID:
             return notes
         let type_text =
@@ -4381,10 +4381,10 @@ impl ComptimeEvaluator:
         comptime_value_struct(decl_type, start, 14)
 
     mut fn typechecked_message_value(comp: &Compilation, ast_pool: &AstPool, node: i32) -> ComptimeValue:
-        let vec_type = self.decl_summary_vec_type(node)
-        if vec_type == 0:
+        let list_type = self.decl_summary_list_type(node)
+        if list_type == 0:
             return comptime_value_invalid()
-        let summaries: Vec[ComptimeValue] = Vec.new()
+        let summaries: List[ComptimeValue] = List.new()
         for di in 0..ast_pool.decl_count():
             let decl = ast_pool.get_decl(di)
             let kind = ast_pool.kind(decl)
@@ -4401,13 +4401,13 @@ impl ComptimeEvaluator:
         let start = self.extra_values.len() as i32
         for i in 0..summaries.len() as i32:
             self.extra_values.push(comptime_value_clone(summaries[i]))
-        let decls = comptime_value_vec(vec_type, start, summaries.len() as i32)
-        let payloads: Vec[ComptimeValue] = Vec.new()
+        let decls = comptime_value_list(list_type, start, summaries.len() as i32)
+        let payloads: List[ComptimeValue] = List.new()
         payloads.push(decls)
         self.compiler_message_value("Typechecked", payloads, node)
 
-    mut fn workspace_typechecked_messages(comp: &Compilation, ast_pool: &AstPool, node: i32) -> Vec[ComptimeValue]:
-        let messages: Vec[ComptimeValue] = Vec.new()
+    mut fn workspace_typechecked_messages(comp: &Compilation, ast_pool: &AstPool, node: i32) -> List[ComptimeValue]:
+        let messages: List[ComptimeValue] = List.new()
         if ast_pool.decl_count() == 0:
             return messages
         let phase = self.compiler_message_phase_value(3, node)
@@ -4420,15 +4420,15 @@ impl ComptimeEvaluator:
         messages.push(typechecked)
         messages
 
-    mut fn workspace_phase_message_append(messages: Vec[ComptimeValue], phase_value: i32, node: i32) -> Vec[ComptimeValue]:
+    mut fn workspace_phase_message_append(messages: List[ComptimeValue], phase_value: i32, node: i32) -> List[ComptimeValue]:
         let phase = self.compiler_message_phase_value(phase_value, node)
         if phase.kind == ComptimeValueKind.CV_INVALID:
             return messages
         messages.push(phase)
         messages
 
-    mut fn workspace_success_messages(comp: &Compilation, ast_pool: &AstPool, node: i32) -> Vec[ComptimeValue]:
-        var messages: Vec[ComptimeValue] = Vec.new()
+    mut fn workspace_success_messages(comp: &Compilation, ast_pool: &AstPool, node: i32) -> List[ComptimeValue]:
+        var messages: List[ComptimeValue] = List.new()
         messages = self.workspace_phase_message_append(move messages, 0, node)
         messages = self.workspace_phase_message_append(move messages, 1, node)
         messages = self.workspace_phase_message_append(move messages, 2, node)
@@ -4449,7 +4449,7 @@ impl ComptimeEvaluator:
                 messages.push(linked)
         messages
 
-    mut fn enum_payload_value(enum_name: &str, variant_name: &str, payloads: &Vec[ComptimeValue], node: i32) -> ComptimeValue:
+    mut fn enum_payload_value(enum_name: &str, variant_name: &str, payloads: &List[ComptimeValue], node: i32) -> ComptimeValue:
         let enum_type = self.named_type_id(enum_name, node)
         if enum_type == 0:
             return comptime_value_invalid()
@@ -4462,7 +4462,7 @@ impl ComptimeEvaluator:
             self.extra_values.push(comptime_value_clone(payloads[i]))
         comptime_value_enum(enum_type, variant_sym, payload_start, payloads.len() as i32)
 
-    mut fn compiler_message_value(variant_name: &str, payloads: &Vec[ComptimeValue], node: i32) -> ComptimeValue:
+    mut fn compiler_message_value(variant_name: &str, payloads: &List[ComptimeValue], node: i32) -> ComptimeValue:
         self.enum_payload_value("CompilerMessage", variant_name, payloads, node)
 
     mut fn compiler_phase_value(phase_value: i32, node: i32) -> ComptimeValue:
@@ -4475,12 +4475,12 @@ impl ComptimeEvaluator:
         let phase = self.compiler_phase_value(phase_value, node)
         if phase.kind == ComptimeValueKind.CV_INVALID:
             return phase
-        let payloads: Vec[ComptimeValue] = Vec.new()
+        let payloads: List[ComptimeValue] = List.new()
         payloads.push(phase)
         self.compiler_message_value("Phase", payloads, node)
 
     mut fn compiler_message_artifact_value(artifact: ComptimeValue, node: i32) -> ComptimeValue:
-        let payloads: Vec[ComptimeValue] = Vec.new()
+        let payloads: List[ComptimeValue] = List.new()
         payloads.push(artifact)
         self.compiler_message_value("Artifact", payloads, node)
 
@@ -4488,16 +4488,16 @@ impl ComptimeEvaluator:
         let command_type = self.named_type_id("LinkCommand", node)
         if command_type == 0:
             return comptime_value_invalid()
-        let args = self.empty_vec_for_field(command_type, "args", node)
-        let env = self.empty_vec_for_field(command_type, "env", node)
-        let inputs = self.empty_vec_for_field(command_type, "inputs", node)
-        let outputs = self.empty_vec_for_field(command_type, "outputs", node)
+        let args = self.empty_list_for_field(command_type, "args", node)
+        let env = self.empty_list_for_field(command_type, "env", node)
+        let inputs = self.empty_list_for_field(command_type, "inputs", node)
+        let outputs = self.empty_list_for_field(command_type, "outputs", node)
         if args.kind == ComptimeValueKind.CV_INVALID or env.kind == ComptimeValueKind.CV_INVALID or inputs.kind == ComptimeValueKind.CV_INVALID or outputs.kind == ComptimeValueKind.CV_INVALID:
             return comptime_value_invalid()
-        let args_value = self.str_vec_value_with_type(args.type_id, command.args)
+        let args_value = self.str_list_value_with_type(args.type_id, command.args)
         let env_value = self.link_command_env_value_with_type(env.type_id, command.env, node)
-        let inputs_value = self.str_vec_value_with_type(inputs.type_id, command.inputs)
-        let outputs_value = self.str_vec_value_with_type(outputs.type_id, command.outputs)
+        let inputs_value = self.str_list_value_with_type(inputs.type_id, command.inputs)
+        let outputs_value = self.str_list_value_with_type(outputs.type_id, command.outputs)
         if env_value.kind == ComptimeValueKind.CV_INVALID:
             return comptime_value_invalid()
         let start = self.extra_values.len() as i32
@@ -4509,21 +4509,21 @@ impl ComptimeEvaluator:
         self.extra_values.push(outputs_value)
         comptime_value_struct(command_type, start, 6)
 
-    mut fn link_command_env_value_with_type(vec_type: i32, values: &Vec[LinkStageEnvVar], node: i32) -> ComptimeValue:
+    mut fn link_command_env_value_with_type(list_type: i32, values: &List[LinkStageEnvVar], node: i32) -> ComptimeValue:
         let env_type = self.named_type_id("EnvVar", node)
         if env_type == 0:
             return comptime_value_invalid()
-        let items: Vec[ComptimeValue] = Vec.new()
+        let items: List[ComptimeValue] = List.new()
         for i in 0..values.len() as i32:
             let item = values[i]
             let field_start = self.extra_values.len() as i32
             self.extra_values.push(comptime_value_str(item.name))
             self.extra_values.push(comptime_value_str(item.value))
             items.push(comptime_value_struct(env_type, field_start, 2))
-        let vec_start = self.extra_values.len() as i32
+        let list_start = self.extra_values.len() as i32
         for i in 0..items.len() as i32:
             self.extra_values.push(comptime_value_clone(items[i]))
-        comptime_value_vec(vec_type, vec_start, items.len() as i32)
+        comptime_value_list(list_type, list_start, items.len() as i32)
 
     mut fn link_command_str_field(value: &ComptimeValue, name: &str, node: i32) -> str:
         let field = self.struct_field_value_by_name(value, name)
@@ -4533,11 +4533,11 @@ impl ComptimeEvaluator:
         // D32: take intended; clone until the D32 compiler is the seed (old §2.4 Drop-owner gate)
         field.text.clone()
 
-    mut fn link_command_str_vec_field(value: &ComptimeValue, name: &str, node: i32) -> Vec[str]:
-        let out: Vec[str] = Vec.new()
+    mut fn link_command_str_list_field(value: &ComptimeValue, name: &str, node: i32) -> List[str]:
+        let out: List[str] = List.new()
         let field = self.struct_field_value_by_name(value, name)
-        if field.kind != ComptimeValueKind.CV_VEC and field.kind != ComptimeValueKind.CV_ARRAY:
-            let _ = self.fail(node, "LinkCommand." ++ name ++ " must be a Vec[str]")
+        if field.kind != ComptimeValueKind.CV_LIST and field.kind != ComptimeValueKind.CV_ARRAY:
+            let _ = self.fail(node, "LinkCommand." ++ name ++ " must be a List[str]")
             return out
         for i in 0..field.extra_count:
             let item = self.extra_value_at((field.extra_start + i) as i64)
@@ -4547,11 +4547,11 @@ impl ComptimeEvaluator:
             out.push(with_str_clone_ref(item.text))
         out
 
-    mut fn link_command_env_field(value: &ComptimeValue, node: i32) -> Vec[LinkStageEnvVar]:
-        let out: Vec[LinkStageEnvVar] = Vec.new()
+    mut fn link_command_env_field(value: &ComptimeValue, node: i32) -> List[LinkStageEnvVar]:
+        let out: List[LinkStageEnvVar] = List.new()
         let field = self.struct_field_value_by_name(value, "env")
-        if field.kind != ComptimeValueKind.CV_VEC and field.kind != ComptimeValueKind.CV_ARRAY:
-            let _ = self.fail(node, "LinkCommand.env must be a Vec[EnvVar]")
+        if field.kind != ComptimeValueKind.CV_LIST and field.kind != ComptimeValueKind.CV_ARRAY:
+            let _ = self.fail(node, "LinkCommand.env must be a List[EnvVar]")
             return out
         for i in 0..field.extra_count:
             let item = self.extra_value_at((field.extra_start + i) as i64)
@@ -4571,11 +4571,11 @@ impl ComptimeEvaluator:
     mut fn link_command_from_value(value: &ComptimeValue, node: i32) -> LinkStageCommand:
         let linker = self.link_command_str_field(value, "linker", node)
         let cwd = self.link_command_str_field(value, "cwd", node)
-        let args = self.link_command_str_vec_field(value, "args", node)
+        let args = self.link_command_str_list_field(value, "args", node)
         let env = self.link_command_env_field(value, node)
-        let inputs = self.link_command_str_vec_field(value, "inputs", node)
-        let outputs = self.link_command_str_vec_field(value, "outputs", node)
-        LinkStageCommand { linker, args, cwd, env, inputs, outputs, cleanup_files: Vec.new() }
+        let inputs = self.link_command_str_list_field(value, "inputs", node)
+        let outputs = self.link_command_str_list_field(value, "outputs", node)
+        LinkStageCommand { linker, args, cwd, env, inputs, outputs, cleanup_files: List.new() }
 
 fn link_command_outputs_superset(replacement: &LinkStageCommand, original: &LinkStageCommand) -> bool:
     for oi in 0..original.outputs.len() as i32:
@@ -4593,7 +4593,7 @@ impl ComptimeEvaluator:
         let command_value = self.link_command_value(command, node)
         if command_value.kind == ComptimeValueKind.CV_INVALID:
             return command_value
-        let payloads: Vec[ComptimeValue] = Vec.new()
+        let payloads: List[ComptimeValue] = List.new()
         payloads.push(command_value)
         self.compiler_message_value("PreLink", payloads, node)
 
@@ -4601,14 +4601,14 @@ impl ComptimeEvaluator:
         let command_value = self.link_command_value(command, node)
         if command_value.kind == ComptimeValueKind.CV_INVALID:
             return command_value
-        let payloads: Vec[ComptimeValue] = Vec.new()
+        let payloads: List[ComptimeValue] = List.new()
         payloads.push(command_value)
         payloads.push(comptime_value_int(self.sema.ty_i32 as i32, rc as i64))
         self.compiler_message_value("Linked", payloads, node)
 
     mut fn enqueue_artifact_messages(record: ComptimeWorkspaceRecord, result: &ComptimeValue, node: i32) -> ComptimeWorkspaceRecord:
         let artifacts = self.struct_field_value_by_name(result, "artifacts")
-        if artifacts.kind != ComptimeValueKind.CV_VEC and artifacts.kind != ComptimeValueKind.CV_ARRAY:
+        if artifacts.kind != ComptimeValueKind.CV_LIST and artifacts.kind != ComptimeValueKind.CV_ARRAY:
             return record
         var out = record
         for i in 0..artifacts.extra_count:
@@ -4619,7 +4619,7 @@ impl ComptimeEvaluator:
             out.messages.push(message)
         out
 
-    mut fn enqueue_workspace_compile_result(record: ComptimeWorkspaceRecord, result: &ComptimeValue, messages: &Vec[ComptimeValue], node: i32) -> ComptimeWorkspaceRecord:
+    mut fn enqueue_workspace_compile_result(record: ComptimeWorkspaceRecord, result: &ComptimeValue, messages: &List[ComptimeValue], node: i32) -> ComptimeWorkspaceRecord:
         var out = record
         for mi in 0..messages.len() as i32:
             out.messages.push(comptime_value_clone(messages[mi]))
@@ -4638,7 +4638,7 @@ impl ComptimeEvaluator:
         out
 
     mut fn compiler_message_complete_value(result: &ComptimeValue, node: i32) -> ComptimeValue:
-        let payloads: Vec[ComptimeValue] = Vec.new()
+        let payloads: List[ComptimeValue] = List.new()
         payloads.push(comptime_value_clone(result))
         self.compiler_message_value("Complete", payloads, node)
 
@@ -4653,7 +4653,7 @@ impl ComptimeEvaluator:
         self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, -1))
         self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, -1))
         let span = comptime_value_struct(span_type, span_start, 5)
-        let payloads: Vec[ComptimeValue] = Vec.new()
+        let payloads: List[ComptimeValue] = List.new()
         payloads.push(comptime_value_int(self.sema.ty_i32 as i32, code as i64))
         payloads.push(comptime_value_str(message))
         payloads.push(span)
@@ -4691,12 +4691,12 @@ fn comptime_workspace_compile_plan_invalid() -> ComptimeWorkspaceCompilePlan:
         absolute_output: "",
         output_kind: 0,
         has_strings: 0,
-        source_paths: Vec.new(),
-        source_texts: Vec.new(),
+        source_paths: List.new(),
+        source_texts: List.new(),
         absolute_source: "",
-        include_paths: Vec.new(),
-        defines: Vec.new(),
-        link_libs: Vec.new(),
+        include_paths: List.new(),
+        defines: List.new(),
+        link_libs: List.new(),
         opt_level: 0,
         no_std: false,
         alloc_mode: false,
@@ -4707,9 +4707,9 @@ fn comptime_workspace_compile_plan_invalid() -> ComptimeWorkspaceCompilePlan:
         overflow_mode: -1,
         migrate_is_dir: 0,
         migrate_source: "",
-        migrate_include_paths: Vec.new(),
-        migrate_forced_includes: Vec.new(),
-        migrate_defines: Vec.new(),
+        migrate_include_paths: List.new(),
+        migrate_forced_includes: List.new(),
+        migrate_defines: List.new(),
         migrate_exclude_basenames: "",
         migrate_no_c_export: false,
         migrate_c_export_functions: false,
@@ -4803,12 +4803,12 @@ impl ComptimeEvaluator:
                 absolute_output: absolute_migrate_output,
                 output_kind: 0,
                 has_strings: 0,
-                source_paths: Vec.new(),
-                source_texts: Vec.new(),
+                source_paths: List.new(),
+                source_texts: List.new(),
                 absolute_source: "",
-                include_paths: Vec.new(),
-                defines: Vec.new(),
-                link_libs: Vec.new(),
+                include_paths: List.new(),
+                defines: List.new(),
+                link_libs: List.new(),
                 opt_level: 0,
                 no_std: false,
                 alloc_mode: false,
@@ -4821,9 +4821,9 @@ impl ComptimeEvaluator:
                 overflow_mode: -1,
                 migrate_is_dir,
                 migrate_source,
-                migrate_include_paths: self.workspace_path_vec_field(capability.project_root, migrate_options, "include_paths"),
-                migrate_forced_includes: self.workspace_path_vec_field(capability.project_root, migrate_options, "forced_includes"),
-                migrate_defines: self.workspace_str_vec_field(migrate_options, "defines"),
+                migrate_include_paths: self.workspace_path_list_field(capability.project_root, migrate_options, "include_paths"),
+                migrate_forced_includes: self.workspace_path_list_field(capability.project_root, migrate_options, "forced_includes"),
+                migrate_defines: self.workspace_str_list_field(migrate_options, "defines"),
                 migrate_exclude_basenames: self.workspace_exclude_basenames_field(migrate_options),
                 migrate_no_c_export: self.workspace_bool_option(migrate_options, "no_c_export", true),
                 migrate_c_export_functions: self.workspace_bool_option(migrate_options, "c_export_functions", false),
@@ -4858,11 +4858,11 @@ impl ComptimeEvaluator:
             else if output_kind == 4:
                 final_output = "out/lib/lib" ++ record.name ++ ".a"
         let absolute_output = self.workspace_path(capability.project_root, final_output)
-        let include_paths = self.workspace_str_vec_field(options, "include_paths")
-        let defines = self.workspace_str_vec_field(options, "defines")
-        let link_libs = self.workspace_str_vec_field(options, "link_libs")
-        let source_paths: Vec[str] = Vec.new()
-        let source_texts: Vec[str] = Vec.new()
+        let include_paths = self.workspace_str_list_field(options, "include_paths")
+        let defines = self.workspace_str_list_field(options, "defines")
+        let link_libs = self.workspace_str_list_field(options, "link_libs")
+        let source_paths: List[str] = List.new()
+        let source_texts: List[str] = List.new()
         var absolute_source = ""
         var has_strings = 0
         if record.string_names.len() > 0:
@@ -4902,9 +4902,9 @@ impl ComptimeEvaluator:
             overflow_mode: self.workspace_i32_option(options, "overflow_mode", -1),
             migrate_is_dir: 0,
             migrate_source: "",
-            migrate_include_paths: Vec.new(),
-            migrate_forced_includes: Vec.new(),
-            migrate_defines: Vec.new(),
+            migrate_include_paths: List.new(),
+            migrate_forced_includes: List.new(),
+            migrate_defines: List.new(),
             migrate_exclude_basenames: "",
             migrate_no_c_export: false,
             migrate_c_export_functions: false,
@@ -4937,10 +4937,10 @@ fn comptime_execute_workspace_compile_plan(plan: &ComptimeWorkspaceCompilePlan) 
             // The Compilation retains these vec handles (Zcu source storage)
             // through share-place-classified params, while the plan keeps its
             // own drop in the caller — pass independent clones (#729 class).
-            if comp.check_source_texts(ce_clone_str_vec(&plan.source_paths), ce_clone_str_vec(&plan.source_texts)):
+            if comp.check_source_texts(ce_clone_str_list(&plan.source_paths), ce_clone_str_list(&plan.source_texts)):
                 success = true
         else:
-            artifact_path = comp.build_entry_binary_from_sources_to_path(ce_clone_str_vec(&plan.source_paths), ce_clone_str_vec(&plan.source_texts), plan.absolute_output)
+            artifact_path = comp.build_entry_binary_from_sources_to_path(ce_clone_str_list(&plan.source_paths), ce_clone_str_list(&plan.source_texts), plan.absolute_output)
             success = artifact_path.len() > 0
     else:
         if plan.output_kind == 0:
@@ -4980,7 +4980,7 @@ impl ComptimeEvaluator:
                 unsafe:
                     self.workspace_success_messages(*native.comp, (*native.comp).zcu.last_sema.ast, node)
             else:
-                Vec.new()
+                List.new()
         if native.rc == 0 and native.is_migrate == 0 and native.comp as i64 != 0:
             unsafe:
                 let tracked_paths = (*native.comp).tracked_input_paths()
@@ -5022,9 +5022,9 @@ impl ComptimeEvaluator:
         let output_dir = link_stage_dirname(absolute_output)
         if output_dir.len() > 0:
             let _ = with_fs_mkdir_p(output_dir)
-        let include_paths = self.workspace_str_vec_field(options, "include_paths")
-        let defines = self.workspace_str_vec_field(options, "defines")
-        let link_libs = self.workspace_str_vec_field(options, "link_libs")
+        let include_paths = self.workspace_str_list_field(options, "include_paths")
+        let defines = self.workspace_str_list_field(options, "defines")
+        let link_libs = self.workspace_str_list_field(options, "link_libs")
 
         var comp = Compilation.init()
         comp.configure(self.workspace_i32_option(options, "opt_level", 1), self.workspace_bool_option(options, "no_std", false), self.workspace_bool_option(options, "alloc_mode", false), self.workspace_bool_option(options, "runtime_available", true))
@@ -5036,8 +5036,8 @@ impl ComptimeEvaluator:
         var ast_pool = AstPool.new()
         var source_name = with_str_clone_ref(source_path)
         if out.string_names.len() > 0:
-            let source_paths: Vec[str] = Vec.new()
-            let source_texts: Vec[str] = Vec.new()
+            let source_paths: List[str] = List.new()
+            let source_texts: List[str] = List.new()
             for si in 0..out.string_names.len() as i32:
                 source_paths.push(self.workspace_path(capability.project_root, out.string_names[si]))
                 source_texts.push(with_str_clone_ref(out.string_sources[si]))
@@ -5306,8 +5306,8 @@ impl ComptimeEvaluator:
         let resolved_output = self.capability_resolve_project_path(record, output_path, method, node)
         if self.had_error != 0:
             return 1
-        if entries_value.kind != ComptimeValueKind.CV_VEC and entries_value.kind != ComptimeValueKind.CV_ARRAY:
-            let _ = self.fail(node, "write_tar second argument must be Vec[ArchiveEntry]")
+        if entries_value.kind != ComptimeValueKind.CV_LIST and entries_value.kind != ComptimeValueKind.CV_ARRAY:
+            let _ = self.fail(node, "write_tar second argument must be List[ArchiveEntry]")
             return 1
         var out = StringBuilder.new()
         for i in 0..entries_value.extra_count:
@@ -5703,7 +5703,7 @@ impl ComptimeEvaluator:
             self.record_read_effect(record, resolved_base)
             let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(resolved_base))
             let pat_segs = comptime_glob_split_by_slash(glob_suffix)
-            let results: Vec[str] = Vec.new()
+            let results: List[str] = List.new()
             for gi in 0..raw_files.len() as i32:
                 let abs_file = raw_files[gi]
                 let rel_file = self.capability_project_relative_path(record, abs_file)
@@ -5715,13 +5715,13 @@ impl ComptimeEvaluator:
             if results.len() == 0:
                 return self.fail(node, "glob pattern matched no files: " ++ pattern)
             let sorted = comptime_glob_sort(results)
-            let vec_type = self.node_type_or(node, 0)
-            if vec_type == 0:
+            let list_type = self.node_type_or(node, 0)
+            if list_type == 0:
                 return self.fail(node, "ToolFs.glob result type is unknown")
             let gstart = self.extra_values.len() as i32
             for gi in 0..sorted.len() as i32:
                 self.extra_values.push(comptime_value_str(sorted[gi]))
-            return comptime_control_value(comptime_value_vec(vec_type, gstart, sorted.len() as i32))
+            return comptime_control_value(comptime_value_list(list_type, gstart, sorted.len() as i32))
         if method == "exists" or method == "is_dir" or method == "read_text" or method == "read_text_opt" or method == "read_binary" or method == "list_files" or method == "sha256_file" or method == "mkdir_all" or method == "remove_file" or method == "remove_tree":
             if not self.capability_expect_arg_count(arg_count, 1, method, node):
                 return comptime_control_error()
@@ -5761,27 +5761,27 @@ impl ComptimeEvaluator:
                 self.extra_values.push(comptime_value_str(text))
                 return comptime_control_value(comptime_value_enum(opt_tid, self.sema.syms.some, some_start, 1))
             if method == "read_binary":
-                let vec_type = self.node_type_or(node, 0)
-                if vec_type == 0:
+                let list_type = self.node_type_or(node, 0)
+                if list_type == 0:
                     return self.fail(node, "ToolFs.read_binary result type is unknown")
                 var status: i32 = 0
                 let data = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
                 if status != 0:
                     return self.fail(node, "read_binary: " ++ resolved ++ ": " ++ comptime_os_error_message(0 - status))
-                return comptime_control_value(comptime_value_bytes(vec_type, data))
+                return comptime_control_value(comptime_value_bytes(list_type, data))
             if method == "sha256_file":
                 if with_fs_file_exists(resolved) == 0:
                     return comptime_control_value(comptime_value_str(""))
                 return comptime_control_value(comptime_value_str(comptime_sha256_text(with_fs_read_file(resolved))))
             if method == "list_files":
                 let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(resolved))
-                let vec_type = self.node_type_or(node, 0)
-                if vec_type == 0:
+                let list_type = self.node_type_or(node, 0)
+                if list_type == 0:
                     return self.fail(node, "ToolFs.list_files result type is unknown")
                 let start = self.extra_values.len() as i32
                 for i in 0..raw_files.len() as i32:
                     self.extra_values.push(comptime_value_str(self.capability_project_relative_path(record, raw_files[i])))
-                return comptime_control_value(comptime_value_vec(vec_type, start, raw_files.len() as i32))
+                return comptime_control_value(comptime_value_list(list_type, start, raw_files.len() as i32))
             if method == "mkdir_all":
                 if not self.capability_require_mkdir_allowed(record, path, method, node):
                     return comptime_control_error()
@@ -5818,13 +5818,13 @@ impl ComptimeEvaluator:
                 return comptime_control_error()
             self.record_read_effect(record, path)
             let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(path))
-            let vec_type = self.node_type_or(node, 0)
-            if vec_type == 0:
+            let list_type = self.node_type_or(node, 0)
+            if list_type == 0:
                 return self.fail(node, "ToolFs.host_list_files result type is unknown")
             let start = self.extra_values.len() as i32
             for i in 0..raw_files.len() as i32:
                 self.extra_values.push(comptime_value_str(raw_files[i]))
-            return comptime_control_value(comptime_value_vec(vec_type, start, raw_files.len() as i32))
+            return comptime_control_value(comptime_value_list(list_type, start, raw_files.len() as i32))
         if method == "write_text" or method == "copy_file" or method == "chmod" or method == "rename" or method == "copy_tree" or method == "symlink":
             let expected =
                 if method == "chmod":
@@ -5969,8 +5969,8 @@ impl ComptimeEvaluator:
                 // The arena shares this text; the file write takes its own.
                 with_str_clone_ref(bytes_value.text)
             else:
-                if bytes_value.kind == ComptimeValueKind.CV_VEC:
-                    let parts: Vec[str] = Vec.new()
+                if bytes_value.kind == ComptimeValueKind.CV_LIST:
+                    let parts: List[str] = List.new()
                     for i in 0..bytes_value.extra_count:
                         let elem = self.extra_value_at((bytes_value.extra_start + i) as i64)
                         parts.push(with_str_from_byte(comptime_value_intlike(elem) as i32))
@@ -5979,7 +5979,7 @@ impl ComptimeEvaluator:
                         return assembled
                     move assembled.value.text
                 else:
-                    let _ = self.fail(node, "write_binary second argument must be Vec[u8]")
+                    let _ = self.fail(node, "write_binary second argument must be List[u8]")
                     return comptime_control_error()
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_write_file(resolved, data) as i64))
         self.fail(node, "ToolFs capability method '" ++ method ++ "' is not implemented yet")
@@ -6012,13 +6012,13 @@ impl ComptimeEvaluator:
                 return self.fail(node, "ProcessRunner.run_spec: capture fields must be bool")
             if spec_capture_stdout.data0 == 0 or spec_capture_stderr.data0 == 0:
                 return self.fail(node, "ProcessRunner.run_spec: non-capturing stdout/stderr is not implemented")
-            var argv_parts: Vec[str] = Vec.new()
+            var argv_parts: List[str] = List.new()
             argv_parts.push(with_str_clone_ref(executable.text))
-            if spec_args.kind == ComptimeValueKind.CV_VEC or spec_args.kind == ComptimeValueKind.CV_ARRAY:
+            if spec_args.kind == ComptimeValueKind.CV_LIST or spec_args.kind == ComptimeValueKind.CV_ARRAY:
                 for ai in 0..spec_args.extra_count:
                     let elem = self.extra_value_at((spec_args.extra_start + ai) as i64)
                     argv_parts.push(with_str_clone_ref(elem.text))
-            let argv = self.vec_str_to_argv_from_parts(argv_parts, method, node)
+            let argv = self.list_str_to_argv_from_parts(argv_parts, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
             let stdout_path = self.capability_arg_str(spec_args_signal.value, 1, method, node)
@@ -6030,7 +6030,7 @@ impl ComptimeEvaluator:
             let timeout_ms = spec_timeout.data0 as i32
             let has_cwd = spec_cwd.text.len() > 0
             let env_vars = if spec_env.kind == ComptimeValueKind.CV_STRUCT: self.struct_field_value_by_name(spec_env, "vars") else: comptime_value_invalid()
-            let has_env = env_vars.kind == ComptimeValueKind.CV_VEC and env_vars.extra_count > 0
+            let has_env = env_vars.kind == ComptimeValueKind.CV_LIST and env_vars.extra_count > 0
             let has_stdin = spec_stdin.text.len() > 0
             if has_stdin and (has_cwd or has_env):
                 return self.fail(node, "ProcessRunner.run_spec: stdin cannot yet be combined with cwd or env")
@@ -6088,7 +6088,7 @@ impl ComptimeEvaluator:
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_exec_wait(pid, timeout_ms) as i64))
 
         let argv_value = self.extra_value_at(args_signal.value.extra_start as i64)
-        let argv = self.vec_str_to_argv(argv_value, method, node)
+        let argv = self.list_str_to_argv(argv_value, method, node)
         if self.had_error != 0:
             return comptime_control_error()
         let argv_parts = self.effect_argv_parts_from_value(argv_value)
@@ -6207,11 +6207,11 @@ impl ComptimeEvaluator:
         if method == "target_name":
             return comptime_control_value(comptime_value_str(record.target_name))
         if method == "inputs":
-            return comptime_control_value(self.str_vec_value(record.inputs, node))
+            return comptime_control_value(self.str_list_value(record.inputs, node))
         if method == "outputs":
-            return comptime_control_value(self.str_vec_value(record.outputs, node))
+            return comptime_control_value(self.str_list_value(record.outputs, node))
         if method == "args":
-            return comptime_control_value(self.str_vec_value(record.args, node))
+            return comptime_control_value(self.str_list_value(record.args, node))
         if method == "output":
             if record.outputs.len() == 0:
                 return comptime_control_value(comptime_value_str(""))
@@ -6221,7 +6221,7 @@ impl ComptimeEvaluator:
         if method == "working_dir":
             return comptime_control_value(comptime_value_str(record.cwd))
         if method == "env":
-            return comptime_control_value(self.str_vec_value(record.env, node))
+            return comptime_control_value(self.str_list_value(record.env, node))
         if method == "network":
             return comptime_control_value(comptime_value_bool(if record.network != 0: 1 else: 0))
         let child_kind =
@@ -6245,15 +6245,15 @@ impl ComptimeEvaluator:
         // at evaluator teardown, so the child owns clones (#715 class).
         var child = comptime_capability_record(child_kind, record.package_name, record.package_version, record.project_root)
         child.target_name = move record.target_name
-        child.inputs = ce_clone_str_vec(&record.inputs)
-        child.outputs = ce_clone_str_vec(&record.outputs)
-        child.args = ce_clone_str_vec(&record.args)
+        child.inputs = ce_clone_str_list(&record.inputs)
+        child.outputs = ce_clone_str_list(&record.outputs)
+        child.args = ce_clone_str_list(&record.args)
         if child_kind == CapabilityKind.CK_BUILD_TOOL_FS:
-            child.write_scope = ce_clone_str_vec(&record.write_scope)
+            child.write_scope = ce_clone_str_list(&record.write_scope)
             child.write_scoped = 1
             child.scratch_path = move record.scratch_path
         else if child_kind == CapabilityKind.CK_BUILD_PROCESS_RUNNER:
-            child.write_scope = ce_clone_str_vec(&record.write_scope)
+            child.write_scope = ce_clone_str_list(&record.write_scope)
             child.write_scoped = record.write_scoped
             child.network = record.network
         comptime_control_value(self.mint_capability(child_type, move child))
@@ -6292,7 +6292,7 @@ impl ComptimeEvaluator:
                 if record.intercept_phase == 3:
                     record.generation = record.generation + 1
                     record.intercept_phase = -1
-                    record.messages = Vec.new()
+                    record.messages = List.new()
                     record.message_cursor = 0
                     record.intercept_started = 0
                     record.pending_link_active = 0
@@ -6337,7 +6337,7 @@ impl ComptimeEvaluator:
             if record.generation <= 0:
                 record.generation = 1
             record.intercept_phase = -1
-            record.messages = Vec.new()
+            record.messages = List.new()
             record.message_cursor = 0
             self.store_workspace_record(workspace_id, record)
             return comptime_control_value(comptime_value_void(0))
@@ -6559,7 +6559,7 @@ impl ComptimeEvaluator:
         // Every element first, then the run of extra values: an element's
         // own evaluation pushes extra values (a call's arguments, a nested
         // aggregate), which interleaved with the elements (#2026).
-        let elems: Vec[ComptimeValue] = Vec.new()
+        let elems: List[ComptimeValue] = List.new()
         for i in 0..count:
             var elem_signal = self.eval_expr(self.ast.get_extra(extra_start + (if fill_count_node != 0: 0 else: i)))
             if elem_signal.kind != ComptimeControlKind.CTL_VALUE:
@@ -6575,7 +6575,7 @@ impl ComptimeEvaluator:
         let count = self.ast.get_data1(node)
         // As eval_array: the elements first, then their run (#2026: a
         // `(rc, fs.read_text(p))` tuple read back `p`, the call's argument).
-        let elems: Vec[ComptimeValue] = Vec.new()
+        let elems: List[ComptimeValue] = List.new()
         for i in 0..count:
             var elem_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
             if elem_signal.kind != ComptimeControlKind.CTL_VALUE:
@@ -6603,8 +6603,8 @@ impl ComptimeEvaluator:
         let field_total = self.sema.type_reflection_field_count(type_id)
         let extra_start = self.ast.get_data1(node)
         let init_count = self.ast.get_data2(node)
-        let init_syms: Vec[i32] = Vec.new()
-        let init_values: Vec[ComptimeValue] = Vec.new()
+        let init_syms: List[i32] = List.new()
+        let init_values: List[ComptimeValue] = List.new()
 
         for fi in 0..init_count:
             var field_sym = self.ast.get_extra(extra_start + fi * 2)
@@ -6820,7 +6820,7 @@ impl ComptimeEvaluator:
             return self.fail(node, "comptime index must be an integer")
         let index = comptime_value_intlike(index_signal.value)
         let base = move base_signal.value
-        if base.kind == ComptimeValueKind.CV_ARRAY or base.kind == ComptimeValueKind.CV_TUPLE or base.kind == ComptimeValueKind.CV_VEC:
+        if base.kind == ComptimeValueKind.CV_ARRAY or base.kind == ComptimeValueKind.CV_TUPLE or base.kind == ComptimeValueKind.CV_LIST:
             if index < 0 or index >= base.extra_count as i64:
                 return self.fail(node, "comptime index out of bounds")
             return comptime_control_value(self.extra_value_at((base.extra_start + index as i32) as i64))
@@ -6833,11 +6833,11 @@ impl ComptimeEvaluator:
             // this evaluator did to the widening (the pre-#1017 seed
             // sign-extended it).
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_u8 as i32), (base.text[index] as i64) & 255))
-        // A Vec[u8] the evaluator holds as bytes (ToolFs.read_binary,
+        // A List[u8] the evaluator holds as bytes (ToolFs.read_binary,
         // StringBuilder.bytes): `xs[i]` is its one element spelling (D71).
         if base.kind == ComptimeValueKind.CV_BYTES:
             if index < 0 or index >= base.text.len():
-                return self.fail(node, "comptime Vec[u8] index out of bounds")
+                return self.fail(node, "comptime List[u8] index out of bounds")
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_u8 as i32), (base.text[index] as i64) & 255))
         self.fail(node, "comptime index requires an array, tuple, vec, or str")
 
@@ -6858,7 +6858,7 @@ impl ComptimeEvaluator:
     mut fn eval_fstring(node: i32) -> ComptimeControl:
         let segment_count = self.ast.get_data0(node)
         let extra_start = self.ast.get_data1(node)
-        let parts: Vec[str] = Vec.new()
+        let parts: List[str] = List.new()
         var cursor = extra_start
         for si in 0..segment_count:
             let segment_kind = self.ast.get_extra(cursor)
@@ -6995,7 +6995,7 @@ impl ComptimeEvaluator:
 
     mut fn eval_binary_membership(node: i32, lhs: &ComptimeValue, rhs: &ComptimeValue, negate: i32) -> ComptimeControl:
         var matched = 0
-        if rhs.kind == ComptimeValueKind.CV_ARRAY or rhs.kind == ComptimeValueKind.CV_TUPLE or rhs.kind == ComptimeValueKind.CV_VEC:
+        if rhs.kind == ComptimeValueKind.CV_ARRAY or rhs.kind == ComptimeValueKind.CV_TUPLE or rhs.kind == ComptimeValueKind.CV_LIST:
             for i in 0..rhs.extra_count:
                 let item = self.extra_value_at((rhs.extra_start + i) as i64)
                 if comptime_values_equal(lhs, item, self.extra_values) != 0:
@@ -7018,23 +7018,23 @@ impl ComptimeEvaluator:
             return false
         self.ast.kind(node) == NodeKind.NK_BINARY and self.ast.get_data0(node) == BinaryOp.OP_CONCAT
 
-    fn collect_left_comptime_concat_parts(node: i32) -> Vec[i32]:
-        let rev: Vec[i32] = Vec.new()
+    fn collect_left_comptime_concat_parts(node: i32) -> List[i32]:
+        let rev: List[i32] = List.new()
         var cur = node
         while self.is_comptime_concat_node(cur):
             rev.push(self.ast.get_data2(cur))
             cur = self.ast.get_data1(cur)
         rev.push(cur)
 
-        let out: Vec[i32] = Vec.new()
+        let out: List[i32] = List.new()
         var i = rev.len() as i32 - 1
         while i >= 0:
             out.push(rev[i])
             i = i - 1
         out
 
-    mut fn eval_concat_chain(node: i32, parts: &Vec[i32]) -> ComptimeControl:
-        let texts: Vec[str] = Vec.new()
+    mut fn eval_concat_chain(node: i32, parts: &List[i32]) -> ComptimeControl:
+        let texts: List[str] = List.new()
         for i in 0..parts.len() as i32:
             let signal = self.eval_expr(parts[i])
             if signal.kind != ComptimeControlKind.CTL_VALUE:
@@ -7531,7 +7531,7 @@ impl ComptimeEvaluator:
         // #2220: a map iterates its entries as (key, value) tuples, D44's
         // `for (k, v) in map`; the entries sit in extra_values as pairs.
         let is_map = iterable_signal.value.kind == ComptimeValueKind.CV_MAP
-        if iterable_signal.value.kind == ComptimeValueKind.CV_ARRAY or iterable_signal.value.kind == ComptimeValueKind.CV_TUPLE or iterable_signal.value.kind == ComptimeValueKind.CV_VEC or is_map:
+        if iterable_signal.value.kind == ComptimeValueKind.CV_ARRAY or iterable_signal.value.kind == ComptimeValueKind.CV_TUPLE or iterable_signal.value.kind == ComptimeValueKind.CV_LIST or is_map:
             count = iterable_signal.value.extra_count
         else if iterable_signal.value.kind == ComptimeValueKind.CV_RANGE:
             let start_value = iterable_signal.value.data0
@@ -7582,7 +7582,7 @@ impl ComptimeEvaluator:
     // expression once per binding of its clauses that passes the filter, in
     // clause order. The result is the collection Sema typed the node as.
     mut fn eval_array_comprehension(node: i32) -> ComptimeControl:
-        let start_state = ComptimeComprehension { signal: comptime_control_value(comptime_value_void(self.sema.ty_void as i32)), elems: Vec.new() }
+        let start_state = ComptimeComprehension { signal: comptime_control_value(comptime_value_void(self.sema.ty_void as i32)), elems: List.new() }
         var done = self.eval_comprehension_clause(node, 0, move start_state)
         if done.signal.kind != ComptimeControlKind.CTL_VALUE:
             return move done.signal
@@ -7592,8 +7592,8 @@ impl ComptimeEvaluator:
         for elem in elems.into_iter():
             self.push_extra_value(elem)
         let type_id = self.node_type_or(node, 0)
-        if type_id != 0 and self.sema.std_generic_of(type_id) == StdGeneric.Vec:
-            return comptime_control_value(comptime_value_vec(type_id, start, count))
+        if type_id != 0 and self.sema.std_generic_of(type_id) == StdGeneric.Sequence:
+            return comptime_control_value(comptime_value_list(type_id, start, count))
         comptime_control_value(comptime_value_array(type_id, start, count))
 
     mut fn eval_comprehension_clause(node: i32, clause: i32, state0: ComptimeComprehension) -> ComptimeComprehension:
@@ -7614,7 +7614,7 @@ impl ComptimeEvaluator:
             return state
         let source = move iterable_signal.value
         var count = 0
-        if source.kind == ComptimeValueKind.CV_ARRAY or source.kind == ComptimeValueKind.CV_TUPLE or source.kind == ComptimeValueKind.CV_VEC:
+        if source.kind == ComptimeValueKind.CV_ARRAY or source.kind == ComptimeValueKind.CV_TUPLE or source.kind == ComptimeValueKind.CV_LIST:
             count = source.extra_count
         else if source.kind == ComptimeValueKind.CV_RANGE:
             count = if source.extra_start != 0: (source.data1 - source.data0 + 1) as i32 else: (source.data1 - source.data0) as i32
@@ -7690,14 +7690,14 @@ impl ComptimeEvaluator:
                 return self.ast.get_data2(callee)
         0
 
-    mut fn install_generic_substitutions(tp_syms: &Vec[i32], tp_tys: &Vec[i32], node: i32) -> ComptimeGenericSubstSnapshot:
-        let saved_named_had: Vec[i32] = Vec.new()
-        let saved_named_tys: Vec[i32] = Vec.new()
-        let snapshot_tp_syms: Vec[i32] = Vec.new()
+    mut fn install_generic_substitutions(tp_syms: &List[i32], tp_tys: &List[i32], node: i32) -> ComptimeGenericSubstSnapshot:
+        let saved_named_had: List[i32] = List.new()
+        let saved_named_tys: List[i32] = List.new()
+        let snapshot_tp_syms: List[i32] = List.new()
         let saved_subst_syms = move self.sema.generic_subst_param_syms
         let saved_subst_tys = move self.sema.generic_subst_type_ids
-        self.sema.generic_subst_param_syms = Vec.new()
-        self.sema.generic_subst_type_ids = Vec.new()
+        self.sema.generic_subst_param_syms = List.new()
+        self.sema.generic_subst_type_ids = List.new()
         for i in 0..tp_syms.len() as i32:
             let tp_sym = tp_syms[i]
             snapshot_tp_syms.push(tp_sym)
@@ -7739,8 +7739,8 @@ impl ComptimeEvaluator:
         self.sema.generic_subst_type_ids = move owned.saved_subst_tys
 
     mut fn resolve_generic_comptime_type_args(fn_node: i32, callee: i32, node: i32) -> ComptimeGenericResolvedArgs:
-        let out_syms: Vec[i32] = Vec.new()
-        let out_tys: Vec[i32] = Vec.new()
+        let out_syms: List[i32] = List.new()
+        let out_tys: List[i32] = List.new()
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
             let _ = self.fail(node, "missing comptime function metadata")
@@ -7805,7 +7805,7 @@ impl ComptimeEvaluator:
                     // annotation) names the instance, as Sema would (Law 2).
                     if result_type != 0 and self.sema.get_type_kind(self.sema.resolve_alias(result_type)) != TypeKind.TY_GENERIC_INST:
                         let recv_name = self.sema.type_name(self.sema.resolve_alias(result_type))
-                        let base = if comptime_type_name_has_base(recv_name, "Vec") != 0: "Vec" else if comptime_type_name_has_base(recv_name, "HashMap") != 0: "HashMap" else: ""
+                        let base = if comptime_type_name_has_base(recv_name, "List") != 0: "List" else if comptime_type_name_has_base(recv_name, "HashMap") != 0: "HashMap" else: ""
                         let demanded = self.expected_type()
                         if base.len() > 0 and demanded != 0 and self.sema.get_type_kind(self.sema.resolve_alias(demanded)) == TypeKind.TY_GENERIC_INST and comptime_type_name_has_base(self.sema.type_name(self.sema.resolve_alias(demanded)), base) != 0:
                             result_type = demanded
@@ -7815,7 +7815,7 @@ impl ComptimeEvaluator:
                     if result_type != 0:
                         let resolved_result = self.sema.resolve_alias(result_type)
                         let result_name = self.sema.type_name(resolved_result)
-                        if comptime_type_name_has_base(result_name, "Vec") != 0 or comptime_type_name_has_base(result_name, "HashMap") != 0:
+                        if comptime_type_name_has_base(result_name, "List") != 0 or comptime_type_name_has_base(result_name, "HashMap") != 0:
                             return self.eval_static_collection_new(result_type, node, arg_count)
                 return self.eval_static_type_method_call(recv_type, field, self.ast.get_data1(node), arg_count, node)
             var recv_signal = self.eval_expr(recv_node)
@@ -7835,10 +7835,10 @@ impl ComptimeEvaluator:
                         return self.eval_fn_value_call(field_value, self.ast.get_data1(node), arg_count, node)
                 if self.sema.pipeline_method_exists(recv_signal.value.type_id, field) != 0:
                     return self.eval_user_method_value(recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node, 0)
-            if recv_signal.value.kind == ComptimeValueKind.CV_VEC or recv_signal.value.kind == ComptimeValueKind.CV_BYTES:
+            if recv_signal.value.kind == ComptimeValueKind.CV_LIST or recv_signal.value.kind == ComptimeValueKind.CV_BYTES:
                 if recv_signal.value.kind == ComptimeValueKind.CV_BYTES:
                     return self.eval_bytes_method_call(recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
-                return self.eval_vec_method_call(recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
+                return self.eval_list_method_call(recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
             if recv_signal.value.kind == ComptimeValueKind.CV_MAP:
                 return self.eval_map_method_call(recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
             if recv_signal.value.kind == ComptimeValueKind.CV_STR:
@@ -7852,7 +7852,7 @@ impl ComptimeEvaluator:
             let resolved_type_args = self.resolve_generic_comptime_type_args(fn_node, callee, node)
             if resolved_type_args.ok == 0:
                 return comptime_control_error()
-            let arg_values: Vec[ComptimeValue] = Vec.new()
+            let arg_values: List[ComptimeValue] = List.new()
             let extra_start = self.ast.get_data1(node)
             for i in 0..arg_count:
                 var arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
@@ -7903,7 +7903,7 @@ impl ComptimeEvaluator:
             return self.fail(node, "a precondition form's condition is a bool")
         if truthy != 0:
             return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
-        let arg_values: Vec[ComptimeValue] = Vec.new()
+        let arg_values: List[ComptimeValue] = List.new()
         arg_values.push(move cond_signal.value)
         for i in 1..arg_count:
             var arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
@@ -7922,7 +7922,7 @@ impl ComptimeEvaluator:
             return self.eval_src_call(node, arg_count)
         if fn_sym == self.sema.syms.embed_file:
             return self.eval_embed_file_call(node, arg_count)
-        let arg_values: Vec[ComptimeValue] = Vec.new()
+        let arg_values: List[ComptimeValue] = List.new()
         for i in 0..arg_count:
             var arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
             if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
@@ -7930,7 +7930,7 @@ impl ComptimeEvaluator:
             arg_values.push(move arg_signal.value)
         self.eval_fn_symbol_call_values(fn_sym, arg_values, node)
 
-    mut fn eval_allowed_runtime_call(fn_sym: i32, arg_values: &Vec[ComptimeValue], node: i32) -> ComptimeControl:
+    mut fn eval_allowed_runtime_call(fn_sym: i32, arg_values: &List[ComptimeValue], node: i32) -> ComptimeControl:
         let fn_name = self.pool.resolve(fn_sym)
         if fn_name == "with_panic" or fn_name == "with_panic_ref":
             if arg_values.len() as i32 != 3:
@@ -8063,12 +8063,12 @@ impl ComptimeEvaluator:
             return comptime_control_value(comptime_value_str(with_sysinfo_hostname()))
         comptime_control_error()
 
-    mut fn eval_fn_symbol_call_values(fn_sym: i32, arg_values: &Vec[ComptimeValue], node: i32) -> ComptimeControl:
-        let empty_tp_syms: Vec[i32] = Vec.new()
-        let empty_tp_tys: Vec[i32] = Vec.new()
+    mut fn eval_fn_symbol_call_values(fn_sym: i32, arg_values: &List[ComptimeValue], node: i32) -> ComptimeControl:
+        let empty_tp_syms: List[i32] = List.new()
+        let empty_tp_tys: List[i32] = List.new()
         self.eval_fn_symbol_call_values_with_type_args(fn_sym, arg_values, node, empty_tp_syms, empty_tp_tys)
 
-    mut fn eval_fn_symbol_call_values_with_type_args(fn_sym: i32, arg_values: &Vec[ComptimeValue], node: i32, tp_syms: &Vec[i32], tp_tys: &Vec[i32]) -> ComptimeControl:
+    mut fn eval_fn_symbol_call_values_with_type_args(fn_sym: i32, arg_values: &List[ComptimeValue], node: i32, tp_syms: &List[i32], tp_tys: &List[i32]) -> ComptimeControl:
         if tp_syms.len() == 0:
             let inferred = self.inferred_generic_type_args(fn_sym, arg_values, node)
             if inferred.ok == 0:
@@ -8083,13 +8083,13 @@ impl ComptimeEvaluator:
     /// them from the arguments (check_generic_call) and recorded the concrete
     /// specialization on the call node; read that, never re-derive it (D65).
     /// `ok` with no type arguments when the callee is not generic.
-    mut fn inferred_generic_type_args(fn_sym: i32, arg_values: &Vec[ComptimeValue], node: i32) -> ComptimeGenericResolvedArgs:
+    mut fn inferred_generic_type_args(fn_sym: i32, arg_values: &List[ComptimeValue], node: i32) -> ComptimeGenericResolvedArgs:
         let fn_node = self.find_fn_decl_node(fn_sym)
         if fn_node == 0:
-            return ComptimeGenericResolvedArgs { ok: 1, tp_syms: Vec.new(), tp_tys: Vec.new() }
+            return ComptimeGenericResolvedArgs { ok: 1, tp_syms: List.new(), tp_tys: List.new() }
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0 or self.ast.fn_meta_tp_count(meta) == 0:
-            return ComptimeGenericResolvedArgs { ok: 1, tp_syms: Vec.new(), tp_tys: Vec.new() }
+            return ComptimeGenericResolvedArgs { ok: 1, tp_syms: List.new(), tp_tys: List.new() }
         var concrete_sig = -1
         let recorded = self.sema.resolved_call_sigs.get(node)
         if recorded.is_some():
@@ -8097,8 +8097,8 @@ impl ComptimeEvaluator:
         else:
             // Fold-order evaluation can reach a call Sema has not checked yet:
             // ask Sema now, as eval_user_method_value does for methods.
-            let arg_types: Vec[i32] = Vec.new()
-            let arg_nodes: Vec[i32] = Vec.new()
+            let arg_types: List[i32] = List.new()
+            let arg_nodes: List[i32] = List.new()
             for i in 0..arg_values.len() as i32:
                 arg_types.push(self.comptime_value_semantic_type(arg_values[i]))
             let ret_ty = self.sema.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, arg_values.len() as i32, node)
@@ -8107,10 +8107,10 @@ impl ComptimeEvaluator:
                 concrete_sig = checked.unwrap()
         if concrete_sig < 0:
             let _ = self.fail(node, "generic comptime function '" ++ self.pool.resolve(fn_sym) ++ "' has no type arguments inferred for this call")
-            return ComptimeGenericResolvedArgs { ok: 0, tp_syms: Vec.new(), tp_tys: Vec.new() }
+            return ComptimeGenericResolvedArgs { ok: 0, tp_syms: List.new(), tp_tys: List.new() }
         self.concrete_method_comptime_type_args(fn_sym, concrete_sig, node)
 
-    mut fn eval_fn_symbol_call_values_with_resolved_type_args(fn_sym: i32, arg_values: &Vec[ComptimeValue], node: i32, tp_syms: &Vec[i32], tp_tys: &Vec[i32]) -> ComptimeControl:
+    mut fn eval_fn_symbol_call_values_with_resolved_type_args(fn_sym: i32, arg_values: &List[ComptimeValue], node: i32, tp_syms: &List[i32], tp_tys: &List[i32]) -> ComptimeControl:
         self.last_call_has_mut_receiver = 0
         self.last_call_mut_receiver = comptime_value_invalid()
         let fn_name: str = with_str_clone_ref(self.pool.resolve(fn_sym))
@@ -8212,11 +8212,11 @@ impl ComptimeEvaluator:
                 self.install_generic_substitutions(tp_syms, tp_tys, node)
             else:
                 ComptimeGenericSubstSnapshot {
-                    tp_syms: Vec.new(),
-                    saved_named_had: Vec.new(),
-                    saved_named_tys: Vec.new(),
-                    saved_subst_syms: Vec.new(),
-                    saved_subst_tys: Vec.new(),
+                    tp_syms: List.new(),
+                    saved_named_had: List.new(),
+                    saved_named_tys: List.new(),
+                    saved_subst_syms: List.new(),
+                    saved_subst_tys: List.new(),
                 }
         // #679: same-file calls (the hot case in interpreted loops) skip the
         // context switch — decl_path clones a str per call otherwise.
@@ -8306,19 +8306,19 @@ impl ComptimeEvaluator:
             return self.fail(fn_node, "loop control escaped comptime function")
         body_signal
 
-    mut fn eval_parallel_workspaces_call(arg_values: &Vec[ComptimeValue], node: i32) -> ComptimeControl:
+    mut fn eval_parallel_workspaces_call(arg_values: &List[ComptimeValue], node: i32) -> ComptimeControl:
         if arg_values.len() as i32 != 1:
-            return self.fail(node, "parallel takes one Vec[Workspace] argument")
+            return self.fail(node, "parallel takes one List[Workspace] argument")
         let workspaces = arg_values[0]
-        if workspaces.kind != ComptimeValueKind.CV_VEC and workspaces.kind != ComptimeValueKind.CV_ARRAY:
-            return self.fail(node, "parallel expects a Vec[Workspace]")
+        if workspaces.kind != ComptimeValueKind.CV_LIST and workspaces.kind != ComptimeValueKind.CV_ARRAY:
+            return self.fail(node, "parallel expects a List[Workspace]")
         let result_type = self.node_type_or(node, 0)
         if result_type == 0:
             return self.fail(node, "parallel result type is unknown")
-        let plans: Vec[ComptimeWorkspaceCompilePlan] = Vec.new()
+        let plans: List[ComptimeWorkspaceCompilePlan] = List.new()
         var par_project_root = ""
-        let workspace_ids: Vec[i32] = Vec.new()
-        let intercepted: Vec[i32] = Vec.new()
+        let workspace_ids: List[i32] = List.new()
+        let intercepted: List[i32] = List.new()
         for i in 0..workspaces.extra_count:
             let workspace_value = self.extra_value_at((workspaces.extra_start + i) as i64)
             let workspace_id = self.workspace_record_index(workspace_value, "parallel", node)
@@ -8343,7 +8343,7 @@ impl ComptimeEvaluator:
             plans.push(move plan)
             workspace_ids.push(workspace_id)
             intercepted.push(if record.intercept_active != 0: 1 else: 0)
-        let native_results: Vec[ComptimeWorkspaceNativeCompileResult] = Vec.new()
+        let native_results: List[ComptimeWorkspaceNativeCompileResult] = List.new()
         if plans.len() as i32 == 1:
             native_results.push(comptime_execute_workspace_compile_plan(ce_clone_compile_plan(&plans[0])))
         else:
@@ -8357,9 +8357,9 @@ impl ComptimeEvaluator:
             let par_dir = par_project_root ++ "/out/.workspace-parallel"
             let _par_mkdir = with_fs_mkdir_p(par_dir)
             let self_exe = with_arg_at(0)
-            let pids: Vec[i32] = Vec.new()
-            let result_paths: Vec[str] = Vec.new()
-            let err_paths: Vec[str] = Vec.new()
+            let pids: List[i32] = List.new()
+            let result_paths: List[str] = List.new()
+            let err_paths: List[str] = List.new()
             for i in 0..plans.len() as i32:
                 if intercepted[i] != 0:
                     pids.push(-1)
@@ -8404,7 +8404,7 @@ impl ComptimeEvaluator:
                     if err_text.len() > 0:
                         with_eprint(err_text)
                 native_results.push(child)
-        let results: Vec[ComptimeValue] = Vec.new()
+        let results: List[ComptimeValue] = List.new()
         for i in 0..native_results.len() as i32:
             let plan = &plans[i]
             let native = native_results[i]
@@ -8421,7 +8421,7 @@ impl ComptimeEvaluator:
                         unsafe:
                             self.workspace_success_messages(*native.comp, (*native.comp).zcu.last_sema.ast, node)
                     else:
-                        Vec.new()
+                        List.new()
                 record.intercept_started = 1
                 // The enqueue retains the result inside the Complete message;
                 // hand it a clone so the copy pushed into `results` below (the
@@ -8436,7 +8436,7 @@ impl ComptimeEvaluator:
         let start = self.extra_values.len() as i32
         for i in 0..results.len() as i32:
             self.extra_values.push(comptime_value_clone(results[i]))
-        comptime_control_value(comptime_value_vec(result_type, start, workspaces.extra_count))
+        comptime_control_value(comptime_value_list(result_type, start, workspaces.extra_count))
 
     mut fn eval_return(node: i32) -> ComptimeControl:
         let value_node = self.ast.get_data0(node)

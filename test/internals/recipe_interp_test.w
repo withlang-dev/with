@@ -87,10 +87,10 @@ fn demo_recipe() -> str:
     "            self.cpp_info.components[\"core\"].defines.append(\"ZLIB_DLL\")\n" ++
     ""
 
-fn env(os: &str, compiler: &str, version: &str, options: Vec[str], known: bool): RecipeEnv { os: os.to_owned(), arch: "x86_64", compiler: compiler.to_owned(), compiler_version: "13", build_type: "Release", version: version.to_owned(), package_folder: "", source_folder: "", options, options_known: known }
+fn env(os: &str, compiler: &str, version: &str, options: List[str], known: bool): RecipeEnv { os: os.to_owned(), arch: "x86_64", compiler: compiler.to_owned(), compiler_version: "13", build_type: "Release", version: version.to_owned(), package_folder: "", source_folder: "", options, options_known: known }
 
-fn options(lines: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn options(lines: &str) -> List[str]:
+    var out: List[str] = List.new()
     for line in lines.split(" "): out.push(line.to_owned())
     out
 
@@ -135,7 +135,7 @@ fn main:
 
     // A package built here takes the recipe's defaults, after its own
     // config_options: no fPIC on Windows, so the `if` that reads it is reported.
-    let windows = recipe_package_info(demo_recipe(), &env("Windows", "clang", "2.0", Vec.new(), false))
+    let windows = recipe_package_info(demo_recipe(), &env("Windows", "clang", "2.0", List.new(), false))
     assert(windows.ok)
     let win_core = &windows.components[component(&windows, "core")]
     assert(win_core.libs.join(",") == "demo-static")
@@ -148,20 +148,20 @@ fn main:
     assert(fpic_noted)
 
     // The recipe's own property decides: gcc on Windows is MinGW.
-    let mingw = recipe_package_info(demo_recipe(), &env("Windows", "gcc", "2.0", Vec.new(), false))
+    let mingw = recipe_package_info(demo_recipe(), &env("Windows", "gcc", "2.0", List.new(), false))
     assert(mingw.components[component(&mingw, "core")].system_libs.join(",") == "kernel32,user32,imm32,mingw32")
 
     // msvc names the library its own way.
     let msvc = recipe_package_info(demo_recipe(), &env("Windows", "msvc", "2.0", options("shared=False audio=True video=True with_ssl=False"), true))
     assert(msvc.components[component(&msvc, "core")].libs.join(",") == "libdemo-static")
 
-    let built = recipe_built_options(demo_recipe(), &env("Windows", "clang", "2.0", Vec.new(), false)).join(" ")
+    let built = recipe_built_options(demo_recipe(), &env("Windows", "clang", "2.0", List.new(), false)).join(" ")
     assert(built.contains("shared=False"))
     assert(built.contains("audio=True"))
     assert(built.contains("with_ssl=openssl"))
     assert(not built.contains("fPIC"))
 
     // No package_info, or no recipe at all, is an error and not an empty answer.
-    assert(not recipe_package_info("class A(ConanFile):\n    name = \"a\"\n", &env("Linux", "gcc", "1", Vec.new(), false)).ok)
-    assert(not recipe_package_info("x = 1\n", &env("Linux", "gcc", "1", Vec.new(), false)).ok)
+    assert(not recipe_package_info("class A(ConanFile):\n    name = \"a\"\n", &env("Linux", "gcc", "1", List.new(), false)).ok)
+    assert(not recipe_package_info("x = 1\n", &env("Linux", "gcc", "1", List.new(), false)).ok)
     print("ok")

@@ -3,8 +3,8 @@
 // #1406: the join carries the union of its arms' origins (§3.8 rule 3). The
 // parameter view `r` must not hide the element origin `v` of the other arm.
 
-fn mkv() -> Vec[str]:
-    var v: Vec[str] = Vec.new()
+fn mkv() -> List[str]:
+    var v: List[str] = List.new()
     v.push("a".clone())
     v
 

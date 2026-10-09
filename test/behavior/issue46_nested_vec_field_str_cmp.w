@@ -8,11 +8,11 @@ type Entry {
 }
 
 type Sig {
-    params: Vec[Param],
+    params: List[Param],
 }
 
 type Bindings {
-    entries: Vec[Entry],
+    entries: List[Entry],
 }
 
 error E =
@@ -21,7 +21,7 @@ error E =
 fn nested_name_eq(bindings: Bindings) -> bool:
     bindings.entries[0].name == bindings.entries[1].name
 
-fn resolve(sig: Sig, bindings: Bindings) -> Result[Vec[i32], E]:
+fn resolve(sig: Sig, bindings: Bindings) -> Result[List[i32], E]:
     var bi: i32 = 0
     while bi < bindings.entries.len() as i32:
         let name = bindings.entries[bi].name
@@ -39,7 +39,7 @@ fn resolve(sig: Sig, bindings: Bindings) -> Result[Vec[i32], E]:
             return Err(.Bad)
         bi = bi + 1
 
-    let ordered: Vec[i32] = Vec.new()
+    let ordered: List[i32] = List.new()
     for pi in 0..sig.params.len():
         let param = sig.params[pi]
         var found = false
@@ -54,23 +54,23 @@ fn resolve(sig: Sig, bindings: Bindings) -> Result[Vec[i32], E]:
     Ok(ordered)
 
 fn main:
-    let same_entries: Vec[Entry] = Vec.new()
+    let same_entries: List[Entry] = List.new()
     same_entries.push(Entry { name: "a" })
     same_entries.push(Entry { name: "a" })
     assert(nested_name_eq(Bindings { entries: same_entries }))
 
-    let diff_entries: Vec[Entry] = Vec.new()
+    let diff_entries: List[Entry] = List.new()
     diff_entries.push(Entry { name: "a" })
     diff_entries.push(Entry { name: "b" })
     assert(not nested_name_eq(Bindings { entries: diff_entries }))
 
-    let params: Vec[Param] = Vec.new()
+    let params: List[Param] = List.new()
     params.push(Param { name: "a", rank: 1 })
     params.push(Param { name: "out", rank: 0 })
-    let entries: Vec[Entry] = Vec.new()
+    let entries: List[Entry] = List.new()
     entries.push(Entry { name: "a" })
     entries.push(Entry { name: "out" })
     let out = match resolve(Sig { params }, Bindings { entries }):
         Ok(v) => v
-        Err(_) => Vec.new()
+        Err(_) => List.new()
     assert(out.len() == 2)

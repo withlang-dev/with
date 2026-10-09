@@ -16,11 +16,11 @@ pub fn widened(range: TallyRange, by: i32) -> TallyRange: tally_widen(range, by)
 pub fn calls -> i32: tally_calls
 
 // C calls this once per value. Its userdata borrows a With callable whose
-// captures remain tracked; it never casts a raw pointer to a mutable Vec.
+// captures remain tracked; it never casts a raw pointer to a mutable List.
 fn collect(visit: &fn(i32) -> Unit, value: i32): visit(value)
 
-pub fn visited(values: []i32) -> Vec[i32]:
-    var seen: Vec[i32] = Vec.new()
+pub fn visited(values: []i32) -> List[i32]:
+    var seen: List[i32] = List.new()
     tally_each(values, collect, value => seen.push(value))
     seen
 

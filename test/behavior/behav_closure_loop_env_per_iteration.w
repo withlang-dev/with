@@ -19,17 +19,17 @@
 type Pt { x: i32, y: i32 }
 impl Copy for Pt
 
-fn keep(v: Vec[fn() -> i32], f: fn() -> i32) -> Vec[fn() -> i32]:
+fn keep(v: List[fn() -> i32], f: fn() -> i32) -> List[fn() -> i32]:
     var w = v
     w.push(f)
     w
 
 fn main:
-    var fs: Vec[fn() -> i32] = Vec.new()
+    var fs: List[fn() -> i32] = List.new()
     for i in 0..3:
         let n = i
         fs.push(move () => n * 10)
-    var gs: Vec[fn() -> i32] = Vec.new()
+    var gs: List[fn() -> i32] = List.new()
     var j = 0
     while j < 3:
         gs.push(move () => j * 10)
@@ -37,19 +37,19 @@ fn main:
     for k in 0..3:
         print(f"{fs[k]()} {gs[k]()}")
 
-    var hs: Vec[fn() -> i32] = Vec.new()
+    var hs: List[fn() -> i32] = List.new()
     for i in 0..3:
         let p = Pt { x: i, y: i + 1 }
         hs.push(move () => p.x + p.y)
     print(f"{hs[0]()} {hs[1]()} {hs[2]()}")
 
-    var ns: Vec[fn() -> i32] = Vec.new()
+    var ns: List[fn() -> i32] = List.new()
     for a in 0..2:
         for b in 0..2:
             ns.push(move () => a * 10 + b)
     print(f"{ns[0]()} {ns[1]()} {ns[2]()} {ns[3]()}")
 
-    var ts: Vec[fn(i32) -> i32] = Vec.new()
+    var ts: List[fn(i32) -> i32] = List.new()
     let base = 100
     for i in 0..3:
         ts = keep_arg(ts, move (x: i32) => base + i * 10 + x)
@@ -61,7 +61,7 @@ fn main:
         total = total + run(() => i + 1)
     print(total)
 
-fn keep_arg(v: Vec[fn(i32) -> i32], f: fn(i32) -> i32) -> Vec[fn(i32) -> i32]:
+fn keep_arg(v: List[fn(i32) -> i32], f: fn(i32) -> i32) -> List[fn(i32) -> i32]:
     var w = v
     w.push(f)
     w

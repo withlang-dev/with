@@ -3,8 +3,8 @@
 // #1406 (§3.4, §21.1 rule 10): a tuple of element views is a carrier of those
 // views; construction preserves their origin `v`.
 
-fn mkv() -> Vec[str]:
-    var v: Vec[str] = Vec.new()
+fn mkv() -> List[str]:
+    var v: List[str] = List.new()
     v.push("a".clone())
     v.push("b".clone())
     v

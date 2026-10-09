@@ -114,7 +114,7 @@ async fn main -> Result[Unit, AppError]:
 
     // --- Compute Final Stats ---
 
-    let sessions = with Vec.new() as mut sessions:
+    let sessions = with List.new() as mut sessions:
         sessions.push(Session { id: 1, addr: "127.0.0.1", packets_received: 5 })
         sessions.push(Session { id: 2, addr: "127.0.0.2", packets_received: 3 })
     let stats = compute_stats(&sessions)

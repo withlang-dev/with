@@ -36,8 +36,8 @@ impl BzBits:
     mut fn align():
         self.count = self.count - self.count % 8
 
-fn bz_crc_table() -> Vec[i64]:
-    let table: Vec[i64] = Vec.new()
+fn bz_crc_table() -> List[i64]:
+    let table: List[i64] = List.new()
     for i in 0..256:
         var c = (i as i64) << 24
         for _ in 0..8:
@@ -50,23 +50,23 @@ fn bz_crc_table() -> Vec[i64]:
 type BzHuffman {
     min_len: i32,
     max_len: i32,
-    limit: Vec[i64],
-    base: Vec[i64],
-    perm: Vec[i32],
+    limit: List[i64],
+    base: List[i64],
+    perm: List[i32],
 }
 
-fn bz_huffman(lengths: &Vec[i32]) -> BzHuffman:
+fn bz_huffman(lengths: &List[i32]) -> BzHuffman:
     var min_len = 32
     var max_len = 0
     for i in 0..lengths.len() as i32:
         if lengths[i] > max_len: max_len = lengths[i]
         if lengths[i] < min_len: min_len = lengths[i]
-    let perm: Vec[i32] = Vec.new()
+    let perm: List[i32] = List.new()
     for len in min_len..max_len + 1:
         for s in 0..lengths.len() as i32:
             if lengths[s] == len: perm.push(s)
-    let limit: Vec[i64] = Vec.new()
-    let base: Vec[i64] = Vec.new()
+    let limit: List[i64] = List.new()
+    let base: List[i64] = List.new()
     for _ in 0..22:
         limit.push(-1)
         base.push(0)
@@ -100,17 +100,17 @@ impl BzBits:
         0
 
 
-fn bz_bytes_to_str(v: &Vec[u8]) -> str:
+fn bz_bytes_to_str(v: &List[u8]) -> str:
     if v.len() == 0: return ""
     unsafe { with_str_from_bytes(&v[0] as *const u8, v.len()) }
 
 // The decompressed contents of the .bz2 file `data`, and "" — or "" and the
 // reason.
-pub fn bzip2_decompress(data: &str) -> Vec[str]:
-    let result: Vec[str] = Vec.new()
+pub fn bzip2_decompress(data: &str) -> List[str]:
+    let result: List[str] = List.new()
     var bits = BzBits { data: data.to_owned(), at: 0, buffer: 0, count: 0, problem: "" }
     let crc_table = bz_crc_table()
-    let out: Vec[u8] = Vec.new()
+    let out: List[u8] = List.new()
     var streams = 0
     while bits.at < data.len():
         bits.align()
@@ -144,7 +144,7 @@ pub fn bzip2_decompress(data: &str) -> Vec[str]:
             let orig_ptr = bits.bits(24)
             // The symbol map: which of the 256 byte values occur.
             let used16 = bits.bits(16)
-            let seq_to_unseq: Vec[i32] = Vec.new()
+            let seq_to_unseq: List[i32] = List.new()
             for i in 0..16:
                 if (used16 >> ((15 - i) as u32)) & 1 == 1:
                     let used = bits.bits(16)
@@ -163,9 +163,9 @@ pub fn bzip2_decompress(data: &str) -> Vec[str]:
                 result.push("a corrupt bzip2 block (coding groups)")
                 return result
             // Selectors, move-to-front coded in unary.
-            let mtf_groups: Vec[i32] = Vec.new()
+            let mtf_groups: List[i32] = List.new()
             for g in 0..groups: mtf_groups.push(g)
-            let selectors: Vec[i32] = Vec.new()
+            let selectors: List[i32] = List.new()
             for _ in 0..selectors_count:
                 var j = 0
                 while bits.bit() == 1:
@@ -182,9 +182,9 @@ pub fn bzip2_decompress(data: &str) -> Vec[str]:
                 mtf_groups[0] = v
                 selectors.push(v)
             // Code lengths per group, delta coded.
-            let tables: Vec[BzHuffman] = Vec.new()
+            let tables: List[BzHuffman] = List.new()
             for _ in 0..groups:
-                let lengths: Vec[i32] = Vec.new()
+                let lengths: List[i32] = List.new()
                 var len = bits.bits(5) as i32
                 for _ in 0..alpha_size:
                     while true:
@@ -197,11 +197,11 @@ pub fn bzip2_decompress(data: &str) -> Vec[str]:
                     lengths.push(len)
                 tables.push(bz_huffman(&lengths))
             // The MTF/RLE2 symbols into the BWT vector `tt`.
-            let mtf: Vec[i32] = Vec.new()
+            let mtf: List[i32] = List.new()
             for i in 0..256: mtf.push(i)
-            let counts: Vec[i64] = Vec.new()
+            let counts: List[i64] = List.new()
             for _ in 0..256: counts.push(0)
-            let tt: Vec[i32] = Vec.new()
+            let tt: List[i32] = List.new()
             let eob = alpha_size - 1
             var group_index = 0
             var group_left = 0
@@ -257,12 +257,12 @@ pub fn bzip2_decompress(data: &str) -> Vec[str]:
                 result.push("a corrupt bzip2 block (origin pointer)")
                 return result
             // Inverse BWT: tt[i]'s high bits link to the next position.
-            let starts: Vec[i64] = Vec.new()
+            let starts: List[i64] = List.new()
             var sum: i64 = 0
             for i in 0..256:
                 starts.push(sum)
                 sum = sum + counts[i]
-            let next: Vec[i32] = Vec.with_capacity(n)
+            let next: List[i32] = List.with_capacity(n)
             for _ in 0..n: next.push(0)
             for i in 0..n:
                 let b: i32 = tt[i as i32]

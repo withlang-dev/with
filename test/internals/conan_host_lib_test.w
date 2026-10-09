@@ -14,7 +14,7 @@ fn main:
     let _clean = runtime_remove_tree(root)
     assert(runtime_mkdir_p(root ++ "/a") == 0)
     assert(runtime_mkdir_p(root ++ "/b") == 0)
-    let dirs: Vec[str] = Vec.new()
+    let dirs: List[str] = List.new()
     dirs.push(root ++ "/a")
     dirs.push(root ++ "/b")
     // Only the runtime soname: link it by path, the highest version, never

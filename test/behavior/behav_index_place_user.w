@@ -4,7 +4,7 @@
 //       §6.3 compound index assignment evaluates the index exactly once
 
 type Grid {
-    data: Vec[i32],
+    data: List[i32],
     width: i32,
 }
 
@@ -22,7 +22,7 @@ unsafe fn counter_inc(p: *mut i32) -> i32:
     v
 
 fn test_index_place_read:
-    var g = Grid { data: Vec.new(), width: 3 }
+    var g = Grid { data: List.new(), width: 3 }
     g.data.push(1)
     g.data.push(2)
     g.data.push(3)
@@ -31,7 +31,7 @@ fn test_index_place_read:
     assert(g[2] == 3)
 
 fn test_index_place_write:
-    var g = Grid { data: Vec.new(), width: 3 }
+    var g = Grid { data: List.new(), width: 3 }
     g.data.push(1)
     g.data.push(2)
     g.data.push(3)
@@ -42,7 +42,7 @@ fn test_index_place_write:
 
 fn test_index_place_compound:
     var counter = 0
-    var g = Grid { data: Vec.new(), width: 3 }
+    var g = Grid { data: List.new(), width: 3 }
     g.data.push(1)
     g.data.push(2)
     g.data.push(3)

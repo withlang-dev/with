@@ -98,16 +98,16 @@ pub fn codegen_unit_object_path(obj_path: &str, k: i32) -> str:
 // packing over the fixed MIR body order is deterministic.
 pub type CodegenUnitAssign {
     unit_count: i32,
-    fn_syms: Vec[i32],
-    units: Vec[i32],
+    fn_syms: List[i32],
+    units: List[i32],
     // Total statement cost across all bodies — the emit window's size input.
     total_cost: i64,
 }
 
 pub fn codegen_units_assign_from_mir(mir_ptr: i64, unit_count: i32) -> CodegenUnitAssign:
-    let fn_syms: Vec[i32] = Vec.new()
-    let units: Vec[i32] = Vec.new()
-    let bin_loads: Vec[i64] = Vec.new()
+    let fn_syms: List[i32] = List.new()
+    let units: List[i32] = List.new()
+    let bin_loads: List[i64] = List.new()
     var total_cost: i64 = 0
     var pre = 0
     while pre < unit_count:
@@ -200,19 +200,19 @@ unsafe fn codegen_unit_emit_thread_entry(arg: *mut u8) -> i32:
 // are allocated up front so no job moves while a thread reads it, and
 // every started thread is joined by `finish` before the pipeline drops.
 pub type CodegenUnitPipeline {
-    jobs: Vec[CodegenUnitEmitJob],
-    handles: Vec[i64],
+    jobs: List[CodegenUnitEmitJob],
+    handles: List[i64],
     window: i32,
     next_join: i32,
     rc: i32,
 }
 
 pub fn codegen_unit_pipeline(unit_count: i32, obj_path: &str, opt_level: i32, do_profile: bool, window: i32) -> CodegenUnitPipeline:
-    let jobs: Vec[CodegenUnitEmitJob] = Vec.new()
+    let jobs: List[CodegenUnitEmitJob] = List.new()
     for k in 0..unit_count:
         jobs.push(CodegenUnitEmitJob { context: 0, llmod: 0, obj_path: with_str_clone_ref(obj_path), opt_level, unit_index: k, do_profile, rc: 0 })
     let w = if window < 1: 1 else: if window > unit_count: unit_count else: window
-    CodegenUnitPipeline { jobs, handles: Vec.new(), window: w, next_join: 0, rc: 0 }
+    CodegenUnitPipeline { jobs, handles: List.new(), window: w, next_join: 0, rc: 0 }
 
 impl CodegenUnitPipeline:
     // Unit k's module and context now belong to the pipeline.
@@ -248,8 +248,8 @@ impl CodegenUnitPipeline:
             runtime_eprint(f"error: codegen-units generated emit failed with exit code {self.rc}")
         self.rc
 
-pub fn codegen_unit_extra_objects(obj_path: &str, unit_count: i32) -> Vec[str]:
-    let extras: Vec[str] = Vec.new()
+pub fn codegen_unit_extra_objects(obj_path: &str, unit_count: i32) -> List[str]:
+    let extras: List[str] = List.new()
     var k = 1
     while k < unit_count:
         extras.push(codegen_unit_object_path(obj_path, k))

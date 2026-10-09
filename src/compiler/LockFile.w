@@ -20,14 +20,14 @@ pub type LockEntry {
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
 pub type LockFile {
-    entries: Vec[LockEntry],
+    entries: List[LockEntry],
 }
 
 pub fn lock_file_path(project_root: &str) -> str:
     project_root ++ "/.with/lock.json"
 
 fn lock_empty -> LockFile:
-    LockFile { entries: Vec.new() }
+    LockFile { entries: List.new() }
 
 fn lock_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
@@ -109,8 +109,8 @@ fn lock_json_extract_string(json: &str, key: &str) -> str:
         pos = pos + 1
     ""
 
-fn lock_json_extract_string_array(json: &str, key: &str) -> Vec[str]:
-    let result: Vec[str] = Vec.new()
+fn lock_json_extract_string_array(json: &str, key: &str) -> List[str]:
+    let result: List[str] = List.new()
     let needle = "\"" ++ key ++ "\""
     let json_len = json.len() as i32
     var pos = 0
@@ -150,8 +150,8 @@ fn lock_json_extract_string_array(json: &str, key: &str) -> Vec[str]:
         pos = pos + 1
     result
 
-fn lock_split_nonempty_lines(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn lock_split_nonempty_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     let n = text.len() as i32
     var start = 0
     var i = 0
@@ -251,7 +251,7 @@ pub fn lock_load(project_root: &str) -> LockFile:
     lock
 
 pub fn lock_upsert(lock: &LockFile, entry: LockEntry) -> LockFile:
-    let out_entries: Vec[LockEntry] = Vec.new()
+    let out_entries: List[LockEntry] = List.new()
     var inserted = false
     for i in 0..lock.entries.len() as i32:
         let existing = lock.entries[i]
@@ -270,7 +270,7 @@ pub fn lock_upsert(lock: &LockFile, entry: LockEntry) -> LockFile:
     LockFile { entries: out_entries }
 
 pub fn lock_remove(lock: &LockFile, name: &str) -> LockFile:
-    let out_entries: Vec[LockEntry] = Vec.new()
+    let out_entries: List[LockEntry] = List.new()
     for i in 0..lock.entries.len() as i32:
         let entry = lock.entries[i]
         if entry.name != name:
@@ -354,10 +354,10 @@ fn lock_entry_from_installed_c_dep(project_root: &str, name: &str, version: &str
     LockEntry { name: dep_name, source: "conan", version: with_str_clone_ref(version), recipe_rev, package_id, package_rev, sha256: digest }
 
 // The dedup memo travels WITH the lock through the recursion: sibling
-// subtrees must see each other's visits, and an owned Vec parameter is
+// subtrees must see each other's visits, and an owned List parameter is
 // consumed by the first recursive call (pre-#691 handle-copy aliasing is
 // gone), so both are threaded as one walk value.
-type LockDepWalk { lock: LockFile, seen: Vec[str] }
+type LockDepWalk { lock: LockFile, seen: List[str] }
 
 fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, name: &str, version: &str) -> LockDepWalk:
     let key = name ++ "/" ++ version
@@ -368,7 +368,7 @@ fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, 
     out.seen.push(key)
     let entry = lock_entry_from_installed_c_dep(project_root, name, version)
     if entry.name.len() == 0:
-        out.lock = LockFile { entries: Vec.new() }
+        out.lock = LockFile { entries: List.new() }
         return out
     out.lock = lock_upsert(move out.lock, entry)
     let meta = runtime_read_file(lock_c_dep_dir(project_root, name, version) ++ "/metadata.json")
@@ -379,7 +379,7 @@ fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, 
         let req_version = lock_ref_version(req)
         if req_name.len() == 0 or req_version.len() == 0:
             runtime_eprint("error: unsupported locked Conan requirement reference: " ++ req)
-            out.lock = LockFile { entries: Vec.new() }
+            out.lock = LockFile { entries: List.new() }
             return out
         out = lock_upsert_installed_c_dep_tree_seen(move out, project_root, req_name, req_version)
         if out.lock.entries.len() == 0:
@@ -387,7 +387,7 @@ fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, 
     out
 
 pub fn lock_upsert_installed_c_dep_tree(lock: LockFile, project_root: &str, name: &str, version: &str) -> LockFile:
-    let walk = LockDepWalk { lock, seen: Vec.new() }
+    let walk = LockDepWalk { lock, seen: List.new() }
     var done = lock_upsert_installed_c_dep_tree_seen(move walk, project_root, name, version)
     return move done.lock
 

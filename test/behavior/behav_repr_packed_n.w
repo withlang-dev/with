@@ -18,7 +18,7 @@
 // d: u8 } under packed(4): big@4, d@12, size 16, alignment 4. A cap no
 // field reaches changes nothing (Loose). `repr(packed)` is alignment 1
 // (Tight), which size_of and align_of now agree on. Fields read and write
-// through the capped offsets, in a Vec and by value; a reference to a
+// through the capped offsets, in a List and by value; a reference to a
 // field naturally aligned within the cap is ordinary (`&h.a`).
 
 @[repr(packed(2))]
@@ -50,7 +50,7 @@ fn main:
     w.big = w.big + 1
     w.d = w.d + 1
     print(f"after writes: b={o.h.b} big={w.big} d={w.d}")
-    var hs: Vec[Hdr] = Vec.new()
+    var hs: List[Hdr] = List.new()
     for i in 1..4: hs.push(Hdr { a: 0, b: i as u32, c: 0 })
     var sum: u32 = 0
     for h in hs: sum = sum + h.b

@@ -5,10 +5,10 @@
 // (check_generic_call) resolved the specialization but never recorded the
 // call's view origins, so `first(&v)` left `w` unattached and `v.push`
 // went unchecked (the seed accepts this program).
-fn first[T](v: &Vec[T]) -> &T: v[0]
+fn first[T](v: &List[T]) -> &T: v[0]
 
 fn main:
-    var v: Vec[i64] = [4, 5, 6]
+    var v: List[i64] = [4, 5, 6]
     let w = first(&v)
     v.push(7)
     print(*w)

@@ -37,7 +37,7 @@ fn main:
     assert(err_i32("missing").ok().is_none())
     assert(err_i32("missing").err().unwrap() == "missing")
 
-    var ok_seen: Vec[i32] = Vec.new()
+    var ok_seen: List[i32] = List.new()
     let inspected_ok = ok_i32(9).inspect(_value => ok_seen.push(1))
     assert(inspected_ok.unwrap() == 9)
     assert(ok_seen.len32() == 1)
@@ -45,7 +45,7 @@ fn main:
         Err(e) => assert(e == "skip")
         Ok(_) => assert(false)
 
-    var err_seen: Vec[i32] = Vec.new()
+    var err_seen: List[i32] = List.new()
     match err_i32("seen").inspect_err(_err => err_seen.push(1)):
         Err(e) => assert(e == "seen")
         Ok(_) => assert(false)

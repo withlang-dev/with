@@ -16,14 +16,14 @@
 use std.builtins.print_i64
 use std.result.ContextError
 
-fn numbers() -> Vec[i32]:
-    var v: Vec[i32] = Vec.new()
+fn numbers() -> List[i32]:
+    var v: List[i32] = List.new()
     for i in 0..100: v.push(i)
     v
 
-fn failing() -> Result[i32, Vec[i32]]: Err(numbers())
+fn failing() -> Result[i32, List[i32]]: Err(numbers())
 
-type Holder { items: Vec[i32], n: i32 }
+type Holder { items: List[i32], n: i32 }
 
 fn held() -> Option[Holder]: Some(Holder { items: numbers(), n: 7 })
 
@@ -48,19 +48,19 @@ fn main:
         Some(e) => print_i64(e.len())
         None => print_i64(0)
     // `?.` moves a field out of the Some payload.
-    let items: Option[Vec[i32]] = held()?.items
+    let items: Option[List[i32]] = held()?.items
     match items:
         Some(v) => print_i64(v.len())
         None => print_i64(0)
     // A failed guard gives the binding back: the next arm binds the same
     // payload, which the guarded arm's binding must not have freed.
-    let opt: Option[Vec[i32]] = Some(numbers())
+    let opt: Option[List[i32]] = Some(numbers())
     match opt:
         Some(v) if v.len() > 500 => print_i64(-1)
         Some(v) => print_i64(v.len())
         None => print_i64(0)
     // A guard that fails on a whole-value binding, then a later arm.
-    let whole: Option[Vec[i32]] = Some(numbers())
+    let whole: Option[List[i32]] = Some(numbers())
     match whole:
         w if w.is_none() => print_i64(-2)
         Some(v) => print_i64(v.len())

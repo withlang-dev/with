@@ -2,12 +2,12 @@
 // `get` observes — the binding holds a view and reads stay legal.
 
 type Inner {
-    tags: Vec[i32],
+    tags: List[i32],
 }
 
 fn main:
-    var inners: Vec[Inner] = Vec.new()
-    inners.push(Inner { tags: Vec.new() })
+    var inners: List[Inner] = List.new()
+    inners.push(Inner { tags: List.new() })
     inners[0].tags.push(99)
     let item = inners[0]
     assert(item.tags.len() == 1)

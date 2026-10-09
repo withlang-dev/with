@@ -4,7 +4,7 @@
 // callee while it holds an element view of G; the closure a caller passes writes G.
 // A call writes every global its callee writes.
 
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 fn run(g: fn() -> Unit): g()
 

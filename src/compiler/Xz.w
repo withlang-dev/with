@@ -11,8 +11,8 @@ extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
 
 let XZ_MASK32: i64 = 4294967295
 
-fn xz_crc32_table() -> Vec[i64]:
-    let table: Vec[i64] = Vec.new()
+fn xz_crc32_table() -> List[i64]:
+    let table: List[i64] = List.new()
     for n in 0..256:
         var c = n as i64
         for _ in 0..8:
@@ -29,9 +29,9 @@ pub fn xz_crc32(data: &str, start: i64, end: i64) -> i64:
 
 // CRC-64/XZ (ECMA-182, reflected). u64 arithmetic in i64: shifts are logical
 // only through the u64 view.
-fn xz_crc64(data: &Vec[u8]) -> u64:
+fn xz_crc64(data: &List[u8]) -> u64:
     let poly: u64 = 0xC96C5795D7870F42
-    let table: Vec[u64] = Vec.new()
+    let table: List[u64] = List.new()
     for n in 0..256:
         var c = n as u64
         for _ in 0..8:
@@ -56,7 +56,7 @@ type XzLzma {
     end: i64,
     range: i64,
     code: i64,
-    probs: Vec[i32],
+    probs: List[i32],
     lc: i32,
     lp: i32,
     pb: i32,
@@ -65,7 +65,7 @@ type XzLzma {
     rep1: i64,
     rep2: i64,
     rep3: i64,
-    out: Vec[u8],
+    out: List[u8],
     dict_start: i64,
     problem: str,
 }
@@ -115,7 +115,7 @@ impl XzLzma:
         self.lp = new_lp
         self.pb = new_pb
         let count = P_LITERAL + 768 * (1 << ((new_lc + new_lp) as u32))
-        self.probs = Vec.with_capacity(count as i64)
+        self.probs = List.with_capacity(count as i64)
         for _ in 0..count: self.probs.push(1024)
         self.state = 0
         self.rep0 = 0
@@ -331,7 +331,7 @@ fn xz_check_size(kind: i32) -> i64:
     if kind <= 12: return 32
     64
 
-fn xz_vli(data: &str, at: i64) -> Vec[i64]:
+fn xz_vli(data: &str, at: i64) -> List[i64]:
     var value: i64 = 0
     var i: i64 = 0
     while i < 9:
@@ -339,20 +339,20 @@ fn xz_vli(data: &str, at: i64) -> Vec[i64]:
         value = value | ((b & 127) << ((7 * i) as u32))
         i = i + 1
         if b < 128: break
-    let out: Vec[i64] = Vec.new()
+    let out: List[i64] = List.new()
     out.push(value)
     out.push(at + i)
     out
 
-fn xz_bytes_to_str(v: &Vec[u8]) -> str:
+fn xz_bytes_to_str(v: &List[u8]) -> str:
     if v.len() == 0: return ""
     unsafe { with_str_from_bytes(&v[0] as *const u8, v.len()) }
 
 // The decompressed contents of the .xz file `data`; "" and the reason in
 // the second element on failure. Concatenated streams are read in turn.
-pub fn xz_decompress(data: &str) -> Vec[str]:
-    var dec = XzLzma { data: data.to_owned(), at: 0, end: 0, range: 0, code: 0, probs: Vec.new(), lc: 0, lp: 0, pb: 0, state: 0, rep0: 0, rep1: 0, rep2: 0, rep3: 0, out: Vec.new(), dict_start: 0, problem: "" }
-    let result: Vec[str] = Vec.new()
+pub fn xz_decompress(data: &str) -> List[str]:
+    var dec = XzLzma { data: data.to_owned(), at: 0, end: 0, range: 0, code: 0, probs: List.new(), lc: 0, lp: 0, pb: 0, state: 0, rep0: 0, rep1: 0, rep2: 0, rep3: 0, out: List.new(), dict_start: 0, problem: "" }
+    let result: List[str] = List.new()
     var at: i64 = 0
     var streams = 0
     while at < data.len():
@@ -396,7 +396,7 @@ pub fn xz_decompress(data: &str) -> Vec[str]:
             at = block_start + header_size
             let block_out_start = dec.out.len()
             dec.dict_start = dec.out.len()
-            dec.probs = Vec.new()
+            dec.probs = List.new()
             at = dec.lzma2(at)
             if at < 0:
                 result.push("")
@@ -404,7 +404,7 @@ pub fn xz_decompress(data: &str) -> Vec[str]:
                 return result
             while (at - block_start) % 4 != 0: at = at + 1
             let check_size = xz_check_size(check)
-            let block_data: Vec[u8] = Vec.with_capacity(dec.out.len() - block_out_start)
+            let block_data: List[u8] = List.with_capacity(dec.out.len() - block_out_start)
             for i in block_out_start..dec.out.len(): block_data.push(dec.out[i])
             var ok = true
             if check == 1:

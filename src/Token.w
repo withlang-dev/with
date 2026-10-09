@@ -361,16 +361,16 @@ pub fn tag_name(tag: i32) -> str:
 // A growable list of tokens stored as parallel arrays for
 // cache-friendly iteration over tags alone.
 pub type TokenList {
-    tags: Vec[i32],
-    starts: Vec[i32],
-    ends: Vec[i32],
+    tags: List[i32],
+    starts: List[i32],
+    ends: List[i32],
 }
 
 fn TokenList.new -> TokenList:
     TokenList {
-        tags: Vec.new(),
-        starts: Vec.new(),
-        ends: Vec.new(),
+        tags: List.new(),
+        starts: List.new(),
+        ends: List.new(),
     }
 
 // No-op: reserved for future manual memory management.

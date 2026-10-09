@@ -7,7 +7,7 @@ enum JV { Null | Str(str) }
 type KV { key: str, value: JV }
 
 fn bad() -> &JV:
-    var xs: Vec[KV] = Vec.new()
+    var xs: List[KV] = List.new()
     xs.push(KV { key: "k".clone(), value: .Null })
     &xs[0].value
 

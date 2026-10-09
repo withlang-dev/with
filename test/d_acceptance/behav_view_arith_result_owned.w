@@ -7,7 +7,7 @@
 
 type T {
     m: HashMap[i32, i32],
-    extra: Vec[i32],
+    extra: List[i32],
 }
 
 impl T:
@@ -33,7 +33,7 @@ impl T:
         0
 
 fn main:
-    var t = T { m: HashMap.new(), extra: Vec.new() }
+    var t = T { m: HashMap.new(), extra: List.new() }
     t.m.insert(7, 2)
     t.extra.push(10)
     t.extra.push(20)

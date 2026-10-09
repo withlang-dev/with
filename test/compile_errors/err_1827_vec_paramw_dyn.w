@@ -1,12 +1,12 @@
 //! expect-check-fail: call to `show` mutates global `G` while its argument is a live view into it
 
-// #1827 (§9.1c: globals are places; §21.1 rules 1 and 7): a `Vec[str]` global, viewed by
+// #1827 (§9.1c: globals are places; §21.1 rules 1 and 7): a `List[str]` global, viewed by
 // an argument that views the whole global, written by the impl a callee's dyn call runs
 // while the view is live.
 // A call writes every global its callee writes, and a drop every global
 // its Drop impls write (§2.4).
 
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 trait Grow:
     fn grow(self: &Self)
@@ -19,7 +19,7 @@ impl Grow for W:
 
 fn run_dyn(g: &dyn Grow): g.grow()
 
-fn show(r: &Vec[str]):
+fn show(r: &List[str]):
     run_dyn(W { x: 0 })
     print(r[0])
 

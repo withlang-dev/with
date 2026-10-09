@@ -29,10 +29,10 @@ pub fn tracked_input_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
-pub fn tracked_input_insert_unique(paths: Vec[str], path: &str) -> Vec[str]:
+pub fn tracked_input_insert_unique(paths: List[str], path: &str) -> List[str]:
     if path.len() == 0:
         return paths
-    var out: Vec[str] = Vec.new()
+    var out: List[str] = List.new()
     var inserted = false
     for i in 0..paths.len() as i32:
         let existing = paths[i]
@@ -47,7 +47,7 @@ pub fn tracked_input_insert_unique(paths: Vec[str], path: &str) -> Vec[str]:
         out.push(with_str_clone_ref(path))
     out
 
-pub fn tracked_input_merge_unique(left: Vec[str], right: &Vec[str]) -> Vec[str]:
+pub fn tracked_input_merge_unique(left: List[str], right: &List[str]) -> List[str]:
     var out = left
     for i in 0..right.len() as i32:
         out = tracked_input_insert_unique(move out, right[i])
@@ -107,7 +107,7 @@ fn tracked_normalize_path(path: &str) -> str:
         return with_str_clone_ref(path)
     let is_abs = runtime_path_is_absolute(path)
     let root_parts = runtime_path_root_part_count(path)
-    let parts: Vec[str] = Vec.new()
+    let parts: List[str] = List.new()
     var start = 0
     for i in 0..(path.len() as i32 + 1):
         let at_end = i == path.len() as i32

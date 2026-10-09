@@ -19,18 +19,18 @@ use MathBuiltins
 extern fn with_parse_float_ref(s: &str) -> f64
 extern fn with_str_clone_ref(s: &str) -> str
 
-var g_ci_realpath_cache_paths: Vec[str] = Vec.new()
-var g_ci_realpath_cache_values: Vec[str] = Vec.new()
+var g_ci_realpath_cache_paths: List[str] = List.new()
+var g_ci_realpath_cache_values: List[str] = List.new()
 var g_cimport_last_error: str = ""
 var g_cimport_warnings: str = ""
 var g_cimport_untranslated_macros: str = ""
-var g_cimport_omitted_symbol_names: Vec[str] = Vec.new()
-var g_cimport_omitted_symbol_reasons: Vec[str] = Vec.new()
+var g_cimport_omitted_symbol_names: List[str] = List.new()
+var g_cimport_omitted_symbol_reasons: List[str] = List.new()
 // §16.2: each omission also records a source location (when libclang gives
 // one) and a directional category: "raw-modelable" (ABI-expressible, usable
 // via a manual extern under unsafe) or "inexpressible" (no With representation).
-var g_cimport_omitted_symbol_locations: Vec[str] = Vec.new()
-var g_cimport_omitted_symbol_categories: Vec[str] = Vec.new()
+var g_cimport_omitted_symbol_locations: List[str] = List.new()
+var g_cimport_omitted_symbol_categories: List[str] = List.new()
 var g_cimport_included_files: str = ""
 var g_cimport_raw_function_names: str = ""
 // #1831: `|name|` for each declaration without a prototype this
@@ -40,7 +40,7 @@ var g_cimport_report_untranslated_macros: i32 = 0
 var g_ci_migrate_in_unsafe_function_body: bool = false
 // §16.2a no_methods opt-out. Set per-import before translation.
 var g_cimport_no_methods_all: i32 = 0
-var g_cimport_no_methods_types: Vec[str] = Vec.new()
+var g_cimport_no_methods_types: List[str] = List.new()
 // #1753: the object-like macro constants ("|NAME|…") the earlier c_imports of
 // this compilation defined, and the ones the current translation defines. A
 // later header's constant of the same name is its own value, not a
@@ -89,13 +89,13 @@ pub fn ci_migrate_set_unsafe_function_body_context(enabled: bool) -> Unit:
     g_ci_migrate_in_unsafe_function_body = enabled
     ci_print_set_unsafe_fn_context(enabled)
 
-pub fn ci_set_no_methods(all_flag: i32, types: Vec[str]):
+pub fn ci_set_no_methods(all_flag: i32, types: List[str]):
     g_cimport_no_methods_all = all_flag
     g_cimport_no_methods_types = types
 
 pub fn ci_clear_no_methods():
     g_cimport_no_methods_all = 0
-    g_cimport_no_methods_types = Vec.new()
+    g_cimport_no_methods_types = List.new()
 
 // True when auto-method/constructor generation is suppressed for `name`.
 fn ci_no_methods_for_type(name: &str) -> bool:
@@ -263,7 +263,7 @@ pub fn ci_prepare_clang_resource_dir():
     // linux-x86_64) unless one is named (compiler.EmbeddedSysroot decides).
     with_cimport_set_sdk_path(host_c_sysroot())
 
-pub fn ci_set_include_paths(paths: &Vec[str]):
+pub fn ci_set_include_paths(paths: &List[str]):
     with_cimport_clear_include_paths()
     for i in 0..paths.len() as i32:
         with_cimport_add_include_path(paths[i])
@@ -281,7 +281,7 @@ pub fn ci_add_windows_system_includes():
 pub fn ci_set_sdk_path(path: &str):
     darwin_sdk_set_configured(path)
 
-fn ci_build_define_prefix(defines: &Vec[str]) -> str:
+fn ci_build_define_prefix(defines: &List[str]) -> str:
     var out = StringBuilder.new()
     for i in 0..defines.len() as i32:
         let define = defines[i]
@@ -326,10 +326,10 @@ fn c_import_untranslated_macros() -> str:
     g_cimport_untranslated_macros ++ ""
 
 fn c_import_omitted_symbols_clear():
-    g_cimport_omitted_symbol_names = Vec.new()
-    g_cimport_omitted_symbol_reasons = Vec.new()
-    g_cimport_omitted_symbol_locations = Vec.new()
-    g_cimport_omitted_symbol_categories = Vec.new()
+    g_cimport_omitted_symbol_names = List.new()
+    g_cimport_omitted_symbol_reasons = List.new()
+    g_cimport_omitted_symbol_locations = List.new()
+    g_cimport_omitted_symbol_categories = List.new()
     return
 
 fn c_import_omitted_symbols() -> str:
@@ -358,7 +358,7 @@ pub fn c_import_included_files() -> str:
 // preamble defines every width; a header import defines each one it names,
 // once, in its own translation — a name nothing defines is a dangling
 // reference, never emitted.
-var g_ci_overflow_helpers_needed: Vec[str] = Vec.new()
+var g_ci_overflow_helpers_needed: List[str] = List.new()
 
 fn ci_note_overflow_helper_needed(helper: &str, op: &str, ty: &str):
     let entry = helper ++ "|" ++ op ++ "|" ++ ty
@@ -380,7 +380,7 @@ fn ci_render_overflow_helpers_needed() -> str:
             with_cimport_mark_name_emitted(shared)
             out = out ++ ci_migrate_render_u128_mul_would_overflow(shared)
         out = out ++ ci_migrate_render_overflow_helper_for(op, ty)
-    g_ci_overflow_helpers_needed = Vec.new()
+    g_ci_overflow_helpers_needed = List.new()
     out
 
 fn ci_record_raw_function_name(name: &str):
@@ -549,7 +549,7 @@ pub fn ci_c_long_double_representable(triple: &str) -> bool:
 // function whose lowering changed between two migrations. One line per
 // site, `rule<TAB>function<TAB>detail`; a directory migration writes them
 // as `rules.tsv` beside its output (never promoted into a corpus).
-var g_ci_rule_sites: Vec[str] = Vec.new()
+var g_ci_rule_sites: List[str] = List.new()
 var g_ci_rule_fn: str = ""
 
 pub fn ci_set_rule_fn(name: &str): g_ci_rule_fn = with_str_clone_ref(name)
@@ -565,7 +565,7 @@ pub fn ci_note_rule_for(fn_name: &str, rule: &str, detail: &str):
 pub fn ci_take_rule_sites() -> str:
     var out = ""
     for line in g_ci_rule_sites: out = out ++ line ++ "\n"
-    g_ci_rule_sites = Vec.new()
+    g_ci_rule_sites = List.new()
     out
 
 fn ci_record_omitted_symbol_cat(name: &str, location: &str, category: &str, reason: &str):
@@ -736,10 +736,10 @@ fn ci_try_translate_compound_literal_macro(session: i64, value: &str) -> str:
     ci_translate_c_initializer_for_type(session, t.slice(brace as i64, t.len()), ty)
 
 fn process_c_import(header_spec: &str) -> str:
-    let defines: Vec[str] = Vec.new()
+    let defines: List[str] = List.new()
     process_c_import_with_defines(header_spec, defines)
 
-pub fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str], cxx: bool = false) -> str:
+pub fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bool = false) -> str:
     c_import_last_error_clear()
     g_cimport_warnings = ""
     g_ci_prior_macro_consts = g_ci_prior_macro_consts ++ g_ci_current_macro_consts.slice(1, g_ci_current_macro_consts.len())
@@ -755,7 +755,7 @@ pub fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str], cxx:
         return ""
     g_cimport_raw_function_names = ""
     g_cimport_unprototyped_names = ""
-    g_ci_overflow_helpers_needed = Vec.new()
+    g_ci_overflow_helpers_needed = List.new()
     ci_record_field_caches_clear()
     g_cimport_report_untranslated_macros = ci_should_report_untranslated_macros(header_spec)
     if with_cimport_available() == 0:
@@ -1649,7 +1649,7 @@ fn ci_buf_len_idx(name: &str, bi: i32) -> i32:
     -1
 
 // buf_out (#379): a mutable buffer parameter models as `[]mut u8` — callable
-// since #604 stage 1 (Vec/array arguments coerce to []mut at the call site).
+// since #604 stage 1 (List/array arguments coerce to []mut at the call site).
 fn ci_buf_is_mut(name: &str, bi: i32) -> i32:
     if name == "memset": return 1
     if name == "explicit_bzero": return 1
@@ -3182,8 +3182,8 @@ fn ci_offsetof_record_type_name(raw_type: &str) -> str:
 
 // D109 (#2131): the text of `offsetof(T, designator)`, as [T, designator],
 // or empty when `expr` is not an offsetof invocation.
-fn ci_offsetof_text_args(expr: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ci_offsetof_text_args(expr: &str) -> List[str]:
+    let out: List[str] = List.new()
     let t = ci_trim(ci_strip_parens(expr))
     var fn_name = ""
     var args = ""
@@ -3219,8 +3219,8 @@ fn ci_offsetof_field_emitted_name(field: &str, ty: &str, fi: i32, count: i32, is
 // The record index (#744) names the first DEFINITION of a tag: a forward
 // declaration of the same name has no fields (pcre2's
 // `struct pcre2_real_match_data`).
-fn ci_record_field_for_offsetof(session: i64, record: &str, field: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ci_record_field_for_offsetof(session: i64, record: &str, field: &str) -> List[str]:
+    let out: List[str] = List.new()
     var cur = with_str_clone_ref(record)
     for _ in 0..8:
         let sidx = ci_record_index_struct(session, cur)
@@ -3467,7 +3467,7 @@ fn ci_macro_token_end(text: &str, start: i32):
             else: break
     end
 
-fn ci_macro_substitute_arguments(session: i64, index: i32, body: &str, args: &Vec[str]):
+fn ci_macro_substitute_arguments(session: i64, index: i32, body: &str, args: &List[str]):
     var output = ""
     var pos = 0
     while pos < body.len():
@@ -3675,7 +3675,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                     // MIN(A, B)) parses as a variant pattern. It takes the
                     // wrapper parameters' `p_` prefix, and the body names the
                     // binding (#1417).
-                    var bindings: Vec[str] = Vec.new()
+                    var bindings: List[str] = List.new()
                     var renamed = false
                     for bpi in 0..param_count:
                         let raw_param = with_cimport_macro_param_name(session, fn_index, bpi)
@@ -6537,12 +6537,12 @@ impl Copy for CiScope
 type CiScopeState {
     names: HashMap[str, str],
     types: HashMap[str, str],
-    name_log_keys: Vec[str],
-    name_log_values: Vec[str],
-    name_log_had: Vec[i32],
-    type_log_keys: Vec[str],
-    type_log_values: Vec[str],
-    type_log_had: Vec[i32],
+    name_log_keys: List[str],
+    name_log_values: List[str],
+    name_log_had: List[i32],
+    type_log_keys: List[str],
+    type_log_values: List[str],
+    type_log_had: List[i32],
     return_type: str,
 }
 
@@ -6558,12 +6558,12 @@ fn CiScope.new(return_type: &str) -> CiScope:
         *ptr = CiScopeState {
             names: HashMap.new(),
             types: HashMap.new(),
-            name_log_keys: Vec.new(),
-            name_log_values: Vec.new(),
-            name_log_had: Vec.new(),
-            type_log_keys: Vec.new(),
-            type_log_values: Vec.new(),
-            type_log_had: Vec.new(),
+            name_log_keys: List.new(),
+            name_log_values: List.new(),
+            name_log_had: List.new(),
+            type_log_keys: List.new(),
+            type_log_values: List.new(),
+            type_log_had: List.new(),
             return_type: with_str_clone_ref(return_type),
         }
     CiScope { ptr }
@@ -6572,12 +6572,12 @@ fn CiScopeState.empty() -> CiScopeState:
     CiScopeState {
         names: HashMap.new(),
         types: HashMap.new(),
-        name_log_keys: Vec.new(),
-        name_log_values: Vec.new(),
-        name_log_had: Vec.new(),
-        type_log_keys: Vec.new(),
-        type_log_values: Vec.new(),
-        type_log_had: Vec.new(),
+        name_log_keys: List.new(),
+        name_log_values: List.new(),
+        name_log_had: List.new(),
+        type_log_keys: List.new(),
+        type_log_values: List.new(),
+        type_log_had: List.new(),
         return_type: "",
     }
 
@@ -6614,12 +6614,12 @@ fn ci_value_ir_plain(value_expr: CiExprId) -> CiValueExprIR:
 fn ci_value_ir_valid(lowered: CiValueExprIR) -> bool:
     (lowered.value_expr as i32) != 0
 
-// docs/completed/mut.md Rev 8 §5.1 — accumulator helper. Owned-by-value `out` Vec
+// docs/completed/mut.md Rev 8 §5.1 — accumulator helper. Owned-by-value `out` List
 // is threaded through the recursion; the underlying buffer is shared by
 // reference but the {len, cap} triple is reassigned on push so we return
-// the updated Vec to avoid losing growth on the caller side.
-fn ci_stmt_collect_flat_ids(stmts: CiStmtPool, stmt_id: CiStmtId) -> Vec[i32]:
-    var out: Vec[i32] = Vec.new()
+// the updated List to avoid losing growth on the caller side.
+fn ci_stmt_collect_flat_ids(stmts: CiStmtPool, stmt_id: CiStmtId) -> List[i32]:
+    var out: List[i32] = List.new()
     if (stmt_id as i32) == 0:
         return out
     if stmts.kind(stmt_id) == CiStmtKind.CIS_BLOCK:
@@ -6641,7 +6641,7 @@ fn ci_stmt_collect_flat_ids(stmts: CiStmtPool, stmt_id: CiStmtId) -> Vec[i32]:
     out
 
 impl CiStmtPool:
-    fn from_flat_ids(ids: &Vec[i32]) -> CiStmtId:
+    fn from_flat_ids(ids: &List[i32]) -> CiStmtId:
         if ids.len() == 0:
             return 0 as CiStmtId
         if ids.len() == 1:
@@ -6667,7 +6667,7 @@ impl CiStmtPool:
             return second
         if (second as i32) == 0:
             return first
-        var ids: Vec[i32] = ci_stmt_collect_flat_ids(self.val(), first)
+        var ids: List[i32] = ci_stmt_collect_flat_ids(self.val(), first)
         let ids2 = ci_stmt_collect_flat_ids(self.val(), second)
         var si: i32 = 0
         while si < ids2.len() as i32:
@@ -6688,7 +6688,7 @@ impl CiStmtPool:
         if kind == CiStmtKind.CIS_BLOCK:
             let extra_start = self.get_d0(stmt_id)
             let count = self.get_d1(stmt_id)
-            var rewritten_ids: Vec[i32] = Vec.new()
+            var rewritten_ids: List[i32] = List.new()
             var i: i32 = 0
             while i < count:
                 let child_id = (self.get_extra(extra_start + i)) as CiStmtId
@@ -6714,7 +6714,7 @@ impl CiStmtPool:
             let subject_id = self.get_d0(stmt_id)
             let arms_start = self.get_d1(stmt_id)
             let arm_count = self.get_d2(stmt_id)
-            var rewritten_records: Vec[i32] = Vec.new()
+            var rewritten_records: List[i32] = List.new()
             var cursor = arms_start
             var ai: i32 = 0
             while ai < arm_count:
@@ -6753,7 +6753,7 @@ impl CiStmtPool:
         if kind == CiStmtKind.CIS_BLOCK:
             let extra_start = self.get_d0(stmt_id)
             let count = self.get_d1(stmt_id)
-            var rewritten_ids: Vec[i32] = Vec.new()
+            var rewritten_ids: List[i32] = List.new()
             var i: i32 = 0
             while i < count:
                 let child_id = (self.get_extra(extra_start + i)) as CiStmtId
@@ -6779,7 +6779,7 @@ impl CiStmtPool:
             let subject_id = self.get_d0(stmt_id)
             let arms_start = self.get_d1(stmt_id)
             let arm_count = self.get_d2(stmt_id)
-            var rewritten_records: Vec[i32] = Vec.new()
+            var rewritten_records: List[i32] = List.new()
             var cursor = arms_start
             var ai: i32 = 0
             while ai < arm_count:
@@ -6865,7 +6865,7 @@ impl CiStmtPool:
         if kind == CiStmtKind.CIS_BLOCK:
             let start = self.get_d0(stmt_id)
             let count = self.get_d1(stmt_id)
-            var ids: Vec[i32] = Vec.new()
+            var ids: List[i32] = List.new()
             var i = 0
             while i < count:
                 let child = (self.get_extra(start + i)) as CiStmtId
@@ -6883,7 +6883,7 @@ impl CiStmtPool:
             let subject_id = self.get_d0(stmt_id)
             let arms_start = self.get_d1(stmt_id)
             let arm_count = self.get_d2(stmt_id)
-            var rewritten_records: Vec[i32] = Vec.new()
+            var rewritten_records: List[i32] = List.new()
             var cursor = arms_start
             var ai: i32 = 0
             while ai < arm_count:
@@ -7144,7 +7144,7 @@ impl CiStmtPool:
             return 0 as CiStmtId
 
         var setup = 0 as CiStmtId
-        let arg_ids: Vec[i32] = Vec.new()
+        let arg_ids: List[i32] = List.new()
         // cfprintf(colour, stream, fmt, ...) expands to fprintf(stream, fmt, ...).
         // The general CXK_CALL_EXPR path coerces each argument to the callee's
         // declared parameter type (so a string-literal fmt drops to c"...".ptr —
@@ -7173,19 +7173,19 @@ impl CiStmtPool:
             arg_ids.push(arg_id as i32)
             ai = ai + 1
 
-        let begin_args: Vec[i32] = Vec.new()
+        let begin_args: List[i32] = List.new()
         begin_args.push(arg_ids[0])
         begin_args.push(arg_ids[1])
         let begin_call = exprs.build_named_call_expr("colour_begin", &begin_args)
 
-        let fprintf_args: Vec[i32] = Vec.new()
+        let fprintf_args: List[i32] = List.new()
         var fi: i64 = 1
         while fi < arg_ids.len():
             fprintf_args.push(arg_ids[fi])
             fi = fi + 1
         let fprintf_call = exprs.build_named_call_expr("fprintf", &fprintf_args)
 
-        let end_args: Vec[i32] = Vec.new()
+        let end_args: List[i32] = List.new()
         end_args.push(arg_ids[1])
         let end_call = exprs.build_named_call_expr("colour_end", &end_args)
 
@@ -7708,7 +7708,7 @@ impl CiTypePool:
             if (ret_ty as i32) == 0:
                 return 0 as CiTypeId
             let arg_count = with_ci_type_arg_count(session, cxtype)
-            var params: Vec[i32] = Vec.new()
+            var params: List[i32] = List.new()
             var i: i32 = 0
             while i < arg_count:
                 let arg_idx = with_ci_type_arg(session, cxtype, i)
@@ -8139,18 +8139,18 @@ fn ci_record_type_field_cxtype(session: i64, ty: i32, field_idx: i32) -> i32:
         return -1
     with_ci_cursor_type(session, field)
 
-var g_ci_record_count_cache_keys: Vec[str] = Vec.new()
-var g_ci_record_count_cache_values: Vec[i32] = Vec.new()
-var g_ci_record_field_cache_keys: Vec[str] = Vec.new()
-var g_ci_record_field_name_cache_values: Vec[str] = Vec.new()
-var g_ci_record_field_type_cache_values: Vec[str] = Vec.new()
+var g_ci_record_count_cache_keys: List[str] = List.new()
+var g_ci_record_count_cache_values: List[i32] = List.new()
+var g_ci_record_field_cache_keys: List[str] = List.new()
+var g_ci_record_field_name_cache_values: List[str] = List.new()
+var g_ci_record_field_type_cache_values: List[str] = List.new()
 
 fn ci_record_field_caches_clear():
-    g_ci_record_count_cache_keys = Vec.new()
-    g_ci_record_count_cache_values = Vec.new()
-    g_ci_record_field_cache_keys = Vec.new()
-    g_ci_record_field_name_cache_values = Vec.new()
-    g_ci_record_field_type_cache_values = Vec.new()
+    g_ci_record_count_cache_keys = List.new()
+    g_ci_record_count_cache_values = List.new()
+    g_ci_record_field_cache_keys = List.new()
+    g_ci_record_field_name_cache_values = List.new()
+    g_ci_record_field_type_cache_values = List.new()
 
 fn ci_record_cache_type_text(session: i64, ty_text: &str, ty: i32) -> str:
     if ty_text.len() > 0:
@@ -8443,7 +8443,7 @@ impl CiExprPool:
             return 0 as CiExprId
         let decl_cursor = ci_find_decl_cursor_for_idx(session, decl_idx)
         let record_is_union = with_cimport_decl_kind(session, decl_idx) == CK_UNION
-        var slot_exprs: Vec[i32] = Vec.new()
+        var slot_exprs: List[i32] = List.new()
         var si = 0
         while si < field_count:
             slot_exprs.push(0)
@@ -8517,8 +8517,8 @@ impl CiExprPool:
         // Unmentioned fields (C zero-fills them) need no pairs: the
         // assignment printer renders a designated init as memset + field
         // stores, so absence IS the zero.
-        var pair_names: Vec[i32] = Vec.new()
-        var pair_values: Vec[i32] = Vec.new()
+        var pair_names: List[i32] = List.new()
+        var pair_values: List[i32] = List.new()
         si = 0
         while si < field_count:
             let v = slot_exprs[si]
@@ -8593,7 +8593,7 @@ impl CiExprPool:
             let elem_ty_str = ci_array_element_type(ty_str)
             let elem_field_count = ci_init_list_record_field_count(session, elem_ty_str, elem_cxtype)
             let elem_ty_id = if elem_cxtype >= 0: types.type_from_libclang(session, elem_cxtype) else: 0 as CiTypeId
-            var item_ids: Vec[i32] = Vec.new()
+            var item_ids: List[i32] = List.new()
             var ai = 0
             while ai < nc:
                 let child = with_ci_child(session, cursor, ai)
@@ -8613,8 +8613,8 @@ impl CiExprPool:
                 if elem_field_count > 0 and not child_is_whole_elem and (child_kind != CXK_INIT_LIST and child_kind != CXK_COMPOUND_LITERAL):
                     if ai + elem_field_count > nc:
                         return 0 as CiExprId
-                    var field_names: Vec[i32] = Vec.new()
-                    var field_values: Vec[i32] = Vec.new()
+                    var field_names: List[i32] = List.new()
+                    var field_values: List[i32] = List.new()
                     var fi = 0
                     while fi < elem_field_count:
                         let field_name = ci_init_list_record_field_name(session, elem_ty_str, elem_cxtype, fi)
@@ -8666,7 +8666,7 @@ impl CiExprPool:
             return 0 as CiExprId
         if nc == 1:
             return self.lower_expr_ir(session, with_ci_child(session, cursor, 0), types, scope)
-        var item_ids: Vec[i32] = Vec.new()
+        var item_ids: List[i32] = List.new()
         var ii = 0
         while ii < nc:
             let item_id = self.lower_expr_ir(session, with_ci_child(session, cursor, ii), types, scope)
@@ -9190,7 +9190,7 @@ impl CiExprPool:
         let c_int_ty = types.named_type_from_text("c_int")
         if (c_int_ty as i32) != 0:
             arg_id = self.cast_if_needed(c_int_ty, arg_id, arg_cursor, session, types)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(arg_id as i32)
         ci_migrate_note_libc_symbol(ctype_fn)
         self.unsafe_expr(self.build_named_call_expr(ctype_fn, &args))
@@ -9220,7 +9220,7 @@ impl CiExprPool:
         let c_int_ty = types.named_type_from_text("c_int")
         if (c_int_ty as i32) != 0:
             arg_id = self.cast_if_needed(c_int_ty, arg_id, arg_cursor, session, types)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(arg_id as i32)
         ci_migrate_note_libc_symbol(ctype_fn)
         self.unsafe_expr(self.build_named_call_expr(ctype_fn, &args))
@@ -9793,7 +9793,7 @@ impl CiExprPool:
 
     // D102: `Some(value)` typed as the nullable function pointer `target`.
     fn some_of(value_id: CiExprId, target_ty_id: CiTypeId) -> CiExprId:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(value_id as i32)
         self.build_named_call_expr_typed("Some", &args, target_ty_id)
 
@@ -10301,7 +10301,7 @@ impl CiExprPool:
                 // A stdio global is std.libc's accessor call on every target.
                 let accessor = ci_libc_stream_accessor(name)
                 ci_migrate_note_libc_symbol(accessor)
-                let no_args: Vec[i32] = Vec.new()
+                let no_args: List[i32] = List.new()
                 return self.build_named_call_expr_typed(accessor, &no_args, types.type_from_libclang(session, with_ci_cursor_type(session, cursor)))
             var text = ""
             if mangled.len() > 0:
@@ -10487,7 +10487,7 @@ impl CiTypePool:
         0 as CiTypeId
 
 impl CiExprPool:
-    fn build_named_call_expr(name: &str, arg_ids: &Vec[i32]) -> CiExprId:
+    fn build_named_call_expr(name: &str, arg_ids: &List[i32]) -> CiExprId:
         self.build_named_call_expr_typed(name, arg_ids, 0 as CiTypeId)
 
     // A synthesized call whose result type is known (a preamble helper with a
@@ -10495,7 +10495,7 @@ impl CiExprPool:
     // mismatch — the return paths, initializers — see the mismatch. An untyped
     // call (`0`) is invisible to them (#941: `return __builtin_mul_overflow(..)`
     // from an `int` function lost its bool→int conversion).
-    fn build_named_call_expr_typed(name: &str, arg_ids: &Vec[i32], result_ty: CiTypeId) -> CiExprId:
+    fn build_named_call_expr_typed(name: &str, arg_ids: &List[i32], result_ty: CiTypeId) -> CiExprId:
         let callee_idx = self.add_string(name)
         let callee_id = self.ident(callee_idx, 0 as CiTypeId)
         let args_start = self.extra_len() as i32
@@ -11050,7 +11050,7 @@ impl CiExprPool:
             g_ci_bail_message = "unsupported compiler builtin '" ++ callee_text ++ "': " ++ reason
         0 as CiExprId
 
-    fn build_overflow_builtin_call(session: i64, cursor: i32, callee_text: &str, arg_ids: &Vec[i32], types: CiTypePool) -> CiExprId:
+    fn build_overflow_builtin_call(session: i64, cursor: i32, callee_text: &str, arg_ids: &List[i32], types: CiTypePool) -> CiExprId:
         if arg_ids.len() != 3:
             return self.reject_builtin_call(session, cursor, callee_text, "expected three arguments")
         let first_arg = with_ci_num_children(session, cursor) - arg_ids.len() as i32
@@ -11074,7 +11074,7 @@ impl CiExprPool:
         if (canonical_ty as i32) == 0:
             return self.reject_builtin_call(session, cursor, callee_text, "could not materialize the integer type")
         let canonical_ptr_ty = types.ty_pointer(canonical_ty, 0)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.cast(canonical_ty, (arg_ids[0]) as CiExprId) as i32)
         args.push(self.cast(canonical_ty, (arg_ids[1]) as CiExprId) as i32)
         args.push(self.cast(canonical_ptr_ty, (arg_ids[2]) as CiExprId) as i32)
@@ -11091,7 +11091,7 @@ impl CiExprPool:
     // pointer). The record must be zero-valid (bails naming the field); a
     // fill of anything else, a non-zero byte or another size is left to
     // `with_memset`. Returns 0 when the call is not that shape.
-    fn memset_record_zero_assign(session: i64, cursor: i32, arg_ids: &Vec[i32], types: CiTypePool) -> CiExprId:
+    fn memset_record_zero_assign(session: i64, cursor: i32, arg_ids: &List[i32], types: CiTypePool) -> CiExprId:
         if not ci_expr_is_null_like(self.val(), (arg_ids[1]) as CiExprId):
             return 0 as CiExprId
         let dst = ci_expr_peel_paren_cast(self.val(), (arg_ids[0]) as CiExprId)
@@ -11126,19 +11126,19 @@ impl CiExprPool:
                 g_ci_bail_message = "memset to zero of '" ++ record_text ++ "' has no `zeroed()`: " ++ invalid ++ " is not zero-valid (D101)"
                 g_ci_bail_location = with_ci_cursor_location(session, cursor)
             return 0 as CiExprId
-        let none: Vec[i32] = Vec.new()
+        let none: List[i32] = List.new()
         ci_note_rule("D101 memset-to-zero of a record is T.zeroed()", record_text)
         let zeroed = self.build_named_call_expr_typed(record_text ++ ".zeroed", &none, record_ty)
         self.add(CiExprKind.CIE_ASSIGN, place as i32, zeroed as i32, 0, record_ty)
 
-    fn build_libc_call_value_expr(session: i64, cursor: i32, callee_text: &str, arg_ids: &Vec[i32], types: CiTypePool) -> CiExprId:
+    fn build_libc_call_value_expr(session: i64, cursor: i32, callee_text: &str, arg_ids: &List[i32], types: CiTypePool) -> CiExprId:
         // The shared preamble declares a size as i64, as with_memcpy's is;
         // C passes size_t, which does not convert implicitly (#1803).
         if callee_text == "strncmp" and arg_ids.len() == 3:
             let size_ty = types.named_type_from_text("i64")
             if (size_ty as i32) == 0:
                 return 0 as CiExprId
-            let sized_args: Vec[i32] = Vec.new()
+            let sized_args: List[i32] = List.new()
             sized_args.push(arg_ids[0])
             sized_args.push(arg_ids[1])
             sized_args.push((self.cast(size_ty, (arg_ids[2]) as CiExprId)) as i32)
@@ -11212,7 +11212,7 @@ impl CiExprPool:
             let zero_id = self.int_lit(zero_idx, 0 as CiTypeId)
             let old_size = self.cast(i64_ty, zero_id)
             let new_size = self.cast(i64_ty, (arg_ids[1]) as CiExprId)
-            let realloc_args: Vec[i32] = Vec.new()
+            let realloc_args: List[i32] = List.new()
             realloc_args.push(arg_ptr as i32)
             realloc_args.push(old_size as i32)
             realloc_args.push(new_size as i32)
@@ -11225,7 +11225,7 @@ impl CiExprPool:
         if callee_text == "memcpy" or callee_text == "memmove" or callee_text == "with_memcpy" or callee_text == "with_memmove":
             if arg_ids.len() != 3 or (i64_ty as i32) == 0 or (mut_ptr_ty as i32) == 0 or (const_ptr_ty as i32) == 0:
                 return 0 as CiExprId
-            let cast_args: Vec[i32] = Vec.new()
+            let cast_args: List[i32] = List.new()
             cast_args.push((self.cast(mut_ptr_ty, (arg_ids[0]) as CiExprId)) as i32)
             cast_args.push((self.cast(const_ptr_ty, (arg_ids[1]) as CiExprId)) as i32)
             cast_args.push((self.cast(i64_ty, (arg_ids[2]) as CiExprId)) as i32)
@@ -11240,7 +11240,7 @@ impl CiExprPool:
                 return zeroed
             if g_ci_bail_message.len() > 0:
                 return 0 as CiExprId
-            let cast_args: Vec[i32] = Vec.new()
+            let cast_args: List[i32] = List.new()
             cast_args.push((self.cast(mut_ptr_ty, (arg_ids[0]) as CiExprId)) as i32)
             cast_args.push(arg_ids[1])
             cast_args.push((self.cast(i64_ty, (arg_ids[2]) as CiExprId)) as i32)
@@ -11248,7 +11248,7 @@ impl CiExprPool:
         if callee_text == "memcmp" or callee_text == "with_memcmp":
             if arg_ids.len() != 3 or (i64_ty as i32) == 0 or (const_ptr_ty as i32) == 0:
                 return 0 as CiExprId
-            let cast_args: Vec[i32] = Vec.new()
+            let cast_args: List[i32] = List.new()
             cast_args.push((self.cast(const_ptr_ty, (arg_ids[0]) as CiExprId)) as i32)
             cast_args.push((self.cast(const_ptr_ty, (arg_ids[1]) as CiExprId)) as i32)
             cast_args.push((self.cast(i64_ty, (arg_ids[2]) as CiExprId)) as i32)
@@ -11260,7 +11260,7 @@ impl CiExprPool:
             if (c_void_ty as i32) == 0:
                 return 0 as CiExprId
             let cvoid_ptr = types.ty_pointer(c_void_ty, 0)
-            let cast_args: Vec[i32] = Vec.new()
+            let cast_args: List[i32] = List.new()
             cast_args.push((self.cast(cvoid_ptr, (arg_ids[0]) as CiExprId)) as i32)
             cast_args.push(arg_ids[1])
             cast_args.push((self.cast(i64_ty, (arg_ids[2]) as CiExprId)) as i32)
@@ -11271,7 +11271,7 @@ impl CiExprPool:
         if callee_text == "isgraph":
             if arg_ids.len() != 1:
                 return 0 as CiExprId
-            let print_args: Vec[i32] = Vec.new()
+            let print_args: List[i32] = List.new()
             print_args.push(arg_ids[0])
             let print_call = self.build_named_call_expr("is_print", &print_args)
             let space_call = self.build_named_call_expr("is_space", &print_args)
@@ -11281,7 +11281,7 @@ impl CiExprPool:
         if callee_text == "ispunct":
             if arg_ids.len() != 1:
                 return 0 as CiExprId
-            let shared_args: Vec[i32] = Vec.new()
+            let shared_args: List[i32] = List.new()
             shared_args.push(arg_ids[0])
             let print_call = self.build_named_call_expr("is_print", &shared_args)
             let alnum_call = self.build_named_call_expr("is_alnum", &shared_args)
@@ -11304,7 +11304,7 @@ impl CiExprPool:
         if callee_text == "__builtin___memcpy_chk" or callee_text == "__builtin___memmove_chk":
             if arg_ids.len() != 4:
                 return 0 as CiExprId
-            let first_three: Vec[i32] = Vec.new()
+            let first_three: List[i32] = List.new()
             first_three.push(arg_ids[0])
             first_three.push(arg_ids[1])
             first_three.push(arg_ids[2])
@@ -11312,7 +11312,7 @@ impl CiExprPool:
         if callee_text == "__builtin___memset_chk":
             if arg_ids.len() != 4:
                 return 0 as CiExprId
-            let first_three: Vec[i32] = Vec.new()
+            let first_three: List[i32] = List.new()
             first_three.push(arg_ids[0])
             first_three.push(arg_ids[1])
             first_three.push(arg_ids[2])
@@ -11983,7 +11983,7 @@ impl CiStmtPool:
                         value_expr: offset_id,
                     }
                 return ci_value_ir_invalid()
-            var arg_ids: Vec[i32] = Vec.new()
+            var arg_ids: List[i32] = List.new()
             let callee_decl_idx = ci_lookup_c_function_decl_idx(session, callee_text)
             // #799: a c_import inline wrapper body must not lower a call to a
             // C function the header-import emitter skips (leading-underscore
@@ -12526,7 +12526,7 @@ impl CiStmtPool:
         self.block(new_start, new_count)
 
     fn lower_switch_prong_forward_ir(session: i64, body_cursor: i32, start_idx: i32, total: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
-        var part_ids: Vec[i32] = Vec.new()
+        var part_ids: List[i32] = List.new()
         let start_child = with_ci_child(session, body_cursor, start_idx)
         let start_kind = with_ci_cursor_kind(session, start_child)
         if start_kind == CXK_CASE_STMT or start_kind == CXK_DEFAULT_STMT:
@@ -12603,7 +12603,7 @@ impl CiStmtPool:
         ci_trace_port("STRUCTURAL[b11.7.switch_subject]")
         let subject_id = prepared_subject.value_expr
 
-        var arm_records: Vec[i32] = Vec.new()
+        var arm_records: List[i32] = List.new()
         var arm_count = 0
         var default_body_id: CiStmtId = 0 as CiStmtId
         var has_default_body = false
@@ -12612,7 +12612,7 @@ impl CiStmtPool:
             let child = with_ci_child(session, body_cursor, i)
             let ck = with_ci_cursor_kind(session, child)
             if ck == CXK_CASE_STMT:
-                var value_ids: Vec[i32] = Vec.new()
+                var value_ids: List[i32] = List.new()
                 var chain = child
                 while with_ci_cursor_kind(session, chain) == CXK_CASE_STMT:
                     let cnc = with_ci_num_children(session, chain)
@@ -12623,7 +12623,7 @@ impl CiStmtPool:
                         return 0 as CiStmtId
                     value_ids.push(val_id as i32)
                     chain = with_ci_child(session, chain, 1)
-                var body_ids: Vec[i32] = Vec.new()
+                var body_ids: List[i32] = List.new()
                 let inner_kind = with_ci_cursor_kind(session, chain)
                 if inner_kind != CXK_BREAK_STMT and not ci_is_null_like_stmt(session, chain):
                     let inner_id = self.lower_stmt_ir(session, chain, exprs, types, 0, scope)
@@ -12675,7 +12675,7 @@ impl CiStmtPool:
                 continue
             else if ck == CXK_DEFAULT_STMT:
                 let inner = ci_drill_innermost_case_substmt(session, child)
-                var body_ids: Vec[i32] = Vec.new()
+                var body_ids: List[i32] = List.new()
                 var hit_break = false
                 if inner >= 0:
                     let inner_kind = with_ci_cursor_kind(session, inner)
@@ -12912,7 +12912,7 @@ impl CiStmtPool:
         // non-NULL kind), bail the whole block transactionally.
         if kind == CXK_COMPOUND_STMT:
             let ccn = with_ci_num_children(session, cursor)
-            var child_ids: Vec[i32] = Vec.new()
+            var child_ids: List[i32] = List.new()
             var block_scope = scope
             let block_mark = ci_scope_mark(block_scope)
             var bailed = false
@@ -13675,7 +13675,7 @@ impl CiStmtPool:
             storage_name = ci_fn_var_names_unique(base_name)
         let new_scope = ci_scope_add_mangled(scope, escaped, storage_name)
         ci_fn_var_names_register(storage_name)
-        let no_args: Vec[i32] = Vec.new()
+        let no_args: List[i32] = List.new()
         let start = exprs.build_named_call_expr_typed("va_start", &no_args, list_ty)
         let decl_id = self.var_decl(self.add_string(storage_name), list_ty, start, 1)
         CiDeclLoweringIR { updated_scope: new_scope, stmt_id: decl_id }
@@ -13683,7 +13683,7 @@ impl CiStmtPool:
     fn lower_decl_stmt_structural(session: i64, cursor: i32, scope: CiScope, hoisted: bool, exprs: CiExprPool, types: CiTypePool) -> CiDeclLoweringIR:
         let nc = with_ci_num_children(session, cursor)
         var new_scope = scope
-        var child_stmt_ids: Vec[i32] = Vec.new()
+        var child_stmt_ids: List[i32] = List.new()
         var deferred_va_list = false
         var i = 0
         while i < nc:
@@ -14086,7 +14086,7 @@ pub fn ci_str_replace(text: &str, needle: &str, replacement: &str) -> str:
     // Collect parts then join: the old byte-by-byte `result = result ++ c`
     // rebuild was O(n²) — 9 minutes and terabytes of memcpy normalizing a
     // 1.6 MB migrate output, unreachable at compiler-C scale.
-    var parts: Vec[str] = Vec.new()
+    var parts: List[str] = List.new()
     let n = text.len()
     let nlen = needle.len()
     let first = needle[0]
@@ -14112,7 +14112,7 @@ fn ci_indent_block(text: &str, indent: i32) -> str:
         return ""
     let prefix = ci_indent_str(indent)
     // Collect parts then join: avoids O(n²) string concatenation in the loop
-    var parts: Vec[str] = Vec.new()
+    var parts: List[str] = List.new()
     var start = 0
     let len = text.len() as i32
     while start < len:
@@ -14618,7 +14618,7 @@ fn ci_char_to_int(s: &str) -> str:
 // ── String concatenation support ────────────────────────────
 
 fn ci_strip_c_comments(s: &str) -> str:
-    var parts: Vec[str] = Vec.new()
+    var parts: List[str] = List.new()
     var i = 0
     var segment_start = 0
     let slen = s.len() as i32
@@ -14811,7 +14811,7 @@ fn ci_render_string_literal_as_byte_array(value: &str, ty: &str) -> str:
     if not ci_is_byte_array_element_type(elem_ty):
         return ""
     let target_len = ci_array_length_from_type(ty)
-    var bytes: Vec[i32] = Vec.new()
+    var bytes: List[i32] = List.new()
     var i = 0
     let slen = value.len() as i32
     var saw_literal = false
@@ -14892,7 +14892,7 @@ fn ci_render_string_literal_as_byte_array(value: &str, ty: &str) -> str:
                 return ""
         while bytes.len() as i32 < target_len:
             bytes.push(0)
-    var parts: Vec[str] = Vec.new()
+    var parts: List[str] = List.new()
     parts.push("[")
     var bi = 0
     while bi < bytes.len() as i32:
@@ -15714,8 +15714,8 @@ fn ci_array_length_from_type(ty: &str) -> i32:
         return -1
     ci_parse_i64(len_text) as i32
 
-fn ci_split_top_level_items(s: &str) -> Vec[str]:
-    var parts: Vec[str] = Vec.new()
+fn ci_split_top_level_items(s: &str) -> List[str]:
+    var parts: List[str] = List.new()
     var paren_depth = 0
     var bracket_depth = 0
     var brace_depth = 0
@@ -15930,7 +15930,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
             return ""
         let elem_cxtype = if cxtype >= 0: with_ci_type_array_element(session, cxtype) else: -1
         let items = ci_split_top_level_items(inner)
-        var expanded_items: Vec[str] = Vec.new()
+        var expanded_items: List[str] = List.new()
         var expand_i = 0
         while expand_i < items.len() as i32:
             let raw_item = items[expand_i]
@@ -15948,7 +15948,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
             if not expanded_any:
                 expanded_items.push(with_str_clone_ref(raw_item))
             expand_i = expand_i + 1
-        var rendered_parts: Vec[str] = Vec.new()
+        var rendered_parts: List[str] = List.new()
         rendered_parts.push("[")
         var i = 0
         while i < expanded_items.len() as i32:
@@ -15965,7 +15965,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
     let field_count = ci_init_list_record_field_count(session, ty, cxtype)
     if field_count > 0:
         let items = ci_split_top_level_items(inner)
-        var field_parts: Vec[str] = Vec.new()
+        var field_parts: List[str] = List.new()
         field_parts.push(with_str_clone_ref(ty))
         field_parts.push(" { ")
         var i = 0
@@ -16506,8 +16506,8 @@ pub var g_macro_type_aliases: str = ""
 // memoization map keeps the assigned id stable per cursor so
 // re-entry returns the same name. Reset at the start of every
 // ci_migrate_translate_function call.
-var g_ci_temp_cursors: Vec[i32] = Vec.new()
-var g_ci_temp_ids: Vec[i32] = Vec.new()
+var g_ci_temp_cursors: List[i32] = List.new()
+var g_ci_temp_ids: List[i32] = List.new()
 var g_ci_temp_next: i32 = 0
 
 // Per-function var-name registry. The string holds `|name|`
@@ -16618,8 +16618,8 @@ fn ci_fn_var_names_unique(base: &str) -> str:
     base ++ "_99"
 
 pub fn ci_temp_reset():
-    g_ci_temp_cursors = Vec.new()
-    g_ci_temp_ids = Vec.new()
+    g_ci_temp_cursors = List.new()
+    g_ci_temp_ids = List.new()
     g_ci_temp_next = 0
     g_ci_fn_var_names = ""
 
@@ -16645,8 +16645,8 @@ fn ci_temp_id_for_cursor(cursor: i32) -> i32:
 // When the flag is off, ci_record_raw_{expr,stmt}_kind is a no-op
 // and the aggregators at end of migration never fire.
 var g_ci_raw_stats_enabled_cache: i32 = -1
-var g_ci_raw_expr_kinds: Vec[i32] = Vec.new()
-var g_ci_raw_stmt_kinds: Vec[i32] = Vec.new()
+var g_ci_raw_expr_kinds: List[i32] = List.new()
+var g_ci_raw_stmt_kinds: List[i32] = List.new()
 
 fn ci_raw_stats_enabled() -> bool:
     if g_ci_raw_stats_enabled_cache == -1:
@@ -16689,10 +16689,10 @@ fn ci_record_raw_stmt_kind(kind: i32) -> Unit:
     if ci_raw_stats_enabled():
         g_ci_raw_stmt_kinds.push(kind)
 
-fn ci_aggregate_kind_vec(v: &Vec[i32], label: &str):
+fn ci_aggregate_kind_list(v: &List[i32], label: &str):
     // Collect unique kinds into parallel vectors and count.
-    var unique: Vec[i32] = Vec.new()
-    var counts: Vec[i32] = Vec.new()
+    var unique: List[i32] = List.new()
+    var counts: List[i32] = List.new()
     var i: i64 = 0
     while i < v.len():
         let k = v[i]
@@ -16702,13 +16702,13 @@ fn ci_aggregate_kind_vec(v: &Vec[i32], label: &str):
             if unique[j] == k:
                 // Reconstruct-and-replace: push the current counts
                 // then rebuild into a fresh vector. Avoids using
-                // Vec.set which codegens poorly right now.
+                // List.set which codegens poorly right now.
                 found = true
                 break
             j = j + 1
         if found:
             // bump by rebuilding counts
-            var new_counts: Vec[i32] = Vec.new()
+            var new_counts: List[i32] = List.new()
             var m: i64 = 0
             while m < counts.len():
                 if m == j:
@@ -16732,8 +16732,8 @@ fn ci_aggregate_kind_vec(v: &Vec[i32], label: &str):
 pub fn ci_dump_raw_fallback_stats():
     if not ci_raw_stats_enabled():
         return
-    ci_aggregate_kind_vec(&g_ci_raw_expr_kinds, "migrate: raw-expr fallback by cursor kind:")
-    ci_aggregate_kind_vec(&g_ci_raw_stmt_kinds, "migrate: raw-stmt fallback by cursor kind:")
+    ci_aggregate_kind_list(&g_ci_raw_expr_kinds, "migrate: raw-expr fallback by cursor kind:")
+    ci_aggregate_kind_list(&g_ci_raw_stmt_kinds, "migrate: raw-stmt fallback by cursor kind:")
 
 // (ci_ir_shim_stmt was removed in B5e — B5d's statement-level
 // detour covers the same path at finer granularity, so the
@@ -16854,7 +16854,7 @@ pub fn ci_body_null_test_evidence(session: i64, cursor: i32, name: &str) -> i32:
 //   `field:<param>`                parameter stored into a record field
 //   `global:<param>`               parameter assigned to something not a parameter
 // `params` are the enclosing definition's parameter names.
-pub fn ci_body_call_evidence(session: i64, cursor: i32, params: &Vec[str]) -> str:
+pub fn ci_body_call_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
     var out = ""
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
@@ -16977,7 +16977,7 @@ pub fn ci_find_substr(haystack: &str, needle: &str) -> i32:
 // Collect all variable declarations in a goto-lowered function body.
 // Names are made unique at the declaration site because all locals are hoisted
 // into one With function scope.
-fn ci_find_hoisted_var_decl_index(decls: &Vec[CiHoistedVarDecl], name: &str) -> i32:
+fn ci_find_hoisted_var_decl_index(decls: &List[CiHoistedVarDecl], name: &str) -> i32:
     var i = 0
     while i < decls.len() as i32:
         if decls[i].name == name:
@@ -16985,7 +16985,7 @@ fn ci_find_hoisted_var_decl_index(decls: &Vec[CiHoistedVarDecl], name: &str) -> 
         i = i + 1
     -1
 
-fn ci_collect_var_decls(session: i64, cursor: i32, decls_in: Vec[CiHoistedVarDecl], types: CiTypePool) -> Vec[CiHoistedVarDecl]:
+fn ci_collect_var_decls(session: i64, cursor: i32, decls_in: List[CiHoistedVarDecl], types: CiTypePool) -> List[CiHoistedVarDecl]:
     var decls = decls_in
     let kind = with_ci_cursor_kind(session, cursor)
     if kind == CXK_DECL_STMT:
@@ -17014,9 +17014,9 @@ fn ci_collect_var_decls(session: i64, cursor: i32, decls_in: Vec[CiHoistedVarDec
 
 type CiGotoCfg {
     graph: StackifyGraph,
-    stmt_blocks: Vec[i32],
-    stmt_ids: Vec[i32],
-    noreturn_blocks: Vec[i32],
+    stmt_blocks: List[i32],
+    stmt_ids: List[i32],
+    noreturn_blocks: List[i32],
 }
 
 type CiGotoCfgContextState {
@@ -17025,11 +17025,11 @@ type CiGotoCfgContextState {
     ok: bool = true,
     message: str = "",
     location: str = "",
-    label_names: Vec[str],
-    label_blocks: Vec[i32],
-    label_defined: Vec[i32],
-    break_targets: Vec[i32],
-    continue_targets: Vec[i32],
+    label_names: List[str],
+    label_blocks: List[i32],
+    label_defined: List[i32],
+    break_targets: List[i32],
+    continue_targets: List[i32],
     switch_cases: CiGotoSwitchCase,
 }
 
@@ -17039,8 +17039,8 @@ type CiGotoCfgContext {
 impl Copy for CiGotoCfgContext
 
 type CiGotoSwitchCaseState {
-    values: Vec[i32],
-    blocks: Vec[i32],
+    values: List[i32],
+    blocks: List[i32],
     has_default: bool = false,
     default_block: i32 = -1,
 }
@@ -17059,7 +17059,7 @@ impl Copy for CiStackEmitFrame
 
 type CiStackEmitContext {
     cfg: CiGotoCfg,
-    frames: Vec[CiStackEmitFrame],
+    frames: List[CiStackEmitFrame],
     ok: bool = true,
     message: str = "",
 }
@@ -17068,8 +17068,8 @@ let CI_STACK_FRAME_BLOCK: i32 = 1
 let CI_STACK_FRAME_LOOP: i32 = 2
 let CI_STACK_FRAME_IF: i32 = 3
 
-fn ci_stackify_no_args() -> Vec[i32]:
-    Vec.new()
+fn ci_stackify_no_args() -> List[i32]:
+    List.new()
 
 fn ci_goto_cfg_new(entry_desc: &str) -> CiGotoCfgContext:
     var graph = StackifyGraph.new(0)
@@ -17079,19 +17079,19 @@ fn ci_goto_cfg_new(entry_desc: &str) -> CiGotoCfgContext:
         *ptr = CiGotoCfgContextState {
             cfg: CiGotoCfg {
                 graph,
-                stmt_blocks: Vec.new(),
-                stmt_ids: Vec.new(),
-                noreturn_blocks: Vec.new(),
+                stmt_blocks: List.new(),
+                stmt_ids: List.new(),
+                noreturn_blocks: List.new(),
             },
             current: entry,
             ok: true,
             message: "",
             location: "",
-            label_names: Vec.new(),
-            label_blocks: Vec.new(),
-            label_defined: Vec.new(),
-            break_targets: Vec.new(),
-            continue_targets: Vec.new(),
+            label_names: List.new(),
+            label_blocks: List.new(),
+            label_defined: List.new(),
+            break_targets: List.new(),
+            continue_targets: List.new(),
             switch_cases: CiGotoSwitchCase { state: 0 as *mut CiGotoSwitchCaseState },
         }
     CiGotoCfgContext { state: ptr }
@@ -17174,7 +17174,7 @@ impl CiGotoCfgContext:
         self.state.cfg.graph.set_cond_br(self.state.current, cond as i32, true_block, ci_stackify_no_args(), false_block, ci_stackify_no_args())
         self.state.current = -1
 
-    mut fn return_current(values: &Vec[i32]):
+    mut fn return_current(values: &List[i32]):
         if not self.state.ok or self.state.current < 0:
             return
         self.state.cfg.graph.set_return(self.state.current, values)
@@ -17237,7 +17237,7 @@ impl CiGotoCfgContext:
         if self.state.continue_targets.len() > 0:
             let _ = self.state.continue_targets.pop()
 
-fn ci_goto_cfg_top_target(stack: &Vec[i32]) -> i32:
+fn ci_goto_cfg_top_target(stack: &List[i32]) -> i32:
     if stack.len() == 0:
         return -1
     stack[stack.len() - 1]
@@ -17283,7 +17283,7 @@ impl CiGotoCfgContext:
         if not self.state.ok or self.state.current < 0:
             return
         let nc = with_ci_num_children(session, cursor)
-        let values: Vec[i32] = Vec.new()
+        let values: List[i32] = List.new()
         if nc == 0:
             self.return_current(values)
             return
@@ -17530,8 +17530,8 @@ fn ci_goto_switch_case_new() -> CiGotoSwitchCase:
     let ptr = with_alloc(sizeof[CiGotoSwitchCaseState]()) as *mut CiGotoSwitchCaseState
     unsafe:
         *ptr = CiGotoSwitchCaseState {
-            values: Vec.new(),
-            blocks: Vec.new(),
+            values: List.new(),
+            blocks: List.new(),
             has_default: false,
             default_block: -1,
         }
@@ -17826,7 +17826,7 @@ impl CiStackEmitContext:
         self.frames[(self.frames.len() as i32 - 1 - depth)]
 
 impl CiStmtPool:
-    fn stack_emit_stmt_block(ids: &Vec[i32]) -> CiStmtId:
+    fn stack_emit_stmt_block(ids: &List[i32]) -> CiStmtId:
         if ids.len() == 0:
             return 0 as CiStmtId
         if ids.len() == 1:
@@ -17840,7 +17840,7 @@ impl CiStmtPool:
 
 impl CiStackEmitContext:
     mut fn leaf(stmts: CiStmtPool, block: i32) -> CiStmtId:
-        let ids: Vec[i32] = Vec.new()
+        let ids: List[i32] = List.new()
         var i: i64 = 0
         while i < self.cfg.stmt_ids.len():
             if self.cfg.stmt_blocks[i] == block:
@@ -17849,7 +17849,7 @@ impl CiStackEmitContext:
         stmts.stack_emit_stmt_block(&ids)
 
     mut fn children(tree: &StackifyTree, start: i32, count: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
-        let ids: Vec[i32] = Vec.new()
+        let ids: List[i32] = List.new()
         var i = 0
         while i < count and self.ok:
             let node_id = tree.children[(start + i)]
@@ -17865,7 +17865,7 @@ impl CiStackEmitContext:
         if node.values_count != node.to_values_count:
             self.fail("stackify emitter: parameter transfer arity mismatch")
             return 0 as CiStmtId
-        let ids: Vec[i32] = Vec.new()
+        let ids: List[i32] = List.new()
         var i = 0
         while i < node.values_count:
             let from_expr = tree.values[(node.values_start + i)] as CiExprId
@@ -17893,7 +17893,7 @@ impl CiStackEmitContext:
             self.push_frame(CI_STACK_FRAME_BLOCK, label_sym)
             let body = self.children(tree, node.first_child_start, node.first_child_count, stmts, exprs, types)
             self.pop_frame()
-            var ids: Vec[i32] = if (body as i32) != 0: ci_stmt_collect_flat_ids(stmts, body) else: Vec.new()
+            var ids: List[i32] = if (body as i32) != 0: ci_stmt_collect_flat_ids(stmts, body) else: List.new()
             let start = stmts.extra_len()
             var i: i64 = 0
             while i < ids.len():
@@ -17936,11 +17936,11 @@ impl CiStmtPool:
     fn stack_emit_tree(tree: &StackifyTree, cfg: CiGotoCfg, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
         var ctx = CiStackEmitContext {
             cfg,
-            frames: Vec.new(),
+            frames: List.new(),
             ok: true,
             message: "",
         }
-        let ids: Vec[i32] = Vec.new()
+        let ids: List[i32] = List.new()
         var i = 0
         while i < tree.roots_count and ctx.ok:
             let node_id = tree.children[(tree.roots_start + i)]
@@ -17958,16 +17958,16 @@ fn ci_native_goto_fail(msg: &str) -> CiStmtId:
     0 as CiStmtId
 
 impl CiStmtPool:
-    fn native_goto_label_syms(cfg: &CiGotoCfg) -> Vec[i32]:
-        let labels: Vec[i32] = Vec.new()
+    fn native_goto_label_syms(cfg: &CiGotoCfg) -> List[i32]:
+        let labels: List[i32] = List.new()
         var block: i32 = 0
         while block < cfg.graph.blocks.len() as i32:
             labels.push(self.add_string("__ci_bb_" ++ i64_to_string(block as i64)))
             block = block + 1
         labels
 
-fn ci_native_goto_collect_leaf_ids(cfg: &CiGotoCfg, block: i32) -> Vec[i32]:
-    var out: Vec[i32] = Vec.new()
+fn ci_native_goto_collect_leaf_ids(cfg: &CiGotoCfg, block: i32) -> List[i32]:
+    var out: List[i32] = List.new()
     var i: i64 = 0
     while i < cfg.stmt_ids.len():
         if cfg.stmt_blocks[i] == block:
@@ -17975,9 +17975,9 @@ fn ci_native_goto_collect_leaf_ids(cfg: &CiGotoCfg, block: i32) -> Vec[i32]:
         i = i + 1
     out
 
-fn ci_goto_cfg_reachable_blocks(cfg: &CiGotoCfg) -> Vec[i32]:
-    let reachable: Vec[i32] = Vec.new()
-    let worklist: Vec[i32] = Vec.new()
+fn ci_goto_cfg_reachable_blocks(cfg: &CiGotoCfg) -> List[i32]:
+    let reachable: List[i32] = List.new()
+    let worklist: List[i32] = List.new()
     let block_count = cfg.graph.blocks.len() as i32
     var i = 0
     while i < block_count:
@@ -18030,7 +18030,7 @@ impl CiStmtPool:
     fn native_goto_single_goto(label_sym: i32) -> CiStmtId:
         self.goto_label(label_sym)
 
-    fn native_goto_emit_terminator(cfg: &CiGotoCfg, block: i32, labels: &Vec[i32], exprs: CiExprPool) -> CiStmtId:
+    fn native_goto_emit_terminator(cfg: &CiGotoCfg, block: i32, labels: &List[i32], exprs: CiExprPool) -> CiStmtId:
         if block < 0 or block >= cfg.graph.blocks.len() as i32:
             return ci_native_goto_fail("native goto emitter: block out of range")
         let b = cfg.graph.blocks[block]
@@ -18095,19 +18095,19 @@ impl CiExprPool:
         self.int_lit(zero_idx, ty_id)
 
 impl CiStmtPool:
-    fn native_goto_emit_cfg(cfg: &CiGotoCfg, hoisted_stmt_ids: &Vec[i32], exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
+    fn native_goto_emit_cfg(cfg: &CiGotoCfg, hoisted_stmt_ids: &List[i32], exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
         let labels = self.native_goto_label_syms(cfg)
         if cfg.graph.entry < 0 or cfg.graph.entry >= labels.len() as i32:
             return ci_native_goto_fail("native goto emitter: entry block out of range")
         let reachable = ci_goto_cfg_reachable_blocks(cfg)
 
-        let ids: Vec[i32] = Vec.new()
+        let ids: List[i32] = List.new()
         var hi: i64 = 0
         while hi < hoisted_stmt_ids.len():
             ids.push(hoisted_stmt_ids[hi])
             hi = hi + 1
 
-        let replace_ids: Vec[i32] = Vec.new()
+        let replace_ids: List[i32] = List.new()
         var ri: i64 = 0
         while ri < cfg.stmt_ids.len():
             let sid = cfg.stmt_ids[ri] as CiStmtId
@@ -18137,7 +18137,7 @@ impl CiStmtPool:
             if reachable[block] == 0:
                 block = block + 1
                 continue
-            let block_ids: Vec[i32] = Vec.new()
+            let block_ids: List[i32] = List.new()
             var li: i64 = 0
             while li < cfg.stmt_ids.len():
                 if cfg.stmt_blocks[li] == block:
@@ -18178,10 +18178,10 @@ impl CiGotoCfgContext:
 
 impl CiStmtPool:
     fn lower_goto_body_stackify(session: i64, body_cursor: i32, scope: CiScope, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
-        var hoisted_decls: Vec[CiHoistedVarDecl] = Vec.new()
+        var hoisted_decls: List[CiHoistedVarDecl] = List.new()
         hoisted_decls = ci_collect_var_decls(session, body_cursor, move hoisted_decls, types)
 
-        var hoisted_stmt_ids: Vec[i32] = Vec.new()
+        var hoisted_stmt_ids: List[i32] = List.new()
         var hvi: i32 = 0
         while hvi < hoisted_decls.len() as i32:
             let decl = hoisted_decls[hvi]
@@ -18219,7 +18219,7 @@ impl CiStmtPool:
             else:
                 let ret_ty = ci_scope_get_return_type(scope)
                 if ret_ty == "void" or ret_ty == "Unit" or ret_ty.len() == 0:
-                    let values: Vec[i32] = Vec.new()
+                    let values: List[i32] = List.new()
                     ctx.return_current(values)
                 else:
                     ctx.fail("goto CFG function can fall through without returning", with_ci_cursor_location(session, body_cursor))
@@ -18244,7 +18244,7 @@ impl CiStmtPool:
                 g_ci_bail_location = with_ci_cursor_location(session, body_cursor)
             g_ci_bail_kind = CXK_GOTO_STMT
             return 0 as CiStmtId
-        var ids: Vec[i32] = Vec.new()
+        var ids: List[i32] = List.new()
         var hi: i64 = 0
         while hi < hoisted_stmt_ids.len():
             ids.push(hoisted_stmt_ids[hi])
@@ -18954,7 +18954,7 @@ impl CiExprPool:
         let renamed = ci_libc_simple_rename(callee_text)
         if ci_is_libm_fn(callee_text):
             ci_trace_port("STRUCTURAL[b11.9.libm_call]")
-            var math_args: Vec[i32] = Vec.new()
+            var math_args: List[i32] = List.new()
             var mai: i32 = 1
             while mai < nc:
                 let arg_id = self.lower_expr_ir(session, with_ci_child(session, cursor, mai), types, scope)
@@ -18966,7 +18966,7 @@ impl CiExprPool:
         if renamed.len() > 0:
             ci_trace_port("STRUCTURAL[b11.9.libc_call]")
             // Lower each argument structurally.
-            var arg_ids: Vec[i32] = Vec.new()
+            var arg_ids: List[i32] = List.new()
             var ai: i32 = 1
             while ai < nc:
                 let arg_cursor = with_ci_child(session, cursor, ai)

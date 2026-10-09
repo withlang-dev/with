@@ -14,13 +14,13 @@ extern fn with_alloc(size: i64) -> *mut u8
 let FND_INTERN_PAGE_SIZE: i64 = 1048576
 
 pub type FndInternStringArena {
-    pages: Vec[*mut u8],
+    pages: List[*mut u8],
     offset: i64,
 }
 
 fn FndInternStringArena.new() -> FndInternStringArena:
     let first = with_alloc(FND_INTERN_PAGE_SIZE)
-    var arena = FndInternStringArena { pages: Vec.new(), offset: 0 }
+    var arena = FndInternStringArena { pages: List.new(), offset: 0 }
     arena.pages.push(first)
     arena
 
@@ -45,12 +45,12 @@ fn FndInternStringArena.store(mut self: FndInternStringArena, s: &str) -> str:
     unsafe *p
 
 pub type InternPoolState {
-    symbol_texts: Vec[str],
+    symbol_texts: List[str],
     symbol_map: HashMap[str, i32],
     strings: FndInternStringArena,
-    type_keys: Vec[TypeKey],
+    type_keys: List[TypeKey],
     type_map: HashMap[str, i32],
-    value_keys: Vec[ValueKey],
+    value_keys: List[ValueKey],
     value_map: HashMap[str, i32],
 }
 
@@ -76,12 +76,12 @@ fn foundation_intern_text_eq(a: &str, b: &str) -> bool:
 pub fn InternPool.init -> InternPool:
     let ptr = with_alloc(256) as *mut InternPoolState
     unsafe *ptr = InternPoolState {
-        symbol_texts: Vec.new(),
+        symbol_texts: List.new(),
         symbol_map: foundation_new_map_str_i32(),
         strings: FndInternStringArena.new(),
-        type_keys: Vec.new(),
+        type_keys: List.new(),
         type_map: foundation_new_map_str_i32(),
-        value_keys: Vec.new(),
+        value_keys: List.new(),
         value_map: foundation_new_map_str_i32(),
     }
     ptr.symbol_texts.push("")

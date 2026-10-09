@@ -246,12 +246,12 @@ observes; consuming iteration transfers; nothing makes a second owner.**
 `for (k, v) in map` is `map.iter()` and binds `&K`/`&V`; `keys()`, `values()`
 and `iter()` return concrete ephemeral view iterators; `remove`, `drain` and
 `into_iter`/`into_keys`/`into_values` transfer; an owned collection is spelled
-`m.keys() |> map(it.clone()) |> collect[Vec]()` and a typed binding never
+`m.keys() |> map(it.clone()) |> collect[List]()` and a typed binding never
 collects. Specification §2.3 says transport is not duplication: the compiler
 may move a value's bytes, and never produces a second live value from one
 unless the type is `Copy` — intrinsics, runtime helpers and generated code
 included. The current compiler is deliberately NON-COMPLIANT (#1158, #1187):
-don't add callers of `keys()`/`values()`/`items()` as `Vec`s, don't byte-copy
+don't add callers of `keys()`/`values()`/`items()` as `List`s, don't byte-copy
 a non-`Copy` element out of a container, and follow the D44 entry's
 non-compliance list rather than isolated fixes.
 
@@ -404,7 +404,7 @@ reasoning from layout, signatures, or spec text goes wrong. Three rules:
 
 **Spell it and run it.** Before concluding a type, mechanism, or API "works" or
 "is the surface," write the smallest program that uses it and compile it. A type
-usable-looking from its layout may be unspellable as a parameter (`VecRange`); a
+usable-looking from its layout may be unspellable as a parameter (`ListRange`); a
 `mut` parameter may *move* rather than borrow; `&raw place` may need an explicit
 `const`/`mut` qualifier. You find these only by compiling.
 
@@ -856,7 +856,7 @@ Match the surrounding code, and follow the mission at the character level:
 - **Don't spell types the compiler can infer.** Omit a return type when the body
   makes it obvious (`fn shout(s: str): s ++ "!"`, not `-> str`); omit a local's
   type when the initializer gives it. Annotate only where inference needs it
-  (e.g. `var xs: Vec[i32] = Vec.new()`).
+  (e.g. `var xs: List[i32] = List.new()`).
 - **Inline the colon when the body is very small.** `fn millis(ms: i32): ms` and
   `fn get(): self.n` on one line — do NOT break a one-token/one-expression body
   onto its own indented line. Use a block body only when the body is actually

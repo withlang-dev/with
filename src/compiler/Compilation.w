@@ -198,7 +198,7 @@ fn compilation_mir_span_range(zcu: &Zcu, pool: AstPool, fn_sym: i32, start: i32,
 fn compilation_bool_digit(value: bool) -> str:
     if value: "1" else: "0"
 
-fn compilation_join_strings(values: &Vec[str], separator: &str) -> str:
+fn compilation_join_strings(values: &List[str], separator: &str) -> str:
     var out = ""
     for i in 0..values.len() as i32:
         if i > 0:
@@ -224,8 +224,8 @@ fn compilation_escape_with_string(value: &str) -> str:
             out = out ++ value.slice(i as i64, (i + 1) as i64)
     out
 
-fn compilation_split_escaped_fields(line: &str) -> Vec[str]:
-    let fields: Vec[str] = Vec.new()
+fn compilation_split_escaped_fields(line: &str) -> List[str]:
+    let fields: List[str] = List.new()
     var cur = ""
     var escaped = false
     for i in 0..line.len() as i32:
@@ -250,8 +250,8 @@ fn compilation_split_escaped_fields(line: &str) -> Vec[str]:
     fields.push(cur)
     fields
 
-fn compilation_split_nonempty_lines(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn compilation_split_nonempty_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     var start = 0
     for i in 0..text.len() as i32:
         if text[i] == 10:
@@ -359,10 +359,10 @@ fn compilation_type_decl_kind_name(sub_kind: i32) -> str:
 pub type Compilation {
     zcu: Zcu,
     config: CompilationConfig,
-    cli_diag_gen_starts: Vec[i32],
-    cli_diag_gen_ends: Vec[i32],
-    cli_diag_source_names: Vec[str],
-    cli_diag_source_texts: Vec[str],
+    cli_diag_gen_starts: List[i32],
+    cli_diag_gen_ends: List[i32],
+    cli_diag_source_names: List[str],
+    cli_diag_source_texts: List[str],
     compiler_hook_emitted_source: str,
     last_link_command_available: i32,
     last_link_command: LinkStageCommand,
@@ -371,13 +371,13 @@ pub type Compilation {
     // #1816: the entry source is statements by construction (a CLI
     // one-liner or a REPL line): its top-level `let`/`var`s are main's locals.
     statements_entry: bool,
-    link_objects: Vec[str],
-    link_search_paths: Vec[str],
-    link_rpaths: Vec[str],
+    link_objects: List[str],
+    link_search_paths: List[str],
+    link_rpaths: List[str],
     // D39: `--link-bundle` prefixes, loaded once by load_link_bundles before
     // the first frontend entry (the interface registry must be populated
     // before any import resolves).
-    link_bundles: Vec[str],
+    link_bundles: List[str],
     link_bundles_loaded: bool,
     // D38: `--emit-bundle-manifest` path for emit_object_to_path ("" = none).
     bundle_manifest_path: str,
@@ -407,19 +407,19 @@ pub fn Compilation.init -> Compilation:
     Compilation {
         zcu: zcu,
         config: compilation_config_default(),
-        cli_diag_gen_starts: Vec.new(),
-        cli_diag_gen_ends: Vec.new(),
-        cli_diag_source_names: Vec.new(),
-        cli_diag_source_texts: Vec.new(),
+        cli_diag_gen_starts: List.new(),
+        cli_diag_gen_ends: List.new(),
+        cli_diag_source_names: List.new(),
+        cli_diag_source_texts: List.new(),
         compiler_hook_emitted_source: "",
         last_link_command_available: 0,
         last_link_command: link_stage_empty_command(),
         last_link_rc: 0,
         statements_entry: false,
-        link_objects: Vec.new(),
-        link_search_paths: Vec.new(),
-        link_rpaths: Vec.new(),
-        link_bundles: Vec.new(),
+        link_objects: List.new(),
+        link_search_paths: List.new(),
+        link_rpaths: List.new(),
+        link_bundles: List.new(),
         link_bundles_loaded: false,
         bundle_manifest_path: "",
         bundle_interface_path: "",
@@ -442,15 +442,15 @@ impl Compilation:
         self.set_debug_info(options.debug_info)
         self.set_compiler_hooks_enabled(options.compiler_hooks_enabled)
         self.set_target_kind(options.target_kind)
-        self.link_objects = driver_clone_str_vec(&options.link_objects)
+        self.link_objects = driver_clone_str_list(&options.link_objects)
         self.set_link_paths(&options.link_search_paths, &options.link_rpaths)
         self.set_link_bundles(&options.link_bundles)
         self.bundle_manifest_path = with_str_clone_ref(options.bundle_manifest_path)
         self.bundle_interface_path = with_str_clone_ref(options.bundle_interface_path)
         self.set_bundle_fingerprint(options.bundle_corpus, options.bundle_fingerprint_path)
 
-    pub mut fn set_link_bundles(prefixes: &Vec[str]):
-        self.link_bundles = driver_clone_str_vec(prefixes)
+    pub mut fn set_link_bundles(prefixes: &List[str]):
+        self.link_bundles = driver_clone_str_list(prefixes)
         self.link_bundles_loaded = false
 
     // D39: `--bundle-corpus <rel>` and `--bundle-fingerprint <path>` — on
@@ -672,9 +672,9 @@ impl Compilation:
             cfg.link_rpaths.push(path.clone())
         cfg
 
-    mut fn set_link_paths(search_paths: &Vec[str], rpaths: &Vec[str]):
-        self.link_search_paths = driver_clone_str_vec(search_paths)
-        self.link_rpaths = driver_clone_str_vec(rpaths)
+    mut fn set_link_paths(search_paths: &List[str], rpaths: &List[str]):
+        self.link_search_paths = driver_clone_str_list(search_paths)
+        self.link_rpaths = driver_clone_str_list(rpaths)
 
     mut fn set_prelude_mode(mode: i32):
         var cfg = move self.config
@@ -1148,8 +1148,8 @@ impl Compilation:
         pool
 
     mut fn compile_entry_source_text(source_path: &str, source_text: &str) -> AstPool:
-        let source_paths: Vec[str] = Vec.new()
-        let source_texts: Vec[str] = Vec.new()
+        let source_paths: List[str] = List.new()
+        let source_texts: List[str] = List.new()
         source_paths.push(with_str_clone_ref(source_path))
         source_texts.push(with_str_clone_ref(source_text))
         self.compile_entry_source_texts(source_paths, source_texts)
@@ -1159,7 +1159,7 @@ impl Compilation:
     // std.regex reaches std.re.* in every program, so an entry that skipped
     // this read the corpus source from the checkout (six seconds of Sema per
     // test) and found nothing outside one.
-    mut fn compile_entry_source_texts(source_paths: &Vec[str], source_texts: &Vec[str]) -> AstPool:
+    mut fn compile_entry_source_texts(source_paths: &List[str], source_texts: &List[str]) -> AstPool:
         if source_paths.len() == 0 or source_texts.len() == 0 or source_paths.len() != source_texts.len():
             runtime_eprint("error: compile_entry_source_texts requires matching non-empty source paths and texts")
             return AstPool.new()
@@ -1176,8 +1176,8 @@ impl Compilation:
             self.zcu = taken_zcu
             return AstPool.new()
         taken_zcu.set_current_source(source_dir, source_path, source_text)
-        let extra_names: Vec[str] = Vec.new()
-        let extra_texts: Vec[str] = Vec.new()
+        let extra_names: List[str] = List.new()
+        let extra_texts: List[str] = List.new()
         for i in 1..source_paths.len() as i32:
             extra_names.push(with_str_clone_ref(source_paths[i]))
             extra_texts.push(with_str_clone_ref(source_texts[i]))
@@ -1199,7 +1199,7 @@ impl Compilation:
         let _ = self.run_mir_lower(prepared_pool)
         not self.has_errors()
 
-    mut fn check_file_with_build_settings(source_path: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> bool:
+    mut fn check_file_with_build_settings(source_path: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str]) -> bool:
         var cfg = self.project_config_for_source(source_path)
         for ii in 0..include_paths.len() as i32:
             cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
@@ -1210,7 +1210,7 @@ impl Compilation:
         let pool = self.compile_file_with_config(source_path, move cfg)
         self.check_pool(pool, source_path)
 
-    mut fn check_source_texts(source_paths: &Vec[str], source_texts: &Vec[str]) -> bool:
+    mut fn check_source_texts(source_paths: &List[str], source_texts: &List[str]) -> bool:
         let pool = self.compile_entry_source_texts(source_paths, source_texts)
         if source_paths.len() == 0:
             return false
@@ -1385,7 +1385,7 @@ impl Compilation:
         // Sema codegen handed back (layouts frozen); the manifest records both.
         var interface_sha = ""
         var fingerprint = ""
-        var omitted: Vec[str] = Vec.new()
+        var omitted: List[str] = List.new()
         if self.bundle_interface_path.len() > 0 or self.bundle_fingerprint_path.len() > 0 or self.bundle_manifest_path.len() > 0:
             let model = self.bundle_model(if self.bundle_interface_path.len() > 0: "--emit-bundle-interface" else if self.bundle_fingerprint_path.len() > 0: "--bundle-fingerprint" else: "--emit-bundle-manifest")
             if not model.ok:
@@ -1401,7 +1401,7 @@ impl Compilation:
                 if fingerprint.len() == 0:
                     compilation_remove_file_best_effort(obj_path)
                     return ""
-            omitted = driver_clone_str_vec(&model.omitted)
+            omitted = driver_clone_str_list(&model.omitted)
         if self.bundle_manifest_path.len() > 0 and not self.write_bundle_manifest(obj_path, fingerprint, interface_sha, &omitted):
             compilation_remove_file_best_effort(obj_path)
             return ""
@@ -1429,7 +1429,7 @@ impl Compilation:
     // interface check; never a prelude or std module the object happens to
     // contain). build.w adds the bundle name, the key, and the corpus hash
     // it computed.
-    mut fn write_bundle_manifest(obj_path: &str, fingerprint: &str, interface_sha: &str, omitted: &Vec[str]) -> bool:
+    mut fn write_bundle_manifest(obj_path: &str, fingerprint: &str, interface_sha: &str, omitted: &List[str]) -> bool:
         if not compiler_abi_sha_is_stamped():
             with_eprint("error: --emit-bundle-manifest: this compiler carries no ABI stamp (unstamped binary); a bundle key needs one")
             return false
@@ -1444,7 +1444,7 @@ impl Compilation:
         // `omitted <module> <name> <why>` line each (the .wi names them too)
         for oi in 0..omitted.len() as i32:
             text = text ++ "omitted " ++ omitted[oi].replace("\t", " ") ++ "\n"
-        let seen: Vec[str] = Vec.new()
+        let seen: List[str] = List.new()
         for pi in 0..self.zcu.decl_source_paths.len() as i32:
             let path = self.zcu.decl_source_paths[pi]
             if path.len() == 0:
@@ -1465,7 +1465,7 @@ impl Compilation:
             return false
         true
 
-    mut fn emit_object_to_path_with_build_settings(source_path: &str, obj_path: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> str:
+    mut fn emit_object_to_path_with_build_settings(source_path: &str, obj_path: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str]) -> str:
         let output_dir = link_stage_dirname(obj_path)
         if not compilation_ensure_output_dir(output_dir):
             return ""
@@ -1490,7 +1490,7 @@ impl Compilation:
             return ""
         with_str_clone_ref(obj_path)
 
-    mut fn emit_archive_to_path_with_build_settings(source_path: &str, ar_path: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> str:
+    mut fn emit_archive_to_path_with_build_settings(source_path: &str, ar_path: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str]) -> str:
         if ar_path.len() == 0:
             return ""
         let output_dir = link_stage_dirname(ar_path)
@@ -1516,7 +1516,7 @@ impl Compilation:
         let pool = self.compile_entry_file(source_path)
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
-    mut fn build_binary_to_path_with_build_settings(source_path: &str, bin_path: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> str:
+    mut fn build_binary_to_path_with_build_settings(source_path: &str, bin_path: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str]) -> str:
         if bin_path.len() == 0:
             return self.build_binary_to_path(source_path, bin_path)
         let obj_path = bin_path ++ ".o"
@@ -1535,9 +1535,9 @@ impl Compilation:
         let pool = self.compile_entry_file_with_config(source_path, move cfg)
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
-    mut fn build_binary_to_path_with_link_libs(source_path: &str, bin_path: &str, link_libs: &Vec[str]) -> str:
-        let include_paths: Vec[str] = Vec.new()
-        let defines: Vec[str] = Vec.new()
+    mut fn build_binary_to_path_with_link_libs(source_path: &str, bin_path: &str, link_libs: &List[str]) -> str:
+        let include_paths: List[str] = List.new()
+        let defines: List[str] = List.new()
         self.build_binary_to_path_with_build_settings(source_path, bin_path, include_paths, defines, link_libs)
 
     mut fn build_binary_from_source_to_path(source_path: &str, source_text: &str, bin_path: &str) -> str:
@@ -1552,7 +1552,7 @@ impl Compilation:
         let pool = self.compile_source_text(source_path, source_text)
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
-    mut fn build_binary_from_source_to_path_with_build_settings(source_path: &str, source_text: &str, bin_path: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> str:
+    mut fn build_binary_from_source_to_path_with_build_settings(source_path: &str, source_text: &str, bin_path: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str]) -> str:
         if bin_path.len() == 0:
             return self.build_binary_from_source_to_path(source_path, source_text, bin_path)
         let obj_path = bin_path ++ ".o"
@@ -1572,13 +1572,13 @@ impl Compilation:
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
     mut fn build_entry_binary_from_source_to_path(source_path: &str, source_text: &str, bin_path: &str) -> str:
-        let source_paths: Vec[str] = Vec.new()
-        let source_texts: Vec[str] = Vec.new()
+        let source_paths: List[str] = List.new()
+        let source_texts: List[str] = List.new()
         source_paths.push(with_str_clone_ref(source_path))
         source_texts.push(with_str_clone_ref(source_text))
         self.build_entry_binary_from_sources_to_path(source_paths, source_texts, bin_path)
 
-    mut fn build_entry_binary_from_sources_to_path(source_paths: &Vec[str], source_texts: &Vec[str], bin_path: &str) -> str:
+    mut fn build_entry_binary_from_sources_to_path(source_paths: &List[str], source_texts: &List[str], bin_path: &str) -> str:
         if source_paths.len() == 0 or source_texts.len() == 0 or source_paths.len() != source_texts.len():
             runtime_eprint("error: build_entry_binary_from_sources_to_path requires matching non-empty source paths and texts")
             return ""
@@ -1657,13 +1657,13 @@ impl Compilation:
         sema.source_text = with_str_clone_ref(taken_zcu.current_source_text)
         // Clone: see run_mir_lower — bare assignments would move these tables
         // out of the Zcu and blank them for later consumers.
-        sema.decl_source_paths = sema_clone_str_vec(&taken_zcu.decl_source_paths)
+        sema.decl_source_paths = sema_clone_str_list(&taken_zcu.decl_source_paths)
         sema.package_keys = taken_zcu.package_key_map()
-        sema.decl_source_file_ids = sema_clone_i32_vec(&taken_zcu.decl_source_file_ids)
-        sema.decl_is_c_import = sema_clone_i32_vec(&taken_zcu.decl_is_c_import)
-        sema.source_text_file_ids = sema_clone_i32_vec(&taken_zcu.source_text_file_ids)
-        sema.source_text_names = sema_clone_str_vec(&taken_zcu.source_text_names)
-        sema.source_texts = sema_clone_str_vec(&taken_zcu.source_texts)
+        sema.decl_source_file_ids = sema_clone_i32_list(&taken_zcu.decl_source_file_ids)
+        sema.decl_is_c_import = sema_clone_i32_list(&taken_zcu.decl_is_c_import)
+        sema.source_text_file_ids = sema_clone_i32_list(&taken_zcu.source_text_file_ids)
+        sema.source_text_names = sema_clone_str_list(&taken_zcu.source_text_names)
+        sema.source_texts = sema_clone_str_list(&taken_zcu.source_texts)
         sema.tool_mode_entry_path = with_str_clone_ref(taken_zcu.tool_mode_entry_path)
         sema.runtime_available = if taken_zcu.project_config.runtime_available: 1 else: 0
         sema.runtime_fiber_stack_size = taken_zcu.project_config.runtime_fiber_stack_size
@@ -1944,8 +1944,8 @@ impl Compilation:
     fn print_warnings():
         self.zcu.print_warnings()
 
-    fn tracked_input_paths() -> Vec[str]:
-        var out: Vec[str] = Vec.new()
+    fn tracked_input_paths() -> List[str]:
+        var out: List[str] = List.new()
         for i in 0..self.zcu.tracked_input_paths.len() as i32:
             out.push(with_str_clone_ref(self.zcu.tracked_input_paths[i]))
         out
@@ -1989,15 +1989,15 @@ impl Compilation:
             // one read 1:1 of an empty line (#1447).
             sema.source_text = with_str_clone_ref(self.zcu.current_source_text)
             // Clone like Frontend's seam: a bare assignment moves the table out of
-            // the Zcu (single-owner Vec), and the backend's module-object pruning
+            // the Zcu (single-owner List), and the backend's module-object pruning
             // then sees empty decl paths and emits every imported module's bodies.
-            sema.decl_source_paths = sema_clone_str_vec(&self.zcu.decl_source_paths)
+            sema.decl_source_paths = sema_clone_str_list(&self.zcu.decl_source_paths)
             sema.package_keys = self.zcu.package_key_map()
-            sema.decl_source_file_ids = sema_clone_i32_vec(&self.zcu.decl_source_file_ids)
-            sema.decl_is_c_import = sema_clone_i32_vec(&self.zcu.decl_is_c_import)
-            sema.source_text_file_ids = sema_clone_i32_vec(&self.zcu.source_text_file_ids)
-            sema.source_text_names = sema_clone_str_vec(&self.zcu.source_text_names)
-            sema.source_texts = sema_clone_str_vec(&self.zcu.source_texts)
+            sema.decl_source_file_ids = sema_clone_i32_list(&self.zcu.decl_source_file_ids)
+            sema.decl_is_c_import = sema_clone_i32_list(&self.zcu.decl_is_c_import)
+            sema.source_text_file_ids = sema_clone_i32_list(&self.zcu.source_text_file_ids)
+            sema.source_text_names = sema_clone_str_list(&self.zcu.source_text_names)
+            sema.source_texts = sema_clone_str_list(&self.zcu.source_texts)
             sema.tool_mode_entry_path = with_str_clone_ref(self.zcu.tool_mode_entry_path)
             sema.runtime_available = if self.zcu.project_config.runtime_available: 1 else: 0
             sema.runtime_fiber_stack_size = self.zcu.project_config.runtime_fiber_stack_size
@@ -2036,7 +2036,7 @@ impl Compilation:
         let t_mir = profile_now()
         // MIR lowering owns the still-mutable semantic state and returns it with
         // the complete module. This makes the phase transfer explicit: no shallow
-        // Sema alias survives a Vec reallocation while generic specializations add
+        // Sema alias survives a List reallocation while generic specializations add
         // their final dependent types.
         var lowered = lower_module(move sema, active_pool, self.zcu.pool)
         sema = move lowered.sema

@@ -6,7 +6,7 @@
 // writable: see behav_for_binding_disjoint_mutation.
 
 type KV { key: str, n: i32 }
-type Bag { items: Vec[KV], count: i32 }
+type Bag { items: List[KV], count: i32 }
 
 impl Bag:
     mut fn grow():
@@ -15,6 +15,6 @@ impl Bag:
             print(e.key)
 
 fn main:
-    var b = Bag { items: Vec.new(), count: 0 }
+    var b = Bag { items: List.new(), count: 0 }
     b.items.push(KV { key: "a".clone(), n: 1 })
     b.grow()

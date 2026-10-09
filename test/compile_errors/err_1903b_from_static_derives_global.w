@@ -3,7 +3,7 @@
 // #1903 (§21.1 rule 6, spec v7.18): a view of a global is no view of static
 // data: the global is written while the program runs.
 
-var G: Vec[i32] = Vec.new()
+var G: List[i32] = List.new()
 
 fn head() -> &i32 from static: &G[0]
 

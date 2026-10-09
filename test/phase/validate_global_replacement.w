@@ -3,9 +3,9 @@
 
 use std.collections
 
-var values: Vec[str] = Vec.new()
+var values: List[str] = List.new()
 
-fn clear(): values = Vec.new()
+fn clear(): values = List.new()
 
 fn main:
     values.push("owned")

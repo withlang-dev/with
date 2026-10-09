@@ -4,5 +4,5 @@
 // as at an annotated `let`. This position accepted it and truncated.
 fn main:
     let s: i64 = 5
-    let a: Vec[i32] = [0, s]
+    let a: List[i32] = [0, s]
     print(f"{a[1]}")

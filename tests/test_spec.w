@@ -415,10 +415,10 @@ fn test_early_return:
     assert_eq(find_first_positive(-1, 2, 3), 2, "early return second")
     assert_eq(find_first_positive(-1, -2, -3), 0, "early return default")
 
-// ── Vec operations ──────────────────────────────────────────────
+// ── List operations ──────────────────────────────────────────────
 
-fn test_vec:
-    var v: Vec[i32] = Vec.new()
+fn test_list:
+    var v: List[i32] = List.new()
     v.push(10)
     v.push(20)
     v.push(30)
@@ -492,7 +492,7 @@ fn main:
     with_eprintln("  early_return...")
     test_early_return()
     with_eprintln("  vec...")
-    test_vec()
+    test_list()
     with_eprintln("  hashmap...")
     test_hashmap()
 

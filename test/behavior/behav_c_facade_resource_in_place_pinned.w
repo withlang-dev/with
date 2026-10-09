@@ -13,7 +13,7 @@
 // still the stream's own, and `z_end` counts a destruction only at the
 // kept address and reads the state first — so it runs on a live cell
 // (destroy, then free) and exactly once per resource: returned from the
-// constructor, moved to a new binding, pushed into a Vec, moved into a
+// constructor, moved to a new binding, pushed into a List, moved into a
 // function. A raw pointer taken from a borrow of the representation stays
 // valid across a move of the resource value. `misplaced` counts every
 // operation that saw the stream at another address.
@@ -48,7 +48,7 @@ fn main:
     let p = a.repr.as_ptr()
     let b = move a
     print(f"moved {check(b)} raw-across-move {unsafe { z_check(p) }}")
-    var v: Vec[Stream] = Vec.new()
+    var v: List[Stream] = List.new()
     v.push(b)
     v.push(make(ends, misplaced))
     print(f"vec {check(v[0])} {check(v[1])}")

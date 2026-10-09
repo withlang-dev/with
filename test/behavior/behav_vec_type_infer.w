@@ -1,8 +1,8 @@
 //! expect-stdout: ok
-// Test Vec[T].new() syntax — specifying element type at construction
+// Test List[T].new() syntax — specifying element type at construction
 
 fn main:
-    var v = Vec[i32].new()
+    var v = List[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)
@@ -10,7 +10,7 @@ fn main:
     assert(v[0] == 10)
     assert(v[2] == 30)
 
-    var names = Vec[str].new()
+    var names = List[str].new()
     names.push("alice")
     names.push("bob")
     assert(names.len() == 2)

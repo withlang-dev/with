@@ -19,7 +19,7 @@ fn apply(f: fn(i32) -> i32, x: i32) -> i32: f(x)
 
 type Counter {
     count: i32,
-    items: Vec[i32],
+    items: List[i32],
     step: fn(i32) -> i32,
     label: str,
 }

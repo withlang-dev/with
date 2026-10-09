@@ -1,11 +1,11 @@
 //! expect-stdout: ok
 
 comptime fn empty_is_none() -> bool:
-    var v = Vec[i32].new()
+    var v = List[i32].new()
     v.pop().is_none()
 
 comptime fn pop_value() -> i32:
-    var v = Vec[i32].new()
+    var v = List[i32].new()
     v |> push(20) |> push(22)
     v.pop().unwrap()
 

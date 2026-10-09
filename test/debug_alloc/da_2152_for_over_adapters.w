@@ -6,8 +6,8 @@
 fn a: "A".to_lower()
 
 fn main:
-    let xs: Vec[i32] = [1, 2, 3]
-    let names: Vec[str] = [a(), "bc".to_lower(), a()]
+    let xs: List[i32] = [1, 2, 3]
+    let names: List[str] = [a(), "bc".to_lower(), a()]
     var seen = 0
     for (i, x) in xs.enumerate(): seen += i as i32 * x
     assert(seen == 8)

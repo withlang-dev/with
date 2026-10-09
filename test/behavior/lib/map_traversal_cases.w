@@ -4,7 +4,7 @@
 // the loop, a Drop-class key or value binds as a view into the map's slot, a
 // Copy-class one binds by value, and a borrowed map iterates like an owned
 // one. It once moved the map into a temporary (m.len() was 0 afterwards and
-// m.get crashed) and walked a byte-copied items() Vec that shared the map's
+// m.get crashed) and walked a byte-copied items() List that shared the map's
 // string buffers. Run under WITH_DEBUG_ALLOC=1 WITH_DEBUG_ALLOC_SCRIBBLE=1:
 // a plain run passed while the map was being corrupted.
 

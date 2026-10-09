@@ -6,10 +6,10 @@ impl Drop for W:
         unsafe:
             *self.slot = *self.slot + 1
 
-type H { items: Vec[W] }
+type H { items: List[W] }
 
 fn run(s: *mut i32):
-    let h = H { items: Vec.new() }
+    let h = H { items: List.new() }
     h.items |> push(W { slot: s }) |> push(W { slot: s })
 
 fn main:

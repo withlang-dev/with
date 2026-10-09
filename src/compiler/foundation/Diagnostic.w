@@ -18,13 +18,13 @@ pub type Diagnostic {
     code: str,
     message: str,
     primary: Span,
-    labels: Vec[DiagnosticLabel],
-    notes: Vec[str],
-    helps: Vec[str],
+    labels: List[DiagnosticLabel],
+    notes: List[str],
+    helps: List[str],
 }
 
 pub type DiagnosticStore {
-    items: Vec[Diagnostic],
+    items: List[Diagnostic],
 }
 
 fn diagnostic_owned_text(text: &str) -> str:
@@ -36,9 +36,9 @@ pub fn diagnostic_error(message: &str, primary: Span) -> Diagnostic:
         code: "",
         message: diagnostic_owned_text(message),
         primary,
-        labels: Vec.new(),
-        notes: Vec.new(),
-        helps: Vec.new(),
+        labels: List.new(),
+        notes: List.new(),
+        helps: List.new(),
     }
 
 pub fn diagnostic_warning(message: &str, primary: Span) -> Diagnostic:
@@ -47,9 +47,9 @@ pub fn diagnostic_warning(message: &str, primary: Span) -> Diagnostic:
         code: "",
         message: diagnostic_owned_text(message),
         primary,
-        labels: Vec.new(),
-        notes: Vec.new(),
-        helps: Vec.new(),
+        labels: List.new(),
+        notes: List.new(),
+        helps: List.new(),
     }
 
 impl Diagnostic:
@@ -63,7 +63,7 @@ impl Diagnostic:
 
 pub fn DiagnosticStore.init -> DiagnosticStore:
     DiagnosticStore {
-        items: Vec.new(),
+        items: List.new(),
     }
 
 impl DiagnosticStore:

@@ -10,8 +10,8 @@ use SemaTypes
 fn suspend_bit_index(local_count: i32, bb: i32, local: i32) -> i32:
     bb * local_count + local
 
-fn suspend_vec_fill(count: i32, value: i32) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+fn suspend_list_fill(count: i32, value: i32) -> List[i32]:
+    let out: List[i32] = List.new()
     for _ in 0..count:
         out.push(value)
     out
@@ -20,7 +20,7 @@ fn suspend_vec_fill(count: i32, value: i32) -> Vec[i32]:
 // pattern, truthfully Copy) so the transfer kernels can mutate vectors
 // passed through plain parameters under spec §3.8.
 type SuspendBitsState {
-    w: Vec[i32],
+    w: List[i32],
 }
 
 type SuspendBits {
@@ -49,10 +49,10 @@ impl SuspendBits:
         unsafe { st.w.push(value) }
 
 fn suspend_bits_fill(count: i32, value: i32) -> SuspendBits:
-    // Vec header is larger than a pointer; allocate generously like the
+    // List header is larger than a pointer; allocate generously like the
     // other handle states (InternPool uses 256 for a 7-field state).
     let ptr = with_alloc(64) as *mut SuspendBitsState
-    unsafe *ptr = SuspendBitsState { w: suspend_vec_fill(count, value) }
+    unsafe *ptr = SuspendBitsState { w: suspend_list_fill(count, value) }
     SuspendBits { state: ptr }
 
 fn suspend_set_bit(bits: SuspendBits, local: i32, value: i32):
@@ -437,21 +437,21 @@ fn suspend_body_has_may_suspend_term(body: &MirBody, body_by_fn: &HashMap[i32, i
             return 1
     0
 
-fn suspend_collect_guard_locals(sema: &Sema, body: &MirBody) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+fn suspend_collect_guard_locals(sema: &Sema, body: &MirBody) -> List[i32]:
+    let out: List[i32] = List.new()
     for li in 0..body.local_count():
         let local_ty = body.local_type_ids[li]
         if suspend_type_is_no_await_guard(sema, local_ty) != 0:
             out.push(li)
     out
 
-fn suspend_guard_index(guard_locals: &Vec[i32], guard_local: i32) -> i32:
+fn suspend_guard_index(guard_locals: &List[i32], guard_local: i32) -> i32:
     for gi in 0..guard_locals.len() as i32:
         if guard_locals[gi] == guard_local:
             return gi
     -1
 
-fn suspend_guard_index_for_sym(body: &MirBody, guard_locals: &Vec[i32], sym: i32) -> i32:
+fn suspend_guard_index_for_sym(body: &MirBody, guard_locals: &List[i32], sym: i32) -> i32:
     if sym == 0:
         return -1
     for gi in 0..guard_locals.len() as i32:
@@ -522,7 +522,7 @@ fn suspend_prov_origins_from_value_place(bits: SuspendBits, body: &MirBody, guar
     let root = suspend_place_root_local(body, place_id)
     suspend_prov_copy_origins_from_local(bits, guard_count, root)
 
-fn suspend_prov_origins_from_borrowed_place(bits: SuspendBits, body: &MirBody, guard_locals: &Vec[i32], guard_count: i32, place_id: i32) -> SuspendBits:
+fn suspend_prov_origins_from_borrowed_place(bits: SuspendBits, body: &MirBody, guard_locals: &List[i32], guard_count: i32, place_id: i32) -> SuspendBits:
     let origins = suspend_prov_origins_from_value_place(bits, body, guard_count, place_id)
     let root = suspend_place_root_local(body, place_id)
     let root_guard_idx = suspend_guard_index(guard_locals, root)
@@ -539,7 +539,7 @@ fn suspend_prov_origins_from_operand(bits: SuspendBits, body: &MirBody, guard_co
         return suspend_prov_origins_from_value_place(bits, body, guard_count, body.operand_d0[operand_id])
     origins
 
-fn suspend_prov_origins_from_rvalue(bits: SuspendBits, body: &MirBody, guard_locals: &Vec[i32], guard_count: i32, rval_id: i32) -> SuspendBits:
+fn suspend_prov_origins_from_rvalue(bits: SuspendBits, body: &MirBody, guard_locals: &List[i32], guard_count: i32, rval_id: i32) -> SuspendBits:
     let origins = suspend_prov_origins_empty(guard_count)
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return origins
@@ -569,7 +569,7 @@ fn suspend_sig_for_callee(sema: &Sema, body: &MirBody, callee_operand: i32) -> i
         return sema.get_sig(sema_sym)
     -1
 
-fn suspend_prov_origins_from_call(bits: SuspendBits, sema: &Sema, body: &MirBody, guard_locals: &Vec[i32], guard_count: i32, callee_operand: i32, call_id: i32) -> SuspendBits:
+fn suspend_prov_origins_from_call(bits: SuspendBits, sema: &Sema, body: &MirBody, guard_locals: &List[i32], guard_count: i32, callee_operand: i32, call_id: i32) -> SuspendBits:
     let origins = suspend_prov_origins_empty(guard_count)
     if call_id < 0 or call_id >= body.call_arg_starts.len() as i32:
         return origins
@@ -602,7 +602,7 @@ fn suspend_prov_origins_from_call(bits: SuspendBits, sema: &Sema, body: &MirBody
             origins.vset(guard_idx, 1)
     origins
 
-fn suspend_prov_transfer_stmt(bits: SuspendBits, sema: &Sema, body: &MirBody, guard_locals: &Vec[i32], guard_count: i32, stmt_id: i32):
+fn suspend_prov_transfer_stmt(bits: SuspendBits, sema: &Sema, body: &MirBody, guard_locals: &List[i32], guard_count: i32, stmt_id: i32):
     let kind = body.stmt_kind(stmt_id)
     let d0 = body.stmt_data0(stmt_id)
     let d1 = body.stmt_data1(stmt_id)
@@ -620,7 +620,7 @@ fn suspend_prov_transfer_stmt(bits: SuspendBits, sema: &Sema, body: &MirBody, gu
     if kind == StmtKind.Drop:
         suspend_prov_clear_local(bits, local_count, guard_count, suspend_direct_place_local(body, d0))
 
-fn suspend_prov_transfer_term(bits: SuspendBits, sema: &Sema, body: &MirBody, guard_locals: &Vec[i32], guard_count: i32, bb: i32):
+fn suspend_prov_transfer_term(bits: SuspendBits, sema: &Sema, body: &MirBody, guard_locals: &List[i32], guard_count: i32, bb: i32):
     let kind = body.term_kind(bb)
     let d0 = body.term_data0(bb)
     let d1 = body.term_data1(bb)
@@ -639,7 +639,7 @@ fn suspend_prov_transfer_term(bits: SuspendBits, sema: &Sema, body: &MirBody, gu
     if kind == TermKind.TK_DROP_AND_GOTO:
         suspend_prov_clear_local(bits, local_count, guard_count, suspend_direct_place_local(body, d0))
 
-fn suspend_prov_transfer_stmts(bits: SuspendBits, sema: &Sema, body: &MirBody, guard_locals: &Vec[i32], guard_count: i32, bb: i32):
+fn suspend_prov_transfer_stmts(bits: SuspendBits, sema: &Sema, body: &MirBody, guard_locals: &List[i32], guard_count: i32, bb: i32):
     let stmt_start = body.bb_stmt_starts[bb]
     let stmt_count = body.bb_stmt_counts[bb]
     for si in 0..stmt_count:
@@ -694,7 +694,7 @@ fn suspend_prov_add_successors(body: &MirBody, prov_in: SuspendBits, local_count
             changed = 1
     changed
 
-fn suspend_compute_prov_in_for_body(sema: &Sema, body: &MirBody, guard_locals: &Vec[i32]) -> SuspendBits:
+fn suspend_compute_prov_in_for_body(sema: &Sema, body: &MirBody, guard_locals: &List[i32]) -> SuspendBits:
     let local_count = body.local_count()
     let bb_count = body.block_count()
     let guard_count = guard_locals.len() as i32
@@ -713,7 +713,7 @@ fn suspend_compute_prov_in_for_body(sema: &Sema, body: &MirBody, guard_locals: &
                 changed = 1
     prov_in
 
-fn suspend_prov_before_term_for_block(prov_in: SuspendBits, sema: &Sema, body: &MirBody, guard_locals: &Vec[i32], local_count: i32, guard_count: i32, bb: i32) -> SuspendBits:
+fn suspend_prov_before_term_for_block(prov_in: SuspendBits, sema: &Sema, body: &MirBody, guard_locals: &List[i32], local_count: i32, guard_count: i32, bb: i32) -> SuspendBits:
     let bits = suspend_prov_copy_block_bits(prov_in, local_count, guard_count, bb)
     suspend_prov_transfer_stmts(bits, sema, body, guard_locals, guard_count, bb)
     bits
@@ -736,7 +736,7 @@ fn suspend_site_span(ast: AstPool, body: &MirBody, bb: i32) -> SuspendSiteSpan:
         end = start + 1
     SuspendSiteSpan { start, end }
 
-fn suspend_reported_site(reported_starts: &Vec[i32], reported_ends: &Vec[i32], reported_locals: &Vec[i32], reported_origins: &Vec[i32], site: SuspendSiteSpan, live_local: i32, origin_local: i32) -> bool:
+fn suspend_reported_site(reported_starts: &List[i32], reported_ends: &List[i32], reported_locals: &List[i32], reported_origins: &List[i32], site: SuspendSiteSpan, live_local: i32, origin_local: i32) -> bool:
     let count = reported_starts.len() as i32
     for i in 0..count:
         if reported_starts[i] == site.start and reported_ends[i] == site.end and reported_locals[i] == live_local and reported_origins[i] == origin_local:
@@ -752,7 +752,7 @@ fn suspend_no_suspend_site_span(ast: AstPool, body: &MirBody, bb: i32, no_suspen
             site.end = site.start + 1
     site
 
-fn suspend_reported_no_suspend_site(reported_starts: &Vec[i32], reported_ends: &Vec[i32], reported_nodes: &Vec[i32], site: SuspendSiteSpan, no_suspend_node: i32) -> bool:
+fn suspend_reported_no_suspend_site(reported_starts: &List[i32], reported_ends: &List[i32], reported_nodes: &List[i32], site: SuspendSiteSpan, no_suspend_node: i32) -> bool:
     let count = reported_starts.len() as i32
     for i in 0..count:
         if reported_starts[i] == site.start and reported_ends[i] == site.end and reported_nodes[i] == no_suspend_node:
@@ -838,10 +838,10 @@ fn suspend_check_body(ast: AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32],
     let liveness = suspend_liveness(sema, body)
     let live_out = liveness.live_out
     let prov_in = suspend_compute_prov_in_for_body(sema, body, guard_locals)
-    let reported_starts: Vec[i32] = Vec.new()
-    let reported_ends: Vec[i32] = Vec.new()
-    let reported_locals: Vec[i32] = Vec.new()
-    let reported_origins: Vec[i32] = Vec.new()
+    let reported_starts: List[i32] = List.new()
+    let reported_ends: List[i32] = List.new()
+    let reported_locals: List[i32] = List.new()
+    let reported_origins: List[i32] = List.new()
 
     for bb in 0..bb_count:
         if suspend_term_may_suspend(body, body_by_fn, body_may_suspend, bb) == 0:
@@ -892,9 +892,9 @@ fn suspend_check_body(ast: AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32],
 
 fn suspend_check_no_suspend_body(ast: AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
-    let reported_starts: Vec[i32] = Vec.new()
-    let reported_ends: Vec[i32] = Vec.new()
-    let reported_nodes: Vec[i32] = Vec.new()
+    let reported_starts: List[i32] = List.new()
+    let reported_ends: List[i32] = List.new()
+    let reported_nodes: List[i32] = List.new()
     for bb in 0..body.block_count():
         let no_suspend_node = body.term_no_suspend_node(bb)
         if no_suspend_node == 0:
@@ -938,8 +938,8 @@ fn suspend_liveness(sema: &Sema, body: &MirBody) -> SuspendLiveness:
 
 // The operand ids a statement's rvalue reads — the operands
 // suspend_gen_rvalue gens.
-fn suspend_rvalue_operands(body: &MirBody, rval_id: i32) -> Vec[i32]:
-    var out: Vec[i32] = Vec.new()
+fn suspend_rvalue_operands(body: &MirBody, rval_id: i32) -> List[i32]:
+    var out: List[i32] = List.new()
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return out
     let kind = body.rval_kinds[rval_id]
@@ -959,8 +959,8 @@ fn suspend_rvalue_operands(body: &MirBody, rval_id: i32) -> Vec[i32]:
         out = suspend_call_operands(body, d0)
     out
 
-fn suspend_call_operands(body: &MirBody, call_id: i32) -> Vec[i32]:
-    var out: Vec[i32] = Vec.new()
+fn suspend_call_operands(body: &MirBody, call_id: i32) -> List[i32]:
+    var out: List[i32] = List.new()
     if call_id < 0 or call_id >= body.call_arg_starts.len() as i32:
         return out
     for ai in 0..body.call_arg_counts[call_id]:
@@ -1022,8 +1022,8 @@ fn last_use_term_event(body: &MirBody, bb: i32, local: i32) -> i32:
         return 2
     0
 
-fn last_use_successors(body: &MirBody, bb: i32) -> Vec[i32]:
-    var out: Vec[i32] = Vec.new()
+fn last_use_successors(body: &MirBody, bb: i32) -> List[i32]:
+    var out: List[i32] = List.new()
     let kind = body.term_kind(bb)
     if kind == TermKind.TK_GOTO:
         out.push(body.term_data0(bb))
@@ -1042,9 +1042,9 @@ fn last_use_successors(body: &MirBody, bb: i32) -> Vec[i32]:
 // For one local: per block, whether it is read on some path from the block's
 // start before anything overwrites or ends it (one bit per block, to a fixed
 // point).
-fn last_use_live_in(body: &MirBody, local: i32) -> Vec[i32]:
+fn last_use_live_in(body: &MirBody, local: i32) -> List[i32]:
     let bb_count = body.block_count()
-    var first: Vec[i32] = Vec.new()
+    var first: List[i32] = List.new()
     for bb in 0..bb_count:
         var event = 0
         var si = 0
@@ -1054,7 +1054,7 @@ fn last_use_live_in(body: &MirBody, local: i32) -> Vec[i32]:
         if event == 0:
             event = last_use_term_event(body, bb, local)
         first.push(event)
-    var live: Vec[i32] = Vec.new()
+    var live: List[i32] = List.new()
     for bb in 0..bb_count: live.push(if first[bb] == 1: 1 else: 0)
     var changed = true
     while changed:
@@ -1073,7 +1073,7 @@ fn last_use_live_in(body: &MirBody, local: i32) -> Vec[i32]:
 
 // Whether `local` is read after point `stmt_index` of `bb` (the terminator
 // when stmt_index is the block's statement count), before anything ends it.
-fn last_use_live_after(body: &MirBody, live_in: &Vec[i32], bb: i32, stmt_index: i32, local: i32) -> bool:
+fn last_use_live_after(body: &MirBody, live_in: &List[i32], bb: i32, stmt_index: i32, local: i32) -> bool:
     var si = stmt_index + 1
     while si < body.bb_stmt_counts[bb]:
         let event = last_use_stmt_event(body, body.bb_stmt_starts[bb] + si, local)
@@ -1102,8 +1102,8 @@ pub fn mir_mark_last_use_holds(body: MirBody) -> MirBody:
     if out.operand_holds.len() == 0:
         return out
     let local_count = out.local_count()
-    var view_free: Vec[i32] = Vec.new()
-    var held: Vec[i32] = Vec.new()
+    var view_free: List[i32] = List.new()
+    var held: List[i32] = List.new()
     for _ in 0..local_count:
         view_free.push(1)
         held.push(0)
@@ -1131,9 +1131,9 @@ pub fn mir_mark_last_use_holds(body: MirBody) -> MirBody:
             for si in 0..out.bb_stmt_counts[bb] + 1:
                 let operands = if si < out.bb_stmt_counts[bb]:
                     let stmt_id = out.bb_stmt_starts[bb] + si
-                    if out.stmt_kind(stmt_id) == StmtKind.Assign: suspend_rvalue_operands(&out, out.stmt_data1(stmt_id)) else: Vec.new()
+                    if out.stmt_kind(stmt_id) == StmtKind.Assign: suspend_rvalue_operands(&out, out.stmt_data1(stmt_id)) else: List.new()
                 else if out.term_kind(bb) == TermKind.TK_CALL: suspend_call_operands(&out, out.term_data1(bb))
-                else: Vec.new()
+                else: List.new()
                 var reads = 0
                 var held_op = -1
                 for oi in 0..operands.len():

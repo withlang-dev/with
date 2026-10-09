@@ -1,8 +1,8 @@
 // Spec test: Section 13.5 — Implicit Iteration
-// Executable subset (vec! literals rewritten to Vec.new()+push).
+// Executable subset (vec! literals rewritten to List.new()+push).
 
 fn test_for_in_auto_iter:
-    let items: Vec[i32] = Vec.new()
+    let items: List[i32] = List.new()
     items.push(1)
     items.push(2)
     items.push(3)
@@ -13,7 +13,7 @@ fn test_for_in_auto_iter:
     assert(items.len() == 3)   // for-in does not consume the collection
 
 fn test_explicit_iter:
-    let items: Vec[i32] = Vec.new()
+    let items: List[i32] = List.new()
     items.push(1)
     items.push(2)
     var sum = 0
@@ -28,7 +28,7 @@ fn test_range_iteration:
     assert(sum == 6)
 
 fn test_for_loop_destructure:
-    let pairs: Vec[(i32, str)] = Vec.new()
+    let pairs: List[(i32, str)] = List.new()
     pairs.push((1, "a"))
     pairs.push((2, "b"))
     var count = 0

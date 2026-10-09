@@ -119,19 +119,19 @@ pub enum LabelFrameKind: i32:
     LFK_LOOP = 4
 
 pub type LabelRegistryState {
-    label_syms: Vec[i32],
-    label_nodes: Vec[i32],
-    label_paths: Vec[str],
-    label_orders: Vec[i32],
-    label_used: Vec[i32],
-    goto_syms: Vec[i32],
-    goto_nodes: Vec[i32],
-    goto_paths: Vec[str],
-    goto_orders: Vec[i32],
-    init_nodes: Vec[i32],
-    init_paths: Vec[str],
-    init_orders: Vec[i32],
-    scope_stack: Vec[i32],
+    label_syms: List[i32],
+    label_nodes: List[i32],
+    label_paths: List[str],
+    label_orders: List[i32],
+    label_used: List[i32],
+    goto_syms: List[i32],
+    goto_nodes: List[i32],
+    goto_paths: List[str],
+    goto_orders: List[i32],
+    init_nodes: List[i32],
+    init_paths: List[str],
+    init_orders: List[i32],
+    scope_stack: List[i32],
     next_scope_id: i32,
     order_counter: i32,
 }
@@ -156,15 +156,15 @@ pub enum SemaMagicIdentKind: i32:
 // #695: a clone of the moved_field_* parallel arrays, for branch-merge of the
 // partial-move set (see save/restore/union in the checker).
 type MovedFieldSnap {
-    base: Vec[i32],
-    starts: Vec[i32],
-    counts: Vec[i32],
-    syms: Vec[i32],
+    base: List[i32],
+    starts: List[i32],
+    counts: List[i32],
+    syms: List[i32],
     // #1655: per-binding foreign-view poison (§16.2b.7) travels with the
     // field-move set so a domain-touching call on a diverging branch
     // leaves the fall-through path's views live.
-    poison_syms: Vec[i32],
-    poison_nodes: Vec[i32],
+    poison_syms: List[i32],
+    poison_nodes: List[i32],
 }
 
 type SemaBuiltinSymbols {
@@ -201,9 +201,9 @@ type SemaBuiltinSymbols {
     display_trait: i32,
     debug_trait: i32,
     self_type: i32,
-    vec: i32,
+    list: i32,
     fixed_string: i32,
-    veciter: i32,
+    listiter: i32,
     mapiter: i32,
     filteriter: i32,
     filtermapiter: i32,
@@ -217,10 +217,10 @@ type SemaBuiltinSymbols {
     zipwithiter: i32,
     stepbyiter: i32,
     flatmapiter: i32,
-    vecslot: i32,
-    veciterplace: i32,
-    vecrange: i32,
-    veciterref: i32,
+    listslot: i32,
+    listiterplace: i32,
+    listrange: i32,
+    listiterref: i32,
     range_type: i32,
     range_inclusive_type: i32,
     iter_place: i32,
@@ -348,7 +348,7 @@ pub const EFF_DECLARED_MASK: i32 = EFF_READ | EFF_WRITE | EFF_CONSUME | EFF_ESCA
 pub const EFF_CAPTURE_BY_PLACE: i32 = 64
 // §21.1 (D22, #1783): a view derived from the parameter is stored into the
 // receiver's storage — the caller's place (D21), which outlives the call — so
-// the caller ties its receiver to this argument's origins as `Vec.push` ties a
+// the caller ties its receiver to this argument's origins as `List.push` ties a
 // container to its element.
 pub const EFF_STORE_IN_RECEIVER: i32 = 128
 
@@ -425,7 +425,7 @@ impl Copy for CallBuiltin
 
 pub enum AllocConstructKind: i32:
     EXPLICIT_API = 1
-    VEC_NEW = 2
+    LIST_NEW = 2
     TO_OWNED = 3
     OWNED_LITERAL = 4
     FSTRING = 5
@@ -511,17 +511,17 @@ pub type FacadeResource {
     node: i32,
     decl: i32,            // the `c facade` block's declaration index: diagnostics name its file
     repr_tid: i32,
-    producers: Vec[i32],  // one per `from` clause (fopen, fdopen, tmpfile → one FILE)
-    out_params: Vec[i32], // parallel to producers; -1 for a direct return
+    producers: List[i32],  // one per `from` clause (fopen, fdopen, tmpfile → one FILE)
+    out_params: List[i32], // parallel to producers; -1 for a direct return
     init: i32,
     preinit: i32,
     drop: i32,
-    destroyers: Vec[i32],
-    ok_consts: Vec[i32],       // `ok C1, C2, …` (§16.2b.4): the success statuses as stated, any of them success; empty without `ok`
+    destroyers: List[i32],
+    ok_consts: List[i32],       // `ok C1, C2, …` (§16.2b.4): the success statuses as stated, any of them success; empty without `ok`
     ok_node: i32,              // the `ok` clause (provenance, and a second one is refused), or 0
-    borrows: Vec[i32],         // the parameter each `borrows` clause names
-    borrows_owner: Vec[i32],   // parallel: the producer it names one of (a `from` index, or FACADE_DEP_INIT)
-    borrows_nodes: Vec[i32],   // parallel: the clause (provenance, §16.2b.2)
+    borrows: List[i32],         // the parameter each `borrows` clause names
+    borrows_owner: List[i32],   // parallel: the producer it names one of (a `from` index, or FACADE_DEP_INIT)
+    borrows_nodes: List[i32],   // parallel: the clause (provenance, §16.2b.2)
     last_producer: i32,        // the producer clause stated last while collecting (-2: none yet)
     independent: i32,
     independent_node: i32,
@@ -541,48 +541,48 @@ pub type ForeignContract {
     node: i32,
     lend: i32,
     destroys: i32,
-    consumes: Vec[i32],
-    consumes_destroyed_by: Vec[i32],   // parallel to consumes; -1 = none
-    retains: Vec[i32],
-    retains_by: Vec[i32],
+    consumes: List[i32],
+    consumes_destroyed_by: List[i32],   // parallel to consumes; -1 = none
+    retains: List[i32],
+    retains_by: List[i32],
     returns_borrow_resource: i32,   // a resource, or `CStr` (the borrowed modeled text, §16.2b.8)
     returns_borrow_from: i32,       // the origin parameter, or -1
     returns_borrow_domain: i32,     // the origin foreign-state domain (`from domain D`, §16.2b.7), or 0
     returns_borrow_parent: i32,     // D85 (§16.2b.6): `from parent P of param N` — the parent resource P of the resource param N receives, or 0
     returns_static_tid: i32,
-    preserves_params: Vec[i32],
-    preserves_domains: Vec[i32],
+    preserves_params: List[i32],
+    preserves_domains: List[i32],
     of_resource: i32,
     rename: i32,
     callback_thread_any: i32,
     callbacks_none: i32,             // clause node; 0 means conservatively reentrant
-    callback_consumes: Vec[i32],
-    callback_userdata_cb: Vec[i32],    // `callback param N userdata param M`: the callback parameter N …
-    callback_userdata_of: Vec[i32],    // … and the userdata parameter M it receives (parallel)
+    callback_consumes: List[i32],
+    callback_userdata_cb: List[i32],    // `callback param N userdata param M`: the callback parameter N …
+    callback_userdata_of: List[i32],    // … and the userdata parameter M it receives (parallel)
     valid_on_failed: i32,              // `valid on failed`: presented on the failed-state resource too (§16.2b.4)
-    nullable_params: Vec[i32],         // `nullable param N`: the facade establishes the parameter accepts NULL (§16.2b.8)
+    nullable_params: List[i32],         // `nullable param N`: the facade establishes the parameter accepts NULL (§16.2b.8)
     bridged: i32,                      // #2223: a clause makes the function render through a bridge (Ast.facade_clause_bridges) — the one owner the renderer's lend item and facade_contract_presented read
-    buffer_ptr: Vec[i32],              // D64 §16.2b.8: each `buffer param P …` pairing's pointer parameter …
-    buffer_len: Vec[i32],              // … its length parameter (parallel) …
-    buffer_inout: Vec[i32],            // … and 1 for `capacity param L inout`, 0 for `len param L` (parallel)
-    buffer_elements: Vec[i32],         // explicit element count; otherwise bytes (D64)
-    fixed_params: Vec[i32],            // D64 §16.2b.11: each `param N fixed <literal>` parameter …
-    fixed_literals: Vec[i32],          // … and its literal node (parallel)
+    buffer_ptr: List[i32],              // D64 §16.2b.8: each `buffer param P …` pairing's pointer parameter …
+    buffer_len: List[i32],              // … its length parameter (parallel) …
+    buffer_inout: List[i32],            // … and 1 for `capacity param L inout`, 0 for `len param L` (parallel)
+    buffer_elements: List[i32],         // explicit element count; otherwise bytes (D64)
+    fixed_params: List[i32],            // D64 §16.2b.11: each `param N fixed <literal>` parameter …
+    fixed_literals: List[i32],          // … and its literal node (parallel)
     ok_const: i32,                     // `ok CONST` on the fn item: its status contract (D64; ruling Amendment 3), the first constant of a list
     ok_count: i32,                     // how many constants the `ok` lists (Amendment 3: several on a status-returning operation)
     variadic_node: i32,                // D66 §16.2b.5: the `variadic param N selected by param P:` clause, or 0 …
     variadic_selector: i32,            // … its selector parameter P (-1: none) …
-    variadic_case_syms: Vec[i32],      // … each case's imported constant …
-    variadic_case_values: Vec[i64],    // … that constant's value (parallel) …
-    variadic_case_tids: Vec[i32],      // … the presented type of the variadic argument (parallel) …
-    variadic_case_kinds: Vec[i32],     // … and its kind: FACADE_VARIADIC_SCALAR or FACADE_VARIADIC_STR (parallel)
-    variadic_slots: Vec[ForeignVariadicSlot], // resolved retained cases; no downstream AST interpretation
+    variadic_case_syms: List[i32],      // … each case's imported constant …
+    variadic_case_values: List[i64],    // … that constant's value (parallel) …
+    variadic_case_tids: List[i32],      // … the presented type of the variadic argument (parallel) …
+    variadic_case_kinds: List[i32],     // … and its kind: FACADE_VARIADIC_SCALAR or FACADE_VARIADIC_STR (parallel)
+    variadic_slots: List[ForeignVariadicSlot], // resolved retained cases; no downstream AST interpretation
     returns_borrow_record: i32,        // D66 §16.2b.6: `returns borrow T from …` for an imported record T (the type's symbol), or 0
-    argv_cb: Vec[i32],                 // D76 §16.2b.9: each `callback param N argv param A paired with argc param C as &[H]`: the callback parameter N …
-    argv_index: Vec[i32],              // … A and C, indices into the callback's own parameters …
-    argc_index: Vec[i32],
-    argv_handle: Vec[i32],             // … the handle H (facade_resources index) …
-    argv_nodes: Vec[i32],              // … and the clause (parallel)
+    argv_cb: List[i32],                 // D76 §16.2b.9: each `callback param N argv param A paired with argc param C as &[H]`: the callback parameter N …
+    argv_index: List[i32],              // … A and C, indices into the callback's own parameters …
+    argc_index: List[i32],
+    argv_handle: List[i32],             // … the handle H (facade_resources index) …
+    argv_nodes: List[i32],              // … and the clause (parallel)
     user_data_fn: i32,                 // D76 §16.2b.9: `user_data from <fn> as &U`: the C function that hands back the registered userdata, or 0 …
     user_data_handle: i32,             // … the callback-scope handle it takes (facade_resources index), or -1 …
     user_data_node: i32,               // … and the clause
@@ -621,7 +621,7 @@ pub type FacadeCallbackMethod {
     retained: i32,
     consumed: i32,
     nullable: i32,    // the callback is nullable (#1618): `Option[extern "C" fn(&U, …)]`, its userdata `Option[&U]`
-    wrapped_params: Vec[i32],  // D76: the callbacks a generated wrapper serves (rendered indices), each `extern "C" fn(…, &U)` with `U` the userdata's
+    wrapped_params: List[i32],  // D76: the callbacks a generated wrapper serves (rendered indices), each `extern "C" fn(…, &U)` with `U` the userdata's
 }
 
 // D66 retained variadic pairs (#1652, §16.2b.9): what one operation of a
@@ -659,11 +659,11 @@ pub type FacadeDomain {
     name: i32,
     kind: i32,          // process | thread | resource | static (sym)
     facade: i32,        // the facade that declared it first
-    facades: Vec[i32],  // every facade declaring it: same name and kind name the same state (§35)
-    blocks: Vec[i32],   // the `c facade` block nodes declaring it (a block declares it once)
+    facades: List[i32],  // every facade declaring it: same name and kind name the same state (§35)
+    blocks: List[i32],   // the `c facade` block nodes declaring it (a block declares it once)
     node: i32,
     origin_sym: i32,
-    files: Vec[i32],
+    files: List[i32],
 }
 
 // What a call to signature `sig` does to foreign views (ruling §38): the
@@ -676,13 +676,13 @@ pub type FacadeCallEffect {
     fn_sym: i32,             // the C function (its facade fn item is `contract`)
     contract: i32,           // foreign_contracts index, or -1
     touch_params: i32,
-    touch_domains: Vec[i32], // facade_domain_list indices
+    touch_domains: List[i32], // facade_domain_list indices
     borrow_domain: i32,      // facade_domain_list index, or -1
     borrow_param: i32,       // a presented call's origin parameter (a C string it is lent), or -1
     // A producer sig's C parameter per presented one (its out slot gone, an
     // init's preinit parameters ahead), as the mask was projected; empty for
     // every other call (facade_effect_source_param inverts their projection).
-    param_sources: Vec[i32],
+    param_sources: List[i32],
 }
 
 pub type Sema {
@@ -694,15 +694,15 @@ pub type Sema {
     decl_index_by_node: HashMap[i32, i32],
 
     // Type table (SoA parallel arrays)
-    type_kinds: Vec[i32],
-    type_d0: Vec[i32],
-    type_d1: Vec[i32],
-    type_d2: Vec[i32],
-    type_extra: Vec[i32],
+    type_kinds: List[i32],
+    type_d0: List[i32],
+    type_d1: List[i32],
+    type_d2: List[i32],
+    type_extra: List[i32],
     // Exact structural type lookup. Hash buckets point into a collision chain
     // indexed by TypeId; component checks keep hash collisions harmless.
     exact_type_cache_heads: HashMap[i64, i32],
-    exact_type_cache_next: Vec[i32],
+    exact_type_cache_next: List[i32],
 
     // Named type lookup: sym → TypeId
     named_types: HashMap[i32, i32],
@@ -717,21 +717,21 @@ pub type Sema {
     // body can ask which concrete destructor a dynamic value may run.
     impl_decl_target_types: HashMap[i32, i32],
     // Temporary accumulators for cycle detection (accessed through self)
-    cycle_dep_syms: Vec[i32],
-    cycle_dep_nodes: Vec[i32],
+    cycle_dep_syms: List[i32],
+    cycle_dep_nodes: List[i32],
     // Fallback pretty names keyed by symbol id.
     pretty_symbol_names: HashMap[i32, str],
 
     // Function signatures (parallel arrays)
-    sig_names: Vec[i32],
+    sig_names: List[i32],
     sig_text_index: HashMap[str, i32],  // resolved name text → newest signature; older ones chain through sig_text_prev
-    sig_text_prev: Vec[i32],
-    sig_type_ids: Vec[i32],
-    sig_ret_types: Vec[i32],
-    sig_param_starts: Vec[i32],
-    sig_param_counts: Vec[i32],
-    sig_variadic: Vec[i32],
-    sig_params: Vec[i32],
+    sig_text_prev: List[i32],
+    sig_type_ids: List[i32],
+    sig_ret_types: List[i32],
+    sig_param_starts: List[i32],
+    sig_param_counts: List[i32],
+    sig_variadic: List[i32],
+    sig_params: List[i32],
     sig_lookup: HashMap[i32, i32],
     // An extern keeps its own signature when a curated wrapper takes its name.
     extern_decl_sigs: HashMap[i32, i32],
@@ -739,54 +739,54 @@ pub type Sema {
     // sig_param_effects[sig_param_eff_starts[si] + pi] = effect bits for param pi of sig si.
     // Effects: EFF_READ=1, EFF_WRITE=2, EFF_CONSUME=4,
     // EFF_ESCAPE_VALUE=8, EFF_ESCAPE_VIEW=16, EFF_RAW_PTR_VALIDITY=32.
-    sig_param_effects: Vec[i32],
+    sig_param_effects: List[i32],
     // Snapshot of sig_param_effects before call-edge fixed-point propagation.
     // Used only by receiver-effect provenance/debugging.
-    sig_param_direct_effects: Vec[i32],
+    sig_param_direct_effects: List[i32],
     // Parallel to sig_param_effects: bitmask of signature parameter indices that a returned
     // view may originate from when this parameter participates in escape_view.
-    sig_param_view_origins: Vec[i32],
+    sig_param_view_origins: List[i32],
     // Parallel to sig_param_view_origins: the origin parameters whose own
     // storage the returned view provably never points into — the result
     // views only what they view (SemaCheck.compute_expr_storage_origin_mask;
     // §21.1 Rule 6). A call records such a parameter's argument by its views
     // alone, never by its own place; 0 (unproven) keeps the place an origin.
-    sig_param_view_through: Vec[i32],
+    sig_param_view_through: List[i32],
     // D63 call-once: 1 when the body invokes this parameter more than once
     // (twice, or once inside a loop) — a consuming closure may not be
     // passed to it.
-    sig_param_invoke_many: Vec[i32],
+    sig_param_invoke_many: List[i32],
     // Per body: how many times each callable binding is invoked (symbol →
     // count; an invocation inside a loop counts twice).
     fn_param_invocations: HashMap[i32, i32],
     // Per body: the call that made a callable binding's count exceed one
     // (the site a `once` parameter's error names, §12.4).
     fn_param_many_nodes: HashMap[i32, i32],
-    sig_param_eff_starts: Vec[i32],
+    sig_param_eff_starts: List[i32],
     // Parallel signature metadata for value parameters lowered through pointer ABI.
     // This is distinct from semantic reference types: `self: &Self` is already a
     // pointer value, while `mut self: Self` / value owner params are With values
     // whose native ABI passes an address.
-    sig_value_ref_abi_params: Vec[i32],
+    sig_value_ref_abi_params: List[i32],
     // Tool Gap #2 — production method-resolution trace, one row per checked
     // method call: which owner/method was looked up, whether the inherent
     // registry hit, how many extension candidates existed and were visible,
     // and the selected signature/function. `with analyze` renders these as
     // kind=method-resolution facts; nothing downstream re-derives lookup.
-    mres_nodes: Vec[i32],
-    mres_recv_types: Vec[i32],
-    mres_owner_syms: Vec[i32],
-    mres_method_syms: Vec[i32],
-    mres_sigs: Vec[i32],
-    mres_fn_syms: Vec[i32],
-    mres_flags: Vec[i32],
-    mres_cands_total: Vec[i32],
-    mres_cands_visible: Vec[i32],
+    mres_nodes: List[i32],
+    mres_recv_types: List[i32],
+    mres_owner_syms: List[i32],
+    mres_method_syms: List[i32],
+    mres_sigs: List[i32],
+    mres_fn_syms: List[i32],
+    mres_flags: List[i32],
+    mres_cands_total: List[i32],
+    mres_cands_visible: List[i32],
     // D7 receiver contracts are stored separately from ABI effects. The mode is
     // declaration syntax; required effects are derived from the checked body and
     // completed call graph. This keeps migration analysis from changing ABI policy.
-    sig_receiver_modes: Vec[i32],
-    sig_receiver_required_effects: Vec[i32],
+    sig_receiver_modes: List[i32],
+    sig_receiver_required_effects: List[i32],
 
     // #D5 share-place foundation (P0): effect-flow edges discovered during body
     // checking, flattened as 4-tuples [caller_sig, caller_pi, callee_sig,
@@ -800,8 +800,8 @@ pub type Sema {
     // reads it. Single-pass inference alone under-detects forward-ref escapes;
     // under share-place that would double-free (caller keeps ownership of a
     // param the callee actually escapes/consumes). See decisions.md D5.
-    effect_flow_edges: Vec[i32],
-    effect_flow_projections: Vec[i32],
+    effect_flow_edges: List[i32],
+    effect_flow_projections: List[i32],
 
     // #D5/P1 share-place: recorded plain (non-move/copy) non-Copy value arguments,
     // flattened as 3-tuples [arg_node, callee_sig, callee_pi]. A plain argument is
@@ -815,7 +815,7 @@ pub type Sema {
     // use_seq, loop_depth, liveness] — liveness stamped at body end (0=unknown,
     // 1=last-use, 2=live-after); backs the `move-sites` analysis request
     // (docs/spec/toolchain/deep-debugging-tools.md).
-    consume_call_sites: Vec[i32],
+    consume_call_sites: List[i32],
     // move-sites: use sequencing. ONE persistent map per key kind, one owner —
     // bodies are separated by an epoch packed into every value (epoch*2^32 +
     // seq), never by swapping map headers (bit-copy map swaps are the #697
@@ -834,7 +834,7 @@ pub type Sema {
     // is an untyped numeric constant is its initializer's to say
     // (untyped_const_init).
     untyped_const_decls: HashMap[i32, i32],
-    untyped_const_alt_decls: Vec[i32],
+    untyped_const_alt_decls: List[i32],
     // An identifier that names an untyped numeric constant -> the
     // initializer it stands for at that use. Its type there is the node's in
     // typed_expr_types; MIR lowers the initializer at that type.
@@ -849,26 +849,26 @@ pub type Sema {
     // (#2099), so a view used only in them is not live across it.
     store_follows_operands: i32,
     collect_field_demands: i32,
-    inferred_field_nodes: Vec[i32],
-    inferred_field_aliases: Vec[i32],
-    inferred_field_paths: Vec[str],
-    field_demand_fields: Vec[i32],
-    field_demand_types: Vec[i32],
-    field_demand_uses: Vec[i32],
-    field_decisions: Vec[i32],
+    inferred_field_nodes: List[i32],
+    inferred_field_aliases: List[i32],
+    inferred_field_paths: List[str],
+    field_demand_fields: List[i32],
+    field_demand_types: List[i32],
+    field_demand_uses: List[i32],
+    field_decisions: List[i32],
     // D93 (§4.3c rule 1): a binding with no annotation whose initializer is
     // an element-form literal takes its type from its uses. The check hears
     // them (literal_demands: per demand, the `let`, the demanded type, the
     // use); a program with a demand is checked again with every such
     // binding at the type decided (literal_decisions; its layout is
     // literal_decisions_from_demands's).
-    literal_demands: Vec[i32],
+    literal_demands: List[i32],
     // Every literal binding checked so far, as (function signature, name,
     // `let`) triples: a return is judged after the body's scopes have
     // closed, and a generic callee's body is checked in the middle of its
     // caller's.
-    fn_literal_lets: Vec[i32],
-    literal_decisions: Vec[i32],
+    fn_literal_lets: List[i32],
+    literal_decisions: List[i32],
     // The number of types when the first such binding was reached: the two
     // checks are the same check up to there, so a type below this mark has
     // one id in both, and a type above it is rebuilt from its structure.
@@ -914,10 +914,10 @@ pub type Sema {
     fn_decl_source_paths: HashMap[i32, str],
     // Multiple function clauses (§9.7): public dispatch symbol -> clause group index.
     fn_clause_group_lookup: HashMap[i32, i32],
-    fn_clause_group_names: Vec[i32],
-    fn_clause_group_starts: Vec[i32],
-    fn_clause_group_counts: Vec[i32],
-    fn_clause_group_decls: Vec[i32],
+    fn_clause_group_names: List[i32],
+    fn_clause_group_starts: List[i32],
+    fn_clause_group_counts: List[i32],
+    fn_clause_group_decls: List[i32],
     // Hidden clause body symbol -> public dispatch symbol.
     fn_clause_body_dispatch: HashMap[i32, i32],
     // Memoized §14.22 by-value Task parameter disposition:
@@ -931,17 +931,17 @@ pub type Sema {
     // selection at call sites.
     generic_fn_nodes: HashMap[i32, i32],
     generic_fn_candidate_counts: HashMap[i32, i32],
-    generic_fn_candidate_syms: Vec[i32],
-    generic_fn_candidate_nodes: Vec[i32],
+    generic_fn_candidate_syms: List[i32],
+    generic_fn_candidate_nodes: List[i32],
     // Call expression/pipeline node -> selected generic declaration node.
     resolved_generic_call_nodes: HashMap[i32, i32],
 
     // Methods: hash(type_sym, method_sym) → sig index
-    extension_method_owner_syms: Vec[i32],
-    extension_method_syms: Vec[i32],
-    extension_method_fn_syms: Vec[i32],
-    extension_method_sig_idxs: Vec[i32],
-    extension_method_paths: Vec[str],
+    extension_method_owner_syms: List[i32],
+    extension_method_syms: List[i32],
+    extension_method_fn_syms: List[i32],
+    extension_method_sig_idxs: List[i32],
+    extension_method_paths: List[str],
     qualified_extension_call_nodes: HashMap[i32, i32],
     // Variant lookup: variant_sym → variant_index
     variant_lookup: HashMap[i32, i32],
@@ -954,7 +954,7 @@ pub type Sema {
     // Per declaration (#1451): enum TypeId -> start of its variants' values in
     // disc_value_list, in variant order.
     disc_value_starts: HashMap[i32, i32],
-    disc_value_list: Vec[i64],
+    disc_value_list: List[i64],
     disc_has_payload: HashMap[i32, i32],
     bitpacked_types: HashMap[i32, i32],  // type_id → 1 if bitpacked
     packed_types: HashMap[i32, i32],     // type_id → 1 if repr(packed)/@[packed]
@@ -972,7 +972,7 @@ pub type Sema {
     // flow). Absent = untracked (never literal-initialized/assigned) and never
     // flagged, which keeps raw/uninitialized union access build-safe.
     union_last_written: HashMap[i32, i32],
-    union_tracked_syms: Vec[i32],   // insertion-ordered tracked union var syms
+    union_tracked_syms: List[i32],   // insertion-ordered tracked union var syms
     union_in_assign_target: i32,
 
     // Dyn-erased generic-inst trait impls: methods specialized for the
@@ -982,46 +982,46 @@ pub type Sema {
     // pre-monomorphized Type__Arg.method functions).
     dyn_impl_starts: HashMap[i64, i32],
     dyn_impl_counts: HashMap[i64, i32],
-    dyn_impl_flat_method_names: Vec[i32],
-    dyn_impl_flat_sigs: Vec[i32],
-    dyn_impl_flat_mono_syms: Vec[i32],
+    dyn_impl_flat_method_names: List[i32],
+    dyn_impl_flat_sigs: List[i32],
+    dyn_impl_flat_mono_syms: List[i32],
 
     // Trait declarations
-    trait_method_names: Vec[i32],
-    trait_method_starts: Vec[i32],
-    trait_method_counts: Vec[i32],
-    trait_method_flags: Vec[i32],
-    trait_method_param_starts: Vec[i32],
-    trait_method_param_counts: Vec[i32],
-    trait_method_ret_nodes: Vec[i32],
-    trait_method_default_bodies: Vec[i32],
-    trait_name_syms: Vec[i32],
+    trait_method_names: List[i32],
+    trait_method_starts: List[i32],
+    trait_method_counts: List[i32],
+    trait_method_flags: List[i32],
+    trait_method_param_starts: List[i32],
+    trait_method_param_counts: List[i32],
+    trait_method_ret_nodes: List[i32],
+    trait_method_default_bodies: List[i32],
+    trait_name_syms: List[i32],
     trait_lookup: HashMap[i32, i32],
     // Trait type params: flat vec of type param name syms per trait
-    trait_tp_starts: Vec[i32],
-    trait_tp_counts: Vec[i32],
-    trait_tp_syms: Vec[i32],
+    trait_tp_starts: List[i32],
+    trait_tp_counts: List[i32],
+    trait_tp_syms: List[i32],
     // Trait associated types: flat vec of [name_sym, default_type_node]*
-    trait_assoc_names: Vec[i32],
-    trait_assoc_defaults: Vec[i32],
-    trait_assoc_starts: Vec[i32],
-    trait_assoc_counts: Vec[i32],
+    trait_assoc_names: List[i32],
+    trait_assoc_defaults: List[i32],
+    trait_assoc_starts: List[i32],
+    trait_assoc_counts: List[i32],
     // Trait assoc type bounds: flat vec of bound trait syms per assoc type
-    trait_assoc_bound_syms: Vec[i32],
-    trait_assoc_bound_starts: Vec[i32],
-    trait_assoc_bound_counts: Vec[i32],
+    trait_assoc_bound_syms: List[i32],
+    trait_assoc_bound_starts: List[i32],
+    trait_assoc_bound_counts: List[i32],
     // Type implementations: type_sym → list of trait syms (encoded in impl_extra)
-    impl_extra: Vec[i32],
-    impl_starts: Vec[i32],
-    impl_counts: Vec[i32],
-    impl_type_syms: Vec[i32],
+    impl_extra: List[i32],
+    impl_starts: List[i32],
+    impl_counts: List[i32],
+    impl_type_syms: List[i32],
     impl_lookup: HashMap[i32, i32],
     // D29 scaffolding (#750): tier provenance for the shadow case (a user type
     // decl reusing a prelude-closure type name). impl_extra_is_std runs in
     // lockstep with impl_extra; type_tid_is_std / type_decl_nodes_by_tid are
     // recorded at type-decl registration; type_sym_tier_mask bits: 1=std, 2=user.
     // All queries stay on the flat path unless the mask reads 3 (shadowed).
-    impl_extra_is_std: Vec[i32],
+    impl_extra_is_std: List[i32],
     type_decl_nodes_by_tid: HashMap[i32, i32],
     // D100 (§18.3): the `pub` fields, keyed by (type declaration node, field
     // name); a field not here is private to its package (sema_field_key).
@@ -1056,21 +1056,21 @@ pub type Sema {
     // Key: pair(type_id, trait_sym) → 1
     impl_generic_inst: HashMap[i64, i32],
     // Blanket impls: impl[T: Bound] Trait for T
-    blanket_trait_syms: Vec[i32],
-    blanket_bound_syms: Vec[i32],
-    blanket_bound_starts: Vec[i32],
-    blanket_bound_counts: Vec[i32],
+    blanket_trait_syms: List[i32],
+    blanket_bound_syms: List[i32],
+    blanket_bound_starts: List[i32],
+    blanket_bound_counts: List[i32],
     // Blanket impl target type: 0 = bare type param, else: = base_sym of generic target
-    blanket_target_base_syms: Vec[i32],
-    blanket_impl_nodes: Vec[i32],
+    blanket_target_base_syms: List[i32],
+    blanket_impl_nodes: List[i32],
     // Trait obligations + deterministic selection cache
-    obligation_trait_syms: Vec[i32],
-    obligation_type_syms: Vec[i32],
-    obligation_nodes: Vec[i32],
+    obligation_trait_syms: List[i32],
+    obligation_type_syms: List[i32],
+    obligation_nodes: List[i32],
     selection_cache: HashMap[i64, i32],
     // Blanket impl recursion guard: keys currently being resolved
     // Cycle-detection guard for select_trait_impl. A HashSet (heap handle), not a
-    // Vec, so it can be mutated through a copied handle from a `&Self` query method
+    // List, so it can be mutated through a copied handle from a `&Self` query method
     // (D7: query methods are read; the guard is interior bookkeeping). See
     // project_enforce_receiver_modes.
     blanket_guard: HashSet[i64],
@@ -1087,7 +1087,7 @@ pub type Sema {
     ephemeral_types: HashMap[i32, i32],
     sealed_traits: HashMap[i32, i32],
     // Sealed trait implementors: flat vec of type syms, with start/count per trait
-    sealed_impl_types: Vec[i32],
+    sealed_impl_types: List[i32],
     sealed_impl_starts: HashMap[i32, i32],
     sealed_impl_counts: HashMap[i32, i32],
 
@@ -1164,14 +1164,14 @@ pub type Sema {
     // UINT_MAX, both from limits.h): every further declaring module gets
     // its own binding, and scope_lookup picks the one the current module
     // imports. Parallel rows: symbol, binding index, declaring module.
-    interface_global_alt_syms: Vec[i32],
-    interface_global_alt_binds: Vec[i32],
-    interface_global_alt_paths: Vec[str],
+    interface_global_alt_syms: List[i32],
+    interface_global_alt_binds: List[i32],
+    interface_global_alt_paths: List[str],
     // D39 lazy interface collection (SemaDecl.prepare_interface_demand):
     // per declaration, 1 when its module is a registered .wi section, and
     // 1 when the source can name it; the symbols the source names.
-    decl_is_iface: Vec[i32],
-    decl_iface_demanded: Vec[i32],
+    decl_is_iface: List[i32],
+    decl_iface_demanded: List[i32],
     iface_mentioned: HashMap[i32, i32],
     interface_eager: i32,            // 1: a bundle build or a .wi root — collect every interface declaration
     // every flat-scope global's declaring module and binding index (symbol
@@ -1181,14 +1181,14 @@ pub type Sema {
     // when the scope ends
     global_value_decl_paths: HashMap[i32, str],
     global_value_decl_bindings: HashMap[i32, i32],
-    shadowed_global_syms: Vec[i32],
-    shadowed_global_indices: Vec[i32],
-    global_race_access_syms: Vec[i32],
-    global_race_access_nodes: Vec[i32],
-    global_race_access_files: Vec[i32],
-    global_race_access_paths: Vec[str],
-    global_race_access_kinds: Vec[i32],
-    global_race_access_unsafe: Vec[i32],
+    shadowed_global_syms: List[i32],
+    shadowed_global_indices: List[i32],
+    global_race_access_syms: List[i32],
+    global_race_access_nodes: List[i32],
+    global_race_access_files: List[i32],
+    global_race_access_paths: List[str],
+    global_race_access_kinds: List[i32],
+    global_race_access_unsafe: List[i32],
     global_race_mutated_syms: HashMap[i32, i32],
     global_race_mutation_nodes: HashMap[i32, i32],
     global_race_concurrency_node: i32,
@@ -1208,11 +1208,11 @@ pub type Sema {
     // as [call, sym, view sym, view node, last use, flags] — judged once
     // every body is checked (check_calls_against_live_global_views), since a
     // callee's writes are known only then (forward references, recursion).
-    global_write_records: Vec[i32],
-    global_calls: Vec[i32],
-    global_call_targets: Vec[i32],
-    global_call_bindings: Vec[i32],
-    global_view_call_checks: Vec[i32],
+    global_write_records: List[i32],
+    global_calls: List[i32],
+    global_call_targets: List[i32],
+    global_call_bindings: List[i32],
+    global_view_call_checks: List[i32],
     // The body writes and calls are in when it is not the function being
     // checked: a closure (-2 - its node) or a default method checked for an
     // impl (its signature); -1 for the function (global_effect_body).
@@ -1225,13 +1225,13 @@ pub type Sema {
     global_dispatchers_expanded: i32,
     // Dynamic drop traversal decisions: [dyn type, impl declaration, target
     // type], with the lookup context retained for the semantic inspector.
-    global_drop_impl_targets: Vec[i32],
-    global_drop_impl_contexts: Vec[str],
+    global_drop_impl_targets: List[i32],
+    global_drop_impl_contexts: List[str],
     // §21.1 rule 1: each declaration's resolved `writes` clause, keyed by
     // its node, as an index into declared_write_syms_flat holding the count
     // then the global symbols (resolve_declared_global_writes).
     declared_write_starts: HashMap[i32, i32],
-    declared_write_syms_flat: Vec[i32],
+    declared_write_syms_flat: List[i32],
     // #1903 (§21.1 rule 6): the globals a function's returned view views —
     // directly, or through a callee's returned view — keyed by signature, as
     // a chain over ret_global_origin_entries [sym, node, next]
@@ -1239,13 +1239,13 @@ pub type Sema {
     // (record_call_view_origins_args), so §21.1 rule 1 judges a write of
     // one while the result is live.
     ret_global_origin_heads: HashMap[i32, i32],
-    ret_global_origin_entries: Vec[i32],
+    ret_global_origin_entries: List[i32],
     // Each declaration's resolved `from` clause, keyed by its node, as an
     // index into declared_from_flat holding the count then the entries: a
     // parameter as -1 - its index, a global as its symbol
     // (resolve_declared_view_origins).
     declared_from_starts: HashMap[i32, i32],
-    declared_from_flat: Vec[i32],
+    declared_from_flat: List[i32],
     // Recursion (#1903): a call that reads a callee's returned-view globals
     // before the callee's body is done (it calls back, directly or through
     // others) also ties its result to a placeholder standing for that
@@ -1259,21 +1259,21 @@ pub type Sema {
     // [declaration, sig, file].
     ret_origin_placeholder_sigs: HashMap[i32, i32],
     ret_origin_placeholder_syms: HashMap[i32, i32],
-    ret_global_origin_sigs: Vec[i32],
-    ret_view_placeholder_writes: Vec[i32],
-    ret_view_placeholder_diags: Vec[Diagnostic],
-    declared_from_checks: Vec[i32],
+    ret_global_origin_sigs: List[i32],
+    ret_view_placeholder_writes: List[i32],
+    ret_view_placeholder_diags: List[Diagnostic],
+    declared_from_checks: List[i32],
     // #1827: bodies a call runs that the running program chooses — every
     // impl of a dyn method, every callable of a callable type, every drop a
     // type's drop runs — as [kind, a, b]; chained by `a` for lookup.
-    global_dispatchers: Vec[i32],
+    global_dispatchers: List[i32],
     global_dispatcher_heads: HashMap[i32, i32],
-    global_dispatcher_next: Vec[i32],
+    global_dispatcher_next: List[i32],
     // #1827: every callable value in this compilation — a closure (-2 - its
     // node) or a function named as a value (its signature) — with its
     // callable type, as [body, type]: what a call through a callable no
     // binding names may run.
-    global_callable_values: Vec[i32],
+    global_callable_values: List[i32],
     // #1827: an argument passed to a by-value parameter (moved into the
     // callee, which drops it), keyed by the argument node; the first
     // binding of the body being checked (a return drops every binding from
@@ -1318,17 +1318,17 @@ pub type Sema {
     pattern_bind_mut: i32,             // 1 while checking a `var PATTERN` head: its bindings are mutable (#1354)
     drop_control_flow_depth: i32,
     move_control_flow_depth: i32,
-    move_control_flow_binding_starts: Vec[i32],
-    move_control_flow_supports_drop_flags: Vec[i32],
-    drop_consumed_field_owner_syms: Vec[i32],
-    drop_consumed_field_syms: Vec[i32],
+    move_control_flow_binding_starts: List[i32],
+    move_control_flow_supports_drop_flags: List[i32],
+    drop_consumed_field_owner_syms: List[i32],
+    drop_consumed_field_syms: List[i32],
 
     // Scope binding storage (stack-based with watermarks)
-    bind_names: Vec[i32],
-    bind_types: Vec[i32],
-    bind_muts: Vec[i32],
-    bind_states: Vec[i32],
-    moved_field_base_syms: Vec[i32],
+    bind_names: List[i32],
+    bind_types: List[i32],
+    bind_muts: List[i32],
+    bind_states: List[i32],
+    moved_field_base_syms: List[i32],
     // #782: bindings whose partial state came from an EXPLICIT `move x.f`.
     // §2.5.1 sanctions whole-value transfer after a spelled-out field move
     // (the hole arrives blanked by design); only IMPLICIT moves (bare
@@ -1344,30 +1344,30 @@ pub type Sema {
     // its payload out of a temporary. Sema decides; MirLower reads.
     optional_chain_observing_nodes: HashMap[i32, i32],
     marking_explicit_move: i32,
-    moved_field_path_starts: Vec[i32],
-    moved_field_path_counts: Vec[i32],
-    moved_field_path_syms: Vec[i32],
-    bind_is_task: Vec[i32],
-    bind_task_used: Vec[i32],
-    bind_is_scoped_task: Vec[i32],
-    bind_is_view_bound: Vec[i32],
-    bind_provenance: Vec[BindingProvenance],
+    moved_field_path_starts: List[i32],
+    moved_field_path_counts: List[i32],
+    moved_field_path_syms: List[i32],
+    bind_is_task: List[i32],
+    bind_task_used: List[i32],
+    bind_is_scoped_task: List[i32],
+    bind_is_view_bound: List[i32],
+    bind_provenance: List[BindingProvenance],
     binding_decl_nodes: HashMap[i32, i32],
     binding_value_nodes: HashMap[i32, i32],
     // §29.6 (D95): a binding a `let _ = x` dropped, and that `let`, for the
     // help on a later use.
     discard_lets: HashMap[i32, i32],
-    scope_starts: Vec[i32],
+    scope_starts: List[i32],
     scope_name_map: HashMap[i32, i32],
     pending_generic_binding_base: HashMap[i32, i32],
     pending_generic_binding_call: HashMap[i32, i32],
     pending_generic_binding_decl: HashMap[i32, i32],
-    async_scope_names: Vec[i32],
-    sync_scope_names: Vec[i32],
-    label_syms: Vec[i32],
-    label_kinds: Vec[i32],
-    label_nodes: Vec[i32],
-    label_break_value_types: Vec[i32],
+    async_scope_names: List[i32],
+    sync_scope_names: List[i32],
+    label_syms: List[i32],
+    label_kinds: List[i32],
+    label_nodes: List[i32],
+    label_break_value_types: List[i32],
     // Loop move-state tracking (docs/completed/branch-merge-soundness.md §6.7 / #613):
     // per label frame: entry bind-count (outer/inner boundary), the offset of this
     // loop's break-flag region in loop_break_flat (-1 = none), and whether any
@@ -1375,48 +1375,48 @@ pub type Sema {
     // per-binding break-moved flags (VarState), one region per active loop. Loop
     // regions open and close strictly LIFO, so one flat stack with a per-frame
     // offset holds them, and loop_entry_flat reuses the same offset.
-    label_loop_entry_binds: Vec[i32],
-    label_break_off: Vec[i32],
-    label_break_seen: Vec[i32],
+    label_loop_entry_binds: List[i32],
+    label_break_off: List[i32],
+    label_break_seen: List[i32],
     // #1733: every loop or labeled block a checked `break` exits, by node.
     // Whether a `while true` or `loop` falls through is this fact: a syntax
     // walk looking for the `break` missed one in a let-else's else branch.
     break_target_nodes: HashMap[i32, i32],
-    loop_break_flat: Vec[i32],
+    loop_break_flat: List[i32],
     // Parallel to loop_break_flat and sharing its per-frame offset (label_break_off):
     // the loop-entry move-state snapshot, one region per active loop. It lets the
     // `continue` back-edge check apply the SAME entry==LIVE guard that
     // finalize_loop_move_state uses for the fall-through back-edge — without it, a
     // value moved *before* the loop is wrongly flagged as moved *inside* it (#696).
-    loop_entry_flat: Vec[i32],
-    fn_label_syms: Vec[i32],
-    fn_label_nodes: Vec[i32],
-    fn_label_paths: Vec[str],
-    fn_label_orders: Vec[i32],
-    fn_label_used: Vec[i32],
-    fn_goto_syms: Vec[i32],
-    fn_goto_nodes: Vec[i32],
-    fn_goto_paths: Vec[str],
-    fn_goto_orders: Vec[i32],
-    fn_init_nodes: Vec[i32],
-    fn_init_paths: Vec[str],
-    fn_init_orders: Vec[i32],
-    fn_label_scope_stack: Vec[i32],
+    loop_entry_flat: List[i32],
+    fn_label_syms: List[i32],
+    fn_label_nodes: List[i32],
+    fn_label_paths: List[str],
+    fn_label_orders: List[i32],
+    fn_label_used: List[i32],
+    fn_goto_syms: List[i32],
+    fn_goto_nodes: List[i32],
+    fn_goto_paths: List[str],
+    fn_goto_orders: List[i32],
+    fn_init_nodes: List[i32],
+    fn_init_paths: List[str],
+    fn_init_orders: List[i32],
+    fn_label_scope_stack: List[i32],
     fn_label_next_scope_id: i32,
     fn_label_order_counter: i32,
 
     // Borrow tracking
-    borrow_kinds: Vec[i32],
-    borrow_places: Vec[i32],
-    borrow_fields: Vec[i32],
-    borrow_refs: Vec[i32],
+    borrow_kinds: List[i32],
+    borrow_places: List[i32],
+    borrow_fields: List[i32],
+    borrow_refs: List[i32],
     // Multi-level field path data for borrow disjointness.
-    // Each borrow has a path_start and path_count into this Vec.
-    borrow_path_starts: Vec[i32],
-    borrow_path_counts: Vec[i32],
-    borrow_path_data: Vec[i32],
-    borrow_scope_depths: Vec[i32],
-    borrow_creation_nodes: Vec[i32],
+    // Each borrow has a path_start and path_count into this List.
+    borrow_path_starts: List[i32],
+    borrow_path_counts: List[i32],
+    borrow_path_data: List[i32],
+    borrow_scope_depths: List[i32],
+    borrow_creation_nodes: List[i32],
     // Block context for §15.6 three-location diagnostics
     current_block_extra_start: i32,
     current_block_stmt_count: i32,
@@ -1425,35 +1425,35 @@ pub type Sema {
     // #1722: every block being checked, outermost first (check_block), and
     // the statement each is at — the current block is the last. A view's
     // later use may be in any of them up to the block that declares it.
-    live_block_starts: Vec[i32],
-    live_block_counts: Vec[i32],
-    live_block_indexes: Vec[i32],
-    live_block_tails: Vec[i32],
-    live_block_depths: Vec[i32],
+    live_block_starts: List[i32],
+    live_block_counts: List[i32],
+    live_block_indexes: List[i32],
+    live_block_tails: List[i32],
+    live_block_depths: List[i32],
     // #1722: every loop being checked, outermost first: the part that runs
     // again (a `while` and its condition; a `loop`'s or `for`'s body), the
     // scope depth at its entry, and the loop_depth of its body. A view
     // declared outside a loop and used anywhere in it is used again after
     // a mutation in it, on the next iteration.
-    live_loop_nodes: Vec[i32],
-    live_loop_depths: Vec[i32],
-    live_loop_body_depths: Vec[i32],
+    live_loop_nodes: List[i32],
+    live_loop_depths: List[i32],
+    live_loop_body_depths: List[i32],
     // The first block and loop frame of the body being checked: a function,
     // closure, `async` or scope body (push_label_boundary) starts its own —
     // a generic callee checked in the middle of its caller must not see the
     // caller's blocks. live_floor_saved holds the enclosing body's pair.
     live_block_floor: i32,
     live_loop_floor: i32,
-    live_floor_saved: Vec[i32],
+    live_floor_saved: List[i32],
     // Transient storage for closure field-level capture analysis.
-    capture_field_syms: Vec[i32],
-    capture_field_kinds: Vec[i32],
+    capture_field_syms: List[i32],
+    capture_field_kinds: List[i32],
 
     // Resolved call args for named/default-arg calls. Keep starts and counts
     // explicit: AST node IDs and the flattened data index both exceed 16 bits.
     call_resolved_arg_starts: HashMap[i32, i32],
     call_resolved_arg_counts: HashMap[i32, i32],
-    call_resolved_args_data: Vec[i32],
+    call_resolved_args_data: List[i32],
     call_resolved_default_arg_keys: HashMap[i64, i32],
     // Concrete call contract chosen by Sema. Generic calls cannot recover this
     // from their template symbol: the concrete signature owns the final
@@ -1491,8 +1491,8 @@ pub type Sema {
     iter_next_mono_syms: HashMap[i32, i32],
     magic_ident_kinds: HashMap[i32, i32],
     // Implicit parameter bindings stack: pairs of (type_id, binding_sym)
-    implicit_binding_types: Vec[i32],
-    implicit_binding_syms: Vec[i32],
+    implicit_binding_types: List[i32],
+    implicit_binding_syms: List[i32],
     with_form_kinds: HashMap[i32, i32],
     with_payload_types: HashMap[i32, i32],
     with_enter_methods: HashMap[i32, i32],
@@ -1501,7 +1501,7 @@ pub type Sema {
     with_enter_mono_syms: HashMap[i32, i32],
     with_exit_sigs: HashMap[i32, i32],
     with_exit_mono_syms: HashMap[i32, i32],
-    no_await_guard_origin_roots: Vec[i32],
+    no_await_guard_origin_roots: List[i32],
     no_await_guard_scope_depth: i32,
     no_suspend_scope_depth: i32,
 
@@ -1511,11 +1511,11 @@ pub type Sema {
     // #2211: resolved name uses (node, kind, declaring module path, name) for
     // the analyzer's `reference` facts: a global read, a function taken as a
     // value, a type name — calls and methods have their own facts.
-    name_use_nodes: Vec[i32],
-    name_use_kinds: Vec[str],
-    name_use_paths: Vec[str],
-    name_use_names: Vec[str],
-    name_use_from: Vec[str],
+    name_use_nodes: List[i32],
+    name_use_kinds: List[str],
+    name_use_paths: List[str],
+    name_use_names: List[str],
+    name_use_from: List[str],
     // Surviving generic comptime-if wrapper node → selected branch node.
     comptime_selected_branches: HashMap[i32, i32],
     // Pipeline method calls: NK_PIPELINE node → method-name symbol. D21 keeps
@@ -1562,16 +1562,16 @@ pub type Sema {
     // after the specialization fixpoint. Entries are keyed by resolved
     // type and kept in registration order (the synthesized bodies' order).
     debug_fmt_index: HashMap[i32, i32],
-    debug_fmt_tids: Vec[i32],
-    debug_fmt_kinds: Vec[i32],
-    debug_fmt_fns: Vec[i32],
-    debug_fmt_sigs: Vec[i32],
-    debug_fmt_monos: Vec[i32],
+    debug_fmt_tids: List[i32],
+    debug_fmt_kinds: List[i32],
+    debug_fmt_fns: List[i32],
+    debug_fmt_sigs: List[i32],
+    debug_fmt_monos: List[i32],
     // A Box entry's accessor (Box[T].as_ref, specialized): the formatter
     // reads the payload through the library's own view of it.
-    debug_fmt_aux_fns: Vec[i32],
-    debug_fmt_aux_sigs: Vec[i32],
-    debug_fmt_aux_monos: Vec[i32],
+    debug_fmt_aux_fns: List[i32],
+    debug_fmt_aux_sigs: List[i32],
+    debug_fmt_aux_monos: List[i32],
     // Synthesized formatter symbol -> its entry (codegen declares these
     // MIR-only functions the way it declares generator producers).
     debug_fmt_synth_syms: HashMap[i32, i32],
@@ -1587,7 +1587,7 @@ pub type Sema {
     slice_coerce_args: HashMap[i32, i32],
     // #1739: a sequence or map literal with no expected instance whose
     // declared destination names a collection with undecided type
-    // arguments (a generic struct field `items: Vec[T]`): literal node ->
+    // arguments (a generic struct field `items: List[T]`): literal node ->
     // the collection base the literal builds (§4.3c rule 1 and 2).
     collection_literal_hints: HashMap[i32, i32],
     // §4.3a (#1478): `[value; N]` with a non-literal count keeps the count
@@ -1601,22 +1601,22 @@ pub type Sema {
     // structured record consumed by later stages; expression type inference
     // never reads this sidecar and therefore remains exact.
     contextual_copy_adjustment_indices: HashMap[i64, i32],
-    contextual_copy_adjustments: Vec[ContextualCopyAdjustment],
+    contextual_copy_adjustments: List[ContextualCopyAdjustment],
     // D22 Stage 3 contextual-join decisions. Roles distinguish ordinary AST
     // expressions from synthetic carrier payloads and lazy fallback results.
     contextual_join_decision_indices: HashMap[i64, i32],
-    contextual_join_decisions: Vec[ContextualJoinDecision],
-    contextual_join_arm_nodes: Vec[i32],
-    contextual_join_arm_origin_nodes: Vec[i32],
-    contextual_join_arm_types: Vec[i32],
-    contextual_join_arm_kinds: Vec[i32],
-    contextual_join_arm_roles: Vec[i32],
-    contextual_join_origin_deps: Vec[i32],
+    contextual_join_decisions: List[ContextualJoinDecision],
+    contextual_join_arm_nodes: List[i32],
+    contextual_join_arm_origin_nodes: List[i32],
+    contextual_join_arm_types: List[i32],
+    contextual_join_arm_kinds: List[i32],
+    contextual_join_arm_roles: List[i32],
+    contextual_join_origin_deps: List[i32],
     // #604 stage 1: >0 while resolving a function-signature parameter type —
     // the only position where `[]mut T` is legal in this release.
     in_param_type_position: i32,
-    autoderef_step_fns: Vec[i32],
-    autoderef_step_tys: Vec[i32],
+    autoderef_step_fns: List[i32],
+    autoderef_step_tys: List[i32],
     // Match value-pattern sidecar: pattern node → symbol compared by value.
     pattern_value_syms: HashMap[i32, i32],
     // #1302: match / let-else nodes whose pattern CONSUMES the subject (an arm
@@ -1628,14 +1628,14 @@ pub type Sema {
     // binding's type, keyed by the same node.
     owned_slice_patterns: HashMap[i32, i32],
     slice_rest_types: HashMap[i32, i32],
-    // The owned-Vec slice pattern of the pattern being checked that removes
-    // elements from its Vec, 0 when none (a match guard cannot follow one).
-    pattern_vec_removal: i32,
+    // The owned-List slice pattern of the pattern being checked that removes
+    // elements from its List, 0 when none (a match guard cannot follow one).
+    pattern_list_removal: i32,
     // Regex literal metadata sidecars, keyed by NK_REGEX_LIT/NK_PAT_REGEX node.
     regex_capture_counts: HashMap[i32, i32],
     regex_capture_name_starts: HashMap[i32, i32],
     regex_capture_name_counts: HashMap[i32, i32],
-    regex_capture_name_syms: Vec[i32],
+    regex_capture_name_syms: List[i32],
 
     // Typed dump sidecar maps (keyed by span start byte offset)
     typed_expr_types: HashMap[i32, i32],
@@ -1665,7 +1665,7 @@ pub type Sema {
     // receiver type names that share an owner (the iterator adapters), and
     // the row each checked builtin call resolved to (call node -> row).
     builtin_sig_index: HashMap[(i32, i32), i32],
-    builtin_sig_modes: Vec[str],
+    builtin_sig_modes: List[str],
     builtin_sig_owner_alias: HashMap[i32, i32],
     builtin_call_sigs: HashMap[i32, i32],
     // D109: each `offsetof[T](field)` call's field index in T's declaration,
@@ -1696,7 +1696,7 @@ pub type Sema {
     // exactly these types; for a variadic callee, the `...` arguments the
     // promotion changes, 0 elsewhere (#1849).
     c_promoted_arg_starts: HashMap[i32, i32],
-    c_promoted_arg_data: Vec[i32],
+    c_promoted_arg_data: List[i32],
     // Signatures declared without a prototype (`int f();`, whose c_import
     // NK_EXTERN_FN carries flag bit 1): C calls them with the promoted arguments
     // and the fixed-argument convention, never the variadic one (#1831).
@@ -1709,9 +1709,9 @@ pub type Sema {
 
     // D51 stage 2: facade facts (SemaFacade.w).
     facade_resource_index: HashMap[i32, i32],   // resource sym -> facade_resources index
-    facade_resources: Vec[FacadeResource],
+    facade_resources: List[FacadeResource],
     foreign_contract_index: HashMap[i32, i32],  // fn sym -> foreign_contracts index
-    foreign_contracts: Vec[ForeignContract],
+    foreign_contracts: List[ForeignContract],
     facade_domains: HashMap[i32, i32],          // domain sym -> kind sym
     // Stage 7 (ruling §33-§38, spec §16.2b.7): the declared foreign-state
     // domains with their origin symbols, and per signature — a rendered
@@ -1721,10 +1721,10 @@ pub type Sema {
     // record_call_view_origins applies them). A view a call invalidated
     // records the call and the parameter or domain it came through, for
     // the diagnostic at its next use.
-    facade_domain_list: Vec[FacadeDomain],
+    facade_domain_list: List[FacadeDomain],
     facade_domain_index: HashMap[i32, i32],     // domain sym -> facade_domain_list index
     facade_domain_origin_index: HashMap[i32, i32], // origin sym -> facade_domain_list index
-    facade_call_effects: Vec[FacadeCallEffect],
+    facade_call_effects: List[FacadeCallEffect],
     facade_call_effect_index: HashMap[i32, i32],   // sig -> facade_call_effects index
     facade_touch_nodes: HashMap[i32, i32],         // call node -> facade_call_effects index
     facade_touch_hit_params: HashMap[i32, i32],    // poisoned view sym -> the parameter the origin came through (-1: a domain)
@@ -1763,20 +1763,20 @@ pub type Sema {
     // §30 (spec §16.2b.6): ephemeral-storage errors whose ephemerality a
     // facade resource supplies, held until the facade facts exist
     // (SemaFacade.w report_facade_layout_errors).
-    facade_layout_nodes: Vec[i32],
-    facade_layout_tids: Vec[i32],
-    facade_layout_containers: Vec[i32],
-    facade_layout_files: Vec[i32],
-    facade_layout_msgs: Vec[str],
-    facade_convention_nodes: Vec[i32],
+    facade_layout_nodes: List[i32],
+    facade_layout_tids: List[i32],
+    facade_layout_containers: List[i32],
+    facade_layout_files: List[i32],
+    facade_layout_msgs: List[str],
+    facade_convention_nodes: List[i32],
     // Stage 9 (ruling §44-§51, spec §16.2b.9-10): the callback methods the
     // facades rendered, by method symbol text (SemaFacade.w
     // index_facade_callback_methods; SemaCheck.w consults them at generic
     // call sites).
-    facade_callback_methods: Vec[FacadeCallbackMethod],
+    facade_callback_methods: List[FacadeCallbackMethod],
     facade_callback_method_index: HashMap[i32, i32],   // the method's generic fn node -> facade_callback_methods index
     facade_c_invoked_userdata: HashMap[i32, i32],      // §12.4/§16.2b.9: a callback method's concrete signature -> its userdata parameter (signature index), which C invokes through the callback any number of times
-    facade_pair_ops: Vec[FacadePairOp],                // D66 #1652: per concrete signature (facade_pair_op_by_sig)
+    facade_pair_ops: List[FacadePairOp],                // D66 #1652: per concrete signature (facade_pair_op_by_sig)
     facade_pair_op_by_sig: HashMap[i32, i32],
     facade_pair_setter_contract: HashMap[i32, i32],    // a pair setter's generic fn node -> foreign_contracts index …
     facade_pair_setter_case: HashMap[i32, i32],        // … and the case it renders (parallel)
@@ -1845,8 +1845,8 @@ pub type Sema {
     callable_opaque_idents: HashMap[i32, i32],
     callable_let_decls: HashMap[i32, i32],
     callable_value_heads: HashMap[i32, i32],
-    callable_value_nodes: Vec[i32],
-    callable_value_next: Vec[i32],
+    callable_value_nodes: List[i32],
+    callable_value_next: List[i32],
     callable_value_visiting: HashMap[i32, i32],
     // Settled with suspend_fact_nodes: the (trait, method) pairs whose `dyn`
     // call may suspend (an implementation or the default body may), and the
@@ -1860,7 +1860,7 @@ pub type Sema {
     generator_state_fns: HashMap[i32, i32],
     generator_local_view_yields: HashMap[i32, i32],
     generator_local_view_origins: HashMap[i32, i32],
-    gen_pull_nodes: Vec[i32],
+    gen_pull_nodes: List[i32],
     // The `g.pull()` calls of a generator value that is ephemeral (§13.4,
     // #1732): the pulled iterator views what the generator's view arguments
     // view, so the call carries those origins and is an ephemeral value.
@@ -1870,13 +1870,13 @@ pub type Sema {
     // (§13.4 `g.pull()` is `gen_pull(g)`); MIR lowers the receiver as an
     // ordinary argument, never as a method receiver.
     receiver_arg_call_nodes: HashMap[i32, i32],
-    gen_pull_fns: Vec[i32],
+    gen_pull_fns: List[i32],
     eph_task_visiting: HashMap[i32, i32],
     typed_dump_seen_nodes: HashMap[i32, i32],
     typed_dump_visit_budget: i32,
     // Generic substitution map + specialization cache
-    generic_subst_param_syms: Vec[i32],
-    generic_subst_type_ids: Vec[i32],
+    generic_subst_param_syms: List[i32],
+    generic_subst_type_ids: List[i32],
     generic_specialization_cache: HashMap[str, i32],
     // The declaring module of each specialization's template, by mono
     // symbol (#1766): a `__sema__` symbol has no declaration node of its
@@ -1889,16 +1889,16 @@ pub type Sema {
     // reopen Sema. Parallel descriptor arrays are indexed by
     // concrete_specialization_by_sym[mono_sym].
     concrete_specialization_by_sym: HashMap[i32, i32],
-    concrete_specialization_nodes: Vec[i32],
-    concrete_specialization_syms: Vec[i32],
-    concrete_specialization_sigs: Vec[i32],
-    concrete_specialization_subst_starts: Vec[i32],
-    concrete_specialization_subst_counts: Vec[i32],
-    concrete_specialization_subst_syms: Vec[i32],
-    concrete_specialization_subst_types: Vec[i32],
-    concrete_specialization_param_starts: Vec[i32],
-    concrete_specialization_param_counts: Vec[i32],
-    concrete_specialization_param_types: Vec[i32],
+    concrete_specialization_nodes: List[i32],
+    concrete_specialization_syms: List[i32],
+    concrete_specialization_sigs: List[i32],
+    concrete_specialization_subst_starts: List[i32],
+    concrete_specialization_subst_counts: List[i32],
+    concrete_specialization_subst_syms: List[i32],
+    concrete_specialization_subst_types: List[i32],
+    concrete_specialization_param_starts: List[i32],
+    concrete_specialization_param_counts: List[i32],
+    concrete_specialization_param_types: List[i32],
     // Synthetic drop glue has no AST call node. Map each concrete generic
     // instance to the Drop.drop contract registered before MIR freeze.
     // #2145: the iterable a `for` or a comprehension clause is stepping
@@ -1922,21 +1922,21 @@ pub type Sema {
     // in order, per function (the binding table itself is popped with its
     // scope), and the first node that put a parameter in a returned view's
     // origins and in its storage set. Event: 1 bind, 2 store, 3 loop.
-    view_fact_fns: Vec[i32],
-    view_fact_syms: Vec[i32],
-    view_fact_nodes: Vec[i32],
-    view_fact_files: Vec[i32],
-    view_fact_events: Vec[i32],
-    view_fact_masks: Vec[i32],
-    view_fact_storage: Vec[i32],
-    view_fact_dep_starts: Vec[i32],
-    view_fact_dep_counts: Vec[i32],
-    view_fact_deps: Vec[i32],
-    param_view_fact_sigs: Vec[i32],
-    param_view_fact_params: Vec[i32],
-    param_view_fact_storage: Vec[i32],
-    param_view_fact_nodes: Vec[i32],
-    param_view_fact_files: Vec[i32],
+    view_fact_fns: List[i32],
+    view_fact_syms: List[i32],
+    view_fact_nodes: List[i32],
+    view_fact_files: List[i32],
+    view_fact_events: List[i32],
+    view_fact_masks: List[i32],
+    view_fact_storage: List[i32],
+    view_fact_dep_starts: List[i32],
+    view_fact_dep_counts: List[i32],
+    view_fact_deps: List[i32],
+    param_view_fact_sigs: List[i32],
+    param_view_fact_params: List[i32],
+    param_view_fact_storage: List[i32],
+    param_view_fact_nodes: List[i32],
+    param_view_fact_files: List[i32],
     concrete_key_mono_syms: HashMap[i32, i32],
     generic_inst_cache: HashMap[i64, i32],
     // D7: eager tables filled in preregister_mir_types (before freeze) so the frozen
@@ -1952,7 +1952,7 @@ pub type Sema {
     generic_struct_field_index_type_cache: HashMap[i64, i32],
     generic_enum_payload_cache_starts: HashMap[i64, i32],
     generic_enum_payload_cache_counts: HashMap[i64, i32],
-    generic_enum_payload_cache_values: Vec[i32],
+    generic_enum_payload_cache_values: List[i32],
 
     // Associated type bindings from current impl (for Self.Name resolution)
     assoc_type_bindings: HashMap[i32, i32],
@@ -1964,12 +1964,12 @@ pub type Sema {
 
     // docs/completed/mutability.md Phase 4 — per-function effect tracking during body analysis.
     // Cleared and set by check_fn_body_with_sig; used to accumulate effects as the body is checked.
-    current_fn_param_syms: Vec[i32],   // param name symbols for the function being checked
-    current_fn_param_effs: Vec[i32],   // accumulated effect bits per param
-    current_fn_param_direct_effs: Vec[i32], // body-local effects, excluding propagated calls
-    current_fn_param_origins: Vec[i32],// accumulated escape_view origin masks per param
-    current_fn_param_storage_origins: Vec[i32], // the subset of those whose own storage the returned view may point into
-    current_fn_param_view_nodes: Vec[i32], // representative return/view node for escape_view diagnostics
+    current_fn_param_syms: List[i32],   // param name symbols for the function being checked
+    current_fn_param_effs: List[i32],   // accumulated effect bits per param
+    current_fn_param_direct_effs: List[i32], // body-local effects, excluding propagated calls
+    current_fn_param_origins: List[i32],// accumulated escape_view origin masks per param
+    current_fn_param_storage_origins: List[i32], // the subset of those whose own storage the returned view may point into
+    current_fn_param_view_nodes: List[i32], // representative return/view node for escape_view diagnostics
     current_fn_sig_idx: i32,           // sig index of current function (-1 if not in a fn body)
     current_fn_variadic: i32,          // 1 while checking a `...` definition body (never a closure in it)
     recording_propagated_effect: i32,
@@ -1978,7 +1978,7 @@ pub type Sema {
     // The type is recorded while the capture's scope is still available.
     closure_capture_summary_starts: HashMap[i32, i32],
     closure_capture_summary_counts: HashMap[i32, i32],
-    closure_capture_summary_data: Vec[i32],
+    closure_capture_summary_data: List[i32],
     // Binding -> originating closure node when initialized directly from a closure literal.
     binding_closure_nodes: HashMap[i32, i32],
     // D63: `f.clone()` call nodes on a callable value (MirLower lowers them
@@ -1990,13 +1990,13 @@ pub type Sema {
     // flags are complete regardless of declaration order. Six ints per
     // record: closure node, callee sym, sig, param index, consumes (0/1),
     // by-place capture sym (0 when none).
-    deferred_closure_arg_checks: Vec[i32],
+    deferred_closure_arg_checks: List[i32],
     // D63 (§12.4): a callable parameter passed on to another callee's
     // parameter — it is invoked as often as that parameter is. Six ints per
     // record: caller sig, caller param index, callee sig, callee param index,
     // argument node, callee sym. Judged after the effect fixpoint.
-    deferred_callable_forwards: Vec[i32],
-    binding_view_dep_data: Vec[i32],
+    deferred_callable_forwards: List[i32],
+    binding_view_dep_data: List[i32],
     // D65 phase 3 (#1647): Sema's category of each `let` it bound as a
     // view, by let node: 1 = a reference value (`&T`), 2 = a view of a
     // place (a recorded view projection or a field view, D22/D27). MIR
@@ -2015,17 +2015,17 @@ pub type Sema {
     expr_view_into_temporary: HashMap[i32, i32],
     expr_view_dep_starts: HashMap[i32, i32],
     expr_view_dep_counts: HashMap[i32, i32],
-    expr_view_dep_data: Vec[i32],
-    alloc_site_nodes: Vec[i32],
-    alloc_site_kinds: Vec[i32],
-    alloc_site_fn_syms: Vec[i32],
-    alloc_site_elided: Vec[i32],
+    expr_view_dep_data: List[i32],
+    alloc_site_nodes: List[i32],
+    alloc_site_kinds: List[i32],
+    alloc_site_fn_syms: List[i32],
+    alloc_site_elided: List[i32],
     current_no_alloc_depth: i32,
     current_fn_may_alloc: i32,
     // #1941: calls recorded while bodies are checked, resolved once every
     // body has published whether it allocates (resolve_allocating_callees).
     // Stride 5: owner fn, callee fn, call node, in @[no_alloc] context, file.
-    alloc_callee_calls: Vec[i32],
+    alloc_callee_calls: List[i32],
     alloc_callee_calls_resolved: i32,
     current_fn_symbol: i32,
     // #1983: the specialization whose body is being checked (its mono
@@ -2053,7 +2053,7 @@ pub type Sema {
     // Current state
     source_text: str,
     tracked_input_root: str,
-    tracked_input_paths: Vec[str],
+    tracked_input_paths: List[str],
     current_return_type: TypeId,
     current_gen_yield_type: TypeId,
     has_gen_yield_type: i32,
@@ -2121,7 +2121,7 @@ pub type Sema {
     body_decl_by_fn: HashMap[i32, i32],
     // Calls checked against such a placeholder: (node, sig, callee symbol, file)
     // in fours. Whether the placeholder was wrong is known once every body is typed.
-    untyped_callee_calls: Vec[i32],
+    untyped_callee_calls: List[i32],
     // The statement a block is checking: its value is discarded, so a callee
     // that is not typed yet costs a call in that position nothing.
     discarded_stmt_node: i32,
@@ -2130,8 +2130,8 @@ pub type Sema {
     // take their type from their body (#1196) or return a view whose origins
     // their body decides (#1473), declaration index by name symbol, with
     // same-name declarations chained through body_typed_next.
-    body_order_state: Vec[i32],
-    body_order_lower: Vec[i32],
+    body_order_state: List[i32],
+    body_order_lower: List[i32],
     // §9.5 (#1930): the struct or union declaration whose fields are in scope
     // by bare name in the body being checked (AstPool.receiver_field_owner),
     // 0 outside its own module's instance methods; and the field names a
@@ -2146,7 +2146,7 @@ pub type Sema {
     // the intrinsic, whatever else the bare name names here.
     builtins_intrinsic_nodes: HashMap[i32, i32],
     body_typed_decls: HashMap[i32, i32],
-    body_typed_next: Vec[i32],
+    body_typed_next: List[i32],
     // §13.6a: one for-comprehension's desugar (AstPool.build_comprehension_match)
     // is a chain from its outermost clause match (the root): the inner clause
     // matches and the yield wrap `_Payload(E)` map to the root, and the root to
@@ -2185,10 +2185,10 @@ pub type Sema {
     in_negated_literal_context: i32,
     // Active lexical unsafe blocks: 0 unused, 1 definite unsafe operation,
     // 2 a global read whose need depends on completed mutation facts.
-    unsafe_scope_used: Vec[i32],
-    unsafe_scope_nodes: Vec[i32],
-    unsafe_global_scope_reads: Vec[i32], // [unsafe block node, global symbol]
-    deferred_unsafe_global_scopes: Vec[i32],
+    unsafe_scope_used: List[i32],
+    unsafe_scope_nodes: List[i32],
+    unsafe_global_scope_reads: List[i32], // [unsafe block node, global symbol]
+    deferred_unsafe_global_scopes: List[i32],
     unsafe_global_scopes_resolved: i32,
     break_value_type: TypeId,
     has_break_value_type: i32,
@@ -2197,18 +2197,18 @@ pub type Sema {
     // iterated place lasts the whole loop (the compiler-inserted iterator
     // reads it on every iteration), so it never expires at a lexical last use.
     // for_view_binding_depths[i] is the loop_depth of that loop's body.
-    for_view_binding_syms: Vec[i32],
-    for_view_binding_depths: Vec[i32],
+    for_view_binding_syms: List[i32],
+    for_view_binding_depths: List[i32],
     // D69 (#1734): 1 when the entry is a generator value's view held across
     // a loop over it — the generator runs while the body runs, so no
     // mutation of the viewed place in the body is harmless.
-    for_view_binding_gen_loops: Vec[i32],
+    for_view_binding_gen_loops: List[i32],
     // D69 (#1734): the places a generator call's view arguments name (the
     // referent of `&x`, a view argument, a borrowed receiver), keyed by the
     // call node: gen_call_view_place_nodes[start..start+count].
     gen_call_view_place_starts: HashMap[i32, i32],
     gen_call_view_place_counts: HashMap[i32, i32],
-    gen_call_view_place_nodes: Vec[i32],
+    gen_call_view_place_nodes: List[i32],
     stmt_pos_depth: i32,
     current_statement_expr_root: i32,
     current_value_expr_root: i32,
@@ -2253,45 +2253,45 @@ pub type Sema {
 
     // Per-module scoping: tracks which module each declaration belongs to
     // and which symbols are visible in each module context.
-    decl_source_paths: Vec[str],     // one path per decl index (from Frontend)
+    decl_source_paths: List[str],     // one path per decl index (from Frontend)
     // D100 (§18.4): module path -> package key, from the Zcu (it can probe
     // for with.toml; Sema reads no files).
     package_keys: HashMap[str, str],
-    decl_source_file_ids: Vec[i32],  // one file id per decl index (from Frontend)
+    decl_source_file_ids: List[i32],  // one file id per decl index (from Frontend)
     module_path_by_file: HashMap[i32, str], // #1362: file id -> declaring module path (lazy)
-    decl_is_c_import: Vec[i32],      // 0 unless the decl came from a c_import; then 1 + the byte offset of that `use c_import` in its module (#1221: import order)
-    source_text_file_ids: Vec[i32],  // imported/extra source text file ids
-    source_text_names: Vec[str],     // source display names aligned with source_text_file_ids
-    source_texts: Vec[str],          // source buffers aligned with source_text_file_ids
-    source_line_offsets: Vec[Vec[i32]], // root first, then one index per source_texts entry
+    decl_is_c_import: List[i32],      // 0 unless the decl came from a c_import; then 1 + the byte offset of that `use c_import` in its module (#1221: import order)
+    source_text_file_ids: List[i32],  // imported/extra source text file ids
+    source_text_names: List[str],     // source display names aligned with source_text_file_ids
+    source_texts: List[str],          // source buffers aligned with source_text_file_ids
+    source_line_offsets: List[List[i32]], // root first, then one index per source_texts entry
     current_module_path: str,        // module path being checked right now
     tool_mode_entry_path: str,        // compiler-generated tool runner allowed to mint capabilities
-    module_paths: Vec[str],          // resolved module graph paths
-    module_import_starts: Vec[i32],  // per-module start into module_import_targets
-    module_import_counts: Vec[i32],  // per-module import edge count
-    module_import_targets: Vec[i32], // flattened target module indices
-    module_import_paths: Vec[str],   // flattened import path text aligned with module_import_targets
-    module_import_selected: Vec[str], // aligned: the names a named import selects ("X,Y"), "" for a whole module (#1221)
-    module_import_offsets: Vec[i32], // aligned: the `use`'s byte offset in its module — §18.2's import order (#1221)
+    module_paths: List[str],          // resolved module graph paths
+    module_import_starts: List[i32],  // per-module start into module_import_targets
+    module_import_counts: List[i32],  // per-module import edge count
+    module_import_targets: List[i32], // flattened target module indices
+    module_import_paths: List[str],   // flattened import path text aligned with module_import_targets
+    module_import_selected: List[str], // aligned: the names a named import selects ("X,Y"), "" for a whole module (#1221)
+    module_import_offsets: List[i32], // aligned: the `use`'s byte offset in its module — §18.2's import order (#1221)
     // D70 (§18.2): every import's namespace, c_imports included — parallel.
-    ns_modules: Vec[i32],   // the importing module's index
-    ns_names: Vec[str],     // the namespace name (`math`, `raylib`, an `as` name)
-    ns_fulls: Vec[str],     // the module's dotted path (`std.math`), "" for a c_import
-    ns_targets: Vec[i32],   // the imported module's index, -1 for a c_import
-    ns_offsets: Vec[i32],   // the import's byte offset in its module
+    ns_modules: List[i32],   // the importing module's index
+    ns_names: List[str],     // the namespace name (`math`, `raylib`, an `as` name)
+    ns_fulls: List[str],     // the module's dotted path (`std.math`), "" for a c_import
+    ns_targets: List[i32],   // the imported module's index, -1 for a c_import
+    ns_offsets: List[i32],   // the import's byte offset in its module
     module_index_by_path: HashMap[str, i32],   // path -> module index
     bundle_corpus: str,              // D39: the --bundle-corpus root, "" outside a bundle lane
     global_visible_module_paths: HashMap[str, i32], // prelude-visible modules
     engine_module_corpus: HashMap[str, i32], // #1362: engine corpus module path -> corpus id
     corpus_private_modules: HashMap[str, i32], // #2248: std modules loaded only through a corpus's own imports
     module_visibility_cache: HashMap[str, i32], // "from->to" -> visibility
-    named_type_candidate_syms: Vec[i32],       // every registered named type symbol
-    named_type_candidate_tids: Vec[i32],       // parallel type id for candidate
-    named_type_candidate_paths: Vec[str],      // defining module path or "" for global
-    named_type_candidate_pub: Vec[i32],        // parallel public flag
-    named_type_candidate_ci: Vec[i32],         // parallel: 1 when a c_import expansion declared it
+    named_type_candidate_syms: List[i32],       // every registered named type symbol
+    named_type_candidate_tids: List[i32],       // parallel type id for candidate
+    named_type_candidate_paths: List[str],      // defining module path or "" for global
+    named_type_candidate_pub: List[i32],        // parallel public flag
+    named_type_candidate_ci: List[i32],         // parallel: 1 when a c_import expansion declared it
     named_type_candidate_heads: HashMap[i32, i32], // symbol -> newest candidate index
-    named_type_candidate_next: Vec[i32],       // previous candidate for the same symbol
+    named_type_candidate_next: List[i32],       // previous candidate for the same symbol
     // #1457: type names declared in more than one source file. A method of
     // such a type carries its declaration: its symbol and its method-table
     // key use the owner's identity symbol (`Name$m$<path hash>`, the way an
@@ -2304,16 +2304,16 @@ pub type Sema {
     type_identity_tids: HashMap[i32, i32],     // identity symbol -> the declaration's TypeId
     type_identity_names: HashMap[i32, i32],    // identity symbol -> the declared name symbol
     impl_identity_traits: HashMap[i64, i32],   // pair(identity symbol, trait) -> 1: that declaration's direct impls
-    decl_visibility_syms: Vec[i32],            // top-level symbol visibility candidates
-    decl_visibility_paths: Vec[str],           // parallel declaring module path
-    decl_visibility_pub: Vec[i32],             // parallel public flag
-    decl_visibility_nodes: Vec[i32],           // parallel declaration node
+    decl_visibility_syms: List[i32],            // top-level symbol visibility candidates
+    decl_visibility_paths: List[str],           // parallel declaring module path
+    decl_visibility_pub: List[i32],             // parallel public flag
+    decl_visibility_nodes: List[i32],           // parallel declaration node
     decl_visibility_index: HashMap[i32, i32],  // symbol → its newest record; older records chain through decl_visibility_prev
-    decl_visibility_prev: Vec[i32],
+    decl_visibility_prev: List[i32],
     // #2249: the visibility explainer (`with analyze … explain:visible:<name>`):
     // every rule a verdict passed through, when on.
     visibility_explain_on: i32,
-    visibility_explain_log: Vec[str],
+    visibility_explain_log: List[str],
     // #2248: the evaluator's own message for the last `comptime if`
     // condition that did not evaluate, so the report names the cause (an
     // unimported type) instead of "not comptime-evaluable".
@@ -2323,10 +2323,10 @@ pub type Sema {
     // (`name$in$<module>`), chained per short name like decl_visibility.
     displaced_fn_index: HashMap[i32, i32],     // short symbol → its newest record
     displaced_fn_record_of: HashMap[i32, i32], // displaced symbol → its record
-    displaced_fn_syms: Vec[i32],               // displaced (module-qualified) symbol
-    displaced_fn_paths: Vec[str],              // parallel declaring module path
-    displaced_fn_pub: Vec[i32],                // parallel public flag
-    displaced_fn_prev: Vec[i32],               // older record for the same short name
+    displaced_fn_syms: List[i32],               // displaced (module-qualified) symbol
+    displaced_fn_paths: List[str],              // parallel declaring module path
+    displaced_fn_pub: List[i32],                // parallel public flag
+    displaced_fn_prev: List[i32],               // older record for the same short name
     displaced_global_syms: HashMap[i32, i32],  // #1703: displaced records that are module values, not fns
     // c_import scoping: tracks which symbols are c_import-origin
     ci_syms: HashMap[i32, i32],      // sym → 1 for c_import-origin symbols
@@ -2423,7 +2423,7 @@ fn sema_dirname(path: &str) -> str:
             last_slash = i
     if last_slash <= 0: "" else: path.slice(0, last_slash as i64)
 
-fn sema_vec_str_contains(v: &Vec[str], s: &str) -> i32:
+fn sema_list_str_contains(v: &List[str], s: &str) -> i32:
     for i in 0..v.len() as i32:
         if v[i] == s:
             return 1
@@ -2478,7 +2478,7 @@ fn sema_prelude_gate_allows_name(name: &str) -> i32:
         return 1
     if name == "Result" or name == "Ok" or name == "Err":
         return 1
-    if name == "Vec" or name == "String" or name == "str" or name == "Unit":
+    if name == "List" or name == "String" or name == "str" or name == "Unit":
         return 1
     if name == "Eq" or name == "Ord" or name == "Key" or name == "Debug":
         return 1
@@ -2573,7 +2573,7 @@ impl Sema:
         1
 
     fn symbol_requires_alloc_tier(sym: i32) -> i32:
-        if sym == self.syms.vec or sym == self.syms.hashmap or sym == self.syms.hashset or sym == self.syms.slotmap:
+        if sym == self.syms.list or sym == self.syms.hashmap or sym == self.syms.hashset or sym == self.syms.slotmap:
             return 1
         if self.type_symbol_is_std_box(sym) != 0:
             return 1
@@ -2636,12 +2636,12 @@ fn sema_new_map_str_i32 -> HashMap[str, i32]:
 pub fn sema_new_map_i64_i32 -> HashMap[i64, i32]:
     HashMap.new()
 
-pub fn sema_new_vec_str -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn sema_new_list_str -> List[str]:
+    let out: List[str] = List.new()
     out
 
-pub fn sema_new_vec_i32 -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+pub fn sema_new_list_i32 -> List[i32]:
+    let out: List[i32] = List.new()
     out
 
 pub fn sema_owned_text(text: &str) -> str:
@@ -2649,14 +2649,14 @@ pub fn sema_owned_text(text: &str) -> str:
         return ""
     with_str_clone_ref(text)
 
-pub fn sema_clone_str_vec(values: &Vec[str]) -> Vec[str]:
-    let out = sema_new_vec_str()
+pub fn sema_clone_str_list(values: &List[str]) -> List[str]:
+    let out = sema_new_list_str()
     for i in 0..values.len() as i32:
         out.push(sema_owned_text(values[i]))
     out
 
-pub fn sema_clone_i32_vec(values: &Vec[i32]) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+pub fn sema_clone_i32_list(values: &List[i32]) -> List[i32]:
+    let out: List[i32] = List.new()
     for i in 0..values.len() as i32:
         out.push(values[i])
     out
@@ -2676,11 +2676,11 @@ impl Sema:
         // Comptime callers replace `ast` before copying Sema. Rebuild this
         // owning map for that AST instead of sharing the source map header.
         self.rebuild_decl_index()
-        self.type_kinds = sema_clone_i32_vec(&self.type_kinds)
-        self.type_d0 = sema_clone_i32_vec(&self.type_d0)
-        self.type_d1 = sema_clone_i32_vec(&self.type_d1)
-        self.type_d2 = sema_clone_i32_vec(&self.type_d2)
-        self.type_extra = sema_clone_i32_vec(&self.type_extra)
+        self.type_kinds = sema_clone_i32_list(&self.type_kinds)
+        self.type_d0 = sema_clone_i32_list(&self.type_d0)
+        self.type_d1 = sema_clone_i32_list(&self.type_d1)
+        self.type_d2 = sema_clone_i32_list(&self.type_d2)
+        self.type_extra = sema_clone_i32_list(&self.type_extra)
         self.rebuild_exact_type_cache()
         self.rebuild_named_type_candidate_index()
         self.generic_inst_cache = sema_new_map_i64_i32()
@@ -2694,10 +2694,10 @@ impl Sema:
         self.generic_struct_field_index_type_cache = sema_new_map_i64_i32()
         self.generic_enum_payload_cache_starts = sema_new_map_i64_i32()
         self.generic_enum_payload_cache_counts = sema_new_map_i64_i32()
-        self.generic_enum_payload_cache_values = Vec.new()
-        self.generic_subst_param_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        self.generic_subst_type_ids = sema_clone_i32_vec(&self.generic_subst_type_ids)
-        self.source_text_file_ids = sema_clone_i32_vec(&self.source_text_file_ids)
+        self.generic_enum_payload_cache_values = List.new()
+        self.generic_subst_param_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        self.generic_subst_type_ids = sema_clone_i32_list(&self.generic_subst_type_ids)
+        self.source_text_file_ids = sema_clone_i32_list(&self.source_text_file_ids)
         // source_texts / source_text_names / tracked_input_paths are read-only during
         // comptime eval and are restored by the write-back in comptime_eval_finish, so
         // share them (shallow) instead of deep-cloning. Deep-cloning the full source
@@ -2733,7 +2733,7 @@ pub fn effect_prov_val_b(v: i64): (v % 268435456) as i32
 
 impl Sema:
     mut fn copy_module_graph_from(source: &Sema):
-        let global_paths = sema_new_vec_str()
+        let global_paths = sema_new_list_str()
         for mi in 0..source.module_paths.len() as i32:
             let source_path = source.module_paths[mi]
             if source.global_visible_module_paths.contains(source_path):
@@ -2746,20 +2746,20 @@ impl Sema:
 
     // D70: the import namespaces of `source`'s module graph.
     mut fn copy_import_namespaces(source: &Sema):
-        self.ns_modules = sema_clone_i32_vec(&source.ns_modules)
-        self.ns_names = sema_clone_str_vec(&source.ns_names)
-        self.ns_fulls = sema_clone_str_vec(&source.ns_fulls)
-        self.ns_targets = sema_clone_i32_vec(&source.ns_targets)
-        self.ns_offsets = sema_clone_i32_vec(&source.ns_offsets)
+        self.ns_modules = sema_clone_i32_list(&source.ns_modules)
+        self.ns_names = sema_clone_str_list(&source.ns_names)
+        self.ns_fulls = sema_clone_str_list(&source.ns_fulls)
+        self.ns_targets = sema_clone_i32_list(&source.ns_targets)
+        self.ns_offsets = sema_clone_i32_list(&source.ns_offsets)
 
-    mut fn copy_module_graph_parts(src_module_paths: &Vec[str], src_module_import_starts: &Vec[i32], src_module_import_counts: &Vec[i32], src_module_import_targets: &Vec[i32], src_module_import_paths: &Vec[str], src_module_import_selected: &Vec[str], src_module_import_offsets: &Vec[i32], global_paths: &Vec[str]):
-        self.module_paths = sema_new_vec_str()
-        self.module_import_starts = sema_new_vec_i32()
-        self.module_import_counts = sema_new_vec_i32()
-        self.module_import_targets = sema_new_vec_i32()
-        self.module_import_paths = sema_new_vec_str()
-        self.module_import_selected = sema_new_vec_str()
-        self.module_import_offsets = sema_new_vec_i32()
+    mut fn copy_module_graph_parts(src_module_paths: &List[str], src_module_import_starts: &List[i32], src_module_import_counts: &List[i32], src_module_import_targets: &List[i32], src_module_import_paths: &List[str], src_module_import_selected: &List[str], src_module_import_offsets: &List[i32], global_paths: &List[str]):
+        self.module_paths = sema_new_list_str()
+        self.module_import_starts = sema_new_list_i32()
+        self.module_import_counts = sema_new_list_i32()
+        self.module_import_targets = sema_new_list_i32()
+        self.module_import_paths = sema_new_list_str()
+        self.module_import_selected = sema_new_list_str()
+        self.module_import_offsets = sema_new_list_i32()
         self.module_index_by_path = sema_new_map_str_i32()
         self.global_visible_module_paths = sema_new_map_str_i32()
         self.module_visibility_cache = sema_new_map_str_i32()
@@ -2821,9 +2821,9 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         display_trait: 0,
         debug_trait: 0,
         self_type: 0,
-        vec: 0,
+        list: 0,
         fixed_string: 0,
-        veciter: 0,
+        listiter: 0,
         mapiter: 0,
         filteriter: 0,
         filtermapiter: 0,
@@ -2837,10 +2837,10 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         zipwithiter: 0,
         stepbyiter: 0,
         flatmapiter: 0,
-        vecslot: 0,
-        veciterplace: 0,
-        vecrange: 0,
-        veciterref: 0,
+        listslot: 0,
+        listiterplace: 0,
+        listrange: 0,
+        listiterref: 0,
         range_type: 0,
         range_inclusive_type: 0,
         iter_place: 0,
@@ -2982,7 +2982,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let local_type_names = sema_new_map_i32_i32()
     let ephemeral_types = sema_new_map_i32_i32()
     let sealed_traits = sema_new_map_i32_i32()
-    let sealed_impl_types: Vec[i32] = Vec.new()
+    let sealed_impl_types: List[i32] = List.new()
     let sealed_impl_starts = sema_new_map_i32_i32()
     let sealed_impl_counts = sema_new_map_i32_i32()
     let must_use_types = sema_new_map_i32_i32()
@@ -3018,11 +3018,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let global_value_decl_kinds = sema_new_map_i32_i32()
     let interface_global_index = sema_new_map_i32_i32()
     let interface_global_paths = sema_new_map_i32_str()
-    let interface_global_alt_syms = sema_new_vec_i32()
-    let interface_global_alt_binds = sema_new_vec_i32()
-    let interface_global_alt_paths = sema_new_vec_str()
-    let decl_is_iface = sema_new_vec_i32()
-    let decl_iface_demanded = sema_new_vec_i32()
+    let interface_global_alt_syms = sema_new_list_i32()
+    let interface_global_alt_binds = sema_new_list_i32()
+    let interface_global_alt_paths = sema_new_list_str()
+    let decl_is_iface = sema_new_list_i32()
+    let decl_iface_demanded = sema_new_list_i32()
     let iface_mentioned = sema_new_map_i32_i32()
     let global_value_decl_paths = sema_new_map_i32_str()
     let global_value_decl_bindings = sema_new_map_i32_i32()
@@ -3034,11 +3034,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let method_has_inherent = sema_new_map_i32_i32()
     let method_symbol_flags = sema_new_map_i32_i32()
     let method_lookup = sema_method_lookup_new()
-    let extension_method_owner_syms = sema_new_vec_i32()
-    let extension_method_syms = sema_new_vec_i32()
-    let extension_method_fn_syms = sema_new_vec_i32()
-    let extension_method_sig_idxs = sema_new_vec_i32()
-    let extension_method_paths = sema_new_vec_str()
+    let extension_method_owner_syms = sema_new_list_i32()
+    let extension_method_syms = sema_new_list_i32()
+    let extension_method_fn_syms = sema_new_list_i32()
+    let extension_method_sig_idxs = sema_new_list_i32()
+    let extension_method_paths = sema_new_list_str()
     let qualified_extension_call_nodes = sema_new_map_i32_i32()
     let drop_method_cache = sema_new_map_i32_i32()
     let liveness_byte_cache = sema_new_map_i32_i32()
@@ -3069,61 +3069,61 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let generic_struct_field_index_type_cache = sema_new_map_i64_i32()
     let generic_enum_payload_cache_starts = sema_new_map_i64_i32()
     let generic_enum_payload_cache_counts = sema_new_map_i64_i32()
-    let generic_enum_payload_cache_values: Vec[i32] = Vec.new()
+    let generic_enum_payload_cache_values: List[i32] = List.new()
     var s = Sema {
         pool: pool,
         diags: diags,
         ast: ast,
         decl_index_by_node: sema_new_map_i32_i32(),
-        type_kinds: Vec.new(),
-        type_d0: Vec.new(),
-        type_d1: Vec.new(),
-        type_d2: Vec.new(),
-        type_extra: Vec.new(),
+        type_kinds: List.new(),
+        type_d0: List.new(),
+        type_d1: List.new(),
+        type_d2: List.new(),
+        type_extra: List.new(),
         exact_type_cache_heads,
-        exact_type_cache_next: Vec.new(),
+        exact_type_cache_next: List.new(),
         named_types,
         type_decl_nodes,
         trait_decl_node_cache,
         type_decl_tids,
         impl_decl_target_types: sema_new_map_i32_i32(),
-        cycle_dep_syms: Vec.new(),
-        cycle_dep_nodes: Vec.new(),
+        cycle_dep_syms: List.new(),
+        cycle_dep_nodes: List.new(),
         pretty_symbol_names,
-        sig_names: Vec.new(),
+        sig_names: List.new(),
         sig_text_index: sema_new_map_str_i32(),
-        sig_text_prev: Vec.new(),
-        sig_type_ids: Vec.new(),
-        sig_ret_types: Vec.new(),
-        sig_param_starts: Vec.new(),
-        sig_param_counts: Vec.new(),
-        sig_variadic: Vec.new(),
-        sig_params: Vec.new(),
+        sig_text_prev: List.new(),
+        sig_type_ids: List.new(),
+        sig_ret_types: List.new(),
+        sig_param_starts: List.new(),
+        sig_param_counts: List.new(),
+        sig_variadic: List.new(),
+        sig_params: List.new(),
         sig_lookup,
         extern_decl_sigs: sema_new_map_i32_i32(),
-        sig_param_effects: Vec.new(),
-        sig_param_direct_effects: Vec.new(),
-        sig_param_view_origins: Vec.new(),
-        sig_param_view_through: Vec.new(),
-        sig_param_invoke_many: Vec.new(),
+        sig_param_effects: List.new(),
+        sig_param_direct_effects: List.new(),
+        sig_param_view_origins: List.new(),
+        sig_param_view_through: List.new(),
+        sig_param_invoke_many: List.new(),
         fn_param_invocations: sema_new_map_i32_i32(),
         fn_param_many_nodes: sema_new_map_i32_i32(),
-        sig_param_eff_starts: Vec.new(),
-        sig_value_ref_abi_params: Vec.new(),
-        mres_nodes: Vec.new(),
-        mres_recv_types: Vec.new(),
-        mres_owner_syms: Vec.new(),
-        mres_method_syms: Vec.new(),
-        mres_sigs: Vec.new(),
-        mres_fn_syms: Vec.new(),
-        mres_flags: Vec.new(),
-        mres_cands_total: Vec.new(),
-        mres_cands_visible: Vec.new(),
-        sig_receiver_modes: Vec.new(),
-        sig_receiver_required_effects: Vec.new(),
-        effect_flow_edges: Vec.new(),
-        effect_flow_projections: Vec.new(),
-        consume_call_sites: Vec.new(),
+        sig_param_eff_starts: List.new(),
+        sig_value_ref_abi_params: List.new(),
+        mres_nodes: List.new(),
+        mres_recv_types: List.new(),
+        mres_owner_syms: List.new(),
+        mres_method_syms: List.new(),
+        mres_sigs: List.new(),
+        mres_fn_syms: List.new(),
+        mres_flags: List.new(),
+        mres_cands_total: List.new(),
+        mres_cands_visible: List.new(),
+        sig_receiver_modes: List.new(),
+        sig_receiver_required_effects: List.new(),
+        effect_flow_edges: List.new(),
+        effect_flow_projections: List.new(),
+        consume_call_sites: List.new(),
         binding_use_seq: 0,
         binding_use_epoch: 0,
         binding_epoch_counter: 0,
@@ -3131,21 +3131,21 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_value_ident_nodes: HashMap.new(),
         const_global_syms: HashMap.new(),
         untyped_const_decls: HashMap.new(),
-        untyped_const_alt_decls: Vec.new(),
+        untyped_const_alt_decls: List.new(),
         untyped_const_uses: HashMap.new(),
         store_follows_operands: 0,
         collect_field_demands: 0,
-        inferred_field_nodes: Vec.new(),
-        inferred_field_aliases: Vec.new(),
-        inferred_field_paths: Vec.new(),
-        field_demand_fields: Vec.new(),
-        field_demand_types: Vec.new(),
-        field_demand_uses: Vec.new(),
-        field_decisions: Vec.new(),
-        literal_demands: Vec.new(),
-        fn_literal_lets: Vec.new(),
+        inferred_field_nodes: List.new(),
+        inferred_field_aliases: List.new(),
+        inferred_field_paths: List.new(),
+        field_demand_fields: List.new(),
+        field_demand_types: List.new(),
+        field_demand_uses: List.new(),
+        field_decisions: List.new(),
+        literal_demands: List.new(),
+        fn_literal_lets: List.new(),
         literal_watermark: 0,
-        literal_decisions: Vec.new(),
+        literal_decisions: List.new(),
         field_last_use: HashMap.new(),
         effect_prov: HashMap.new(),
         effect_note_origin_node: 0,
@@ -3158,18 +3158,18 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         fn_decl_effective_syms,
         fn_decl_source_paths,
         fn_clause_group_lookup,
-        fn_clause_group_names: Vec.new(),
-        fn_clause_group_starts: Vec.new(),
-        fn_clause_group_counts: Vec.new(),
-        fn_clause_group_decls: Vec.new(),
+        fn_clause_group_names: List.new(),
+        fn_clause_group_starts: List.new(),
+        fn_clause_group_counts: List.new(),
+        fn_clause_group_decls: List.new(),
         fn_clause_body_dispatch,
         task_param_consumed_memo: sema_new_map_i64_i32(),
         task_param_consumed_visiting: sema_new_map_i64_i32(),
         detached_task_stmt_nodes: sema_new_map_i32_i32(),
         generic_fn_nodes,
         generic_fn_candidate_counts,
-        generic_fn_candidate_syms: Vec.new(),
-        generic_fn_candidate_nodes: Vec.new(),
+        generic_fn_candidate_syms: List.new(),
+        generic_fn_candidate_nodes: List.new(),
         resolved_generic_call_nodes: sema_new_map_i32_i32(),
         extension_method_owner_syms,
         extension_method_syms,
@@ -3182,7 +3182,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         imported_variant_owners,
         disc_repr_types,
         disc_value_starts: sema_new_map_i32_i32(),
-        disc_value_list: Vec.new(),
+        disc_value_list: List.new(),
         disc_has_payload,
         bitpacked_types: sema_new_map_i32_i32(),
         packed_types: sema_new_map_i32_i32(),
@@ -3191,35 +3191,35 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         unsafe_fn_type_set: sema_new_map_i32_i32(),
         variadic_fn_type_set: sema_new_map_i32_i32(),
         union_last_written: sema_new_map_i32_i32(),
-        union_tracked_syms: Vec.new(),
+        union_tracked_syms: List.new(),
         union_in_assign_target: 0,
         dyn_impl_starts: HashMap.new(),
         dyn_impl_counts: HashMap.new(),
-        dyn_impl_flat_method_names: Vec.new(),
-        dyn_impl_flat_sigs: Vec.new(),
-        dyn_impl_flat_mono_syms: Vec.new(),
-        trait_method_names: Vec.new(),
-        trait_method_starts: Vec.new(),
-        trait_method_counts: Vec.new(),
-        trait_method_flags: Vec.new(),
-        trait_method_param_starts: Vec.new(),
-        trait_method_param_counts: Vec.new(),
-        trait_method_ret_nodes: Vec.new(),
-        trait_method_default_bodies: Vec.new(),
-        trait_name_syms: Vec.new(),
+        dyn_impl_flat_method_names: List.new(),
+        dyn_impl_flat_sigs: List.new(),
+        dyn_impl_flat_mono_syms: List.new(),
+        trait_method_names: List.new(),
+        trait_method_starts: List.new(),
+        trait_method_counts: List.new(),
+        trait_method_flags: List.new(),
+        trait_method_param_starts: List.new(),
+        trait_method_param_counts: List.new(),
+        trait_method_ret_nodes: List.new(),
+        trait_method_default_bodies: List.new(),
+        trait_name_syms: List.new(),
         trait_lookup,
-        trait_tp_starts: Vec.new(),
-        trait_tp_counts: Vec.new(),
-        trait_tp_syms: Vec.new(),
-        trait_assoc_names: Vec.new(),
-        trait_assoc_defaults: Vec.new(),
-        trait_assoc_starts: Vec.new(),
-        trait_assoc_counts: Vec.new(),
-        trait_assoc_bound_syms: Vec.new(),
-        trait_assoc_bound_starts: Vec.new(),
-        trait_assoc_bound_counts: Vec.new(),
-        impl_extra: Vec.new(),
-        impl_extra_is_std: Vec.new(),
+        trait_tp_starts: List.new(),
+        trait_tp_counts: List.new(),
+        trait_tp_syms: List.new(),
+        trait_assoc_names: List.new(),
+        trait_assoc_defaults: List.new(),
+        trait_assoc_starts: List.new(),
+        trait_assoc_counts: List.new(),
+        trait_assoc_bound_syms: List.new(),
+        trait_assoc_bound_starts: List.new(),
+        trait_assoc_bound_counts: List.new(),
+        impl_extra: List.new(),
+        impl_extra_is_std: List.new(),
         type_decl_nodes_by_tid: HashMap.new(),
         pub_field_keys: HashSet[i64].new(),
         zeroed_call_nodes: HashSet[i32].new(),
@@ -3231,20 +3231,20 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         type_tid_is_std: HashMap.new(),
         generic_inst_templates: HashMap.new(),
         type_sym_tier_mask: HashMap.new(),
-        impl_starts: Vec.new(),
-        impl_counts: Vec.new(),
-        impl_type_syms: Vec.new(),
+        impl_starts: List.new(),
+        impl_counts: List.new(),
+        impl_type_syms: List.new(),
         impl_lookup,
         impl_generic_inst: HashMap.new(),
-        blanket_trait_syms: Vec.new(),
-        blanket_bound_syms: Vec.new(),
-        blanket_bound_starts: Vec.new(),
-        blanket_bound_counts: Vec.new(),
-        blanket_target_base_syms: Vec.new(),
-        blanket_impl_nodes: Vec.new(),
-        obligation_trait_syms: Vec.new(),
-        obligation_type_syms: Vec.new(),
-        obligation_nodes: Vec.new(),
+        blanket_trait_syms: List.new(),
+        blanket_bound_syms: List.new(),
+        blanket_bound_starts: List.new(),
+        blanket_bound_counts: List.new(),
+        blanket_target_base_syms: List.new(),
+        blanket_impl_nodes: List.new(),
+        obligation_trait_syms: List.new(),
+        obligation_type_syms: List.new(),
+        obligation_nodes: List.new(),
         selection_cache,
         blanket_guard: HashSet.new(),
         local_trait_names,
@@ -3299,45 +3299,45 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         interface_eager: 0,
         global_value_decl_paths,
         global_value_decl_bindings,
-        shadowed_global_syms: Vec.new(),
-        shadowed_global_indices: Vec.new(),
-        global_race_access_syms: Vec.new(),
-        global_race_access_nodes: Vec.new(),
-        global_race_access_files: Vec.new(),
-        global_race_access_paths: sema_new_vec_str(),
-        global_race_access_kinds: Vec.new(),
-        global_race_access_unsafe: Vec.new(),
+        shadowed_global_syms: List.new(),
+        shadowed_global_indices: List.new(),
+        global_race_access_syms: List.new(),
+        global_race_access_nodes: List.new(),
+        global_race_access_files: List.new(),
+        global_race_access_paths: sema_new_list_str(),
+        global_race_access_kinds: List.new(),
+        global_race_access_unsafe: List.new(),
         global_race_mutated_syms,
         global_race_mutation_nodes,
         global_race_concurrency_node: 0,
         global_race_concurrency_file: 0,
         global_race_concurrency_reason: "",
-        global_write_records: Vec.new(),
-        global_calls: Vec.new(),
-        global_call_targets: Vec.new(),
-        global_call_bindings: Vec.new(),
-        global_view_call_checks: Vec.new(),
+        global_write_records: List.new(),
+        global_calls: List.new(),
+        global_call_targets: List.new(),
+        global_call_bindings: List.new(),
+        global_view_call_checks: List.new(),
         current_effect_body: -1,
         fn_value_ident_sigs: sema_new_map_i32_i32(),
         global_dispatchers_expanded: 0,
-        global_drop_impl_targets: Vec.new(),
-        global_drop_impl_contexts: Vec.new(),
+        global_drop_impl_targets: List.new(),
+        global_drop_impl_contexts: List.new(),
         declared_write_starts: sema_new_map_i32_i32(),
-        declared_write_syms_flat: Vec.new(),
+        declared_write_syms_flat: List.new(),
         ret_global_origin_heads: sema_new_map_i32_i32(),
-        ret_global_origin_entries: Vec.new(),
+        ret_global_origin_entries: List.new(),
         declared_from_starts: sema_new_map_i32_i32(),
-        declared_from_flat: Vec.new(),
+        declared_from_flat: List.new(),
         ret_origin_placeholder_sigs: sema_new_map_i32_i32(),
         ret_origin_placeholder_syms: sema_new_map_i32_i32(),
-        ret_global_origin_sigs: Vec.new(),
-        ret_view_placeholder_writes: Vec.new(),
-        ret_view_placeholder_diags: Vec.new(),
-        declared_from_checks: Vec.new(),
-        global_dispatchers: Vec.new(),
+        ret_global_origin_sigs: List.new(),
+        ret_view_placeholder_writes: List.new(),
+        ret_view_placeholder_diags: List.new(),
+        declared_from_checks: List.new(),
+        global_dispatchers: List.new(),
         global_dispatcher_heads: sema_new_map_i32_i32(),
-        global_dispatcher_next: Vec.new(),
-        global_callable_values: Vec.new(),
+        global_dispatcher_next: List.new(),
+        global_callable_values: List.new(),
         global_consumed_args: sema_new_map_i32_i32(),
         current_fn_bind_start: 0,
         global_user_drop_types: sema_new_map_i32_i32(),
@@ -3361,91 +3361,91 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         pattern_bind_mut: 0,
         drop_control_flow_depth: 0,
         move_control_flow_depth: 0,
-        move_control_flow_binding_starts: Vec.new(),
-        move_control_flow_supports_drop_flags: Vec.new(),
-        drop_consumed_field_owner_syms: Vec.new(),
-        drop_consumed_field_syms: Vec.new(),
-        bind_names: Vec.new(),
-        bind_types: Vec.new(),
-        bind_muts: Vec.new(),
-        bind_states: Vec.new(),
-        moved_field_base_syms: Vec.new(),
+        move_control_flow_binding_starts: List.new(),
+        move_control_flow_supports_drop_flags: List.new(),
+        drop_consumed_field_owner_syms: List.new(),
+        drop_consumed_field_syms: List.new(),
+        bind_names: List.new(),
+        bind_types: List.new(),
+        bind_muts: List.new(),
+        bind_states: List.new(),
+        moved_field_base_syms: List.new(),
         explicitly_partial_syms: sema_new_map_i32_i32(),
         field_move_diag_nodes: sema_new_map_i32_i32(),
         optional_chain_observing_nodes: sema_new_map_i32_i32(),
         marking_explicit_move: 0,
-        moved_field_path_starts: Vec.new(),
-        moved_field_path_counts: Vec.new(),
-        moved_field_path_syms: Vec.new(),
-        bind_is_task: Vec.new(),
-        bind_task_used: Vec.new(),
-        bind_is_scoped_task: Vec.new(),
-        bind_is_view_bound: Vec.new(),
-        bind_provenance: Vec.new(),
+        moved_field_path_starts: List.new(),
+        moved_field_path_counts: List.new(),
+        moved_field_path_syms: List.new(),
+        bind_is_task: List.new(),
+        bind_task_used: List.new(),
+        bind_is_scoped_task: List.new(),
+        bind_is_view_bound: List.new(),
+        bind_provenance: List.new(),
         binding_decl_nodes: sema_new_map_i32_i32(),
         binding_value_nodes: sema_new_map_i32_i32(),
         discard_lets: sema_new_map_i32_i32(),
-        scope_starts: Vec.new(),
+        scope_starts: List.new(),
         scope_name_map: HashMap.new(),
         pending_generic_binding_base: sema_new_map_i32_i32(),
         pending_generic_binding_call: sema_new_map_i32_i32(),
         pending_generic_binding_decl: sema_new_map_i32_i32(),
-        async_scope_names: Vec.new(),
-        sync_scope_names: Vec.new(),
-        label_syms: Vec.new(),
-        label_kinds: Vec.new(),
-        label_nodes: Vec.new(),
-        label_break_value_types: Vec.new(),
-        label_loop_entry_binds: Vec.new(),
-        label_break_off: Vec.new(),
-        label_break_seen: Vec.new(),
+        async_scope_names: List.new(),
+        sync_scope_names: List.new(),
+        label_syms: List.new(),
+        label_kinds: List.new(),
+        label_nodes: List.new(),
+        label_break_value_types: List.new(),
+        label_loop_entry_binds: List.new(),
+        label_break_off: List.new(),
+        label_break_seen: List.new(),
         break_target_nodes: sema_new_map_i32_i32(),
-        loop_break_flat: Vec.new(),
-        loop_entry_flat: Vec.new(),
-        fn_label_syms: Vec.new(),
-        fn_label_nodes: Vec.new(),
-        fn_label_paths: sema_new_vec_str(),
-        fn_label_orders: Vec.new(),
-        fn_label_used: Vec.new(),
-        fn_goto_syms: Vec.new(),
-        fn_goto_nodes: Vec.new(),
-        fn_goto_paths: sema_new_vec_str(),
-        fn_goto_orders: Vec.new(),
-        fn_init_nodes: Vec.new(),
-        fn_init_paths: sema_new_vec_str(),
-        fn_init_orders: Vec.new(),
-        fn_label_scope_stack: Vec.new(),
+        loop_break_flat: List.new(),
+        loop_entry_flat: List.new(),
+        fn_label_syms: List.new(),
+        fn_label_nodes: List.new(),
+        fn_label_paths: sema_new_list_str(),
+        fn_label_orders: List.new(),
+        fn_label_used: List.new(),
+        fn_goto_syms: List.new(),
+        fn_goto_nodes: List.new(),
+        fn_goto_paths: sema_new_list_str(),
+        fn_goto_orders: List.new(),
+        fn_init_nodes: List.new(),
+        fn_init_paths: sema_new_list_str(),
+        fn_init_orders: List.new(),
+        fn_label_scope_stack: List.new(),
         fn_label_next_scope_id: 0,
         fn_label_order_counter: 0,
-        borrow_kinds: Vec.new(),
-        borrow_places: Vec.new(),
-        borrow_fields: Vec.new(),
-        borrow_refs: Vec.new(),
-        borrow_path_starts: Vec.new(),
-        borrow_path_counts: Vec.new(),
-        borrow_path_data: Vec.new(),
-        borrow_scope_depths: Vec.new(),
-        borrow_creation_nodes: Vec.new(),
+        borrow_kinds: List.new(),
+        borrow_places: List.new(),
+        borrow_fields: List.new(),
+        borrow_refs: List.new(),
+        borrow_path_starts: List.new(),
+        borrow_path_counts: List.new(),
+        borrow_path_data: List.new(),
+        borrow_scope_depths: List.new(),
+        borrow_creation_nodes: List.new(),
         current_block_extra_start: 0,
         current_block_stmt_count: 0,
         current_block_stmt_index: 0,
         current_block_tail: 0,
-        live_block_starts: Vec.new(),
-        live_block_counts: Vec.new(),
-        live_block_indexes: Vec.new(),
-        live_block_tails: Vec.new(),
-        live_block_depths: Vec.new(),
-        live_loop_nodes: Vec.new(),
-        live_loop_depths: Vec.new(),
-        live_loop_body_depths: Vec.new(),
+        live_block_starts: List.new(),
+        live_block_counts: List.new(),
+        live_block_indexes: List.new(),
+        live_block_tails: List.new(),
+        live_block_depths: List.new(),
+        live_loop_nodes: List.new(),
+        live_loop_depths: List.new(),
+        live_loop_body_depths: List.new(),
         live_block_floor: 0,
         live_loop_floor: 0,
-        live_floor_saved: Vec.new(),
-        capture_field_syms: Vec.new(),
-        capture_field_kinds: Vec.new(),
+        live_floor_saved: List.new(),
+        capture_field_syms: List.new(),
+        capture_field_kinds: List.new(),
         call_resolved_arg_starts: sema_new_map_i32_i32(),
         call_resolved_arg_counts: sema_new_map_i32_i32(),
-        call_resolved_args_data: Vec.new(),
+        call_resolved_args_data: List.new(),
         call_resolved_default_arg_keys: sema_new_map_i64_i32(),
         resolved_call_sigs: sema_new_map_i32_i32(),
         resolved_call_mono_syms: sema_new_map_i32_i32(),
@@ -3460,8 +3460,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         iter_next_sigs: sema_new_map_i32_i32(),
         iter_next_mono_syms: sema_new_map_i32_i32(),
         magic_ident_kinds: sema_new_map_i32_i32(),
-        implicit_binding_types: Vec.new(),
-        implicit_binding_syms: Vec.new(),
+        implicit_binding_types: List.new(),
+        implicit_binding_syms: List.new(),
         with_form_kinds: sema_new_map_i32_i32(),
         with_payload_types: sema_new_map_i32_i32(),
         with_enter_methods: sema_new_map_i32_i32(),
@@ -3470,15 +3470,15 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         with_enter_mono_syms: sema_new_map_i32_i32(),
         with_exit_sigs: sema_new_map_i32_i32(),
         with_exit_mono_syms: sema_new_map_i32_i32(),
-        no_await_guard_origin_roots: Vec.new(),
+        no_await_guard_origin_roots: List.new(),
         no_await_guard_scope_depth: 0,
         no_suspend_scope_depth: 0,
         comp_resolved: sema_new_map_i32_i32(),
-        name_use_nodes: sema_new_vec_i32(),
-        name_use_kinds: sema_new_vec_str(),
-        name_use_paths: sema_new_vec_str(),
-        name_use_names: sema_new_vec_str(),
-        name_use_from: sema_new_vec_str(),
+        name_use_nodes: sema_new_list_i32(),
+        name_use_kinds: sema_new_list_str(),
+        name_use_paths: sema_new_list_str(),
+        name_use_names: sema_new_list_str(),
+        name_use_from: sema_new_list_str(),
         comptime_selected_branches: sema_new_map_i32_i32(),
         pipeline_method_calls: sema_new_map_i32_i32(),
         pipeline_call_return_types: sema_new_map_i32_i32(),
@@ -3501,14 +3501,14 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         clone_contract_sigs: sema_new_map_i32_i32(),
         clone_contract_mono_syms: sema_new_map_i32_i32(),
         debug_fmt_index: sema_new_map_i32_i32(),
-        debug_fmt_tids: Vec.new(),
-        debug_fmt_kinds: Vec.new(),
-        debug_fmt_fns: Vec.new(),
-        debug_fmt_sigs: Vec.new(),
-        debug_fmt_monos: Vec.new(),
-        debug_fmt_aux_fns: Vec.new(),
-        debug_fmt_aux_sigs: Vec.new(),
-        debug_fmt_aux_monos: Vec.new(),
+        debug_fmt_tids: List.new(),
+        debug_fmt_kinds: List.new(),
+        debug_fmt_fns: List.new(),
+        debug_fmt_sigs: List.new(),
+        debug_fmt_monos: List.new(),
+        debug_fmt_aux_fns: List.new(),
+        debug_fmt_aux_sigs: List.new(),
+        debug_fmt_aux_monos: List.new(),
         debug_fmt_synth_syms: sema_new_map_i32_i32(),
         debug_fmt_probe_visiting: sema_new_map_i32_i32(),
         autoderef_step_starts: sema_new_map_i32_i32(),
@@ -3518,20 +3518,20 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         array_fill_counts: sema_new_map_i32_i32(),
         borrow_pointee_join_node: 0,
         contextual_copy_adjustment_indices: sema_new_map_i64_i32(),
-        contextual_copy_adjustments: Vec.new(),
+        contextual_copy_adjustments: List.new(),
         contextual_join_decision_indices: sema_new_map_i64_i32(),
-        contextual_join_decisions: Vec.new(),
-        contextual_join_arm_nodes: Vec.new(),
-        contextual_join_arm_origin_nodes: Vec.new(),
+        contextual_join_decisions: List.new(),
+        contextual_join_arm_nodes: List.new(),
+        contextual_join_arm_origin_nodes: List.new(),
         facade_resource_index: sema_new_map_i32_i32(),
-        facade_resources: Vec.new(),
+        facade_resources: List.new(),
         foreign_contract_index: sema_new_map_i32_i32(),
-        foreign_contracts: Vec.new(),
+        foreign_contracts: List.new(),
         facade_domains: sema_new_map_i32_i32(),
-        facade_domain_list: Vec.new(),
+        facade_domain_list: List.new(),
         facade_domain_index: sema_new_map_i32_i32(),
         facade_domain_origin_index: sema_new_map_i32_i32(),
-        facade_call_effects: Vec.new(),
+        facade_call_effects: List.new(),
         facade_call_effect_index: sema_new_map_i32_i32(),
         facade_touch_nodes: sema_new_map_i32_i32(),
         facade_touch_hit_params: sema_new_map_i32_i32(),
@@ -3545,37 +3545,37 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         precondition_form_calls: sema_new_map_i32_i32(),
         facade_variadic_ops: HashMap.new(),
         facade_variadic_method_names: sema_new_map_i32_i32(),
-        facade_layout_nodes: Vec.new(),
-        facade_layout_tids: Vec.new(),
-        facade_layout_containers: Vec.new(),
-        facade_layout_files: Vec.new(),
-        facade_layout_msgs: Vec.new(),
-        facade_convention_nodes: Vec.new(),
-        facade_callback_methods: Vec.new(),
+        facade_layout_nodes: List.new(),
+        facade_layout_tids: List.new(),
+        facade_layout_containers: List.new(),
+        facade_layout_files: List.new(),
+        facade_layout_msgs: List.new(),
+        facade_convention_nodes: List.new(),
+        facade_callback_methods: List.new(),
         facade_callback_method_index: sema_new_map_i32_i32(),
         facade_c_invoked_userdata: sema_new_map_i32_i32(),
-        facade_pair_ops: Vec.new(),
+        facade_pair_ops: List.new(),
         facade_pair_op_by_sig: sema_new_map_i32_i32(),
         facade_pair_setter_contract: sema_new_map_i32_i32(),
         facade_pair_setter_case: sema_new_map_i32_i32(),
         facade_pair_resources: sema_new_map_i32_i32(),
         facade_pair_retainers: sema_new_map_i32_i32(),
-        contextual_join_arm_types: Vec.new(),
-        contextual_join_arm_kinds: Vec.new(),
-        contextual_join_arm_roles: Vec.new(),
-        contextual_join_origin_deps: Vec.new(),
+        contextual_join_arm_types: List.new(),
+        contextual_join_arm_kinds: List.new(),
+        contextual_join_arm_roles: List.new(),
+        contextual_join_origin_deps: List.new(),
         in_param_type_position: 0,
-        autoderef_step_fns: Vec.new(),
-        autoderef_step_tys: Vec.new(),
+        autoderef_step_fns: List.new(),
+        autoderef_step_tys: List.new(),
         pattern_value_syms: sema_new_map_i32_i32(),
         consuming_pattern_subjects: sema_new_map_i32_i32(),
         owned_slice_patterns: sema_new_map_i32_i32(),
         slice_rest_types: sema_new_map_i32_i32(),
-        pattern_vec_removal: 0,
+        pattern_list_removal: 0,
         regex_capture_counts: sema_new_map_i32_i32(),
         regex_capture_name_starts: sema_new_map_i32_i32(),
         regex_capture_name_counts: sema_new_map_i32_i32(),
-        regex_capture_name_syms: Vec.new(),
+        regex_capture_name_syms: List.new(),
         typed_expr_types,
         typed_binding_types,
         call_callable_types,
@@ -3585,7 +3585,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         method_owner_keys: sema_new_map_i32_i32(),
         call_builtins: sema_new_map_i32_i32(),
         builtin_sig_index: HashMap.new(),
-        builtin_sig_modes: sema_new_vec_str(),
+        builtin_sig_modes: sema_new_list_str(),
         builtin_sig_owner_alias: sema_new_map_i32_i32(),
         builtin_call_sigs: sema_new_map_i32_i32(),
         offsetof_field_indices: sema_new_map_i32_i32(),
@@ -3597,7 +3597,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         impl_trait_arg_type_ids: sema_new_map_i32_i32(),
 
         c_promoted_arg_starts: sema_new_map_i32_i32(),
-        c_promoted_arg_data: Vec.new(),
+        c_promoted_arg_data: List.new(),
         unprototyped_sigs: sema_new_map_i32_i32(),
 
         fn_callable_values,
@@ -3624,36 +3624,36 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         callable_opaque_idents: sema_new_map_i32_i32(),
         callable_let_decls: sema_new_map_i32_i32(),
         callable_value_heads: sema_new_map_i32_i32(),
-        callable_value_nodes: Vec.new(),
-        callable_value_next: Vec.new(),
+        callable_value_nodes: List.new(),
+        callable_value_next: List.new(),
         callable_value_visiting: sema_new_map_i32_i32(),
         dyn_suspend_methods: HashMap.new(),
         suspend_call_sites: sema_new_map_i32_i32(),
         generator_state_fns: sema_new_map_i32_i32(),
         generator_local_view_yields: sema_new_map_i32_i32(),
         generator_local_view_origins: sema_new_map_i32_i32(),
-        gen_pull_nodes: Vec.new(),
+        gen_pull_nodes: List.new(),
         gen_pull_view_nodes: sema_new_map_i32_i32(),
         receiver_arg_call_nodes: sema_new_map_i32_i32(),
-        gen_pull_fns: Vec.new(),
+        gen_pull_fns: List.new(),
         eph_task_visiting: sema_new_map_i32_i32(),
         typed_dump_seen_nodes,
         typed_dump_visit_budget: 0,
-        generic_subst_param_syms: Vec.new(),
-        generic_subst_type_ids: Vec.new(),
+        generic_subst_param_syms: List.new(),
+        generic_subst_type_ids: List.new(),
         generic_specialization_cache,
         specialization_source_paths,
         concrete_specialization_by_sym: sema_new_map_i32_i32(),
-        concrete_specialization_nodes: Vec.new(),
-        concrete_specialization_syms: Vec.new(),
-        concrete_specialization_sigs: Vec.new(),
-        concrete_specialization_subst_starts: Vec.new(),
-        concrete_specialization_subst_counts: Vec.new(),
-        concrete_specialization_subst_syms: Vec.new(),
-        concrete_specialization_subst_types: Vec.new(),
-        concrete_specialization_param_starts: Vec.new(),
-        concrete_specialization_param_counts: Vec.new(),
-        concrete_specialization_param_types: Vec.new(),
+        concrete_specialization_nodes: List.new(),
+        concrete_specialization_syms: List.new(),
+        concrete_specialization_sigs: List.new(),
+        concrete_specialization_subst_starts: List.new(),
+        concrete_specialization_subst_counts: List.new(),
+        concrete_specialization_subst_syms: List.new(),
+        concrete_specialization_subst_types: List.new(),
+        concrete_specialization_param_starts: List.new(),
+        concrete_specialization_param_counts: List.new(),
+        concrete_specialization_param_types: List.new(),
         loop_iterable_node: 0,
         concrete_drop_sigs: sema_new_map_i32_i32(),
         concrete_drop_mono_syms: sema_new_map_i32_i32(),
@@ -3662,21 +3662,21 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         concrete_cmp_sigs: sema_new_map_i32_i32(),
         concrete_cmp_mono_syms: sema_new_map_i32_i32(),
         concrete_key_sigs: sema_new_map_i32_i32(),
-        view_fact_fns: Vec.new(),
-        view_fact_syms: Vec.new(),
-        view_fact_nodes: Vec.new(),
-        view_fact_files: Vec.new(),
-        view_fact_events: Vec.new(),
-        view_fact_masks: Vec.new(),
-        view_fact_storage: Vec.new(),
-        view_fact_dep_starts: Vec.new(),
-        view_fact_dep_counts: Vec.new(),
-        view_fact_deps: Vec.new(),
-        param_view_fact_sigs: Vec.new(),
-        param_view_fact_params: Vec.new(),
-        param_view_fact_storage: Vec.new(),
-        param_view_fact_nodes: Vec.new(),
-        param_view_fact_files: Vec.new(),
+        view_fact_fns: List.new(),
+        view_fact_syms: List.new(),
+        view_fact_nodes: List.new(),
+        view_fact_files: List.new(),
+        view_fact_events: List.new(),
+        view_fact_masks: List.new(),
+        view_fact_storage: List.new(),
+        view_fact_dep_starts: List.new(),
+        view_fact_dep_counts: List.new(),
+        view_fact_deps: List.new(),
+        param_view_fact_sigs: List.new(),
+        param_view_fact_params: List.new(),
+        param_view_fact_storage: List.new(),
+        param_view_fact_nodes: List.new(),
+        param_view_fact_files: List.new(),
         concrete_key_mono_syms: sema_new_map_i32_i32(),
         generic_inst_cache,
         layout_size_cache,
@@ -3693,37 +3693,37 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         assoc_type_bindings: sema_new_map_i32_i32(),
         symbols_frozen: 0,
         types_frozen: 0,
-        current_fn_param_syms: Vec.new(),
-        current_fn_param_effs: Vec.new(),
-        current_fn_param_direct_effs: Vec.new(),
-        current_fn_param_origins: Vec.new(),
-        current_fn_param_storage_origins: Vec.new(),
-        current_fn_param_view_nodes: Vec.new(),
+        current_fn_param_syms: List.new(),
+        current_fn_param_effs: List.new(),
+        current_fn_param_direct_effs: List.new(),
+        current_fn_param_origins: List.new(),
+        current_fn_param_storage_origins: List.new(),
+        current_fn_param_view_nodes: List.new(),
         current_fn_sig_idx: -1,
         current_fn_variadic: 0,
         recording_propagated_effect: 0,
         closure_capture_summary_starts: sema_new_map_i32_i32(),
         closure_capture_summary_counts: sema_new_map_i32_i32(),
-        closure_capture_summary_data: Vec.new(),
+        closure_capture_summary_data: List.new(),
         binding_closure_nodes: sema_new_map_i32_i32(),
         callable_clone_nodes: sema_new_map_i32_i32(),
-        deferred_closure_arg_checks: Vec.new(),
-        deferred_callable_forwards: Vec.new(),
-        binding_view_dep_data: Vec.new(),
+        deferred_closure_arg_checks: List.new(),
+        deferred_callable_forwards: List.new(),
+        binding_view_dep_data: List.new(),
         view_bound_let_nodes: sema_new_map_i32_i32(),
         expr_view_param_origins: sema_new_map_i32_i32(),
         expr_view_storage_origins: sema_new_map_i32_i32(),
         expr_view_into_temporary: sema_new_map_i32_i32(),
         expr_view_dep_starts: sema_new_map_i32_i32(),
         expr_view_dep_counts: sema_new_map_i32_i32(),
-        expr_view_dep_data: Vec.new(),
-        alloc_site_nodes: Vec.new(),
-        alloc_site_kinds: Vec.new(),
-        alloc_site_fn_syms: Vec.new(),
-        alloc_site_elided: Vec.new(),
+        expr_view_dep_data: List.new(),
+        alloc_site_nodes: List.new(),
+        alloc_site_kinds: List.new(),
+        alloc_site_fn_syms: List.new(),
+        alloc_site_elided: List.new(),
         current_no_alloc_depth: 0,
         current_fn_may_alloc: 0,
-        alloc_callee_calls: Vec.new(),
+        alloc_callee_calls: List.new(),
         alloc_callee_calls_resolved: 0,
         current_fn_symbol: 0,
         current_specialization_sym: 0,
@@ -3735,7 +3735,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         field_access_owners: sema_new_map_i64_i32(),
         source_text: "",
         tracked_input_root: "",
-        tracked_input_paths: sema_new_vec_str(),
+        tracked_input_paths: sema_new_list_str(),
         current_return_type: 0,
         current_gen_yield_type: 0,
         has_gen_yield_type: 0,
@@ -3757,17 +3757,17 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         join_assign_arms_as_views: 0,
         body_typed_sigs: sema_new_map_i32_i32(),
         body_decl_by_fn: sema_new_map_i32_i32(),
-        untyped_callee_calls: Vec.new(),
+        untyped_callee_calls: List.new(),
         discarded_stmt_node: 0,
-        body_order_state: Vec.new(),
-        body_order_lower: Vec.new(),
+        body_order_state: List.new(),
+        body_order_lower: List.new(),
         receiver_field_owner: 0,
         receiver_field_shadowed: sema_new_map_i32_i32(),
         self_name_cache_path: "",
         self_name_cache: "",
         builtins_intrinsic_nodes: sema_new_map_i32_i32(),
         body_typed_decls: sema_new_map_i32_i32(),
-        body_typed_next: Vec.new(),
+        body_typed_next: List.new(),
         comprehension_chain_roots: sema_new_map_i32_i32(),
         comprehension_root_carriers: sema_new_map_i32_i32(),
         comprehension_root_err_types: sema_new_map_i32_i32(),
@@ -3791,20 +3791,20 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         in_unsafe: 0,
         in_bitwise_literal_context: 0,
         in_negated_literal_context: 0,
-        unsafe_scope_used: Vec.new(),
-        unsafe_scope_nodes: Vec.new(),
-        unsafe_global_scope_reads: Vec.new(),
-        deferred_unsafe_global_scopes: Vec.new(),
+        unsafe_scope_used: List.new(),
+        unsafe_scope_nodes: List.new(),
+        unsafe_global_scope_reads: List.new(),
+        deferred_unsafe_global_scopes: List.new(),
         unsafe_global_scopes_resolved: 0,
         break_value_type: 0,
         has_break_value_type: 0,
         loop_depth: 0,
-        for_view_binding_syms: Vec.new(),
-        for_view_binding_depths: Vec.new(),
-        for_view_binding_gen_loops: Vec.new(),
+        for_view_binding_syms: List.new(),
+        for_view_binding_depths: List.new(),
+        for_view_binding_gen_loops: List.new(),
         gen_call_view_place_starts: sema_new_map_i32_i32(),
         gen_call_view_place_counts: sema_new_map_i32_i32(),
-        gen_call_view_place_nodes: Vec.new(),
+        gen_call_view_place_nodes: List.new(),
         stmt_pos_depth: 0,
         current_statement_expr_root: 0,
         current_value_expr_root: 0,
@@ -3823,63 +3823,63 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         ty_cstr: 0, ty_cstr_view: 0,
         ty_usize: 0, ty_isize: 0, ty_c_va_list: 0, ty_const_i8_ptr: 0,
         ty_field_info: 0, ty_variant_info: 0,
-        decl_source_paths: sema_new_vec_str(),
+        decl_source_paths: sema_new_list_str(),
         package_keys: HashMap[str, str].new(),
-        decl_source_file_ids: Vec.new(),
+        decl_source_file_ids: List.new(),
         module_path_by_file: HashMap.new(),
-        decl_is_c_import: Vec.new(),
-        source_text_file_ids: Vec.new(),
-        source_text_names: sema_new_vec_str(),
-        source_texts: sema_new_vec_str(),
-        source_line_offsets: Vec.new(),
+        decl_is_c_import: List.new(),
+        source_text_file_ids: List.new(),
+        source_text_names: sema_new_list_str(),
+        source_texts: sema_new_list_str(),
+        source_line_offsets: List.new(),
         current_module_path: "",
         tool_mode_entry_path: "",
-        module_paths: sema_new_vec_str(),
-        module_import_starts: Vec.new(),
-        module_import_counts: Vec.new(),
-        module_import_targets: Vec.new(),
-        module_import_paths: sema_new_vec_str(),
-        module_import_selected: sema_new_vec_str(),
-        module_import_offsets: Vec.new(),
-        ns_modules: Vec.new(),
-        ns_names: sema_new_vec_str(),
-        ns_fulls: sema_new_vec_str(),
-        ns_targets: Vec.new(),
-        ns_offsets: Vec.new(),
+        module_paths: sema_new_list_str(),
+        module_import_starts: List.new(),
+        module_import_counts: List.new(),
+        module_import_targets: List.new(),
+        module_import_paths: sema_new_list_str(),
+        module_import_selected: sema_new_list_str(),
+        module_import_offsets: List.new(),
+        ns_modules: List.new(),
+        ns_names: sema_new_list_str(),
+        ns_fulls: sema_new_list_str(),
+        ns_targets: List.new(),
+        ns_offsets: List.new(),
         module_index_by_path: sema_new_map_str_i32(),
         bundle_corpus: "",
         global_visible_module_paths: sema_new_map_str_i32(),
         engine_module_corpus: sema_new_map_str_i32(),
         corpus_private_modules: sema_new_map_str_i32(),
         module_visibility_cache: sema_new_map_str_i32(),
-        named_type_candidate_syms: Vec.new(),
-        named_type_candidate_tids: Vec.new(),
-        named_type_candidate_paths: sema_new_vec_str(),
-        named_type_candidate_pub: Vec.new(),
-        named_type_candidate_ci: Vec.new(),
+        named_type_candidate_syms: List.new(),
+        named_type_candidate_tids: List.new(),
+        named_type_candidate_paths: sema_new_list_str(),
+        named_type_candidate_pub: List.new(),
+        named_type_candidate_ci: List.new(),
         named_type_candidate_heads: sema_new_map_i32_i32(),
-        named_type_candidate_next: Vec.new(),
+        named_type_candidate_next: List.new(),
         colliding_type_names: sema_new_map_i32_i32(),
         type_identity_syms: sema_new_map_i64_i32(),
         type_identity_tids: sema_new_map_i32_i32(),
         type_identity_names: sema_new_map_i32_i32(),
         impl_identity_traits: sema_new_map_i64_i32(),
-        decl_visibility_syms: Vec.new(),
-        decl_visibility_paths: sema_new_vec_str(),
-        decl_visibility_pub: Vec.new(),
-        decl_visibility_nodes: Vec.new(),
+        decl_visibility_syms: List.new(),
+        decl_visibility_paths: sema_new_list_str(),
+        decl_visibility_pub: List.new(),
+        decl_visibility_nodes: List.new(),
         decl_visibility_index: sema_new_map_i32_i32(),
         visibility_explain_on: 0,
-        visibility_explain_log: sema_new_vec_str(),
+        visibility_explain_log: sema_new_list_str(),
         comptime_truthy_error: "",
-        decl_visibility_prev: Vec.new(),
+        decl_visibility_prev: List.new(),
         decl_visibility_node_index: sema_new_map_i32_i32(),
         displaced_fn_index: sema_new_map_i32_i32(),
         displaced_fn_record_of: sema_new_map_i32_i32(),
-        displaced_fn_syms: Vec.new(),
-        displaced_fn_paths: sema_new_vec_str(),
-        displaced_fn_pub: Vec.new(),
-        displaced_fn_prev: Vec.new(),
+        displaced_fn_syms: List.new(),
+        displaced_fn_paths: sema_new_list_str(),
+        displaced_fn_pub: List.new(),
+        displaced_fn_prev: List.new(),
         displaced_global_syms: sema_new_map_i32_i32(),
         ci_syms: sema_new_map_i32_i32(),
         ci_raw_syms: sema_new_map_i32_i32(),
@@ -4010,10 +4010,10 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.ty_isize = s.add_type(TypeKind.TY_INT, 64, 1, 1)
     s.ty_c_va_list = s.add_type(TypeKind.TY_VA_LIST, 0, 0, 0)
     s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_i8, 0, 0)
-    let cstr_field_names: Vec[str] = Vec.new()
+    let cstr_field_names: List[str] = List.new()
     cstr_field_names.push("ptr")
     cstr_field_names.push("len")
-    let cstr_field_types: Vec[i32] = Vec.new()
+    let cstr_field_types: List[i32] = List.new()
     cstr_field_types.push(s.ty_const_i8_ptr as i32)
     cstr_field_types.push(s.ty_i64 as i32)
     s.ty_cstr = s.register_builtin_struct_type("CStr", cstr_field_names, cstr_field_types, 2) as TypeId
@@ -4025,9 +4025,9 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     // cannot be stored past them, and a borrowed `CStr` a facade returns is
     // kept inside its origin's life by the ordinary view analysis.
     s.ephemeral_types.insert(s.pool_intern("CStr"), 1)
-    // A `VecRange` (`split_at`, `range`) views the Vec it came from: it
+    // A `ListRange` (`split_at`, `range`) views the List it came from: it
     // cannot outlive it, a statement temporary included.
-    s.ephemeral_types.insert(s.pool_intern("VecRange"), 1)
+    s.ephemeral_types.insert(s.pool_intern("ListRange"), 1)
 
     // Sub-byte and non-standard integer widths for bitpacked structs.
     for w in 1..8:
@@ -4072,15 +4072,15 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s
 
 impl Sema:
-    mut fn set_tracked_input_context(root: &str, paths: &Vec[str]):
+    mut fn set_tracked_input_context(root: &str, paths: &List[str]):
         self.tracked_input_root = sema_owned_text(root)
-        self.tracked_input_paths = sema_clone_str_vec(paths)
+        self.tracked_input_paths = sema_clone_str_list(paths)
 
     mut fn record_tracked_input(path: &str):
         var paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_insert_unique(move paths, path)
 
-    mut fn merge_tracked_inputs(paths: &Vec[str]):
+    mut fn merge_tracked_inputs(paths: &List[str]):
         var tracked_paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, paths)
 
@@ -4108,7 +4108,7 @@ impl Sema:
 
     mut fn rebuild_named_type_candidate_index():
         self.named_type_candidate_heads = sema_new_map_i32_i32()
-        self.named_type_candidate_next = Vec.new()
+        self.named_type_candidate_next = List.new()
         for candidate_index in 0..self.named_type_candidate_syms.len() as i32:
             self.index_named_type_candidate(
                 self.named_type_candidate_syms[candidate_index],
@@ -4238,9 +4238,9 @@ impl Sema:
             // current module's explicit imports provide, the import written
             // last shadows the others — `use a.helper` then `use b.helper`
             // calls b's, whatever order the flat merge kept.
-            let cands: Vec[i32] = Vec.new()
-            let cand_paths = sema_new_vec_str()
-            let cand_pub: Vec[i32] = Vec.new()
+            let cands: List[i32] = List.new()
+            let cand_paths = sema_new_list_str()
+            let cand_pub: List[i32] = List.new()
             var r = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
             while r >= 0:
                 // The current module's own fn keeps the short name (tier 2).
@@ -4300,9 +4300,9 @@ impl Sema:
             return sym
         if self.current_module_path.len() == 0:
             return sym
-        let cands: Vec[i32] = Vec.new()
-        let cand_paths = sema_new_vec_str()
-        let cand_pub: Vec[i32] = Vec.new()
+        let cands: List[i32] = List.new()
+        let cand_paths = sema_new_list_str()
+        let cand_pub: List[i32] = List.new()
         let flat_path = self.global_value_decl_paths.get(sym)
         if bound.is_some() and flat_path.is_some():
             cands.push(sym)
@@ -4322,7 +4322,7 @@ impl Sema:
         let imported = self.last_import_provider(sym, &cands, &cand_paths, &cand_pub)
         if imported >= 0:
             return self.bind_displaced_global_ident(sym, node, cands[imported])
-        let fallback: Vec[i32] = Vec.new()
+        let fallback: List[i32] = List.new()
         for ci in 0..cands.len() as i32:
             if not self.ci_syms.contains(cands[ci]) and self.decl_visible_from_current_gated(cand_paths[ci], cand_pub[ci], sym) != 0:
                 fallback.push(ci)
@@ -4335,7 +4335,7 @@ impl Sema:
     // §18.2 tier 3 under Eric's #1221 ruling: of the candidates an explicit
     // import of the current module provides, the one whose import is written
     // last. -1 when no explicit import provides the name.
-    fn last_import_provider(sym: i32, cands: &Vec[i32], paths: &Vec[str], pubs: &Vec[i32]) -> i32:
+    fn last_import_provider(sym: i32, cands: &List[i32], paths: &List[str], pubs: &List[i32]) -> i32:
         let name: str = with_str_clone_ref(self.pool_resolve(sym))
         var best = -1
         var best_pos = -1
@@ -4407,7 +4407,7 @@ impl Sema:
     // D29 (§18.2 tier 5): two standard-library candidates for one name, and
     // no import that decides it, is a hard ambiguity at the use; each
     // candidate is offered as the import that picks it.
-    mut fn emit_ambiguous_fallback_use(name: &str, node: i32, paths: &Vec[str], fallback: &Vec[i32]):
+    mut fn emit_ambiguous_fallback_use(name: &str, node: i32, paths: &List[str], fallback: &List[i32]):
         if self.suppress_errors != 0:
             return
         var listed = ""
@@ -4468,7 +4468,7 @@ impl Sema:
         if candidates == 0: out = out ++ "  no declaration of that name in any loaded module\n"
         // The §18.2 fallback bridge: the module a bare, displaced std name
         // resolves to from user code, with the bridge's own reasoning.
-        self.visibility_explain_log = sema_new_vec_str()
+        self.visibility_explain_log = sema_new_list_str()
         self.visibility_explain_on = 1
         let bridge = self.std_fallback_bridge_path(sym)
         self.visibility_explain_on = 0
@@ -4479,7 +4479,7 @@ impl Sema:
 
     mut fn explain_one_candidate(what: &str, sym: i32, path: &str, is_pub: i32) -> str:
         var out = "  " ++ what ++ " declared in " ++ (if path.len() > 0: with_str_clone_ref(path) else: "<no module path: the registration-time module was unset>".to_owned()) ++ " (package " ++ self.package_of(path) ++ f", pub={is_pub}, engine={self.engine_corpus_id(path)}, prelude-closure={self.module_in_prelude_closure(path)}, corpus-private={if self.corpus_private_modules.contains(path): 1 else: 0})\n"
-        self.visibility_explain_log = sema_new_vec_str()
+        self.visibility_explain_log = sema_new_list_str()
         self.visibility_explain_on = 1
         self.module_visibility_cache = sema_new_map_str_i32()
         let verdict = self.decl_visible_from_current_gated(path, is_pub, sym)
@@ -4731,7 +4731,7 @@ impl Sema:
         let start_idx: i32 = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path)).unwrap()
         let target_idx: i32 = self.module_index_by_path.get(target_path).unwrap()
         let seen: HashMap[i32, i32] = sema_new_map_i32_i32()
-        let stack: Vec[i32] = Vec.new()
+        let stack: List[i32] = List.new()
         stack.push(start_idx)
         while stack.len() as i32 > 0:
             let last = stack.len() as i32 - 1
@@ -4837,8 +4837,8 @@ impl Sema:
     fn std_fallback_bridge_path(sym: i32) -> str:
         if sym == 0 or self.current_module_path.len() == 0 or sema_tier_path_is_std_implementation(self.current_module_path) != 0:
             return ""
-        let paths = sema_new_vec_str()
-        let pubs: Vec[i32] = Vec.new()
+        let paths = sema_new_list_str()
+        let pubs: List[i32] = List.new()
         var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
         while i >= 0:
             paths.push(sema_owned_text(self.decl_visibility_paths[i]))
@@ -4864,7 +4864,7 @@ impl Sema:
         // reachability says nothing about the std module's; the unique
         // non-engine std declaration is the answer on its own.
         var engine_twin = ""
-        let modules = sema_new_vec_str()
+        let modules = sema_new_list_str()
         for pi in 0..paths.len() as i32:
             let path = paths[pi]
             if pubs[pi] == 0 or sema_tier_path_is_std_implementation(path) == 0:
@@ -4874,7 +4874,7 @@ impl Sema:
                 engine_twin = sema_owned_text(path)
             else if self.corpus_private_modules.contains(path):
                 self.vis_note("  bridge: skip " ++ path ++ " (corpus-private, #2248)")
-            else if sema_vec_str_contains(&modules, path) == 0:
+            else if sema_list_str_contains(&modules, path) == 0:
                 modules.push(sema_owned_text(path))
         self.vis_note(f"  bridge: {modules.len()} non-engine std module(s) declare it" ++ (if engine_twin.len() > 0: "; engine twin " ++ engine_twin else: "; no engine twin"))
         // Only a name an engine twin displaced takes the bridge: a std name
@@ -4920,7 +4920,7 @@ impl Sema:
         let name = self.pool_resolve(sym)
         if name.len() == 0 or sema_prelude_gate_allows_name(name) != 0:
             return ""
-        let paths = sema_new_vec_str()
+        let paths = sema_new_list_str()
         var i = 0
         while i < self.named_type_candidate_syms.len() as i32:
             if self.named_type_candidate_syms[i] == sym and self.named_type_candidate_pub[i] != 0:
@@ -4936,7 +4936,7 @@ impl Sema:
             if self.displaced_fn_pub[i] != 0:
                 paths.push(sema_owned_text(self.displaced_fn_paths[i]))
             i = self.displaced_fn_prev[i]
-        var modules = sema_new_vec_str()
+        var modules = sema_new_list_str()
         for round in 0..2:
             let closure_only = 1 - round
             if modules.len() as i32 > 0:
@@ -4944,7 +4944,7 @@ impl Sema:
             for path in paths:
                 if sema_tier_path_is_std_implementation(path) != 0 and (closure_only == 0 or self.module_in_prelude_closure(path) != 0):
                     let dotted = sema_std_module_dotted(path)
-                    if dotted.len() > 0 and sema_vec_str_contains(&modules, dotted) == 0:
+                    if dotted.len() > 0 and sema_list_str_contains(&modules, dotted) == 0:
                         modules.push(sema_owned_text(dotted))
         if modules.len() as i32 == 0:
             return ""
@@ -5005,7 +5005,7 @@ impl Sema:
             self.module_visibility_cache.insert(sema_owned_text(cache_key), 1)
             return 1
         let seen: HashMap[i32, i32] = sema_new_map_i32_i32()
-        let stack: Vec[i32] = Vec.new()
+        let stack: List[i32] = List.new()
         stack.push(start_idx)
         while stack.len() as i32 > 0:
             let last = stack.len() as i32 - 1
@@ -5203,7 +5203,7 @@ impl Sema:
             return self.ast.get_data2(callee)
         0
 
-    mut fn register_builtin_struct_type(name: &str, field_names: &Vec[str], field_types: &Vec[i32], field_count: i32) -> i32:
+    mut fn register_builtin_struct_type(name: &str, field_names: &List[str], field_types: &List[i32], field_count: i32) -> i32:
         let name_sym = self.pool_intern(name)
         let te_start = self.type_extra.len() as i32
         for fi in 0..field_count:
@@ -5219,13 +5219,13 @@ impl Sema:
         tid as i32
 
     mut fn init_builtin_reflection_types():
-        let field_info_names: Vec[str] = Vec.new()
+        let field_info_names: List[str] = List.new()
         field_info_names.push("name")
         field_info_names.push("type_name")
         field_info_names.push("offset")
         field_info_names.push("size")
         field_info_names.push("is_ephemeral")
-        let field_info_types: Vec[i32] = Vec.new()
+        let field_info_types: List[i32] = List.new()
         field_info_types.push(self.ty_str as i32)
         field_info_types.push(self.ty_str as i32)
         field_info_types.push(self.ty_usize as i32)
@@ -5233,12 +5233,12 @@ impl Sema:
         field_info_types.push(self.ty_bool as i32)
         self.ty_field_info = self.register_builtin_struct_type("FieldInfo", field_info_names, field_info_types, 5) as TypeId
 
-        let variant_info_names: Vec[str] = Vec.new()
+        let variant_info_names: List[str] = List.new()
         variant_info_names.push("name")
         variant_info_names.push("discriminant")
         variant_info_names.push("has_payload")
         variant_info_names.push("payload_type_name")
-        let variant_info_types: Vec[i32] = Vec.new()
+        let variant_info_types: List[i32] = List.new()
         variant_info_types.push(self.ty_str as i32)
         variant_info_types.push(self.ty_i64 as i32)
         variant_info_types.push(self.ty_bool as i32)
@@ -5280,9 +5280,9 @@ impl Sema:
         self.syms.display_trait = self.pool_intern("Display")
         self.syms.debug_trait = self.pool_intern("Debug")
         self.syms.self_type = self.pool_intern("Self")
-        self.syms.vec = self.pool_intern("Vec")
+        self.syms.list = self.pool_intern("List")
         self.syms.fixed_string = self.pool_intern("FixedString")
-        self.syms.veciter = self.pool_intern("VecIter")
+        self.syms.listiter = self.pool_intern("ListIter")
         self.syms.mapiter = self.pool_intern("MappedIter")
         self.syms.filteriter = self.pool_intern("FilterIter")
         self.syms.filtermapiter = self.pool_intern("FilterMapIter")
@@ -5296,10 +5296,10 @@ impl Sema:
         self.syms.zipwithiter = self.pool_intern("ZipWithIter")
         self.syms.stepbyiter = self.pool_intern("StepByIter")
         self.syms.flatmapiter = self.pool_intern("FlatMapIter")
-        self.syms.vecslot = self.pool_intern("VecSlot")
-        self.syms.veciterplace = self.pool_intern("VecIterPlace")
-        self.syms.vecrange = self.pool_intern("VecRange")
-        self.syms.veciterref = self.pool_intern("VecIterRef")
+        self.syms.listslot = self.pool_intern("ListSlot")
+        self.syms.listiterplace = self.pool_intern("ListIterPlace")
+        self.syms.listrange = self.pool_intern("ListRange")
+        self.syms.listiterref = self.pool_intern("ListIterRef")
         self.syms.range_type = self.pool_intern("Range")
         self.syms.range_inclusive_type = self.pool_intern("RangeInclusive")
         self.syms.iter_place = self.pool_intern("iter_place")
@@ -5589,7 +5589,7 @@ fn extract_fn_param_name_in_text(text: &str, param_index: i32) -> str:
     ""
 
 fn sema_source_line_offsets(text: &str):
-    let offsets: Vec[i32] = Vec.new()
+    let offsets: List[i32] = List.new()
     offsets.push(0)
     for i in 0..text.len():
         if text[i] == 10:
@@ -5598,7 +5598,7 @@ fn sema_source_line_offsets(text: &str):
 
 impl Sema:
     mut fn prepare_source_line_offsets():
-        self.source_line_offsets = Vec.new()
+        self.source_line_offsets = List.new()
         self.source_line_offsets.push(sema_source_line_offsets(self.source_text))
         for si in 0..self.source_texts.len() as i32:
             self.source_line_offsets.push(sema_source_line_offsets(self.source_texts[si]))
@@ -5738,7 +5738,7 @@ impl Sema:
 
     mut fn rebuild_exact_type_cache():
         self.exact_type_cache_heads = sema_new_map_i64_i32()
-        self.exact_type_cache_next = Vec.new()
+        self.exact_type_cache_next = List.new()
         for tid in 0..self.type_kinds.len() as i32:
             self.index_exact_type(
                 tid,
@@ -5768,7 +5768,7 @@ impl Sema:
     mut fn freeze_types():
         self.types_frozen = 1
 
-    fn type_extra_matches(extra_start: i32, values: &Vec[i32], count: i32) -> i32:
+    fn type_extra_matches(extra_start: i32, values: &List[i32], count: i32) -> i32:
         for i in 0..count:
             if self.type_extra[(extra_start + i)] != values[i]:
                 return 0
@@ -5793,7 +5793,7 @@ impl Sema:
             return 0 as TypeId
         self.add_type(kind, d0, d1, d2)
 
-    fn find_tuple_type(elems: &Vec[i32], elem_count: i32) -> TypeId:
+    fn find_tuple_type(elems: &List[i32], elem_count: i32) -> TypeId:
         let type_count = self.type_kinds.len() as i32
         for ti in 0..type_count:
             if self.type_kinds[ti] != TypeKind.TY_TUPLE:
@@ -5805,7 +5805,7 @@ impl Sema:
                 return ti as TypeId
         0 as TypeId
 
-    fn ensure_tuple_type(elems: &Vec[i32], elem_count: i32) -> TypeId:
+    fn ensure_tuple_type(elems: &List[i32], elem_count: i32) -> TypeId:
         let existing = self.find_tuple_type(elems, elem_count)
         if existing != 0:
             return existing
@@ -5816,13 +5816,13 @@ impl Sema:
             self.type_extra.push(elems[ei])
         self.add_type(TypeKind.TY_TUPLE, te_start, elem_count, 0)
 
-    fn find_fn_type_of_kind(kind: i32, params: &Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+    fn find_fn_type_of_kind(kind: i32, params: &List[i32], param_count: i32, ret: TypeId) -> TypeId:
         self.find_fn_type_of_kind_u(kind, params, param_count, ret, 0)
 
     // §16.11: unsafe-ness is part of callable type identity, so two signatures
     // that differ only in unsafe-ness are distinct types; so is variadic-ness
     // (#1832). `flags`: CALLABLE_UNSAFE | CALLABLE_VARIADIC.
-    fn find_fn_type_of_kind_u(kind: i32, params: &Vec[i32], param_count: i32, ret: TypeId, flags: i32) -> TypeId:
+    fn find_fn_type_of_kind_u(kind: i32, params: &List[i32], param_count: i32, ret: TypeId, flags: i32) -> TypeId:
         let type_count = self.type_kinds.len() as i32
         for ti in 0..type_count:
             if self.type_kinds[ti] != kind:
@@ -5838,19 +5838,19 @@ impl Sema:
                 return ti as TypeId
         0 as TypeId
 
-    fn find_fn_type(params: &Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+    fn find_fn_type(params: &List[i32], param_count: i32, ret: TypeId) -> TypeId:
         self.find_fn_type_of_kind_u(TypeKind.TY_FN, params, param_count, ret, 0)
 
-    fn find_extern_fn_type(params: &Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+    fn find_extern_fn_type(params: &List[i32], param_count: i32, ret: TypeId) -> TypeId:
         self.find_fn_type_of_kind_u(TypeKind.TY_EXTERN_FN, params, param_count, ret, 0)
 
-    fn ensure_fn_type(params: &Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+    fn ensure_fn_type(params: &List[i32], param_count: i32, ret: TypeId) -> TypeId:
         self.ensure_callable_type(TypeKind.TY_FN, params, param_count, ret, 0)
 
-    fn ensure_extern_fn_type(params: &Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+    fn ensure_extern_fn_type(params: &List[i32], param_count: i32, ret: TypeId) -> TypeId:
         self.ensure_callable_type(TypeKind.TY_EXTERN_FN, params, param_count, ret, 0)
 
-    fn ensure_callable_type(kind: i32, params: &Vec[i32], param_count: i32, ret: TypeId, flags: i32) -> TypeId:
+    fn ensure_callable_type(kind: i32, params: &List[i32], param_count: i32, ret: TypeId, flags: i32) -> TypeId:
         let existing = self.find_fn_type_of_kind_u(kind, params, param_count, ret, flags)
         if existing != 0:
             return existing
@@ -5929,7 +5929,7 @@ impl Sema:
             return resolved
         let param_count = self.get_type_d1(resolved)
         let start = self.get_type_d0(resolved)
-        let params: Vec[i32] = Vec.new()
+        let params: List[i32] = List.new()
         for pi in 0..param_count:
             params.push(self.type_extra[(start + pi)])
         self.ensure_callable_type(kind, params, param_count, self.get_type_d2(resolved) as TypeId, CALLABLE_UNSAFE) as i32
@@ -5940,7 +5940,7 @@ impl Sema:
         let resolved = self.resolve_alias(tid as TypeId) as i32
         let param_count = self.get_type_d1(resolved)
         let start = self.get_type_d0(resolved)
-        let params: Vec[i32] = Vec.new()
+        let params: List[i32] = List.new()
         for pi in 0..param_count:
             params.push(self.type_extra[(start + pi)])
         self.ensure_callable_type(TypeKind.TY_EXTERN_FN, params, param_count, self.get_type_d2(resolved) as TypeId, CALLABLE_UNSAFE | CALLABLE_VARIADIC) as i32
@@ -6044,14 +6044,14 @@ impl Sema:
             return self.types_identical(self.get_type_d2(ar as TypeId), self.get_type_d2(br as TypeId))
         false
 
-pub fn sema_generic_inst_hash(base_sym: i32, args: &Vec[i32], arg_count: i32) -> i64:
+pub fn sema_generic_inst_hash(base_sym: i32, args: &List[i32], arg_count: i32) -> i64:
     var h: i64 = base_sym as i64
     for ai in 0..arg_count:
         h = (h *% 31) +% (args[ai] as i64)
     h
 
 impl Sema:
-    fn find_generic_inst_type(base_sym: i32, args: &Vec[i32], arg_count: i32) -> TypeId:
+    fn find_generic_inst_type(base_sym: i32, args: &List[i32], arg_count: i32) -> TypeId:
         let key = sema_generic_inst_hash(base_sym, args, arg_count)
         if self.generic_inst_cache.contains(key):
             let cached = self.generic_inst_cache.get(key).unwrap()
@@ -6084,7 +6084,7 @@ impl Sema:
                 return ti as TypeId
         0 as TypeId
 
-    fn ensure_generic_inst_type(base_sym: i32, args: &Vec[i32], arg_count: i32) -> TypeId:
+    fn ensure_generic_inst_type(base_sym: i32, args: &List[i32], arg_count: i32) -> TypeId:
         let existing = self.find_generic_inst_type(base_sym, args, arg_count)
         if existing != 0:
             return existing
@@ -6101,7 +6101,7 @@ impl Sema:
     // Look up an existing TypeKind.TY_GENERIC_INST(base_sym, [arg_tid]) in the cache.
     // Returns the TypeId, or 0 if not found.
     fn find_generic_inst(base_sym: i32, arg_tid: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(arg_tid)
         self.find_generic_inst_type(base_sym, args, 1) as i32
 
@@ -6161,7 +6161,7 @@ impl Sema:
             self.emit_error("FixedString length is too large", length_node)
             return 0
         let storage_tid = self.ensure_exact_type(TypeKind.TY_ARRAY, self.ty_u8 as i32, length.value as i32, 0) as i32
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(storage_tid)
         self.ensure_generic_inst_type(self.syms.fixed_string, args, 1) as i32
 
@@ -6184,7 +6184,7 @@ impl Sema:
                 if canonical != 0:
                     self.generic_struct_field_type_cache.insert(sema_pair_key(tid, canonical), field_ty)
 
-    mut fn cache_generic_enum_payload(tid: i32, variant_sym: i32, payloads: &Vec[i32]):
+    mut fn cache_generic_enum_payload(tid: i32, variant_sym: i32, payloads: &List[i32]):
         if variant_sym == 0:
             return
         let key = sema_pair_key(tid, variant_sym)
@@ -6219,12 +6219,12 @@ impl Sema:
         0
 
     mut fn preregister_mir_types():
-        let vec_sym = self.syms.vec
-        let vi_sym = self.syms.veciter
+        let list_sym = self.syms.list
+        let vi_sym = self.syms.listiter
         let hashmap_sym = self.syms.hashmap
         let option_sym = self.syms.option
 
-        // For every Vec[T] type registered, also register VecIter[T].
+        // For every List[T] type registered, also register ListIter[T].
         // For every HashMap[K, V], register Option[V] so MIR/codegen can
         // materialize aggregate map-get results after type freezing.
         // #2000: each through ensure_generic_inst_type, which finds an
@@ -6235,19 +6235,19 @@ impl Sema:
         let type_count = self.type_kinds.len() as i32
         for ti in 0..type_count:
             if self.type_kinds[ti] == TypeKind.TY_GENERIC_INST:
-                if self.type_d0[ti] == vec_sym and self.type_d2[ti] >= 1:
-                    let vi_args: Vec[i32] = Vec.new()
+                if self.type_d0[ti] == list_sym and self.type_d2[ti] >= 1:
+                    let vi_args: List[i32] = List.new()
                     vi_args.push(self.type_extra[self.type_d1[ti]])
                     let _ = self.ensure_generic_inst_type(vi_sym, &vi_args, 1)
                 if self.type_d0[ti] == hashmap_sym and self.type_d2[ti] >= 2:
-                    let opt_args: Vec[i32] = Vec.new()
+                    let opt_args: List[i32] = List.new()
                     opt_args.push(self.type_extra[self.type_d1[ti] + 1])
                     let _ = self.ensure_generic_inst_type(option_sym, &opt_args, 1)
 
-        // Vec[str] for str.split(), and VecIter[str] for its .iter().
-        let str_args: Vec[i32] = Vec.new()
+        // List[str] for str.split(), and ListIter[str] for its .iter().
+        let str_args: List[i32] = List.new()
         str_args.push(self.ty_str as i32)
-        let _vec_str = self.ensure_generic_inst_type(vec_sym, &str_args, 1)
+        let _list_str = self.ensure_generic_inst_type(list_sym, &str_args, 1)
         let _vi_str = self.ensure_generic_inst_type(vi_sym, &str_args, 1)
 
         // D7 eager layout tables: compute size/align for every type now (types_frozen is
@@ -6260,7 +6260,7 @@ impl Sema:
     // in the D7 eager pass and again from freeze_types as a catch-up: generic
     // insts created between the two (e.g. by specialization re-checks) must be
     // cached too, or frozen consumers phase-bug on the first drop/reflection
-    // query (VecIter[i32] through iter_sum was the repro).
+    // query (ListIter[i32] through iter_sum was the repro).
     mut fn eager_type_caches_pass():
         if with_getenv_str("WITH_TRACE_INST").len() > 0:
             with_eprint(f"[eager] pass types={self.type_kinds.len() as i32}")
@@ -6323,7 +6323,7 @@ impl Sema:
             return 1
         0
 
-    mut fn validate_atomic_payload_type(base_sym: i32, args: &Vec[i32], arg_count: i32, node: i32) -> i32:
+    mut fn validate_atomic_payload_type(base_sym: i32, args: &List[i32], arg_count: i32, node: i32) -> i32:
         if self.pool_resolve_symbol(base_sym) != "Atomic":
             return 1
         if arg_count != 1:
@@ -6391,7 +6391,7 @@ impl Sema:
                 if self.collecting_types != 0:
                     return 0
                 let gi_name: str = with_str_clone_ref(self.pool_resolve_symbol(gi_base_sym))
-                self.emit_error("unknown type: " ++ gi_name, node)
+                self.emit_error(if gi_name == "Vec": self.vec_is_list_message() else: "unknown type: " ++ gi_name, node)
                 return 0
         if self.require_alloc_tier_for_symbol(gi_base_sym, node) == 0:
             return 0
@@ -6399,7 +6399,7 @@ impl Sema:
             return 0
         let gi_arg_count = self.ast.get_data2(node)
         let gi_extra_start = self.ast.get_data1(node)
-        let gi_args: Vec[i32] = Vec.new()
+        let gi_args: List[i32] = List.new()
         for gi in 0..gi_arg_count:
             let gi_arg_node = self.ast.get_extra(gi_extra_start + gi)
             let gi_arg_tid = self.resolve_type_expr(gi_arg_node)
@@ -6417,7 +6417,7 @@ impl Sema:
     // NON-inst type returned whatever number lived in its d-slots — garbage
     // that happened to be harmless under one type-table layout and a live
     // type id under another (#682-inc1 bring-up: a pending unannotated
-    // `Vec.new()` receiver typed push literals as u7 through exactly this).
+    // `List.new()` receiver typed push literals as u7 through exactly this).
     fn get_generic_inst_base(tid: i32) -> i32:
         if self.get_type_kind(tid as TypeId) != TypeKind.TY_GENERIC_INST:
             return 0
@@ -6733,7 +6733,7 @@ impl Sema:
     // substitute_type: walk a TypeId, replacing type parameters with concrete types.
     // subst_syms/subst_tids/count define the mapping: subst_syms[i] → subst_tids[i].
     // Returns the substituted TypeId, or the original if no substitution applies.
-    fn substitute_type(tid: i32, subst_syms: &Vec[i32], subst_tids: &Vec[i32], count: i32) -> i32:
+    fn substitute_type(tid: i32, subst_syms: &List[i32], subst_tids: &List[i32], count: i32) -> i32:
         if tid <= 0 or count == 0:
             return tid
         let kind = self.get_type_kind(tid as TypeId)
@@ -6761,7 +6761,7 @@ impl Sema:
         if kind == TypeKind.TY_GENERIC_INST:
             let gi_ac = self.get_type_d2(tid as TypeId)
             var changed = 0
-            let sub_args: Vec[i32] = Vec.new()
+            let sub_args: List[i32] = List.new()
             for ai in 0..gi_ac:
                 let orig = self.get_generic_inst_arg(tid, ai)
                 let subbed = self.substitute_type(orig, subst_syms, subst_tids, count)
@@ -6798,7 +6798,7 @@ impl Sema:
             let te_start_orig = d0
             let elem_count = self.get_type_d1(tid as TypeId)
             var t_changed = 0
-            let tuple_elems: Vec[i32] = Vec.new()
+            let tuple_elems: List[i32] = List.new()
             for ei in 0..elem_count:
                 let orig = self.type_extra[(te_start_orig + ei)]
                 let subbed = self.substitute_type(orig, subst_syms, subst_tids, count)
@@ -6956,7 +6956,7 @@ impl Sema:
         // Expire borrows for bindings leaving scope
         self.expire_borrows_in_scope(start)
         // Remove bindings from map and parallel arrays
-        let reported_pending_calls: Vec[i32] = Vec.new()
+        let reported_pending_calls: List[i32] = List.new()
         while self.bind_names.len() as i32 > start:
             let removed_sym: i32 = self.bind_names[self.bind_names.len() - 1]
             let removed_node = self.binding_decl_node(removed_sym)
@@ -7566,14 +7566,14 @@ impl Sema:
 
     // Snapshot current bind_states so early-returning if/else branches don't
     // permanently mark outer variables as MOVED.
-    fn save_scope_states() -> Vec[i32]:
+    fn save_scope_states() -> List[i32]:
         let count = self.bind_states.len() as i32
-        var snapshot: Vec[i32] = Vec.new()
+        var snapshot: List[i32] = List.new()
         for i in 0..count:
             snapshot.push(self.bind_states[i])
         snapshot
 
-    mut fn restore_scope_states(snapshot: &Vec[i32]):
+    mut fn restore_scope_states(snapshot: &List[i32]):
         let count = snapshot.len() as i32
         for i in 0..count:
             self.bind_states[i] = snapshot[i]
@@ -7585,23 +7585,23 @@ impl Sema:
     // fall-through. These mirror save/restore/merge for the field-move set.
     // A placeholder snapshot for a slot filled only on some paths.
     fn empty_moved_field_state() -> MovedFieldSnap:
-        MovedFieldSnap { base: Vec.new(), starts: Vec.new(), counts: Vec.new(), syms: Vec.new(), poison_syms: Vec.new(), poison_nodes: Vec.new() }
+        MovedFieldSnap { base: List.new(), starts: List.new(), counts: List.new(), syms: List.new(), poison_syms: List.new(), poison_nodes: List.new() }
 
     fn save_moved_field_state() -> MovedFieldSnap:
         MovedFieldSnap {
-            base: sema_clone_i32_vec(&self.moved_field_base_syms),
-            starts: sema_clone_i32_vec(&self.moved_field_path_starts),
-            counts: sema_clone_i32_vec(&self.moved_field_path_counts),
-            syms: sema_clone_i32_vec(&self.moved_field_path_syms),
+            base: sema_clone_i32_list(&self.moved_field_base_syms),
+            starts: sema_clone_i32_list(&self.moved_field_path_starts),
+            counts: sema_clone_i32_list(&self.moved_field_path_counts),
+            syms: sema_clone_i32_list(&self.moved_field_path_syms),
             poison_syms: self.snapshot_poison_syms(),
             poison_nodes: self.snapshot_poison_nodes(),
         }
 
     mut fn restore_moved_field_state(snap: &MovedFieldSnap):
-        self.moved_field_base_syms = sema_clone_i32_vec(&snap.base)
-        self.moved_field_path_starts = sema_clone_i32_vec(&snap.starts)
-        self.moved_field_path_counts = sema_clone_i32_vec(&snap.counts)
-        self.moved_field_path_syms = sema_clone_i32_vec(&snap.syms)
+        self.moved_field_base_syms = sema_clone_i32_list(&snap.base)
+        self.moved_field_path_starts = sema_clone_i32_list(&snap.starts)
+        self.moved_field_path_counts = sema_clone_i32_list(&snap.counts)
+        self.moved_field_path_syms = sema_clone_i32_list(&snap.syms)
         self.restore_poison(&snap.poison_syms, &snap.poison_nodes)
 
     // Set the live field-move set to the union of two branch-exit snapshots
@@ -7612,9 +7612,9 @@ impl Sema:
     // result arrays being built — so the union DEDUPS. Without this the union
     // concatenated, and across N nested branches the moved-field set grew ~2^N
     // (a field moved on both paths re-added every merge), detonating memory
-    // once the flip made Vec fields drop-tracked (#695 follow-up; the set must
+    // once the flip made List fields drop-tracked (#695 follow-up; the set must
     // stay bounded by the distinct field-paths in the function).
-    fn moved_field_entry_present(base: &Vec[i32], starts: &Vec[i32], counts: &Vec[i32], path_syms: &Vec[i32], base_sym: i32, src_start: i32, src_count: i32, src_syms: &Vec[i32]) -> bool:
+    fn moved_field_entry_present(base: &List[i32], starts: &List[i32], counts: &List[i32], path_syms: &List[i32], base_sym: i32, src_start: i32, src_count: i32, src_syms: &List[i32]) -> bool:
         for i in 0..base.len() as i32:
             if base[i] != base_sym:
                 continue
@@ -7631,10 +7631,10 @@ impl Sema:
         false
 
     mut fn set_moved_field_union(a: &MovedFieldSnap, b: &MovedFieldSnap):
-        var base: Vec[i32] = Vec.new()
-        var starts: Vec[i32] = Vec.new()
-        var counts: Vec[i32] = Vec.new()
-        var path_syms: Vec[i32] = Vec.new()
+        var base: List[i32] = List.new()
+        var starts: List[i32] = List.new()
+        var counts: List[i32] = List.new()
+        var path_syms: List[i32] = List.new()
         for i in 0..a.base.len() as i32:
             starts.push(path_syms.len() as i32)
             counts.push(a.counts[i])
@@ -7658,8 +7658,8 @@ impl Sema:
         self.moved_field_path_counts = move counts
         self.moved_field_path_syms = move path_syms
         // Poisoned at the join iff poisoned at some non-divergent exit.
-        var poison_syms: Vec[i32] = Vec.new()
-        var poison_nodes: Vec[i32] = Vec.new()
+        var poison_syms: List[i32] = List.new()
+        var poison_nodes: List[i32] = List.new()
         for i in 0..a.poison_syms.len() as i32:
             if a.poison_syms[i] != 0:
                 poison_syms.push(a.poison_syms[i])
@@ -7672,19 +7672,19 @@ impl Sema:
                 poison_nodes.push(0)
         self.restore_poison(&poison_syms, &poison_nodes)
 
-    fn snapshot_poison_syms() -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    fn snapshot_poison_syms() -> List[i32]:
+        var out: List[i32] = List.new()
         for i in 0..self.bind_provenance.len() as i32:
             out.push(self.bind_provenance[i].poisoned_origin_sym)
         out
 
-    fn snapshot_poison_nodes() -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    fn snapshot_poison_nodes() -> List[i32]:
+        var out: List[i32] = List.new()
         for i in 0..self.bind_provenance.len() as i32:
             out.push(self.bind_provenance[i].poisoned_origin_node)
         out
 
-    mut fn restore_poison(path_syms: &Vec[i32], nodes: &Vec[i32]):
+    mut fn restore_poison(path_syms: &List[i32], nodes: &List[i32]):
         for i in 0..path_syms.len() as i32:
             if i >= self.bind_provenance.len() as i32:
                 break
@@ -7701,8 +7701,8 @@ impl Sema:
     // branch (so a value moved on one path cannot be used after — use-after-move
     // soundness); divergent branches (TY_NEVER) contribute nothing. If both branches
     // diverge the continuation is unreachable, so fall back to the entry state.
-    fn merge_branch_move_states(entry: &Vec[i32], a: &Vec[i32], a_diverges: i32, b: &Vec[i32], b_diverges: i32) -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    fn merge_branch_move_states(entry: &List[i32], a: &List[i32], a_diverges: i32, b: &List[i32], b_diverges: i32) -> List[i32]:
+        var out: List[i32] = List.new()
         let n = entry.len() as i32
         if a_diverges != 0 and b_diverges != 0:
             for i in 0..n:
@@ -7721,8 +7721,8 @@ impl Sema:
     // binding is MOVED in the result iff MOVED in either input. Seed the accumulator
     // with the entry state (the implicit no-match/fallthrough path) and fold each
     // non-diverging arm exit into it; see docs/completed/branch-merge-soundness.md.
-    fn union_move_states(base: &Vec[i32], other: &Vec[i32]) -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    fn union_move_states(base: &List[i32], other: &List[i32]) -> List[i32]:
+        var out: List[i32] = List.new()
         let n = base.len() as i32
         for i in 0..n:
             let bv = base[i]
@@ -7816,7 +7816,7 @@ impl Sema:
     // (the loop may exit via its condition with the entry or body-end state) and 0
     // for `loop` (exits only via break). The break accumulator carries moves that a
     // break propagated out of the loop.
-    mut fn finalize_loop_move_state(entry: &Vec[i32], frame_idx: i32, body_diverges: i32, has_condition_exit: i32, loop_node: i32):
+    mut fn finalize_loop_move_state(entry: &List[i32], frame_idx: i32, body_diverges: i32, has_condition_exit: i32, loop_node: i32):
         let entry_count = entry.len() as i32
         // WITH_TRACE_MOVE: dump the loop back-edge move-check inputs per binding
         // (the sema-phase analog of --trace-ownership). Prints name, entry-state,
@@ -7829,7 +7829,7 @@ impl Sema:
             var i = 0
             while i < entry_count:
                 // Scoped to needs-drop values (like the conditional-move feature): a
-                // moved-out POD Vec is a non-destructive copy today (#607), and the
+                // moved-out POD List is a non-destructive copy today (#607), and the
                 // codebase relies on that, so only Drop/transitive-Drop loop-carried
                 // moves are use-after-move errors here.
                 let e_state = entry[i]
@@ -7841,7 +7841,7 @@ impl Sema:
                 if self.is_loop_carried_move(e_state, cur_state, nd) != 0:
                     self.emit_loop_carried_move_error(i, loop_node)
                 i = i + 1
-        var post: Vec[i32] = if has_condition_exit != 0:
+        var post: List[i32] = if has_condition_exit != 0:
             let body_end = self.save_scope_states()
             self.union_move_states(entry, &body_end)
         else:
@@ -7849,7 +7849,7 @@ impl Sema:
         if frame_idx >= 0 and frame_idx < self.label_break_seen.len() as i32 and self.label_break_seen[frame_idx] != 0:
             let off = self.label_break_off[frame_idx]
             if off >= 0:
-                var brk: Vec[i32] = Vec.new()
+                var brk: List[i32] = List.new()
                 var i = 0
                 while i < entry_count:
                     let v = if (off + i) < self.loop_break_flat.len() as i32: self.loop_break_flat[(off + i)] else: VarState.LIVE
@@ -7883,7 +7883,7 @@ impl Sema:
                 provenance.poisoned_binding_node = 0
                 slot.set(provenance)
 
-    fn set_binding_view_deps(sym: i32, param_mask: i32, deps: &Vec[i32]):
+    fn set_binding_view_deps(sym: i32, param_mask: i32, deps: &List[i32]):
         if sym == 0:
             return
         if param_mask == 0 and deps.len() == 0:
@@ -7927,7 +7927,7 @@ impl Sema:
         0
 
     // #625 (viral-escape): union additional view origins into a binding that
-    // already exists — used when a store (Vec.push / HashMap.insert) adds the
+    // already exists — used when a store (List.push / HashMap.insert) adds the
     // pushed element's borrow origins to the container binding, so a later escape
     // of the container is caught by the ephemeral-escape checks.
     // One row of `sym`'s view facts as they stand now (explain:origin).
@@ -7945,12 +7945,12 @@ impl Sema:
         for di in 0..count: self.view_fact_deps.push(self.binding_view_dep_at(sym, di))
         self.view_fact_dep_counts.push(count)
 
-    fn add_binding_view_deps(sym: i32, param_mask: i32, deps: &Vec[i32]):
+    fn add_binding_view_deps(sym: i32, param_mask: i32, deps: &List[i32]):
         if sym == 0:
             return
         if param_mask == 0 and deps.len() == 0:
             return
-        var merged: Vec[i32] = Vec.new()
+        var merged: List[i32] = List.new()
         let existing = self.binding_view_dep_count(sym)
         for i in 0..existing:
             merged = self.push_unique_i32(move merged, self.binding_view_dep_at(sym, i))
@@ -8195,9 +8195,9 @@ impl Sema:
             // drop. Codegen has exact drop glue for these opaque handles, so the
             // ownership classifier must agree; otherwise an aggregate move copies
             // the handle without resetting its source and both places free it.
-            // BTreeMap/BTreeSet are ordinary Vec-backed structs and are discovered
+            // BTreeMap/BTreeSet are ordinary List-backed structs and are discovered
             // transitively below rather than duplicated in this special case.
-            if base_sym == self.syms.vec or base_sym == self.syms.hashmap or base_sym == self.syms.hashset or base_sym == self.syms.slotmap:
+            if base_sym == self.syms.list or base_sym == self.syms.hashmap or base_sym == self.syms.hashset or base_sym == self.syms.slotmap:
                 return 1
             let base_name = self.pool_resolve(base_sym)
             if base_name == "Sender" or base_name == "Receiver":
@@ -8412,8 +8412,8 @@ impl Sema:
         0
 
     // Whether a value of this type transitively carries a USER Drop impl
-    // (W, Vec[W], Holder{item: W}). Narrower than `type_needs_drop`: pure
-    // memory-managed types (str, Vec[str], HashMap[str, str]) answer 0 —
+    // (W, List[W], Holder{item: W}). Narrower than `type_needs_drop`: pure
+    // memory-managed types (str, List[str], HashMap[str, str]) answer 0 —
     // their cleanup is invisible, so a field let may observe them (D22),
     // while a user-Drop-bearing field stays an explicit ownership transfer
     // (err_use_after_move_*_field pins).
@@ -8625,7 +8625,7 @@ impl Sema:
             let view_ty: i32 = self.bind_types[bi]
             // Rule 7's "variable implementing Drop" is any value whose drop
             // runs a destructor retaining the borrow: `Option[S]`, `(i32,
-            // Option[S])` or `Vec[S]` of an ephemeral Drop `S` (a dependent
+            // Option[S])` or `List[S]` of an ephemeral Drop `S` (a dependent
             // facade resource) as much as `S` itself. Shallow
             // type_has_drop_impl let an `Option[S]` declared before its
             // origin drop after it.
@@ -8653,7 +8653,7 @@ impl Sema:
                 self.diags.emit(move diag)
                 return
 
-    fn set_expr_view_deps(expr_node: i32, param_mask: i32, deps: &Vec[i32]):
+    fn set_expr_view_deps(expr_node: i32, param_mask: i32, deps: &List[i32]):
         if expr_node == 0:
             return
         self.expr_view_storage_origins.remove(expr_node)
@@ -8705,7 +8705,7 @@ impl Sema:
         let start = self.expr_view_dep_starts.get(expr_node).unwrap()
         self.expr_view_dep_data[(start + idx)]
 
-    fn set_closure_capture_summary(closure_node: i32, capture_syms: &Vec[i32], capture_effs: &Vec[i32]):
+    fn set_closure_capture_summary(closure_node: i32, capture_syms: &List[i32], capture_effs: &List[i32]):
         if closure_node == 0:
             return
         let start = self.closure_capture_summary_data.len() as i32
@@ -9331,7 +9331,7 @@ impl Sema:
     // direct consume/escape seed. If every path crosses a projection, consuming a
     // field was incorrectly promoted to consuming the whole receiver.
     fn audit_receiver_projection_origins() -> str:
-        let root_owned: Vec[i32] = Vec.new()
+        let root_owned: List[i32] = List.new()
         for i in 0..self.sig_param_effects.len() as i32:
             let direct = if i < self.sig_param_direct_effects.len() as i32: self.sig_param_direct_effects[i] else: 0
             root_owned.push(if (direct & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0: 1 else: 0)
@@ -9664,8 +9664,8 @@ impl Sema:
 
     // The promoted argument types Sema recorded for a call (#1831, #1849);
     // empty for a call that has none.
-    fn c_promoted_arg_types(call_node: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn c_promoted_arg_types(call_node: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         let start = self.c_promoted_arg_starts.get(call_node) ?? -1
         if start < 0:
             return out
@@ -9888,12 +9888,12 @@ fn sema_levenshtein(a: &str, b: &str, max: i32) -> i32:
     let diff = if al > bl: al - bl else: bl - al
     if diff > max: return max + 1
     // Single-row DP with early exit
-    var prev: Vec[i32] = Vec.new()
+    var prev: List[i32] = List.new()
     for j in 0..bl + 1:
         prev.push(j)
     for i in 1..al + 1:
         var row_min = max + 1
-        var cur: Vec[i32] = Vec.new()
+        var cur: List[i32] = List.new()
         cur.push(i)
         for j in 1..bl + 1:
             let cost = if a[(i - 1)] == b[(j - 1)]: 0 else: 1
@@ -10410,7 +10410,7 @@ impl Sema:
                     return 1
         0
 
-    // #604 stage 1: a Vec[T] / [T; N] argument may coerce to a []T / []mut T
+    // #604 stage 1: a List[T] / [T; N] argument may coerce to a []T / []mut T
     // parameter — the first collection→slice coercion (slice→slice compat,
     // including the mut gate, stays in types_compatible). Element types must
     // match EXACTLY: a `[]mut` write goes back into the collection, so no
@@ -10428,7 +10428,7 @@ impl Sema:
                 return 1
             return 0
         if act_k == TypeKind.TY_GENERIC_INST:
-            if self.get_type_d0(act_r) == self.syms.vec and self.get_generic_inst_arg_count(act_r as i32) > 0:
+            if self.get_type_d0(act_r) == self.syms.list and self.get_generic_inst_arg_count(act_r as i32) > 0:
                 if (self.resolve_alias(self.get_generic_inst_arg(act_r as i32, 0) as TypeId) as i32) == want_elem:
                     return 1
         0
@@ -10607,7 +10607,7 @@ impl Sema:
                 return 0
             if generic_base == self.syms.handle:
                 return 1
-            // Generic instances (Vec[T], etc.) are non-Copy by default.
+            // Generic instances (List[T], etc.) are non-Copy by default.
             // Copy iff there is an explicit `impl[T: Copy] Copy for Base[T]` registered.
             // Do NOT call type_implements_trait(copy_trait) here — it just calls is_copy() back.
             return self.select_trait_impl_for_generic_inst(resolved as i32, self.syms.copy_trait)

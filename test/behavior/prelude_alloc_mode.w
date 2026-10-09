@@ -4,7 +4,7 @@
 // Test: --prelude=alloc provides core + allocation-backed containers.
 
 fn main:
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     v.push(1)
     assert(v.len() == 1)
     print("ok")

@@ -14,7 +14,7 @@ pub fn local_named(c: i32) -> i32:
     twice
 pub fn generic_own(c: i32) -> i32: pick(c, twice(c))
 pub fn owner_label() -> str: label()
-pub fn count_digits(xs: &Vec[i32]) -> i32:
+pub fn count_digits(xs: &List[i32]) -> i32:
     var n = 0
     for x in xs:
         if is_digit(x): n = n + 1

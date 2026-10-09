@@ -28,13 +28,13 @@ const CALG_TESTS_DIR = "test/corpora/c_algorithms"
 const CALG_TESTS_PACKAGE = "std.calg_testing"
 fn calg_tests_package_dir(): "lib/" ++ CALG_TESTS_PACKAGE.replace(".", "/")
 
-fn calg_modules() -> Vec[str]:
+fn calg_modules() -> List[str]:
     ["arraylist", "avl-tree", "binary-heap", "binomial-heap", "bloom-filter",
      "compare-int", "compare-pointer", "compare-string", "hash-int",
      "hash-pointer", "hash-string", "hash-table", "list", "queue", "rb-tree",
      "set", "slist", "sortedarray", "trie"]
 
-fn calg_tests() -> Vec[str]:
+fn calg_tests() -> List[str]:
     ["alloc-testing", "arraylist", "avl-tree", "binary-heap", "binomial-heap",
      "bloom-filter", "cpp", "list", "slist", "queue", "compare-functions",
      "hash-functions", "hash-table", "rb-tree", "set", "trie", "sortedarray"]
@@ -51,7 +51,7 @@ pub fn c_algorithms_corpus() -> Corpus:
         // exercises every module once) ride along in the production corpus
         // as the drift harness; they are never part of the bundle root
         harness: ["alloc_testing", "framework", "test_cpp"], drift_harness: "test_cpp.w", drift_harness_arg: "",
-        module_floor: 20, defines: Vec.new(), excludes: Vec.new(),
+        module_floor: 20, defines: List.new(), excludes: List.new(),
         // rb-tree.h declares rb_tree_subtree_height; rb-tree.c never defines it.
         declared_externs: ["rb_tree_subtree_height"],
         promote_after: ["c-algorithms-promote-tests"], test_lane: "c-algorithms-test",
@@ -80,8 +80,8 @@ fn calg_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) -
 fn calg_tests_options(source: &str, output: &str) -> MigrateOptions:
     MigrateOptions {
         source_path: source.clone(), output_path: output.clone(),
-        include_paths: [source.clone()], forced_includes: Vec.new(),
-        defines: ["ALLOC_TESTING"], exclude_basenames: Vec.new(), check_mode: false,
+        include_paths: [source.clone()], forced_includes: List.new(),
+        defines: ["ALLOC_TESTING"], exclude_basenames: List.new(), check_mode: false,
         diff_mode: false, stats_mode: false, no_c_export: true, c_export_functions: false,
         convert_goto_to_structured: false, block_style: 2, width_slice: 8,
         shared_defs: CALG_TESTS_PACKAGE ++ ".defs", migrate_one: "",
@@ -176,7 +176,7 @@ pub fn run_calg_test_action(ctx: ActionCtx) -> i32:
         // the package; the release binary's embedded std supplies std.libc.
         // Build-layer code is compiled by the SEED: a collection literal with
         // moved element temporaries is #1122 under seeds before 9ccd1e2d.
-        var compile_args: Vec[str] = Vec.new()
+        var compile_args: List[str] = List.new()
         compile_args.push(compiler.clone())
         compile_args.push("build")
         compile_args.push("--no-prelude")
@@ -188,7 +188,7 @@ pub fn run_calg_test_action(ctx: ActionCtx) -> i32:
         if compiled.rc != 0: return corpus_fail(ctx, "compile test-" ++ name ++ f" exited {compiled.rc}\n" ++ fs.read_text(binary ++ ".compile.stderr"))
         // #2230: name what runs before it runs.
         if corpus_provenance(ctx, output, binary) != 0: return 1
-        var argv: Vec[str] = Vec.new()
+        var argv: List[str] = List.new()
         argv.push(corpus_abs(ctx, binary))
         let result = ctx.process_runner().run_capture(argv, corpus_abs(ctx, binary ++ ".stdout"), corpus_abs(ctx, binary ++ ".stderr"), 300000)
         if result.rc != 0: return corpus_fail(ctx, "test-" ++ name ++ f" exited {result.rc}\n" ++ result.stdout ++ result.stderr)

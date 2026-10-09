@@ -2,9 +2,9 @@
 
 // #1783 (§21.1 rule 6): `h.v.push(&n)` stores into `h` exactly as
 // `v.push(&n)` stores into `v`; the receiver's spelling never decided it.
-type Holder = ephemeral { v: Vec[&i32] }
+type Holder = ephemeral { v: List[&i32] }
 fn main:
-    var h = Holder { v: Vec.new() }
+    var h = Holder { v: List.new() }
     if true:
         let n = 5
         h.v.push(&n)

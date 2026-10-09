@@ -655,66 +655,66 @@ pub enum FStringSegmentKind: i32:
 // Node 0 is reserved as a null sentinel.
 
 type AstPoolState {
-    kinds: Vec[i32],
-    starts: Vec[i32],
-    ends: Vec[i32],
-    data0: Vec[i32],
-    data1: Vec[i32],
-    data2: Vec[i32],
-    literal_suffixes: Vec[i32],
-    int_literal_digit_idxs: Vec[i32],
-    int_literal_radices: Vec[i32],
+    kinds: List[i32],
+    starts: List[i32],
+    ends: List[i32],
+    data0: List[i32],
+    data1: List[i32],
+    data2: List[i32],
+    literal_suffixes: List[i32],
+    int_literal_digit_idxs: List[i32],
+    int_literal_radices: List[i32],
     // Tenth SoA column: the file each node was parsed from. Spans store
     // (start,end) byte offsets only; without this, file identity is
     // reconstructed positionally from decl tables (#661 class). Stamped
     // from current_file_id, which each Parser sets for its file.
-    files: Vec[i32],
+    files: List[i32],
     current_file_id: i32,
-    extra: Vec[i32],
-    decls: Vec[i32],
+    extra: List[i32],
+    decls: List[i32],
     local_decl_count: i32,
     prelude_decl_count: i32,
-    strings: Vec[str],
-    fn_meta: Vec[i32],
-    type_meta: Vec[i32],
-    pattern_qualifiers: Vec[i32],
-    fn_param_patterns: Vec[i32],
-    fn_param_pattern_meta: Vec[i32],
-    for_meta: Vec[i32],
+    strings: List[str],
+    fn_meta: List[i32],
+    type_meta: List[i32],
+    pattern_qualifiers: List[i32],
+    fn_param_patterns: List[i32],
+    fn_param_pattern_meta: List[i32],
+    for_meta: List[i32],
     // §13.6a: (for node, one-clause comprehension match) pairs; see
     // add_for_carrier_alt.
-    for_carrier_alts: Vec[i32],
-    block_meta: Vec[i32],
-    must_use_type_nodes: Vec[i32],
-    no_await_guard_type_nodes: Vec[i32],
-    no_alloc_fn_nodes: Vec[i32],
-    iter_of_self_fn_nodes: Vec[i32],
-    sealed_trait_nodes: Vec[i32],
-    extend_impl_nodes: Vec[i32],
-    comptime_decl_nodes: Vec[i32],
+    for_carrier_alts: List[i32],
+    block_meta: List[i32],
+    must_use_type_nodes: List[i32],
+    no_await_guard_type_nodes: List[i32],
+    no_alloc_fn_nodes: List[i32],
+    iter_of_self_fn_nodes: List[i32],
+    sealed_trait_nodes: List[i32],
+    extend_impl_nodes: List[i32],
+    comptime_decl_nodes: List[i32],
     // D39: NK_LET_DECL nodes the parser produced from `const` — the wrapper
     // it desugars to (NK_COMPTIME) is folded away by the comptime transform,
     // so the bundle-interface emitter reads const-ness from this mark, which
     // is identical for `.w` and `.wi` input.
-    const_decl_nodes: Vec[i32],
-    move_closure_nodes: Vec[i32],
-    non_escaping_closure_nodes: Vec[i32],
-    by_place_closure_nodes: Vec[i32],
+    const_decl_nodes: List[i32],
+    move_closure_nodes: List[i32],
+    non_escaping_closure_nodes: List[i32],
+    by_place_closure_nodes: List[i32],
     // (closure node, `-> T` type node) pairs: a closure's declared result
     // (§12, #1508), kept in order for a pool copy.
-    closure_ret_type_nodes: Vec[i32],
-    compiler_hook_fn_nodes: Vec[i32],
-    compiler_hook_phase_syms: Vec[i32],
-    global_allocator_decl_nodes: Vec[i32],
-    where_meta: Vec[i32],
-    impl_type_params: Vec[i32],
-    impl_target_type_nodes: Vec[i32],
-    impl_trait_type_args: Vec[i32],
+    closure_ret_type_nodes: List[i32],
+    compiler_hook_fn_nodes: List[i32],
+    compiler_hook_phase_syms: List[i32],
+    global_allocator_decl_nodes: List[i32],
+    where_meta: List[i32],
+    impl_type_params: List[i32],
+    impl_target_type_nodes: List[i32],
+    impl_trait_type_args: List[i32],
     // A parameterized type-parameter bound's arguments (`G: Gen[T]`):
     // (extra index of the bound's trait symbol, start in
     // type_bound_arg_nodes, count) triples.
-    type_bound_args: Vec[i32],
-    type_bound_arg_nodes: Vec[i32],
+    type_bound_args: List[i32],
+    type_bound_arg_nodes: List[i32],
     fn_meta_map: HashMap[i32, i32],
     // For `x in collection` / `x not in collection` binary nodes: the extra-array
     // index of the pre-reserved `collection.contains(x)` argument. Allocated at
@@ -722,10 +722,10 @@ type AstPoolState {
     membership_arg_map: HashMap[i32, i32],
     // (parent for/comprehension node, binding value) pairs the parser built
     // as PATTERN bindings; absent = plain symbol binding. See
-    // for_binding_is_pattern. The Vec mirrors the map in insertion order so
+    // for_binding_is_pattern. The List mirrors the map in insertion order so
     // pool clones (ComptimeTransform) can copy it deterministically.
     pattern_binding_keys: HashMap[i64, i32],
-    pattern_binding_pairs: Vec[i64],
+    pattern_binding_pairs: List[i64],
     type_meta_map: HashMap[i32, i32],
     pattern_qualifier_map: HashMap[i32, i32],
     where_meta_map: HashMap[i32, i32],
@@ -764,33 +764,33 @@ type AstPoolState {
     variadic_fn_type_nodes: HashMap[i32, i32],  // NK_TYPE_EXTERN_FN node → 1 if `extern "C" fn(A, ...)` (#1832)
     fn_effect_pin_starts: HashMap[i32, i32],   // fn_node → first entry in fn_effect_pin_*
     fn_effect_pin_counts: HashMap[i32, i32],   // fn_node → entry count
-    fn_effect_pin_params: Vec[i32],            // param_name_sym
-    fn_effect_pin_bits: Vec[i32],              // effect bitmask
+    fn_effect_pin_params: List[i32],            // param_name_sym
+    fn_effect_pin_bits: List[i32],              // effect bitmask
     // §21.1 rule 1 (D39): a function's declared global write set, its
     // checked contract — (module path sym, 0 when the clause names the
     // global in scope; name sym) pairs (Parser.attach_pending_global_writes).
     fn_global_write_starts: HashMap[i32, i32],  // fn_node → first entry in fn_global_write_*
     fn_global_write_counts: HashMap[i32, i32],  // fn_node → entry count
-    fn_global_write_paths: Vec[i32],            // module path sym
-    fn_global_write_names: Vec[i32],            // global name sym
+    fn_global_write_paths: List[i32],            // module path sym
+    fn_global_write_names: List[i32],            // global name sym
     // §21.1 rule 6 (#1903): a function's declared returned-view origins,
     // `-> &T from p, other.G` — (module path sym or 0; name sym) pairs, a
     // parameter (`self` included) or a global (Parser.parse_optional_from_clause).
     fn_view_origin_starts: HashMap[i32, i32],   // fn_node → first entry in fn_view_origin_*
     fn_view_origin_counts: HashMap[i32, i32],   // fn_node → entry count
-    fn_view_origin_paths: Vec[i32],             // module path sym
-    fn_view_origin_names: Vec[i32],             // parameter or global name sym
+    fn_view_origin_paths: List[i32],             // module path sym
+    fn_view_origin_names: List[i32],             // parameter or global name sym
     // NK_COPY_ARG nodes that require a .clone() call (type is Clone-only, not Copy)
     copy_arg_needs_clone: HashMap[i32, i32],   // node → 1
     // A trait's default method body as one impl's own nodes
     // (clone_default_method_bodies): the impl, the trait's body, the copy.
-    default_body_clone_impls: Vec[i32],
-    default_body_clone_origins: Vec[i32],
-    default_body_clones: Vec[i32],
+    default_body_clone_impls: List[i32],
+    default_body_clone_origins: List[i32],
+    default_body_clones: List[i32],
     default_body_clone_index: HashMap[i64, i32],   // (impl, trait body) → index
     // D61: type symbols whose Debug impl the compiler generated (a derive,
     // an `error` declaration). `:?` formats them with the generated form.
-    generated_debug_type_syms: Vec[i32],
+    generated_debug_type_syms: List[i32],
     // D70 (§18.2): `use m as n` / `use c_import(...) as n` — import decl → n.
     use_alias_map: HashMap[i32, i32],
     // D70: field-access nodes Sema resolved through an import namespace and
@@ -806,8 +806,8 @@ type AstPoolState {
     receiver_field_keys: HashMap[i64, i32],
     // §18.1: (file, last segment of its `module` header) pairs, in parse
     // order — a module's self-name when it has a header.
-    module_header_files: Vec[i32],
-    module_header_names: Vec[i32],
+    module_header_files: List[i32],
+    module_header_names: List[i32],
     frozen: i32,
 }
 
@@ -820,55 +820,55 @@ fn AstPool.new -> AstPool:
     let ptr = with_alloc(sizeof[AstPoolState]()) as *mut AstPoolState
     unsafe:
         *ptr = AstPoolState {
-            kinds: Vec.new(),
-            starts: Vec.new(),
-            ends: Vec.new(),
-            data0: Vec.new(),
-            data1: Vec.new(),
-            data2: Vec.new(),
-            literal_suffixes: Vec.new(),
-            int_literal_digit_idxs: Vec.new(),
-            int_literal_radices: Vec.new(),
-            files: Vec.new(),
+            kinds: List.new(),
+            starts: List.new(),
+            ends: List.new(),
+            data0: List.new(),
+            data1: List.new(),
+            data2: List.new(),
+            literal_suffixes: List.new(),
+            int_literal_digit_idxs: List.new(),
+            int_literal_radices: List.new(),
+            files: List.new(),
             current_file_id: 0,
-            extra: Vec.new(),
-            decls: Vec.new(),
+            extra: List.new(),
+            decls: List.new(),
             local_decl_count: -1,
             prelude_decl_count: -1,
-            strings: Vec.new(),
-            fn_meta: Vec.new(),
-            type_meta: Vec.new(),
-            pattern_qualifiers: Vec.new(),
-            fn_param_patterns: Vec.new(),
-            fn_param_pattern_meta: Vec.new(),
-            for_meta: Vec.new(),
-            for_carrier_alts: Vec.new(),
-            block_meta: Vec.new(),
-            must_use_type_nodes: Vec.new(),
-            no_await_guard_type_nodes: Vec.new(),
-            no_alloc_fn_nodes: Vec.new(),
-            iter_of_self_fn_nodes: Vec.new(),
-            sealed_trait_nodes: Vec.new(),
-            extend_impl_nodes: Vec.new(),
-            comptime_decl_nodes: Vec.new(),
-            const_decl_nodes: Vec.new(),
-            move_closure_nodes: Vec.new(),
-            non_escaping_closure_nodes: Vec.new(),
-            by_place_closure_nodes: Vec.new(),
-            closure_ret_type_nodes: Vec.new(),
-            compiler_hook_fn_nodes: Vec.new(),
-            compiler_hook_phase_syms: Vec.new(),
-            global_allocator_decl_nodes: Vec.new(),
-            where_meta: Vec.new(),
-            impl_type_params: Vec.new(),
-            impl_target_type_nodes: Vec.new(),
-            impl_trait_type_args: Vec.new(),
-            type_bound_args: Vec.new(),
-            type_bound_arg_nodes: Vec.new(),
+            strings: List.new(),
+            fn_meta: List.new(),
+            type_meta: List.new(),
+            pattern_qualifiers: List.new(),
+            fn_param_patterns: List.new(),
+            fn_param_pattern_meta: List.new(),
+            for_meta: List.new(),
+            for_carrier_alts: List.new(),
+            block_meta: List.new(),
+            must_use_type_nodes: List.new(),
+            no_await_guard_type_nodes: List.new(),
+            no_alloc_fn_nodes: List.new(),
+            iter_of_self_fn_nodes: List.new(),
+            sealed_trait_nodes: List.new(),
+            extend_impl_nodes: List.new(),
+            comptime_decl_nodes: List.new(),
+            const_decl_nodes: List.new(),
+            move_closure_nodes: List.new(),
+            non_escaping_closure_nodes: List.new(),
+            by_place_closure_nodes: List.new(),
+            closure_ret_type_nodes: List.new(),
+            compiler_hook_fn_nodes: List.new(),
+            compiler_hook_phase_syms: List.new(),
+            global_allocator_decl_nodes: List.new(),
+            where_meta: List.new(),
+            impl_type_params: List.new(),
+            impl_target_type_nodes: List.new(),
+            impl_trait_type_args: List.new(),
+            type_bound_args: List.new(),
+            type_bound_arg_nodes: List.new(),
             fn_meta_map: HashMap.new(),
             membership_arg_map: HashMap.new(),
             pattern_binding_keys: HashMap.new(),
-            pattern_binding_pairs: Vec.new(),
+            pattern_binding_pairs: List.new(),
             type_meta_map: HashMap.new(),
             pattern_qualifier_map: HashMap.new(),
             where_meta_map: HashMap.new(),
@@ -906,28 +906,28 @@ fn AstPool.new -> AstPool:
             receiver_field_methods: HashMap.new(),
             receiver_field_accesses: HashMap.new(),
             receiver_field_keys: HashMap.new(),
-            module_header_files: Vec.new(),
-            module_header_names: Vec.new(),
+            module_header_files: List.new(),
+            module_header_names: List.new(),
             unsafe_fn_type_nodes: HashMap.new(),
             variadic_fn_type_nodes: HashMap.new(),
             fn_effect_pin_starts: HashMap.new(),
             fn_effect_pin_counts: HashMap.new(),
-            fn_effect_pin_params: Vec.new(),
-            fn_effect_pin_bits: Vec.new(),
+            fn_effect_pin_params: List.new(),
+            fn_effect_pin_bits: List.new(),
             fn_global_write_starts: HashMap.new(),
             fn_global_write_counts: HashMap.new(),
-            fn_global_write_paths: Vec.new(),
-            fn_global_write_names: Vec.new(),
+            fn_global_write_paths: List.new(),
+            fn_global_write_names: List.new(),
             fn_view_origin_starts: HashMap.new(),
             fn_view_origin_counts: HashMap.new(),
-            fn_view_origin_paths: Vec.new(),
-            fn_view_origin_names: Vec.new(),
+            fn_view_origin_paths: List.new(),
+            fn_view_origin_names: List.new(),
             copy_arg_needs_clone: HashMap.new(),
-            default_body_clone_impls: Vec.new(),
-            default_body_clone_origins: Vec.new(),
-            default_body_clones: Vec.new(),
+            default_body_clone_impls: List.new(),
+            default_body_clone_origins: List.new(),
+            default_body_clones: List.new(),
             default_body_clone_index: HashMap.new(),
-            generated_debug_type_syms: Vec.new(),
+            generated_debug_type_syms: List.new(),
             frozen: 0,
         }
     let st = ptr
@@ -1847,7 +1847,7 @@ impl AstPool:
     // c_import's declarations and the types and methods a `c facade`
     // renders (`generated_files`) are the compiler's text, not a module
     // anyone wrote: their C parameter names stand.
-    mut fn resolve_receiver_field_names(intern: InternPool, decl_is_c_import: &Vec[i32], generated_files: &Vec[i32]):
+    mut fn resolve_receiver_field_names(intern: InternPool, decl_is_c_import: &List[i32], generated_files: &List[i32]):
         if self.state.frozen != 0:
             ast_pool_phase_bug("BUG: receiver field-name resolution ran after AstPool.freeze")
         let self_sym = intern.intern("self")
@@ -1915,8 +1915,8 @@ impl AstPool:
         var below = fn_node as i32 - 1
         while below > 0 and not decl_nodes.contains(below): below = below - 1
         // A nested fn is its own scope, with no receiver.
-        let nested_starts: Vec[i32] = Vec.new()
-        let nested_ends: Vec[i32] = Vec.new()
+        let nested_starts: List[i32] = List.new()
+        let nested_ends: List[i32] = List.new()
         let callees: HashMap[i32, i32] = HashMap.new()
         // Names a binding in the body takes. Sema refuses that binding
         // (§29.8); its uses stay the binding's, so the refusal is the one
@@ -2265,7 +2265,7 @@ impl AstPool:
     // A type-parameter bound's trait arguments, keyed by the extra index
     // that holds the bound's trait symbol: `G: Gen[T]` records `[T]`, so a
     // call can infer T from the type G is bound to (#1732).
-    fn add_type_bound_args(bound_extra_idx: i32, arg_nodes: Vec[i32]):
+    fn add_type_bound_args(bound_extra_idx: i32, arg_nodes: List[i32]):
         let idx = self.state.type_bound_args.len() as i32
         self.state.type_bound_args.push(bound_extra_idx)
         self.state.type_bound_args.push(self.state.type_bound_arg_nodes.len() as i32)
@@ -2277,8 +2277,8 @@ impl AstPool:
     fn find_type_bound_args(bound_extra_idx: i32) -> i32: self.state.type_bound_args_map.get(bound_extra_idx) ?? -1
 
     // The argument type nodes of the bound record `meta`.
-    fn type_bound_arg_nodes(meta: i32) -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    fn type_bound_arg_nodes(meta: i32) -> List[i32]:
+        var out: List[i32] = List.new()
         let start: i32 = self.state.type_bound_args[(meta + 1)]
         for i in 0..self.state.type_bound_args[(meta + 2)]:
             out.push(self.state.type_bound_arg_nodes[(start + i)])
@@ -2350,13 +2350,13 @@ impl AstPool:
     fn build_for_carrier_alt(for_node: i32, binding_is_pat: bool, payload_sym: i32, fail_sym: i32) -> NodeId:
         let start = self.get_start(for_node)
         let binding = self.get_data0(for_node)
-        let pats: Vec[i32] = Vec.new()
+        let pats: List[i32] = List.new()
         pats.push(if binding_is_pat: binding else: self.add_node(NodeKind.NK_PAT_IDENT, start, start, binding, 0, 0))
-        let exprs: Vec[i32] = Vec.new()
+        let exprs: List[i32] = List.new()
         exprs.push(self.get_data1(for_node))
-        let kinds: Vec[i32] = Vec.new()
+        let kinds: List[i32] = List.new()
         kinds.push(0)
-        let fail_syms: Vec[i32] = Vec.new()
+        let fail_syms: List[i32] = List.new()
         fail_syms.push(fail_sym)
         let body = self.get_data2(for_node)
         let yielded = ast_for_body_yield_value(self, body)
@@ -2374,7 +2374,7 @@ impl AstPool:
     // the failure arm `{}` in the statement form. The innermost value is
     // `body`, wrapped in `_Payload(...)` in the yield form. Sema resolves the
     // placeholders against each clause's carrier.
-    fn build_comprehension_match(start: i32, end: i32, payload_sym: i32, empty_sym: i32, fail_syms: &Vec[i32], pats: &Vec[i32], exprs: &Vec[i32], kinds: &Vec[i32], body: i32, has_yield: bool) -> NodeId:
+    fn build_comprehension_match(start: i32, end: i32, payload_sym: i32, empty_sym: i32, fail_syms: &List[i32], pats: &List[i32], exprs: &List[i32], kinds: &List[i32], body: i32, has_yield: bool) -> NodeId:
         var inner = body
         if has_yield:
             let some_callee = self.add_node(NodeKind.NK_IDENT, start, start, payload_sym, 0, 0)

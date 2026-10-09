@@ -5,11 +5,11 @@
 use std.builtins.print_i32
 var DROPS: i32 = 0
 var PTARGET: i32 = 0
-type S { a: i32, v: Vec[i32] }
+type S { a: i32, v: List[i32] }
 impl Drop for S:
     fn drop(move self: Self):
         DROPS = DROPS + 1
-fn mk() -> S: S { a: 1, v: Vec.new() }
+fn mk() -> S: S { a: 1, v: List.new() }
 fn use_s(x: S): ()
 fn scenario():
     var x = mk()

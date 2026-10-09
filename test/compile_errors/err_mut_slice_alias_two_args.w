@@ -6,6 +6,6 @@
 fn merge(a: []mut i32, b: []mut i32): ()
 
 fn main:
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     v.push(1)
     merge(v, v)

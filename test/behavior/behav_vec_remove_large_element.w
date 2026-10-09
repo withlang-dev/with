@@ -2,7 +2,7 @@
 //! expect-stdout: records: 100 one x | 200 two y
 //! expect-stdout: into_iter: 100 one x | 200 two y
 
-// #1689: `Vec.remove(i)` loads the element, shifts the buffer, then stores
+// #1689: `List.remove(i)` loads the element, shifts the buffer, then stores
 // the loaded value into the caller's binding. For an element of 64 bytes or
 // more the aggregate-copy lowering (compiler/LlvmBridge.w
 // wl_lower_aggregate_copies) rewrote that store into a memmove from the
@@ -18,14 +18,14 @@ fn describe(kind: i32, at: i32) -> F:
         return F { a: 7, b: at, c: at + 1, m: "one " ++ "x", n: "note", h: "help" }
     F { a: 7, b: at, c: at + 1, m: "two " ++ "y", n: "", h: "help2" }
 
-fn records() -> Vec[F]:
-    var out: Vec[F] = Vec.new()
+fn records() -> List[F]:
+    var out: List[F] = List.new()
     for i in 0..2:
         out.push(describe(i + 1, 100 * (i + 1)))
     out
 
 fn main:
-    var pods: Vec[H] = Vec.new()
+    var pods: List[H] = List.new()
     pods.push(H { a: 1, b: 0, c: 0, d: 0, e: 0, f: 0, g: 0, h: 0, i: 0, j: 0, k: 0, l: 0, m: 0, n: 0, o: 0, p: 0 })
     pods.push(H { a: 2, b: 0, c: 0, d: 0, e: 0, f: 0, g: 0, h: 0, i: 0, j: 0, k: 0, l: 0, m: 0, n: 0, o: 0, p: 0 })
     let first = pods.remove(0)
@@ -36,7 +36,7 @@ fn main:
     let r1 = rs.remove(0)
     print(f"records: {r0.b} {r0.m} | {r1.b} {r1.m}")
 
-    var all: Vec[F] = Vec.new()
+    var all: List[F] = List.new()
     let found = records()
     for f in found.into_iter(): all.push(f)
     print(f"into_iter: {all[0].b} {all[0].m} | {all[1].b} {all[1].m}")

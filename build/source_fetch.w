@@ -74,7 +74,7 @@ fn sf_helper(ctx: &ActionCtx, scratch: &str, label: &str) -> str:
 // why it was not.
 fn sf_fetch_https(ctx: &ActionCtx, scratch: &str, helper: &str, label: &str, source: &str, part: &str, connect_ms: i32, download_ms: i32) -> str:
     let root = ctx.project_info().project_root()
-    let probe: Vec[str] = Vec.new()
+    let probe: List[str] = List.new()
     probe.push(sf_abs(root, helper))
     probe.push("--probe")
     probe.push(sf_owned(source))
@@ -84,7 +84,7 @@ fn sf_fetch_https(ctx: &ActionCtx, scratch: &str, helper: &str, label: &str, sou
     if probed.rc != 0:
         let said = sf_last_line(probed.stdout ++ probed.stderr)
         return if said.len() > 0: said else: f"the connection probe failed (exit {probed.rc})"
-    let get: Vec[str] = Vec.new()
+    let get: List[str] = List.new()
     get.push(sf_abs(root, helper))
     get.push(sf_owned(source))
     get.push(sf_abs(root, part))
@@ -117,7 +117,7 @@ pub fn source_fetch_url(ctx: &ActionCtx, scratch: &str, label: &str, url: &str, 
 /// `sources` that delivers it. `rc` is 0 and `report` says which source did
 /// and what the earlier ones did; otherwise `rc` is nonzero, `output` does
 /// not exist and `report` is the failure, naming every source.
-pub fn source_fetch_pinned(ctx: &ActionCtx, scratch: &str, label: &str, sources: &Vec[str], sha256: &str, output: &str, connect_ms: i32, download_ms: i32) -> SourceFetch:
+pub fn source_fetch_pinned(ctx: &ActionCtx, scratch: &str, label: &str, sources: &List[str], sha256: &str, output: &str, connect_ms: i32, download_ms: i32) -> SourceFetch:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let name = sf_basename(output)
@@ -190,7 +190,7 @@ pub fn run_source_fetch_tests_action(ctx: ActionCtx) -> i32:
     let down_b = "https://127.0.0.1:2/archive.bin"
 
     // 1. The first source is down; the second delivers the pinned bytes.
-    let fall: Vec[str] = Vec.new()
+    let fall: List[str] = List.new()
     fall.push(sf_owned(down_a))
     fall.push(sf_owned(good))
     let out1 = sf_join(scratch, "got/fallthrough.bin")
@@ -202,7 +202,7 @@ pub fn run_source_fetch_tests_action(ctx: ActionCtx) -> i32:
 
     // 2. Every source is down: a failure naming the archive, the pin and
     //    each source, and no output.
-    let dead: Vec[str] = Vec.new()
+    let dead: List[str] = List.new()
     dead.push(sf_owned(down_a))
     dead.push(sf_owned(down_b))
     let out2 = sf_join(scratch, "got/unreachable.bin")
@@ -214,7 +214,7 @@ pub fn run_source_fetch_tests_action(ctx: ActionCtx) -> i32:
 
     // 3. A source that delivers other bytes is not the archive: skipped,
     //    with the digest it had, and the next one is used.
-    let wrong: Vec[str] = Vec.new()
+    let wrong: List[str] = List.new()
     wrong.push(sf_owned(other))
     wrong.push(sf_owned(good))
     let out3 = sf_join(scratch, "got/wrong-bytes.bin")
@@ -235,7 +235,7 @@ pub fn run_source_fetch_tests_action(ctx: ActionCtx) -> i32:
     if compiled.rc != 0 or not fs.exists(listener):
         return sft_fail(ctx, f"could not compile build/silent_listener.w (exit {compiled.rc})")
     let port_file = sf_join(scratch, "silent.port")
-    let serve: Vec[str] = Vec.new()
+    let serve: List[str] = List.new()
     serve.push(sf_abs(root, listener))
     serve.push(sf_abs(root, port_file))
     let pid = ctx.process_runner().spawn_capture(serve, sf_abs(root, sf_join(scratch, "silent.stdout")), sf_abs(root, sf_join(scratch, "silent.stderr")))
@@ -246,7 +246,7 @@ pub fn run_source_fetch_tests_action(ctx: ActionCtx) -> i32:
     while port.len() == 0 and waited < 15:
         if fs.exists(port_file): port = sft_digits(fs.read_text(port_file))
         if port.len() == 0:
-            let nap: Vec[str] = Vec.new()
+            let nap: List[str] = List.new()
             nap.push(sf_abs(root, listener))
             nap.push("nap")
             let _napped = ctx.process_runner().run_capture(nap, sf_abs(root, sf_join(scratch, "nap.stdout")), sf_abs(root, sf_join(scratch, "nap.stderr")), 10000)
@@ -255,7 +255,7 @@ pub fn run_source_fetch_tests_action(ctx: ActionCtx) -> i32:
         let _reaped = ctx.process_runner().wait(pid, 30000)
         return sft_fail(ctx, "the silent listener never wrote its port to " ++ port_file)
     let silent = "https://127.0.0.1:" ++ port ++ "/archive.bin"
-    let stall: Vec[str] = Vec.new()
+    let stall: List[str] = List.new()
     stall.push(sf_owned(silent))
     stall.push(sf_owned(good))
     let out4 = sf_join(scratch, "got/stalled.bin")
@@ -282,7 +282,7 @@ pub fn run_source_fetch_tests_action(ctx: ActionCtx) -> i32:
 fn sct_build_w(pin: &str, source: &str) -> str:
     "use std.build\n\n" ++
     "fn fetch(ctx: ActionCtx) -> i32:\n" ++
-    "    let sources: Vec[str] = Vec.new()\n" ++
+    "    let sources: List[str] = List.new()\n" ++
     "    sources.push(ctx.args()[1] ++ \"\")\n" ++
     "    let got = ctx.fetch_source(&sources, ctx.args()[0], ctx.output(), 20000)\n" ++
     "    let how = if got.rc != 0: \"failed\" else if got.from_cache: \"cache\" else: \"fetched\"\n" ++
@@ -317,7 +317,7 @@ fn sct_run(ctx: &ActionCtx, compiler: &str, scratch: &str, case_name: &str, pin:
     let wrote = fs.mkdir_all(dir) == 0 and fs.write_text(sf_join(dir, "with.toml"), "[package]\nname = \"" ++ case_name.replace("-", "") ++ "\"\nversion = \"0.1.0\"\n") == 0 and fs.write_text(sf_join(dir, "build.w"), sct_build_w(pin, source)) == 0 and fs.write_text(sf_join(dir, "archive-src.bin"), "the pinned archive\n") == 0
     if not wrote:
         return ToolProcessResult { rc: -1, stdout: "", stderr: "could not write the project in " ++ dir, timed_out: false }
-    let argv: Vec[str] = Vec.new()
+    let argv: List[str] = List.new()
     argv.push(sf_abs(root, compiler))
     argv.push("build")
     var env = process_env()

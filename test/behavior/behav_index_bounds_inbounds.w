@@ -21,7 +21,7 @@ fn main:
     let empty = arr[3..3]
     assert(empty.len() == 0)
 
-    let values: Vec[i32] = Vec.new()
+    let values: List[i32] = List.new()
     values.push(4)
     values.push(5)
     values.push(6)

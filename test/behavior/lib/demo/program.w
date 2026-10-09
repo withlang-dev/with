@@ -22,7 +22,7 @@ pub type BindEntry {
 }
 
 pub type Bindings {
-    entries: Vec[BindEntry],
+    entries: List[BindEntry],
 }
 
 fn program_rec(prog: Program) -> *mut ProgramRec:
@@ -43,7 +43,7 @@ pub fn program_source(entry: str) -> ProgramSource:
 pub fn bind(name: str, view: View) -> BindEntry:
     BindEntry { name, view }
 
-pub fn bindings_from(entries: Vec[BindEntry]) -> Bindings:
+pub fn bindings_from(entries: List[BindEntry]) -> Bindings:
     Bindings { entries }
 
 pub fn compile(device: Device, source: &ProgramSource) -> Result[Program, DemoError]:

@@ -11,5 +11,5 @@ fn main:
     let value = 42
     var task = owned_task(1)
     task = borrowed_task(&value)
-    var tasks = Vec[Task[i32]].new()
+    var tasks = List[Task[i32]].new()
     tasks.push(task)

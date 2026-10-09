@@ -3,7 +3,7 @@ use std.iter
 use std.builtins.int_to_string
 
 fn main:
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     v.push(10)
     v.push(20)
     v.push(30)

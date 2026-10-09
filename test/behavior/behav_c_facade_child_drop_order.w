@@ -13,7 +13,7 @@
 // D51 stage 6 (ruling §27, §29; spec §16.2b.6): a statement produced from a
 // database depends on it — unknown independence means dependency — so it is
 // destroyed before the database on every path: at scope end, on an early
-// return, on `?`, per loop iteration, inside a Vec, inside an Option, in a
+// return, on `?`, per loop iteration, inside a List, inside an Option, in a
 // match arm, in a helper that borrows the database, and when a helper
 // returns a statement derived from its borrowed database. The C side logs
 // each finalize (fNN) and each close with the statements still open at
@@ -97,7 +97,7 @@ fn main:
     log_reset(l)
     if true:
         let db = Database.new(l, 5).unwrap()
-        var all: Vec[Statement] = Vec.new()
+        var all: List[Statement] = List.new()
         for i in 1..4:
             all.push(Statement.new(db, 50 + i).unwrap())
         let _ = all.len()

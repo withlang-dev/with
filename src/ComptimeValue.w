@@ -17,7 +17,7 @@ pub enum ComptimeValueKind: i32:
     CV_TUPLE = 6
     CV_RANGE = 7
     CV_STRUCT = 8
-    CV_VEC = 9
+    CV_LIST = 9
     CV_MAP = 10
     CV_CAPABILITY = 11
     CV_FN = 12
@@ -204,9 +204,9 @@ pub fn comptime_value_struct(type_id: i32, extra_start: i32, extra_count: i32) -
         extra_count,
     }
 
-pub fn comptime_value_vec(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
+pub fn comptime_value_list(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
     ComptimeValue {
-        kind: ComptimeValueKind.CV_VEC,
+        kind: ComptimeValueKind.CV_LIST,
         type_id,
         data0: 0,
         data1: 0,
@@ -326,7 +326,7 @@ pub fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_TUPLE: return "tuple"
     if kind == ComptimeValueKind.CV_RANGE: return "range"
     if kind == ComptimeValueKind.CV_STRUCT: return "struct"
-    if kind == ComptimeValueKind.CV_VEC: return "vec"
+    if kind == ComptimeValueKind.CV_LIST: return "vec"
     if kind == ComptimeValueKind.CV_MAP: return "map"
     if kind == ComptimeValueKind.CV_CAPABILITY: return "capability"
     if kind == ComptimeValueKind.CV_FN: return "function"
@@ -336,7 +336,7 @@ pub fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_FLOAT: return "float"
     "invalid"
 
-fn comptime_value_format(value: &ComptimeValue, extras: &Vec[ComptimeValue], sema: &Sema) -> str:
+fn comptime_value_format(value: &ComptimeValue, extras: &List[ComptimeValue], sema: &Sema) -> str:
     if value.kind == ComptimeValueKind.CV_VOID:
         return "void"
     if value.kind == ComptimeValueKind.CV_INT:
@@ -374,7 +374,7 @@ fn comptime_value_format(value: &ComptimeValue, extras: &Vec[ComptimeValue], sem
                 let field_value = extras[(value.extra_start + fi)]
                 out = out ++ sema.pool_resolve(field_sym) ++ ": " ++ comptime_value_format(field_value, extras, sema)
             return out ++ " }"
-    if value.kind == ComptimeValueKind.CV_VEC:
+    if value.kind == ComptimeValueKind.CV_LIST:
         var out = sema.type_name(value.type_id) ++ "(["
         for i in 0..value.extra_count:
             if i > 0:
@@ -406,14 +406,14 @@ fn comptime_value_format(value: &ComptimeValue, extras: &Vec[ComptimeValue], sem
             out = out ++ ")"
         return out
     if value.kind == ComptimeValueKind.CV_BYTES:
-        return f"Vec[u8]({value.text.len()} bytes)"
+        return f"List[u8]({value.text.len()} bytes)"
     if value.kind == ComptimeValueKind.CV_STRING_BUILDER:
         return f"StringBuilder({value.data0} bytes)"
     if value.type_id != 0:
         return "<" ++ sema.type_name(value.type_id) ++ ">"
     "<invalid>"
 
-pub fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &Vec[ComptimeValue]) -> i32:
+pub fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &List[ComptimeValue]) -> i32:
     if lhs.kind != rhs.kind:
         return 0
     if lhs.kind == ComptimeValueKind.CV_INVALID:
@@ -452,7 +452,7 @@ pub fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &
             if comptime_values_equal(left, right, extras) == 0:
                 return 0
         return 1
-    if lhs.kind == ComptimeValueKind.CV_VEC:
+    if lhs.kind == ComptimeValueKind.CV_LIST:
         if lhs.type_id != rhs.type_id or lhs.extra_count != rhs.extra_count:
             return 0
         for i in 0..lhs.extra_count:

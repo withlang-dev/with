@@ -4,7 +4,7 @@
 // an element view of G is live; the closure's own body is refused in place.
 // A call writes every global its callee writes.
 
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 fn apply(f: fn() -> Unit): f()
 

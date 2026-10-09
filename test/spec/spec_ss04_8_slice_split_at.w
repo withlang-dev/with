@@ -25,8 +25,8 @@ fn test_slice_split:
     assert(right.get(0) == 3)
     assert(right.get(1) == 4)
 
-fn test_vec_split:
-    var xs = Vec.new()
+fn test_list_split:
+    var xs = List.new()
     xs.push(5)
     xs.push(6)
     xs.push(7)
@@ -38,7 +38,7 @@ fn test_vec_split:
     assert(right.get(0) == 8)
 
 fn test_range_split:
-    var xs = Vec.new()
+    var xs = List.new()
     xs.push(11)
     xs.push(12)
     xs.push(13)
@@ -52,6 +52,6 @@ fn test_range_split:
 fn main:
     test_array_split()
     test_slice_split()
-    test_vec_split()
+    test_list_split()
     test_range_split()
     print("ok")

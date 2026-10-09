@@ -2,11 +2,11 @@
 
 use std.builtins.print_i32
 type Payload {
-    values: Vec[i32],
+    values: List[i32],
 }
 
 fn main:
-    let items: Vec[Payload] = Vec.new()
-    let value = Payload { values: Vec.new() }
+    let items: List[Payload] = List.new()
+    let value = Payload { values: List.new() }
     items.push(value)
     print_i32(value.values.len() as i32)

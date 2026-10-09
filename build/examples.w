@@ -30,8 +30,8 @@ fn ex_slug(path: &str) -> str:
 
 /// Single-file examples: built with `with build`, then run from their
 /// directory.
-fn ex_programs() -> Vec[str]:
-    var out = Vec.new()
+fn ex_programs() -> List[str]:
+    var out = List.new()
     out.push("examples/hello.w")
     out.push("examples/fizzbuzz.w")
     out.push("examples/json_test.w")
@@ -46,8 +46,8 @@ fn ex_programs() -> Vec[str]:
 
 /// Packages (a `with.toml` and `src/main.w`): built from their entry,
 /// then run from the package directory.
-fn ex_packages() -> Vec[str]:
-    var out = Vec.new()
+fn ex_packages() -> List[str]:
+    var out = List.new()
     out.push("examples/ecs")
     out.push("examples/nebula")
     out.push("examples/service")
@@ -57,14 +57,14 @@ fn ex_packages() -> Vec[str]:
 /// target, from the project directory, as their README says to. They were
 /// in no lane, and examples/c-interop's tests failed on main unseen (#2137).
 /// It reads the host's sqlite3.h, which a Windows host does not have.
-fn ex_projects() -> Vec[str]:
-    var out = Vec.new()
+fn ex_projects() -> List[str]:
+    var out = List.new()
     if os() != "Windows": out.push("examples/c-interop")
     out
 
 /// Package test files (standalone), run with `with test` from the root.
-fn ex_tests() -> Vec[str]:
-    var out = Vec.new()
+fn ex_tests() -> List[str]:
+    var out = List.new()
     out.push("examples/channels/test/pipeline_test.w")
     out.push("examples/ecs/test/ecs_test.w")
     out.push("examples/ephemerality-and-lowering/test/ephemerality_and_lowering_test.w")
@@ -74,8 +74,8 @@ fn ex_tests() -> Vec[str]:
     out
 
 /// Files checked only: a benchmark has no main.
-fn ex_checked() -> Vec[str]:
-    var out = Vec.new()
+fn ex_checked() -> List[str]:
+    var out = List.new()
     out.push("examples/bench_demo.w")
     out
 
@@ -92,8 +92,8 @@ fn ex_dirname(path: &str) -> str:
 /// header. The check is what keeps the header's "diff clean" claim true; a
 /// copy that drifted (examples/c-interop missed Amendment 1 until D76) taught
 /// a stale contract.
-fn ex_facade_copies() -> Vec[str]:
-    var out = Vec.new()
+fn ex_facade_copies() -> List[str]:
+    var out = List.new()
     out.push("examples/c-interop/src/facades/sqlite3.w")
     out
 
@@ -135,7 +135,7 @@ fn ex_facade_copy_failures(ctx: &ActionCtx) -> i32:
 /// Runs one lane step; a failure is printed (with the compiler's
 /// diagnostic lines) and counted, never fatal on its own, so one run
 /// reports every rotted example.
-fn ex_run(ctx: &ActionCtx, args: Vec[str], label: &str, cwd: &str, timeout_ms: i32) -> i32:
+fn ex_run(ctx: &ActionCtx, args: List[str], label: &str, cwd: &str, timeout_ms: i32) -> i32:
     let root = ctx.project_info().project_root()
     let out_dir = ctx.output()
     let stdout_rel = ex_join(out_dir, label ++ ".stdout")
@@ -168,7 +168,7 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
     var failures = ex_facade_copy_failures(ctx)
 
     for source in ex_checked():
-        var args: Vec[str] = Vec.new()
+        var args: List[str] = List.new()
         args.push(compiler.clone())
         args.push("check")
         args.push(ex_abs(root, source))
@@ -177,7 +177,7 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
     for source in ex_programs():
         let slug = ex_slug(source)
         let binary = ex_abs(root, ex_join(out_dir, slug))
-        var build_args: Vec[str] = Vec.new()
+        var build_args: List[str] = List.new()
         build_args.push(compiler.clone())
         build_args.push("build")
         build_args.push(ex_abs(root, source))
@@ -186,14 +186,14 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
         if ex_run(ctx, build_args, slug ++ ".build", root, 300000) != 0:
             failures += 1
             continue
-        var run_args: Vec[str] = Vec.new()
+        var run_args: List[str] = List.new()
         run_args.push(binary.clone())
         failures += ex_run(ctx, run_args, slug ++ ".run", ex_abs(root, ex_dirname(source)), 60000)
 
     for package in ex_packages():
         let slug = ex_slug(package)
         let binary = ex_abs(root, ex_join(out_dir, slug))
-        var build_args: Vec[str] = Vec.new()
+        var build_args: List[str] = List.new()
         build_args.push(compiler.clone())
         build_args.push("build")
         build_args.push(ex_abs(root, ex_join(package, "src/main.w")))
@@ -202,24 +202,24 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
         if ex_run(ctx, build_args, slug ++ ".build", root, 300000) != 0:
             failures += 1
             continue
-        var run_args: Vec[str] = Vec.new()
+        var run_args: List[str] = List.new()
         run_args.push(binary.clone())
         failures += ex_run(ctx, run_args, slug ++ ".run", ex_abs(root, package), 60000)
 
     for project in ex_projects():
         let slug = ex_slug(project)
-        var run_args: Vec[str] = Vec.new()
+        var run_args: List[str] = List.new()
         run_args.push(compiler.clone())
         run_args.push("run")
         failures += ex_run(ctx, run_args, slug ++ ".run", ex_abs(root, project), 300000)
-        var test_args: Vec[str] = Vec.new()
+        var test_args: List[str] = List.new()
         test_args.push(compiler.clone())
         test_args.push("build")
         test_args.push(":test")
         failures += ex_run(ctx, test_args, slug ++ ".test", ex_abs(root, project), 300000)
 
     for test in ex_tests():
-        var args: Vec[str] = Vec.new()
+        var args: List[str] = List.new()
         args.push(compiler.clone())
         args.push("test")
         args.push(ex_abs(root, test))

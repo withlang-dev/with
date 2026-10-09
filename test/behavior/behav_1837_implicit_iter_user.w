@@ -6,9 +6,9 @@
 // §13.5 (#1837): a user type with no `next()` and a non-generic `fn iter()`
 // returning its own Iter[T] iterates bare, as if `.iter()` were spelled —
 // through an owned binding and through a `&Deck` view.
-type Deck { cards: Vec[i32] }
+type Deck { cards: List[i32] }
 
-type DeckIter = ephemeral { cards: &Vec[i32], i: i32 }
+type DeckIter = ephemeral { cards: &List[i32], i: i32 }
 
 impl DeckIter:
     mut fn next() -> Option[i32]:
@@ -29,7 +29,7 @@ fn doubled(d: &Deck) -> str:
     out
 
 fn main:
-    var cards: Vec[i32] = Vec.new()
+    var cards: List[i32] = List.new()
     cards.push(10)
     cards.push(20)
     cards.push(30)
@@ -40,6 +40,6 @@ fn main:
     print(out)
     print(doubled(&deck))
     // §13.6: a comprehension clause is the same iteration.
-    let bumped: Vec[i32] = [c + 1 for c in deck]
+    let bumped: List[i32] = [c + 1 for c in deck]
     print(f"{bumped[0]} {bumped[1]} {bumped[2]}")
     print(f"{deck.len()}")

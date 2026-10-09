@@ -3,7 +3,7 @@
 // Views expire at last use; mutation after last use is legal.
 
 fn test_straight_line:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(1)
     xs.push(2)
     let first = &xs[0]

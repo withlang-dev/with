@@ -7,7 +7,7 @@
 // D69 (§13.4): a generator value holds only its arguments, so it can be
 // stored — here in a struct — and consumed later; a generator may consume
 // another, itself included, and yield what it receives (a recursive tree
-// walk). The tree is index-linked: a type recursive through Vec is #1557.
+// walk). The tree is index-linked: a type recursive through List is #1557.
 gen fn upto(n: i32) -> i32:
     for i in 0..n:
         yield i
@@ -19,16 +19,16 @@ type Job[G] {
 
 type Node {
     value: i32,
-    kids: Vec[i32],
+    kids: List[i32],
 }
 
-gen fn walk(nodes: &Vec[Node], at: i32) -> i32:
+gen fn walk(nodes: &List[Node], at: i32) -> i32:
     yield nodes[at].value
     for kid in nodes[at].kids:
         for v in walk(nodes, kid):
             yield v
 
-fn node(value: i32, kids: Vec[i32]) -> Node: Node { value, kids }
+fn node(value: i32, kids: List[i32]) -> Node: Node { value, kids }
 
 fn main:
     let job = Job { name: "later", source: upto(4) }
@@ -45,7 +45,7 @@ fn main:
     for v in second:
         sum += v
     print(sum)
-    var nodes: Vec[Node] = Vec.new()
+    var nodes: List[Node] = List.new()
     nodes.push(node(1, [1, 4]))
     nodes.push(node(2, [2, 3]))
     nodes.push(node(3, []))

@@ -1,12 +1,12 @@
 //! expect-stdout: 7
-// A `pub fn`'s own type parameter and Option/Vec of public types are not
+// A `pub fn`'s own type parameter and Option/List of public types are not
 // private types; the §18.1 signature check must stay silent here.
 
 use std.builtins.print_i32
 
 pub type Pair { a: i32, b: i32 }
 
-pub fn first[T](xs: &Vec[T]) -> &T:
+pub fn first[T](xs: &List[T]) -> &T:
     xs.get(0)
 
 pub fn total(p: &Pair, extra: Option[i32]) -> i32:

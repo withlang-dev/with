@@ -228,8 +228,8 @@ fn build_graph_asm_resolve_operands(root: &str, text: &str) -> str:
 // an embed target's assembly names its blobs by path only, so a blob whose
 // bytes changed leaves the source identical, and without these the object
 // stayed fresh over the old bytes.
-pub fn build_graph_discovered_inputs(root: &str, target: &BuildGraphTarget) -> Vec[str]:
-    var paths: Vec[str] = Vec.new()
+pub fn build_graph_discovered_inputs(root: &str, target: &BuildGraphTarget) -> List[str]:
+    var paths: List[str] = List.new()
     if target.kind != 13 or target.entry.len() == 0: return paths
     let text = build_graph_rt_read_file(build_graph_resolve_project_path(root, target.entry))
     var start: i64 = 0
@@ -280,7 +280,7 @@ pub fn build_graph_compile_ir_to_object(root: &str, target: &BuildGraphTarget) -
         build_graph_rt_eprint("error: compile_llvm_ir_object target '" ++ target.name ++ "' failed")
     rc
 
-fn build_graph_archive_member_seen(inputs: &Vec[str], count: i32, basename: &str) -> bool:
+fn build_graph_archive_member_seen(inputs: &List[str], count: i32, basename: &str) -> bool:
     for i in 0..count:
         if build_graph_path_basename(inputs[i]) == basename:
             return true
@@ -301,7 +301,7 @@ pub fn build_graph_create_archive(root: &str, target: &BuildGraphTarget) -> i32:
     if build_graph_rt_mkdir_p(output_dir) != 0:
         build_graph_rt_eprint("error: could not create archive output directory for target '" ++ target.name ++ "': " ++ output_dir)
         return 1
-    let resolved_inputs: Vec[str] = Vec.new()
+    let resolved_inputs: List[str] = List.new()
     for ii in 0..target.inputs.len() as i32:
         let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
         if build_graph_rt_file_exists(input_path) == 0:

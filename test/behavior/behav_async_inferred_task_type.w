@@ -10,7 +10,7 @@
 // An unannotated async fn's inferred return was stored as the bare T, so its
 // calls were typed `i32`: the handle lived in i32-typed MIR locals, a method
 // could not be awaited ("await requires a Task value"), a Task parameter or
-// Vec[Task[i32]] refused it, and `.cancel()` aborted the compiler. Annotated
+// List[Task[i32]] refused it, and `.cancel()` aborted the compiler. Annotated
 // async fns were always `Task[T]`.
 use std.task.Task
 
@@ -38,7 +38,7 @@ async fn main:
     print(f"{a} {b}")
     let p = mk(7).await
     print(f"{p.a} {p.s}")
-    var ts: Vec[Task[i32]] = Vec.new()
+    var ts: List[Task[i32]] = List.new()
     ts.push(double(1))
     ts.push(double(2))
     var total = 0

@@ -2,7 +2,7 @@
 //! expect-stdout: 170 164 167
 
 // #1477: an unsuffixed literal beside a Copy view of an integer takes the
-// pointee's type for `^`, `&` and `|` too; a Vec[u8] element (`v[i]` is
+// pointee's type for `^`, `&` and `|` too; a List[u8] element (`v[i]` is
 // `&u8`, D27) and a `&u8` field view both count. The literal fell to i32,
 // so the mixed-signedness check rejected `v[i] ^ 0x55`.
 
@@ -15,7 +15,7 @@ fn field_ops(f: &Flags) -> str:
     f"{x} {a} {o}"
 
 fn main:
-    let v: Vec[u8] = Vec.new()
+    let v: List[u8] = List.new()
     v.push(0)
     v.push(255)
     v[0] = v[0] ^ 0x55

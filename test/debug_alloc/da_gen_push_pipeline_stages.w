@@ -30,15 +30,15 @@ gen fn words(n: i32) -> str:
         yield f"w{i}"
 
 fn main:
-    let first_10 = fibonacci() |> take(10) |> collect[Vec]()
+    let first_10 = fibonacci() |> take(10) |> collect[List]()
     print(first_10.len())
-    let picked = fibonacci() |> map(it * 2) |> filter(it > 4) |> take(3) |> collect[Vec]()
+    let picked = fibonacci() |> map(it * 2) |> filter(it > 4) |> take(3) |> collect[List]()
     print(f"{picked[0]} {picked[1]} {picked[2]}")
     var out = ""
     for w in words(100) |> filter(it != "w1") |> map(it ++ "!") |> take(2):
         out = out ++ (if out.len() > 0: " " else: "") ++ w
     print(out)
-    let lens = words(2) |> map(it.len()) |> collect[Vec]()
+    let lens = words(2) |> map(it.len()) |> collect[List]()
     print(lens.len())
     var n = 0
     for v in fibonacci() |> take(5):

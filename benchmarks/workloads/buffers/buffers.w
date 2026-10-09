@@ -5,16 +5,16 @@ use std.time
 const ITERATIONS: i32 = 2000000
 const RING: i32 = 32
 
-type Ring { slots: Vec[Vec[u64]] }
+type Ring { slots: List[List[u64]] }
 
 fn main:
     let start = now_ns()
-    var ring = Ring { slots: Vec.with_capacity(RING) }
-    for _ in 0..RING: ring.slots.push(Vec.new())
+    var ring = Ring { slots: List.with_capacity(RING) }
+    for _ in 0..RING: ring.slots.push(List.new())
     var checksum: u64 = 0
     for i in 0..ITERATIONS:
         let words = 1024 * (1 + (i % 8))
-        var block: Vec[u64] = Vec.with_capacity(words)
+        var block: List[u64] = List.with_capacity(words)
         // Touch a contiguous prefix; the block's size is the point, not its fill.
         for j in 0..(words / 64):
             let value = (i as u64) *% 2654435761 +% (j as u64)

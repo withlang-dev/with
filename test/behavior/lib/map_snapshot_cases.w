@@ -2,7 +2,7 @@
 
 // D44 / §2.3 (#1158): traversal observes and an owned collection is cloned
 // where it is wanted. The snapshots once byte-copied their elements, so the
-// Vec and the map owned the same string buffers: a plain run passed while
+// List and the map owned the same string buffers: a plain run passed while
 // WITH_DEBUG_ALLOC_SCRIBBLE=1 showed the map corrupted, and the compiler's
 // own `.keys()` call double-freed while building the OpenSSL project. An
 // owned collection must survive its map, and the map must survive every
@@ -17,24 +17,24 @@ fn names() -> HashMap[str, str]:
     m.insert("beta".to_owned(), "two".to_owned())
     m
 
-fn keys_outlive_map() -> Vec[str]:
+fn keys_outlive_map() -> List[str]:
     let m = names()
-    m.keys() |> map(it.clone()) |> collect[Vec]()
+    m.keys() |> map(it.clone()) |> collect[List]()
 
-fn values_outlive_map() -> Vec[str]:
+fn values_outlive_map() -> List[str]:
     let m = names()
-    m.values() |> map(it.clone()) |> collect[Vec]()
+    m.values() |> map(it.clone()) |> collect[List]()
 
-fn entries_outlive_map() -> Vec[(str, str)]:
+fn entries_outlive_map() -> List[(str, str)]:
     let m = names()
-    m.iter() |> map(e => (e.0.clone(), e.1.clone())) |> collect[Vec]()
+    m.iter() |> map(e => (e.0.clone(), e.1.clone())) |> collect[List]()
 
 fn borrowed_keys(m: &HashMap[str, str]) -> i32:
     var n = 0
     for k in m.keys(): n += k.len() as i32
     n
 
-fn total(xs: &Vec[str]) -> i32:
+fn total(xs: &List[str]) -> i32:
     var n = 0
     for x in xs: n += x.len() as i32
     n

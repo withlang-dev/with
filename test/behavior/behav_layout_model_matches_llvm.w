@@ -25,7 +25,7 @@
 //! expect-stdout: Option[Big] 32/16 32/16 ok
 //! expect-stdout: Option[Option[i32]] 12/4 12/4 ok
 //! expect-stdout: Option[Option[P]] 32/8 32/8 ok
-//! expect-stdout: Option[Vec] 40/8 40/8 ok
+//! expect-stdout: Option[List] 40/8 40/8 ok
 //! expect-stdout: Option[str] 24/8 24/8 ok
 //! expect-stdout: Option[HashMap] 16/8 16/8 ok
 //! expect-stdout: Option[E64] 24/8 24/8 ok
@@ -51,7 +51,7 @@
 //! expect-stdout: [Option[&P];3] 24/8 24/8 ok
 //! expect-stdout: [EP;2] 48/8 48/8 ok
 //! expect-stdout: [E8;3] 24/4 24/4 ok
-//! expect-stdout: Vec[i32] 32/8 32/8 ok
+//! expect-stdout: List[i32] 32/8 32/8 ok
 //! expect-stdout: HashMap 8/8 8/8 ok
 //! expect-stdout: str 16/8 16/8 ok
 //! expect-stdout: []i32 16/8 16/8 ok
@@ -136,7 +136,7 @@ type TOptQ = Option[Q]
 type TOptBig = Option[Big]
 type TOptOptI32 = Option[Option[i32]]
 type TOptOptP = Option[Option[P]]
-type TOptVec = Option[Vec[i32]]
+type TOptList = Option[List[i32]]
 type TOptStr = Option[str]
 type TOptHM = Option[HashMap[i32, i32]]
 type TOptE64 = Option[E64]
@@ -180,7 +180,7 @@ type TArrTup = [(i8, i64); 2]
 type TArrOptRef = [Option[&P]; 3]
 type TArrEP = [EP; 2]
 type TArrE8 = [E8; 3]
-type TVec = Vec[i32]
+type TVec = List[i32]
 type THM = HashMap[i32, i32]
 type TStr = str
 type TSlice = []i32
@@ -217,7 +217,7 @@ type W_TOptQ = (i8, TOptQ)
 type W_TOptBig = (i8, TOptBig)
 type W_TOptOptI32 = (i8, TOptOptI32)
 type W_TOptOptP = (i8, TOptOptP)
-type W_TOptVec = (i8, TOptVec)
+type W_TOptList = (i8, TOptList)
 type W_TOptStr = (i8, TOptStr)
 type W_TOptHM = (i8, TOptHM)
 type W_TOptE64 = (i8, TOptE64)
@@ -313,7 +313,7 @@ fn main:
     row("Option[Big]", comptime TOptBig.size(), comptime TOptBig.align(), size_of[TOptBig](), size_of[W_TOptBig]())
     row("Option[Option[i32]]", comptime TOptOptI32.size(), comptime TOptOptI32.align(), size_of[TOptOptI32](), size_of[W_TOptOptI32]())
     row("Option[Option[P]]", comptime TOptOptP.size(), comptime TOptOptP.align(), size_of[TOptOptP](), size_of[W_TOptOptP]())
-    row("Option[Vec]", comptime TOptVec.size(), comptime TOptVec.align(), size_of[TOptVec](), size_of[W_TOptVec]())
+    row("Option[List]", comptime TOptList.size(), comptime TOptList.align(), size_of[TOptList](), size_of[W_TOptList]())
     row("Option[str]", comptime TOptStr.size(), comptime TOptStr.align(), size_of[TOptStr](), size_of[W_TOptStr]())
     row("Option[HashMap]", comptime TOptHM.size(), comptime TOptHM.align(), size_of[TOptHM](), size_of[W_TOptHM]())
     row("Option[E64]", comptime TOptE64.size(), comptime TOptE64.align(), size_of[TOptE64](), size_of[W_TOptE64]())
@@ -339,7 +339,7 @@ fn main:
     row("[Option[&P];3]", comptime TArrOptRef.size(), comptime TArrOptRef.align(), size_of[TArrOptRef](), size_of[W_TArrOptRef]())
     row("[EP;2]", comptime TArrEP.size(), comptime TArrEP.align(), size_of[TArrEP](), size_of[W_TArrEP]())
     row("[E8;3]", comptime TArrE8.size(), comptime TArrE8.align(), size_of[TArrE8](), size_of[W_TArrE8]())
-    row("Vec[i32]", comptime TVec.size(), comptime TVec.align(), size_of[TVec](), size_of[W_TVec]())
+    row("List[i32]", comptime TVec.size(), comptime TVec.align(), size_of[TVec](), size_of[W_TVec]())
     row("HashMap", comptime THM.size(), comptime THM.align(), size_of[THM](), size_of[W_THM]())
     row("str", comptime TStr.size(), comptime TStr.align(), size_of[TStr](), size_of[W_TStr]())
     row("[]i32", comptime TSlice.size(), comptime TSlice.align(), size_of[TSlice](), size_of[W_TSlice]())

@@ -57,7 +57,7 @@ fn lld_flavor_from_option(name: &str) -> str:
     ""
 
 // A GNU-flavor link with `-m <x>pe` is MinGW's, as lld decides.
-fn lld_gnu_is_mingw(args: &Vec[str]) -> bool:
+fn lld_gnu_is_mingw(args: &List[str]) -> bool:
     for i in 0..args.len() as i32:
         let emulation = if args[i] == "-m" and i + 1 < args.len() as i32: args[i + 1].clone() else if args[i].starts_with("-m") and args[i] != "-m": args[i].slice(2, args[i].len()) else: ""
         if emulation.ends_with("pe") or emulation.ends_with("pep"):
@@ -74,7 +74,7 @@ unsafe fn ld_c_string(s: &str) -> *mut u8:
 
 // Runs lld's `flavor` driver over `args` (args[0] is the tool name) in this
 // process; 0 when the link succeeded. lld prints its own diagnostics.
-pub fn lld_link(flavor: &str, args: &Vec[str]) -> i32:
+pub fn lld_link(flavor: &str, args: &List[str]) -> i32:
     if not lld_flavor_linked(flavor):
         runtime_eprint("error: this build of `with` has no " ++ lld_tool_name(flavor) ++ " linker: the LLVM SDK it was linked against has no lld " ++ flavor ++ " driver archive")
         return 127
@@ -108,11 +108,11 @@ pub fn with_ld_main() -> i32:
             runtime_eprint("error: with __ld: unknown -flavor '" ++ with_arg_at(3) ++ "' (darwin, gnu, link or wasm)")
             return 2
         first = 4
-    let rest: Vec[str] = Vec.new()
+    let rest: List[str] = List.new()
     for i in first..with_arg_count(): rest.push(with_arg_at(i))
     if flavor == "elf" and lld_gnu_is_mingw(&rest):
         flavor = "mingw"
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(lld_tool_name(flavor))
     for i in 0..rest.len() as i32: args.push(rest[i].clone())
     lld_link(flavor, &args)
@@ -142,7 +142,7 @@ pub fn lld_flavor_for_tool_name(argv0: &str) -> str:
 
 // argv[0] is the tool name; every other argument is lld's.
 pub fn with_ld_tool_main(flavor: &str) -> i32:
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(lld_tool_name(flavor))
     for i in 1..with_arg_count(): args.push(with_arg_at(i))
     let chosen = if flavor == "elf" and lld_gnu_is_mingw(&args): "mingw" else: flavor.to_owned()

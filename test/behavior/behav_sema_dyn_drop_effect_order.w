@@ -18,7 +18,7 @@ fn main:
     // A private implementor is still a possible dynamic destructor when the
     // public factory and trait cross a module boundary.
     let dir = p7_prepare_case("dyn_drop_effect_order", "droporder")
-    p7_write(dir, "src/owner.w", "use std.box.Box\npub var G: Vec[str] = Vec.new()\npub trait Named:\n    fn name(self: &Self) -> i32\ntype Tok:\n    n: i32\nimpl Named for Tok:\n    fn name(self: &Self) -> i32: self.n\nimpl Drop for Tok:\n    move fn drop(): G.push(\"grown\")\npub fn make() -> Box[dyn Named]: Box.new(Tok { n: 1 })\n")
+    p7_write(dir, "src/owner.w", "use std.box.Box\npub var G: List[str] = List.new()\npub trait Named:\n    fn name(self: &Self) -> i32\ntype Tok:\n    n: i32\nimpl Named for Tok:\n    fn name(self: &Self) -> i32: self.n\nimpl Drop for Tok:\n    move fn drop(): G.push(\"grown\")\npub fn make() -> Box[dyn Named]: Box.new(Tok { n: 1 })\n")
     p7_write(dir, "src/main.w", "use owner\nfn main:\n    G.push(\"first\")\n    let b = make()\n    let r = G[0]\n    {\n        let c = b\n        print(c.name())\n    }\n    print(r)\n")
     let module_forward = p7_run(dir, "dyn_drop_module_forward", "check\0src/main.w\0")
     let module_reverse = p7_run(dir, "dyn_drop_module_reverse", "check\0--sema-body-order-reverse\0src/main.w\0")

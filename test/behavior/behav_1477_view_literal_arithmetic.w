@@ -11,7 +11,7 @@
 fn f(p: &i64) -> i64: p + 1
 
 fn main:
-    let v: Vec[i64] = Vec.new()
+    let v: List[i64] = List.new()
     v.push(3000000000)
     let p = v[0]
     let q = p + 1

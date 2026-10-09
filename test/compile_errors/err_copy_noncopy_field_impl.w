@@ -1,4 +1,4 @@
 //! expect-check-fail: field 'data' is not Copy
 
-type CopySafetyBuffer { data: Vec[u8] }
+type CopySafetyBuffer { data: List[u8] }
 impl Copy for CopySafetyBuffer

@@ -2,12 +2,12 @@
 //! expect-stdout: 0 true
 //! expect-stdout: 3 false
 
-// #1954: `len()` and `is_empty()` on a VecRange, from `v.range(start..end)`,
+// #1954: `len()` and `is_empty()` on a ListRange, from `v.range(start..end)`,
 // build and run; a range the wrong shape is a Sema error
 // (test/compile_errors/err_1954_vec_range_two_args.w), never a crash.
 
 fn main:
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     v.push(1)
     v.push(2)
     v.push(3)

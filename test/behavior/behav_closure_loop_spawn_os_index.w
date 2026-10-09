@@ -10,7 +10,7 @@ use std.thread
 fn run_once(i: i32) -> i32: i * 100
 
 fn main:
-    var hs: Vec[JoinHandle] = Vec.new()
+    var hs: List[JoinHandle] = List.new()
     for i in 0..4:
         hs.push(spawn_os(move () => run_once(i)))
     var sum = 0

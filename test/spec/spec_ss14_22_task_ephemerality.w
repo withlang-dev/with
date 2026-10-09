@@ -10,7 +10,7 @@ async fn process(value: &i32) -> i32:
 
 fn owned_argument_task_is_storable:
     let task = fetch(42)
-    var tasks = Vec[Task[i32]].new()
+    var tasks = List[Task[i32]].new()
     tasks.push(task)
 
 async fn borrowing_task_is_scoped:

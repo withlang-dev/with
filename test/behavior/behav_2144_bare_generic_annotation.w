@@ -16,12 +16,12 @@ use std.collections.BTreeMap
 
 type Pair[A, B] { first: A, second: B }
 
-fn total(xs: &Vec[i32]): xs.iter() |> sum()
+fn total(xs: &List[i32]): xs.iter() |> sum()
 
 fn main:
-    let xs: Vec = [1, 2, 3]
+    let xs: List = [1, 2, 3]
     print(total(xs))
-    var names: Vec = ["a", "b"]
+    var names: List = ["a", "b"]
     names.push("c")
     print(names.len())
     let seen: HashSet = ["a", "b", "a"]
@@ -32,5 +32,5 @@ fn main:
     print(found ?? 0)
     let pair: Pair = Pair { first: 1, second: "one" }
     print(pair.second)
-    let grown: Vec = Vec[str].new()
+    let grown: List = List[str].new()
     print(grown.len())

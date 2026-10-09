@@ -2,7 +2,7 @@
 
 // #1317 / D44: `for (k, v) in m` is `m.iter()` and binds `&K`/`&V`; a
 // pattern-bound loop view borrows the map exactly as the plain binding
-// borrows a Vec, so inserting while iterating is rejected.
+// borrows a List, so inserting while iterating is rejected.
 
 use std.collections
 

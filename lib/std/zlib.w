@@ -32,28 +32,28 @@ fn zlib_code_error(code: i32) -> ZlibError:
         return zlib_error(code, "zlib version mismatch")
     zlib_error(code, "zlib operation failed")
 
-fn zlib_vec_data(bytes: &Vec[u8]) -> *const u8:
+fn zlib_list_data(bytes: &List[u8]) -> *const u8:
     bytes.ptr as *const u8
 
-fn zlib_copy_from_raw(ptr: *const u8, len: i64) -> Vec[u8]:
-    let out: Vec[u8] = Vec.new()
+fn zlib_copy_from_raw(ptr: *const u8, len: i64) -> List[u8]:
+    let out: List[u8] = List.new()
     var i: i64 = 0
     while i < len:
         out.push(unsafe *((ptr as i64 + i) as *const u8))
         i = i + 1
     out
 
-pub fn compress(data: &Vec[u8]) -> Result[Vec[u8], ZlibError]:
+pub fn compress(data: &List[u8]) -> Result[List[u8], ZlibError]:
     compress_level(data, Z_DEFAULT_COMPRESSION)
 
-pub fn compress_level(data: &Vec[u8], level: i32) -> Result[Vec[u8], ZlibError]:
+pub fn compress_level(data: &List[u8], level: i32) -> Result[List[u8], ZlibError]:
     if level < Z_DEFAULT_COMPRESSION or level > Z_BEST_COMPRESSION:
         return Err(zlib_error(Z_STREAM_ERROR, "zlib compression level must be -1..9"))
     var out_len = compressBound(data.len() as c_ulong)
     let out_ptr = with_alloc(out_len as i64) as *mut u8
     if out_ptr as i64 == 0:
         return Err(zlib_code_error(Z_MEM_ERROR))
-    let rc = unsafe { compress2(out_ptr, &raw mut out_len, zlib_vec_data(data), data.len() as c_ulong, level as c_int) }
+    let rc = unsafe { compress2(out_ptr, &raw mut out_len, zlib_list_data(data), data.len() as c_ulong, level as c_int) }
     if rc != Z_OK:
         with_free(out_ptr)
         return Err(zlib_code_error(rc))
@@ -61,10 +61,10 @@ pub fn compress_level(data: &Vec[u8], level: i32) -> Result[Vec[u8], ZlibError]:
     with_free(out_ptr)
     Ok(out)
 
-pub fn compress_gzip(data: &Vec[u8]) -> Result[Vec[u8], ZlibError]:
+pub fn compress_gzip(data: &List[u8]) -> Result[List[u8], ZlibError]:
     compress_gzip_level(data, Z_DEFAULT_COMPRESSION)
 
-pub fn compress_gzip_level(data: &Vec[u8], level: i32) -> Result[Vec[u8], ZlibError]:
+pub fn compress_gzip_level(data: &List[u8], level: i32) -> Result[List[u8], ZlibError]:
     if level < Z_DEFAULT_COMPRESSION or level > Z_BEST_COMPRESSION:
         return Err(zlib_error(Z_STREAM_ERROR, "zlib compression level must be -1..9"))
     if data.len() > ZLIB_MAX_CHUNK:
@@ -81,7 +81,7 @@ pub fn compress_gzip_level(data: &Vec[u8], level: i32) -> Result[Vec[u8], ZlibEr
     if out_ptr as i64 == 0:
         unsafe { deflateEnd(&raw mut stream) }
         return Err(zlib_code_error(Z_MEM_ERROR))
-    stream.next_in = zlib_vec_data(data) as *mut u8
+    stream.next_in = zlib_list_data(data) as *mut u8
     stream.avail_in = data.len() as c_uint
     stream.next_out = out_ptr
     stream.avail_out = out_len as c_uint
@@ -98,19 +98,19 @@ pub fn compress_gzip_level(data: &Vec[u8], level: i32) -> Result[Vec[u8], ZlibEr
     with_free(out_ptr)
     Ok(out)
 
-pub fn decompress(data: &Vec[u8]) -> Result[Vec[u8], ZlibError]:
+pub fn decompress(data: &List[u8]) -> Result[List[u8], ZlibError]:
     decompress_with_limit(data, ZLIB_DEFAULT_MAX_OUTPUT)
 
-pub fn decompress_with_limit(data: &Vec[u8], max_output_len: i64) -> Result[Vec[u8], ZlibError]:
+pub fn decompress_with_limit(data: &List[u8], max_output_len: i64) -> Result[List[u8], ZlibError]:
     decompress_window_bits(data, max_output_len, MAX_WBITS)
 
-pub fn decompress_gzip(data: &Vec[u8]) -> Result[Vec[u8], ZlibError]:
+pub fn decompress_gzip(data: &List[u8]) -> Result[List[u8], ZlibError]:
     decompress_gzip_with_limit(data, ZLIB_DEFAULT_MAX_OUTPUT)
 
-pub fn decompress_gzip_with_limit(data: &Vec[u8], max_output_len: i64) -> Result[Vec[u8], ZlibError]:
+pub fn decompress_gzip_with_limit(data: &List[u8], max_output_len: i64) -> Result[List[u8], ZlibError]:
     decompress_window_bits(data, max_output_len, MAX_WBITS + 16)
 
-fn decompress_window_bits(data: &Vec[u8], max_output_len: i64, window_bits: i32) -> Result[Vec[u8], ZlibError]:
+fn decompress_window_bits(data: &List[u8], max_output_len: i64, window_bits: i32) -> Result[List[u8], ZlibError]:
     if max_output_len < 0:
         return Err(zlib_error(Z_STREAM_ERROR, "zlib maximum output length must be non-negative"))
     var cap: i64 = (data.len() * 3) as i64
@@ -123,7 +123,7 @@ fn decompress_window_bits(data: &Vec[u8], max_output_len: i64, window_bits: i32)
         let out_ptr = with_alloc(cap) as *mut u8
         if out_ptr as i64 == 0:
             return Err(zlib_code_error(Z_MEM_ERROR))
-        let rc = unsafe { zlib_inflate_to_buffer(out_ptr, &raw mut out_len, zlib_vec_data(data), data.len() as c_ulong, window_bits as c_int) }
+        let rc = unsafe { zlib_inflate_to_buffer(out_ptr, &raw mut out_len, zlib_list_data(data), data.len() as c_ulong, window_bits as c_int) }
         if rc == Z_OK:
             let out = zlib_copy_from_raw(out_ptr as *const u8, out_len as i64)
             with_free(out_ptr)

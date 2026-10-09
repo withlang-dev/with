@@ -5,7 +5,7 @@
 // right before a `break`, since the stopped generator still leaves through
 // its own scopes.
 type Counter {
-    items: Vec[i32],
+    items: List[i32],
 }
 
 impl Counter:

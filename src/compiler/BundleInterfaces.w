@@ -45,8 +45,8 @@ pub fn bundle_module_dotted_name(canonical_path: &str) -> str:
     out
 
 // The `module <path>` section paths of an interface file, in file order.
-pub fn bundle_interface_section_paths(wi_text: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn bundle_interface_section_paths(wi_text: &str) -> List[str]:
+    let out: List[str] = List.new()
     var start: i64 = 0
     while start < wi_text.len():
         var end = start

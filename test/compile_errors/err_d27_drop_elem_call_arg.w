@@ -2,11 +2,11 @@
 
 // D27 E3: a by-value parameter is an owned demand; &Thing cannot satisfy it.
 
-type Thing { vals: Vec[i32] }
+type Thing { vals: List[i32] }
 
 fn consume(t: Thing) -> i64: t.vals.len()
 
 fn main:
-    var items: Vec[Thing] = Vec.new()
-    items.push(Thing { vals: Vec.new() })
+    var items: List[Thing] = List.new()
+    items.push(Thing { vals: List.new() })
     assert(consume(items[0]) == 0)

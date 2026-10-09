@@ -17,7 +17,7 @@
 // it by its With type — field by field, element by element, variant by
 // variant — and a part that has an `eq` is compared by that method. It was
 // compared as the bytes of its representation: an enum's payload as raw
-// bytes, so `Option[str] == Some("a")` was false, and a `Vec` by its buffer
+// bytes, so `Option[str] == Some("a")` was false, and a `List` by its buffer
 // pointer. Each case builds its operands apart (`to_lower`, separate
 // vectors), so nothing is equal by sharing storage.
 use std.box.Box
@@ -27,7 +27,7 @@ enum Token:
     Pair(str, i32)
     End
 
-type Holder { tag: Option[str], items: Vec[str], n: i32 }
+type Holder { tag: Option[str], items: List[str], n: i32 }
 
 // Equal when the text matches without regard to case.
 type Loose { text: str }
@@ -44,7 +44,7 @@ enum Tree:
     Node(Box[Tree], Box[Tree])
 
 fn same_holder(a: &Holder, b: &Holder): a == b
-fn same_names(a: &Vec[str], b: &Vec[str]): a == b
+fn same_names(a: &List[str], b: &List[str]): a == b
 
 fn a: "A".to_lower()
 
@@ -55,14 +55,14 @@ fn main:
     let none: Option[str] = None
     print(f"option of str: {some == Some("a")} {some == Some("b")} {none == None}")
     print(f"enum payloads: {Token.Name(a()) == Token.Name("a")} {Token.Name(a()) == Token.Pair("a", 1)} {Token.Pair(a(), 1) == Token.Pair("a", 2)} {Token.End == Token.End}")
-    let names: Vec[str] = [a(), "b"]
-    let same: Vec[str] = ["a", "b"]
-    let shorter: Vec[str] = ["a"]
-    let other: Vec[str] = ["a", "c"]
-    let empty: Vec[str] = Vec.new()
-    let none_yet: Vec[str] = Vec.new()
+    let names: List[str] = [a(), "b"]
+    let same: List[str] = ["a", "b"]
+    let shorter: List[str] = ["a"]
+    let other: List[str] = ["a", "c"]
+    let empty: List[str] = List.new()
+    let none_yet: List[str] = List.new()
     print(f"vec: {names == same} {names == shorter} {names == other} {empty == none_yet}")
-    let deep: Option[Option[Vec[str]]] = Some(Some([a()]))
+    let deep: Option[Option[List[str]]] = Some(Some([a()]))
     print(f"nested: {deep == Some(Some(["a"]))} {deep == Some(None)}")
     let failed: Result[i32, str] = Err("bad".to_lower())
     print(f"result: {failed == Err("bad")} {failed == Err("worse")} {failed == Ok(1)}")
@@ -74,9 +74,9 @@ fn main:
     print(f"struct fields: {held == Holder { tag: Some("a"), items: ["a"], n: 1 }} {held == Holder { tag: Some("a"), items: ["b"], n: 1 }} {same_holder(held, Holder { tag: Some("a"), items: ["a"], n: 1 })}")
     let loose: Option[Loose] = Some(Loose { text: "A" })
     print(f"part with its own eq: {loose == Some(Loose { text: "a" })} {loose == Some(Loose { text: "b" })}")
-    let keyed: Vec[Keyed[i32]] = [Keyed { key: 1, note: "first" }]
-    let rekeyed: Vec[Keyed[i32]] = [Keyed { key: 1, note: "again" }]
-    let unkeyed: Vec[Keyed[i32]] = [Keyed { key: 2, note: "first" }]
+    let keyed: List[Keyed[i32]] = [Keyed { key: 1, note: "first" }]
+    let rekeyed: List[Keyed[i32]] = [Keyed { key: 1, note: "again" }]
+    let unkeyed: List[Keyed[i32]] = [Keyed { key: 2, note: "first" }]
     print(f"generic part with its own eq: {keyed == rekeyed} {keyed == unkeyed}")
     let view: Option[&str] = Some("a")
     print(f"views: {same_names(names, same)} {same_names(names, other)} {view == Some(a())} {(a() in names) and (Some(a()) == some)}")

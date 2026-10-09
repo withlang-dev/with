@@ -137,16 +137,7 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
 
     (__local_index = ((0 as c_uint)))
 
-    var __ci_expr_ternary_0: c_uint = 0
-
-    if ((if __local_right > 1: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = __local_right)
-    } else {
-        (__ci_expr_ternary_0 = ((0 as c_uint)))
-    }
-
-    (__local_right = __ci_expr_ternary_0)
-
+    (__local_right = (((if (if __local_right > 1: 1 else: 0) != 0: __local_right else: (0 as c_uint)) as c_uint)))
 
     while ((if __local_left != __local_right: 1 else: 0) != 0) {
         (__local_index = ((((((__local_left as c_uint) +% (__local_right as c_uint)) as c_uint) / (2 as c_uint)) as c_uint)))
@@ -168,13 +159,13 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
 
     }
 
-    var __ci_expr_logic_1: c_int = 0
+    var __ci_expr_logic_0: c_int = 0
 
     if ((if (*__param_sortedarray).length > 0: 1 else: 0) != 0) {
-        (__ci_expr_logic_1 = (if (if (*__param_sortedarray).cmp_func.unwrap()(__local_data, ((*__param_sortedarray).data[__local_index])) > 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if (*__param_sortedarray).cmp_func.unwrap()(__local_data, ((*__param_sortedarray).data[__local_index])) > 0: 1 else: 0) != 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if (__ci_expr_logic_0 != 0) {
         (__local_index = (__local_index +% 1))
 
     }
@@ -231,16 +222,7 @@ pub unsafe fn sortedarray_index_of(__param_sortedarray: *mut _SortedArray, __par
 
     (__local_index = ((0 as c_uint)))
 
-    var __ci_expr_ternary_0: c_uint = 0
-
-    if ((if __local_right > 1: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = __local_right)
-    } else {
-        (__ci_expr_ternary_0 = ((0 as c_uint)))
-    }
-
-    (__local_right = __ci_expr_ternary_0)
-
+    (__local_right = (((if (if __local_right > 1: 1 else: 0) != 0: __local_right else: (0 as c_uint)) as c_uint)))
 
     while ((if __local_left != __local_right: 1 else: 0) != 0) {
         (__local_index = ((((((__local_left as c_uint) +% (__local_right as c_uint)) as c_uint) / (2 as c_uint)) as c_uint)))

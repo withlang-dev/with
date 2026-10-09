@@ -23,9 +23,9 @@ fn source_path(path: &str) -> str:
     let embedded = "<embedded-std>/"
     if path.starts_with(embedded): "lib/" ++ slice(path, embedded.len() as i32, path.len() as i32) else: path.clone()
 
-fn collect_sites(entry: &str) -> Vec[OwnershipSite]:
+fn collect_sites(entry: &str) -> List[OwnershipSite]:
     let result = compiler_analyze_file(entry, "select:kind=diagnostic")
-    let sites: Vec[OwnershipSite] = Vec.new()
+    let sites: List[OwnershipSite] = List.new()
     let message = "this parameter takes ownership of a non-Copy value"
     var unrelated = 0
     for i in 0..result.report.facts.len() as i32:
@@ -101,8 +101,8 @@ fn line_col_offset(text: &str, want_line: i64, want_col: i64) -> i32:
 // filters to last-use). This lets the SEED run the tool while a flip-carrying
 // stage binary supplies the analysis — the tool's own dependency graph is the
 // compiler, which does not compile under the flip until migration completes.
-fn collect_sites_from_tsv(tsv: &str) -> Vec[OwnershipSite]:
-    let sites: Vec[OwnershipSite] = Vec.new()
+fn collect_sites_from_tsv(tsv: &str) -> List[OwnershipSite]:
+    let sites: List[OwnershipSite] = List.new()
     var line_start: i64 = 0
     var i: i64 = 0
     while i <= tsv.len():
@@ -138,15 +138,15 @@ fn bcm_parse_i64(s: &str) -> i64:
         i = i + 1
     out
 
-fn migrate_file(path: &str, sites: &Vec[OwnershipSite], apply: bool, liveness_tsv: &str) -> i32:
+fn migrate_file(path: &str, sites: &List[OwnershipSite], apply: bool, liveness_tsv: &str) -> i32:
     let text = read_file(path).unwrap_or("".clone())
     if text.len() == 0:
         print("migrate-method-arg-moves: cannot read " ++ path)
         exit_code(1)
     var lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
-    let offsets: Vec[i32] = Vec.new()
-    let labels: Vec[str] = Vec.new()
+    let offsets: List[i32] = List.new()
+    let labels: List[str] = List.new()
     for i in 0..sites.len() as i32:
         let site = sites[i]
         if site.path != path: continue
@@ -187,7 +187,7 @@ fn migrate_file(path: &str, sites: &Vec[OwnershipSite], apply: bool, liveness_ts
     for oi in 0..offsets.len() as i32:
         print(f"{path}\t{offsets[oi]}\t{labels[oi]}")
     if not apply or offsets.len() == 0: return offsets.len() as i32
-    let chunks: Vec[str] = Vec.new()
+    let chunks: List[str] = List.new()
     var cursor = 0
     for oi in 0..offsets.len() as i32:
         let offset = offsets[oi]
@@ -243,7 +243,7 @@ fn main:
             print("migrate-method-arg-moves: cannot read liveness tsv " ++ liveness_path)
             exit_code(1)
     let sites = if entry == "--from-tsv": collect_sites_from_tsv(liveness_tsv) else: collect_sites(entry)
-    let files: Vec[str] = Vec.new()
+    let files: List[str] = List.new()
     for i in 0..sites.len() as i32:
         let path = sites[i].path
         var seen = false

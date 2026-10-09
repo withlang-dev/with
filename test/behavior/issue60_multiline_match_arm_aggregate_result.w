@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 type Source {
-    ir: Vec[i32],
+    ir: List[i32],
     entry: str,
 }
 
@@ -9,7 +9,7 @@ error ParseErr =
     Bad
 
 fn parsed_source() -> Source:
-    let ir: Vec[i32] = Vec.new()
+    let ir: List[i32] = List.new()
     ir.push(7)
     ir.push(8)
     Source { ir, entry: "main" }
@@ -22,7 +22,7 @@ fn compile_text_source(ok: bool) -> Source:
         Ok(v) => v
         Err(_) =>
             assert(true)
-            let fallback: Vec[i32] = Vec.new()
+            let fallback: List[i32] = List.new()
             Source { ir: fallback, entry: "fallback" }
 
 fn main:

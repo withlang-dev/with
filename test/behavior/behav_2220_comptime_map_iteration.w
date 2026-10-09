@@ -12,7 +12,7 @@ fn tally(n: i32) -> i32:
     s
 
 fn pairs() -> i32:
-    var v: Vec[(i32, i32)] = Vec.new()
+    var v: List[(i32, i32)] = List.new()
     v.push((1, 2))
     var s = 0
     for (a, b) in v: s = s + a + b

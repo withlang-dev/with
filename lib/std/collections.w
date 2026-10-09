@@ -7,19 +7,19 @@
 
 use std.option
 
-/// A growable array. Create with `Vec.new()`, add with `.push()`,
+/// A growable array. Create with `List.new()`, add with `.push()`,
 /// read with `.get()`. Supports iteration via `.iter()`.
-pub type Vec[T]  {
+pub type List[T]  {
     ptr: *const T,
     len: i64,
     cap: i64,
     elem_size: i64,
 }
 
-/// Clone for Vec[T]: produces a deep copy by cloning each element.
-impl[T: Clone] Clone for Vec[T]:
+/// Clone for List[T]: produces a deep copy by cloning each element.
+impl[T: Clone] Clone for List[T]:
     fn clone() -> Self:
-        var out: Vec[T] = Vec.new()
+        var out: List[T] = List.new()
         var index: i64 = 0
         while index < self.len():
             let item = self[index]
@@ -41,19 +41,19 @@ pub type HashSet[T]  {
     ptr: *const i8,
 }
 
-/// Ordered key-value map. This first stdlib implementation uses Vec-backed
+/// Ordered key-value map. This first stdlib implementation uses List-backed
 /// storage but preserves BTree semantics without using HashMap storage.
 pub type BTreeMap[K, V] {
-    entries: Vec[(K, V)],
+    entries: List[(K, V)],
 }
 
-/// Ordered set of unique values. Backed by a sorted Vec.
+/// Ordered set of unique values. Backed by a sorted List.
 pub type BTreeSet[T] {
-    values: Vec[T],
+    values: List[T],
 }
 
 pub fn BTreeMap.new[K, V]() -> BTreeMap[K, V]:
-    BTreeMap { entries: Vec.new() }
+    BTreeMap { entries: List.new() }
 
 impl[K: Ord, V] BTreeMap[K, V]:
     pub fn len() -> i64:
@@ -107,7 +107,7 @@ impl[K: Ord, V] BTreeMap[K, V]:
                     slot.set((key, value))
                 return
             if existing > key:
-                let reordered: Vec[(K, V)] = Vec.new()
+                let reordered: List[(K, V)] = List.new()
                 var old_index = 0
                 while old_index < i:
                     reordered.push(self.entries.remove(0))
@@ -144,7 +144,7 @@ impl[K: Ord, V] BTreeMap[K, V]:
 // `{key: value, key: value}` in key order.
 impl[K: Ord, V] BTreeMap[K, V]:
     fn debug_form() -> str:
-        let parts: Vec[str] = Vec.with_capacity(self.entries.len())
+        let parts: List[str] = List.with_capacity(self.entries.len())
         var i: i64 = 0
         while i < self.entries.len():
             parts.push(f"{self.key_at(i):?}: {self.value_at(i):?}")
@@ -158,13 +158,13 @@ impl[K: Ord, V] BTreeMap[K, V]:
 // value text and the output is byte-identical for equal maps.
 impl[K, V] HashMap[K, V]:
     fn debug_form() -> str:
-        let keys: Vec[str] = Vec.with_capacity(self.len())
-        let values: Vec[str] = Vec.with_capacity(self.len())
+        let keys: List[str] = List.with_capacity(self.len())
+        let values: List[str] = List.with_capacity(self.len())
         for (key, value) in self:
             keys.push(f"{key:?}")
             values.push(f"{value:?}")
         let order = debug_entry_order(&keys, &values)
-        let parts: Vec[str] = Vec.with_capacity(order.len())
+        let parts: List[str] = List.with_capacity(order.len())
         for i in order:
             parts.push(f"{keys[i]}: {values[i]}")
         "{" ++ parts.join(", ") ++ "}"
@@ -174,21 +174,21 @@ impl[K, V] HashMap[K, V]:
 // compiler walks its table, formats each element with `:?`, and hands the
 // texts here (#1564).
 impl[T] HashSet[T]:
-    fn debug_form_of(texts: &Vec[str]) -> str:
-        let parts: Vec[str] = Vec.with_capacity(texts.len())
+    fn debug_form_of(texts: &List[str]) -> str:
+        let parts: List[str] = List.with_capacity(texts.len())
         for i in debug_entry_order(texts, texts):
             parts.push(texts[i].clone())
         "{" ++ parts.join(", ") ++ "}"
 
-fn debug_entry_before(keys: &Vec[str], values: &Vec[str], a: i64, b: i64) -> bool:
+fn debug_entry_before(keys: &List[str], values: &List[str], a: i64, b: i64) -> bool:
     keys[a] < keys[b] or (keys[a] == keys[b] and values[a] < values[b])
 
 // Bottom-up merge sort of 0..n by (key text, value text): n log n
 // comparisons, one scratch buffer, no allocation per comparison.
-fn debug_entry_order(keys: &Vec[str], values: &Vec[str]) -> Vec[i64]:
+fn debug_entry_order(keys: &List[str], values: &List[str]) -> List[i64]:
     let n = keys.len()
-    let order: Vec[i64] = Vec.with_capacity(n)
-    let scratch: Vec[i64] = Vec.with_capacity(n)
+    let order: List[i64] = List.with_capacity(n)
+    let scratch: List[i64] = List.with_capacity(n)
     for i in 0..n:
         order.push(i)
         scratch.push(i)
@@ -214,7 +214,7 @@ fn debug_entry_order(keys: &Vec[str], values: &Vec[str]) -> Vec[i64]:
     order
 
 pub fn BTreeSet.new[T]() -> BTreeSet[T]:
-    BTreeSet { values: Vec.new() }
+    BTreeSet { values: List.new() }
 
 impl[T: Ord] BTreeSet[T]:
     pub fn len() -> i64:
@@ -285,8 +285,8 @@ impl[T: Ord] BTreeSet[T]:
                 i = i + 1
         true
 
-    pub fn items() -> Vec[T]:
-        let out: Vec[T] = Vec.new()
+    pub fn items() -> List[T]:
+        let out: List[T] = List.new()
         var value_i = 0
         while value_i < self.values.len():
             let value = self.values[value_i]
@@ -331,7 +331,7 @@ impl[T: Ord] BTreeSet[T]:
         out
 
 impl[T: Ord] Iterable[T] for BTreeSet[T]:
-    fn iter() -> VecIter[T]:
+    fn iter() -> ListIter[T]:
         self.values.iter()
 
 /// Type-safe generational handle into a SlotMap[T].
@@ -345,13 +345,13 @@ pub type Handle[T] {
 impl[T] Copy for Handle[T]
 
 /// Generational dense-ish storage for long-lived relationships.
-/// Runtime storage is compiler-backed like Vec and HashMap.
+/// Runtime storage is compiler-backed like List and HashMap.
 pub type SlotMap[T] {
     ptr: *const i8,
 }
 
 /// Scoped mutable slot handle returned by SlotMap.slot/get_disjoint.
-/// Use `.get()` / `.set(value)` inside the `with` block, matching VecSlot.
+/// Use `.get()` / `.set(value)` inside the `with` block, matching ListSlot.
 pub type SlotMapSlot[T] ephemeral {
     map_ptr: i64,
     index: u32,
@@ -382,16 +382,16 @@ pub type Atomic[T]  {
 
 // ── Scoped access ────────────────────────────────────────────────
 
-/// Scoped handle to a single Vec element (docs/mut.md Rev 8 §10).
+/// Scoped handle to a single List element (docs/mut.md Rev 8 §10).
 /// Obtain via `vec.slot(index)`. Use with `with`:
 ///   with xs.slot(i) as mut s:
 ///       let v = s.get()
 ///       s.set(v + 1)
-pub type VecSlot[T] ephemeral { data_ptr: i64, index: i64 }
+pub type ListSlot[T] ephemeral { data_ptr: i64, index: i64 }
 
-/// Iterator yielding VecSlot[T] handles for in-place element mutation (§19.5).
-/// Obtain via `vec.iter_place()`. Each `.next()` returns `Option[VecSlot[T]]`.
-pub type VecIterPlace[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
+/// Iterator yielding ListSlot[T] handles for in-place element mutation (§19.5).
+/// Obtain via `vec.iter_place()`. Each `.next()` returns `Option[ListSlot[T]]`.
+pub type ListIterPlace[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
 
 /// Scoped handle to a HashMap entry (docs/mut.md Rev 8 §10).
 /// Obtain via `map.entry(key)`. Use with `with`:
@@ -401,27 +401,27 @@ pub type HashMapEntry[K, V] ephemeral { map_ptr: i64, key: K }
 
 // ── Iterators ─────────────────────────────────────────────────────
 
-/// Iterator over Vec[T]. Obtain via `vec.iter()`.
+/// Iterator over List[T]. Obtain via `vec.iter()`.
 /// Call `.next()` to get `Option[T]` — `Some(val)` or `None`.
-pub type VecIter[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
+pub type ListIter[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
 
 /// Borrow-iteration capability for allocation-backed collection types
 /// (D33 naming: formerly misnamed `IntoIter`).
 /// §13.2: the borrow an iterator registers on its receiver is SHARED, so
-/// constructing one only reads the collection — a `&Vec` parameter iterates.
+/// constructing one only reads the collection — a `&List` parameter iterates.
 /// (A trait method's receiver is explicit: plain `fn` in a trait declares a
 /// static method, per the parser's trait-impl receiver rule.)
 pub trait Iterable[T]:
-    fn iter(self: &Self) -> VecIter[T]
+    fn iter(self: &Self) -> ListIter[T]
 
-// Iterable for Vec — explicit borrow-iteration trait dispatch over
-// Vec-backed collections.
-impl[T] Iterable[T] for Vec[T]:
-    fn iter() -> VecIter[T]: self.iter()
+// Iterable for List — explicit borrow-iteration trait dispatch over
+// List-backed collections.
+impl[T] Iterable[T] for List[T]:
+    fn iter() -> ListIter[T]: self.iter()
 
 /// Each element with its index (§13.5): `for (i, x) in xs.enumerate():`.
-impl[T] Vec[T]:
-    // D100 (§18.3): Vec's fields are private to std. The buffer's address,
+impl[T] List[T]:
+    // D100 (§18.3): List's fields are private to std. The buffer's address,
     // for a C call or a runtime helper; reading through it is `unsafe`.
     pub fn as_ptr() -> *const T: self.ptr
     pub fn as_mut_ptr() -> *mut T: self.ptr as *mut T
@@ -432,27 +432,27 @@ impl[T] Vec[T]:
     // `iter()` yields views (#2145), so the pairs hold `&T`.
     fn enumerate(): self.iter() |> enumerate()
 
-/// Consuming iterator over Vec[T] (§13, D33). Obtain via `vec.into_iter()`:
-/// the Vec moves into the iterator and each `.next()` moves one element out.
+/// Consuming iterator over List[T] (§13, D33). Obtain via `vec.into_iter()`:
+/// the List moves into the iterator and each `.next()` moves one element out.
 /// Dropping the iterator early (break, `?`, return) releases the un-yielded
-/// tail and the buffer through the owned Vec's ordinary drop.
-pub type VecIntoIter[T] { vec: Vec[T] }
+/// tail and the buffer through the owned List's ordinary drop.
+pub type ListIntoIter[T] { list: List[T] }
 
 /// Consuming-iteration capability (§13, D33): the collection moves in,
 /// elements move out. The loop-shaped `remove` — access observes,
 /// transfer is explicit (D27).
 pub trait IntoIter[T]:
-    move fn into_iter() -> VecIntoIter[T]
+    move fn into_iter() -> ListIntoIter[T]
 
-impl[T] IntoIter[T] for Vec[T]:
-    move fn into_iter() -> VecIntoIter[T]: VecIntoIter { vec: self }
+impl[T] IntoIter[T] for List[T]:
+    move fn into_iter() -> ListIntoIter[T]: ListIntoIter { list: self }
 
-impl[T] Iter[T] for VecIntoIter[T]:
+impl[T] Iter[T] for ListIntoIter[T]:
     // remove(0) is D27's proven element transfer; the memmove-per-next
     // cost stands until a front-cursor variant earns its unsafe.
     mut fn next() -> Option[T]:
-        if self.vec.len() == 0: return None
-        Some(self.vec.remove(0))
+        if self.list.len() == 0: return None
+        Some(self.list.remove(0))
 
 // ── Map traversal (D44) ───────────────────────────────────────────
 // The observing traversals of a keyed map: concrete ephemeral structs over a
@@ -533,7 +533,7 @@ impl[K, V] HashMap[K, V]:
 // the ones never yielded drop with the iterator.
 
 /// `map.into_iter()`: each entry, moved out; the map is consumed.
-pub type MapIntoIter[K, V] { entries: Vec[(K, V)] }
+pub type MapIntoIter[K, V] { entries: List[(K, V)] }
 
 /// `map.into_keys()`: each key, moved out; the values are dropped.
 pub type MapIntoKeys[K, V] { entries: MapIntoIter[K, V] }
@@ -565,7 +565,7 @@ impl[K, V] Iter[(K, V)] for MapDrain[K, V]:
 impl[K, V] HashMap[K, V]:
     // Every entry, moved out, last first; the table is left empty.
     mut fn take_reversed() -> MapIntoIter[K, V]:
-        var reversed: Vec[(K, V)] = Vec.with_capacity(self.len())
+        var reversed: List[(K, V)] = List.with_capacity(self.len())
         var slot = self.slot_count() - 1
         while slot >= 0:
             if self.slot_live(slot): reversed.push(self.slot_take(slot))
@@ -586,7 +586,7 @@ impl[K, V] HashMap[K, V]:
 impl[K, V] BTreeMap[K, V]:
     // Every entry, moved out, last first; the map is left empty.
     mut fn take_reversed() -> MapIntoIter[K, V]:
-        var reversed: Vec[(K, V)] = Vec.with_capacity(self.entries.len())
+        var reversed: List[(K, V)] = List.with_capacity(self.entries.len())
         while true:
             match self.entries.pop():
                 Some(entry) => reversed.push(entry)
@@ -662,7 +662,7 @@ pub type FlatMapIter[I, C, J, T, U] ephemeral {
     has_current: bool,
 }
 
-impl[T] Iter[T] for VecIter[T]:
+impl[T] Iter[T] for ListIter[T]:
     mut fn next() -> Option[T]:
         self.next()
 
@@ -713,13 +713,13 @@ pub type IndexSpec {
     pub has_step: bool,
 }
 
-// §13.3 (#1746): `it.collect[Vec]()` on any Iter[T] implementor, the one
-// adapter that builds a collection, so it lives with Vec rather than in
-// std.traits (which the core prelude, Vec-less, also loads).
-/// `it.collect[Vec]()`: every element, in order.
-pub fn iter_collect[T, I: Iter[T]](iter: I) -> Vec[T]:
+// §13.3 (#1746): `it.collect[List]()` on any Iter[T] implementor, the one
+// adapter that builds a collection, so it lives with List rather than in
+// std.traits (which the core prelude, List-less, also loads).
+/// `it.collect[List]()`: every element, in order.
+pub fn iter_collect[T, I: Iter[T]](iter: I) -> List[T]:
     var i = iter
-    var out: Vec[T] = Vec.new()
+    var out: List[T] = List.new()
     while true:
         match i.next():
             None => break

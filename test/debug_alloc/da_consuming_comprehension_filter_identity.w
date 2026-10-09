@@ -27,8 +27,8 @@ impl Drop for W:
 fn new_w(dropped: *mut i32, id: i32) -> W:
     unsafe { W { ptr: with_alloc(16), dropped, id } }
 
-fn three(dropped: *mut i32) -> Vec[W]:
-    var v: Vec[W] = Vec.new()
+fn three(dropped: *mut i32) -> List[W]:
+    var v: List[W] = List.new()
     v.push(new_w(dropped, 1))
     v.push(new_w(dropped, 2))
     v.push(new_w(dropped, 4))
@@ -47,7 +47,7 @@ fn main:
     print(f"iter {before_a} kept {a - before_a}")
 
     var b = 0
-    var pairs: Vec[(i32, W)] = Vec.new()
+    var pairs: List[(i32, W)] = List.new()
     for w in three(&raw mut b).into_iter(): pairs.push((w.id, w))
     let kept_b = [w for (k, w) in pairs.into_iter() if k != 2]
     let before_b = b

@@ -17,7 +17,7 @@ fn fill_then_read(buf: []mut i32) -> i32:
     read_first(buf)
 
 fn main:
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     v.push(0)
     v.push(0)
     assert(fill_then_read(v) == 4)

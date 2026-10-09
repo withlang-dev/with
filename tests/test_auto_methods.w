@@ -26,18 +26,18 @@ fn main:
     with_eprintln("=== auto-method generation tests ===")
 
     // Verify auto-methods compile: use constructor + methods via malloc/struct
-    var v = AmtVec { x: 3.0, y: 4.0, z: 0.0 }
+    var v = AmtList { x: 3.0, y: 4.0, z: 0.0 }
 
     // Direct struct field access still works
     assert_true(v.x > 2.9 and v.x < 3.1, "struct field access .x")
     assert_true(v.y > 3.9 and v.y < 4.1, "struct field access .y")
 
-    // Auto-generated method: amt_vec_get_x → AmtVec.get_x
-    let x = amt_vec_get_x(&v)
+    // Auto-generated method: amt_vec_get_x → AmtList.get_x
+    let x = amt_list_get_x(&v)
     assert_true(x > 2.9 and x < 3.1, "flat fn amt_vec_get_x works")
 
-    // Auto-generated method: amt_vec_length_sq → AmtVec.length_sq
-    let lsq = amt_vec_length_sq(&v)
+    // Auto-generated method: amt_vec_length_sq → AmtList.length_sq
+    let lsq = amt_list_length_sq(&v)
     assert_true(lsq > 24.9 and lsq < 25.1, "flat fn amt_vec_length_sq = 25")
 
     with_eprintln(int_to_string(pass_count) ++ "/" ++ int_to_string(test_count) ++ " tests passed")

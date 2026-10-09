@@ -167,8 +167,8 @@ extern fn LLVMGetElementType(ty: *mut u8) -> *mut u8
 extern fn LLVMGetArrayLength2(ty: *mut u8) -> u64
 extern fn LLVMVectorType(elem: *mut u8, count: u32) -> *mut u8
 extern fn LLVMGetVectorSize(ty: *mut u8) -> u32
-extern fn LLVMBuildInsertElement(b: *mut u8, vec: *mut u8, elt: *mut u8, idx: *mut u8, name: *const u8) -> *mut u8
-extern fn LLVMBuildExtractElement(b: *mut u8, vec: *mut u8, idx: *mut u8, name: *const u8) -> *mut u8
+extern fn LLVMBuildInsertElement(b: *mut u8, list: *mut u8, elt: *mut u8, idx: *mut u8, name: *const u8) -> *mut u8
+extern fn LLVMBuildExtractElement(b: *mut u8, list: *mut u8, idx: *mut u8, name: *const u8) -> *mut u8
 extern fn LLVMConstVector(vals: *const *mut u8, count: u32) -> *mut u8
 
 // Type queries
@@ -695,10 +695,10 @@ pub fn wl_get_array_length(ty: i64) -> i64: unsafe { LLVMGetArrayLength2(ty as *
 // §4.3d: SIMD vectors, `<N x T>`.
 pub fn wl_vector_type(elem: i64, count: i32) -> i64: unsafe { LLVMVectorType(elem as *mut u8, count as u32) as i64 }
 pub fn wl_get_vector_size(ty: i64) -> i32: unsafe { LLVMGetVectorSize(ty as *mut u8) as i32 }
-pub fn wl_build_insert_element(b: i64, vec: i64, elt: i64, idx: i64) -> i64:
-    unsafe { LLVMBuildInsertElement(b as *mut u8, vec as *mut u8, elt as *mut u8, idx as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_extract_element(b: i64, vec: i64, idx: i64) -> i64:
-    unsafe { LLVMBuildExtractElement(b as *mut u8, vec as *mut u8, idx as *mut u8, empty_cstr()) as i64 }
+pub fn wl_build_insert_element(b: i64, list: i64, elt: i64, idx: i64) -> i64:
+    unsafe { LLVMBuildInsertElement(b as *mut u8, list as *mut u8, elt as *mut u8, idx as *mut u8, empty_cstr()) as i64 }
+pub fn wl_build_extract_element(b: i64, list: i64, idx: i64) -> i64:
+    unsafe { LLVMBuildExtractElement(b as *mut u8, list as *mut u8, idx as *mut u8, empty_cstr()) as i64 }
 pub fn wl_const_vector(vals_ptr: i64, count: i32) -> i64: unsafe { LLVMConstVector(vals_ptr as *const *mut u8, count as u32) as i64 }
 
 // ── Type queries ────────────────────────────────────────────────
@@ -1192,7 +1192,7 @@ pub fn wl_lower_aggregate_copies(f: i64, ctx: i64, dl: i64, min_bytes: i64) -> i
                             // everything between the load and the store ran;
                             // the load read it before. The rewrite is sound
                             // only when nothing in between can write memory
-                            // (#1689: Vec.remove loads the element, calls
+                            // (#1689: List.remove loads the element, calls
                             // with_vec_remove to shift the buffer, then stores
                             // the result — the memmove copied the shifted
                             // element). The bulk moves this pass exists for
@@ -1548,18 +1548,18 @@ pub fn wl_print_type(ty: i64) -> str:
         LLVMDisposeMessage(text)
         out
 
-// ── Vec data pointer helper ─────────────────────────────────────
+// ── List data pointer helper ─────────────────────────────────────
 
-type WithVec {
+type WithList {
     ptr: *mut u8,
     len: i64,
     cap: i64,
     elem_size: i64,
 }
 
-pub fn wl_vec_data_ptr(v: i64) -> i64:
+pub fn wl_list_data_ptr(v: i64) -> i64:
     if v == 0: return 0
-    (unsafe *(v as *const WithVec)).ptr as i64
+    (unsafe *(v as *const WithList)).ptr as i64
 
 // ── Entry alloca helper ─────────────────────────────────────────
 

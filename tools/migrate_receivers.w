@@ -33,15 +33,15 @@ extern fn with_fs_write_file(path: &str, data: &str) -> i32
 fn slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
 
 type ReceiverDeclFacts {
-    starts: Vec[i32],
-    ends: Vec[i32],
-    modes: Vec[i32],
-    flags: Vec[i32],
+    starts: List[i32],
+    ends: List[i32],
+    modes: List[i32],
+    flags: List[i32],
 }
 
 fn compiler_receiver_decls(path: &str) -> ReceiverDeclFacts:
     let result = compiler_analyze_file(path, "select:kind=declaration")
-    let facts = ReceiverDeclFacts { starts: Vec.new(), ends: Vec.new(), modes: Vec.new(), flags: Vec.new() }
+    let facts = ReceiverDeclFacts { starts: List.new(), ends: List.new(), modes: List.new(), flags: List.new() }
     for i in 0..result.report.facts.len() as i32:
         let fact = result.report.facts[i]
         if fact.kind != AnalysisFactKind.Declaration or fact.path != path: continue
@@ -71,9 +71,9 @@ fn migrate_file(path: &str) -> i32:
     let n = tokens.len()
 
     // Edits as (start, end, replacement) byte-offset splices, in ascending order.
-    var starts: Vec[i32] = Vec.new()
-    var ends: Vec[i32] = Vec.new()
-    var repls: Vec[str] = Vec.new()
+    var starts: List[i32] = List.new()
+    var ends: List[i32] = List.new()
+    var repls: List[str] = List.new()
 
     var failures = 0
     var i = 0
@@ -205,12 +205,12 @@ fn migrate_file(path: &str) -> i32:
     let _ = unsafe { with_fs_write_file(path, result) }
     methods
 
-fn path_excluded(path: &str, excludes: &Vec[str]) -> bool:
+fn path_excluded(path: &str, excludes: &List[str]) -> bool:
     for i in 0..excludes.len() as i32:
         if path == excludes[i]: return true
     false
 
-fn migrate_path(path: &str, excludes: &Vec[str]) -> i32:
+fn migrate_path(path: &str, excludes: &List[str]) -> i32:
     if path_excluded(path, excludes): return 0
     if path.ends_with(".w"):
         let changed = migrate_file(path)
@@ -236,8 +236,8 @@ fn main:
     if argv.len() < 2:
         print("usage: migrate_receivers [--exclude file.w ...] <file-or-dir> [file-or-dir ...]")
         exit_code(1)
-    let excludes: Vec[str] = Vec.new()
-    let paths: Vec[str] = Vec.new()
+    let excludes: List[str] = List.new()
+    let paths: List[str] = List.new()
     var arg = 1
     while arg < argv.len() as i32:
         if argv[arg] == "--exclude":

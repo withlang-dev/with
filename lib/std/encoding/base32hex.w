@@ -82,10 +82,10 @@ pub fn base32hex_encode(data: []u8) -> str:
     out.to_str()
 
 /// Decode padded RFC 4648 Base32hex, accepting ASCII letter case variants.
-pub fn base32hex_decode(text: &str) -> Result[Vec[u8], DecodeError]:
+pub fn base32hex_decode(text: &str) -> Result[List[u8], DecodeError]:
     let padding = base32hex_validate(text)?
     let removed = if padding == 6: 4 else if padding == 4: 3 else if padding == 3: 2 else if padding == 1: 1 else: 0
-    let out = Vec[u8].with_capacity((text.len() / 8) * 5 - removed)
+    let out = List[u8].with_capacity((text.len() / 8) * 5 - removed)
     var offset: i64 = 0
     while offset < text.len():
         let final_quantum = offset + 8 == text.len()

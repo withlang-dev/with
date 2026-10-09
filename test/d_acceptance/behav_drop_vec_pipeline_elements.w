@@ -4,7 +4,7 @@
 // `mut self` stages keep carrying that same place, and ordinary assignment-move
 // transfers it into `v` because it remains the pipeline's final value. There are
 // no receiver-returning aliases or intermediate owners; `v` drops both elements
-// and the Vec buffer exactly once.
+// and the List buffer exactly once.
 
 var COUNT = 0
 
@@ -14,7 +14,7 @@ impl Drop for W:
         COUNT = COUNT + 1
 
 fn body() -> i64:
-    let v: Vec[W] = Vec.new() |> push(W { tag: 1 }) |> push(W { tag: 2 })
+    let v: List[W] = List.new() |> push(W { tag: 1 }) |> push(W { tag: 2 })
     // Bind, then use v with trailing code: capture must move the hidden place.
     v.len()
 

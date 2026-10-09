@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// Test: Vec with for loop and pipeline
+// Test: List with for loop and pipeline
 
 fn double(x: i32) -> i32:
     x * 2

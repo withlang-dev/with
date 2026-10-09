@@ -32,7 +32,7 @@ fn main:
     var maybe: HashSet[Option[str]] = HashSet.new()
     maybe.insert(Some("m".to_lower()))
     maybe.insert(Some("M".to_lower()))
-    var vecs: HashSet[Vec[i32]] = HashSet.new()
+    var vecs: HashSet[List[i32]] = HashSet.new()
     vecs.insert([1, 2])
     vecs.insert([1, 2])
     print(f"{pairs.len()} {wide.len()} {maybe.len()} {vecs.len()}")

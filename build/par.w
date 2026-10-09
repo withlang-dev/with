@@ -12,28 +12,28 @@ use std.build
 
 
 pub type ParJob {
-    argv: Vec[str],
+    argv: List[str],
     stdout: str,
     stderr: str,
     timeout_ms: i32,
 }
 
-pub fn par_job(argv: Vec[str], stdout: str, stderr: str, timeout_ms: i32): ParJob { argv, stdout, stderr, timeout_ms }
+pub fn par_job(argv: List[str], stdout: str, stderr: str, timeout_ms: i32): ParJob { argv, stdout, stderr, timeout_ms }
 
 // The window is the job count, capped at 32 like the test lanes' own window
 // (build_graph_test_jobs): an action may run in the comptime evaluator,
 // which cannot read the host core count, and every lane using this holds
 // fewer cases than that cap, so the kernel spreads them over the cores.
-pub fn par_width(jobs: &Vec[ParJob]) -> i32: if jobs.len() as i32 > 32: 32 else: jobs.len() as i32
+pub fn par_width(jobs: &List[ParJob]) -> i32: if jobs.len() as i32 > 32: 32 else: jobs.len() as i32
 
 /// Runs every job with at most `width` children alive, reaping the oldest
 /// to open each slot. Returns each job's exit code in job order; -1 means
 /// the job could not be spawned. Returns only after every child is reaped.
-pub fn par_run(ctx: &ActionCtx, jobs: &Vec[ParJob], width: i32) -> Vec[i32]:
+pub fn par_run(ctx: &ActionCtx, jobs: &List[ParJob], width: i32) -> List[i32]:
     let limit = if width < 1: 1 else: width
     let total = jobs.len() as i32
-    var rcs: Vec[i32] = Vec.new()
-    var pids: Vec[i32] = Vec.new()
+    var rcs: List[i32] = List.new()
+    var pids: List[i32] = List.new()
     var next = 0
     var oldest = 0
     while oldest < total:

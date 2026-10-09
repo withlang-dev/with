@@ -10,7 +10,7 @@
 // D51 §16.2b.3 stage 4a: a facade's pointer resource and by-value resource
 // are rendered as ordinary With with a Drop that runs the facade's `drop`
 // exactly once on every path — scope exit, early return, moved into a
-// function, moved out and returned, held in a Vec. Each C object counts
+// function, moved out and returned, held in a List. Each C object counts
 // its own destructions (`closed`), read back through its raw pointer after
 // the resource is gone; the by-value token counts through a slot it names.
 // The objects are never freed, so the count stays readable. The resources
@@ -62,7 +62,7 @@ fn main:
     let g = give()
     let gp = g.repr
     drop(g)
-    var v: Vec[Database] = Vec.new()
+    var v: List[Database] = List.new()
     v.push(Database.new(5).unwrap())
     v.push(Database.new(6).unwrap())
     let p5 = v[0].repr

@@ -13,13 +13,13 @@ impl Drop for W:
 fn new_w(s: *mut i32) -> W:
     unsafe { W { ptr: with_alloc(24), slot: s } }
 
-fn mkw(s: *mut i32) -> Vec[W]:
-    let values: Vec[W] = Vec.new()
+fn mkw(s: *mut i32) -> List[W]:
+    let values: List[W] = List.new()
     values.push(new_w(s))
     values.push(new_w(s))
     values
 
-fn consume(values: Vec[W]):
+fn consume(values: List[W]):
     drop(values)
 
 fn run(s: *mut i32):

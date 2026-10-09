@@ -143,7 +143,7 @@ pub fn with_cc_main() -> i32:
     if not with_cc_available():
         with_eprint("error: this build of `with` has no C compiler: the LLVM SDK it was linked against predates `with cc`")
         return 127
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push("clang")
     let first = if with_arg_count() > 2: with_arg_at(2) else: ""
     // The driver passes -resource-dir down to its own -cc1 invocations.
@@ -221,10 +221,10 @@ fn cc_caller_names(prefix: &str) -> bool:
 
 // The windows-gnu toolchain `with cc` drives on Windows x86_64, from the SDK
 // the link reads: its arguments, or the piece that is missing.
-type CcToolchain { problem: str, args: Vec[str] }
+type CcToolchain { problem: str, args: List[str] }
 
 fn cc_windows_toolchain() -> CcToolchain:
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     // The link-only choices below are not unused in a compile-only run.
     args.push("--start-no-unused-arguments")
     let libc = link_stage_windows_libc_root()

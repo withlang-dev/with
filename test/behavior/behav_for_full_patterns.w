@@ -16,7 +16,7 @@ fn test_struct_pattern:
     assert(total == 121)
 
 fn test_enum_pattern_filters:
-    let opts: Vec[?i32] = Vec.new()
+    let opts: List[?i32] = List.new()
     opts.push(Some(1))
     opts.push(None)
     opts.push(Some(4))
@@ -48,8 +48,8 @@ fn test_refutable_range_pattern_skips:
         sum = sum + 1
     assert(sum == 3)
 
-fn test_vec_refutable_pattern_skips:
-    let nums: Vec[i32] = Vec.new()
+fn test_list_refutable_pattern_skips:
+    let nums: List[i32] = List.new()
     nums.push(1)
     nums.push(2)
     nums.push(3)
@@ -65,5 +65,5 @@ fn main:
     test_enum_pattern_filters()
     test_slice_rest_pattern()
     test_refutable_range_pattern_skips()
-    test_vec_refutable_pattern_skips()
+    test_list_refutable_pattern_skips()
     print("ok")

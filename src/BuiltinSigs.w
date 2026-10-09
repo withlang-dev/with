@@ -13,7 +13,7 @@
 //   codegen   drops only what the method stores; a probe is the caller's.
 //
 // Owners are type names, plus `str`, `array` (arrays and slices), `int`,
-// `float` and `Iter` (VecIter and every iterator adapter); the float math
+// `float` and `Iter` (ListIter and every iterator adapter); the float math
 // methods are MathBuiltins' and take every operand. A builtin method called
 // with arguments must resolve to a row; MirLower refuses one that did not.
 
@@ -21,8 +21,8 @@ pub type BuiltinSigRow { owner: str, method: str, params: str }
 
 fn sig(owner: str, method: str, params: str) -> BuiltinSigRow: BuiltinSigRow { owner, method, params }
 
-pub fn builtin_sig_table() -> Vec[BuiltinSigRow]:
-    var t: Vec[BuiltinSigRow] = Vec.new()
+pub fn builtin_sig_table() -> List[BuiltinSigRow]:
+    var t: List[BuiltinSigRow] = List.new()
     t.push(sig("str", "byte_at", "index: i64"))
     t.push(sig("str", "slice", "start: i64, end: i64"))
     t.push(sig("str", "contains", "needle: &str"))
@@ -43,20 +43,20 @@ pub fn builtin_sig_table() -> Vec[BuiltinSigRow]:
     t.push(sig("float", "max", "other: Self"))
     t.push(sig("float", "mul_add", "a: Self, b: Self"))
     t.push(sig("Sender", "send", "value: T"))
-    t.push(sig("Vec", "with_capacity", "capacity: i64"))
-    t.push(sig("Vec", "push", "value: T"))
-    t.push(sig("Vec", "get", "index: i32"))
-    t.push(sig("Vec", "remove", "index: i32"))
-    t.push(sig("Vec", "slot", "index: i32"))
-    t.push(sig("Vec", "get_disjoint", "a: i32, b: i32"))
-    t.push(sig("Vec", "range", "r: Range[i32]"))
-    t.push(sig("Vec", "split_at", "mid: i64"))
-    t.push(sig("Vec", "split_at_mut", "mid: i64"))
-    t.push(sig("Vec", "map", "f: fn(&T) -> U"))
-    t.push(sig("Vec", "filter", "pred: fn(&T) -> bool"))
-    t.push(sig("Vec", "fold", "init: A, f: fn(A, &T) -> A"))
-    t.push(sig("Vec", "contains", "value: &T"))
-    t.push(sig("Vec", "join", "sep: &str"))
+    t.push(sig("List", "with_capacity", "capacity: i64"))
+    t.push(sig("List", "push", "value: T"))
+    t.push(sig("List", "get", "index: i32"))
+    t.push(sig("List", "remove", "index: i32"))
+    t.push(sig("List", "slot", "index: i32"))
+    t.push(sig("List", "get_disjoint", "a: i32, b: i32"))
+    t.push(sig("List", "range", "r: Range[i32]"))
+    t.push(sig("List", "split_at", "mid: i64"))
+    t.push(sig("List", "split_at_mut", "mid: i64"))
+    t.push(sig("List", "map", "f: fn(&T) -> U"))
+    t.push(sig("List", "filter", "pred: fn(&T) -> bool"))
+    t.push(sig("List", "fold", "init: A, f: fn(A, &T) -> A"))
+    t.push(sig("List", "contains", "value: &T"))
+    t.push(sig("List", "join", "sep: &str"))
     t.push(sig("FixedString", "push_byte", "b: u8"))
     t.push(sig("FixedString", "push_str", "s: &str"))
     t.push(sig("FixedString", "equals", "other: &str"))
@@ -83,7 +83,7 @@ pub fn builtin_sig_table() -> Vec[BuiltinSigRow]:
     t.push(sig("Iter", "none", "pred: fn(&T) -> bool"))
     t.push(sig("Iter", "for_each", "f: fn(T)"))
     t.push(sig("Iter", "partition", "pred: fn(&T) -> bool"))
-    t.push(sig("VecSlot", "set", "value: T"))
+    t.push(sig("ListSlot", "set", "value: T"))
     t.push(sig("SlotMap", "insert", "value: T"))
     t.push(sig("SlotMap", "get", "h: Handle[T]"))
     t.push(sig("SlotMap", "slot", "h: Handle[T]"))
@@ -92,10 +92,10 @@ pub fn builtin_sig_table() -> Vec[BuiltinSigRow]:
     t.push(sig("SlotMap", "contains", "h: Handle[T]"))
     t.push(sig("SlotMap", "get_disjoint", "a: Handle[T], b: Handle[T]"))
     t.push(sig("SlotMapSlot", "set", "value: T"))
-    t.push(sig("VecRange", "get", "index: i32"))
-    t.push(sig("VecRange", "set", "index: i32, value: T"))
-    t.push(sig("VecRange", "split_at", "mid: i64"))
-    t.push(sig("VecRange", "split_at_mut", "mid: i64"))
+    t.push(sig("ListRange", "get", "index: i32"))
+    t.push(sig("ListRange", "set", "index: i32, value: T"))
+    t.push(sig("ListRange", "split_at", "mid: i64"))
+    t.push(sig("ListRange", "split_at_mut", "mid: i64"))
     t.push(sig("HashMap", "insert", "key: K, value: V"))
     t.push(sig("HashMap", "get", "key: &K"))
     t.push(sig("HashMap", "contains", "key: &K"))

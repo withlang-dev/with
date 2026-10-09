@@ -24,7 +24,7 @@ type ScopeEntry {
 }
 
 type DropScope {
-    drops: Vec[ScopeEntry],
+    drops: List[ScopeEntry],
 }
 
 // Exact move-state snapshot for branch lowering. Lengths are insufficient:
@@ -32,13 +32,13 @@ type DropScope {
 // the vector length while replacing its identity. Restoring cloned contents
 // keeps entries and their path storage atomic.
 type MirMoveStateSnapshot {
-    moved_values: Vec[i32],
-    drop_kinds: Vec[i32],
-    field_base_locals: Vec[i32],
-    field_path_starts: Vec[i32],
-    field_path_counts: Vec[i32],
-    field_path_kinds: Vec[i32],
-    field_path_syms: Vec[i32],
+    moved_values: List[i32],
+    drop_kinds: List[i32],
+    field_base_locals: List[i32],
+    field_path_starts: List[i32],
+    field_path_counts: List[i32],
+    field_path_kinds: List[i32],
+    field_path_syms: List[i32],
 }
 
 // The lazy fallback arm of a carrier eliminator (`??`, unwrap_or,
@@ -49,8 +49,8 @@ type MirLazyArmFrame {
     temp_frame: i32,
 }
 
-fn mir_clone_i32_vec(values: &Vec[i32]) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+fn mir_clone_i32_list(values: &List[i32]) -> List[i32]:
+    let out: List[i32] = List.new()
     for i in 0..values.len():
         out.push(values[i])
     out
@@ -122,32 +122,32 @@ enum ControlTargetKind: i32:
 
 pub type MirBuilder = ephemeral {
     body: MirBody,
-    anonymous_bodies: Vec[MirBody],
+    anonymous_bodies: List[MirBody],
     cur_bb: BlockId,
 
     // Drop scope stack (flat storage + per-scope start offsets).
-    drop_local_ids: Vec[i32],
-    drop_kinds: Vec[i32],
-    drop_scope_starts: Vec[i32],
-    moved_value_local_ids: Vec[i32],
-    moved_field_base_locals: Vec[i32],
-    moved_field_path_starts: Vec[i32],
-    moved_field_path_counts: Vec[i32],
-    moved_field_path_kinds: Vec[i32],
-    moved_field_path_syms: Vec[i32],
-    stmt_temp_locals: Vec[i32],
-    stmt_temp_drop_depths: Vec[i32],
-    stmt_temp_starts: Vec[i32],
-    pending_reset_locals: Vec[i32],
+    drop_local_ids: List[i32],
+    drop_kinds: List[i32],
+    drop_scope_starts: List[i32],
+    moved_value_local_ids: List[i32],
+    moved_field_base_locals: List[i32],
+    moved_field_path_starts: List[i32],
+    moved_field_path_counts: List[i32],
+    moved_field_path_kinds: List[i32],
+    moved_field_path_syms: List[i32],
+    stmt_temp_locals: List[i32],
+    stmt_temp_drop_depths: List[i32],
+    stmt_temp_starts: List[i32],
+    pending_reset_locals: List[i32],
     // #719: per-statement-frame snapshots of the pending-reset stacks.
-    stmt_reset_starts: Vec[i32],
-    stmt_reset_field_starts: Vec[i32],
-    stmt_reset_temp_starts: Vec[i32],
+    stmt_reset_starts: List[i32],
+    stmt_reset_field_starts: List[i32],
+    stmt_reset_temp_starts: List[i32],
     // Field-place niche (Slice E): a conditionally-moved Drop-bearing field place
     // and its sema type, blanked at the branch/statement boundary so the owner's
     // guarded per-field drop skips it — the field analogue of pending_reset_locals.
-    pending_reset_field_places: Vec[i32],
-    pending_reset_field_types: Vec[i32],
+    pending_reset_field_places: List[i32],
+    pending_reset_field_types: List[i32],
     // #1394: variant-payload moves awaiting their reset-on-move blank (§2.5.1),
     // each with the block it happened in. A payload slot overlaps the other
     // variants' payloads, so the blank must land on the moving path while the
@@ -155,14 +155,14 @@ pub type MirBuilder = ephemeral {
     // terminator (carried across a call into its continuation), and before
     // any earlier drop or overwrite of the same base in that block — never
     // at a statement flush that may sit after a join.
-    pending_payload_reset_places: Vec[i32],
-    pending_payload_reset_types: Vec[i32],
-    pending_payload_reset_blocks: Vec[i32],
+    pending_payload_reset_places: List[i32],
+    pending_payload_reset_types: List[i32],
+    pending_payload_reset_blocks: List[i32],
     // D16 (rvalue-uniform `move`): temps holding a value moved into a
     // share-place callee. Dropped at the same flush points as the pending
     // resets (statement end, or branch-scoped on the moving path), AFTER the
     // call — the end-of-enclosing-statement death §2.4 promises a temporary.
-    pending_move_temp_locals: Vec[i32],
+    pending_move_temp_locals: List[i32],
     // >0 while lowering a branch body (if/match/loop). Only a field move inside a
     // branch needs the niche reset: an unconditional field move stays statically
     // moved and the owner's partial drop skips it without a reset.
@@ -178,50 +178,50 @@ pub type MirBuilder = ephemeral {
     pattern_bind_mut: i32,
     // Pairs (binding local, subject place) of every value a pattern binding
     // moved out of its subject, in order (bind_pattern_value).
-    pattern_move_log: Vec[i32],
-    with_cleanup_guard_locals: Vec[i32],
-    with_cleanup_payload_locals: Vec[i32],
-    with_cleanup_method_syms: Vec[i32],
-    with_cleanup_sigs: Vec[i32],
-    with_cleanup_mono_syms: Vec[i32],
+    pattern_move_log: List[i32],
+    with_cleanup_guard_locals: List[i32],
+    with_cleanup_payload_locals: List[i32],
+    with_cleanup_method_syms: List[i32],
+    with_cleanup_sigs: List[i32],
+    with_cleanup_mono_syms: List[i32],
 
     // Lexical local bindings (sym -> local id), scoped.
-    bind_syms: Vec[i32],
-    bind_local_ids: Vec[i32],
-    bind_scope_starts: Vec[i32],
+    bind_syms: List[i32],
+    bind_local_ids: List[i32],
+    bind_scope_starts: List[i32],
     // Non-owning lexical aliases (sym -> place), scoped.
-    alias_syms: Vec[i32],
-    alias_places: Vec[i32],
-    alias_types: Vec[i32],
-    alias_scope_starts: Vec[i32],
+    alias_syms: List[i32],
+    alias_places: List[i32],
+    alias_types: List[i32],
+    alias_scope_starts: List[i32],
 
     // Defer/errdefer stacks (body AST nodes).
-    defer_nodes: Vec[i32],
-    defer_scope_starts: Vec[i32],
-    errdefer_nodes: Vec[i32],
-    errdefer_scope_starts: Vec[i32],
+    defer_nodes: List[i32],
+    defer_scope_starts: List[i32],
+    errdefer_nodes: List[i32],
+    errdefer_scope_starts: List[i32],
 
     // Structured control target stack.
-    loop_continue_bbs: Vec[i32],
-    loop_break_bbs: Vec[i32],
-    loop_result_places: Vec[i32],
-    loop_break_drop_depths: Vec[i32],
-    loop_break_defer_depths: Vec[i32],
-    loop_break_scope_depths: Vec[i32],
-    loop_labels: Vec[i32],
-    loop_target_kinds: Vec[i32],
+    loop_continue_bbs: List[i32],
+    loop_break_bbs: List[i32],
+    loop_result_places: List[i32],
+    loop_break_drop_depths: List[i32],
+    loop_break_defer_depths: List[i32],
+    loop_break_scope_depths: List[i32],
+    loop_labels: List[i32],
+    loop_target_kinds: List[i32],
 
     // First-class goto labels. Blocks are allocated on demand so forward
     // gotos can branch before the label statement is lowered.
-    goto_label_syms: Vec[i32],
-    goto_label_bbs: Vec[i32],
-    goto_label_scope_depths: Vec[i32],
-    goto_label_drop_depths: Vec[i32],
-    goto_label_defer_depths: Vec[i32],
-    goto_label_defined: Vec[i32],
+    goto_label_syms: List[i32],
+    goto_label_bbs: List[i32],
+    goto_label_scope_depths: List[i32],
+    goto_label_drop_depths: List[i32],
+    goto_label_defer_depths: List[i32],
+    goto_label_defined: List[i32],
     // Whether a goto targets the label; a target this body never defines
     // is a phase bug (verify_goto_labels).
-    goto_label_jumped: Vec[i32],
+    goto_label_jumped: List[i32],
 
     next_temp: i32,
     cur_node: i32,
@@ -229,7 +229,7 @@ pub type MirBuilder = ephemeral {
     // D88: while an untyped constant's initializer is lowered for one use,
     // the nodes on its value path have the type of that use (Sema:
     // untyped_const_value_path).
-    untyped_override_nodes: Vec[i32],
+    untyped_override_nodes: List[i32],
     untyped_override_type: i32,
     untyped_override_depth: i32,
     // D22 Stage 5: lower_expr consumes Sema's contextual-Copy adjustment at
@@ -263,17 +263,17 @@ pub type MirBuilder = ephemeral {
     // The outer labels this closure's break, continue and goto leave through
     // the flag: exit i sets the flag to GEN_LOOP_LABEL_BASE + i, and its kind
     // (GEN_EXIT_*) says what the owning frame does at the label.
-    gen_loop_exit_labels: Vec[i32],
-    gen_loop_exit_kinds: Vec[i32],
+    gen_loop_exit_labels: List[i32],
+    gen_loop_exit_kinds: List[i32],
     // Which of GEN_LOOP_RETURN..GEN_LOOP_CANCEL this closure sets (bit per
     // code, gen_loop_code_bit), so the owning frame emits only those arms.
     gen_loop_used_codes: i32,
 
-    regex_capture_pat_nodes: Vec[i32],
-    regex_capture_opt_places: Vec[i32],
+    regex_capture_pat_nodes: List[i32],
+    regex_capture_opt_places: List[i32],
 
-    string_alias_local_ids: Vec[i32],
-    string_alias_flags: Vec[i32],
+    string_alias_local_ids: List[i32],
+    string_alias_flags: List[i32],
     // #747 (03g): set by lower_if when the just-lowered value-producing if had
     // only view/constant result arms — the result is a VIEW of storage owned
     // elsewhere, so neither the result temp nor a binding of it may drop.
@@ -282,13 +282,13 @@ pub type MirBuilder = ephemeral {
     // str comparison or concat part): a &str read there is its pointee's
     // bits, never a materialized owner.
     observing_str_read: i32,
-    string_field_alias_base_locals: Vec[i32],
-    string_field_alias_path_starts: Vec[i32],
-    string_field_alias_path_counts: Vec[i32],
-    string_field_alias_path_kinds: Vec[i32],
-    string_field_alias_path_syms: Vec[i32],
-    string_field_alias_flags: Vec[i32],
-    no_suspend_nodes: Vec[i32],
+    string_field_alias_base_locals: List[i32],
+    string_field_alias_path_starts: List[i32],
+    string_field_alias_path_counts: List[i32],
+    string_field_alias_path_kinds: List[i32],
+    string_field_alias_path_syms: List[i32],
+    string_field_alias_flags: List[i32],
+    no_suspend_nodes: List[i32],
 
     sema: &Sema,
     ast: AstPool,
@@ -300,70 +300,70 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
     let entry = body.new_block()
     MirBuilder {
         body,
-        anonymous_bodies: Vec.new(),
+        anonymous_bodies: List.new(),
         cur_bb: entry,
-        drop_local_ids: Vec.new(),
-        drop_kinds: Vec.new(),
-        drop_scope_starts: Vec.new(),
-        moved_value_local_ids: Vec.new(),
-        moved_field_base_locals: Vec.new(),
-        moved_field_path_starts: Vec.new(),
-        moved_field_path_counts: Vec.new(),
-        moved_field_path_kinds: Vec.new(),
-        moved_field_path_syms: Vec.new(),
-        stmt_temp_locals: Vec.new(),
-        stmt_temp_drop_depths: Vec.new(),
-        stmt_temp_starts: Vec.new(),
-        pending_reset_locals: Vec.new(),
-        stmt_reset_starts: Vec.new(),
-        stmt_reset_field_starts: Vec.new(),
-        stmt_reset_temp_starts: Vec.new(),
-        pending_reset_field_places: Vec.new(),
-        pending_reset_field_types: Vec.new(),
-        pending_payload_reset_places: Vec.new(),
-        pending_payload_reset_types: Vec.new(),
-        pending_payload_reset_blocks: Vec.new(),
-        pending_move_temp_locals: Vec.new(),
+        drop_local_ids: List.new(),
+        drop_kinds: List.new(),
+        drop_scope_starts: List.new(),
+        moved_value_local_ids: List.new(),
+        moved_field_base_locals: List.new(),
+        moved_field_path_starts: List.new(),
+        moved_field_path_counts: List.new(),
+        moved_field_path_kinds: List.new(),
+        moved_field_path_syms: List.new(),
+        stmt_temp_locals: List.new(),
+        stmt_temp_drop_depths: List.new(),
+        stmt_temp_starts: List.new(),
+        pending_reset_locals: List.new(),
+        stmt_reset_starts: List.new(),
+        stmt_reset_field_starts: List.new(),
+        stmt_reset_temp_starts: List.new(),
+        pending_reset_field_places: List.new(),
+        pending_reset_field_types: List.new(),
+        pending_payload_reset_places: List.new(),
+        pending_payload_reset_types: List.new(),
+        pending_payload_reset_blocks: List.new(),
+        pending_move_temp_locals: List.new(),
         field_move_in_branch: 0,
         pattern_subject_observed: 0,
         never_call_node: 0,
         pattern_bind_mut: 0,
-        pattern_move_log: Vec.new(),
-        with_cleanup_guard_locals: Vec.new(),
-        with_cleanup_payload_locals: Vec.new(),
-        with_cleanup_method_syms: Vec.new(),
-        with_cleanup_sigs: Vec.new(),
-        with_cleanup_mono_syms: Vec.new(),
-        bind_syms: Vec.new(),
-        bind_local_ids: Vec.new(),
-        bind_scope_starts: Vec.new(),
-        alias_syms: Vec.new(),
-        alias_places: Vec.new(),
-        alias_types: Vec.new(),
-        alias_scope_starts: Vec.new(),
-        defer_nodes: Vec.new(),
-        defer_scope_starts: Vec.new(),
-        errdefer_nodes: Vec.new(),
-        errdefer_scope_starts: Vec.new(),
-        loop_continue_bbs: Vec.new(),
-        loop_break_bbs: Vec.new(),
-        loop_result_places: Vec.new(),
-        loop_break_drop_depths: Vec.new(),
-        loop_break_defer_depths: Vec.new(),
-        loop_break_scope_depths: Vec.new(),
-        loop_labels: Vec.new(),
-        loop_target_kinds: Vec.new(),
-        goto_label_syms: Vec.new(),
-        goto_label_bbs: Vec.new(),
-        goto_label_scope_depths: Vec.new(),
-        goto_label_drop_depths: Vec.new(),
-        goto_label_defer_depths: Vec.new(),
-        goto_label_defined: Vec.new(),
-        goto_label_jumped: Vec.new(),
+        pattern_move_log: List.new(),
+        with_cleanup_guard_locals: List.new(),
+        with_cleanup_payload_locals: List.new(),
+        with_cleanup_method_syms: List.new(),
+        with_cleanup_sigs: List.new(),
+        with_cleanup_mono_syms: List.new(),
+        bind_syms: List.new(),
+        bind_local_ids: List.new(),
+        bind_scope_starts: List.new(),
+        alias_syms: List.new(),
+        alias_places: List.new(),
+        alias_types: List.new(),
+        alias_scope_starts: List.new(),
+        defer_nodes: List.new(),
+        defer_scope_starts: List.new(),
+        errdefer_nodes: List.new(),
+        errdefer_scope_starts: List.new(),
+        loop_continue_bbs: List.new(),
+        loop_break_bbs: List.new(),
+        loop_result_places: List.new(),
+        loop_break_drop_depths: List.new(),
+        loop_break_defer_depths: List.new(),
+        loop_break_scope_depths: List.new(),
+        loop_labels: List.new(),
+        loop_target_kinds: List.new(),
+        goto_label_syms: List.new(),
+        goto_label_bbs: List.new(),
+        goto_label_scope_depths: List.new(),
+        goto_label_drop_depths: List.new(),
+        goto_label_defer_depths: List.new(),
+        goto_label_defined: List.new(),
+        goto_label_jumped: List.new(),
         next_temp: 0,
         cur_node: 0,
         expected_type: 0,
-        untyped_override_nodes: Vec.new(),
+        untyped_override_nodes: List.new(),
         untyped_override_type: 0,
         untyped_override_depth: 0,
         contextual_copy_raw_node: 0,
@@ -375,22 +375,22 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         gen_loop_flag_local: -1,
         gen_loop_ret_local: -1,
         gen_loop_ret_ty: 0,
-        gen_loop_exit_labels: Vec.new(),
-        gen_loop_exit_kinds: Vec.new(),
+        gen_loop_exit_labels: List.new(),
+        gen_loop_exit_kinds: List.new(),
         gen_loop_used_codes: 0,
-        regex_capture_pat_nodes: Vec.new(),
-        regex_capture_opt_places: Vec.new(),
-        string_alias_local_ids: Vec.new(),
-        string_alias_flags: Vec.new(),
+        regex_capture_pat_nodes: List.new(),
+        regex_capture_opt_places: List.new(),
+        string_alias_local_ids: List.new(),
+        string_alias_flags: List.new(),
         last_if_result_view: 0,
         observing_str_read: 0,
-        string_field_alias_base_locals: Vec.new(),
-        string_field_alias_path_starts: Vec.new(),
-        string_field_alias_path_counts: Vec.new(),
-        string_field_alias_path_kinds: Vec.new(),
-        string_field_alias_path_syms: Vec.new(),
-        string_field_alias_flags: Vec.new(),
-        no_suspend_nodes: Vec.new(),
+        string_field_alias_base_locals: List.new(),
+        string_field_alias_path_starts: List.new(),
+        string_field_alias_path_counts: List.new(),
+        string_field_alias_path_kinds: List.new(),
+        string_field_alias_path_syms: List.new(),
+        string_field_alias_flags: List.new(),
+        no_suspend_nodes: List.new(),
         sema,
         ast,
         pool,
@@ -544,7 +544,7 @@ impl MirBuilder:
         let guard_ty = self.local_type(guard_local)
         let guard_place = self.place_for_local(guard_local)
         let guard_expected = if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 0: self.sema.sig_param_type(sig_idx, 0) else: 0
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.operand_for_place_arg(guard_place, guard_ty, guard_expected, 0))
         if drop_kind == DropKind.DK_WITH_GUARD_MUT:
             let payload_ty = self.local_type(payload_local)
@@ -601,28 +601,28 @@ impl MirBuilder:
 
     fn save_move_state() -> MirMoveStateSnapshot:
         MirMoveStateSnapshot {
-            moved_values: mir_clone_i32_vec(&self.moved_value_local_ids),
-            drop_kinds: mir_clone_i32_vec(&self.drop_kinds),
-            field_base_locals: mir_clone_i32_vec(&self.moved_field_base_locals),
-            field_path_starts: mir_clone_i32_vec(&self.moved_field_path_starts),
-            field_path_counts: mir_clone_i32_vec(&self.moved_field_path_counts),
-            field_path_kinds: mir_clone_i32_vec(&self.moved_field_path_kinds),
-            field_path_syms: mir_clone_i32_vec(&self.moved_field_path_syms),
+            moved_values: mir_clone_i32_list(&self.moved_value_local_ids),
+            drop_kinds: mir_clone_i32_list(&self.drop_kinds),
+            field_base_locals: mir_clone_i32_list(&self.moved_field_base_locals),
+            field_path_starts: mir_clone_i32_list(&self.moved_field_path_starts),
+            field_path_counts: mir_clone_i32_list(&self.moved_field_path_counts),
+            field_path_kinds: mir_clone_i32_list(&self.moved_field_path_kinds),
+            field_path_syms: mir_clone_i32_list(&self.moved_field_path_syms),
         }
 
     mut fn restore_move_state(snapshot: &MirMoveStateSnapshot):
-        self.moved_value_local_ids = mir_clone_i32_vec(&snapshot.moved_values)
+        self.moved_value_local_ids = mir_clone_i32_list(&snapshot.moved_values)
         // A return or carrier elimination can retire an outer owner's cleanup
         // on one arm. That retirement belongs to the arm, just like its move.
         // Keep later registrations and restore the pre-existing scope prefix.
         for i in 0..snapshot.drop_kinds.len():
             if i < self.drop_kinds.len():
                 self.drop_kinds[i] = snapshot.drop_kinds[i]
-        self.moved_field_base_locals = mir_clone_i32_vec(&snapshot.field_base_locals)
-        self.moved_field_path_starts = mir_clone_i32_vec(&snapshot.field_path_starts)
-        self.moved_field_path_counts = mir_clone_i32_vec(&snapshot.field_path_counts)
-        self.moved_field_path_kinds = mir_clone_i32_vec(&snapshot.field_path_kinds)
-        self.moved_field_path_syms = mir_clone_i32_vec(&snapshot.field_path_syms)
+        self.moved_field_base_locals = mir_clone_i32_list(&snapshot.field_base_locals)
+        self.moved_field_path_starts = mir_clone_i32_list(&snapshot.field_path_starts)
+        self.moved_field_path_counts = mir_clone_i32_list(&snapshot.field_path_counts)
+        self.moved_field_path_kinds = mir_clone_i32_list(&snapshot.field_path_kinds)
+        self.moved_field_path_syms = mir_clone_i32_list(&snapshot.field_path_syms)
 
     // Open the lazy fallback arm of `??` / unwrap_or / unwrap_or_else. A value
     // the fallback consumes (`r.unwrap_or(d)`, `o ?? d`) moves on this path
@@ -1219,7 +1219,7 @@ impl MirBuilder:
             if cap_sym != 0 and self.place_base_local(cap_place) == local_id and self.place_field_projection_count(cap_place) > 0 and self.type_id_is_str(cap_ty) != 0:
                 let cap_local = self.body.new_local(cap_ty, 0, cap_sym, 1)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, cap_local, 0, 0)
-                let cap_parts: Vec[i32] = Vec.new()
+                let cap_parts: List[i32] = List.new()
                 cap_parts.push(self.body.new_operand(OperandKind.OK_COPY, cap_place))
                 cap_parts.push(self.lower_str_lit(self.pool.intern("")))
                 let cap_args = self.body.new_call_args(cap_parts)
@@ -1329,7 +1329,7 @@ impl MirBuilder:
     // destination has no concrete MIR type, and validate-all refused every
     // scope program for it (#1411).
     mut fn emit_handle_call(handle_op: i32, intrinsic: MirIntrinsic, node: i32):
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(handle_op)
         let call_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(call_id, intrinsic)
@@ -1489,7 +1489,7 @@ impl MirBuilder:
     mut fn emit_defers_for_range(start: i32, end: i32):
         var i = end - 1
         while i >= start:
-            let ran: Vec[i32] = Vec.new()
+            let ran: List[i32] = List.new()
             while self.defer_nodes.len() as i32 > i:
                 ran.push(self.defer_nodes.remove(self.defer_nodes.len() as i32 - 1))
             self.emit_deferred_body(ran[(ran.len() as i32 - 1)])
@@ -1509,8 +1509,8 @@ impl MirBuilder:
     // outer scope's defer (§14.7, #1986) runs only the drops still pending,
     // never one this exit already ran. Sibling paths keep every record.
     mut fn emit_cleanup_to_target(target: LoopInfo):
-        let ran_ids: Vec[i32] = Vec.new()
-        let ran_kinds: Vec[i32] = Vec.new()
+        let ran_ids: List[i32] = List.new()
+        let ran_kinds: List[i32] = List.new()
         var scope_idx = self.drop_scope_starts.len() as i32 - 1
         var lowest_drop_start = self.drop_local_ids.len() as i32
         var lowest_defer_start = self.defer_nodes.len() as i32
@@ -1975,8 +1975,8 @@ impl MirBuilder:
         self.sema.ty_void as i32
 
     mut fn resolve_index_generic_inst(node: i32) -> i32:
-        // Resolve NodeKind.NK_INDEX(NodeKind.NK_IDENT("Vec"), type_arg) to a TypeKind.TY_GENERIC_INST.
-        // Used for Vec[i32].new() and HashMap[str, i32].new().
+        // Resolve NodeKind.NK_INDEX(NodeKind.NK_IDENT("List"), type_arg) to a TypeKind.TY_GENERIC_INST.
+        // Used for List[i32].new() and HashMap[str, i32].new().
         // Sema.check_index creates these during the check pass; we only look up here.
         let whole_type = self.sema.resolve_type_level_arg_expr_frozen(node)
         if whole_type > 0:
@@ -2004,7 +2004,7 @@ impl MirBuilder:
         // The instance Sema.check_index created. #2000: by identity, not by
         // the memo's hash alone (a comptime evaluation empties the memo, and
         // a hash names no type on its own).
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(arg_type)
         if arg2_type > 0: args.push(arg2_type)
         self.sema.find_generic_inst_type(base_sym, &args, args.len() as i32) as i32
@@ -2014,8 +2014,8 @@ impl MirBuilder:
 
     mut fn type_receiver_type(node: i32) -> i32:
         // Resolve a type-level receiver expression to its base sema type.
-        // Used for intrinsic classification (Vec, HashMap, etc.)
-        // Handles: Vec (NodeKind.NK_IDENT), Vec[i32] (NodeKind.NK_INDEX of NodeKind.NK_IDENT)
+        // Used for intrinsic classification (List, HashMap, etc.)
+        // Handles: List (NodeKind.NK_IDENT), List[i32] (NodeKind.NK_INDEX of NodeKind.NK_IDENT)
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
             return self.sema.resolve_type_expr_frozen(node) as i32
@@ -2045,19 +2045,19 @@ impl MirBuilder:
             return self.index_expr_is_type_level(self.ast.get_data0(expr))
         false
 
-    mut fn vec_literal_type(node: i32) -> i32:
+    mut fn list_literal_type(node: i32) -> i32:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_INDEX:
             return 0
         let base_expr = self.ast.get_data0(node)
         if not self.index_expr_is_type_level(base_expr):
             return 0
-        let vec_ty = self.expr_type(node)
-        if vec_ty == 0 or vec_ty == self.sema.ty_void:
+        let list_ty = self.expr_type(node)
+        if list_ty == 0 or list_ty == self.sema.ty_void:
             return 0
-        let resolved = self.sema.resolve_alias(vec_ty) as i32
+        let resolved = self.sema.resolve_alias(list_ty) as i32
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
-        if self.sema.std_generic_of(resolved) != StdGeneric.Vec:
+        if self.sema.std_generic_of(resolved) != StdGeneric.Sequence:
             return 0
         resolved
 
@@ -2190,7 +2190,7 @@ impl MirBuilder:
         if tk == TypeKind.TY_REF:
             return self.indexed_element_type(self.sema.get_type_d0(resolved))
         if tk == TypeKind.TY_GENERIC_INST:
-            if self.sema.std_generic_of(resolved) == StdGeneric.Vec and self.sema.get_generic_inst_arg_count(resolved) > 0:
+            if self.sema.std_generic_of(resolved) == StdGeneric.Sequence and self.sema.get_generic_inst_arg_count(resolved) > 0:
                 return self.sema.get_generic_inst_arg(resolved, 0)
         0
 
@@ -2218,7 +2218,7 @@ impl MirBuilder:
             return 0
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.sema.get_generic_inst_base(resolved)
-            if base_sym == self.sema.syms.vec or base_sym == self.sema.syms.hashmap:
+            if base_sym == self.sema.syms.list or base_sym == self.sema.syms.hashmap:
                 return 0
         if self.sema.type_is_index_place(base_ty) != 0:
             return 1
@@ -3053,11 +3053,11 @@ impl MirBuilder:
         let saved_alias_syms = move self.alias_syms
         let saved_alias_places = move self.alias_places
         let saved_alias_types = move self.alias_types
-        self.bind_syms = Vec.new()
-        self.bind_local_ids = Vec.new()
-        self.alias_syms = Vec.new()
-        self.alias_places = Vec.new()
-        self.alias_types = Vec.new()
+        self.bind_syms = List.new()
+        self.bind_local_ids = List.new()
+        self.alias_syms = List.new()
+        self.alias_places = List.new()
+        self.alias_types = List.new()
         let value = self.lower_call_arg(default_node, sig_idx, callable_fn_tid, param_idx)
         self.bind_syms = saved_bind_syms
         self.bind_local_ids = saved_bind_local_ids
@@ -3087,7 +3087,7 @@ impl MirBuilder:
         let found = self.sema.find_generic_inst(opt_sym, cap_ty)
         if found != 0:
             return found
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(cap_ty)
         self.sema.find_generic_inst_type(opt_sym, args, 1) as i32
 
@@ -3113,7 +3113,7 @@ impl MirBuilder:
         let method_sym = self.sema.pool_lookup_symbol(method_name)
         let fn_sym = self.sema.lookup_method_fn(self.sema.syms.regex, method_sym)
         let fn_op = self.lower_var(fn_sym, 0, 0)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.regex_ref_operand(regex_place))
         args.push(self.body.new_operand(OperandKind.OK_COPY, text_place))
         let args_id = self.body.new_call_args(args)
@@ -3131,7 +3131,7 @@ impl MirBuilder:
         let method_sym = self.sema.pool_lookup_symbol("captures_match_op")
         let fn_sym = self.sema.lookup_method_fn(self.sema.syms.regex, method_sym)
         let fn_op = self.lower_var(fn_sym, 0, 0)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.regex_ref_operand(regex_place))
         args.push(self.body.new_operand(OperandKind.OK_COPY, text_place))
         let args_id = self.body.new_call_args(args)
@@ -3145,7 +3145,7 @@ impl MirBuilder:
 
     mut fn lower_option_is_some_place(opt_place: i32, opt_ty: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, self.sema.pool_lookup_symbol("is_some"), self.sema.ty_void)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.body.new_operand(OperandKind.OK_COPY, opt_place))
         let args_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(args_id, MirIntrinsic.OPT_IS_SOME)
@@ -3158,7 +3158,7 @@ impl MirBuilder:
 
     mut fn lower_option_unwrap_place(opt_place: i32, opt_ty: i32, result_ty: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, self.sema.pool_lookup_symbol("unwrap"), self.sema.ty_void)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         let opt_op = self.body.new_operand(OperandKind.OK_MOVE, opt_place)
         self.consume_moved_operand(opt_op)
         args.push(opt_op)
@@ -3211,7 +3211,7 @@ impl MirBuilder:
         let captures_sym = self.sema.pool_lookup_symbol("Captures")
         let fn_sym = self.sema.lookup_method_fn(captures_sym, method_sym)
         let fn_op = self.lower_var(fn_sym, 0, 0)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.captures_ref_operand(captures_place))
         if name_sym != 0:
             args.push(self.lower_str_lit(name_sym))
@@ -3286,7 +3286,7 @@ impl MirBuilder:
     mut fn lower_fmt_to_str(operand: i32, node: i32) -> i32:
         // Emit MirIntrinsic.FMT_TO_STR call to format a non-str value to str.
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_to_str"), self.sema.ty_str)
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         call_args.push(operand)
         let args_id = self.body.new_call_args(call_args)
         let result_local = self.new_temp(self.sema.ty_str)
@@ -3304,7 +3304,7 @@ impl MirBuilder:
     mut fn lower_fmt_debug_str(operand: i32, node: i32) -> i32:
         // Emit MirIntrinsic.FMT_DEBUG_STR call to wrap a str value in quotes.
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_debug_str"), self.sema.ty_str)
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         call_args.push(operand)
         let args_id = self.body.new_call_args(call_args)
         let result_local = self.new_temp(self.sema.ty_str)
@@ -3324,7 +3324,7 @@ impl MirBuilder:
         // Codegen dispatches based on type: str→quoted, struct→fields, etc.
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_debug"), self.sema.ty_str)
         let type_const = self.const_operand(ConstKind.CK_INT, sema_ty, self.sema.ty_i32)
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         call_args.push(operand)
         call_args.push(type_const)
         let args_id = self.body.new_call_args(call_args)
@@ -3410,7 +3410,7 @@ impl MirBuilder:
 
     // The same, with a second borrowed argument when `place2` >= 0.
     mut fn lower_debug_borrowing_call2(fn_sym: i32, sig: i32, mono: i32, place: i32, place_ty: i32, place2: i32, place2_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.operand_for_place_arg(place, place_ty, self.sema.sig_param_type(sig, 0), 0))
         if place2 >= 0:
             args.push(self.operand_for_place_arg(place2, place2_ty, self.sema.sig_param_type(sig, 1), 0))
@@ -3451,7 +3451,7 @@ impl MirBuilder:
             self.lower_debug_sequence(buf_op, place, resolved, 0)
             return
         let base = if kind == TypeKind.TY_GENERIC_INST: self.sema.get_generic_inst_base(resolved) else: 0
-        if base != 0 and base == self.sema.syms.vec:
+        if base != 0 and base == self.sema.syms.list:
             self.lower_debug_sequence(buf_op, place, resolved, 1)
             return
         if self.sema.debug_fmt_transparent_owner(resolved):
@@ -3496,13 +3496,13 @@ impl MirBuilder:
         let disc = self.lower_enum_discriminant(place)
         let join_bb = self.new_block()
         let default_bb = self.new_block()
-        let vals: Vec[i64] = Vec.new()
-        let targets: Vec[i32] = Vec.new()
-        let arms: Vec[i32] = Vec.new()
+        let vals: List[i64] = List.new()
+        let targets: List[i32] = List.new()
+        let arms: List[i32] = List.new()
         let variant_count = self.sema.get_type_d2(enum_base as TypeId)
         var pos = self.sema.get_type_d1(enum_base as TypeId)
-        let names: Vec[i32] = Vec.new()
-        let payload_counts: Vec[i32] = Vec.new()
+        let names: List[i32] = List.new()
+        let payload_counts: List[i32] = List.new()
         for vi in 0..variant_count:
             let variant_sym: i32 = self.sema.type_extra[pos]
             let payload_count: i32 = self.sema.type_extra[(pos + 1)]
@@ -3551,9 +3551,9 @@ impl MirBuilder:
         self.switch_to(join_bb)
 
     // `[elem, elem]` for an array, a slice (`vec_like` 0: element places by
-    // index) or a Vec (`vec_like` 1: its length by VEC_LEN, its element
+    // index) or a List (`vec_like` 1: its length by VEC_LEN, its element
     // places by index too).
-    mut fn lower_debug_sequence(buf_op: i32, value_place: i32, resolved: i32, vec_like: i32):
+    mut fn lower_debug_sequence(buf_op: i32, value_place: i32, resolved: i32, list_like: i32):
         self.lower_debug_write_literal(buf_op, "[", 0)
         var place = value_place
         if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_SLICE:
@@ -3565,11 +3565,11 @@ impl MirBuilder:
             self.assign_operand_to_place(place, view_op, 0)
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        if vec_like != 0:
-            let len_args: Vec[i32] = Vec.new()
+        if list_like != 0:
+            let len_args: List[i32] = List.new()
             len_args.push(self.body.new_operand(OperandKind.OK_COPY, place))
             let len_args_id = self.body.new_call_args(len_args)
-            self.body.set_call_intrinsic(len_args_id, MirIntrinsic.VEC_LEN)
+            self.body.set_call_intrinsic(len_args_id, MirIntrinsic.LIST_LEN)
             let len_after_bb = self.new_block()
             let len_unit = self.unit_operand()
             self.terminate(TermKind.TK_CALL, len_unit, len_args_id, len_place, len_after_bb)
@@ -3609,7 +3609,7 @@ impl MirBuilder:
         self.switch_to(elem_bb)
         // The element is formatted where it lives (D27: `xs[i]` is the
         // element place); nothing is copied out of the sequence.
-        let elem_ty = if vec_like != 0: self.sema.get_generic_inst_arg(resolved, 0) else: self.sema.get_type_d0(resolved as TypeId)
+        let elem_ty = if list_like != 0: self.sema.get_generic_inst_arg(resolved, 0) else: self.sema.get_type_d0(resolved as TypeId)
         let elem_place = self.body.new_index_place(place, counter_local, elem_ty)
         self.lower_debug_write_place(buf_op, elem_place, elem_ty, 0)
         self.finish_stmt_temp_frame(frame)
@@ -3625,7 +3625,7 @@ impl MirBuilder:
     // §15.4.7 (#1564): a HashSet's `{elem, elem}`, ordered by the elements'
     // Debug text. The set has no traversal of its own, so its table is walked
     // here as a map's is (D44: each element is viewed where it lives, never
-    // copied out), each element's `:?` text is pushed onto a Vec[str], and the
+    // copied out), each element's `:?` text is pushed onto a List[str], and the
     // library's HashSet.debug_form_of (Sema bound it as the entry's aux
     // method) orders and joins the texts.
     mut fn lower_debug_set(buf_op: i32, set_place: i32, resolved: i32):
@@ -3638,15 +3638,15 @@ impl MirBuilder:
         let view_ty = self.sema.find_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
         let texts_ty = self.sema.get_type_d0(self.sema.resolve_alias(self.sema.sig_param_type(join_sig, 1) as TypeId)) as i32
         if view_ty == 0 or texts_ty == 0:
-            sema_phase_bug(f"BUG: HashSet `:?` formatter for type {resolved} is missing its element view or text Vec type (D61)")
+            sema_phase_bug(f"BUG: HashSet `:?` formatter for type {resolved} is missing its element view or text List type (D61)")
         let texts_local = self.new_temp(texts_ty)
         let texts_place = self.place_for_local(texts_local)
-        self.emit_vec_new_into(texts_place, 0)
+        self.emit_list_new_into(texts_place, 0)
         self.register_stmt_temp(texts_local, texts_ty)
 
         let cap_local = self.new_temp(self.sema.ty_i64)
         let cap_place = self.place_for_local(cap_local)
-        let cap_args: Vec[i32] = Vec.new()
+        let cap_args: List[i32] = List.new()
         cap_args.push(self.body.new_operand(OperandKind.OK_COPY, set_place))
         let cap_args_id = self.body.new_call_args(cap_args)
         self.body.set_call_intrinsic(cap_args_id, MirIntrinsic.MAP_CAPACITY)
@@ -3672,15 +3672,15 @@ impl MirBuilder:
         let occupied_local = self.new_temp(self.sema.ty_i32)
         let occupied_place = self.place_for_local(occupied_local)
         self.emit_map_slot_call(MirIntrinsic.MAP_SLOT_OCCUPIED, set_place, slot_place, occupied_place)
-        let empty_vals: Vec[i64] = Vec.new()
+        let empty_vals: List[i64] = List.new()
         empty_vals.push(0)
-        let empty_targets: Vec[i32] = Vec.new()
+        let empty_targets: List[i32] = List.new()
         empty_targets.push(inc_bb as i32)
         let empty_table = self.body.new_switch_table(empty_vals, empty_targets)
         let occupied_read = self.body.new_operand(OperandKind.OK_COPY, occupied_place)
         self.terminate(TermKind.TK_SWITCH_INT, occupied_read, empty_table, live_bb, 0)
 
-        // The element's text moves into the Vec; the iteration's other
+        // The element's text moves into the List; the iteration's other
         // temps drop inside it (#771).
         self.switch_to(live_bb)
         let frame = self.push_stmt_temp_frame()
@@ -3691,7 +3691,7 @@ impl MirBuilder:
         self.lower_debug_write_place(elem_buf, view_place, view_ty, 0)
         let text_op = self.lower_fstring_buf_finish(elem_buf, 0)
         self.consume_moved_operand(text_op)
-        self.emit_vec_push(texts_place, text_op, 0)
+        self.emit_list_push(texts_place, text_op, 0)
         self.finish_stmt_temp_frame(frame)
         self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
@@ -3715,9 +3715,9 @@ impl MirBuilder:
         let test_place = self.place_for_local(test_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, test_place, test_rv, 0)
         let test_op = self.body.new_operand(OperandKind.OK_COPY, test_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(yes_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, test_op, table, no_bb, 0)
@@ -3731,7 +3731,7 @@ impl MirBuilder:
         let width_const = self.const_operand(ConstKind.CK_INT, width, self.sema.ty_i32)
         let prec_const = self.const_operand(ConstKind.CK_INT, precision, self.sema.ty_i32)
         let type_const = self.const_operand(ConstKind.CK_INT, sema_ty, self.sema.ty_i32)
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         call_args.push(operand)
         call_args.push(flags_const)
         call_args.push(width_const)
@@ -3871,7 +3871,7 @@ impl MirBuilder:
 
     mut fn lower_fstring_buf_new(node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_new"), self.sema.ty_i32)
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         let args_id = self.body.new_call_args(call_args)
         // Result is a pointer (use i32 as placeholder sema type, codegen knows it's ptr)
         let result_local = self.new_temp(self.sema.ty_i32)
@@ -3884,7 +3884,7 @@ impl MirBuilder:
 
     mut fn lower_fstring_buf_write_str(buf_op: i32, str_op: i32, node: i32):
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_write_str"), self.sema.ty_void)
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         call_args.push(buf_op)
         call_args.push(str_op)
         let args_id = self.body.new_call_args(call_args)
@@ -3897,7 +3897,7 @@ impl MirBuilder:
 
     mut fn lower_fstring_buf_write_str_ref(buf_op: i32, str_ref_op: i32, node: i32):
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_write_str_ref"), self.sema.ty_void)
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         call_args.push(buf_op)
         call_args.push(str_ref_op)
         let args_id = self.body.new_call_args(call_args)
@@ -3910,7 +3910,7 @@ impl MirBuilder:
 
     mut fn lower_str_clone_ref(str_ref_op: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("str_clone_ref"), self.sema.ty_str)
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         call_args.push(str_ref_op)
         let args_id = self.body.new_call_args(call_args)
         let result_local = self.new_temp(self.sema.ty_str)
@@ -3931,7 +3931,7 @@ impl MirBuilder:
         let width_const = self.const_operand(ConstKind.CK_INT, width, self.sema.ty_i32)
         let prec_const = self.const_operand(ConstKind.CK_INT, precision, self.sema.ty_i32)
         let type_const = self.const_operand(ConstKind.CK_INT, sema_ty, self.sema.ty_i32)
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         call_args.push(buf_op)
         call_args.push(val_op)
         call_args.push(flags_const)
@@ -3948,7 +3948,7 @@ impl MirBuilder:
 
     mut fn lower_fstring_buf_finish(buf_op: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_finish"), self.sema.ty_str)
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         call_args.push(buf_op)
         let args_id = self.body.new_call_args(call_args)
         let result_local = self.new_temp(self.sema.ty_str)
@@ -4045,13 +4045,13 @@ impl MirBuilder:
     // D88 (§4.2.1): a use of a constant with no numeric type of its own is
     // its initializer, lowered at the type Sema gave this use.
     mut fn lower_untyped_const_use(init: i32, use_ty: i32) -> i32:
-        let path = self.sema.untyped_const_value_path(init, Vec.new())
+        let path = self.sema.untyped_const_value_path(init, List.new())
         for n in path: self.untyped_override_nodes.push(n)
         self.untyped_override_type = use_ty
         self.untyped_override_depth = self.untyped_override_depth + 1
         let op = self.lower_expr(init)
         self.untyped_override_depth = self.untyped_override_depth - 1
-        if self.untyped_override_depth == 0: self.untyped_override_nodes = Vec.new()
+        if self.untyped_override_depth == 0: self.untyped_override_nodes = List.new()
         op
 
     mut fn lower_var(sym: i32, type_id: i32, node_id: i32) -> i32:
@@ -4189,8 +4189,8 @@ impl MirBuilder:
             let vl_is_disc_enum = self.sema.disc_repr_types.contains(vl_resolved as i32)
             if vl_is_disc_enum and not self.sema.disc_has_payload.contains(vl_resolved as i32):
                 return self.int_const_operand(self.enum_variant_discriminant_for_type(vl_decl_ty, vl_sym), vl_result_ty)
-            let vl_fields: Vec[i32] = Vec.new()
-            let vl_names: Vec[i32] = Vec.new()
+            let vl_fields: List[i32] = List.new()
+            let vl_names: List[i32] = List.new()
             let vl_fid = self.body.new_agg_fields(vl_fields, vl_names)
             let vl_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, vl_fid, vl_variant_idx)
             let vl_tmp = self.new_temp(vl_result_ty)
@@ -4509,9 +4509,9 @@ impl MirBuilder:
     // #1491: the string flow facts as they stand (lower_if keeps them per
     // arm and joins them).
     fn save_string_flow_facts() -> MirStrFlowFacts:
-        var local_ids: Vec[i32] = Vec.new()
-        var local_flags: Vec[i32] = Vec.new()
-        var field_flags: Vec[i32] = Vec.new()
+        var local_ids: List[i32] = List.new()
+        var local_flags: List[i32] = List.new()
+        var field_flags: List[i32] = List.new()
         for i in 0..self.string_alias_local_ids.len():
             local_ids.push(self.string_alias_local_ids[i])
             local_flags.push(self.string_alias_flags[i])
@@ -4522,8 +4522,8 @@ impl MirBuilder:
     // Back to `facts`. A field entry made since reads as may-alias, as a
     // field with no entry does (string_field_flags).
     mut fn restore_string_flow_facts(facts: &MirStrFlowFacts):
-        self.string_alias_local_ids = Vec.new()
-        self.string_alias_flags = Vec.new()
+        self.string_alias_local_ids = List.new()
+        self.string_alias_flags = List.new()
         for i in 0..facts.local_ids.len():
             self.string_alias_local_ids.push(facts.local_ids[i])
             self.string_alias_flags.push(facts.local_flags[i])
@@ -4533,14 +4533,14 @@ impl MirBuilder:
     // The facts where two paths meet: a place may alias if it may on either
     // path, and is owned only if it is owned on both.
     mut fn join_string_flow_facts(a: &MirStrFlowFacts, b: &MirStrFlowFacts):
-        var ids: Vec[i32] = Vec.new()
+        var ids: List[i32] = List.new()
         for i in 0..a.local_ids.len():
             ids.push(a.local_ids[i])
         for i in 0..b.local_ids.len():
             if str_flow_local_index(a, b.local_ids[i]) < 0:
                 ids.push(b.local_ids[i])
-        self.string_alias_local_ids = Vec.new()
-        self.string_alias_flags = Vec.new()
+        self.string_alias_local_ids = List.new()
+        self.string_alias_flags = List.new()
         for i in 0..ids.len():
             self.string_alias_local_ids.push(ids[i])
             self.string_alias_flags.push(str_flow_join(str_flow_local_flags(a, ids[i]), str_flow_local_flags(b, ids[i])))
@@ -4669,15 +4669,15 @@ impl MirBuilder:
             return false
         self.sema.resolve_alias(ty) == self.sema.ty_str
 
-    mut fn collect_left_string_concat_parts(node: i32) -> Vec[i32]:
-        let rev: Vec[i32] = Vec.new()
+    mut fn collect_left_string_concat_parts(node: i32) -> List[i32]:
+        let rev: List[i32] = List.new()
         var cur = node
         while self.is_string_concat_node(cur):
             rev.push(self.ast.get_data2(cur))
             cur = self.ast.get_data1(cur)
         rev.push(cur)
 
-        let out: Vec[i32] = Vec.new()
+        let out: List[i32] = List.new()
         var i = rev.len() as i32 - 1
         while i >= 0:
             out.push(rev[i])
@@ -4694,7 +4694,7 @@ fn mir_str_payload_is_raw_marked(text: &str) -> bool:
 // and unmarked payloads are left to the runtime path. Returns -1 when the
 // chain is not foldable.
 impl MirBuilder:
-    mut fn try_fold_literal_str_concat(node: i32, parts: &Vec[i32]) -> i32:
+    mut fn try_fold_literal_str_concat(node: i32, parts: &List[i32]) -> i32:
         for i in 0..parts.len():
             if self.ast.kind(parts[i]) != NodeKind.NK_STRING_LIT:
                 return -1
@@ -4715,10 +4715,10 @@ impl MirBuilder:
         let folded_ty = self.expr_type(node)
         self.lower_str_lit_as(folded_sym, folded_ty)
 
-    mut fn lower_str_concat_chain(node: i32, parts: &Vec[i32]) -> i32:
+    mut fn lower_str_concat_chain(node: i32, parts: &List[i32]) -> i32:
         let saved_expected = self.expected_type
         self.expected_type = self.sema.ty_str as i32
-        let operands: Vec[i32] = Vec.new()
+        let operands: List[i32] = List.new()
         for i in 0..parts.len():
             operands.push(self.lower_str_concat_part(parts[i]))
         self.expected_type = saved_expected
@@ -5004,7 +5004,7 @@ impl MirBuilder:
 
         let saved_expected = self.expected_type
         self.expected_type = self.sema.ty_str as i32
-        let operands: Vec[i32] = Vec.new()
+        let operands: List[i32] = List.new()
         operands.push(self.body.new_operand(OperandKind.OK_MOVE, dest_place))
         for i in 1..parts.len() as i32:
             operands.push(self.lower_str_concat_part(parts[i]))
@@ -5295,7 +5295,7 @@ impl MirBuilder:
 
     mut fn lower_str_contains_char(op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void)
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         let recv_op = self.lower_receiver_with_method_autoderef(rhs_expr)
         call_args.push(self.borrowed_receiver_operand(recv_op))
         call_args.push(self.lower_expr(lhs_expr))
@@ -5332,7 +5332,7 @@ impl MirBuilder:
             if lhs_resolved == 0 or self.sema.get_type_kind(lhs_resolved) != TypeKind.TY_STR:
                 return self.lower_str_contains_char(op, lhs_expr, rhs_expr, node)
         // §9.9: `x in collection` desugars to `collection.contains(x)` (Contains
-        // trait) for Vec / str / HashMap etc.
+        // trait) for List / str / HashMap etc.
         let contains_sym = self.pool.intern("contains")
         // The call-argument extra slot was pre-reserved at parse time (the AST is
         // frozen now); read it back rather than mutating the frozen pool (#234).
@@ -5354,9 +5354,9 @@ impl MirBuilder:
         let end_bb = self.new_block()
         let lhs_read = self.body.new_operand(OperandKind.OK_COPY, result_place)
         // Use switch_int: value 1 (true) goes to one target, default goes to other
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         if op == 12:
             // or: if lhs is true (1), skip to end; default (false) → evaluate rhs
             targets.push(end_bb as i32)
@@ -5413,7 +5413,7 @@ impl MirBuilder:
     mut fn lower_method_bin_op(lhs_expr: i32, rhs_expr: i32, method_sym: i32, node: i32) -> i32:
         // Lower as: method_sym(lhs, rhs)
         let fn_op = self.lower_var(method_sym, 0, 0)
-        let arg_nodes: Vec[i32] = Vec.new()
+        let arg_nodes: List[i32] = List.new()
         arg_nodes.push(lhs_expr)
         arg_nodes.push(rhs_expr)
         let ret_ty = self.expr_type(node)
@@ -5423,7 +5423,7 @@ impl MirBuilder:
     // selection is `b.cmp(&a) > 0`); `a != b` with no `ne` is `not a.eq(&b)`.
     mut fn lower_derived_comparison(op: i32, lhs_expr: i32, rhs_expr: i32, method_sym: i32, reversed: i32, node: i32) -> i32:
         let fn_op = self.lower_var(method_sym, 0, 0)
-        let arg_nodes: Vec[i32] = Vec.new()
+        let arg_nodes: List[i32] = List.new()
         arg_nodes.push(if reversed != 0: rhs_expr else: lhs_expr)
         arg_nodes.push(if reversed != 0: lhs_expr else: rhs_expr)
         let bool_ty = self.sema.ty_bool as i32
@@ -5447,7 +5447,7 @@ impl MirBuilder:
 
     mut fn lower_method_un_op(expr: i32, method_sym: i32, node: i32) -> i32:
         let fn_op = self.lower_var(method_sym, 0, 0)
-        let arg_nodes: Vec[i32] = Vec.new()
+        let arg_nodes: List[i32] = List.new()
         arg_nodes.push(expr)
         let ret_ty = self.expr_type(node)
         self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, ret_ty, node)
@@ -5465,7 +5465,7 @@ impl MirBuilder:
         let from_break_sig: i32 = self.sema.try_from_break_sigs.get(node).unwrap()
         let from_break_mono_sym: i32 = self.sema.try_from_break_mono_syms.get(node).unwrap()
 
-        let branch_args: Vec[i32] = Vec.new()
+        let branch_args: List[i32] = List.new()
         branch_args.push(self.lower_expr(expr))
         let branch_op = self.lower_resolved_call_with_operand_args_contract(branch_fn, branch_args, branch_ty, node, branch_sig, branch_mono_sym)
         let branch_place = self.materialize_operand(branch_op, branch_ty, self.ast.get_start(expr))
@@ -5483,9 +5483,9 @@ impl MirBuilder:
             return self.unit_operand()
 
         let disc = self.lower_enum_discriminant(branch_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.enum_variant_discriminant_for_type(branch_ty, continue_sym))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(pass_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, fail_bb, 0)
@@ -5506,7 +5506,7 @@ impl MirBuilder:
         let break_downcast = self.body.new_downcast_place(branch_place, break_idx)
         let break_payload_place = self.body.new_field_place(break_downcast, 0, break_ty)
         let break_op = self.body.new_operand(self.carrier_read_kind(break_ty, self.local_type(self.place_base_local(break_payload_place))), break_payload_place)
-        let from_break_args: Vec[i32] = Vec.new()
+        let from_break_args: List[i32] = List.new()
         from_break_args.push(break_op)
         let ret_op = self.lower_resolved_call_with_operand_args_contract(from_break_fn, from_break_args, ret_ty, node, from_break_sig, from_break_mono_sym)
         self.assign_operand_to_place(ret_place, ret_op, self.ast.get_start(expr))
@@ -5540,7 +5540,7 @@ impl MirBuilder:
 
     mut fn lower_multi_index_read(node: i32) -> i32:
         let base_op = self.lower_expr(self.ast.get_data0(node))
-        let mi_args: Vec[i32] = Vec.new()
+        let mi_args: List[i32] = List.new()
         mi_args.push(base_op)
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_INDEX:
@@ -5576,7 +5576,7 @@ impl MirBuilder:
 
     mut fn lower_multi_index_set(place_expr: i32, rhs_expr: i32):
         let mi_base_op = self.lower_expr(self.ast.get_data0(place_expr))
-        let mi_args: Vec[i32] = Vec.new()
+        let mi_args: List[i32] = List.new()
         mi_args.push(mi_base_op)
         let kind = self.ast.kind(place_expr)
         if kind == NodeKind.NK_INDEX:
@@ -5935,7 +5935,7 @@ impl MirBuilder:
         let recv_tmp = self.new_temp(recv_ref_ty)
         let recv_place = self.place_for_local(recv_tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, recv_place, rv, self.ast.get_start(node))
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.body.new_operand(OperandKind.OK_COPY, recv_place))
         // Sema records the concrete deref specialization on the base expr
         // (ensure_user_deref_specialization), so the dispatch keeps the full
@@ -6071,7 +6071,7 @@ impl MirBuilder:
         let base_expr = self.ast.get_data0(node)
         let index_expr = self.ast.get_data1(node)
         var base = self.lower_expr_place(base_expr)
-        // Indexing through `&Vec[T]` / `&mut Vec[T]` should index the container,
+        // Indexing through `&List[T]` / `&mut List[T]` should index the container,
         // not treat the reference itself like a raw pointer. A D27 index has
         // semantic type &T while its place already denotes the physical T
         // slot, so prefer the place type before deciding whether a dereference
@@ -6181,7 +6181,7 @@ impl MirBuilder:
             return alias_field
         -1
 
-    mut fn lower_vec_literal_push(vec_place: i32, elem_node: i32, elem_ty: i32):
+    mut fn lower_list_literal_push(list_place: i32, elem_node: i32, elem_ty: i32):
         if elem_node == 0:
             return
         let push_sym = self.pool.intern("push")
@@ -6191,8 +6191,8 @@ impl MirBuilder:
             self.expected_type = elem_ty
         let elem_op = self.lower_expr(elem_node)
         self.expected_type = saved_expected
-        let args: Vec[i32] = Vec.new()
-        args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+        let args: List[i32] = List.new()
+        args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         args.push(elem_op)
         let args_id = self.body.new_call_args(args)
         let result_local = self.new_temp(self.sema.ty_void)
@@ -6200,23 +6200,23 @@ impl MirBuilder:
         let next_bb = self.new_block()
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
-        self.body.set_call_intrinsic(args_id, MirIntrinsic.VEC_PUSH)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_PUSH)
 
-    mut fn lower_vec_literal(node: i32, vec_ty: i32) -> i32:
+    mut fn lower_list_literal(node: i32, list_ty: i32) -> i32:
         let base_expr = self.ast.get_data0(node)
         let first_elem = self.ast.get_data1(node)
         let second_elem = self.ast.get_data2(node)
         let new_sym = self.pool.intern("new")
-        let new_op = self.lower_intrinsic_call(MirIntrinsic.VEC_NEW, base_expr, new_sym, 0, 0, node)
-        let vec_place = self.materialize_operand(new_op, vec_ty, self.ast.get_start(node))
-        let resolved = self.sema.resolve_alias(vec_ty)
+        let new_op = self.lower_intrinsic_call(MirIntrinsic.LIST_NEW, base_expr, new_sym, 0, 0, node)
+        let list_place = self.materialize_operand(new_op, list_ty, self.ast.get_start(node))
+        let resolved = self.sema.resolve_alias(list_ty)
         let elem_ty = if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST: self.sema.get_generic_inst_arg(resolved, 0) else: 0
-        self.lower_vec_literal_push(vec_place, first_elem, elem_ty)
+        self.lower_list_literal_push(list_place, first_elem, elem_ty)
         if second_elem != 0:
-            self.lower_vec_literal_push(vec_place, second_elem, elem_ty)
-        if self.copy_is_bits(vec_ty):
-            return self.body.new_operand(OperandKind.OK_COPY, vec_place)
-        self.body.new_operand(OperandKind.OK_MOVE, vec_place)
+            self.lower_list_literal_push(list_place, second_elem, elem_ty)
+        if self.copy_is_bits(list_ty):
+            return self.body.new_operand(OperandKind.OK_COPY, list_place)
+        self.body.new_operand(OperandKind.OK_MOVE, list_place)
 
     fn literal_target_base_sym(ty: i32) -> i32:
         if ty == 0:
@@ -6232,7 +6232,7 @@ impl MirBuilder:
     fn is_btreemap_base_sym(sym: i32) -> i32:
         if self.sema.std_generic_of_base(sym, 0) == StdGeneric.BTreeMap: 1 else: 0
 
-    mut fn btree_storage_vec_type(target_ty: i32) -> i32:
+    mut fn btree_storage_list_type(target_ty: i32) -> i32:
         let resolved = self.sema.resolve_alias(target_ty)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
@@ -6243,31 +6243,31 @@ impl MirBuilder:
                 return values_ty
             if self.sema.get_generic_inst_arg_count(resolved as i32) <= 0:
                 return 0
-            return self.sema.find_vec_type_for(self.sema.get_generic_inst_arg(resolved as i32, 0))
+            return self.sema.find_list_type_for(self.sema.get_generic_inst_arg(resolved as i32, 0))
         if self.is_btreemap_base_sym(base) != 0:
             let entries_ty = self.struct_field_type(target_ty, self.pool.intern("entries"))
             if entries_ty != 0:
                 return entries_ty
             if self.sema.get_generic_inst_arg_count(resolved as i32) < 2:
                 return 0
-            let elems: Vec[i32] = Vec.new()
+            let elems: List[i32] = List.new()
             elems.push(self.sema.get_generic_inst_arg(resolved as i32, 0))
             elems.push(self.sema.get_generic_inst_arg(resolved as i32, 1))
             let pair_ty = self.sema.find_tuple_type(elems, 2) as i32
-            return self.sema.find_vec_type_for(pair_ty)
+            return self.sema.find_list_type_for(pair_ty)
         0
 
     mut fn emit_btree_new_into(out_place: i32, target_ty: i32, span: i32):
-        let storage_ty = self.btree_storage_vec_type(target_ty)
+        let storage_ty = self.btree_storage_list_type(target_ty)
         if storage_ty == 0:
             self.mark_unsupported()
             return
         let storage_local = self.new_temp(storage_ty)
         let storage_place = self.place_for_local(storage_local)
-        self.emit_vec_new_into(storage_place, span)
+        self.emit_list_new_into(storage_place, span)
         let storage_op = self.body.new_operand(OperandKind.OK_MOVE, storage_place)
-        let fields: Vec[i32] = Vec.new()
-        let names: Vec[i32] = Vec.new()
+        let fields: List[i32] = List.new()
+        let names: List[i32] = List.new()
         fields.push(storage_op)
         names.push(0)
         let fid = self.body.new_agg_fields(fields, names)
@@ -6280,7 +6280,7 @@ impl MirBuilder:
         if fn_sym == 0:
             self.mark_unsupported()
             return
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.body.new_operand(OperandKind.OK_COPY, set_place))
         args.push(elem_op)
         let sig_idx: i32 = self.sema.btree_insert_sigs.get(node).unwrap()
@@ -6293,7 +6293,7 @@ impl MirBuilder:
         if fn_sym == 0:
             self.mark_unsupported()
             return
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
         args.push(key_op)
         args.push(val_op)
@@ -6305,7 +6305,7 @@ impl MirBuilder:
         let elem_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
         let target_ty = self.expr_type(node)
-        if self.btree_storage_vec_type(target_ty) == 0:
+        if self.btree_storage_list_type(target_ty) == 0:
             self.mark_unsupported()
             return self.unit_operand()
         let out_local = self.new_temp(target_ty)
@@ -6327,7 +6327,7 @@ impl MirBuilder:
         let pair_start = self.ast.get_data0(node)
         let pair_count = self.ast.get_data1(node)
         let target_ty = self.expr_type(node)
-        if self.btree_storage_vec_type(target_ty) == 0:
+        if self.btree_storage_list_type(target_ty) == 0:
             self.mark_unsupported()
             return self.unit_operand()
         let out_local = self.new_temp(target_ty)
@@ -6353,14 +6353,14 @@ impl MirBuilder:
 
     mut fn lower_btree_new(node: i32, fallback_ty: i32) -> i32:
         var target_ty = self.expr_type(node)
-        var storage_ty = self.btree_storage_vec_type(target_ty)
+        var storage_ty = self.btree_storage_list_type(target_ty)
         if storage_ty == 0 and self.expected_type > 0:
-            let expected_storage_ty = self.btree_storage_vec_type(self.expected_type)
+            let expected_storage_ty = self.btree_storage_list_type(self.expected_type)
             if expected_storage_ty != 0:
                 target_ty = self.expected_type
                 storage_ty = expected_storage_ty
         if storage_ty == 0 and fallback_ty > 0:
-            let fallback_storage_ty = self.btree_storage_vec_type(fallback_ty)
+            let fallback_storage_ty = self.btree_storage_list_type(fallback_ty)
             if fallback_storage_ty != 0:
                 target_ty = fallback_ty
                 storage_ty = fallback_storage_ty
@@ -6377,7 +6377,7 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_COPY, out_place)
         self.body.new_operand(OperandKind.OK_MOVE, out_place)
 
-    mut fn lower_collection_literal_call(node: i32, intrinsic: MirIntrinsic, operands: &Vec[i32]):
+    mut fn lower_collection_literal_call(node: i32, intrinsic: MirIntrinsic, operands: &List[i32]):
         // Literal elements transfer to their collection just like arguments to
         // consuming calls. Cancel their temporary drops and schedule move resets.
         for operand in operands: self.consume_moved_operand(operand)
@@ -6400,7 +6400,7 @@ impl MirBuilder:
         let elem_count = self.ast.get_data1(node)
         let target_ty = self.expr_type(node)
         let target_base = self.literal_target_base_sym(target_ty)
-        if target_base != self.sema.syms.vec and target_base != self.sema.syms.hashset and self.is_btreeset_base_sym(target_base) == 0:
+        if target_base != self.sema.syms.list and target_base != self.sema.syms.hashset and self.is_btreeset_base_sym(target_base) == 0:
             return -1
         var elem_ty = 0
         let resolved = self.sema.resolve_alias(target_ty)
@@ -6409,9 +6409,9 @@ impl MirBuilder:
         if self.is_btreeset_base_sym(target_base) != 0:
             return self.lower_btree_seq_literal(node, elem_ty)
         let saved_expected = self.expected_type
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         // §4.3a (#1478): a fill with a non-literal count holds its value
-        // once; Sema evaluated the count, and the Vec gets that many copies,
+        // once; Sema evaluated the count, and the List gets that many copies,
         // each an evaluation of the value as the written form's are.
         let fill_count_node = self.ast.get_data2(node)
         var fill_count = elem_count
@@ -6467,9 +6467,9 @@ impl MirBuilder:
         let cmp_local = self.new_temp(self.sema.ty_bool)
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, self.body.new_operand(OperandKind.OK_COPY, cmp_place), table, exit_bb, 0)
@@ -6504,7 +6504,7 @@ impl MirBuilder:
         if self.is_btreemap_base_sym(target_base) != 0:
             return self.lower_btree_map_literal(node, key_ty, val_ty)
         let saved_expected = self.expected_type
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         for i in 0..pair_count:
             let key_node = self.ast.get_extra(pair_start + i * 2)
             let val_node = self.ast.get_extra(pair_start + i * 2 + 1)
@@ -6683,7 +6683,7 @@ impl MirBuilder:
                         let ip_get_fn = self.sema.lookup_method_fn(ip_type_sym, ip_get_sym)
                         let ip_get_ty = self.expr_type(place_expr)
                         let ip_get_fn_op = self.const_operand(ConstKind.CK_FN, ip_get_fn, ip_get_ty)
-                        let ip_get_args: Vec[i32] = Vec.new()
+                        let ip_get_args: List[i32] = List.new()
                         ip_get_args.push(ip_recv_op)
                         ip_get_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
                         let ip_get_args_id = self.body.new_call_args(ip_get_args)
@@ -6700,7 +6700,7 @@ impl MirBuilder:
                     else:
                         ip_val_op = self.lower_expr(rhs_expr)
                     let ip_fn_op = self.const_operand(ConstKind.CK_FN, ip_fn_sym, self.sema.ty_void)
-                    let ip_args: Vec[i32] = Vec.new()
+                    let ip_args: List[i32] = List.new()
                     ip_args.push(ip_recv_op)
                     ip_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
                     ip_args.push(ip_val_op)
@@ -6720,7 +6720,7 @@ impl MirBuilder:
                     let ip_rb_sym = self.sema.pool_lookup_symbol("get")
                     let ip_rb_fn = self.sema.lookup_method_fn(ip_type_sym, ip_rb_sym)
                     let ip_rb_ty = self.assignment_place_value_type(place_expr)
-                    let ip_rb_args: Vec[i32] = Vec.new()
+                    let ip_rb_args: List[i32] = List.new()
                     ip_rb_args.push(self.body.new_operand(ip_recv_kind, ip_recv_place))
                     ip_rb_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
                     let ip_rb_args_id = self.body.new_call_args(ip_rb_args)
@@ -6796,7 +6796,7 @@ impl MirBuilder:
             sema_phase_bug(f"BUG: a tail assignment reads an owning place Sema should have rejected: node={place_expr} type={ty}")
         // A projected place (a field, an element, a pointee, a global) is read
         // now, into a temp: the block's scope-exit drops run before the
-        // caller consumes the tail operand, and the base they free — the Vec
+        // caller consumes the tail operand, and the base they free — the List
         // behind `v[i]` — must not be read after them.
         self.mark_string_place_copied(place)
         let read_tmp = self.new_temp(ty)
@@ -6878,7 +6878,7 @@ impl MirBuilder:
             return self.lower_field_access(node)
 
         if kind == NodeKind.NK_INDEX:
-            if self.vec_literal_type(node) != 0:
+            if self.list_literal_type(node) != 0:
                 let op = self.lower_expr(node)
                 let ty = self.expr_type(node)
                 let tmp = self.new_temp(ty)
@@ -7188,7 +7188,7 @@ impl MirBuilder:
         // The failing path is lowered before the success path binds: a binding's
         // scope-exit drop scheduled by lower_pattern is live only on the success
         // path. Lowered after it, the else body's `return` dropped the unbound
-        // binding (`Ok(v)` with a Vec payload freed uninitialized stack, #1365).
+        // binding (`Ok(v)` with a List payload freed uninitialized stack, #1365).
         self.switch_to(fail_bb)
         // The subject's source was moved into the materialized subject; blank it
         // on this path too (reset-on-move, §2.5.1) — the statement-end flush
@@ -7305,7 +7305,7 @@ impl MirBuilder:
     // block's scope-exit drops: left lazy, pop_scope_inline drops the
     // base local in full (the move was never recorded) and the outer
     // consumer's capture reads freed storage — tail `move owned.field`
-    // returned a blanked Vec. ONLY the explicit `move` spelling routes
+    // returned a blanked List. ONLY the explicit `move` spelling routes
     // here: bare field tails also lower to OK_MOVE place operands (view
     // returns, borrow tails) and materializing those copies the pointee
     // into a value temp that mismatches a `&`-typed destination.
@@ -7335,13 +7335,13 @@ impl MirBuilder:
     // A want_result tail that is a lazy COPY of a projected place rooted in
     // a local this scope drops at exit (`let t = table(); t[id].arity`) must
     // read BEFORE pop_scope_inline: left lazy, the consumer's assignment
-    // reads the element after `drop(t)` — the freed Vec's cleared length
+    // reads the element after `drop(t)` — the freed List's cleared length
     // panicked "index out of bounds" in math_fn_arity once `t.get(id).arity`
     // (a call, materialized) became `t[id].arity` (a place). A view-typed
     // tail stays lazy: it is a reference value for a `&`-typed destination,
     // and Sema refuses one that outlives its origin. A raw pointer is not a
     // view: `t[i].p` copies the pointer the element stores, and left lazy it
-    // read the freed Vec the same way (#1991; the read-after-drop validator
+    // read the freed List the same way (#1991; the read-after-drop validator
     // named `drop(_1); _0 = copy _1.repr` in a facade resource's tail).
     mut fn materialize_tail_read_of_dropped_local(result: i32, tail_expr: i32) -> i32:
         if self.body.operand_kinds[result] != OperandKind.OK_COPY:
@@ -7392,7 +7392,7 @@ impl MirBuilder:
         self.assign_operand_to_place(yielded_place, raw_op, self.ast.get_start(inner))
         let value_op = self.operand_for_place(yielded_place, elem_ty)
         self.consume_moved_operand(value_op)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(value_op)
         let args_id = self.body.new_call_args(args)
         self.body.set_call_ast_node(args_id, node)
@@ -7405,9 +7405,9 @@ impl MirBuilder:
         self.switch_to(after_call)
         let resume_bb = self.new_block()
         let stop_bb = self.new_block()
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(0)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(stop_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         let more_op = self.body.new_operand(OperandKind.OK_COPY, more_place)
@@ -7598,9 +7598,9 @@ impl MirBuilder:
         let else_bb = self.new_block()
         let join_bb = self.new_block()
 
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(then_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, else_bb, 0)
@@ -7865,9 +7865,9 @@ impl MirBuilder:
         else:
             cond_op = self.lower_expr(cond_expr)
         self.finish_stmt_temp_frame(cond_frame)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, exit_bb, 0)
@@ -7928,9 +7928,9 @@ impl MirBuilder:
 
         self.switch_to(cond_bb)
         let cond_op = self.lower_expr(cond_expr)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, exit_bb, 0)
@@ -7946,8 +7946,8 @@ impl MirBuilder:
     // error out. The binding's payload is then gone; it is not dropped again.
     mut fn lower_comprehension_failure(node: i32) -> i32:
         let result_ty = self.expr_type(node)
-        let fields: Vec[i32] = Vec.new()
-        let names: Vec[i32] = Vec.new()
+        let fields: List[i32] = List.new()
+        let names: List[i32] = List.new()
         var variant = self.sema.syms.none
         if (self.sema.comprehension_failure_rewraps.get(node) ?? 0) == 2:
             variant = self.sema.syms.err
@@ -7985,14 +7985,14 @@ impl MirBuilder:
 
         // #607: `for w in &vec` / `for w in &h.field` → borrow-iterate (loop var &T) via
         // the iter_ref path, which borrows the receiver in place (no element copy, no
-        // drop-scheduled header copy). The `&` operand is the Vec place itself.
+        // drop-scheduled header copy). The `&` operand is the List place itself.
         if self.ast.kind(iter_expr) == NodeKind.NK_UNARY and self.ast.get_data0(iter_expr) == UnaryOp.UOP_REF:
             let ref_inner = self.ast.get_data1(iter_expr)
             let ref_inner_ty = self.expr_type(ref_inner)
             if ref_inner_ty != 0:
                 let ref_inner_resolved = self.sema.resolve_alias(ref_inner_ty)
                 let rin_std = self.sema.std_generic_of(ref_inner_resolved as i32)
-                if rin_std == StdGeneric.Vec:
+                if rin_std == StdGeneric.Sequence:
                     return self.lower_for_iter_ref(for_node, pat_or_sym, ref_inner, body_expr)
                 // #1187: `for (k, v) in &m` walks m's table in place.
                 if rin_std == StdGeneric.HashMap:
@@ -8006,12 +8006,12 @@ impl MirBuilder:
             let range_resolved = self.sema.resolve_alias(iter_ty)
             if self.sema.get_type_kind(range_resolved) == TypeKind.TY_RANGE:
                 return self.lower_for_range_var(for_node, pat_or_sym, iter_expr, body_expr, range_resolved)
-            // A binding of type &Vec[T] (e.g. the &T view yielded by an outer
+            // A binding of type &List[T] (e.g. the &T view yielded by an outer
             // Drop-element loop) borrow-iterates like the syntactic `&vec` form.
             if self.sema.get_type_kind(range_resolved) == TypeKind.TY_REF:
                 let ref_pointee = self.sema.resolve_alias(self.sema.get_type_d0(range_resolved))
                 let rp_std = self.sema.std_generic_of(ref_pointee as i32)
-                if rp_std == StdGeneric.Vec:
+                if rp_std == StdGeneric.Sequence:
                     return self.lower_for_iter_ref(for_node, pat_or_sym, iter_expr, body_expr)
                 // #1187: a `&HashMap` binding (a borrowed parameter)
                 // traverses like the map it views.
@@ -8032,11 +8032,11 @@ impl MirBuilder:
             let tk = self.sema.get_type_kind(resolved)
             if tk == TypeKind.TY_SLICE or tk == TypeKind.TY_ARRAY:
                 return self.lower_for_slice(for_node, pat_or_sym, iter_expr, body_expr)
-            // Vec[T] — use counter-based loop with VEC_LEN / VEC_GET intrinsics
+            // List[T] — use counter-based loop with VEC_LEN / VEC_GET intrinsics
             if tk == TypeKind.TY_GENERIC_INST:
                 let iter_std = self.sema.std_generic_of(resolved as i32)
                 if iter_std != StdGeneric.None:
-                    if iter_std == StdGeneric.Vec:
+                    if iter_std == StdGeneric.Sequence:
                         // §13 implicit iteration borrows the collection. An
                         // element with drop glue (Drop-class, or a str under
                         // D111) iterates as a &T view, as Sema binds it
@@ -8046,7 +8046,7 @@ impl MirBuilder:
                         let bare_elem = self.sema.get_generic_inst_arg(resolved as i32, 0)
                         if self.sema.type_needs_drop_frozen(bare_elem) != 0:
                             return self.lower_for_iter_ref(for_node, pat_or_sym, iter_expr, body_expr)
-                        return self.lower_for_vec(for_node, pat_or_sym, iter_expr, body_expr)
+                        return self.lower_for_list(for_node, pat_or_sym, iter_expr, body_expr)
                     if iter_std == StdGeneric.HashMap:
                         return self.lower_for_hashmap(for_node, pat_or_sym, iter_expr, body_expr)
                     if iter_std == StdGeneric.BTreeMap:
@@ -8054,7 +8054,7 @@ impl MirBuilder:
                     if iter_std == StdGeneric.Receiver:
                         return self.lower_for_receiver(for_node, pat_or_sym, iter_expr, body_expr)
 
-        // Handle for x in vec.iter() — redirect to lower_for_vec with the Vec receiver.
+        // Handle for x in vec.iter() — redirect to lower_for_vec with the List receiver.
         // Handle for slot in vec.iter_place() — redirect to lower_for_iter_place.
         if self.ast.kind(iter_expr) == NodeKind.NK_CALL:
             let call_callee = self.ast.get_data0(iter_expr)
@@ -8062,19 +8062,19 @@ impl MirBuilder:
                 let recv = self.ast.get_data0(call_callee)
                 // Which iterator the call makes is Sema's record for it (#2043).
                 let iter_intrinsic = self.sema.method_intrinsic_in_body(self.body.instance_sym, iter_expr)
-                if iter_intrinsic == MirIntrinsic.VEC_ITER:
+                if iter_intrinsic == MirIntrinsic.LIST_ITER:
                     let recv_resolved = self.sema.resolve_alias(self.expr_type(recv))
-                    if self.sema.std_generic_of(recv_resolved as i32) == StdGeneric.Vec:
+                    if self.sema.std_generic_of(recv_resolved as i32) == StdGeneric.Sequence:
                         // .iter() ≡ the implicit form (§13): same
-                        // borrow split as the bare-Vec dispatch.
+                        // borrow split as the bare-List dispatch.
                         self.body.note_elided_call_node(iter_expr)
                         let it_elem = self.sema.get_generic_inst_arg(recv_resolved as i32, 0)
                         if self.sema.type_needs_drop_frozen(it_elem) != 0:
                             return self.lower_for_iter_ref(for_node, pat_or_sym, recv, body_expr)
-                        return self.lower_for_vec(for_node, pat_or_sym, recv, body_expr)
-                if iter_intrinsic == MirIntrinsic.VEC_ITER_REF and self.sema.std_generic_of(self.expr_type(recv)) == StdGeneric.Vec:
+                        return self.lower_for_list(for_node, pat_or_sym, recv, body_expr)
+                if iter_intrinsic == MirIntrinsic.LIST_ITER_REF and self.sema.std_generic_of(self.expr_type(recv)) == StdGeneric.Sequence:
                     return self.lower_for_iter_ref(for_node, pat_or_sym, recv, body_expr)
-                if iter_intrinsic == MirIntrinsic.VEC_ITER_PLACE and self.sema.std_generic_of(self.expr_type(recv)) == StdGeneric.Vec:
+                if iter_intrinsic == MirIntrinsic.LIST_ITER_PLACE and self.sema.std_generic_of(self.expr_type(recv)) == StdGeneric.Sequence:
                     return self.lower_for_iter_place(for_node, pat_or_sym, recv, body_expr)
 
         // Generic iterator protocol: resolve next() on the iterator type.
@@ -8129,7 +8129,7 @@ impl MirBuilder:
         self.push_control_target(self.for_label(for_node), ControlTargetKind.CT_LOOP, header_bb, exit_bb, -1)
 
         self.switch_to(header_bb)
-        let next_args: Vec[i32] = Vec.new()
+        let next_args: List[i32] = List.new()
         next_args.push(self.body.new_operand(OperandKind.OK_COPY, iter_place))
         let args_id = self.body.new_call_args(next_args)
         if recorded_sig_idx >= 0:
@@ -8147,9 +8147,9 @@ impl MirBuilder:
         self.switch_to(after_next_bb)
         let disc = self.lower_enum_discriminant(next_place)
         let some_idx = self.success_variant_index(next_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.success_variant_tag(next_place))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, exit_bb, 0)
@@ -8204,7 +8204,7 @@ impl MirBuilder:
             self.consume_moved_operand(recv_op)
         else:
             recv_op = self.lower_generic_receiver_arg(iterable, self.pool.intern("iter"), iter_sig)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(recv_op)
         let args_id = self.body.new_call_args(args)
         self.body.set_call_ast_node(args_id, key_node)
@@ -8295,9 +8295,9 @@ impl MirBuilder:
         if clause_filter != 0:
             let pass_bb = child.new_block()
             let cond_op = child.lower_comprehension_filter(clause_filter)
-            let vals: Vec[i64] = Vec.new()
+            let vals: List[i64] = List.new()
             vals.push(1)
-            let targets: Vec[i32] = Vec.new()
+            let targets: List[i32] = List.new()
             targets.push(pass_bb as i32)
             let table = child.body.new_switch_table(vals, targets)
             child.terminate(TermKind.TK_SWITCH_INT, cond_op, table, join_bb, 0)
@@ -8348,8 +8348,8 @@ impl MirBuilder:
         // The body's captures, resolved in this frame. A body that moves out
         // of a by-place capture blanks the outer slot (#1481); that slot's
         // scope-exit drop keeps its null guard.
-        let capture_syms: Vec[i32] = Vec.new()
-        let capture_sources: Vec[ClosureCaptureSource] = Vec.new()
+        let capture_syms: List[i32] = List.new()
+        let capture_sources: List[ClosureCaptureSource] = List.new()
         for ci in 0..self.sema.closure_capture_summary_count(key_node):
             let sym = mir_symbol_for_pool(self.sema, self.pool, self.sema.closure_capture_summary_sym(key_node, ci))
             let source = self.closure_capture_source(sym, key_node, ci)
@@ -8394,8 +8394,8 @@ impl MirBuilder:
         let each_mono: i32 = if self.sema.gen_for_each_monos.contains(key_node): self.sema.gen_for_each_monos.get(key_node).unwrap() else: 0
         let body_sym = child.body.fn_sym
         let used_codes = child.gen_loop_used_codes
-        let exit_labels = mir_clone_i32_vec(&child.gen_loop_exit_labels)
-        let exit_kinds = mir_clone_i32_vec(&child.gen_loop_exit_kinds)
+        let exit_labels = mir_clone_i32_list(&child.gen_loop_exit_labels)
+        let exit_kinds = mir_clone_i32_list(&child.gen_loop_exit_kinds)
         child.body = mir_mark_last_use_holds(move child.body)
         var finished = LoweredFunction { body: move child.body, anonymous_bodies: move child.anonymous_bodies }
         self.anonymous_bodies.push(move finished.body)
@@ -8413,7 +8413,7 @@ impl MirBuilder:
         let closure_op = self.body.new_operand(OperandKind.OK_MOVE, closure_place)
         self.consume_moved_operand(gen_op)
         self.consume_moved_operand(closure_op)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(gen_op)
         args.push(closure_op)
         let args_id = self.body.new_call_args(args)
@@ -8434,15 +8434,15 @@ impl MirBuilder:
 
         // Act on the flag: the closure's exits that leave this loop too.
         let exit_bb = self.new_block()
-        let vals: Vec[i64] = Vec.new()
-        let targets: Vec[i32] = Vec.new()
-        let codes: Vec[i32] = Vec.new()
+        let vals: List[i64] = List.new()
+        let targets: List[i32] = List.new()
+        let codes: List[i32] = List.new()
         for code in GEN_LOOP_RETURN..GEN_LOOP_LABEL_BASE:
             if (used_codes / gen_loop_code_bit(code)) % 2 == 1:
                 codes.push(code)
         for ei in 0..exit_labels.len() as i32:
             codes.push(GEN_LOOP_LABEL_BASE + ei)
-        let arm_bbs: Vec[BlockId] = Vec.new()
+        let arm_bbs: List[BlockId] = List.new()
         for ai in 0..codes.len() as i32:
             let arm_bb = self.new_block()
             arm_bbs.push(arm_bb)
@@ -8578,7 +8578,7 @@ impl MirBuilder:
             let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
             self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(span_node))
 
-    // D33/#912: a value a comprehension stores in its output (a Vec or set
+    // D33/#912: a value a comprehension stores in its output (a List or set
     // element, a map key or value) MOVES there, and the move is REGISTERED
     // (consume_moved_operand) so the per-iteration scope drop's moved-skip
     // and the reset-on-move blank protect what the output now owns — a bare
@@ -8616,7 +8616,7 @@ impl MirBuilder:
             if key_ty > 0:
                 self.expected_type = key_ty
             // #1736: the key and the value move into the map as an element
-            // moves into a Vec. Left unregistered, the last iteration's
+            // moves into a List. Left unregistered, the last iteration's
             // `f"k{i}"` key was also dropped at the comprehension's end —
             // the map freed it again (DOUBLE FREE).
             let key_raw = self.lower_expr(key_expr)
@@ -8630,7 +8630,7 @@ impl MirBuilder:
             self.expected_type = saved_expected2
             let target_base = self.literal_target_base_sym(target_ty)
             if self.is_btreemap_base_sym(target_base) != 0:
-                if self.btree_storage_vec_type(target_ty) == 0:
+                if self.btree_storage_list_type(target_ty) == 0:
                     self.mark_unsupported()
                     return
                 self.emit_btree_map_insert(out_place, key_op, val_op, key_expr)
@@ -8648,7 +8648,7 @@ impl MirBuilder:
         let comp_ty = self.expr_type(comp_node)
         let target_base = self.literal_target_base_sym(comp_ty)
         if self.is_btreeset_base_sym(target_base) != 0:
-            if self.btree_storage_vec_type(comp_ty) == 0:
+            if self.btree_storage_list_type(comp_ty) == 0:
                 self.mark_unsupported()
                 return
             self.emit_btree_set_insert(out_place, elem_op, expr)
@@ -8657,7 +8657,7 @@ impl MirBuilder:
             let unit_op = self.unit_operand()
             self.emit_map_insert(out_place, elem_op, unit_op, 1, self.ast.get_start(expr))
         else:
-            self.emit_vec_push(out_place, elem_op, self.ast.get_start(expr))
+            self.emit_list_push(out_place, elem_op, self.ast.get_start(expr))
 
     fn comprehension_clause_start(comp_node: i32) -> i32:
         if self.ast.kind(comp_node) == NodeKind.NK_MAP_COMPREHENSION:
@@ -8702,9 +8702,9 @@ impl MirBuilder:
             let pass_bb = self.new_block()
             let skip_bb = self.new_block()
             let cond_op = self.lower_comprehension_filter(filter)
-            let vals: Vec[i64] = Vec.new()
+            let vals: List[i64] = List.new()
             vals.push(1)
-            let targets: Vec[i32] = Vec.new()
+            let targets: List[i32] = List.new()
             targets.push(pass_bb as i32)
             let table = self.body.new_switch_table(vals, targets)
             self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, skip_bb, 0)
@@ -8764,9 +8764,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
         let cmp_result = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
@@ -8819,9 +8819,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(range_node))
         let cmp_result = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
@@ -8871,9 +8871,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
@@ -8893,9 +8893,9 @@ impl MirBuilder:
         self.switch_to(exit_bb)
         self.forget_string_flow_facts()
 
-    mut fn lower_comprehension_vec(comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32):
+    mut fn lower_comprehension_list(comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32):
         // #934: a comprehension iterates like a `for` (§13): a place receiver
-        // is read through its own place — no header move, so the source Vec
+        // is read through its own place — no header move, so the source List
         // stays valid afterwards — and Drop-class elements bind &T views read
         // by VEC_GET_REF (lower_for_iter_ref), Copy-class elements by value
         // (lower_for_vec). Materializing the receiver moved it out of its
@@ -8904,20 +8904,20 @@ impl MirBuilder:
         let iter_ty = self.expr_type(iter_expr)
         let elem_ty = self.clause_element_type(comp_node, clause_index)
         let ivk = self.ast.kind(iter_expr)
-        var vec_place = 0
+        var list_place = 0
         if ivk == NodeKind.NK_IDENT or ivk == NodeKind.NK_FIELD_ACCESS or ivk == NodeKind.NK_INDEX:
-            vec_place = self.lower_expr_place(iter_expr)
+            list_place = self.lower_expr_place(iter_expr)
         else:
             let iter_op = self.lower_expr(iter_expr)
-            vec_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
-        // A &Vec[T] receiver reads through one deref (lower_for_iter_ref).
+            list_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+        // A &List[T] receiver reads through one deref (lower_for_iter_ref).
         if self.sema.get_type_kind(self.sema.resolve_alias(iter_ty)) == TypeKind.TY_REF:
-            vec_place = self.new_deref_place(vec_place)
+            list_place = self.new_deref_place(list_place)
         let elem_is_view = self.sema.get_type_kind(self.sema.resolve_alias(elem_ty)) == TypeKind.TY_REF
 
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        self.emit_vec_len_into(vec_place, len_place, self.ast.get_start(iter_expr))
+        self.emit_list_len_into(list_place, len_place, self.ast.get_start(iter_expr))
 
         let counter_local = self.new_temp(self.sema.ty_i64)
         let counter_place = self.place_for_local(counter_local)
@@ -8939,9 +8939,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
@@ -8950,9 +8950,9 @@ impl MirBuilder:
         let elem_local = self.new_temp(elem_ty)
         let elem_place = self.place_for_local(elem_local)
         if elem_is_view:
-            self.emit_vec_get_ref_into(vec_place, counter_place, elem_place, self.ast.get_start(iter_expr))
+            self.emit_list_get_ref_into(list_place, counter_place, elem_place, self.ast.get_start(iter_expr))
         else:
-            self.emit_vec_get_into(vec_place, counter_place, elem_place, self.ast.get_start(iter_expr))
+            self.emit_list_get_into(list_place, counter_place, elem_place, self.ast.get_start(iter_expr))
         self.bind_comprehension_element(comp_node, pat_or_sym, elem_place, elem_ty, iter_expr, false, inc_bb)
         self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
 
@@ -9012,7 +9012,7 @@ impl MirBuilder:
 
         self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
         self.switch_to(header_bb)
-        let next_args: Vec[i32] = Vec.new()
+        let next_args: List[i32] = List.new()
         next_args.push(self.body.new_operand(OperandKind.OK_COPY, iter_place))
         let args_id = self.body.new_call_args(next_args)
         if recorded_sig_idx >= 0:
@@ -9030,9 +9030,9 @@ impl MirBuilder:
         self.switch_to(after_next_bb)
         let disc = self.lower_enum_discriminant(next_place)
         let some_idx = self.success_variant_index(next_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.success_variant_tag(next_place))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, exit_bb, 0)
@@ -9061,9 +9061,9 @@ impl MirBuilder:
         if clause_filter != 0:
             let pass_bb = self.new_block()
             let cond_op = self.lower_comprehension_filter(clause_filter)
-            let fvals: Vec[i64] = Vec.new()
+            let fvals: List[i64] = List.new()
             fvals.push(1)
-            let ftargets: Vec[i32] = Vec.new()
+            let ftargets: List[i32] = List.new()
             ftargets.push(pass_bb as i32)
             let ftable = self.body.new_switch_table(fvals, ftargets)
             self.terminate(TermKind.TK_SWITCH_INT, cond_op, ftable, iter_join_bb, 0)
@@ -9118,18 +9118,18 @@ impl MirBuilder:
                 self.lower_comprehension_range_var(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr, range_resolved)
                 return
 
-            // A sequence reached through a reference (`ws: &Vec[str]`, a
+            // A sequence reached through a reference (`ws: &List[str]`, a
             // `&[T]` parameter) is traversed like the sequence itself, as a
             // `for` does (lower_for_iter_ref, lower_sequence_place). #1736:
-            // `[f(w) for w in ws]` over a `&Vec` parameter fell through to
+            // `[f(w) for w in ws]` over a `&List` parameter fell through to
             // the generic iterator path and failed MIR lowering.
             let resolved = self.sema.resolve_alias(self.sequence_iter_type(iter_expr))
             let tk = self.sema.get_type_kind(resolved)
             if tk == TypeKind.TY_SLICE or tk == TypeKind.TY_ARRAY:
                 self.lower_comprehension_slice(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr)
                 return
-            if tk == TypeKind.TY_GENERIC_INST and self.sema.std_generic_of(resolved as i32) == StdGeneric.Vec:
-                self.lower_comprehension_vec(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr)
+            if tk == TypeKind.TY_GENERIC_INST and self.sema.std_generic_of(resolved as i32) == StdGeneric.Sequence:
+                self.lower_comprehension_list(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr)
                 return
 
         if self.ast.kind(iter_expr) == NodeKind.NK_CALL:
@@ -9140,14 +9140,14 @@ impl MirBuilder:
                 // vector's elements as views (#2152: the second failed to
                 // lower here).
                 let clause_iter = self.sema.method_intrinsic_in_body(self.body.instance_sym, iter_expr)
-                if clause_iter == MirIntrinsic.VEC_ITER or clause_iter == MirIntrinsic.VEC_ITER_REF:
+                if clause_iter == MirIntrinsic.LIST_ITER or clause_iter == MirIntrinsic.LIST_ITER_REF:
                     let recv_ty = self.expr_type(recv)
                     if recv_ty != 0:
                         let recv_resolved = self.sema.resolve_alias(recv_ty)
                         if self.sema.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
-                            if self.sema.std_generic_of(recv_resolved as i32) == StdGeneric.Vec:
+                            if self.sema.std_generic_of(recv_resolved as i32) == StdGeneric.Sequence:
                                 self.body.note_elided_call_node(iter_expr)
-                                self.lower_comprehension_vec(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, recv)
+                                self.lower_comprehension_list(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, recv)
                                 return
 
         self.lower_comprehension_generic_iter(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr, iter_ty)
@@ -9175,12 +9175,12 @@ impl MirBuilder:
         if out_base == self.sema.syms.hashset or out_base == self.sema.syms.hashmap:
             self.emit_map_new_into(out_place, self.ast.get_start(comp_node))
         else if self.is_btreeset_base_sym(out_base) != 0 or self.is_btreemap_base_sym(out_base) != 0:
-            if self.btree_storage_vec_type(out_ty) == 0:
+            if self.btree_storage_list_type(out_ty) == 0:
                 self.mark_unsupported()
                 return self.unit_operand()
             self.emit_btree_new_into(out_place, out_ty, self.ast.get_start(comp_node))
         else:
-            self.emit_vec_new_into(out_place, self.ast.get_start(comp_node))
+            self.emit_list_new_into(out_place, self.ast.get_start(comp_node))
         self.lower_comprehension_clause(comp_node, 0, out_place, elem_ty)
 
         if self.copy_is_bits(out_ty):
@@ -9189,7 +9189,7 @@ impl MirBuilder:
 
     // D65 (§13.5): the element type Sema bound a loop's pattern to — never
     // re-derived here from the iterable's type, which answered differently
-    // for `v.iter()` and fell back to i32 over a `&Vec` it did not know.
+    // for `v.iter()` and fell back to i32 over a `&List` it did not know.
     fn loop_element_type(for_node: i32) -> i32:
         let elem = self.sema.for_elem_types.get(for_node) ?? 0
         if elem == 0:
@@ -9253,9 +9253,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
         let cmp_result = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
@@ -9327,9 +9327,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(range_node))
         let cmp_result = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
@@ -9465,9 +9465,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
@@ -9500,7 +9500,7 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         self.unit_operand()
 
-    mut fn lower_for_vec(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
+    mut fn lower_for_list(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
         // for x in vec → counter loop using VEC_LEN / VEC_GET intrinsics.
         // §13: the implicit form borrows — a place receiver is read through
         // its own place (no header move; the collection stays valid after the
@@ -9510,24 +9510,24 @@ impl MirBuilder:
         let elem_ty = self.loop_element_type(for_node)
 
         let ivk = self.ast.kind(iter_expr)
-        var vec_place = 0
+        var list_place = 0
         if ivk == NodeKind.NK_IDENT or ivk == NodeKind.NK_FIELD_ACCESS or ivk == NodeKind.NK_INDEX:
-            vec_place = self.lower_expr_place(iter_expr)
+            list_place = self.lower_expr_place(iter_expr)
         else:
             let iter_op = self.lower_expr(iter_expr)
-            vec_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
-        self.lower_for_vec_place(for_node, pat_or_sym, vec_place, elem_ty, self.ast.get_start(iter_expr), body_expr)
+            list_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+        self.lower_for_list_place(for_node, pat_or_sym, list_place, elem_ty, self.ast.get_start(iter_expr), body_expr)
 
-    // The by-value counter loop over a Vec PLACE (Copy-class elements read
+    // The by-value counter loop over a List PLACE (Copy-class elements read
     // through the borrowed place).
-    mut fn lower_for_vec_place(for_node: i32, pat_or_sym: i32, vec_place: i32, elem_ty: i32, span_start: i32, body_expr: i32) -> i32:
+    mut fn lower_for_list_place(for_node: i32, pat_or_sym: i32, list_place: i32, elem_ty: i32, span_start: i32, body_expr: i32) -> i32:
         // Get length via VEC_LEN intrinsic (returns i64)
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        let len_args: Vec[i32] = Vec.new()
-        len_args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+        let len_args: List[i32] = List.new()
+        len_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         let len_args_id = self.body.new_call_args(len_args)
-        self.body.set_call_intrinsic(len_args_id, MirIntrinsic.VEC_LEN)
+        self.body.set_call_intrinsic(len_args_id, MirIntrinsic.LIST_LEN)
         let len_after_bb = self.new_block()
         let len_unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, len_unit, len_args_id, len_place, len_after_bb)
@@ -9557,9 +9557,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span_start)
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
@@ -9568,11 +9568,11 @@ impl MirBuilder:
         self.switch_to(body_bb)
         let elem_local = self.new_temp(elem_ty)
         let elem_place = self.place_for_local(elem_local)
-        let get_args: Vec[i32] = Vec.new()
-        get_args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+        let get_args: List[i32] = List.new()
+        get_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         get_args.push(self.body.new_operand(OperandKind.OK_COPY, counter_place))
         let get_args_id = self.body.new_call_args(get_args)
-        self.body.set_call_intrinsic(get_args_id, MirIntrinsic.VEC_GET)
+        self.body.set_call_intrinsic(get_args_id, MirIntrinsic.LIST_GET)
         let get_after_bb = self.new_block()
         let get_unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, get_unit, get_args_id, elem_place, get_after_bb)
@@ -9606,7 +9606,7 @@ impl MirBuilder:
 
     // D44: one call of a map table-walk intrinsic on (map, slot).
     mut fn emit_map_slot_call(intrinsic: MirIntrinsic, map_place: i32, slot_place: i32, dest_place: i32):
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
         args.push(self.body.new_operand(OperandKind.OK_COPY, slot_place))
         let args_id = self.body.new_call_args(args)
@@ -9628,7 +9628,7 @@ impl MirBuilder:
         self.body.new_operand(OperandKind.OK_COPY, binding_place)
 
     // D44 (#1561): `for (k, v) in bt` traverses the BTreeMap's `entries`
-    // (`Vec[(K, V)]`, kept in key order) in place — the Vec loop over that
+    // (`List[(K, V)]`, kept in key order) in place — the List loop over that
     // field place: a Drop-class pair binds as a `&(K, V)` view, a Copy pair
     // by value. The map itself is only borrowed; a `&BTreeMap` binding
     // reads through one deref. Sema typed the element the same way
@@ -9646,7 +9646,7 @@ impl MirBuilder:
         if self.sema.get_type_kind(resolved_map) == TypeKind.TY_REF:
             map_place = self.new_deref_place(map_place)
             resolved_map = self.sema.resolve_alias(self.sema.get_type_d0(resolved_map))
-        let storage_ty = self.btree_storage_vec_type(resolved_map as i32)
+        let storage_ty = self.btree_storage_list_type(resolved_map as i32)
         if storage_ty == 0:
             self.mark_unsupported()
             return self.unit_operand()
@@ -9655,10 +9655,10 @@ impl MirBuilder:
         let pair_ty = self.sema.get_generic_inst_arg(resolved_storage as i32, 0)
         if self.sema.type_needs_drop_frozen(pair_ty) != 0:
             return self.lower_for_iter_ref_place(for_node, pat_or_sym, entries_place, self.ast.get_start(iter_expr), body_expr)
-        self.lower_for_vec_place(for_node, pat_or_sym, entries_place, self.loop_element_type(for_node), self.ast.get_start(iter_expr), body_expr)
+        self.lower_for_list_place(for_node, pat_or_sym, entries_place, self.loop_element_type(for_node), self.ast.get_start(iter_expr), body_expr)
 
     mut fn lower_for_hashmap(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
-        // for (k, v) in map → materialize map.items() then use the normal Vec loop.
+        // for (k, v) in map → materialize map.items() then use the normal List loop.
         // §13.5 / D44 (#1187): the implicit form borrows. A place receiver is
         // read through its own place, as lower_for_vec does; moving it into a
         // temp dropped the map after the loop and left the binding blank
@@ -9676,7 +9676,7 @@ impl MirBuilder:
             map_place = self.materialize_operand(map_op, map_ty, self.ast.get_start(iter_expr))
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        let len_args: Vec[i32] = Vec.new()
+        let len_args: List[i32] = List.new()
         len_args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
         let len_args_id = self.body.new_call_args(len_args)
         self.body.set_call_intrinsic(len_args_id, MirIntrinsic.MAP_CAPACITY)
@@ -9707,9 +9707,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
@@ -9722,17 +9722,17 @@ impl MirBuilder:
         let occupied_place = self.place_for_local(occupied_local)
         self.emit_map_slot_call(MirIntrinsic.MAP_SLOT_OCCUPIED, map_place, counter_place, occupied_place)
         let live_bb = self.new_block()
-        let occupied_vals: Vec[i64] = Vec.new()
+        let occupied_vals: List[i64] = List.new()
         occupied_vals.push(0)
-        let occupied_targets: Vec[i32] = Vec.new()
+        let occupied_targets: List[i32] = List.new()
         occupied_targets.push(inc_bb as i32)
         let occupied_table = self.body.new_switch_table(occupied_vals, occupied_targets)
         let occupied_read = self.body.new_operand(OperandKind.OK_COPY, occupied_place)
         self.terminate(TermKind.TK_SWITCH_INT, occupied_read, occupied_table, live_bb, 0)
 
         self.switch_to(live_bb)
-        let tuple_fields: Vec[i32] = Vec.new()
-        let tuple_names: Vec[i32] = Vec.new()
+        let tuple_fields: List[i32] = List.new()
+        let tuple_names: List[i32] = List.new()
         tuple_fields.push(self.lower_map_slot_binding(MirIntrinsic.MAP_KEY_AT, map_place, counter_place, self.tuple_elem_type(elem_ty, 0)))
         tuple_names.push(0)
         tuple_fields.push(self.lower_map_slot_binding(MirIntrinsic.MAP_VALUE_AT, map_place, counter_place, self.tuple_elem_type(elem_ty, 1)))
@@ -9767,17 +9767,17 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         self.unit_operand()
 
-    mut fn lower_for_iter_place(for_node: i32, pat_or_sym: i32, vec_expr: i32, body_expr: i32) -> i32:
-        let vec_op = self.lower_expr(vec_expr)
-        let vec_ty = self.expr_type(vec_expr)
+    mut fn lower_for_iter_place(for_node: i32, pat_or_sym: i32, list_expr: i32, body_expr: i32) -> i32:
+        let list_op = self.lower_expr(list_expr)
+        let list_ty = self.expr_type(list_expr)
         let slot_ty = self.loop_element_type(for_node)
-        let vec_place = self.materialize_operand(vec_op, vec_ty, self.ast.get_start(vec_expr))
+        let list_place = self.materialize_operand(list_op, list_ty, self.ast.get_start(list_expr))
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        let len_args: Vec[i32] = Vec.new()
-        len_args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+        let len_args: List[i32] = List.new()
+        len_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         let len_args_id = self.body.new_call_args(len_args)
-        self.body.set_call_intrinsic(len_args_id, MirIntrinsic.VEC_LEN)
+        self.body.set_call_intrinsic(len_args_id, MirIntrinsic.LIST_LEN)
         let len_after_bb = self.new_block()
         let len_unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, len_unit, len_args_id, len_place, len_after_bb)
@@ -9786,7 +9786,7 @@ impl MirBuilder:
         let counter_place = self.place_for_local(counter_local)
         let zero_op = self.int_const_operand(0, self.sema.ty_i64)
         let zero_rv = self.body.new_rvalue(RvalueKind.RK_USE, zero_op, 0, 0)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, self.ast.get_start(vec_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, self.ast.get_start(list_expr))
         let header_bb = self.new_block()
         let body_bb = self.new_block()
         let inc_bb = self.new_block()
@@ -9799,22 +9799,22 @@ impl MirBuilder:
         let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, counter_op, len_op)
         let cmp_local = self.new_temp(self.sema.ty_bool)
         let cmp_place = self.place_for_local(cmp_local)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(vec_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(list_expr))
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
         self.switch_to(body_bb)
         let slot_local = self.new_temp(slot_ty)
         let slot_place = self.place_for_local(slot_local)
-        let slot_args: Vec[i32] = Vec.new()
-        slot_args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+        let slot_args: List[i32] = List.new()
+        slot_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         slot_args.push(self.body.new_operand(OperandKind.OK_COPY, counter_place))
         let slot_args_id = self.body.new_call_args(slot_args)
-        self.body.set_call_intrinsic(slot_args_id, MirIntrinsic.VEC_SLOT)
+        self.body.set_call_intrinsic(slot_args_id, MirIntrinsic.LIST_SLOT)
         let slot_after_bb = self.new_block()
         let slot_unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, slot_unit, slot_args_id, slot_place, slot_after_bb)
@@ -9833,7 +9833,7 @@ impl MirBuilder:
         let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
         let one_op = self.int_const_operand(1, self.sema.ty_i64)
         let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(vec_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(list_expr))
         self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
         self.pop_control_target()
         self.switch_to(exit_bb)
@@ -9862,7 +9862,7 @@ impl MirBuilder:
         self.switch_to(header_bb)
         let opt_local = self.new_temp(opt_ty)
         let opt_place = self.place_for_local(opt_local)
-        let recv_args: Vec[i32] = Vec.new()
+        let recv_args: List[i32] = List.new()
         recv_args.push(self.body.new_operand(OperandKind.OK_COPY, rx_place))
         let recv_args_id = self.body.new_call_args(recv_args)
         self.body.set_call_intrinsic(recv_args_id, MirIntrinsic.CHAN_RECV)
@@ -9873,9 +9873,9 @@ impl MirBuilder:
         self.emit_wait_cancel_check()
         let disc = self.lower_enum_discriminant(opt_place)
         let some_disc = self.enum_variant_discriminant_for_type(opt_ty, self.sema.syms.some)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(some_disc)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(bind_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, exit_bb, 0)
@@ -9898,38 +9898,38 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         self.unit_operand()
 
-    mut fn lower_for_iter_ref(for_node: i32, pat_or_sym: i32, vec_expr: i32, body_expr: i32) -> i32:
-        let vec_ty = self.expr_type(vec_expr)
+    mut fn lower_for_iter_ref(for_node: i32, pat_or_sym: i32, list_expr: i32, body_expr: i32) -> i32:
+        let list_ty = self.expr_type(list_expr)
         // #607: borrow-iteration. If the receiver is a place (local/field/index), read len
         // and element refs through that place directly — do NOT materialize a (drop-
-        // scheduled) copy of the Vec header. For a Drop-element field/local that copy would
+        // scheduled) copy of the List header. For a Drop-element field/local that copy would
         // be a second live header and double-free the shared buffer at scope exit; iter_ref
         // only borrows (VEC_GET_REF), so the receiver keeps sole ownership. Non-place
         // receivers (e.g. a call result) get a genuine owning temp as before.
-        let vk = self.ast.kind(vec_expr)
-        var vec_place = 0
+        let vk = self.ast.kind(list_expr)
+        var list_place = 0
         if vk == NodeKind.NK_IDENT or vk == NodeKind.NK_FIELD_ACCESS or vk == NodeKind.NK_INDEX:
-            vec_place = self.lower_expr_place(vec_expr)
+            list_place = self.lower_expr_place(list_expr)
         else:
-            let vec_op = self.lower_expr(vec_expr)
-            vec_place = self.materialize_operand(vec_op, vec_ty, self.ast.get_start(vec_expr))
-        var resolved_vec = self.sema.resolve_alias(vec_ty)
-        // A &Vec[T] receiver (ref-typed binding) reads through one deref.
-        if self.sema.get_type_kind(resolved_vec) == TypeKind.TY_REF:
-            vec_place = self.new_deref_place(vec_place)
-            resolved_vec = self.sema.resolve_alias(self.sema.get_type_d0(resolved_vec))
-        self.lower_for_iter_ref_place(for_node, pat_or_sym, vec_place, self.ast.get_start(vec_expr), body_expr)
+            let list_op = self.lower_expr(list_expr)
+            list_place = self.materialize_operand(list_op, list_ty, self.ast.get_start(list_expr))
+        var resolved_list = self.sema.resolve_alias(list_ty)
+        // A &List[T] receiver (ref-typed binding) reads through one deref.
+        if self.sema.get_type_kind(resolved_list) == TypeKind.TY_REF:
+            list_place = self.new_deref_place(list_place)
+            resolved_list = self.sema.resolve_alias(self.sema.get_type_d0(resolved_list))
+        self.lower_for_iter_ref_place(for_node, pat_or_sym, list_place, self.ast.get_start(list_expr), body_expr)
 
-    // The borrow-iterating loop over a Vec PLACE (a binding, a field, a
+    // The borrow-iterating loop over a List PLACE (a binding, a field, a
     // map's storage): `&T` views of each element, the header never copied.
-    mut fn lower_for_iter_ref_place(for_node: i32, pat_or_sym: i32, vec_place: i32, span_start: i32, body_expr: i32) -> i32:
+    mut fn lower_for_iter_ref_place(for_node: i32, pat_or_sym: i32, list_place: i32, span_start: i32, body_expr: i32) -> i32:
         let ref_elem_ty = self.loop_element_type(for_node)
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        let len_args: Vec[i32] = Vec.new()
-        len_args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+        let len_args: List[i32] = List.new()
+        len_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         let len_args_id = self.body.new_call_args(len_args)
-        self.body.set_call_intrinsic(len_args_id, MirIntrinsic.VEC_LEN)
+        self.body.set_call_intrinsic(len_args_id, MirIntrinsic.LIST_LEN)
         let len_after_bb = self.new_block()
         let len_unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, len_unit, len_args_id, len_place, len_after_bb)
@@ -9953,20 +9953,20 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span_start)
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
         self.switch_to(body_bb)
         let ref_local = self.new_temp(ref_elem_ty)
         let ref_place = self.place_for_local(ref_local)
-        let ref_args: Vec[i32] = Vec.new()
-        ref_args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+        let ref_args: List[i32] = List.new()
+        ref_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         ref_args.push(self.body.new_operand(OperandKind.OK_COPY, counter_place))
         let ref_args_id = self.body.new_call_args(ref_args)
-        self.body.set_call_intrinsic(ref_args_id, MirIntrinsic.VEC_GET_REF)
+        self.body.set_call_intrinsic(ref_args_id, MirIntrinsic.LIST_GET_REF)
         let ref_after_bb = self.new_block()
         let ref_unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, ref_unit, ref_args_id, ref_place, ref_after_bb)
@@ -10170,7 +10170,7 @@ impl MirBuilder:
         self.body.new_operand(OperandKind.OK_COPY, place)
 
     mut fn lower_single_await(task_op: i32, result_ty: i32, task_ty: i32, node: i32, await_owns: i32) -> i32:
-        let no_siblings: Vec[i32] = Vec.new()
+        let no_siblings: List[i32] = List.new()
         self.lower_group_await(task_op, result_ty, task_ty, node, await_owns, &no_siblings, 0)
 
     // One task of a tuple await `(t1, t2, ...).await`: `sibling_ops` are the
@@ -10180,7 +10180,7 @@ impl MirBuilder:
     // (emit_cleanup_awaits_from) — the tuple await retired their scope-exit
     // drops, so nothing else would: the unwind left them running, owned by
     // no one.
-    mut fn lower_group_await(task_op: i32, result_ty: i32, task_ty: i32, node: i32, await_owns: i32, sibling_ops: &Vec[i32], next_sibling: i32) -> i32:
+    mut fn lower_group_await(task_op: i32, result_ty: i32, task_ty: i32, node: i32, await_owns: i32, sibling_ops: &List[i32], next_sibling: i32) -> i32:
         let span = self.ast.get_start(node)
         // #1993: each path reads the handle and takes it once. The await
         // parks on it and cancel observes it (copy); the normal path's
@@ -10191,7 +10191,7 @@ impl MirBuilder:
         // 1. Emit FIBER_AWAIT intrinsic call. Arg 1 (await_owns) tells codegen whether
         // this value-await OWNS the result buffer and must free it (§14.7/G3): 1 for a
         // temporary/owned-local await, 0 for a borrowed param (the owner's drop frees).
-        let await_args: Vec[i32] = Vec.new()
+        let await_args: List[i32] = List.new()
         await_args.push(observe_op)
         await_args.push(self.const_operand(ConstKind.CK_INT, await_owns, self.sema.ty_i32))
         let await_args_id = self.body.new_call_args(await_args)
@@ -10205,7 +10205,7 @@ impl MirBuilder:
         self.switch_to(after_await)
 
         // 2. Check self-cancellation: IS_CANCELLED() → i32
-        let ic_args: Vec[i32] = Vec.new()
+        let ic_args: List[i32] = List.new()
         let ic_args_id = self.body.new_call_args(ic_args)
         self.body.set_call_intrinsic(ic_args_id, MirIntrinsic.FIBER_IS_CANCELLED)
         let ic_result = self.new_temp(self.sema.ty_i32 as i32)
@@ -10220,9 +10220,9 @@ impl MirBuilder:
         let self_cancel_bb = self.new_block()
         let unwind_bb = self.new_block()
         let normal_bb = self.new_block()
-        let sw_vals1: Vec[i64] = Vec.new()
+        let sw_vals1: List[i64] = List.new()
         sw_vals1.push(0)
-        let sw_tgts1: Vec[i32] = Vec.new()
+        let sw_tgts1: List[i32] = List.new()
         sw_tgts1.push(check_child_bb)
         let sw1 = self.body.new_switch_table(sw_vals1, sw_tgts1)
         let ic_op = self.body.new_operand(OperandKind.OK_COPY, ic_place)
@@ -10230,7 +10230,7 @@ impl MirBuilder:
 
         // 3. Self-cancel BB: cancel child, join it for cleanup, then unwind.
         self.switch_to(self_cancel_bb)
-        let cancel_args: Vec[i32] = Vec.new()
+        let cancel_args: List[i32] = List.new()
         cancel_args.push(self.observing_operand(task_op))
         let cancel_call_id = self.body.new_call_args(cancel_args)
         self.body.set_call_intrinsic(cancel_call_id, MirIntrinsic.FIBER_CANCEL)
@@ -10249,7 +10249,7 @@ impl MirBuilder:
         let task_place = self.materialize_operand(task_op, task_ty, span)
         let fid_place = self.body.new_field_place(task_place, 0, self.sema.ty_i32 as i32)
         let fid_op = self.body.new_operand(OperandKind.OK_COPY, fid_place)
-        let wcr_args: Vec[i32] = Vec.new()
+        let wcr_args: List[i32] = List.new()
         wcr_args.push(fid_op)
         let wcr_args_id = self.body.new_call_args(wcr_args)
         self.body.set_call_intrinsic(wcr_args_id, MirIntrinsic.FIBER_WAS_CANCELLED_RETURN)
@@ -10261,9 +10261,9 @@ impl MirBuilder:
         self.switch_to(check_child_cont)
 
         // Branch: 0 → normal, else: → unwind
-        let sw_vals2: Vec[i64] = Vec.new()
+        let sw_vals2: List[i64] = List.new()
         sw_vals2.push(0)
-        let sw_tgts2: Vec[i32] = Vec.new()
+        let sw_tgts2: List[i32] = List.new()
         sw_tgts2.push(normal_bb)
         let sw2 = self.body.new_switch_table(sw_vals2, sw_tgts2)
         let wcr_op = self.body.new_operand(OperandKind.OK_COPY, wcr_place)
@@ -10283,7 +10283,7 @@ impl MirBuilder:
     // cancelled, then leave the function the way a return does — defers and
     // drops run, the value is never produced.
     mut fn emit_cancelled_return():
-        let scr_args: Vec[i32] = Vec.new()
+        let scr_args: List[i32] = List.new()
         let scr_args_id = self.body.new_call_args(scr_args)
         self.body.set_call_intrinsic(scr_args_id, MirIntrinsic.FIBER_SET_CANCELLED_RETURN)
         let scr_result = self.new_temp(self.sema.ty_i32)
@@ -10322,7 +10322,7 @@ impl MirBuilder:
             for di in 0..self.drop_local_ids.len():
                 if self.drop_local_ids[di] == dest_local:
                     sema_phase_bug(f"BUG: a call that may unwind on cancellation writes _{dest_local}, already scheduled for drop (#916)")
-        let ic_args: Vec[i32] = Vec.new()
+        let ic_args: List[i32] = List.new()
         let ic_args_id = self.body.new_call_args(ic_args)
         self.body.set_call_intrinsic(ic_args_id, MirIntrinsic.FIBER_WAIT_CANCELLED)
         let ic_result = self.new_temp(self.sema.ty_i32)
@@ -10332,9 +10332,9 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, ic_unit, ic_args_id, ic_place, check_bb)
         self.switch_to(check_bb)
         let unwind_bb = self.new_block()
-        let sw_vals: Vec[i64] = Vec.new()
+        let sw_vals: List[i64] = List.new()
         sw_vals.push(0)
-        let sw_tgts: Vec[i32] = Vec.new()
+        let sw_tgts: List[i32] = List.new()
         sw_tgts.push(continue_bb)
         let sw = self.body.new_switch_table(sw_vals, sw_tgts)
         let ic_op = self.body.new_operand(OperandKind.OK_COPY, ic_place)
@@ -10347,7 +10347,7 @@ impl MirBuilder:
     // Join a Task purely for cleanup: await completion and free its result buffer,
     // but do not propagate child-cancel status into the current fiber.
     mut fn lower_cleanup_await(task_op: i32, node: i32):
-        let await_args: Vec[i32] = Vec.new()
+        let await_args: List[i32] = List.new()
         await_args.push(task_op)
         let await_args_id = self.body.new_call_args(await_args)
         self.body.set_call_intrinsic(await_args_id, MirIntrinsic.FIBER_CLEANUP_AWAIT)
@@ -10410,9 +10410,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(pat_node))
         let cmp_op = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(arm_bb)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_op, table, fail_bb, 0)
@@ -10489,9 +10489,9 @@ impl MirBuilder:
         let captures_opt_place = self.lower_regex_captures_places(regex_place, scrutinee_place)
         self.remember_regex_pattern_captures(pat_node, captures_opt_place)
         let result_op = self.lower_option_is_some_place(captures_opt_place, self.regex_captures_option_type())
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(arm_bb)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, result_op, table, fail_bb, 0)
@@ -10589,9 +10589,9 @@ impl MirBuilder:
             if needs_payload_checks:
                 success_bb = self.new_block() as i32
             let disc = self.lower_enum_discriminant(variant_subject_place)
-            let vals: Vec[i64] = Vec.new()
+            let vals: List[i64] = List.new()
             vals.push(variant_disc)
-            let targets: Vec[i32] = Vec.new()
+            let targets: List[i32] = List.new()
             targets.push(success_bb)
             let table = self.body.new_switch_table(vals, targets)
             self.terminate(TermKind.TK_SWITCH_INT, disc, table, fail_bb, 0)
@@ -10654,9 +10654,9 @@ impl MirBuilder:
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, ge_place, ge_rv, self.ast.get_start(pat_node))
             let ge_op = self.body.new_operand(OperandKind.OK_COPY, ge_place)
             let range_hi_bb = self.new_block()
-            let ge_vals: Vec[i64] = Vec.new()
+            let ge_vals: List[i64] = List.new()
             ge_vals.push(1)
-            let ge_targets: Vec[i32] = Vec.new()
+            let ge_targets: List[i32] = List.new()
             ge_targets.push(range_hi_bb as i32)
             let ge_table = self.body.new_switch_table(ge_vals, ge_targets)
             self.terminate(TermKind.TK_SWITCH_INT, ge_op, ge_table, fail_bb, 0)
@@ -10668,9 +10668,9 @@ impl MirBuilder:
             let le_place = self.place_for_local(le_tmp)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, le_place, le_rv, self.ast.get_start(pat_node))
             let le_op = self.body.new_operand(OperandKind.OK_COPY, le_place)
-            let le_vals: Vec[i64] = Vec.new()
+            let le_vals: List[i64] = List.new()
             le_vals.push(1)
-            let le_targets: Vec[i32] = Vec.new()
+            let le_targets: List[i32] = List.new()
             le_targets.push(arm_bb)
             let le_table = self.body.new_switch_table(le_vals, le_targets)
             self.terminate(TermKind.TK_SWITCH_INT, le_op, le_table, fail_bb, 0)
@@ -10737,7 +10737,7 @@ impl MirBuilder:
             let tb_scrutinee_op = self.body.new_operand(OperandKind.OK_COPY, scrutinee_place)
             let tb_type_const = self.int_const_operand(tb_type_sym, self.sema.ty_i32)
             let tb_trait_const = self.int_const_operand(tb_trait_sym, self.sema.ty_i32)
-            let tb_args: Vec[i32] = Vec.new()
+            let tb_args: List[i32] = List.new()
             tb_args.push(tb_scrutinee_op)
             tb_args.push(tb_type_const)
             tb_args.push(tb_trait_const)
@@ -10749,9 +10749,9 @@ impl MirBuilder:
             self.terminate(TermKind.TK_CALL, tb_fn_op, tb_args_id, tb_result_place, tb_switch_bb)
             self.switch_to(tb_switch_bb)
             let tb_cmp_op = self.body.new_operand(OperandKind.OK_COPY, tb_result_place)
-            let tb_vals: Vec[i64] = Vec.new()
+            let tb_vals: List[i64] = List.new()
             tb_vals.push(1)
-            let tb_targets: Vec[i32] = Vec.new()
+            let tb_targets: List[i32] = List.new()
             tb_targets.push(arm_bb)
             let tb_table = self.body.new_switch_table(tb_vals, tb_targets)
             self.terminate(TermKind.TK_SWITCH_INT, tb_cmp_op, tb_table, fail_bb, 0)
@@ -10782,7 +10782,7 @@ impl MirBuilder:
                     else:
                         self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
                 return
-            // A slice or Vec (owned or borrowed): the length is tested at run
+            // A slice or List (owned or borrowed): the length is tested at run
             // time, `==` without a rest and `>=` with one (#1389).
             if self.slice_pattern_dyn_kind(sp_arr_ty) != 0:
                 let sp_span = self.ast.get_start(pat_node)
@@ -10795,9 +10795,9 @@ impl MirBuilder:
                 let sp_cmp_local = self.new_temp(self.sema.ty_bool)
                 let sp_cmp = self.place_for_local(sp_cmp_local)
                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, sp_cmp, sp_cmp_rv, sp_span)
-                let sp_vals: Vec[i64] = Vec.new()
+                let sp_vals: List[i64] = List.new()
                 sp_vals.push(1)
-                let sp_targets: Vec[i32] = Vec.new()
+                let sp_targets: List[i32] = List.new()
                 sp_targets.push(arm_bb)
                 let sp_table = self.body.new_switch_table(sp_vals, sp_targets)
                 let sp_cmp_op = self.body.new_operand(OperandKind.OK_COPY, sp_cmp)
@@ -10885,7 +10885,7 @@ impl MirBuilder:
             i = i - 2
 
     // Slice patterns over a sequence observed in place (§9.7, #1389): 1 for a
-    // slice, 2 for a Vec, 0 for anything else (an array is decided at
+    // slice, 2 for a List, 0 for anything else (an array is decided at
     // compile time).
     fn slice_pattern_dyn_kind(seq_ty: i32) -> i32:
         if seq_ty <= 0:
@@ -10894,11 +10894,11 @@ impl MirBuilder:
         let kind = self.sema.get_type_kind(resolved)
         if kind == TypeKind.TY_SLICE:
             return 1
-        if kind == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_base(resolved) == self.sema.syms.vec:
+        if kind == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_base(resolved) == self.sema.syms.list:
             return 2
         0
 
-    // The place a slice pattern reads its sequence from. A Vec is read where
+    // The place a slice pattern reads its sequence from. A List is read where
     // it is (the VEC_ intrinsics take its place, through a deref included).
     // A slice view is copied out first: RK_LEN does not see through a deref
     // projection (see lower_sequence_place).
@@ -10919,10 +10919,10 @@ impl MirBuilder:
             let len_rv = self.body.new_rvalue(RvalueKind.RK_LEN, base, 0, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, span)
             return len_place
-        let len_args: Vec[i32] = Vec.new()
+        let len_args: List[i32] = List.new()
         len_args.push(self.body.new_operand(OperandKind.OK_COPY, base))
         let len_args_id = self.body.new_call_args(len_args)
-        self.body.set_call_intrinsic(len_args_id, MirIntrinsic.VEC_LEN)
+        self.body.set_call_intrinsic(len_args_id, MirIntrinsic.LIST_LEN)
         let after_bb = self.new_block()
         let unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, unit, len_args_id, len_place, after_bb)
@@ -10933,8 +10933,8 @@ impl MirBuilder:
     // place, a reference or a slice): each named element binds as a view `&T`
     // of the element (D27: element access observes), and `rest` as a `[]T`
     // view of the elements between the matched ends.
-    mut fn lower_slice_pattern_views(pat_node: i32, scrutinee_place: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    mut fn lower_slice_pattern_views(pat_node: i32, scrutinee_place: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         let span = self.ast.get_start(pat_node)
         let sp_extra = self.ast.get_data0(pat_node)
         let head = self.ast.get_data1(pat_node)
@@ -10993,11 +10993,11 @@ impl MirBuilder:
                     let view_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, elem_place, 0)
                     self.body.push_stmt(self.cur_bb, StmtKind.Assign, local_place, view_rv, span)
                 else:
-                    let ref_args: Vec[i32] = Vec.new()
+                    let ref_args: List[i32] = List.new()
                     ref_args.push(self.body.new_operand(OperandKind.OK_COPY, base))
                     ref_args.push(self.body.new_operand(OperandKind.OK_COPY, idx_place))
                     let ref_args_id = self.body.new_call_args(ref_args)
-                    self.body.set_call_intrinsic(ref_args_id, MirIntrinsic.VEC_GET_REF)
+                    self.body.set_call_intrinsic(ref_args_id, MirIntrinsic.LIST_GET_REF)
                     let after_bb = self.new_block()
                     let unit = self.unit_operand()
                     self.terminate(TermKind.TK_CALL, unit, ref_args_id, local_place, after_bb)
@@ -11058,12 +11058,12 @@ impl MirBuilder:
     // D115: an owned fixed array taken apart by value. Every element leaves
     // the subject: a named one into its binding, the ones between the ends
     // into the rest array (or, under a bare `..`, each discarded like `_`).
-    mut fn lower_slice_pattern_take_array(pat_node: i32, scrutinee_place: i32) -> Vec[i32]:
-        var out: Vec[i32] = []
+    mut fn lower_slice_pattern_take_array(pat_node: i32, scrutinee_place: i32) -> List[i32]:
+        var out: List[i32] = []
         let span = self.ast.get_start(pat_node)
         let arr_ty = self.sema.resolve_alias(self.place_local_type(scrutinee_place) as TypeId) as i32
         if self.sema.get_type_kind(arr_ty) != TypeKind.TY_ARRAY or self.sema.get_type_d0(arr_ty) == 0:
-            eprint("error: slice pattern reached MIR binding lowering with an owned subject that is not an array or Vec")
+            eprint("error: slice pattern reached MIR binding lowering with an owned subject that is not an array or List")
             self.mark_unsupported()
             return out
         let elem_ty = self.sema.get_type_d0(arr_ty)
@@ -11094,8 +11094,8 @@ impl MirBuilder:
                 self.assign_operand_to_place(rest_place, zop, span)
             else:
                 let moves = self.type_needs_value_drop(elem_ty) != 0
-                let fields: Vec[i32] = Vec.new()
-                let names: Vec[i32] = Vec.new()
+                let fields: List[i32] = List.new()
+                let names: List[i32] = List.new()
                 for j in 0..mid:
                     let src = self.body.new_field_place(scrutinee_place, head + j, elem_ty)
                     let op = self.body.new_operand(if moves: OperandKind.OK_MOVE else: OperandKind.OK_COPY, src)
@@ -11118,23 +11118,23 @@ impl MirBuilder:
                 out.push(place)
         out
 
-    // D115: an owned Vec taken apart by value, in its own buffer. The tail
+    // D115: an owned List taken apart by value, in its own buffer. The tail
     // comes off the end, last element first, and the head off the front,
     // each by `remove` (the element moves out and the gap closes); what is
     // left is the remainder, moved into `rest` or, under a bare `..`,
     // dropped with the subject. Sema refuses a match guard after any
     // removal (#2289): a removed element has no place to be put back.
-    mut fn lower_slice_pattern_take_vec(pat_node: i32, scrutinee_place: i32) -> Vec[i32]:
-        var out: Vec[i32] = []
+    mut fn lower_slice_pattern_take_list(pat_node: i32, scrutinee_place: i32) -> List[i32]:
+        var out: List[i32] = []
         let span = self.ast.get_start(pat_node)
-        let vec_ty = self.sema.resolve_alias(self.place_local_type(scrutinee_place) as TypeId) as i32
-        let elem_ty = self.sema.get_generic_inst_arg(vec_ty, 0)
+        let list_ty = self.sema.resolve_alias(self.place_local_type(scrutinee_place) as TypeId) as i32
+        let elem_ty = self.sema.get_generic_inst_arg(list_ty, 0)
         let sp_extra = self.ast.get_data0(pat_node)
         let head = self.ast.get_data1(pat_node)
         let tail = self.ast.get_extra(sp_extra + 1 + head)
         let rest_sym = if self.ast.get_extra(sp_extra) != 0: self.ast.get_data2(pat_node) else: 0
         if tail > 0:
-            let len_place = self.slice_pattern_dyn_len(scrutinee_place, vec_ty, span)
+            let len_place = self.slice_pattern_dyn_len(scrutinee_place, list_ty, span)
             var t = tail - 1
             while t >= 0:
                 let idx_local = self.new_temp(self.sema.ty_i64)
@@ -11144,14 +11144,14 @@ impl MirBuilder:
                 let idx_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_SUB, len_op, back_op)
                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, idx_place, idx_rv, span)
                 let idx_op = self.body.new_operand(OperandKind.OK_COPY, idx_place)
-                let bound = self.take_vec_element(self.ast.get_extra(sp_extra + 2 + head + t), scrutinee_place, idx_op, elem_ty, span)
+                let bound = self.take_list_element(self.ast.get_extra(sp_extra + 2 + head + t), scrutinee_place, idx_op, elem_ty, span)
                 if bound >= 0:
                     out.push(bound)
                     out.push(scrutinee_place)
                 t = t - 1
         for i in 0..head:
             let front_op = self.int_const_operand(0, self.sema.ty_i64)
-            let bound = self.take_vec_element(self.ast.get_extra(sp_extra + 1 + i), scrutinee_place, front_op, elem_ty, span)
+            let bound = self.take_list_element(self.ast.get_extra(sp_extra + 1 + i), scrutinee_place, front_op, elem_ty, span)
             if bound >= 0:
                 out.push(bound)
                 out.push(scrutinee_place)
@@ -11170,19 +11170,19 @@ impl MirBuilder:
             out.push(scrutinee_place)
         out
 
-    // One element removed from an owned Vec at `idx_op` into its binding (a
+    // One element removed from an owned List at `idx_op` into its binding (a
     // name), or into an anonymous local that drops at scope exit (`_`).
     // Returns the named binding's local, -1 for `_`.
-    mut fn take_vec_element(sym: i32, vec_place: i32, idx_op: i32, elem_ty: i32, span: i32) -> i32:
+    mut fn take_list_element(sym: i32, list_place: i32, idx_op: i32, elem_ty: i32, span: i32) -> i32:
         let local_id = self.body.new_local(elem_ty, if sym != 0: self.pattern_bind_mut else: 0, sym, 1)
         if sym != 0:
             self.bind_local(sym, local_id)
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, span)
         if self.type_needs_value_drop(elem_ty) != 0:
             self.schedule_drop(local_id, DropKind.DK_VALUE)
-        let args: Vec[i32] = [self.body.new_operand(OperandKind.OK_COPY, vec_place), idx_op]
+        let args: List[i32] = [self.body.new_operand(OperandKind.OK_COPY, list_place), idx_op]
         let args_id = self.body.new_call_args(args)
-        self.body.set_call_intrinsic(args_id, MirIntrinsic.VEC_REMOVE)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_REMOVE)
         let after_bb = self.new_block()
         let unit = self.unit_operand()
         let local_place = self.place_for_local(local_id)
@@ -11196,11 +11196,11 @@ impl MirBuilder:
     // `..name` binds them as one tuple of the type check_pattern recorded on
     // the rest node; each moved element is logged against its slot in that
     // tuple so a failed guard can put it back.
-    mut fn lower_tuple_rest_pattern(rest_pat: i32, scrutinee_place: i32, tuple_place: i32, elem_start: i32, first: i32, covered: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    mut fn lower_tuple_rest_pattern(rest_pat: i32, scrutinee_place: i32, tuple_place: i32, elem_start: i32, first: i32, covered: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         let span = self.ast.get_start(rest_pat)
         let rest_name = self.ast.get_data0(rest_pat)
-        let child_places: Vec[i32] = Vec.new()
+        let child_places: List[i32] = List.new()
         for ci in 0..covered:
             let elem_ty: i32 = self.sema.type_extra[(elem_start + first + ci)]
             let field_place = self.body.new_tuple_index_place(tuple_place, first + ci, elem_ty)
@@ -11228,8 +11228,8 @@ impl MirBuilder:
         if self.type_needs_value_drop(rest_ty) != 0:
             self.schedule_drop(local_id, DropKind.DK_VALUE)
         let local_place = self.place_for_local(local_id)
-        let fields: Vec[i32] = Vec.new()
-        let names: Vec[i32] = Vec.new()
+        let fields: List[i32] = List.new()
+        let names: List[i32] = List.new()
         for ci in 0..covered:
             let child = child_places[ci]
             let moves = self.type_needs_value_drop(self.place_local_type(child)) != 0
@@ -11251,8 +11251,8 @@ impl MirBuilder:
         out.push(scrutinee_place)
         out
 
-    mut fn lower_pattern(pat_node: i32, scrutinee_place: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    mut fn lower_pattern(pat_node: i32, scrutinee_place: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         if pat_node == 0:
             return out
 
@@ -11511,7 +11511,7 @@ impl MirBuilder:
             let dc_fn_op = self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void)
             let dc_scrutinee_op = self.body.new_operand(OperandKind.OK_COPY, scrutinee_place)
             let dc_type_const = self.int_const_operand(tb_type_sym, self.sema.ty_i32)
-            let dc_args: Vec[i32] = Vec.new()
+            let dc_args: List[i32] = List.new()
             dc_args.push(dc_scrutinee_op)
             dc_args.push(dc_type_const)
             let dc_args_id = self.body.new_call_args(dc_args)
@@ -11532,7 +11532,7 @@ impl MirBuilder:
             if not self.sema.owned_slice_patterns.contains(pat_node):
                 return self.lower_slice_pattern_views(pat_node, scrutinee_place)
             if self.slice_pattern_dyn_kind(self.place_local_type(scrutinee_place)) == 2:
-                return self.lower_slice_pattern_take_vec(pat_node, scrutinee_place)
+                return self.lower_slice_pattern_take_list(pat_node, scrutinee_place)
             return self.lower_slice_pattern_take_array(pat_node, scrutinee_place)
 
         out
@@ -11667,9 +11667,9 @@ impl MirBuilder:
                 self.finish_stmt_temp_frame(guard_temp_frame)
                 let guard_pass_bb = self.new_block()
                 let guard_fail_bb = self.new_block()
-                let vals: Vec[i64] = Vec.new()
+                let vals: List[i64] = List.new()
                 vals.push(1)
-                let targets: Vec[i32] = Vec.new()
+                let targets: List[i32] = List.new()
                 targets.push(guard_pass_bb as i32)
                 let table = self.body.new_switch_table(vals, targets)
                 self.terminate(TermKind.TK_SWITCH_INT, guard_op, table, guard_fail_bb, 0)
@@ -11754,7 +11754,7 @@ impl MirBuilder:
         let arg_exprs_start = self.ast.get_data1(node)
         let arg_exprs_count = self.ast.get_data2(node)
         let ret_type_id = self.expr_type(node)
-        let math_args: Vec[i32] = Vec.new()
+        let math_args: List[i32] = List.new()
         for i in 0..arg_exprs_count:
             let math_arg_node = self.ast.get_extra(arg_exprs_start + i)
             // An integer operand converts to the call's float type (Sema
@@ -11783,7 +11783,7 @@ impl MirBuilder:
     // of the binding Sema accepted it for (va_start_calls) — the list is
     // started where it lives, never in a temporary copied out.
     mut fn lower_va_start_into(place: i32, node: i32):
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         let call_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(call_id, MirIntrinsic.VA_START)
         self.body.set_call_ast_node(call_id, node)
@@ -11799,7 +11799,7 @@ impl MirBuilder:
         let arg_ty: i32 = self.sema.va_arg_calls.get(node).unwrap()
         let callee = self.ast.get_data0(node)
         let list_place = self.lower_expr_place(self.ast.get_data0(self.ast.get_data0(callee)))
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         let call_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(call_id, MirIntrinsic.VA_ARG)
@@ -11839,7 +11839,7 @@ impl MirBuilder:
         if self.sema.precondition_form_calls.contains(node):
             return self.lower_precondition_form(fn_op, sig_idx, self.sema.precondition_form_calls.get(node).unwrap(), actual_ret_type_id, 0, arg_exprs_start, arg_exprs_count, node)
 
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         // Use sema-resolved arg order for named-arg and implicit-arg calls
         if self.sema.has_resolved_call_args(node) != 0:
             let resolved_count = self.sema.get_resolved_call_arg_count(node)
@@ -11918,8 +11918,8 @@ impl MirBuilder:
         // that leaves parameters to their defaults (#2024,
         // SemaCheck.w resolve_named_call_args); a call without one spells
         // every argument.
-        let arg_nodes: Vec[i32] = Vec.new()
-        let arg_defaults: Vec[bool] = Vec.new()
+        let arg_nodes: List[i32] = List.new()
+        let arg_defaults: List[bool] = List.new()
         if lead != 0:
             arg_nodes.push(lead)
             arg_defaults.push(false)
@@ -11938,9 +11938,9 @@ impl MirBuilder:
         let cond_op = self.lower_call_arg(arg_nodes[0], sig_idx, 0, 0, form_sym)
         let fail_bb = self.new_block()
         let pass_bb = self.new_block()
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(1)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(pass_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, fail_bb, 0)
@@ -11955,7 +11955,7 @@ impl MirBuilder:
         let pending_move_temp_start = self.pending_move_temp_locals.len() as i32
         self.switch_to(fail_bb)
         let fail_arm = self.begin_lazy_arm()
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         // The condition is false on this path.
         args.push(self.lower_bool_lit(0))
         for i in 1..arg_nodes.len() as i32:
@@ -11991,7 +11991,7 @@ impl MirBuilder:
         if conv_sig < 0:
             sema_phase_bug(f"BUG: Sema converts a call's value through a function with no signature: node={node}")
         let fn_op = self.lower_var(conv_sym, 0, 0)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.body.new_operand(OperandKind.OK_COPY, raw_place))
         let args_id = self.body.new_call_args(args)
         let result_ty = self.sema.sig_return_type(conv_sig)
@@ -12014,7 +12014,7 @@ impl MirBuilder:
             let sig_ret = self.sema.sig_return_type(sig_idx)
             if sig_ret != 0:
                 actual_ret_type_id = sig_ret
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         for i in 0..arg_exprs_count:
             let arg_node = self.ast.get_extra(arg_exprs_start + i)
             args.push(self.lower_call_arg(arg_node, sig_idx, 0, i, fn_sym))
@@ -12034,11 +12034,11 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
-    // Like lower_call but takes arg node indices in a Vec instead of reading from
+    // Like lower_call but takes arg node indices in a List instead of reading from
     // pool.extra. This avoids mutating the shared AstPool (which would trigger
-    // Vec realloc and invalidate other copies' pointers — use-after-free).
-    mut fn lower_call_with_arg_nodes(fn_op: i32, callee_sym: i32, arg_node_vec: &Vec[i32], ret_type_id: i32, node: i32) -> i32:
-        self.lower_call_with_arg_nodes_recv(fn_op, callee_sym, -1, arg_node_vec, ret_type_id, node)
+    // List realloc and invalidate other copies' pointers — use-after-free).
+    mut fn lower_call_with_arg_nodes(fn_op: i32, callee_sym: i32, arg_node_list: &List[i32], ret_type_id: i32, node: i32) -> i32:
+        self.lower_call_with_arg_nodes_recv(fn_op, callee_sym, -1, arg_node_list, ret_type_id, node)
 
     // Variant taking a pre-lowered receiver operand (recv_op >= 0): used by the
     // non-generic method path for `mut self` callees, where the receiver must be
@@ -12047,7 +12047,7 @@ impl MirBuilder:
     // `args_node` is the call whose Sema-resolved arguments (defaults among
     // them) `arg_node_vec` ends with, when not `node` itself: a pipeline
     // stage's call (#2024).
-    mut fn lower_call_with_arg_nodes_recv(fn_op: i32, callee_sym: i32, recv_op: i32, arg_node_vec: &Vec[i32], ret_type_id: i32, node: i32, args_node: i32 = 0) -> i32:
+    mut fn lower_call_with_arg_nodes_recv(fn_op: i32, callee_sym: i32, recv_op: i32, arg_node_list: &List[i32], ret_type_id: i32, node: i32, args_node: i32 = 0) -> i32:
         let resolved_node = if args_node != 0: args_node else: node
         var sig_idx = self.call_sig_for_sym(callee_sym)
         let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
@@ -12058,14 +12058,14 @@ impl MirBuilder:
             let sig_ret = self.sema.sig_return_type(sig_idx)
             if sig_ret != 0:
                 actual_ret_type_id = sig_ret
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         var arg_pos = 0
         if recv_op >= 0:
             args.push(recv_op)
             arg_pos = 1
-        let default_offset = if self.sema.has_resolved_call_args(resolved_node) != 0: arg_node_vec.len() as i32 - self.sema.get_resolved_call_arg_count(resolved_node) else: 0
-        for i in 0..arg_node_vec.len() as i32:
-            let arg_node = arg_node_vec[i]
+        let default_offset = if self.sema.has_resolved_call_args(resolved_node) != 0: arg_node_list.len() as i32 - self.sema.get_resolved_call_arg_count(resolved_node) else: 0
+        for i in 0..arg_node_list.len() as i32:
+            let arg_node = arg_node_list[i]
             if arg_node < 0:
                 args.push(self.lower_implicit_fill(0 - arg_node, sig_idx, i + arg_pos))
             else if i >= default_offset and self.sema.resolved_call_arg_is_default(resolved_node, i - default_offset) != 0:
@@ -12305,7 +12305,7 @@ impl MirBuilder:
             self.expected_type = saved_expected
             if self.call_param_owns(sig_idx, arg_i, expected_ty): self.consume_moved_operand(autoderef_op)
             return autoderef_op
-        // #604 stage 1: a Vec/array arg coerced to a []T / []mut T param borrows
+        // #604 stage 1: a List/array arg coerced to a []T / []mut T param borrows
         // the place into a fat-pointer view. Never materialize the collection —
         // no header copy, no drop schedule (the lower_for_iter_ref discipline);
         // the caller's binding keeps sole ownership across the call.
@@ -12815,7 +12815,7 @@ impl MirBuilder:
                 if method_fn != 0 and self.sema.lookup_method_sig(type_sym, method_sym) >= 0:
                     return method_fn
 
-        // Handle Vec[i32].method() — receiver is NodeKind.NK_INDEX of a type name
+        // Handle List[i32].method() — receiver is NodeKind.NK_INDEX of a type name
         if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
             let base = self.ast.get_data0(self_expr)
             if self.ast.kind(base) == NodeKind.NK_IDENT:
@@ -12873,8 +12873,8 @@ impl MirBuilder:
         let payload_tys = self.sema.enum_variant_payload_types_frozen(result_ty, variant_sym)
         let has_resolved = self.sema.has_resolved_call_args(node)
         let count = if has_resolved != 0: self.sema.get_resolved_call_arg_count(node) else: arg_count
-        let fields: Vec[i32] = Vec.new()
-        let names: Vec[i32] = Vec.new()
+        let fields: List[i32] = List.new()
+        let names: List[i32] = List.new()
         for i in 0..count:
             let arg_node = if has_resolved != 0: self.sema.get_resolved_call_arg(node, i) else: self.ast.get_extra(arg_start + i)
             let saved_expected = self.expected_type
@@ -12943,13 +12943,13 @@ impl MirBuilder:
 
         // Classify intrinsic early — needed to decide whether to mark_unsupported.
         // For instance methods (vec.push), recv_type comes from the receiver expression.
-        // For static calls (Vec.new), the receiver is a type ident — use its symbol to
+        // For static calls (List.new), the receiver is a type ident — use its symbol to
         // look up the type name, and fall back to the call's return type.
         var recv_type = self.expr_type(self_expr)
         if recv_type == 0 or recv_type == self.sema.ty_void:
             recv_type = self.type_receiver_type(self_expr)
         if recv_type == 0 or recv_type == self.sema.ty_void:
-            // Fall back to call's return type for static constructors (Vec.new())
+            // Fall back to call's return type for static constructors (List.new())
             let ret_type = self.method_call_result_type(node)
             let ret_name_sym = self.sema.get_type_name(ret_type)
             if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
@@ -12969,7 +12969,7 @@ impl MirBuilder:
             if clone_recv_place < 0:
                 sema_phase_bug(f"BUG: callable clone receiver is not a place: node={node}")
             let clone_fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
-            let clone_args: Vec[i32] = Vec.new()
+            let clone_args: List[i32] = List.new()
             clone_args.push(self.body.new_operand(OperandKind.OK_COPY, clone_recv_place))
             let clone_args_id = self.body.new_call_args(clone_args)
             self.body.set_call_intrinsic(clone_args_id, MirIntrinsic.CLOSURE_CLONE)
@@ -13024,8 +13024,8 @@ impl MirBuilder:
         if lowering == MethodLowering.ResTranspose:
             return self.lower_result_transpose_method(self_expr, arg_count, node)
 
-        if lowering == MethodLowering.VecSequence or lowering == MethodLowering.VecTraverse:
-            return self.lower_vec_sequence_or_traverse_method(self_expr, lowering, arg_start, arg_count, node)
+        if lowering == MethodLowering.ListSequence or lowering == MethodLowering.ListTraverse:
+            return self.lower_list_sequence_or_traverse_method(self_expr, lowering, arg_start, arg_count, node)
 
         if lowering == MethodLowering.BTreeNew:
             return self.lower_btree_new(node, recv_type)
@@ -13047,12 +13047,12 @@ impl MirBuilder:
         // D27 E2: Sema types vec.get(i) as &T — element access observes. Lower
         // the borrow intrinsic so the result place holds the element address;
         // VEC_GET stays the owned-load form for iteration and materialization.
-        if intrinsic == MirIntrinsic.VEC_GET:
+        if intrinsic == MirIntrinsic.LIST_GET:
             let d27_get_ret = self.expr_type(node)
             if d27_get_ret != 0 and self.sema.get_type_kind(self.sema.resolve_alias(d27_get_ret as TypeId)) == TypeKind.TY_REF:
-                intrinsic = MirIntrinsic.VEC_GET_REF
+                intrinsic = MirIntrinsic.LIST_GET_REF
 
-        // For intrinsic calls (Vec/HashMap/Option), bypass lower_call entirely.
+        // For intrinsic calls (List/HashMap/Option), bypass lower_call entirely.
         // lower_call → lower_var would mark_unsupported on the bare method sym.
         // Instead, emit the call terminator directly with an intrinsic tag.
         if intrinsic != MirIntrinsic.NONE:
@@ -13074,7 +13074,7 @@ impl MirBuilder:
                     dyn_recv_is_static = true
             if not dyn_recv_is_static:
                 let dyn_fn_op = self.const_operand(ConstKind.CK_FN, method_sym, 0)
-                let dyn_args: Vec[i32] = Vec.new()
+                let dyn_args: List[i32] = List.new()
                 // #1847: only a `move self` method consumes the receiver
                 // (Sema: dyn_consuming_calls); any other call observes the
                 // fat pointer in place. Moving it made the caller skip the
@@ -13121,7 +13121,7 @@ impl MirBuilder:
         let method_is_unresolved = callee_sym == method_sym and not has_recorded_method_sig
         if method_is_unresolved or self.sym_is_generic_fn(callee_sym):
                 let gc_fn_op = self.const_operand(ConstKind.CK_FN, callee_sym, 0)
-                let gc_args: Vec[i32] = Vec.new()
+                let gc_args: List[i32] = List.new()
                 let gc_sig_idx = if has_recorded_method_sig: recorded_method_sig else: self.call_sig_for_sym(callee_sym)
                 // Lower self + method args so the handler can eval them.
                 // Skip receiver for static calls (type name, not value expression).
@@ -13158,7 +13158,7 @@ impl MirBuilder:
                 let gc_has_resolved_args = self.sema.has_resolved_call_args(node)
                 let gc_arg_count = if gc_has_resolved_args != 0: self.sema.get_resolved_call_arg_count(node) else: arg_count
                 let gc_param_offset = if gc_is_static: 0 else: 1
-                let gc_closure_ops: Vec[i32] = Vec.new()
+                let gc_closure_ops: List[i32] = List.new()
                 for gc_mai in 0..gc_arg_count:
                     let gc_ma_node = if gc_has_resolved_args != 0: self.sema.get_resolved_call_arg(node, gc_mai) else: self.ast.get_extra(arg_start + gc_mai)
                     if self.ast.kind(gc_ma_node) != NodeKind.NK_CLOSURE:
@@ -13220,7 +13220,7 @@ impl MirBuilder:
                 return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
 
         let fn_op = self.lower_var(callee_sym, 0, 0)
-        let arg_nodes: Vec[i32] = Vec.new()
+        let arg_nodes: List[i32] = List.new()
         // For static method calls (receiver is a type name, not a value),
         // don't pass the receiver as an argument.
         var is_static_call = false
@@ -13232,7 +13232,7 @@ impl MirBuilder:
                 is_static_call = true
         if self.ast.kind(self_expr) == NodeKind.NK_TYPE_NAMED or self.ast.kind(self_expr) == NodeKind.NK_TYPE_GENERIC or self.ast.kind(self_expr) == NodeKind.NK_TYPE_PTR or self.ast.kind(self_expr) == NodeKind.NK_TYPE_REF or self.ast.kind(self_expr) == NodeKind.NK_TYPE_ARRAY or self.ast.kind(self_expr) == NodeKind.NK_TYPE_SLICE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TUPLE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_FN or self.ast.kind(self_expr) == NodeKind.NK_TYPE_EXTERN_FN or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TRAIT_OBJ:
             is_static_call = true
-        // Also detect Vec[i32].method() as static
+        // Also detect List[i32].method() as static
         if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
             let idx_base = self.ast.get_data0(self_expr)
             if self.ast.kind(idx_base) == NodeKind.NK_IDENT:
@@ -13281,7 +13281,7 @@ impl MirBuilder:
         self.expr_type(node)
 
     // D22: an observer intrinsic's probe argument (HashMap/HashSet get and
-    // contains key, Vec.contains element) is read transiently by the runtime;
+    // contains key, List.contains element) is read transiently by the runtime;
     // the caller keeps ownership. A &K argument reads the same header through
     // one deref. An owned argument shares its place bitwise (OK_COPY, never
     // consumed); an rvalue lowers through lower_expr_place, which registers a
@@ -13339,10 +13339,10 @@ impl MirBuilder:
         // The ConstKind.CK_FN sym is meaningless — codegen dispatches by intrinsic kind.
         let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
 
-        // Build argument operands. For static calls (Vec.new, HashMap.new),
+        // Build argument operands. For static calls (List.new, HashMap.new),
         // the receiver is a type ident — skip it. For instance methods, include it.
-        let is_static = intrinsic == MirIntrinsic.VEC_NEW or intrinsic == MirIntrinsic.FIXED_STRING_NEW or intrinsic == MirIntrinsic.VEC_WITH_CAPACITY or intrinsic == MirIntrinsic.MAP_NEW or intrinsic == MirIntrinsic.SLOTMAP_NEW
-        let call_args: Vec[i32] = Vec.new()
+        let is_static = intrinsic == MirIntrinsic.LIST_NEW or intrinsic == MirIntrinsic.FIXED_STRING_NEW or intrinsic == MirIntrinsic.LIST_WITH_CAPACITY or intrinsic == MirIntrinsic.MAP_NEW or intrinsic == MirIntrinsic.SLOTMAP_NEW
+        let call_args: List[i32] = List.new()
         var recv_type_for_args = 0
         if not is_static:
             let recv_ty = self.expr_type(self_expr)
@@ -13410,7 +13410,7 @@ impl MirBuilder:
         // `BTreeMap.new()` Sema resolved to its specialization is MAP_NEW).
         self.body.set_call_ast_node(args_id, node)
         var ret_type = self.method_call_result_type(node)
-        // For static constructors (Vec.new, HashMap.new), expr_type often returns
+        // For static constructors (List.new, HashMap.new), expr_type often returns
         // the bare struct type (TypeKind.TY_STRUCT) instead of the generic instance
         // (TypeKind.TY_GENERIC_INST). Use the expected type from the let binding if available.
         // Only apply to static constructors — instance methods (str.slice, vec.len) must
@@ -13429,12 +13429,12 @@ impl MirBuilder:
             if expected_matches_receiver:
                 ret_type = expected_resolved as i32
         // If ret_type is still a base struct (not generic instance) for a static
-        // constructor, try to resolve from the NodeKind.NK_INDEX receiver (Vec[i32]).
+        // constructor, try to resolve from the NodeKind.NK_INDEX receiver (List[i32]).
         if is_static:
             let ret_resolved = if ret_type != 0: self.sema.resolve_alias(ret_type) else: 0
             let ret_tk = self.sema.get_type_kind(ret_resolved)
             if ret_type == 0 or ret_type == self.sema.ty_void or ret_tk == TypeKind.TY_STRUCT:
-                // Try resolving generic instance from NodeKind.NK_INDEX receiver (e.g. Vec[i32])
+                // Try resolving generic instance from NodeKind.NK_INDEX receiver (e.g. List[i32])
                 if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
                     let gi_type = self.resolve_index_generic_inst(self_expr)
                     if gi_type > 0:
@@ -13561,8 +13561,8 @@ impl MirBuilder:
             let op_kind = self.carrier_read_kind(payload_ty, enum_ty)
             return self.body.new_operand(op_kind, field_place)
 
-        let tuple_fields: Vec[i32] = Vec.new()
-        let tuple_names: Vec[i32] = Vec.new()
+        let tuple_fields: List[i32] = List.new()
+        let tuple_names: List[i32] = List.new()
         let tuple_elem_start = if self.sema.get_type_kind(self.sema.resolve_alias(unwrapped_ty as TypeId)) == TypeKind.TY_TUPLE: self.sema.get_type_d0(self.sema.resolve_alias(unwrapped_ty as TypeId)) else: 0
         for pi in 0..payload_count:
             let payload_ty = payloads[pi]
@@ -13587,8 +13587,8 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, tuple_place, tuple_rv, span)
         self.body.new_operand(if self.copy_is_bits(unwrapped_ty): OperandKind.OK_COPY else: OperandKind.OK_MOVE, tuple_place)
 
-    mut fn assign_enum_variant_to_place(result_place: i32, result_ty: i32, variant_sym: i32, fields: &Vec[i32], span: i32):
-        let names: Vec[i32] = Vec.new()
+    mut fn assign_enum_variant_to_place(result_place: i32, result_ty: i32, variant_sym: i32, fields: &List[i32], span: i32):
+        let names: List[i32] = List.new()
         for _ in 0..fields.len():
             names.push(0)
         let fid = self.body.new_agg_fields(fields, names)
@@ -13600,10 +13600,10 @@ impl MirBuilder:
             self.consume_moved_operand(fields[cfi])
 
     mut fn lower_context_error_operand(message_op: i32, source_op: i32, context_error_ty: i32, span: i32) -> i32:
-        let fields: Vec[i32] = Vec.new()
+        let fields: List[i32] = List.new()
         fields.push(message_op)
         fields.push(source_op)
-        let names: Vec[i32] = Vec.new()
+        let names: List[i32] = List.new()
         names.push(self.pool.intern("message"))
         names.push(self.pool.intern("source"))
         let fid = self.body.new_agg_fields(fields, names)
@@ -13671,9 +13671,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(recv_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(variant_disc)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
@@ -13681,13 +13681,13 @@ impl MirBuilder:
         self.switch_to(none_bb)
         if accessor_kind == 2 and not self.copy_is_bits(enum_ty):
             self.emit_drop_stmt(recv_place, "enum-accessor", span)
-        let none_fields: Vec[i32] = Vec.new()
+        let none_fields: List[i32] = List.new()
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb as i32, 0, 0, 0)
 
         self.switch_to(some_bb)
         let payload = self.enum_accessor_payload_operand(recv_place, enum_ty, variant_sym, variant_index, accessor_kind, result_ty, span)
-        let some_fields: Vec[i32] = Vec.new()
+        let some_fields: List[i32] = List.new()
         some_fields.push(payload)
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb as i32, 0, 0, 0)
@@ -13696,7 +13696,7 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         self.body.new_operand(if self.sema.is_copy_frozen(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, result_place)
 
-    mut fn emit_cleanup_awaits_from(task_ops: &Vec[i32], start_idx: i32, node: i32):
+    mut fn emit_cleanup_awaits_from(task_ops: &List[i32], start_idx: i32, node: i32):
         var ci = start_idx
         while ci < task_ops.len():
             let task_op = task_ops[ci]
@@ -13705,7 +13705,7 @@ impl MirBuilder:
             self.lower_cleanup_await(task_op, node)
             ci = ci + 1
 
-    mut fn lower_question_mark_value(value_op: i32, value_ty: i32, result_ty_hint: i32, node: i32, span_node: i32, cleanup_task_ops: &Vec[i32], cleanup_start_idx: i32) -> i32:
+    mut fn lower_question_mark_value(value_op: i32, value_ty: i32, result_ty_hint: i32, node: i32, span_node: i32, cleanup_task_ops: &List[i32], cleanup_start_idx: i32) -> i32:
         let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(span_node))
 
         // #605/#606: `?` decomposes the Result/Option — its active payload is moved
@@ -13719,9 +13719,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.success_variant_tag(value_place))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(pass_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, fail_bb, 0)
@@ -13754,21 +13754,21 @@ impl MirBuilder:
                             let conversion_variant = conversion_chain.variant_syms[ci]
                             let wrapped_err_local = self.new_temp(wrapped_ty)
                             let wrapped_err_place = self.place_for_local(wrapped_err_local)
-                            let wrapped_fields: Vec[i32] = Vec.new()
+                            let wrapped_fields: List[i32] = List.new()
                             wrapped_fields.push(target_err_op)
                             self.assign_enum_variant_to_place(wrapped_err_place, wrapped_ty, conversion_variant, wrapped_fields, self.ast.get_start(span_node))
                             target_err_op = self.operand_for_place(wrapped_err_place, wrapped_ty)
                             if ci == 0:
                                 break
                             ci = ci - 1
-                        let err_fields: Vec[i32] = Vec.new()
+                        let err_fields: List[i32] = List.new()
                         err_fields.push(target_err_op)
                         self.assign_enum_variant_to_place(ret_place, ret_ty, self.sema.syms.err, err_fields, self.ast.get_start(span_node))
         else if source_option_ty != 0:
             if target_option_ty == 0:
                 self.mark_unsupported()
             else:
-                let none_fields: Vec[i32] = Vec.new()
+                let none_fields: List[i32] = List.new()
                 self.assign_enum_variant_to_place(ret_place, ret_ty, self.sema.syms.none, none_fields, self.ast.get_start(span_node))
         else:
             let fail_op = self.body.new_operand(OperandKind.OK_MOVE, value_place)
@@ -13827,16 +13827,16 @@ impl MirBuilder:
         let await_tuple_ty = self.expr_type(await_node)
         let result_tuple_ty = self.expr_type(question_node)
 
-        let task_ops: Vec[i32] = Vec.new()
-        let tq_owns: Vec[i32] = Vec.new()
+        let task_ops: List[i32] = List.new()
+        let tq_owns: List[i32] = List.new()
         for i in 0..count:
             let elem = self.ast.get_extra(extra + i)
             tq_owns.push(self.await_task_owns_result(elem))
             self.cancel_scheduled_value_drop_for_receiver_expr(elem)
             task_ops.push(self.lower_expr(elem))
 
-        let fields: Vec[i32] = Vec.new()
-        let names: Vec[i32] = Vec.new()
+        let fields: List[i32] = List.new()
+        let names: List[i32] = List.new()
         for i in 0..count:
             let elem_node = self.ast.get_extra(extra + i)
             let task_ty = self.expr_type(elem_node)
@@ -13865,7 +13865,7 @@ impl MirBuilder:
             if await_inner != 0 and self.ast.kind(await_inner) == NodeKind.NK_TUPLE:
                 return self.lower_tuple_await_question_mark(expr, node)
 
-        let cleanup_task_ops: Vec[i32] = Vec.new()
+        let cleanup_task_ops: List[i32] = List.new()
         let value_op = self.lower_expr(expr)
         let value_ty = self.expr_type(expr)
         // #605/#606: `?` consumes its operand; cancel a named source's drop so its
@@ -13892,9 +13892,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.success_variant_tag(value_place))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
@@ -13967,13 +13967,13 @@ impl MirBuilder:
             return 0
         if self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.result: 1 else: 0
 
-    fn is_vec_type(type_id: i32) -> i32:
+    fn is_list_type(type_id: i32) -> i32:
         if type_id == 0:
             return 0
         let resolved = self.sema.resolve_alias(type_id as TypeId)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
-        if self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.vec: 1 else: 0
+        if self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.list: 1 else: 0
 
     mut fn lower_owned_receiver_place(self_expr: i32, value_ty: i32) -> i32:
         let source_place = self.lower_expr_place(self_expr)
@@ -13990,60 +13990,60 @@ impl MirBuilder:
         self.consume_moved_operand(value_op)
         self.materialize_operand(value_op, value_ty, self.ast.get_start(self_expr))
 
-    mut fn emit_vec_new_into(vec_place: i32, span: i32):
+    mut fn emit_list_new_into(list_place: i32, span: i32):
         let new_sym = self.sema.syms.new
         let fn_op = self.const_operand(ConstKind.CK_FN, new_sym, self.sema.ty_void)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         let args_id = self.body.new_call_args(args)
-        self.body.set_call_intrinsic(args_id, MirIntrinsic.VEC_NEW)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_NEW)
         let next_bb = self.new_block()
-        self.terminate(TermKind.TK_CALL, fn_op, args_id, vec_place, next_bb)
+        self.terminate(TermKind.TK_CALL, fn_op, args_id, list_place, next_bb)
         self.switch_to(next_bb)
 
-    mut fn emit_vec_len_into(vec_place: i32, len_place: i32, span: i32):
+    mut fn emit_list_len_into(list_place: i32, len_place: i32, span: i32):
         let len_sym = self.sema.syms.len
         let fn_op = self.const_operand(ConstKind.CK_FN, len_sym, self.sema.ty_void)
-        let args: Vec[i32] = Vec.new()
-        args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+        let args: List[i32] = List.new()
+        args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         let args_id = self.body.new_call_args(args)
-        self.body.set_call_intrinsic(args_id, MirIntrinsic.VEC_LEN)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_LEN)
         let next_bb = self.new_block()
         self.terminate(TermKind.TK_CALL, fn_op, args_id, len_place, next_bb)
         self.switch_to(next_bb)
 
-    mut fn emit_vec_get_into(vec_place: i32, index_place: i32, elem_place: i32, span: i32):
+    mut fn emit_list_get_into(list_place: i32, index_place: i32, elem_place: i32, span: i32):
         let get_sym = self.sema.syms.get
         let fn_op = self.const_operand(ConstKind.CK_FN, get_sym, self.sema.ty_void)
-        let args: Vec[i32] = Vec.new()
-        args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+        let args: List[i32] = List.new()
+        args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         args.push(self.body.new_operand(OperandKind.OK_COPY, index_place))
         let args_id = self.body.new_call_args(args)
-        self.body.set_call_intrinsic(args_id, MirIntrinsic.VEC_GET)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_GET)
         let next_bb = self.new_block()
         self.terminate(TermKind.TK_CALL, fn_op, args_id, elem_place, next_bb)
         self.switch_to(next_bb)
 
     // Element view: VEC_GET_REF yields &T for the element at index without
     // copying it — the read lower_for_iter_ref uses for Drop-class elements.
-    mut fn emit_vec_get_ref_into(vec_place: i32, index_place: i32, elem_place: i32, span: i32):
-        let args: Vec[i32] = Vec.new()
-        args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+    mut fn emit_list_get_ref_into(list_place: i32, index_place: i32, elem_place: i32, span: i32):
+        let args: List[i32] = List.new()
+        args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         args.push(self.body.new_operand(OperandKind.OK_COPY, index_place))
         let args_id = self.body.new_call_args(args)
-        self.body.set_call_intrinsic(args_id, MirIntrinsic.VEC_GET_REF)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_GET_REF)
         let next_bb = self.new_block()
         let unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, unit, args_id, elem_place, next_bb)
         self.switch_to(next_bb)
 
-    mut fn emit_vec_push(vec_place: i32, elem_op: i32, span: i32):
+    mut fn emit_list_push(list_place: i32, elem_op: i32, span: i32):
         let push_sym = self.sema.syms.push
         let fn_op = self.const_operand(ConstKind.CK_FN, push_sym, self.sema.ty_void)
-        let args: Vec[i32] = Vec.new()
-        args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+        let args: List[i32] = List.new()
+        args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
         args.push(elem_op)
         let args_id = self.body.new_call_args(args)
-        self.body.set_call_intrinsic(args_id, MirIntrinsic.VEC_PUSH)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_PUSH)
         let result_local = self.new_temp(self.sema.ty_void)
         let result_place = self.place_for_local(result_local)
         let next_bb = self.new_block()
@@ -14053,7 +14053,7 @@ impl MirBuilder:
     mut fn emit_map_new_into(map_place: i32, span: i32):
         let new_sym = self.sema.syms.new
         let fn_op = self.const_operand(ConstKind.CK_FN, new_sym, self.sema.ty_void)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         let args_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(args_id, MirIntrinsic.MAP_NEW)
         let next_bb = self.new_block()
@@ -14063,7 +14063,7 @@ impl MirBuilder:
     mut fn emit_map_insert(map_place: i32, key_op: i32, val_op: i32, is_set: i32, span: i32):
         let insert_sym = self.sema.syms.insert
         let fn_op = self.const_operand(ConstKind.CK_FN, insert_sym, self.sema.ty_void)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
         args.push(key_op)
         if is_set == 0:
@@ -14103,9 +14103,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.some))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
@@ -14113,9 +14113,9 @@ impl MirBuilder:
         self.switch_to(none_bb)
         let none_option_local = self.new_temp(result_ok_ty)
         let none_option_place = self.place_for_local(none_option_local)
-        let none_fields: Vec[i32] = Vec.new()
+        let none_fields: List[i32] = List.new()
         self.assign_enum_variant_to_place(none_option_place, result_ok_ty, self.sema.syms.none, none_fields, span)
-        let none_ok_fields: Vec[i32] = Vec.new()
+        let none_ok_fields: List[i32] = List.new()
         none_ok_fields.push(self.operand_for_place(none_option_place, result_ok_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.ok, none_ok_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -14125,9 +14125,9 @@ impl MirBuilder:
         let some_downcast = self.body.new_downcast_place(value_place, some_idx)
         let inner_result_place = self.body.new_field_place(some_downcast, 0, inner_result_ty)
         let inner_disc = self.lower_enum_discriminant(inner_result_place)
-        let inner_vals: Vec[i64] = Vec.new()
+        let inner_vals: List[i64] = List.new()
         inner_vals.push(self.enum_variant_discriminant_for_type(inner_result_ty, self.sema.syms.ok))
-        let inner_targets: Vec[i32] = Vec.new()
+        let inner_targets: List[i32] = List.new()
         inner_targets.push(inner_ok_bb as i32)
         let inner_table = self.body.new_switch_table(inner_vals, inner_targets)
         self.terminate(TermKind.TK_SWITCH_INT, inner_disc, inner_table, inner_err_bb, 0)
@@ -14138,10 +14138,10 @@ impl MirBuilder:
         let ok_payload_place = self.body.new_field_place(ok_downcast, 0, inner_ok_ty)
         let some_option_local = self.new_temp(result_ok_ty)
         let some_option_place = self.place_for_local(some_option_local)
-        let some_fields: Vec[i32] = Vec.new()
+        let some_fields: List[i32] = List.new()
         some_fields.push(self.body.new_operand(self.carrier_read_kind(inner_ok_ty, self.local_type(self.place_base_local(ok_payload_place))), ok_payload_place))
         self.assign_enum_variant_to_place(some_option_place, result_ok_ty, self.sema.syms.some, some_fields, span)
-        let ok_fields: Vec[i32] = Vec.new()
+        let ok_fields: List[i32] = List.new()
         ok_fields.push(self.operand_for_place(some_option_place, result_ok_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.ok, ok_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -14150,7 +14150,7 @@ impl MirBuilder:
         let err_idx = self.enum_variant_index_for_type(inner_result_ty, self.sema.syms.err)
         let err_downcast = self.body.new_downcast_place(inner_result_place, err_idx)
         let err_payload_place = self.body.new_field_place(err_downcast, 0, inner_err_ty)
-        let err_fields: Vec[i32] = Vec.new()
+        let err_fields: List[i32] = List.new()
         err_fields.push(self.body.new_operand(self.carrier_read_kind(inner_err_ty, self.local_type(self.place_base_local(err_payload_place))), err_payload_place))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -14186,9 +14186,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.ok))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(ok_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, err_bb, 0)
@@ -14199,10 +14199,10 @@ impl MirBuilder:
         let err_payload_place = self.body.new_field_place(err_downcast, 0, inner_err_ty)
         let err_result_local = self.new_temp(result_some_ty)
         let err_result_place = self.place_for_local(err_result_local)
-        let err_fields: Vec[i32] = Vec.new()
+        let err_fields: List[i32] = List.new()
         err_fields.push(self.body.new_operand(self.carrier_read_kind(inner_err_ty, self.local_type(self.place_base_local(err_payload_place))), err_payload_place))
         self.assign_enum_variant_to_place(err_result_place, result_some_ty, self.sema.syms.err, err_fields, span)
-        let err_some_fields: Vec[i32] = Vec.new()
+        let err_some_fields: List[i32] = List.new()
         err_some_fields.push(self.operand_for_place(err_result_place, result_some_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, err_some_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -14212,15 +14212,15 @@ impl MirBuilder:
         let ok_downcast = self.body.new_downcast_place(value_place, ok_idx)
         let inner_option_place = self.body.new_field_place(ok_downcast, 0, inner_option_ty)
         let inner_disc = self.lower_enum_discriminant(inner_option_place)
-        let inner_vals: Vec[i64] = Vec.new()
+        let inner_vals: List[i64] = List.new()
         inner_vals.push(self.enum_variant_discriminant_for_type(inner_option_ty, self.sema.syms.some))
-        let inner_targets: Vec[i32] = Vec.new()
+        let inner_targets: List[i32] = List.new()
         inner_targets.push(inner_some_bb as i32)
         let inner_table = self.body.new_switch_table(inner_vals, inner_targets)
         self.terminate(TermKind.TK_SWITCH_INT, inner_disc, inner_table, inner_none_bb, 0)
 
         self.switch_to(inner_none_bb)
-        let none_fields: Vec[i32] = Vec.new()
+        let none_fields: List[i32] = List.new()
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -14230,10 +14230,10 @@ impl MirBuilder:
         let some_payload_place = self.body.new_field_place(some_downcast, 0, inner_some_ty)
         let ok_result_local = self.new_temp(result_some_ty)
         let ok_result_place = self.place_for_local(ok_result_local)
-        let ok_fields: Vec[i32] = Vec.new()
+        let ok_fields: List[i32] = List.new()
         ok_fields.push(self.body.new_operand(self.carrier_read_kind(inner_some_ty, self.local_type(self.place_base_local(some_payload_place))), some_payload_place))
         self.assign_enum_variant_to_place(ok_result_place, result_some_ty, self.sema.syms.ok, ok_fields, span)
-        let some_fields: Vec[i32] = Vec.new()
+        let some_fields: List[i32] = List.new()
         some_fields.push(self.operand_for_place(ok_result_place, result_some_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -14242,8 +14242,8 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         self.operand_for_place(result_place, result_ty)
 
-    mut fn tuple_operand_from_fields(fields: &Vec[i32], result_ty: i32, span: i32) -> i32:
-        let names: Vec[i32] = Vec.new()
+    mut fn tuple_operand_from_fields(fields: &List[i32], result_ty: i32, span: i32) -> i32:
+        let names: List[i32] = List.new()
         for _ in 0..fields.len():
             names.push(0)
         let fid = self.body.new_agg_fields(fields, names)
@@ -14266,7 +14266,7 @@ impl MirBuilder:
         let sig_idx: i32 = clone_sig_opt.unwrap()
         let mono_sym: i32 = clone_mono_opt.unwrap()
         let expected = if self.sema.sig_get_param_count(sig_idx) > 0: self.sema.sig_param_type(sig_idx, 0) else: 0
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(self.operand_for_place_arg(payload_place, payload_ty, expected, self.ast.get_start(node)))
         self.lower_resolved_call_with_operand_args_contract(clone_fn, args, payload_ty, node, sig_idx, mono_sym)
 
@@ -14290,15 +14290,15 @@ impl MirBuilder:
         let none_bb = self.new_block()
         let join_bb = self.new_block()
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.some))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
 
         self.switch_to(none_bb)
-        let none_fields: Vec[i32] = Vec.new()
+        let none_fields: List[i32] = List.new()
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -14342,15 +14342,15 @@ impl MirBuilder:
         let join_bb = self.new_block()
         let wanted_variant: i32 = if lowering == MethodLowering.ResOk: self.sema.syms.ok else: self.sema.syms.err
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.enum_variant_discriminant_for_type(value_ty, wanted_variant))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(wanted_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, other_bb, 0)
 
         self.switch_to(other_bb)
-        let none_fields: Vec[i32] = Vec.new()
+        let none_fields: List[i32] = List.new()
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -14358,7 +14358,7 @@ impl MirBuilder:
         let variant_idx = self.enum_variant_index_for_type(value_ty, wanted_variant)
         let downcast = self.body.new_downcast_place(value_place, variant_idx)
         let payload_place = self.body.new_field_place(downcast, 0, payload_ty)
-        let some_fields: Vec[i32] = Vec.new()
+        let some_fields: List[i32] = List.new()
         let ok_err_payload_op = self.body.new_operand(self.carrier_read_kind(payload_ty, self.local_type(self.place_base_local(payload_place))), payload_place)
         some_fields.push(ok_err_payload_op)
         // Consuming the payload into the Option queues its reset-on-move
@@ -14399,24 +14399,24 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let left_disc = self.lower_enum_discriminant(left_place)
-        let left_vals: Vec[i64] = Vec.new()
+        let left_vals: List[i64] = List.new()
         left_vals.push(self.enum_variant_discriminant_for_type(left_ty, self.sema.syms.some))
-        let left_targets: Vec[i32] = Vec.new()
+        let left_targets: List[i32] = List.new()
         left_targets.push(left_some_bb as i32)
         let left_table = self.body.new_switch_table(left_vals, left_targets)
         self.terminate(TermKind.TK_SWITCH_INT, left_disc, left_table, none_bb, 0)
 
         self.switch_to(left_some_bb)
         let right_disc = self.lower_enum_discriminant(right_place)
-        let right_vals: Vec[i64] = Vec.new()
+        let right_vals: List[i64] = List.new()
         right_vals.push(self.enum_variant_discriminant_for_type(right_ty, self.sema.syms.some))
-        let right_targets: Vec[i32] = Vec.new()
+        let right_targets: List[i32] = List.new()
         right_targets.push(right_some_bb as i32)
         let right_table = self.body.new_switch_table(right_vals, right_targets)
         self.terminate(TermKind.TK_SWITCH_INT, right_disc, right_table, none_bb, 0)
 
         self.switch_to(none_bb)
-        let none_fields: Vec[i32] = Vec.new()
+        let none_fields: List[i32] = List.new()
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -14427,11 +14427,11 @@ impl MirBuilder:
         let right_idx = self.enum_variant_index_for_type(right_ty, self.sema.syms.some)
         let right_downcast = self.body.new_downcast_place(right_place, right_idx)
         let right_payload_place = self.body.new_field_place(right_downcast, 0, right_elem_ty)
-        let tuple_fields: Vec[i32] = Vec.new()
+        let tuple_fields: List[i32] = List.new()
         tuple_fields.push(self.operand_for_place(left_payload_place, left_elem_ty))
         tuple_fields.push(self.operand_for_place(right_payload_place, right_elem_ty))
         let tuple_op = self.tuple_operand_from_fields(tuple_fields, tuple_ty, span)
-        let some_fields: Vec[i32] = Vec.new()
+        let some_fields: List[i32] = List.new()
         some_fields.push(tuple_op)
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -14469,9 +14469,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.some))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
@@ -14479,13 +14479,13 @@ impl MirBuilder:
         self.switch_to(none_bb)
         let left_none_local = self.new_temp(left_option_ty)
         let left_none_place = self.place_for_local(left_none_local)
-        let left_none_fields: Vec[i32] = Vec.new()
+        let left_none_fields: List[i32] = List.new()
         self.assign_enum_variant_to_place(left_none_place, left_option_ty, self.sema.syms.none, left_none_fields, span)
         let right_none_local = self.new_temp(right_option_ty)
         let right_none_place = self.place_for_local(right_none_local)
-        let right_none_fields: Vec[i32] = Vec.new()
+        let right_none_fields: List[i32] = List.new()
         self.assign_enum_variant_to_place(right_none_place, right_option_ty, self.sema.syms.none, right_none_fields, span)
-        let none_tuple_fields: Vec[i32] = Vec.new()
+        let none_tuple_fields: List[i32] = List.new()
         none_tuple_fields.push(self.operand_for_place(left_none_place, left_option_ty))
         none_tuple_fields.push(self.operand_for_place(right_none_place, right_option_ty))
         let none_tuple_op = self.tuple_operand_from_fields(none_tuple_fields, result_ty, span)
@@ -14500,15 +14500,15 @@ impl MirBuilder:
         let right_place = self.body.new_tuple_index_place(tuple_place, 1, right_elem_ty)
         let left_some_local = self.new_temp(left_option_ty)
         let left_some_place = self.place_for_local(left_some_local)
-        let left_some_fields: Vec[i32] = Vec.new()
+        let left_some_fields: List[i32] = List.new()
         left_some_fields.push(self.operand_for_place(left_place, left_elem_ty))
         self.assign_enum_variant_to_place(left_some_place, left_option_ty, self.sema.syms.some, left_some_fields, span)
         let right_some_local = self.new_temp(right_option_ty)
         let right_some_place = self.place_for_local(right_some_local)
-        let right_some_fields: Vec[i32] = Vec.new()
+        let right_some_fields: List[i32] = List.new()
         right_some_fields.push(self.operand_for_place(right_place, right_elem_ty))
         self.assign_enum_variant_to_place(right_some_place, right_option_ty, self.sema.syms.some, right_some_fields, span)
-        let some_tuple_fields: Vec[i32] = Vec.new()
+        let some_tuple_fields: List[i32] = List.new()
         some_tuple_fields.push(self.operand_for_place(left_some_place, left_option_ty))
         some_tuple_fields.push(self.operand_for_place(right_some_place, right_option_ty))
         let some_tuple_op = self.tuple_operand_from_fields(some_tuple_fields, result_ty, span)
@@ -14519,34 +14519,34 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         self.operand_for_place(result_place, result_ty)
 
-    mut fn lower_vec_sequence_or_traverse_method(self_expr: i32, lowering: MethodLowering, arg_start: i32, arg_count: i32, node: i32) -> i32:
+    mut fn lower_list_sequence_or_traverse_method(self_expr: i32, lowering: MethodLowering, arg_start: i32, arg_count: i32, node: i32) -> i32:
         let span = self.ast.get_start(node)
         var recv_type = self.expr_type(self_expr)
         if recv_type == 0 or recv_type == self.sema.ty_void:
             recv_type = self.type_receiver_type(self_expr)
-        let recv_elem_ty = self.generic_inst_arg_type(recv_type, self.sema.syms.vec, 0)
+        let recv_elem_ty = self.generic_inst_arg_type(recv_type, self.sema.syms.list, 0)
         let result_ty = self.expr_type(node)
         var wrapper_base = self.sema.syms.option
-        var output_vec_ty = self.generic_inst_arg_type(result_ty, self.sema.syms.option, 0)
-        var output_elem_ty = self.generic_inst_arg_type(output_vec_ty, self.sema.syms.vec, 0)
-        if output_vec_ty == 0:
+        var output_list_ty = self.generic_inst_arg_type(result_ty, self.sema.syms.option, 0)
+        var output_elem_ty = self.generic_inst_arg_type(output_list_ty, self.sema.syms.list, 0)
+        if output_list_ty == 0:
             wrapper_base = self.sema.syms.result
-            output_vec_ty = self.generic_inst_arg_type(result_ty, self.sema.syms.result, 0)
-            output_elem_ty = self.generic_inst_arg_type(output_vec_ty, self.sema.syms.vec, 0)
-        if recv_type == 0 or recv_elem_ty == 0 or result_ty == 0 or output_vec_ty == 0 or output_elem_ty == 0:
+            output_list_ty = self.generic_inst_arg_type(result_ty, self.sema.syms.result, 0)
+            output_elem_ty = self.generic_inst_arg_type(output_list_ty, self.sema.syms.list, 0)
+        if recv_type == 0 or recv_elem_ty == 0 or result_ty == 0 or output_list_ty == 0 or output_elem_ty == 0:
             self.mark_unsupported()
             return self.unit_operand()
-        if lowering == MethodLowering.VecSequence and arg_count != 0:
+        if lowering == MethodLowering.ListSequence and arg_count != 0:
             self.mark_unsupported()
             return self.unit_operand()
-        if lowering == MethodLowering.VecTraverse and arg_count != 1:
+        if lowering == MethodLowering.ListTraverse and arg_count != 1:
             self.mark_unsupported()
             return self.unit_operand()
 
         let recv_place = self.lower_owned_receiver_place(self_expr, recv_type)
         var mapper_op = 0
         var wrapper_ty = recv_elem_ty
-        if lowering == MethodLowering.VecTraverse:
+        if lowering == MethodLowering.ListTraverse:
             mapper_op = self.lower_method_arg_with_expected(recv_type, self.sema.syms.traverse, self.ast.get_extra(arg_start), 0)
             if wrapper_base == self.sema.syms.option:
                 wrapper_ty = self.sema.find_option_type_for(output_elem_ty)
@@ -14562,13 +14562,13 @@ impl MirBuilder:
 
         let result_local = self.new_temp(result_ty)
         let result_place = self.place_for_local(result_local)
-        let out_vec_local = self.new_temp(output_vec_ty)
-        let out_vec_place = self.place_for_local(out_vec_local)
-        self.emit_vec_new_into(out_vec_place, span)
+        let out_list_local = self.new_temp(output_list_ty)
+        let out_list_place = self.place_for_local(out_list_local)
+        self.emit_list_new_into(out_list_place, span)
 
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        self.emit_vec_len_into(recv_place, len_place, span)
+        self.emit_list_len_into(recv_place, len_place, span)
 
         let counter_local = self.new_temp(self.sema.ty_i64)
         let counter_place = self.place_for_local(counter_local)
@@ -14594,9 +14594,9 @@ impl MirBuilder:
         let cmp_place = self.place_for_local(cmp_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span)
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let header_vals: Vec[i64] = Vec.new()
+        let header_vals: List[i64] = List.new()
         header_vals.push(1)
-        let header_targets: Vec[i32] = Vec.new()
+        let header_targets: List[i32] = List.new()
         header_targets.push(body_bb as i32)
         let header_table = self.body.new_switch_table(header_vals, header_targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, header_table, done_bb, 0)
@@ -14604,17 +14604,17 @@ impl MirBuilder:
         self.switch_to(body_bb)
         let recv_elem_local = self.new_temp(recv_elem_ty)
         let recv_elem_place = self.place_for_local(recv_elem_local)
-        self.emit_vec_get_into(recv_place, counter_place, recv_elem_place, span)
+        self.emit_list_get_into(recv_place, counter_place, recv_elem_place, span)
         var wrapper_place = recv_elem_place
-        if lowering == MethodLowering.VecTraverse:
-            let call_args: Vec[i32] = Vec.new()
+        if lowering == MethodLowering.ListTraverse:
+            let call_args: List[i32] = List.new()
             call_args.push(self.operand_for_place(recv_elem_place, recv_elem_ty))
             let wrapper_op = self.lower_call_with_operand_args(mapper_op, call_args, wrapper_ty, node)
             wrapper_place = self.materialize_operand(wrapper_op, wrapper_ty, span)
         let item_disc = self.lower_enum_discriminant(wrapper_place)
-        let item_vals: Vec[i64] = Vec.new()
+        let item_vals: List[i64] = List.new()
         item_vals.push(self.enum_variant_discriminant_for_type(wrapper_ty, success_variant))
-        let item_targets: Vec[i32] = Vec.new()
+        let item_targets: List[i32] = List.new()
         item_targets.push(item_success_bb as i32)
         let item_table = self.body.new_switch_table(item_vals, item_targets)
         self.terminate(TermKind.TK_SWITCH_INT, item_disc, item_table, item_fail_bb, 0)
@@ -14624,18 +14624,18 @@ impl MirBuilder:
         let success_downcast = self.body.new_downcast_place(wrapper_place, success_idx)
         let success_payload_place = self.body.new_field_place(success_downcast, 0, output_elem_ty)
         let success_payload_op = self.operand_for_place(success_payload_place, output_elem_ty)
-        self.emit_vec_push(out_vec_place, success_payload_op, span)
+        self.emit_list_push(out_list_place, success_payload_op, span)
         self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
         self.switch_to(item_fail_bb)
         if wrapper_base == self.sema.syms.option:
-            let fail_fields: Vec[i32] = Vec.new()
+            let fail_fields: List[i32] = List.new()
             self.assign_enum_variant_to_place(result_place, result_ty, failure_variant, fail_fields, span)
         else:
             let failure_idx = self.enum_variant_index_for_type(wrapper_ty, failure_variant)
             let failure_downcast = self.body.new_downcast_place(wrapper_place, failure_idx)
             let failure_payload_place = self.body.new_field_place(failure_downcast, 0, failure_payload_ty)
-            let fail_fields2: Vec[i32] = Vec.new()
+            let fail_fields2: List[i32] = List.new()
             fail_fields2.push(self.operand_for_place(failure_payload_place, failure_payload_ty))
             self.assign_enum_variant_to_place(result_place, result_ty, failure_variant, fail_fields2, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -14648,8 +14648,8 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
         self.switch_to(done_bb)
-        let success_fields: Vec[i32] = Vec.new()
-        success_fields.push(self.operand_for_place(out_vec_place, output_vec_ty))
+        let success_fields: List[i32] = List.new()
+        success_fields.push(self.operand_for_place(out_list_place, output_list_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, success_variant, success_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -14690,20 +14690,20 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.some))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
 
         self.switch_to(none_bb)
         if lowering == MethodLowering.OptOrElse:
-            let no_args: Vec[i32] = Vec.new()
+            let no_args: List[i32] = List.new()
             let fallback_op = self.lower_call_with_operand_args(mapper_op, no_args, result_ty, node)
             self.assign_operand_to_place(result_place, fallback_op, span)
         else:
-            let none_fields: Vec[i32] = Vec.new()
+            let none_fields: List[i32] = List.new()
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -14712,7 +14712,7 @@ impl MirBuilder:
         let downcast_place = self.body.new_downcast_place(value_place, some_idx)
         let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
         if lowering == MethodLowering.OptFilter:
-            let filter_args: Vec[i32] = Vec.new()
+            let filter_args: List[i32] = List.new()
             // §10.5 `(fn(&T) -> bool)`: the predicate observes the payload in
             // place, like `inspect`; Sema types its parameter `&T`. Passing
             // it by value moved the payload into the predicate, which freed
@@ -14722,15 +14722,15 @@ impl MirBuilder:
             let keep_op = self.lower_call_with_operand_args(mapper_op, filter_args, self.sema.ty_bool as i32, node)
             let keep_bb = self.new_block()
             let reject_bb = self.new_block()
-            let keep_vals: Vec[i64] = Vec.new()
+            let keep_vals: List[i64] = List.new()
             keep_vals.push(1)
-            let keep_targets: Vec[i32] = Vec.new()
+            let keep_targets: List[i32] = List.new()
             keep_targets.push(keep_bb as i32)
             let keep_table = self.body.new_switch_table(keep_vals, keep_targets)
             self.terminate(TermKind.TK_SWITCH_INT, keep_op, keep_table, reject_bb, 0)
 
             self.switch_to(keep_bb)
-            let kept_fields: Vec[i32] = Vec.new()
+            let kept_fields: List[i32] = List.new()
             kept_fields.push(self.operand_for_place(payload_place, payload_ty))
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, kept_fields, span)
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -14740,7 +14740,7 @@ impl MirBuilder:
             self.switch_to(reject_bb)
             if mir_place_plain_local(&self.body, value_place) >= 0:
                 self.emit_drop_stmt(value_place, "filter-reject", span)
-            let rejected_fields: Vec[i32] = Vec.new()
+            let rejected_fields: List[i32] = List.new()
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, rejected_fields, span)
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -14754,19 +14754,19 @@ impl MirBuilder:
             self.forget_string_flow_facts()
             return self.operand_for_place(result_place, result_ty)
         if lowering == MethodLowering.OptAndThen:
-            let call_args: Vec[i32] = Vec.new()
+            let call_args: List[i32] = List.new()
             call_args.push(self.operand_for_place(payload_place, payload_ty))
             let mapped_op = self.lower_call_with_operand_args(mapper_op, call_args, result_ty, node)
             self.assign_operand_to_place(result_place, mapped_op, span)
         else:
             var payload_op = 0
             if lowering == MethodLowering.OptMap:
-                let call_args2: Vec[i32] = Vec.new()
+                let call_args2: List[i32] = List.new()
                 call_args2.push(self.operand_for_place(payload_place, payload_ty))
                 let mapped_ty = self.generic_inst_arg_type(result_ty, self.sema.syms.option, 0)
                 payload_op = self.lower_call_with_operand_args(mapper_op, call_args2, mapped_ty, node)
             else if lowering == MethodLowering.OptInspect:
-                let inspect_args: Vec[i32] = Vec.new()
+                let inspect_args: List[i32] = List.new()
                 let ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, payload_ty, 0, 0) as i32
                 inspect_args.push(self.operand_for_place_arg(payload_place, payload_ty, ref_ty, span))
                 let _ = self.lower_call_with_operand_args(mapper_op, inspect_args, self.sema.ty_void as i32, node)
@@ -14780,7 +14780,7 @@ impl MirBuilder:
                     payload_op = self.clone_or_copy_place(pointee_place, owned_payload_ty, node)
             else:
                 payload_op = self.operand_for_place(payload_place, payload_ty)
-            let some_fields: Vec[i32] = Vec.new()
+            let some_fields: List[i32] = List.new()
             some_fields.push(payload_op)
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -14845,9 +14845,9 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.ok))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(ok_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, err_bb, 0)
@@ -14856,13 +14856,13 @@ impl MirBuilder:
         let ok_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.ok)
         let ok_downcast = self.body.new_downcast_place(value_place, ok_idx)
         let ok_payload_place = self.body.new_field_place(ok_downcast, 0, source_ok_ty)
-        let ok_fields: Vec[i32] = Vec.new()
+        let ok_fields: List[i32] = List.new()
         if lowering == MethodLowering.ResMap:
-            let ok_call_args: Vec[i32] = Vec.new()
+            let ok_call_args: List[i32] = List.new()
             ok_call_args.push(self.operand_for_place(ok_payload_place, source_ok_ty))
             ok_fields.push(self.lower_call_with_operand_args(mapper_op, ok_call_args, result_ok_ty, node))
         else if lowering == MethodLowering.ResAndThen:
-            let ok_call_args2: Vec[i32] = Vec.new()
+            let ok_call_args2: List[i32] = List.new()
             ok_call_args2.push(self.operand_for_place(ok_payload_place, source_ok_ty))
             let chained_op = self.lower_call_with_operand_args(mapper_op, ok_call_args2, result_ty, node)
             self.assign_operand_to_place(result_place, chained_op, span)
@@ -14871,7 +14871,7 @@ impl MirBuilder:
             let err_idx2 = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
             let err_downcast2 = self.body.new_downcast_place(value_place, err_idx2)
             let err_payload_place2 = self.body.new_field_place(err_downcast2, 0, source_err_ty)
-            let err_fields2: Vec[i32] = Vec.new()
+            let err_fields2: List[i32] = List.new()
             err_fields2.push(self.operand_for_place(err_payload_place2, source_err_ty))
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields2, span)
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -14879,7 +14879,7 @@ impl MirBuilder:
             self.forget_string_flow_facts()
             return self.operand_for_place(result_place, result_ty)
         else if lowering == MethodLowering.ResInspect:
-            let inspect_args: Vec[i32] = Vec.new()
+            let inspect_args: List[i32] = List.new()
             let ok_ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, source_ok_ty, 0, 0) as i32
             inspect_args.push(self.operand_for_place_arg(ok_payload_place, source_ok_ty, ok_ref_ty, span))
             let _ = self.lower_call_with_operand_args(mapper_op, inspect_args, self.sema.ty_void as i32, node)
@@ -14896,13 +14896,13 @@ impl MirBuilder:
         let err_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
         let err_downcast = self.body.new_downcast_place(value_place, err_idx)
         let err_payload_place = self.body.new_field_place(err_downcast, 0, source_err_ty)
-        let err_fields: Vec[i32] = Vec.new()
+        let err_fields: List[i32] = List.new()
         if lowering == MethodLowering.ResMapErr:
-            let err_call_args: Vec[i32] = Vec.new()
+            let err_call_args: List[i32] = List.new()
             err_call_args.push(self.operand_for_place(err_payload_place, source_err_ty))
             err_fields.push(self.lower_call_with_operand_args(mapper_op, err_call_args, result_err_ty, node))
         else if lowering == MethodLowering.ResOrElse:
-            let err_call_args2: Vec[i32] = Vec.new()
+            let err_call_args2: List[i32] = List.new()
             err_call_args2.push(self.operand_for_place(err_payload_place, source_err_ty))
             let recovered_op = self.lower_call_with_operand_args(mapper_op, err_call_args2, result_ty, node)
             self.assign_operand_to_place(result_place, recovered_op, span)
@@ -14913,12 +14913,12 @@ impl MirBuilder:
         else if lowering == MethodLowering.ResContext or lowering == MethodLowering.ResWithContext:
             var message_op = context_message_op
             if lowering == MethodLowering.ResWithContext:
-                let no_context_args: Vec[i32] = Vec.new()
+                let no_context_args: List[i32] = List.new()
                 message_op = self.lower_call_with_operand_args(context_fn_op, no_context_args, self.sema.ty_str as i32, node)
             let source_op = self.operand_for_place(err_payload_place, source_err_ty)
             err_fields.push(self.lower_context_error_operand(message_op, source_op, result_err_ty, span))
         else if lowering == MethodLowering.ResInspectErr:
-            let inspect_err_args: Vec[i32] = Vec.new()
+            let inspect_err_args: List[i32] = List.new()
             let err_ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, source_err_ty, 0, 0) as i32
             inspect_err_args.push(self.operand_for_place_arg(err_payload_place, source_err_ty, err_ref_ty, span))
             let _ = self.lower_call_with_operand_args(mapper_op, inspect_err_args, self.sema.ty_void as i32, node)
@@ -14971,9 +14971,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.success_variant_tag(value_place))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
@@ -15063,9 +15063,9 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
 
         let disc = self.lower_enum_discriminant(value_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.success_variant_tag(value_place))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(success_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, failure_bb, 0)
@@ -15084,7 +15084,7 @@ impl MirBuilder:
         self.switch_to(failure_bb)
         let uoe_scrut_local = self.retire_decomposed_carrier(value_place)
         let uoe_arm = self.begin_lazy_arm()
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         if self.is_result_type(value_ty) != 0:
             let err_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.result, 1)
             if err_ty == 0:
@@ -15151,7 +15151,7 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, payload_local, 0, span)
 
         let guard_expected = if enter_sig >= 0 and self.sema.sig_get_param_count(enter_sig) > 0: self.sema.sig_param_type(enter_sig, 0) else: 0
-        let enter_args: Vec[i32] = Vec.new()
+        let enter_args: List[i32] = List.new()
         let enter_guard_place = self.place_for_local(guard_local)
         enter_args.push(self.operand_for_place_arg(enter_guard_place, source_ty, guard_expected, span))
         let enter_args_id = self.body.new_call_args(enter_args)
@@ -15299,7 +15299,7 @@ impl MirBuilder:
                     struct_extra = self.sema.get_type_d1(base_resolved)
                     struct_fc = self.sema.get_type_d2(base_resolved)
 
-        let update_ops: Vec[i32] = Vec.new()
+        let update_ops: List[i32] = List.new()
         for i in 0..field_updates_count:
             let f_name_sym = self.ast.get_extra(field_updates_start + i * 2)
             let f_val_node = self.ast.get_extra(field_updates_start + i * 2 + 1)
@@ -15321,8 +15321,8 @@ impl MirBuilder:
             self.assign_operand_to_place(whole_place, self.body.new_operand(OperandKind.OK_MOVE, base_place), self.ast.get_start(node))
             base_place = whole_place
 
-        let result_fields: Vec[i32] = Vec.new()
-        let result_names: Vec[i32] = Vec.new()
+        let result_fields: List[i32] = List.new()
+        let result_names: List[i32] = List.new()
         for fi in 0..struct_fc:
             let f_name_sym: i32 = self.sema.type_extra[(struct_extra + fi * 3)]
             let field_ty = self.struct_field_type(ty, f_name_sym)
@@ -15356,9 +15356,9 @@ impl MirBuilder:
 
     mut fn lower_implicit_ok(expr: i32, ok_type_id: i32) -> i32:
         let op = self.lower_expr(expr)
-        let fields: Vec[i32] = Vec.new()
+        let fields: List[i32] = List.new()
         fields.push(op)
-        let no_names: Vec[i32] = Vec.new()
+        let no_names: List[i32] = List.new()
         no_names.push(0)
         let fid = self.body.new_agg_fields(fields, no_names)
         let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, 0)
@@ -15380,7 +15380,7 @@ impl MirBuilder:
             if base == self.sema.syms.option:
                 let tmp = self.new_temp(type_id)
                 let place = self.place_for_local(tmp)
-                let fields: Vec[i32] = Vec.new()
+                let fields: List[i32] = List.new()
                 self.assign_enum_variant_to_place(place, type_id, self.sema.syms.none, fields, span)
                 return self.body.new_operand(OperandKind.OK_COPY, place)
             if base == self.sema.syms.result and self.sema.get_generic_inst_arg_count(resolved as i32) == 2:
@@ -15388,24 +15388,24 @@ impl MirBuilder:
                 let ok_value = self.lower_implicit_default_value(ok_type, span)
                 let tmp = self.new_temp(type_id)
                 let place = self.place_for_local(tmp)
-                let fields: Vec[i32] = Vec.new()
+                let fields: List[i32] = List.new()
                 fields.push(ok_value)
                 self.assign_enum_variant_to_place(place, type_id, self.sema.syms.ok, fields, span)
                 return self.body.new_operand(OperandKind.OK_COPY, place)
             // #633 (§4.10): the implicit default of a heap container must equal
             // `.new()`'s value, not a zeroed struct. A zeroed HashMap/HashSet has
-            // null buckets and SEGFAULTs on use; a zeroed Vec happens to work but
-            // has elem_size=0, differing from Vec.new(). Emit the real constructor.
+            // null buckets and SEGFAULTs on use; a zeroed List happens to work but
+            // has elem_size=0, differing from List.new(). Emit the real constructor.
             if base == self.sema.syms.hashmap or base == self.sema.syms.hashset:
                 let map_tmp = self.new_temp(type_id)
                 let map_place = self.place_for_local(map_tmp)
                 self.emit_map_new_into(map_place, span)
                 return self.body.new_operand(OperandKind.OK_COPY, map_place)
-            if base == self.sema.syms.vec:
-                let vec_tmp = self.new_temp(type_id)
-                let vec_place = self.place_for_local(vec_tmp)
-                self.emit_vec_new_into(vec_place, span)
-                return self.body.new_operand(OperandKind.OK_COPY, vec_place)
+            if base == self.sema.syms.list:
+                let list_tmp = self.new_temp(type_id)
+                let list_place = self.place_for_local(list_tmp)
+                self.emit_list_new_into(list_place, span)
+                return self.body.new_operand(OperandKind.OK_COPY, list_place)
         self.const_operand(ConstKind.CK_UNIT, 0, type_id)
 
     mut fn lower_implicit_default_return(type_id: i32, span: i32) -> i32:
@@ -15463,13 +15463,13 @@ impl MirBuilder:
             self.assign_operand_to_place(result_place, field_op, span)
             return
 
-        let success_fields: Vec[i32] = Vec.new()
+        let success_fields: List[i32] = List.new()
         success_fields.push(field_op)
         self.assign_enum_variant_to_place(result_place, result_ty, success_sym, success_fields, span)
 
     mut fn lower_intrinsic_call_with_receiver_operand(intrinsic: MirIntrinsic, recv_op: i32, recv_type: i32, method_sym: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
-        let call_args: Vec[i32] = Vec.new()
+        let call_args: List[i32] = List.new()
         // A builtin reads its receiver in place (D110): a copy takes no hold.
         if self.body.operand_kinds[recv_op] == OperandKind.OK_MOVE:
             self.consume_moved_operand(recv_op)
@@ -15515,7 +15515,7 @@ impl MirBuilder:
         self.register_stmt_temp(local, type_id)
         self.body.new_operand(if self.copy_is_bits(type_id): OperandKind.OK_COPY else: OperandKind.OK_MOVE, place)
 
-    mut fn lower_call_with_operand_args(fn_op: i32, args: &Vec[i32], ret_type: i32, node: i32) -> i32:
+    mut fn lower_call_with_operand_args(fn_op: i32, args: &List[i32], ret_type: i32, node: i32) -> i32:
         for ai in 0..args.len():
             self.consume_moved_operand(args[ai])
         let args_id = self.body.new_call_args(args)
@@ -15570,10 +15570,10 @@ impl MirBuilder:
         else:
             self.body.set_call_machinery_dispatch(args_id)
 
-    mut fn lower_resolved_call_with_operand_args(fn_sym: i32, args: &Vec[i32], ret_type: i32, node: i32, require_contract: bool = true) -> i32:
+    mut fn lower_resolved_call_with_operand_args(fn_sym: i32, args: &List[i32], ret_type: i32, node: i32, require_contract: bool = true) -> i32:
         self.lower_resolved_call_with_operand_args_contract(fn_sym, args, ret_type, node, -1, 0, require_contract)
 
-    mut fn lower_resolved_call_with_operand_args_contract(fn_sym: i32, args: &Vec[i32], ret_type: i32, node: i32, explicit_sig: i32, explicit_mono_sym: i32, require_contract: bool = true) -> i32:
+    mut fn lower_resolved_call_with_operand_args_contract(fn_sym: i32, args: &List[i32], ret_type: i32, node: i32, explicit_sig: i32, explicit_mono_sym: i32, require_contract: bool = true) -> i32:
         let fn_op = self.lower_var(fn_sym, 0, node)
         var sig_idx = self.call_sig_for_sym(fn_sym)
         let recorded_sig_opt = self.sema.resolved_call_sigs.get(node)
@@ -15616,7 +15616,7 @@ impl MirBuilder:
         let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
         if recorded_sig.is_some():
             sig_idx = recorded_sig.unwrap()
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         if sig_idx < 0 or self.sema.sig_param_uses_value_ref_abi(sig_idx, 0) == 0:
             self.consume_moved_operand(recv_op)
         args.push(recv_op)
@@ -15674,7 +15674,7 @@ impl MirBuilder:
             self.assign_operand_to_place(result_place, raw_op, self.ast.get_start(node))
             return
 
-        let success_fields: Vec[i32] = Vec.new()
+        let success_fields: List[i32] = List.new()
         success_fields.push(raw_op)
         self.assign_enum_variant_to_place(result_place, result_ty, success_sym, success_fields, self.ast.get_start(node))
 
@@ -15705,7 +15705,7 @@ impl MirBuilder:
                 let carrier_kind = if self.sema.is_copy_frozen(recv_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
                 return self.body.new_operand(carrier_kind, recv_place)
             return self.lower_method_call(lhs_expr, method_sym, args_start, args_count, node)
-        // `collect[Vec]()`: Sema resolved the stage to the generic function
+        // `collect[List]()`: Sema resolved the stage to the generic function
         // the bracketed callee names (check_generic_pipeline_call).
         let stage_expr = if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_INDEX and self.sema.comp_resolved.contains(node): self.ast.get_data0(fn_expr) else: fn_expr
         var fn_op = self.lower_expr(stage_expr)
@@ -15722,7 +15722,7 @@ impl MirBuilder:
             fn_op = self.const_operand(ConstKind.CK_FN, resolved, if resolved_sig >= 0: self.sema.sig_return_type(resolved_sig) else: self.sema.ty_void as i32)
             callee_sym = resolved
         let conv_sym: i32 = if call_node != 0: self.sema.call_value_conversions.get(call_node) ?? 0 else: 0
-        let arg_nodes: Vec[i32] = Vec.new()
+        let arg_nodes: List[i32] = List.new()
         arg_nodes.push(lhs_expr)
         // #2024: the stage call's argument list as Sema filled it (its
         // defaults included), after the piped value.
@@ -15787,7 +15787,7 @@ impl MirBuilder:
     mut fn prepare_anonymous_body(node: i32, ty: i32, is_async: bool) -> i32:
         let body_node = self.ast.get_data0(node)
         let body_sym = self.pool.intern(f"$anonymous${self.body.fn_sym}${node}")
-        let captures: Vec[i32] = Vec.new()
+        let captures: List[i32] = List.new()
         if is_async:
             for i in 0..self.bind_syms.len():
                 let sym = self.bind_syms[i]
@@ -15818,7 +15818,7 @@ impl MirBuilder:
                 // the outer slot — so its drop keeps the guard too.
                 if not self.sema.closure_capture_by_place(node, ci) or self.sema.closure_capture_consumes(node, ci) != 0:
                     self.body.mark_local_ever_moved(consumed_local)
-        let capture_sources: Vec[ClosureCaptureSource] = Vec.new()
+        let capture_sources: List[ClosureCaptureSource] = List.new()
         if not is_async:
             for ci in 0..captures.len() as i32:
                 capture_sources.push(self.closure_capture_source(captures[ci], node, ci))
@@ -15961,9 +15961,9 @@ impl MirBuilder:
         let join_bb = self.new_block()
 
         let disc = self.lower_enum_discriminant(base_place)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(self.enum_variant_discriminant_for_type(base_ty, success_sym))
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(success_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, failure_bb, 0)
@@ -15987,11 +15987,11 @@ impl MirBuilder:
             else:
                 let err_downcast = self.body.new_downcast_place(base_place, err_idx)
                 let err_payload_place = self.body.new_field_place(err_downcast, 0, result_err_ty)
-                let err_fields: Vec[i32] = Vec.new()
+                let err_fields: List[i32] = List.new()
                 err_fields.push(self.operand_for_place(err_payload_place, result_err_ty))
                 self.assign_enum_variant_to_place(result_place, result_ty, failure_sym, err_fields, self.ast.get_start(node))
         else:
-            let none_fields: Vec[i32] = Vec.new()
+            let none_fields: List[i32] = List.new()
             self.assign_enum_variant_to_place(result_place, result_ty, failure_sym, none_fields, self.ast.get_start(node))
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -16022,7 +16022,7 @@ impl MirBuilder:
                 op = self.lower_value_cast(op, src_ty, payload, span)
             let tmp = self.new_temp(opt_ty)
             let place = self.place_for_local(tmp)
-            let fields: Vec[i32] = Vec.new()
+            let fields: List[i32] = List.new()
             fields.push(op)
             self.assign_enum_variant_to_place(place, opt_ty, self.sema.syms.some, fields, self.ast.get_start(node))
             op = if self.sema.is_copy_frozen(opt_ty) != 0: self.body.new_operand(OperandKind.OK_COPY, place) else: self.body.new_operand(OperandKind.OK_MOVE, place)
@@ -16130,7 +16130,7 @@ impl MirBuilder:
             // Lower input expression values as MIR args
             let asm_packed_d2 = self.ast.get_data2(node)
             let asm_extra_start = asm_packed_d2 >> 8
-            let asm_args: Vec[i32] = Vec.new()
+            let asm_args: List[i32] = List.new()
             if asm_extra_start > 0:
                 // Extras: [output_count, out_types.., input_count, in_exprs..]
                 let asm_output_count = self.ast.get_extra(asm_extra_start)
@@ -16242,8 +16242,8 @@ impl MirBuilder:
                             // discriminant enums lower to their repr integer.
                             let fa_is_disc_enum = self.sema.disc_repr_types.contains(fa_resolved as i32)
                             if not fa_is_disc_enum or self.sema.disc_has_payload.contains(fa_resolved as i32):
-                                let fa_fields: Vec[i32] = Vec.new()
-                                let fa_names: Vec[i32] = Vec.new()
+                                let fa_fields: List[i32] = List.new()
+                                let fa_names: List[i32] = List.new()
                                 let fa_fid = self.body.new_agg_fields(fa_fields, fa_names)
                                 let fa_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fa_fid, self.enum_variant_index_for_type(fa_base_ty, fa_qual_sym))
                                 let fa_tmp = self.new_temp(fa_base_ty)
@@ -16257,8 +16257,8 @@ impl MirBuilder:
                             if self.sema.enum_pattern_owner_sym(fa_var_tid) == self.sema.enum_pattern_owner_sym(fa_resolved):
                                 let fa_is_disc_enum2 = self.sema.disc_repr_types.contains(fa_resolved as i32)
                                 if not fa_is_disc_enum2 or self.sema.disc_has_payload.contains(fa_resolved as i32):
-                                    let fa_fields2: Vec[i32] = Vec.new()
-                                    let fa_names2: Vec[i32] = Vec.new()
+                                    let fa_fields2: List[i32] = List.new()
+                                    let fa_names2: List[i32] = List.new()
                                     let fa_fid2 = self.body.new_agg_fields(fa_fields2, fa_names2)
                                     let fa_rv2 = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fa_fid2, self.enum_variant_index_for_type(fa_base_ty, fa_field_sym))
                                     let fa_tmp2 = self.new_temp(fa_base_ty)
@@ -16283,7 +16283,7 @@ impl MirBuilder:
                 // historical move; recorded as #780 residue.
                 let fb_owned_demand = self.expected_type != 0 and self.type_id_is_str(self.sema.resolve_alias(self.expected_type as TypeId) as i32) != 0
                 if fb_owned_demand and self.type_id_is_str(fa_val_ty) != 0 and self.field_read_base_is_shared_borrow(node) != 0:
-                    let fb_parts: Vec[i32] = Vec.new()
+                    let fb_parts: List[i32] = List.new()
                     fb_parts.push(self.body.new_operand(OperandKind.OK_COPY, place))
                     fb_parts.push(self.lower_str_lit(self.pool.intern("")))
                     let fb_args = self.body.new_call_args(fb_parts)
@@ -16298,9 +16298,9 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_COPY, place)
 
         if kind == NodeKind.NK_INDEX:
-            let vec_ty = self.vec_literal_type(node)
-            if vec_ty != 0:
-                return self.lower_vec_literal(node, vec_ty)
+            let list_ty = self.list_literal_type(node)
+            if list_ty != 0:
+                return self.lower_list_literal(node, list_ty)
             if self.is_runtime_pair_multi_index(node) != 0:
                 let mi_place = self.lower_multi_index_read(node)
                 return self.body.new_operand(OperandKind.OK_COPY, mi_place)
@@ -16317,7 +16317,7 @@ impl MirBuilder:
                     let ip_rd_idx_op = self.lower_expr(self.ast.get_data1(node))
                     let ip_rd_ret_ty = self.expr_type(node)
                     let ip_rd_fn_op = self.const_operand(ConstKind.CK_FN, ip_rd_fn_sym, ip_rd_ret_ty)
-                    let ip_rd_args: Vec[i32] = Vec.new()
+                    let ip_rd_args: List[i32] = List.new()
                     ip_rd_args.push(ip_rd_recv_op)
                     ip_rd_args.push(ip_rd_idx_op)
                     let ip_rd_args_id = self.body.new_call_args(ip_rd_args)
@@ -16341,7 +16341,7 @@ impl MirBuilder:
             // niche guard: the per-element guarded drop skips the blanked slot and
             // still frees the non-extracted siblings. (Replaces the whole-base
             // consume, which cancelled the array's drop and leaked every sibling.)
-            // Tightly scoped to a plain array-local base — Vec/slice/map indexing is
+            // Tightly scoped to a plain array-local base — List/slice/map indexing is
             // unaffected.
             let idx_val_ty = self.expr_type(node)
             if idx_val_ty != 0 and self.sema.is_copy_frozen(idx_val_ty as TypeId) == 0:
@@ -16516,7 +16516,7 @@ impl MirBuilder:
                 generic_builtin_sym = self.ast.get_data0(gb_base)
             if generic_builtin_sym > 0:
                 let gc_fn_op = self.const_operand(ConstKind.CK_FN, generic_builtin_sym, 0)
-                let gc_args: Vec[i32] = Vec.new()
+                let gc_args: List[i32] = List.new()
                 let gc_as = self.ast.get_data1(node)
                 // D109: `offsetof[T](field)` names a field of T's declaration;
                 // Sema recorded its index, and nothing is evaluated.
@@ -16593,8 +16593,8 @@ impl MirBuilder:
                     let vc_args_start = self.ast.get_data1(node)
                     let vc_has_resolved = self.sema.has_resolved_call_args(node)
                     let vc_args_count = if vc_has_resolved != 0: self.sema.get_resolved_call_arg_count(node) else: self.ast.get_data2(node)
-                    let vc_fields: Vec[i32] = Vec.new()
-                    let vc_names: Vec[i32] = Vec.new()
+                    let vc_fields: List[i32] = List.new()
+                    let vc_names: List[i32] = List.new()
                     for vci in 0..vc_args_count:
                         let vc_arg = if vc_has_resolved != 0: self.sema.get_resolved_call_arg(node, vci) else: self.ast.get_extra(vc_args_start + vci)
                         let saved_expected = self.expected_type
@@ -16668,7 +16668,7 @@ impl MirBuilder:
                     let gc_recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
                     if gc_recorded_sig.is_some():
                         gc_sig_idx = gc_recorded_sig.unwrap()
-                    let gc_args: Vec[i32] = Vec.new()
+                    let gc_args: List[i32] = List.new()
                     let gc_as = self.ast.get_data1(node)
                     let gc_ac = self.ast.get_data2(node)
                     for gc_ai in 0..gc_ac:
@@ -16704,7 +16704,7 @@ impl MirBuilder:
                 let bu_fn_op = self.const_operand(ConstKind.CK_FN, self.ast.get_data0(callee), 0)
                 // The builtin's arguments are MIR operands like any call's;
                 // codegen reads them, never the AST (#2043).
-                let bu_args: Vec[i32] = Vec.new()
+                let bu_args: List[i32] = List.new()
                 let bu_resolved = self.sema.has_resolved_call_args(node) != 0
                 let bu_count = if bu_resolved: self.sema.get_resolved_call_arg_count(node) else: self.ast.get_data2(node)
                 for bu_ai in 0..bu_count:
@@ -16727,7 +16727,7 @@ impl MirBuilder:
             // std's `fence(order)`: the atomic fence intrinsic (Sema's
             // declaration identity, not the name).
             if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.AtomicFence:
-                let ifn_args: Vec[i32] = Vec.new()
+                let ifn_args: List[i32] = List.new()
                 let ifn_as = self.ast.get_data1(node)
                 for ifn_ai in 0..self.ast.get_data2(node):
                     ifn_args.push(self.lower_expr(self.ast.get_extra(ifn_as + ifn_ai)))
@@ -16789,8 +16789,8 @@ impl MirBuilder:
             let sl_field_count = self.ast.get_data2(node)
             let sl_name_sym = self.ast.get_data0(node)
             let sl_struct_ty = self.expr_type(node)
-            let sl_fields: Vec[i32] = Vec.new()
-            let sl_names: Vec[i32] = Vec.new()
+            let sl_fields: List[i32] = List.new()
+            let sl_names: List[i32] = List.new()
             for i in 0..sl_field_count:
                 let f_name_sym = self.ast.get_extra(sl_fields_start + i * 2)
                 let f_val_node = self.ast.get_extra(sl_fields_start + i * 2 + 1)
@@ -16898,8 +16898,8 @@ impl MirBuilder:
             let start_op = if range_start_node != 0: self.lower_expr(range_start_node) else: self.int_const_operand(0, range_elem)
             let end_op = self.lower_expr(range_end_node)
             let incl_op = self.int_const_operand(range_inclusive, self.sema.ty_bool)
-            let range_fields: Vec[i32] = Vec.new()
-            let range_names: Vec[i32] = Vec.new()
+            let range_fields: List[i32] = List.new()
+            let range_names: List[i32] = List.new()
             range_fields.push(start_op)
             range_fields.push(end_op)
             range_fields.push(incl_op)
@@ -16918,8 +16918,8 @@ impl MirBuilder:
             let elem_count = self.ast.get_data1(node)
             if elem_count == 0:
                 return self.unit_operand()
-            let tup_fields: Vec[i32] = Vec.new()
-            let tup_names: Vec[i32] = Vec.new()
+            let tup_fields: List[i32] = List.new()
+            let tup_names: List[i32] = List.new()
             let saved_expected = self.expected_type
             var expected_tuple = 0
             var expected_elem_start = 0
@@ -16999,8 +16999,8 @@ impl MirBuilder:
                 let fill_place = self.place_for_local(fill_tmp)
                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, fill_place, fill_rv, self.ast.get_start(node))
                 return self.body.new_operand(OperandKind.OK_COPY, fill_place)
-            let arr_fields: Vec[i32] = Vec.new()
-            let arr_names: Vec[i32] = Vec.new()
+            let arr_fields: List[i32] = List.new()
+            let arr_names: List[i32] = List.new()
             // #586: elements lower under the ARRAY'S ELEMENT type, not the ambient
             // expected type. Without the rebind, the array/let type leaked into
             // enum-variant element temps (Some(1) inside [?i32] typed as the ARRAY
@@ -17063,8 +17063,8 @@ impl MirBuilder:
                     if vs_arg_count == 0:
                         let vs_is_disc_enum = self.sema.disc_repr_types.contains(vs_resolved as i32)
                         if not vs_is_disc_enum or self.sema.disc_has_payload.contains(vs_resolved as i32):
-                            let vs_de_fields: Vec[i32] = Vec.new()
-                            let vs_de_names: Vec[i32] = Vec.new()
+                            let vs_de_fields: List[i32] = List.new()
+                            let vs_de_names: List[i32] = List.new()
                             let vs_de_fid = self.body.new_agg_fields(vs_de_fields, vs_de_names)
                             let vs_de_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, vs_de_fid, vs_variant_idx)
                             let vs_de_tmp = self.new_temp(vs_result_ty)
@@ -17072,8 +17072,8 @@ impl MirBuilder:
                             self.body.push_stmt(self.cur_bb, StmtKind.Assign, vs_de_place, vs_de_rv, self.ast.get_start(node))
                             return self.body.new_operand(OperandKind.OK_COPY, vs_de_place)
                         return self.int_const_operand(self.enum_variant_discriminant_for_type(vs_result_ty, vs_name_sym), vs_result_ty)
-            let vs_fields: Vec[i32] = Vec.new()
-            let vs_names: Vec[i32] = Vec.new()
+            let vs_fields: List[i32] = List.new()
+            let vs_names: List[i32] = List.new()
             let vs_payload_tys = self.sema.enum_variant_payload_types_frozen(vs_result_ty, vs_name_sym)
             for vsi in 0..vs_arg_count:
                 let vs_arg = self.ast.get_extra(vs_args_start + vsi)
@@ -17184,16 +17184,16 @@ impl MirBuilder:
                 let ta_count = self.ast.get_data1(inner)
                 let ta_result_ty = self.expr_type(node)
                 // Lower all task expressions first (spawns all fibers)
-                var ta_task_ops: Vec[i32] = Vec.new()
-                var ta_owns: Vec[i32] = Vec.new()
+                var ta_task_ops: List[i32] = List.new()
+                var ta_owns: List[i32] = List.new()
                 for ta_i in 0..ta_count:
                     let ta_elem = self.ast.get_extra(ta_extra + ta_i)
                     ta_owns.push(self.await_task_owns_result(ta_elem))
                     self.cancel_scheduled_value_drop_for_receiver_expr(ta_elem)
                     ta_task_ops.push(self.lower_expr(ta_elem))
                 // Await each sequentially, collect results
-                var ta_awaited_ops: Vec[i32] = Vec.new()
-                var ta_awaited_names: Vec[i32] = Vec.new()
+                var ta_awaited_ops: List[i32] = List.new()
+                var ta_awaited_names: List[i32] = List.new()
                 for ta_i in 0..ta_count:
                     let ta_elem_ty = self.tuple_elem_type(ta_result_ty, ta_i)
                     let ta_elem_node = self.ast.get_extra(ta_extra + ta_i)
@@ -17226,7 +17226,7 @@ impl MirBuilder:
             // 1. Create scope handle via with_scope_create()
             let scope_sym = self.ast.get_data0(node)
             let span = self.ast.get_start(node)
-            let create_args: Vec[i32] = Vec.new()
+            let create_args: List[i32] = List.new()
             let create_call_id = self.body.new_call_args(create_args)
             self.body.set_call_intrinsic(create_call_id, MirIntrinsic.SCOPE_CREATE)
             self.body.set_call_ast_node(create_call_id, node)
@@ -17262,7 +17262,7 @@ impl MirBuilder:
         if kind == NodeKind.NK_SCOPE:
             let scope_sym = self.ast.get_data0(node)
             let span = self.ast.get_start(node)
-            let create_args: Vec[i32] = Vec.new()
+            let create_args: List[i32] = List.new()
             let create_call_id = self.body.new_call_args(create_args)
             self.body.set_call_intrinsic(create_call_id, MirIntrinsic.THREAD_SCOPE_CREATE)
             self.body.set_call_ast_node(create_call_id, node)
@@ -17315,8 +17315,8 @@ impl MirBuilder:
             // 1. Lower each arm's task expression → task operands. Capture ownership
             // BEFORE the cancel (§14.7/G3): the winner's value-await frees its result
             // buffer iff this scope owns the task (its drop, cancelled just below).
-            var task_ops: Vec[i32] = Vec.new()
-            var sel_owns: Vec[i32] = Vec.new()
+            var task_ops: List[i32] = List.new()
+            var sel_owns: List[i32] = List.new()
             for ai in 0..arm_count:
                 let task_node = self.ast.get_extra(extra_start + ai * 3 + 1)
                 sel_owns.push(self.await_task_owns_result(task_node))
@@ -17328,7 +17328,7 @@ impl MirBuilder:
             // #2011: the select observes every task (copy); on each arm's
             // path every task is taken once — the winner by its await, each
             // loser by its cleanup await (its cancel observes).
-            let select_args: Vec[i32] = Vec.new()
+            let select_args: List[i32] = List.new()
             for ai in 0..arm_count:
                 select_args.push(self.observing_operand(task_ops[ai]))
             let select_call_id = self.body.new_call_args(select_args)
@@ -17344,8 +17344,8 @@ impl MirBuilder:
             self.switch_to(switch_bb)
 
             // 3. Create basic blocks for each arm + join
-            var arm_bbs: Vec[i32] = Vec.new()
-            var switch_vals: Vec[i64] = Vec.new()
+            var arm_bbs: List[i32] = List.new()
+            var switch_vals: List[i64] = List.new()
             for ai in 0..arm_count:
                 let arm_bb = self.new_block()
                 arm_bbs.push(arm_bb)
@@ -17373,7 +17373,7 @@ impl MirBuilder:
                 let arm_body = self.ast.get_extra(extra_start + ai * 3 + 2)
 
                 // Await the winning task to get its result
-                let await_args: Vec[i32] = Vec.new()
+                let await_args: List[i32] = List.new()
                 await_args.push(task_ops[ai])
                 await_args.push(self.const_operand(ConstKind.CK_INT, sel_owns[ai], self.sema.ty_i32))
                 let await_call_id = self.body.new_call_args(await_args)
@@ -17401,7 +17401,7 @@ impl MirBuilder:
                 // Cancel losing tasks
                 for li in 0..arm_count:
                     if li != ai:
-                        let cancel_args: Vec[i32] = Vec.new()
+                        let cancel_args: List[i32] = List.new()
                         let loser_task = task_ops[li]
                         cancel_args.push(self.observing_operand(loser_task))
                         let cancel_call_id = self.body.new_call_args(cancel_args)
@@ -17451,7 +17451,7 @@ type LoweredFunction {
     body: MirBody,
     // The bodies lowered along with it: its closures and gen-loop bodies,
     // and, for a gen fn's producer, the constructor and `each`.
-    anonymous_bodies: Vec[MirBody],
+    anonymous_bodies: List[MirBody],
 }
 
 fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> LoweredFunction:
@@ -17492,7 +17492,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
         // Parameter locals must occupy locals 1..n contiguously (codegen binds
         // incoming arguments to them in order), so create them all first and
         // record their ids before destructuring any parameter patterns.
-        let param_locals: Vec[i32] = Vec.new()
+        let param_locals: List[i32] = List.new()
         for i in 0..param_count:
             let p_name = builder.ast.fn_param_name(param_start, i)
             var p_ty = 0
@@ -17563,7 +17563,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
                         let _ = builder.lower_pattern(ppat, param_place)
 
     // Set expected_type to the function's return type so that intrinsic calls
-    // (Vec.new, HashMap.new) in tail position can resolve their generic inst type.
+    // (List.new, HashMap.new) in tail position can resolve their generic inst type.
     // Typed let: body lowering GROWS local_type_ids (every new_temp pushes),
     // so an element view here dangles by the time the implicit-Ok wrap
     // decision reads it — stage2's build() returned unwrapped Config bits.
@@ -17616,8 +17616,8 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
             if result_body_ty != 0 and result_body_ty != ret_ty:
                 if builder.sema.types_compatible_frozen(ok_type, result_body_ty) != 0 or builder.sema.arithmetic_result_type(ok_type, result_body_ty) != 0:
                     // Wrap in Ok variant (tag=0)
-                    let ok_fields: Vec[i32] = Vec.new()
-                    let ok_names: Vec[i32] = Vec.new()
+                    let ok_fields: List[i32] = List.new()
+                    let ok_names: List[i32] = List.new()
                     ok_fields.push(result)
                     ok_names.push(0)
                     let ok_fid = builder.body.new_agg_fields(ok_fields, ok_names)
@@ -17675,7 +17675,7 @@ fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, 
     let first_clause = if clause_count > 0: sema.fn_clause_group_clause(group, 0) else: 0
     let first_meta = if first_clause != 0: ast_pool.find_fn_meta(first_clause) else: -1
     let param_count = sema.sig_get_param_count(sig_idx)
-    let param_locals: Vec[i32] = Vec.new()
+    let param_locals: List[i32] = List.new()
     for pi in 0..param_count:
         var p_name = pool.intern(f"__param_{pi}")
         if first_meta >= 0:
@@ -17736,7 +17736,7 @@ fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, 
 
         builder.switch_to(arm_bb)
         let fn_op = builder.const_operand(ConstKind.CK_FN, clause_sym, sema.ty_void)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         for pi2 in 0..param_count:
             let p_ty = sema.sig_param_type(sig_idx, pi2)
             let place = builder.place_for_local(param_locals[pi2])
@@ -17759,7 +17759,7 @@ fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, 
     builder.switch_to(dispatch_bb)
     let panic_sym = sema.pool_lookup_symbol("with_panic")
     let panic_op = builder.const_operand(ConstKind.CK_FN, panic_sym, sema.ty_void)
-    let panic_args: Vec[i32] = Vec.new()
+    let panic_args: List[i32] = List.new()
     panic_args.push(builder.lower_str_lit(pool.intern("no function clause matched")))
     panic_args.push(builder.lower_str_lit(pool.intern("")))
     panic_args.push(builder.int_const_operand(0, sema.ty_i32))
@@ -17867,8 +17867,8 @@ fn lower_generator_constructor(sema: &Sema, ast_pool: AstPool, pool: InternPool,
     var builder = MirBuilder.init(sema, ast_pool, pool, body_sym)
     builder.body.local_type_ids[0] = state_tid
     let span = ast_pool.get_start(fn_node)
-    let fields: Vec[i32] = Vec.new()
-    let names: Vec[i32] = Vec.new()
+    let fields: List[i32] = List.new()
+    let names: List[i32] = List.new()
     let param_count = sema.sig_get_param_count(sig_idx)
     let meta = ast_pool.find_fn_meta(fn_node)
     // The parameters are locals 1..=param_count, before any temporary.
@@ -17936,7 +17936,7 @@ fn lower_generator_each_body(sema: &Sema, ast_pool: AstPool, pool: InternPool, f
     let body_local = builder.body.new_local(sema.sig_param_type(each_sig, 1), 0, pool.intern("__with_gen_body"), 1)
     builder.body.n_params = 2
     let self_place = builder.place_for_local(self_local)
-    let args: Vec[i32] = Vec.new()
+    let args: List[i32] = List.new()
     let field_start = sema.get_type_d1(state_tid)
     for fi in 0..sema.get_type_d2(state_tid):
         let field_sym: i32 = sema.type_extra[(field_start + fi * 3)]
@@ -18054,9 +18054,9 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
     let subst_count: i32 = sema.concrete_specialization_subst_counts[specialization]
     let param_start: i32 = sema.concrete_specialization_param_starts[specialization]
     let param_count: i32 = sema.concrete_specialization_param_counts[specialization]
-    let subst_syms: Vec[i32] = Vec.new()
-    let subst_types: Vec[i32] = Vec.new()
-    let concrete_params: Vec[i32] = Vec.new()
+    let subst_syms: List[i32] = List.new()
+    let subst_types: List[i32] = List.new()
+    let concrete_params: List[i32] = List.new()
     for i in 0..subst_count:
         subst_syms.push(sema.concrete_specialization_subst_syms[(subst_start + i)])
         subst_types.push(sema.concrete_specialization_subst_types[(subst_start + i)])
@@ -18075,12 +18075,12 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
     if sema.is_copy_cache.len() != sema.type_kinds.len():
         sema.preregister_mir_types()
 
-    let saved_subst_syms = sema_clone_i32_vec(&sema.generic_subst_param_syms)
-    let saved_subst_types = sema_clone_i32_vec(&sema.generic_subst_type_ids)
-    let saved_named: Vec[i32] = Vec.new()
-    let saved_named_had: Vec[i32] = Vec.new()
-    sema.generic_subst_param_syms = Vec.new()
-    sema.generic_subst_type_ids = Vec.new()
+    let saved_subst_syms = sema_clone_i32_list(&sema.generic_subst_param_syms)
+    let saved_subst_types = sema_clone_i32_list(&sema.generic_subst_type_ids)
+    let saved_named: List[i32] = List.new()
+    let saved_named_had: List[i32] = List.new()
+    sema.generic_subst_param_syms = List.new()
+    sema.generic_subst_type_ids = List.new()
     for i in 0..subst_count:
         let sym = subst_syms[i]
         let tid = subst_types[i]
@@ -18234,8 +18234,8 @@ pub fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> Mi
 
     MirLowerResult { sema, mir_module: mir_mod }
 
-pub fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: AstPool, pool: InternPool) -> Vec[i32]:
-    let tailrec_syms: Vec[i32] = Vec.new()
+pub fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: AstPool, pool: InternPool) -> List[i32]:
+    let tailrec_syms: List[i32] = List.new()
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)
         if ast_pool.kind(decl) != NodeKind.NK_FN_DECL:
@@ -18328,7 +18328,7 @@ fn mir_is_tail_call_to(body: &MirBody, bb: i32, target_sym: i32) -> bool:
     let next_bb = body.term_data3(bb)
     mir_is_tail_return_path(body, next_bb, result_local, 0)
 
-fn mir_vec_contains_i32(v: &Vec[i32], value: i32) -> bool:
+fn mir_list_contains_i32(v: &List[i32], value: i32) -> bool:
     for i in 0..v.len():
         if v[i] == value:
             return true
@@ -18396,7 +18396,7 @@ fn mir_tailrec_sig_compatible(sema: &Sema, ast_pool: AstPool, fn_a: i32, fn_b: i
         return 0
     1
 
-fn tailrec_scc_contains(scc: &Vec[i32], fn_sym: i32) -> bool:
+fn tailrec_scc_contains(scc: &List[i32], fn_sym: i32) -> bool:
     for i in 0..scc.len():
         if scc[i] == fn_sym:
             return true
@@ -18507,7 +18507,7 @@ fn tailrec_stmt_ends_drop_sym(sema: &Sema, node: i32) -> i32:
             return tailrec_consumed_ident_sym(sema, sema.ast.get_data1(node))
     0
 
-fn tailrec_verify_recursive_edges(sema: &Sema, node: i32, scc: &Vec[i32], in_tail: i32, active_cleanup: i32, active_drop: TailrecDropState) -> TailrecViolation:
+fn tailrec_verify_recursive_edges(sema: &Sema, node: i32, scc: &List[i32], in_tail: i32, active_cleanup: i32, active_drop: TailrecDropState) -> TailrecViolation:
     if node == 0:
         return tailrec_no_violation()
     let kind = sema.ast.kind(node)
@@ -18616,10 +18616,10 @@ impl MirModule:
         if start_idx == target_idx:
             return true
         let body_count = self.body_count()
-        var visited: Vec[i32] = Vec.new()
+        var visited: List[i32] = List.new()
         for _ in 0..body_count:
             visited.push(0)
-        var stack: Vec[i32] = Vec.new()
+        var stack: List[i32] = List.new()
         stack.push(start_idx)
         while stack.len() > 0:
             let idx = stack.remove(stack.len() - 1)
@@ -18644,22 +18644,22 @@ impl MirModule:
                     stack.push(callee_idx)
         false
 
-    fn collect_tailrec_scc(start_idx: i32) -> Vec[i32]:
-        var members: Vec[i32] = Vec.new()
+    fn collect_tailrec_scc(start_idx: i32) -> List[i32]:
+        var members: List[i32] = List.new()
         let body_count = self.body_count()
         for idx in 0..body_count:
             if self.body_reaches(start_idx, idx) and self.body_reaches(idx, start_idx):
                 members.push(idx)
         members
 
-    mut fn mark_tailrec_scc_edges(scc: &Vec[i32]):
+    mut fn mark_tailrec_scc_edges(scc: &List[i32]):
         for si in 0..scc.len():
             let src_idx = scc[si]
             // View: a bare element read copies the MirBody's Drop-bearing
             // tables and aliases the module's own (#715 class).
             let body = &self.bodies[src_idx]
             let bb_count = body.block_count()
-            let tail_bbs: Vec[i32] = Vec.new()
+            let tail_bbs: List[i32] = List.new()
             for bb in 0..bb_count:
                 if body.term_kind(bb) != TermKind.TK_CALL:
                     continue
@@ -18672,17 +18672,17 @@ impl MirModule:
                     if dst_body.fn_sym == callee_sym and mir_is_tail_call_to(body, bb, callee_sym):
                         // Keep the shared body view live only while inspecting
                         // the SCC; mutate the owning body after that view ends.
-                        if not mir_vec_contains_i32(&body.mutual_tail_bbs, bb):
+                        if not mir_list_contains_i32(&body.mutual_tail_bbs, bb):
                             tail_bbs.push(bb)
                         break
             for ti in 0..tail_bbs.len():
                 let tail_bb: i32 = tail_bbs[ti]
-                // The direct place is load-bearing: copying the Vec handle
+                // The direct place is load-bearing: copying the List handle
                 // would update a temporary and leave the owning body unchanged.
                 self.bodies[src_idx].mutual_tail_bbs.push(tail_bb)
 
-    fn tailrec_scc_syms(scc: &Vec[i32]) -> Vec[i32]:
-        var syms: Vec[i32] = Vec.new()
+    fn tailrec_scc_syms(scc: &List[i32]) -> List[i32]:
+        var syms: List[i32] = List.new()
         for si in 0..scc.len():
             let body_idx = scc[si]
             if body_idx < 0 or body_idx >= self.body_count():
@@ -18690,10 +18690,10 @@ impl MirModule:
             syms.push(self.bodies[body_idx].fn_sym)
         syms
 
-    mut fn verify_tailrec_contracts(sema: &Sema, ast_pool: AstPool, tailrec_syms: &Vec[i32]) -> Vec[TailrecViolation]:
-        let violations: Vec[TailrecViolation] = Vec.new()
+    mut fn verify_tailrec_contracts(sema: &Sema, ast_pool: AstPool, tailrec_syms: &List[i32]) -> List[TailrecViolation]:
+        let violations: List[TailrecViolation] = List.new()
         let body_count = self.body_count()
-        var processed: Vec[i32] = Vec.new()
+        var processed: List[i32] = List.new()
         for _ in 0..body_count:
             processed.push(0)
         for ti in 0..tailrec_syms.len():
@@ -18774,9 +18774,9 @@ impl MirModule:
 // #1491: the string flow facts at one point (string_alias_local_ids and
 // string_alias_flags, string_field_alias_flags): bit 1 may alias, bit 2 owned.
 type MirStrFlowFacts {
-    local_ids: Vec[i32],
-    local_flags: Vec[i32],
-    field_flags: Vec[i32],
+    local_ids: List[i32],
+    local_flags: List[i32],
+    field_flags: List[i32],
 }
 
 fn str_flow_local_index(facts: &MirStrFlowFacts, local_id: i32) -> i32:

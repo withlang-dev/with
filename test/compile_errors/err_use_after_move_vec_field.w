@@ -11,11 +11,11 @@ impl Drop for W:
         unsafe:
             *self.slot = *self.slot + 1
 
-type Holder { a: Vec[W] }
+type Holder { a: List[W] }
 
 fn main:
     var c = 0
-    let v: Vec[W] = Vec.new()
+    let v: List[W] = List.new()
     v.push(W { slot: &raw mut c })
     var h = Holder { a: v }
     let m = move h.a

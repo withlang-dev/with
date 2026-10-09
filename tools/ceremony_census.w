@@ -9,6 +9,7 @@
 //   let-underscore   `let _ =`
 //   move-arg         `move x` (not `move fn` / `move self`)
 //   copy-arg         `copy x`
+//   vec-name         the identifier `Vec` (D118: it names no type; target 0)
 // Typed patterns come from one compilation of src/main.w, which covers the
 // compiler and lib/std (`with check --ceremony-census`):
 //   str-clone              `.clone()` on a str
@@ -53,22 +54,22 @@ fn counted(path: &str) -> bool:
 // D112: a directory holding a corpus.stamp is a migrated corpus, generated
 // code that carries its migrator generation's idioms; it is never counted
 // as written With.
-fn under_any(path: &str, dirs: &Vec[str]) -> bool:
+fn under_any(path: &str, dirs: &List[str]) -> bool:
     for dir in dirs:
         if path.starts_with(dir): return true
     false
 
-fn tracked_files() -> Vec[str]:
+fn tracked_files() -> List[str]:
     let argv = ["git", "ls-files"]
     let done = run_to_files_in(".", argv, "out/ceremony-ls.txt", "out/ceremony-ls.err")
     if done.code != 0:
         eprint("ceremony-census: git ls-files failed")
         exit_code(2)
     let listing = (read_file("out/ceremony-ls.txt") ?? "").split("\n")
-    var generated: Vec[str] = Vec.new()
+    var generated: List[str] = List.new()
     for path in listing:
         if path.ends_with("/corpus.stamp"): generated.push(path.slice(0, path.len() - "corpus.stamp".len()))
-    var files: Vec[str] = Vec.new()
+    var files: List[str] = List.new()
     for path in listing:
         if counted(path) and not under_any(path, generated): files.push(path)
     files
@@ -98,9 +99,11 @@ impl Census:
                 self.bump(f"move-arg\t{area}")
             else if tag == TokenKind.TK_KW_COPY and i + 1 < n and tokens.get_tag(i + 1) == TokenKind.TK_IDENT:
                 self.bump(f"copy-arg\t{area}")
+            else if tag == TokenKind.TK_IDENT and word(i) == "Vec":
+                self.bump(f"vec-name\t{area}")
 
 fn typed_sites(compiler: &str) -> str:
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push(compiler.clone())
     argv.push("check")
     argv.push("src/main.w")

@@ -50,7 +50,7 @@ fn ci_reindent_spaces(text: &str, spaces: i32) -> str:
     // CIS_BLOCK's child-separator convention — the legacy
     // `ci_indent_block(s, indent) ++ push("\n")` pattern produces
     // two trailing newlines after each child, and we need the same.
-    var parts: Vec[str] = Vec.new()
+    var parts: List[str] = List.new()
     var start = 0
     let tlen = text.len() as i32
     while start < tlen:
@@ -934,14 +934,14 @@ pub fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_
 // translator) takes the record and refuses the declaration loudly. The
 // placeholder text is what a reader sees only if that refusal is missing;
 // it once reached a generated corpus with exit status 0.
-var g_ci_print_unknowns: Vec[str] = Vec.new()
+var g_ci_print_unknowns: List[str] = List.new()
 
 fn ci_print_note_unknown(detail: &str):
     g_ci_print_unknowns.push(detail.clone())
 
 /// The printer's unrenderable-node records since the last take; taking clears.
-pub fn ci_print_take_unknowns() -> Vec[str]:
-    var taken: Vec[str] = Vec.new()
+pub fn ci_print_take_unknowns() -> List[str]:
+    var taken: List[str] = List.new()
     for i in 0..g_ci_print_unknowns.len() as i32:
         taken.push(g_ci_print_unknowns[i].clone())
     g_ci_print_unknowns.clear()
@@ -1107,7 +1107,7 @@ pub fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id
         while ai < arm_count:
             let value_count = stmts.get_extra(cursor)
             cursor = cursor + 1
-            var arm_heads: Vec[str] = Vec.new()
+            var arm_heads: List[str] = List.new()
             if value_count == 0:
                 arm_heads.push("_")
             else:

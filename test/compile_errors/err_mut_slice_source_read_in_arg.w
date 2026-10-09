@@ -6,6 +6,6 @@
 fn fill(buf: []mut i32, n: i32): ()
 
 fn main:
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     v.push(1)
     fill(v, v[0])

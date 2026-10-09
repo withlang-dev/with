@@ -31,8 +31,8 @@ fn ht_join(a: &str, b: &str) -> str:
     if a.len() == 0: b.to_owned() else if a.ends_with("/"): a ++ b else: a ++ "/" ++ b
 
 // Paths no build input may name.
-fn ht_forbidden_markers() -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ht_forbidden_markers() -> List[str]:
+    let out: List[str] = List.new()
     out.push("/Library/Developer")
     out.push("/Applications/Xcode")
     out.push("MacOSX.sdk")
@@ -44,13 +44,13 @@ fn ht_forbidden_markers() -> Vec[str]:
     out
 
 // The link records the build writes for the compiler's own links.
-fn ht_link_records() -> Vec[str]:
-    let out: Vec[str] = Vec.new()
-    let dirs: Vec[str] = Vec.new()
+fn ht_link_records() -> List[str]:
+    let out: List[str] = List.new()
+    let dirs: List[str] = List.new()
     dirs.push("out/bootstrap-lib")
     dirs.push("out/bootstrap/lib")
     dirs.push("out/lib")
-    let names: Vec[str] = Vec.new()
+    let names: List[str] = List.new()
     names.push("llvm_ld.rsp")
     names.push("llvm_link.rsp")
     names.push("llvm_ld")
@@ -108,8 +108,8 @@ fn ht_windows_path(token: &str) -> str:
 
 // Every problem with one record: a forbidden marker, or an absolute path
 // outside the repository and the SDK.
-fn ht_record_problems(path: &str, text: &str, root: &str, sdk: &str) -> Vec[str]:
-    let problems: Vec[str] = Vec.new()
+fn ht_record_problems(path: &str, text: &str, root: &str, sdk: &str) -> List[str]:
+    let problems: List[str] = List.new()
     let markers = ht_forbidden_markers()
     for line in text.split("\n"):
         let token = ht_unquote(ht_trim(line))
@@ -154,8 +154,8 @@ fn ht_sandbox_profile() -> str:
     p = p ++ "(deny process-exec (literal \"/usr/bin/cc\") (literal \"/usr/bin/clang\") (literal \"/usr/bin/ld\") (literal \"/usr/bin/nm\") (literal \"/usr/bin/xcrun\") (literal \"/usr/bin/dsymutil\"))"
     p
 
-fn ht_sandboxed(profile: &str, home: &str, command: Vec[str]) -> Vec[str]:
-    let argv: Vec[str] = Vec.new()
+fn ht_sandboxed(profile: &str, home: &str, command: List[str]) -> List[str]:
+    let argv: List[str] = List.new()
     if os() == "Linux":
         // bwrap: the host as it is, but for what ht_linux_masks() hides.
         argv.push("/usr/bin/bwrap")
@@ -226,7 +226,7 @@ fn ht_setup_framework_project(ctx: &ActionCtx, scratch: &str, compiler: &str, pr
     meta = meta ++ "  \"link_args\": [\"-framework\", \"CoreFoundation\"],\n  \"framework_paths\": [\"Frameworks\"],\n  \"requires\": []\n}\n"
     if fs.write_text(ht_join(dep, "metadata.json"), meta) != 0:
         return "error: could not write " ++ dep ++ "/metadata.json"
-    let stubs: Vec[str] = Vec.new()
+    let stubs: List[str] = List.new()
     stubs.push(compiler.to_owned())
     stubs.push("__framework-stubs")
     stubs.push(ht_join(root, ht_join(dep, "Frameworks")))
@@ -268,7 +268,7 @@ fn ht_setup_windows_dll_project(ctx: &ActionCtx, scratch: &str, compiler: &str) 
     meta = meta ++ "  \"libs\": [\"gdi32\", \"opengl32\", \"winmm\"],\n  \"defines\": [],\n  \"link_args\": [],\n  \"requires\": []\n}\n"
     if fs.write_text(ht_join(dep, "metadata.json"), meta) != 0:
         return "error: could not write " ++ dep ++ "/metadata.json"
-    let made_args: Vec[str] = Vec.new()
+    let made_args: List[str] = List.new()
     made_args.push(compiler.to_owned())
     made_args.push("__windows-import-libs")
     made_args.push(ht_join(root, ht_join(dep, "windows-libs")))
@@ -282,17 +282,17 @@ fn ht_setup_windows_dll_project(ctx: &ActionCtx, scratch: &str, compiler: &str) 
 
 // The Windows builds: each fixture built and run with no Visual Studio or
 // Windows SDK in reach. One line per result; a problem starts "problem: ".
-fn ht_windows_builds(ctx: &ActionCtx, root: &str, compiler: &str) -> Vec[str]:
+fn ht_windows_builds(ctx: &ActionCtx, root: &str, compiler: &str) -> List[str]:
     let fs = ctx.fs()
-    let out: Vec[str] = Vec.new()
+    let out: List[str] = List.new()
     let scratch = ht_join("out/command", ctx.target_name())
     let _clean = fs.remove_tree(scratch)
     if fs.mkdir_all(scratch) != 0:
         out.push("problem: could not create " ++ scratch)
         return out
-    let fixtures: Vec[str] = Vec.new()
-    let sources: Vec[str] = Vec.new()
-    let names: Vec[str] = Vec.new()
+    let fixtures: List[str] = List.new()
+    let sources: List[str] = List.new()
+    let names: List[str] = List.new()
     fixtures.push("test/host_toolchain/hi.w")
     sources.push(ht_join(root, "test/host_toolchain/hi.w"))
     names.push("hi")
@@ -310,7 +310,7 @@ fn ht_windows_builds(ctx: &ActionCtx, root: &str, compiler: &str) -> Vec[str]:
         let source = fixtures[i]
         let name = names[i].clone()
         let binary = ht_join(root, ht_join(scratch, name ++ ".exe"))
-        let build: Vec[str] = Vec.new()
+        let build: List[str] = List.new()
         build.push(compiler.to_owned())
         build.push("build")
         build.push(sources[i].clone())
@@ -320,7 +320,7 @@ fn ht_windows_builds(ctx: &ActionCtx, root: &str, compiler: &str) -> Vec[str]:
         if built.rc != 0:
             out.push("problem: " ++ source ++ ": the build failed with no Visual Studio or Windows SDK in reach (exit " ++ f"{built.rc}" ++ "):\n" ++ built.stdout ++ built.stderr)
             continue
-        let run: Vec[str] = Vec.new()
+        let run: List[str] = List.new()
         run.push(binary.clone())
         let ran = ctx.process_runner().run_capture_with_env(run, ht_join(root, ht_join(scratch, name ++ ".run.stdout")), ht_join(root, ht_join(scratch, name ++ ".run.stderr")), 60000, ht_windows_env(ht_join(root, ht_join(scratch, "cache"))))
         let expected = ht_expected_stdout(fs.read_text(source))
@@ -339,7 +339,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
         return ht_fail(ctx, "requires the release compiler input and an output path")
     // An SDK named by LLVM_PREFIX (a lane's pinned SDK) is ours too.
     let sdk = ctx.env_input("LLVM_PREFIX")
-    var problems: Vec[str] = Vec.new()
+    var problems: List[str] = List.new()
     let records = ht_link_records()
     var read = 0
     for r in 0..records.len() as i32:
@@ -374,9 +374,9 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
         let profile = if linux: ht_linux_masks(fs) else: ht_sandbox_profile()
         // Each fixture: the repository file its expect-stdout lines come from,
         // the source built, and the binary's name.
-        let fixtures: Vec[str] = Vec.new()
-        let sources: Vec[str] = Vec.new()
-        let names: Vec[str] = Vec.new()
+        let fixtures: List[str] = List.new()
+        let sources: List[str] = List.new()
+        let names: List[str] = List.new()
         fixtures.push("test/host_toolchain/hi.w")
         sources.push(ht_join(root, "test/host_toolchain/hi.w"))
         names.push("hi")
@@ -397,7 +397,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
             names.push("framework_program")
         // #1915 (D81): `with get` builds from source with the SDK's cmake and
         // ninja, which the compiler carries; they run in the sandbox too.
-        let tools_argv: Vec[str] = Vec.new()
+        let tools_argv: List[str] = List.new()
         tools_argv.push(compiler.clone())
         tools_argv.push("__sdk-tools")
         let tools = ctx.process_runner().run_capture(ht_sandboxed(profile, home, tools_argv), ht_join(root, ht_join(scratch, "sdk-tools.stdout")), ht_join(root, ht_join(scratch, "sdk-tools.stderr")), 300000)
@@ -406,7 +406,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
             problems.push(f"`with __sdk-tools` failed (exit {tools.rc}): " ++ tools.stdout ++ tools.stderr)
         else:
             for tool in ["cmake", "ninja"]:
-                let run_tool: Vec[str] = Vec.new()
+                let run_tool: List[str] = List.new()
                 run_tool.push(tools_dir ++ "/bin/" ++ tool)
                 run_tool.push("--version")
                 let ran_tool = ctx.process_runner().run_capture(ht_sandboxed(profile, home, run_tool), ht_join(root, ht_join(scratch, tool ++ ".stdout")), ht_join(root, ht_join(scratch, tool ++ ".stderr")), 60000)
@@ -423,7 +423,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
             let cc_source = if which == 0: "test/host_toolchain/cc_hello.c" else: "test/host_toolchain/cxx_hello.cpp"
             let cc_name = if which == 0: "cc_hello" else: "cxx_hello"
             let cc_binary = ht_join(root, ht_join(scratch, cc_name))
-            let cc_argv: Vec[str] = Vec.new()
+            let cc_argv: List[str] = List.new()
             cc_argv.push(compiler.clone())
             cc_argv.push("cc")
             if which == 1: cc_argv.push("--driver-mode=g++")
@@ -435,7 +435,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
             if cc_built.rc != 0:
                 problems.push(cc_source ++ f": `with cc` failed with no host toolchain in reach (exit {cc_built.rc}):\n" ++ cc_built.stdout ++ cc_built.stderr)
                 continue
-            let cc_run: Vec[str] = Vec.new()
+            let cc_run: List[str] = List.new()
             cc_run.push(cc_binary.clone())
             let cc_ran = ctx.process_runner().run_capture(ht_sandboxed(profile, home, cc_run), ht_join(root, ht_join(scratch, cc_name ++ ".run.stdout")), ht_join(root, ht_join(scratch, cc_name ++ ".run.stderr")), 60000)
             let cc_expected = ht_expected_stdout(fs.read_text(cc_source))
@@ -447,7 +447,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
             let source = fixtures[i]
             let name = names[i].clone()
             let binary = ht_join(root, ht_join(scratch, name))
-            let build: Vec[str] = Vec.new()
+            let build: List[str] = List.new()
             build.push(compiler.clone())
             build.push("build")
             build.push(sources[i].clone())
@@ -457,7 +457,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
             if built.rc != 0:
                 problems.push(source ++ ": the build failed with no host toolchain in reach (exit " ++ f"{built.rc}" ++ "):\n" ++ built.stdout ++ built.stderr)
                 continue
-            let run: Vec[str] = Vec.new()
+            let run: List[str] = List.new()
             run.push(binary.clone())
             let ran = ctx.process_runner().run_capture(ht_sandboxed(profile, home, run), ht_join(root, ht_join(scratch, name ++ ".run.stdout")), ht_join(root, ht_join(scratch, name ++ ".run.stderr")), 60000)
             let expected = ht_expected_stdout(fs.read_text(source))

@@ -3,9 +3,9 @@
 // call does, and no more: a stage whose first parameter is `&T` borrows, so
 // the value stays usable after `xs |> total()`.
 
-fn total[T](xs: &Vec[T]) -> i64: xs.len()
+fn total[T](xs: &List[T]) -> i64: xs.len()
 
 fn main:
-    let xs: Vec[str] = ["a", "b", "c"]
+    let xs: List[str] = ["a", "b", "c"]
     let n = xs |> total()
     print(f"{n} {xs.len()}")

@@ -4,11 +4,11 @@
 // that field while the generator iterates it is refused (path-precise: a
 // sibling field stays writable, behav_gen_push_view_borrow_disjoint).
 type Doc {
-    lines: Vec[str],
+    lines: List[str],
     title: str,
 }
 
-gen fn each_line(lines: &Vec[str]) -> &str:
+gen fn each_line(lines: &List[str]) -> &str:
     for line in lines:
         yield line
 

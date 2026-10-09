@@ -2,8 +2,8 @@
 
 use std.collections.HashMap
 fn main:
-    var map: HashMap[i32, Vec[i64]] = HashMap.new()
-    let values: Vec[i64] = Vec.new()
+    var map: HashMap[i32, List[i64]] = HashMap.new()
+    let values: List[i64] = List.new()
     values.push(7)
     values.push(9)
     map.insert(1, move values)

@@ -16,7 +16,7 @@
 
 // §2.5.1 / D72 (#1431): a `Drop` value whose bytes are all zero is a live
 // value, not the reset sentinel. `Fd { n: 0 }` gets a hidden liveness byte:
-// its destructor runs once from a Vec, from an enum payload, and after a
+// its destructor runs once from a List, from an enum payload, and after a
 // move (the moved-out source is blanked, so it does not run twice).
 
 var closes = 0
@@ -45,8 +45,8 @@ fn moved():
     let g = f
     print("moved close 0")
 
-fn vec_case():
-    var v: Vec[Fd] = Vec.new()
+fn list_case():
+    var v: List[Fd] = List.new()
     v.push(Fd { n: 0 })
     v.push(Fd { n: 7 })
     print("end")
@@ -55,8 +55,8 @@ fn main:
     take(Fd { n: 0 })
     take(Fd { n: 5 })
     closes = 0
-    vec_case()
-    let vec_closed = closes
+    list_case()
+    let list_closed = closes
     print(f"vec closed {vec_closed}")
     closes = 0
     payload()

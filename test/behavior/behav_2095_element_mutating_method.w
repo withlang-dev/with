@@ -9,16 +9,16 @@
 // vector of structs. The element reads as a view, which is not a read-only
 // receiver when the vector it indexes is one the program may mutate.
 
-type Grid { rows: Vec[Vec[i32]] }
+type Grid { rows: List[List[i32]] }
 
 impl Grid:
     mut fn add(i: i32, x: i32): self.rows[i].push(x)
     mut fn clear_row(i: i32): self.rows[i].clear()
 
 fn main:
-    var rows: Vec[Vec[i32]] = Vec.new()
-    rows.push(Vec.new())
-    rows.push(Vec.new())
+    var rows: List[List[i32]] = List.new()
+    rows.push(List.new())
+    rows.push(List.new())
     rows[0].push(7)
     rows[0].push(8)
     rows[1].push(5)

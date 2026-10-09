@@ -61,9 +61,9 @@ type UatScenario {
     name: str,            // the file stem
     path: str,
     title: str,
-    requires: Vec[str],
-    platforms: Vec[str],
-    steps: Vec[UatStep],
+    requires: List[str],
+    platforms: List[str],
+    steps: List[UatStep],
     problem: str,         // a parse error, with its line already named
 }
 
@@ -82,8 +82,8 @@ fn uat_trim_trailing_line_endings(text: &str) -> str:
         end = end - 1
     text.slice(0, end)
 
-fn uat_split_list(text: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn uat_split_list(text: &str) -> List[str]:
+    var out: List[str] = List.new()
     for part in text.split(","):
         let t = part.trim()
         if t.len() > 0: out.push(t.clone())
@@ -94,7 +94,7 @@ fn uat_rest_after(line: &str, prefix: &str) -> str: line.slice(prefix.len(), lin
 // The lines of an indented block after `at` (exclusive), de-indented by
 // the first line's indentation; returns the block and the index of the
 // first line after it.
-fn uat_indented_block(lines: &Vec[str], at: i32) -> (str, i32):
+fn uat_indented_block(lines: &List[str], at: i32) -> (str, i32):
     var i = at + 1
     var indent = -1
     var out = ""
@@ -133,7 +133,7 @@ fn uat_parse_int(text: &str) -> (bool, i64):
         i = i + 1
     (true, if neg: 0 - value else: value)
 
-fn uat_sort_strings(items: Vec[str]) -> Vec[str]:
+fn uat_sort_strings(items: List[str]) -> List[str]:
     var sorted = move items
     for i in 1..sorted.len() as i32:
         var j = i
@@ -158,8 +158,8 @@ fn uat_stem(path: &str) -> str:
     path.slice(start, end).clone()
 
 fn uat_parse(path: &str, text: &str) -> UatScenario:
-    var sc = UatScenario { name: uat_stem(path), path: path.clone(), title: "", requires: Vec.new(), platforms: Vec.new(), steps: Vec.new(), problem: "" }
-    var lines: Vec[str] = Vec.new()
+    var sc = UatScenario { name: uat_stem(path), path: path.clone(), title: "", requires: List.new(), platforms: List.new(), steps: List.new(), problem: "" }
+    var lines: List[str] = List.new()
     for raw in text.split("\n"):
         lines.push(uat_trim_trailing_line_endings(raw).clone())
     var i = 0
@@ -267,8 +267,8 @@ fn uat_parse(path: &str, text: &str) -> UatScenario:
 
 // A command line into argv: whitespace-separated, single or double quotes
 // group, a backslash escapes the next character inside double quotes.
-fn uat_split_command(text: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn uat_split_command(text: &str) -> List[str]:
+    var out: List[str] = List.new()
     var cur = ""
     var have = false
     var quote = 0
@@ -298,7 +298,7 @@ fn uat_split_command(text: &str) -> Vec[str]:
     if have: out.push(cur)
     out
 
-fn uat_argv_blob(items: &Vec[str]) -> str:
+fn uat_argv_blob(items: &List[str]) -> str:
     var out = ""
     for i in 0..items.len() as i32:
         out = out ++ items[i] ++ "\0"
@@ -313,14 +313,14 @@ fn uat_host_platform() -> str:
     if name == "Windows": return "windows"
     name.clone()
 
-fn uat_probe_capture(argv: &Vec[str], scratch: &str) -> i32:
+fn uat_probe_capture(argv: &List[str], scratch: &str) -> i32:
     let _ = with_fs_mkdir_p(scratch)
     with_exec_argv_capture_cwd(uat_argv_blob(argv), scratch ++ "/probe.stdout", scratch ++ "/probe.stderr", 20000, ".")
 
 // Whether the console session's screen is locked: `ioreg` (in the base
 // system) prints the session dictionary with `"CGSSessionScreenIsLocked"=Yes`.
 fn uat_darwin_screen_locked(scratch: &str) -> bool:
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push("/usr/sbin/ioreg")
     argv.push("-n")
     argv.push("Root")
@@ -346,7 +346,7 @@ fn uat_unmet(req: &str, scratch: &str) -> str:
         return ""
     if req.starts_with("lib "):
         let name = req.slice(4, req.len()).trim().to_owned()
-        var argv: Vec[str] = Vec.new()
+        var argv: List[str] = List.new()
         argv.push("pkg-config")
         argv.push("--exists")
         argv.push(name.clone())
@@ -356,7 +356,7 @@ fn uat_unmet(req: &str, scratch: &str) -> str:
         return "requires lib " ++ name ++ ": not found"
     if req.starts_with("tool "):
         let name = req.slice(5, req.len()).trim().to_owned()
-        var argv: Vec[str] = Vec.new()
+        var argv: List[str] = List.new()
         argv.push(if uat_host_platform() == "windows": "where" else: "which")
         argv.push(name.clone())
         if uat_probe_capture(argv, scratch) == 0: return ""
@@ -386,7 +386,7 @@ type UatOutcome {
     detail: str,      // the failed step's line, or the skip reason
     stderr_path: str,
     steps: i32,
-    human: Vec[str],
+    human: List[str],
 }
 
 fn uat_join(dir: &str, path: &str) -> str:
@@ -405,7 +405,7 @@ fn uat_write_text(path: &str, text: &str) -> i32:
 
 fn uat_read_text(path: &str) -> str: with_fs_read_file(path)
 
-fn uat_fail(steps: i32, step: &UatStep, what: &str, stderr_path: &str, human: Vec[str]) -> UatOutcome:
+fn uat_fail(steps: i32, step: &UatStep, what: &str, stderr_path: &str, human: List[str]) -> UatOutcome:
     UatOutcome { verdict: "FAIL", detail: f"step {steps} (line {step.line}): {what}", stderr_path: stderr_path.clone(), steps, human }
 
 // The toolchain a `run:` line's leading `with` names: WITH_UAT_WITH, else
@@ -421,7 +421,7 @@ fn uat_toolchain(self_path: &str) -> str:
 // `--keep`): a run leaves the project as it found it. A file that was there
 // before the run is the project's and stays.
 fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> UatOutcome:
-    var created: Vec[str] = Vec.new()
+    var created: List[str] = List.new()
     for si in 0..sc.steps.len() as i32:
         let verb = sc.steps[si].verb
         if verb == UAT_NEW_DIRECTORY: break
@@ -435,7 +435,7 @@ fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -
     outcome
 
 fn uat_run_steps(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> UatOutcome:
-    var human: Vec[str] = Vec.new()
+    var human: List[str] = List.new()
     let capture_dir = uat_join(root, "out/uat/" ++ sc.name)
     let _ = with_fs_mkdir_p(capture_dir)
     var cwd = root.clone()
@@ -549,15 +549,15 @@ fn uat_project_root() -> str:
     // take it); scenarios live in its `uat/`.
     uat_abs(".")
 
-pub fn uat_list_scenarios(root: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+pub fn uat_list_scenarios(root: &str) -> List[str]:
+    var out: List[str] = List.new()
     let listing = with_fs_list_files(uat_join(root, "uat"))
     for line in listing.split("\n"):
         let p = line.trim()
         if p.ends_with(".uat") and not p.contains("/fixtures/"): out.push(p.clone())
     uat_sort_strings(move out)
 
-pub fn run_uat_command(argv: &Vec[str]) -> i32:
+pub fn run_uat_command(argv: &List[str]) -> i32:
     var list_only = false
     var keep = false
     var wanted = ""

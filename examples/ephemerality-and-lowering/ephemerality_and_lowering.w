@@ -58,10 +58,10 @@ fn test_defer:
     print("middle")
     // defers run in reverse order: cleanup 2,: cleanup 1
 
-// --- Vec mutation ---
+// --- List mutation ---
 
-fn test_vec_mutation:
-    var buffer = Vec.new()
+fn test_list_mutation:
+    var buffer = List.new()
     buffer.push(1)
     buffer.push(2)
     buffer.push(3)
@@ -73,6 +73,6 @@ fn test_vec_mutation:
 async fn main:
     test_with_blocks()
     test_defer()
-    test_vec_mutation()
+    test_list_mutation()
     test_async_scope().await
     print("=== all tests passed ===")

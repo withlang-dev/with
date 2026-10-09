@@ -19,7 +19,7 @@ fn count_all[C: Iterable[i32]](c: &C) -> i32:
 fn peek_first[T](x: &T) -> i64: 1
 
 fn main:
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     v.push(1)
     v.push(2)
     assert(count_all(v) == 2)

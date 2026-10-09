@@ -112,9 +112,9 @@ pub type BuildOptions {
     pub overflow_mode: OverflowMode,
     pub deterministic: bool,
     pub target: BuildTarget,
-    pub include_paths: Vec[str],
-    pub defines: Vec[str],
-    pub link_libs: Vec[str],
+    pub include_paths: List[str],
+    pub defines: List[str],
+    pub link_libs: List[str],
     pub compiler_hooks_enabled: bool,
 }
 
@@ -134,10 +134,10 @@ pub type BuildGraphOptions {
 pub type MigrateOptions {
     pub source_path: str,
     pub output_path: str,
-    pub include_paths: Vec[str],
-    pub forced_includes: Vec[str],
-    pub defines: Vec[str],
-    pub exclude_basenames: Vec[str],
+    pub include_paths: List[str],
+    pub forced_includes: List[str],
+    pub defines: List[str],
+    pub exclude_basenames: List[str],
     pub check_mode: bool,
     pub diff_mode: bool,
     pub stats_mode: bool,
@@ -191,8 +191,8 @@ pub type BuildResult {
     pub status: BuildStatus,
     pub rc: i32,
     pub workspace_name: str,
-    pub artifacts: Vec[Artifact],
-    pub diagnostics: Vec[DiagnosticSummary],
+    pub artifacts: List[Artifact],
+    pub diagnostics: List[DiagnosticSummary],
 }
 
 pub enum DeclKind: i32:
@@ -217,7 +217,7 @@ pub type DeclSummary {
     pub generic_param_count: i32,
     pub receiver_type_text: str,
     pub source: SourceSpan,
-    pub notes: Vec[str],
+    pub notes: List[str],
 }
 
 pub enum CompilerPhase: i32:
@@ -239,18 +239,18 @@ pub type EnvVar {
 
 pub type LinkCommand {
     pub linker: str,
-    pub args: Vec[str],
+    pub args: List[str],
     pub cwd: str,
-    pub env: Vec[EnvVar],
-    pub inputs: Vec[str],
-    pub outputs: Vec[str],
+    pub env: List[EnvVar],
+    pub inputs: List[str],
+    pub outputs: List[str],
 }
 
 pub enum CompilerMessage:
     Phase(CompilerPhase)
     File(str)
     Import(str, str)
-    Typechecked(Vec[DeclSummary])
+    Typechecked(List[DeclSummary])
     Diagnostic(DiagnosticSummary)
     Artifact(Artifact)
     PreLink(LinkCommand)
@@ -286,7 +286,7 @@ pub type SourceEmitter {
 pub type ToolFs {
     token: str,
     root: str,
-    write_scope: Vec[str],
+    write_scope: List[str],
     write_scoped: bool,
     scratch_path: str,
 }
@@ -295,7 +295,7 @@ pub type ProcessRunner {
     token: str,
     root: str,
     target_name: str,
-    write_scope: Vec[str],
+    write_scope: List[str],
     write_scoped: bool,
     network: bool,
 }
@@ -305,7 +305,7 @@ pub type Workspace ephemeral {
     id: i32,
 }
 
-// A Workspace is a capability HANDLE: pushing it into a Vec or passing it
+// A Workspace is a capability HANDLE: pushing it into a List or passing it
 // to parallel() must not consume the binding (`ws.end_intercept()` after
 // `parallel(workspaces)` is the intended API shape).
 impl Copy for Workspace
@@ -316,12 +316,12 @@ pub type ProcessEnvVar {
 }
 
 pub type ProcessEnv {
-    pub vars: Vec[ProcessEnvVar],
+    pub vars: List[ProcessEnvVar],
 }
 
 pub type ProcessSpec {
     pub executable: str,
-    pub args: Vec[str],
+    pub args: List[str],
     pub cwd: str,
     pub env: ProcessEnv,
     pub timeout_ms: i32,
@@ -369,9 +369,9 @@ pub fn archive_symlink_entry(target: str, archive_path: str, mode: i32) -> Archi
 pub fn process_spec(executable: str) -> ProcessSpec:
     ProcessSpec {
         executable,
-        args: Vec.new(),
+        args: List.new(),
         cwd: "",
-        env: ProcessEnv { vars: Vec.new() },
+        env: ProcessEnv { vars: List.new() },
         timeout_ms: 0,
         stdin_path: "",
         capture_stdout: true,
@@ -434,12 +434,12 @@ pub type ActionCtx {
     diagnostics_value: Diagnostics,
     fs_value: ToolFs,
     process_runner_value: ProcessRunner,
-    inputs_value: Vec[str],
-    outputs_value: Vec[str],
-    args_value: Vec[str],
+    inputs_value: List[str],
+    outputs_value: List[str],
+    args_value: List[str],
     timeout_ms_value: i32,
     cwd_value: str,
-    env_value: Vec[str],
+    env_value: List[str],
     network_value: bool,
 }
 
@@ -453,20 +453,20 @@ pub type Target {
     pub output: str,
     pub target_kind: BuildTarget,
     pub optimize_mode: OptimizeMode,
-    pub system_libs: Vec[str],
-    pub library_paths: Vec[str],
-    pub rpaths: Vec[str],
-    pub include_paths: Vec[str],
-    pub defines: Vec[str],
-    pub inputs: Vec[str],
-    pub extra_outputs: Vec[str],
-    pub write_scopes: Vec[str],
-    pub deps: Vec[str],
-    pub args: Vec[str],
+    pub system_libs: List[str],
+    pub library_paths: List[str],
+    pub rpaths: List[str],
+    pub include_paths: List[str],
+    pub defines: List[str],
+    pub inputs: List[str],
+    pub extra_outputs: List[str],
+    pub write_scopes: List[str],
+    pub deps: List[str],
+    pub args: List[str],
     pub action: fn(ActionCtx) -> i32,
     pub timeout_ms: i32,
     pub cwd: str,
-    pub env: Vec[str],
+    pub env: List[str],
     pub network: bool,
     pub parallel: bool,
 }
@@ -479,8 +479,8 @@ pub type GeneratedSource {
 pub type Build {
     pub package: Package,
     pub default_target: str,
-    pub targets: Vec[Target],
-    pub generated_sources: Vec[GeneratedSource],
+    pub targets: List[Target],
+    pub generated_sources: List[GeneratedSource],
 }
 
 fn tool_capability_valid(token: &str) -> bool:
@@ -525,8 +525,8 @@ pub fn BuildCtx.__driver_new(package: Package, root: str, token: str) -> BuildCt
         project: ProjectInfo { package, root: with_str_clone_ref(root) },
         diagnostics: Diagnostics { token: with_str_clone_ref(token) },
         source_emitter: SourceEmitter { token: with_str_clone_ref(token) },
-        fs: ToolFs { token: with_str_clone_ref(token), root: with_str_clone_ref(root), write_scope: Vec.new(), write_scoped: false, scratch_path: "" },
-        process_runner: ProcessRunner { token, root, target_name: "", write_scope: Vec.new(), write_scoped: false, network: false },
+        fs: ToolFs { token: with_str_clone_ref(token), root: with_str_clone_ref(root), write_scope: List.new(), write_scoped: false, scratch_path: "" },
+        process_runner: ProcessRunner { token, root, target_name: "", write_scope: List.new(), write_scoped: false, network: false },
     }
 
 pub fn BuildCtx.project_info(self: &Self) -> &ProjectInfo:
@@ -646,12 +646,12 @@ pub fn Workspace.set_link_command(self: &Self, command: LinkCommand) -> Unit:
     with_eprint("error: Workspace.set_link_command requires compiler driver comptime evaluation\n")
     exit(97)
 
-pub fn parallel(workspaces: Vec[Workspace]) -> Vec[BuildResult]:
+pub fn parallel(workspaces: List[Workspace]) -> List[BuildResult]:
     with_eprint("error: parallel requires compiler driver comptime evaluation\n")
     exit(97)
 
 pub fn process_env() -> ProcessEnv:
-    ProcessEnv { vars: Vec.new() }
+    ProcessEnv { vars: List.new() }
 
 pub fn ProcessEnv.set(move self: Self, name: str, value: str) -> ProcessEnv:
     var owned = self
@@ -710,7 +710,7 @@ fn tool_path_dirname(path: &str) -> str:
 fn tool_path_normalize(path: &str) -> str:
     if path.len() == 0:
         return "."
-    let parts: Vec[str] = Vec.new()
+    let parts: List[str] = List.new()
     var start = 0
     var is_absolute = path[0] == 47 or path[0] == 92
     for i in 0..path.len() as i32:
@@ -748,8 +748,8 @@ fn tool_path_normalize(path: &str) -> str:
         result = result ++ parts[i]
     result
 
-fn tool_split_by_slash(path: &str) -> Vec[str]:
-    let parts: Vec[str] = Vec.new()
+fn tool_split_by_slash(path: &str) -> List[str]:
+    let parts: List[str] = List.new()
     var start = 0
     for i in 0..path.len() as i32:
         let ch = path[i]
@@ -782,7 +782,7 @@ fn tool_glob_segment_matches(pattern: &str, name: &str) -> bool:
             return false
     true
 
-fn tool_glob_segments_match(pat_segs: &Vec[str], pi: i32, file_segs: &Vec[str], fi: i32) -> bool:
+fn tool_glob_segments_match(pat_segs: &List[str], pi: i32, file_segs: &List[str], fi: i32) -> bool:
     if pi >= pat_segs.len() as i32:
         return fi >= file_segs.len() as i32
     let seg = pat_segs[pi]
@@ -814,12 +814,12 @@ fn tool_glob_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
-fn tool_glob_sort(items: Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
+fn tool_glob_sort(items: List[str]) -> List[str]:
+    var sorted: List[str] = List.new()
     for i in 0..items.len() as i32:
         let item = items[i]
         var inserted = false
-        var out: Vec[str] = Vec.new()
+        var out: List[str] = List.new()
         for j in 0..sorted.len() as i32:
             let existing = sorted[j]
             if not inserted and tool_glob_str_compare(item, existing) < 0:
@@ -884,8 +884,8 @@ fn ToolFs.require_mkdir_allowed(self: &Self, path: &str):
         with_eprint("error: ToolFs mkdir path is not a declared action output: " ++ path ++ "\n")
         exit(1)
 
-fn tool_split_nonempty_lines(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn tool_split_nonempty_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     var start = 0
     for i in 0..text.len() as i32:
         if text[i] == 10:
@@ -948,7 +948,7 @@ pub fn ToolFs.sha256_file(self: &Self, path: &str) -> str:
         return ""
     tool_sha256_text(self.read_text(path))
 
-pub fn ToolFs.host_list_files(self: &Self, path: &str) -> Vec[str]:
+pub fn ToolFs.host_list_files(self: &Self, path: &str) -> List[str]:
     tool_capability_require(self.token, "ToolFs")
     self.record_read(path)
     tool_split_nonempty_lines(with_fs_list_files(path))
@@ -995,7 +995,7 @@ pub fn ToolFs.read_text_opt(self: &Self, path: &str) -> Option[str]:
     let text = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
     if status != 0: None else: Some(text)
 
-pub fn ToolFs.read_binary(self: &Self, path: &str) -> Vec[u8]:
+pub fn ToolFs.read_binary(self: &Self, path: &str) -> List[u8]:
     let resolved = self.resolve_path(path)
     self.record_read(resolved)
     var status: i32 = 0
@@ -1004,21 +1004,21 @@ pub fn ToolFs.read_binary(self: &Self, path: &str) -> Vec[u8]:
         let site = "read_binary: " ++ resolved ++ ": "
         let err: IoError = .Os(0 - status, resolved)
         panic(site ++ err.message())
-    let result: Vec[u8] = Vec.new()
+    let result: List[u8] = List.new()
     for i in 0..data.len() as i32:
         result.push(data[i] as u8)
     result
 
-pub fn ToolFs.list_files(self: &Self, path: &str) -> Vec[str]:
+pub fn ToolFs.list_files(self: &Self, path: &str) -> List[str]:
     let resolved = self.resolve_path(path)
     self.record_read(resolved)
     let raw_files = tool_split_nonempty_lines(with_fs_list_files(resolved))
-    let files: Vec[str] = Vec.new()
+    let files: List[str] = List.new()
     for i in 0..raw_files.len() as i32:
         files.push(self.project_relative_path(raw_files[i]))
     files
 
-pub fn ToolFs.glob(self: &Self, pattern: &str) -> Vec[str]:
+pub fn ToolFs.glob(self: &Self, pattern: &str) -> List[str]:
     var last_clean_slash = -1
     var has_glob = false
     for i in 0..pattern.len() as i32:
@@ -1035,7 +1035,7 @@ pub fn ToolFs.glob(self: &Self, pattern: &str) -> Vec[str]:
     let glob_suffix = if last_clean_slash < 0: with_str_clone_ref(pattern) else: pattern.slice((last_clean_slash + 1) as i64, pattern.len())
     let all_files = self.list_files(base_dir)
     let pat_segs = tool_split_by_slash(glob_suffix)
-    let results: Vec[str] = Vec.new()
+    let results: List[str] = List.new()
     let prefix = if base_dir == ".": "" else: base_dir ++ "/"
     for i in 0..all_files.len() as i32:
         let file = all_files[i]
@@ -1053,7 +1053,7 @@ pub fn ToolFs.write_text(self: &Self, path: &str, contents: &str) -> i32:
     self.require_write_file_allowed(path)
     with_fs_write_file(self.resolve_path(path), contents)
 
-pub fn ToolFs.write_binary(self: &Self, path: &str, bytes: Vec[u8]) -> i32:
+pub fn ToolFs.write_binary(self: &Self, path: &str, bytes: List[u8]) -> i32:
     if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(path)
     var out = StringBuilder.with_capacity(bytes.len())
@@ -1061,21 +1061,21 @@ pub fn ToolFs.write_binary(self: &Self, path: &str, bytes: Vec[u8]) -> i32:
         out.push_byte(bytes[i])
     with_fs_write_file(self.resolve_path(path), out.to_str())
 
-fn tool_tar_append_zeroes(out: Vec[u8], count: i64) -> Vec[u8]:
+fn tool_tar_append_zeroes(out: List[u8], count: i64) -> List[u8]:
     var i: i64 = 0
     while i < count:
         out.push(0 as u8)
         i = i + 1
     out
 
-fn tool_tar_append_bytes(out: Vec[u8], bytes: &Vec[u8]) -> Vec[u8]:
+fn tool_tar_append_bytes(out: List[u8], bytes: &List[u8]) -> List[u8]:
     for i in 0..bytes.len() as i32:
         out.push(bytes[i])
     out
 
-fn tool_tar_append_str_padded(out: Vec[u8], value: &str, width: i64) -> Vec[u8]:
+fn tool_tar_append_str_padded(out: List[u8], value: &str, width: i64) -> List[u8]:
     if value.len() > width:
-        return Vec.new()
+        return List.new()
     for i in 0..value.len() as i32:
         out.push(value[i] as u8)
     var pad = value.len()
@@ -1100,12 +1100,12 @@ fn tool_tar_octal_digits(value: i64) -> str:
         out.push_byte(reversed[i] as u8)
     out.to_str()
 
-fn tool_tar_append_octal_nul(out: Vec[u8], value: i64, width: i64) -> Vec[u8]:
+fn tool_tar_append_octal_nul(out: List[u8], value: i64, width: i64) -> List[u8]:
     if value < 0:
-        return Vec.new()
+        return List.new()
     let digits = tool_tar_octal_digits(value)
     if digits.len() + 1 > width:
-        return Vec.new()
+        return List.new()
     var pad = digits.len() + 1
     while pad < width:
         out.push(48 as u8)
@@ -1115,10 +1115,10 @@ fn tool_tar_append_octal_nul(out: Vec[u8], value: i64, width: i64) -> Vec[u8]:
     out.push(0 as u8)
     out
 
-fn tool_tar_append_checksum(out: Vec[u8], checksum: i64) -> Vec[u8]:
+fn tool_tar_append_checksum(out: List[u8], checksum: i64) -> List[u8]:
     let digits = tool_tar_octal_digits(checksum)
     if digits.len() > 6:
-        return Vec.new()
+        return List.new()
     var pad = digits.len()
     while pad < 6:
         out.push(48 as u8)
@@ -1129,7 +1129,7 @@ fn tool_tar_append_checksum(out: Vec[u8], checksum: i64) -> Vec[u8]:
     out.push(32 as u8)
     out
 
-fn tool_tar_sum(bytes: &Vec[u8]) -> i64:
+fn tool_tar_sum(bytes: &List[u8]) -> i64:
     var sum: i64 = 0
     for i in 0..bytes.len() as i32:
         sum = sum + bytes[i] as i64
@@ -1176,9 +1176,9 @@ fn tool_tar_extract_fail(message: &str) -> i32:
     with_eprint("error: ToolFs.extract_tar: " ++ message ++ "\n")
     1
 
-fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKind, link_name: &str) -> Vec[u8]:
+fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKind, link_name: &str) -> List[u8]:
     if name.len() == 0 or mode < 0 or size < 0 or link_name.len() > 100:
-        return Vec.new()
+        return List.new()
     var split = -1
     if name.len() > 100:
         for i in 0..name.len() as i32:
@@ -1186,10 +1186,10 @@ fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKin
                 split = i
         if split < 0:
             with_eprint("error: archive path cannot be represented in USTAR: " ++ name ++ "\n")
-            return Vec.new()
+            return List.new()
     let leaf = if split < 0: with_str_clone_ref(name) else: name.slice(split + 1, name.len())
     let path_prefix = if split < 0: "" else: name.slice(0, split)
-    var prefix: Vec[u8] = Vec.new()
+    var prefix: List[u8] = List.new()
     prefix = tool_tar_append_str_padded(move prefix, leaf, 100)
     prefix = tool_tar_append_octal_nul(move prefix, mode as i64, 8)
     prefix = tool_tar_append_octal_nul(move prefix, 0, 8)
@@ -1197,8 +1197,8 @@ fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKin
     prefix = tool_tar_append_octal_nul(move prefix, size, 12)
     prefix = tool_tar_append_octal_nul(move prefix, 0, 12)
     if prefix.len() == 0:
-        return Vec.new()
-    var suffix: Vec[u8] = Vec.new()
+        return List.new()
+    var suffix: List[u8] = List.new()
     if kind == ArchiveEntryKind.Directory:
         suffix.push(53 as u8)
     else if kind == ArchiveEntryKind.Symlink:
@@ -1212,42 +1212,42 @@ fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKin
     suffix = tool_tar_append_str_padded(move suffix, path_prefix, 155)
     suffix = tool_tar_append_zeroes(move suffix, 12)
     if suffix.len() == 0:
-        return Vec.new()
+        return List.new()
     let checksum = tool_tar_sum(&prefix) + 256 + tool_tar_sum(&suffix)
-    var header: Vec[u8] = Vec.new()
+    var header: List[u8] = List.new()
     header = tool_tar_append_bytes(move header, &prefix)
     header = tool_tar_append_checksum(move header, checksum)
     header = tool_tar_append_bytes(move header, &suffix)
     if header.len() != 512:
-        return Vec.new()
+        return List.new()
     header
 
-fn ToolFs.tar_bytes(self: &Self, entries: &Vec[ArchiveEntry]) -> Vec[u8]:
-    var out: Vec[u8] = Vec.new()
+fn ToolFs.tar_bytes(self: &Self, entries: &List[ArchiveEntry]) -> List[u8]:
+    var out: List[u8] = List.new()
     for i in 0..entries.len() as i32:
         let entry = entries[i]
         if entry.kind == ArchiveEntryKind.Directory:
             let name = tool_tar_entry_name(entry.archive_path, true)
             let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Directory, "")
             if header.len() == 0:
-                return Vec.new()
+                return List.new()
             out = tool_tar_append_bytes(move out, &header)
         else if entry.kind == ArchiveEntryKind.Symlink:
             let name = tool_tar_entry_name(entry.archive_path, false)
             let link_name = tool_tar_link_name(entry.source_path)
             let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Symlink, link_name)
             if header.len() == 0:
-                return Vec.new()
+                return List.new()
             out = tool_tar_append_bytes(move out, &header)
         else:
             if entry.source_path.len() == 0:
-                return Vec.new()
+                return List.new()
             tool_path_require_project_relative(entry.source_path)
             let name = tool_tar_entry_name(entry.archive_path, false)
             let contents = self.read_binary(entry.source_path)
             let header = tool_tar_build_header(name, entry.mode, contents.len(), ArchiveEntryKind.File, "")
             if header.len() == 0:
-                return Vec.new()
+                return List.new()
             out = tool_tar_append_bytes(move out, &header)
             out = tool_tar_append_bytes(move out, &contents)
             let padding = (512 - (contents.len() % 512)) % 512
@@ -1255,19 +1255,19 @@ fn ToolFs.tar_bytes(self: &Self, entries: &Vec[ArchiveEntry]) -> Vec[u8]:
     out = tool_tar_append_zeroes(move out, 1024)
     out
 
-fn tool_gzip_append_u16_le(out: Vec[u8], value: i32) -> Vec[u8]:
+fn tool_gzip_append_u16_le(out: List[u8], value: i32) -> List[u8]:
     out.push((value & 0xff) as u8)
     out.push(((value >> 8) & 0xff) as u8)
     out
 
-fn tool_gzip_append_u32_le(out: Vec[u8], value: u32) -> Vec[u8]:
+fn tool_gzip_append_u32_le(out: List[u8], value: u32) -> List[u8]:
     out.push((value & (0xff as u32)) as u8)
     out.push(((value >> (8 as u32)) & (0xff as u32)) as u8)
     out.push(((value >> (16 as u32)) & (0xff as u32)) as u8)
     out.push(((value >> (24 as u32)) & (0xff as u32)) as u8)
     out
 
-fn tool_gzip_crc32(bytes: &Vec[u8]) -> u32:
+fn tool_gzip_crc32(bytes: &List[u8]) -> u32:
     var crc = 0xffffffff as u32
     for i in 0..bytes.len() as i32:
         var c = (crc ^ (bytes[i] as u32)) & (0xff as u32)
@@ -1281,8 +1281,8 @@ fn tool_gzip_crc32(bytes: &Vec[u8]) -> u32:
         crc = (crc >> (8 as u32)) ^ c
     crc ^ (0xffffffff as u32)
 
-fn tool_gzip_stored(bytes: &Vec[u8]) -> Vec[u8]:
-    var out: Vec[u8] = Vec.new()
+fn tool_gzip_stored(bytes: &List[u8]) -> List[u8]:
+    var out: List[u8] = List.new()
     out.push(31 as u8)
     out.push(139 as u8)
     out.push(8 as u8)
@@ -1311,7 +1311,7 @@ fn tool_gzip_stored(bytes: &Vec[u8]) -> Vec[u8]:
     out = tool_gzip_append_u32_le(move out, bytes.len() as u32)
     out
 
-pub fn ToolFs.write_tar(self: &Self, output_path: &str, entries: &Vec[ArchiveEntry]) -> i32:
+pub fn ToolFs.write_tar(self: &Self, output_path: &str, entries: &List[ArchiveEntry]) -> i32:
     if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(output_path)
     let out = self.tar_bytes(entries)
@@ -1319,7 +1319,7 @@ pub fn ToolFs.write_tar(self: &Self, output_path: &str, entries: &Vec[ArchiveEnt
         return 1
     self.write_binary(output_path, out)
 
-pub fn ToolFs.write_tar_gz(self: &Self, output_path: &str, entries: &Vec[ArchiveEntry]) -> i32:
+pub fn ToolFs.write_tar_gz(self: &Self, output_path: &str, entries: &List[ArchiveEntry]) -> i32:
     if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(output_path)
     var file = tool_archive_open(self.resolve_path(output_path), c"wb".ptr)
@@ -1331,11 +1331,11 @@ pub fn ToolFs.write_tar_gz(self: &Self, output_path: &str, entries: &Vec[Archive
     let init_rc = unsafe { deflateInit2_(&raw mut state, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int) }
     if init_rc != Z_OK: return 1
     defer: unsafe { deflateEnd(&raw mut state) }
-    var compressed = Vec[u8].with_capacity(65536)
+    var compressed = List[u8].with_capacity(65536)
     for _ in 0..65536: compressed.push(0)
     // state never moves while zlib retains its address.
     var writer = ToolGzipStream { file: move file, state: &raw mut state, buffer: move compressed }
-    var buffer = Vec[u8].with_capacity(65535)
+    var buffer = List[u8].with_capacity(65535)
     for _ in 0..65535: buffer.push(0)
     for i in 0..entries.len() as i32:
         let entry = entries[i]
@@ -1365,9 +1365,9 @@ pub fn ToolFs.write_tar_gz(self: &Self, output_path: &str, entries: &Vec[Archive
                 if not writer.append(buffer, got as i64): return 1
                 remaining = remaining - got as i64
             if input.close() != 0: return 1
-            let padding = tool_tar_append_zeroes(Vec.new(), (512 - (size % 512)) % 512)
+            let padding = tool_tar_append_zeroes(List.new(), (512 - (size % 512)) % 512)
             if not writer.append(padding, padding.len()): return 1
-    let end = tool_tar_append_zeroes(Vec.new(), 1024)
+    let end = tool_tar_append_zeroes(List.new(), 1024)
     if not writer.append(end, end.len()): return 1
     if not writer.finish(): return 1
     writer.file.close()
@@ -1391,7 +1391,7 @@ fn tool_archive_open(path: &str, mode: *const i8) -> ToolArchiveFile:
         Err(_) => return ToolArchiveFile { handle: null }
     ToolArchiveFile { handle: fopen(cpath.as_cstr().ptr(), mode) }
 
-fn tool_archive_write(file: &ToolArchiveFile, bytes: &Vec[u8], offset: i64, count: i64) -> bool:
+fn tool_archive_write(file: &ToolArchiveFile, bytes: &List[u8], offset: i64, count: i64) -> bool:
     var written: i64 = 0
     while written < count:
         let n = fwrite(&raw const bytes[offset + written] as *const c_void, 1, (count - written) as u64, file.handle)
@@ -1434,10 +1434,10 @@ fn tool_archive_skip(file: &ToolArchiveFile, count: i64) -> bool:
         remaining = remaining - chunk
     true
 
-type ToolGzipStream { file: ToolArchiveFile, state: *mut z_stream_s, buffer: Vec[u8] }
+type ToolGzipStream { file: ToolArchiveFile, state: *mut z_stream_s, buffer: List[u8] }
 
 impl ToolGzipStream:
-    mut fn append(bytes: &Vec[u8], count: i64) -> bool:
+    mut fn append(bytes: &List[u8], count: i64) -> bool:
         assert(count >= 0 and count <= bytes.len())
         if count == 0: return true
         assert(count <= 65536)
@@ -1467,7 +1467,7 @@ impl ToolGzipStream:
                 if rc == Z_STREAM_END: return true
         false
 
-fn tool_tar_block_is_zero(bytes: &Vec[u8], offset: i64) -> bool:
+fn tool_tar_block_is_zero(bytes: &List[u8], offset: i64) -> bool:
     if offset + 512 > bytes.len():
         return false
     var i: i64 = 0
@@ -1477,7 +1477,7 @@ fn tool_tar_block_is_zero(bytes: &Vec[u8], offset: i64) -> bool:
         i = i + 1
     true
 
-fn tool_tar_field_str(bytes: &Vec[u8], offset: i64, width: i64) -> str:
+fn tool_tar_field_str(bytes: &List[u8], offset: i64, width: i64) -> str:
     var out = StringBuilder.new()
     var i: i64 = 0
     while i < width:
@@ -1488,7 +1488,7 @@ fn tool_tar_field_str(bytes: &Vec[u8], offset: i64, width: i64) -> str:
         i = i + 1
     out.to_str()
 
-fn tool_tar_parse_octal(bytes: &Vec[u8], offset: i64, width: i64) -> i64:
+fn tool_tar_parse_octal(bytes: &List[u8], offset: i64, width: i64) -> i64:
     var value: i64 = 0
     var i: i64 = 0
     while i < width:
@@ -1500,7 +1500,7 @@ fn tool_tar_parse_octal(bytes: &Vec[u8], offset: i64, width: i64) -> i64:
         i = i + 1
     value
 
-fn tool_tar_header_checksum(bytes: &Vec[u8], offset: i64) -> i64:
+fn tool_tar_header_checksum(bytes: &List[u8], offset: i64) -> i64:
     var sum: i64 = 0
     var i: i64 = 0
     while i < 512:
@@ -1511,7 +1511,7 @@ fn tool_tar_header_checksum(bytes: &Vec[u8], offset: i64) -> i64:
         i = i + 1
     sum
 
-fn tool_tar_magic_ok(bytes: &Vec[u8], offset: i64) -> bool:
+fn tool_tar_magic_ok(bytes: &List[u8], offset: i64) -> bool:
     let ustar = bytes[offset + 257] == 117 as u8 and
         bytes[offset + 258] == 115 as u8 and
         bytes[offset + 259] == 116 as u8 and
@@ -1531,14 +1531,14 @@ fn tool_tar_archive_name_safe(name: &str) -> bool:
         return false
     tool_path_is_project_relative(name)
 
-fn tool_tar_header_name(bytes: &Vec[u8], offset: i64) -> str:
+fn tool_tar_header_name(bytes: &List[u8], offset: i64) -> str:
     let name = tool_tar_field_str(bytes, offset, 100)
     let prefix = tool_tar_field_str(bytes, offset + 345, 155)
     if prefix.len() == 0:
         return name
     prefix ++ "/" ++ name
 
-fn tool_tar_payload_text(bytes: &Vec[u8], offset: i64, size: i64) -> str:
+fn tool_tar_payload_text(bytes: &List[u8], offset: i64, size: i64) -> str:
     var out = StringBuilder.with_capacity(size)
     var i: i64 = 0
     while i < size:
@@ -1608,9 +1608,9 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
     if archive_len < 0: return tool_tar_extract_fail("could not read archive size: " ++ archive_path)
     var input = tool_archive_open(input_path, c"rb".ptr)
     if input.handle == null: return tool_tar_extract_fail("could not open " ++ archive_path)
-    var archive = Vec[u8].with_capacity(512)
+    var archive = List[u8].with_capacity(512)
     for _ in 0..512: archive.push(0)
-    var buffer = Vec[u8].with_capacity(65536)
+    var buffer = List[u8].with_capacity(65536)
     for _ in 0..65536: buffer.push(0)
     var offset: i64 = 0
     var pending_path = ""
@@ -1634,7 +1634,7 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
         if size > archive_len - content_start:
             return tool_tar_extract_fail(f"entry payload extends past archive at offset {offset}")
         let padded = ((size + 511) / 512) * 512
-        var metadata: Vec[u8] = Vec.new()
+        var metadata: List[u8] = List.new()
         if typeflag == 120 as u8 or typeflag == 76 as u8:
             for _ in 0..size: metadata.push(0)
             if size > 0 and not tool_archive_read(input, &raw mut metadata[0], size):
@@ -1788,7 +1788,7 @@ pub fn SourceEmitter.generated_source(self: &Self, path: str, contents: str) -> 
     tool_capability_require(self.token, "SourceEmitter")
     GeneratedSource { path, contents }
 
-fn tool_process_argv(args: &Vec[str]) -> str:
+fn tool_process_argv(args: &List[str]) -> str:
     var out = StringBuilder.new()
     for i in 0..args.len() as i32:
         out.push_str(args[i])
@@ -1802,8 +1802,8 @@ type ToolProcessEnv {
 
 type SavedProcessEnv {
     driver: ToolProcessEnv,
-    names: Vec[str],
-    values: Vec[str],
+    names: List[str],
+    values: List[str],
 }
 
 fn tool_process_clear_driver_env() -> ToolProcessEnv:
@@ -1823,8 +1823,8 @@ fn tool_process_restore_driver_env(env: ToolProcessEnv):
 
 fn tool_process_apply_env(env: ProcessEnv) -> SavedProcessEnv:
     let driver = tool_process_clear_driver_env()
-    let names: Vec[str] = Vec.new()
-    let values: Vec[str] = Vec.new()
+    let names: List[str] = List.new()
+    let values: List[str] = List.new()
     for i in 0..env.vars.len() as i32:
         let item = env.vars[i]
         names.push(with_str_clone_ref(item.name))
@@ -1863,7 +1863,7 @@ fn tool_effect_escape(text: &str) -> str:
             out.push_byte(ch as u8)
     out.to_str()
 
-fn tool_effect_join_argv(parts: &Vec[str]) -> str:
+fn tool_effect_join_argv(parts: &List[str]) -> str:
     var out = StringBuilder.new()
     for i in 0..parts.len() as i32:
         if i > 0:
@@ -1897,7 +1897,7 @@ fn tool_effect_resolve_executable(exe: &str) -> str:
         i = i + 1
     ""
 
-fn tool_effect_tool_identity(parts: &Vec[str]) -> str:
+fn tool_effect_tool_identity(parts: &List[str]) -> str:
     if parts.len() == 0:
         return ""
     let exe = parts[0]
@@ -1936,7 +1936,7 @@ fn tool_effect_env_text(process_env: &ProcessEnv) -> str:
 // nothing said so). Hashed once per binary per driver run.
 var g_compile_provenance_digests: HashMap[str, str] = HashMap.new()
 
-fn tool_compile_provenance(target: &str, parts: &Vec[str]):
+fn tool_compile_provenance(target: &str, parts: &List[str]):
     if parts.len() == 0: return
     let exe = parts[0].clone()
     var base = exe.clone()
@@ -1953,7 +1953,7 @@ fn tool_compile_provenance(target: &str, parts: &Vec[str]):
     for i in 1..parts.len() as i32: argv = argv ++ " " ++ parts[i]
     print("[compile] " ++ target ++ " ran " ++ digest[0..12] ++ " " ++ exe ++ argv)
 
-fn ProcessRunner.record_process_effect(self: &Self, method: &str, parts: &Vec[str], cwd: &str, timeout_ms: i32, stdin_path: &str, stdout_path: &str, stderr_path: &str, env_text: &str):
+fn ProcessRunner.record_process_effect(self: &Self, method: &str, parts: &List[str], cwd: &str, timeout_ms: i32, stdin_path: &str, stdout_path: &str, stderr_path: &str, env_text: &str):
     tool_compile_provenance(if self.target_name.len() > 0: self.target_name.clone() else: "<build>".to_owned(), parts)
     if with_getenv_str("WITH_BUILD_EFFECTS_OUT").len() == 0:
         return
@@ -1981,7 +1981,7 @@ fn ProcessRunner.record_process_effect(self: &Self, method: &str, parts: &Vec[st
     line.push_str(tool_effect_tool_identity(parts))
     tool_effect_record(line.to_str())
 
-pub fn ProcessRunner.run_capture(self: &Self, args: &Vec[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> ToolProcessResult:
+pub fn ProcessRunner.run_capture(self: &Self, args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     self.require_network_allowed(args, "run_capture")
     self.require_capture_allowed(stdout_path, stderr_path, "run_capture")
@@ -1996,7 +1996,7 @@ pub fn ProcessRunner.run_capture(self: &Self, args: &Vec[str], stdout_path: &str
         timed_out: rc == 124,
     }
 
-pub fn ProcessRunner.run(self: &Self, args: &Vec[str]) -> i32:
+pub fn ProcessRunner.run(self: &Self, args: &List[str]) -> i32:
     tool_capability_require(self.token, "ProcessRunner")
     self.require_network_allowed(args, "run")
     let env = tool_process_clear_driver_env()
@@ -2005,7 +2005,7 @@ pub fn ProcessRunner.run(self: &Self, args: &Vec[str]) -> i32:
     self.record_process_effect("run", args, "", 0, "", "", "", "")
     rc
 
-pub fn ProcessRunner.run_capture_with_env(self: &Self, args: &Vec[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, process_env: ProcessEnv) -> ToolProcessResult:
+pub fn ProcessRunner.run_capture_with_env(self: &Self, args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, process_env: ProcessEnv) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     self.require_network_allowed(args, "run_capture_with_env")
     self.require_capture_allowed(stdout_path, stderr_path, "run_capture_with_env")
@@ -2021,7 +2021,7 @@ pub fn ProcessRunner.run_capture_with_env(self: &Self, args: &Vec[str], stdout_p
         timed_out: rc == 124,
     }
 
-pub fn ProcessRunner.run_capture_cwd(self: &Self, args: &Vec[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> ToolProcessResult:
+pub fn ProcessRunner.run_capture_cwd(self: &Self, args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     self.require_network_allowed(args, "run_capture_cwd")
     self.require_capture_allowed(stdout_path, stderr_path, "run_capture_cwd")
@@ -2036,7 +2036,7 @@ pub fn ProcessRunner.run_capture_cwd(self: &Self, args: &Vec[str], stdout_path: 
         timed_out: rc == 124,
     }
 
-pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: &Vec[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str, process_env: ProcessEnv) -> ToolProcessResult:
+pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str, process_env: ProcessEnv) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     self.require_network_allowed(args, "run_capture_cwd_with_env")
     self.require_capture_allowed(stdout_path, stderr_path, "run_capture_cwd_with_env")
@@ -2052,7 +2052,7 @@ pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: &Vec[str], stdo
         timed_out: rc == 124,
     }
 
-pub fn ProcessRunner.run_capture_input(self: &Self, args: &Vec[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> ToolProcessResult:
+pub fn ProcessRunner.run_capture_input(self: &Self, args: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     self.require_network_allowed(args, "run_capture_input")
     self.require_capture_allowed(stdout_path, stderr_path, "run_capture_input")
@@ -2067,7 +2067,7 @@ pub fn ProcessRunner.run_capture_input(self: &Self, args: &Vec[str], stdout_path
         timed_out: rc == 124,
     }
 
-pub fn ProcessRunner.spawn_capture(self: &Self, args: &Vec[str], stdout_path: &str, stderr_path: &str) -> i32:
+pub fn ProcessRunner.spawn_capture(self: &Self, args: &List[str], stdout_path: &str, stderr_path: &str) -> i32:
     tool_capability_require(self.token, "ProcessRunner")
     self.require_network_allowed(args, "spawn_capture")
     self.require_capture_allowed(stdout_path, stderr_path, "spawn_capture")
@@ -2089,7 +2089,7 @@ fn tool_process_basename(path: &str) -> str:
             start = i + 1
     path.slice(start as i64, path.len())
 
-fn tool_process_requires_network(args: &Vec[str]) -> bool:
+fn tool_process_requires_network(args: &List[str]) -> bool:
     if args.len() == 0:
         return false
     let name = tool_process_basename(args[0])
@@ -2113,7 +2113,7 @@ fn ProcessRunner.write_path_allowed(self: &Self, path: &str) -> bool:
             return true
     false
 
-fn ProcessRunner.require_network_allowed(self: &Self, args: &Vec[str], method: &str):
+fn ProcessRunner.require_network_allowed(self: &Self, args: &List[str], method: &str):
     if not tool_process_requires_network(args):
         return
     if self.network:
@@ -2155,7 +2155,7 @@ fn tool_process_spec_validate(spec: &ProcessSpec, stdout_path: &str, stderr_path
 pub fn ProcessRunner.run_spec(self: &Self, spec: ProcessSpec, stdout_path: &str, stderr_path: &str) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     tool_process_spec_validate(spec, stdout_path, stderr_path)
-    let full_args: Vec[str] = Vec.new()
+    let full_args: List[str] = List.new()
     full_args.push(with_str_clone_ref(spec.executable))
     for i in 0..spec.args.len() as i32:
         full_args.push(with_str_clone_ref(spec.args[i]))
@@ -2194,15 +2194,15 @@ pub fn ActionCtx.process_runner(self: &Self) -> &ProcessRunner:
     tool_capability_require(self.token, "ActionCtx")
     self.process_runner_value
 
-pub fn ActionCtx.inputs(self: &Self) -> &Vec[str]:
+pub fn ActionCtx.inputs(self: &Self) -> &List[str]:
     tool_capability_require(self.token, "ActionCtx")
     self.inputs_value
 
-pub fn ActionCtx.outputs(self: &Self) -> &Vec[str]:
+pub fn ActionCtx.outputs(self: &Self) -> &List[str]:
     tool_capability_require(self.token, "ActionCtx")
     self.outputs_value
 
-pub fn ActionCtx.args(self: &Self) -> &Vec[str]:
+pub fn ActionCtx.args(self: &Self) -> &List[str]:
     tool_capability_require(self.token, "ActionCtx")
     self.args_value
 
@@ -2220,7 +2220,7 @@ pub fn ActionCtx.working_dir(self: &Self) -> &str:
     tool_capability_require(self.token, "ActionCtx")
     self.cwd_value
 
-pub fn ActionCtx.env(self: &Self) -> &Vec[str]:
+pub fn ActionCtx.env(self: &Self) -> &List[str]:
     tool_capability_require(self.token, "ActionCtx")
     self.env_value
 
@@ -2253,8 +2253,8 @@ pub fn new_build(package: Package) -> Build:
     Build {
         package,
         default_target: "",
-        targets: Vec.new(),
-        generated_sources: Vec.new(),
+        targets: List.new(),
+        generated_sources: List.new(),
     }
 
 pub fn Build.default(move self: Build, target_name: str) -> Build:
@@ -2270,20 +2270,20 @@ pub fn target_new(kind: BuildKind, name: str, entry: str) -> Target:
         output: "",
         target_kind: BuildTarget.native,
         optimize_mode: OptimizeMode.debug,
-        system_libs: Vec.new(),
-        library_paths: Vec.new(),
-        rpaths: Vec.new(),
-        include_paths: Vec.new(),
-        defines: Vec.new(),
-        inputs: Vec.new(),
-        extra_outputs: Vec.new(),
-        write_scopes: Vec.new(),
-        deps: Vec.new(),
-        args: Vec.new(),
+        system_libs: List.new(),
+        library_paths: List.new(),
+        rpaths: List.new(),
+        include_paths: List.new(),
+        defines: List.new(),
+        inputs: List.new(),
+        extra_outputs: List.new(),
+        write_scopes: List.new(),
+        deps: List.new(),
+        args: List.new(),
         action: build_noop_action,
         timeout_ms: 0,
         cwd: "",
-        env: Vec.new(),
+        env: List.new(),
         network: false,
         parallel: false,
     }
@@ -2620,7 +2620,7 @@ fn ActionCtx.fetch_url(self: &Self, cmd_dir: &str, url: &str, part: &str, downlo
         let compiled = ws.compile()
         if compiled.status != BuildStatus.ok or compiled.rc != 0:
             return "could not compile the https_fetch helper"
-    let argv: Vec[str] = Vec.new()
+    let argv: List[str] = List.new()
     argv.push(with_str_clone_ref(helper))
     argv.push(with_str_clone_ref(url))
     argv.push(with_str_clone_ref(part))
@@ -2640,7 +2640,7 @@ fn ActionCtx.fetch_url(self: &Self, cmd_dir: &str, url: &str, part: &str, downlo
 /// under `download_ms`, and the first that delivers the pinned bytes is kept
 /// in the cache for every other worktree. An https source needs
 /// `target.allow_network()`; a cache hit does not.
-pub fn ActionCtx.fetch_source(self: &Self, sources: &Vec[str], sha256: &str, output: &str, download_ms: i32) -> FetchedSource:
+pub fn ActionCtx.fetch_source(self: &Self, sources: &List[str], sha256: &str, output: &str, download_ms: i32) -> FetchedSource:
     let fs = self.fs()
     let name = tool_process_basename(output)
     if not build_fetch_is_sha256(sha256):
@@ -2706,14 +2706,14 @@ fn build_zlib_gunzip_source() -> str:
     // its imports; StringBuilder is import-gated under the §18.2 prelude.
     "use std.string.StringBuilder\n\n" ++
     "const MAX_OUTPUT: i64 = 8589934592\n\n" ++
-    "fn bytes_from_str(data: str) -> Vec[u8]:\n" ++
-    "    let out: Vec[u8] = Vec.new()\n" ++
+    "fn bytes_from_str(data: str) -> List[u8]:\n" ++
+    "    let out: List[u8] = List.new()\n" ++
     "    var i: i64 = 0\n" ++
     "    while i < data.len():\n" ++
     "        out.push(data[i])\n" ++
     "        i = i + 1\n" ++
     "    out\n\n" ++
-    "fn bytes_to_str(data: &Vec[u8]) -> str:\n" ++
+    "fn bytes_to_str(data: &List[u8]) -> str:\n" ++
     "    var out = StringBuilder.with_capacity(data.len())\n" ++
     "    var i: i64 = 0\n" ++
     "    while i < data.len():\n" ++
@@ -2756,7 +2756,7 @@ fn build_download_action(ctx: ActionCtx) -> i32:
     let download_ms = build_timeout_or(ctx.timeout(), 300000)
     if sha256.len() > 0:
         // Pinned: the machine's source cache first, then the URL (#2062).
-        let sources: Vec[str] = Vec.new()
+        let sources: List[str] = List.new()
         sources.push(with_str_clone_ref(url))
         let fetched = ctx.fetch_source(&sources, sha256, output_path, download_ms)
         if fetched.rc != 0:
@@ -2799,7 +2799,7 @@ fn build_extract_tar_gz_action(ctx: ActionCtx) -> i32:
     if compile_result.status != BuildStatus.ok or compile_result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": failed to compile zlib_gunzip helper")
     let tar_path = cmd_dir ++ "/archive.tar"
-    let gunzip_args: Vec[str] = Vec.new()
+    let gunzip_args: List[str] = List.new()
     gunzip_args.push(helper)
     gunzip_args.push(with_str_clone_ref(archive))
     gunzip_args.push(with_str_clone_ref(tar_path))
@@ -2909,12 +2909,12 @@ pub type WorkspaceCompilePlan {
     pub absolute_output: str,
     pub output_kind: i32,
     pub has_strings: i32,
-    pub source_paths: Vec[str],
-    pub source_texts: Vec[str],
+    pub source_paths: List[str],
+    pub source_texts: List[str],
     pub absolute_source: str,
-    pub include_paths: Vec[str],
-    pub defines: Vec[str],
-    pub link_libs: Vec[str],
+    pub include_paths: List[str],
+    pub defines: List[str],
+    pub link_libs: List[str],
     pub opt_level: i32,
     pub no_std: bool,
     pub alloc_mode: bool,
@@ -2925,9 +2925,9 @@ pub type WorkspaceCompilePlan {
     pub overflow_mode: i32,
     pub migrate_is_dir: i32,
     pub migrate_source: str,
-    pub migrate_include_paths: Vec[str],
-    pub migrate_forced_includes: Vec[str],
-    pub migrate_defines: Vec[str],
+    pub migrate_include_paths: List[str],
+    pub migrate_forced_includes: List[str],
+    pub migrate_defines: List[str],
     pub migrate_exclude_basenames: str,
     pub migrate_no_c_export: bool,
     pub migrate_c_export_functions: bool,
@@ -2942,12 +2942,12 @@ pub type WorkspaceCompilePlan {
 pub fn __driver_workspace_plan_invalid() -> WorkspaceCompilePlan:
     WorkspaceCompilePlan {
         valid: 0, name: "", is_migrate: 0, final_output: "", absolute_output: "",
-        output_kind: 0, has_strings: 0, source_paths: Vec.new(), source_texts: Vec.new(),
-        absolute_source: "", include_paths: Vec.new(), defines: Vec.new(), link_libs: Vec.new(),
+        output_kind: 0, has_strings: 0, source_paths: List.new(), source_texts: List.new(),
+        absolute_source: "", include_paths: List.new(), defines: List.new(), link_libs: List.new(),
         opt_level: 1, no_std: false, alloc_mode: false, runtime_available: true,
         debug_info: true, compiler_hooks_enabled: true, prelude_mode: 0, overflow_mode: -1,
-        migrate_is_dir: 0, migrate_source: "", migrate_include_paths: Vec.new(),
-        migrate_forced_includes: Vec.new(), migrate_defines: Vec.new(),
+        migrate_is_dir: 0, migrate_source: "", migrate_include_paths: List.new(),
+        migrate_forced_includes: List.new(), migrate_defines: List.new(),
         migrate_exclude_basenames: "", migrate_no_c_export: false,
         migrate_c_export_functions: false, migrate_convert_goto_to_structured: false,
         migrate_block_style: 0, migrate_width_slice: 0, migrate_shared_defs: "",
@@ -2958,7 +2958,7 @@ fn wp_put_int(out: &str, v: i32) -> str: out ++ f"{v}\n"
 
 fn wp_put_str(out: &str, s: &str) -> str: out ++ f"{s.len()}\n" ++ s ++ "\n"
 
-fn wp_put_vec(out: &str, v: &Vec[str]) -> str:
+fn wp_put_list(out: &str, v: &List[str]) -> str:
     var acc = out ++ f"{v.len() as i32}\n"
     for i in 0..v.len() as i32:
         acc = wp_put_str(acc, v[i])
@@ -2975,12 +2975,12 @@ pub fn __driver_workspace_plan_serialize(p: &WorkspaceCompilePlan) -> str:
     out = wp_put_str(out, p.absolute_output)
     out = wp_put_int(out, p.output_kind)
     out = wp_put_int(out, p.has_strings)
-    out = wp_put_vec(out, &p.source_paths)
-    out = wp_put_vec(out, &p.source_texts)
+    out = wp_put_list(out, &p.source_paths)
+    out = wp_put_list(out, &p.source_texts)
     out = wp_put_str(out, p.absolute_source)
-    out = wp_put_vec(out, &p.include_paths)
-    out = wp_put_vec(out, &p.defines)
-    out = wp_put_vec(out, &p.link_libs)
+    out = wp_put_list(out, &p.include_paths)
+    out = wp_put_list(out, &p.defines)
+    out = wp_put_list(out, &p.link_libs)
     out = wp_put_int(out, p.opt_level)
     out = wp_put_bool(out, p.no_std)
     out = wp_put_bool(out, p.alloc_mode)
@@ -2991,9 +2991,9 @@ pub fn __driver_workspace_plan_serialize(p: &WorkspaceCompilePlan) -> str:
     out = wp_put_int(out, p.overflow_mode)
     out = wp_put_int(out, p.migrate_is_dir)
     out = wp_put_str(out, p.migrate_source)
-    out = wp_put_vec(out, &p.migrate_include_paths)
-    out = wp_put_vec(out, &p.migrate_forced_includes)
-    out = wp_put_vec(out, &p.migrate_defines)
+    out = wp_put_list(out, &p.migrate_include_paths)
+    out = wp_put_list(out, &p.migrate_forced_includes)
+    out = wp_put_list(out, &p.migrate_defines)
     out = wp_put_str(out, p.migrate_exclude_basenames)
     out = wp_put_bool(out, p.migrate_no_c_export)
     out = wp_put_bool(out, p.migrate_c_export_functions)
@@ -3052,8 +3052,8 @@ impl WpCursor:
         self.pos = self.pos + want as i64 + 1
         s
 
-    mut fn next_vec() -> Vec[str]:
-        let out: Vec[str] = Vec.new()
+    mut fn next_list() -> List[str]:
+        let out: List[str] = List.new()
         let count = self.next_int()
         for i in 0..count:
             out.push(self.next_str())
@@ -3071,12 +3071,12 @@ pub fn __driver_workspace_plan_deserialize(text: &str) -> WorkspaceCompilePlan:
     out.absolute_output = c.next_str()
     out.output_kind = c.next_int()
     out.has_strings = c.next_int()
-    out.source_paths = c.next_vec()
-    out.source_texts = c.next_vec()
+    out.source_paths = c.next_list()
+    out.source_texts = c.next_list()
     out.absolute_source = c.next_str()
-    out.include_paths = c.next_vec()
-    out.defines = c.next_vec()
-    out.link_libs = c.next_vec()
+    out.include_paths = c.next_list()
+    out.defines = c.next_list()
+    out.link_libs = c.next_list()
     out.opt_level = c.next_int()
     out.no_std = c.next_bool()
     out.alloc_mode = c.next_bool()
@@ -3087,9 +3087,9 @@ pub fn __driver_workspace_plan_deserialize(text: &str) -> WorkspaceCompilePlan:
     out.overflow_mode = c.next_int()
     out.migrate_is_dir = c.next_int()
     out.migrate_source = c.next_str()
-    out.migrate_include_paths = c.next_vec()
-    out.migrate_forced_includes = c.next_vec()
-    out.migrate_defines = c.next_vec()
+    out.migrate_include_paths = c.next_list()
+    out.migrate_forced_includes = c.next_list()
+    out.migrate_defines = c.next_list()
     out.migrate_exclude_basenames = c.next_str()
     out.migrate_no_c_export = c.next_bool()
     out.migrate_c_export_functions = c.next_bool()
@@ -3126,9 +3126,9 @@ fn ws_state_path(id: i32) -> str: ws_dir(id) ++ "/state.txt"
 
 type WsState {
     name: str,
-    files: Vec[str],
-    string_names: Vec[str],
-    string_texts: Vec[str],
+    files: List[str],
+    string_names: List[str],
+    string_texts: List[str],
     has_options: bool,
     options: BuildOptions,
 }
@@ -3138,16 +3138,16 @@ fn ws_default_options() -> BuildOptions:
         source_path: "", output_path: "", output_kind: BuildOutputKind.Binary,
         opt_level: 1, debug_info: true, no_std: false, alloc_mode: false,
         prelude_mode: PreludeMode.Full, overflow_mode: OverflowMode.Default, deterministic: false,
-        target: BuildTarget.native, include_paths: Vec.new(), defines: Vec.new(),
-        link_libs: Vec.new(), compiler_hooks_enabled: true,
+        target: BuildTarget.native, include_paths: List.new(), defines: List.new(),
+        link_libs: List.new(), compiler_hooks_enabled: true,
     }
 
 fn ws_state_serialize(s: &WsState) -> str:
     var out = ""
     out = wp_put_str(out, s.name)
-    out = wp_put_vec(out, &s.files)
-    out = wp_put_vec(out, &s.string_names)
-    out = wp_put_vec(out, &s.string_texts)
+    out = wp_put_list(out, &s.files)
+    out = wp_put_list(out, &s.string_names)
+    out = wp_put_list(out, &s.string_texts)
     out = wp_put_bool(out, s.has_options)
     out = wp_put_str(out, s.options.source_path)
     out = wp_put_str(out, s.options.output_path)
@@ -3160,22 +3160,22 @@ fn ws_state_serialize(s: &WsState) -> str:
     out = wp_put_int(out, s.options.overflow_mode as i32)
     out = wp_put_bool(out, s.options.deterministic)
     out = wp_put_int(out, s.options.target as i32)
-    out = wp_put_vec(out, &s.options.include_paths)
-    out = wp_put_vec(out, &s.options.defines)
-    out = wp_put_vec(out, &s.options.link_libs)
+    out = wp_put_list(out, &s.options.include_paths)
+    out = wp_put_list(out, &s.options.defines)
+    out = wp_put_list(out, &s.options.link_libs)
     out = wp_put_bool(out, s.options.compiler_hooks_enabled)
     out
 
 fn ws_state_load(id: i32) -> WsState:
     let text = with_fs_read_file(ws_state_path(id))
     var c = WpCursor { text: with_str_clone_ref(text), pos: 0, ok: if text.len() > 0: 1 else: 0 }
-    var s = WsState { name: "", files: Vec.new(), string_names: Vec.new(), string_texts: Vec.new(), has_options: false, options: ws_default_options() }
+    var s = WsState { name: "", files: List.new(), string_names: List.new(), string_texts: List.new(), has_options: false, options: ws_default_options() }
     if c.ok == 0:
         return s
     s.name = c.next_str()
-    s.files = c.next_vec()
-    s.string_names = c.next_vec()
-    s.string_texts = c.next_vec()
+    s.files = c.next_list()
+    s.string_names = c.next_list()
+    s.string_texts = c.next_list()
     s.has_options = c.next_bool()
     s.options.source_path = c.next_str()
     s.options.output_path = c.next_str()
@@ -3188,9 +3188,9 @@ fn ws_state_load(id: i32) -> WsState:
     s.options.overflow_mode = c.next_int() as OverflowMode
     s.options.deterministic = c.next_bool()
     s.options.target = c.next_int() as BuildTarget
-    s.options.include_paths = c.next_vec()
-    s.options.defines = c.next_vec()
-    s.options.link_libs = c.next_vec()
+    s.options.include_paths = c.next_list()
+    s.options.defines = c.next_list()
+    s.options.link_libs = c.next_list()
     s.options.compiler_hooks_enabled = c.next_bool()
     s
 
@@ -3215,7 +3215,7 @@ fn ws_alloc_id(name: &str) -> i32:
             id = id * 10 + (ch - 48)
             i = i + 1
     let _w = with_fs_write_file(counter_path, f"{id + 1}")
-    var s = WsState { name: with_str_clone_ref(name), files: Vec.new(), string_names: Vec.new(), string_texts: Vec.new(), has_options: false, options: ws_default_options() }
+    var s = WsState { name: with_str_clone_ref(name), files: List.new(), string_names: List.new(), string_texts: List.new(), has_options: false, options: ws_default_options() }
     ws_state_store(id, &s)
     id
 
@@ -3269,9 +3269,9 @@ fn ws_build_plan(state: &WsState, project_root: &str) -> WorkspaceCompilePlan:
     plan.final_output = with_str_clone_ref(final_output)
     plan.absolute_output = ws_path(project_root, final_output)
     plan.output_kind = output_kind
-    plan.include_paths = tool_clone_str_vec(&state.options.include_paths)
-    plan.defines = tool_clone_str_vec(&state.options.defines)
-    plan.link_libs = tool_clone_str_vec(&state.options.link_libs)
+    plan.include_paths = tool_clone_str_list(&state.options.include_paths)
+    plan.defines = tool_clone_str_list(&state.options.defines)
+    plan.link_libs = tool_clone_str_list(&state.options.link_libs)
     plan.opt_level = state.options.opt_level
     plan.no_std = state.options.no_std
     plan.alloc_mode = state.options.alloc_mode
@@ -3338,7 +3338,7 @@ fn ws_run_compile_child(id: i32, plan: &WorkspaceCompilePlan) -> BuildResult:
         let file_rc = c.next_int()
         if c.ok != 0 and child_rc == 0:
             child_rc = file_rc
-    let artifacts: Vec[Artifact] = Vec.new()
+    let artifacts: List[Artifact] = List.new()
     let want_artifact_path = if plan.output_kind == 5: "" ++ "" else: with_str_clone_ref(plan.final_output)
     if child_rc == 0 and want_artifact_path.len() > 0:
         artifacts.push(Artifact { kind: ws_artifact_kind_for_output(plan.output_kind), path: want_artifact_path })
@@ -3347,26 +3347,26 @@ fn ws_run_compile_child(id: i32, plan: &WorkspaceCompilePlan) -> BuildResult:
         rc: child_rc,
         workspace_name: with_str_clone_ref(plan.name),
         artifacts,
-        diagnostics: Vec.new(),
+        diagnostics: List.new(),
     }
 
-fn build_action_outputs(target: &Target) -> Vec[str]:
-    let outputs: Vec[str] = Vec.new()
+fn build_action_outputs(target: &Target) -> List[str]:
+    let outputs: List[str] = List.new()
     if target.output.len() > 0:
         outputs.push(with_str_clone_ref(target.output))
     for i in 0..target.extra_outputs.len() as i32:
         outputs.push(with_str_clone_ref(target.extra_outputs[i]))
     outputs
 
-fn build_action_write_scope(target: &Target) -> Vec[str]:
+fn build_action_write_scope(target: &Target) -> List[str]:
     let scopes = build_action_outputs(target)
     for i in 0..target.write_scopes.len() as i32:
         scopes.push(with_str_clone_ref(target.write_scopes[i]))
     scopes.push(tool_action_scratch_dir(target.name))
     scopes
 
-fn tool_clone_str_vec(values: &Vec[str]) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn tool_clone_str_list(values: &List[str]) -> List[str]:
+    let out: List[str] = List.new()
     for i in 0..values.len() as i32:
         out.push(with_str_clone_ref(values[i]))
     out
@@ -3385,7 +3385,7 @@ fn build_action_ctx(ctx: &BuildCtx, target: &Target) -> ActionCtx:
     let process_outputs = build_action_write_scope(target)
     let ctx_outputs = build_action_outputs(target)
     let scratch_path = tool_action_scratch_dir(target.name)
-    let action_args: Vec[str] = Vec.new()
+    let action_args: List[str] = List.new()
     for i in 0..target.args.len() as i32:
         if not target.args[i].starts_with("rss-limit-bytes="):
             action_args.push(with_str_clone_ref(target.args[i]))
@@ -3396,12 +3396,12 @@ fn build_action_ctx(ctx: &BuildCtx, target: &Target) -> ActionCtx:
         diagnostics_value: tool_clone_diagnostics(&ctx.diagnostics),
         fs_value: ToolFs { token: with_str_clone_ref(ctx.token), root: with_str_clone_ref(ctx.fs.root), write_scope: fs_outputs, write_scoped: true, scratch_path },
         process_runner_value: ProcessRunner { token: with_str_clone_ref(ctx.token), root: with_str_clone_ref(ctx.fs.root), target_name: with_str_clone_ref(target.name), write_scope: process_outputs, write_scoped: true, network: target.network },
-        inputs_value: tool_clone_str_vec(&target.inputs),
+        inputs_value: tool_clone_str_list(&target.inputs),
         outputs_value: ctx_outputs,
         args_value: action_args,
         timeout_ms_value: target.timeout_ms,
         cwd_value: with_str_clone_ref(target.cwd),
-        env_value: tool_clone_str_vec(&target.env),
+        env_value: tool_clone_str_list(&target.env),
         network_value: target.network,
     }
 

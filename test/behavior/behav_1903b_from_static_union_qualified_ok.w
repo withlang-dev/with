@@ -10,13 +10,13 @@
 
 use lib.issue1903b.counters as counters
 
-var G: Vec[i32] = Vec.new()
+var G: List[i32] = List.new()
 
 fn greeting() -> &str from static: "hello"
 
-fn both(a: &Vec[i32]) -> (&i32, &i32) from a, G: (&a[0], &G[0])
+fn both(a: &List[i32]) -> (&i32, &i32) from a, G: (&a[0], &G[0])
 
-fn maybe(a: &Vec[i32], c: bool) -> Option[&i32] from a, G:
+fn maybe(a: &List[i32], c: bool) -> Option[&i32] from a, G:
     if c: Some(&a[0]) else: Some(&G[0])
 
 fn total_head() -> &i32 from counters.TOTAL: &counters.TOTAL[0]
@@ -25,7 +25,7 @@ fn main:
     let s = greeting()
     G.push(1)
     print(s)
-    var x: Vec[i32] = Vec.new()
+    var x: List[i32] = List.new()
     x.push(7)
     let (p, q) = both(&x)
     print(f"{*p} {*q}")

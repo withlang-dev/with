@@ -2,17 +2,17 @@
 
 ## Signatures
 ```with
-pub async fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[Vec[T], E]
-pub async fn await_all[T](tasks: impl IntoIter[Task[T]]) -> Vec[T]
+pub async fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[List[T], E]
+pub async fn await_all[T](tasks: impl IntoIter[Task[T]]) -> List[T]
 ```
 
 ## Behavior
 - Awaits every input task and collects results in input order.
-- **Fallible overload** (`Result` tasks): returns `Ok(Vec[T])` when all tasks succeed. On first `Err`, cancels remaining tasks and returns that error immediately (fail-fast).
-- **Infallible overload** (plain tasks): awaits all tasks and returns `Vec[T]`.
+- **Fallible overload** (`Result` tasks): returns `Ok(List[T])` when all tasks succeed. On first `Err`, cancels remaining tasks and returns that error immediately (fail-fast).
+- **Infallible overload** (plain tasks): awaits all tasks and returns `List[T]`.
 
 ## Empty input
-- `await_all([])` returns `Ok(Vec.new())` (fallible) or `Vec.new()` (infallible).
+- `await_all([])` returns `Ok(List.new())` (fallible) or `List.new()` (infallible).
 
 ## Cancellation
 - Fallible overload: on first error, remaining owned tasks are cancelled and joined before return.
@@ -26,7 +26,7 @@ pub async fn await_all[T](tasks: impl IntoIter[Task[T]]) -> Vec[T]
 
 ## Example
 ```with
-let tasks = Vec.new()
+let tasks = List.new()
 tasks.push(fetch_user(1))
 tasks.push(fetch_user(2))
 tasks.push(fetch_user(3))

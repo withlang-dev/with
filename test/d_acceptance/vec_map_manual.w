@@ -3,11 +3,11 @@
 //! expect-stdout: 40
 //! expect-stdout: 60
 fn main:
-    var items: Vec[i32] = Vec.new()
+    var items: List[i32] = List.new()
     items.push(10)
     items.push(20)
     items.push(30)
-    var result: Vec[i32] = Vec.new()
+    var result: List[i32] = List.new()
     for v in items:
         result.push(v * 2)
     print(int_to_string(result.len()))

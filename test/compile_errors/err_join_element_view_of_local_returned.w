@@ -4,8 +4,8 @@
 // when `pick` returns. Before the fix this compiled and returned a dangling
 // view.
 
-fn mkv() -> Vec[str]:
-    var v: Vec[str] = Vec.new()
+fn mkv() -> List[str]:
+    var v: List[str] = List.new()
     v.push("a".clone())
     v.push("b".clone())
     v

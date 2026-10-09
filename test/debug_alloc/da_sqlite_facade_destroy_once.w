@@ -6,18 +6,18 @@
 // the function is deleted, either by being overloaded or when the
 // database connection closes") and when the connection closes, whether by
 // its Drop at scope end, by an explicit close_v2, on an early return, or
-// from a Vec of connections. Data destroyed twice is a DOUBLE FREE; data
+// from a List of connections. Data destroyed twice is a DOUBLE FREE; data
 // never destroyed is a LEAK. Statements are finalized before their
 // connection on every path.
 use facades.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
-type AppData { id: i32, name: str, seen: Vec[i32] }
+type AppData { id: i32, name: str, seen: List[i32] }
 
 fn silent(ctx: Context, args: &[Value], app: &AppData): ()
 
 fn register(db: &Database, id: i32) -> bool:
-    db.create_function_v2("silent", 0, SQLITE_UTF8, AppData { id: id, name: f"data {id}", seen: Vec.new() }, silent, null, null).is_ok()
+    db.create_function_v2("silent", 0, SQLITE_UTF8, AppData { id: id, name: f"data {id}", seen: List.new() }, silent, null, null).is_ok()
 
 fn early() -> i32:
     let db = Database.open(":memory:").unwrap()
@@ -40,7 +40,7 @@ fn main:
         assert(register(db, 31))
         assert(db.close_v2() == SQLITE_OK)
     if true:
-        var all: Vec[Database] = Vec.new()
+        var all: List[Database] = List.new()
         for i in 1..4:
             let db = Database.open(":memory:").unwrap()
             assert(register(db, 40 + i))

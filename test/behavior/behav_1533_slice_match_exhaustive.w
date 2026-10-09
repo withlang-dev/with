@@ -14,7 +14,7 @@ fn head(s: []i32) -> i32:
         [a, ..] => a
         [] => -2
 
-fn kind(v: Vec[i32]) -> i32:
+fn kind(v: List[i32]) -> i32:
     match v:
         [] => 0
         [_] => 1
@@ -29,10 +29,10 @@ fn main:
     print(head(b[..]))
     let c: [i32; 3] = [5, 2, 9]
     print(head(c[..]))
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     v.push(1)
     print(kind(v))
-    let w: Vec[i32] = Vec.new()
+    let w: List[i32] = List.new()
     w.push(1)
     w.push(2)
     w.push(3)

@@ -1,4 +1,4 @@
-//! expect-check-fail: binds a view into a temporary `Vec[str]` that is freed when this statement ends
+//! expect-check-fail: binds a view into a temporary `List[str]` that is freed when this statement ends
 
 fn main:
     let line = "x\tdocs"

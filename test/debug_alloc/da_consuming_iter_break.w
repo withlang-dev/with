@@ -21,7 +21,7 @@ fn new_w(drops: *mut i32, n: i32) -> W:
 
 fn main:
     var drops = 0
-    var ys: Vec[W] = Vec.new()
+    var ys: List[W] = List.new()
     ys.push(new_w(&raw mut drops, 11))
     ys.push(new_w(&raw mut drops, 12))
     ys.push(new_w(&raw mut drops, 13))

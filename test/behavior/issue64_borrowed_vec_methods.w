@@ -1,11 +1,11 @@
 fn main:
-    var nums: Vec[i32] = Vec.new()
+    var nums: List[i32] = List.new()
     nums.push(1)
     nums.push(2)
     nums.push(3)
 
     // iter() is declared `mut fn` today, so it runs on the owned mutable
-    // place before any shared view exists; iter()-through-&Vec is a filed
+    // place before any shared view exists; iter()-through-&List is a filed
     // conformance gap (spec §13).
     var nums_iter = nums.iter()
     assert(nums_iter.next().unwrap() == 1)
@@ -20,13 +20,13 @@ fn main:
     assert(evens.len() == 1)
     assert(evens[0] == 2)
 
-    let words: Vec[str] = Vec.new()
+    let words: List[str] = List.new()
     words.push("a")
     words.push("b")
     let words_ref = &words
     assert(words_ref.join(",") == "a,b")
 
-    var nums_mut: Vec[i32] = Vec.new()
+    var nums_mut: List[i32] = List.new()
     nums_mut.push(7)
     nums_mut.push(8)
     nums_mut.push(9)

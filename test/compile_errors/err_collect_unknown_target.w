@@ -1,5 +1,5 @@
 //! expect-check-fail: unsupported collect target
 
 fn main:
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     let _opt = xs.iter() |> collect[Option[i32]]()

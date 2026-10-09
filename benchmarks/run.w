@@ -28,7 +28,7 @@ use std.time
 
 // ── Languages ────────────────────────────────────────────────────────
 
-fn language_keys() -> Vec[str]: "with rust c go zig".split(" ")
+fn language_keys() -> List[str]: "with rust c go zig".split(" ")
 
 fn language_name(key: &str) -> str:
     if key == "with": return "With"
@@ -57,19 +57,19 @@ fn c_compiler() -> str:
     "cc"
 
 /// Every level the compiler offers, in order.
-fn levels(key: &str) -> Vec[str]:
+fn levels(key: &str) -> List[str]:
     if key == "go": return "debug release".split(" ")
     if key == "zig": return "Debug ReleaseSafe ReleaseFast ReleaseSmall".split(" ")
     "O0 O1 O2 O3".split(" ")
 
 /// The (debug, release) pair used without --full.
-fn default_levels(key: &str) -> Vec[str]:
+fn default_levels(key: &str) -> List[str]:
     if key == "go": return "debug release".split(" ")
     if key == "zig": return "Debug ReleaseFast".split(" ")
     "O0 O3".split(" ")
 
-fn level_args(key: &str, level: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn level_args(key: &str, level: &str) -> List[str]:
+    var out: List[str] = List.new()
     if key == "rust": out.push("-Copt-level=" ++ level.slice(1, 2))
     else if key == "go":
         if level == "debug": out.push("-gcflags=all=-N -l")
@@ -77,12 +77,12 @@ fn level_args(key: &str, level: &str) -> Vec[str]:
     else: out.push("-" ++ level)
     out
 
-fn version_args(key: &str) -> Vec[str]:
+fn version_args(key: &str) -> List[str]:
     if key == "go" or key == "zig": return "version".split(" ")
     "--version".split(" ")
 
-fn compile_command(key: &str, level: &str, source: &str, output: &str) -> Vec[str]:
-    var argv: Vec[str] = Vec.new()
+fn compile_command(key: &str, level: &str, source: &str, output: &str) -> List[str]:
+    var argv: List[str] = List.new()
     let extra = level_args(key, level)
     if key == "with":
         argv.push("with")
@@ -149,7 +149,7 @@ fn available(key: &str): which(compiler(key)).len() > 0
 
 /// The first line the compiler prints for its version flag.
 fn version(key: &str, scratch: &str) -> str:
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push(compiler(key))
     for a in version_args(key): argv.push(a.clone())
     let out = scratch ++ "/version.stdout"
@@ -165,7 +165,7 @@ fn host(scratch: &str) -> str:
     let system = if is_mac(): "Darwin" else: os()
     let machine = if is_mac() and arch() == "aarch64": "arm64" else: arch()
     var out = f"{system} {machine}"
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     for a in "sysctl -n machdep.cpu.brand_string".split(" "): argv.push(a.clone())
     let path = scratch ++ "/cpu.stdout"
     let finished = run_to_files(&argv, path, "/dev/null", 60000)
@@ -176,8 +176,8 @@ fn host(scratch: &str) -> str:
 // ── Text ─────────────────────────────────────────────────────────────
 
 /// Whitespace-separated words (Python's `str.split()`).
-fn words(line: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn words(line: &str) -> List[str]:
+    var out: List[str] = List.new()
     var start: i64 = -1
     for i in 0..line.len() + 1:
         let space = i == line.len() or line[i] == ' ' or line[i] == '\t' or line[i] == '\r'
@@ -232,7 +232,7 @@ fn tail(text: &str, n: i64) -> str: if text.len() <= n: text.clone() else: text.
 fn head(text: &str, n: i64) -> str: if text.len() <= n: text.clone() else: text.slice(0, n)
 
 /// Python's repr of a list of strings: `['a', 'b']`.
-fn py_list(items: &Vec[str]) -> str:
+fn py_list(items: &List[str]) -> str:
     var out = "["
     for i in 0..items.len():
         if i > 0: out = out ++ ", "
@@ -240,13 +240,13 @@ fn py_list(items: &Vec[str]) -> str:
     out ++ "]"
 
 /// The distinct strings, sorted.
-fn sorted_set(items: &Vec[str]) -> Vec[str]:
-    var distinct: Vec[str] = Vec.new()
+fn sorted_set(items: &List[str]) -> List[str]:
+    var distinct: List[str] = List.new()
     for item in items:
         if not distinct.contains(item): distinct.push(item.clone())
-    // Selection by repeated minimum: the lists are a handful long, and Vec
+    // Selection by repeated minimum: the lists are a handful long, and List
     // has no sort yet (#960).
-    var out: Vec[str] = Vec.new()
+    var out: List[str] = List.new()
     while out.len() < distinct.len():
         var least: i64 = -1
         for i in 0..distinct.len():
@@ -256,7 +256,7 @@ fn sorted_set(items: &Vec[str]) -> Vec[str]:
     out
 
 /// The k-th smallest value (0-based).
-fn kth(values: &Vec[f64], k: i64) -> f64:
+fn kth(values: &List[f64], k: i64) -> f64:
     for v in values:
         var less: i64 = 0
         var equal: i64 = 0
@@ -268,7 +268,7 @@ fn kth(values: &Vec[f64], k: i64) -> f64:
 
 /// The median (Python's `statistics.median`: the mean of the middle two of
 /// an even count).
-fn median(values: &Vec[f64]) -> f64:
+fn median(values: &List[f64]) -> f64:
     let n = values.len()
     if n % 2 == 1: kth(values, n / 2) else: (kth(values, n / 2 - 1) + kth(values, n / 2)) / 2.0
 
@@ -346,7 +346,7 @@ fn compile_once(key: &str, level: &str, source: &str, work: &str) -> Compiled:
 fn strip_binary(path: &str) -> i64:
     let stripped = path ++ ".stripped"
     assert(copy_tree(path, stripped) == 0)
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push("strip")
     argv.push(stripped.clone())
     let _ = run_to_files(&argv, "/dev/null", "/dev/null", 0)
@@ -365,7 +365,7 @@ type RunResult {
 /// Run the program once with its output captured; the runtime reaps it and
 /// reports its peak RSS, as `/usr/bin/time -l` read it from the same wait.
 fn run_once(binary: &str, timeout_ms: i32) -> RunResult:
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push(binary.clone())
     let out = binary ++ ".stdout"
     let err = binary ++ ".stderr"
@@ -417,10 +417,10 @@ fn measure(root: &str, workload: &str, key: &str, level: &str, runs: i32, timeou
         return cell
     cell.size_bytes = Some(strip_binary(compiled.binary))
 
-    var walls: Vec[f64] = Vec.new()
-    var inners: Vec[f64] = Vec.new()
-    var rsses: Vec[i64] = Vec.new()
-    var checksums: Vec[str] = Vec.new()
+    var walls: List[f64] = List.new()
+    var inners: List[f64] = List.new()
+    var rsses: List[i64] = List.new()
+    var checksums: List[str] = List.new()
     for _ in 0..runs:
         let result = run_once(compiled.binary, timeout_ms)
         if result.failure == "timeout":
@@ -473,7 +473,7 @@ fn fmt_ratio(value: &Option[f64], best: &Option[f64]) -> str:
 fn workload_description(root: &str, workload: &str) -> str:
     let source = f"{root}/workloads/{workload}/{workload}.w"
     if not file_exists(source): return ""
-    var lines: Vec[str] = Vec.new()
+    var lines: List[str] = List.new()
     for line in (read_file(source) ?? "").split("\n"):
         if line.starts_with("// ") and lines.len() < 2: lines.push(line.slice(3, line.len()))
     var out = ""
@@ -485,7 +485,7 @@ fn workload_description(root: &str, workload: &str) -> str:
 fn is_release(c: &Cell): c.status == "ok" and (c.level == "O3" or c.level == "release" or c.level == "ReleaseFast")
 
 /// The smallest nonzero value, or None.
-fn best_of(values: &Vec[f64]) -> Option[f64]:
+fn best_of(values: &List[f64]) -> Option[f64]:
     var best: Option[f64] = None
     for v in values:
         if *v == 0.0: continue
@@ -493,8 +493,8 @@ fn best_of(values: &Vec[f64]) -> Option[f64]:
     best
 
 type Options {
-    workloads: Vec[str],
-    languages: Vec[str],
+    workloads: List[str],
+    languages: List[str],
     runs: i32,
     full: bool,
     timeout_ms: i32,
@@ -502,8 +502,8 @@ type Options {
     keep: bool,
 }
 
-fn markdown_report(root: &str, cells: &Vec[Cell], toolchains: &Vec[str], versions: &Vec[str], options: &Options, host_line: &str) -> str:
-    var out: Vec[str] = Vec.new()
+fn markdown_report(root: &str, cells: &List[Cell], toolchains: &List[str], versions: &List[str], options: &Options, host_line: &str) -> str:
+    var out: List[str] = List.new()
     out.push("# Benchmark results\n")
     out.push(f"Host: {host_line}  ")
     out.push(f"Runs per cell: {options.runs} (median for times, max for memory)  ")
@@ -512,16 +512,16 @@ fn markdown_report(root: &str, cells: &Vec[Cell], toolchains: &Vec[str], version
     out.push("## Toolchains\n")
     for i in 0..toolchains.len(): out.push(f"- {toolchains[i]}: {versions[i]}")
     out.push("")
-    var workloads: Vec[str] = Vec.new()
+    var workloads: List[str] = List.new()
     for c in cells:
         if not workloads.contains(&c.workload): workloads.push(c.workload.clone())
     for workload in workloads:
         out.push(f"## {workload}\n")
         let description = workload_description(root, workload)
         if description.len() > 0: out.push(description ++ "\n")
-        var release_runs: Vec[f64] = Vec.new()
-        var release_inners: Vec[f64] = Vec.new()
-        var compiles: Vec[f64] = Vec.new()
+        var release_runs: List[f64] = List.new()
+        var release_inners: List[f64] = List.new()
+        var compiles: List[f64] = List.new()
         for c in cells:
             if c.workload != *workload: continue
             if is_release(c):
@@ -544,7 +544,7 @@ fn markdown_report(root: &str, cells: &Vec[Cell], toolchains: &Vec[str], version
         else:
             out.push("| Language | Level | Compile | Size | Run (wall) | Hot loop | Peak RSS | Checksum |")
             out.push("|---|---|---:|---:|---:|---:|---:|---|")
-            var checksums: Vec[str] = Vec.new()
+            var checksums: List[str] = List.new()
             for c in cells:
                 if c.workload != *workload: continue
                 if c.status != "ok":
@@ -575,11 +575,11 @@ fn csv_field(value: &str) -> str:
     if value.contains(",") or value.contains("\"") or value.contains("\n"): return "\"" ++ value.replace("\"", "\"\"") ++ "\""
     value.clone()
 
-fn csv_report(cells: &Vec[Cell]) -> str:
+fn csv_report(cells: &List[Cell]) -> str:
     var text = "workload,language,level,status,compile_s,size_bytes,run_s,inner_s,rss_bytes,checksum\n"
     for c in cells:
         let checksum = if let Some(v) = &c.checksum: v.clone() else: ""
-        var fields: Vec[str] = Vec.new()
+        var fields: List[str] = List.new()
         fields.push(c.workload.clone())
         fields.push(c.language.clone())
         fields.push(c.level.clone())
@@ -600,7 +600,7 @@ fn json_f64(value: &Option[f64]) -> str: if let Some(v) = value: exact(*v) else:
 
 fn json_i64(value: &Option[i64]) -> str: if let Some(v) = value: f"{*v}" else: "null"
 
-fn json_report(cells: &Vec[Cell], toolchains: &Vec[str], versions: &Vec[str]) -> str:
+fn json_report(cells: &List[Cell], toolchains: &List[str], versions: &List[str]) -> str:
     var text = "{\n  \"toolchains\": {"
     for i in 0..toolchains.len():
         text = text ++ (if i > 0: "," else: "") ++ "\n    " ++ json_quote(toolchains[i]) ++ ": " ++ json_quote(versions[i])
@@ -653,7 +653,7 @@ fn usage_error(message: &str) -> Never:
 
 fn parse_options() -> Options:
     let argv = args()
-    var options = Options { workloads: Vec.new(), languages: Vec.new(), runs: 3, full: false, timeout_ms: 120000, output: "", keep: false }
+    var options = Options { workloads: List.new(), languages: List.new(), runs: 3, full: false, timeout_ms: 120000, output: "", keep: false }
     var i = 1
     while i < argv.len():
         var flag = argv[i].clone()
@@ -698,7 +698,7 @@ fn parse_options() -> Options:
 let root = here()
 var options = parse_options()
 
-var all_workloads: Vec[str] = Vec.new()
+var all_workloads: List[str] = List.new()
 for path in list_files_text(root ++ "/workloads").split("\n"):
     // workloads/<name>/<file>: the directory names, sorted.
     let parts = path.split("/")
@@ -719,9 +719,9 @@ let tmp_base = if env("TMPDIR").len() > 0: env("TMPDIR") else: "/tmp"
 let work_root = (if tmp_base.ends_with("/"): tmp_base else: tmp_base ++ "/") ++ f"with-bench-{pid()}-{now_ns()}"
 assert(mkdir_p(work_root) == 0)
 
-var toolchains: Vec[str] = Vec.new()
-var versions: Vec[str] = Vec.new()
-var active: Vec[str] = Vec.new()
+var toolchains: List[str] = List.new()
+var versions: List[str] = List.new()
+var active: List[str] = List.new()
 for key in options.languages:
     if available(key):
         toolchains.push(language_name(key))
@@ -734,7 +734,7 @@ if active.len() == 0:
     let _ = remove_tree(work_root)
     exit_code(1)
 
-var cells: Vec[Cell] = Vec.new()
+var cells: List[Cell] = List.new()
 var total = 0
 for key in active: total += if options.full: levels(key).len() as i32 else: 2
 total = total * options.workloads.len() as i32

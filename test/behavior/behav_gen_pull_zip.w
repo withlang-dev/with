@@ -11,7 +11,7 @@ gen fn odds_from(start: i32, count: i32) -> i32:
     for i in 0..count:
         yield start + 2 * i
 
-gen fn letters(all: Vec[str]) -> str:
+gen fn letters(all: List[str]) -> str:
     var last = ""
     defer:
         print(f"letters stopped at {last}")
@@ -19,10 +19,10 @@ gen fn letters(all: Vec[str]) -> str:
         last = s
         yield s
 
-fn lockstep[A, B](left: impl Iter[A], right: impl Iter[B]) -> Vec[(A, B)]:
+fn lockstep[A, B](left: impl Iter[A], right: impl Iter[B]) -> List[(A, B)]:
     var l = left
     var r = right
-    var out: Vec[(A, B)] = Vec.new()
+    var out: List[(A, B)] = List.new()
     // `match`, not `let … else: break`: #1733.
     while true:
         match l.next():

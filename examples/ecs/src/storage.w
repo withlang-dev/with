@@ -14,15 +14,15 @@ use components.Entity
 // view of the stored component and `remove` returns the component.
 
 pub type DenseStorage[T] {
-    dense_entities: Vec[i32],
-    dense_data: Vec[T],
+    dense_entities: List[i32],
+    dense_data: List[T],
     sparse: HashMap[i32, i64],
 }
 
 pub fn DenseStorage.new[T]() -> DenseStorage[T]:
     DenseStorage {
-        dense_entities: Vec.new(),
-        dense_data: Vec.new(),
+        dense_entities: List.new(),
+        dense_data: List.new(),
         sparse: HashMap.new(),
     }
 
@@ -45,7 +45,7 @@ extend[T] DenseStorage[T]:
         let idx = self.sparse.get(entity.id) ?? return None
         Some(self.dense_data[idx])
 
-    // Transfers the component out (`Vec.remove`, D27) and re-indexes the
+    // Transfers the component out (`List.remove`, D27) and re-indexes the
     // entities that shifted down behind it.
     pub mut fn remove(entity: Entity) -> Option[T]:
         let idx: i64 = self.sparse.remove(entity.id) ?? return None

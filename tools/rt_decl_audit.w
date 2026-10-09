@@ -34,8 +34,8 @@ fn line_of(text: &str, off: i32) -> i32:
 // One "name|sig|file:line" record per matching decl. `sig` is normalized to
 // parameter TYPES plus return type, names dropped:
 // `fn f(dst: *mut u8, n: i64) -> Unit` -> "(*mut u8,i64)->Unit"
-fn scan(path: &str, want_extern: bool, aliases: &Vec[str]) -> Vec[str]:
-    var found: Vec[str] = Vec.new()
+fn scan(path: &str, want_extern: bool, aliases: &List[str]) -> List[str]:
+    var found: List[str] = List.new()
     let text = read_file(path) ?? ""
     if text.len() == 0: return found
     var lexer = Lexer.init(text.slice(0, text.len()), 0)
@@ -103,8 +103,8 @@ fn scan(path: &str, want_extern: bool, aliases: &Vec[str]) -> Vec[str]:
 // rt's own `type X = ...` aliases, as "name|expansion" records. A def spelled
 // through an alias and a decl spelled through its expansion are the same
 // contract; the audit must not report them as divergent.
-fn load_aliases(root: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn load_aliases(root: &str) -> List[str]:
+    var out: List[str] = List.new()
     for p in list_files_text(root).split("\n"):
         if not p.ends_with(".w"): continue
         for line in (read_file(p) ?? "").split("\n"):
@@ -122,7 +122,7 @@ fn load_aliases(root: &str) -> Vec[str]:
 fn normalize_type_text(body: &str) -> str:
     body.replace(" ", "")
 
-fn expand_aliases(sig: &str, rt_aliases: &Vec[str]) -> str:
+fn expand_aliases(sig: &str, rt_aliases: &List[str]) -> str:
     var out = normalize_type_text(sig)
     for i in 0..rt_aliases.len() as i32:
         let rec = rt_aliases[i]
@@ -132,8 +132,8 @@ fn expand_aliases(sig: &str, rt_aliases: &Vec[str]) -> str:
         out = out.replace(alias, body)
     out
 
-fn collect(root: &str, want_extern: bool, aliases: &Vec[str]) -> Vec[str]:
-    var all: Vec[str] = Vec.new()
+fn collect(root: &str, want_extern: bool, aliases: &List[str]) -> List[str]:
+    var all: List[str] = List.new()
     for p in list_files_text(root).split("\n"):
         if not p.ends_with(".w"): continue
         for r in scan(p, want_extern, aliases):
@@ -149,8 +149,8 @@ fn field(rec: &str, k: i32) -> str:
 
 let aliases = load_aliases("rt")
 let defs = collect("rt", false, &aliases)
-var decls: Vec[str] = Vec.new()
-var roots: Vec[str] = Vec.new()
+var decls: List[str] = List.new()
+var roots: List[str] = List.new()
 roots.push("rt")
 roots.push("lib/std")
 roots.push("src")

@@ -11,7 +11,7 @@
 // codegen ran it.
 
 type Grid {
-    data: Vec[i32],
+    data: List[i32],
     width: i32,
 }
 
@@ -28,7 +28,7 @@ fn main:
     let email = f"user{n}@example.com"
     assert('@' in email)
     assert('!' not in email)
-    var g = Grid { data: Vec.new(), width: 3 }
+    var g = Grid { data: List.new(), width: 3 }
     g.data.push(1)
     g.data.push(2)
     g[0] += 100

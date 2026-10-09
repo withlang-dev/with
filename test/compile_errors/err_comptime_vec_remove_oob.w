@@ -1,7 +1,7 @@
 //! expect-check-fail: remove() index out of bounds in comptime
 
 comptime fn remove_oob() -> i32:
-    var v = Vec[i32].new()
+    var v = List[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)

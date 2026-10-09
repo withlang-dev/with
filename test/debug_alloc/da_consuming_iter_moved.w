@@ -20,7 +20,7 @@ fn new_w(drops: *mut i32, n: i32) -> W:
 
 fn main:
     var drops = 0
-    var zs: Vec[W] = Vec.new()
+    var zs: List[W] = List.new()
     zs.push(new_w(&raw mut drops, 21))
     zs.push(new_w(&raw mut drops, 22))
     var src_iter = zs.into_iter()

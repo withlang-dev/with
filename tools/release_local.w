@@ -38,7 +38,7 @@ fn text_of(path: &str) -> str:
     r.unwrap()
 
 /// Run one command with the current environment; print it first.
-fn step(label: &str, argv: &Vec[str]) -> i32:
+fn step(label: &str, argv: &List[str]) -> i32:
     var shown = ""
     for a in argv: shown = shown ++ a ++ " "
     print("== " ++ label ++ ": " ++ shown)
@@ -46,13 +46,13 @@ fn step(label: &str, argv: &Vec[str]) -> i32:
     if rc != 0: eprint("release_local: " ++ label ++ " failed with exit code " ++ f"{rc}" ++ "\n")
     rc
 
-fn argv2(a: &str, b: &str) -> Vec[str]:
-    var v: Vec[str] = Vec.new()
+fn argv2(a: &str, b: &str) -> List[str]:
+    var v: List[str] = List.new()
     v.push(a ++ "")
     v.push(b ++ "")
     v
 
-fn argv3(a: &str, b: &str, c: &str) -> Vec[str]:
+fn argv3(a: &str, b: &str, c: &str) -> List[str]:
     var v = argv2(a, b)
     v.push(c ++ "")
     v
@@ -80,7 +80,7 @@ fn darwin_leg(version: &str, channel: &str) -> i32:
     set_env("WITH_VERSION", version)
     // The pinned seed drives the gates (seed-driver refuses any other driver).
     set_env("WITH", seed)
-    var gates: Vec[str] = Vec.new()
+    var gates: List[str] = List.new()
     gates.push(":fixpoint")
     gates.push(":test")
     gates.push(":test-green")
@@ -93,7 +93,7 @@ fn darwin_leg(version: &str, channel: &str) -> i32:
         if step("darwin " ++ target, &argv) != 0: return 1
     // The rebuilt compiler runs the UAT, packages and publishes.
     set_env("WITH", release)
-    var finals: Vec[str] = Vec.new()
+    var finals: List[str] = List.new()
     finals.push(":release-uat")
     finals.push(":package-current-host")
     finals.push(":package-llvm-sdk")
@@ -137,7 +137,7 @@ fn linux_aarch64_leg(version: &str, channel: &str) -> i32:
     if seed_sha.len() != 64 or seed_version.len() == 0: return fail("seed.lock has no linux-aarch64 seed pin")
     let sha = env("RELEASE_SOURCE_SHA")
     if sha.len() == 0: return fail("set RELEASE_SOURCE_SHA to the tagged commit (git rev-parse " ++ version ++ ")")
-    var build_args: Vec[str] = Vec.new()
+    var build_args: List[str] = List.new()
     build_args.push("docker")
     build_args.push("build")
     build_args.push("--platform")
@@ -147,13 +147,13 @@ fn linux_aarch64_leg(version: &str, channel: &str) -> i32:
     build_args.push("with-aarch64-host")
     build_args.push("tools/docker/linux-aarch64")
     if step("docker image", &build_args) != 0: return 1
-    var volume_args: Vec[str] = Vec.new()
+    var volume_args: List[str] = List.new()
     volume_args.push("docker")
     volume_args.push("volume")
     volume_args.push("create")
     volume_args.push("with-aarch64")
     if step("docker volume", &volume_args) != 0: return 1
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args.push("docker")
     run_args.push("run")
     run_args.push("--rm")

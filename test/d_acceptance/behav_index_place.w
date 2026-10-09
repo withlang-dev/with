@@ -28,7 +28,7 @@ fn g() -> i32:
 
 fn main:
     // §6.2 direct index assignment
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)
@@ -36,25 +36,25 @@ fn main:
     print(int_to_string(xs[1] as i64))
 
     // §6.2 nested field assignment through index
-    let items: Vec[Item] = Vec.new()
+    let items: List[Item] = List.new()
     items.push(Item { value: 0, name: "world" })
     items[0].name = "hello"
     print(items[0].name)
 
     // §6.3 compound assignment through index
-    let ys: Vec[i32] = Vec.new()
+    let ys: List[i32] = List.new()
     ys.push(10)
     ys[0] += 5
     print(int_to_string(ys[0] as i64))
 
     // §6.2 mutating receiver call through index
-    let counters: Vec[Counter] = Vec.new()
+    let counters: List[Counter] = List.new()
     counters.push(Counter { val: 98 })
     counters[0].increment()
     print(int_to_string(counters[0].val as i64))
 
     // §6.3 single-evaluation rule: xs[f()] += g()
-    let zs: Vec[i32] = Vec.new()
+    let zs: List[i32] = List.new()
     zs.push(10)
     zs[f()] += g()
     print(int_to_string(f_calls as i64))

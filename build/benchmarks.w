@@ -45,12 +45,12 @@ pub fn run_benchmarks_check_action(ctx: ActionCtx) -> i32:
     if not fs.exists(inputs[0]):
         ctx.diagnostics().error("benchmarks-check: missing compiler: " ++ inputs[0])
     let compiler = bm_abs(root, inputs[0])
-    var sources: Vec[str] = Vec.new()
+    var sources: List[str] = List.new()
     for source in fs.glob("benchmarks/workloads/*/*.w"): sources.push(source.clone())
     sources.push("benchmarks/run.w")
-    var jobs: Vec[ParJob] = Vec.new()
+    var jobs: List[ParJob] = List.new()
     for source in sources:
-        var args: Vec[str] = Vec.new()
+        var args: List[str] = List.new()
         args.push(compiler.clone())
         args.push("check")
         args.push(bm_abs(root, source))

@@ -25,9 +25,9 @@ fn main:
     print(f"{c.len()} {c[3]}")
     let d = [0 as u8; N * 2]
     print(f"{d.len()}")
-    let v: Vec[i32] = [0; 3]
+    let v: List[i32] = [0; 3]
     print(f"{v.len()} {v[2]}")
-    let w: Vec[i32] = [9; HALF]
+    let w: List[i32] = [9; HALF]
     print(f"{w.len()}")
     print(f"{A.len()} {A[2]}")
     const M = 5

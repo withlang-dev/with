@@ -5,9 +5,9 @@
 // `main` read an empty one: the push that may reallocate `v` was accepted
 // and `print(r)` read freed memory. Declared above `main`, it was refused.
 fn main:
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     v.push(1)
     let r = first(v)
     v.push(2)
     print(f"{r}")
-fn first(xs: &Vec[i32]) -> &i32: &xs[0]
+fn first(xs: &List[i32]) -> &i32: &xs[0]

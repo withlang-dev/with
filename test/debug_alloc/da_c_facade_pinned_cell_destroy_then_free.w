@@ -2,7 +2,7 @@
 // Spec §16.2b.3, D54: a pinned in-place resource's cell outlives the C
 // state — Drop runs the facade's `drop` first (`z_end` reads and clears
 // the state through the address `z_init` kept) and the Box field frees
-// the cell after. Every path that moves the value (rebinding, a Vec, a
+// the cell after. Every path that moves the value (rebinding, a List, a
 // function argument, a return) frees its one cell exactly once. A failed
 // init under `ok` is `Err(StreamError.Failed(status))` (stage 5, Eric
 // 2026-09-23 on #1426): its cell is freed with no destruction call — the
@@ -28,7 +28,7 @@ fn give() -> Stream: Stream.init(0).unwrap()
 fn main:
     let a = Stream.init(0).unwrap()
     let b = move a
-    var v: Vec[Stream] = Vec.new()
+    var v: List[Stream] = List.new()
     v.push(b)
     v.push(give())
     let n = check(v[0]) + check(v[1]) + take(give())

@@ -8,14 +8,14 @@
 // its scope-exit drop, or the enum's variant-aware drop glue frees the str the
 // result now owns. That was a double free in std.build's generated gunzip
 // helper (`read_file(p) ?? ""` then `bytes_from_str(input)`): the payload's
-// buffer was freed by the Result drop, reused by a Vec, freed by the dangling
-// str, and freed again by the Vec. On the default path nothing moved out, so
+// buffer was freed by the Result drop, reused by a List, freed by the dangling
+// str, and freed again by the List. On the default path nothing moved out, so
 // the subject (an Err payload, or nothing) is dropped there, once.
 use std.fs
 use std.builtins.print_i64
 
-fn bytes_from_str(data: str) -> Vec[u8]:
-    let out: Vec[u8] = Vec.new()
+fn bytes_from_str(data: str) -> List[u8]:
+    let out: List[u8] = List.new()
     var i: i64 = 0
     while i < data.len():
         out.push(data[i])

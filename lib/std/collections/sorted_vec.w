@@ -1,4 +1,4 @@
-// std.collections.sorted_vec — SortedVec[T]: a sorted contiguous collection
+// std.collections.sorted_vec — SortedList[T]: a sorted contiguous collection
 // over the migrated c-algorithms sorted array (docs/proposals/stdlib_sourcing_plan.md,
 // Phase 1). The engine keeps an array of slot pointers in comparator order;
 // the facade owns every value (std.collections.engine_slot).
@@ -20,14 +20,14 @@ extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 /// Values kept in ascending `Ord` order (D41: `cmp` backs the `<`/`>` the
 /// comparator applies to views). `get(i)` observes the i-th value;
 /// `remove(i)` transfers it out (D27).
-pub type SortedVec[T] { array: *mut _SortedArray }
+pub type SortedList[T] { array: *mut _SortedArray }
 
-pub fn SortedVec.new[T: Ord]() -> SortedVec[T]:
+pub fn SortedList.new[T: Ord]() -> SortedList[T]:
     let array = sortedarray_new(0 as c_uint, Some(slot_compare))
     assert(array as i64 != 0)
-    SortedVec { array: array }
+    SortedList { array: array }
 
-impl[T: Ord] SortedVec[T]:
+impl[T: Ord] SortedList[T]:
     fn comparator() -> fn(*const u8, *const u8) -> i32:
         (a, b) =>
             let left = unsafe { &(*(a as *const Slot[T])).value }
@@ -83,10 +83,10 @@ impl[T: Ord] SortedVec[T]:
         unsafe { sortedarray_clear(self.array) }
 
     /// An ephemeral cursor over the values in order, yielding views.
-    pub fn iter() -> SortedVecIter[T]:
-        SortedVecIter { array: self.array as i64, index: 0, len: self.len() }
+    pub fn iter() -> SortedListIter[T]:
+        SortedListIter { array: self.array as i64, index: 0, len: self.len() }
 
-impl[T] Drop for SortedVec[T]:
+impl[T] Drop for SortedList[T]:
     move fn drop():
         let len = unsafe { sortedarray_length(self.array) } as i32
         for index in 0..len:
@@ -96,11 +96,11 @@ impl[T] Drop for SortedVec[T]:
             unsafe { with_free(slot as *mut u8) }
         unsafe { sortedarray_free(self.array) }
 
-/// Cursor over a SortedVec; obtain via `sorted.iter()`. `next()` yields
+/// Cursor over a SortedList; obtain via `sorted.iter()`. `next()` yields
 /// `Some(&T)` in ascending order, then `None`.
-pub type SortedVecIter[T] ephemeral { array: i64, index: i32, len: i32 }
+pub type SortedListIter[T] ephemeral { array: i64, index: i32, len: i32 }
 
-impl[T] SortedVecIter[T]:
+impl[T] SortedListIter[T]:
     pub mut fn next() -> Option[&T]:
         if self.index >= self.len: return None
         let slot = unsafe { sortedarray_get(self.array as *mut _SortedArray, self.index as c_uint) } as *const Slot[T]

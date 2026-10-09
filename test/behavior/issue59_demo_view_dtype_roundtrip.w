@@ -15,7 +15,7 @@ fn main:
     assert(echoed.dtype == .Int32)
 
     let entry = bind("a", echoed)
-    let entries: Vec[BindEntry] = Vec.new()
+    let entries: List[BindEntry] = List.new()
     entries.push(move entry)
     let bindings = bindings_from(move entries)
     assert(bindings.entries.len() == 1)

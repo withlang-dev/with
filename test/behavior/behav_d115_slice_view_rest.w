@@ -2,7 +2,7 @@
 //! expect-stdout: 10 2 20 40
 //! expect-stdout: 4
 
-// D115 (§9.7): over a place, a slice or a Vec, the pattern observes its
+// D115 (§9.7): over a place, a slice or a List, the pattern observes its
 // subject: elements bind as views and `rest` is a `[]T` view of the
 // elements between the matched ends. The subject stays whole.
 fn first_and_rest(s: []i32) -> i32:

@@ -56,7 +56,7 @@ pub fn read_all() -> str:
 // A CRLF line loses its `\r` in place. Draining the split with remove(0)
 // shifted every remaining line once per line, quadratic in the line count
 // (#1352: `with -n` ran over two minutes on 16 MB).
-pub fn Stdin.lines(self: &Self) -> Vec[str]:
+pub fn Stdin.lines(self: &Self) -> List[str]:
     let _ = self
     var out = lines(read_all())
     for i in 0..out.len():

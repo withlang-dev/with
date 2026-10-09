@@ -12,18 +12,18 @@ enum Token:
 fn a: "A".to_lower()
 
 fn main:
-    let names: Vec[str] = [a(), a(), "bc".to_lower()]
+    let names: List[str] = [a(), a(), "bc".to_lower()]
     assert((names.iter() |> filter(it.len() > 1) |> count()) == 1)
     assert((names.iter() |> map(it.len()) |> sum()) == 4)
     assert(names.iter() |> any(it == "bc"))
     assert((names.iter() |> take(2) |> count()) == 2)
-    let lens = names.iter() |> map(it.len()) |> collect[Vec]()
+    let lens = names.iter() |> map(it.len()) |> collect[List]()
     assert(lens.len() == 3)
-    let kept = names.iter() |> filter(it.len() == 1) |> collect[Vec]()
+    let kept = names.iter() |> filter(it.len() == 1) |> collect[List]()
     assert(kept.len() == 2)
-    let owned = names.iter() |> filter(it.len() == 1) |> map(it) |> collect[Vec]()
+    let owned = names.iter() |> filter(it.len() == 1) |> map(it) |> collect[List]()
     assert(owned.len() == 2)
-    let upper = names.iter() |> map(it.to_upper()) |> collect[Vec]()
+    let upper = names.iter() |> map(it.to_upper()) |> collect[List]()
     assert(upper[2] == "BC")
     var walk = names.iter()
     assert(walk.next().unwrap() == "a")
@@ -31,7 +31,7 @@ fn main:
     for name in names.iter(): total += name.len() as i32
     assert(total == 4)
     // An element that is an enum with an owned payload.
-    let tokens: Vec[Token] = [.Name(a()), .End, .Name("bc".to_lower())]
+    let tokens: List[Token] = [.Name(a()), .End, .Name("bc".to_lower())]
     let named = tokens.iter() |> filter(match it { .Name(_) => true, _ => false }) |> count()
     assert(named == 2)
     // `names` still owns every element.

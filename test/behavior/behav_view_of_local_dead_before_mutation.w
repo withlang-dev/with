@@ -7,7 +7,7 @@
 type Box2 { n: i32 }
 
 fn main:
-    var v: Vec[str] = Vec.new()
+    var v: List[str] = List.new()
     v.push("a")
     let s = &v
     let n1 = s.len()

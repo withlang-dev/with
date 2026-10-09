@@ -10,15 +10,15 @@
 
 // D115 (§9.7): a temporary is owned, so the pattern takes it apart by
 // value: each binding owns its element and `rest` is the owned remainder,
-// a `Vec[W]` in the temporary's own buffer. Under a bare `..` the remainder
+// a `List[W]` in the temporary's own buffer. Under a bare `..` the remainder
 // drops with the subject at the end of the `let`; the bound element lives
 // on (it once bound a view into the dropped temporary).
 type W { id: i32 }
 impl Drop for W:
     move fn drop(): print(f"drop {self.id}")
 
-fn mk() -> Vec[W]: [W { id: 1 }, W { id: 2 }, W { id: 3 }, W { id: 4 }]
-fn pair() -> Vec[W]: [W { id: 5 }, W { id: 6 }]
+fn mk() -> List[W]: [W { id: 1 }, W { id: 2 }, W { id: 3 }, W { id: 4 }]
+fn pair() -> List[W]: [W { id: 5 }, W { id: 6 }]
 
 fn ends() -> i32:
     let [first, ..rest, last] = mk() else return -1

@@ -13,7 +13,7 @@ fn empty:
 
 fn filled_and_reused:
     var map = SlotMap[Item].new()
-    let handles: Vec[Handle[Item]] = Vec.new()
+    let handles: List[Handle[Item]] = List.new()
     for i in 0..128: handles.push(map.insert(Item { text: f"item {i}" }))
     let removed = map.remove(handles[3]).unwrap()
     assert(removed.text == "item 3")

@@ -4,8 +4,8 @@
 // binding) keeps `v` as the view's origin; `v[0] = …` drops the element `x`
 // still views.
 
-fn mkv() -> Vec[str]:
-    var v: Vec[str] = Vec.new()
+fn mkv() -> List[str]:
+    var v: List[str] = List.new()
     v.push("a".clone())
     v.push("b".clone())
     v

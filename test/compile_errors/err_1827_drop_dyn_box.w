@@ -8,7 +8,7 @@
 
 use std.box.Box
 
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 trait Named:
     fn name(self: &Self) -> i32

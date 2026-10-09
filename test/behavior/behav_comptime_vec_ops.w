@@ -1,14 +1,14 @@
 //! expect-stdout: ok
 
 comptime fn i32_pop_val() -> i32:
-    var v = Vec[i32].new()
+    var v = List[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)
     v.pop().unwrap()
 
-comptime fn i32_pop_remaining() -> Vec[i32]:
-    var v = Vec[i32].new()
+comptime fn i32_pop_remaining() -> List[i32]:
+    var v = List[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)
@@ -16,28 +16,28 @@ comptime fn i32_pop_remaining() -> Vec[i32]:
     v
 
 comptime fn i32_remove_first() -> i32:
-    var v = Vec[i32].new()
+    var v = List[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)
     v.remove(0)
 
 comptime fn i32_remove_middle() -> i32:
-    var v = Vec[i32].new()
+    var v = List[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)
     v.remove(1)
 
 comptime fn i32_remove_last() -> i32:
-    var v = Vec[i32].new()
+    var v = List[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)
     v.remove(2)
 
-comptime fn i32_remove_remaining() -> Vec[i32]:
-    var v = Vec[i32].new()
+comptime fn i32_remove_remaining() -> List[i32]:
+    var v = List[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)
@@ -45,7 +45,7 @@ comptime fn i32_remove_remaining() -> Vec[i32]:
     v
 
 comptime fn i32_clear_len() -> i64:
-    var v = Vec[i32].new()
+    var v = List[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)
@@ -53,25 +53,25 @@ comptime fn i32_clear_len() -> i64:
     v.len()
 
 comptime fn i32_contains_hit() -> bool:
-    var v = Vec[i32].new()
+    var v = List[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)
     v.contains(20)
 
 comptime fn i32_contains_miss() -> bool:
-    var v = Vec[i32].new()
+    var v = List[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)
     v.contains(99)
 
 const POP_VAL: i32 = comptime i32_pop_val()
-const POP_REM: Vec[i32] = comptime i32_pop_remaining()
+const POP_REM: List[i32] = comptime i32_pop_remaining()
 const REM_FIRST: i32 = comptime i32_remove_first()
 const REM_MID: i32 = comptime i32_remove_middle()
 const REM_LAST: i32 = comptime i32_remove_last()
-const REM_REM: Vec[i32] = comptime i32_remove_remaining()
+const REM_REM: List[i32] = comptime i32_remove_remaining()
 const CLR_LEN: i64 = comptime i32_clear_len()
 const HAS_20: bool = comptime i32_contains_hit()
 const HAS_99: bool = comptime i32_contains_miss()

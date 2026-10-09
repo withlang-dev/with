@@ -10,7 +10,7 @@ type Rock { x: f32 = 0.0 }
 impl Copy for Rock
 
 fn main:
-    var rocks: Vec[Rock] = Vec.new()
+    var rocks: List[Rock] = List.new()
     rocks.push(Rock { x: 1.0 })
     rocks.push(Rock { x: 2.0 })
     let last = rocks[rocks.len() as i32 - 1]

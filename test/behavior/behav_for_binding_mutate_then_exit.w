@@ -8,7 +8,7 @@
 // view again. Find-then-grow and find-then-clear stay accepted.
 
 type KV { key: str, n: i32 }
-type Bag { items: Vec[KV] }
+type Bag { items: List[KV] }
 
 impl Bag:
     mut fn clear_if_found(n: i32) -> bool:
@@ -19,7 +19,7 @@ impl Bag:
         false
 
 fn main:
-    var xs: Vec[KV] = Vec.new()
+    var xs: List[KV] = List.new()
     xs.push(KV { key: "a", n: 1 })
     xs.push(KV { key: "b", n: 2 })
     for e in xs:
@@ -27,7 +27,7 @@ fn main:
             xs.push(KV { key: "c", n: 3 })
             break
     print(f"{xs.len()}")
-    var b = Bag { items: Vec.new() }
+    var b = Bag { items: List.new() }
     b.items.push(KV { key: "a", n: 1 })
     if b.clear_if_found(1):
         print("1")

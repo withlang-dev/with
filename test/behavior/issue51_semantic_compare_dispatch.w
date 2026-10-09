@@ -4,7 +4,7 @@ type Entry {
 }
 
 type Wrap {
-    items: Vec[Entry],
+    items: List[Entry],
 }
 
 fn dup(s: str) -> str:
@@ -31,7 +31,7 @@ fn array_entry_eq() -> bool:
 
 fn main:
     assert(direct_str_eq(dup("a"), "a"))
-    let items: Vec[Entry] = Vec.new()
+    let items: List[Entry] = List.new()
     items.push(Entry { name: dup("x"), rank: 1 })
     items.push(Entry { name: "y", rank: 2 })
     let wrap = Wrap { items }

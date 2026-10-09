@@ -4,7 +4,7 @@
 // the caller's view is judged once every body is checked.
 // A call writes every global its callee writes.
 
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 fn main:
     G.push("first" ++ "!")

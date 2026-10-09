@@ -6,7 +6,7 @@
 
 // `urls` are the archive's mirrors in the recipe's order; the first is the
 // canonical one, the rest are tried when it does not answer.
-pub type ConanSource { urls: Vec[str], sha256: str }
+pub type ConanSource { urls: List[str], sha256: str }
 
 fn cr_unquote(text: &str) -> str:
     let t = text.trim()
@@ -19,8 +19,8 @@ fn cr_is_version_key(line: &str, version: &str) -> bool:
 // The lines of `section:`'s block for `version`, trimmed. conandata.yml is
 // regular enough to read by line: a version block ends at the next line that
 // is itself a key with nothing after the colon, other than `url:`.
-fn cr_version_block(data: &str, section: &str, version: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn cr_version_block(data: &str, section: &str, version: &str) -> List[str]:
+    let out: List[str] = List.new()
     var in_section = false
     var in_version = false
     for raw in data.split("\n"):
@@ -36,7 +36,7 @@ fn cr_version_block(data: &str, section: &str, version: &str) -> Vec[str]:
     out
 
 pub fn conan_data_source(data: &str, version: &str) -> ConanSource:
-    let urls: Vec[str] = Vec.new()
+    let urls: List[str] = List.new()
     var sha256 = ""
     var in_url_list = false
     for line in cr_version_block(data, "sources", version):
@@ -85,8 +85,8 @@ pub fn conan_data_patch_problem(data: &str, version: &str) -> str:
     ""
 
 // Paths of the version's patch files, relative to the recipe folder, in order.
-pub fn conan_data_patches(data: &str, version: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn conan_data_patches(data: &str, version: &str) -> List[str]:
+    let out: List[str] = List.new()
     for line in cr_version_block(data, "patches", version):
         let at = line.find("patch_file:")
         if at >= 0: out.push(cr_unquote(line.slice(at + 11, line.len())))

@@ -157,9 +157,9 @@ pub type AnalysisFact {
 }
 
 pub type AnalysisReport {
-    facts: Vec[AnalysisFact],
-    violations: Vec[str],
-    notes: Vec[str],
+    facts: List[AnalysisFact],
+    violations: List[str],
+    notes: List[str],
 }
 
 pub type AnalysisBackendResult {
@@ -168,7 +168,7 @@ pub type AnalysisBackendResult {
 }
 
 fn AnalysisReport.init -> AnalysisReport:
-    AnalysisReport { facts: Vec.new(), violations: Vec.new(), notes: Vec.new() }
+    AnalysisReport { facts: List.new(), violations: List.new(), notes: List.new() }
 
 fn AnalysisFact.new(stage: AnalysisStage, kind: AnalysisFactKind) -> AnalysisFact:
     AnalysisFact {
@@ -308,7 +308,7 @@ pub fn analysis_parse_i32(text: &str) -> i32:
     value * sign
 
 fn analysis_escape(text: &str) -> str:
-    let parts: Vec[str] = Vec.new()
+    let parts: List[str] = List.new()
     var start = 0
     for i in 0..text.len() as i32:
         let c = text[i] as i32
@@ -402,7 +402,7 @@ impl AnalysisFact:
 
 impl AnalysisReport:
     fn render_facts(query: &str) -> str:
-        let lines: Vec[str] = Vec.new()
+        let lines: List[str] = List.new()
         lines.push("analysis-facts\tv2\tstage\tkind\tid\tparent\tnode\tbody\tsymbol\towner\tindex\ttype\teffects\tflags\tsource-file\tstart\tend\tline\tcolumn\tpath\tname\tdetail\n")
         for i in 0..self.facts.len() as i32:
             let fact = self.facts[i]
@@ -420,7 +420,7 @@ impl AnalysisReport:
         count
 
     fn render_summary(query: &str) -> str:
-        let lines: Vec[str] = Vec.new()
+        let lines: List[str] = List.new()
         lines.push("analysis-summary\tv1\n")
         let stages = [AnalysisStage.Ast, AnalysisStage.Sema, AnalysisStage.Mir, AnalysisStage.Abi, AnalysisStage.Codegen, AnalysisStage.Diagnostic, AnalysisStage.Source]
         let kinds = [
@@ -435,8 +435,8 @@ impl AnalysisReport:
             AnalysisFactKind.MethodResolution, AnalysisFactKind.ForeignContract,
             AnalysisFactKind.GlobalEffect, AnalysisFactKind.Operator,
         ]
-        let stage_counts: Vec[i32] = Vec.new()
-        let kind_counts: Vec[i32] = Vec.new()
+        let stage_counts: List[i32] = List.new()
+        let kind_counts: List[i32] = List.new()
         for i in 0..8: stage_counts.push(0)
         for i in 0..28: kind_counts.push(0)
         var total = 0
@@ -464,7 +464,7 @@ impl AnalysisReport:
         lines.join("")
 
     fn render_matrix(query: &str) -> str:
-        let lines: Vec[str] = Vec.new()
+        let lines: List[str] = List.new()
         lines.push("analysis-matrix\tv2\tstage\tkind\tname\towner\tindex\ttype\teffects\tflags\tsource-file\tstart\tend\tdetail\n")
         for i in 0..self.facts.len() as i32:
             let fact = self.facts[i]
@@ -482,7 +482,7 @@ impl AnalysisReport:
         lines.join("")
 
     fn render_verdict(label: &str) -> str:
-        let lines: Vec[str] = Vec.new()
+        let lines: List[str] = List.new()
         for i in 0..self.notes.len() as i32:
             lines.push("note: ")
             lines.push(with_str_clone_ref(self.notes[i]))

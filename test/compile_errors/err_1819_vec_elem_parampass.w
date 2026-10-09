@@ -4,7 +4,7 @@
 // callable parameter; the closure a caller passes for it writes G.
 // A call writes every global its callee writes.
 
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 fn apply(f: fn() -> Unit):
     let r = G[0]

@@ -2,7 +2,7 @@
 
 // #604 stage 1: []mut T is not a return type in this release.
 
-fn view(v: Vec[i32]) -> []mut i32:
+fn view(v: List[i32]) -> []mut i32:
     v
 
 fn main:

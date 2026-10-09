@@ -13,7 +13,7 @@ fn check(i: i32, bad: i32) -> Result[str, str]:
     if i == bad: return Err(f"bad{i}")
     Ok(f"ok{i}")
 
-fn checked_vec(bad: i32) -> Result[Vec[str], str]:
+fn checked_list(bad: i32) -> Result[List[str], str]:
     let v = [check(i, bad)? for i in 0..6]
     Ok(v)
 
@@ -22,12 +22,12 @@ fn checked_set(bad: i32) -> Result[HashSet[str], str]:
     Ok(s)
 
 fn main:
-    match checked_vec(2):
+    match checked_list(2):
         Ok(v) => print(f"vec kept {v.len()}")
         Err(e) => print(f"vec stopped at {e}")
     match checked_set(3):
         Ok(s) => print(f"set kept {s.len()}")
         Err(e) => print(f"set stopped at {e}")
-    match checked_vec(9):
+    match checked_list(9):
         Ok(v) => print(f"all {v.len() - 2}")
         Err(e) => print(f"vec stopped at {e}")

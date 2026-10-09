@@ -12,7 +12,7 @@ fn main:
     var map: HashMap[i32, i32] = HashMap.new()
     map.insert(1, 65)
     let values = [map.get(1).unwrap(), 66]
-    let collected: Vec[i32] = [map.get(1).unwrap(), 67]
+    let collected: List[i32] = [map.get(1).unwrap(), 67]
     map.clear()
     assert(values[0] == 65)
     assert(values[1] == 66)

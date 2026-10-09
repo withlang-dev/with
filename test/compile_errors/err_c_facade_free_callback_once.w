@@ -3,7 +3,7 @@
 // Callback userdata cannot erase the call-once restriction of a closure:
 // `visit` hands its callable to C as `each`'s userdata, and C calls the
 // callback — and so the userdata — any number of times (§12.4, §16.2b.9).
-// A Vec capture, not a str: a str capture is copied (D111).
+// A List capture, not a str: a str capture is copied (D111).
 use c_import("static inline int each(int (*visit)(void *, int), void *ctx) { visit(ctx, 7); return visit(ctx, 9); }")
 c facade calls:
     fn each
@@ -11,5 +11,5 @@ c facade calls:
 fn invoke(context: &fn(i32) -> i32, value: i32) -> i32: context(value)
 fn visit(callback: fn(i32) -> i32): each(invoke, callback)
 fn main:
-    let owned: Vec[i32] = [1]
+    let owned: List[i32] = [1]
     visit(value => { drop(owned); value })

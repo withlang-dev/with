@@ -8,7 +8,7 @@ extern fn with_fs_read_file(path: &str) -> str
 pub type Source {
     path: str,
     text: str,
-    line_offsets: Vec[i32],
+    line_offsets: List[i32],
     file_id: FileId,
 }
 
@@ -70,8 +70,8 @@ pub fn Source.line_text(self: &Self, line: i32) -> str:
         return slice.slice(0, (slice.len() - 1) as i64)
     slice
 
-fn source_compute_line_offsets(text: &str) -> Vec[i32]:
-    var offsets: Vec[i32] = Vec.new()
+fn source_compute_line_offsets(text: &str) -> List[i32]:
+    var offsets: List[i32] = List.new()
     offsets.push(0)
     for i in 0..text.len():
         if text[i] == 10:

@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
-fn test_vec_split_at_mut:
-    var xs = Vec.new()
+fn test_list_split_at_mut:
+    var xs = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)
@@ -40,7 +40,7 @@ fn test_slice_split_at_mut:
     assert(xs[3] == 40)
 
 fn test_range_split_at_mut:
-    var xs = Vec.new()
+    var xs = List.new()
     xs.push(100)
     xs.push(200)
     xs.push(300)
@@ -55,7 +55,7 @@ fn test_range_split_at_mut:
     assert(xs[3] == 401)
 
 fn main:
-    test_vec_split_at_mut()
+    test_list_split_at_mut()
     test_array_split_at_mut()
     test_slice_split_at_mut()
     test_range_split_at_mut()

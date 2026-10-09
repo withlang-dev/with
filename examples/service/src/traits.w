@@ -8,7 +8,7 @@ use errors.*
 trait UserRepository:
     async fn find_by_id(self: &Self, id: UserId) -> Option[User]
     async fn find_by_email(self: &Self, email: str) -> Option[User]
-    async fn list_active(self: &Self, limit: i32, offset: i32) -> Vec[User]
+    async fn list_active(self: &Self, limit: i32, offset: i32) -> List[User]
     async fn insert(self: &Self, user: User) -> UserId
     async fn update(self: &Self, id: UserId, fields: UserUpdate) -> bool
     async fn delete(self: &Self, id: UserId) -> bool
@@ -30,7 +30,7 @@ trait CacheService:
 
 trait NotificationService:
     async fn send(self: &Self, notif: Notification) -> bool
-    async fn send_batch(self: &Self, notifs: Vec[Notification]) -> i32
+    async fn send_batch(self: &Self, notifs: List[Notification]) -> i32
 
 // --- Audit Logging ---
 

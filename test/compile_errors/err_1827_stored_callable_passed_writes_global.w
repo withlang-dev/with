@@ -4,7 +4,7 @@
 // callable its caller passes for `f`; the caller passes one read out of a
 // field, which may be any callable value of its type — `grow` among them,
 // which reallocates `G` while `r` views its first element.
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 type H:
     f: fn() -> Unit

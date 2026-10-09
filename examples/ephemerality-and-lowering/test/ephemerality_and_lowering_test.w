@@ -29,7 +29,7 @@ fn test_with_blocks:
             assert(x + y == 30)
 
 fn run_defer_order:
-    var order = Vec.new()
+    var order = List.new()
     order.push(1)
     defer: defer_order_len.store(order.len(), .SeqCst)
     defer: defer_order_third.store(order[2], .SeqCst)
@@ -49,8 +49,8 @@ fn test_defer_order:
     assert(defer_order_fourth.load(.SeqCst) == 4)
 
 @[test]
-fn test_vec_mutation:
-    var buffer = Vec.new()
+fn test_list_mutation:
+    var buffer = List.new()
     buffer.push(1)
     buffer.push(2)
     buffer.push(3)

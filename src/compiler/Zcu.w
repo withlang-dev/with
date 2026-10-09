@@ -23,8 +23,8 @@ fn zcu_owned_text(text: &str) -> str:
         return ""
     runtime_str_clone(text)
 
-fn zcu_new_vec_str -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn zcu_new_list_str -> List[str]:
+    let out: List[str] = List.new()
     out
 
 pub fn zcu_debug_init_enabled() -> i32:
@@ -52,10 +52,10 @@ pub type Zcu {
     pool: InternPool,
     frontend_pool: InternPool,
     diagnostics: DiagnosticList,
-    imported_paths: Vec[str],
-    imported_std_identities: Vec[str],
-    imported_std_files: Vec[str],
-    import_conflicts: Vec[str],
+    imported_paths: List[str],
+    imported_std_identities: List[str],
+    imported_std_files: List[str],
+    import_conflicts: List[str],
     // #682-inc1: pool decl count (and its non-use subset) of the pre-expanded
     // prelude closure prefix — [use decl, closure decls...] parsed BEFORE the
     // user source so the prefix's node/intern/file ids are deterministic for
@@ -63,23 +63,23 @@ pub type Zcu {
     // modes and secondary frontend entries keep the legacy order).
     prelude_prefix_decls: i32,
     prelude_prefix_non_use: i32,
-    decl_source_paths: Vec[str],
-    decl_source_file_ids: Vec[i32],
-    decl_is_c_import: Vec[i32],   // 0, or 1 + the offset of the importing `use c_import` (Sema.decl_is_c_import)
+    decl_source_paths: List[str],
+    decl_source_file_ids: List[i32],
+    decl_is_c_import: List[i32],   // 0, or 1 + the offset of the importing `use c_import` (Sema.decl_is_c_import)
     c_import_omitted_symbols: HashMap[str, str],
-    c_import_cache_keys: Vec[str],
-    c_import_cache_values: Vec[str],
+    c_import_cache_keys: List[str],
+    c_import_cache_values: List[str],
     source_dir: str,
     next_file_id: i32,
     current_source_path: str,
     current_source_text: str,
-    extra_source_names: Vec[str],
-    extra_source_texts: Vec[str],
-    source_text_file_ids: Vec[i32],
-    source_text_names: Vec[str],
-    source_texts: Vec[str],
+    extra_source_names: List[str],
+    extra_source_texts: List[str],
+    source_text_file_ids: List[i32],
+    source_text_names: List[str],
+    source_texts: List[str],
     tool_mode_entry_path: str,
-    pending_warnings: Vec[str],
+    pending_warnings: List[str],
     last_resolved: ResolveResult,
     resolved_root_path: str,
     // Wave 5 canonical typed sidecars from the latest semantic pass.
@@ -93,12 +93,12 @@ pub type Zcu {
     // #650: how many codegen-unit objects the last backend emit produced
     // (1 = single canonical object; K > 1 adds <obj>.u1.o .. .u{K-1}.o).
     last_codegen_unit_count: i32,
-    last_link_lib_names: Vec[str],
-    tracked_input_paths: Vec[str],
+    last_link_lib_names: List[str],
+    tracked_input_paths: List[str],
     // D39: module prefixes of the `--link-bundle` manifests — codegen
     // declares (never defines) the functions of these modules, exactly as
     // for the compiler's embedded bundles (Codegen.bundle_prefixes).
-    link_bundle_prefixes: Vec[str],
+    link_bundle_prefixes: List[str],
     // D38 batch C3: `--bundle-corpus <rel>` of a bundle build — codegen
     // owns (defines) every module under it (Codegen.bundle_corpus); "".
     bundle_corpus: str,
@@ -108,12 +108,12 @@ pub type Zcu {
     // The symbols the source names — the on-demand interface merge's S —
     // and the interface sections whose declarations wait for it.
     iface_mentioned: HashMap[i32, i32],
-    pending_iface_paths: Vec[str],
-    pending_iface_texts: Vec[str],
+    pending_iface_paths: List[str],
+    pending_iface_texts: List[str],
     import_path_memo: HashMap[str, str],   // "name|dir" → resolved module path (the sections' 937 use lines name ~35 modules)
     // The owned globals the last bundle build could not fold to data
     // (Codegen.bundle_unlowered_globals), for the interface emitter.
-    last_bundle_unlowered_globals: Vec[str],
+    last_bundle_unlowered_globals: List[str],
     project_config: ProjectConfig,
     trace_c_import_cache: i32,
     // Analysis commands preserve diagnostics but may continue past preliminary
@@ -125,10 +125,10 @@ pub type Zcu {
     // to exit 0, whatever state produced the stop.
     frontend_sema_completed: i32,
     prelude_mode: i32,
-    cli_diag_gen_starts: Vec[i32],
-    cli_diag_gen_ends: Vec[i32],
-    cli_diag_source_names: Vec[str],
-    cli_diag_source_texts: Vec[str],
+    cli_diag_gen_starts: List[i32],
+    cli_diag_gen_ends: List[i32],
+    cli_diag_source_names: List[str],
+    cli_diag_source_texts: List[str],
 }
 
 fn Zcu.init -> Zcu:
@@ -145,29 +145,29 @@ fn Zcu.init -> Zcu:
         // Zcu owns the active diagnostic list. The placeholder snapshot has an
         // independent empty list so neither field aliases or moves from the other.
         diagnostics,
-        imported_paths: zcu_new_vec_str(),
-        imported_std_identities: zcu_new_vec_str(),
-        imported_std_files: zcu_new_vec_str(),
-        import_conflicts: zcu_new_vec_str(),
+        imported_paths: zcu_new_list_str(),
+        imported_std_identities: zcu_new_list_str(),
+        imported_std_files: zcu_new_list_str(),
+        import_conflicts: zcu_new_list_str(),
         prelude_prefix_decls: 0,
         prelude_prefix_non_use: 0,
-        decl_source_paths: zcu_new_vec_str(),
-        decl_source_file_ids: Vec.new(),
-        decl_is_c_import: Vec.new(),
+        decl_source_paths: zcu_new_list_str(),
+        decl_source_file_ids: List.new(),
+        decl_is_c_import: List.new(),
         c_import_omitted_symbols: HashMap.new(),
-        c_import_cache_keys: zcu_new_vec_str(),
-        c_import_cache_values: zcu_new_vec_str(),
+        c_import_cache_keys: zcu_new_list_str(),
+        c_import_cache_values: zcu_new_list_str(),
         source_dir: ".",
         next_file_id: 1,
         current_source_path: "<unknown>",
         current_source_text: "",
-        extra_source_names: zcu_new_vec_str(),
-        extra_source_texts: zcu_new_vec_str(),
-        source_text_file_ids: Vec.new(),
-        source_text_names: zcu_new_vec_str(),
-        source_texts: zcu_new_vec_str(),
+        extra_source_names: zcu_new_list_str(),
+        extra_source_texts: zcu_new_list_str(),
+        source_text_file_ids: List.new(),
+        source_text_names: zcu_new_list_str(),
+        source_texts: zcu_new_list_str(),
         tool_mode_entry_path: "",
-        pending_warnings: zcu_new_vec_str(),
+        pending_warnings: zcu_new_list_str(),
         last_resolved: ResolveResult.init(),
         resolved_root_path: "",
         last_typed_dump: "",
@@ -178,43 +178,43 @@ fn Zcu.init -> Zcu:
         last_async_mir_module: AsyncMirModule.init(),
         last_async_mir_dump: "",
         last_codegen_unit_count: 1,
-        last_link_lib_names: zcu_new_vec_str(),
-        tracked_input_paths: zcu_new_vec_str(),
-        link_bundle_prefixes: zcu_new_vec_str(),
+        last_link_lib_names: zcu_new_list_str(),
+        tracked_input_paths: zcu_new_list_str(),
+        link_bundle_prefixes: zcu_new_list_str(),
         bundle_corpus: "",
         interface_eager: false,
         iface_mentioned: HashMap.new(),
-        pending_iface_paths: zcu_new_vec_str(),
-        pending_iface_texts: zcu_new_vec_str(),
+        pending_iface_paths: zcu_new_list_str(),
+        pending_iface_texts: zcu_new_list_str(),
         import_path_memo: HashMap.new(),
-        last_bundle_unlowered_globals: zcu_new_vec_str(),
+        last_bundle_unlowered_globals: zcu_new_list_str(),
         project_config: project_config_default(),
         trace_c_import_cache: 0,
         analysis_partial_semantics: 0,
         frontend_sema_completed: 0,
         prelude_mode: PRELUDE_FULL(),
-        cli_diag_gen_starts: Vec.new(),
-        cli_diag_gen_ends: Vec.new(),
-        cli_diag_source_names: zcu_new_vec_str(),
-        cli_diag_source_texts: zcu_new_vec_str(),
+        cli_diag_gen_starts: List.new(),
+        cli_diag_gen_ends: List.new(),
+        cli_diag_source_names: zcu_new_list_str(),
+        cli_diag_source_texts: zcu_new_list_str(),
     }
 
 impl Zcu:
-    mut fn add_link_bundle_prefixes(prefixes: &Vec[str]):
+    mut fn add_link_bundle_prefixes(prefixes: &List[str]):
         for i in 0..prefixes.len() as i32:
             let prefix = prefixes[i]
             if not self.link_bundle_prefixes.contains(prefix):
                 self.link_bundle_prefixes.push(with_str_clone_ref(prefix))
 
     mut fn reset_import_state():
-        let empty = zcu_new_vec_str()
+        let empty = zcu_new_list_str()
         self.imported_paths = empty
-        self.imported_std_identities = zcu_new_vec_str()
-        self.imported_std_files = zcu_new_vec_str()
-        self.import_conflicts = zcu_new_vec_str()
-        self.decl_source_paths = zcu_new_vec_str()
-        self.decl_source_file_ids = Vec.new()
-        self.decl_is_c_import = Vec.new()
+        self.imported_std_identities = zcu_new_list_str()
+        self.imported_std_files = zcu_new_list_str()
+        self.import_conflicts = zcu_new_list_str()
+        self.decl_source_paths = zcu_new_list_str()
+        self.decl_source_file_ids = List.new()
+        self.decl_is_c_import = List.new()
         self.c_import_omitted_symbols = HashMap.new()
         self.next_file_id = 1
 
@@ -258,16 +258,16 @@ impl Zcu:
         self.imported_std_identities.push(zcu_owned_text(identity))
         self.imported_std_files.push(zcu_owned_text(key))
 
-    fn import_conflict_messages() -> Vec[str]:
-        var out = zcu_new_vec_str()
+    fn import_conflict_messages() -> List[str]:
+        var out = zcu_new_list_str()
         for i in 0..self.import_conflicts.len() as i32:
             out.push(zcu_owned_text(self.import_conflicts[i]))
         out
 
     mut fn seed_decl_source_paths(new_pool: AstPool, path: &str, file_id: i32):
-        self.decl_source_paths = Vec.new()
-        self.decl_source_file_ids = Vec.new()
-        self.decl_is_c_import = Vec.new()
+        self.decl_source_paths = List.new()
+        self.decl_source_file_ids = List.new()
+        self.decl_is_c_import = List.new()
         for _ in 0..new_pool.decl_count():
             self.decl_source_paths.push(zcu_owned_text(path))
             self.decl_source_file_ids.push(file_id)
@@ -332,10 +332,10 @@ impl Zcu:
         self.prelude_mode = compilation_normalize_prelude_mode(mode)
 
     mut fn clear_cli_diag_mappings():
-        self.cli_diag_gen_starts = Vec.new()
-        self.cli_diag_gen_ends = Vec.new()
-        self.cli_diag_source_names = Vec.new()
-        self.cli_diag_source_texts = Vec.new()
+        self.cli_diag_gen_starts = List.new()
+        self.cli_diag_gen_ends = List.new()
+        self.cli_diag_source_names = List.new()
+        self.cli_diag_source_texts = List.new()
 
     fn add_cli_diag_mapping(gen_start: i32, gen_end: i32, source_name: &str, source_text: &str) -> Unit:
         self.cli_diag_gen_starts.push(gen_start)
@@ -374,8 +374,8 @@ impl Zcu:
             return
         // #670: labels can point into other files (e.g. E0921's concurrency
         // evidence in the std prelude); resolve each one against its own file.
-        let label_paths: Vec[str] = Vec.new()
-        let label_texts: Vec[str] = Vec.new()
+        let label_paths: List[str] = List.new()
+        let label_texts: List[str] = List.new()
         for li in 0..diag.labels.len() as i32:
             let lab_file = diag.labels[li].span.file
             // File 0 is the root source, and is a cross-file label when the
@@ -445,7 +445,7 @@ impl Zcu:
         self.render_warnings_frontend()
 
     mut fn reset_pending_warnings():
-        let empty = zcu_new_vec_str()
+        let empty = zcu_new_list_str()
         self.pending_warnings = empty
 
     mut fn capture_pending_warnings():
@@ -467,7 +467,7 @@ impl Zcu:
         sema.interface_eager = if self.interface_eager or self.bundle_corpus.len() > 0: 1 else: 0
         sema
 
-    mut fn set_extra_sources(names: Vec[str], texts: Vec[str]):
+    mut fn set_extra_sources(names: List[str], texts: List[str]):
         self.extra_source_names = names
         self.extra_source_texts = texts
 
@@ -482,8 +482,8 @@ impl Zcu:
         self.last_typed_dump = ""
         self.typed_pool_cache = AstPool.new()
         // Reset the active diagnostics and the placeholder snapshot independently.
-        // Moving one list into both roles leaves the active Vec as a reset sentinel,
-        // which is not a reusable empty Vec (its element-size metadata is zero).
+        // Moving one list into both roles leaves the active List as a reset sentinel,
+        // which is not a reusable empty List (its element-size metadata is zero).
         self.diagnostics = DiagnosticList.init()
         self.last_sema = Sema.placeholder(self.pool, DiagnosticList.init(), AstPool.new())
         self.last_mir_module = MirModule.init()
@@ -491,23 +491,23 @@ impl Zcu:
         self.last_async_mir_module = AsyncMirModule.init()
         self.last_async_mir_dump = ""
         self.reset_last_link_lib_names()
-        self.tracked_input_paths = Vec.new()
+        self.tracked_input_paths = List.new()
         self.trace_c_import_cache = 0
-        self.source_text_file_ids = Vec.new()
-        self.source_text_names = Vec.new()
-        self.source_texts = Vec.new()
+        self.source_text_file_ids = List.new()
+        self.source_text_names = List.new()
+        self.source_texts = List.new()
 
     mut fn reset_for_new_invocation(dir: &str, path: &str, text: &str):
         self.set_current_source(dir, path, text)
         self.frontend_sema_completed = 0
-        self.extra_source_names = Vec.new()
-        self.extra_source_texts = Vec.new()
+        self.extra_source_names = List.new()
+        self.extra_source_texts = List.new()
         self.reset_import_state()
         self.reset_pending_warnings()
         self.clear_stage_outputs()
         self.project_config = project_config_default()
 
-    mut fn set_pending_warnings(warnings: Vec[str]):
+    mut fn set_pending_warnings(warnings: List[str]):
         self.pending_warnings = warnings
 
     mut fn set_pool(new_pool: InternPool):
@@ -523,7 +523,7 @@ impl Zcu:
         var tracked_paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &sema.tracked_input_paths)
         // Callers move sema.diags into Zcu.diagnostics before syncing. The moved
-        // field is an all-zero reset sentinel, not a reusable Vec: pushing a
+        // field is an all-zero reset sentinel, not a reusable List: pushing a
         // later comptime/action diagnostic would allocate zero bytes and leave
         // stale allocator contents to be dropped as a Diagnostic (#743).
         sema.diags = DiagnosticList.init()
@@ -532,7 +532,7 @@ impl Zcu:
             runtime_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.state.symbol_texts.len() as i32} last_sema.pool={self.last_sema.pool.state.symbol_texts.len() as i32} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
 
     mut fn set_resolve_snapshot(result: &ResolveResult, root_path: &str):
-        let modules: Vec[ResolvedModule] = Vec.new()
+        let modules: List[ResolvedModule] = List.new()
         for i in 0..result.modules.len() as i32:
             let m = result.modules[i]
             modules.push(ResolvedModule {
@@ -544,7 +544,7 @@ impl Zcu:
                 decl_count: m.decl_count,
             })
 
-        let imports: Vec[ResolvedImport] = Vec.new()
+        let imports: List[ResolvedImport] = List.new()
         for i in 0..result.imports.len() as i32:
             let imp = result.imports[i]
             imports.push(ResolvedImport {
@@ -560,23 +560,23 @@ impl Zcu:
                 span_end: imp.span_end,
             })
 
-        let defs: Vec[ResolvedDef] = Vec.new()
+        let defs: List[ResolvedDef] = List.new()
         for i in 0..result.defs.len() as i32:
             defs.push(result.defs[i])
 
-        let scopes: Vec[ResolvedScope] = Vec.new()
+        let scopes: List[ResolvedScope] = List.new()
         for i in 0..result.scopes.len() as i32:
             scopes.push(result.scopes[i])
 
-        let bindings: Vec[ResolvedBinding] = Vec.new()
+        let bindings: List[ResolvedBinding] = List.new()
         for i in 0..result.bindings.len() as i32:
             bindings.push(result.bindings[i])
 
-        let uses: Vec[ResolvedUse] = Vec.new()
+        let uses: List[ResolvedUse] = List.new()
         for i in 0..result.uses.len() as i32:
             uses.push(result.uses[i])
 
-        let link_libs: Vec[i32] = Vec.new()
+        let link_libs: List[i32] = List.new()
         for i in 0..result.link_libs.len() as i32:
             link_libs.push(result.link_libs[i])
 
@@ -601,11 +601,11 @@ impl Zcu:
         self.last_async_mir_module = async_mod
         self.last_async_mir_dump = with_str_clone_ref(async_dump)
 
-    mut fn set_link_lib_names(names: Vec[str]):
+    mut fn set_link_lib_names(names: List[str]):
         self.last_link_lib_names = names
 
     mut fn reset_last_link_lib_names():
-        let empty = zcu_new_vec_str()
+        let empty = zcu_new_list_str()
         self.last_link_lib_names = empty
 
     mut fn capture_last_link_lib_names(new_pool: InternPool, result: &ResolveResult):

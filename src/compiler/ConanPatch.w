@@ -3,8 +3,8 @@
 // context and removed lines match exactly — at the stated line, or the nearest
 // place they do — and anything else is an error naming the file and hunk.
 
-fn cp_lines(text: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn cp_lines(text: &str) -> List[str]:
+    let out: List[str] = List.new()
     for raw in text.split("\n"): out.push(if raw.ends_with("\r"): raw.slice(0, raw.len() - 1).to_owned() else: raw.to_owned())
     out
 
@@ -30,27 +30,27 @@ fn cp_hunk_old_start(line: &str) -> i32:
         i = i + 1
     if digits == 0: -1 else: n
 
-fn cp_matches_at(file: &Vec[str], at: i32, old: &Vec[str]) -> bool:
+fn cp_matches_at(file: &List[str], at: i32, old: &List[str]) -> bool:
     if at < 0 or at + old.len() as i32 > file.len() as i32: return false
     for i in 0..old.len() as i32:
         if file[at + i] != old[i]: return false
     true
 
 // Where `old` sits in `file`, preferring `want` and then the nearest line; -1 if nowhere.
-fn cp_locate(file: &Vec[str], want: i32, old: &Vec[str]) -> i32:
+fn cp_locate(file: &List[str], want: i32, old: &List[str]) -> i32:
     if cp_matches_at(file, want, old): return want
     for distance in 1..file.len() as i32 + 1:
         if cp_matches_at(file, want - distance, old): return want - distance
         if cp_matches_at(file, want + distance, old): return want + distance
     -1
 
-type CpHunk { old_start: i32, old: Vec[str], new: Vec[str] }
+type CpHunk { old_start: i32, old: List[str], new: List[str] }
 
 // The patched text of one file, or the problem. Pure: the caller reads and
 // writes through its `read`/`write` callables itself — a callable is not
 // Copy (D63), and calling through the binding observes it while passing it
 // into this helper on every file of the loop would move it.
-fn cp_patched_text(path: &str, creates: bool, original: &str, hunks: &Vec[CpHunk]) -> (str, str):
+fn cp_patched_text(path: &str, creates: bool, original: &str, hunks: &List[CpHunk]) -> (str, str):
     if not creates and original.len() == 0: return ("", "patch targets " ++ path ++ ", which is not in the source")
     let ends_with_newline = creates or original.ends_with("\n")
     var file = cp_lines(original)
@@ -62,7 +62,7 @@ fn cp_patched_text(path: &str, creates: bool, original: &str, hunks: &Vec[CpHunk
         let want: i32 = hunks[hi].old_start - 1 + shift
         let at = if hunks[hi].old.len() == 0: (if want < 0: 0 else: want) else: cp_locate(&file, want, &hunks[hi].old)
         if at < 0: return ("", f"hunk {hi + 1} of the patch does not apply to " ++ path)
-        let rebuilt: Vec[str] = Vec.new()
+        let rebuilt: List[str] = List.new()
         for i in 0..at: rebuilt.push(file[i].clone())
         for line in hunks[hi].new: rebuilt.push(line.to_owned())
         for i in at + hunks[hi].old.len() as i32..file.len() as i32: rebuilt.push(file[i].clone())
@@ -77,7 +77,7 @@ pub fn conan_apply_patch(patch: &str, root: &str, read: fn(&str) -> str, write: 
     let lines = cp_lines(patch)
     var path = ""
     var creates = false
-    var hunks: Vec[CpHunk] = Vec.new()
+    var hunks: List[CpHunk] = List.new()
     var in_hunk = false
     var i = 0
     while i <= lines.len() as i32:
@@ -95,14 +95,14 @@ pub fn conan_apply_patch(patch: &str, root: &str, read: fn(&str) -> str, write: 
             creates = cp_header_path(line) == "/dev/null"
             path = cp_header_path(lines[i + 1])
             if path == "/dev/null": return "patch deletes " ++ cp_header_path(line) ++ "; deleting a file is not supported"
-            hunks = Vec.new()
+            hunks = List.new()
             in_hunk = false
             i = i + 2
             continue
         if line.starts_with("@@ "):
             let start = cp_hunk_old_start(line)
             if start < 0: return "malformed hunk header: " ++ line
-            hunks.push(CpHunk { old_start: start, old: Vec.new(), new: Vec.new() })
+            hunks.push(CpHunk { old_start: start, old: List.new(), new: List.new() })
             in_hunk = true
         else if in_hunk and hunks.len() > 0 and not line.starts_with("\\"):
             let last = hunks.len() as i32 - 1

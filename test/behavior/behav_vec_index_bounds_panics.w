@@ -2,6 +2,6 @@
 //! expect-stderr: index out of bounds
 
 fn main:
-    let values: Vec[i32] = Vec.new()
+    let values: List[i32] = List.new()
     values.push(1)
     let _ = values[1]

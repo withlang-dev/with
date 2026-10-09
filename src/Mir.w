@@ -86,7 +86,7 @@ impl MirModule:
     // (#1414). Reads the place type through the typed validator's own walk,
     // so the ownership validator looks a place up by the same type.
     mut fn snapshot_moved_drop_types(sema: &Sema):
-        var moved: Vec[i32] = Vec.new()
+        var moved: List[i32] = List.new()
         for bi in 0..self.bodies.len():
             let body = &self.bodies[bi]
             for op in 0..body.operand_kinds.len():
@@ -101,7 +101,7 @@ impl MirModule:
             if ty > 0 and not self.sema_moved_drop_types.contains(ty) and sema.type_needs_drop_frozen(ty) != 0:
                 self.sema_moved_drop_types.insert(ty, 1)
         // #1559: every dropped place's type with drop glue.
-        var dropped: Vec[i32] = Vec.new()
+        var dropped: List[i32] = List.new()
         for bi in 0..self.bodies.len():
             let body = &self.bodies[bi]
             for si in 0..body.stmt_kinds.len():
@@ -115,7 +115,7 @@ impl MirModule:
             if ty > 0 and not self.sema_dropped_types.contains(ty) and sema.type_needs_drop_frozen(ty) != 0:
                 self.sema_dropped_types.insert(ty, 1)
         // #1814: every non-Copy element type an `array_fill` copies.
-        var filled: Vec[i32] = Vec.new()
+        var filled: List[i32] = List.new()
         for bi in 0..self.bodies.len():
             let body = &self.bodies[bi]
             for si in 0..body.stmt_kinds.len():

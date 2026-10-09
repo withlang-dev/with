@@ -9,14 +9,14 @@ use std.encoding.base64
 use std.encoding.base64url
 
 fn ascii_bytes(text: &str):
-    let out = Vec[u8].with_capacity(text.len())
+    let out = List[u8].with_capacity(text.len())
     var i: i64 = 0
     while i < text.len():
         out.push(text.byte_at(i) as u8)
         i = i + 1
     out
 
-fn assert_bytes_eq(actual: &Vec[u8], expected: &Vec[u8]):
+fn assert_bytes_eq(actual: &List[u8], expected: &List[u8]):
     assert(actual.len() == expected.len())
     var i: i64 = 0
     while i < expected.len():

@@ -4,11 +4,11 @@
 // local left the old bytes in the global: the reassignment dropped them, and
 // so did the caller of the returned value (debug-alloc: DOUBLE FREE).
 
-var g: Vec[str] = Vec.new()
+var g: List[str] = List.new()
 
-fn take() -> Vec[str]:
+fn take() -> List[str]:
     let out = g
-    g = Vec.new()
+    g = List.new()
     out
 
 fn main:

@@ -24,8 +24,8 @@ type MathFnRow { name: str, arity: i32, llvm: str, libm: str }
 fn math_row(name: str, arity: i32, llvm: str, libm: str) -> MathFnRow:
     MathFnRow { name, arity, llvm, libm }
 
-fn math_fn_table() -> Vec[MathFnRow]:
-    var t: Vec[MathFnRow] = Vec.new()
+fn math_fn_table() -> List[MathFnRow]:
+    var t: List[MathFnRow] = List.new()
     // Unary, LLVM intrinsic.
     t.push(math_row("sqrt", 1, "llvm.sqrt", "sqrt"))
     t.push(math_row("sin", 1, "llvm.sin", "sin"))

@@ -16,7 +16,7 @@ fn platform_object -> str:
 
 fn main:
     let case = p7_prepare_case("stale_out_lib_runtime", "stale_out_lib_runtime")
-    p7_write(case, "src/main.w", "fn main:\n    var v: Vec[str] = Vec.new()\n    v.push(\"a\".clone())\n    print(v.len())\n")
+    p7_write(case, "src/main.w", "fn main:\n    var v: List[str] = List.new()\n    v.push(\"a\".clone())\n    print(v.len())\n")
     // A complete-looking runtime root whose objects are not this compiler's.
     let stale = "stale runtime object from another compiler generation\n"
     p7_write(case, "out/lib/rt_core.o", stale)

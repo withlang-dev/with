@@ -6,12 +6,12 @@
 // view materializes its pointee (D22 contextual Copy), the same as
 // `let b: bool = v[i]`.
 
-type D { flags: Vec[bool] }
+type D { flags: List[bool] }
 
 fn f(d: &D, i: i32) -> str: if d.flags[i]: "a" else: "b"
 
 fn main:
-    let v: Vec[bool] = Vec.new()
+    let v: List[bool] = List.new()
     v.push(true)
     v.push(false)
     let x = if v[0]: 1 else: 2

@@ -1,4 +1,4 @@
-//! expect-error: element comprehension requires Vec, HashSet, or BTreeSet expected type
+//! expect-error: element comprehension requires List, HashSet, or BTreeSet expected type
 
 // A comprehension bound to a non-collection expected type is rejected with the
 // comprehension-specific diagnostic. (This fixture previously pinned "type

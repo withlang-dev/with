@@ -38,30 +38,30 @@ fn main:
 
     // Frame 0: player presses Right
     print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
-    var ev0 = Vec.new()
+    var ev0 = List.new()
     ev0.push(InputEvent.KeyDown(.Right))
     world.run_frame(&ev0)
 
     // Frame 1: key held (no new events)
     print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
-    let ev1: Vec[InputEvent] = Vec.new()
+    let ev1: List[InputEvent] = List.new()
     world.run_frame(&ev1)
 
     // Frame 2: player also presses Up (diagonal movement)
     print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
-    var ev2 = Vec.new()
+    var ev2 = List.new()
     ev2.push(InputEvent.KeyDown(.Up))
     world.run_frame(&ev2)
 
     // Frame 3: release Right, keep Up
     print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
-    var ev3 = Vec.new()
+    var ev3 = List.new()
     ev3.push(InputEvent.KeyUp(.Right))
     world.run_frame(&ev3)
 
     // Frame 4: release everything
     print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
-    var ev4 = Vec.new()
+    var ev4 = List.new()
     ev4.push(InputEvent.KeyUp(.Up))
     world.run_frame(&ev4)
 
@@ -130,8 +130,8 @@ extend World:
         })
         player
 
-    mut fn spawn_enemies(count: i32) -> Vec[Entity]:
-        with Vec.new() as mut enemies:
+    mut fn spawn_enemies(count: i32) -> List[Entity]:
+        with List.new() as mut enemies:
             for i in 0..count:
                 let enemy = self.spawn_entity(f"enemy_{i}")
                 self.add_transform(enemy, Transform {
@@ -157,7 +157,7 @@ extend World:
                 })
                 enemies.push(enemy)
 
-    mut fn spawn_walls() -> Vec[Entity]:
+    mut fn spawn_walls() -> List[Entity]:
         // Spawn border walls using record update syntax
         let base_wall = Transform {
             position: Vec2.zero(),
@@ -172,7 +172,7 @@ extend World:
             visible: true,
         }
 
-        with Vec.new() as mut walls:
+        with List.new() as mut walls:
             // Top wall
             let top = self.spawn_entity("wall_top")
             self.add_transform(top, { base_wall with position: Vec2.new(400.0, 0.0) })

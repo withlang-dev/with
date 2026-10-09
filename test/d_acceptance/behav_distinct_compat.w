@@ -27,7 +27,7 @@ fn main:
     let raw2: i32 = n as i32
     check("as i32", raw2 == 42)
 
-    // 4. as i64 for Vec indexing
+    // 4. as i64 for List indexing
     let idx: i64 = n as i64
     check("as i64", idx == 42i64)
 
@@ -51,16 +51,16 @@ fn main:
     let default_id = NodeId(0)
     check("zero init", default_id == NodeId(0))
 
-    // 9. Store in Vec
-    var ids: Vec[NodeId] = Vec.new()
+    // 9. Store in List
+    var ids: List[NodeId] = List.new()
     ids.push(NodeId(10))
     ids.push(NodeId(20))
     ids.push(NodeId(30))
-    check("Vec push + len", ids.len() == 3)
+    check("List push + len", ids.len() == 3)
 
-    // 10. Vec.get returns NodeId
+    // 10. List.get returns NodeId
     let got = ids[0]
-    check("Vec.get", got == NodeId(10))
+    check("List.get", got == NodeId(10))
 
     // 11. HashMap with distinct key
     var map: HashMap[NodeId, str] = HashMap.new()

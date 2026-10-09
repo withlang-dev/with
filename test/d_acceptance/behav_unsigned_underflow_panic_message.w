@@ -7,7 +7,7 @@
 // pinned through a pure u64 underflow on a runtime value.)
 
 fn main:
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     let zero: u64 = v.len() as u64
     let n = zero - 1
     print_i64(n as i64)

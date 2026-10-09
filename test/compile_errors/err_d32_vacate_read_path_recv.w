@@ -4,15 +4,15 @@
 // shape passed check and double-freed at runtime (the vacate never reached
 // the caller's storage; both copies dropped).
 
-type Holder { v: Vec[i32], n: i32 }
+type Holder { v: List[i32], n: i32 }
 
-fn consume(v: Vec[i32]): assert(v.len() >= 0)
+fn consume(v: List[i32]): assert(v.len() >= 0)
 
 impl Holder:
     fn take_it(self: &Self): consume(move self.v)
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(7)
     let h = Holder { v: xs, n: 1 }
     h.take_it()

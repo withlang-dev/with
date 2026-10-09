@@ -8,7 +8,7 @@
 // receiver the moved field was freed by both the join and the caller.
 use std.process
 
-type S { s: str, v: Vec[str] }
+type S { s: str, v: List[str] }
 
 impl S:
     fn pick(c: bool) -> i32:
@@ -22,7 +22,7 @@ impl S:
         x.len() as i32
 
 fn mk(t: &str) -> S:
-    var v: Vec[str] = Vec.new()
+    var v: List[str] = List.new()
     v.push(t)
     S { s: t ++ "!", v }
 

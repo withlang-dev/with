@@ -15,7 +15,7 @@ gen fn labels(count: i32) -> &str:
         buf = f"item-{i}"
         yield &buf
 
-gen fn nonempty(lines: &Vec[str]) -> &str:
+gen fn nonempty(lines: &List[str]) -> &str:
     for line in lines:
         if line.len() > 0:
             yield line
@@ -36,7 +36,7 @@ fn test_view_of_own_local:
     assert(last == "item-2")
 
 fn test_view_into_argument:
-    let lines: Vec[str] = ["a", "", "c"]
+    let lines: List[str] = ["a", "", "c"]
     var joined = ""
     for line in nonempty(&lines):
         joined = joined ++ line

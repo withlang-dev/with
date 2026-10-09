@@ -8,12 +8,12 @@
 //! expect-stdout: 3
 //! expect-stdout: 10 2
 
-// D113 (§4.3c rule 1): a bracket literal is a Vec[T] unless another
+// D113 (§4.3c rule 1): a bracket literal is a List[T] unless another
 // collection built from a list is demanded. With no demand it grows, is
-// passed straight to a `&Vec` parameter, iterates, and keeps duplicates; the
-// repeat form is a Vec too.
+// passed straight to a `&List` parameter, iterates, and keeps duplicates; the
+// repeat form is a List too.
 
-fn total(xs: &Vec[i32]): xs.iter() |> sum()
+fn total(xs: &List[i32]): xs.iter() |> sum()
 
 fn main:
     var a = [1, 2, 3]
@@ -30,7 +30,7 @@ fn main:
     print(zeros.len())
     let twice = ["a", "a"]
     print(f"{twice.len()} {twice[0]} {twice[1]}")
-    let w: Vec = [1, 2, 3]
+    let w: List = [1, 2, 3]
     print(w.len())
     let moved = a
     print(f"{moved.iter() |> sum()} {moved[1]}")

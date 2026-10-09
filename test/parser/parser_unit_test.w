@@ -164,7 +164,7 @@ fn test_recovery_to_next_top_level_decl:
     assert(pool.decl_count() == 2)
 
 fn test_trailing_commas_call_and_type_params:
-    let src = "fn f[T,](x: Vec[i32,],) -> i32:\n    add(1, 2,)\n"
+    let src = "fn f[T,](x: List[i32,],) -> i32:\n    add(1, 2,)\n"
     let pool = parse_module(src)
     let decl = pool.get_decl(0)
     let meta = pool.find_fn_meta(decl)

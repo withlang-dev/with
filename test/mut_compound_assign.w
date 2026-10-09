@@ -8,7 +8,7 @@ fn counter() -> i32:
 
 fn test_compound_assign_single_eval:
     counter_state = 0
-    var xs = Vec.new()
+    var xs = List.new()
     xs.push(10)
     xs.push(20)
     xs.push(30)
@@ -20,7 +20,7 @@ fn test_compound_assign_single_eval:
     assert(xs[2] == 30)
 
 fn test_compound_assign_variable_index:
-    var xs = Vec.new()
+    var xs = List.new()
     xs.push(100)
     xs.push(200)
     var i = 1

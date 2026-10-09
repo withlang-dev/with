@@ -9,7 +9,7 @@
 // whitespace to the lexer, so gaps between methods carry no tokens: a same-target
 // run of methods (only comments/blanks between them) groups under one impl header,
 // and their inter-method comments are re-indented into the block. A method whose
-// type params are not all bound by its receiver (e.g. `Vec.map[T, U]` on `Vec[T]`)
+// type params are not all bound by its receiver (e.g. `List.map[T, U]` on `List[T]`)
 // is SKIPPED and reported, never silently mis-moved.
 //
 //   with migrate-receivers --report src/main.w     # whole-project proof
@@ -48,7 +48,7 @@ fn trim(s: &str):
 // Names from a type-param inner text ("K: Ord, V" -> "K, V"): each top-level
 // comma segment's identifier, stripped of its optional `: Bound`.
 fn tparam_names(inner: &str):
-    var parts: Vec[str] = Vec.new()
+    var parts: List[str] = List.new()
     let m = inner.len() as i32
     var seg_start = 0
     var depth = 0
@@ -75,7 +75,7 @@ fn tparam_names(inner: &str):
 
 // Prefix `pad` to every non-empty line of `text` (blank lines stay blank).
 fn reindent(text: &str, pad: &str):
-    var parts: Vec[str] = Vec.new()
+    var parts: List[str] = List.new()
     let m = text.len() as i32
     var line_start = 0
     var i = 0
@@ -112,11 +112,11 @@ fn count_args(inner: &str) -> i32:
     segs
 
 type RelocationFacts {
-    paths: Vec[str],
-    starts: Vec[i32],
-    ends: Vec[i32],
-    modes: Vec[i32],
-    matched: Vec[i32],
+    paths: List[str],
+    starts: List[i32],
+    ends: List[i32],
+    modes: List[i32],
+    matched: List[i32],
 }
 
 fn local_source_path(path: &str) -> str:
@@ -125,7 +125,7 @@ fn local_source_path(path: &str) -> str:
 
 fn compiler_relocation_facts(entry: &str) -> RelocationFacts:
     let result = compiler_analyze_file(entry, "select:kind=declaration")
-    let facts = RelocationFacts { paths: Vec.new(), starts: Vec.new(), ends: Vec.new(), modes: Vec.new(), matched: Vec.new() }
+    let facts = RelocationFacts { paths: List.new(), starts: List.new(), ends: List.new(), modes: List.new(), matched: List.new() }
     for i in 0..result.report.facts.len() as i32:
         let fact = result.report.facts[i]
         if fact.kind != AnalysisFactKind.Declaration: continue
@@ -155,7 +155,7 @@ impl RelocationFacts:
         let tokens = lexer.tokenize()
         let n = tokens.len()
 
-        var chunks: Vec[str] = Vec.new()
+        var chunks: List[str] = List.new()
         var cursor = 0             // bytes emitted up to here
         var open_header = ""       // current open impl group header ("" = none)
         var count = 0
@@ -382,7 +382,7 @@ impl RelocationFacts:
                 open_header = header
 
             // transformed method: pub? + mode + `fn ` + name + `(` + params-after-self + body
-            var mparts: Vec[str] = Vec.new()
+            var mparts: List[str] = List.new()
             mparts.push(slice(text, decl_start, fn_pos))   // `pub ` or ``
             mparts.push(mode_kw)                           // `mut `/`move `/``
             mparts.push(slice(text, fn_pos, type_start))   // `fn `
@@ -418,14 +418,14 @@ impl RelocationFacts:
         print(f"{path}: relocated {count}")
         count
 
-fn path_excluded(path: &str, excludes: &Vec[str]) -> bool:
+fn path_excluded(path: &str, excludes: &List[str]) -> bool:
     for i in 0..excludes.len() as i32:
         let excluded = excludes[i]
         if path == excluded or path.starts_with(excluded ++ "/"): return true
     false
 
-fn unique_relocation_paths(facts: &RelocationFacts, excludes: &Vec[str]) -> Vec[str]:
-    let paths: Vec[str] = Vec.new()
+fn unique_relocation_paths(facts: &RelocationFacts, excludes: &List[str]) -> List[str]:
+    let paths: List[str] = List.new()
     for i in 0..facts.paths.len() as i32:
         let path = facts.paths[i]
         if path_excluded(path, excludes): continue
@@ -437,13 +437,13 @@ fn unique_relocation_paths(facts: &RelocationFacts, excludes: &Vec[str]) -> Vec[
         if not seen: paths.push(with_str_clone_ref(path))
     paths
 
-fn count_selected(facts: &RelocationFacts, excludes: &Vec[str]) -> i32:
+fn count_selected(facts: &RelocationFacts, excludes: &List[str]) -> i32:
     var count = 0
     for i in 0..facts.paths.len() as i32:
         if not path_excluded(facts.paths[i], excludes): count = count + 1
     count
 
-fn verify_all_matched(facts: &RelocationFacts, excludes: &Vec[str]) -> bool:
+fn verify_all_matched(facts: &RelocationFacts, excludes: &List[str]) -> bool:
     for i in 0..facts.matched.len() as i32:
         if path_excluded(facts.paths[i], excludes): continue
         if facts.matched[i] == 0:
@@ -462,7 +462,7 @@ pub fn run_receiver_migration -> i32:
         exit_code(1)
     var apply = false
     var list_methods = false
-    let excludes: Vec[str] = Vec.new()
+    let excludes: List[str] = List.new()
     var entry = ""
     var arg = 2
     while arg < argv.len() as i32:

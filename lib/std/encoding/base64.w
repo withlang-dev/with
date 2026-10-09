@@ -74,9 +74,9 @@ pub fn base64_encode(data: []u8) -> str:
     out.to_str()
 
 /// Decode padded RFC 4648 Base64 with strict alphabet and unused-bit checks.
-pub fn base64_decode(text: &str) -> Result[Vec[u8], DecodeError]:
+pub fn base64_decode(text: &str) -> Result[List[u8], DecodeError]:
     let padding = base64_validate(text)?
-    let out = Vec[u8].with_capacity((text.len() / 4) * 3 - padding)
+    let out = List[u8].with_capacity((text.len() / 4) * 3 - padding)
     var offset: i64 = 0
     while offset < text.len():
         let final_quantum = offset + 4 == text.len()

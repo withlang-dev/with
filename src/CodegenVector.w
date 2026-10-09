@@ -40,10 +40,10 @@ impl Codegen:
 
     // A vector constant with `elem` in every one of `n` lanes.
     fn cg_splat_const(elem: i64, n: i32) -> i64:
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         for _ in 0..n:
             vals.push(elem)
-        wl_const_vector(vec_data_i64(&vals), n)
+        wl_const_vector(list_data_i64(&vals), n)
 
     // The signed minimum and maximum and the unsigned maximum of a `bits`-bit
     // integer as constants of the integer type `ty` (bits <= width(ty)), at
@@ -72,21 +72,21 @@ impl Codegen:
         out
 
     // Call the overloaded LLVM intrinsic `name` at `overloads`.
-    mut fn cg_vector_intrinsic(name: &str, overloads: &Vec[i64], args: &Vec[i64]) -> i64:
+    mut fn cg_vector_intrinsic(name: &str, overloads: &List[i64], args: &List[i64]) -> i64:
         let id = wl_lookup_intrinsic_id(name)
         if id == 0:
             self.had_error = 1
             self.codegen_error_detail = "missing LLVM intrinsic " ++ name
             return 0
-        let fn_val = wl_get_intrinsic_decl(self.llmod, id, vec_data_i64(overloads), overloads.len() as i32)
-        let fn_ty = wl_intrinsic_get_type(self.context, id, vec_data_i64(overloads), overloads.len() as i32)
-        wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(args), args.len() as i32)
+        let fn_val = wl_get_intrinsic_decl(self.llmod, id, list_data_i64(overloads), overloads.len() as i32)
+        let fn_ty = wl_intrinsic_get_type(self.context, id, list_data_i64(overloads), overloads.len() as i32)
+        wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(args), args.len() as i32)
 
     // Whether any lane of a `<N x i1>` is set, as an i1.
     mut fn cg_any_lane(bits: i64) -> i64:
-        let overloads: Vec[i64] = Vec.new()
+        let overloads: List[i64] = List.new()
         overloads.push(wl_type_of(bits))
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(bits)
         self.cg_vector_intrinsic("llvm.vector.reduce.or", overloads, args)
 
@@ -175,9 +175,9 @@ impl Codegen:
             if saturating or self.overflow_mode == OVERFLOW_MODE_SATURATE():
                 return self.cg_vector_saturating(base_op, l, r, unsigned)
             let name = self.mir_checked_overflow_intrinsic_name(base_op, unsigned)
-            let overloads: Vec[i64] = Vec.new()
+            let overloads: List[i64] = List.new()
             overloads.push(vec_ty)
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(l)
             args.push(r)
             let pair = self.cg_vector_intrinsic(name, overloads, args)
@@ -209,9 +209,9 @@ impl Codegen:
         let vec_ty = wl_type_of(l)
         if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB:
             let name = if op == BinaryOp.OP_ADD: (if unsigned: "llvm.uadd.sat" else: "llvm.sadd.sat") else: (if unsigned: "llvm.usub.sat" else: "llvm.ssub.sat")
-            let overloads: Vec[i64] = Vec.new()
+            let overloads: List[i64] = List.new()
             overloads.push(vec_ty)
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(l)
             args.push(r)
             return self.cg_vector_intrinsic(name, overloads, args)
@@ -307,13 +307,13 @@ impl Codegen:
         if op != VectorOp.CONSTRUCT as i32 and op != VectorOp.SPLAT as i32:
             return 0
         let extra_start = self.pool.get_data1(node)
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         for i in 0..n:
             let arg = self.pool.get_extra(extra_start + (if op == VectorOp.SPLAT as i32: 0 else: i))
             let c = self.try_eval_const_llvm(arg, lane)
             if c == 0: return 0
             vals.push(c)
-        wl_const_vector(vec_data_i64(&vals), n)
+        wl_const_vector(list_data_i64(&vals), n)
 
     // A vector aggregate: lane i from operand i.
     mut fn mir_build_vector_aggregate(body: &MirBody, start: i32, count: i32, vec_ty: i64) -> i64:
@@ -351,9 +351,9 @@ impl Codegen:
             wl_position_at_end(self.builder, panic_bb)
             self.emit_runtime_panic("index out of bounds")
             wl_position_at_end(self.builder, ok_bb)
-        let indices: Vec[i64] = Vec.new()
+        let indices: List[i64] = List.new()
         indices.push(idx64)
-        wl_build_gep(self.builder, wl_get_element_type(vec_ty), vec_ptr, vec_data_i64(&indices), 1)
+        wl_build_gep(self.builder, wl_get_element_type(vec_ty), vec_ptr, list_data_i64(&indices), 1)
 
     // The SIMD_* intrinsic calls MirVector emits. False for any other.
     mut fn mir_emit_vector_intrinsic_call(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
@@ -393,9 +393,9 @@ impl Codegen:
                 result = wl_build_insert_element(self.builder, a, lane_value, idx64)
         else if intrinsic == MirIntrinsic.SIMD_ALL or intrinsic == MirIntrinsic.SIMD_ANY:
             let bits = self.cg_mask_to_bits(a)
-            let overloads: Vec[i64] = Vec.new()
+            let overloads: List[i64] = List.new()
             overloads.push(wl_type_of(bits))
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(bits)
             result = self.cg_vector_intrinsic(if intrinsic == MirIntrinsic.SIMD_ALL: "llvm.vector.reduce.and" else: "llvm.vector.reduce.or", overloads, args)
         else:
@@ -405,9 +405,9 @@ impl Codegen:
             let is_float = self.cg_lane_is_float(lane)
             let unsigned = self.cg_lane_is_unsigned(lane)
             let elem_ty = wl_get_element_type(a_ty)
-            let overloads: Vec[i64] = Vec.new()
+            let overloads: List[i64] = List.new()
             overloads.push(a_ty)
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             var name = ""
             if intrinsic == MirIntrinsic.SIMD_REDUCE_ADD or intrinsic == MirIntrinsic.SIMD_REDUCE_MUL:
                 if is_float:

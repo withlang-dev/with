@@ -67,7 +67,7 @@ fn wil_crt_dir(libc_root: &str) -> str:
     let actual = wil_sha256_file(archive)
     if actual != sha:
         return "error: " ++ url ++ " has sha256 " ++ actual ++ "; the SDK was built from " ++ sha
-    let keep: Vec[str] = Vec.new()
+    let keep: List[str] = List.new()
     keep.push("mingw-w64-crt/lib-common/")
     keep.push("mingw-w64-crt/lib64/")
     keep.push("mingw-w64-crt/libarm64/")
@@ -92,7 +92,7 @@ fn wil_strip_stdcall_suffix(line: &str) -> str:
         if word[i] < '0' or word[i] > '9': return line.to_owned()
     word.slice(0, at) ++ line.slice(end, line.len())
 
-fn wil_run(argv: &Vec[str], work: &str, label: &str) -> str:
+fn wil_run(argv: &List[str], work: &str, label: &str) -> str:
     var packed = ""
     for arg in argv: packed = packed ++ arg ++ "\0"
     let out = work ++ "/" ++ label ++ ".stdout"
@@ -115,7 +115,7 @@ fn wil_def(self_exe: &str, crt: &str, arch: &str, name: &str, work: &str) -> str
         common = true
         if runtime_file_exists(input) == 0: return ""
     let pre = work ++ "/" ++ name ++ ".pre.def"
-    let argv: Vec[str] = Vec.new()
+    let argv: List[str] = List.new()
     argv.push(self_exe.to_owned())
     argv.push("cc")
     argv.push("--target=" ++ arch ++ "-w64-windows-gnu")
@@ -142,7 +142,7 @@ fn wil_def(self_exe: &str, crt: &str, arch: &str, name: &str, work: &str) -> str
 
 // Whether `name` resolves to a library in one of `dirs`, as a Windows link
 // looks it up (compiler.Link link_stage_windows_find_lib).
-pub fn windows_lib_in_dirs(name: &str, dirs: &Vec[str]) -> bool:
+pub fn windows_lib_in_dirs(name: &str, dirs: &List[str]) -> bool:
     for d in dirs:
         for candidate in ["lib" ++ name ++ ".a", name ++ ".lib", "lib" ++ name ++ ".lib", name ++ ".a"]:
             if runtime_file_exists(d ++ "/" ++ candidate) != 0: return true
@@ -151,10 +151,10 @@ pub fn windows_lib_in_dirs(name: &str, dirs: &Vec[str]) -> bool:
 // Writes <dir>/lib<name>.a for each name mingw-w64 has a .def for. The names
 // written; `problem` says why not, and is "" on success. A name with no .def
 // is not an in-box DLL mingw-w64 knows and is left to the link to report.
-pub type WindowsImportLibs { written: Vec[str], problem: str }
+pub type WindowsImportLibs { written: List[str], problem: str }
 
-pub fn windows_import_libs_write(dir: &str, names: &Vec[str]) -> WindowsImportLibs:
-    let written: Vec[str] = Vec.new()
+pub fn windows_import_libs_write(dir: &str, names: &List[str]) -> WindowsImportLibs:
+    let written: List[str] = List.new()
     if runtime_sysinfo_os() != "Windows":
         return WindowsImportLibs { written, problem: "Windows import libraries are generated on Windows only" }
     let libc_root = link_stage_windows_libc_root()
@@ -177,7 +177,7 @@ pub fn windows_import_libs_write(dir: &str, names: &Vec[str]) -> WindowsImportLi
         if def.starts_with("error: "):
             let _rm = runtime_remove_tree(work)
             return WindowsImportLibs { written, problem: def.slice(7, def.len()) }
-        let argv: Vec[str] = Vec.new()
+        let argv: List[str] = List.new()
         argv.push(self_exe.clone())
         argv.push("__dlltool")
         argv.push("-m")
@@ -197,11 +197,11 @@ pub fn windows_import_libs_write(dir: &str, names: &Vec[str]) -> WindowsImportLi
 
 // `with __windows-import-libs <dir> <name>...`: the step `with get` runs, on
 // its own (the :no-host-toolchain check uses it).
-pub fn with_windows_import_libs_main(args: &Vec[str]) -> i32:
+pub fn with_windows_import_libs_main(args: &List[str]) -> i32:
     if args.len() < 2:
         runtime_eprint("usage: with __windows-import-libs <dir> <dll-name>...")
         return 2
-    let names: Vec[str] = Vec.new()
+    let names: List[str] = List.new()
     for i in 1..args.len() as i32: names.push(args[i].clone())
     if runtime_mkdir_p(args[0]) != 0:
         runtime_eprint("error: could not create " ++ args[0])

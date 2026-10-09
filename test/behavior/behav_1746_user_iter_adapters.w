@@ -27,7 +27,7 @@ fn main:
         out = if out.len() == 0: f"{x}:{y}" else: out ++ f" {x}:{y}"
     print(out)
     let c = Counter { n: 0, limit: 5 }
-    let evens = c |> filter(*it % 2 == 0) |> map(it * 10) |> collect[Vec]()
+    let evens = c |> filter(*it % 2 == 0) |> map(it * 10) |> collect[List]()
     print(f"{evens[0]} {evens[1]}")
     var tagged = ""
     for (i, s) in letters().pull().enumerate():

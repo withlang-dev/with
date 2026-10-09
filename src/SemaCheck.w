@@ -89,20 +89,20 @@ impl Sema:
 // checked in the middle of it (a concrete generic instance, or a body
 // checked on demand for its inferred return type).
 type SemaLexicalEnv {
-    bind_names: Vec[i32],
-    bind_types: Vec[i32],
-    bind_muts: Vec[i32],
-    bind_states: Vec[i32],
-    bind_is_task: Vec[i32],
-    bind_task_used: Vec[i32],
-    bind_is_scoped_task: Vec[i32],
-    bind_is_view_bound: Vec[i32],
-    moved_field_base_syms: Vec[i32],
-    moved_field_path_starts: Vec[i32],
-    moved_field_path_counts: Vec[i32],
-    moved_field_path_syms: Vec[i32],
-    bind_provenance: Vec[BindingProvenance],
-    scope_starts: Vec[i32],
+    bind_names: List[i32],
+    bind_types: List[i32],
+    bind_muts: List[i32],
+    bind_states: List[i32],
+    bind_is_task: List[i32],
+    bind_task_used: List[i32],
+    bind_is_scoped_task: List[i32],
+    bind_is_view_bound: List[i32],
+    moved_field_base_syms: List[i32],
+    moved_field_path_starts: List[i32],
+    moved_field_path_counts: List[i32],
+    moved_field_path_syms: List[i32],
+    bind_provenance: List[BindingProvenance],
+    scope_starts: List[i32],
     scope_name_map: HashMap[i32, i32],
     pending_generic_binding_base: HashMap[i32, i32],
     pending_generic_binding_call: HashMap[i32, i32],
@@ -683,7 +683,7 @@ impl Sema:
     // - #1849: each argument from `variadic_from` on that a `...` receives,
     //   where the promotion changes its type (0 elsewhere); codegen converts
     //   the argument (sign- or zero-extending by its own type).
-    mut fn record_c_promoted_args(call_node: i32, fn_sym: i32, arg_nodes: &Vec[i32], arg_types: &Vec[i32], passed_types: &HashMap[i32, i32], variadic_from: i32):
+    mut fn record_c_promoted_args(call_node: i32, fn_sym: i32, arg_nodes: &List[i32], arg_types: &List[i32], passed_types: &HashMap[i32, i32], variadic_from: i32):
         let unprototyped = variadic_from < 0
         let start = self.c_promoted_arg_data.len() as i32
         self.c_promoted_arg_data.push(arg_types.len() as i32)
@@ -750,11 +750,11 @@ impl Sema:
             return 0
         if self.types_compatible(expected as TypeId, actual as TypeId) != 0 or self.builtin_arg_type_compatible(expected, actual) != 0:
             return 1
-        // Generic constructors such as Vec.new() can retain the erased base
+        // Generic constructors such as List.new() can retain the erased base
         // declaration as their exact arm type until the surrounding join has
         // selected a concrete instance. The commutative merger below already
         // makes that selection; validation must accept the same base/instance
-        // relation instead of rejecting the selected Vec[T] afterward.
+        // relation instead of rejecting the selected List[T] afterward.
         let expected_resolved = self.resolve_alias(expected as TypeId)
         let actual_resolved = self.resolve_alias(actual as TypeId)
         let expected_kind = self.get_type_kind(expected_resolved)
@@ -862,13 +862,13 @@ impl Sema:
     // expressions eligible for Stage 2 adjustments. Synthetic carrier payloads
     // and lazy closure results use node 0 plus an origin node and role; later MIR
     // consumes that classification without pretending either is an AST value.
-    mut fn resolve_contextual_join(expected: i32, arm_nodes: &Vec[i32], origin_nodes: &Vec[i32], arm_types: &Vec[i32], arm_roles: &Vec[i32], report_node: i32, join_name: &str) -> i32:
+    mut fn resolve_contextual_join(expected: i32, arm_nodes: &List[i32], origin_nodes: &List[i32], arm_types: &List[i32], arm_roles: &List[i32], report_node: i32, join_name: &str) -> i32:
         let arm_count = arm_types.len() as i32
         if arm_nodes.len() as i32 != arm_count or origin_nodes.len() as i32 != arm_count or arm_roles.len() as i32 != arm_count:
             self.emit_error("internal error: malformed contextual join inputs", report_node)
             return 0
 
-        let resolved_arm_types: Vec[i32] = Vec.new()
+        let resolved_arm_types: List[i32] = List.new()
         for ai in 0..arm_count:
             resolved_arm_types.push(arm_types[ai])
 
@@ -1019,16 +1019,16 @@ impl Sema:
                     resolved_arm_types[ai] = completed
             else if arm_roles[ai] == D22_JOIN_ROLE_LAZY_RESULT and self.type_is_generic_base_of(resolved_arm_types[ai], final_type) != 0:
                 // #1378: a lazy fallback's bare generic result (`() =>
-                // Vec.new()` returns `Vec`) is the join's type; the owning
+                // List.new()` returns `List`) is the join's type; the owning
                 // eliminator completes the closure to match
                 // (complete_lazy_fallback_result).
                 resolved_arm_types[ai] = final_type
             else if arm_roles[ai] == D22_JOIN_ROLE_EXPR and arm_nodes[ai] > 0 and self.type_is_generic_base_of(resolved_arm_types[ai], final_type) != 0:
-                // #1393: a constructor with no expected type (`Vec.new()`)
-                // is the bare generic `Vec`; the join settled it. Record the
+                // #1393: a constructor with no expected type (`List.new()`)
+                // is the bare generic `List`; the join settled it. Record the
                 // settled type on the arm itself, so lowering it does not
                 // depend on the surrounding expectation (`&o.unwrap_or(
-                // Vec.new())`, `o.unwrap_or(Vec.new()).len()`).
+                // List.new())`, `o.unwrap_or(List.new()).len()`).
                 self.typed_expr_types.insert(arm_nodes[ai], final_type)
                 resolved_arm_types[ai] = final_type
 
@@ -1040,7 +1040,7 @@ impl Sema:
         var view_count = 0
         var diverging_count = 0
         var origin_mask = 0
-        var gathered_origins: Vec[i32] = Vec.new()
+        var gathered_origins: List[i32] = List.new()
 
         for ai in 0..arm_count:
             let arm_node = arm_nodes[ai]
@@ -1127,7 +1127,7 @@ impl Sema:
         if final_is_ref != 0:
             self.set_expr_view_deps(report_node, origin_mask, gathered_origins)
         else:
-            let empty_origins: Vec[i32] = Vec.new()
+            let empty_origins: List[i32] = List.new()
             self.set_expr_view_deps(report_node, 0, empty_origins)
         final_type
 
@@ -1152,23 +1152,23 @@ impl Sema:
         self.get_type_d0(er)
 
     mut fn resolve_contextual_default_join(expected: i32, carrier_node: i32, payload_ty: i32, default_node: i32, default_origin_node: i32, default_ty: i32, default_role: i32, report_node: i32, join_name: &str) -> i32:
-        let nodes: Vec[i32] = Vec.new()
+        let nodes: List[i32] = List.new()
         nodes.push(0)
         nodes.push(default_node)
-        let origins: Vec[i32] = Vec.new()
+        let origins: List[i32] = List.new()
         origins.push(carrier_node)
         origins.push(default_origin_node)
-        let types: Vec[i32] = Vec.new()
+        let types: List[i32] = List.new()
         types.push(payload_ty)
         types.push(default_ty)
-        let roles: Vec[i32] = Vec.new()
+        let roles: List[i32] = List.new()
         roles.push(D22_JOIN_ROLE_CARRIER_PAYLOAD)
         roles.push(default_role)
         self.resolve_contextual_join(expected, &nodes, &origins, &types, &roles, report_node, join_name)
 
     // `bare` is the uninstantiated generic declaration that `inst` instantiates
-    // (`Vec` for `Vec[i32]`): what a constructor with no expected type
-    // (`Vec.new()`) is typed as until context completes it.
+    // (`List` for `List[i32]`): what a constructor with no expected type
+    // (`List.new()`) is typed as until context completes it.
     fn type_is_generic_base_of(bare: i32, inst: i32) -> i32:
         if bare == 0 or inst == 0:
             return 0
@@ -1181,8 +1181,8 @@ impl Sema:
 
     // #1378 (§10: `unwrap_or_else[U]((fn(E) -> U)) -> Join[T, U]`): a lazy
     // fallback's result is a join input, so the closure is checked with no
-    // expected return and `(_) => Vec.new()` infers the bare base `Vec`. Once
-    // the join settles on `Vec[i32]` only one meaning is left: the closure
+    // expected return and `(_) => List.new()` infers the bare base `List`. Once
+    // the join settles on `List[i32]` only one meaning is left: the closure
     // returns the join's type. Complete its function type so MIR builds the
     // body against it — left bare, the closure's return local had no LLVM type
     // (`BUG: closure result lacks LLVM type`, gen_closure).
@@ -1192,7 +1192,7 @@ impl Sema:
         if self.type_is_generic_base_of(self.get_type_d2(fn_ty), joined) == 0:
             return
         let param_count = self.get_type_d1(fn_ty)
-        let params: Vec[i32] = Vec.new()
+        let params: List[i32] = List.new()
         for pi in 0..param_count:
             params.push(self.fn_type_param_type(fn_ty, pi))
         let completed = self.ensure_fn_type(params, param_count, joined as TypeId) as i32
@@ -1374,7 +1374,7 @@ impl Sema:
         self.note_call_arg_coercion(expected, actual, arg_node, arg_node)
         1
 
-    // #604 stage 1: a Vec/array argument coerces to a []T / []mut T parameter.
+    // #604 stage 1: a List/array argument coerces to a []T / []mut T parameter.
     // Returns 0 when the coercion does not apply (caller emits the ordinary
     // mismatch), 1 when handled as an immutable view, 2 when handled as a `[]mut`
     // view (caller collects it for the call-local exclusivity pass). The `[]mut`
@@ -1448,7 +1448,7 @@ impl Sema:
     // view of a place, no other argument of the same call may read or view an
     // overlapping part of that place. Diagnostics speak in terms of the user's
     // binding, not the type machinery.
-    mut fn check_mut_slice_call_exclusivity(mut_args: &Vec[i32], all_args: &Vec[i32]):
+    mut fn check_mut_slice_call_exclusivity(mut_args: &List[i32], all_args: &List[i32]):
         for mi in 0..mut_args.len() as i32:
             let m_node = mut_args[mi]
             let m_root = self.place_root_sym(m_node)
@@ -1572,8 +1572,8 @@ impl Sema:
     // What the collected demands decide, for the second check: per inferred
     // field, [type node, type, conflict, first type, its use, second type,
     // its use]. No demand leaves the default; two different ones conflict.
-    pub fn inferred_field_decisions() -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    pub fn inferred_field_decisions() -> List[i32]:
+        var out: List[i32] = List.new()
         for k in 0..self.inferred_field_nodes.len() as i32:
             let default_ty = self.resolve_alias(self.inferred_field_aliases[k] as TypeId) as i32
             var first = 0
@@ -1722,7 +1722,7 @@ impl Sema:
             let extra_start = self.ast.get_data0(node)
             let param_count = self.ast.get_data1(node)
             let ret_node = self.ast.get_data2(node)
-            let param_types: Vec[i32] = Vec.new()
+            let param_types: List[i32] = List.new()
             for pi in 0..param_count:
                 let p_node = self.ast.get_extra(extra_start + pi)
                 let p_ty = self.resolve_type_expr(p_node) as i32
@@ -1755,7 +1755,7 @@ impl Sema:
             let elem_count = self.ast.get_data1(node)
             if elem_count == 0:
                 return self.ty_void
-            let tuple_elems: Vec[i32] = Vec.new()
+            let tuple_elems: List[i32] = List.new()
             for ei in 0..elem_count:
                 let e_node = self.ast.get_extra(extra_start + ei)
                 tuple_elems.push(self.resolve_type_expr(e_node) as i32)
@@ -1767,7 +1767,7 @@ impl Sema:
                 return 0 as TypeId
             if not self.named_types.contains(self.syms.option):
                 return 0 as TypeId
-            let opt_args: Vec[i32] = Vec.new()
+            let opt_args: List[i32] = List.new()
             opt_args.push(inner as i32)
             return self.ensure_generic_inst_type(self.syms.option, opt_args, 1)
 
@@ -1826,7 +1826,7 @@ impl Sema:
                 return prim as i32
             let named = self.lookup_named_type_visible(sym)
             // #2011: an unimported std type (§18.1) is the same error here as in
-            // an annotation; left silent, `Vec[Task[i32]].new()` without `use
+            // an annotation; left silent, `List[Task[i32]].new()` without `use
             // std.task.Task` passed Sema and failed MIR lowering.
             // #2248: a `pub` type some unimported module declares is as
             // unresolved here as a private one; left silent, a comptime
@@ -1863,7 +1863,7 @@ impl Sema:
             let arg1_ty = self.resolve_type_level_arg_expr(arg1_node)
             if arg1_ty == 0:
                 return 0
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             args.push(arg1_ty)
             var arg_count = 1
             let arg2_node = self.ast.get_data2(node)
@@ -1883,7 +1883,7 @@ impl Sema:
         let storage_tid = self.find_exact_type(TypeKind.TY_ARRAY, self.ty_u8 as i32, length.value as i32, 0) as i32
         if storage_tid == 0:
             sema_phase_bug("BUG: frozen FixedString storage array type not preregistered")
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(storage_tid)
         self.find_generic_inst_type(self.syms.fixed_string, args, 1) as i32
 
@@ -1927,7 +1927,7 @@ impl Sema:
             sema_phase_bug("BUG: frozen generic type base not visible")
         let gi_arg_count = self.ast.get_data2(node)
         let gi_extra_start = self.ast.get_data1(node)
-        let gi_args: Vec[i32] = Vec.new()
+        let gi_args: List[i32] = List.new()
         for gi in 0..gi_arg_count:
             let gi_arg_tid = self.resolve_type_expr_frozen(self.ast.get_extra(gi_extra_start + gi))
             if gi_arg_tid == 0:
@@ -1990,7 +1990,7 @@ impl Sema:
             let extra_start = self.ast.get_data0(node)
             let param_count = self.ast.get_data1(node)
             let ret_node = self.ast.get_data2(node)
-            let param_types: Vec[i32] = Vec.new()
+            let param_types: List[i32] = List.new()
             for pi in 0..param_count:
                 param_types.push(self.resolve_type_expr_frozen(self.ast.get_extra(extra_start + pi)) as i32)
             // No return annotation on a fn type means Unit, not TY_ERR (matches
@@ -2011,7 +2011,7 @@ impl Sema:
             let elem_count = self.ast.get_data1(node)
             if elem_count == 0:
                 return self.ty_void
-            let tuple_elems: Vec[i32] = Vec.new()
+            let tuple_elems: List[i32] = List.new()
             for ei in 0..elem_count:
                 tuple_elems.push(self.resolve_type_expr_frozen(self.ast.get_extra(extra_start2 + ei)) as i32)
             return self.find_tuple_type(tuple_elems, elem_count)
@@ -2095,7 +2095,7 @@ impl Sema:
             let arg1_ty = self.resolve_type_level_arg_expr_frozen(self.ast.get_data1(node))
             if arg1_ty == 0:
                 return 0
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             args.push(arg1_ty)
             var arg_count = 1
             let arg2_node = self.ast.get_data2(node)
@@ -2303,9 +2303,9 @@ impl Sema:
     mut fn prepare_body_order(count: i32):
         var decl_nodes: HashMap[i32, i32] = sema_new_map_i32_i32()
         for di in 0..count: decl_nodes.insert(self.ast.get_decl(di), di)
-        self.body_order_state = Vec.new()
-        self.body_order_lower = Vec.new()
-        self.body_typed_next = Vec.new()
+        self.body_order_state = List.new()
+        self.body_order_lower = List.new()
+        self.body_typed_next = List.new()
         self.body_typed_decls = sema_new_map_i32_i32()
         for di in 0..count:
             let decl = self.ast.get_decl(di)
@@ -2466,7 +2466,7 @@ impl Sema:
         let body_end = self.ast.get_end(body)
         let body_file = self.ast.file(decl as NodeId)
         let owner = if owner_dotted.contains("."): owner_dotted[0..owner_dotted.find(".")].to_owned() else: "".to_owned()
-        var blocks: Vec[i32] = Vec.new()
+        var blocks: List[i32] = List.new()
         for n in 1..self.ast.node_count():
             if self.ast.kind(n) != NodeKind.NK_UNSAFE_BLOCK or self.ast.file(n as NodeId) != body_file: continue
             if self.ast.get_start(n) < body_start or self.ast.get_end(n) > body_end: continue
@@ -2756,8 +2756,8 @@ impl Sema:
 
     // The resolved `from` clause of declaration `node`
     // (resolve_declared_view_origins); empty for none.
-    fn declared_view_origin_entries(node: i32) -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    fn declared_view_origin_entries(node: i32) -> List[i32]:
+        var out: List[i32] = List.new()
         let start_opt = self.declared_from_starts.get(node)
         if start_opt.is_none():
             return out
@@ -2778,8 +2778,8 @@ impl Sema:
     // when it states one (checked against the body,
     // check_declared_view_origins), else those its body returns a view of
     // (note_returned_global_origins).
-    fn sig_ret_global_origins(sig: i32) -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    fn sig_ret_global_origins(sig: i32) -> List[i32]:
+        var out: List[i32] = List.new()
         let from_node = self.sig_from_clause_node(sig)
         if from_node != 0:
             let entries = self.declared_view_origin_entries(from_node)
@@ -2792,9 +2792,9 @@ impl Sema:
     // The globals `sig`'s body returns a view of, in the order first met —
     // complete once the recursion fixpoint ran
     // (resolve_ret_global_origin_fixpoint).
-    fn sig_derived_global_origins(sig: i32) -> Vec[i32]:
+    fn sig_derived_global_origins(sig: i32) -> List[i32]:
         let raw = self.sig_raw_global_origins(sig)
-        var out: Vec[i32] = Vec.new()
+        var out: List[i32] = List.new()
         for ri in 0..raw.len() as i32:
             if not self.is_ret_origin_placeholder(raw[ri]):
                 out.push(raw[ri])
@@ -2802,14 +2802,14 @@ impl Sema:
 
     // Those globals and the placeholders of the callees whose sets they
     // include (ret_origin_placeholder), in the order first met.
-    fn sig_raw_global_origins(sig: i32) -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    fn sig_raw_global_origins(sig: i32) -> List[i32]:
+        var out: List[i32] = List.new()
         var e: i32 = self.ret_global_origin_heads.get(sig) ?? -1
         while e >= 0:
             out.push(self.ret_global_origin_entries[e * 3])
             e = self.ret_global_origin_entries[e * 3 + 2]
         // The chain is newest first; report in source order.
-        var rev: Vec[i32] = Vec.new()
+        var rev: List[i32] = List.new()
         var ri = out.len() as i32 - 1
         while ri >= 0:
             rev.push(out[ri])
@@ -2831,7 +2831,7 @@ impl Sema:
     // (collect_expr_view_deps) — a global named in the body, or one a
     // callee's returned view carries (record_call_view_origins_args). Only
     // the function's own returns count: a closure's return is the closure's.
-    mut fn note_returned_global_origins(deps: &Vec[i32], expr_node: i32):
+    mut fn note_returned_global_origins(deps: &List[i32], expr_node: i32):
         let sig: i32 = self.current_fn_sig_idx
         if sig < 0 or self.current_effect_body <= -2:
             return
@@ -2963,7 +2963,7 @@ impl Sema:
                             changed = true
 
     // The globals `view` (a placeholder) stands for, once resolved.
-    fn placeholder_globals(sym: i32) -> Vec[i32]:
+    fn placeholder_globals(sym: i32) -> List[i32]:
         self.sig_derived_global_origins(self.ret_origin_placeholder_sigs.get(sym) ?? -1)
 
     // A direct write of a global while a view tied to a placeholder is live
@@ -2972,9 +2972,9 @@ impl Sema:
     // global — the same diagnostic a view of the global itself gets.
     mut fn judge_placeholder_writes():
         var pending = move self.ret_view_placeholder_diags
-        self.ret_view_placeholder_diags = Vec.new()
+        self.ret_view_placeholder_diags = List.new()
         // Popped from the back, then emitted front first.
-        var kept: Vec[Diagnostic] = Vec.new()
+        var kept: List[Diagnostic] = List.new()
         var di = pending.len() as i32 - 1
         while di >= 0:
             let diag = pending.pop().unwrap()
@@ -3002,11 +3002,11 @@ impl Sema:
         if self.ret_origin_placeholder_sigs.len() == 0:
             return
         let rows = self.global_view_call_checks.len() as i32 / GLOBAL_VIEW_CHECK_STRIDE
-        let kept: Vec[i32] = Vec.new()
+        let kept: List[i32] = List.new()
         for ri in 0..rows:
             let base = ri * GLOBAL_VIEW_CHECK_STRIDE
             let sym: i32 = self.global_view_call_checks[base + 1]
-            var targets: Vec[i32] = Vec.new()
+            var targets: List[i32] = List.new()
             if self.is_ret_origin_placeholder(sym):
                 targets = self.placeholder_globals(sym)
             else:
@@ -3035,8 +3035,8 @@ impl Sema:
 
     // The globals declaration `node`'s `writes` clause names, resolved
     // (resolve_declared_global_writes); empty for no clause.
-    fn declared_global_write_syms(node: i32) -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    fn declared_global_write_syms(node: i32) -> List[i32]:
+        var out: List[i32] = List.new()
         let start_opt = self.declared_write_starts.get(node)
         if start_opt.is_none():
             return out
@@ -3049,7 +3049,7 @@ impl Sema:
     // fn_global_effects.
     fn global_call_index() -> SemaGlobalCallIndex:
         var head: HashMap[i32, i32] = sema_new_map_i32_i32()
-        let next: Vec[i32] = Vec.new()
+        let next: List[i32] = List.new()
         for ci in 0..self.global_calls.len() as i32 / GLOBAL_CALL_STRIDE:
             let caller: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE]
             next.push(head.get(caller) ?? -1)
@@ -3064,9 +3064,9 @@ impl Sema:
     // bundle build checks an exported function's declared write contract
     // against this set (compiler.BundleInterfaceEmit
     // check_declared_global_writes); it is never written into an interface.
-    fn fn_global_effects(sig: i32, index: &SemaGlobalCallIndex) -> Vec[i32]:
+    fn fn_global_effects(sig: i32, index: &SemaGlobalCallIndex) -> List[i32]:
         var seen: HashMap[i32, i32] = sema_new_map_i32_i32()
-        let work: Vec[i32] = Vec.new()
+        let work: List[i32] = List.new()
         seen.insert(sig, 1)
         work.push(sig)
         var k = 0
@@ -3082,7 +3082,7 @@ impl Sema:
                         seen.insert(target, 1)
                         work.push(target)
                 ci = index.next[ci]
-        var out: Vec[i32] = Vec.new()
+        var out: List[i32] = List.new()
         for wi in 0..self.global_write_records.len() as i32 / GLOBAL_WRITE_STRIDE:
             if seen.contains(self.global_write_records[wi * GLOBAL_WRITE_STRIDE]):
                 out = self.push_unique_i32(move out, self.global_write_records[wi * GLOBAL_WRITE_STRIDE + 1])
@@ -3094,7 +3094,7 @@ impl Sema:
     // body's caller.
     fn fn_global_write_chain(sig: i32, sym: i32, index: &SemaGlobalCallIndex) -> str:
         var parent: HashMap[i32, i32] = sema_new_map_i32_i32()
-        let work: Vec[i32] = Vec.new()
+        let work: List[i32] = List.new()
         parent.insert(sig, sig)
         work.push(sig)
         var writers: HashMap[i32, i32] = sema_new_map_i32_i32()
@@ -3121,7 +3121,7 @@ impl Sema:
                 ci = index.next[ci]
         if found == -1:
             return self.global_effect_body_name(sig) ++ ", which writes it"
-        var names: Vec[str] = Vec.new()
+        var names: List[str] = List.new()
         var cur = found
         while true:
             names.push(self.global_effect_body_name(cur))
@@ -3204,11 +3204,11 @@ impl Sema:
     // and the place's own root when its parameter takes it by place (`&T`,
     // `[]T`, a reading or mutating receiver). A `copy`/`move` argument is
     // an independent value.
-    fn push_arg_global_views(out0: Vec[i32], arg: i32, by_place: bool) -> Vec[i32]:
+    fn push_arg_global_views(out0: List[i32], arg: i32, by_place: bool) -> List[i32]:
         var out = out0
         if arg <= 0 or self.ast.kind(arg) == NodeKind.NK_MOVE_ARG or self.ast.kind(arg) == NodeKind.NK_COPY_ARG:
             return out
-        var roots: Vec[i32] = Vec.new()
+        var roots: List[i32] = List.new()
         roots = self.collect_expr_view_deps(arg, move roots)
         if by_place:
             roots = self.push_unique_i32(move roots, self.borrow_root_place(arg))
@@ -3247,7 +3247,7 @@ impl Sema:
 
     // The bodies of function `fn_sym`, declared at `fn_node`: its own
     // signature, and every concrete specialization of it.
-    fn push_fn_bodies(out0: Vec[i32], fn_sym: i32, fn_node: i32) -> Vec[i32]:
+    fn push_fn_bodies(out0: List[i32], fn_sym: i32, fn_node: i32) -> List[i32]:
         var out = out0
         let sig = if fn_sym != 0: self.get_sig(fn_sym) else: -1
         if sig >= 0:
@@ -3260,8 +3260,8 @@ impl Sema:
 
     // The bodies a dispatcher may run (global_dispatcher): every impl of a
     // dyn method in this compilation.
-    mut fn dispatcher_bodies(index: i32) -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    mut fn dispatcher_bodies(index: i32) -> List[i32]:
+        var out: List[i32] = List.new()
         let kind: i32 = self.global_dispatchers[index * GLOBAL_DISPATCH_STRIDE]
         let a: i32 = self.global_dispatchers[index * GLOBAL_DISPATCH_STRIDE + 1]
         let b: i32 = self.global_dispatchers[index * GLOBAL_DISPATCH_STRIDE + 2]
@@ -3296,10 +3296,10 @@ impl Sema:
     // The Drop impl bodies the drop of `tid` runs: the type's own `drop`
     // (each specialization of a generic impl's), then its elements', fields'
     // and payloads' — the walk type_carries_user_drop makes.
-    mut fn push_drop_glue_bodies(out0: Vec[i32], tid: i32) -> Vec[i32]:
+    mut fn push_drop_glue_bodies(out0: List[i32], tid: i32) -> List[i32]:
         var out = out0
         var seen: HashMap[i32, i32] = sema_new_map_i32_i32()
-        let work: Vec[i32] = Vec.new()
+        let work: List[i32] = List.new()
         work.push(self.resolve_alias(tid as TypeId) as i32)
         var k = 0
         while k < work.len() as i32:
@@ -3413,7 +3413,7 @@ impl Sema:
     // by), and an argument or receiver that views a global for the whole
     // call. `callee` is the called body (-1 when none is known); `args[i]`
     // is the argument for the callee's parameter `first_param + i`.
-    mut fn note_call_global_effects(call_node: i32, callee: i32, first_param: i32, recv_node: i32, recv_by_place: bool, args: &Vec[i32], args_by_place: &Vec[bool]):
+    mut fn note_call_global_effects(call_node: i32, callee: i32, first_param: i32, recv_node: i32, recv_by_place: bool, args: &List[i32], args_by_place: &List[bool]):
         if call_node <= 0:
             return
         let call = self.global_calls.len() as i32 / GLOBAL_CALL_STRIDE
@@ -3446,7 +3446,7 @@ impl Sema:
         if target_count == 0 or self.suppress_errors != 0:
             return
         self.keep_live_global_views(call, call_node, false)
-        var views: Vec[i32] = Vec.new()
+        var views: List[i32] = List.new()
         if recv_node > 0 and recv_by_place:
             views = self.push_arg_global_views(move views, recv_node, true)
         for ai in 0..args.len() as i32:
@@ -3510,7 +3510,7 @@ impl Sema:
     // temporary).
     // `scan_rows` is false where no view can be used after the drop (a
     // function's last block, a `return`).
-    mut fn note_drop_global_effects(site_node: i32, display: i32, kind: i32, subject: i32, tid: i32, views: &Vec[i32], scan_rows: bool):
+    mut fn note_drop_global_effects(site_node: i32, display: i32, kind: i32, subject: i32, tid: i32, views: &List[i32], scan_rows: bool):
         if site_node <= 0 or not self.type_has_user_drop_glue(tid):
             return
         let drop_body = self.global_dispatcher(GLOBAL_DISPATCH_DROP, self.resolve_alias(tid as TypeId) as i32, 0)
@@ -3524,7 +3524,7 @@ impl Sema:
             return
         if scan_rows:
             self.keep_live_global_views(call, site_node, true)
-        var kept: Vec[i32] = Vec.new()
+        var kept: List[i32] = List.new()
         for vi in 0..views.len() as i32:
             kept = self.push_arg_global_views(move kept, views[vi], false)
         var ki = 0
@@ -3537,7 +3537,7 @@ impl Sema:
     // Drop impl, with `views` outliving them. A binding moved on every path
     // is not dropped there (§2.4); Sema's move state joins paths (§21.1 rule
     // 9), so every binding counts — the drop may run on a path that kept it.
-    mut fn note_scope_exit_drops(site_node: i32, kind: i32, bind_start: i32, views: &Vec[i32], scan_rows: bool):
+    mut fn note_scope_exit_drops(site_node: i32, kind: i32, bind_start: i32, views: &List[i32], scan_rows: bool):
         var bi = self.bind_names.len() as i32 - 1
         while bi >= bind_start:
             let sym: i32 = self.bind_names[bi]
@@ -3552,7 +3552,7 @@ impl Sema:
     fn expr_views_global(node: i32) -> bool:
         if node <= 0:
             return false
-        var roots: Vec[i32] = Vec.new()
+        var roots: List[i32] = List.new()
         roots = self.collect_expr_view_deps(node, move roots)
         for ri in 0..roots.len() as i32:
             if self.names_global_place(roots[ri]):
@@ -3566,7 +3566,7 @@ impl Sema:
     // field, element or payload of an aggregate, an argument moved into its
     // callee — is dropped by its new owner, not here. A nested block's
     // statements drop their own at their ends; its tail is this statement's.
-    mut fn collect_drop_temporaries(node: i32, owned: bool, out0: Vec[i32]) -> Vec[i32]:
+    mut fn collect_drop_temporaries(node: i32, owned: bool, out0: List[i32]) -> List[i32]:
         var out = out0
         if node <= 0:
             return out
@@ -3632,9 +3632,9 @@ impl Sema:
     // when its value is a body's returned value, after which no view is used
     // (`scan_rows` false).
     mut fn note_statement_temporary_drops(stmt: i32, owned: bool, scan_rows: bool):
-        var temps: Vec[i32] = Vec.new()
+        var temps: List[i32] = List.new()
         temps = self.collect_drop_temporaries(stmt, owned, move temps)
-        let no_views: Vec[i32] = Vec.new()
+        let no_views: List[i32] = List.new()
         for ti in 0..temps.len() as i32:
             let tid: i32 = self.typed_expr_types.get(temps[ti]) ?? 0
             self.note_drop_global_effects(stmt, temps[ti], GLOBAL_SITE_TEMP_DROP, 0, tid, no_views, scan_rows)
@@ -3645,8 +3645,8 @@ impl Sema:
         if call_node <= 0 or sig_idx < 0:
             return
         let param_count = self.sig_get_param_count(sig_idx)
-        let args: Vec[i32] = Vec.new()
-        let by_place: Vec[bool] = Vec.new()
+        let args: List[i32] = List.new()
+        let by_place: List[bool] = List.new()
         for ai in 0..arg_count:
             args.push(if has_resolved != 0: self.get_resolved_call_arg(call_node, ai) else: self.ast.get_extra(extra_start + ai))
             by_place.push(ai + param_offset < param_count and self.type_takes_place(self.sig_param_type(sig_idx, ai + param_offset)))
@@ -3724,7 +3724,7 @@ impl Sema:
         let check_count = self.global_view_call_checks.len() as i32 / GLOBAL_VIEW_CHECK_STRIDE
         // The calls that run each body: its target entries, chained.
         var runs_head: HashMap[i32, i32] = sema_new_map_i32_i32()
-        let runs_next: Vec[i32] = Vec.new()
+        let runs_next: List[i32] = List.new()
         let target_count = self.global_call_targets.len() as i32 / GLOBAL_TARGET_STRIDE
         for ti in 0..target_count:
             let body: i32 = self.global_call_targets[ti * GLOBAL_TARGET_STRIDE]
@@ -3732,7 +3732,7 @@ impl Sema:
             runs_head.insert(body, ti)
         // The callables bound to each callable parameter, chained.
         var bound_head: HashMap[i32, i32] = sema_new_map_i32_i32()
-        let bound_next: Vec[i32] = Vec.new()
+        let bound_next: List[i32] = List.new()
         let binding_count = self.global_call_bindings.len() as i32 / GLOBAL_BINDING_STRIDE
         for bi in 0..binding_count:
             let callee: i32 = self.global_call_bindings[bi * GLOBAL_BINDING_STRIDE]
@@ -3745,7 +3745,7 @@ impl Sema:
             bound_head.insert(key, bi)
         let write_count = self.global_write_records.len() as i32 / GLOBAL_WRITE_STRIDE
         var judged: HashMap[i32, i32] = sema_new_map_i32_i32()
-        let reported: Vec[i32] = Vec.new()
+        let reported: List[i32] = List.new()
         for ci in 0..check_count:
             let sym: i32 = self.global_view_call_checks[ci * GLOBAL_VIEW_CHECK_STRIDE + 1]
             if judged.contains(sym):
@@ -3755,7 +3755,7 @@ impl Sema:
             // `via` holds, toward the write, the target entry of the call
             // it makes next, or -1 - the write record where it writes.
             var via: HashMap[i32, i32] = sema_new_map_i32_i32()
-            let work: Vec[i32] = Vec.new()
+            let work: List[i32] = List.new()
             for wi in 0..write_count:
                 let writer: i32 = self.global_write_records[wi * GLOBAL_WRITE_STRIDE]
                 if self.global_write_records[wi * GLOBAL_WRITE_STRIDE + 1] == sym and not via.contains(writer):
@@ -3788,9 +3788,9 @@ impl Sema:
     // The binding through which callable parameter `param_body` runs a body
     // that writes (is in `via`): a closure a call binds to it, directly or
     // through a parameter of the caller that it forwards. -1 when none does.
-    fn param_binding_writer(param_body: i32, via: &HashMap[i32, i32], bound_head: &HashMap[i32, i32], bound_next: &Vec[i32]) -> i32:
+    fn param_binding_writer(param_body: i32, via: &HashMap[i32, i32], bound_head: &HashMap[i32, i32], bound_next: &List[i32]) -> i32:
         var seen: HashMap[i32, i32] = sema_new_map_i32_i32()
-        let work: Vec[i32] = Vec.new()
+        let work: List[i32] = List.new()
         seen.insert(param_body, 1)
         work.push(param_body)
         var k = 0
@@ -3810,7 +3810,7 @@ impl Sema:
 
     // One kept check against `via` (check_calls_against_live_global_views):
     // reported when a body the call runs writes the global.
-    mut fn report_global_view_call_check(ci: i32, via: &HashMap[i32, i32], bound_head: &HashMap[i32, i32], bound_next: &Vec[i32]) -> bool:
+    mut fn report_global_view_call_check(ci: i32, via: &HashMap[i32, i32], bound_head: &HashMap[i32, i32], bound_next: &List[i32]) -> bool:
         let base = ci * GLOBAL_VIEW_CHECK_STRIDE
         let call: i32 = self.global_view_call_checks[base]
         let sym: i32 = self.global_view_call_checks[base + 1]
@@ -4152,7 +4152,7 @@ impl Sema:
             var expected_ret = contract.ret_type
             if (contract.method_flags / FnFlags.ASYNC) % 2 == 1:
                 let task_sym = self.pool_intern("Task")
-                let task_args: Vec[i32] = Vec.new()
+                let task_args: List[i32] = List.new()
                 task_args.push(contract.ret_type)
                 let task_ty = self.ensure_generic_inst_type(task_sym, task_args, 1)
                 if task_ty != 0:
@@ -4178,7 +4178,7 @@ impl Sema:
             return
         // §16.4 union last-written tracking is per-function-body.
         self.union_last_written = sema_new_map_i32_i32()
-        self.union_tracked_syms = Vec.new()
+        self.union_tracked_syms = List.new()
         self.union_in_assign_target = 0
         let saved_body_file_id: i32 = self.local_file_id
         // #747 instance C: capture by move, not view. update_decl_source_context
@@ -4209,8 +4209,8 @@ impl Sema:
         let saved_unsafe_scope_used = move self.unsafe_scope_used
         let saved_unsafe_scope_nodes = move self.unsafe_scope_nodes
         self.in_unsafe = 0
-        self.unsafe_scope_used = Vec.new()
-        self.unsafe_scope_nodes = Vec.new()
+        self.unsafe_scope_used = List.new()
+        self.unsafe_scope_nodes = List.new()
         self.current_fn_may_alloc = 0
         self.current_fn_symbol = fn_name
         if self.no_alloc_fns.contains(fn_name):
@@ -4238,17 +4238,17 @@ impl Sema:
         let saved_for_view_binding_syms = move self.for_view_binding_syms
         let saved_for_view_binding_depths = move self.for_view_binding_depths
         let saved_for_view_binding_gen_loops = move self.for_view_binding_gen_loops
-        self.borrow_kinds = Vec.new()
-        self.borrow_places = Vec.new()
-        self.borrow_fields = Vec.new()
-        self.borrow_refs = Vec.new()
-        self.borrow_path_starts = Vec.new()
-        self.borrow_path_counts = Vec.new()
-        self.borrow_scope_depths = Vec.new()
-        self.borrow_creation_nodes = Vec.new()
-        self.for_view_binding_syms = Vec.new()
-        self.for_view_binding_depths = Vec.new()
-        self.for_view_binding_gen_loops = Vec.new()
+        self.borrow_kinds = List.new()
+        self.borrow_places = List.new()
+        self.borrow_fields = List.new()
+        self.borrow_refs = List.new()
+        self.borrow_path_starts = List.new()
+        self.borrow_path_counts = List.new()
+        self.borrow_scope_depths = List.new()
+        self.borrow_creation_nodes = List.new()
+        self.for_view_binding_syms = List.new()
+        self.for_view_binding_depths = List.new()
+        self.for_view_binding_gen_loops = List.new()
 
         // Push function scope
         self.push_scope()
@@ -4344,12 +4344,12 @@ impl Sema:
         // closure being checked when it was instantiated.
         let saved_effect_body: i32 = self.current_effect_body
         self.current_effect_body = -1
-        let saved_eff_param_syms = sema_clone_i32_vec(&self.current_fn_param_syms)
-        let saved_eff_param_effs = sema_clone_i32_vec(&self.current_fn_param_effs)
-        let saved_eff_param_direct_effs = sema_clone_i32_vec(&self.current_fn_param_direct_effs)
-        let saved_eff_param_origins = sema_clone_i32_vec(&self.current_fn_param_origins)
-        let saved_eff_param_storage_origins = sema_clone_i32_vec(&self.current_fn_param_storage_origins)
-        let saved_eff_param_view_nodes = sema_clone_i32_vec(&self.current_fn_param_view_nodes)
+        let saved_eff_param_syms = sema_clone_i32_list(&self.current_fn_param_syms)
+        let saved_eff_param_effs = sema_clone_i32_list(&self.current_fn_param_effs)
+        let saved_eff_param_direct_effs = sema_clone_i32_list(&self.current_fn_param_direct_effs)
+        let saved_eff_param_origins = sema_clone_i32_list(&self.current_fn_param_origins)
+        let saved_eff_param_storage_origins = sema_clone_i32_list(&self.current_fn_param_storage_origins)
+        let saved_eff_param_view_nodes = sema_clone_i32_list(&self.current_fn_param_view_nodes)
         // D63: the invocation counts are this body's. A generic callee's
         // specialization is checked in the middle of its caller's body, and
         // reset the caller's counts: `f(); id(1); f()` counted one call.
@@ -4487,7 +4487,7 @@ impl Sema:
         self.note_statement_temporary_drops(body_value, body_expected_ret != self.ty_void as i32 and not body_tail_is_statement and not body_discarded, false)
         // A discarded tail (an assignment under D43's inferred `Unit`, an
         // entry point's) is no value: nothing of it outlives the drops.
-        let body_views: Vec[i32] = Vec.new()
+        let body_views: List[i32] = List.new()
         if body_value != 0 and body_expected_ret != self.ty_void as i32 and not body_discarded and not self.tail_value_discarded(body_value) and self.expr_views_global(body_value):
             body_views.push(body_value)
         self.note_scope_exit_drops(source_body, GLOBAL_SITE_SCOPE_DROP, self.current_fn_bind_start, body_views, false)
@@ -4908,8 +4908,8 @@ impl Sema:
         if impl_type_tid != 0:
             self.named_types.insert(self.syms.self_type, impl_type_tid)
         self.assoc_type_bindings = fresh_assoc
-        self.generic_subst_param_syms = Vec.new()
-        self.generic_subst_type_ids = Vec.new()
+        self.generic_subst_param_syms = List.new()
+        self.generic_subst_type_ids = List.new()
         self.install_trait_default_type_args(self.ast.get_data2(impl_node), impl_node)
         let impl_ex = self.ast.get_data1(impl_node)
         let impl_ac = self.ast.get_extra(impl_ex)
@@ -5028,19 +5028,19 @@ impl Sema:
         self.fn_label_order_counter = owned.order_counter
 
     mut fn reset_label_registry() -> Unit:
-        self.fn_label_syms = Vec.new()
-        self.fn_label_nodes = Vec.new()
-        self.fn_label_paths = Vec.new()
-        self.fn_label_orders = Vec.new()
-        self.fn_label_used = Vec.new()
-        self.fn_goto_syms = Vec.new()
-        self.fn_goto_nodes = Vec.new()
-        self.fn_goto_paths = Vec.new()
-        self.fn_goto_orders = Vec.new()
-        self.fn_init_nodes = Vec.new()
-        self.fn_init_paths = Vec.new()
-        self.fn_init_orders = Vec.new()
-        self.fn_label_scope_stack = Vec.new()
+        self.fn_label_syms = List.new()
+        self.fn_label_nodes = List.new()
+        self.fn_label_paths = List.new()
+        self.fn_label_orders = List.new()
+        self.fn_label_used = List.new()
+        self.fn_goto_syms = List.new()
+        self.fn_goto_nodes = List.new()
+        self.fn_goto_paths = List.new()
+        self.fn_goto_orders = List.new()
+        self.fn_init_nodes = List.new()
+        self.fn_init_paths = List.new()
+        self.fn_init_orders = List.new()
+        self.fn_label_scope_stack = List.new()
         self.fn_label_next_scope_id = 1
         self.fn_label_order_counter = 0
         self.fn_label_scope_stack.push(1)
@@ -5442,7 +5442,7 @@ impl Sema:
         self.merge_loop_break_value_type(target, value_ty, node)
         // #1395: a break value becomes the loop's owned result.
         if value != 0:
-            let bv_arms: Vec[i32] = Vec.new()
+            let bv_arms: List[i32] = List.new()
             bv_arms.push(value)
             self.d32_check_owned_join_arms(value_ty, &bv_arms, "break value")
 
@@ -5465,7 +5465,7 @@ impl Sema:
     // §16.5: which types may cross a C ABI boundary. A raw pointer is always a C
     // pointer; an `extern "C" fn` is a C function pointer; scalars map to stdint
     // spellings; `@[repr(C)]` structs/enums have a defined C layout. Everything
-    // else (str, slices, tuples, With `&T`, Option/Result/Vec and other generics,
+    // else (str, slices, tuples, With `&T`, Option/Result/List and other generics,
     // closures, plain non-repr(C) structs) has no C-ABI representation and would
     // be silently miscompiled if exported.
     fn type_is_c_abi_expressible(tid: i32, allow_void: i32) -> i32:
@@ -5530,8 +5530,8 @@ impl Sema:
 
     // The extern declarations whose C symbol is `symbol`: the `@[link_name]`
     // when there is one, else the declared name.
-    fn extern_decls_of_c_symbol(symbol: &str) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn extern_decls_of_c_symbol(symbol: &str) -> List[i32]:
+        let out: List[i32] = List.new()
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_EXTERN_FN:
@@ -5663,7 +5663,7 @@ impl Sema:
                     return nm
         with_str_clone_ref(self.pool_resolve(self.ast.get_data0(fn_node)))
 
-fn cheader_vec_has(v: &Vec[i32], x: i32) -> bool:
+fn cheader_list_has(v: &List[i32], x: i32) -> bool:
     for i in 0..v.len() as i32:
         if v[i] == x:
             return true
@@ -5684,7 +5684,7 @@ impl Sema:
         0
 
     fn cheader_generate(guard: &str) -> str:
-        let exported: Vec[i32] = Vec.new()
+        let exported: List[i32] = List.new()
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
                 continue
@@ -5696,7 +5696,7 @@ impl Sema:
 
         // Collect referenced repr(C) structs (signature types + their fields),
         // deepest first so by-value field structs are defined before their users.
-        var ordered: Vec[i32] = Vec.new()
+        var ordered: List[i32] = List.new()
         for ei in 0..exported.len() as i32:
             let fn_node = exported[ei]
             let sig = self.get_sig(self.ast.get_data0(fn_node))
@@ -5718,9 +5718,9 @@ impl Sema:
         out
 
     // Return `ordered` with `tid` and its by-value field structs appended
-    // (deepest first), deduped. Threaded by return value since Vec is value-typed.
-    fn cheader_collect_struct(tid: i32, ordered: Vec[i32]) -> Vec[i32]:
-        if tid == 0 or cheader_vec_has(&ordered, tid):
+    // (deepest first), deduped. Threaded by return value since List is value-typed.
+    fn cheader_collect_struct(tid: i32, ordered: List[i32]) -> List[i32]:
+        if tid == 0 or cheader_list_has(&ordered, tid):
             return ordered
         var result = ordered
         let te = self.get_type_d1(tid)
@@ -5728,7 +5728,7 @@ impl Sema:
         for fi in 0..fc:
             let ftid = self.type_extra[(te + fi * 3 + 1)]
             result = self.cheader_collect_struct(self.cheader_struct_ref(ftid), move result)
-        if not cheader_vec_has(&result, tid):
+        if not cheader_list_has(&result, tid):
             result.push(tid)
         result
 
@@ -6143,7 +6143,7 @@ impl Sema:
     // populating typed_expr_types so MirLower has type information.
     // Returns the sig index for the concrete signature.
 
-    mut fn register_concrete_specialization(fn_node: i32, mono_sym: i32, sig_idx: i32, tp_syms: &Vec[i32], tp_sema_tys: &Vec[i32], param_concrete_tys: &Vec[i32]):
+    mut fn register_concrete_specialization(fn_node: i32, mono_sym: i32, sig_idx: i32, tp_syms: &List[i32], tp_sema_tys: &List[i32], param_concrete_tys: &List[i32]):
         if mono_sym == 0 or sig_idx < 0:
             return
         self.record_fn_behavior_metadata(mono_sym, fn_node, self.ast.get_data2(fn_node))
@@ -6199,20 +6199,20 @@ impl Sema:
             pending_generic_binding_call: move self.pending_generic_binding_call,
             pending_generic_binding_decl: move self.pending_generic_binding_decl,
         }
-        self.bind_names = Vec.new()
-        self.bind_types = Vec.new()
-        self.bind_muts = Vec.new()
-        self.bind_states = Vec.new()
-        self.bind_is_task = Vec.new()
-        self.bind_task_used = Vec.new()
-        self.bind_is_scoped_task = Vec.new()
-        self.bind_is_view_bound = Vec.new()
-        self.moved_field_base_syms = Vec.new()
-        self.moved_field_path_starts = Vec.new()
-        self.moved_field_path_counts = Vec.new()
-        self.moved_field_path_syms = Vec.new()
-        self.bind_provenance = Vec.new()
-        self.scope_starts = Vec.new()
+        self.bind_names = List.new()
+        self.bind_types = List.new()
+        self.bind_muts = List.new()
+        self.bind_states = List.new()
+        self.bind_is_task = List.new()
+        self.bind_task_used = List.new()
+        self.bind_is_scoped_task = List.new()
+        self.bind_is_view_bound = List.new()
+        self.moved_field_base_syms = List.new()
+        self.moved_field_path_starts = List.new()
+        self.moved_field_path_counts = List.new()
+        self.moved_field_path_syms = List.new()
+        self.bind_provenance = List.new()
+        self.scope_starts = List.new()
         self.scope_starts.push(0)
         self.scope_name_map = HashMap.new()
         self.pending_generic_binding_base = HashMap.new()
@@ -6261,7 +6261,7 @@ impl Sema:
         self.pending_generic_binding_call = move env.pending_generic_binding_call
         self.pending_generic_binding_decl = move env.pending_generic_binding_decl
 
-    mut fn check_fn_body_concrete(fn_node: i32, tp_syms: &Vec[i32], tp_sema_tys: &Vec[i32], mono_sym: i32, param_concrete_tys: &Vec[i32]) -> i32:
+    mut fn check_fn_body_concrete(fn_node: i32, tp_syms: &List[i32], tp_sema_tys: &List[i32], mono_sym: i32, param_concrete_tys: &List[i32]) -> i32:
         let fn_name = self.ast.get_data0(fn_node)
         let body = self.ast.get_data1(fn_node)
         if self.ast.fn_decl_body_is_interface(fn_node):
@@ -6286,12 +6286,12 @@ impl Sema:
         let saved_generic_subst_type_ids = move self.generic_subst_type_ids
         let saved_types_frozen: i32 = self.types_frozen
         self.types_frozen = 0
-        self.generic_subst_param_syms = Vec.new()
-        self.generic_subst_type_ids = Vec.new()
+        self.generic_subst_param_syms = List.new()
+        self.generic_subst_type_ids = List.new()
 
         // Save named_types entries for type params and install concrete types
-        let saved_named: Vec[i32] = Vec.new()
-        let saved_had: Vec[i32] = Vec.new()
+        let saved_named: List[i32] = List.new()
+        let saved_had: List[i32] = List.new()
         for ti in 0..tp_count:
             let tp_sym = tp_syms[ti]
             if self.named_types.contains(tp_sym):
@@ -6345,7 +6345,7 @@ impl Sema:
             // the prior flags rather than re-derive — re-derivation can
             // flip sigs codegen already contracted (a D6 divergence that
             // segfaulted the compiler on the Mutex drop path).
-            let saved_vra: Vec[i32] = Vec.new()
+            let saved_vra: List[i32] = List.new()
             let saved_vra_count = self.sig_get_param_count(sig_idx)
             for svi in 0..saved_vra_count:
                 saved_vra.push(self.sig_param_uses_value_ref_abi(sig_idx, svi))
@@ -6623,7 +6623,7 @@ impl Sema:
 
     fn alloc_construct_label(kind: AllocConstructKind) -> str:
         if kind == AllocConstructKind.EXPLICIT_API: return "explicit allocation API"
-        if kind == AllocConstructKind.VEC_NEW: return "Vec.new"
+        if kind == AllocConstructKind.LIST_NEW: return "List.new"
         if kind == AllocConstructKind.TO_OWNED: return ".to_owned"
         if kind == AllocConstructKind.OWNED_LITERAL: return "owned string literal"
         if kind == AllocConstructKind.FSTRING: return "f-string"
@@ -6785,8 +6785,8 @@ impl Sema:
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
             return -1
-        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_types = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_types = sema_clone_i32_list(&self.generic_subst_type_ids)
         self.clear_generic_substitution()
         if owner_tp_count > 0 and self.setup_generic_inst_substitution(owner_type, owner_sym) == 0:
             self.generic_subst_param_syms = saved_syms
@@ -6850,8 +6850,8 @@ impl Sema:
 
     // A compiler-modeled operation that promises an owned clone must carry the
     // same concrete method contract as an ordinary source `value.clone()` call.
-    // In particular, blanket impls such as Clone for Vec[T] are generic methods:
-    // lookup_method_fn(Vec, clone) is intentionally empty, while
+    // In particular, blanket impls such as Clone for List[T] are generic methods:
+    // lookup_method_fn(List, clone) is intentionally empty, while
     // lookup_generic_method_fn + concrete_owner_method_sig is the canonical
     // resolution/specialization path. Record that Sema decision for MIR rather
     // than re-resolving a frozen trait call during lowering.
@@ -7598,7 +7598,7 @@ impl Sema:
         self.builtin_sig_index.insert((self.pool_intern("float"), 0), row_index)
         self.builtin_sig_modes.push("tttt")
         let iter = self.pool_intern("Iter")
-        for name in "VecIter VecIterRef MappedIter FilterIter FilterMapIter TakeIter DropIter TakeWhileIter DropWhileIter ZipIter EnumerateIter ChainIter ZipWithIter StepByIter FlatMapIter".split(" "):
+        for name in "ListIter ListIterRef MappedIter FilterIter FilterMapIter TakeIter DropIter TakeWhileIter DropWhileIter ZipIter EnumerateIter ChainIter ZipWithIter StepByIter FlatMapIter".split(" "):
             self.builtin_sig_owner_alias.insert(self.pool_intern(name), iter)
         self.builtin_sig_owner_alias.insert(self.pool_intern("ScopedTask"), self.pool_intern("Task"))
         self.builtin_sig_owner_alias.insert(-(TypeKind.TY_STR as i32), self.pool_intern("str"))
@@ -7716,30 +7716,30 @@ impl Sema:
             if method_name == "is_done": return MirIntrinsic.FIBER_IS_DONE
             if method_name == "was_cancelled": return MirIntrinsic.FIBER_WAS_CANCELLED_RETURN
             return MirIntrinsic.NONE
-        if type_name == "Vec":
-            if method_name == "new": return MirIntrinsic.VEC_NEW
-            if method_name == "with_capacity": return MirIntrinsic.VEC_WITH_CAPACITY
-            if method_name == "push": return MirIntrinsic.VEC_PUSH
-            if method_name == "get": return MirIntrinsic.VEC_GET
-            if method_name == "is_empty": return MirIntrinsic.VEC_IS_EMPTY
-            let vec_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VEC_LEN, method_name)
-            if vec_len_intrinsic != MirIntrinsic.NONE: return vec_len_intrinsic
-            if method_name == "remove": return MirIntrinsic.VEC_REMOVE
-            if method_name == "clear": return MirIntrinsic.VEC_CLEAR
-            if method_name == "pop": return MirIntrinsic.VEC_POP
-            if method_name == "iter": return MirIntrinsic.VEC_ITER
-            if method_name == "iter_ref": return MirIntrinsic.VEC_ITER_REF
-            if method_name == "slot": return MirIntrinsic.VEC_SLOT
-            if method_name == "get_disjoint": return MirIntrinsic.VEC_GET_DISJOINT
-            if method_name == "range": return MirIntrinsic.VEC_RANGE
+        if type_name == "List":
+            if method_name == "new": return MirIntrinsic.LIST_NEW
+            if method_name == "with_capacity": return MirIntrinsic.LIST_WITH_CAPACITY
+            if method_name == "push": return MirIntrinsic.LIST_PUSH
+            if method_name == "get": return MirIntrinsic.LIST_GET
+            if method_name == "is_empty": return MirIntrinsic.LIST_IS_EMPTY
+            let list_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.LIST_LEN, method_name)
+            if list_len_intrinsic != MirIntrinsic.NONE: return list_len_intrinsic
+            if method_name == "remove": return MirIntrinsic.LIST_REMOVE
+            if method_name == "clear": return MirIntrinsic.LIST_CLEAR
+            if method_name == "pop": return MirIntrinsic.LIST_POP
+            if method_name == "iter": return MirIntrinsic.LIST_ITER
+            if method_name == "iter_ref": return MirIntrinsic.LIST_ITER_REF
+            if method_name == "slot": return MirIntrinsic.LIST_SLOT
+            if method_name == "get_disjoint": return MirIntrinsic.LIST_GET_DISJOINT
+            if method_name == "range": return MirIntrinsic.LIST_RANGE
             if method_name == "split_at": return MirIntrinsic.SPLIT_AT
             if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
-            if method_name == "iter_place": return MirIntrinsic.VEC_ITER_PLACE
-            if method_name == "map": return MirIntrinsic.VEC_MAP
-            if method_name == "filter": return MirIntrinsic.VEC_FILTER
-            if method_name == "fold": return MirIntrinsic.VEC_FOLD
-            if method_name == "contains": return MirIntrinsic.VEC_CONTAINS
-            if method_name == "join": return MirIntrinsic.VEC_JOIN
+            if method_name == "iter_place": return MirIntrinsic.LIST_ITER_PLACE
+            if method_name == "map": return MirIntrinsic.LIST_MAP
+            if method_name == "filter": return MirIntrinsic.LIST_FILTER
+            if method_name == "fold": return MirIntrinsic.LIST_FOLD
+            if method_name == "contains": return MirIntrinsic.LIST_CONTAINS
+            if method_name == "join": return MirIntrinsic.LIST_JOIN
             return MirIntrinsic.NONE
         if type_name == "FixedString" or type_name.starts_with("FixedString__"):
             if method_name == "new": return MirIntrinsic.FIXED_STRING_NEW
@@ -7754,9 +7754,9 @@ impl Sema:
             if method_name == "as_view": return MirIntrinsic.FIXED_STRING_AS_VIEW
             if method_name == "equals": return MirIntrinsic.FIXED_STRING_EQUALS
             return MirIntrinsic.NONE
-        if type_name == "VecIter" or type_name == "VecIterRef":
+        if type_name == "ListIter" or type_name == "ListIterRef":
             if method_name == "next":
-                if type_name == "VecIterRef": return MirIntrinsic.VECITERREF_NEXT
+                if type_name == "ListIterRef": return MirIntrinsic.VECITERREF_NEXT
                 return MirIntrinsic.VECITER_NEXT
             if method_name == "map": return MirIntrinsic.ITER_MAP
             if method_name == "filter": return MirIntrinsic.ITER_FILTER
@@ -7837,7 +7837,7 @@ impl Sema:
             if method_name == "partition": return MirIntrinsic.ITER_PARTITION
             if method_name == "unzip": return MirIntrinsic.ITER_UNZIP
             return MirIntrinsic.NONE
-        if type_name == "VecSlot":
+        if type_name == "ListSlot":
             if method_name == "get": return MirIntrinsic.VECSLOT_GET
             if method_name == "set": return MirIntrinsic.VECSLOT_SET
             return MirIntrinsic.NONE
@@ -7857,15 +7857,15 @@ impl Sema:
             if method_name == "get": return MirIntrinsic.SLOTMAPSLOT_GET
             if method_name == "set": return MirIntrinsic.SLOTMAPSLOT_SET
             return MirIntrinsic.NONE
-        if type_name == "VecRange":
+        if type_name == "ListRange":
             if method_name == "get": return MirIntrinsic.VECRANGE_GET
             if method_name == "set": return MirIntrinsic.VECRANGE_SET
             if method_name == "split_at": return MirIntrinsic.SPLIT_AT
             if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
-            let vecrange_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VECRANGE_LEN, method_name)
-            if vecrange_len_intrinsic != MirIntrinsic.NONE: return vecrange_len_intrinsic
+            let listrange_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VECRANGE_LEN, method_name)
+            if listrange_len_intrinsic != MirIntrinsic.NONE: return listrange_len_intrinsic
             return MirIntrinsic.NONE
-        if type_name == "VecIterPlace":
+        if type_name == "ListIterPlace":
             if method_name == "next": return MirIntrinsic.VECITERPLACE_NEXT
             return MirIntrinsic.NONE
         if type_name == "HashMap":
@@ -8682,7 +8682,7 @@ impl Sema:
         // #600 (§5.1): an ephemeral VALUE cannot move by value into a heap-owning
         // constructor (Box.new / Rc.new / Arc.new / std.ffi.box_ctx) — the heap
         // copy would let the borrowed storage escape its origin's lifetime.
-        // Same unsafe lane as the task gate below. (Vec element virality per
+        // Same unsafe lane as the task gate below. (List element virality per
         // §5.2 is tracked separately.)
         if self.expr_is_ephemeral_value(arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0 and callee_sym != 0:
             let ebx_path = self.fn_symbol_source_path(callee_sym)
@@ -8741,7 +8741,7 @@ impl Sema:
             if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
                 return 1
             // `*r` is the pointee read out as a value: it holds a view only
-            // when its own type can (`**rr`, `*r` of a `&Vec[&T]`). A Copy
+            // when its own type can (`**rr`, `*r` of a `&List[&T]`). A Copy
             // read through a reference (`*r` of a `&i32`) owns what it holds
             // (#1783); the operand's reference is not the value's.
             if op == UnaryOp.UOP_DEREF:
@@ -9526,7 +9526,7 @@ const BORROW_LIVE: i32 = 2
 // bundle build's index for fn_global_effects.
 pub type SemaGlobalCallIndex {
     head: HashMap[i32, i32],
-    next: Vec[i32],
+    next: List[i32],
 }
 
 type SemaBorrowLiveness {
@@ -10510,7 +10510,7 @@ impl Sema:
                         // Read-write "+r": output type is the (last) input's type.
                         asm_result_ty = self.check_expr(self.ast.get_extra(asm_in_base + 1 + asm_in_count - 1)) as i32
                 if asm_out_count > 1:
-                    let asm_elems: Vec[i32] = Vec.new()
+                    let asm_elems: List[i32] = List.new()
                     for asm_oi in 0..asm_out_count:
                         let asm_out_node = self.ast.get_extra(asm_extra_start + 1 + asm_oi)
                         let asm_out_ty = self.resolve_type_expr(asm_out_node) as i32
@@ -10633,7 +10633,7 @@ impl Sema:
                     return inner_ty
                 // Unwrap tuple of Task[T] → tuple of T
                 let extra_s = self.ast.get_data0(inner)
-                let unwrapped_elems: Vec[i32] = Vec.new()
+                let unwrapped_elems: List[i32] = List.new()
                 for ei in 0..elem_count:
                     let elem_node = self.ast.get_extra(extra_s + ei)
                     self.mark_awaited_task_moved(elem_node)
@@ -10679,7 +10679,7 @@ impl Sema:
             // Record the sidecar entry: MirLower's expr_type reads it, and an
             // unrecorded async node fell back to void (typed-MIR validator
             // rejected the let assign as Task[T] <- void).
-            let ab_task_args: Vec[i32] = Vec.new()
+            let ab_task_args: List[i32] = List.new()
             ab_task_args.push(ab_body_ty as i32)
             let ab_task_ty = self.ensure_generic_inst_type(self.syms.task, ab_task_args, 1)
             if ab_task_ty != 0:
@@ -10914,18 +10914,18 @@ impl Sema:
                 if self.get_type_kind(expected) == TypeKind.TY_GENERIC_INST:
                     let base = self.get_generic_inst_base(expected as i32)
                     let base_name = self.pool_resolve(base)
-                    if base == self.syms.vec or base == self.syms.hashset or base == self.syms.btreeset:
+                    if base == self.syms.list or base == self.syms.hashset or base == self.syms.btreeset:
                         target_ty = expected as i32
                         result_expected = self.get_generic_inst_arg(expected as i32, 0)
                     else if base == self.syms.hashmap or base == self.syms.btreemap:
                         self.emit_error("element comprehension cannot target a map; use [key: value for ...] form", node)
                         return 0
                 else:
-                    self.emit_error("element comprehension requires Vec, HashSet, or BTreeSet expected type", node)
+                    self.emit_error("element comprehension requires List, HashSet, or BTreeSet expected type", node)
                     return 0
             var pushed_scopes = 0
             let comp_view_count = self.for_view_binding_syms.len() as i32
-            let gen_outer_counts: Vec[i32] = Vec.new()
+            let gen_outer_counts: List[i32] = List.new()
             for ci in 0..clause_count:
                 let base = comp_start + ci * 3
                 let binding = self.ast.get_extra(base)
@@ -10958,7 +10958,7 @@ impl Sema:
             for _ in 0..pushed_scopes:
                 self.pop_scope()
             self.truncate_for_view_bindings(comp_view_count)
-            let result_ty = if target_ty != 0: target_ty else: self.ensure_vec_type_for(result_elem as i32)
+            let result_ty = if target_ty != 0: target_ty else: self.ensure_list_type_for(result_elem as i32)
             if target_ty != 0:
                 let target_resolved = self.resolve_alias(target_ty as TypeId)
                 if self.get_type_kind(target_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(target_resolved as i32) == self.syms.btreeset:
@@ -10995,7 +10995,7 @@ impl Sema:
                 val_expected = self.get_generic_inst_arg(expected2 as i32, 1)
             var pushed_scopes2 = 0
             let comp_view_count2 = self.for_view_binding_syms.len() as i32
-            let gen_outer_counts2: Vec[i32] = Vec.new()
+            let gen_outer_counts2: List[i32] = List.new()
             for ci2 in 0..clause_count2:
                 let base3 = comp_start2 + 2 + ci2 * 3
                 let binding2 = self.ast.get_extra(base3)
@@ -11042,7 +11042,7 @@ impl Sema:
                 self.pop_scope()
             self.truncate_for_view_bindings(comp_view_count2)
             if map_target_ty == 0:
-                let map_args: Vec[i32] = Vec.new()
+                let map_args: List[i32] = List.new()
                 map_args.push(stored_key_ty)
                 map_args.push(stored_val_ty)
                 map_target_ty = self.ensure_generic_inst_type(self.syms.hashmap, map_args, 2) as i32
@@ -11281,8 +11281,8 @@ impl Sema:
                 if self.get_type_kind(expected_callable) == TypeKind.TY_FN:
                     let generic_node = self.generic_fn_node_for_symbol(sym)
                     let expected_param_count = self.get_type_d1(expected_callable)
-                    let instance_arg_types: Vec[i32] = Vec.new()
-                    let instance_arg_nodes: Vec[i32] = Vec.new()
+                    let instance_arg_types: List[i32] = List.new()
+                    let instance_arg_nodes: List[i32] = List.new()
                     for pi in 0..expected_param_count:
                         instance_arg_types.push(self.fn_type_param_type(expected_callable as i32, pi))
                     if self.check_generic_call(sym, generic_node, &instance_arg_types, &instance_arg_nodes, expected_param_count, node) == 0:
@@ -11295,7 +11295,7 @@ impl Sema:
                     // callable type is built from its concrete parameters
                     // and return.
                     let mono_param_count = self.sig_get_param_count(mono_sig)
-                    let mono_params: Vec[i32] = Vec.new()
+                    let mono_params: List[i32] = List.new()
                     for mpi in 0..mono_param_count:
                         mono_params.push(self.sig_param_type(mono_sig, mpi))
                     let mono_tid = self.ensure_fn_type(&mono_params, mono_param_count, self.sig_return_type(mono_sig) as TypeId) as i32
@@ -11411,6 +11411,9 @@ impl Sema:
         let ident_gate_note = self.std_gated_import_note(sym)
         if ident_gate_note.len() > 0:
             self.emit_error("'" ++ target_name ++ "' requires an explicit import (§18.1)" ++ ident_gate_note, node)
+            return 0
+        if target_name == "Vec":
+            self.emit_error(self.vec_is_list_message(), node)
             return 0
         if self.ast.kind(node) == NodeKind.NK_PAT_VARIANT:
             // A bare uppercase-initial identifier in a pattern is a unit
@@ -11865,7 +11868,7 @@ impl Sema:
         var ok = true
         if base != 0 and (base == self.syms.hashmap or base == self.syms.btreemap):
             ok = self.debug_fmt_has_form(self.get_generic_inst_arg(resolved, 0)) and self.debug_fmt_has_form(self.get_generic_inst_arg(resolved, 1))
-        else if kind == TypeKind.TY_GENERIC_INST and base != self.syms.vec and not self.debug_fmt_transparent_owner(resolved) and
+        else if kind == TypeKind.TY_GENERIC_INST and base != self.syms.list and not self.debug_fmt_transparent_owner(resolved) and
             self.debug_fmt_enum_base(resolved) == 0 and not self.debug_fmt_generic_struct(resolved):
             ok = false
         else:
@@ -11936,7 +11939,7 @@ impl Sema:
     // `:?`). -1 when the value is formatted inline, or when it cannot be
     // formatted at all — then the error names the type. The entry exists
     // before its components are registered, so a recursive type (through
-    // Box, Vec, ...) reaches itself and stops.
+    // Box, List, ...) reaches itself and stops.
     mut fn ensure_debug_formatter(tid: i32, node: i32) -> i32:
         if tid <= 0:
             return -1
@@ -11973,14 +11976,14 @@ impl Sema:
             let entry = self.debug_fmt_push(resolved, DebugFmtKind.HELPER, 0)
             let _ = self.debug_fmt_bind_method(entry, resolved, "debug_form", node)
             return entry
-        if kind == TypeKind.TY_GENERIC_INST and base != self.syms.vec and not self.debug_fmt_transparent_owner(resolved) and
+        if kind == TypeKind.TY_GENERIC_INST and base != self.syms.list and not self.debug_fmt_transparent_owner(resolved) and
             self.debug_fmt_enum_base(resolved) == 0 and not self.debug_fmt_generic_struct(resolved):
             self.emit_error("cannot format a value of type '" ++ self.type_name(resolved) ++ "' with :? — §15.4.7 gives it no Debug form", node)
             return -1
         let fn_sym = self.pool_intern(f"__with_debug_fmt_{resolved}")
         let entry = self.debug_fmt_push(resolved, DebugFmtKind.SYNTH, fn_sym)
         let view_ty = self.ensure_exact_type(TypeKind.TY_REF, resolved, 0, 0) as i32
-        let params: Vec[i32] = Vec.new()
+        let params: List[i32] = List.new()
         params.push(view_ty)
         let fn_tid = self.ensure_fn_type(params, 1, self.ty_str) as i32
         let param_start = self.sig_params.len() as i32
@@ -12000,12 +12003,12 @@ impl Sema:
         else if base == self.syms.hashset:
             // `{elem, elem}` ordered by the elements' Debug text (§15.4.7,
             // #1564). The set has no traversal of its own: the formatter
-            // walks its table (MirLower.lower_debug_set) into a Vec of the
+            // walks its table (MirLower.lower_debug_set) into a List of the
             // elements' texts, which the library's debug_form_of orders.
             let _ = self.ensure_exact_type(TypeKind.TY_REF, self.get_generic_inst_arg(resolved, 0), 0, 0)
-            let texts_args: Vec[i32] = Vec.new()
+            let texts_args: List[i32] = List.new()
             texts_args.push(self.ty_str as i32)
-            let texts_ty = self.ensure_generic_inst_type(self.syms.vec, texts_args, 1) as i32
+            let texts_ty = self.ensure_generic_inst_type(self.syms.list, texts_args, 1) as i32
             let _ = self.ensure_exact_type(TypeKind.TY_REF, texts_ty, 0, 0)
             self.debug_fmt_bind_aux(entry, resolved, "debug_form_of", node)
         let components = self.debug_fmt_components(resolved)
@@ -12055,8 +12058,8 @@ impl Sema:
         if template != 0 and self.get_type_kind(template as TypeId) == TypeKind.TY_ENUM: template else: 0
 
     // The types a synthesized formatter formats inside `resolved`, in order.
-    mut fn debug_fmt_components(resolved: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    mut fn debug_fmt_components(resolved: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         let kind = self.get_type_kind(resolved as TypeId)
         if kind == TypeKind.TY_TUPLE:
             let te = self.get_type_d0(resolved as TypeId)
@@ -12067,7 +12070,7 @@ impl Sema:
             out.push(self.get_type_d0(resolved as TypeId))
             return out
         let base = if kind == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(resolved) else: 0
-        if base != 0 and (base == self.syms.vec or base == self.syms.hashset or self.debug_fmt_transparent_owner(resolved)):
+        if base != 0 and (base == self.syms.list or base == self.syms.hashset or self.debug_fmt_transparent_owner(resolved)):
             out.push(self.get_generic_inst_arg(resolved, 0))
             return out
         let enum_base = self.debug_fmt_enum_base(resolved)
@@ -12138,7 +12141,7 @@ impl Sema:
             return self.get_type_d0(resolved)
         self.get_type_name(resolved)
 
-    mut fn resolve_type_node_with_subst(type_node: i32, self_ty: i32, subst_names: &Vec[i32], subst_types: &Vec[i32]) -> i32:
+    mut fn resolve_type_node_with_subst(type_node: i32, self_ty: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
         if type_node == 0:
             return self.ty_void as i32
         let kind = self.ast.kind(type_node)
@@ -12146,7 +12149,7 @@ impl Sema:
             let sym = self.ast.get_data0(type_node)
             if sym == self.syms.self_type and self_ty != 0:
                 return self_ty
-            let subst = self.subst_vec_lookup(subst_names, subst_types, sym)
+            let subst = self.subst_list_lookup(subst_names, subst_types, sym)
             if subst != 0:
                 return subst
             return self.resolve_type_expr(type_node) as i32
@@ -12159,7 +12162,7 @@ impl Sema:
         if kind == NodeKind.NK_TYPE_TUPLE:
             let extra_start = self.ast.get_data0(type_node)
             let elem_count = self.ast.get_data1(type_node)
-            let elems: Vec[i32] = Vec.new()
+            let elems: List[i32] = List.new()
             for ei in 0..elem_count:
                 elems.push(self.resolve_type_node_with_subst(self.ast.get_extra(extra_start + ei), self_ty, subst_names, subst_types))
             return self.ensure_tuple_type(elems, elem_count) as i32
@@ -12171,14 +12174,14 @@ impl Sema:
                 return self.mask_type_from_args(vs_a0, vs_a1)
             let vs_lane = self.resolve_type_node_with_subst(vs_a1, self_ty, subst_names, subst_types)
             let vs_count_kind = self.ast.kind(vs_a0)
-            let vs_vec_subst = if vs_count_kind == NodeKind.NK_TYPE_NAMED or vs_count_kind == NodeKind.NK_IDENT: self.subst_vec_lookup(subst_names, subst_types, self.ast.get_data0(vs_a0)) else: 0
-            let vs_count_subst = if vs_vec_subst != 0: vs_vec_subst else: self.vector_count_subst(vs_a0)
+            let vs_list_subst = if vs_count_kind == NodeKind.NK_TYPE_NAMED or vs_count_kind == NodeKind.NK_IDENT: self.subst_list_lookup(subst_names, subst_types, self.ast.get_data0(vs_a0)) else: 0
+            let vs_count_subst = if vs_list_subst != 0: vs_list_subst else: self.vector_count_subst(vs_a0)
             return self.vector_type_from_args(vs_a0, vs_lane, vs_a1, vs_count_subst)
         if kind == NodeKind.NK_TYPE_GENERIC:
             let base_sym = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
             let extra_start2 = self.ast.get_data1(type_node)
             let arg_count = self.ast.get_data2(type_node)
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             for ai in 0..arg_count:
                 let arg_ty = self.resolve_type_node_with_subst(self.ast.get_extra(extra_start2 + ai), self_ty, subst_names, subst_types)
                 if arg_ty == 0:
@@ -12187,12 +12190,12 @@ impl Sema:
             return self.ensure_generic_inst_type(base_sym, args, arg_count) as i32
         if kind == NodeKind.NK_TYPE_OPTIONAL:
             let inner3 = self.resolve_type_node_with_subst(self.ast.get_data0(type_node), self_ty, subst_names, subst_types)
-            let opt_args: Vec[i32] = Vec.new()
+            let opt_args: List[i32] = List.new()
             opt_args.push(inner3)
             return self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
         self.resolve_type_expr(type_node) as i32
 
-    fn resolve_type_node_with_subst_frozen(type_node: i32, self_ty: i32, subst_names: &Vec[i32], subst_types: &Vec[i32]) -> i32:
+    fn resolve_type_node_with_subst_frozen(type_node: i32, self_ty: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
         if type_node == 0:
             return self.ty_void as i32
         let kind = self.ast.kind(type_node)
@@ -12200,7 +12203,7 @@ impl Sema:
             let sym = self.ast.get_data0(type_node)
             if sym == self.syms.self_type and self_ty != 0:
                 return self_ty
-            let subst = self.subst_vec_lookup(subst_names, subst_types, sym)
+            let subst = self.subst_list_lookup(subst_names, subst_types, sym)
             if subst != 0:
                 return subst
             return self.resolve_type_expr_frozen(type_node) as i32
@@ -12213,7 +12216,7 @@ impl Sema:
         if kind == NodeKind.NK_TYPE_TUPLE:
             let extra_start = self.ast.get_data0(type_node)
             let elem_count = self.ast.get_data1(type_node)
-            let elems: Vec[i32] = Vec.new()
+            let elems: List[i32] = List.new()
             for ei in 0..elem_count:
                 elems.push(self.resolve_type_node_with_subst_frozen(self.ast.get_extra(extra_start + ei), self_ty, subst_names, subst_types))
             return self.find_tuple_type(elems, elem_count) as i32
@@ -12221,8 +12224,8 @@ impl Sema:
             let vs_start = self.ast.get_data1(type_node)
             let vs_a0 = self.ast.get_extra(vs_start)
             let vs_count_kind = self.ast.kind(vs_a0)
-            let vs_vec_subst = if vs_count_kind == NodeKind.NK_TYPE_NAMED or vs_count_kind == NodeKind.NK_IDENT: self.subst_vec_lookup(subst_names, subst_types, self.ast.get_data0(vs_a0)) else: 0
-            let vs_count = self.vector_count_node_value(vs_a0, if vs_vec_subst != 0: vs_vec_subst else: self.vector_count_subst(vs_a0))
+            let vs_list_subst = if vs_count_kind == NodeKind.NK_TYPE_NAMED or vs_count_kind == NodeKind.NK_IDENT: self.subst_list_lookup(subst_names, subst_types, self.ast.get_data0(vs_a0)) else: 0
+            let vs_count = self.vector_count_node_value(vs_a0, if vs_list_subst != 0: vs_list_subst else: self.vector_count_subst(vs_a0))
             if vs_count < 1:
                 return 0
             if self.is_mask_symbol(self.ast.get_data0(type_node)):
@@ -12234,7 +12237,7 @@ impl Sema:
             let base_sym = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
             let extra_start2 = self.ast.get_data1(type_node)
             let arg_count = self.ast.get_data2(type_node)
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             for ai in 0..arg_count:
                 let arg_ty = self.resolve_type_node_with_subst_frozen(self.ast.get_extra(extra_start2 + ai), self_ty, subst_names, subst_types)
                 if arg_ty == 0:
@@ -12248,17 +12251,17 @@ impl Sema:
 
 type SemaImplTargetMatch {
     ok: i32,
-    subst_names: Vec[i32],
-    subst_types: Vec[i32],
+    subst_names: List[i32],
+    subst_types: List[i32],
 }
 
 fn sema_impl_target_no_match -> SemaImplTargetMatch:
-    SemaImplTargetMatch { 0, Vec.new(), Vec.new() }
+    SemaImplTargetMatch { 0, List.new(), List.new() }
 
 impl Sema:
     mut fn impl_target_match(impl_node: i32, carrier_ty: i32) -> SemaImplTargetMatch:
-        let subst_names: Vec[i32] = Vec.new()
-        let subst_types: Vec[i32] = Vec.new()
+        let subst_names: List[i32] = List.new()
+        let subst_types: List[i32] = List.new()
         let carrier_resolved = self.resolve_alias(carrier_ty as TypeId)
         let carrier_base = self.type_base_symbol(carrier_ty)
         if carrier_base == 0:
@@ -12291,7 +12294,7 @@ impl Sema:
                 if pattern_kind == NodeKind.NK_TYPE_NAMED or pattern_kind == NodeKind.NK_IDENT:
                     let pattern_sym = self.ast.get_data0(pattern_arg)
                     if self.type_param_in_impl_list(tp_start, tp_count, pattern_sym) != 0 or self.impl_target_bare_type_param(impl_node, pattern_sym) != 0:
-                        let existing = self.subst_vec_lookup(&subst_names, &subst_types, pattern_sym)
+                        let existing = self.subst_list_lookup(&subst_names, &subst_types, pattern_sym)
                         if existing != 0:
                             if self.types_compatible(existing, actual_arg) == 0:
                                 return sema_impl_target_no_match()
@@ -12311,8 +12314,8 @@ impl Sema:
         sema_impl_target_no_match()
 
     fn impl_target_match_frozen(impl_node: i32, carrier_ty: i32) -> SemaImplTargetMatch:
-        let subst_names: Vec[i32] = Vec.new()
-        let subst_types: Vec[i32] = Vec.new()
+        let subst_names: List[i32] = List.new()
+        let subst_types: List[i32] = List.new()
         let carrier_resolved = self.resolve_alias(carrier_ty as TypeId)
         let carrier_base = self.type_base_symbol(carrier_ty)
         if carrier_base == 0:
@@ -12345,7 +12348,7 @@ impl Sema:
                 if pattern_kind == NodeKind.NK_TYPE_NAMED or pattern_kind == NodeKind.NK_IDENT:
                     let pattern_sym = self.ast.get_data0(pattern_arg)
                     if self.type_param_in_impl_list(tp_start, tp_count, pattern_sym) != 0 or self.impl_target_bare_type_param(impl_node, pattern_sym) != 0:
-                        let existing = self.subst_vec_lookup(&subst_names, &subst_types, pattern_sym)
+                        let existing = self.subst_list_lookup(&subst_names, &subst_types, pattern_sym)
                         if existing != 0:
                             if self.types_compatible_frozen(existing, actual_arg) == 0:
                                 return sema_impl_target_no_match()
@@ -12405,11 +12408,11 @@ impl Sema:
                     return self.get_generic_inst_arg(source_resolved as i32, ai)
         0
 
-    mut fn resolve_impl_trait_arg_for_source(impl_node: i32, source_ty: i32, arg_node: i32, subst_names: &Vec[i32], subst_types: &Vec[i32]) -> i32:
+    mut fn resolve_impl_trait_arg_for_source(impl_node: i32, source_ty: i32, arg_node: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
         let arg_kind = self.ast.kind(arg_node)
         if arg_kind == NodeKind.NK_TYPE_NAMED or arg_kind == NodeKind.NK_IDENT:
             let arg_sym = self.ast.get_data0(arg_node)
-            let subst = self.subst_vec_lookup(subst_names, subst_types, arg_sym)
+            let subst = self.subst_list_lookup(subst_names, subst_types, arg_sym)
             if subst != 0:
                 return subst
             let target_actual = self.impl_target_actual_for_type_param(impl_node, source_ty, arg_sym)
@@ -12417,11 +12420,11 @@ impl Sema:
                 return target_actual
         self.resolve_type_node_with_subst(arg_node, source_ty, subst_names, subst_types)
 
-    fn resolve_impl_trait_arg_for_source_frozen(impl_node: i32, source_ty: i32, arg_node: i32, subst_names: &Vec[i32], subst_types: &Vec[i32]) -> i32:
+    fn resolve_impl_trait_arg_for_source_frozen(impl_node: i32, source_ty: i32, arg_node: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
         let arg_kind = self.ast.kind(arg_node)
         if arg_kind == NodeKind.NK_TYPE_NAMED or arg_kind == NodeKind.NK_IDENT:
             let arg_sym = self.ast.get_data0(arg_node)
-            let subst = self.subst_vec_lookup(subst_names, subst_types, arg_sym)
+            let subst = self.subst_list_lookup(subst_names, subst_types, arg_sym)
             if subst != 0:
                 return subst
             let target_actual = self.impl_target_actual_for_type_param(impl_node, source_ty, arg_sym)
@@ -12559,7 +12562,7 @@ impl Sema:
                         continue_ty = self.get_generic_inst_arg(branch_ret as i32, 1)
             if continue_ty == 0 or break_ty == 0:
                 continue
-            let cf_args: Vec[i32] = Vec.new()
+            let cf_args: List[i32] = List.new()
             cf_args.push(break_ty)
             cf_args.push(continue_ty)
             let branch_result_ty = self.ensure_generic_inst_type(control_flow_sym, cf_args, 2) as i32
@@ -12574,7 +12577,7 @@ impl Sema:
                     if self.get_type_kind(branch_ret2) == TypeKind.TY_GENERIC_INST and self.get_type_d0(branch_ret2) == control_flow_sym:
                         let break_ty2 = self.get_generic_inst_arg(branch_ret2 as i32, 0)
                         let continue_ty2 = self.get_generic_inst_arg(branch_ret2 as i32, 1)
-                        let cf_args2: Vec[i32] = Vec.new()
+                        let cf_args2: List[i32] = List.new()
                         cf_args2.push(break_ty2)
                         cf_args2.push(continue_ty2)
                         let branch_result_ty2 = self.ensure_generic_inst_type(control_flow_sym, cf_args2, 2) as i32
@@ -12699,8 +12702,8 @@ impl Sema:
             return 0
         self.operator_method_calls.insert(node, candidate.fn_sym)
         // #1819: the operator is a call of its method.
-        let args: Vec[i32] = Vec.new()
-        let by_place: Vec[bool] = Vec.new()
+        let args: List[i32] = List.new()
+        let by_place: List[bool] = List.new()
         args.push(operand_node)
         by_place.push(self.type_takes_place(expected_operand))
         self.note_call_global_effects(node, candidate.sig, 0, 0, false, args, by_place)
@@ -12770,8 +12773,8 @@ impl Sema:
         self.operator_method_calls.insert(node, selected.fn_sym)
         self.operator_method_reversed.insert(node, reversed)
         // #1819: the operator is a call of its method.
-        let args: Vec[i32] = Vec.new()
-        let by_place: Vec[bool] = Vec.new()
+        let args: List[i32] = List.new()
+        let by_place: List[bool] = List.new()
         args.push(selected_lhs_node)
         args.push(selected_rhs_node)
         by_place.push(self.type_takes_place(expected_lhs))
@@ -12783,7 +12786,7 @@ impl Sema:
     // compare), so it is not treated as a bare pointer. Derefs only str references;
     // `&i32` etc. keep pointer semantics. (#293)
     // A view of a str compares as the str it observes, through every level
-    // of view (`kept[i]` of a `Vec[&str]` is a view of a view, #2142).
+    // of view (`kept[i]` of a `List[&str]` is a view of a view, #2142).
     fn cmp_normalize_str_ref(ty: i32) -> i32:
         var inner = ty
         var r = self.resolve_alias(inner as TypeId)
@@ -13043,7 +13046,7 @@ impl Sema:
     // The nodes of an untyped constant's initializer that take the type of
     // the use: its literals and the operators over them, through the
     // constants it names. A shift's amount keeps its own type (§4.2.4).
-    pub fn untyped_const_value_path(node: i32, out0: Vec[i32]) -> Vec[i32]:
+    pub fn untyped_const_value_path(node: i32, out0: List[i32]) -> List[i32]:
         var out = out0
         if node == 0:
             return out
@@ -13346,7 +13349,7 @@ impl Sema:
             // payload-int into an Option-typed temp (issue43).
             if dj != 0:
                 self.typed_expr_types.insert(node, dj as i32)
-                let dj_arms: Vec[i32] = Vec.new()
+                let dj_arms: List[i32] = List.new()
                 dj_arms.push(lhs_node)
                 dj_arms.push(rhs_node)
                 self.d32_check_owned_join_arms(dj, &dj_arms, "`??` operand")
@@ -14283,7 +14286,7 @@ impl Sema:
                 // #1903: the body's tail is the returned view; its global
                 // origins are read here, while its bindings' are in scope.
                 if node == self.body_tail_block and self.stmt_pos_depth == 0:
-                    var tail_deps: Vec[i32] = Vec.new()
+                    var tail_deps: List[i32] = List.new()
                     tail_deps = self.collect_expr_view_deps(tail, move tail_deps)
                     self.note_returned_global_origins(&tail_deps, tail)
                     // And its parameter origins: a view reached through a
@@ -14340,7 +14343,7 @@ impl Sema:
             self.pop_label_frame()
         // #1827 (§2.4): the drops at this block's end, its tail's value
         // outliving them; nothing is used after a function's last block.
-        let tail_views: Vec[i32] = Vec.new()
+        let tail_views: List[i32] = List.new()
         if tail != 0 and not self.tail_value_discarded(tail) and self.expr_views_global(tail):
             tail_views.push(tail)
         self.note_scope_exit_drops(node, GLOBAL_SITE_SCOPE_DROP, block_scope_start, tail_views, node != self.body_tail_block)
@@ -14462,9 +14465,9 @@ impl Sema:
         if v_owner != 0 and self.has_drop_method(v_owner) != 0:
             return 0
         // A field whose TYPE carries a user Drop impl (directly or
-        // transitively — W, Vec[W]) stays a MOVE: RAII resources want
+        // transitively — W, List[W]) stays a MOVE: RAII resources want
         // explicit ownership transfer (err_use_after_move_*_field pins).
-        // Pure memory-managed types (str, Vec[str]) observe per D22.
+        // Pure memory-managed types (str, List[str]) observe per D22.
         let v_fty_opt = self.typed_expr_types.get(expr)
         let v_fty = if v_fty_opt.is_some(): v_fty_opt.unwrap() else: self.field_access_type_no_diagnostic(expr)
         if v_fty != 0 and self.type_carries_user_drop(v_fty) != 0:
@@ -14635,8 +14638,8 @@ impl Sema:
         0
 
     // A use of `expr` that needs the type `demanded`: a parameter, a typed
-    // place, a return. The collections a list builds are demanded (`Vec`,
-    // `HashSet`, `BTreeSet`, a fixed array); a slice views the Vec and
+    // place, a return. The collections a list builds are demanded (`List`,
+    // `HashSet`, `BTreeSet`, a fixed array); a slice views the List and
     // demands nothing (D113).
     mut fn note_literal_demand(expr: i32, demanded: i32, use_node: i32):
         let let_node = self.literal_binding_let(expr)
@@ -14646,7 +14649,7 @@ impl Sema:
         let kind = self.get_type_kind(want as TypeId)
         if kind == TypeKind.TY_GENERIC_INST:
             let base = self.canonical_symbol_by_text(self.get_generic_inst_base(want))
-            if base != self.syms.vec and base != self.syms.hashset and base != self.syms.btreeset:
+            if base != self.syms.list and base != self.syms.hashset and base != self.syms.btreeset:
                 return
         else if kind != TypeKind.TY_ARRAY:
             return
@@ -14655,7 +14658,7 @@ impl Sema:
         self.literal_demands.push(use_node)
 
     // A method called on `recv_expr` that exactly one of the collections a
-    // literal builds has (`push` demands a `Vec`). The element type is the
+    // literal builds has (`push` demands a `List`). The element type is the
     // literal's, or the argument's when the literal is empty.
     mut fn note_literal_method_demand(recv_expr: i32, recv_ty: i32, field: i32, first_arg_ty: i32, use_node: i32):
         let let_node = self.literal_binding_let(recv_expr)
@@ -14664,7 +14667,7 @@ impl Sema:
         let have = if recv_ty != 0: self.resolve_alias(recv_ty as TypeId) as i32 else: 0
         var elem = if have == 0: 0
             else if self.get_type_kind(have as TypeId) == TypeKind.TY_ARRAY: self.get_type_d0(have as TypeId)
-            else if self.std_generic_of(have) == StdGeneric.Vec: self.get_generic_inst_arg(have, 0)
+            else if self.std_generic_of(have) == StdGeneric.Sequence: self.get_generic_inst_arg(have, 0)
             else: 0
         if elem == 0 and first_arg_ty != 0: elem = self.auto_deref_ref_ptr_type(self.resolve_alias(first_arg_ty as TypeId)) as i32
         if elem == 0:
@@ -14672,8 +14675,8 @@ impl Sema:
         let method_name: str = with_str_clone_ref(self.pool_resolve(field))
         var found = 0
         var count = 0
-        for base in [self.syms.vec, self.syms.hashset, self.syms.btreeset]:
-            let args: Vec[i32] = Vec.new()
+        for base in [self.syms.list, self.syms.hashset, self.syms.btreeset]:
+            let args: List[i32] = List.new()
             args.push(elem)
             let candidate = self.ensure_generic_inst_type(base, args, 1) as i32
             if self.builtin_method_intrinsic(candidate, method_name) != MirIntrinsic.NONE:
@@ -14686,18 +14689,18 @@ impl Sema:
         self.literal_demands.push(use_node)
 
     // A type in a form the second check can read. The two checks are two
-    // Semas, and a type first made after `literal_watermark` (the `Vec[f64]`
+    // Semas, and a type first made after `literal_watermark` (the `List[f64]`
     // a use demanded) has no id in the second: it is written as its
     // structure over types below the mark, and rebuilt there. Empty when the
     // type has a part this form does not carry.
-    fn literal_type_encode(tid: i32) -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    fn literal_type_encode(tid: i32) -> List[i32]:
+        var out: List[i32] = List.new()
         if tid < self.literal_watermark:
             out.push(0)
             out.push(tid)
             return out
         let kind = self.get_type_kind(tid as TypeId)
-        var parts: Vec[i32] = Vec.new()
+        var parts: List[i32] = List.new()
         if kind == TypeKind.TY_GENERIC_INST:
             out.push(1)
             out.push(self.get_generic_inst_base(tid))
@@ -14711,28 +14714,28 @@ impl Sema:
             out.push(self.get_type_d1(tid as TypeId))
             out.push(self.get_type_d2(tid as TypeId))
             let inner = self.literal_type_encode(self.get_type_d0(tid as TypeId))
-            if inner.len() == 0: return Vec.new()
+            if inner.len() == 0: return List.new()
             for code in inner: out.push(code)
             return out
         else:
-            return Vec.new()
+            return List.new()
         out.push(parts.len() as i32)
         for part in parts:
             let inner = self.literal_type_encode(part)
-            if inner.len() == 0: return Vec.new()
+            if inner.len() == 0: return List.new()
             for code in inner: out.push(code)
         out
 
     // The type written at `codes[at]`, and the index after it, as a pair
     // packed `type * 2^32 + next`.
-    mut fn literal_type_decode(codes: &Vec[i32], at: i32) -> i64:
+    mut fn literal_type_decode(codes: &List[i32], at: i32) -> i64:
         let tag: i32 = codes[at]
         if tag == 0:
             return (codes[at + 1] as i64) * 4294967296 + (at + 2) as i64
         if tag == 1 or tag == 2:
             let count: i32 = if tag == 1: codes[at + 2] else: codes[at + 1]
             var next = if tag == 1: at + 3 else: at + 2
-            let parts: Vec[i32] = Vec.new()
+            let parts: List[i32] = List.new()
             for _ in 0..count:
                 let part = self.literal_type_decode(codes, next)
                 parts.push((part / 4294967296) as i32)
@@ -14748,10 +14751,10 @@ impl Sema:
     // the use that demanded its type, the use that demanded another (or 0),
     // then each of the two types as a length and its encoding (the second
     // has length 0 when there is none). A binding whose demanded type cannot
-    // be carried is left out, and stays the Vec it is without its uses.
-    pub fn literal_decisions_from_demands() -> Vec[i32]:
+    // be carried is left out, and stays the List it is without its uses.
+    pub fn literal_decisions_from_demands() -> List[i32]:
         // (let, type, second type or 0, use, second use), in this check's ids.
-        var found: Vec[i32] = Vec.new()
+        var found: List[i32] = List.new()
         var i = 0
         while i + 2 < self.literal_demands.len() as i32:
             let let_node: i32 = self.literal_demands[i]
@@ -14772,11 +14775,11 @@ impl Sema:
             else if found[at + 1] != want and found[at + 2] == 0:
                 found[at + 2] = want
                 found[at + 4] = use_node
-        var out: Vec[i32] = Vec.new()
+        var out: List[i32] = List.new()
         var f = 0
         while f + 4 < found.len() as i32:
             let first = self.literal_type_encode(found[f + 1])
-            let second = if found[f + 2] != 0: self.literal_type_encode(found[f + 2]) else: Vec.new()
+            let second = if found[f + 2] != 0: self.literal_type_encode(found[f + 2]) else: List.new()
             if first.len() > 0 and (found[f + 2] == 0 or second.len() > 0):
                 out.push(found[f])
                 out.push(found[f + 3])
@@ -14797,7 +14800,7 @@ impl Sema:
             let first_len: i32 = self.literal_decisions[k + 3]
             let second_len: i32 = self.literal_decisions[k + 4 + first_len]
             if self.literal_decisions[k] == let_node:
-                let codes = sema_clone_i32_vec(&self.literal_decisions)
+                let codes = sema_clone_i32_list(&self.literal_decisions)
                 let decided = (self.literal_type_decode(&codes, k + 4) / 4294967296) as i32
                 if second_len != 0:
                     let other = (self.literal_type_decode(&codes, k + 5 + first_len) / 4294967296) as i32
@@ -14806,14 +14809,14 @@ impl Sema:
             k = k + 5 + first_len + second_len
         0
 
-    // The generic type a bare name in an annotation names (`Vec`, `Option`,
+    // The generic type a bare name in an annotation names (`List`, `Option`,
     // a user `Pair`), or 0: a name with arguments, a non-generic type, or
     // anything that is not a plain name.
     fn bare_generic_annotation(type_node: i32) -> i32:
         if type_node == 0 or self.ast.kind(type_node) != NodeKind.NK_TYPE_NAMED:
             return 0
         let base = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
-        if base == self.syms.vec or base == self.syms.hashset or base == self.syms.btreeset or base == self.syms.hashmap or base == self.syms.btreemap:
+        if base == self.syms.list or base == self.syms.hashset or base == self.syms.btreeset or base == self.syms.hashmap or base == self.syms.btreemap:
             return base
         if self.type_decl_nodes.contains(base) and self.type_decl_tp_count(self.type_decl_nodes.get(base).unwrap()) > 0:
             return base
@@ -14840,7 +14843,7 @@ impl Sema:
         var ann_type: TypeId = 0 as TypeId
         var ann_type_node = 0
         // #2144: an annotation naming a generic type without its arguments
-        // (`let xs: Vec = [1, 2, 3]`) names the type; the initializer decides
+        // (`let xs: List = [1, 2, 3]`) names the type; the initializer decides
         // the arguments. A collection literal builds that collection (§4.3c).
         var bare_generic = 0
         if ann_extra >= 0:
@@ -14848,7 +14851,7 @@ impl Sema:
             bare_generic = if value != 0: self.bare_generic_annotation(ann_type_node) else: 0
             if bare_generic != 0:
                 let value_kind = self.ast.kind(value)
-                let sequence = bare_generic == self.syms.vec or bare_generic == self.syms.hashset or bare_generic == self.syms.btreeset
+                let sequence = bare_generic == self.syms.list or bare_generic == self.syms.hashset or bare_generic == self.syms.btreeset
                 let keyed = bare_generic == self.syms.hashmap or bare_generic == self.syms.btreemap
                 if (value_kind == NodeKind.NK_ARRAY_LIT and sequence) or (value_kind == NodeKind.NK_MAP_LIT and keyed): self.collection_literal_hints.insert(value, bare_generic)
             else:
@@ -15175,16 +15178,16 @@ impl Sema:
                 self.mark_arm_tail_consumed(else_body)
             else_is_never = if self.get_type_kind(self.resolve_alias(else_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
             if in_value_context:
-                let join_nodes: Vec[i32] = Vec.new()
+                let join_nodes: List[i32] = List.new()
                 join_nodes.push(then_body)
                 join_nodes.push(else_body)
-                let origin_nodes: Vec[i32] = Vec.new()
+                let origin_nodes: List[i32] = List.new()
                 origin_nodes.push(then_body)
                 origin_nodes.push(else_body)
-                let join_types: Vec[i32] = Vec.new()
+                let join_types: List[i32] = List.new()
                 join_types.push(then_type as i32)
                 join_types.push(else_type as i32)
-                let join_roles: Vec[i32] = Vec.new()
+                let join_roles: List[i32] = List.new()
                 join_roles.push(D22_JOIN_ROLE_EXPR)
                 join_roles.push(D22_JOIN_ROLE_EXPR)
                 // #1754: at a `&T` parameter the arms decide the join (no anchor).
@@ -15243,7 +15246,7 @@ impl Sema:
             return if name == "with_sysinfo_os" or name == "with_sysinfo_arch": "" else: name ++ " (an extern)"
         if self.is_intrinsic_fn_sym(fn_sym) != 0:
             return if fn_sym == self.syms.src or fn_sym == self.syms.embed_file: "" else: name ++ " (a runtime intrinsic)"
-        if self.fn_symbol_is_comptime(fn_sym) != 0 or self.fn_symbol_is_tool_comptime_allowed(fn_sym) != 0 or self.fn_symbol_is_std_string_builder_comptime_allowed(fn_sym) != 0 or self.fn_symbol_is_std_str_comptime_allowed(fn_sym) != 0 or self.fn_symbol_is_builtin_vec_comptime_allowed(fn_sym) != 0:
+        if self.fn_symbol_is_comptime(fn_sym) != 0 or self.fn_symbol_is_tool_comptime_allowed(fn_sym) != 0 or self.fn_symbol_is_std_string_builder_comptime_allowed(fn_sym) != 0 or self.fn_symbol_is_std_str_comptime_allowed(fn_sym) != 0 or self.fn_symbol_is_builtin_list_comptime_allowed(fn_sym) != 0:
             return ""
         let fn_node = self.fn_symbol_decl_node(fn_sym)
         if fn_node == 0: return name ++ " (no With body)"
@@ -15361,13 +15364,13 @@ impl Sema:
         // for one it has no builtin for); `to_owned` was the one allowed.
         if source_path.ends_with("string.w") and self.pool_resolve(fn_sym).starts_with("str."): 1 else: 0
 
-    // The comptime evaluator implements the Vec core (push/pop/get/set/
+    // The comptime evaluator implements the List core (push/pop/get/set/
     // clear/len/is_empty) directly; the flip's method registration exposed
     // these builtin methods to the callability check, breaking D21
     // comptime pipelines. Allow exactly the evaluator's surface.
-    fn fn_symbol_is_builtin_vec_comptime_allowed(fn_sym: i32) -> i32:
+    fn fn_symbol_is_builtin_list_comptime_allowed(fn_sym: i32) -> i32:
         let name = self.pool_resolve(fn_sym)
-        if not name.starts_with("Vec."):
+        if not name.starts_with("List."):
             return 0
         let m = name.slice(4, name.len())
         if m.starts_with("push") or m.starts_with("pop") or m.starts_with("get") or m.starts_with("set") or m.starts_with("clear") or m.starts_with("len") or m.starts_with("is_empty"): 1 else: 0
@@ -15395,7 +15398,7 @@ impl Sema:
                 return 0
             if self.fn_symbol_is_std_str_comptime_allowed(fn_sym) != 0:
                 return 0
-            if self.fn_symbol_is_builtin_vec_comptime_allowed(fn_sym) != 0:
+            if self.fn_symbol_is_builtin_list_comptime_allowed(fn_sym) != 0:
                 return 0
             // D104: a `comptime fn` body is checked statically; a plain
             // callee is fine when everything it reaches is, and the
@@ -15416,7 +15419,7 @@ impl Sema:
             return 0
         if self.fn_symbol_is_std_str_comptime_allowed(method_sym) != 0:
             return 0
-        if self.fn_symbol_is_builtin_vec_comptime_allowed(method_sym) != 0:
+        if self.fn_symbol_is_builtin_list_comptime_allowed(method_sym) != 0:
             return 0
         if self.fn_symbol_is_comptime(method_sym) == 0:
             let cm_name: str = self.pool_resolve(method_sym)
@@ -15424,7 +15427,7 @@ impl Sema:
             return 1
         0
 
-    fn push_unique_i32(xs: Vec[i32], value: i32) -> Vec[i32]:
+    fn push_unique_i32(xs: List[i32], value: i32) -> List[i32]:
         if value == 0:
             return xs
         for i in 0..xs.len() as i32:
@@ -15433,7 +15436,7 @@ impl Sema:
         xs.push(value)
         xs
 
-    fn collect_expr_view_deps(node: i32, out0: Vec[i32]) -> Vec[i32]:
+    fn collect_expr_view_deps(node: i32, out0: List[i32]) -> List[i32]:
         var out = out0
         if node == 0:
             return out
@@ -15635,8 +15638,8 @@ impl Sema:
     // A match yields one of its arms. Each arm body's view facts were frozen
     // while its pattern bindings were in scope (check_match_expr): read
     // after the match, `.One(v) => &v.name` no longer finds `v`.
-    fn match_arm_bodies(node: i32) -> Vec[i32]:
-        let bodies: Vec[i32] = Vec.new()
+    fn match_arm_bodies(node: i32) -> List[i32]:
+        let bodies: List[i32] = List.new()
         let extra_start = self.ast.get_data1(node)
         for ai in 0..self.ast.get_data2(node):
             let arm = self.ast.get_extra(extra_start + ai)
@@ -15925,7 +15928,7 @@ impl Sema:
         if result_node == 0 or source_node == 0 or self.has_contextual_copy_adjustment(result_node) != 0:
             return
         let param_mask = self.compute_expr_view_origin_mask(source_node)
-        var deps: Vec[i32] = Vec.new()
+        var deps: List[i32] = List.new()
         deps = self.collect_expr_view_deps(source_node, move deps)
         // Read before writing: freezing an arm on itself (`result_node ==
         // source_node`) resets its storage to the whole mask.
@@ -15961,18 +15964,18 @@ impl Sema:
 
     // Rule 10: a variant whose type says nothing (`Option[fn() -> i32]`)
     // still carries a payload that is a view as a value (#1698).
-    mut fn nodes_hold_ephemeral_value(nodes: &Vec[i32]) -> bool:
+    mut fn nodes_hold_ephemeral_value(nodes: &List[i32]) -> bool:
         for i in 0..nodes.len() as i32:
             if nodes[i] > 0 and self.expr_is_ephemeral_value(nodes[i]) != 0:
                 return true
         false
 
-    fn record_transparent_view_origins_from_nodes(result_node: i32, source_nodes: &Vec[i32]):
+    fn record_transparent_view_origins_from_nodes(result_node: i32, source_nodes: &List[i32]):
         if result_node == 0 or self.has_contextual_copy_adjustment(result_node) != 0:
             return
         var param_mask = 0
         var storage_mask = 0
-        var deps: Vec[i32] = Vec.new()
+        var deps: List[i32] = List.new()
         for si in 0..source_nodes.len() as i32:
             let source_node = source_nodes[si]
             if source_node > 0:
@@ -15986,7 +15989,7 @@ impl Sema:
         if result_node == 0 or receiver_node == 0:
             return
         let param_mask = self.compute_expr_view_origin_mask(receiver_node)
-        var deps: Vec[i32] = Vec.new()
+        var deps: List[i32] = List.new()
         deps = self.collect_expr_view_deps(receiver_node, move deps)
         if deps.len() == 0:
             deps = self.push_unique_i32(move deps, self.place_root_sym(receiver_node))
@@ -16009,7 +16012,7 @@ impl Sema:
         if self.reject_view_into_temporary(expr_node, "`" ++ self.pool_resolve(sym) ++ "` binds") != 0:
             return
         let param_mask = self.compute_expr_view_origin_mask(expr_node)
-        var deps: Vec[i32] = Vec.new()
+        var deps: List[i32] = List.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
         // D27 R3 / §21.1 rule 1: an unannotated let of an ELEMENT place binds
         // the VIEW, so the viewed root must borrow exactly as `&v[0]` does —
@@ -16020,7 +16023,7 @@ impl Sema:
         // narrowly: only a view-bound binding whose initializer is a bare
         // index place — a call or projection result keeps its collected deps
         // (a fallback through place_root_sym there manufactured phantom
-        // receiver views). A Vec/array/slice element now carries its root
+        // receiver views). A List/array/slice element now carries its root
         // through collect_expr_view_deps wherever it flows (#1406); this
         // covers the index places check_index records no origins for.
         if deps.len() == 0 and param_mask == 0 and self.scope_is_view_bound(sym) != 0:
@@ -16284,8 +16287,8 @@ impl Sema:
         if fn_node == 0 or not self.fn_symbol_source_path(fn_sym).ends_with("std/task.w"):
             self.emit_error("g.pull() needs std.task's gen_pull, which this build does not include (§13.4: pulling runs the generator on a fiber of the standard runtime)", node)
             return 0
-        let arg_types: Vec[i32] = Vec.new()
-        let arg_nodes: Vec[i32] = Vec.new()
+        let arg_types: List[i32] = List.new()
+        let arg_nodes: List[i32] = List.new()
         arg_types.push(gen_ty)
         arg_nodes.push(recv)
         self.resolved_generic_call_nodes.insert(node, fn_node)
@@ -16309,7 +16312,7 @@ impl Sema:
         // generator), as record_call_view_origins does for an escaping
         // view parameter.
         if self.type_is_ephemeral_value(gen_ty as TypeId) != 0:
-            var deps: Vec[i32] = Vec.new()
+            var deps: List[i32] = List.new()
             deps = self.collect_expr_view_deps(recv, move deps)
             if deps.len() == 0 or self.expr_type_is_value(recv):
                 deps = self.push_unique_i32(move deps, self.place_root_sym(recv))
@@ -16332,7 +16335,7 @@ impl Sema:
             return
         if self.type_is_ephemeral_value(ret_ty) == 0 or self.type_is_ephemeral_value(recv_ty) == 0:
             return
-        var deps: Vec[i32] = Vec.new()
+        var deps: List[i32] = List.new()
         deps = self.collect_expr_view_deps(recv, move deps)
         let mask = self.compute_expr_view_origin_mask(recv)
         if deps.len() == 0 and mask == 0:
@@ -16434,7 +16437,7 @@ impl Sema:
                                 return origin_sym
                         if init_kind == NodeKind.NK_CALL or init_kind == NodeKind.NK_FIELD_ACCESS or init_kind == NodeKind.NK_UNARY:
                             return 0 - view_sym
-        var deps: Vec[i32] = Vec.new()
+        var deps: List[i32] = List.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
         for i in 0..deps.len() as i32:
             let origin_sym = deps[i]
@@ -16464,7 +16467,7 @@ impl Sema:
             return
         if self.reject_view_into_temporary(expr_node, "returns") != 0:
             return
-        var deps: Vec[i32] = Vec.new()
+        var deps: List[i32] = List.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
         for i in 0..deps.len() as i32:
             let origin_sym = deps[i]
@@ -16497,7 +16500,7 @@ impl Sema:
         // parameter the structural walk did not reach, found only as a
         // concrete dep below, is unproven: storage.
         var storage_mask = self.compute_expr_storage_origin_mask(expr_node)
-        var deps: Vec[i32] = Vec.new()
+        var deps: List[i32] = List.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
         // #1903: and every global the returned view views.
         self.note_returned_global_origins(&deps, expr_node)
@@ -16532,7 +16535,7 @@ impl Sema:
         // The call's arguments by PARAMETER index: the receiver first when
         // the signature has one, then the (resolved) argument list.
         let param_count = self.sig_get_param_count(sig_idx)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         for pi in 0..param_count:
             var arg = 0
             if param_offset == 1 and pi == 0:
@@ -16552,11 +16555,11 @@ impl Sema:
     // per parameter (0 for a missing one), the receiver at index 0 when
     // `has_receiver`. A generic call records through this directly: its
     // arguments (a pipeline's lhs first) are not a contiguous AST run.
-    mut fn record_call_view_origins_args(call_node: i32, sig_idx: i32, has_receiver: bool, args: &Vec[i32]):
+    mut fn record_call_view_origins_args(call_node: i32, sig_idx: i32, has_receiver: bool, args: &List[i32]):
         let param_count = self.sig_get_param_count(sig_idx)
         var union_mask = 0
         var storage_mask = 0
-        var concrete_deps: Vec[i32] = Vec.new()
+        var concrete_deps: List[i32] = List.new()
         for pi in 0..param_count:
             if (self.sig_param_effect(sig_idx, pi) & EFF_ESCAPE_VIEW) == 0:
                 continue
@@ -16688,7 +16691,7 @@ impl Sema:
             // The resource is the argument's own storage when it is a value
             // (`db`, a `Borrowed<R>`); through a reference it is the pointee,
             // whose bindings the reference's deps name.
-            var roots: Vec[i32] = Vec.new()
+            var roots: List[i32] = List.new()
             if self.expr_type_is_value(origin_arg):
                 roots.push(self.place_root_sym(origin_arg))
             else:
@@ -16756,7 +16759,7 @@ impl Sema:
         let param_count = self.sig_get_param_count(sig_idx)
         let field_start = self.get_type_d1(ret as TypeId)
         var union_mask = 0
-        var concrete_deps: Vec[i32] = Vec.new()
+        var concrete_deps: List[i32] = List.new()
         self.gen_call_view_place_starts.insert(call_node, self.gen_call_view_place_nodes.len() as i32)
         var place_count = 0
         for pi in 0..param_count:
@@ -16822,7 +16825,7 @@ impl Sema:
                 let path_count = self.borrow_collect_path(place_node)
                 self.register_gen_loop_view_borrow(ref_sym, root, self.borrow_field(place_node), path_start, path_count, iterable)
             return
-        var deps: Vec[i32] = Vec.new()
+        var deps: List[i32] = List.new()
         deps = self.collect_expr_view_deps(node, move deps)
         for di in 0..deps.len() as i32:
             if deps[di] != 0 and deps[di] != ref_sym:
@@ -16925,7 +16928,7 @@ impl Sema:
             // #1827 (§2.4): the return drops every binding of the body, and
             // the returned value outlives them.
             if self.expr_views_global(value):
-                let returned: Vec[i32] = Vec.new()
+                let returned: List[i32] = List.new()
                 returned.push(value)
                 self.note_scope_exit_drops(node, GLOBAL_SITE_RETURN_DROP, self.current_fn_bind_start, returned, false)
             // Record the return value's type at this single choke point so
@@ -17138,7 +17141,7 @@ impl Sema:
         self.note_place_effect(target, EFF_WRITE)
         self.record_global_place_write(target, node)
         // #1827 (§2.4): the assignment drops the place's old value first.
-        let reassign_views: Vec[i32] = Vec.new()
+        let reassign_views: List[i32] = List.new()
         self.note_drop_global_effects(node, node, GLOBAL_SITE_REASSIGN_DROP, self.place_root_sym(target), target_type as i32, reassign_views, true)
 
         // Check mutability
@@ -17298,8 +17301,8 @@ impl Sema:
         let sig = self.lookup_method_sig(owner_sym, next_sym)
         if sig < 0:
             return
-        let no_args: Vec[i32] = Vec.new()
-        let no_places: Vec[bool] = Vec.new()
+        let no_args: List[i32] = List.new()
+        let no_places: List[bool] = List.new()
         let mode = self.sig_receiver_mode(sig)
         self.note_call_global_effects(node, sig, 1, iterable, mode == ReceiverMode.Read or mode == ReceiverMode.Mut, no_args, no_places)
 
@@ -17340,7 +17343,7 @@ impl Sema:
         let saved_mono = self.resolved_call_mono_syms.get(key_node)
         var saved_mono_val = 0
         if saved_mono.is_some(): saved_mono_val = saved_mono.unwrap()
-        let no_args: Vec[i32] = Vec.new()
+        let no_args: List[i32] = List.new()
         let _ = self.check_generic_method_call(owner_sym, iter_type as i32, next_fn, 0, iterable, no_args, 0, 0, key_node)
         let new_sig = self.resolved_call_sigs.get(key_node)
         var new_sig_val = -1
@@ -17493,8 +17496,8 @@ impl Sema:
     // A comprehension clause over a Gen[T] (§13.6, #1727) runs the rest of
     // the comprehension the same way (comp_node != 0; comprehension_rest_uses_symbol).
     mut fn record_gen_loop_captures(key_node: i32, body: i32, comp_node: i32, clause_index: i32, outer_count: i32):
-        let syms: Vec[i32] = Vec.new()
-        let effs: Vec[i32] = Vec.new()
+        let syms: List[i32] = List.new()
+        let effs: List[i32] = List.new()
         for ci in 0..outer_count:
             let sym: i32 = self.bind_names[ci]
             if self.binding_index_is_global(ci, sym):
@@ -17533,7 +17536,7 @@ impl Sema:
     // outer_counts[ci] is how many bindings were in scope before clause ci's
     // own (-1 when clause ci is not over a generator); every clause binding
     // is still in scope here.
-    mut fn record_gen_comprehension_captures(comp_node: i32, clause_start: i32, outer_counts: &Vec[i32]):
+    mut fn record_gen_comprehension_captures(comp_node: i32, clause_start: i32, outer_counts: &List[i32]):
         for ci in 0..outer_counts.len() as i32:
             if outer_counts[ci] >= 0:
                 self.record_gen_loop_captures(self.ast.get_extra(clause_start + ci * 3 + 1), 0, comp_node, ci, outer_counts[ci])
@@ -17541,7 +17544,7 @@ impl Sema:
     // A capture of a binding that names a place rather than a local of its
     // own is taken through a &T (MirLower's closure_capture_source); make sure
     // that type exists before types freeze.
-    fn ensure_capture_ref_types(syms: &Vec[i32]):
+    fn ensure_capture_ref_types(syms: &List[i32]):
         for si in 0..syms.len() as i32:
             let ty = self.scope_lookup(syms[si])
             if ty > 0:
@@ -17671,8 +17674,8 @@ impl Sema:
         if each_mono != 0:
             self.gen_for_each_monos.insert(node, each_mono)
         // #1819: the loop is a call of `each` on the iterable.
-        let no_args: Vec[i32] = Vec.new()
-        let no_places: Vec[bool] = Vec.new()
+        let no_args: List[i32] = List.new()
+        let no_places: List[bool] = List.new()
         let mode = self.sig_receiver_mode(each_sig)
         self.note_call_global_effects(node, each_sig, 1, iterable, mode == ReceiverMode.Read or mode == ReceiverMode.Mut, no_args, no_places)
         elem
@@ -17688,7 +17691,7 @@ impl Sema:
         let saved_sig: i32 = if had_sig: self.resolved_call_sigs.get(key_node).unwrap() else: 0
         let had_mono = self.resolved_call_mono_syms.contains(key_node)
         let saved_mono: i32 = if had_mono: self.resolved_call_mono_syms.get(key_node).unwrap() else: 0
-        let no_args: Vec[i32] = Vec.new()
+        let no_args: List[i32] = List.new()
         let _ = self.check_generic_method_call(owner_sym, owner_type, each_fn, 0, iterable, no_args, 0, -1, key_node)
         let each_sig: i32 = if self.resolved_call_sigs.contains(key_node): self.resolved_call_sigs.get(key_node).unwrap() else: -1
         if had_ty:
@@ -17788,8 +17791,8 @@ impl Sema:
         if iter_mono != 0:
             self.for_iter_monos.insert(key_node, iter_mono)
         self.for_iter_types.insert(key_node, iterator_type)
-        let no_args: Vec[i32] = Vec.new()
-        let no_places: Vec[bool] = Vec.new()
+        let no_args: List[i32] = List.new()
+        let no_places: List[bool] = List.new()
         self.note_call_global_effects(key_node, iter_sig, 1, iterable, mode == ReceiverMode.Read or mode == ReceiverMode.Mut, no_args, no_places)
         iterator_type
 
@@ -17805,7 +17808,7 @@ impl Sema:
         let saved_sig: i32 = if had_sig: self.resolved_call_sigs.get(key_node).unwrap() else: 0
         let had_mono = self.resolved_call_mono_syms.contains(key_node)
         let saved_mono: i32 = if had_mono: self.resolved_call_mono_syms.get(key_node).unwrap() else: 0
-        let no_args: Vec[i32] = Vec.new()
+        let no_args: List[i32] = List.new()
         let iterator_type = self.check_generic_method_call(owner_sym, owner_type, iter_fn, 0, iterable, no_args, 0, 0, key_node)
         let iter_sig: i32 = if self.resolved_call_sigs.contains(key_node): self.resolved_call_sigs.get(key_node).unwrap() else: -1
         if iterator_type != 0:
@@ -17841,7 +17844,7 @@ impl Sema:
     // local collection, so `&x.field` cannot escape).
     fn record_for_binding_view_origins(sym: i32, iterable: i32):
         let param_mask = self.compute_expr_view_origin_mask(iterable)
-        var deps: Vec[i32] = Vec.new()
+        var deps: List[i32] = List.new()
         deps = self.collect_expr_view_deps(iterable, move deps)
         if deps.len() == 0 and param_mask == 0:
             deps = self.push_unique_i32(move deps, self.place_root_sym(iterable))
@@ -17927,11 +17930,11 @@ impl Sema:
         node
 
     // Every binding a pattern introduces, in pattern order.
-    fn pattern_binding_syms(node: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn pattern_binding_syms(node: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         self.collect_pattern_binding_syms(node, out)
 
-    fn collect_pattern_binding_syms(node: i32, out: Vec[i32]) -> Vec[i32]:
+    fn collect_pattern_binding_syms(node: i32, out: List[i32]) -> List[i32]:
         if node == 0:
             return out
         var acc = move out
@@ -18326,8 +18329,8 @@ impl Sema:
                     let after = td_extra + 1 + fc * 4
                     let tp_start = self.ast.get_extra(after + 1)
                     let tp_count = self.ast.get_extra(after + 2)
-                    let saved_field_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-                    let saved_field_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+                    let saved_field_subst_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+                    let saved_field_subst_tys = sema_clone_i32_list(&self.generic_subst_type_ids)
                     let field_setup_ok = self.setup_generic_inst_substitution(resolved, gi_base_sym)
                     var resolved_field_ty = 0
                     if field_setup_ok != 0:
@@ -18493,7 +18496,7 @@ impl Sema:
                 return self.ty_i64 as i32
         0
 
-    fn autoderef_record_steps(expr: i32, step_fns: &Vec[i32], step_tys: &Vec[i32]):
+    fn autoderef_record_steps(expr: i32, step_fns: &List[i32], step_tys: &List[i32]):
         if with_getenv_str("WITH_DEBUG_DEREF").len() > 0:
             with_eprint(f"[deref-record] expr={expr} steps={step_fns.len() as i32}")
         if expr == 0:
@@ -18507,7 +18510,7 @@ impl Sema:
         self.autoderef_step_starts.insert(expr, start)
         self.autoderef_step_counts.insert(expr, step_fns.len() as i32)
 
-fn sema_autoderef_seen_type(types: &Vec[i32], ty: i32) -> i32:
+fn sema_autoderef_seen_type(types: &List[i32], ty: i32) -> i32:
     for i in 0..types.len() as i32:
         if types[i] == ty:
             return 1
@@ -18566,9 +18569,9 @@ impl Sema:
         var current = self.resolve_alias(tid)
         if with_getenv_str("WITH_DEBUG_DEREF").len() > 0:
             with_eprint(f"[deref-walk] expr={expr} tid={tid as i32} current={current as i32} tk={self.get_type_kind(current)} field={field} has0={self.autoderef_type_has_field(current, field)}")
-        let seen: Vec[i32] = Vec.new()
-        let step_fns: Vec[i32] = Vec.new()
-        let step_tys: Vec[i32] = Vec.new()
+        let seen: List[i32] = List.new()
+        let step_fns: List[i32] = List.new()
+        let step_tys: List[i32] = List.new()
         var depth = 0
         while depth < 32:
             if self.autoderef_type_has_field(current, field) != 0:
@@ -18592,9 +18595,9 @@ impl Sema:
 
     mut fn auto_deref_method_type(tid: TypeId, method: i32, node: i32, expr: i32) -> TypeId:
         var current = self.resolve_alias(tid)
-        let seen: Vec[i32] = Vec.new()
-        let step_fns: Vec[i32] = Vec.new()
-        let step_tys: Vec[i32] = Vec.new()
+        let seen: List[i32] = List.new()
+        let step_fns: List[i32] = List.new()
+        let step_tys: List[i32] = List.new()
         var depth = 0
         while depth < 32:
             if self.autoderef_type_has_method(current, method) != 0:
@@ -18630,7 +18633,7 @@ impl Sema:
 
     fn auto_deref_method_type_frozen(tid: TypeId, method: i32) -> TypeId:
         var current = self.resolve_alias(tid)
-        let seen: Vec[i32] = Vec.new()
+        let seen: List[i32] = List.new()
         var depth = 0
         while depth < 32:
             if self.autoderef_type_has_method(current, method) != 0:
@@ -18697,7 +18700,7 @@ impl Sema:
     // variable is no longer known on all paths — mark every tracked entry unknown
     // (0) so subsequent reads conservatively require unsafe. Entries stay present
     // (tracked) rather than removed, so the unknown state is enforced. Iteration is
-    // over the insertion-ordered Vec to keep codegen deterministic.
+    // over the insertion-ordered List to keep codegen deterministic.
     fn union_clear_last_written():
         for i in 0..self.union_tracked_syms.len() as i32:
             self.union_last_written.insert(self.union_tracked_syms[i], 0)
@@ -18744,7 +18747,7 @@ impl Sema:
                 let static_named = self.static_receiver_named_type(expr, static_type_sym)
                 if static_named != 0:
                     obj_type = static_named as TypeId
-            // docs/completed/mut.md Rev 8 §5.3 / §15.4 — `Vec.push` (etc.) parsed as a
+            // docs/completed/mut.md Rev 8 §5.3 / §15.4 — `List.push` (etc.) parsed as a
             // first-class value expression. Method calls dispatch through
             // check_method_call, which never invokes check_field_access on the
             // callee node. Reaching this point with a static-type base means
@@ -18873,7 +18876,7 @@ impl Sema:
             return self.index_expr_is_type_level(self.ast.get_data0(expr))
         false
 
-    mut fn check_vec_literal_elem(elem_ty: i32, elem_node: i32, arg_index: i32):
+    mut fn check_list_literal_elem(elem_ty: i32, elem_node: i32, arg_index: i32):
         if elem_node == 0:
             return
         let actual_ty = self.check_expr_with_owned_demand(elem_node, elem_ty)
@@ -18881,7 +18884,7 @@ impl Sema:
         if elem_ty != 0 and actual_ty != 0:
             if self.types_compatible(elem_ty, actual_ty) == 0 and self.has_contextual_copy_adjustment(elem_node) == 0:
                 if self.arithmetic_result_type(elem_ty, actual_ty) == 0:
-                    self.emit_argument_type_mismatch("Vec.literal", 0, arg_index, arg_index, elem_ty, actual_ty, elem_node)
+                    self.emit_argument_type_mismatch("List.literal", 0, arg_index, arg_index, elem_ty, actual_ty, elem_node)
 
     mut fn check_runtime_index_operand(index_node: i32) -> i32:
         // An index is a value wherever its place stands, an assignment
@@ -18932,7 +18935,7 @@ impl Sema:
         var container_tk = tk
         if container_tk == TypeKind.TY_REF:
             // Indexing auto-dereferences through every view: a pattern binds a
-            // view payload through a view of its enum as `&&Vec[T]`.
+            // view payload through a view of its enum as `&&List[T]`.
             while container_tk == TypeKind.TY_REF:
                 container_tid = self.resolve_alias(self.get_type_d0(container_tid))
                 container_tk = self.get_type_kind(container_tid)
@@ -18981,14 +18984,14 @@ impl Sema:
         if container_tk == TypeKind.TY_GENERIC_INST:
             let base_name = self.pool_resolve(self.get_type_d0(container_tid)).clone()
             let is_type_level_index = self.index_expr_is_type_level(expr)
-            if is_type_level_index and base_name == "Vec" and self.get_generic_inst_arg_count(container_tid) > 0:
+            if is_type_level_index and base_name == "List" and self.get_generic_inst_arg_count(container_tid) > 0:
                 let elem_ty = self.get_generic_inst_arg(container_tid, 0)
-                self.check_vec_literal_elem(elem_ty, index, 0)
+                self.check_list_literal_elem(elem_ty, index, 0)
                 if index2 != 0:
-                    self.check_vec_literal_elem(elem_ty, index2, 1)
+                    self.check_list_literal_elem(elem_ty, index2, 1)
                 self.typed_expr_types.insert(node, container_tid as i32)
                 return container_tid as i32
-            if not is_type_level_index and base_name == "Vec" and self.get_generic_inst_arg_count(container_tid) > 0:
+            if not is_type_level_index and base_name == "List" and self.get_generic_inst_arg_count(container_tid) > 0:
                 self.check_runtime_index_operand(index)
                 let elem_ty = self.get_generic_inst_arg(container_tid, 0)
                 let elem_view = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
@@ -19006,7 +19009,7 @@ impl Sema:
                 self.emit_error(base_name ++ " is not indexable: a lookup may be absent, so it returns Option — use .get(key) (D22 §3.4)", node)
                 return 0
 
-        // Type-level NodeKind.NK_INDEX: Vec[i32], HashMap[str, i32], etc.
+        // Type-level NodeKind.NK_INDEX: List[i32], HashMap[str, i32], etc.
         // Create TypeKind.TY_GENERIC_INST so MirLower can find it in the sema snapshot.
         if container_tk == TypeKind.TY_STRUCT:
             if self.ast.kind(expr) == NodeKind.NK_IDENT:
@@ -19019,7 +19022,7 @@ impl Sema:
                         var ci_arg2_type = 0
                         if ci_index2 != 0:
                             ci_arg2_type = self.resolve_type_level_arg_expr(ci_index2)
-                        let ci_args: Vec[i32] = Vec.new()
+                        let ci_args: List[i32] = List.new()
                         ci_args.push(ci_arg_type)
                         var ci_arg_count = 1
                         if ci_arg2_type > 0:
@@ -19237,10 +19240,10 @@ impl Sema:
             self.typed_expr_types.insert(node, resolved as i32)
             self.record_view_producer_origins(node, expr)
             return resolved as i32
-        // §4.8a: a slice is a view into any contiguous storage — a Vec's
+        // §4.8a: a slice is a view into any contiguous storage — a List's
         // range is `[]T` (#1632) and a str's range is `&str` (#1587); both
         // observe the base (D27), so the base is the view's origin.
-        if tk == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(resolved as i32) == self.syms.vec:
+        if tk == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(resolved as i32) == self.syms.list:
             let elem = self.get_generic_inst_arg(resolved as i32, 0)
             let result = self.ensure_exact_type(TypeKind.TY_SLICE, elem, 0, 0) as i32
             self.typed_expr_types.insert(node, result)
@@ -19254,7 +19257,7 @@ impl Sema:
             self.typed_expr_types.insert(node, result)
             self.record_view_producer_origins(node, expr)
             return result
-        self.emit_error("range indexing needs an array, slice or Vec; this is " ++ self.type_name(arr_type as i32), node)
+        self.emit_error("range indexing needs an array, slice or List; this is " ++ self.type_name(arr_type as i32), node)
         0
 
     // §4.3a (#1478): `[value; N]` — N is an integer literal or a `const`. A
@@ -19357,14 +19360,14 @@ impl Sema:
                 // #1229: a slice expectation types the ELEMENTS, never the
                 // literal. A literal typed as `[]T` reached MIR as an
                 // `aggregate` into a slice-typed temp and the callee received
-                // `{ptr = 5, len = 6}`. The literal is a Vec (D113); a
+                // `{ptr = 5, len = 6}`. The literal is a List (D113); a
                 // call site slices it (note_slice_coerce_call_arg) and every
                 // other slice context reports the mismatch.
                 expected_elem = self.get_type_d0(expected)
             else if expected_kind == TypeKind.TY_GENERIC_INST:
                 target_base = self.get_generic_inst_base(expected as i32)
                 let target_name = self.pool_resolve(target_base)
-                if target_base == self.syms.vec or target_base == self.syms.hashset or target_base == self.syms.btreeset:
+                if target_base == self.syms.list or target_base == self.syms.hashset or target_base == self.syms.btreeset:
                     expected_elem = self.get_generic_inst_arg(expected as i32, 0)
                     target_ty = expected as i32
                 else if target_base == self.syms.hashmap or target_base == self.syms.btreemap:
@@ -19372,32 +19375,32 @@ impl Sema:
                     return 0
         // #1739 (§4.3c rule 1): a destination whose collection is named but
         // whose element type is still undecided (a generic struct's
-        // `items: Vec[T]`) selects the collection; the elements decide T.
+        // `items: List[T]`) selects the collection; the elements decide T.
         if target_ty == 0 and expected_elem == 0 and self.collection_literal_hints.contains(node):
             target_base = self.collection_literal_hints.get(node).unwrap()
-        // D113 (§4.3c rule 1): brackets make a Vec, unless the demanded type
+        // D113 (§4.3c rule 1): brackets make a List, unless the demanded type
         // is another collection built from a list (a fixed array, a set). A
-        // slice demand views the Vec.
+        // slice demand views the List.
         if target_ty == 0 and target_base == 0:
-            target_base = self.syms.vec
+            target_base = self.syms.list
         if elem_count == 0:
             if target_ty == 0 and expected_elem != 0:
-                let empty_args: Vec[i32] = Vec.new()
+                let empty_args: List[i32] = List.new()
                 empty_args.push(expected_elem)
                 target_ty = self.ensure_generic_inst_type(target_base, empty_args, 1) as i32
             if target_ty != 0:
                 self.typed_expr_types.insert(node, target_ty)
                 return target_ty
             if self.has_expected_type != 0 and self.expected_expr_type != 0:
-                self.emit_error("empty sequence literal requires array, slice, Vec, HashSet, or BTreeSet expected type", node)
+                self.emit_error("empty sequence literal requires array, slice, List, HashSet, or BTreeSet expected type", node)
                 return 0
             self.emit_error("empty sequence literal requires expected type", node)
             return 0
 
-        let elem_nodes: Vec[i32] = Vec.new()
-        let elem_origins: Vec[i32] = Vec.new()
-        let elem_types: Vec[i32] = Vec.new()
-        let elem_roles: Vec[i32] = Vec.new()
+        let elem_nodes: List[i32] = List.new()
+        let elem_origins: List[i32] = List.new()
+        let elem_types: List[i32] = List.new()
+        let elem_roles: List[i32] = List.new()
         // §4.3a (#1814): a fill is its written form, one evaluation per
         // element. A const-count fill holds its value once; checking it a
         // second time is what refuses a moved place (`[s; N]`, "use of moved
@@ -19423,7 +19426,7 @@ impl Sema:
             elem_roles.push(D22_JOIN_ROLE_EXPR)
             // #605: a whole non-Copy (Drop) local moved into an element is
             // consumed (use-after-move + drop-once), whatever collection the
-            // literal builds: MIR moved it into a Vec too, and a later use
+            // literal builds: MIR moved it into a List too, and a later use
             // read the vacated local.
             if self.ast.kind(elem) == NodeKind.NK_IDENT and self.type_needs_drop(et as i32) != 0:
                 self.mark_moved_if_consumed(elem)
@@ -19434,10 +19437,10 @@ impl Sema:
                 self.mark_moved_if_consumed(elem)
 
         let elem_type = self.resolve_contextual_join(expected_elem, &elem_nodes, &elem_origins, &elem_types, &elem_roles, node, "sequence literal")
-        // A fill builds an array or a Vec (§4.3a); a set of N copies of one
+        // A fill builds an array or a List (§4.3a); a set of N copies of one
         // value is one element, never what was written.
-        if fill_count_node != 0 and target_base != 0 and target_base != self.syms.vec:
-            self.emit_error("`[value; N]` fills an array or a Vec, not a `" ++ self.pool_resolve(target_base) ++ "` (§4.3a)", node)
+        if fill_count_node != 0 and target_base != 0 and target_base != self.syms.list:
+            self.emit_error("`[value; N]` fills an array or a List, not a `" ++ self.pool_resolve(target_base) ++ "` (§4.3a)", node)
             return 0
         // #1478: a fixed-size destination has the literal's length or the
         // program is wrong; typing the literal as the annotation regardless
@@ -19450,12 +19453,12 @@ impl Sema:
         let result: TypeId = if target_ty != 0:
             target_ty as TypeId
         else:
-            let hinted_args: Vec[i32] = Vec.new()
+            let hinted_args: List[i32] = List.new()
             hinted_args.push(elem_type)
             self.ensure_generic_inst_type(target_base, hinted_args, 1)
         self.typed_expr_types.insert(node, result as i32)
         // D113: a duplicate constant in a literal built as a set is almost
-        // always a typo; a Vec keeps every element (`["a", "a"]` has two).
+        // always a typo; a List keeps every element (`["a", "a"]` has two).
         if target_base == self.syms.hashset or target_base == self.syms.btreeset:
             self.warn_duplicate_set_constants(extra_start, elem_count)
         if target_base == self.syms.btreeset:
@@ -19539,7 +19542,7 @@ impl Sema:
             else if vt != 0 and self.types_compatible(val_ty as TypeId, vt) == 0 and self.has_contextual_copy_adjustment(val_node) == 0:
                 self.emit_error("map literal value types must match", val_node)
         if target_ty == 0:
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             args.push(key_ty)
             args.push(val_ty)
             // #1739: a generic destination that names the map picks it.
@@ -19607,7 +19610,7 @@ impl Sema:
 
     // #1739: a generic struct literal with no expected instance checks its
     // fields with no expectation, so `Stack { items: ["p", "q"] }` typed the
-    // element list as the default `[str; 2]` array and `items: Vec[T]` bound
+    // element list as the default `[str; 2]` array and `items: List[T]` bound
     // nothing. A sequence or map literal whose declared field type names a
     // collection builds that collection (§4.3c), and its elements decide T.
     mut fn hint_generic_struct_literal_collections(td_extra: i32, extra_start: i32, field_count: i32):
@@ -19639,16 +19642,16 @@ impl Sema:
         if type_node == 0 or self.ast.kind(type_node) != NodeKind.NK_TYPE_GENERIC:
             return
         let base = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
-        let is_sequence = base == self.syms.vec or base == self.syms.hashset or base == self.syms.btreeset
+        let is_sequence = base == self.syms.list or base == self.syms.hashset or base == self.syms.btreeset
         let is_map = base == self.syms.hashmap or base == self.syms.btreemap
         if (value_kind == NodeKind.NK_ARRAY_LIT and is_sequence) or (value_kind == NodeKind.NK_MAP_LIT and is_map):
             self.collection_literal_hints.insert(value, base)
 
-    mut fn infer_struct_literal_generic_type(node: i32, name: i32, td_extra: i32, tp_start: i32, tp_count: i32, extra_start: i32, field_count: i32, val_types: &Vec[i32]) -> i32:
+    mut fn infer_struct_literal_generic_type(node: i32, name: i32, td_extra: i32, tp_start: i32, tp_count: i32, extra_start: i32, field_count: i32, val_types: &List[i32]) -> i32:
         let declared_count = self.ast.get_extra(td_extra)
         let positional = if field_count > 0: self.ast.get_extra(extra_start) == 0 else: false
-        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_types = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_types = sema_clone_i32_list(&self.generic_subst_type_ids)
         self.clear_generic_substitution()
 
         for li in 0..field_count:
@@ -19664,13 +19667,13 @@ impl Sema:
             let type_node = self.ast.get_extra(td_extra + 1 + declared * 3 + 1)
             let value = self.ast.get_extra(extra_start + li * 2 + 1)
             let value_ty = val_types[li]
-            // A bare Vec.new()/HashMap.new()/HashSet.new() needs context; it
+            // A bare List.new()/HashMap.new()/HashSet.new() needs context; it
             // cannot constrain the struct type until concrete sibling fields
             // have supplied that context. Settle it after the instance exists.
             if self.pending_generic_constructor_base(value, value_ty) == 0:
                 self.bind_type_params_from_type_expr(type_node, value_ty, tp_start, tp_count, node)
 
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         var complete = true
         var tp_pos = tp_start
         for _ in 0..tp_count:
@@ -19817,10 +19820,10 @@ impl Sema:
                     else if td_node != 0 and type_decl_sub_kind(self.ast.get_data2(td_node)) == TypeDeclKind.Struct:
                         self.hint_generic_struct_literal_collections(self.ast.get_data1(td_node), extra_start, field_count)
                 // Check field initializers and collect value types
-                let val_types: Vec[i32] = Vec.new()
+                let val_types: List[i32] = List.new()
                 // #626: origins of owned locals coerced into `&T` fields — this
                 // struct borrows them, so a returned/stored view must be caught.
-                let coerce_borrow_origins: Vec[i32] = Vec.new()
+                let coerce_borrow_origins: List[i32] = List.new()
                 for fi in 0..field_count:
                     let f_name = self.ast.get_extra(extra_start + fi * 2)
                     let f_value = self.ast.get_extra(extra_start + fi * 2 + 1)
@@ -19857,7 +19860,7 @@ impl Sema:
                         let field_expected_kind = self.get_type_kind(field_expected_resolved)
                         let field_value_kind = self.get_type_kind(self.resolve_alias(val_ty))
                         // A raw-pointer field accepts integers (the stdlib's
-                        // `Vec{ ptr: 0 }` null idiom) and any other raw
+                        // `List{ ptr: 0 }` null idiom) and any other raw
                         // pointer (`CString{ ptr: buf }` mixes *mut u8 and
                         // *const i8) — pointer-type mixing is the unsafe
                         // tier's concern, not this check's.
@@ -19926,7 +19929,7 @@ impl Sema:
                     let uf_td_packed = self.ast.get_data2(uf_td_node)
                     if type_decl_sub_kind(uf_td_packed) == TypeDeclKind.Struct:
                         let uf_decl_count = self.ast.get_extra(uf_td_extra)
-                        let seen_lit_fields: Vec[i32] = Vec.new()
+                        let seen_lit_fields: List[i32] = List.new()
                         for cfi in 0..field_count:
                             let cf_name = self.ast.get_extra(extra_start + cfi * 2)
                             if cf_name == 0:
@@ -20053,11 +20056,11 @@ impl Sema:
         let match_is_value = if is_infer_tail: self.match_has_missing_arm(subject_type as i32, extra_start, arm_count) == 0 else: self.match_in_stmt_pos == 0
         let match_expected: TypeId = if is_infer_tail: 0 as TypeId else if match_is_value and self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
         var stmt_arms_mixed = false
-        let join_expr_nodes: Vec[i32] = Vec.new()
-        let join_origin_nodes: Vec[i32] = Vec.new()
-        let join_expr_types: Vec[i32] = Vec.new()
-        let join_roles: Vec[i32] = Vec.new()
-        let failure_values: Vec[i32] = Vec.new()
+        let join_expr_nodes: List[i32] = List.new()
+        let join_origin_nodes: List[i32] = List.new()
+        let join_expr_types: List[i32] = List.new()
+        let join_roles: List[i32] = List.new()
+        let failure_values: List[i32] = List.new()
 
         // Branch move-state join over the arms (docs/completed/branch-merge-soundness.md): seed
         // with the entry state (the implicit no-match/fallthrough path) and union each
@@ -20081,13 +20084,13 @@ impl Sema:
             self.push_move_control_flow_context(1)
             self.push_scope()
             self.pattern_subject_node = subject
-            self.pattern_vec_removal = 0
+            self.pattern_list_removal = 0
             self.check_pattern(pat, subject_type as i32)
             self.pattern_subject_node = 0
             // A failed guard puts the arm's bindings back into the subject;
-            // an element removed from an owned Vec has no way back yet (#2289).
-            if guard != 0 and self.pattern_vec_removal != 0:
-                self.emit_error("a match guard cannot follow a pattern that takes elements out of an owned Vec yet (#2289)", self.pattern_vec_removal)
+            // an element removed from an owned List has no way back yet (#2289).
+            if guard != 0 and self.pattern_list_removal != 0:
+                self.emit_error("a match guard cannot follow a pattern that takes elements out of an owned List yet (#2289)", self.pattern_list_removal)
             self.record_pattern_view_bindings(pat, subject)
             // #1302: marked per arm, before its body, from the shared entry
             // state — an arm that consumes the subject and reassigns it
@@ -20297,7 +20300,7 @@ impl Sema:
             value_expected = self.get_generic_inst_arg(self.resolve_alias(self.expected_expr_type) as i32, 0)
         let value_ty = if value_expected != 0: self.check_expr_with_expected(value, value_expected) else: self.check_expr_value_context(value)
         self.mark_moved_if_consumed(value)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(value_ty)
         if carrier == 2:
             args.push(self.comprehension_root_err_types.get(root) ?? 0)
@@ -20538,8 +20541,8 @@ fn sema_pattern_covers_variant(ast: AstPool, pat: i32, variant_sym: i32) -> bool
 // and range patterns cut it into. Every other type (str, floats, dynamic
 // slices, 64-bit-unsigned and wider integers) is open: only a catch-all
 // covers it. `witness` names one value no row matches, per column.
-type SemaPatRows { cells: Vec[i32], count: i32 }
-type SemaPatMissing { missing: bool, witness: Vec[str] }
+type SemaPatRows { cells: List[i32], count: i32 }
+type SemaPatMissing { missing: bool, witness: List[str] }
 
 enum SemaExhClass: i32:
     Open = 0
@@ -20585,12 +20588,12 @@ impl Sema:
             return SemaExhClass.Int
         if tk == TypeKind.TY_TUPLE:
             return SemaExhClass.Tuple
-        // A dynamic slice or Vec is decided by its length (#1533): the
-        // Vec check precedes the struct one, or a slice pattern on a Vec
-        // column would be a non-constructor of the Vec struct.
+        // A dynamic slice or List is decided by its length (#1533): the
+        // List check precedes the struct one, or a slice pattern on a List
+        // column would be a non-constructor of the List struct.
         if tk == TypeKind.TY_SLICE:
             return SemaExhClass.Slice
-        if tk == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(ty) == self.syms.vec:
+        if tk == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(ty) == self.syms.list:
             return SemaExhClass.Slice
         if self.enum_pattern_type(ty) != 0:
             return SemaExhClass.Enum
@@ -20629,8 +20632,8 @@ impl Sema:
         0
 
     // An or-pattern contributes one row per alternative.
-    fn exh_alternatives(pat: i32, ty: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn exh_alternatives(pat: i32, ty: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         let h = self.exh_head(pat, ty)
         if h != 0 and self.ast.kind(h) == NodeKind.NK_PAT_OR:
             let or_start = self.ast.get_data0(h)
@@ -20688,8 +20691,8 @@ impl Sema:
                     return vi
         -1
 
-    mut fn exh_constructor_field_types(cls: SemaExhClass, ty: i32, ctor: i32) -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    mut fn exh_constructor_field_types(cls: SemaExhClass, ty: i32, ctor: i32) -> List[i32]:
+        var out: List[i32] = List.new()
         if cls == SemaExhClass.Tuple:
             let elem_start = self.get_type_d0(ty as TypeId)
             for ti in 0..self.get_type_d1(ty as TypeId):
@@ -20703,8 +20706,8 @@ impl Sema:
 
     // The sub-patterns a head pattern of constructor `ctor` gives each of
     // its `arity` fields; 0 (a catch-all) for a field it leaves unstated.
-    fn exh_constructor_fields(h: i32, cls: SemaExhClass, ty: i32, arity: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn exh_constructor_fields(h: i32, cls: SemaExhClass, ty: i32, arity: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         if h == 0:
             for _ in 0..arity:
                 out.push(0)
@@ -20796,7 +20799,7 @@ impl Sema:
             return if self.ast.get_data2(h) != 0: hi else: hi - 1
         0
 
-    fn exh_render(cls: SemaExhClass, ty: i32, ctor: i32, fields: &Vec[str]) -> str:
+    fn exh_render(cls: SemaExhClass, ty: i32, ctor: i32, fields: &List[str]) -> str:
         if cls == SemaExhClass.Bool:
             return if ctor != 0: "true" else: "false"
         var parts = ""
@@ -20820,26 +20823,26 @@ impl Sema:
         if fields.len() == 0: vname else: vname ++ "(" ++ parts ++ ")"
 
     // Is some value of the columns `tys` matched by no row of `m`?
-    mut fn exh_missing(m: &SemaPatRows, tys: &Vec[i32]) -> SemaPatMissing:
+    mut fn exh_missing(m: &SemaPatRows, tys: &List[i32]) -> SemaPatMissing:
         let width = tys.len() as i32
         if m.count == 0:
-            let all: Vec[str] = Vec.new()
+            let all: List[str] = List.new()
             for _ in 0..width:
                 all.push("_")
             return SemaPatMissing { missing: true, witness: all }
         if width == 0:
-            return SemaPatMissing { missing: false, witness: Vec.new() }
+            return SemaPatMissing { missing: false, witness: List.new() }
         let ty = self.exh_shape_type(tys[0])
         let cls = self.exh_class(ty)
         // Column 0's heads, one per or-alternative, and the row each came from.
-        let heads: Vec[i32] = Vec.new()
-        let origins: Vec[i32] = Vec.new()
+        let heads: List[i32] = List.new()
+        let origins: List[i32] = List.new()
         for ri in 0..m.count:
             let alts = self.exh_alternatives(m.cells[ri * width], ty)
             for ai in 0..alts.len() as i32:
                 heads.push(alts[ai])
                 origins.push(ri)
-        let rest_tys: Vec[i32] = Vec.new()
+        let rest_tys: List[i32] = List.new()
         for ci in 1..width:
             rest_tys.push(tys[ci])
 
@@ -20865,13 +20868,13 @@ impl Sema:
                 for ctor in 0..ctor_count:
                     let field_tys = self.exh_constructor_field_types(cls, ty, ctor)
                     let arity = field_tys.len() as i32
-                    let sub_tys: Vec[i32] = Vec.new()
+                    let sub_tys: List[i32] = List.new()
                     for fi in 0..arity:
                         sub_tys.push(field_tys[fi])
                     for ci in 0..rest_tys.len() as i32:
                         sub_tys.push(rest_tys[ci])
                     let sub_width = sub_tys.len() as i32
-                    let cells: Vec[i32] = Vec.new()
+                    let cells: List[i32] = List.new()
                     var count = 0
                     for hi in 0..heads.len() as i32:
                         let h = heads[hi]
@@ -20885,24 +20888,24 @@ impl Sema:
                         count = count + 1
                     let sub = self.exh_missing(SemaPatRows { cells: cells, count: count }, &sub_tys)
                     if sub.missing:
-                        let field_ws: Vec[str] = Vec.new()
+                        let field_ws: List[str] = List.new()
                         for fi in 0..arity:
                             field_ws.push(sub.witness[fi].clone())
-                        let w: Vec[str] = Vec.new()
+                        let w: List[str] = List.new()
                         w.push(self.exh_render(cls, ty, ctor, &field_ws))
                         for ci in arity..sub_width:
                             w.push(sub.witness[ci].clone())
                         return SemaPatMissing { missing: true, witness: w }
-                return SemaPatMissing { missing: false, witness: Vec.new() }
+                return SemaPatMissing { missing: false, witness: List.new() }
             let dflt = self.exh_default_rows(m, &heads, &origins, width)
             let sub = self.exh_missing(dflt, &rest_tys)
             if not sub.missing:
                 return sub
             let field_tys = self.exh_constructor_field_types(cls, ty, first_absent)
-            let blanks: Vec[str] = Vec.new()
+            let blanks: List[str] = List.new()
             for _ in 0..field_tys.len() as i32:
                 blanks.push("_")
-            let w: Vec[str] = Vec.new()
+            let w: List[str] = List.new()
             w.push(self.exh_render(cls, ty, first_absent, &blanks))
             for ci in 0..sub.witness.len() as i32:
                 w.push(sub.witness[ci].clone())
@@ -20913,7 +20916,7 @@ impl Sema:
         let sub = self.exh_missing(dflt, &rest_tys)
         if not sub.missing:
             return sub
-        let w: Vec[str] = Vec.new()
+        let w: List[str] = List.new()
         w.push("_")
         for ci in 0..sub.witness.len() as i32:
             w.push(sub.witness[ci].clone())
@@ -20946,10 +20949,10 @@ impl Sema:
             out = out ++ (if n > 0: ", .." else: "..")
         out ++ "]"
 
-    // A dynamic slice or Vec column (#1533, §9.7): the constructors are the
+    // A dynamic slice or List column (#1533, §9.7): the constructors are the
     // lengths 0..L and "L+1 or more", L the longest fixed count among the
     // heads; a length no row covers is the witness (`[_, _]`).
-    mut fn exh_missing_slice(m: &SemaPatRows, heads: &Vec[i32], origins: &Vec[i32], rest_tys: &Vec[i32]) -> SemaPatMissing:
+    mut fn exh_missing_slice(m: &SemaPatRows, heads: &List[i32], origins: &List[i32], rest_tys: &List[i32]) -> SemaPatMissing:
         let width = rest_tys.len() as i32 + 1
         var longest = 0
         for hi in 0..heads.len() as i32:
@@ -20959,7 +20962,7 @@ impl Sema:
                 if fixed > longest:
                     longest = fixed
         for n in 0..(longest + 2):
-            let cells: Vec[i32] = Vec.new()
+            let cells: List[i32] = List.new()
             var count = 0
             for hi in 0..heads.len() as i32:
                 let h = heads[hi]
@@ -20970,16 +20973,16 @@ impl Sema:
                 count = count + 1
             let sub = self.exh_missing(SemaPatRows { cells: cells, count: count }, rest_tys)
             if sub.missing:
-                let w: Vec[str] = Vec.new()
+                let w: List[str] = List.new()
                 w.push(self.exh_render_slice_length(n, n > longest))
                 for ci in 0..sub.witness.len() as i32:
                     w.push(sub.witness[ci].clone())
                 return SemaPatMissing { missing: true, witness: w }
-        SemaPatMissing { missing: false, witness: Vec.new() }
+        SemaPatMissing { missing: false, witness: List.new() }
 
     // The rows whose column-0 head is a catch-all, without that column.
-    fn exh_default_rows(m: &SemaPatRows, heads: &Vec[i32], origins: &Vec[i32], width: i32) -> SemaPatRows:
-        let cells: Vec[i32] = Vec.new()
+    fn exh_default_rows(m: &SemaPatRows, heads: &List[i32], origins: &List[i32], width: i32) -> SemaPatRows:
+        let cells: List[i32] = List.new()
         var count = 0
         for hi in 0..heads.len() as i32:
             if heads[hi] != 0:
@@ -20993,11 +20996,11 @@ impl Sema:
     // the type's range into segments no head straddles. When every segment
     // lies inside some head, each segment is a constructor; otherwise the
     // first uncovered segment (nearest zero) is the witness.
-    mut fn exh_missing_int(m: &SemaPatRows, heads: &Vec[i32], origins: &Vec[i32], rest_tys: &Vec[i32], ty: i32) -> SemaPatMissing:
+    mut fn exh_missing_int(m: &SemaPatRows, heads: &List[i32], origins: &List[i32], rest_tys: &List[i32], ty: i32) -> SemaPatMissing:
         let width = rest_tys.len() as i32 + 1
         let dom_lo = self.exh_int_domain_lo(ty)
         let dom_hi = self.exh_int_domain_hi(ty)
-        let cuts: Vec[i64] = Vec.new()
+        let cuts: List[i64] = List.new()
         cuts.push(dom_lo)
         for hi in 0..heads.len() as i32:
             let h = heads[hi]
@@ -21019,7 +21022,7 @@ impl Sema:
                 cuts[j] = cuts[j - 1]
                 cuts[j - 1] = t
                 j = j - 1
-        let starts: Vec[i64] = Vec.new()
+        let starts: List[i64] = List.new()
         for i in 0..cuts.len() as i32:
             if starts.len() == 0 or starts[starts.len() as i32 - 1] != cuts[i]:
                 starts.push(cuts[i])
@@ -21048,7 +21051,7 @@ impl Sema:
             if not sub.missing:
                 return sub
             // With no literal in the column any value is the witness.
-            let w: Vec[str] = Vec.new()
+            let w: List[str] = List.new()
             w.push(if starts.len() == 1: "_" else: int_to_string(witness_value))
             for ci in 0..sub.witness.len() as i32:
                 w.push(sub.witness[ci].clone())
@@ -21056,7 +21059,7 @@ impl Sema:
         for si in 0..starts.len() as i32:
             let seg_lo = starts[si]
             let seg_hi = if si + 1 < starts.len() as i32: starts[si + 1] - 1 else: dom_hi
-            let cells: Vec[i32] = Vec.new()
+            let cells: List[i32] = List.new()
             var count = 0
             for hi in 0..heads.len() as i32:
                 let h = heads[hi]
@@ -21067,17 +21070,17 @@ impl Sema:
                 count = count + 1
             let sub = self.exh_missing(SemaPatRows { cells: cells, count: count }, rest_tys)
             if sub.missing:
-                let w: Vec[str] = Vec.new()
+                let w: List[str] = List.new()
                 w.push(int_to_string(seg_lo))
                 for ci in 0..sub.witness.len() as i32:
                     w.push(sub.witness[ci].clone())
                 return SemaPatMissing { missing: true, witness: w }
-        SemaPatMissing { missing: false, witness: Vec.new() }
+        SemaPatMissing { missing: false, witness: List.new() }
 
     // A value of `subject_type` that no unguarded arm of the match
     // matches, or "" when the arms are exhaustive.
     mut fn match_missing_witness(subject_type: i32, extra_start: i32, arm_count: i32) -> str:
-        let cells: Vec[i32] = Vec.new()
+        let cells: List[i32] = List.new()
         var count = 0
         for ai in 0..arm_count:
             let arm_node = self.ast.get_extra(extra_start + ai)
@@ -21085,7 +21088,7 @@ impl Sema:
                 continue
             cells.push(self.ast.get_data0(arm_node))
             count = count + 1
-        let tys: Vec[i32] = Vec.new()
+        let tys: List[i32] = List.new()
         tys.push(subject_type)
         let r = self.exh_missing(SemaPatRows { cells: cells, count: count }, &tys)
         if not r.missing: "" else: r.witness[0].clone()
@@ -21102,14 +21105,14 @@ impl Sema:
 
     // Infer a concrete generic enum type for direct variant constructor calls like
     // Some(7) when the payload directly names the enum's type parameter.
-    mut fn infer_generic_enum_variant_type(variant_sym: i32, arg_types: &Vec[i32], arg_count: i32) -> i32:
+    mut fn infer_generic_enum_variant_type(variant_sym: i32, arg_types: &List[i32], arg_count: i32) -> i32:
         if not self.variant_type_ids.contains(variant_sym):
             return 0
         self.infer_generic_enum_variant_type_of(self.variant_type_ids.get(variant_sym).unwrap(), variant_sym, arg_types, arg_count)
 
     // The instance of the generic enum `enum_tid` whose variant's payload
     // types are `arg_types`; 0 when the payloads do not fix every parameter.
-    mut fn infer_generic_enum_variant_type_of(enum_ty: i32, variant_sym: i32, arg_types: &Vec[i32], arg_count: i32) -> i32:
+    mut fn infer_generic_enum_variant_type_of(enum_ty: i32, variant_sym: i32, arg_types: &List[i32], arg_count: i32) -> i32:
         let enum_tid = self.resolve_alias(enum_ty as TypeId) as i32
         if self.get_type_kind(enum_tid) != TypeKind.TY_ENUM:
             return 0
@@ -21129,7 +21132,7 @@ impl Sema:
         if not type_decl_is_enum(td_sub_kind):
             return 0
 
-        let inferred_args: Vec[i32] = Vec.new()
+        let inferred_args: List[i32] = List.new()
         for _ in 0..tp_count:
             inferred_args.push(0)
 
@@ -21171,12 +21174,12 @@ impl Sema:
 
     // Resolve payload types for a variant of a generic enum (e.g., Option[i32].Some → [i32]).
     // Walks the AST type declaration with type param substitution active.
-    mut fn resolve_generic_enum_payload(gi_tid: i32, base_sym: i32, variant_name: i32, expected_count: i32) -> Vec[i32]:
-        var result: Vec[i32] = Vec.new()
+    mut fn resolve_generic_enum_payload(gi_tid: i32, base_sym: i32, variant_name: i32, expected_count: i32) -> List[i32]:
+        var result: List[i32] = List.new()
         if not self.type_decl_nodes.contains(base_sym):
             return result
-        let saved_payload_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_payload_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_payload_subst_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_payload_subst_tys = sema_clone_i32_list(&self.generic_subst_type_ids)
         if self.setup_generic_inst_substitution(gi_tid, base_sym) == 0:
             self.generic_subst_param_syms = saved_payload_subst_syms
             self.generic_subst_type_ids = saved_payload_subst_tys
@@ -21210,7 +21213,7 @@ impl Sema:
         self.generic_subst_type_ids = saved_payload_subst_tys
         result
 
-    fn resolve_generic_enum_payload_frozen(gi_tid: i32, base_sym: i32, variant_name: i32, expected_count: i32) -> Vec[i32]:
+    fn resolve_generic_enum_payload_frozen(gi_tid: i32, base_sym: i32, variant_name: i32, expected_count: i32) -> List[i32]:
         let resolved = self.resolve_alias(gi_tid)
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(resolved as i32) != base_sym:
             sema_phase_bug("BUG: resolve_generic_enum_payload_frozen received the wrong generic instance")
@@ -21248,7 +21251,7 @@ impl Sema:
         if target_err_ty == 0:
             self.emit_error("tuple await? requires the enclosing function to return Result", question_node)
             return 0
-        let payloads: Vec[i32] = Vec.new()
+        let payloads: List[i32] = List.new()
         for ei in 0..elem_count:
             let elem_ty: i32 = self.type_extra[(elem_start + ei)]
             let payload_ty = self.try_unwrapped_type(elem_ty)
@@ -21285,15 +21288,15 @@ type ErrorConversionChain {
     ambiguous: i32
     first_variant: i32
     other_variant: i32
-    type_ids: Vec[i32]
-    variant_syms: Vec[i32]
+    type_ids: List[i32]
+    variant_syms: List[i32]
 }
 
 fn error_conversion_chain_not_found -> ErrorConversionChain:
-    ErrorConversionChain { 0, 0, 0, 0, Vec.new(), Vec.new() }
+    ErrorConversionChain { 0, 0, 0, 0, List.new(), List.new() }
 
 fn error_conversion_chain_empty -> ErrorConversionChain:
-    ErrorConversionChain { 1, 0, 0, 0, Vec.new(), Vec.new() }
+    ErrorConversionChain { 1, 0, 0, 0, List.new(), List.new() }
 
 impl Sema:
     fn error_conversion_type_matches(left: i32, right: i32) -> i32:
@@ -21314,12 +21317,12 @@ impl Sema:
         if self.error_conversion_type_matches(target_err_ty, source_err_ty) != 0:
             return error_conversion_chain_empty()
 
-        let queue_types: Vec[i32] = Vec.new()
-        let queue_starts: Vec[i32] = Vec.new()
-        let queue_counts: Vec[i32] = Vec.new()
-        let queue_first_variants: Vec[i32] = Vec.new()
-        let path_types: Vec[i32] = Vec.new()
-        let path_variants: Vec[i32] = Vec.new()
+        let queue_types: List[i32] = List.new()
+        let queue_starts: List[i32] = List.new()
+        let queue_counts: List[i32] = List.new()
+        let queue_first_variants: List[i32] = List.new()
+        let path_types: List[i32] = List.new()
+        let path_variants: List[i32] = List.new()
         queue_types.push(target_err_ty)
         queue_starts.push(0)
         queue_counts.push(0)
@@ -21390,8 +21393,8 @@ impl Sema:
 
         if best_count < 0:
             return error_conversion_chain_not_found()
-        let out_types: Vec[i32] = Vec.new()
-        let out_variants: Vec[i32] = Vec.new()
+        let out_types: List[i32] = List.new()
+        let out_variants: List[i32] = List.new()
         for pi in 0..best_count:
             out_types.push(path_types[(best_start + pi)])
             out_variants.push(path_variants[(best_start + pi)])
@@ -21403,12 +21406,12 @@ impl Sema:
         if self.error_conversion_type_matches(target_err_ty, source_err_ty) != 0:
             return error_conversion_chain_empty()
 
-        let queue_types: Vec[i32] = Vec.new()
-        let queue_starts: Vec[i32] = Vec.new()
-        let queue_counts: Vec[i32] = Vec.new()
-        let queue_first_variants: Vec[i32] = Vec.new()
-        let path_types: Vec[i32] = Vec.new()
-        let path_variants: Vec[i32] = Vec.new()
+        let queue_types: List[i32] = List.new()
+        let queue_starts: List[i32] = List.new()
+        let queue_counts: List[i32] = List.new()
+        let queue_first_variants: List[i32] = List.new()
+        let path_types: List[i32] = List.new()
+        let path_variants: List[i32] = List.new()
         queue_types.push(target_err_ty)
         queue_starts.push(0)
         queue_counts.push(0)
@@ -21479,8 +21482,8 @@ impl Sema:
 
         if best_count < 0:
             return error_conversion_chain_not_found()
-        let out_types: Vec[i32] = Vec.new()
-        let out_variants: Vec[i32] = Vec.new()
+        let out_types: List[i32] = List.new()
+        let out_variants: List[i32] = List.new()
         for pi in 0..best_count:
             out_types.push(path_types[(best_start + pi)])
             out_variants.push(path_variants[(best_start + pi)])
@@ -21498,8 +21501,8 @@ impl Sema:
             return chain.variant_syms[0]
         -1
 
-    mut fn enum_variant_payload_types(enum_tid: i32, variant_name: i32) -> Vec[i32]:
-        var result: Vec[i32] = Vec.new()
+    mut fn enum_variant_payload_types(enum_tid: i32, variant_name: i32) -> List[i32]:
+        var result: List[i32] = List.new()
         let bare_variant_name = self.unqualified_enum_variant_sym(variant_name)
         let resolved = self.resolve_alias(enum_tid)
         let kind = self.get_type_kind(resolved)
@@ -21539,8 +21542,8 @@ impl Sema:
                 pos = pos + 2 + payload_count
         result
 
-    fn enum_variant_payload_types_frozen(enum_tid: i32, variant_name: i32) -> Vec[i32]:
-        var result: Vec[i32] = Vec.new()
+    fn enum_variant_payload_types_frozen(enum_tid: i32, variant_name: i32) -> List[i32]:
+        var result: List[i32] = List.new()
         let bare_variant_name = self.unqualified_enum_variant_sym(variant_name)
         let resolved = self.resolve_alias(enum_tid)
         let kind = self.get_type_kind(resolved)
@@ -21787,7 +21790,7 @@ impl Sema:
         let payload_count = payloads.len() as i32
         if payload_count <= 0:
             return 0
-        let elem_tys: Vec[i32] = Vec.new()
+        let elem_tys: List[i32] = List.new()
         for pi in 0..payload_count:
             var elem_ty: i32 = payloads[pi]
             if accessor_kind == 3:
@@ -21799,7 +21802,7 @@ impl Sema:
             elem_tys[0]
         else:
             self.ensure_tuple_type(elem_tys, payload_count) as i32
-        let opt_args: Vec[i32] = Vec.new()
+        let opt_args: List[i32] = List.new()
         opt_args.push(payload_ty)
         self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
 
@@ -21901,7 +21904,7 @@ impl Sema:
             return self.get_type_d0(resolved)
         subject_type
 
-    // The element type of a slice pattern's subject (an array, slice or Vec,
+    // The element type of a slice pattern's subject (an array, slice or List,
     // through a reference included), 0 for anything else.
     fn slice_pattern_seq_elem(subject_type: i32) -> i32:
         if subject_type == 0:
@@ -21910,7 +21913,7 @@ impl Sema:
         let kind = self.get_type_kind(shape)
         if kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_SLICE:
             return self.get_type_d0(shape)
-        if kind == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(shape as i32) == self.syms.vec and self.get_generic_inst_arg_count(shape as i32) == 1:
+        if kind == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(shape as i32) == self.syms.list and self.get_generic_inst_arg_count(shape as i32) == 1:
             return self.get_generic_inst_arg(shape as i32, 0)
         0
 
@@ -22189,7 +22192,7 @@ impl Sema:
                 return
             // Recursively check each payload pattern (extra stores pattern nodes).
             // For TypeKind.TY_GENERIC_INST, re-resolve payload types from AST with substitution.
-            var gi_payload_types: Vec[i32] = Vec.new()
+            var gi_payload_types: List[i32] = List.new()
             if resolved_kind == TypeKind.TY_GENERIC_INST and payload_count > 0:
                 let gi_base = self.get_generic_inst_base(resolved)
                 gi_payload_types = self.resolve_generic_enum_payload(resolved, gi_base, v_name, payload_count)
@@ -22306,7 +22309,7 @@ impl Sema:
                 if ti == rest:
                     let rest_name = self.ast.get_data0(elem_pat)
                     if rest_name != 0:
-                        let covered: Vec[i32] = Vec.new()
+                        let covered: List[i32] = List.new()
                         for ci in rest..rest + elem_count - (t_count - 1):
                             covered.push(self.pattern_child_subject_type(subject_type, self.type_extra[(elem_start + ci)]))
                         // Nothing covered binds `()` (§4.8 unit), typed like `()` itself.
@@ -22330,7 +22333,7 @@ impl Sema:
             // §9.7 slice patterns (D115). An owned subject — a temporary, a
             // place moved with `move`, a parameter — is taken apart by value:
             // each binding is an owned element and `rest` the owned remainder
-            // (`[T; N-k]` for a fixed array, `Vec[T]` for a Vec). A place, a
+            // (`[T; N-k]` for a fixed array, `List[T]` for a List). A place, a
             // reference or a slice is observed: elements bind as views and
             // `rest` is a `[]T` view (D27: element access observes). The
             // length is known at compile time for arrays and tested at run
@@ -22346,14 +22349,14 @@ impl Sema:
                         let rest_len = self.get_type_d1(shape) - head_count - tail_count
                         rest_type = self.ensure_exact_type(TypeKind.TY_ARRAY, seq_elem, if rest_len > 0: rest_len else: 0, 0) as i32
                     else:
-                        rest_type = self.ensure_vec_type_for(seq_elem)
+                        rest_type = self.ensure_list_type_for(seq_elem)
                         if head_count + tail_count > 0:
-                            self.pattern_vec_removal = node
+                            self.pattern_list_removal = node
                 else:
                     elem_type = self.ensure_exact_type(TypeKind.TY_REF, seq_elem, 0, 0) as i32
                     rest_type = self.ensure_exact_type(TypeKind.TY_SLICE, seq_elem, 0, 0) as i32
             else if subject_type != 0 and self.get_type_kind(self.resolve_alias(subject_type)) != TypeKind.TY_ERR:
-                self.emit_error("a slice pattern requires an array, slice or Vec subject, found '" ++ self.type_name(subject_type) ++ "'", node)
+                self.emit_error("a slice pattern requires an array, slice or List subject, found '" ++ self.type_name(subject_type) ++ "'", node)
             for hi in 0..head_count:
                 let h_sym = self.ast.get_extra(s_extra + 1 + hi)
                 if h_sym != 0:
@@ -22426,7 +22429,7 @@ impl Sema:
                 if field_ty == 0:
                     self.emit_error("struct pattern names no field '" ++ self.pool_resolve(f_name) ++ "' of '" ++ self.type_name(subject_type) ++ "'", node)
                 let binding_ty = self.pattern_child_subject_type(subject_type, field_ty)
-                // #607: destructuring a needs-drop field (incl. Vec[Drop]) out of a
+                // #607: destructuring a needs-drop field (incl. List[Drop]) out of a
                 // by-value struct is a move into the binding; the pattern-lowering
                 // consume machinery (A7) makes the binding the sole owner. A borrow
                 // subject (`match &h`) yields ref-typed bindings and never moves.
@@ -22769,12 +22772,12 @@ impl Sema:
         // of the enclosing variadic definition.
         let saved_capture_fn_variadic: i32 = self.current_fn_variadic
         self.current_fn_variadic = 0
-        let saved_capture_syms: Vec[i32] = Vec.new()
-        let saved_capture_effs: Vec[i32] = Vec.new()
-        let saved_capture_direct_effs: Vec[i32] = Vec.new()
-        let saved_capture_origins: Vec[i32] = Vec.new()
-        let saved_capture_storage_origins: Vec[i32] = Vec.new()
-        let saved_capture_view_nodes: Vec[i32] = Vec.new()
+        let saved_capture_syms: List[i32] = List.new()
+        let saved_capture_effs: List[i32] = List.new()
+        let saved_capture_direct_effs: List[i32] = List.new()
+        let saved_capture_origins: List[i32] = List.new()
+        let saved_capture_storage_origins: List[i32] = List.new()
+        let saved_capture_view_nodes: List[i32] = List.new()
         for i in 0..self.current_fn_param_syms.len() as i32:
             saved_capture_syms.push(self.current_fn_param_syms[i])
             saved_capture_effs.push(self.current_fn_param_effs[i])
@@ -22789,7 +22792,7 @@ impl Sema:
             self.current_fn_param_origins.pop()
             self.current_fn_param_storage_origins.pop()
             self.current_fn_param_view_nodes.pop()
-        let closure_capture_syms: Vec[i32] = Vec.new()
+        let closure_capture_syms: List[i32] = List.new()
         for ci in 0..outer_count:
             let cap_sym: i32 = self.bind_names[ci]
             if self.binding_index_is_global(ci, cap_sym):
@@ -22835,7 +22838,7 @@ impl Sema:
         // type_extra (a new generic instance records its arguments there), and
         // a list started before the loop would read that argument as a
         // parameter type (#1402).
-        let param_tys: Vec[i32] = Vec.new()
+        let param_tys: List[i32] = List.new()
         // Partial application: if body is NK_CALL, resolve callee param types for placeholders
         var partial_sig = -1
         if self.ast.kind(body) == NodeKind.NK_CALL:
@@ -22936,7 +22939,7 @@ impl Sema:
         // drop when it returns; its value outlives them unless discarded.
         let closure_value = if self.ast.kind(body) == NodeKind.NK_BLOCK: self.ast.get_data2(body) else: body
         self.note_statement_temporary_drops(closure_value, body_ty != self.ty_void, false)
-        let closure_views: Vec[i32] = Vec.new()
+        let closure_views: List[i32] = List.new()
         if closure_value != 0 and body_ty != self.ty_void and not body_discarded and not self.tail_value_discarded(closure_value) and self.expr_views_global(closure_value):
             closure_views.push(closure_value)
         self.note_scope_exit_drops(body, GLOBAL_SITE_SCOPE_DROP, self.current_fn_bind_start, closure_views, false)
@@ -23024,7 +23027,7 @@ impl Sema:
         // transfers ownership, which for a Copy value is a copy." Every
         // capture of a non-move closure carries its real effects on the
         // originating place; only `move ||` snapshots.
-        let closure_capture_effs: Vec[i32] = Vec.new()
+        let closure_capture_effs: List[i32] = List.new()
         let by_place = if self.ast.is_move_closure(node) == 0: EFF_CAPTURE_BY_PLACE else: 0
         for ci in 0..closure_capture_syms.len() as i32:
             closure_capture_effs.push(self.current_fn_param_effs[ci] | by_place)
@@ -23180,7 +23183,7 @@ impl Sema:
     // `fn(A) -> R` under the substitution the other arguments bind, with R
     // left open (0) while it names an unbound type parameter. 0 when an A
     // still does, or the parameter is not a callable type.
-    mut fn generic_closure_arg_expected_type(fn_node: i32, arg_types: &Vec[i32], arg_count: i32, arg_index: i32, call_node: i32) -> i32:
+    mut fn generic_closure_arg_expected_type(fn_node: i32, arg_types: &List[i32], arg_count: i32, arg_index: i32, call_node: i32) -> i32:
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
             return 0
@@ -23193,8 +23196,8 @@ impl Sema:
         let p_node = self.ast.fn_param_type(param_start, arg_index)
         if p_node == 0 or self.ast.kind(p_node) != NodeKind.NK_TYPE_FN:
             return 0
-        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_tys = sema_clone_i32_list(&self.generic_subst_type_ids)
         self.clear_generic_substitution()
         self.suppress_errors = self.suppress_errors + 1
         for pi in 0..arg_count:
@@ -23206,7 +23209,7 @@ impl Sema:
         let ret_node = self.ast.get_data2(p_node)
         var expected = 0
         var bound = true
-        let params: Vec[i32] = Vec.new()
+        let params: List[i32] = List.new()
         for fpi in 0..fp_count:
             let fp_node = self.ast.get_extra(fp_start + fpi)
             if self.type_node_mentions_unbound_type_param(fp_node, tp_start, tp_count):
@@ -23223,7 +23226,7 @@ impl Sema:
 
     // Check the closure arguments deferred until the rest of a generic call's
     // arguments were typed (closure_has_untyped_param).
-    mut fn check_deferred_generic_closure_args(fn_node: i32, fn_sym: i32, deferred: &Vec[i32], arg_types: Vec[i32], arg_nodes: &Vec[i32], call_node: i32) -> Vec[i32]:
+    mut fn check_deferred_generic_closure_args(fn_node: i32, fn_sym: i32, deferred: &List[i32], arg_types: List[i32], arg_nodes: &List[i32], call_node: i32) -> List[i32]:
         var types = arg_types
         for di in 0..deferred.len() as i32:
             let ai = deferred[di]
@@ -23249,7 +23252,7 @@ impl Sema:
         if not sema_iter_adapter_name(name):
             return 0
         let resolved = self.auto_deref_method_type(recv_type as TypeId, method, 0, 0)
-        // A built-in iterator (VecIter, the intrinsic adapter types) declares
+        // A built-in iterator (ListIter, the intrinsic adapter types) declares
         // `next()` in std too, but its adapters are the compiler's intrinsics
         // (builtin_intrinsic_method_return_type), with their own diagnostics
         // (`unsupported collect target`) and lowering: this dispatch is only
@@ -23283,9 +23286,9 @@ impl Sema:
     // receiver is an ordinary by-value argument (receiver_arg_call_nodes).
     mut fn check_user_iter_method(node: i32, expr: i32, recv_type: i32, field: i32, extra_start: i32, arg_count: i32) -> i32:
         let fn_sym = self.pool_lookup_symbol("iter_" ++ self.pool_resolve(field))
-        var arg_types: Vec[i32] = Vec.new()
-        let arg_nodes: Vec[i32] = Vec.new()
-        let deferred: Vec[i32] = Vec.new()
+        var arg_types: List[i32] = List.new()
+        let arg_nodes: List[i32] = List.new()
+        let deferred: List[i32] = List.new()
         arg_types.push(recv_type)
         arg_nodes.push(expr)
         for ai in 0..arg_count:
@@ -23323,7 +23326,7 @@ impl Sema:
             callee = self.ast.get_data0(rhs)
             args_start = self.ast.get_data1(rhs)
             args_count = self.ast.get_data2(rhs)
-        // `g |> collect[Vec]()`: the bracket names the collection the stage
+        // `g |> collect[List]()`: the bracket names the collection the stage
         // builds; the stage itself is the generic function (std.gen).
         var target_sym = 0
         if callee != 0 and self.ast.kind(callee) == NodeKind.NK_INDEX and self.ast.kind(self.ast.get_data0(callee)) == NodeKind.NK_IDENT and self.ast.kind(self.ast.get_data1(callee)) == NodeKind.NK_IDENT:
@@ -23340,9 +23343,9 @@ impl Sema:
         if self.symbol_visible_from_current(fn_sym) == 0:
             self.emit_private_symbol_error(fn_sym, callee)
             return 0
-        var arg_types: Vec[i32] = Vec.new()
-        let arg_nodes: Vec[i32] = Vec.new()
-        let deferred: Vec[i32] = Vec.new()
+        var arg_types: List[i32] = List.new()
+        let arg_nodes: List[i32] = List.new()
+        let deferred: List[i32] = List.new()
         arg_types.push(lhs_ty)
         arg_nodes.push(lhs)
         let pipe_hint_meta = self.ast.find_fn_meta(generic_fn_node)
@@ -23415,12 +23418,12 @@ impl Sema:
                     if self.pipeline_method_exists(lhs_ty as i32, method) != 0:
                         var ret = 0
                         if method == self.syms.collect and self.ast.kind(rhs_callee) == NodeKind.NK_INDEX and self.user_iter_adapter_fn(lhs_ty as i32, method) != 0:
-                            // `it |> collect[Vec]()` over an Iter[T] implementor:
+                            // `it |> collect[List]()` over an Iter[T] implementor:
                             // the bracket names what iter_collect builds.
                             let target_node = self.ast.get_data1(rhs_callee)
                             let target_sym = if self.ast.kind(target_node) == NodeKind.NK_IDENT: self.ast.get_data0(target_node) else: 0
-                            if target_sym != self.syms.vec:
-                                self.emit_error(f"`collect[{self.pool_resolve(target_sym)}]` over a {self.type_name(lhs_ty as i32)} is not available: an Iter[T] implementor collects into a Vec (§13.3)", rhs_callee)
+                            if target_sym != self.syms.list:
+                                self.emit_error(f"`collect[{self.pool_resolve(target_sym)}]` over a {self.type_name(lhs_ty as i32)} is not available: an Iter[T] implementor collects into a List (§13.3)", rhs_callee)
                                 return 0
                             ret = self.check_method_call_parts(lhs, method, self.ast.get_data1(rhs), self.ast.get_data2(rhs), node, lhs_ty as i32)
                         else if method == self.syms.collect and self.ast.kind(rhs_callee) == NodeKind.NK_INDEX:
@@ -23586,7 +23589,7 @@ impl Sema:
         // method resolution needs this explicit allowlist. Long term, generic
         // instance method lookup should use the same method table path as ordinary
         // methods and this stdlib-specific list should disappear.
-        if owner_sym == self.syms.vec:
+        if owner_sym == self.syms.list:
             if field == self.syms.push or field == self.syms.clear:
                 return 1
             if field == self.syms.get or field == self.syms.pop or field == self.syms.remove:
@@ -23650,13 +23653,13 @@ impl Sema:
                 return 1
             if fixed_method_name == "len_i32" or fixed_method_name == "len_i64" or fixed_method_name == "capacity" or fixed_method_name == "is_empty" or fixed_method_name == "clear" or fixed_method_name == "push_byte" or fixed_method_name == "push_str" or fixed_method_name == "as_view" or fixed_method_name == "equals":
                 return 1
-        if owner_sym == self.syms.vecslot or owner_sym == self.syms.vecrange:
+        if owner_sym == self.syms.listslot or owner_sym == self.syms.listrange:
             if field == self.syms.get or self.pool_resolve(field) == "set" or self.is_collection_len_method(field):
                 return 1
-        if owner_sym == self.syms.veciter or owner_sym == self.syms.veciterref or owner_sym == self.syms.veciterplace:
+        if owner_sym == self.syms.listiter or owner_sym == self.syms.listiterref or owner_sym == self.syms.listiterplace:
             if field == self.syms.next:
                 return 1
-            if owner_sym == self.syms.veciter or owner_sym == self.syms.veciterref:
+            if owner_sym == self.syms.listiter or owner_sym == self.syms.listiterref:
                 if field == self.syms.map or field == self.syms.filter or field == self.syms.take or field == self.syms.zip or field == self.syms.flat_map:
                     return 1
                 if field == self.syms.fold or field == self.syms.reduce or field == self.syms.sum or field == self.syms.count or field == self.syms.partition or field == self.syms.collect:
@@ -23704,7 +23707,7 @@ impl Sema:
             if self.get_type_kind(expected) == TypeKind.TY_TUPLE and self.get_type_d1(expected) == elem_count:
                 expected_tuple = expected as i32
                 expected_elem_start = self.get_type_d0(expected)
-        let tuple_elems: Vec[i32] = Vec.new()
+        let tuple_elems: List[i32] = List.new()
         for ei in 0..elem_count:
             let elem = self.ast.get_extra(extra_start + ei)
             let expected_elem = if expected_tuple != 0: self.type_extra[(expected_elem_start + ei)] else: 0
@@ -23798,7 +23801,7 @@ impl Sema:
             if form == WithFormKind.GuardedMut and self.type_is_ephemeral_value(payload_ty) != 0:
                 let guard_root = self.guard_source_root_sym(source)
                 if guard_root != 0:
-                    let written_deps: Vec[i32] = Vec.new()
+                    let written_deps: List[i32] = List.new()
                     for wi in 0..self.binding_view_dep_count(name):
                         written_deps.push(self.binding_view_dep_at(name, wi))
                     self.note_view_store_into_root(guard_root, written_deps, self.binding_view_origin_mask(name), payload_ty, node, "this call")
@@ -24121,7 +24124,7 @@ impl Sema:
             let after_rest = name_count - rest_pos - 1
             let rest_elem_count = elem_count - rest_pos - after_rest
             if rest_sym > 0 and rest_elem_count > 0:
-                let rest_elems: Vec[i32] = Vec.new()
+                let rest_elems: List[i32] = List.new()
                 for ri in 0..rest_elem_count:
                     let idx = rest_pos + ri
                     if idx < elem_count:
@@ -24292,14 +24295,14 @@ impl Sema:
         // Build Sender[T] and Receiver[T] types
         let sender_sym = self.pool_intern("Sender")
         let receiver_sym = self.pool_intern("Receiver")
-        let sender_args: Vec[i32] = Vec.new()
+        let sender_args: List[i32] = List.new()
         sender_args.push(elem_type)
         let sender_ty = self.ensure_generic_inst_type(sender_sym, sender_args, 1)
-        let receiver_args: Vec[i32] = Vec.new()
+        let receiver_args: List[i32] = List.new()
         receiver_args.push(elem_type)
         let receiver_ty = self.ensure_generic_inst_type(receiver_sym, receiver_args, 1)
         // Build tuple (Sender[T], Receiver[T])
-        let tuple_elems: Vec[i32] = Vec.new()
+        let tuple_elems: List[i32] = List.new()
         tuple_elems.push(sender_ty as i32)
         tuple_elems.push(receiver_ty as i32)
         let te_start = self.type_extra.len() as i32
@@ -24416,7 +24419,7 @@ impl Sema:
         0
 
     fn store_unit_elided_call_arg(call_node: i32):
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(0)
         self.store_resolved_call_args(call_node, args)
 
@@ -24432,7 +24435,7 @@ impl Sema:
         self.store_unit_elided_call_arg(call_node)
         1
 
-    mut fn check_callable_value_call(call_name: &str, fn_tid: i32, closure_node: i32, node: i32, extra_start: i32, arg_count: i32, param_offset: i32, has_resolved: i32, arg_types: &Vec[i32]) -> i32:
+    mut fn check_callable_value_call(call_name: &str, fn_tid: i32, closure_node: i32, node: i32, extra_start: i32, arg_count: i32, param_offset: i32, has_resolved: i32, arg_types: &List[i32]) -> i32:
         if closure_node > 0:
             self.emit_no_await_guard_may_suspend_expr(node, closure_node)
             self.check_indirect_may_suspend_context(node, closure_node)
@@ -24469,8 +24472,8 @@ impl Sema:
         // (callable_param_body); a call through any other callable value — a
         // field, an element, a call's result — runs any callable value of its
         // type (callable_type_body, #1827).
-        let global_args: Vec[i32] = Vec.new()
-        let global_by_place: Vec[bool] = Vec.new()
+        let global_args: List[i32] = List.new()
+        let global_by_place: List[bool] = List.new()
         for gai in 0..arg_count:
             global_args.push(if has_resolved != 0: self.get_resolved_call_arg(node, gai) else: self.ast.get_extra(extra_start + gai))
             global_by_place.push(self.type_takes_place(self.fn_type_param_type(fn_tid, gai + param_offset)))
@@ -24484,7 +24487,7 @@ impl Sema:
 
         if closure_node > 0:
             let capture_count = self.closure_capture_summary_count(closure_node)
-            var closure_view_deps: Vec[i32] = Vec.new()
+            var closure_view_deps: List[i32] = List.new()
             var closure_view_mask = 0
             for ci in 0..capture_count:
                 let cap_sym = self.closure_capture_summary_sym(closure_node, ci)
@@ -24972,8 +24975,8 @@ impl Sema:
                     self.require_unsafe_operation("call to unsafe function pointer requires unsafe context", node)
                 if self.ast.has_call_named_args(node) != 0:
                     self.emit_error("named arguments are not supported for closures or function pointers", node)
-                let arg_types_for_callable: Vec[i32] = Vec.new()
-                let callable_arg_nodes: Vec[i32] = Vec.new()
+                let arg_types_for_callable: List[i32] = List.new()
+                let callable_arg_nodes: List[i32] = List.new()
                 var callable_passed_types = sema_new_map_i32_i32()
                 for cai in 0..arg_count:
                     let arg_node = self.ast.get_extra(extra_start + cai)
@@ -25144,7 +25147,7 @@ impl Sema:
             self.variant_type_ids.get(fn_sym).unwrap()
         else:
             0
-        let variant_payload_tys = if variant_payload_owner != 0: self.enum_variant_payload_types(variant_payload_owner, fn_sym) else: Vec.new()
+        let variant_payload_tys = if variant_payload_owner != 0: self.enum_variant_payload_types(variant_payload_owner, fn_sym) else: List.new()
 
         if self.check_std_builtins_diverging_call_surface(fn_sym, node, arg_count) != 0:
             return 0
@@ -25201,7 +25204,7 @@ impl Sema:
                                     if default_node != 0:
                                         resolved_map.insert(pi, default_node)
                                         resolved_defaults.insert(pi, 1)
-                            let final_args: Vec[i32] = Vec.new()
+                            let final_args: List[i32] = List.new()
                             for pi in param_offset..param_count:
                                 if resolved_map.contains(pi):
                                     final_args.push(resolved_map.get(pi).unwrap())
@@ -25252,20 +25255,20 @@ impl Sema:
         let facade_context = self.facade_prepare_callback_call(facade_mi, node, resolved_extra_start, resolved_arg_count)
         if not facade_context.valid:
             return 0
-        var arg_types: Vec[i32] = Vec.new()
-        let checked_arg_nodes: Vec[i32] = Vec.new()
+        var arg_types: List[i32] = List.new()
+        let checked_arg_nodes: List[i32] = List.new()
         // Argument index -> the pointee a variadic slot's Copy view passes.
         var variadic_passed_types = sema_new_map_i32_i32()
         // docs/completed/mut.md Rev 8 §15.8 — borrow indices to remove after this call's
         // arg-loop completes. Iterator-of-self borrows live for the duration of
         // the enclosing call so sibling closures conflict with them.
-        let iter_borrow_idxs: Vec[i32] = Vec.new()
+        let iter_borrow_idxs: List[i32] = List.new()
         // A generic callee's unannotated closure arguments wait for the other
         // arguments (check_deferred_generic_closure_args).
         let defer_generic_closures = sig_idx < 0 and callable_value_tid == 0 and variant_payload_tys.len() == 0 and self.generic_fn_node_for_symbol(fn_sym) != 0
         let generic_hint_fn = if sig_idx < 0 and callable_value_tid == 0 and variant_payload_tys.len() == 0: self.generic_fn_node_for_symbol(fn_sym) else: 0
         let generic_hint_meta = if generic_hint_fn != 0: self.ast.find_fn_meta(generic_hint_fn) else: -1
-        let deferred_closure_args: Vec[i32] = Vec.new()
+        let deferred_closure_args: List[i32] = List.new()
         // D86 (§18.2): a precondition form evaluates the operands after its
         // condition only when the condition is false, on a path that does
         // not return (MirLower.w lower_call): as for an `if` whose arm
@@ -25274,7 +25277,7 @@ impl Sema:
         // after the condition.
         let precondition_form = sig_idx >= 0 and callable_value_tid == 0 and self.fn_symbol_is_precondition_form(fn_sym)
         var pf_entered = false
-        var pf_states: Vec[i32] = Vec.new()
+        var pf_states: List[i32] = List.new()
         var pf_mf = self.empty_moved_field_state()
         for ai in 0..resolved_arg_count:
             let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
@@ -25317,7 +25320,7 @@ impl Sema:
             let is_closure_arg = self.ast.kind(arg_node) == NodeKind.NK_CLOSURE
             if is_closure_arg:
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
-            // #1739: a generic callee's `Vec[T]` parameter names the collection
+            // #1739: a generic callee's `List[T]` parameter names the collection
             // a literal argument builds; its elements decide T.
             if expected_ty == 0 and sig_idx < 0 and generic_hint_meta >= 0 and ai + param_offset < self.ast.fn_meta_param_count(generic_hint_meta):
                 self.hint_collection_literal(arg_node, self.ast.fn_param_type(self.ast.fn_meta_param_start(generic_hint_meta), ai + param_offset))
@@ -25515,8 +25518,8 @@ impl Sema:
             let expected = self.sig_get_param_count(sig_idx)
             let _ = self.check_call_arity(node, fn_sym, expected, self.sig_is_variadic(sig_idx) != 0, resolved_arg_count + param_offset, 0, self.pool_resolve(fn_sym), "function")
 
-            let sc_mut_args: Vec[i32] = Vec.new()
-            let sc_all_args: Vec[i32] = Vec.new()
+            let sc_mut_args: List[i32] = List.new()
+            let sc_all_args: List[i32] = List.new()
             for ai in 0..resolved_arg_count:
                 let param_i = ai + param_offset
                 if param_i >= expected:
@@ -25528,7 +25531,7 @@ impl Sema:
                     if self.type_is_dyn_object(exp_resolved) == 0:
                         let err_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                         if self.call_arg_type_compatible(expected_ty, arg_ty) == 0:
-                            // #604 stage 1: Vec/array → []T / []mut T call-site coercion.
+                            // #604 stage 1: List/array → []T / []mut T call-site coercion.
                             let sc_kind = self.note_slice_coerce_call_arg(expected_ty, arg_ty, err_arg_node, if err_arg_node > 0: err_arg_node else: node)
                             if sc_kind == 2:
                                 sc_mut_args.push(err_arg_node)
@@ -25743,7 +25746,7 @@ impl Sema:
             self.emit_error("value is not callable", callee)
         0
 
-    fn store_resolved_call_args(call_node: i32, args: &Vec[i32]):
+    fn store_resolved_call_args(call_node: i32, args: &List[i32]):
         let start = self.call_resolved_args_data.len() as i32
         let count = args.len() as i32
         for i in 0..count:
@@ -26001,7 +26004,7 @@ impl Sema:
         var out = self.check_expr(node)
         out = self.value_to_option_at_demand(node, expected, out)
         // D93: every demand on a literal's binding counts, the ones its
-        // default (a Vec, D113) already meets too, so two that disagree are
+        // default (a List, D113) already meets too, so two that disagree are
         // an error at the second.
         self.note_literal_demand(node, expected as i32, node)
         self.stmt_pos_depth = saved_stmt_depth
@@ -26107,13 +26110,13 @@ impl Sema:
     // or the arms do not fix both arguments (all `Ok`: the binding stays
     // pending for a later demand, as before). The constructor calls are
     // retyped to the instance, which MIR then lowers.
-    mut fn infer_result_join_from_variant_arms(join_ty: i32, arm_nodes: &Vec[i32]) -> i32:
+    mut fn infer_result_join_from_variant_arms(join_ty: i32, arm_nodes: &List[i32]) -> i32:
         let resolved = self.resolve_alias(join_ty as TypeId)
         if self.get_type_kind(resolved) != TypeKind.TY_ENUM or self.get_type_d0(resolved) != self.syms.result:
             return 0
         var ok_ty = 0
         var err_ty = 0
-        let retyped: Vec[i32] = Vec.new()
+        let retyped: List[i32] = List.new()
         for ai in 0..arm_nodes.len() as i32:
             let arm = arm_nodes[ai]
             if arm <= 0 or self.body_can_fall_through(arm) == 0:
@@ -26409,7 +26412,7 @@ impl Sema:
         self.pattern_value_syms.insert(node, value_sym)
         1
 
-    mut fn check_dyn_trait_call_compat(fn_sym: i32, call_extra_start: i32, arg_types: &Vec[i32], arg_count: i32, param_offset: i32) -> Unit:
+    mut fn check_dyn_trait_call_compat(fn_sym: i32, call_extra_start: i32, arg_types: &List[i32], arg_count: i32, param_offset: i32):
         if not self.fn_decl_nodes.contains(fn_sym):
             return
         let fn_node: i32 = self.fn_decl_nodes.get(fn_sym).unwrap()
@@ -26548,7 +26551,7 @@ impl Sema:
             pos = pos + 2 + bound_count
         1
 
-    mut fn generic_overload_match_score(fn_node: i32, arg_types: &Vec[i32], arg_count: i32, call_node: i32) -> i32:
+    mut fn generic_overload_match_score(fn_node: i32, arg_types: &List[i32], arg_count: i32, call_node: i32) -> i32:
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
             return -1
@@ -26564,8 +26567,8 @@ impl Sema:
 
         let tp_start = self.ast.fn_meta_tp_start(meta)
         let tp_count = self.ast.fn_meta_tp_count(meta)
-        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_types = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_types = sema_clone_i32_list(&self.generic_subst_type_ids)
         let saved_diag_count = self.diags.items.len() as i32
         self.clear_generic_substitution()
         for pi in 0..arg_count:
@@ -26598,7 +26601,7 @@ impl Sema:
         self.generic_subst_type_ids = saved_types
         if matches != 0: score else: -1
 
-    mut fn select_generic_fn_node(fn_sym: i32, arg_types: &Vec[i32], arg_count: i32, call_node: i32) -> i32:
+    mut fn select_generic_fn_node(fn_sym: i32, arg_types: &List[i32], arg_count: i32, call_node: i32) -> i32:
         let fallback = self.generic_fn_node_for_symbol(fn_sym)
         if fallback == 0:
             return 0
@@ -26637,13 +26640,13 @@ impl Sema:
     // signature, then record any D22 adjustment demanded by that signature.
     // Keeping this after selection prevents Copy-ness from choosing a generic
     // overload or changing its substitutions.
-    mut fn check_selected_generic_call_args(fn_sym: i32, sig_idx: i32, arg_types: &Vec[i32], arg_nodes: &Vec[i32], arg_count: i32, call_node: i32):
+    mut fn check_selected_generic_call_args(fn_sym: i32, sig_idx: i32, arg_types: &List[i32], arg_nodes: &List[i32], arg_count: i32, call_node: i32):
         if sig_idx < 0:
             return
         self.facade_note_callback_method_sig(fn_sym, sig_idx)
         self.facade_note_pair_op_sig(fn_sym, sig_idx)
         let param_count = self.sig_get_param_count(sig_idx)
-        let slice_mut_args: Vec[i32] = Vec.new()
+        let slice_mut_args: List[i32] = List.new()
         for ai in 0..arg_count:
             if ai >= param_count:
                 break
@@ -26678,14 +26681,14 @@ impl Sema:
         // `over(&v) |> map(f)` view `v`.
         self.record_call_view_origins_args(call_node, sig_idx, false, arg_nodes)
         // #1819: the specialization is the body the call runs.
-        let args: Vec[i32] = Vec.new()
-        let by_place: Vec[bool] = Vec.new()
+        let args: List[i32] = List.new()
+        let by_place: List[bool] = List.new()
         for ai in 0..arg_count:
             args.push(if ai < arg_nodes.len() as i32: arg_nodes[ai] else: 0)
             by_place.push(ai < param_count and self.type_takes_place(self.sig_param_type(sig_idx, ai)))
         self.note_call_global_effects(call_node, sig_idx, 0, 0, false, args, by_place)
 
-    mut fn check_generic_call(fn_sym: i32, fn_node: i32, arg_types: &Vec[i32], arg_nodes: &Vec[i32], arg_count: i32, call_node: i32) -> i32:
+    mut fn check_generic_call(fn_sym: i32, fn_node: i32, arg_types: &List[i32], arg_nodes: &List[i32], arg_count: i32, call_node: i32) -> i32:
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
             if arg_count > 0:
@@ -26718,8 +26721,8 @@ impl Sema:
             else:
                 self.emit_error(f"wrong argument count: function '{fn_name}' expects {generic_min_args}-{param_count} argument(s), found {arg_count}", call_node)
 
-        let saved_generic_call_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_generic_call_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_generic_call_subst_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_generic_call_subst_tys = sema_clone_i32_list(&self.generic_subst_type_ids)
         self.clear_generic_substitution()
 
         // Infer type parameter substitutions from call argument types.
@@ -26768,7 +26771,7 @@ impl Sema:
         // An `impl Trait` parameter specializes on its argument's concrete
         // type, which no type parameter names: `take(g, 3)` over a generator
         // and over a GenStage bind the same T but are different functions.
-        let param_concrete_tys: Vec[i32] = Vec.new()
+        let param_concrete_tys: List[i32] = List.new()
         var spec_key = self.generic_specialization_key(fn_sym, fn_node, tp_start, tp_count)
         for cpi in 0..param_count:
             var concrete_param_ty = 0
@@ -26791,8 +26794,8 @@ impl Sema:
             return cached
 
         let before_errors = self.diags.count_by_severity(DiagSeverity.Error)
-        let tp_syms: Vec[i32] = Vec.new()
-        let tp_sema_tys: Vec[i32] = Vec.new()
+        let tp_syms: List[i32] = List.new()
+        let tp_sema_tys: List[i32] = List.new()
         var tp_pos = tp_start
         for ti in 0..tp_count:
             let tp_sym = self.ast.get_extra(tp_pos)
@@ -26971,7 +26974,7 @@ impl Sema:
             let _ = self.generic_subst_type_ids.pop()
 
     // A type parameter no argument mentions takes its type from the result
-    // the call is checked against (`var xs: ArenaVec[i32] =
+    // the call is checked against (`var xs: ArenaList[i32] =
     // arena_vec_new_in(arena)`, the restructure the uninferable-parameter
     // diagnostic teaches): the declared return type is matched against the
     // demanded type. A parameter the arguments bound keeps its binding; a
@@ -26980,22 +26983,22 @@ impl Sema:
     mut fn bind_unbound_type_params_from_result(ret_node: i32, tp_start: i32, tp_count: i32, call_node: i32):
         let expected = self.expected_expr_type as i32
         if ret_node == 0 or self.has_expected_type == 0 or expected == 0 or expected == self.ty_void as i32 or self.current_value_expr_root != call_node: return
-        var unbound: Vec[i32] = Vec.new()
+        var unbound: List[i32] = List.new()
         var pos = tp_start
         for _ in 0..tp_count:
             let tp_name = self.ast.get_extra(pos)
             if self.lookup_generic_subst(tp_name) == 0: unbound.push(tp_name)
             pos = pos + 2 + self.ast.get_extra(pos + 1)
         if unbound.len() == 0: return
-        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_types = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_types = sema_clone_i32_list(&self.generic_subst_type_ids)
         let saved_diag_count = self.diags.items.len() as i32
         self.clear_generic_substitution()
         self.bind_type_params_from_type_expr(ret_node, expected, tp_start, tp_count, call_node)
         let clean = self.diags.items.len() as i32 == saved_diag_count
         while self.diags.items.len() as i32 > saved_diag_count:
             self.diags.items.pop()
-        var found: Vec[i32] = Vec.new()
+        var found: List[i32] = List.new()
         for tp_name in unbound: found.push(if clean: self.lookup_generic_subst(tp_name) else: 0)
         self.generic_subst_param_syms = saved_syms
         self.generic_subst_type_ids = saved_types
@@ -27243,7 +27246,7 @@ impl Sema:
             let trait_args_idx = self.ast.find_impl_trait_type_args(type_node as NodeId)
             if trait_args_idx < 0:
                 return
-            var trait_args: Vec[i32] = Vec.new()
+            var trait_args: List[i32] = List.new()
             for tai in 0..self.ast.impl_trait_type_args_count(trait_args_idx):
                 trait_args.push(self.ast.get_extra(self.ast.impl_trait_type_args_start(trait_args_idx) + tai))
             self.bind_type_params_from_trait_args(trait_sym, trait_args, arg_tid, tp_start, tp_count, err_node)
@@ -27252,7 +27255,7 @@ impl Sema:
     // parameters A and B name from the trait arguments of arg_tid's impl
     // of Trait — for an `impl Trait[A]` parameter and for a bound
     // `G: Trait[A]` once G is known (#1732).
-    mut fn bind_type_params_from_trait_args(trait_sym: i32, trait_args: Vec[i32], arg_tid: i32, tp_start: i32, tp_count: i32, err_node: i32):
+    mut fn bind_type_params_from_trait_args(trait_sym: i32, trait_args: List[i32], arg_tid: i32, tp_start: i32, tp_count: i32, err_node: i32):
         let trait_arg_count = trait_args.len() as i32
         // D69 (§13.4): a generator value implements Gen[T] with no impl
         // declaration; T is its element type.
@@ -27336,7 +27339,7 @@ impl Sema:
 
     // A generic declaration's type node names what its own module sees, as
     // a generic fn body does (check_generic_body switches the same way): the
-    // layout, field, variant or return type of `SortedVec[T] { array: *mut
+    // layout, field, variant or return type of `SortedList[T] { array: *mut
     // _SortedArray }` asked for from a user module resolves `_SortedArray`
     // in std.collections.sorted_vec, never against the user's imports
     // (#1362: an engine corpus type is never the user's).
@@ -27406,7 +27409,7 @@ impl Sema:
         if kind == NodeKind.NK_TYPE_TUPLE:
             let extra_start = self.ast.get_data0(ret_node)
             let elem_count = self.ast.get_data1(ret_node)
-            let tuple_elems: Vec[i32] = Vec.new()
+            let tuple_elems: List[i32] = List.new()
             for ei in 0..elem_count:
                 let e_node = self.ast.get_extra(extra_start + ei)
                 tuple_elems.push(self.resolve_generic_return_type_node(e_node, tp_start, tp_count))
@@ -27426,7 +27429,7 @@ impl Sema:
                     return 0
                 return self.ensure_exact_type(TypeKind.TY_RANGE, elem_ty, range_inclusive, 0) as i32
             let final_base = self.canonical_symbol_by_text(gi_base)
-            let gi_args: Vec[i32] = Vec.new()
+            let gi_args: List[i32] = List.new()
             for gi in 0..gi_argc:
                 let ga_node = self.ast.get_extra(gi_extra + gi)
                 let ga_tid = self.resolve_generic_return_type_node(ga_node, tp_start, tp_count)
@@ -27437,7 +27440,7 @@ impl Sema:
 
         if kind == NodeKind.NK_TYPE_OPTIONAL:
             let inner = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
-            let opt_args: Vec[i32] = Vec.new()
+            let opt_args: List[i32] = List.new()
             opt_args.push(inner)
             return self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
 
@@ -27533,7 +27536,7 @@ impl Sema:
             for bi in 0..self.blanket_trait_syms.len() as i32:
                 if self.blanket_trait_syms[bi] != trait_sym:
                     continue
-                // For generic blanket impls (impl[T] Trait for Vec[T]),
+                // For generic blanket impls (impl[T] Trait for List[T]),
                 // only match if query type's base sym matches the target.
                 let target_base = self.blanket_target_base_syms[bi]
                 if target_base != 0 and target_base != type_sym:
@@ -27558,7 +27561,7 @@ impl Sema:
         unsafe { (*cache).insert(key, found) }
         found
 
-    fn subst_vec_lookup(names: &Vec[i32], types: &Vec[i32], name: i32) -> i32:
+    fn subst_list_lookup(names: &List[i32], types: &List[i32], name: i32) -> i32:
         for i in 0..names.len() as i32:
             if names[i] == name:
                 return types[i]
@@ -27583,7 +27586,7 @@ impl Sema:
             pos = pos + 2 + bound_count
         0
 
-    mut fn blanket_impl_type_bounds_satisfied(impl_node: i32, subst_names: &Vec[i32], subst_types: &Vec[i32]) -> i32:
+    mut fn blanket_impl_type_bounds_satisfied(impl_node: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
         let tp_meta = self.ast.find_impl_type_params(impl_node)
         if tp_meta < 0:
             return 1
@@ -27593,7 +27596,7 @@ impl Sema:
         for ti in 0..tp_count:
             let tp_name = self.ast.get_extra(pos)
             let bound_count = self.ast.get_extra(pos + 1)
-            let concrete_tid = self.subst_vec_lookup(subst_names, subst_types, tp_name)
+            let concrete_tid = self.subst_list_lookup(subst_names, subst_types, tp_name)
             for bi in 0..bound_count:
                 let bound_trait = self.ast.get_extra(pos + 2 + bi)
                 if concrete_tid == 0:
@@ -27603,7 +27606,7 @@ impl Sema:
             pos = pos + 2 + bound_count
         1
 
-    fn blanket_impl_type_bounds_satisfied_frozen(impl_node: i32, subst_names: &Vec[i32], subst_types: &Vec[i32]) -> i32:
+    fn blanket_impl_type_bounds_satisfied_frozen(impl_node: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
         let tp_meta = self.ast.find_impl_type_params(impl_node)
         if tp_meta < 0:
             return 1
@@ -27613,7 +27616,7 @@ impl Sema:
         for ti in 0..tp_count:
             let tp_name = self.ast.get_extra(pos)
             let bound_count = self.ast.get_extra(pos + 1)
-            let concrete_tid = self.subst_vec_lookup(subst_names, subst_types, tp_name)
+            let concrete_tid = self.subst_list_lookup(subst_names, subst_types, tp_name)
             for bi in 0..bound_count:
                 let bound_trait = self.ast.get_extra(pos + 2 + bi)
                 if concrete_tid == 0:
@@ -27649,8 +27652,8 @@ impl Sema:
             if pattern_arg_count != self.get_generic_inst_arg_count(resolved as i32):
                 continue
             let pattern_arg_start = self.ast.get_data1(target_node)
-            let subst_names: Vec[i32] = Vec.new()
-            let subst_types: Vec[i32] = Vec.new()
+            let subst_names: List[i32] = List.new()
+            let subst_types: List[i32] = List.new()
             var matches = 1
             for ai in 0..pattern_arg_count:
                 let pattern_arg = self.ast.get_extra(pattern_arg_start + ai)
@@ -27659,7 +27662,7 @@ impl Sema:
                 if pattern_kind == NodeKind.NK_TYPE_NAMED or pattern_kind == NodeKind.NK_IDENT:
                     let pattern_sym = self.ast.get_data0(pattern_arg)
                     if self.type_param_in_impl_list(tp_start, tp_count, pattern_sym) != 0:
-                        let existing = self.subst_vec_lookup(subst_names, subst_types, pattern_sym)
+                        let existing = self.subst_list_lookup(subst_names, subst_types, pattern_sym)
                         if existing != 0:
                             if self.types_compatible(existing, actual_arg) == 0:
                                 matches = 0
@@ -27701,7 +27704,7 @@ impl Sema:
             return self.is_copy(resolved)
         // Every Copy value has a valid Clone operation: cloning it is the
         // ordinary independent bit-copy. This is also what makes blanket
-        // implementations such as `Clone for Vec[T] where T: Clone`
+        // implementations such as `Clone for List[T] where T: Clone`
         // applicable to Vecs of primitive/other Copy elements.
         if trait_sym == self.syms.clone_trait and self.is_copy(resolved) != 0:
             return 1
@@ -27801,8 +27804,8 @@ impl Sema:
             return 0
         let tp_start = self.type_decl_tp_start(decl)
         let tp_count = self.type_decl_tp_count(decl)
-        let subst_syms: Vec[i32] = Vec.new()
-        let subst_tids: Vec[i32] = Vec.new()
+        let subst_syms: List[i32] = List.new()
+        let subst_tids: List[i32] = List.new()
         var pos = tp_start
         for ti in 0..tp_count:
             let tp_name = self.ast.get_extra(pos)
@@ -27863,7 +27866,7 @@ impl Sema:
             return if trait_sym == self.syms.scoped_send_trait: 1 else: 0
         if base == self.syms.handle:
             return 1
-        if base == self.syms.vec or base == self.syms.option or base == self.syms.hashset or base_name == "Sender" or base_name == "Receiver":
+        if base == self.syms.list or base == self.syms.option or base == self.syms.hashset or base_name == "Sender" or base_name == "Receiver":
             let arg_count = self.get_generic_inst_arg_count(resolved as i32)
             for ai in 0..arg_count:
                 if self.type_satisfies_thread_trait(self.get_generic_inst_arg(resolved as i32, ai), trait_sym) == 0:
@@ -27963,7 +27966,7 @@ impl Sema:
         if tk == TypeKind.TY_GENERIC_INST:
             let base = self.get_generic_inst_base(resolved as i32)
             let arg_count = self.get_generic_inst_arg_count(resolved as i32)
-            if base == self.syms.option or base == self.syms.vec or base == self.syms.hashmap or base == self.syms.hashset:
+            if base == self.syms.option or base == self.syms.list or base == self.syms.hashmap or base == self.syms.hashset:
                 return 1
             if base == self.syms.result and arg_count == 2:
                 return self.type_has_default_value(self.get_generic_inst_arg(resolved as i32, 0))
@@ -28071,7 +28074,7 @@ impl Sema:
     fn owner_inst_from_current_subst(owner_sym: i32, tp_start: i32, tp_count: i32) -> i32:
         if tp_count == 0:
             return self.lookup_named_type_visible(owner_sym)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         var pos = tp_start
         for ti in 0..tp_count:
             let tp_name = self.ast.get_extra(pos)
@@ -28110,7 +28113,7 @@ impl Sema:
         if kind == NodeKind.NK_TYPE_TUPLE:
             let extra_start = self.ast.get_data0(type_node)
             let elem_count = self.ast.get_data1(type_node)
-            let elems: Vec[i32] = Vec.new()
+            let elems: List[i32] = List.new()
             for ei in 0..elem_count:
                 elems.push(self.resolve_type_node_with_current_subst(self.ast.get_extra(extra_start + ei), self_ty))
             return self.ensure_tuple_type(elems, elem_count) as i32
@@ -28128,7 +28131,7 @@ impl Sema:
                     return 0
                 return self.ensure_exact_type(TypeKind.TY_RANGE, elem_ty, range_inclusive, 0) as i32
             let final_base = self.canonical_symbol_by_text(base_sym)
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             for ai in 0..arg_count:
                 let arg_ty = self.resolve_type_node_with_current_subst(self.ast.get_extra(extra_start + ai), self_ty)
                 if arg_ty == 0:
@@ -28137,7 +28140,7 @@ impl Sema:
             return self.ensure_generic_inst_type(final_base, args, arg_count) as i32
         if kind == NodeKind.NK_TYPE_OPTIONAL:
             let inner = self.resolve_type_node_with_current_subst(self.ast.get_data0(type_node), self_ty)
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             args.push(inner)
             return self.ensure_generic_inst_type(self.syms.option, args, 1) as i32
         self.resolve_type_expr(type_node) as i32
@@ -28227,8 +28230,8 @@ impl Sema:
         let owner_tp_count = self.type_decl_tp_count(td_node)
         let fn_tp_start = self.ast.fn_meta_tp_start(meta)
         let fn_tp_count = self.ast.fn_meta_tp_count(meta)
-        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_tys = sema_clone_i32_list(&self.generic_subst_type_ids)
         self.clear_generic_substitution()
         let owner_resolved = self.resolve_alias(owner_type as TypeId)
         if owner_tp_count > 0 and self.get_type_kind(owner_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(owner_resolved as i32) == owner_sym:
@@ -28236,7 +28239,7 @@ impl Sema:
         let fp_start = self.ast.get_data0(param_node)
         let fp_count = self.ast.get_data1(param_node)
         let ret_node = self.ast.get_data2(param_node)
-        let params: Vec[i32] = Vec.new()
+        let params: List[i32] = List.new()
         var bound = true
         for fpi in 0..fp_count:
             let fp_node = self.ast.get_extra(fp_start + fpi)
@@ -28271,8 +28274,8 @@ impl Sema:
         let owner_tp_count = self.type_decl_tp_count(td_node)
         if owner_tp_count == 0:
             return 0
-        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_tys = sema_clone_i32_list(&self.generic_subst_type_ids)
         self.clear_generic_substitution()
         let owner_resolved = self.resolve_alias(owner_type as TypeId)
         let bound = if self.get_type_kind(owner_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(owner_resolved as i32) == owner_sym:
@@ -28332,8 +28335,8 @@ impl Sema:
         self.bind_type_params_from_type_expr(type_node, arg_tid, tp_start, tp_count, err_node)
 
     mut fn check_generic_method_body_concrete(fn_node: i32, method_fn_sym: i32, concrete_owner: i32, owner_tp_start: i32, owner_tp_count: i32, fn_tp_start: i32, fn_tp_count: i32) -> i32:
-        let tp_syms: Vec[i32] = Vec.new()
-        let tp_types: Vec[i32] = Vec.new()
+        let tp_syms: List[i32] = List.new()
+        let tp_types: List[i32] = List.new()
         var key = f"{self.pool_resolve(method_fn_sym)}__receiver__{concrete_owner}"
         var pos = owner_tp_start
         for ti in 0..owner_tp_count:
@@ -28360,15 +28363,15 @@ impl Sema:
         let existing = self.get_sig(mono_sym)
         if existing >= 0:
             return existing
-        let param_concrete_types: Vec[i32] = Vec.new()
+        let param_concrete_types: List[i32] = List.new()
         self.check_fn_body_concrete(fn_node, tp_syms, tp_types, mono_sym, param_concrete_types)
 
 // Deduplicating symbol→type substitution accumulator. A mut-receiver
 // method because the pushes must land in the caller's vectors; an owned
-// Vec parameter would consume them (pre-#691 handle-copy aliasing is gone).
-type ConcreteSubst { names: Vec[i32], types: Vec[i32] }
+// List parameter would consume them (pre-#691 handle-copy aliasing is gone).
+type ConcreteSubst { names: List[i32], types: List[i32] }
 
-fn ConcreteSubst.init() -> ConcreteSubst: ConcreteSubst { names: Vec.new(), types: Vec.new() }
+fn ConcreteSubst.init() -> ConcreteSubst: ConcreteSubst { names: List.new(), types: List.new() }
 
 impl ConcreteSubst:
     mut fn push(sym: i32, tid: i32):
@@ -28406,8 +28409,8 @@ impl Sema:
         let drop_method = self.pool_lookup_symbol("drop")
         var method_fn = 0
         var method_node = 0
-        var matched_subst_names: Vec[i32] = Vec.new()
-        var matched_subst_types: Vec[i32] = Vec.new()
+        var matched_subst_names: List[i32] = List.new()
+        var matched_subst_types: List[i32] = List.new()
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
                 continue
@@ -28459,7 +28462,7 @@ impl Sema:
             with_eprint(f"[gdrop] tid={resolved} base={self.pool_resolve(self.get_generic_inst_base(resolved))} method_fn={self.pool_resolve(method_fn)} node={method_node} mono={mono_text}")
         var sig_idx = self.get_sig(mono_sym)
         if sig_idx < 0:
-            let concrete_params: Vec[i32] = Vec.new()
+            let concrete_params: List[i32] = List.new()
             sig_idx = self.check_fn_body_concrete(method_node, subst.names, subst.types, mono_sym, concrete_params)
         if sig_idx < 0:
             sema_phase_bug(f"BUG: failed to specialize Drop.drop for concrete generic type {resolved}")
@@ -28485,7 +28488,7 @@ impl Sema:
     // rest.
     mut fn note_structural_contract(tid: i32, node: i32, method: &str):
         var seen: HashMap[i32, i32] = sema_new_map_i32_i32()
-        let work: Vec[i32] = Vec.new()
+        let work: List[i32] = List.new()
         work.push(tid)
         let eq_sym = self.pool_intern(method)
         var k = 0
@@ -28515,8 +28518,8 @@ impl Sema:
                 // needs to know of it.
                 let part_sig = self.structural_contract_sig(eq_sym, t)
                 if part_sig >= 0:
-                    let no_args: Vec[i32] = Vec.new()
-                    let no_places: Vec[bool] = Vec.new()
+                    let no_args: List[i32] = List.new()
+                    let no_places: List[bool] = List.new()
                     self.note_call_global_effects(node, part_sig, 0, 0, false, no_args, no_places)
                 continue
             if tk == TypeKind.TY_TUPLE:
@@ -28524,7 +28527,7 @@ impl Sema:
             else if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
                 work.push(self.get_type_d0(t as TypeId))
             else if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
-                // A `Vec[T]` compares its elements and a `Box[T]` its pointee:
+                // A `List[T]` compares its elements and a `Box[T]` its pointee:
                 // what they hold is their argument, not a field.
                 if tk == TypeKind.TY_GENERIC_INST:
                     for ai in 0..self.get_generic_inst_arg_count(t): work.push(self.get_generic_inst_arg(t, ai))
@@ -28562,7 +28565,7 @@ impl Sema:
     // 0 when it is one.
     mut fn map_key_problem(tid: i32) -> i64:
         var seen: HashMap[i32, i32] = sema_new_map_i32_i32()
-        let work: Vec[i32] = [tid]
+        let work: List[i32] = [tid]
         let eq_sym = self.pool_intern("eq")
         let eq_trait = self.pool_lookup_symbol("Eq")
         var k = 0
@@ -28630,8 +28633,8 @@ impl Sema:
         else:
             var method_node = 0
             var method_fn = 0
-            var matched_subst_names: Vec[i32] = Vec.new()
-            var matched_subst_types: Vec[i32] = Vec.new()
+            var matched_subst_names: List[i32] = List.new()
+            var matched_subst_types: List[i32] = List.new()
             for di in 0..self.ast.decl_count():
                 if self.decl_is_lazy_skipped(di):
                     continue
@@ -28675,7 +28678,7 @@ impl Sema:
             mono_sym = self.pool_intern(mono_text)
             sig_idx = self.get_sig(mono_sym)
             if sig_idx < 0:
-                let concrete_params: Vec[i32] = Vec.new()
+                let concrete_params: List[i32] = List.new()
                 sig_idx = self.check_fn_body_concrete(method_node, subst.names, subst.types, mono_sym, concrete_params)
         if sig_idx < 0 or mono_sym == 0:
             return
@@ -28747,14 +28750,14 @@ impl Sema:
         let mono_sym = self.pool_intern(mono_text)
         var sig_idx = self.get_sig(mono_sym)
         if sig_idx < 0:
-            let concrete_params: Vec[i32] = Vec.new()
+            let concrete_params: List[i32] = List.new()
             sig_idx = self.check_fn_body_concrete(fn_node, subst.names, subst.types, mono_sym, concrete_params)
         if sig_idx < 0:
             return
         self.resolved_call_sigs.insert(expr, sig_idx)
         self.resolved_call_mono_syms.insert(expr, mono_sym)
 
-    mut fn check_generic_method_call(owner_sym: i32, owner_type: i32, method_fn_sym: i32, is_static: i32, recv_node: i32, arg_types: &Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
+    mut fn check_generic_method_call(owner_sym: i32, owner_type: i32, method_fn_sym: i32, is_static: i32, recv_node: i32, arg_types: &List[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
         if method_fn_sym == 0:
             return 0
         let fn_node = self.generic_fn_node_for_symbol(method_fn_sym)
@@ -28775,8 +28778,8 @@ impl Sema:
         let fn_tp_start = self.ast.fn_meta_tp_start(meta)
         let fn_tp_count = self.ast.fn_meta_tp_count(meta)
 
-        let saved_generic_method_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_generic_method_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_generic_method_subst_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_generic_method_subst_tys = sema_clone_i32_list(&self.generic_subst_type_ids)
         self.clear_generic_substitution()
         let owner_resolved = self.resolve_alias(owner_type as TypeId)
         if owner_tp_count > 0:
@@ -28859,11 +28862,11 @@ impl Sema:
             let _ = self.check_call_arity(node, method_fn_sym, param_count, false, arg_count, param_offset, self.pool_resolve(method_fn_sym), if param_offset == 1: "method" else: "function")
         // #604 stage 1 applies to a method's arguments as to a free call's
         // (D64 found the gap: `n.read(buf)` over a `[]mut u8` refused the
-        // array a free `fill(buf)` accepted): a Vec/array argument coerces to
+        // array a free `fill(buf)` accepted): a List/array argument coerces to
         // a []T / []mut T parameter, the `[]mut` ones under the call-local
         // exclusivity pass.
-        let sc_mut_args: Vec[i32] = Vec.new()
-        let sc_all_args: Vec[i32] = Vec.new()
+        let sc_mut_args: List[i32] = List.new()
+        let sc_all_args: List[i32] = List.new()
         for ai3 in 0..arg_count:
             let pi3 = ai3 + param_offset
             if pi3 >= param_count:
@@ -28946,7 +28949,7 @@ impl Sema:
         recv_type
 
     fn is_pending_generic_collection_base(base_sym: i32) -> i32:
-        if base_sym == self.syms.vec or base_sym == self.syms.hashmap or base_sym == self.syms.hashset:
+        if base_sym == self.syms.list or base_sym == self.syms.hashmap or base_sym == self.syms.hashset:
             return 1
         0
 
@@ -28959,7 +28962,7 @@ impl Sema:
             let src_sym = self.ast.get_data0(value)
             // A payloadless variant of a generic enum written with nothing to
             // say its type arguments (`var best = None`, #2103) is pending as
-            // `Vec.new()` is: a later use settles it.
+            // `List.new()` is: a later use settles it.
             if self.variant_lookup.contains(src_sym) and not self.pending_generic_binding_base.contains(src_sym):
                 let enum_ty = self.resolve_alias(val_type as TypeId)
                 if self.get_type_kind(enum_ty) == TypeKind.TY_ENUM:
@@ -28982,7 +28985,7 @@ impl Sema:
         let base_sym = self.static_receiver_base_sym(recv)
         if self.is_pending_generic_collection_base(base_sym) == 0:
             return 0
-        if base_sym != self.syms.vec and method_name == "with_capacity":
+        if base_sym != self.syms.list and method_name == "with_capacity":
             return 0
         let resolved = self.resolve_alias(val_type as TypeId)
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
@@ -29018,7 +29021,7 @@ impl Sema:
             self.pending_generic_binding_call.insert(sym, value)
         if call_node != 0:
             self.pending_generic_binding_call.insert(sym, call_node)
-            if self.ast.kind(call_node) == NodeKind.NK_CALL: self.note_allocation_site(call_node, AllocConstructKind.VEC_NEW, 0, 0)
+            if self.ast.kind(call_node) == NodeKind.NK_CALL: self.note_allocation_site(call_node, AllocConstructKind.LIST_NEW, 0, 0)
         if decl_node != 0:
             self.pending_generic_binding_decl.insert(sym, decl_node)
 
@@ -29104,7 +29107,7 @@ impl Sema:
             return 0
         self.settle_pending_generic_binding(sym, concrete, expr_node)
 
-    mut fn infer_pending_generic_method_receiver(expr: i32, field: i32, arg_types: &Vec[i32], arg_count: i32, node: i32) -> i32:
+    mut fn infer_pending_generic_method_receiver(expr: i32, field: i32, arg_types: &List[i32], arg_count: i32, node: i32) -> i32:
         let _ = node
         if expr == 0 or self.ast.kind(expr) != NodeKind.NK_IDENT:
             return 0
@@ -29112,8 +29115,8 @@ impl Sema:
         if not self.pending_generic_binding_base.contains(sym):
             return 0
         let base_sym = self.pending_generic_binding_base.get(sym).unwrap()
-        let args: Vec[i32] = Vec.new()
-        if base_sym == self.syms.vec:
+        let args: List[i32] = List.new()
+        if base_sym == self.syms.list:
             if (field == self.syms.push or field == self.syms.contains) and arg_count >= 1:
                 let elem_ty = arg_types[0]
                 if elem_ty != 0 and elem_ty != self.ty_void:
@@ -29213,26 +29216,26 @@ impl Sema:
                 return 0
         1
 
-    fn ensure_vec_str_type() -> i32:
-        let args: Vec[i32] = Vec.new()
+    fn ensure_list_str_type() -> i32:
+        let args: List[i32] = List.new()
         args.push(self.ty_str as i32)
-        self.ensure_generic_inst_type(self.syms.vec, args, 1) as i32
+        self.ensure_generic_inst_type(self.syms.list, args, 1) as i32
 
-    fn ensure_vec_type_for(elem_ty: i32) -> i32:
-        let found = self.find_generic_inst(self.syms.vec, elem_ty)
+    fn ensure_list_type_for(elem_ty: i32) -> i32:
+        let found = self.find_generic_inst(self.syms.list, elem_ty)
         if found != 0:
             return found
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(elem_ty)
-        self.ensure_generic_inst_type(self.syms.vec, args, 1) as i32
+        self.ensure_generic_inst_type(self.syms.list, args, 1) as i32
 
-    fn ensure_veciter_type_for(elem_ty: i32) -> i32:
-        let found = self.find_generic_inst(self.syms.veciter, elem_ty)
+    fn ensure_listiter_type_for(elem_ty: i32) -> i32:
+        let found = self.find_generic_inst(self.syms.listiter, elem_ty)
         if found != 0:
             return found
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(elem_ty)
-        self.ensure_generic_inst_type(self.syms.veciter, args, 1) as i32
+        self.ensure_generic_inst_type(self.syms.listiter, args, 1) as i32
 
     fn ensure_btree_storage_type(btree_ty: i32) -> i32:
         let resolved = self.resolve_alias(btree_ty as TypeId)
@@ -29242,63 +29245,63 @@ impl Sema:
         let base_name = self.pool_resolve(base)
         let argc = self.get_generic_inst_arg_count(resolved as i32)
         if base_name == "BTreeSet" and argc > 0:
-            return self.ensure_vec_type_for(self.get_generic_inst_arg(resolved as i32, 0))
+            return self.ensure_list_type_for(self.get_generic_inst_arg(resolved as i32, 0))
         if base_name == "BTreeMap" and argc >= 2:
-            let elems: Vec[i32] = Vec.new()
+            let elems: List[i32] = List.new()
             elems.push(self.get_generic_inst_arg(resolved as i32, 0))
             elems.push(self.get_generic_inst_arg(resolved as i32, 1))
             let pair_ty = self.ensure_tuple_type(elems, 2) as i32
             if pair_ty == 0:
                 return 0
-            return self.ensure_vec_type_for(pair_ty)
+            return self.ensure_list_type_for(pair_ty)
         0
 
     fn ensure_mapiter_type_for(iter_ty: i32, in_ty: i32, out_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(iter_ty)
         args.push(in_ty)
         args.push(out_ty)
         self.ensure_generic_inst_type(self.syms.mapiter, args, 3) as i32
 
     fn ensure_filteriter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(iter_ty)
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.filteriter, args, 2) as i32
 
     fn ensure_filtermapiter_type_for(iter_ty: i32, in_ty: i32, out_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(iter_ty)
         args.push(in_ty)
         args.push(out_ty)
         self.ensure_generic_inst_type(self.syms.filtermapiter, args, 3) as i32
 
     fn ensure_takeiter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(iter_ty)
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.takeiter, args, 2) as i32
 
     fn ensure_dropiter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(iter_ty)
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.dropiter, args, 2) as i32
 
     fn ensure_takewhileiter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(iter_ty)
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.takewhileiter, args, 2) as i32
 
     fn ensure_dropwhileiter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(iter_ty)
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.dropwhileiter, args, 2) as i32
 
     fn ensure_zipiter_type_for(left_ty: i32, right_ty: i32, left_elem_ty: i32, right_elem_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(left_ty)
         args.push(right_ty)
         args.push(left_elem_ty)
@@ -29306,20 +29309,20 @@ impl Sema:
         self.ensure_generic_inst_type(self.syms.zipiter, args, 4) as i32
 
     fn ensure_enumerateiter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(iter_ty)
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.enumerateiter, args, 2) as i32
 
     fn ensure_chainiter_type_for(left_ty: i32, right_ty: i32, elem_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(left_ty)
         args.push(right_ty)
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.chainiter, args, 3) as i32
 
     fn ensure_zipwithiter_type_for(left_ty: i32, right_ty: i32, left_elem_ty: i32, right_elem_ty: i32, out_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(left_ty)
         args.push(right_ty)
         args.push(left_elem_ty)
@@ -29328,13 +29331,13 @@ impl Sema:
         self.ensure_generic_inst_type(self.syms.zipwithiter, args, 5) as i32
 
     fn ensure_stepbyiter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(iter_ty)
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.stepbyiter, args, 2) as i32
 
     fn ensure_flatmapiter_type_for(iter_ty: i32, collection_ty: i32, inner_ty: i32, in_ty: i32, out_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(iter_ty)
         args.push(collection_ty)
         args.push(inner_ty)
@@ -29352,7 +29355,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
         let owner = self.get_generic_inst_base(resolved as i32)
-        if owner == self.syms.veciter or owner == self.syms.veciterref or owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.filtermapiter or owner == self.syms.takeiter or owner == self.syms.dropiter or owner == self.syms.takewhileiter or owner == self.syms.dropwhileiter or owner == self.syms.zipiter or owner == self.syms.enumerateiter or owner == self.syms.chainiter or owner == self.syms.zipwithiter or owner == self.syms.stepbyiter or owner == self.syms.flatmapiter:
+        if owner == self.syms.listiter or owner == self.syms.listiterref or owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.filtermapiter or owner == self.syms.takeiter or owner == self.syms.dropiter or owner == self.syms.takewhileiter or owner == self.syms.dropwhileiter or owner == self.syms.zipiter or owner == self.syms.enumerateiter or owner == self.syms.chainiter or owner == self.syms.zipwithiter or owner == self.syms.stepbyiter or owner == self.syms.flatmapiter:
             return owner
         0
 
@@ -29369,9 +29372,9 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
         let owner = self.get_generic_inst_base(resolved as i32)
-        if owner == self.syms.veciter:
+        if owner == self.syms.listiter:
             return self.get_generic_inst_arg(resolved as i32, 0)
-        if owner == self.syms.veciterref:
+        if owner == self.syms.listiterref:
             let ref_elem_ty = self.get_generic_inst_arg(resolved as i32, 0)
             return self.ensure_exact_type(TypeKind.TY_REF, ref_elem_ty, 0, 0) as i32
         if owner == self.syms.mapiter:
@@ -29383,12 +29386,12 @@ impl Sema:
         if owner == self.syms.chainiter:
             return self.get_generic_inst_arg(resolved as i32, 2)
         if owner == self.syms.zipiter:
-            let elems: Vec[i32] = Vec.new()
+            let elems: List[i32] = List.new()
             elems.push(self.get_generic_inst_arg(resolved as i32, 2))
             elems.push(self.get_generic_inst_arg(resolved as i32, 3))
             return self.ensure_tuple_type(elems, 2) as i32
         if owner == self.syms.enumerateiter:
-            let elems2: Vec[i32] = Vec.new()
+            let elems2: List[i32] = List.new()
             elems2.push(self.ty_i64 as i32)
             elems2.push(self.get_generic_inst_arg(resolved as i32, 1))
             return self.ensure_tuple_type(elems2, 2) as i32
@@ -29402,7 +29405,7 @@ impl Sema:
         let found = self.find_generic_inst(self.syms.handle, elem_ty)
         if found != 0:
             return found
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.handle, args, 1) as i32
 
@@ -29410,7 +29413,7 @@ impl Sema:
         let found = self.find_generic_inst(self.syms.slotmapslot, elem_ty)
         if found != 0:
             return found
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.slotmapslot, args, 1) as i32
 
@@ -29427,7 +29430,7 @@ impl Sema:
         if name == "slot_count": return self.ty_i64 as i32
         if name == "slot_live": return self.ty_bool as i32
         if name == "slot_take":
-            let entry: Vec[i32] = [self.get_generic_inst_arg(recv_type, 0), self.get_generic_inst_arg(recv_type, 1)]
+            let entry: List[i32] = [self.get_generic_inst_arg(recv_type, 0), self.get_generic_inst_arg(recv_type, 1)]
             return self.ensure_tuple_type(entry, 2) as i32
         self.record_builtin_receiver_view_origins(node, expr)
         let elem = self.get_generic_inst_arg(recv_type, if name == "slot_key": 0 else: 1)
@@ -29440,7 +29443,7 @@ impl Sema:
         let found = self.find_generic_inst(self.syms.option, ref_ty)
         if found != 0:
             return found
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(ref_ty)
         self.ensure_generic_inst_type(self.syms.option, args, 1) as i32
 
@@ -29448,12 +29451,12 @@ impl Sema:
         let found = self.find_generic_inst(self.syms.option, elem_ty)
         if found != 0:
             return found
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.option, args, 1) as i32
 
     fn ensure_result_type_for(ok_ty: i32, err_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(ok_ty)
         args.push(err_ty)
         self.ensure_generic_inst_type(self.syms.result, args, 2) as i32
@@ -29461,7 +29464,7 @@ impl Sema:
     // Frozen-phase read twins of the ensure_*_type_for wrappers (D7): at codegen the
     // type already exists (preregister_mir_types), so these are pure lookups. A miss
     // returns 0, exactly as the ensure_* form does when types are frozen.
-    fn find_vec_type_for(elem_ty: i32) -> i32: self.find_generic_inst(self.syms.vec, elem_ty)
+    fn find_list_type_for(elem_ty: i32) -> i32: self.find_generic_inst(self.syms.list, elem_ty)
     fn find_handle_type_for(elem_ty: i32) -> i32: self.find_generic_inst(self.syms.handle, elem_ty)
     fn find_slotmapslot_type_for(elem_ty: i32) -> i32: self.find_generic_inst(self.syms.slotmapslot, elem_ty)
     fn find_option_type_for(elem_ty: i32) -> i32: self.find_generic_inst(self.syms.option, elem_ty)
@@ -29471,7 +29474,7 @@ impl Sema:
             return 0
         self.find_generic_inst(self.syms.option, ref_ty)
     fn find_result_type_for(ok_ty: i32, err_ty: i32) -> i32:
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(ok_ty)
         args.push(err_ty)
         self.find_generic_inst_type(self.syms.result, args, 2) as i32
@@ -29480,7 +29483,7 @@ impl Sema:
         let found = self.find_generic_inst(self.syms.context_error, source_err_ty)
         if found != 0:
             return found
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(source_err_ty)
         self.ensure_generic_inst_type(self.syms.context_error, args, 1) as i32
 
@@ -29496,47 +29499,47 @@ impl Sema:
             return 0
         self.get_type_d2(fn_ty)
 
-    mut fn vec_sequence_return_type(recv_type: i32, arg_count: i32, node: i32) -> i32:
+    mut fn list_sequence_return_type(recv_type: i32, arg_count: i32, node: i32) -> i32:
         if arg_count != 0:
-            self.emit_error("Vec.sequence() expects no arguments", node)
+            self.emit_error("List.sequence() expects no arguments", node)
             return 0
         let elem_ty = self.get_generic_inst_arg(recv_type, 0)
         let resolved_elem = self.resolve_alias(elem_ty as TypeId)
         if self.get_type_kind(resolved_elem) != TypeKind.TY_GENERIC_INST:
-            self.emit_error("Vec.sequence() requires Vec[Option[T]] or Vec[Result[T, E]]", node)
+            self.emit_error("List.sequence() requires List[Option[T]] or List[Result[T, E]]", node)
             return 0
         let elem_base = self.get_generic_inst_base(resolved_elem as i32)
         if elem_base == self.syms.option:
             let inner_ty = self.get_generic_inst_arg(resolved_elem as i32, 0)
-            return self.ensure_option_type_for(self.ensure_vec_type_for(inner_ty))
+            return self.ensure_option_type_for(self.ensure_list_type_for(inner_ty))
         if elem_base == self.syms.result:
             let ok_ty = self.get_generic_inst_arg(resolved_elem as i32, 0)
             let err_ty = self.get_generic_inst_arg(resolved_elem as i32, 1)
-            return self.ensure_result_type_for(self.ensure_vec_type_for(ok_ty), err_ty)
-        self.emit_error("Vec.sequence() requires Vec[Option[T]] or Vec[Result[T, E]]", node)
+            return self.ensure_result_type_for(self.ensure_list_type_for(ok_ty), err_ty)
+        self.emit_error("List.sequence() requires List[Option[T]] or List[Result[T, E]]", node)
         0
 
-    mut fn vec_traverse_return_type(recv_type: i32, arg_types: &Vec[i32], arg_count: i32, node: i32) -> i32:
+    mut fn list_traverse_return_type(recv_type: i32, arg_types: &List[i32], arg_count: i32, node: i32) -> i32:
         if arg_count != 1:
-            self.emit_error("Vec.traverse() expects exactly one argument", node)
+            self.emit_error("List.traverse() expects exactly one argument", node)
             return 0
         let mapped_wrapper_ty = self.callable_return_type(arg_types[0])
         if mapped_wrapper_ty == 0:
-            self.emit_error("Vec.traverse() expects a function argument", node)
+            self.emit_error("List.traverse() expects a function argument", node)
             return 0
         let resolved_wrapper = self.resolve_alias(mapped_wrapper_ty as TypeId)
         if self.get_type_kind(resolved_wrapper) != TypeKind.TY_GENERIC_INST:
-            self.emit_error("Vec.traverse() function must return Option or Result", node)
+            self.emit_error("List.traverse() function must return Option or Result", node)
             return 0
         let wrapper_base = self.get_generic_inst_base(resolved_wrapper as i32)
         if wrapper_base == self.syms.option:
             let inner_ty = self.get_generic_inst_arg(resolved_wrapper as i32, 0)
-            return self.ensure_option_type_for(self.ensure_vec_type_for(inner_ty))
+            return self.ensure_option_type_for(self.ensure_list_type_for(inner_ty))
         if wrapper_base == self.syms.result:
             let ok_ty = self.get_generic_inst_arg(resolved_wrapper as i32, 0)
             let err_ty = self.get_generic_inst_arg(resolved_wrapper as i32, 1)
-            return self.ensure_result_type_for(self.ensure_vec_type_for(ok_ty), err_ty)
-        self.emit_error("Vec.traverse() function must return Option or Result", node)
+            return self.ensure_result_type_for(self.ensure_list_type_for(ok_ty), err_ty)
+        self.emit_error("List.traverse() function must return Option or Result", node)
         0
 
     // §10.5: an observing callback (`filter`, `inspect`, `inspect_err`)
@@ -29549,7 +29552,7 @@ impl Sema:
             return 0
         self.types_compatible(ref_ty as TypeId, param as TypeId)
 
-    mut fn option_combinator_return_type(recv_type: i32, recv_node: i32, method_name: &str, arg_types: &Vec[i32], arg_count: i32, default_node: i32, node: i32) -> i32:
+    mut fn option_combinator_return_type(recv_type: i32, recv_node: i32, method_name: &str, arg_types: &List[i32], arg_count: i32, default_node: i32, node: i32) -> i32:
         let elem_ty = self.get_generic_inst_arg(recv_type, 0)
         if method_name == "transpose":
             if arg_count != 0:
@@ -29629,7 +29632,7 @@ impl Sema:
                 self.emit_error("Option.zip() expects an Option argument", node)
                 return 0
             let other_elem_ty = self.get_generic_inst_arg(other_ty as i32, 0)
-            let tuple_elems: Vec[i32] = Vec.new()
+            let tuple_elems: List[i32] = List.new()
             tuple_elems.push(elem_ty)
             tuple_elems.push(other_elem_ty)
             return self.ensure_option_type_for(self.ensure_tuple_type(tuple_elems, 2) as i32)
@@ -29642,7 +29645,7 @@ impl Sema:
                 self.emit_error("Option.unzip() requires Option[(A, B)]", node)
                 return 0
             let elem_start = self.get_type_d0(elem_resolved)
-            let out_elems: Vec[i32] = Vec.new()
+            let out_elems: List[i32] = List.new()
             out_elems.push(self.ensure_option_type_for(self.type_extra[elem_start]))
             out_elems.push(self.ensure_option_type_for(self.type_extra[(elem_start + 1)]))
             return self.ensure_tuple_type(out_elems, 2) as i32
@@ -29691,7 +29694,7 @@ impl Sema:
             return recv_type
         0
 
-    mut fn result_combinator_return_type(recv_type: i32, recv_node: i32, method_name: &str, arg_types: &Vec[i32], arg_count: i32, default_node: i32, node: i32) -> i32:
+    mut fn result_combinator_return_type(recv_type: i32, recv_node: i32, method_name: &str, arg_types: &List[i32], arg_count: i32, default_node: i32, node: i32) -> i32:
         if method_name == "transpose":
             if arg_count != 0:
                 self.emit_error("Result.transpose() expects no arguments", node)
@@ -29809,17 +29812,17 @@ impl Sema:
     fn is_collection_len_method(field: i32) -> bool:
         self.collection_len_method_return_type(self.pool_resolve(field)) != 0
 
-    fn ensure_vecrange_type_for(elem_ty: i32) -> i32:
-        let existing = self.find_generic_inst(self.syms.vecrange, elem_ty)
+    fn ensure_listrange_type_for(elem_ty: i32) -> i32:
+        let existing = self.find_generic_inst(self.syms.listrange, elem_ty)
         if existing != 0:
             return existing
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(elem_ty)
-        self.ensure_generic_inst_type(self.syms.vecrange, args, 1) as i32
+        self.ensure_generic_inst_type(self.syms.listrange, args, 1) as i32
 
-    fn ensure_vecrange_pair_type_for(elem_ty: i32) -> i32:
-        let range_ty = self.ensure_vecrange_type_for(elem_ty)
-        let elems: Vec[i32] = Vec.new()
+    fn ensure_listrange_pair_type_for(elem_ty: i32) -> i32:
+        let range_ty = self.ensure_listrange_type_for(elem_ty)
+        let elems: List[i32] = List.new()
         elems.push(range_ty)
         elems.push(range_ty)
         self.ensure_tuple_type(elems, 2) as i32
@@ -29859,12 +29862,12 @@ impl Sema:
                 if self.ast.kind(base) == NodeKind.NK_IDENT: with_str_clone_ref(self.pool_resolve(self.ast.get_data0(base))) else: ""
             else:
                 ""
-        if target_name == "Vec":
+        if target_name == "List":
             if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
-                return self.ensure_vec_type_for(iter_elem_ty)
+                return self.ensure_list_type_for(iter_elem_ty)
         if target_name == "HashSet":
             if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
-                let hs_args: Vec[i32] = Vec.new()
+                let hs_args: List[i32] = List.new()
                 hs_args.push(iter_elem_ty)
                 return self.ensure_generic_inst_type(self.syms.hashset, hs_args, 1) as i32
         if target_name == "BTreeSet":
@@ -29873,7 +29876,7 @@ impl Sema:
                 if ord_trait0 != 0 and self.type_implements_trait(iter_elem_ty, ord_trait0) == 0:
                     self.emit_error("collect[BTreeSet]() element type must implement Ord", node)
                     return 0
-                let bs_args: Vec[i32] = Vec.new()
+                let bs_args: List[i32] = List.new()
                 bs_args.push(iter_elem_ty)
                 return self.ensure_generic_inst_type(self.syms.btreeset, bs_args, 1) as i32
         if target_name == "HashMap":
@@ -29883,7 +29886,7 @@ impl Sema:
                     self.emit_error("collect[HashMap]() requires iterator elements of type (K, V)", node)
                     return 0
                 let pair_start0 = self.get_type_d0(pair_resolved0)
-                let hm_args0: Vec[i32] = Vec.new()
+                let hm_args0: List[i32] = List.new()
                 hm_args0.push(self.type_extra[pair_start0])
                 hm_args0.push(self.type_extra[(pair_start0 + 1)])
                 return self.ensure_generic_inst_type(self.syms.hashmap, hm_args0, 2) as i32
@@ -29899,7 +29902,7 @@ impl Sema:
                 if ord_trait_b0 != 0 and self.type_implements_trait(key_b0, ord_trait_b0) == 0:
                     self.emit_error("collect[BTreeMap]() key type must implement Ord", node)
                     return 0
-                let bm_args0: Vec[i32] = Vec.new()
+                let bm_args0: List[i32] = List.new()
                 bm_args0.push(key_b0)
                 bm_args0.push(self.type_extra[(pair_start_b0 + 1)])
                 return self.ensure_generic_inst_type(self.syms.btreemap, bm_args0, 2) as i32
@@ -29920,10 +29923,10 @@ impl Sema:
             return 0
         let base_sym = self.get_generic_inst_base(target_resolved as i32)
         let base_name = self.pool_resolve(base_sym)
-        if base_sym == self.syms.vec:
+        if base_sym == self.syms.list:
             let elem_ty = self.get_generic_inst_arg(target_resolved as i32, 0)
             if self.types_compatible(elem_ty as TypeId, iter_elem_ty as TypeId) == 0:
-                self.emit_error("collect[Vec[T]] element type does not match iterator element type", node)
+                self.emit_error("collect[List[T]] element type does not match iterator element type", node)
                 return 0
             return target_ty
         if base_sym == self.syms.hashset:
@@ -30038,24 +30041,24 @@ impl Sema:
             if field == self.syms.count:
                 return self.ty_i64 as i32
             if field == self.syms.collect:
-                return self.ensure_vec_type_for(iter_elem_ty)
+                return self.ensure_list_type_for(iter_elem_ty)
             if field == self.syms.partition:
-                let part_vec_ty = self.ensure_vec_type_for(iter_elem_ty)
-                let part_elems: Vec[i32] = Vec.new()
-                part_elems.push(part_vec_ty)
-                part_elems.push(part_vec_ty)
+                let part_list_ty = self.ensure_list_type_for(iter_elem_ty)
+                let part_elems: List[i32] = List.new()
+                part_elems.push(part_list_ty)
+                part_elems.push(part_list_ty)
                 return self.ensure_tuple_type(part_elems, 2) as i32
             if field == self.syms.unzip:
                 let unzip_resolved = self.resolve_alias(iter_elem_ty as TypeId)
                 if self.get_type_kind(unzip_resolved) == TypeKind.TY_TUPLE and self.get_type_d1(unzip_resolved) == 2:
                     let uz_start = self.get_type_d0(unzip_resolved)
-                    let uz_elems: Vec[i32] = Vec.new()
-                    uz_elems.push(self.ensure_vec_type_for(self.type_extra[uz_start]))
-                    uz_elems.push(self.ensure_vec_type_for(self.type_extra[(uz_start + 1)]))
+                    let uz_elems: List[i32] = List.new()
+                    uz_elems.push(self.ensure_list_type_for(self.type_extra[uz_start]))
+                    uz_elems.push(self.ensure_list_type_for(self.type_extra[(uz_start + 1)]))
                     return self.ensure_tuple_type(uz_elems, 2) as i32
                 return 0
 
-        if owner_sym == self.syms.vec:
+        if owner_sym == self.syms.list:
             if field == self.syms.new or method_name == "with_capacity":
                 return self.generic_constructor_return_type(owner_sym, recv_type)
             if field == self.syms.push or field == self.syms.clear:
@@ -30107,7 +30110,7 @@ impl Sema:
                     return self.ensure_slotmapslot_type_for(elem_ty)
                 if field == self.syms.get_disjoint:
                     let slot_ty = self.ensure_slotmapslot_type_for(elem_ty)
-                    let elems: Vec[i32] = Vec.new()
+                    let elems: List[i32] = List.new()
                     elems.push(slot_ty)
                     elems.push(slot_ty)
                     return self.ensure_tuple_type(elems, 2) as i32
@@ -30162,7 +30165,7 @@ impl Sema:
                     let recv_existing = self.find_generic_inst(self.syms.option, recv_elem)
                     if recv_existing != 0:
                         return recv_existing
-                    let recv_args: Vec[i32] = Vec.new()
+                    let recv_args: List[i32] = List.new()
                     recv_args.push(recv_elem)
                     return self.ensure_generic_inst_type(self.syms.option, recv_args, 1) as i32
                 return self.ty_i32 as i32
@@ -30181,7 +30184,7 @@ impl Sema:
             if field == self.syms.to_lower or field == self.syms.to_upper or field == self.syms.lower or field == self.syms.upper or field == self.syms.replace or field == self.syms.slice or method_name == "repeat":
                 return self.ty_str as i32
             if method_name == "split":
-                return self.ensure_vec_str_type()
+                return self.ensure_list_str_type()
         if tk == TypeKind.TY_ARRAY:
             if len_method_ret != 0:
                 return len_method_ret
@@ -30299,21 +30302,21 @@ impl Sema:
         let iter_elem = self.iterator_element_type(resolved as i32)
         if iter_elem != 0:
             if (field == self.syms.map or field == self.syms.filter_map or field == self.syms.flat_map) and arg_index == 0:
-                let params: Vec[i32] = Vec.new()
+                let params: List[i32] = List.new()
                 params.push(iter_elem)
                 return self.ensure_fn_type(params, 1, 0 as TypeId) as i32
             if (field == self.syms.filter or field == self.syms.take_while or field == self.syms.drop_while or field == self.syms.partition or field == self.syms.find or field == self.syms.position or field == self.syms.any or field == self.syms.all or field == self.syms.none_pred) and arg_index == 0:
-                let params2: Vec[i32] = Vec.new()
+                let params2: List[i32] = List.new()
                 params2.push(iter_elem)
                 return self.ensure_fn_type(params2, 1, self.ty_bool) as i32
             if (field == self.syms.reduce or field == self.syms.min_by or field == self.syms.max_by) and arg_index == 0:
-                let params3: Vec[i32] = Vec.new()
+                let params3: List[i32] = List.new()
                 params3.push(iter_elem)
                 params3.push(iter_elem)
                 let ret3 = if field == self.syms.reduce: iter_elem as TypeId else: self.ty_i32
                 return self.ensure_fn_type(params3, 2, ret3) as i32
             if field == self.syms.for_each and arg_index == 0:
-                let params4: Vec[i32] = Vec.new()
+                let params4: List[i32] = List.new()
                 params4.push(iter_elem)
                 return self.ensure_fn_type(params4, 1, self.ty_void) as i32
             if (field == self.syms.take or field == self.syms.drop_items or field == self.syms.step_by) and arg_index == 0:
@@ -30324,28 +30327,28 @@ impl Sema:
                 if arg_index == 0:
                     return recv_type
                 if arg_index == 1:
-                    let params5: Vec[i32] = Vec.new()
+                    let params5: List[i32] = List.new()
                     params5.push(iter_elem)
                     params5.push(iter_elem)
                     return self.ensure_fn_type(params5, 2, 0 as TypeId) as i32
-        if owner_sym == self.syms.vec:
+        if owner_sym == self.syms.list:
             if (field == self.syms.push or field == self.syms.contains) and arg_index == 0:
                 return self.get_generic_inst_arg(resolved as i32, 0)
             // `map`/`traverse` closure parameters are the element type; push `fn(elem) -> _`
-            // as the expected arg type so the closure param is typed from the Vec's
+            // as the expected arg type so the closure param is typed from the List's
             // element instead of defaulting to i32 (#306). The closure return is
             // left to inference (ret = 0), so the mapped element type comes from the
             // closure body, not the input element.
             if (field == self.syms.map or field == self.syms.traverse) and arg_index == 0:
                 let map_elem = self.get_generic_inst_arg(resolved as i32, 0)
                 if map_elem != 0:
-                    let map_params: Vec[i32] = Vec.new()
+                    let map_params: List[i32] = List.new()
                     map_params.push(map_elem)
                     return self.ensure_fn_type(map_params, 1, 0 as TypeId) as i32
             if field == self.syms.filter and arg_index == 0:
                 let filter_elem = self.get_generic_inst_arg(resolved as i32, 0)
                 if filter_elem != 0:
-                    let filter_params: Vec[i32] = Vec.new()
+                    let filter_params: List[i32] = List.new()
                     filter_params.push(filter_elem)
                     return self.ensure_fn_type(filter_params, 1, self.ty_bool) as i32
         if owner_sym == self.syms.hashset:
@@ -30361,16 +30364,16 @@ impl Sema:
                 if arg_index == 1:
                     return update_value_ty
                 if arg_index == 2:
-                    let update_params: Vec[i32] = Vec.new()
+                    let update_params: List[i32] = List.new()
                     update_params.push(update_value_ty)
                     return self.ensure_fn_type(update_params, 1, update_value_ty as TypeId) as i32
         // #669: storing methods (mirror method_arg_stores_value) must publish the
         // stored element type, or a contextual enum arg (`slot.set(Some(x))`)
         // never learns its enum and codegen has no aggregate destination.
-        if owner_sym == self.syms.vecslot or owner_sym == self.syms.slotmapslot:
+        if owner_sym == self.syms.listslot or owner_sym == self.syms.slotmapslot:
             if method_name == "set" and arg_index == 0:
                 return self.get_generic_inst_arg(resolved as i32, 0)
-        if owner_sym == self.syms.vecrange:
+        if owner_sym == self.syms.listrange:
             if method_name == "set" and arg_index == 1:
                 return self.get_generic_inst_arg(resolved as i32, 0)
         if owner_sym == self.syms.hashmapentry:
@@ -30402,12 +30405,12 @@ impl Sema:
                 return self.ty_str as i32
             if (field == self.syms.map or method_name == "and_then") and arg_index == 0:
                 let option_elem = self.get_generic_inst_arg(resolved as i32, 0)
-                let params: Vec[i32] = Vec.new()
+                let params: List[i32] = List.new()
                 params.push(option_elem)
                 return self.ensure_fn_type(params, 1, 0 as TypeId) as i32
             if (method_name == "or_else" or method_name == "unwrap_or_else") and arg_index == 0:
                 let option_elem3 = self.get_generic_inst_arg(resolved as i32, 0)
-                let params3: Vec[i32] = Vec.new()
+                let params3: List[i32] = List.new()
                 // unwrap_or_else's fallback result is a join input, not a value
                 // required to equal the payload. Preserve its inferred return;
                 // the shared D22 resolver decides the result after checking it.
@@ -30419,13 +30422,13 @@ impl Sema:
             // bool`); the payload moves once, into the kept `Some` (#1379).
             if field == self.syms.filter and arg_index == 0:
                 let option_elem2 = self.get_generic_inst_arg(resolved as i32, 0)
-                let params2: Vec[i32] = Vec.new()
+                let params2: List[i32] = List.new()
                 params2.push(self.ensure_exact_type(TypeKind.TY_REF, option_elem2, 0, 0) as i32)
                 return self.ensure_fn_type(params2, 1, self.ty_bool) as i32
             if method_name == "inspect" and arg_index == 0:
                 let option_elem4 = self.get_generic_inst_arg(resolved as i32, 0)
                 let option_elem_ref = self.ensure_exact_type(TypeKind.TY_REF, option_elem4, 0, 0) as i32
-                let params4: Vec[i32] = Vec.new()
+                let params4: List[i32] = List.new()
                 params4.push(option_elem_ref)
                 return self.ensure_fn_type(params4, 1, self.ty_void) as i32
         if owner_sym == self.syms.result:
@@ -30433,13 +30436,13 @@ impl Sema:
                 return self.ty_str as i32
             if (field == self.syms.map or method_name == "map_err") and arg_index == 0:
                 let result_arg = if field == self.syms.map: self.get_generic_inst_arg(resolved as i32, 0) else: self.get_generic_inst_arg(resolved as i32, 1)
-                let result_params: Vec[i32] = Vec.new()
+                let result_params: List[i32] = List.new()
                 result_params.push(result_arg)
                 return self.ensure_fn_type(result_params, 1, 0 as TypeId) as i32
             if (method_name == "and_then" or method_name == "or_else" or method_name == "unwrap_or_else") and arg_index == 0:
                 let result_ok = self.get_generic_inst_arg(resolved as i32, 0)
                 let result_err = self.get_generic_inst_arg(resolved as i32, 1)
-                let result_params2: Vec[i32] = Vec.new()
+                let result_params2: List[i32] = List.new()
                 result_params2.push(if method_name == "or_else" or method_name == "unwrap_or_else": result_err else: result_ok)
                 let result_ret = 0
                 return self.ensure_fn_type(result_params2, 1, result_ret as TypeId) as i32
@@ -30448,13 +30451,13 @@ impl Sema:
                 let result_err2 = self.get_generic_inst_arg(resolved as i32, 1)
                 let inspect_payload = if method_name == "inspect_err": result_err2 else: result_ok2
                 let inspect_ref = self.ensure_exact_type(TypeKind.TY_REF, inspect_payload, 0, 0) as i32
-                let inspect_params: Vec[i32] = Vec.new()
+                let inspect_params: List[i32] = List.new()
                 inspect_params.push(inspect_ref)
                 return self.ensure_fn_type(inspect_params, 1, self.ty_void) as i32
             if method_name == "context" and arg_index == 0:
                 return self.ty_str as i32
             if method_name == "with_context" and arg_index == 0:
-                let context_params: Vec[i32] = Vec.new()
+                let context_params: List[i32] = List.new()
                 return self.ensure_fn_type(context_params, 0, self.ty_str) as i32
         if (owner_sym == self.syms.option or owner_sym == self.syms.result) and method_name == "unwrap_or" and arg_index == 0:
             // The direct fallback is likewise a join input. Giving it the
@@ -30565,10 +30568,10 @@ impl Sema:
         let value_carries = value_ty <= 0 or self.type_can_carry_view(value_ty) or self.expr_is_ephemeral_task(value) != 0 or self.expr_is_ephemeral_value(value) != 0
         if not value_carries and not self.type_can_carry_view(slot_ty):
             return
-        var value_deps: Vec[i32] = Vec.new()
+        var value_deps: List[i32] = List.new()
         value_deps = self.collect_expr_view_deps(value, move value_deps)
         // §3.8 auto-referencing: a plain place reaching a `&T` slot
-        // (`h.keep(n)`, `h.v.push(n)` into `Vec[&i32]`) stores `&n`, so the
+        // (`h.keep(n)`, `h.v.push(n)` into `List[&i32]`) stores `&n`, so the
         // place's storage is an origin, as `&n` spelled out would be.
         if not value_carries and slot_ty > 0 and self.get_type_kind(self.resolve_alias(slot_ty as TypeId)) == TypeKind.TY_REF:
             let place_root = self.ref_storage_root_sym(value)
@@ -30594,7 +30597,7 @@ impl Sema:
     //   whose bindings the reference's own deps name.
     // Inside a closure body the parameter frame is the capture frame, so a
     // captured root is storage the body reaches, never a receiver.
-    mut fn note_view_store_into_root(root: i32, value_deps: Vec[i32], value_mask: i32, value_ty: i32, node: i32, how: &str):
+    mut fn note_view_store_into_root(root: i32, value_deps: List[i32], value_mask: i32, value_ty: i32, node: i32, how: &str):
         if value_deps.len() == 0 and value_mask == 0:
             return
         let root_pi = if self.closure_body_depth == 0: self.param_index_for_sym(root) else: -1
@@ -30644,7 +30647,7 @@ impl Sema:
             if escaping != 0:
                 self.emit_view_store_escape(root, escaping, value_ty, node, how, true)
             return
-        var storage: Vec[i32] = Vec.new()
+        var storage: List[i32] = List.new()
         storage.push(root)
         if root_is_ref:
             for di in 0..self.binding_view_dep_count(root):
@@ -30653,13 +30656,13 @@ impl Sema:
                     storage = self.push_unique_i32(move storage, d)
         for si in 0..storage.len() as i32:
             // A view of the storage's own binding adds nothing to it.
-            let others: Vec[i32] = Vec.new()
+            let others: List[i32] = List.new()
             for vi in 0..value_deps.len() as i32:
                 if value_deps[vi] != storage[si]: others.push(value_deps[vi])
             if others.len() > 0 or value_mask != 0:
                 self.add_binding_view_deps(storage[si], value_mask, others)
                 // Rule 7 (§22.1): storage holding a view is ephemeral as a
-                // value, whatever its type says (`Vec[fn() -> i32]`
+                // value, whatever its type says (`List[fn() -> i32]`
                 // holding a non-move closure), so its escapes are checked.
                 self.scope_set_is_ephemeral_value(storage[si], 1)
 
@@ -30910,7 +30913,7 @@ impl Sema:
                 return 1
         0
 
-    mut fn check_dyn_trait_method_call(trait_sym: i32, method_sym: i32, receiver_type: i32, receiver_expr: i32, arg_types: &Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
+    mut fn check_dyn_trait_method_call(trait_sym: i32, method_sym: i32, receiver_type: i32, receiver_expr: i32, arg_types: &List[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
         let info = self.find_dyn_trait_method_info(trait_sym, method_sym)
         if info.ok == 0:
             self.emit_error("unknown method '" ++ self.pool_resolve(method_sym) ++ "' for dyn trait '" ++ self.pool_resolve(trait_sym) ++ "'", node)
@@ -30958,8 +30961,8 @@ impl Sema:
             return 0
         // #1827: a call through the vtable runs one of the method's impls —
         // any of them in this compilation (global_dispatcher).
-        let dyn_args: Vec[i32] = Vec.new()
-        let dyn_by_place: Vec[bool] = Vec.new()
+        let dyn_args: List[i32] = List.new()
+        let dyn_by_place: List[bool] = List.new()
         for dai in 0..arg_count:
             dyn_args.push(self.ast.get_extra(extra_start + dai))
             let dyn_param_node = if dai + 1 < info.param_count: self.ast.fn_param_type(info.param_start, dai + 1) else: 0
@@ -31037,7 +31040,7 @@ impl Sema:
                 self.note_place_effect(expr, EFF_CONSUME)
                 self.mark_moved_if_consumed(expr)
 
-    mut fn check_concrete_trait_method_call(recv_type: i32, method_sym: i32, arg_types: &Vec[i32], extra_start: i32, arg_count: i32, node: i32, expr: i32, has_resolved_args: i32) -> i32:
+    mut fn check_concrete_trait_method_call(recv_type: i32, method_sym: i32, arg_types: &List[i32], extra_start: i32, arg_count: i32, node: i32, expr: i32, has_resolved_args: i32) -> i32:
         if recv_type == 0:
             return 0
         if self.any_trait_method_named(method_sym) == 0:
@@ -31046,8 +31049,8 @@ impl Sema:
         var found_impl = 0
         var found_fn = 0
         var found_info = sema_dyn_trait_method_missing()
-        let found_subst_names: Vec[i32] = Vec.new()
-        let found_subst_types: Vec[i32] = Vec.new()
+        let found_subst_names: List[i32] = List.new()
+        let found_subst_types: List[i32] = List.new()
 
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
@@ -31159,8 +31162,8 @@ impl Sema:
         1
 
     mut fn substitute_method_return_for_generic_inst(gi_tid: i32, type_sym: i32, method_sym: i32, method_fn_sym: i32, sig_ret: i32) -> i32:
-        let saved_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_subst_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_subst_tys = sema_clone_i32_list(&self.generic_subst_type_ids)
         var out = 0
         // Set up type param → concrete arg substitution
         if self.setup_generic_inst_substitution(gi_tid, type_sym) != 0:
@@ -31197,10 +31200,10 @@ impl Sema:
     // is small and corresponds to types whose methods are intercepted by the
     // builtin codegen path (see `if field == self.syms.iter` in check_method_call).
     fn builtin_method_is_iter_of_self(type_name_sym: i32, field: i32) -> i32:
-        if type_name_sym == self.syms.vec:
+        if type_name_sym == self.syms.list:
             if field == self.syms.iter or field == self.syms.keys or field == self.syms.iter_place or field == self.syms.iter_ref or field == self.syms.range_method or field == self.syms.split_at or field == self.syms.split_at_mut:
                 return 1
-        if type_name_sym == self.syms.vecrange:
+        if type_name_sym == self.syms.listrange:
             if field == self.syms.split_at or field == self.syms.split_at_mut:
                 return 1
         0
@@ -31210,12 +31213,12 @@ impl Sema:
     // ownership-critical: Mut retains the caller's place, while Move consumes
     // it. Keep predicates and independently-cloning operations read-only.
     fn builtin_method_receiver_mode(type_name_sym: i32, field: i32) -> ReceiverMode:
-        if type_name_sym == self.syms.vec:
+        if type_name_sym == self.syms.list:
             if field == self.syms.split_at_mut:
                 return ReceiverMode.Mut
             if field == self.syms.push or field == self.syms.remove or field == self.syms.clear or field == self.syms.pop:
                 return ReceiverMode.Mut
-        if type_name_sym == self.syms.vecrange:
+        if type_name_sym == self.syms.listrange:
             if field == self.syms.split_at_mut:
                 return ReceiverMode.Mut
         if type_name_sym == self.syms.hashmap:
@@ -31379,7 +31382,7 @@ impl Sema:
             if default_node != 0:
                 resolved_map.insert(pi, default_node)
                 resolved_defaults.insert(pi, 1)
-        var final_args: Vec[i32] = Vec.new()
+        var final_args: List[i32] = List.new()
         for pi in param_offset..param_count:
             if not resolved_map.contains(pi):
                 if fn_param_is_implicit(self.ast.fn_param_flags(ps, pi)) != 0:
@@ -31466,7 +31469,7 @@ impl Sema:
         // arguments stand, and check_call_arity reports the count.
         if filled == 0 or (missing_required and missing_implicit < 0):
             return arg_count
-        let final_args: Vec[i32] = Vec.new()
+        let final_args: List[i32] = List.new()
         for pi3 in param_offset..param_count:
             if resolved_map.contains(pi3):
                 final_args.push(resolved_map.get(pi3).unwrap())
@@ -31507,31 +31510,31 @@ impl Sema:
         let expr = expr0
         var field = field0
         var known_recv_ty = known_recv_ty0
-        // #2145 (§2.3, §13.1: "Vec[i32]'s iterator yields &i32"): `v.iter()`
+        // #2145 (§2.3, §13.1: "List[i32]'s iterator yields &i32"): `v.iter()`
         // on a vector whose elements own something is the view iterator.
-        // The by-value `VecIter[T]` handed each element out as a byte copy,
+        // The by-value `ListIter[T]` handed each element out as a byte copy,
         // a second owner, and every `.iter() |> filter/map/collect` over a
-        // `Vec[str]` double-freed. A Copy element keeps the by-value
+        // `List[str]` double-freed. A Copy element keeps the by-value
         // iterator until D22's contextual Copy reaches pipelines, and a
         // loop's own iterable is the loop's to lower (it binds views).
         if field == self.syms.iter and arg_count == 0 and node != self.loop_iterable_node and self.static_receiver_type_is_known(expr) == 0:
             if known_recv_ty == 0: known_recv_ty = self.check_expr(expr) as i32
-            let vec_ty = if known_recv_ty != 0: self.auto_deref_ref_ptr_type(self.resolve_alias(known_recv_ty as TypeId)) as i32 else: 0
+            let list_ty = if known_recv_ty != 0: self.auto_deref_ref_ptr_type(self.resolve_alias(known_recv_ty as TypeId)) as i32 else: 0
             // Where the by-value iterator is what is asked for (std's own
-            // `Iterable.iter`, declared `-> VecIter[T]`), it is what is made.
+            // `Iterable.iter`, declared `-> ListIter[T]`), it is what is made.
             let wanted = if self.has_expected_type != 0 and self.expected_expr_type != 0: self.resolve_alias(self.expected_expr_type) as i32 else: 0
-            let wants_by_value = wanted != 0 and self.get_type_kind(wanted as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(wanted) == self.syms.veciter
-            if not wants_by_value and vec_ty != 0 and self.std_generic_of(vec_ty) == StdGeneric.Vec and not self.copy_is_bits(self.get_generic_inst_arg(vec_ty, 0)):
+            let wants_by_value = wanted != 0 and self.get_type_kind(wanted as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(wanted) == self.syms.listiter
+            if not wants_by_value and list_ty != 0 and self.std_generic_of(list_ty) == StdGeneric.Sequence and not self.copy_is_bits(self.get_generic_inst_arg(list_ty, 0)):
                 field = self.syms.iter_ref
         let ret = self.check_method_call_parts_inner(expr, field, extra_start, arg_count, node, known_recv_ty)
         // §15.3: `next()` advances the iterator, so it needs a place. The
         // view iterator's `next` is a builtin with no declaration to carry
-        // `mut fn`; `VecIter.next` gets the same rule through its trait
+        // `mut fn`; `ListIter.next` gets the same rule through its trait
         // (check_trait_receiver_mode).
         if field == self.syms.next and ret != 0 and self.ast.kind(node) != NodeKind.NK_PIPELINE:
             let stepped: i32 = self.typed_expr_types.get(expr) ?? 0
             let stepped_ty = if stepped != 0: self.resolve_alias(stepped as TypeId) as i32 else: 0
-            if stepped_ty != 0 and self.get_type_kind(stepped_ty as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(stepped_ty) == self.syms.veciterref and unpack_place_kind(self.classify_place(expr)) == PlaceKind.PK_NotPlace:
+            if stepped_ty != 0 and self.get_type_kind(stepped_ty as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(stepped_ty) == self.syms.listiterref and unpack_place_kind(self.classify_place(expr)) == PlaceKind.PK_NotPlace:
                 self.emit_error("mutating method requires a place receiver (§15.3)", node)
         // D93: a method called on the binding of an empty literal, which has
         // no type until a use gives it one (`var xs = []`, `xs.push(1)`).
@@ -31569,17 +31572,17 @@ impl Sema:
                     self.check_map_key(self.get_generic_inst_arg(map_ty, 0), node)
                     self.note_structural_equality(self.get_generic_inst_arg(map_ty, 0), node)
         // `v.contains(x)` and `x in v` compare each element with `x` (#2137).
-        if intrinsic == MirIntrinsic.VEC_CONTAINS and recv > 0:
-            let vec_ty = self.auto_deref_ref_ptr_type(self.resolve_alias(recv as TypeId)) as i32
-            if self.get_type_kind(vec_ty as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(vec_ty) == 1:
-                self.note_structural_equality(self.get_generic_inst_arg(vec_ty, 0), node)
+        if intrinsic == MirIntrinsic.LIST_CONTAINS and recv > 0:
+            let list_ty = self.auto_deref_ref_ptr_type(self.resolve_alias(recv as TypeId)) as i32
+            if self.get_type_kind(list_ty as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(list_ty) == 1:
+                self.note_structural_equality(self.get_generic_inst_arg(list_ty, 0), node)
         if lowering == MethodLowering.IsEmptyViaLen:
             intrinsic = self.builtin_method_intrinsic(recv, "len")
-        // A builtin constructor on a written type (`Vec[str].new()`, the
+        // A builtin constructor on a written type (`List[str].new()`, the
         // receiver a type node as comptime freezing and derive build it) has
         // that type: MirLower reads the call's type here, never the name.
         var constructed = 0
-        let is_constructor = intrinsic == MirIntrinsic.VEC_NEW or intrinsic == MirIntrinsic.FIXED_STRING_NEW or intrinsic == MirIntrinsic.VEC_WITH_CAPACITY or intrinsic == MirIntrinsic.MAP_NEW or intrinsic == MirIntrinsic.SLOTMAP_NEW
+        let is_constructor = intrinsic == MirIntrinsic.LIST_NEW or intrinsic == MirIntrinsic.FIXED_STRING_NEW or intrinsic == MirIntrinsic.LIST_WITH_CAPACITY or intrinsic == MirIntrinsic.MAP_NEW or intrinsic == MirIntrinsic.SLOTMAP_NEW
         if is_constructor and recv > 0:
             let named = self.resolve_alias(recv as TypeId)
             let have: i32 = self.typed_expr_types.get(node) ?? 0
@@ -31596,7 +31599,7 @@ impl Sema:
 
     // D65 phase 5 (#2043): the receiver type a method call's lowering is
     // decided on: the receiver expression's type, a static receiver's named
-    // type (`Vec.new()`), or the call's own result when the receiver names
+    // type (`List.new()`), or the call's own result when the receiver names
     // it, through the references and user derefs the method resolves over.
     // `raw` is the same before that auto-deref.
     mut fn method_lowering_raw_recv_type(expr: i32, ret: i32, known_recv_ty: i32) -> i32:
@@ -31696,9 +31699,9 @@ impl Sema:
         if name == "transpose":
             if is_option: return MethodLowering.OptTranspose
             if is_result: return MethodLowering.ResTranspose
-        if base != 0 and base == self.syms.vec:
-            if name == "sequence": return MethodLowering.VecSequence
-            if name == "traverse": return MethodLowering.VecTraverse
+        if base != 0 and base == self.syms.list:
+            if name == "sequence": return MethodLowering.ListSequence
+            if name == "traverse": return MethodLowering.ListTraverse
         if name == "new" and (self.base_sym_is_btree(self.static_receiver_sema_base(expr)) or self.base_sym_is_btree(base)):
             return MethodLowering.BTreeNew
         if is_option or is_result:
@@ -31731,7 +31734,7 @@ impl Sema:
     fn std_generic_of_base(base: i32, tid: i32) -> StdGeneric:
         if base == 0:
             return StdGeneric.None
-        if base == self.syms.vec: return StdGeneric.Vec
+        if base == self.syms.list: return StdGeneric.Sequence
         if base == self.syms.hashmap: return StdGeneric.HashMap
         if base == self.syms.hashset: return StdGeneric.HashSet
         if base == self.syms.option: return StdGeneric.Option
@@ -31844,8 +31847,8 @@ impl Sema:
                 return 0
             if self.require_std_tier_for_symbol(static_type_sym, expr) == 0:
                 return 0
-        if static_type_sym != 0 and self.is_pending_generic_collection_base(static_type_sym) != 0 and (field == self.syms.new or (static_type_sym == self.syms.vec and early_method_name == "with_capacity")):
-            self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
+        if static_type_sym != 0 and self.is_pending_generic_collection_base(static_type_sym) != 0 and (field == self.syms.new or (static_type_sym == self.syms.list and early_method_name == "with_capacity")):
+            self.note_allocation_site(node, AllocConstructKind.LIST_NEW, 0, 0)
         obj_type = self.adjust_static_receiver_type(expr, obj_type as i32)
         // §13.3 (#1746): an adapter on any Iter[T] implementor is std.traits'
         // free fn of that name over the trait, the receiver first — decided
@@ -31895,7 +31898,7 @@ impl Sema:
             if expected_variant_ty != 0: expected_variant_ty else: obj_type as i32
         else:
             0
-        let mc_static_variant_payload_tys = if mc_is_static_enum_variant: self.enum_variant_payload_types(mc_static_variant_result_ty, field) else: Vec.new()
+        let mc_static_variant_payload_tys = if mc_is_static_enum_variant: self.enum_variant_payload_types(mc_static_variant_result_ty, field) else: List.new()
 
         // Check all arguments (with expected-type propagation for Atomic ordering params)
         // Also applies method and static enum variant payload expected types.
@@ -31905,9 +31908,9 @@ impl Sema:
         let mc_method_fn_for_resolution = if mc_owner_sym_for_effect != 0: self.lookup_method_fn(mc_owner_sym_for_effect, field) else: 0
         self.trace_method_resolution(node, obj_type as i32, mc_owner_sym_for_effect, field, mc_sig_idx_for_effect, mc_method_fn_for_resolution)
         if mc_method_fn_for_resolution != 0: self.check_method_visible(mc_method_fn_for_resolution, node)
-        let arg_types: Vec[i32] = Vec.new()
+        let arg_types: List[i32] = List.new()
         // docs/completed/mut.md Rev 8 §15.8 — see check_call.
-        let mc_iter_borrow_idxs: Vec[i32] = Vec.new()
+        let mc_iter_borrow_idxs: List[i32] = List.new()
         let mc_param_offset_for_resolution = if self.static_receiver_type_is_known(expr) != 0: 0 else: 1
         // #2002: a generic method has no signature; its declaration supplies the defaults.
         let mc_default_fn = if mc_owner_sym_for_effect != 0 and mc_sig_idx_for_effect < 0: self.lookup_generic_method_fn(mc_owner_sym_for_effect, field) else: mc_method_fn_for_resolution
@@ -31966,20 +31969,20 @@ impl Sema:
                 mc_expected = self.static_generic_method_expected_arg_type(obj_type as i32, field, ai)
             if mc_expected == 0 and field == self.syms.spawn_method and ai == 0:
                 if self.ast.kind(expr) == NodeKind.NK_IDENT and self.is_active_sync_scope_symbol(self.ast.get_data0(expr)) != 0:
-                    let spawn_params: Vec[i32] = Vec.new()
+                    let spawn_params: List[i32] = List.new()
                     mc_expected = self.ensure_fn_type(spawn_params, 0, self.ty_i32) as i32
             if mc_expected == 0 and field == self.syms.fold and ai == 1 and arg_types.len() > 0:
                 let fold_elem = if self.iterator_element_type(obj_type as i32) != 0:
                     self.iterator_element_type(obj_type as i32)
                 else:
                     let fold_resolved = self.resolve_alias(obj_type)
-                    if self.get_type_kind(fold_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(fold_resolved as i32) == self.syms.vec:
+                    if self.get_type_kind(fold_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(fold_resolved as i32) == self.syms.list:
                         self.get_generic_inst_arg(fold_resolved as i32, 0)
                     else:
                         0
                 let fold_acc = arg_types[0]
                 if fold_elem != 0 and fold_acc != 0:
-                    let fold_params: Vec[i32] = Vec.new()
+                    let fold_params: List[i32] = List.new()
                     fold_params.push(fold_acc)
                     fold_params.push(fold_elem)
                     mc_expected = self.ensure_fn_type(fold_params, 2, fold_acc as TypeId) as i32
@@ -32122,7 +32125,7 @@ impl Sema:
             if self.expr_is_task_value(task_arg) == 0:
                 self.emit_error("track() requires a Task value", task_arg)
             let task_ty = arg_types[0]
-            let scoped_args: Vec[i32] = Vec.new()
+            let scoped_args: List[i32] = List.new()
             scoped_args.push(self.unwrap_task_type(task_ty as TypeId) as i32)
             self.call_builtins.insert(node, CallBuiltin.ScopeTrack as i32)
             return self.ensure_generic_inst_type(self.syms.scoped_task, scoped_args, 1) as i32
@@ -32229,7 +32232,7 @@ impl Sema:
             if self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0:
                 // D27: `xs[i]` denotes the element place, so a mutating method on
                 // it mutates the element where it is. The element reads as a view
-                // (`&Vec[T]` for `rows[i]`), which is not a read-only receiver
+                // (`&List[T]` for `rows[i]`), which is not a read-only receiver
                 // when the vector it indexes is a place the program may mutate.
                 var element_place = false
                 var indexed = expr
@@ -32360,7 +32363,7 @@ impl Sema:
                     mc_static_variant_ty = inferred_variant_ty
             let payload_tys = if mc_static_variant_ty != mc_static_variant_result_ty: self.enum_variant_payload_types(mc_static_variant_ty, field) else: mc_static_variant_payload_tys
             let expected = payload_tys.len() as i32
-            let static_payload_nodes: Vec[i32] = Vec.new()
+            let static_payload_nodes: List[i32] = List.new()
             if mc_resolved_arg_count != expected:
                 let owner_name = self.type_name(obj_type)
                 let variant_name: str = self.pool_resolve(field)
@@ -32413,7 +32416,7 @@ impl Sema:
                 // §4.4a: `Type.from_int(n)` is an `Option[Type]` —
                 // `Color.from_int(2)` is `Some(Color.Green)` (#1453: it was
                 // typed the repr's Option).
-                let opt_args: Vec[i32] = Vec.new()
+                let opt_args: List[i32] = List.new()
                 opt_args.push(enum_resolved as i32)
                 let opt_ty = self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
                 self.typed_expr_types.insert(node, opt_ty)
@@ -32518,11 +32521,11 @@ impl Sema:
                     // #604 stage 1 applies to a method's arguments as to a
                     // free call's (D64 found the gap: `n.read(buf)` over a
                     // `[]mut u8` refused the array a free `fill(buf)`
-                    // accepted): a Vec/array argument coerces to a []T /
+                    // accepted): a List/array argument coerces to a []T /
                     // []mut T parameter, the `[]mut` ones under the
                     // call-local exclusivity pass.
-                    let mc_sc_mut_args: Vec[i32] = Vec.new()
-                    let mc_sc_all_args: Vec[i32] = Vec.new()
+                    let mc_sc_mut_args: List[i32] = List.new()
+                    let mc_sc_all_args: List[i32] = List.new()
                     for mc_pai in 0..mc_resolved_arg_count:
                         let mc_plain_pi = mc_pai + mc_plain_poff
                         if mc_plain_pi >= mc_plain_pc:
@@ -32547,8 +32550,8 @@ impl Sema:
                 if mc_resolved_tk == TypeKind.TY_GENERIC_INST:
                     // Check argument types against substituted parameter types
                     let mc_method_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
-                    let saved_mc_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-                    let saved_mc_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+                    let saved_mc_subst_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+                    let saved_mc_subst_tys = sema_clone_i32_list(&self.generic_subst_type_ids)
                     if self.setup_generic_inst_substitution(recv_type, type_name_sym) != 0:
                         let mc_subst_count = self.generic_subst_param_syms.len() as i32
                         // Check argument types via substitute_type on stored sig param types
@@ -32608,14 +32611,14 @@ impl Sema:
                 if arg_count != 0:
                     self.emit_error("FixedString.new() expects no arguments", node)
                 return recv_type as i32
-            if (type_name_sym == self.syms.vec or type_name_sym == self.syms.hashmap or type_name_sym == self.syms.hashset or type_name_sym == self.syms.btreemap or type_name_sym == self.syms.btreeset or type_name_sym == self.syms.slotmap or self.pool_resolve(type_name_sym) == "Atomic") and field == self.syms.new:
-                self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
+            if (type_name_sym == self.syms.list or type_name_sym == self.syms.hashmap or type_name_sym == self.syms.hashset or type_name_sym == self.syms.btreemap or type_name_sym == self.syms.btreeset or type_name_sym == self.syms.slotmap or self.pool_resolve(type_name_sym) == "Atomic") and field == self.syms.new:
+                self.note_allocation_site(node, AllocConstructKind.LIST_NEW, 0, 0)
                 return recv_type as i32
-            if type_name_sym == self.syms.vec and mc_method_name_raw == "with_capacity":
-                self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
+            if type_name_sym == self.syms.list and mc_method_name_raw == "with_capacity":
+                self.note_allocation_site(node, AllocConstructKind.LIST_NEW, 0, 0)
                 return recv_type as i32
             if field == self.syms.push:
-                // Vec.push(value: T) / HashSet.insert(value: T) — arg[0] must be T
+                // List.push(value: T) / HashSet.insert(value: T) — arg[0] must be T
                 if arg_count >= 1:
                     let elem_ty = self.get_generic_inst_arg(recv_type, 0)
                     let a0_ty = arg_types[0]
@@ -32633,14 +32636,14 @@ impl Sema:
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, key_ty, a0_ty, self.ast.get_extra(extra_start))
                     if val_ty != 0 and a1_ty != 0:
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 1, val_ty, a1_ty, self.ast.get_extra(extra_start + 1))
-            else if type_name_sym == self.syms.vec and (field == self.syms.get or field == self.syms.remove):
-                // Vec.get(index) / Vec.remove(index) — arg[0] must be integer-ish
+            else if type_name_sym == self.syms.list and (field == self.syms.get or field == self.syms.remove):
+                // List.get(index) / List.remove(index) — arg[0] must be integer-ish
                 if arg_count >= 1:
                     let a0_ty = arg_types[0]
                     if a0_ty != 0:
                         let index_ty = self.ty_i64 as i32
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, index_ty, a0_ty, self.ast.get_extra(extra_start))
-            else if (type_name_sym == self.syms.vec or type_name_sym == self.syms.vecrange) and (field == self.syms.split_at or field == self.syms.split_at_mut):
+            else if (type_name_sym == self.syms.list or type_name_sym == self.syms.listrange) and (field == self.syms.split_at or field == self.syms.split_at_mut):
                 if arg_count != 1:
                     self.emit_error(mc_method_name_raw ++ "() expects exactly one index argument", node)
                 else:
@@ -32648,8 +32651,8 @@ impl Sema:
                     if split_arg_ty != 0:
                         let split_index_ty = self.ty_i64 as i32
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, split_index_ty, split_arg_ty, self.ast.get_extra(extra_start))
-            else if type_name_sym == self.syms.vec and field == self.syms.range_method:
-                // Vec.range(r: Range): the one argument is a range. Two
+            else if type_name_sym == self.syms.list and field == self.syms.range_method:
+                // List.range(r: Range): the one argument is a range. Two
                 // integers passed Sema and the VEC_RANGE lowering read a
                 // Range field off an i64, crashing the compiler at build
                 // (#1954).
@@ -32659,15 +32662,15 @@ impl Sema:
                     let range_arg_ty = arg_types[0]
                     if range_arg_ty != 0 and self.get_type_kind(self.resolve_alias(range_arg_ty as TypeId)) != TypeKind.TY_RANGE:
                         self.emit_error("range() expects a range argument, `v.range(start..end)`, found " ++ self.type_name(range_arg_ty), self.ast.get_extra(extra_start))
-            else if type_name_sym == self.syms.vec and field == self.syms.join:
-                // Vec.join(sep: &str) concatenates str elements. Any other
+            else if type_name_sym == self.syms.list and field == self.syms.join:
+                // List.join(sep: &str) concatenates str elements. Any other
                 // element was read as a str's {ptr, len} at run time: a
-                // Vec[i32] printed nothing or crashed in memcpy.
+                // List[i32] printed nothing or crashed in memcpy.
                 let join_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                 if join_elem_ty != 0 and self.get_type_kind(self.auto_deref_ref_ptr_type(self.resolve_alias(join_elem_ty as TypeId))) != TypeKind.TY_STR and self.type_has_unresolved_parts(join_elem_ty) == 0:
-                    self.emit_error(f"Vec.join joins str elements, and this Vec holds `{self.type_name(join_elem_ty)}`; turn each element into text first: `v.iter() |> map(f\"\{it\}\") |> collect[Vec]()`", node)
-            else if type_name_sym == self.syms.vec and field == self.syms.contains:
-                // D22: Vec.contains(value: &T) observes — arg[0] is &T; an
+                    self.emit_error(f"List.join joins str elements, and this List holds `{self.type_name(join_elem_ty)}`; turn each element into text first: `v.iter() |> map(f\"\{it\}\") |> collect[List]()`", node)
+            else if type_name_sym == self.syms.list and field == self.syms.contains:
+                // D22: List.contains(value: &T) observes — arg[0] is &T; an
                 // owned argument auto-refs at the call site.
                 if arg_count >= 1:
                     let elem_ty = self.get_generic_inst_arg(recv_type, 0)
@@ -32774,7 +32777,7 @@ impl Sema:
                     return self.ty_void as i32
                 if mc_method_name_raw == "as_view":
                     return self.ty_str as i32
-            if type_name_sym == self.syms.vec:
+            if type_name_sym == self.syms.list:
                 if field == self.syms.push:
                     return self.ty_void as i32
                 if field == self.syms.clear:
@@ -32783,7 +32786,7 @@ impl Sema:
                     // D71 (§ Element access): a positional collection has no
                     // `get`; `xs[i]` is the one spelling. The call still types
                     // as the element view so checking continues past the error.
-                    self.emit_error("Vec has no 'get': element access is spelled 'xs[i]' (§ Element access, D71)", node)
+                    self.emit_error("List has no 'get': element access is spelled 'xs[i]' (§ Element access, D71)", node)
                     self.record_builtin_receiver_view_origins(node, expr)
                     return self.ensure_exact_type(TypeKind.TY_REF, self.get_generic_inst_arg(recv_type, 0), 0, 0) as i32
                 if field == self.syms.remove:
@@ -32798,52 +32801,52 @@ impl Sema:
                     return self.ty_str as i32
                 if field == self.syms.iter:
                     let iter_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let iter_tid = self.find_generic_inst(self.syms.veciter, iter_elem_ty)
+                    let iter_tid = self.find_generic_inst(self.syms.listiter, iter_elem_ty)
                     if iter_tid != 0:
                         return iter_tid
-                    let iter_args: Vec[i32] = Vec.new()
+                    let iter_args: List[i32] = List.new()
                     iter_args.push(iter_elem_ty)
-                    return self.ensure_generic_inst_type(self.syms.veciter, iter_args, 1) as i32
+                    return self.ensure_generic_inst_type(self.syms.listiter, iter_args, 1) as i32
                 if field == self.syms.slot:
                     let slot_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let slot_tid = self.find_generic_inst(self.syms.vecslot, slot_elem_ty)
+                    let slot_tid = self.find_generic_inst(self.syms.listslot, slot_elem_ty)
                     if slot_tid != 0:
                         return slot_tid
-                    let slot_args: Vec[i32] = Vec.new()
+                    let slot_args: List[i32] = List.new()
                     slot_args.push(slot_elem_ty)
-                    return self.ensure_generic_inst_type(self.syms.vecslot, slot_args, 1) as i32
+                    return self.ensure_generic_inst_type(self.syms.listslot, slot_args, 1) as i32
                 if field == self.syms.get_disjoint:
                     let gd_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    var gd_slot_tid = self.find_generic_inst(self.syms.vecslot, gd_elem_ty)
+                    var gd_slot_tid = self.find_generic_inst(self.syms.listslot, gd_elem_ty)
                     if gd_slot_tid == 0:
-                        let gd_args: Vec[i32] = Vec.new()
+                        let gd_args: List[i32] = List.new()
                         gd_args.push(gd_elem_ty)
-                        gd_slot_tid = self.ensure_generic_inst_type(self.syms.vecslot, gd_args, 1) as i32
-                    let gd_elems: Vec[i32] = Vec.new()
+                        gd_slot_tid = self.ensure_generic_inst_type(self.syms.listslot, gd_args, 1) as i32
+                    let gd_elems: List[i32] = List.new()
                     gd_elems.push(gd_slot_tid)
                     gd_elems.push(gd_slot_tid)
                     return self.ensure_tuple_type(gd_elems, 2) as i32
                 if field == self.syms.range_method:
                     let vr_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    return self.ensure_vecrange_type_for(vr_elem_ty)
+                    return self.ensure_listrange_type_for(vr_elem_ty)
                 if field == self.syms.split_at or field == self.syms.split_at_mut:
-                    return self.ensure_vecrange_pair_type_for(self.get_generic_inst_arg(recv_type, 0))
+                    return self.ensure_listrange_pair_type_for(self.get_generic_inst_arg(recv_type, 0))
                 if field == self.syms.iter_ref:
                     let iref_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let iref_tid = self.find_generic_inst(self.syms.veciterref, iref_elem_ty)
+                    let iref_tid = self.find_generic_inst(self.syms.listiterref, iref_elem_ty)
                     if iref_tid != 0:
                         return iref_tid
-                    let iref_args: Vec[i32] = Vec.new()
+                    let iref_args: List[i32] = List.new()
                     iref_args.push(iref_elem_ty)
-                    return self.ensure_generic_inst_type(self.syms.veciterref, iref_args, 1) as i32
+                    return self.ensure_generic_inst_type(self.syms.listiterref, iref_args, 1) as i32
                 if field == self.syms.iter_place:
                     let ip_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let ip_tid = self.find_generic_inst(self.syms.veciterplace, ip_elem_ty)
+                    let ip_tid = self.find_generic_inst(self.syms.listiterplace, ip_elem_ty)
                     if ip_tid != 0:
                         return ip_tid
-                    let ip_args: Vec[i32] = Vec.new()
+                    let ip_args: List[i32] = List.new()
                     ip_args.push(ip_elem_ty)
-                    return self.ensure_generic_inst_type(self.syms.veciterplace, ip_args, 1) as i32
+                    return self.ensure_generic_inst_type(self.syms.listiterplace, ip_args, 1) as i32
                 if field == self.syms.filter:
                     return recv_type as i32
                 if field == self.syms.map:
@@ -32851,27 +32854,27 @@ impl Sema:
                         let mapper_ty = self.resolve_alias(arg_types[0] as TypeId)
                         if self.get_type_kind(mapper_ty) == TypeKind.TY_FN:
                             let mapped_elem_ty = self.get_type_d2(mapper_ty)
-                            let mapped_tid = self.find_generic_inst(self.syms.vec, mapped_elem_ty)
+                            let mapped_tid = self.find_generic_inst(self.syms.list, mapped_elem_ty)
                             if mapped_tid != 0:
                                 return mapped_tid
-                            let mapped_args: Vec[i32] = Vec.new()
+                            let mapped_args: List[i32] = List.new()
                             mapped_args.push(mapped_elem_ty)
-                            return self.ensure_generic_inst_type(self.syms.vec, mapped_args, 1) as i32
+                            return self.ensure_generic_inst_type(self.syms.list, mapped_args, 1) as i32
                     return recv_type as i32
                 if field == self.syms.fold:
                     if arg_count >= 1:
                         return arg_types[0]
                     return self.get_generic_inst_arg(recv_type, 0)
                 if field == self.syms.sequence:
-                    return self.vec_sequence_return_type(recv_type, mc_resolved_arg_count, node)
+                    return self.list_sequence_return_type(recv_type, mc_resolved_arg_count, node)
                 if field == self.syms.traverse:
-                    return self.vec_traverse_return_type(recv_type, arg_types, mc_resolved_arg_count, node)
-            if type_name_sym == self.syms.vecslot:
+                    return self.list_traverse_return_type(recv_type, arg_types, mc_resolved_arg_count, node)
+            if type_name_sym == self.syms.listslot:
                 if field == self.syms.get:
                     return self.get_generic_inst_arg(recv_type, 0)
                 if mc_method_name_raw == "set":
                     return self.ty_void as i32
-            if type_name_sym == self.syms.vecrange:
+            if type_name_sym == self.syms.listrange:
                 if field == self.syms.get:
                     return self.get_generic_inst_arg(recv_type, 0)
                 if mc_method_name_raw == "set":
@@ -32879,28 +32882,28 @@ impl Sema:
                 if generic_len_ret != 0:
                     return generic_len_ret
                 if field == self.syms.split_at or field == self.syms.split_at_mut:
-                    return self.ensure_vecrange_pair_type_for(self.get_generic_inst_arg(recv_type, 0))
-            if type_name_sym == self.syms.veciterplace:
+                    return self.ensure_listrange_pair_type_for(self.get_generic_inst_arg(recv_type, 0))
+            if type_name_sym == self.syms.listiterplace:
                 if field == self.syms.next:
                     let ip_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    var vs_tid = self.find_generic_inst(self.syms.vecslot, ip_elem_ty)
+                    var vs_tid = self.find_generic_inst(self.syms.listslot, ip_elem_ty)
                     if vs_tid == 0:
-                        let vs_args: Vec[i32] = Vec.new()
+                        let vs_args: List[i32] = List.new()
                         vs_args.push(ip_elem_ty)
-                        vs_tid = self.ensure_generic_inst_type(self.syms.vecslot, vs_args, 1) as i32
+                        vs_tid = self.ensure_generic_inst_type(self.syms.listslot, vs_args, 1) as i32
                     let opt_tid = self.find_generic_inst(self.syms.option, vs_tid)
                     if opt_tid != 0:
                         return opt_tid
-                    let opt_args: Vec[i32] = Vec.new()
+                    let opt_args: List[i32] = List.new()
                     opt_args.push(vs_tid)
                     return self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
-            if type_name_sym == self.syms.veciter:
+            if type_name_sym == self.syms.listiter:
                 if field == self.syms.next:
                     let next_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                     let next_tid = self.find_generic_inst(self.syms.option, next_elem_ty)
                     if next_tid != 0:
                         return next_tid
-                    let next_args: Vec[i32] = Vec.new()
+                    let next_args: List[i32] = List.new()
                     next_args.push(next_elem_ty)
                     return self.ensure_generic_inst_type(self.syms.option, next_args, 1) as i32
             if self.is_iterator_type(recv_type) != 0:
@@ -32968,9 +32971,9 @@ impl Sema:
                                 var fm_elem_ty = self.iterator_element_type(fm_inner_ty)
                                 if fm_elem_ty == 0:
                                     let fm_inner_resolved = self.resolve_alias(fm_inner_ty as TypeId)
-                                    if self.get_type_kind(fm_inner_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(fm_inner_resolved as i32) == self.syms.vec:
+                                    if self.get_type_kind(fm_inner_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(fm_inner_resolved as i32) == self.syms.list:
                                         fm_elem_ty = self.get_generic_inst_arg(fm_inner_resolved as i32, 0)
-                                        fm_iter_ty = self.ensure_veciter_type_for(fm_elem_ty)
+                                        fm_iter_ty = self.ensure_listiter_type_for(fm_elem_ty)
                                 if fm_elem_ty != 0:
                                     return self.ensure_flatmapiter_type_for(recv_type, fm_inner_ty, fm_iter_ty, iter_elem_ty, fm_elem_ty)
                         return 0
@@ -32993,23 +32996,23 @@ impl Sema:
                     if field == self.syms.count:
                         return self.ty_i64 as i32
                     if field == self.syms.collect:
-                        return self.ensure_vec_type_for(iter_elem_ty)
+                        return self.ensure_list_type_for(iter_elem_ty)
                     if field == self.syms.partition:
-                        let part_vec_ty = self.ensure_vec_type_for(iter_elem_ty)
-                        let part_elems: Vec[i32] = Vec.new()
-                        part_elems.push(part_vec_ty)
-                        part_elems.push(part_vec_ty)
+                        let part_list_ty = self.ensure_list_type_for(iter_elem_ty)
+                        let part_elems: List[i32] = List.new()
+                        part_elems.push(part_list_ty)
+                        part_elems.push(part_list_ty)
                         return self.ensure_tuple_type(part_elems, 2) as i32
                     if field == self.syms.unzip:
                         let uz_iter_resolved = self.resolve_alias(iter_elem_ty as TypeId)
                         if self.get_type_kind(uz_iter_resolved) == TypeKind.TY_TUPLE and self.get_type_d1(uz_iter_resolved) == 2:
                             let uz_iter_start = self.get_type_d0(uz_iter_resolved)
-                            let uz_vecs: Vec[i32] = Vec.new()
-                            uz_vecs.push(self.ensure_vec_type_for(self.type_extra[uz_iter_start]))
-                            uz_vecs.push(self.ensure_vec_type_for(self.type_extra[(uz_iter_start + 1)]))
+                            let uz_vecs: List[i32] = List.new()
+                            uz_vecs.push(self.ensure_list_type_for(self.type_extra[uz_iter_start]))
+                            uz_vecs.push(self.ensure_list_type_for(self.type_extra[(uz_iter_start + 1)]))
                             return self.ensure_tuple_type(uz_vecs, 2) as i32
                         return 0
-            if type_name_sym == self.syms.veciterref:
+            if type_name_sym == self.syms.listiterref:
                 if field == self.syms.next:
                     let ref_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                     let ref_ty = self.ensure_exact_type(TypeKind.TY_REF, ref_elem_ty, 0, 0) as i32
@@ -33018,7 +33021,7 @@ impl Sema:
                     let ref_opt_tid = self.find_generic_inst(self.syms.option, ref_ty)
                     if ref_opt_tid != 0:
                         return ref_opt_tid
-                    let ref_opt_args: Vec[i32] = Vec.new()
+                    let ref_opt_args: List[i32] = List.new()
                     ref_opt_args.push(ref_ty)
                     return self.ensure_generic_inst_type(self.syms.option, ref_opt_args, 1) as i32
             if type_name_sym == self.syms.hashmap:
@@ -33045,7 +33048,7 @@ impl Sema:
                 if field == self.syms.entry:
                     let ek = self.get_generic_inst_arg(recv_type, 0)
                     let ev = self.get_generic_inst_arg(recv_type, 1)
-                    let entry_args: Vec[i32] = Vec.new()
+                    let entry_args: List[i32] = List.new()
                     entry_args.push(ek)
                     entry_args.push(ev)
                     return self.ensure_generic_inst_type(self.syms.hashmapentry, entry_args, 2) as i32
@@ -33078,7 +33081,7 @@ impl Sema:
                     return self.ensure_slotmapslot_type_for(sm_elem_ret_ty)
                 if field == self.syms.get_disjoint:
                     let sm_slot_ty = self.ensure_slotmapslot_type_for(sm_elem_ret_ty)
-                    let sm_tuple_elems: Vec[i32] = Vec.new()
+                    let sm_tuple_elems: List[i32] = List.new()
                     sm_tuple_elems.push(sm_slot_ty)
                     sm_tuple_elems.push(sm_slot_ty)
                     return self.ensure_tuple_type(sm_tuple_elems, 2) as i32
@@ -33235,7 +33238,7 @@ impl Sema:
                     let split_idx_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, 0) else: self.ast.get_extra(extra_start)
                     if self.check_builtin_method_call_arg(self.pool_resolve(field), 0, self.ty_i64 as i32, split_idx_ty, split_idx_node) == 0:
                         return 0
-                return self.ensure_vecrange_pair_type_for(self.get_type_d0(resolved))
+                return self.ensure_listrange_pair_type_for(self.get_type_d0(resolved))
 
         // Static method call on a named type expression.
         if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
@@ -33319,8 +33322,8 @@ impl Sema:
     // enumerated for the MIR module's callable snapshot: the typed-MIR
     // validator recognizes a builtin call by this Sema fact, never by a name
     // of its own (#1639). Keep the two in step.
-    fn intrinsic_fn_syms() -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn intrinsic_fn_syms() -> List[i32]:
+        let out: List[i32] = List.new()
         out.push(self.syms.channel)
         out.push(self.syms.send)
         out.push(self.syms.recv)
@@ -33337,8 +33340,8 @@ impl Sema:
     // is_nameof_call and is_chan_call accept under a type argument
     // (`sizeof[T]()`), enumerated for the same snapshot. Keep in step with
     // those predicates.
-    fn generic_builtin_syms() -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn generic_builtin_syms() -> List[i32]:
+        let out: List[i32] = List.new()
         let names = ["sizeof", "size_of", "alignof", "align_of", "transmute", "nameof", "type_name", "chan", "with_key_hash", "offsetof", "offset_of"]
         for i in 0..names.len() as i32:
             let sym = self.pool_lookup_symbol(names[i])
@@ -33375,7 +33378,7 @@ impl Sema:
 
     // §18.2: `builtins.name(..)` bound to an intrinsic (bind_builtins_member).
     mut fn check_builtins_intrinsic_call(node: i32, fn_sym: i32, extra_start: i32, arg_count: i32) -> i32:
-        let arg_types: Vec[i32] = Vec.new()
+        let arg_types: List[i32] = List.new()
         for ai in 0..arg_count:
             arg_types.push(self.check_expr(self.ast.get_extra(extra_start + ai)) as i32)
         if self.check_comptime_call_restriction(fn_sym, node) != 0:
@@ -33394,7 +33397,7 @@ impl Sema:
             else: CallCalleeKind.Intrinsic
         self.note_call_callee(node, kind)
 
-    mut fn check_intrinsic_call(fn_sym: i32, node: i32, arg_types: &Vec[i32], arg_count: i32) -> i32:
+    mut fn check_intrinsic_call(fn_sym: i32, node: i32, arg_types: &List[i32], arg_count: i32) -> i32:
 
         let args_start = self.ast.get_data1(node)
         // #2043: which builtin this is, for codegen's dispatch.
@@ -33619,7 +33622,7 @@ impl Sema:
         let kind = self.ast.kind(expr)
         if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC:
             return self.ast.get_data0(expr)
-        // Handle Vec[i32].method() — NodeKind.NK_INDEX(NodeKind.NK_IDENT("Vec"), ...)
+        // Handle List[i32].method() — NodeKind.NK_INDEX(NodeKind.NK_IDENT("List"), ...)
         if kind == NodeKind.NK_INDEX:
             let base = self.ast.get_data0(expr)
             if self.ast.kind(base) == NodeKind.NK_IDENT:
@@ -33675,7 +33678,7 @@ impl Sema:
         if ambient != 0:
             return ambient
         // #742: both lookups above still filter by the CURRENT module's
-        // imports, so reflection on an inst created elsewhere (VecIter[i32]
+        // imports, so reflection on an inst created elsewhere (ListIter[i32]
         // reached through std.iter's iter_sum) answered "no fields" during the
         // eager cache passes and only worked once codegen stood in a module
         // that could see the decl. An existing inst names its template by
@@ -34134,7 +34137,7 @@ impl Sema:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_TYPE_GENERIC:
             return 0
         let base = self.ast.get_data0(node)
-        if base == self.syms.vec or base == self.syms.hashmap or base == self.syms.hashset or base == self.syms.btreemap or base == self.syms.btreeset or base == self.syms.slotmap or base == self.syms.box or base == self.syms.task or base == self.syms.scoped_task or base == self.syms.channel:
+        if base == self.syms.list or base == self.syms.hashmap or base == self.syms.hashset or base == self.syms.btreemap or base == self.syms.btreeset or base == self.syms.slotmap or base == self.syms.box or base == self.syms.task or base == self.syms.scoped_task or base == self.syms.channel:
             return 1
         let name = self.pool_resolve(base)
         if name == "Rc" or name == "Arc" or name == "Sender" or name == "Receiver":
@@ -34152,8 +34155,8 @@ impl Sema:
                 let arg_node = self.ast.get_extra(extra_start + ai)
                 // §3.3 forbids references in long-lived storage, not in every
                 // generic carrier. Option[&T] and Result[&T, E] are ordinary
-                // ephemeral locals (§3.4); Vec[&T] and other owning stores are
-                // forbidden. Recurse so Option[Vec[&T]] remains forbidden.
+                // ephemeral locals (§3.4); List[&T] and other owning stores are
+                // forbidden. Recurse so Option[List[&T]] remains forbidden.
                 if self.generic_type_expr_is_long_lived_storage(node) != 0 and self.type_expr_contains_ref(arg_node) != 0:
                     return 1
                 if self.type_expr_is_collection_with_ref(arg_node) != 0:
@@ -35513,7 +35516,7 @@ impl Sema:
 
     // #1297 / §21.1 rule 10: the binding whose OWN storage `&place` borrows.
     // A place projected through a reference-typed root (`&e.value` with
-    // `e: &KV`, `&v[i]` with `v: &Vec[KV]`) borrows the pointee, whose origins
+    // `e: &KV`, `&v[i]` with `v: &List[KV]`) borrows the pointee, whose origins
     // the root binding already carries (its deps and parameter mask); the
     // root is not the storage, and naming it pinned every field view of a
     // loop or element binding to that binding. A bare `&e` borrows the
@@ -35586,7 +35589,7 @@ impl Sema:
             return 1
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_type_d0(resolved)
-            if base_sym == self.syms.vec or base_sym == self.syms.hashmap:
+            if base_sym == self.syms.list or base_sym == self.syms.hashmap:
                 return 1
             let ip_sym = self.pool_lookup_symbol("IndexPlace")
             if ip_sym > 0:
@@ -36045,7 +36048,7 @@ impl Sema:
 
     // ── Helper functions ─────────────────────────────────────────────
 
-    // D44 / §13.5: map traversal observes. One element rule with Vec above:
+    // D44 / §13.5: map traversal observes. One element rule with List above:
     // a plain-bits key or value binds by value; one with drop glue (a str,
     // D111, or a Drop-class value) binds as a view into the map's slot
     // (copying a Drop-class one would make a second owner, §2.3).
@@ -36055,13 +36058,13 @@ impl Sema:
         elem
 
     mut fn map_traversal_element_type(map_inst: i32) -> i32:
-        let elems: Vec[i32] = Vec.new()
+        let elems: List[i32] = List.new()
         elems.push(self.traversal_binding_type(self.get_generic_inst_arg(map_inst, 0)))
         elems.push(self.traversal_binding_type(self.get_generic_inst_arg(map_inst, 1)))
         self.ensure_tuple_type(elems, 2) as i32
 
-    // D44: `for (k, v) in bt` traverses a BTreeMap's `Vec[(K, V)]` storage in
-    // place, exactly as a Vec of pairs is traversed — a Drop-class pair binds
+    // D44: `for (k, v) in bt` traverses a BTreeMap's `List[(K, V)]` storage in
+    // place, exactly as a List of pairs is traversed — a Drop-class pair binds
     // as a `&(K, V)` view and the tuple pattern projects `&K`/`&V`; a Copy
     // pair binds by value. The generic `next()` protocol found no `next` on
     // the map and typed the element `i32`, so the tuple pattern was refused
@@ -36089,15 +36092,15 @@ impl Sema:
             return seq_elem
         if tk == TypeKind.TY_REF:
             // #607: `for w in &vec` / `for w in &h.field` borrow-iterates — the loop var
-            // is `&T` (each element borrowed, no copy/move). Mirrors VecIterRef[T] below.
+            // is `&T` (each element borrowed, no copy/move). Mirrors ListIterRef[T] below.
             let ref_pointee = self.get_type_d0(resolved)
             let ref_pointee_resolved = self.resolve_alias(ref_pointee as TypeId)
             if self.get_type_kind(ref_pointee_resolved) == TypeKind.TY_GENERIC_INST:
                 let ref_base = self.pool_resolve(self.get_type_d0(ref_pointee_resolved))
-                let ref_is_vec = ref_base == "Vec"
+                let ref_is_list = ref_base == "List"
                 let ref_is_hashmap = ref_base == "HashMap"
                 let ref_is_btreemap = ref_base == "BTreeMap"
-                if ref_is_vec and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) > 0:
+                if ref_is_list and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) > 0:
                     let ref_elem = self.get_generic_inst_arg(ref_pointee_resolved as i32, 0)
                     return self.ensure_exact_type(TypeKind.TY_REF, ref_elem, 0, 0) as i32
                 // #1187: `for (k, v) in &m` and a `&HashMap` parameter iterate
@@ -36113,14 +36116,14 @@ impl Sema:
             return 0
         if tk == TypeKind.TY_GENERIC_INST:
             let base_name = self.pool_resolve(self.get_type_d0(resolved))
-            if base_name == "Vec" and self.get_generic_inst_arg_count(resolved as i32) > 0:
-                let vec_elem = self.get_generic_inst_arg(resolved as i32, 0)
+            if base_name == "List" and self.get_generic_inst_arg_count(resolved as i32) > 0:
+                let list_elem = self.get_generic_inst_arg(resolved as i32, 0)
                 // §13: the implicit form borrows the collection. Copy-class
                 // elements bind by value; Drop-class elements bind as &T
                 // views (copying one would double-drop it).
-                if self.type_needs_drop(vec_elem) != 0:
-                    return self.ensure_exact_type(TypeKind.TY_REF, vec_elem, 0, 0) as i32
-                return vec_elem
+                if self.type_needs_drop(list_elem) != 0:
+                    return self.ensure_exact_type(TypeKind.TY_REF, list_elem, 0, 0) as i32
+                return list_elem
             if base_name == "HashMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
                 return self.map_traversal_element_type(resolved as i32)
             if base_name == "BTreeMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
@@ -36131,20 +36134,20 @@ impl Sema:
                 // ensure the Option instantiation exists before types freeze.
                 let rx_elem = self.get_generic_inst_arg(resolved as i32, 0)
                 if self.find_generic_inst(self.syms.option, rx_elem) == 0:
-                    let rx_args: Vec[i32] = Vec.new()
+                    let rx_args: List[i32] = List.new()
                     rx_args.push(rx_elem)
                     let _ = self.ensure_generic_inst_type(self.syms.option, rx_args, 1)
                 return rx_elem
-            if base_name == "VecIterRef" and self.get_generic_inst_arg_count(resolved as i32) > 0:
+            if base_name == "ListIterRef" and self.get_generic_inst_arg_count(resolved as i32) > 0:
                 let iref_elem = self.get_generic_inst_arg(resolved as i32, 0)
                 return self.ensure_exact_type(TypeKind.TY_REF, iref_elem, 0, 0) as i32
-            if base_name == "VecIterPlace" and self.get_generic_inst_arg_count(resolved as i32) > 0:
+            if base_name == "ListIterPlace" and self.get_generic_inst_arg_count(resolved as i32) > 0:
                 let vip_elem = self.get_generic_inst_arg(resolved as i32, 0)
-                var vip_slot = self.find_generic_inst(self.syms.vecslot, vip_elem)
+                var vip_slot = self.find_generic_inst(self.syms.listslot, vip_elem)
                 if vip_slot == 0:
-                    let vip_args: Vec[i32] = Vec.new()
+                    let vip_args: List[i32] = List.new()
                     vip_args.push(vip_elem)
-                    vip_slot = self.ensure_generic_inst_type(self.syms.vecslot, vip_args, 1) as i32
+                    vip_slot = self.ensure_generic_inst_type(self.syms.listslot, vip_args, 1) as i32
                 return vip_slot
         // Generic Iter[T] protocol: look up next() method on the type,
         // extract T from its Option[T] return type. For a generic-inst
@@ -36397,7 +36400,7 @@ impl Sema:
     // lowers as `ref(shared, place)`. A field of a temporary is no place —
     // rule 4: "An owned temporary is never implicitly borrowed merely to
     // force a reference result." Copy fields keep their value join.
-    mut fn join_field_arms_as_views(expected: i32, arm_nodes: &Vec[i32], arm_types: Vec[i32]) -> Vec[i32]:
+    mut fn join_field_arms_as_views(expected: i32, arm_nodes: &List[i32], arm_types: List[i32]) -> List[i32]:
         var types = arm_types
         if expected != 0 and self.get_type_kind(self.resolve_alias(expected as TypeId)) != TypeKind.TY_REF:
             return types
@@ -36469,7 +36472,7 @@ impl Sema:
 
     // The arms of a resolved join: an owned result consumes every arm (§3.8
     // join rules 2 and 5); a reference result observes them.
-    mut fn d32_check_owned_join_arms(result_type: i32, arm_nodes: &Vec[i32], context: &str):
+    mut fn d32_check_owned_join_arms(result_type: i32, arm_nodes: &List[i32], context: &str):
         if result_type == 0:
             return
         let rk = self.get_type_kind(self.resolve_alias(result_type as TypeId))
@@ -36523,7 +36526,7 @@ impl Sema:
                 // (conditional moves on the moving path; unconditional moves
                 // stay statically moved with the owner's partial drop), and the
                 // owner's guarded per-field drop (rt_value_is_zero) skips a
-                // blanked field. This covers transitive-Drop fields (Vec[W]) as
+                // blanked field. This covers transitive-Drop fields (List[W]) as
                 // well as Drop-impl fields.
                 self.mark_field_moved(node)
             return
@@ -37019,13 +37022,13 @@ impl Sema:
     // is a .iter() call (or any iter_of_self method), meaning the iterator
     // yields &T views rather than owned T values.
     // #925: `for x in vec.iter()` IS §13's implicit form. MirLower lowers it
-    // exactly like the bare Vec — Drop-class elements bind &T views through
+    // exactly like the bare List — Drop-class elements bind &T views through
     // VEC_GET_REF, Copy-class elements bind by value — and never calls
-    // VecIter.next(). Typing the binding from next()'s Option[T] made Sema
+    // ListIter.next(). Typing the binding from next()'s Option[T] made Sema
     // say `str` where MIR held `&str`; the call site then auto-referenced a
     // reference and passed a pointer to the pointer as the {ptr,len} pair.
     // Mirror MirLower's dispatch predicate here (an `iter` call on a
-    // receiver whose type is a Vec instantiation); every other iterable,
+    // receiver whose type is a List instantiation); every other iterable,
     // including HashMap.iter() and user iterators, keeps next()'s element.
     mut fn for_loop_element_type(iterable: i32, iter_type: i32) -> i32:
         if self.ast.kind(iterable) == NodeKind.NK_CALL:
@@ -37035,15 +37038,15 @@ impl Sema:
                 if self.typed_expr_types.contains(recv_node):
                     let recv_resolved = self.resolve_alias(self.typed_expr_types.get(recv_node).unwrap() as TypeId)
                     if self.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(recv_resolved as i32) > 0:
-                        if self.pool_resolve(self.get_type_d0(recv_resolved)) == "Vec":
-                            let vec_elem = self.get_generic_inst_arg(recv_resolved as i32, 0)
-                            if self.type_needs_drop(vec_elem) != 0:
-                                return self.ensure_exact_type(TypeKind.TY_REF, vec_elem, 0, 0) as i32
-                            return vec_elem
+                        if self.pool_resolve(self.get_type_d0(recv_resolved)) == "List":
+                            let list_elem = self.get_generic_inst_arg(recv_resolved as i32, 0)
+                            if self.type_needs_drop(list_elem) != 0:
+                                return self.ensure_exact_type(TypeKind.TY_REF, list_elem, 0, 0) as i32
+                            return list_elem
         self.infer_for_element_type(iter_type)
 
     mut fn for_iterable_yields_views(iterable: i32) -> i32:
-        // §13: a bare Drop-element Vec iterable binds &T views (see
+        // §13: a bare Drop-element List iterable binds &T views (see
         // infer_for_element_type), so the binding is view-bound for §15.17.
         if self.typed_expr_types.contains(iterable):
             let bare_ty = self.typed_expr_types.get(iterable).unwrap()
@@ -37055,11 +37058,11 @@ impl Sema:
             if self.get_type_kind(seq_resolved) == TypeKind.TY_ARRAY or self.get_type_kind(seq_resolved) == TypeKind.TY_SLICE:
                 let seq_elem = self.get_type_d0(seq_resolved)
                 return if self.type_needs_drop(seq_elem) != 0: 1 else: 0
-            // A `&Vec[T]` / `&HashMap[K, V]` iterable (a borrowed parameter,
+            // A `&List[T]` / `&HashMap[K, V]` iterable (a borrowed parameter,
             // a match-bound payload) yields the same views as the owned
             // collection (#1297).
             if self.get_type_kind(seq_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(seq_resolved as i32) > 0:
-                if self.pool_resolve(self.get_type_d0(seq_resolved)) == "Vec":
+                if self.pool_resolve(self.get_type_d0(seq_resolved)) == "List":
                     let bare_elem = self.get_generic_inst_arg(seq_resolved as i32, 0)
                     if self.type_needs_drop(bare_elem) != 0:
                         return 1
@@ -37220,7 +37223,7 @@ impl Sema:
 
     // docs/completed/mut.md Rev 8 §15.8 — returns 1 when the method's fn-decl is marked
     // `@[iter_of_self]`, indicating the produced value retains access to its
-    // receiver place (e.g., Vec.iter, HashMap.entries). Used by check_call's
+    // receiver place (e.g., List.iter, HashMap.entries). Used by check_call's
     // arg-loop to register a SHARED borrow on the receiver place root for the
     // duration of the enclosing call so that sibling closure mutations conflict.
     fn fn_symbol_is_iter_of_self(fn_sym: i32) -> i32:

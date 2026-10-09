@@ -15,7 +15,7 @@ fn forty_two() -> i32: 42
 fn run(f: fn() -> i32) -> i32: f()
 fn relay(f: fn() -> i32) -> i32: run(f) + 1
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(1)
     let n = xs.len32()
     let c = wrap(move () => n)

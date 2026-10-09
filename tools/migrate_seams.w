@@ -18,8 +18,8 @@
 use std.process
 use std.fs
 
-fn split_lines(text: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn split_lines(text: &str) -> List[str]:
+    let out: List[str] = List.new()
     var start: i64 = 0
     var i: i64 = 0
     while i < text.len():
@@ -31,8 +31,8 @@ fn split_lines(text: &str) -> Vec[str]:
         out.push(text.slice(start, text.len()))
     out
 
-fn split_tabs(line: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn split_tabs(line: &str) -> List[str]:
+    let out: List[str] = List.new()
     var start: i64 = 0
     var i: i64 = 0
     while i < line.len():
@@ -70,7 +70,7 @@ fn main:
     let out_path = "out/tmp/seam-sites.tsv"
     let err_path = "out/tmp/seam-sites.err"
     let _ = mkdir_p("out/tmp")
-    var cmd: Vec[str] = Vec.new()
+    var cmd: List[str] = List.new()
     cmd.push("/bin/sh")
     cmd.push("-c")
     cmd.push("\"$0\" analyze \"$1\" seam-sites > \"$2\" 2> \"$3\"")

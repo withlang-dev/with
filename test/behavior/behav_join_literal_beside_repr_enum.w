@@ -9,7 +9,7 @@ enum K: i32:
     B = 2
 
 fn main:
-    var kinds: Vec[i32] = Vec.new()
+    var kinds: List[i32] = List.new()
     var ones = 0
     for k in [0, K.A, K.B]:
         kinds.push(k)

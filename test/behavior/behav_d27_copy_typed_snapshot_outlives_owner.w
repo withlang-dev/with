@@ -4,7 +4,7 @@
 // origin, so the snapshot may survive both mutation and the owner's scope.
 
 fn snapshot() -> i32:
-    var values: Vec[i32] = Vec.new()
+    var values: List[i32] = List.new()
     values.push(41)
     let value: i32 = values[0]
     values.push(42)

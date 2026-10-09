@@ -106,7 +106,7 @@ fn stmt_partial(p: Point, out: str) -> str:
         Point { x: 8, y } => s = s ++ f"stmt {y}|"
     s
 
-fn byref(ps: &Vec[Point]) -> i32:
+fn byref(ps: &List[Point]) -> i32:
     var n = 0
     for Point { x, y } in ps:
         n = n + x * 10 + y
@@ -116,7 +116,7 @@ fn byref(ps: &Vec[Point]) -> i32:
 
 // A refutable `for` pattern skips the elements it does not match
 // (behav_for_full_patterns); a literal field is part of that test.
-fn filtered(ps: &Vec[Point]) -> i32:
+fn filtered(ps: &List[Point]) -> i32:
     var n = 0
     for Point { x: 0, y } in ps:
         n = n + y
@@ -166,6 +166,6 @@ fn main:
     print("if-let: " ++ iflet(Point { x: 5, y: 6 }) ++ "|" ++ iflet(Point { x: 4, y: 6 }) ++ "|")
     print(f"let-else: {letelse(Point { x: 0, y: 7 })}|{letelse(Point { x: 1, y: 7 })}|")
     print(stmt_partial(Point { x: 9, y: 2 }, stmt_partial(Point { x: 8, y: 1 }, "stmt: ")))
-    let ps: Vec[Point] = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }, Point { x: 0, y: 5 }]
+    let ps: List[Point] = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }, Point { x: 0, y: 5 }]
     print(f"for: {byref(ps)}|{filtered(ps)}|")
     print(f"exhaustive: {bytes(3)}|{bytes(200)}|{bools((false, true))}|{opt(Some(false))}|")

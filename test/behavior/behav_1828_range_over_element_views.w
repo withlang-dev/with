@@ -9,8 +9,8 @@
 // `i32` for-element fallback #1828 removed — `i32` for an i64 range too.
 
 type Keys:
-    starts: Vec[i32]
-    wide: Vec[i64]
+    starts: List[i32]
+    wide: List[i64]
 
 fn walk(keys: &Keys, base: i32):
     var out = ""
@@ -28,10 +28,10 @@ fn walk(keys: &Keys, base: i32):
     print(f"{bound}{5000000001 in keys.wide[0]..keys.wide[1]}")
 
 fn main:
-    var starts: Vec[i32] = Vec.new()
+    var starts: List[i32] = List.new()
     starts.push(1)
     starts.push(3)
-    var wide: Vec[i64] = Vec.new()
+    var wide: List[i64] = List.new()
     wide.push(5000000000)
     wide.push(5000000002)
     walk(&Keys { starts, wide }, 0)

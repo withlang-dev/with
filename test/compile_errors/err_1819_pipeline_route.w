@@ -4,7 +4,7 @@
 // while an element view of G is live.
 // A call writes every global its callee writes.
 
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 fn grow(n: i32) -> i32:
     for i in 0..64: G.push(f"item{i}")

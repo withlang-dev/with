@@ -19,7 +19,7 @@
 // `self.value` in an `extend` method aborted codegen.
 
 type Name = distinct str
-type Nums = distinct Vec[i32]
+type Nums = distinct List[i32]
 type Pt:
     x: i32
     label: str
@@ -42,7 +42,7 @@ fn main:
     by_ref(&n)
     n.show()
     print(f"size {n.size()}")
-    var nums: Vec[i32] = Vec.new()
+    var nums: List[i32] = List.new()
     nums.push(4)
     nums.push(5)
     let v = Nums(nums)

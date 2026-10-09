@@ -13,8 +13,8 @@ json.w    Tokenizer, parser, accessors, tree walker, demo
 ## What It Demonstrates
 
 **Algebraic data types** — `JsonValue` is an enum with six variants: `Null`,
-`Bool(bool)`, `Number(f64)`, `Str(str)`, `Array(Vec[JsonValue])`,
-`Object(Vec[(str, JsonValue)])`. The type system enforces exhaustive handling.
+`Bool(bool)`, `Number(f64)`, `Str(str)`, `Array(List[JsonValue])`,
+`Object(List[(str, JsonValue)])`. The type system enforces exhaustive handling.
 
 **Recursive descent parsing** — The parser consumes tokens and recursively
 builds the tree. `parse_value()` dispatches on the current token to

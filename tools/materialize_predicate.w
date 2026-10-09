@@ -29,7 +29,7 @@ if write_file(materialized, candidate) != 0:
     print(f"error: could not materialize candidate at {materialized}")
     exit_code(2)
 
-let child: Vec[str] = Vec.new()
+let child: List[str] = List.new()
 for i in separator + 1..argv.len() as i32:
     let arg = argv[i]
     child.push(if arg == "{file}": materialized.clone() else: arg.clone())

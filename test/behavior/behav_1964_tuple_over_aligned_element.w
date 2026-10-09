@@ -113,7 +113,7 @@ fn main:
     let (da, ds) = d
     print(f"drop {ds} {da.a} {da.b}")
 
-    var ts: Vec[(i8, Al)] = Vec.new()
+    var ts: List[(i8, Al)] = List.new()
     ts.push(make(3, 4, 5))
     let popped = ts.pop().unwrap()
     print(f"pop {show(&popped)} | empty {ts.pop().is_none()}")
@@ -127,7 +127,7 @@ fn main:
         print(f"enumerate {i} {v.a} {v.b}")
     for (x, y) in als(0).zip(als(2)):
         print(f"zip {x.a} {x.b} {y.a} {y.b}")
-    var ps: Vec[(i8, Al)] = Vec.new()
+    var ps: List[(i8, Al)] = List.new()
     ps.push(make(7, 5, 6))
     ps.push(make(8, 9, 10))
     for e in ps:

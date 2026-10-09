@@ -4,7 +4,7 @@
 // body must drop inside the body. Registered outward, its single drop landed
 // at the loop exit: N iterations leaked N-1 temp values, and a ZERO-iteration
 // loop dropped a never-initialized stack slot (the release-lane c_import SEGV
-// — the slot held the previous call's dead-frame Vec header, so the "drop"
+// — the slot held the previous call's dead-frame List header, so the "drop"
 // freed the tracked-input vec's live buffer).
 fn piece(n: i32) -> str:
     f"part{n}" ++ "!"

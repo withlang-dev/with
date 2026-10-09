@@ -48,19 +48,19 @@ type DeclSpan {
 }
 
 type CollectResult {
-    targets: Vec[ShareTarget],
-    decls: Vec[DeclSpan],
+    targets: List[ShareTarget],
+    decls: List[DeclSpan],
 }
 
 fn collect_targets(entry: &str) -> CollectResult:
     let result = compiler_analyze_file(entry, "facts")
-    var receiver_sigs: Vec[i32] = Vec.new()
+    var receiver_sigs: List[i32] = List.new()
     for i in 0..result.report.facts.len() as i32:
         let fact = &result.report.facts[i]
         if fact.kind == AnalysisFactKind.Receiver:
             receiver_sigs.push(fact.parent)
-    var targets: Vec[ShareTarget] = Vec.new()
-    var decls: Vec[DeclSpan] = Vec.new()
+    var targets: List[ShareTarget] = List.new()
+    var decls: List[DeclSpan] = List.new()
     for i in 0..result.report.facts.len() as i32:
         let fact = &result.report.facts[i]
         if fact.kind == AnalysisFactKind.Declaration:
@@ -109,7 +109,7 @@ fn base_name(name: &str) -> str:
     if cut >= 0: return owned_text(name.slice(0, cut as i64))
     owned_text(name)
 
-fn decl_for(decls: &Vec[DeclSpan], path: &str, name: &str) -> i32:
+fn decl_for(decls: &List[DeclSpan], path: &str, name: &str) -> i32:
     for i in 0..decls.len() as i32:
         let d = &decls[i]
         if d.path == path and d.name == name: return i
@@ -128,8 +128,8 @@ fn main:
     print(f"targets: {targets.len() as i32} share-place free parameters")
 
     // (path, insert-offset) edits, deduped across specializations.
-    var edit_paths: Vec[str] = Vec.new()
-    var edit_offsets: Vec[i32] = Vec.new()
+    var edit_paths: List[str] = List.new()
+    var edit_offsets: List[i32] = List.new()
     var failures = 0
     var fi = 0
     while fi < targets.len() as i32:
@@ -249,7 +249,7 @@ fn main:
         exit_code(1)
 
     // Apply per file, edits sorted ascending.
-    var files: Vec[str] = Vec.new()
+    var files: List[str] = List.new()
     for e in 0..edit_paths.len() as i32:
         let p = edit_paths[e]
         var seen = false
@@ -258,10 +258,10 @@ fn main:
         if not seen: files.push(owned_text(p))
     var total = 0
     for f in files:
-        var offs: Vec[i32] = Vec.new()
+        var offs: List[i32] = List.new()
         for e in 0..edit_paths.len() as i32:
             if edit_paths[e] == f: offs.push(edit_offsets[e])
-        var sorted: Vec[i32] = Vec.new()
+        var sorted: List[i32] = List.new()
         while sorted.len() < offs.len():
             var best = 2147483647
             for o in offs:

@@ -30,7 +30,7 @@ fn main:
     assert(up == low)
     assert(hash_of(&up) == hash_of(&low))
 
-    let v: Vec[i32] = [1, 2, 3]
-    let w: Vec[i32] = [1, 2, 3]
+    let v: List[i32] = [1, 2, 3]
+    let w: List[i32] = [1, 2, 3]
     assert(hash_of(&v) == hash_of(&w))
     print("ok")

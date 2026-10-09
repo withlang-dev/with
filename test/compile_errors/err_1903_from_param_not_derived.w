@@ -3,11 +3,11 @@
 // #1903 (§21.1 rule 6): a declared origin the body does not derive the view
 // from is an error.
 
-var HIDDEN: Vec[i32] = Vec.new()
+var HIDDEN: List[i32] = List.new()
 
-fn first(p: &Vec[i32]) -> &i32 from p: &HIDDEN[0]
+fn first(p: &List[i32]) -> &i32 from p: &HIDDEN[0]
 
 fn main:
     HIDDEN.push(41)
-    let x: Vec[i32] = Vec.new()
+    let x: List[i32] = List.new()
     print(*first(&x))

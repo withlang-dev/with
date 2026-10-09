@@ -58,7 +58,7 @@ fn test_handles_in_containers:
     var map = SlotMap[str].new()
     let h1 = map.insert("hello")
     let h2 = map.insert("world")
-    var handles = Vec[Handle[str]].new()
+    var handles = List[Handle[str]].new()
     handles.push(h1)
     handles.push(h2)
     assert(handles.len() == 2)

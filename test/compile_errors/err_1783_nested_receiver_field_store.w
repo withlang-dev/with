@@ -2,12 +2,12 @@
 
 // #1783: the storage is what the receiver path's ROOT reaches, whatever the
 // spelling — `self.inner.v.push(x)` stores into the caller's `h`.
-type Inner = ephemeral { v: Vec[&i32] }
+type Inner = ephemeral { v: List[&i32] }
 type Holder = ephemeral { inner: Inner }
 impl Holder:
     mut fn keep(x: &i32): self.inner.v.push(x)
 fn main:
-    var h = Holder { inner: Inner { v: Vec.new() } }
+    var h = Holder { inner: Inner { v: List.new() } }
     if true:
         let n = 5
         h.keep(&n)

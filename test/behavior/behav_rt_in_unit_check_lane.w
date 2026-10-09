@@ -10,7 +10,7 @@
 use std.builtins.print
 
 fn main:
-    var v: Vec[str] = Vec.new()
+    var v: List[str] = List.new()
     v.push("a" ++ "")
     print(v.join("-"))
     print(f"{v.len()}")

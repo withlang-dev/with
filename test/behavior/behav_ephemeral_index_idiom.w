@@ -3,7 +3,7 @@
 // rather than ephemeral borrows.
 use std.builtins.print_i32
 fn main:
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     v.push(10)
     v.push(20)
     let idx = 1

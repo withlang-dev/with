@@ -19,9 +19,9 @@
 type Config { limit: i32 }
 
 var CONFIG = Config { limit: 1 }
-var HIDDEN: Vec[i32] = Vec.new()
-var OTHER: Vec[i32] = Vec.new()
-var G: Vec[i32] = Vec.new()
+var HIDDEN: List[i32] = List.new()
+var OTHER: List[i32] = List.new()
+var G: List[i32] = List.new()
 
 fn peek() -> &Config: &CONFIG
 
@@ -30,7 +30,7 @@ fn set(n: i32): CONFIG = Config { limit: n }
 fn grow_other():
     for i in 0..100: OTHER.push(i)
 
-fn pick(p: &Vec[i32], c: bool) -> &i32 from p, HIDDEN:
+fn pick(p: &List[i32], c: bool) -> &i32 from p, HIDDEN:
     if c: &p[0] else: &HIDDEN[0]
 
 fn head() -> &i32 from HIDDEN: &HIDDEN[0]
@@ -65,7 +65,7 @@ fn main:
     set(5)
     print(peek().limit)
     HIDDEN.push(41)
-    var x: Vec[i32] = Vec.new()
+    var x: List[i32] = List.new()
     x.push(7)
     let a = pick(&x, false)
     let b = pick(&x, true)

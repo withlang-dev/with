@@ -4,7 +4,7 @@
 // container declared outside `n`'s scope stores a view that outlives its
 // origin. The snapshot is spelled `move () => n * 10`.
 fn main:
-    var fs: Vec[fn() -> i32] = Vec.new()
+    var fs: List[fn() -> i32] = List.new()
     for i in 0..3:
         let n = i
         fs.push(() => n * 10)

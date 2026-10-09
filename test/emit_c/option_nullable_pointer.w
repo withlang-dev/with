@@ -17,7 +17,7 @@ use std.box.Box
 type Node { v: i32, next: Option[Box[Node]] }
 type Holder { r: Option[*const i32], n: i64 }
 
-fn find(xs: &Vec[i32], want: i32) -> Option[&i32]:
+fn find(xs: &List[i32], want: i32) -> Option[&i32]:
     for x in xs:
         if x == want: return Some(x)
     None
@@ -42,7 +42,7 @@ fn main:
     let m: HashMap[str, i32] = ["a": 10, "b": 20]
     let got = m.get("b")
     print(f"get {got.unwrap()} none {m.get("z").is_none()}")
-    let xs: Vec[i32] = [10, 20, 30]
+    let xs: List[i32] = [10, 20, 30]
     let hit = match find(&xs, 30):
         Some(x) => f"{x}"
         None => "none"

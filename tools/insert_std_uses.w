@@ -53,7 +53,7 @@ fn header_insert_offset(text: &str) -> i64:
         line_start = line_end + 1
     if last_use_end >= 0: last_use_end else: line_start
 
-fn vec_contains(v: &Vec[str], s: &str) -> bool:
+fn list_contains(v: &List[str], s: &str) -> bool:
     for i in 0..v.len():
         if v[i] == s: return true
     false
@@ -70,8 +70,8 @@ if diags_file.len() == 0:
     exit_code(2)
 
 let diags = read_file(diags_file).unwrap_or("".clone())
-var pair_paths: Vec[str] = Vec.new()
-var pair_lines: Vec[str] = Vec.new()
+var pair_paths: List[str] = List.new()
+var pair_lines: List[str] = List.new()
 var pending_use = ""
 var gate_count = 0
 for line in diags.split("\n"):
@@ -93,10 +93,10 @@ for line in diags.split("\n"):
         pending_use = ""
 
 print(f"insert-std-uses: {gate_count} gate diagnostics, {pair_paths.len() as i32} distinct (file, use) pairs")
-var done_paths: Vec[str] = Vec.new()
+var done_paths: List[str] = List.new()
 for fi in 0..pair_paths.len() as i32:
     let path = pair_paths[fi]
-    if vec_contains(&done_paths, path):
+    if list_contains(&done_paths, path):
         continue
     done_paths.push(path.clone())
     var block = ""

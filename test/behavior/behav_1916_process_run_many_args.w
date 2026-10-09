@@ -12,7 +12,7 @@ fn main:
     if argv.len() > 1 and argv[1] == "--child":
         print(f"child saw {argv.len() - 2} arguments")
         exit_code(if argv.len() - 2 == 300: 0 else: 3)
-    var cmd: Vec[str] = Vec.new()
+    var cmd: List[str] = List.new()
     cmd.push(argv[0])
     cmd.push("--child")
     for i in 0..300:

@@ -1,10 +1,10 @@
 //! expect-stdout: ok
 
-// Tests: Vec as dynamic slice, push/get/len, Vec iteration,
-//        Vec in functions, Vec accumulation
+// Tests: List as dynamic slice, push/get/len, List iteration,
+//        List in functions, List accumulation
 
-fn test_vec_basic:
-    let v: Vec[i32] = Vec.new()
+fn test_list_basic:
+    let v: List[i32] = List.new()
     v.push(10)
     v.push(20)
     v.push(30)
@@ -13,18 +13,18 @@ fn test_vec_basic:
     assert(v[1] == 20)
     assert(v[2] == 30)
 
-fn test_vec_empty:
-    let v: Vec[i32] = Vec.new()
+fn test_list_empty:
+    let v: List[i32] = List.new()
     assert(v.len() == 0)
 
-fn test_vec_single:
-    let v: Vec[i32] = Vec.new()
+fn test_list_single:
+    let v: List[i32] = List.new()
     v.push(42)
     assert(v.len() == 1)
     assert(v[0] == 42)
 
-fn test_vec_many_pushes:
-    let v: Vec[i32] = Vec.new()
+fn test_list_many_pushes:
+    let v: List[i32] = List.new()
     var i = 0
     while i < 100:
         v.push(i)
@@ -33,8 +33,8 @@ fn test_vec_many_pushes:
     assert(v[0] == 0)
     assert(v[99] == 99)
 
-fn test_vec_sum:
-    let v: Vec[i32] = Vec.new()
+fn test_list_sum:
+    let v: List[i32] = List.new()
     v.push(1)
     v.push(2)
     v.push(3)
@@ -47,8 +47,8 @@ fn test_vec_sum:
         i = i + 1
     assert(sum == 15)
 
-fn test_vec_for_loop:
-    let v: Vec[i32] = Vec.new()
+fn test_list_for_loop:
+    let v: List[i32] = List.new()
     v.push(10)
     v.push(20)
     v.push(30)
@@ -57,25 +57,25 @@ fn test_vec_for_loop:
         sum = sum + val
     assert(sum == 60)
 
-fn vec_sum(v: Vec[i32]) -> i32:
+fn list_sum(v: List[i32]) -> i32:
     var total = 0
     for val in v:
         total = total + val
     total
 
-fn test_vec_in_function:
-    let v: Vec[i32] = Vec.new()
+fn test_list_in_function:
+    let v: List[i32] = List.new()
     v.push(5)
     v.push(10)
     v.push(15)
-    assert(vec_sum(v) == 30)
+    assert(list_sum(v) == 30)
 
 fn main:
-    test_vec_basic()
-    test_vec_empty()
-    test_vec_single()
-    test_vec_many_pushes()
-    test_vec_sum()
-    test_vec_for_loop()
-    test_vec_in_function()
+    test_list_basic()
+    test_list_empty()
+    test_list_single()
+    test_list_many_pushes()
+    test_list_sum()
+    test_list_for_loop()
+    test_list_in_function()
     print("ok")

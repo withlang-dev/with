@@ -18,35 +18,35 @@ async fn wait_forever_result(value: i32) -> Result[i32, str]:
     Ok(value)
 
 async fn await_all_parent -> i32:
-    let tasks: Vec[Task[i32]] = Vec.new()
+    let tasks: List[Task[i32]] = List.new()
     tasks.push(wait_forever(1))
     tasks.push(wait_forever(2))
     let _ = tasks |> await_all
     0
 
 async fn await_all_result_parent -> i32:
-    let tasks: Vec[Task[Result[i32, str]]] = Vec.new()
+    let tasks: List[Task[Result[i32, str]]] = List.new()
     tasks.push(wait_forever_result(1))
     tasks.push(wait_forever_result(2))
     let _ = tasks |> await_all
     0
 
 async fn await_first_parent -> i32:
-    let tasks: Vec[Task[i32]] = Vec.new()
+    let tasks: List[Task[i32]] = List.new()
     tasks.push(wait_forever(1))
     tasks.push(wait_forever(2))
     let _ = tasks |> await_first
     0
 
 async fn await_any_parent -> i32:
-    let tasks: Vec[Task[Result[i32, str]]] = Vec.new()
+    let tasks: List[Task[Result[i32, str]]] = List.new()
     tasks.push(wait_forever_result(1))
     tasks.push(wait_forever_result(2))
     let _ = tasks |> await_any
     0
 
 async fn await_settled_parent -> i32:
-    let tasks: Vec[Task[Result[i32, str]]] = Vec.new()
+    let tasks: List[Task[Result[i32, str]]] = List.new()
     tasks.push(wait_forever_result(1))
     tasks.push(wait_forever_result(2))
     let _ = tasks |> await_settled

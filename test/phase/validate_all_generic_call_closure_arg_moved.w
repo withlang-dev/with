@@ -15,5 +15,5 @@ gen fn nums -> i32:
         i = i + 1
 
 fn main:
-    let v = nums() |> take(3) |> collect[Vec]()
+    let v = nums() |> take(3) |> collect[List]()
     print(f"{v.len()}")

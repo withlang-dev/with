@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 // Test: local function definitions shadow prelude-provided functions.
-// The prelude imports std.iter which provides map(Vec[str], fn(str)->i32).
+// The prelude imports std.iter which provides map(List[str], fn(str)->i32).
 // A local fn map with a different signature must shadow it silently.
 
 fn map(x: i32) -> i32:

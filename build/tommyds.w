@@ -10,12 +10,12 @@ use build.corpus
 
 // Upstream compiles tommy.c, which #includes every other .c, as one unit;
 // the corpus migrates the units themselves so each structure is a module.
-fn tommy_modules() -> Vec[str]:
+fn tommy_modules() -> List[str]:
     ["tommyalloc", "tommyarray", "tommyarrayblk", "tommyarrayblkof",
      "tommyarrayof", "tommyhash", "tommyhashdyn", "tommyhashlin",
      "tommyhashtbl", "tommylist", "tommytree", "tommytrie", "tommytrieinp"]
 
-fn tommy_headers() -> Vec[str]: ["tommy", "tommychain", "tommytypes"]
+fn tommy_headers() -> List[str]: ["tommy", "tommychain", "tommytypes"]
 
 pub fn tommyds_corpus() -> Corpus:
     Corpus {
@@ -29,9 +29,9 @@ pub fn tommyds_corpus() -> Corpus:
         // program, never in the bundle root (`check` collides with the
         // prelude name, so the migrator spells the module check_)
         harness: ["check_"], drift_harness: "check_.w", drift_harness_arg: "",
-        module_floor: 14, defines: Vec.new(), excludes: Vec.new(), declared_externs: Vec.new(),
-        promote_after: Vec.new(), test_lane: "tommyds-test",
-        fresh_test_lanes: ["tommyds-test-fresh"], extra_generated_dirs: Vec.new(),
+        module_floor: 14, defines: List.new(), excludes: List.new(), declared_externs: List.new(),
+        promote_after: List.new(), test_lane: "tommyds-test",
+        fresh_test_lanes: ["tommyds-test-fresh"], extra_generated_dirs: List.new(),
         prepare_reference: corpus_no_prepare, stage: tommy_stage,
         migrate: corpus_migrate_directory, finish_generated: corpus_no_finish,
         verify_generated: corpus_no_verify, lanes: tommy_lanes,
@@ -69,12 +69,12 @@ pub fn run_tommy_test_fresh_action(ctx: ActionCtx) -> i32:
     if corpus_copy_w_files(ctx, ctx.inputs()[1], tree ++ "/lib/std/tommyds") != 0: return 1
     tommy_compile_and_run(ctx, ["build", "-O1", "lib/std/tommyds/check_.w", "--bundle-corpus", "std/tommyds"], tree)
 
-fn tommy_compile_and_run(ctx: &ActionCtx, build_args: Vec[str], cwd: &str) -> i32:
+fn tommy_compile_and_run(ctx: &ActionCtx, build_args: List[str], cwd: &str) -> i32:
     let fs = ctx.fs()
     let compiler = corpus_abs(ctx, ctx.inputs()[0])
     let output = ctx.output()
     let binary = output ++ "/tommycheck"
-    var compile_args: Vec[str] = Vec.new()
+    var compile_args: List[str] = List.new()
     compile_args.push(compiler.clone())
     for arg in build_args: compile_args.push(arg.clone())
     compile_args.push("-o")
@@ -84,7 +84,7 @@ fn tommy_compile_and_run(ctx: &ActionCtx, build_args: Vec[str], cwd: &str) -> i3
     // #2230: name what runs before it runs — the compiler and the binary.
     if corpus_provenance(ctx, output, ctx.inputs()[0]) != 0: return 1
     if corpus_provenance(ctx, output, binary) != 0: return 1
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push(corpus_abs(ctx, binary))
     let result = ctx.process_runner().run_capture(argv, corpus_abs(ctx, binary ++ ".stdout"), corpus_abs(ctx, binary ++ ".stderr"), 600000)
     if result.rc != 0: return corpus_fail(ctx, f"tommycheck exited {result.rc}\n" ++ result.stdout ++ result.stderr)

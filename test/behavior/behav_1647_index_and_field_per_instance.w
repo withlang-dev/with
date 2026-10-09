@@ -16,13 +16,13 @@ type Pair[A, B] {
     second: B,
 }
 
-fn joined[T](xs: &Vec[T], f: fn(&T) -> str) -> str:
+fn joined[T](xs: &List[T], f: fn(&T) -> str) -> str:
     var out = ""
     for i in 0..xs.len() as i32:
         out = out ++ f(&xs[i])
     out
 
-fn count_of[T](xs: &Vec[T]) -> i32:
+fn count_of[T](xs: &List[T]) -> i32:
     var n = 0
     for i in 0..xs.len() as i32:
         let _ = &xs[i]
@@ -32,9 +32,9 @@ fn count_of[T](xs: &Vec[T]) -> i32:
 fn describe[A, B](p: &Pair[A, B], fa: fn(&A) -> str, fb: fn(&B) -> str) -> str: fa(&p.first) ++ " " ++ fb(&p.second)
 
 fn main:
-    let words: Vec[str] = ["a", "b"]
+    let words: List[str] = ["a", "b"]
     print(f"str {joined(&words, w => w)} {count_of(&words)}")
-    let nums: Vec[i32] = [3, 4]
+    let nums: List[i32] = [3, 4]
     print(f"i32 {nums[0] + nums[1]} {count_of(&nums)}")
     let p = Pair { first: "x", second: 3 }
     let q = Pair { first: 4, second: "y" }

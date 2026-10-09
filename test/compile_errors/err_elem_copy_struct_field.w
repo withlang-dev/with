@@ -4,11 +4,11 @@
 // &Thing element view cannot satisfy it because Thing is not Copy.
 
 use std.builtins.int_to_string
-type Thing { vals: Vec[i32] }
+type Thing { vals: List[i32] }
 type Holder { t: Thing }
 
 fn main:
-    var items: Vec[Thing] = Vec.new()
-    items.push(Thing { vals: Vec.new() })
+    var items: List[Thing] = List.new()
+    items.push(Thing { vals: List.new() })
     let h = Holder { t: items[0] }
     print(int_to_string(h.t.vals.len()))

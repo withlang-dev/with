@@ -13,7 +13,7 @@ extern fn with_runtime_run_one_step()
 var res_drops: Atomic[i32]
 var after_loop: Atomic[i32]
 
-type Res { data: Vec[i32] }
+type Res { data: List[i32] }
 impl Drop for Res:
     move fn drop():
         res_drops.fetch_add(1, .SeqCst)

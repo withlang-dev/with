@@ -8,7 +8,7 @@
 
 use std.builtins.print_i64
 fn main:
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     let zero: u64 = v.len() as u64
     let n = zero - 1
     print_i64(n as i64)

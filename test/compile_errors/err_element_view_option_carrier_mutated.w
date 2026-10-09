@@ -3,8 +3,8 @@
 // #1406 (§3.4): Option is transparent to view origins — `Some(v[0])` carries
 // the element view and its origin `v`, through the if join too.
 
-fn mkv() -> Vec[str]:
-    var v: Vec[str] = Vec.new()
+fn mkv() -> List[str]:
+    var v: List[str] = List.new()
     v.push("a".clone())
     v
 

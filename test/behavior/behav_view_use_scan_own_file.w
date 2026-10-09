@@ -8,7 +8,7 @@
 // edit to Sema.w.
 use lib.phantom_count_peer
 
-type B { xs: Vec[i32], ys: Vec[i32] }
+type B { xs: List[i32], ys: List[i32] }
 
 impl B:
     mut fn add(v: i32): self.ys.push(v)
@@ -20,8 +20,8 @@ impl B:
             let doubled_value_kept_for_width = i * 2 + i * 2 - i * 2
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(3)
-    var b = B { xs, ys: Vec.new() }
+    var b = B { xs, ys: List.new() }
     b.fill()
     print(peer_len(&b.ys))

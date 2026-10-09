@@ -5,10 +5,10 @@
 
 use std.collections.HashMap
 type Inner {
-    tags: Vec[i32],
+    tags: List[i32],
 }
 
 fn main:
     var lookup: HashMap[str, Inner] = HashMap.new()
-    lookup.insert("alpha", Inner { tags: Vec.new() })
+    lookup.insert("alpha", Inner { tags: List.new() })
     lookup.get("alpha").unwrap().tags.push(4)

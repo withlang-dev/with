@@ -11,12 +11,12 @@
 
 use std.collections.HashMap
 type Inner {
-    tags: Vec[i32],
+    tags: List[i32],
     label: str,
 }
 
 fn make_inner(label: str) -> Inner:
-    Inner { tags: Vec.new(), label }
+    Inner { tags: List.new(), label }
 
 fn option_direct_no_crash:
     let opt: Option[Inner] = Some(make_inner("option-direct"))
@@ -41,7 +41,7 @@ fn result_binding:
     assert(item.tags[0] == 22)
 
 fn iter_view_binding:
-    var items: Vec[Inner] = Vec.new()
+    var items: List[Inner] = List.new()
     items.push(make_inner("iter-binding"))
     var iter = items.iter()
     let item = iter.next().unwrap()

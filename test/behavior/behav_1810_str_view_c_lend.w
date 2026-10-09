@@ -20,7 +20,7 @@ fn main:
     let r: &str = h
     print(clen(r))
     print(strlen(r[1..4]))
-    var xs: Vec[str] = Vec.new()
+    var xs: List[str] = List.new()
     xs.push("ab")
     print(strlen(xs[0]))
     let rec = Rec { name: "fives" }

@@ -19,7 +19,7 @@ fn main:
     let base = &raw const o as i64
     let b_at = &raw const o.al.b as i64
     print(f"outer offset {b_at - base} aligned {b_at % 32 == 0}")
-    var v: Vec[Big] = Vec.new()
+    var v: List[Big] = List.new()
     for i in 0..20: v.push(Big { n: i as i64 })
     var ok = 0
     var sum: i64 = 0

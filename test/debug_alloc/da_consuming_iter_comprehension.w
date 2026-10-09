@@ -22,20 +22,20 @@ fn new_w(drops: *mut i32, n: i32) -> W:
 fn main:
     // projection with filter: every element drops during the loop
     var drops = 0
-    var xs: Vec[W] = Vec.new()
+    var xs: List[W] = List.new()
     xs.push(new_w(&raw mut drops, 1))
     xs.push(new_w(&raw mut drops, 2))
     xs.push(new_w(&raw mut drops, 3))
-    let odd: Vec[i32] = [w.n for w in xs.into_iter() if w.n % 2 == 1]
+    let odd: List[i32] = [w.n for w in xs.into_iter() if w.n % 2 == 1]
     assert(odd.len() == 2)
     assert(drops == 3)
 
     // identity: elements move into the output; ownership transfers whole
     var drops2 = 0
-    var ys: Vec[W] = Vec.new()
+    var ys: List[W] = List.new()
     ys.push(new_w(&raw mut drops2, 7))
     ys.push(new_w(&raw mut drops2, 8))
-    var kept: Vec[W] = [w for w in ys.into_iter()]
+    var kept: List[W] = [w for w in ys.into_iter()]
     assert(kept.len() == 2)
     assert(drops2 == 0)
     kept.clear()

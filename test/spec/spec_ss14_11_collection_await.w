@@ -37,7 +37,7 @@ async fn never_result(value: i32) -> Result[i32, str]:
 
 fn test_await_all_in_input_order():
     let baseline = unsafe { with_fiber_live_fibers() }
-    let tasks: Vec[Task[i32]] = Vec.new()
+    let tasks: List[Task[i32]] = List.new()
     tasks.push(delayed_value(10, 4))
     tasks.push(delayed_value(20, 0))
     let values = tasks |> await_all
@@ -48,7 +48,7 @@ fn test_await_all_in_input_order():
 
 fn test_fallible_await_all_in_input_order():
     let baseline = unsafe { with_fiber_live_fibers() }
-    let tasks: Vec[Task[Result[i32, str]]] = Vec.new()
+    let tasks: List[Task[Result[i32, str]]] = List.new()
     tasks.push(delayed_ok(10, 4))
     tasks.push(delayed_ok(20, 0))
     let result = tasks |> await_all
@@ -59,8 +59,8 @@ fn test_fallible_await_all_in_input_order():
     assert(values[1] == 20)
     assert(unsafe { with_fiber_live_fibers() } == baseline)
 
-fn collect_first_error() -> Result[Vec[i32], str]:
-    let tasks: Vec[Task[Result[i32, str]]] = Vec.new()
+fn collect_first_error() -> Result[List[i32], str]:
+    let tasks: List[Task[Result[i32, str]]] = List.new()
     tasks.push(never_result(10))
     tasks.push(delayed_err("fast", 0))
     tasks |> await_all?
@@ -74,7 +74,7 @@ fn test_fallible_await_all_is_completion_fail_fast():
 
 fn test_await_first_uses_completion_order():
     let baseline = unsafe { with_fiber_live_fibers() }
-    let tasks: Vec[Task[i32]] = Vec.new()
+    let tasks: List[Task[i32]] = List.new()
     tasks.push(delayed_value(10, 4))
     tasks.push(delayed_value(20, 0))
     assert((tasks |> await_first) == 20)
@@ -82,7 +82,7 @@ fn test_await_first_uses_completion_order():
 
 fn test_await_any_uses_completion_order():
     let baseline = unsafe { with_fiber_live_fibers() }
-    let tasks: Vec[Task[Result[i32, str]]] = Vec.new()
+    let tasks: List[Task[Result[i32, str]]] = List.new()
     tasks.push(delayed_ok(10, 4))
     tasks.push(delayed_ok(20, 0))
     tasks.push(never_result(30))
@@ -93,7 +93,7 @@ fn test_await_any_uses_completion_order():
 
 fn test_await_any_all_fail_is_input_ordered():
     let baseline = unsafe { with_fiber_live_fibers() }
-    let tasks: Vec[Task[Result[i32, str]]] = Vec.new()
+    let tasks: List[Task[Result[i32, str]]] = List.new()
     tasks.push(delayed_err("slow", 4))
     tasks.push(delayed_err("fast", 0))
     let result = tasks |> await_any
@@ -105,14 +105,14 @@ fn test_await_any_all_fail_is_input_ordered():
     assert(unsafe { with_fiber_live_fibers() } == baseline)
 
 fn test_await_any_empty():
-    let tasks: Vec[Task[Result[i32, str]]] = Vec.new()
+    let tasks: List[Task[Result[i32, str]]] = List.new()
     let result = tasks |> await_any
     assert(result.is_err())
     assert(result.err().unwrap().is_empty())
 
 fn test_await_settled_is_input_ordered():
     let baseline = unsafe { with_fiber_live_fibers() }
-    let tasks: Vec[Task[Result[i32, str]]] = Vec.new()
+    let tasks: List[Task[Result[i32, str]]] = List.new()
     tasks.push(delayed_err("slow", 4))
     tasks.push(delayed_ok(20, 0))
     let settled = tasks |> await_settled

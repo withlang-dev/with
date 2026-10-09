@@ -6,7 +6,7 @@ type Frame {
 }
 
 fn callee -> Unit:
-    var v: Vec[Frame] = Vec.new()
+    var v: List[Frame] = List.new()
     v.push(Frame { kind: 1, label: 2 })
     let _ = v.pop()
 

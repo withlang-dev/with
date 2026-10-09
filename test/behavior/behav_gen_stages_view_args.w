@@ -6,14 +6,14 @@
 // as the generator value; the chain is consumed where the views are live.
 use std.generators.{map, filter, take, collect}
 
-gen fn over(xs: &Vec[i64]) -> &i64:
+gen fn over(xs: &List[i64]) -> &i64:
     for x in xs:
         yield x
 
 fn main:
-    let v: Vec[i64] = [4, 5, 6]
-    let firsts = over(&v) |> map(it * 2) |> take(2) |> collect[Vec]()
-    let evens = over(&v) |> filter(*it % 2 == 0) |> map(it * 2) |> collect[Vec]()
+    let v: List[i64] = [4, 5, 6]
+    let firsts = over(&v) |> map(it * 2) |> take(2) |> collect[List]()
+    let evens = over(&v) |> filter(*it % 2 == 0) |> map(it * 2) |> collect[List]()
     print(f"{firsts.len()} {firsts[0]} {firsts[1]}")
     let staged = over(&v) |> map(it * 3)
     var total: i64 = 0

@@ -12,14 +12,14 @@
 // moves it, and the distinct type has its underlying type's destructor —
 // every buffer below is freed exactly once. Before, `s as Name` left the
 // buffer with `s` (a `Name` drop freed nothing) and `n as str` made a second
-// owner: a double free for str, an invalid free for Vec, a leak for a struct.
+// owner: a double free for str, an invalid free for List, a leak for a struct.
 type Name = distinct str
-type Bag = distinct Vec[i32]
+type Bag = distinct List[i32]
 type Rec { s: str }
 type RecD = distinct Rec
 
-fn vec3() -> Vec[i32]:
-    var v: Vec[i32] = Vec.new()
+fn vec3() -> List[i32]:
+    var v: List[i32] = List.new()
     v.push(1)
     v.push(2)
     v.push(3)
@@ -38,13 +38,13 @@ fn main:
     let m = "abc" as Name
     print(m as str)
     print(mk_name() as str)
-    // a Vec
+    // a List
     let v = vec3()
     let b = v as Bag
-    let w = b as Vec[i32]
+    let w = b as List[i32]
     print(w.len())
     let b2 = vec3() as Bag
-    print((b2 as Vec[i32]).len())
+    print((b2 as List[i32]).len())
     // a struct holding an owned str
     let r = Rec { s: "rec" }
     let d = r as RecD

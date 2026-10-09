@@ -2,5 +2,5 @@
 use std.collections.HashMap
 
 fn main:
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     let _map = xs.iter() |> collect[HashMap[i32, i32]]()

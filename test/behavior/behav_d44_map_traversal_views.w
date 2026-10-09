@@ -16,11 +16,11 @@ var m: HashMap[str, i32] = HashMap.new()
 m.insert("alpha".to_owned(), 1)
 m.insert("beta".to_owned(), 2)
 
-let names = m.keys() |> map(it.clone()) |> collect[Vec]()
+let names = m.keys() |> map(it.clone()) |> collect[List]()
 print(names.join(" "))
-let counts = m.values() |> map(it.clone()) |> collect[Vec]()
+let counts = m.values() |> map(it.clone()) |> collect[List]()
 print(f"{counts:?}")
-let entries = m.iter() |> map(e => f"{e.0}={e.1}") |> collect[Vec]()
+let entries = m.iter() |> map(e => f"{e.0}={e.1}") |> collect[List]()
 print(entries.join(" "))
 
 let doubled = [v * 2 for (k, v) in m]
@@ -38,5 +38,5 @@ print(seen)
 let bt: BTreeMap[str, i32] = ["b": 2, "a": 1]
 let pairs = [f"{k}{v}" for (k, v) in bt]
 print(f"{pairs:?}")
-let bt_keys = bt.keys() |> collect[Vec]()
+let bt_keys = bt.keys() |> collect[List]()
 print(f"{bt_keys[0]} {bt_keys[1]}")

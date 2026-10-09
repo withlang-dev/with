@@ -59,12 +59,12 @@ fn local_field -> i32:
     var p = Pt { x: 1, y: 2 }
     p.y += 5
 fn element -> i32:
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     v.push(1)
     v.push(2)
     v[1] = 20
 fn element_compound -> i32:
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     v.push(4)
     v[0] *= 3
 fn array_element -> i32:

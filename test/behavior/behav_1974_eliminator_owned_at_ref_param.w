@@ -17,7 +17,7 @@ fn make(ok: bool) -> Result[str, i32]:
 fn some(ok: bool) -> Option[str]:
     if ok: Some("abc") else: None
 
-fn first(v: &Vec[str]) -> Option[&str]:
+fn first(v: &List[str]) -> Option[&str]:
     if v.len() > 0: Some(v[0]) else: None
 
 fn main:
@@ -25,7 +25,7 @@ fn main:
     let n: Option[i64] = Some(3)
     let none_n: Option[i64] = None
     print(f"{peek(some(false).unwrap_or_else(() => "four"))} {bump(n ?? 0)} {peek(make(false).unwrap_or_else((e) => "seven!"))} {bump(none_n ?? 0)}")
-    var v: Vec[str] = Vec.new()
+    var v: List[str] = List.new()
     v.push("xyz")
-    let empty: Vec[str] = Vec.new()
+    let empty: List[str] = List.new()
     print(f"{peek(first(&v) ?? "")} {peek(first(&empty) ?? "")}")

@@ -12,10 +12,10 @@ use std.collections.HashMap
 // tree construction.
 //
 // Storage follows the SoA idiom used throughout the compiler (see
-// src/Ast.w): parallel Vec[i32] arrays keyed by a stable id handle.
+// src/Ast.w): parallel List[i32] arrays keyed by a stable id handle.
 // Node 0 is the null sentinel in every pool. Variable-length payloads
 // (init list items, call args, fn param lists) live in a single flat
-// `extra: Vec[i32]` per pool, referenced by (start, count).
+// `extra: List[i32]` per pool, referenced by (start, count).
 //
 // Every CiExpr carries its resolved CiType (an index into the shared
 // CiTypePool). The printer must not re-query libclang at print time —
@@ -41,9 +41,9 @@ pub fn ci_ir_owned_text(text: &str) -> str:
         return ""
     with_str_clone_ref(text)
 
-fn ci_ir_free_vec_i32(v: &Vec[i32]): with_vec_free(v as *const Vec[i32] as *mut u8)
+fn ci_ir_free_list_i32(v: &List[i32]): with_vec_free(v as *const List[i32] as *mut u8)
 
-fn ci_ir_free_vec_str(v: &Vec[str]): with_vec_free(v as *const Vec[str] as *mut u8)
+fn ci_ir_free_list_str(v: &List[str]): with_vec_free(v as *const List[str] as *mut u8)
 
 // ── CiType ────────────────────────────────────────────────────
 
@@ -65,12 +65,12 @@ pub enum CiTypeKind: i32:
 pub const CI_SIZE_INCOMPLETE: i32 = -1
 
 type CiTypePoolState {
-    kinds: Vec[i32],
-    data0: Vec[i32],
-    data1: Vec[i32],
-    data2: Vec[i32],
-    extra: Vec[i32],
-    strings: Vec[str],
+    kinds: List[i32],
+    data0: List[i32],
+    data1: List[i32],
+    data2: List[i32],
+    extra: List[i32],
+    strings: List[str],
     frozen: i32,
 }
 
@@ -82,12 +82,12 @@ impl Copy for CiTypePool
 fn CiTypePool.new -> CiTypePool:
     let ptr = with_alloc(sizeof[CiTypePoolState]()) as *mut CiTypePoolState
     unsafe *ptr = CiTypePoolState {
-        kinds: Vec.new(),
-        data0: Vec.new(),
-        data1: Vec.new(),
-        data2: Vec.new(),
-        extra: Vec.new(),
-        strings: Vec.new(),
+        kinds: List.new(),
+        data0: List.new(),
+        data1: List.new(),
+        data2: List.new(),
+        extra: List.new(),
+        strings: List.new(),
         frozen: 0,
     }
     ptr.kinds.push(0)
@@ -101,12 +101,12 @@ impl CiTypePool:
         if self.state as i64 == 0:
             return
         let st = self.state
-        ci_ir_free_vec_i32(st.kinds)
-        ci_ir_free_vec_i32(st.data0)
-        ci_ir_free_vec_i32(st.data1)
-        ci_ir_free_vec_i32(st.data2)
-        ci_ir_free_vec_i32(st.extra)
-        ci_ir_free_vec_str(st.strings)
+        ci_ir_free_list_i32(st.kinds)
+        ci_ir_free_list_i32(st.data0)
+        ci_ir_free_list_i32(st.data1)
+        ci_ir_free_list_i32(st.data2)
+        ci_ir_free_list_i32(st.extra)
+        ci_ir_free_list_str(st.strings)
         with_free(st as *mut u8)
 
     fn add(kind: i32, d0: i32, d1: i32, d2: i32) -> CiTypeId:
@@ -285,13 +285,13 @@ pub enum CiUnaryOp: i32:
     CIUO_BIT_NOT = 3
 
 type CiExprPoolState {
-    kinds: Vec[i32],
-    data0: Vec[i32],
-    data1: Vec[i32],
-    data2: Vec[i32],
-    types: Vec[i32],
-    extra: Vec[i32],
-    strings: Vec[str],
+    kinds: List[i32],
+    data0: List[i32],
+    data1: List[i32],
+    data2: List[i32],
+    types: List[i32],
+    extra: List[i32],
+    strings: List[str],
     frozen: i32,
 }
 
@@ -303,13 +303,13 @@ impl Copy for CiExprPool
 fn CiExprPool.new -> CiExprPool:
     let ptr = with_alloc(sizeof[CiExprPoolState]()) as *mut CiExprPoolState
     unsafe *ptr = CiExprPoolState {
-        kinds: Vec.new(),
-        data0: Vec.new(),
-        data1: Vec.new(),
-        data2: Vec.new(),
-        types: Vec.new(),
-        extra: Vec.new(),
-        strings: Vec.new(),
+        kinds: List.new(),
+        data0: List.new(),
+        data1: List.new(),
+        data2: List.new(),
+        types: List.new(),
+        extra: List.new(),
+        strings: List.new(),
         frozen: 0,
     }
     ptr.kinds.push(0)
@@ -324,13 +324,13 @@ impl CiExprPool:
         if self.state as i64 == 0:
             return
         let st = self.state
-        ci_ir_free_vec_i32(st.kinds)
-        ci_ir_free_vec_i32(st.data0)
-        ci_ir_free_vec_i32(st.data1)
-        ci_ir_free_vec_i32(st.data2)
-        ci_ir_free_vec_i32(st.types)
-        ci_ir_free_vec_i32(st.extra)
-        ci_ir_free_vec_str(st.strings)
+        ci_ir_free_list_i32(st.kinds)
+        ci_ir_free_list_i32(st.data0)
+        ci_ir_free_list_i32(st.data1)
+        ci_ir_free_list_i32(st.data2)
+        ci_ir_free_list_i32(st.types)
+        ci_ir_free_list_i32(st.extra)
+        ci_ir_free_list_str(st.strings)
         with_free(st as *mut u8)
 
     fn add(kind: i32, d0: i32, d1: i32, d2: i32, ty: CiTypeId) -> CiExprId:
@@ -385,7 +385,7 @@ impl CiExprPool:
             ci_ir_phase_bug("BUG: CiExprPool.set_type called after freeze")
         let idx = (id as i32) as i64
         var i: i64 = 0
-        var out: Vec[i32] = Vec.new()
+        var out: List[i32] = List.new()
         let n = st.types.len()
         while i < n:
             if i == idx:
@@ -464,13 +464,13 @@ pub enum CiStmtKind: i32:
 // For _ / default arms, value_count == 0.
 
 type CiStmtPoolState {
-    kinds: Vec[i32],
-    data0: Vec[i32],
-    data1: Vec[i32],
-    data2: Vec[i32],
-    extra: Vec[i32],
-    strings: Vec[str],
-    flags: Vec[i32],
+    kinds: List[i32],
+    data0: List[i32],
+    data1: List[i32],
+    data2: List[i32],
+    extra: List[i32],
+    strings: List[str],
+    flags: List[i32],
     frozen: i32,
 }
 
@@ -483,13 +483,13 @@ fn CiStmtPool.new -> CiStmtPool:
     let ptr = with_alloc(sizeof[CiStmtPoolState]()) as *mut CiStmtPoolState
     unsafe:
         *ptr = CiStmtPoolState {
-            kinds: Vec.new(),
-            data0: Vec.new(),
-            data1: Vec.new(),
-            data2: Vec.new(),
-            extra: Vec.new(),
-            strings: Vec.new(),
-            flags: Vec.new(),
+            kinds: List.new(),
+            data0: List.new(),
+            data1: List.new(),
+            data2: List.new(),
+            extra: List.new(),
+            strings: List.new(),
+            flags: List.new(),
             frozen: 0,
         }
     let st = ptr
@@ -506,13 +506,13 @@ impl CiStmtPool:
         if self.state as i64 == 0:
             return
         let st = self.state
-        ci_ir_free_vec_i32(st.kinds)
-        ci_ir_free_vec_i32(st.data0)
-        ci_ir_free_vec_i32(st.data1)
-        ci_ir_free_vec_i32(st.data2)
-        ci_ir_free_vec_i32(st.extra)
-        ci_ir_free_vec_str(st.strings)
-        ci_ir_free_vec_i32(st.flags)
+        ci_ir_free_list_i32(st.kinds)
+        ci_ir_free_list_i32(st.data0)
+        ci_ir_free_list_i32(st.data1)
+        ci_ir_free_list_i32(st.data2)
+        ci_ir_free_list_i32(st.extra)
+        ci_ir_free_list_str(st.strings)
+        ci_ir_free_list_i32(st.flags)
         with_free(st as *mut u8)
 
     fn add(kind: i32, d0: i32, d1: i32, d2: i32, flags: i32) -> CiStmtId:
@@ -676,14 +676,14 @@ const CID_FLAG_DEFINITION: i32 = 4
 const CID_FLAG_VAR_STATIC: i32 = 8
 
 type CiDeclPoolState {
-    kinds: Vec[i32],
-    data0: Vec[i32],
-    data1: Vec[i32],
-    data2: Vec[i32],
-    extra: Vec[i32],
-    strings: Vec[str],
-    flags: Vec[i32],
-    owner_module: Vec[i32],
+    kinds: List[i32],
+    data0: List[i32],
+    data1: List[i32],
+    data2: List[i32],
+    extra: List[i32],
+    strings: List[str],
+    flags: List[i32],
+    owner_module: List[i32],
     frozen: i32,
 }
 
@@ -696,14 +696,14 @@ fn CiDeclPool.new -> CiDeclPool:
     let ptr = with_alloc(sizeof[CiDeclPoolState]()) as *mut CiDeclPoolState
     unsafe:
         *ptr = CiDeclPoolState {
-            kinds: Vec.new(),
-            data0: Vec.new(),
-            data1: Vec.new(),
-            data2: Vec.new(),
-            extra: Vec.new(),
-            strings: Vec.new(),
-            flags: Vec.new(),
-            owner_module: Vec.new(),
+            kinds: List.new(),
+            data0: List.new(),
+            data1: List.new(),
+            data2: List.new(),
+            extra: List.new(),
+            strings: List.new(),
+            flags: List.new(),
+            owner_module: List.new(),
             frozen: 0,
         }
     let st = ptr
@@ -803,8 +803,8 @@ type CiModule {
     exprs: CiExprPool,
     stmts: CiStmtPool,
     decls: CiDeclPool,
-    top_level_decls: Vec[i32],
-    imports: Vec[str],
+    top_level_decls: List[i32],
+    imports: List[str],
 }
 
 fn CiModule.new(name: &str, source_path: &str) -> CiModule:
@@ -815,8 +815,8 @@ fn CiModule.new(name: &str, source_path: &str) -> CiModule:
         exprs: CiExprPool.new(),
         stmts: CiStmtPool.new(),
         decls: CiDeclPool.new(),
-        top_level_decls: Vec.new(),
-        imports: Vec.new(),
+        top_level_decls: List.new(),
+        imports: List.new(),
     }
 
 impl CiModule:
@@ -860,13 +860,13 @@ type CiProjectSymbol {
     // and `param_reason[i]` its one-line reason. `has_definition` is 1 when
     // a corpus unit defines the function; `unanalyzable` 1 when a body
     // could not be walked.
-    param_fn_ptr: Vec[i32],
-    param_tested: Vec[i32],
-    param_aborting: Vec[i32],
-    param_null_caller: Vec[str],
-    param_sinks: Vec[str],
-    param_nullable: Vec[i32],
-    param_reason: Vec[str],
+    param_fn_ptr: List[i32],
+    param_tested: List[i32],
+    param_aborting: List[i32],
+    param_null_caller: List[str],
+    param_sinks: List[str],
+    param_nullable: List[i32],
+    param_reason: List[str],
     has_definition: i32,
     unanalyzable: i32,
 }
@@ -882,13 +882,13 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         consumers: "",
         owner_rank: -1,
         owner_definition_kind: 0,
-        param_fn_ptr: Vec.new(),
-        param_tested: Vec.new(),
-        param_aborting: Vec.new(),
-        param_null_caller: Vec.new(),
-        param_sinks: Vec.new(),
-        param_nullable: Vec.new(),
-        param_reason: Vec.new(),
+        param_fn_ptr: List.new(),
+        param_tested: List.new(),
+        param_aborting: List.new(),
+        param_null_caller: List.new(),
+        param_sinks: List.new(),
+        param_nullable: List.new(),
+        param_reason: List.new(),
         has_definition: 0,
         unanalyzable: 0,
     }
@@ -953,8 +953,8 @@ fn ci_project_symbol_key(kind: i32, name: &str) -> str:
     "m:" ++ name
 
 pub type CiProject {
-    module_paths: Vec[str],
-    symbols: Vec[CiProjectSymbol],
+    module_paths: List[str],
+    symbols: List[CiProjectSymbol],
     types: CiTypePool,
     // key (ci_project_symbol_key) → index into `symbols`: the lookup every
     // evidence line and sink walk makes, once linear over thousands of
@@ -966,8 +966,8 @@ pub type CiProject {
 
 fn CiProject.new -> CiProject:
     CiProject {
-        module_paths: Vec.new(),
-        symbols: Vec.new(),
+        module_paths: List.new(),
+        symbols: List.new(),
         types: CiTypePool.new(),
         symbol_index: HashMap.new(),
         sink_seen: HashMap.new(),

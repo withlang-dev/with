@@ -1,7 +1,7 @@
-// Test: Vec.range(start..end) scoped sub-range view
+// Test: List.range(start..end) scoped sub-range view
 
 fn test_range_read:
-    var xs = Vec.new()
+    var xs = List.new()
     xs.push(10)
     xs.push(20)
     xs.push(30)
@@ -12,7 +12,7 @@ fn test_range_read:
     assert(r.len() == 2)
 
 fn test_range_write:
-    var xs = Vec.new()
+    var xs = List.new()
     xs.push(10)
     xs.push(20)
     xs.push(30)
@@ -26,7 +26,7 @@ fn test_range_write:
     assert(xs[3] == 40)
 
 fn test_range_len:
-    var xs = Vec.new()
+    var xs = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)

@@ -65,8 +65,8 @@ unsafe fn zip_current_entry(handle: *mut c_void) -> Result[ZipEntry, ZipError]:
 
 impl ZipArchive:
     /// Every member, in archive order.
-    pub fn entries() -> Result[Vec[ZipEntry], ZipError]:
-        var out: Vec[ZipEntry] = Vec.new()
+    pub fn entries() -> Result[List[ZipEntry], ZipError]:
+        var out: List[ZipEntry] = List.new()
         var rc = unsafe { unzGoToFirstFile(self.handle) }
         while rc == UNZ_OK:
             out.push(unsafe { zip_current_entry(self.handle) }?)
@@ -75,7 +75,7 @@ impl ZipArchive:
         out
 
     /// The bytes of the member named `name`.
-    pub fn read(name: &str) -> Result[Vec[u8], ZipError]:
+    pub fn read(name: &str) -> Result[List[u8], ZipError]:
         let cname = match name.to_cstring():
             Ok(c) => c
             Err(_) => return Err(zip_error(UNZ_PARAMERROR, "an entry name cannot hold a NUL byte"))
@@ -139,11 +139,11 @@ unsafe fn zip_write_current(handle: *mut c_void, target: &str) -> Result[Unit, Z
 // Decompresses the current member: into `stream` when it is set (the
 // returned bytes are then empty), else into the returned bytes. Closing the
 // member is where minizip checks the CRC-32.
-unsafe fn zip_drain_current(handle: *mut c_void, stream: *mut c_void) -> Result[Vec[u8], ZipError]:
+unsafe fn zip_drain_current(handle: *mut c_void, stream: *mut c_void) -> Result[List[u8], ZipError]:
     let opened = unsafe { unzOpenCurrentFile(handle) }
     if opened != UNZ_OK: return Err(zip_error(opened, "cannot open an entry (an encrypted or unsupported method)"))
     let buf = with_alloc(ZIP_CHUNK as i64) as *mut u8
-    var bytes: Vec[u8] = Vec.new()
+    var bytes: List[u8] = List.new()
     var failure = 0
     var n = unsafe { unzReadCurrentFile(handle, buf as *mut c_void, ZIP_CHUNK as c_uint) }
     while n > 0 and failure == 0:

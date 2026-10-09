@@ -4,12 +4,12 @@
 // shorthand — trapped the compiler (the call result was typed unit and
 // aggregated into the Option). Both the view and the owned payload shapes
 // must compile and carry the value.
-fn first_view(v: &Vec[i32]) -> Option[&i32]: .Some(v[0])
-fn first_owned(v: &Vec[i32]) -> Option[i32]: .Some(v[0])
-fn first_str(v: &Vec[str]) -> Option[&str]: .Some(v[0])
+fn first_view(v: &List[i32]) -> Option[&i32]: .Some(v[0])
+fn first_owned(v: &List[i32]) -> Option[i32]: .Some(v[0])
+fn first_str(v: &List[str]) -> Option[&str]: .Some(v[0])
 
 fn main:
-    let xs: Vec[i32] = [7, 8]
+    let xs: List[i32] = [7, 8]
     match first_view(xs):
         .Some(p) => if *p != 7:
             print("FAIL view")
@@ -34,7 +34,7 @@ fn main:
         .None =>
             print("FAIL autoref none")
             return
-    var ss: Vec[str] = Vec.new()
+    var ss: List[str] = List.new()
     ss.push("hello")
     match first_str(ss):
         .Some(s) => if s.len() != 5:

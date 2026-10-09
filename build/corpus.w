@@ -45,28 +45,28 @@ pub type Corpus ephemeral {
     // the license file in the reference tree, copied beside the migration ("" = none)
     license: str,
     // modules that ride in the corpus but never in the bundle root (the harness)
-    harness: Vec[str],
+    harness: List[str],
     // the corpus module the drift lane builds against both objects, and its argument
     drift_harness: str,
     drift_harness_arg: str,
     // the least number of generated modules a migration must produce
     module_floor: i32,
     // preprocessor defines and excluded basenames for the directory migration
-    defines: Vec[str],
-    excludes: Vec[str],
+    defines: List[str],
+    excludes: List[str],
     // functions upstream declares in its own headers but never defines (the
     // migrated extern has no body anywhere; it links only while unreferenced)
-    declared_externs: Vec[str],
+    declared_externs: List[str],
     // lane targets a promote waits for (the corpus's own tests)
-    promote_after: Vec[str],
+    promote_after: List[str],
     // the lane `:test` runs ("" = none)
     test_lane: str,
     // D112: the lanes that run upstream's tests on a fresh migration; with
     // `<stem>-check-generated` they are this corpus's migrator gate
-    fresh_test_lanes: Vec[str],
+    fresh_test_lanes: List[str],
     // D112: generated directories beside corpus_dir that promotion writes
     // and the corpus stamp covers (c-algorithms' migrated test programs)
-    extra_generated_dirs: Vec[str],
+    extra_generated_dirs: List[str],
     // ── hooks ────────────────────────────────────────────────────
     // adjust the extracted reference tree (pcre2 generates config.h)
     prepare_reference: fn(&ActionCtx, &Corpus, &str) -> i32,
@@ -180,11 +180,11 @@ fn corpus_str_less(a: &str, b: &str) -> bool:
         if a[i] != b[i]: return (a[i] as i32) < (b[i] as i32)
     a.len() < b.len()
 
-pub fn corpus_sorted(items: Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
+pub fn corpus_sorted(items: List[str]) -> List[str]:
+    var sorted: List[str] = List.new()
     for item in items:
         var placed = false
-        var next: Vec[str] = Vec.new()
+        var next: List[str] = List.new()
         for existing in sorted:
             if not placed and corpus_str_less(item, existing):
                 next.push(item.clone())
@@ -203,13 +203,13 @@ pub fn corpus_is_harness(corpus: &Corpus, name: &str) -> bool:
 /// (the .wo build compiles it --no-prelude, so its defs carry c_void and the
 /// unreachable shim), no foreign ABI surface, one shared definitions module.
 pub fn corpus_migrate_options(corpus: &Corpus, source: &str, output: &str) -> MigrateOptions:
-    var defines: Vec[str] = Vec.new()
+    var defines: List[str] = List.new()
     for define in corpus.defines: defines.push(define.clone())
-    var excludes: Vec[str] = Vec.new()
+    var excludes: List[str] = List.new()
     for exclude in corpus.excludes: excludes.push(exclude.clone())
     MigrateOptions {
         source_path: corpus_owned_text(source), output_path: corpus_owned_text(output),
-        include_paths: [corpus_owned_text(source)], forced_includes: Vec.new(),
+        include_paths: [corpus_owned_text(source)], forced_includes: List.new(),
         defines: defines, exclude_basenames: excludes, check_mode: false,
         diff_mode: false, stats_mode: false, no_c_export: true,
         c_export_functions: false, convert_goto_to_structured: false,
@@ -274,8 +274,8 @@ pub fn corpus_migrator_arg(ctx: &ActionCtx) -> str:
 /// takes: the CLI and the workspace both set the migrator's options and call
 /// migrate_c_directory (or migrate_c_file), and a `--no-prelude` CLI run is
 /// the workspace's PreludeMode.None.
-pub fn corpus_migrate_argv(ctx: &ActionCtx, compiler: &str, options: &MigrateOptions) -> Vec[str]:
-    var argv: Vec[str] = Vec.new()
+pub fn corpus_migrate_argv(ctx: &ActionCtx, compiler: &str, options: &MigrateOptions) -> List[str]:
+    var argv: List[str] = List.new()
     argv.push(corpus_abs(ctx, compiler))
     argv.push("migrate")
     argv.push(corpus_abs(ctx, options.source_path))
@@ -339,7 +339,7 @@ pub fn corpus_migrate_directory(ctx: &ActionCtx, corpus: &Corpus, source: &str, 
 /// every fresh compiler accepted it, and a migration that changed a
 /// signature could not pass (the pcre2 cohesive check had the same defect).
 pub fn corpus_compile_binary(ctx: &ActionCtx, corpus: &Corpus, compiler: &str, label: &str, source: &str, output: &str) -> i32:
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push(corpus_abs(ctx, compiler))
     argv.push("build")
     argv.push(corpus_abs(ctx, source))
@@ -370,7 +370,7 @@ pub fn corpus_check_every_module(ctx: &ActionCtx, corpus: &Corpus, generated: &s
     if corpus_copy_w_files(ctx, generated, modules) != 0: return 1
     // Pushed, not a literal: the pinned seed frees a literal's moved
     // temporaries (#1122).
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push(corpus_abs(ctx, compiler))
     argv.push("check")
     argv.push(corpus_abs(ctx, modules ++ "/bundle.w"))
@@ -416,7 +416,7 @@ fn corpus_permitted_externs() -> str:
 
 /// Host-only symbols std.libc no longer exports; a reference in generated
 /// source means the migrator emitted the host's spelling instead of the model.
-fn corpus_retired_host_symbols() -> Vec[str]:
+fn corpus_retired_host_symbols() -> List[str]:
     ["__stderrp", "__stdoutp", "__stdinp", "__error(", "__errno_location(", "_errno(", "__acrt_iob_func(", "_fileno(", "_isatty("]
 
 // Not `str.trim`: this runs under the comptime evaluator when the action
@@ -487,8 +487,8 @@ pub fn corpus_reject_foreign_symbols(ctx: &ActionCtx, corpus: &Corpus, generated
 /// module, bytewise by name, so the bundle build reaches every module. The
 /// text is a pure function of the module listing; <stem>-bundle-root-check
 /// checks the promoted root against it.
-pub fn corpus_bundle_root_text(corpus: &Corpus, module_paths: &Vec[str]) -> str:
-    var names: Vec[str] = Vec.new()
+pub fn corpus_bundle_root_text(corpus: &Corpus, module_paths: &List[str]) -> str:
+    var names: List[str] = List.new()
     for path in module_paths:
         if not path.ends_with(".w"): continue
         let name = corpus_module_name(path)

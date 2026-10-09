@@ -16,7 +16,7 @@
 //                                   # baseline=installed `with`
 //
 // Verdicts: PASS | LEAK | DOUBLE-FREE | VALUE-FAIL | COMPILE-FAIL | RUN-FAIL.
-// POD-container cells expect CLEAN allocator verdicts (#691/D18: every Vec
+// POD-container cells expect CLEAN allocator verdicts (#691/D18: every List
 // frees its buffer at scope exit and on reassignment).
 // Run BEFORE and AFTER any change to drop scheduling, ownership lowering,
 // or receiver modes (CLAUDE.md gate).
@@ -114,7 +114,7 @@ fn cell(name: str, decls: str, expect_sum: i32) -> Cell:
 
 // #1847: the audit was blind to trait objects. A Box[dyn T] never ran its
 // payload's drop and leaked its cell, a dyn call moved its borrowed receiver,
-// and a box stored into a Vec or a field aborted codegen, with every cell
+// and a box stored into a List or a field aborted codegen, with every cell
 // green. `boxdyn` / `boxdynfield` hold R behind `dyn Held`.
 fn dyn_held_decls() -> str:
     "trait Held:\n    fn held(self: &Self) -> i32\n    fn yield_id(move self: Self) -> i32\n" ++
@@ -433,17 +433,17 @@ fn sc_dyn_call(consume: bool) -> str:
     (if consume: "    let _n = a.yield_id()\n" else: "    let _n = a.held()\n    let _m = a.held()\n") ++
     "    let _k = 0\n"
 
-fn sc_vec_elem_dyn() -> str:
+fn sc_list_elem_dyn() -> str:
     dyn_held_decls() ++
     "fn go(slot: *mut i32):\n" ++
-    "    var v: Vec[Box[dyn Held]] = Vec.new()\n" ++
+    "    var v: List[Box[dyn Held]] = List.new()\n" ++
     "    v.push(Box.new(mk(1, slot)))\n" ++
     "    v.push(Box.new(mk(2, slot)))\n" ++
     "    let _k = 0\n"
 
-fn sc_vec_elem() -> str:
+fn sc_list_elem() -> str:
     "fn go(slot: *mut i32):\n" ++
-    "    var v: Vec[R] = Vec.new()\n" ++
+    "    var v: List[R] = List.new()\n" ++
     "    v.push(mk(1, slot))\n" ++
     "    v.push(mk(2, slot))\n" ++
     "    let _k = 0\n"
@@ -479,10 +479,10 @@ fn sc_display(form: &str) -> str:
 // the clause's to drop (exactly once, at the skip); a bound one moves into
 // the result. Over a view, nothing moves. Every R (1 + 2 + 4) drops once.
 fn sc_comprehension_skip(form: &str) -> str:
-    var fill = "    var v: Vec[(i32, R)] = Vec.new()\n    v.push((0, mk(1, slot)))\n    v.push((1, mk(2, slot)))\n    v.push((0, mk(4, slot)))\n"
+    var fill = "    var v: List[(i32, R)] = List.new()\n    v.push((0, mk(1, slot)))\n    v.push((1, mk(2, slot)))\n    v.push((0, mk(4, slot)))\n"
     var comp = "[r for (0, r) in v.into_iter()]"
     if form == "option":
-        fill = "    var v: Vec[Option[R]] = Vec.new()\n    v.push(Some(mk(1, slot)))\n    v.push(None)\n    v.push(Some(mk(2, slot)))\n    v.push(Some(mk(4, slot)))\n"
+        fill = "    var v: List[Option[R]] = List.new()\n    v.push(Some(mk(1, slot)))\n    v.push(None)\n    v.push(Some(mk(2, slot)))\n    v.push(Some(mk(4, slot)))\n"
         comp = "[r for Some(r) in v.into_iter()]"
     else if form == "view":
         comp = "[r.id for (0, r) in v]"
@@ -610,7 +610,7 @@ fn le_sum(shape: &str, hit: bool) -> i32:
     if not hit: return if shape == "option": 0 else: 2
     if shape == "struct": 5 else: 1
 
-// POD-container cells: #691/D18 — every Vec frees its buffer at scope exit
+// POD-container cells: #691/D18 — every List frees its buffer at scope exit
 // and on reassignment, so the allocator verdict must be CLEAN.
 fn pod_cell(name: str, body: str) -> Cell:
     let src = "use std.builtins.print_i32\n" ++ "fn main:\n" ++ body ++ "    print_i32(0)\n"
@@ -619,7 +619,7 @@ fn pod_cell(name: str, body: str) -> Cell:
 fn sc_slotmap(kind: &str):
     var source = "use std.collections\nfn go(slot: *mut i32):\n    var map = SlotMap[R].new()\n"
     if kind == "empty": return source
-    source = source ++ "    let handles: Vec[Handle[R]] = Vec.new()\n" ++
+    source = source ++ "    let handles: List[Handle[R]] = List.new()\n" ++
         "    for i in 1..129: handles.push(map.insert(mk(i, slot)))\n"
     if kind == "partial" or kind == "refill":
         source = source ++ "    for i in 0..128:\n" ++
@@ -641,8 +641,8 @@ fn sc_facade_prelude(facade: &str):
     "impl Ord for R:\n" ++
     "    fn cmp(other: &R) -> i32: if self.id < other.id: -1 else if self.id > other.id: 1 else: 0\n"
 
-fn sc_sorted_vec(kind: &str):
-    var source = sc_facade_prelude("sorted_vec.SortedVec") ++ "fn go(slot: *mut i32):\n    var sorted = SortedVec[R].new()\n"
+fn sc_sorted_list(kind: &str):
+    var source = sc_facade_prelude("sorted_vec.SortedList") ++ "fn go(slot: *mut i32):\n    var sorted = SortedList[R].new()\n"
     if kind == "empty": return source
     source = source ++ "    for i in 1..9: sorted.insert(mk(9 - i, slot))\n" ++
         "    assert(sorted.get(0).id == 1 and sorted.get(7).id == 8)\n"
@@ -689,16 +689,16 @@ fn sc_hash_index(kind: &str):
     source
 
 fn build_cells():
-    var cells: Vec[Cell] = Vec.new()
+    var cells: List[Cell] = List.new()
     cells.push(cell("hash_index_empty/facade", sc_hash_index("empty"), 0))
     cells.push(cell("hash_index_full/facade", sc_hash_index("full"), 36))
     cells.push(cell("hash_index_partial/facade", sc_hash_index("partial"), 36))
     cells.push(cell("hash_index_replace/facade", sc_hash_index("replace"), 39))
     cells.push(cell("hash_index_cursor/facade", sc_hash_index("cursor"), 36))
-    cells.push(cell("sorted_vec_empty/facade", sc_sorted_vec("empty"), 0))
-    cells.push(cell("sorted_vec_full/facade", sc_sorted_vec("full"), 36))
-    cells.push(cell("sorted_vec_partial/facade", sc_sorted_vec("partial"), 36))
-    cells.push(cell("sorted_vec_cursor/facade", sc_sorted_vec("cursor"), 36))
+    cells.push(cell("sorted_vec_empty/facade", sc_sorted_list("empty"), 0))
+    cells.push(cell("sorted_vec_full/facade", sc_sorted_list("full"), 36))
+    cells.push(cell("sorted_vec_partial/facade", sc_sorted_list("partial"), 36))
+    cells.push(cell("sorted_vec_cursor/facade", sc_sorted_list("cursor"), 36))
     cells.push(cell("binary_heap_empty/facade", sc_binary_heap("empty"), 0))
     cells.push(cell("binary_heap_full/facade", sc_binary_heap("full"), 36))
     cells.push(cell("binary_heap_partial/facade", sc_binary_heap("partial"), 36))
@@ -748,8 +748,8 @@ fn build_cells():
     cells.push(cell("recv_mut_borrow/bare", sc_recv_mut(), 1))
     cells.push(cell("recv_move_consume/bare", sc_recv_move(), 1))
     cells.push(cell("recv_bare_self_replace/bare", sc_recv_replace(), 3))
-    cells.push(cell("vec_elem_drop/vec", sc_vec_elem(), 3))
-    cells.push(cell("vec_elem_drop/vecdyn", sc_vec_elem_dyn(), 3))
+    cells.push(cell("vec_elem_drop/vec", sc_list_elem(), 3))
+    cells.push(cell("vec_elem_drop/vecdyn", sc_list_elem_dyn(), 3))
     for form in ["field", "method", "concat", "slice", "spec"]:
         cells.push(cell("fstring_hole_temp_" ++ form ++ "/bare", sc_fstring_hole(form), 1))
     for form in ["enum", "nested", "struct"]:
@@ -777,8 +777,8 @@ fn build_cells():
     for form in ["inline", "block", "field"]:
         cells.push(cell("let_else_consume_hit_" ++ form ++ "/bare", sc_let_else_consume(form, true), 9))
         cells.push(cell("let_else_consume_miss_" ++ form ++ "/bare", sc_let_else_consume(form, false), 10))
-    cells.push(pod_cell("pod_vec_scope_exit/EXPECT-CLEAN", "    var v: Vec[i32] = Vec.new()\n    v.push(1)\n"))
-    cells.push(pod_cell("pod_vec_reassign/EXPECT-CLEAN", "    var v: Vec[i32] = Vec.new()\n    v.push(1)\n    var w: Vec[i32] = Vec.new()\n    w.push(2)\n    v = w\n"))
+    cells.push(pod_cell("pod_vec_scope_exit/EXPECT-CLEAN", "    var v: List[i32] = List.new()\n    v.push(1)\n"))
+    cells.push(pod_cell("pod_vec_reassign/EXPECT-CLEAN", "    var v: List[i32] = List.new()\n    v.push(1)\n    var w: List[i32] = List.new()\n    w.push(2)\n    v = w\n"))
     cells
 
 // ── Runner ───────────────────────────────────────────────────────────────
@@ -864,11 +864,11 @@ fn main:
     // another they took 263 s; the table below is printed in cell order.
     let sides = if baseline.len() > 0: 2 else: 1
     let total = cells.len() as i32 * sides
-    var verdicts: Vec[str] = Vec.new()
+    var verdicts: List[str] = List.new()
     for _ in 0..total: verdicts.push("")
-    var pids: Vec[i32] = Vec.new()
-    var started: Vec[i64] = Vec.new()
-    var live: Vec[i32] = Vec.new()
+    var pids: List[i32] = List.new()
+    var started: List[i64] = List.new()
+    var live: List[i32] = List.new()
     let width = if cpu_count() > 1: cpu_count() else: 1
     var next = 0
     var finished = 0

@@ -9,10 +9,10 @@ type Point { x: i32, y: i32 }
 fn main:
     let x = "hel" ++ "lo"
     let s: &str = x
-    var v: Vec[str] = Vec.new()
+    var v: List[str] = List.new()
     v.push("a")
     v.push("b")
-    let vv: &Vec[str] = v
+    let vv: &List[str] = v
     let p = Point { x: 1, y: 2 }
     let pr: &Point = p
     print(f"{s.len()} {x.len()} {vv.len()} {v.len()} {x}")

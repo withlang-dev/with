@@ -197,7 +197,7 @@ impl Sema:
             let err: str = self.pool_resolve(facade_error_sym(self.ast, decl as i32))
             var first = 0
             var first_ret = 0
-            var readers: Vec[i32] = Vec.new()
+            var readers: List[i32] = List.new()
             for ri in 0..self.facade_resources.len() as i32:
                 if self.facade_resources[ri].decl != di or self.facade_resources[ri].ok_consts.len() == 0:
                     continue
@@ -316,8 +316,8 @@ impl Sema:
     // naming both. The prelude's implicit names are not imports (D29).
     mut fn verify_facade_generated_names(ri: i32) -> bool:
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
-        var names: Vec[str] = Vec.new()
-        var roles: Vec[str] = Vec.new()
+        var names: List[str] = List.new()
+        var roles: List[str] = List.new()
         names.push(rname.clone())
         roles.push(if self.facade_resources[ri].handle != 0: "the handle type" else: "the resource type")
         if self.facade_projects_status(ri):
@@ -506,8 +506,8 @@ impl Sema:
     // The signatures a producer of `ri` was rendered under: its
     // constructor, and the receiver method on the parent its first
     // parameter receives (a `from` producer, never the in-place `init`).
-    fn facade_producer_sigs(ri: i32, owner: i32, f: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn facade_producer_sigs(ri: i32, owner: i32, f: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         let pn: str = self.pool_resolve(f)
         let sig = self.facade_constructor_sig(rname ++ "." ++ self.facade_presented(ri, pn))
@@ -717,14 +717,14 @@ impl Sema:
     // A match record's parts: (rule, status, subject, candidate syms). The
     // subject is the resource item for a resource rule and the function's
     // name symbol for an fn rule (0 when the rule matched nothing).
-    fn facade_profile_match(rec: i32) -> (i32, i32, i32, Vec[i32]):
+    fn facade_profile_match(rec: i32) -> (i32, i32, i32, List[i32]):
         let rx = self.ast.get_data2(rec)
-        let cands: Vec[i32] = Vec.new()
+        let cands: List[i32] = List.new()
         for i in 0..self.ast.get_extra(rx + 1): cands.push(self.ast.get_extra(rx + 2 + i))
         (self.ast.get_data0(rec), self.ast.get_data1(rec), self.ast.get_extra(rx), cands)
 
-    fn facade_profile_matches(item: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn facade_profile_matches(item: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         let start = self.ast.get_data0(item)
         let path_count = self.ast.get_data1(item)
         for m in 0..self.ast.get_data2(item): out.push(self.ast.get_extra(start + path_count + m))
@@ -735,7 +735,7 @@ impl Sema:
         if self.facade_rule_is_fn(rule): return "'" ++ self.safe_symbol_text(subject) ++ "'"
         "resource '" ++ self.safe_symbol_text(self.ast.get_data0(subject)) ++ "'"
 
-    fn facade_profile_names(syms: &Vec[i32]) -> str:
+    fn facade_profile_names(syms: &List[i32]) -> str:
         var out = ""
         for i in 0..syms.len() as i32:
             out = out ++ (if i > 0: ", " else: "") ++ self.safe_symbol_text(syms[i])
@@ -812,11 +812,11 @@ impl Sema:
         let origin_sym = self.pool_intern("<domain " ++ dn ++ ">")
         self.facade_domain_index.insert(name, self.facade_domain_list.len() as i32)
         self.facade_domain_origin_index.insert(origin_sym, self.facade_domain_list.len() as i32)
-        let facades: Vec[i32] = Vec.new()
+        let facades: List[i32] = List.new()
         facades.push(self.current_facade_sym)
-        let blocks: Vec[i32] = Vec.new()
+        let blocks: List[i32] = List.new()
         blocks.push(self.current_facade_node)
-        self.facade_domain_list.push(FacadeDomain { name, kind: self.ast.get_data1(item), facade: self.current_facade_sym, facades, blocks, node: item, origin_sym, files: Vec.new() })
+        self.facade_domain_list.push(FacadeDomain { name, kind: self.ast.get_data1(item), facade: self.current_facade_sym, facades, blocks, node: item, origin_sym, files: List.new() })
 
     // ── resources ────────────────────────────────────────────────────────
 
@@ -832,7 +832,7 @@ impl Sema:
         let repr_tid = self.resolve_type_expr(repr_node) as i32
         if repr_tid == 0:
             return
-        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: Vec.new(), out_params: Vec.new(), init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_consts: Vec.new(), ok_node: 0, borrows: Vec.new(), borrows_owner: Vec.new(), borrows_nodes: Vec.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, message: 0, message_node: 0, handle: 0 }
+        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: List.new(), out_params: List.new(), init: 0, preinit: 0, drop: 0, destroyers: List.new(), ok_consts: List.new(), ok_node: 0, borrows: List.new(), borrows_owner: List.new(), borrows_nodes: List.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, message: 0, message_node: 0, handle: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
             r = self.collect_resource_clause(rname, move r, clause)
@@ -922,7 +922,7 @@ impl Sema:
             if r.ok_node != 0:
                 self.emit_error(f"resource '{rname}': 'ok' is stated twice; list every success status in one clause: 'ok C1, C2' (§16.2b.4)", clause)
                 return r
-            let listed: Vec[i32] = Vec.new()
+            let listed: List[i32] = List.new()
             for k in 0..self.ast.get_data2(clause):
                 let c = self.ast.get_extra(ops + k)
                 let cn: str = self.pool_resolve(c)
@@ -1044,7 +1044,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), bridged: 0, buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), variadic_slots: Vec.new(), returns_borrow_record: 0, argv_cb: Vec.new(), argv_index: Vec.new(), argc_index: Vec.new(), argv_handle: Vec.new(), argv_nodes: Vec.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -2535,8 +2535,8 @@ impl Sema:
     // handle or an in-place resource's storage, by value or by address — the
     // line facade_param_takes_resource draws. A by-value token is not
     // recognized by its type (`int` is an `Fd` and every other integer).
-    fn facade_param_receives(fn_sym: i32, pi: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn facade_param_receives(fn_sym: i32, pi: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         let sig = self.get_sig(fn_sym)
         if sig < 0 or pi < 0 or pi >= self.sig_get_param_count(sig):
             return out
@@ -2597,7 +2597,7 @@ impl Sema:
     // resource only after the facade assigns it"). Several left means the
     // facade has not assigned it (verify_facade_assignments); an `of`
     // naming a resource the parameter does not receive is that error too.
-    fn facade_method_host(fn_sym: i32) -> Vec[i32]:
+    fn facade_method_host(fn_sym: i32) -> List[i32]:
         let recv = self.facade_param_receives(fn_sym, 0)
         let ci = self.facade_contract_for(fn_sym)
         // A by-value token is never recognized by its type (`int` is an `Fd`
@@ -2605,7 +2605,7 @@ impl Sema:
         // item's own `of` makes an operation its method (#1669).
         let by_value = self.facade_by_value_of_host(fn_sym)
         if by_value >= 0:
-            let one: Vec[i32] = Vec.new()
+            let one: List[i32] = List.new()
             one.push(by_value)
             return one
         if ci < 0 or self.foreign_contracts[ci].of_resource == 0 or recv.len() < 2:
@@ -2613,7 +2613,7 @@ impl Sema:
         let want: i32 = self.facade_resource_index.get(self.foreign_contracts[ci].of_resource).unwrap()
         for i in 0..recv.len() as i32:
             if recv[i] == want:
-                let one: Vec[i32] = Vec.new()
+                let one: List[i32] = List.new()
                 one.push(want)
                 return one
         recv
@@ -2750,7 +2750,7 @@ impl Sema:
             let rname: str = self.pool_resolve(self.facade_resources[ri].name)
             let rnode = self.facade_resources[ri].node
             let ops = facade_render_presented_ops(self.ast, self.pool, &self.decl_is_c_import, rnode)
-            var noted: Vec[str] = Vec.new()
+            var noted: List[str] = List.new()
             for oi in 0..ops.len() as i32:
                 let cname = ops[oi]
                 let short = facade_render_shortened(self.ast, self.pool, rnode, cname)
@@ -3049,8 +3049,8 @@ impl Sema:
 
     // A resource's producers, as owners of dependencies: each `from` by its
     // index, and the `init` as FACADE_DEP_INIT.
-    fn facade_owners(ri: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn facade_owners(ri: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         for pi in 0..self.facade_resources[ri].producers.len() as i32:
             out.push(pi)
         if self.facade_resources[ri].init != 0:
@@ -3066,8 +3066,8 @@ impl Sema:
     // The parameters producer `owner`'s result depends on (spec §16.2b.6):
     // none under `independent`, the ones its `borrows` clauses name, and
     // otherwise every parameter receiving a resource.
-    fn facade_producer_parents(ri: i32, owner: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn facade_producer_parents(ri: i32, owner: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         if self.facade_resources[ri].independent != 0:
             return out
         var stated = false
@@ -3300,8 +3300,8 @@ impl Sema:
     // parent, the producer receiving it with the resolved C parameter, and
     // the evidence — the facade clause stating it, or the conservative
     // default.
-    fn facade_dependency_notes(ri: i32) -> Vec[str]:
-        let out: Vec[str] = Vec.new()
+    fn facade_dependency_notes(ri: i32) -> List[str]:
+        let out: List[str] = List.new()
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         let fname: str = self.pool_resolve(self.facade_resources[ri].facade)
         let owners = self.facade_owners(ri)
@@ -3461,7 +3461,7 @@ impl Sema:
     // `'Database'`, or `'Database' and 'Cache'`: the resources `ri` depends on.
     fn facade_parent_names(ri: i32) -> str:
         var out = ""
-        let seen: Vec[i32] = Vec.new()
+        let seen: List[i32] = List.new()
         let owners = self.facade_owners(ri)
         for oi in 0..owners.len() as i32:
             let f = self.facade_owner_fn(ri, owners[oi])
@@ -3689,7 +3689,7 @@ impl Sema:
             return
         let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
         let mname = self.facade_presented(recv0[0], fname)
-        let hosts: Vec[str] = Vec.new()
+        let hosts: List[str] = List.new()
         hosts.push(host.clone())
         hosts.push(facade_render_borrowed_name(host))
         if self.foreign_contracts[ci].valid_on_failed != 0:
@@ -3755,7 +3755,7 @@ impl Sema:
             return
         let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
         let mname = self.facade_presented(recv0[0], fname)
-        let hosts: Vec[str] = Vec.new()
+        let hosts: List[str] = List.new()
         hosts.push(host.clone())
         hosts.push(facade_render_borrowed_name(host))
         // `valid on failed`: the same view on the failed state (#1612).
@@ -3802,7 +3802,7 @@ impl Sema:
             let facade = self.facade_resources[ri].facade
             for pi in 0..self.facade_resources[ri].producers.len() as i32:
                 self.facade_domain_note_file(facade, self.facade_fn_file(self.facade_resources[ri].producers[pi]))
-            let ops: Vec[i32] = Vec.new()
+            let ops: List[i32] = List.new()
             ops.push(self.facade_resources[ri].init)
             ops.push(self.facade_resources[ri].preinit)
             ops.push(self.facade_resources[ri].drop)
@@ -3844,7 +3844,7 @@ impl Sema:
                 // projection below, kept so a presented bit names its source
                 // (facade_effect_source_param) instead of reading as the C
                 // parameter at the presented index.
-                var sources: Vec[i32] = Vec.new()
+                var sources: List[i32] = List.new()
                 for c_pi in 0..self.sig_get_param_count(self.get_sig(f)):
                     if c_pi == slot or (owner == FACADE_DEP_INIT and c_pi == 0):
                         continue
@@ -3915,7 +3915,7 @@ impl Sema:
                 continue
             let mname = self.facade_presented(recv0[0], self.pool_resolve(fn_sym))
             let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
-            let hosts: Vec[str] = Vec.new()
+            let hosts: List[str] = List.new()
             hosts.push(host ++ "." ++ mname)
             hosts.push(facade_render_borrowed_name(host) ++ "." ++ mname)
             if self.foreign_contracts[ci].valid_on_failed != 0:
@@ -3930,12 +3930,12 @@ impl Sema:
     // The signatures of the free renderings presenting contract `ci`: its
     // D64 bridge under the C name, or the case functions of its variadic
     // contract (D66) — under the C name or the item's `rename`.
-    fn facade_free_bridge_sigs(ci: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn facade_free_bridge_sigs(ci: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         if self.facade_method_host(self.foreign_contracts[ci].fn_sym).len() == 1:
             return out
         let fname: str = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
-        let names: Vec[str] = Vec.new()
+        let names: List[str] = List.new()
         let rename = self.foreign_contracts[ci].rename
         let rename_text: str = self.pool_resolve(if rename != 0: rename else: self.foreign_contracts[ci].fn_sym)
         if self.facade_bridge_of.contains(fname):
@@ -3954,14 +3954,14 @@ impl Sema:
                 out.push(sig)
         out
 
-    mut fn facade_add_call_effect(sig: i32, fn_sym: i32, ci: i32, mask: i32, domains: &Vec[i32], borrow: i32, borrow_param: i32):
+    mut fn facade_add_call_effect(sig: i32, fn_sym: i32, ci: i32, mask: i32, domains: &List[i32], borrow: i32, borrow_param: i32):
         if self.facade_call_effect_index.contains(sig):
             return
-        let touched: Vec[i32] = Vec.new()
+        let touched: List[i32] = List.new()
         for i in 0..domains.len() as i32:
             touched.push(domains[i])
         self.facade_call_effect_index.insert(sig, self.facade_call_effects.len() as i32)
-        self.facade_call_effects.push(FacadeCallEffect { sig, fn_sym, contract: ci, touch_params: mask, touch_domains: touched, borrow_domain: borrow, borrow_param, param_sources: Vec.new() })
+        self.facade_call_effects.push(FacadeCallEffect { sig, fn_sym, contract: ci, touch_params: mask, touch_domains: touched, borrow_domain: borrow, borrow_param, param_sources: List.new() })
 
     // The parameters of `fn_sym` (from `first`) that receive one modeled
     // resource and are not preserved by its fn item, as origin bits.
@@ -3983,8 +3983,8 @@ impl Sema:
 
     // The domains a function declared in `file` touches: those of its
     // library, less the ones its fn item preserves.
-    fn facade_domains_touched(file: i32, ci: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn facade_domains_touched(file: i32, ci: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         for di in 0..self.facade_domain_list.len() as i32:
             var in_library = false
             for fi in 0..self.facade_domain_list[di].files.len() as i32:
@@ -4114,7 +4114,7 @@ impl Sema:
         let from = self.foreign_contracts[ci].returns_borrow_from
         let written = f"'returns borrow {rn} from parent {pn} of param {from}'"
         // The parents the argument's resource declares, by resource index.
-        let declared: Vec[i32] = Vec.new()
+        let declared: List[i32] = List.new()
         for bi in 0..self.facade_resources[ari].borrows.len() as i32:
             let f = self.facade_owner_fn(ari, self.facade_resources[ari].borrows_owner[bi])
             let recv = self.facade_param_receives(f, self.facade_resources[ari].borrows[bi])
@@ -4358,7 +4358,7 @@ impl Sema:
                 continue
             self.update_decl_source_context(self.facade_resources[ri].decl)
             let rname: str = self.pool_resolve(self.facade_resources[ri].name)
-            let hosts: Vec[str] = Vec.new()
+            let hosts: List[str] = List.new()
             hosts.push(rname.clone())
             hosts.push(facade_render_borrowed_name(rname))
             for hi in 0..hosts.len() as i32:
@@ -4532,8 +4532,8 @@ impl Sema:
     // under `user_data from <fn> as &U` — every callable parameter but the
     // destroy callback whose own parameters include the handle the accessor
     // reads, since that handle is how the wrapper finds the registration.
-    fn facade_contract_wrapped_callbacks(ci: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn facade_contract_wrapped_callbacks(ci: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         let h = self.foreign_contracts[ci].user_data_handle
         let sig = self.get_sig(self.foreign_contracts[ci].fn_sym)
         if self.foreign_contracts[ci].user_data_node == 0 or h < 0 or sig < 0:
@@ -4565,7 +4565,7 @@ impl Sema:
     // boxes (consumed into C with its destroy callback, or retained by the
     // resource), since the box is what the accessor hands back; and each
     // callback it serves receives the accessor's handle exactly once.
-    mut fn verify_facade_wrapped_callbacks(ci: i32, wrapped: &Vec[i32]) -> bool:
+    mut fn verify_facade_wrapped_callbacks(ci: i32, wrapped: &List[i32]) -> bool:
         let fn_sym = self.foreign_contracts[ci].fn_sym
         let fname: str = self.pool_resolve(fn_sym)
         let sig = self.get_sig(fn_sym)
@@ -4727,7 +4727,7 @@ impl Sema:
             let mnode = if msym != 0: self.generic_fn_node_for_symbol(msym) else: 0
             if mnode != 0:
                 self.facade_callback_method_index.insert(mnode, self.facade_callback_methods.len() as i32)
-            let wrapped_params: Vec[i32] = Vec.new()
+            let wrapped_params: List[i32] = List.new()
             for wi in 0..wrapped.len() as i32:
                 let projected = self.facade_presented_param_index(ci, wrapped[wi])
                 if projected >= receiver_params: wrapped_params.push(projected - receiver_params)
@@ -4900,7 +4900,7 @@ impl Sema:
     // generic binder cannot: it matches the rendered `extern "C" fn(…, &U)`
     // against a plain `fn` argument, which coerces to it only once `U` is
     // known (§12.4).
-    mut fn facade_bind_pair_callback_u(fn_node: i32, arg_types: &Vec[i32], arg_count: i32, fn_tp_start: i32, fn_tp_count: i32, node: i32):
+    mut fn facade_bind_pair_callback_u(fn_node: i32, arg_types: &List[i32], arg_count: i32, fn_tp_start: i32, fn_tp_count: i32, node: i32):
         if fn_tp_count != 1 or arg_count == 0 or self.facade_pair_setter_contract.len() == 0 or not self.facade_pair_setter_contract.contains(fn_node):
             return
         let ci: i32 = self.facade_pair_setter_contract.get(fn_node).unwrap()
@@ -4995,7 +4995,7 @@ impl Sema:
         let sig = self.get_visible_sig(self.ast.get_data0(arg_node))
         if sig < 0:
             return 0
-        let params: Vec[i32] = Vec.new()
+        let params: List[i32] = List.new()
         for pi in 0..self.sig_get_param_count(sig):
             params.push(self.sig_param_type(sig, pi))
         self.ensure_extern_fn_type(params, params.len() as i32, self.sig_return_type(sig) as TypeId) as i32
@@ -5007,7 +5007,7 @@ impl Sema:
         let kind: i32 = self.get_type_kind(r as TypeId)
         if kind != TypeKind.TY_FN and kind != TypeKind.TY_EXTERN_FN:
             return r
-        let params: Vec[i32] = Vec.new()
+        let params: List[i32] = List.new()
         for pi in 0..self.get_type_d1(r as TypeId):
             params.push(self.type_extra[self.get_type_d0(r as TypeId) + pi])
         let ret: i32 = self.get_type_d2(r as TypeId)
@@ -5194,8 +5194,8 @@ impl Sema:
         if r < 0 or pi >= self.ast.fn_meta_param_count(meta):
             return 0
         let p_type_node = self.ast.fn_param_type(param_start, pi)
-        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_tys = sema_clone_i32_list(&self.generic_subst_type_ids)
         self.clear_generic_substitution()
         self.put_generic_subst(u_sym, u_ty as i32, fn_node)
         let expected = self.resolve_type_node_with_current_subst(p_type_node, self_type)

@@ -35,7 +35,7 @@ fn run_under_debug_alloc(with_bin: &str, repro: &str, filter: &str) -> DebugAllo
     // one capture file and read each other's half-written report (#2004).
     let outp = f"/tmp/debug_drop_{pid()}_out.txt"
     let errp = f"/tmp/debug_drop_{pid()}_err.txt"
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push(with_bin.clone())
     argv.push("run")
     argv.push("--debug-alloc")
@@ -56,8 +56,8 @@ fn line_after_prefix(src: &str, prefix: &str) -> str:
     src.slice(start, end)
 
 // Every `//! expect-stdout:` value, in order.
-fn expected_stdout_lines(source: &str) -> Vec[str]:
-    var lines: Vec[str] = Vec.new()
+fn expected_stdout_lines(source: &str) -> List[str]:
+    var lines: List[str] = List.new()
     for line in source.split("\n"):
         if line.starts_with("//! expect-stdout:"):
             var value = line.slice("//! expect-stdout:".len(), line.len())
@@ -66,8 +66,8 @@ fn expected_stdout_lines(source: &str) -> Vec[str]:
     lines
 
 // "" when stdout is exactly the expected lines; otherwise what differs first.
-fn stdout_mismatch(expected: &Vec[str], stdout: &str) -> str:
-    var actual: Vec[str] = Vec.new()
+fn stdout_mismatch(expected: &List[str], stdout: &str) -> str:
+    var actual: List[str] = List.new()
     for line in stdout.split("\n"): actual.push(line.clone())
     // print ends every line: the text after the last newline is empty.
     if actual.len() > 0 and actual[actual.len() as i32 - 1].len() == 0: let _ = actual.pop()

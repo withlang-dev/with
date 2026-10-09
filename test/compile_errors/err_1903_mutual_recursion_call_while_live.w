@@ -4,7 +4,7 @@
 // `up`'s globals before its body is done; the fixpoint completes them, so a
 // call that writes G while that view is live is refused there too.
 
-var G: Vec[i32] = Vec.new()
+var G: List[i32] = List.new()
 
 fn grow():
     for i in 0..1000: G.push(i)

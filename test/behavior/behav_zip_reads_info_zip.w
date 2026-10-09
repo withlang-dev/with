@@ -11,7 +11,7 @@ use std.zip
 // `zip -X -r t.zip top` over a directory, a stored file, an executable
 // script and a deflated 9490-byte file (300 lines). Reading goes through
 // the migrated minizip reader (std.zl.unzip), which checks each CRC-32.
-fn fixture() -> Vec[u8]:
+fn fixture() -> List[u8]:
     [
      80, 75, 3, 4, 10, 0, 0, 0, 0, 0, 7, 153, 51, 93, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
      0, 0, 4, 0, 0, 0, 116, 111, 112, 47, 80, 75, 3, 4, 10, 0, 0, 0, 0, 0, 7, 153, 51, 93,
@@ -68,23 +68,23 @@ fn fixture() -> Vec[u8]:
      6, 0, 0, 0, 0, 5, 0, 5, 0, 20, 1, 0, 0, 201, 3, 0, 0, 0, 0,
     ]
 
-fn write_bytes(path: &str, bytes: &Vec[u8]):
+fn write_bytes(path: &str, bytes: &List[u8]):
     let cpath = path.to_cstring().unwrap()
     let stream = fopen(cpath.as_cstr().ptr(), c"wb".ptr())
     assert(stream != null)
     assert(fwrite(bytes.as_ptr() as *const c_void, 1, bytes.len() as u64, stream) == bytes.len() as u64)
     assert(fclose(stream) == 0)
 
-fn text_of(bytes: &Vec[u8]) -> str:
+fn text_of(bytes: &List[u8]) -> str:
     var out = ""
     for i in 0..bytes.len() as i32: out = out ++ with_str_from_bytes(&raw const bytes[i] as *const u8, 1)
     out
 
 // Every occurrence of `from` becomes `to` (same length): the local header
 // and the central directory both carry the name, and no checksum covers it.
-fn rename_entry(bytes: &Vec[u8], from: &str, to: &str) -> Vec[u8]:
+fn rename_entry(bytes: &List[u8], from: &str, to: &str) -> List[u8]:
     assert(from.len() == to.len())
-    var out: Vec[u8] = Vec.new()
+    var out: List[u8] = List.new()
     for i in 0..bytes.len() as i32: out.push(bytes[i])
     var at = 0
     while at + from.len() as i32 <= out.len() as i32:

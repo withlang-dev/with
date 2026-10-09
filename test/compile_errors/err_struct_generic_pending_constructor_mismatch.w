@@ -4,5 +4,5 @@ use std.collections.HashSet
 type Pair[T] { a: T, b: T }
 
 fn main:
-    let v: Vec[i64] = Vec.new()
+    let v: List[i64] = List.new()
     let _w = Pair { a: v, b: HashSet.new() }

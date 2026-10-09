@@ -8,12 +8,12 @@
 // viewed field and any place the generator does not view, and may read what
 // it views. After the loop the viewed place is free again.
 type Doc {
-    lines: Vec[str],
+    lines: List[str],
     title: str,
 }
 
 type Counter {
-    items: Vec[i32],
+    items: List[i32],
 }
 
 impl Counter:
@@ -21,11 +21,11 @@ impl Counter:
         for x in self.items:
             yield x
 
-gen fn each_line(lines: &Vec[str]) -> &str:
+gen fn each_line(lines: &List[str]) -> &str:
     for line in lines:
         yield line
 
-gen fn over(xs: &Vec[i32]) -> i32:
+gen fn over(xs: &List[i32]) -> i32:
     for x in xs:
         yield x
 
@@ -41,8 +41,8 @@ fn main:
         count += 1
     print(f"count {count} items {c.items.len()}")
 
-    var xs: Vec[i32] = [1, 2, 3]
-    var other: Vec[i32] = []
+    var xs: List[i32] = [1, 2, 3]
+    var other: List[i32] = []
     var sum = 0
     for x in over(&xs):
         other.push(x)

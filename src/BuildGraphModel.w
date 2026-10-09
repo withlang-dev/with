@@ -10,24 +10,24 @@ pub type BuildGraphTarget {
     output: str,
     target_kind: i32,
     optimize_mode: i32,
-    system_libs: Vec[str],
-    library_paths: Vec[str],
-    rpaths: Vec[str],
-    include_paths: Vec[str],
-    defines: Vec[str],
-    inputs: Vec[str],
-    extra_outputs: Vec[str],
-    write_scopes: Vec[str],
-    deps: Vec[str],
-    args: Vec[str],
+    system_libs: List[str],
+    library_paths: List[str],
+    rpaths: List[str],
+    include_paths: List[str],
+    defines: List[str],
+    inputs: List[str],
+    extra_outputs: List[str],
+    write_scopes: List[str],
+    deps: List[str],
+    args: List[str],
     action_fn: i32,
     timeout_ms: i32,
     rss_limit_bytes: i64,
     cwd: str,
-    env: Vec[str],
+    env: List[str],
     network: i32,
     parallel: i32,
-    action_source_paths: Vec[str],
+    action_source_paths: List[str],
 }
 
 pub type BuildGraphGeneratedSource {
@@ -42,16 +42,16 @@ pub type BuildGraph {
     package_name: str,
     package_version: str,
     default_target: str,
-    targets: Vec[BuildGraphTarget],
-    generated_sources: Vec[BuildGraphGeneratedSource],
+    targets: List[BuildGraphTarget],
+    generated_sources: List[BuildGraphGeneratedSource],
 }
 
 type BuildGraphSelectedTargets {
     ok: bool,
     error_msg: str,
-    targets: Vec[BuildGraphTarget],
-    selected_names: Vec[str],
-    visiting_names: Vec[str],
+    targets: List[BuildGraphTarget],
+    selected_names: List[str],
+    visiting_names: List[str],
 }
 
 pub fn empty_build_graph -> BuildGraph:
@@ -62,8 +62,8 @@ pub fn empty_build_graph -> BuildGraph:
         package_name: "",
         package_version: "",
         default_target: "",
-        targets: Vec.new(),
-        generated_sources: Vec.new(),
+        targets: List.new(),
+        generated_sources: List.new(),
     }
 
 fn build_graph_generated_source_new(path: &str, contents: &str) -> BuildGraphGeneratedSource:
@@ -77,31 +77,31 @@ fn build_graph_target_new(kind: i32, name: &str, entry: &str, target_kind: i32, 
         output: with_str_clone_ref(output),
         target_kind,
         optimize_mode,
-        system_libs: Vec.new(),
-        library_paths: Vec.new(),
-        rpaths: Vec.new(),
-        include_paths: Vec.new(),
-        defines: Vec.new(),
-        inputs: Vec.new(),
-        extra_outputs: Vec.new(),
-        write_scopes: Vec.new(),
-        deps: Vec.new(),
-        args: Vec.new(),
+        system_libs: List.new(),
+        library_paths: List.new(),
+        rpaths: List.new(),
+        include_paths: List.new(),
+        defines: List.new(),
+        inputs: List.new(),
+        extra_outputs: List.new(),
+        write_scopes: List.new(),
+        deps: List.new(),
+        args: List.new(),
         action_fn: 0,
         timeout_ms: 0,
         rss_limit_bytes: 0,
         cwd: "",
-        env: Vec.new(),
+        env: List.new(),
         network: 0,
         parallel: 0,
-        action_source_paths: Vec.new(),
+        action_source_paths: List.new(),
     }
 
 pub fn empty_build_graph_target -> BuildGraphTarget:
     build_graph_target_new(-1, "", "", 0, 0, "")
 
-fn build_graph_split_nonempty_lines(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     let text_len = text.len() as i32
     var start = 0
     var i = 0
@@ -119,8 +119,8 @@ fn build_graph_split_nonempty_lines(text: &str) -> Vec[str]:
         i = i + 1
     lines
 
-fn build_graph_split_fields(line: &str) -> Vec[str]:
-    let fields: Vec[str] = Vec.new()
+fn build_graph_split_fields(line: &str) -> List[str]:
+    let fields: List[str] = List.new()
     var cur = ""
     var escaped = false
     for i in 0..line.len() as i32:
@@ -383,7 +383,7 @@ pub fn build_graph_resolve_rss_budgets(graph: BuildGraph) -> BuildGraph:
     var out = graph
     for ti in 0..out.targets.len() as i32:
         let target = &out.targets[ti]
-        let args: Vec[str] = Vec.new()
+        let args: List[str] = List.new()
         var limit: i64 = target.rss_limit_bytes
         for ai in 0..target.args.len() as i32:
             let arg = &target.args[ai]
@@ -400,14 +400,14 @@ pub fn build_graph_resolve_rss_budgets(graph: BuildGraph) -> BuildGraph:
         out.targets[ti].args = args
     out
 
-pub fn bg_clone_str_vec(values: &Vec[str]) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn bg_clone_str_list(values: &List[str]) -> List[str]:
+    let out: List[str] = List.new()
     for i in 0..values.len() as i32:
         out.push(with_str_clone_ref(values[i]))
     out
 
 // A stored element copy must own its buffers: BuildGraphTarget carries nine
-// Vec[str] fields, and a bitwise element copy aliases them (#715 class), so
+// List[str] fields, and a bitwise element copy aliases them (#715 class), so
 // two graphs dropping both free the same buffers.
 fn build_graph_target_deep_copy(t: &BuildGraphTarget) -> BuildGraphTarget:
     BuildGraphTarget {
@@ -417,27 +417,27 @@ fn build_graph_target_deep_copy(t: &BuildGraphTarget) -> BuildGraphTarget:
         output: with_str_clone_ref(t.output),
         target_kind: t.target_kind,
         optimize_mode: t.optimize_mode,
-        system_libs: bg_clone_str_vec(&t.system_libs),
-        library_paths: bg_clone_str_vec(&t.library_paths),
-        rpaths: bg_clone_str_vec(&t.rpaths),
-        include_paths: bg_clone_str_vec(&t.include_paths),
-        defines: bg_clone_str_vec(&t.defines),
-        inputs: bg_clone_str_vec(&t.inputs),
-        extra_outputs: bg_clone_str_vec(&t.extra_outputs),
-        write_scopes: bg_clone_str_vec(&t.write_scopes),
-        deps: bg_clone_str_vec(&t.deps),
-        args: bg_clone_str_vec(&t.args),
+        system_libs: bg_clone_str_list(&t.system_libs),
+        library_paths: bg_clone_str_list(&t.library_paths),
+        rpaths: bg_clone_str_list(&t.rpaths),
+        include_paths: bg_clone_str_list(&t.include_paths),
+        defines: bg_clone_str_list(&t.defines),
+        inputs: bg_clone_str_list(&t.inputs),
+        extra_outputs: bg_clone_str_list(&t.extra_outputs),
+        write_scopes: bg_clone_str_list(&t.write_scopes),
+        deps: bg_clone_str_list(&t.deps),
+        args: bg_clone_str_list(&t.args),
         action_fn: t.action_fn,
         timeout_ms: t.timeout_ms,
         rss_limit_bytes: t.rss_limit_bytes,
         cwd: with_str_clone_ref(t.cwd),
-        env: bg_clone_str_vec(&t.env),
+        env: bg_clone_str_list(&t.env),
         network: t.network,
         parallel: t.parallel,
-        action_source_paths: bg_clone_str_vec(&t.action_source_paths),
+        action_source_paths: bg_clone_str_list(&t.action_source_paths),
     }
 
-fn build_graph_output_index(paths: &Vec[str], path: &str) -> i64:
+fn build_graph_output_index(paths: &List[str], path: &str) -> i64:
     for i in 0..paths.len() as i32:
         if paths[i] == path:
             return i as i64
@@ -456,8 +456,8 @@ fn build_graph_output_index(paths: &Vec[str], path: &str) -> i64:
 // the completed edges.
 pub fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
     var out = graph
-    let out_paths: Vec[str] = Vec.new()
-    let out_owners: Vec[str] = Vec.new()
+    let out_paths: List[str] = List.new()
+    let out_owners: List[str] = List.new()
     for i in 0..out.targets.len() as i32:
         let t = &out.targets[i]
         if t.output.len() > 0:
@@ -467,9 +467,9 @@ pub fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
             out_paths.push(with_str_clone_ref(t.extra_outputs[oi]))
             out_owners.push(with_str_clone_ref(t.name))
     for i in 0..out.targets.len() as i32:
-        let to_add: Vec[str] = Vec.new()
+        let to_add: List[str] = List.new()
         let t = &out.targets[i]
-        let consumed: Vec[str] = Vec.new()
+        let consumed: List[str] = List.new()
         if t.entry.len() > 0:
             consumed.push(with_str_clone_ref(t.entry))
         for ii in 0..t.inputs.len() as i32:
@@ -544,12 +544,12 @@ fn build_graph_selected_targets_new -> BuildGraphSelectedTargets:
     BuildGraphSelectedTargets {
         ok: true,
         error_msg: "",
-        targets: Vec.new(),
-        selected_names: Vec.new(),
-        visiting_names: Vec.new(),
+        targets: List.new(),
+        selected_names: List.new(),
+        visiting_names: List.new(),
     }
 
-fn build_graph_name_vec_contains(names: &Vec[str], name: &str) -> bool:
+fn build_graph_name_list_contains(names: &List[str], name: &str) -> bool:
     for i in 0..names.len() as i32:
         if names[i] == name:
             return true
@@ -557,7 +557,7 @@ fn build_graph_name_vec_contains(names: &Vec[str], name: &str) -> bool:
 
 fn build_graph_find_target_index(graph: &BuildGraph, name: &str) -> i32:
     for i in 0..graph.targets.len() as i32:
-        // Borrow the stored target. Vec.get currently materializes an owned
+        // Borrow the stored target. List.get currently materializes an owned
         // aggregate here, so merely searching would drop aliases of its nine
         // owned vectors and corrupt the graph before dependency traversal.
         let candidate = &graph.targets[i]
@@ -578,9 +578,9 @@ fn build_graph_selected_targets_add(selected: BuildGraphSelectedTargets, graph: 
     var out = selected
     if not out.ok:
         return out
-    if build_graph_name_vec_contains(out.selected_names, name):
+    if build_graph_name_list_contains(out.selected_names, name):
         return out
-    if build_graph_name_vec_contains(out.visiting_names, name):
+    if build_graph_name_list_contains(out.visiting_names, name):
         out.ok = false
         out.error_msg = "build.w target dependency cycle includes '" ++ name ++ "'"
         return out

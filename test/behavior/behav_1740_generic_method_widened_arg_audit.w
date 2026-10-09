@@ -10,7 +10,7 @@ use pre_d_build_runner
 
 fn program_text -> str:
     "use std.collections.{BTreeMap}\n" ++
-        "type Bag[T] { items: Vec[T] }\n" ++
+        "type Bag[T] { items: List[T] }\n" ++
         "impl[T] Bag[T]:\n" ++
         "    fn shift(k: i64) -> i64: k * 2\n" ++
         "    fn run() -> i64:\n" ++

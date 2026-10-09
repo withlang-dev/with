@@ -1,7 +1,7 @@
 // std.generators — pipeline stages over Gen[T] (§13.3, §13.4, D69).
 //
 // A stage that visits elements in order takes any Gen[T] and is itself a
-// Gen: `g |> map(f) |> filter(p) |> take(n) |> collect[Vec]()`. A stage
+// Gen: `g |> map(f) |> filter(p) |> take(n) |> collect[List]()`. A stage
 // holds the stage before it as a field, so a pipeline is as lazy as the
 // generator it starts from: nothing runs until the last stage is consumed,
 // and a stage that has what it needs (take) stops the whole chain by
@@ -58,9 +58,9 @@ fn take_each[T](g: impl Gen[T], n: i32, body: fn(T) -> bool):
         body(x) and left > 0
     })
 
-/// `g |> collect[Vec]()`: every element of `g`, in order.
-pub fn collect[T](g: impl Gen[T]) -> Vec[T]:
-    var out: Vec[T] = Vec.new()
+/// `g |> collect[List]()`: every element of `g`, in order.
+pub fn collect[T](g: impl Gen[T]) -> List[T]:
+    var out: List[T] = List.new()
     g.each(x => {
         out.push(x)
         true

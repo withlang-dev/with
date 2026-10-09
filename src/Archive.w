@@ -120,8 +120,8 @@ fn ar_str_compare(a: &str, b: &str) -> i32:
         return 1
     0
 
-fn ar_sort_symbols(items: Vec[ArSymbol]) -> Vec[ArSymbol]:
-    let result: Vec[ArSymbol] = Vec.new()
+fn ar_sort_symbols(items: List[ArSymbol]) -> List[ArSymbol]:
+    let result: List[ArSymbol] = List.new()
     while items.len() > 0:
         let item = items.remove(0)
         var pos = result.len() as i32
@@ -129,7 +129,7 @@ fn ar_sort_symbols(items: Vec[ArSymbol]) -> Vec[ArSymbol]:
             if ar_str_compare(item.name, result[j].name) < 0:
                 pos = j
                 break
-        let tail: Vec[ArSymbol] = Vec.new()
+        let tail: List[ArSymbol] = List.new()
         while result.len() as i32 > pos:
             tail.push(result.remove(pos as i64))
         result.push(move item)
@@ -137,8 +137,8 @@ fn ar_sort_symbols(items: Vec[ArSymbol]) -> Vec[ArSymbol]:
             result.push(tail.remove(0))
     result
 
-fn extract_macho_symbols(data: &str) -> Vec[str]:
-    let result: Vec[str] = Vec.new()
+fn extract_macho_symbols(data: &str) -> List[str]:
+    let result: List[str] = List.new()
     if data.len() < 32:
         return result
     let magic = ar_read_u32_le(data, 0)
@@ -190,8 +190,8 @@ fn ar_elf_str_at(data: &str, start: i64) -> str:
         return ""
     data.slice(start, end)
 
-fn extract_elf_symbols(data: &str) -> Vec[str]:
-    let result: Vec[str] = Vec.new()
+fn extract_elf_symbols(data: &str) -> List[str]:
+    let result: List[str] = List.new()
     if data.len() < 64:
         return result
     if data[0] != 0x7f or data[1] != 69 or data[2] != 76 or data[3] != 70:
@@ -248,8 +248,8 @@ fn extract_elf_symbols(data: &str) -> Vec[str]:
 // class(1), aux-count(1). A definition is an external (class 2) in a section
 // (> 0), or a common symbol (section 0, value > 0); a weak external (class
 // 105) defines its name too.
-fn extract_coff_symbols(data: &str) -> Vec[str]:
-    let result: Vec[str] = Vec.new()
+fn extract_coff_symbols(data: &str) -> List[str]:
+    let result: List[str] = List.new()
     if data.len() < 20:
         return result
     let machine = ar_read_u16_le(data, 0)
@@ -287,7 +287,7 @@ fn ar_coff_short_name(data: &str, at: i64) -> str:
         end = end + 1
     data.slice(at, end)
 
-fn create_gnu_indexed_archive(output_path: &str, member_names: &Vec[str], member_data: &Vec[str], sorted: &Vec[ArSymbol]) -> i32:
+fn create_gnu_indexed_archive(output_path: &str, member_names: &List[str], member_data: &List[str], sorted: &List[ArSymbol]) -> i32:
     var string_table = ""
     for i in 0..sorted.len() as i32:
         string_table = string_table ++ sorted[i].name ++ str_from_byte(0)
@@ -295,7 +295,7 @@ fn create_gnu_indexed_archive(output_path: &str, member_names: &Vec[str], member
     let symtab_size = 4 + ranlib_count * 4 + string_table.len() as i32
 
     var long_name_table = ""
-    let long_name_offsets: Vec[i32] = Vec.new()
+    let long_name_offsets: List[i32] = List.new()
     for i in 0..member_names.len() as i32:
         let name = member_names[i]
         if ar_gnu_needs_long_name(name):
@@ -304,7 +304,7 @@ fn create_gnu_indexed_archive(output_path: &str, member_names: &Vec[str], member
         else:
             long_name_offsets.push(-1)
 
-    var member_offsets: Vec[i64] = Vec.new()
+    var member_offsets: List[i64] = List.new()
     var offset: i64 = 8 + ar_gnu_member_size(symtab_size as i64)
     if long_name_table.len() > 0:
         offset = offset + ar_gnu_member_size(long_name_table.len())
@@ -351,8 +351,8 @@ fn create_gnu_indexed_archive(output_path: &str, member_names: &Vec[str], member
 // on Windows a backslash is a path character and escapes only a double
 // quote; elsewhere (GNU) it escapes the next character and single quotes
 // quote too.
-pub fn ar_tokenize_response(text: &str, windows_quoting: bool) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn ar_tokenize_response(text: &str, windows_quoting: bool) -> List[str]:
+    let out: List[str] = List.new()
     var token = ""
     var started = false
     var quote = 0
@@ -392,11 +392,11 @@ pub fn ar_tokenize_response(text: &str, windows_quoting: bool) -> Vec[str]:
 // (a response file may name another). `ok` is false when one cannot be read.
 pub type ArResponseArgs {
     ok: bool,
-    args: Vec[str],
+    args: List[str],
 }
 
-pub fn ar_expand_response_args(args: &Vec[str], windows_quoting: bool, depth: i32) -> ArResponseArgs:
-    let out: Vec[str] = Vec.new()
+pub fn ar_expand_response_args(args: &List[str], windows_quoting: bool, depth: i32) -> ArResponseArgs:
+    let out: List[str] = List.new()
     for i in 0..args.len() as i32:
         let arg = args[i]
         if arg.len() < 2 or arg[0] != 64:
@@ -414,10 +414,10 @@ pub fn ar_expand_response_args(args: &Vec[str], windows_quoting: bool, depth: i3
             out.push(with_str_clone_ref(inner.args[j]))
     ArResponseArgs { ok: true, args: out }
 
-pub fn create_static_archive(output_path: &str, member_paths: &Vec[str]) -> i32:
+pub fn create_static_archive(output_path: &str, member_paths: &List[str]) -> i32:
     let member_count = member_paths.len() as i32
-    let member_names: Vec[str] = Vec.new()
-    let member_data: Vec[str] = Vec.new()
+    let member_names: List[str] = List.new()
+    let member_data: List[str] = List.new()
     for i in 0..member_count:
         let path = member_paths[i]
         let data = with_fs_read_file(path)
@@ -428,11 +428,11 @@ pub fn create_static_archive(output_path: &str, member_paths: &Vec[str]) -> i32:
         member_data.push(data)
 
     var gnu_index = false
-    let all_symbols: Vec[ArSymbol] = Vec.new()
+    let all_symbols: List[ArSymbol] = List.new()
     for i in 0..member_count:
         let data = member_data[i]
         let elf_syms = extract_elf_symbols(data)
-        let coff_syms = if elf_syms.len() == 0: extract_coff_symbols(data) else: Vec.new()
+        let coff_syms = if elf_syms.len() == 0: extract_coff_symbols(data) else: List.new()
         // COFF objects index GNU-style too: lld reads that symbol table.
         let syms = if elf_syms.len() > 0 or coff_syms.len() > 0:
             gnu_index = true
@@ -447,7 +447,7 @@ pub fn create_static_archive(output_path: &str, member_paths: &Vec[str]) -> i32:
         return create_gnu_indexed_archive(output_path, member_names, member_data, sorted)
 
     var string_table = ""
-    let string_offsets: Vec[i32] = Vec.new()
+    let string_offsets: List[i32] = List.new()
     for i in 0..sorted.len() as i32:
         string_offsets.push(string_table.len() as i32)
         string_table = string_table ++ sorted[i].name ++ str_from_byte(0)
@@ -459,7 +459,7 @@ pub fn create_static_archive(output_path: &str, member_paths: &Vec[str]) -> i32:
     let symdef_name = "__.SYMDEF SORTED"
     let symdef_content_size = 4 + ranlib_array_size as i64 + 4 + string_table.len()
 
-    var member_offsets: Vec[i64] = Vec.new()
+    var member_offsets: List[i64] = List.new()
     var offset: i64 = 8 + ar_member_size(symdef_name, symdef_content_size)
     for i in 0..member_count:
         member_offsets.push(offset)

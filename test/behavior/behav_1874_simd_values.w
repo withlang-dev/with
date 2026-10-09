@@ -2,7 +2,7 @@
 //! expect-stdout: global 2 3
 //! expect-stdout: generic 10 10
 
-// §4.3d (D78, #1874): a vector is an ordinary Copy value — in a Vec, an
+// §4.3d (D78, #1874): a vector is an ordinary Copy value — in a List, an
 // array, a struct field, an Option, a global — with compound assignment,
 // and a generic function may take `Vector[4, T]` for any lane type.
 type P { tag: i32, v: f32x4 }
@@ -16,7 +16,7 @@ fn main:
     var v = i32x4(1, 2, 3, 4)
     v += i32x4(1, 1, 1, 1)
     v *= 2
-    var xs: Vec[i32x4] = Vec.new()
+    var xs: List[i32x4] = List.new()
     xs.push(v)
     xs.push(v * 2)
     let arr = [v, v + 1]

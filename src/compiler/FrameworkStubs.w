@@ -33,9 +33,9 @@ type DscMapping { address: i64, size: i64, file_offset: i64, fd: i32 }
 type DscImage { address: i64, path: str }
 
 type DscCache {
-    fds: Vec[i32],
-    mappings: Vec[DscMapping],
-    images: Vec[DscImage],
+    fds: List[i32],
+    mappings: List[DscMapping],
+    images: List[DscImage],
     problem: str,
 }
 
@@ -44,10 +44,10 @@ type DscLibrary {
     install_name: str,
     current_version: str,
     compatibility_version: str,
-    reexports: Vec[str],
-    symbols: Vec[str],
-    weak_symbols: Vec[str],
-    tls_symbols: Vec[str],
+    reexports: List[str],
+    symbols: List[str],
+    weak_symbols: List[str],
+    tls_symbols: List[str],
     problem: str,
 }
 
@@ -118,7 +118,7 @@ fn fs_dirname(path: &str) -> str:
     if last <= 0: "/" else: path.slice(0, last)
 
 fn fs_cache_error(message: &str) -> DscCache:
-    DscCache { fds: Vec.new(), mappings: Vec.new(), images: Vec.new(), problem: message.to_owned() }
+    DscCache { fds: List.new(), mappings: List.new(), images: List.new(), problem: message.to_owned() }
 
 // Opens the main cache file and every sub-cache beside it, and reads their
 // mappings and the image list.
@@ -127,7 +127,7 @@ fn fs_open_cache() -> DscCache:
     if main_path.len() == 0:
         return fs_cache_error("no dyld shared cache on this machine (looked in /System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld and /System/Library/dyld)")
     let base = fs_basename(main_path)
-    let files: Vec[str] = Vec.new()
+    let files: List[str] = List.new()
     files.push(main_path.clone())
     for line in runtime_list_files(fs_dirname(main_path)).split("\n"):
         let name = fs_basename(line)
@@ -135,7 +135,7 @@ fn fs_open_cache() -> DscCache:
         // .atlas side files, and not the local-symbols file.
         if name.starts_with(base ++ ".") and not name.ends_with(".map") and not name.ends_with(".atlas") and not name.ends_with(".symbols"):
             files.push(fs_dirname(main_path) ++ "/" ++ name)
-    var cache = DscCache { fds: Vec.new(), mappings: Vec.new(), images: Vec.new(), problem: "" }
+    var cache = DscCache { fds: List.new(), mappings: List.new(), images: List.new(), problem: "" }
     for f in 0..files.len() as i32:
         let fd = fs_open(files[f])
         if fd < 0:
@@ -218,7 +218,7 @@ fn fs_uleb(data: &str, at: i64) -> FsUleb:
     FsUleb { value: -1, next: data.len() }
 
 fn fs_library_error(install_name: &str, message: &str) -> DscLibrary:
-    DscLibrary { install_name: install_name.to_owned(), current_version: "", compatibility_version: "", reexports: Vec.new(), symbols: Vec.new(), weak_symbols: Vec.new(), tls_symbols: Vec.new(), problem: message.to_owned() }
+    DscLibrary { install_name: install_name.to_owned(), current_version: "", compatibility_version: "", reexports: List.new(), symbols: List.new(), weak_symbols: List.new(), tls_symbols: List.new(), problem: message.to_owned() }
 
 // The exports of the image `install_name`: its load commands for the
 // identity and re-exports, its exports trie for the symbols.
@@ -231,7 +231,7 @@ fn fs_read_library(cache: &DscCache, install_name: &str) -> DscLibrary:
         return fs_library_error(install_name, "no 64-bit Mach-O header for " ++ install_name)
     let ncmds = fs_u32(head, 16)
     let cmds = fs_read_vm(cache, address, 32 + fs_u32(head, 20))
-    var library = DscLibrary { install_name: install_name.to_owned(), current_version: "1", compatibility_version: "1", reexports: Vec.new(), symbols: Vec.new(), weak_symbols: Vec.new(), tls_symbols: Vec.new(), problem: "" }
+    var library = DscLibrary { install_name: install_name.to_owned(), current_version: "1", compatibility_version: "1", reexports: List.new(), symbols: List.new(), weak_symbols: List.new(), tls_symbols: List.new(), problem: "" }
     var linkedit_vm: i64 = -1
     var linkedit_file: i64 = 0
     var trie_off: i64 = -1
@@ -265,8 +265,8 @@ fn fs_read_library(cache: &DscCache, install_name: &str) -> DscLibrary:
         return fs_library_error(install_name, "could not read the exports trie of " ++ install_name)
     // Depth-first over the trie: each node is a terminal (its export flags)
     // and edges (a label and a child offset).
-    let prefixes: Vec[str] = Vec.new()
-    let nodes: Vec[i64] = Vec.new()
+    let prefixes: List[str] = List.new()
+    let nodes: List[i64] = List.new()
     prefixes.push("")
     nodes.push(0)
     var visited = 0
@@ -310,19 +310,19 @@ fn fs_str_less(a: &str, b: &str) -> bool:
         if a[i] != b[i]: return a[i] < b[i]
     a.len() < b.len()
 
-fn fs_sorted(items: &Vec[str]) -> Vec[str]:
+fn fs_sorted(items: &List[str]) -> List[str]:
     if items.len() <= 1:
-        let one: Vec[str] = Vec.new()
+        let one: List[str] = List.new()
         for i in 0..items.len() as i32: one.push(items[i].clone())
         return one
     let mid = items.len() as i32 / 2
-    let left: Vec[str] = Vec.new()
-    let right: Vec[str] = Vec.new()
+    let left: List[str] = List.new()
+    let right: List[str] = List.new()
     for i in 0..items.len() as i32:
         if i < mid: left.push(items[i].clone()) else: right.push(items[i].clone())
     let a = fs_sorted(&left)
     let b = fs_sorted(&right)
-    let out: Vec[str] = Vec.new()
+    let out: List[str] = List.new()
     var i = 0
     var j = 0
     while i < a.len() as i32 or j < b.len() as i32:
@@ -334,7 +334,7 @@ fn fs_sorted(items: &Vec[str]) -> Vec[str]:
             j = j + 1
     out
 
-fn fs_yaml_list(out: &str, key: &str, items: &Vec[str]) -> str:
+fn fs_yaml_list(out: &str, key: &str, items: &List[str]) -> str:
     if items.len() == 0: return out.to_owned()
     var text = StringBuilder.new()
     text.push_str(out)
@@ -376,8 +376,8 @@ fn fs_framework_tbd(cache: &DscCache, name: &str) -> str:
     let install_name = fs_framework_install_name(cache, name)
     if install_name.len() == 0:
         return "error: no framework " ++ name ++ " in this machine's dyld shared cache"
-    let queue: Vec[str] = Vec.new()
-    let seen: Vec[str] = Vec.new()
+    let queue: List[str] = List.new()
+    let seen: List[str] = List.new()
     queue.push(install_name)
     var text = StringBuilder.new()
     var next = 0
@@ -399,7 +399,7 @@ fn fs_framework_tbd(cache: &DscCache, name: &str) -> str:
 // Writes <dir>/<Name>.framework/<Name>.tbd for each framework name, from
 // this machine's dyld shared cache. "" when every stub is written, else why
 // not.
-pub fn framework_stubs_write(dir: &str, names: &Vec[str]) -> str:
+pub fn framework_stubs_write(dir: &str, names: &List[str]) -> str:
     if runtime_sysinfo_os() != "Macos":
         return "Apple framework stubs are generated on macOS only"
     let cache = fs_open_cache()
@@ -421,8 +421,8 @@ pub fn framework_stubs_write(dir: &str, names: &Vec[str]) -> str:
 // The framework names of `-framework <Name>` and `-weak_framework <Name>`
 // pairs in a package's link arguments: a weakly linked framework needs its
 // stub at link time as any other does.
-pub fn framework_names_in_link_args(link_args: &Vec[str]) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn framework_names_in_link_args(link_args: &List[str]) -> List[str]:
+    let out: List[str] = List.new()
     for i in 0..link_args.len() as i32:
         if (link_args[i] == "-framework" or link_args[i] == "-weak_framework") and i + 1 < link_args.len() as i32:
             out.push(link_args[i + 1].clone())
@@ -430,11 +430,11 @@ pub fn framework_names_in_link_args(link_args: &Vec[str]) -> Vec[str]:
 
 // `with __framework-stubs <dir> <Name>...`: the step `with get` runs, on its
 // own (the :no-host-toolchain check uses it).
-pub fn with_framework_stubs_main(args: &Vec[str]) -> i32:
+pub fn with_framework_stubs_main(args: &List[str]) -> i32:
     if args.len() < 2:
         runtime_eprint("usage: with __framework-stubs <dir> <Framework>...")
         return 2
-    let names: Vec[str] = Vec.new()
+    let names: List[str] = List.new()
     for i in 1..args.len() as i32: names.push(args[i].clone())
     let problem = framework_stubs_write(args[0], &names)
     if problem.len() > 0:

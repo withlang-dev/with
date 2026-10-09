@@ -2,11 +2,11 @@
 
 // #1783 (§21.1 rule 6): the loop local `n` dies every iteration; the views
 // `keep` stored into `h` outlive it, so `h` may not be read afterwards.
-type Holder = ephemeral { v: Vec[&i32] }
+type Holder = ephemeral { v: List[&i32] }
 impl Holder:
     mut fn keep(x: &i32): self.v.push(x)
 fn main:
-    var h = Holder { v: Vec.new() }
+    var h = Holder { v: List.new() }
     for i in 0..3:
         let n = i * 10
         h.keep(&n)

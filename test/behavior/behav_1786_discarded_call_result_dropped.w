@@ -28,13 +28,13 @@ fn test_tail_call_is_a_statement:
     mk(7)
 
 fn test_tail_pop_is_a_statement:
-    var v: Vec[Fd] = Vec.new()
+    var v: List[Fd] = List.new()
     v.push(Fd { n: 3 })
     v.push(Fd { n: 5 })
     v.pop()
 
 fn main:
-    var v: Vec[Fd] = Vec.new()
+    var v: List[Fd] = List.new()
     v.push(Fd { n: 1 })
     v.push(Fd { n: 2 })
     v.pop()

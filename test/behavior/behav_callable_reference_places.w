@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-use std.collections.Vec
+use std.collections.List
 use std.libc.atoi
 
 // D102 (§16.6): an `extern "C" fn` is never null; the slot that may be
@@ -17,7 +17,7 @@ fn main:
     assert(invoke_c(conversions[0].unwrap()) == 21)
     let increase: fn(i32) -> i32 = value => value + 1
     assert(invoke(increase) == 21)
-    var callbacks: Vec[fn(i32) -> i32] = Vec.new()
+    var callbacks: List[fn(i32) -> i32] = List.new()
     callbacks.push(increase)
     assert(callbacks[0](30) == 31)
     assert(callbacks[0](40) == 41)

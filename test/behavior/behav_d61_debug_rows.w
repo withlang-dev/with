@@ -15,7 +15,7 @@ enum Shape:
     Dot
     Circle(f64)
     Tagged(str)
-type ShapeBox { shape: Shape, all: Vec[Shape] }
+type ShapeBox { shape: Shape, all: List[Shape] }
 
 fn slice_form(xs: []i32) -> str: f"{xs:?}"
 fn view_form(xs: &[str]) -> str: f"{xs:?}"
@@ -36,7 +36,7 @@ fn main:
     let f: f64 = 3.5
     let yes = true
     check(f"{i:?} {big:?} {small:?} {byte:?} {tiny:?} {f:?} {yes:?}", "-42 18446744073709551615 -9223372036854775807 255 -128 3.5 true")
-    let ints: Vec[u64] = Vec.new()
+    let ints: List[u64] = List.new()
     ints.push(big)
     ints.push(0)
     check(f"{ints:?}", "[18446744073709551615, 0]")
@@ -57,7 +57,7 @@ fn main:
     check(f"{circle:?}", "Circle(1.5)")
     let tagged = Shape.Tagged("t, u")
     check(f"{tagged:?}", r#"Tagged("t, u")"#)
-    let shapes: Vec[Shape] = Vec.new()
+    let shapes: List[Shape] = List.new()
     shapes.push(Shape.Dot)
     shapes.push(Shape.Tagged("x"))
     let sb = ShapeBox { shape: Shape.Circle(0.5), all: shapes }
@@ -74,19 +74,19 @@ fn main:
     let unit: Option[Unit] = Some(())
     check(f"{unit:?}", "Some(())")
 
-    // Vec, array, slice: `[elem, elem]`; empty reads `[]`.
-    let names: Vec[str] = Vec.new()
+    // List, array, slice: `[elem, elem]`; empty reads `[]`.
+    let names: List[str] = List.new()
     names.push("a")
     names.push("b, c")
     check(f"{names:?}", r#"["a", "b, c"]"#)
-    let none_yet: Vec[str] = Vec.new()
+    let none_yet: List[str] = List.new()
     check(f"{none_yet:?}", "[]")
-    let grid: Vec[Vec[i32]] = Vec.new()
-    let row: Vec[i32] = Vec.new()
+    let grid: List[List[i32]] = List.new()
+    let row: List[i32] = List.new()
     row.push(1)
     row.push(2)
     grid.push(row)
-    grid.push(Vec.new())
+    grid.push(List.new())
     check(f"{grid:?}", "[[1, 2], []]")
     let arr: [3]i32 = [4, 5, 6]
     check(f"{arr:?}", "[4, 5, 6]")
@@ -120,11 +120,11 @@ fn main:
     check(f"{by_num:?}", r#"{-1: "minus", 10: "ten", 2: "two"}"#)
     let empty_map: HashMap[str, i32] = HashMap.new()
     check(f"{empty_map:?}", "{}")
-    var lists: HashMap[str, Vec[Point]] = HashMap.new()
-    let pts: Vec[Point] = Vec.new()
+    var lists: HashMap[str, List[Point]] = HashMap.new()
+    let pts: List[Point] = List.new()
     pts.push(Point { x: 0, y: 0 })
     lists.insert("origin", pts)
-    lists.insert("none", Vec.new())
+    lists.insert("none", List.new())
     check(f"{lists:?}", r#"{"none": [], "origin": [Point { x: 0, y: 0 }]}"#)
 
     // BTreeMap: `{key: value, ...}` in key order.

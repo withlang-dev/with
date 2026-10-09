@@ -5,7 +5,7 @@ use std.time
 const ROUNDS: i32 = 800
 const ROWS: i32 = 100000
 
-type Table { xs: Vec[i64], ys: Vec[i64], ids: Vec[i64] }
+type Table { xs: List[i64], ys: List[i64], ids: List[i64] }
 
 fn next(state: u64) -> u64:
     var x = state
@@ -31,7 +31,7 @@ fn main:
     var rng: u64 = 2463534242
     var checksum: i64 = 0
     for round in 0..ROUNDS:
-        var table = Table { xs: Vec.new(), ys: Vec.new(), ids: Vec.new() }
+        var table = Table { xs: List.new(), ys: List.new(), ids: List.new() }
         for i in 0..ROWS:
             rng = next(rng)
             table.push_row(rng, (round * ROWS + i) as i64)

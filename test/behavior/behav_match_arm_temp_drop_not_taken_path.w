@@ -10,10 +10,10 @@
 // live heap pointer (spec_ss06's SlotMap values buffer), a double free. Each
 // shape below takes the arm WITHOUT the temp and must run clean.
 use std.builtins.print_i32
-type Big { a: Vec[str], b: Vec[str] }
+type Big { a: List[str], b: List[str] }
 
-fn cl(v: &Vec[str]) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn cl(v: &List[str]) -> List[str]:
+    var out: List[str] = List.new()
     for i in 0..v.len() as i32:
         out.push(v[i as i64] ++ "")
     out
@@ -28,10 +28,10 @@ fn note(n: i32, tag: &str = "note") -> i32:
     tag.len() as i32 + n
 
 fn main:
-    let seed: Vec[str] = Vec.new()
+    let seed: List[str] = List.new()
     seed.push("x")
     var big = Big { a: cl(&seed), b: cl(&seed) }
-    var results: Vec[i32] = Vec.new()
+    var results: List[i32] = List.new()
     let n = big.a.len() as i32
 
     // Temp-bearing arm first, taken arm second.

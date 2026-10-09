@@ -7,7 +7,7 @@ use compiler.Link
 // as pure arg-mapping logic (both is_darwin branches) so it needs no live
 // framework and runs on every platform.
 
-fn join_args(v: &Vec[str]) -> str:
+fn join_args(v: &List[str]) -> str:
     var out = ""
     for i in 0..v.len() as i32:
         if i > 0: out = out ++ " "

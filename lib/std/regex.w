@@ -64,7 +64,7 @@ pub type Regex {
 pub type Captures {
     regex_ptr: *const i8,
     subject: str,
-    spans: Vec[i32],
+    spans: List[i32],
 }
 
 fn regex_make_flags(options: i32, flags: i32) -> RegexFlags:
@@ -183,8 +183,8 @@ unsafe fn regex_pattern_info_count(code: *const i8, what: c_int, label: &str) ->
     count as i32
 
 // The match ovector as [start, end] pairs; empty when nothing matched.
-unsafe fn regex_match_spans_at(code: *const i8, text: &str, start_offset: i32) -> Vec[i32]:
-    let spans: Vec[i32] = Vec.new()
+unsafe fn regex_match_spans_at(code: *const i8, text: &str, start_offset: i32) -> List[i32]:
+    let spans: List[i32] = List.new()
     if code as i64 == 0 or start_offset < 0 or start_offset as i64 > text.len():
         return spans
     let gcontext = regex_general_context("Regex.captures_at")
@@ -417,8 +417,8 @@ impl Regex:
             return None
         Some(number)
 
-    pub fn capture_names() -> Vec[str]:
-        let out: Vec[str] = Vec.new()
+    pub fn capture_names() -> List[str]:
+        let out: List[str] = List.new()
         if self.ptr as i64 == 0:
             return out
         let count = unsafe { regex_pattern_info_count(self.ptr, PCRE2_INFO_NAMECOUNT, "capture_names") }
@@ -491,8 +491,8 @@ impl Regex:
             Some(captures) => captures.get(0)
             None => None
 
-    pub fn find_all(text: &str) -> Vec[Match]:
-        let out: Vec[Match] = Vec.new()
+    pub fn find_all(text: &str) -> List[Match]:
+        let out: List[Match] = List.new()
         var cursor: i32 = 0
         while cursor <= text.len() as i32:
             match self.find_at(text, cursor):
@@ -512,8 +512,8 @@ impl Regex:
                 None => break
         out
 
-    pub fn captures_all(text: &str) -> Vec[Captures]:
-        let out: Vec[Captures] = Vec.new()
+    pub fn captures_all(text: &str) -> List[Captures]:
+        let out: List[Captures] = List.new()
         var cursor: i32 = 0
         while cursor <= text.len() as i32:
             match self.captures_at(text, cursor):
@@ -686,11 +686,11 @@ impl Regex:
                 }
         out
 
-    pub fn split(text: &str) -> Vec[str]:
+    pub fn split(text: &str) -> List[str]:
         self.splitn(text, 0)
 
-    pub fn splitn(text: &str, n: i32) -> Vec[str]:
-        let out: Vec[str] = Vec.new()
+    pub fn splitn(text: &str, n: i32) -> List[str]:
+        let out: List[str] = List.new()
         var cursor: i32 = 0
         while cursor <= text.len() as i32:
             if n > 0 and out.len() as i32 >= n - 1:

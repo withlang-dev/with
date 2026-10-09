@@ -8,7 +8,7 @@ use std.process
 use std.fs
 
 fn sh(cmd: &str) -> i32:
-    let argv: Vec[str] = Vec.new()
+    let argv: List[str] = List.new()
     argv.push("/bin/sh")
     argv.push("-c")
     argv.push(cmd.clone())

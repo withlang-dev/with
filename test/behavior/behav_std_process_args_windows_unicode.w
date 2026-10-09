@@ -29,7 +29,7 @@ fn main:
                 print(f"child got [{byte_list(argv[i])}]")
             exit_code(3)
         return
-    var child: Vec[str] = Vec.new()
+    var child: List[str] = List.new()
     child.push(argv[0] ++ "")
     child.push("--child")
     for a in sent:

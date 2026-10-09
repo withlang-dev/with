@@ -3,10 +3,10 @@
 
 type Entry {
     name: str,
-    values: Vec[i32],
+    values: List[i32],
 }
 
-fn score(entries: Vec[Entry], lookup: HashMap[str, i32]) -> i32:
+fn score(entries: List[Entry], lookup: HashMap[str, i32]) -> i32:
     var total = 0
     var i = 0
     while i < entries.len():
@@ -23,6 +23,6 @@ fn score(entries: Vec[Entry], lookup: HashMap[str, i32]) -> i32:
     total
 
 fn main:
-    let entries: Vec[Entry] = Vec.new()
+    let entries: List[Entry] = List.new()
     let lookup: HashMap[str, i32] = HashMap.new()
     let _ = score(entries, lookup)

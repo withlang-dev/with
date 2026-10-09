@@ -2,10 +2,10 @@
 
 // #1395: `??` with an owned default is an owned join; its Option operand is
 // a field, so the payload would move out of it.
-type S { o: Option[Vec[i32]] }
+type S { o: Option[List[i32]] }
 fn g(c: bool):
-    var s = S { o: Some(Vec.new()) }
-    let v = s.o ?? Vec.new()
+    var s = S { o: Some(List.new()) }
+    let v = s.o ?? List.new()
     print(v.len())
     print(s.o.is_some())
 fn main:

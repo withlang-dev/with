@@ -2,5 +2,5 @@
 
 fn bad:
     let x = 42
-    var refs: Vec[&i32] = Vec.new()
+    var refs: List[&i32] = List.new()
     refs.push(&x)

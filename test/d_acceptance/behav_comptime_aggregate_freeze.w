@@ -1,13 +1,13 @@
 //! expect-stdout: ok
 
 type Package {
-    values: Vec[i32],
+    values: List[i32],
     table: HashMap[str, i32],
     total: i64,
 }
 
 comptime fn build_package() -> Package:
-    var values = Vec[i32].new()
+    var values = List[i32].new()
     values.push(4)
     values.push(8)
 

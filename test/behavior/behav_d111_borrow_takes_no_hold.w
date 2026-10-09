@@ -12,19 +12,19 @@ use std.collections.HashMap
 
 type Pair { a: i64, b: i64 }
 
-fn first_seven(ps: &Vec[Pair]) -> i64:
+fn first_seven(ps: &List[Pair]) -> i64:
     for p in ps.iter():
         if p.a + p.b == 7:
             return p.a + p.b
     0
 
 fn main:
-    var ps: Vec[Pair] = Vec.new()
+    var ps: List[Pair] = List.new()
     ps.push(Pair { a: 3, b: 4 })
     print(first_seven(ps))
     var m: HashMap[str, i32] = HashMap.new()
     m.insert("alpha".to_owned(), 1)
-    var ks: Vec[str] = Vec.new()
+    var ks: List[str] = List.new()
     for k in m.keys():
         let c = k.clone()
         ks.push(k.clone())

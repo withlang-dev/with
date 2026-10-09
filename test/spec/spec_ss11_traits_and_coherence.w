@@ -21,6 +21,6 @@ fn test_second_impl:
     let o = Other { name: "hello" }
     assert(o.show() == "Other(hello)")
 
-// blocked: orphan rule (impl Show for Vec[i32]) not enforced yet
-// impl Show for Vec[i32]:              // should ERROR
-//     fn show(self: &Vec[i32]) -> str: "vec"
+// blocked: orphan rule (impl Show for List[i32]) not enforced yet
+// impl Show for List[i32]:              // should ERROR
+//     fn show(self: &List[i32]) -> str: "vec"

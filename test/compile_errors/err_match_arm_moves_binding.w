@@ -5,9 +5,9 @@
 use std.process
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(1)
-    let ys: Vec[i32] = Vec.new()
+    let ys: List[i32] = List.new()
     let p = match args().len() > 0:
         true => xs
         false => ys

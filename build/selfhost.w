@@ -88,7 +88,7 @@ fn bs_c_compiler() -> str:
         return cc
     "cc"
 
-fn bs_push_c_compiler(argv: Vec[str]) -> Vec[str]:
+fn bs_push_c_compiler(argv: List[str]) -> List[str]:
     argv.push(bs_c_compiler())
     argv
 
@@ -131,12 +131,12 @@ fn bs_cross_target_triple() -> str:
         return "aarch64-apple-darwin"
     "x86_64-unknown-linux-gnu"
 
-fn bs_run_cli_capture(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &Vec[str], timeout_ms: i32) -> SelfhostRunResult:
+fn bs_run_cli_capture(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str], timeout_ms: i32) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
     let stderr_path = bs_capture_path(root, output_dir, label, "stderr")
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(selfhost_owned_text(compiler_path))
     for i in 0..args.len() as i32:
         argv |> push(selfhost_owned_text(args[i]))
@@ -147,18 +147,18 @@ fn bs_run_cli_capture(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &
     SelfhostRunResult { result.rc, move result.stdout, move result.stderr }
 
 fn bs_clone_process_env(process_env: &ProcessEnv) -> ProcessEnv:
-    var vars: Vec[ProcessEnvVar] = Vec.new()
+    var vars: List[ProcessEnvVar] = List.new()
     for i in 0..process_env.vars.len() as i32:
         let item = process_env.vars[i]
         vars.push(ProcessEnvVar { name: selfhost_owned_text(item.name), value: selfhost_owned_text(item.value) })
     ProcessEnv { vars }
 
-fn bs_run_cli_capture_with_env(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &Vec[str], timeout_ms: i32, process_env: &ProcessEnv) -> SelfhostRunResult:
+fn bs_run_cli_capture_with_env(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str], timeout_ms: i32, process_env: &ProcessEnv) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
     let stderr_path = bs_capture_path(root, output_dir, label, "stderr")
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(selfhost_owned_text(compiler_path))
     for i in 0..args.len() as i32:
         argv |> push(selfhost_owned_text(args[i]))
@@ -183,12 +183,12 @@ fn bs_case_process_env(root: &str, output_dir: &str, cwd: &str, process_env: &Pr
     let name = if rel.len() == 0 or rel == ".": "root" else: rel.replace("/", "_")
     env.set("WITH_BUILD_CACHE_DIR", bs_abs(root, bs_join(output_dir, ".build-store/" ++ name)))
 
-fn bs_run_cli_capture_cwd_with_env(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &Vec[str], timeout_ms: i32, cwd: &str, process_env: &ProcessEnv) -> SelfhostRunResult:
+fn bs_run_cli_capture_cwd_with_env(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str], timeout_ms: i32, cwd: &str, process_env: &ProcessEnv) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
     let stderr_path = bs_capture_path(root, output_dir, label, "stderr")
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(selfhost_owned_text(compiler_path))
     for i in 0..args.len() as i32:
         argv |> push(selfhost_owned_text(args[i]))
@@ -198,7 +198,7 @@ fn bs_run_cli_capture_cwd_with_env(ctx: &ActionCtx, compiler_path: &str, label: 
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, move result.stdout, move result.stderr }
 
-fn bs_run_cli_capture_input(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &Vec[str], stdin_text: &str, timeout_ms: i32) -> SelfhostRunResult:
+fn bs_run_cli_capture_input(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str], stdin_text: &str, timeout_ms: i32) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdin_rel = bs_join(output_dir, label ++ ".stdin")
@@ -207,7 +207,7 @@ fn bs_run_cli_capture_input(ctx: &ActionCtx, compiler_path: &str, label: &str, a
     let stdin_path = bs_abs(root, stdin_rel)
     if ctx.fs().write_text(stdin_rel, stdin_text) != 0:
         return SelfhostRunResult { 1, "", "could not write stdin fixture: " ++ stdin_rel }
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(selfhost_owned_text(compiler_path))
     for i in 0..args.len() as i32:
         argv |> push(selfhost_owned_text(args[i]))
@@ -218,7 +218,7 @@ fn bs_run_cli_capture_input(ctx: &ActionCtx, compiler_path: &str, label: &str, a
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, move result.stdout, move result.stderr }
 
-fn bs_run_cli_capture_cwd(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &Vec[str], timeout_ms: i32, cwd: &str) -> SelfhostRunResult:
+fn bs_run_cli_capture_cwd(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str], timeout_ms: i32, cwd: &str) -> SelfhostRunResult:
     bs_run_cli_capture_cwd_with_env(ctx, compiler_path, label, args, timeout_ms, cwd, &process_env())
 
 fn bs_run_binary_capture_with_env(ctx: &ActionCtx, exe_path: &str, label: &str, timeout_ms: i32, process_env: &ProcessEnv) -> SelfhostRunResult:
@@ -226,7 +226,7 @@ fn bs_run_binary_capture_with_env(ctx: &ActionCtx, exe_path: &str, label: &str, 
     let output_dir = ctx.output()
     let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
     let stderr_path = bs_capture_path(root, output_dir, label, "stderr")
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(bs_abs(root, exe_path))
     var result = ctx.process_runner().run_capture_with_env(argv, stdout_path, stderr_path, timeout_ms, bs_clone_process_env(process_env))
     if result.rc == 0:
@@ -252,7 +252,7 @@ fn bs_run_binary_capture(ctx: &ActionCtx, exe_path: &str, label: &str, timeout_m
     let output_dir = ctx.output()
     let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
     let stderr_path = bs_capture_path(root, output_dir, label, "stderr")
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(bs_abs(root, exe_path))
     var result = ctx.process_runner().run_capture(argv, stdout_path, stderr_path, timeout_ms)
     if result.rc == 0:
@@ -294,7 +294,7 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
     let bin_path = bs_join(output_dir, "hello")
     let build_stdout = bs_join(output_dir, "build.stdout")
     let build_stderr = bs_join(output_dir, "build.stderr")
-    var build_args: Vec[str] = Vec.new()
+    var build_args: List[str] = List.new()
     build_args |> push(bs_abs(root, copied_compiler))
     build_args |> push("build")
     build_args |> push(bs_abs(root, source_path))
@@ -313,7 +313,7 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
 
     let run_stdout = bs_join(output_dir, "run.stdout")
     let run_stderr = bs_join(output_dir, "run.stderr")
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push(bs_abs(root, bin_path))
     let run_result = ctx.process_runner().run_capture(run_args, bs_abs(root, run_stdout), bs_abs(root, run_stderr), 60000)
     if run_result.rc == 124:
@@ -349,11 +349,11 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
     let compiler = inputs[0]
 
-    var gen_args: Vec[str] = Vec.new()
+    var gen_args: List[str] = List.new()
     gen_args |> push("version")
     gen_args |> push("--generation")
     let generation = bs_trim_trailing_line_endings(bs_run_cli_capture(ctx, compiler, "generation", &gen_args, 60000).stdout)
-    var rt_args: Vec[str] = Vec.new()
+    var rt_args: List[str] = List.new()
     rt_args |> push("version")
     rt_args |> push("--runtime-generation")
     let runtime_generation = bs_trim_trailing_line_endings(bs_run_cli_capture(ctx, compiler, "runtime-generation", &rt_args, 60000).stdout)
@@ -374,7 +374,7 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
 
     // This generation's root links, and the program runs.
     let bin_path = bs_join(output_dir, "hello")
-    var build_args: Vec[str] = Vec.new()
+    var build_args: List[str] = List.new()
     build_args |> push(bs_abs(root, compiler))
     build_args |> push("build")
     build_args |> push(bs_abs(root, source_path))
@@ -384,7 +384,7 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
     let same = ctx.process_runner().run_capture_with_env(build_args, bs_abs(root, bs_join(output_dir, "same.stdout")), bs_abs(root, bs_join(output_dir, "same.stderr")), 300000, same_env)
     if same.rc != 0:
         return bs_fail(ctx, f"linking through out/lib (this generation) failed with exit code {same.rc}: " ++ same.stderr)
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push(bs_abs(root, bin_path))
     let ran = ctx.process_runner().run_capture(run_args, bs_abs(root, bs_join(output_dir, "run.stdout")), bs_abs(root, bs_join(output_dir, "run.stderr")), 60000)
     if ran.rc != 0 or bs_trim_trailing_line_endings(ran.stdout) != "hello":
@@ -392,7 +392,7 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
 
     // Another generation's root is refused, and nothing else links instead.
     let refused_bin = bs_join(output_dir, "refused")
-    var refused_args: Vec[str] = Vec.new()
+    var refused_args: List[str] = List.new()
     refused_args |> push(bs_abs(root, compiler))
     refused_args |> push("build")
     refused_args |> push(bs_abs(root, source_path))
@@ -406,7 +406,7 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "a WITH_RUNTIME_ROOT of another compiler generation failed without saying why: " ++ refused.stderr)
     0
 
-fn bs_run_cli_expect_success(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &Vec[str]) -> SelfhostRunResult:
+fn bs_run_cli_expect_success(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": cli selfhost command '" ++ label ++ f"' failed with exit code {result.rc}")
@@ -427,13 +427,13 @@ fn bs_assert_stdout_exact(ctx: &ActionCtx, result: &SelfhostRunResult, expected:
         return 0
     bs_fail(ctx, "stdout mismatch for " ++ label ++ ": expected '" ++ expected ++ "' got '" ++ actual ++ "'")
 
-fn bs_expect_cli_success_exact(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &Vec[str], expected: &str) -> i32:
+fn bs_expect_cli_success_exact(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str], expected: &str) -> i32:
     let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
     if result.rc != 0:
         return bs_fail(ctx, "one-liner '" ++ label ++ f"' failed with exit code {result.rc}")
     bs_assert_stdout_exact(ctx, result, expected, label)
 
-fn bs_expect_cli_input_success_exact(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &Vec[str], stdin_text: &str, expected: &str) -> i32:
+fn bs_expect_cli_input_success_exact(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str], stdin_text: &str, expected: &str) -> i32:
     let result = bs_run_cli_capture_input(ctx, compiler_path, label, args, stdin_text, 120000)
     if result.rc != 0:
         return bs_fail(ctx, "one-liner '" ++ label ++ f"' failed with exit code {result.rc}")
@@ -508,8 +508,8 @@ fn bs_lsp_input(text: &str, request: &str) -> str:
         "}}}"
     bs_lsp_frame(init) ++ bs_lsp_frame(didopen) ++ bs_lsp_frame(request)
 
-fn bs_lsp_args() -> Vec[str]:
-    let args: Vec[str] = Vec.new()
+fn bs_lsp_args() -> List[str]:
+    let args: List[str] = List.new()
     args.push("lsp")
     args
 
@@ -560,7 +560,7 @@ fn bs_check_lsp_parser_recovery(ctx: &ActionCtx, compiler_path: &str) -> i32:
         let name = bs_basename(path)
         if name.starts_with("err_recovery_") and name.ends_with(".w"):
             checked = checked + 1
-            let args: Vec[str] = Vec.new()
+            let args: List[str] = List.new()
             args.push("check")
             args.push(selfhost_owned_text(path))
             let result = bs_run_cli_capture(ctx, compiler_path, "lsp-parser-" ++ name, args, 60000)
@@ -697,14 +697,14 @@ fn bs_check_lsp_dot_completion(ctx: &ActionCtx, compiler_path: &str) -> i32:
     rc = bs_assert_contains(ctx, point_out.stdout, "\"label\":\"name\"", "lsp_dot_struct_name")
     if rc != 0: return rc
 
-    let vec_text = "fn main:\n    let v = Vec.new()\n    v.\n"
-    let vec_out = bs_lsp_run_ok(ctx, compiler_path, "lsp-dot-vec", vec_text, bs_lsp_completion(2, 6))
-    if vec_out.rc != 0 and vec_out.rc != 124: return vec_out.rc
-    rc = bs_assert_contains(ctx, vec_out.stdout, "\"label\":\"push\"", "lsp_dot_vec_push")
+    let list_text = "fn main:\n    let v = List.new()\n    v.\n"
+    let list_out = bs_lsp_run_ok(ctx, compiler_path, "lsp-dot-vec", list_text, bs_lsp_completion(2, 6))
+    if list_out.rc != 0 and list_out.rc != 124: return list_out.rc
+    rc = bs_assert_contains(ctx, list_out.stdout, "\"label\":\"push\"", "lsp_dot_vec_push")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, vec_out.stdout, "\"label\":\"len\"", "lsp_dot_vec_len")
+    rc = bs_assert_contains(ctx, list_out.stdout, "\"label\":\"len\"", "lsp_dot_vec_len")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, vec_out.stdout, "\"label\":\"get\"", "lsp_dot_vec_get")
+    rc = bs_assert_contains(ctx, list_out.stdout, "\"label\":\"get\"", "lsp_dot_vec_get")
     if rc != 0: return rc
 
     let user_text =
@@ -799,7 +799,7 @@ fn bs_check_lsp_prelude_trait_scope_slow(ctx: &ActionCtx, compiler_path: &str) -
     if prelude.rc != 0 and prelude.rc != 124: return prelude.rc
     var rc = bs_assert_contains(ctx, prelude.stdout, "\"label\":\"print\"", "lsp_prelude_print")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, prelude.stdout, "\"label\":\"Vec\"", "lsp_prelude_vec")
+    rc = bs_assert_contains(ctx, prelude.stdout, "\"label\":\"List\"", "lsp_prelude_vec")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, prelude.stdout, "\"label\":\"Option\"", "lsp_prelude_option")
     if rc != 0: return rc
@@ -891,13 +891,13 @@ pub fn run_cli_selfhost_lsp_action(ctx: ActionCtx) -> i32:
     bs_check_lsp_prelude_trait_scope_slow(ctx, compiler_path)
 
 fn bs_check_help(ctx: &ActionCtx, compiler_path: &str) -> i32:
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("--help")
     let result = bs_run_cli_expect_success(ctx, compiler_path, "help", args)
     if result.rc != 0:
         return result.rc
 
-    let checks: Vec[str] = Vec.new()
+    let checks: List[str] = List.new()
     checks |> push("Usage: with [command] [options]")
     checks |> push("  doc              Generate documentation")
     checks |> push("  repl             Start an interactive session")
@@ -918,13 +918,13 @@ fn bs_check_help(ctx: &ActionCtx, compiler_path: &str) -> i32:
     if forbid_prefer_curly != 0:
         return forbid_prefer_curly
 
-    var build_args: Vec[str] = Vec.new()
+    var build_args: List[str] = List.new()
     build_args |> push("build")
     build_args |> push("--help")
     let build_help = bs_run_cli_expect_success(ctx, compiler_path, "build-help", build_args)
     if build_help.rc != 0:
         return build_help.rc
-    let build_checks: Vec[str] = Vec.new()
+    let build_checks: List[str] = List.new()
     build_checks |> push("Usage: with build [source.w|:target] [options]")
     build_checks |> push("  --graph          Print the build graph and exit")
     build_checks |> push("  --target <triple>")
@@ -937,7 +937,7 @@ fn bs_check_help(ctx: &ActionCtx, compiler_path: &str) -> i32:
     if forbid_build_run != 0:
         return forbid_build_run
 
-    var build_short_args: Vec[str] = Vec.new()
+    var build_short_args: List[str] = List.new()
     build_short_args |> push("build")
     build_short_args |> push("-h")
     let build_short_help = bs_run_cli_expect_success(ctx, compiler_path, "build-help-short", build_short_args)
@@ -946,7 +946,7 @@ fn bs_check_help(ctx: &ActionCtx, compiler_path: &str) -> i32:
     bs_assert_contains(ctx, build_short_help.stdout, "Usage: with build [source.w|:target] [options]", "build_help_short")
 
 fn bs_check_doc_repl_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
-    var doc_help_args: Vec[str] = Vec.new()
+    var doc_help_args: List[str] = List.new()
     doc_help_args |> push("doc")
     doc_help_args |> push("--help")
     let doc_help = bs_run_cli_expect_success(ctx, compiler_path, "doc-help", doc_help_args)
@@ -957,7 +957,7 @@ fn bs_check_doc_repl_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -
     rc = bs_assert_contains(ctx, doc_help.stdout, "--open", "doc_help")
     if rc != 0: return rc
 
-    var repl_help_args: Vec[str] = Vec.new()
+    var repl_help_args: List[str] = List.new()
     repl_help_args |> push("repl")
     repl_help_args |> push("--help")
     let repl_help = bs_run_cli_expect_success(ctx, compiler_path, "repl-help", repl_help_args)
@@ -990,7 +990,7 @@ fn bs_check_doc_repl_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -
         "pub type PublicThing { value: i32 }\n",
         "doc sample")
     if rc != 0: return rc
-    var doc_args: Vec[str] = Vec.new()
+    var doc_args: List[str] = List.new()
     doc_args |> push("doc")
     doc_args |> push(bs_abs(ctx.project_info().project_root(), doc_src))
     doc_args |> push("-o")
@@ -1019,7 +1019,7 @@ fn bs_check_doc_repl_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -
     let missing_dir = bs_join(case_dir, "missing-doc-source")
     if ctx.fs().mkdir_all(missing_dir) != 0:
         return bs_fail(ctx, "could not create missing doc source directory")
-    var missing_doc_args: Vec[str] = Vec.new()
+    var missing_doc_args: List[str] = List.new()
     missing_doc_args |> push("doc")
     let missing_doc = bs_run_cli_capture_cwd(ctx, compiler_path, "doc-missing-source", missing_doc_args, 120000, missing_dir)
     if missing_doc.rc == 0:
@@ -1027,7 +1027,7 @@ fn bs_check_doc_repl_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -
     rc = bs_assert_contains(ctx, missing_doc.stderr, "with doc requires a source file or a project with src/main.w", "doc_missing_source")
     if rc != 0: return rc
 
-    var repl_args: Vec[str] = Vec.new()
+    var repl_args: List[str] = List.new()
     repl_args |> push("repl")
     let repl_run = bs_run_cli_capture_input(ctx, compiler_path, "repl-smoke", repl_args, "print(\"repl-ok\")\n:quit\n", 120000)
     if repl_run.rc != 0:
@@ -1040,8 +1040,8 @@ fn bs_check_doc_repl_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -
         return bs_fail(ctx, "repl persistent declaration unexpectedly succeeded")
     bs_assert_contains(ctx, repl_bad.stderr, "persistent declarations are not implemented", "repl_persistent_decl")
 
-fn bs_test_args(source_path: &str) -> Vec[str]:
-    let args: Vec[str] = Vec.new()
+fn bs_test_args(source_path: &str) -> List[str]:
+    let args: List[str] = List.new()
     args |> push("test")
     args |> push(selfhost_owned_text(source_path))
     args
@@ -1197,7 +1197,7 @@ fn bs_check_test_keep_binary(ctx: &ActionCtx, compiler_path: &str, test_dir: &st
     let green_src = bs_join(test_dir, "keep_binary_green.w")
     if fs.write_text(green_src, "fn test_green: assert(true)\n") != 0:
         return bs_fail(ctx, "could not write " ++ green_src)
-    var verbose_args: Vec[str] = Vec.new()
+    var verbose_args: List[str] = List.new()
     verbose_args |> push("test")
     verbose_args |> push("--verbose")
     verbose_args |> push(selfhost_owned_text(green_src))
@@ -1212,7 +1212,7 @@ fn bs_check_test_keep_binary(ctx: &ActionCtx, compiler_path: &str, test_dir: &st
     rc = bs_assert_not_contains(ctx, green.stderr, "test binary kept: ", "test_keep_binary")
     if rc != 0: return rc
 
-    var keep_args: Vec[str] = Vec.new()
+    var keep_args: List[str] = List.new()
     keep_args |> push("test")
     keep_args |> push("--keep-binary")
     keep_args |> push(selfhost_owned_text(green_src))
@@ -1265,8 +1265,8 @@ pub fn run_cli_selfhost_smoke_action(ctx: ActionCtx) -> i32:
         return keep_rc
     0
 
-fn bs_one_liner_args(first: &str, second: &str) -> Vec[str]:
-    let args: Vec[str] = Vec.new()
+fn bs_one_liner_args(first: &str, second: &str) -> List[str]:
+    let args: List[str] = List.new()
     args |> push(selfhost_owned_text(first))
     args |> push(selfhost_owned_text(second))
     args
@@ -1275,7 +1275,7 @@ fn bs_fmt_case(ctx: &ActionCtx, compiler_path: &str, output_dir: &str, label: &s
     let src = bs_join(output_dir, label ++ ".w")
     var rc = bs_write_fixture(ctx, src, input, "fmt case " ++ label)
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("fmt")
     if flag.len() > 0:
         args |> push(selfhost_owned_text(flag))
@@ -1354,7 +1354,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     var rc = bs_expect_cli_success_exact(ctx, compiler_path, "one-liner-e", bs_one_liner_args("-e", "print(\"hello\")"), "hello")
     if rc != 0: return rc
 
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("-e")
     args |> push("var x = 0")
     args |> push("-e")
@@ -1379,7 +1379,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_expect_cli_success_exact(ctx, compiler_path, "one-liner-semicolon-brace", bs_one_liner_args("-e", "if true { print(\"yes\"); print(\"also\") }"), "yes\nalso")
     if rc != 0: return rc
 
-    args = Vec.new()
+    args = List.new()
     args |> push("-e")
     args |> push("for a in args: print(a)")
     args |> push("--")
@@ -1440,13 +1440,13 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     let echo_src = bs_join(output_dir, "echo_args.w")
     if fs.write_text(echo_src, "use std.process\nlet argv = args()\nfor i in 1..argv.len(): print(argv[i])\n") != 0:
         return bs_fail(ctx, "could not write one-liner fixture source: " ++ echo_src)
-    args = Vec.new()
+    args = List.new()
     args |> push("run")
     args |> push(selfhost_owned_text(echo_src))
     for a in "-n 5 -e x -p y --debug-alloc -O0 --help".split(" "): args |> push(selfhost_owned_text(a))
     rc = bs_expect_cli_success_exact(ctx, compiler_path, "run-forwards-driver-flags", args, "-n\n5\n-e\nx\n-p\ny\n--debug-alloc\n-O0\n--help")
     if rc != 0: return rc
-    args = Vec.new()
+    args = List.new()
     args |> push(selfhost_owned_text(echo_src))
     for a in "-n 5".split(" "): args |> push(selfhost_owned_text(a))
     rc = bs_expect_cli_success_exact(ctx, compiler_path, "implicit-run-forwards-driver-flags", args, "-n\n5")
@@ -1497,7 +1497,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p-use", bs_one_liner_args("-p", "use std.time.now_ns\nuse std.time.now; line = line ++ f\" {now_ns() > 0} {now() > 0}\""), "a\n", "a true true")
     if rc != 0: return rc
-    var use_parts: Vec[str] = Vec.new()
+    var use_parts: List[str] = List.new()
     for a in ["-n", "use std.time.now_ns", "-n", "if now_ns() > 0: print(line.upper())"]: use_parts |> push(selfhost_owned_text(a))
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-n-use-own-part", use_parts, "a\n", "A")
     if rc != 0: return rc
@@ -1510,7 +1510,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_assert_contains(ctx, diag_use.stderr, "<cli -n #1>:2:8", "one_liners")
     if rc != 0: return rc
 
-    args = Vec.new()
+    args = List.new()
     args |> push("-e")
     args |> push("print(\"x\")")
     args |> push("-n")
@@ -1541,7 +1541,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
 
     // ── #513: one-liner edge cases (§18.5b) ────────────────────────────
     // Multiple same-mode fragments accumulate, for -n and -p as well as -e.
-    var repeat_n: Vec[str] = Vec.new()
+    var repeat_n: List[str] = List.new()
     repeat_n |> push("-n")
     repeat_n |> push("let u = line.upper()")
     repeat_n |> push("-n")
@@ -1549,7 +1549,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-repeat-n", repeat_n, "ab\ncd\n", "AB\nCD")
     if rc != 0: return rc
 
-    var repeat_p: Vec[str] = Vec.new()
+    var repeat_p: List[str] = List.new()
     repeat_p |> push("-p")
     repeat_p |> push("line = line.upper()")
     repeat_p |> push("-p")
@@ -1569,7 +1569,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     let src_mix = bs_join(output_dir, "one_liner_mix_src.w")
     if fs.write_text(src_mix, "fn main: print(1)\n") != 0:
         return bs_fail(ctx, "could not write one-liner source-mix fixture: " ++ src_mix)
-    var mix_args: Vec[str] = Vec.new()
+    var mix_args: List[str] = List.new()
     mix_args |> push("-e")
     mix_args |> push("print(\"x\")")
     mix_args |> push(src_mix)
@@ -1603,12 +1603,12 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     bs_assert_not_contains(ctx, diag_capture.stderr, "one-liner compilation failed", "one_liners")
 
-fn bs_project_args(command: &str) -> Vec[str]:
-    let args: Vec[str] = Vec.new()
+fn bs_project_args(command: &str) -> List[str]:
+    let args: List[str] = List.new()
     args |> push(selfhost_owned_text(command))
     args
 
-fn bs_project_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &Vec[str]) -> SelfhostRunResult:
+fn bs_project_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 120000, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": project selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
@@ -1681,7 +1681,7 @@ fn bs_check_init_named_dir(ctx: &ActionCtx, compiler_path: &str, case_dir: &str)
     if ctx.fs().mkdir_all(case_dir) != 0:
         return bs_fail(ctx, "could not create init named case directory: " ++ case_dir)
     let project_name = "sqlite"
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("init")
     args |> push(selfhost_owned_text(project_name))
     let result = bs_project_expect_success(ctx, compiler_path, case_dir, "init-named-dir", args)
@@ -1729,7 +1729,7 @@ fn bs_check_build_rejects_imperative_manifest(ctx: &ActionCtx, compiler_path: &s
     rc = bs_assert_contains(ctx, implicit.stderr, "error: invalid with.toml: imperative build configuration belongs in build.w", "imperative manifest diagnostic")
     if rc != 0: return rc
 
-    var explicit_args: Vec[str] = Vec.new()
+    var explicit_args: List[str] = List.new()
     explicit_args |> push("build")
     explicit_args |> push(bs_abs(ctx.project_info().project_root(), bs_join(case_dir, "src/main.w")))
     let explicit = bs_run_cli_capture_cwd(ctx, compiler_path, "imperative-manifest-explicit-source", explicit_args, 120000, case_dir)
@@ -1770,7 +1770,7 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: &str, ca
     rc = bs_write_fixture(ctx, bs_join(case_dir, ".with/deps/c/fixture/1.0/metadata.json"), bs_lock_fixture_metadata("fixture", "1.0"), "declarative manifest dep metadata")
     if rc != 0: return rc
 
-    var dump_args: Vec[str] = Vec.new()
+    var dump_args: List[str] = List.new()
     dump_args |> push("check")
     dump_args |> push(bs_abs(root, src))
     dump_args |> push("--dump-project-info")
@@ -1810,7 +1810,7 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: &str, ca
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(c_define_dir, "src/main.w"), "use c_import(\"defined_config.h\")\n\nfn main:\n    let x: i32 = WITH_CONFIG_VALUE\n    let _ = x\n", "c import define source")
     if rc != 0: return rc
-    var c_define_args: Vec[str] = Vec.new()
+    var c_define_args: List[str] = List.new()
     c_define_args |> push("build")
     c_define_args |> push("-o")
     c_define_args |> push(bs_abs(root, bs_join(c_define_dir, "out/bin/cdefine")))
@@ -1828,7 +1828,7 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: &str, ca
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(c_define_bad_dir, "src/main.w"), "use c_import(\"defined_config.h\")\n\nfn main:\n    let x: i32 = WITH_CONFIG_VALUE\n    let _ = x\n", "c import missing define source")
     if rc != 0: return rc
-    var c_define_bad_args: Vec[str] = Vec.new()
+    var c_define_bad_args: List[str] = List.new()
     c_define_bad_args |> push("check")
     c_define_bad_args |> push(bs_abs(root, bs_join(c_define_bad_dir, "src/main.w")))
     let c_define_bad = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-c-import-define-missing", c_define_bad_args, 120000, c_define_bad_dir)
@@ -1842,7 +1842,7 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: &str, ca
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(link_bad_dir, "src/main.w"), "fn main:\n    print(\"linkbad\")\n", "missing link lib source")
     if rc != 0: return rc
-    var link_bad_args: Vec[str] = Vec.new()
+    var link_bad_args: List[str] = List.new()
     link_bad_args |> push("build")
     link_bad_args |> push(bs_abs(root, bs_join(link_bad_dir, "src/main.w")))
     link_bad_args |> push("-o")
@@ -2187,7 +2187,7 @@ fn bs_check_manual_c_dep_manifest(ctx: &ActionCtx, compiler_path: &str, case_dir
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "use c_import(\"fixture.h\")\n\nfn main:\n    let x: i32 = MANUAL_C_DEP_VALUE\n    let _ = x\n", "manual c dep source")
     if rc != 0: return rc
 
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(bs_abs(root, bs_join(case_dir, "src/main.w")))
     args |> push("--dump-project-info")
@@ -2251,7 +2251,7 @@ fn bs_check_run_project_targets(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     rc = bs_assert_stdout_exact(ctx, default_result, "default-run-5", "run_project_default")
     if rc != 0: return rc
 
-    var target_args: Vec[str] = Vec.new()
+    var target_args: List[str] = List.new()
     target_args |> push("run")
     target_args |> push(":tool")
     let target_result = bs_project_expect_success(ctx, compiler_path, case_dir, "run-project-target", target_args)
@@ -2262,7 +2262,7 @@ fn bs_check_get_force_reinstall(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     var rc = bs_write_project_manifest(ctx, case_dir, "getforcedemo")
     if rc != 0: return rc
 
-    var first_args: Vec[str] = Vec.new()
+    var first_args: List[str] = List.new()
     first_args |> push("get")
     first_args |> push("c.opengl@system")
     let first = bs_project_expect_success(ctx, compiler_path, case_dir, "get-force-first", first_args)
@@ -2283,7 +2283,7 @@ fn bs_check_get_force_reinstall(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     rc = bs_write_fixture(ctx, sentinel, "cached", "get force sentinel")
     if rc != 0: return rc
 
-    var cached_args: Vec[str] = Vec.new()
+    var cached_args: List[str] = List.new()
     cached_args |> push("get")
     cached_args |> push("c.opengl@system")
     let cached = bs_project_expect_success(ctx, compiler_path, case_dir, "get-force-cached", cached_args)
@@ -2291,7 +2291,7 @@ fn bs_check_get_force_reinstall(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     if not ctx.fs().exists(sentinel):
         return bs_fail(ctx, "cached get unexpectedly reinstalled package")
 
-    var force_args: Vec[str] = Vec.new()
+    var force_args: List[str] = List.new()
     force_args |> push("get")
     force_args |> push("--force-reinstall")
     force_args |> push("c.opengl@system")
@@ -2402,7 +2402,7 @@ fn bs_check_with_package_registry_surface(ctx: &ActionCtx, compiler_path: &str, 
     if rc != 0: return rc
     let before = ctx.fs().read_text(bs_join(case_dir, "with.toml"))
 
-    var json_args: Vec[str] = Vec.new()
+    var json_args: List[str] = List.new()
     json_args |> push("get")
     json_args |> push("json")
     let json = bs_run_cli_capture_cwd(ctx, compiler_path, "get-with-package-json", json_args, 120000, case_dir)
@@ -2420,7 +2420,7 @@ fn bs_check_with_package_registry_surface(ctx: &ActionCtx, compiler_path: &str, 
     if ctx.fs().exists(bs_join(case_dir, ".with")):
         return bs_fail(ctx, "with get json created .with before registry exists")
 
-    var http_args: Vec[str] = Vec.new()
+    var http_args: List[str] = List.new()
     http_args |> push("get")
     http_args |> push("http@1.0")
     let http = bs_run_cli_capture_cwd(ctx, compiler_path, "get-with-package-http", http_args, 120000, case_dir)
@@ -2429,7 +2429,7 @@ fn bs_check_with_package_registry_surface(ctx: &ActionCtx, compiler_path: &str, 
     rc = bs_assert_contains(ctx, http.stderr, "With package 'http'", "get_with_package_http")
     if rc != 0: return rc
 
-    var empty_c_args: Vec[str] = Vec.new()
+    var empty_c_args: List[str] = List.new()
     empty_c_args |> push("get")
     empty_c_args |> push("c.")
     let empty_c = bs_run_cli_capture_cwd(ctx, compiler_path, "get-invalid-empty-c", empty_c_args, 120000, case_dir)
@@ -2438,7 +2438,7 @@ fn bs_check_with_package_registry_surface(ctx: &ActionCtx, compiler_path: &str, 
     rc = bs_assert_contains(ctx, empty_c.stderr, "invalid package spec 'c.'", "get_invalid_empty_c")
     if rc != 0: return rc
 
-    var invalid_args: Vec[str] = Vec.new()
+    var invalid_args: List[str] = List.new()
     invalid_args |> push("get")
     invalid_args |> push("Foo/Bar")
     let invalid = bs_run_cli_capture_cwd(ctx, compiler_path, "get-invalid-with-package", invalid_args, 120000, case_dir)
@@ -2467,7 +2467,7 @@ fn bs_check_remove_update_packages(ctx: &ActionCtx, compiler_path: &str, case_di
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(remove_dir, ".with/lock.json"), bs_lock_json_system("opengl"), "remove package lock")
     if rc != 0: return rc
-    var remove_args: Vec[str] = Vec.new()
+    var remove_args: List[str] = List.new()
     remove_args |> push("remove")
     remove_args |> push("c.opengl")
     let removed = bs_project_expect_success(ctx, compiler_path, remove_dir, "remove-c-package", remove_args)
@@ -2509,7 +2509,7 @@ fn bs_check_get_zlib_versions(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     let pinned_latest_dir = bs_join(case_dir, "pinned_1_3_2")
     var rc = bs_write_project_manifest(ctx, pinned_latest_dir, "getzlib132")
     if rc != 0: return rc
-    var latest_args: Vec[str] = Vec.new()
+    var latest_args: List[str] = List.new()
     latest_args |> push("get")
     latest_args |> push("c.zlib@1.3.2")
     let latest = bs_run_cli_capture_cwd(ctx, compiler_path, "get-zlib-1-3-2", latest_args, 300000, pinned_latest_dir)
@@ -2527,7 +2527,7 @@ fn bs_check_get_zlib_versions(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     let pinned_dir = bs_join(case_dir, "pinned_1_3_1")
     rc = bs_write_project_manifest(ctx, pinned_dir, "getzlib131")
     if rc != 0: return rc
-    var pinned_args: Vec[str] = Vec.new()
+    var pinned_args: List[str] = List.new()
     pinned_args |> push("get")
     pinned_args |> push("c.zlib@1.3.1")
     let pinned = bs_run_cli_capture_cwd(ctx, compiler_path, "get-zlib-1-3-1", pinned_args, 300000, pinned_dir)
@@ -2629,7 +2629,7 @@ fn bs_check_build_cache_tracks_embed_file(ctx: &ActionCtx, compiler_path: &str, 
     rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build().executable(\"embedcache\", \"src/main.w\")\n    out.default(\"embedcache\")\n", "embed cache build")
     if rc != 0: return rc
 
-    var build_args: Vec[str] = Vec.new()
+    var build_args: List[str] = List.new()
     build_args |> push("build")
     build_args |> push(":embedcache")
     let first = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-embed-first", build_args)
@@ -2644,7 +2644,7 @@ fn bs_check_build_cache_tracks_embed_file(ctx: &ActionCtx, compiler_path: &str, 
 
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/data.txt"), "second", "embed cache second data")
     if rc != 0: return rc
-    var rebuild_args: Vec[str] = Vec.new()
+    var rebuild_args: List[str] = List.new()
     rebuild_args |> push("build")
     rebuild_args |> push(":embedcache")
     let second = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-embed-second", rebuild_args)
@@ -2665,7 +2665,7 @@ fn bs_check_build_graph_inferred_edge(ctx: &ActionCtx, compiler_path: &str, case
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn produce(ctx: ActionCtx) -> i32:\n    if ctx.fs().write_text(ctx.output(), \"a\") != 0: return 1\n    0\n\nfn consume(ctx: ActionCtx) -> i32:\n    if ctx.fs().write_text(ctx.output(), ctx.fs().read_text(\"out/a.txt\")) != 0: return 1\n    0\n\npub fn build(ctx: BuildCtx) -> Build:\n    var out = ctx.new_build()\n    var a = target_new(.Action, \"a\", \"\").output(\"out/a.txt\")\n    a.action = produce\n    a = a.write_scope(\"out\")\n    out = out.add_target(move a)\n    var b = target_new(.Action, \"b\", \"\").output(\"out/b.txt\")\n    b.action = consume\n    b = b.input(\"out/a.txt\")\n    b = b.write_scope(\"out\")\n    out = out.add_target(move b)\n    out.default(\"b\")\n", "inferred edge build")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("build")
     args |> push(":b")
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-graph-inferred-edge", args, 120000, case_dir)
@@ -2687,7 +2687,7 @@ fn bs_check_imported_module_diag_location(ctx: &ActionCtx, compiler_path: &str, 
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/helper.w"), "pub fn helper_two() -> str:\n    let x = = 1\n    \"a\"\n", "import diag helper")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push("src/main.w")
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, "imported-module-diag-location", args, 120000, case_dir)
@@ -2704,13 +2704,13 @@ fn bs_check_imported_module_diag_location(ctx: &ActionCtx, compiler_path: &str, 
 fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "effectaudit")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn generate(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let value = ctx.env_input(\"WITH_EFFECT_FLAG\")\n    let graph_value = ctx.args()[1]\n    if fs.write_text(\"out/effect.txt\", value ++ \"/\" ++ graph_value) != 0:\n        return 1\n    let argv: Vec[str] = Vec.new()\n    argv.push(ctx.args()[0].clone())\n    argv.push(\"version\")\n    let result = ctx.process_runner().run_capture(argv, \"out/proc.stdout\", \"out/proc.stderr\", 120000)\n    result.rc\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let graph_value = ctx.env_input(\"WITH_GRAPH_FLAG\")\n    var out = ctx.new_build()\n    var target = target_new(.Action, \"effect\", \"\").output(\"out/effect.txt\")\n    target.action = generate\n    target = target.write_scope(\"out\")\n    target = target.arg(\"" ++ compiler_path ++ "\")\n    target = target.arg(graph_value)\n    out = out.add_target(target)\n    out.default(\"effect\")\n", "effect audit build")
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn generate(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let value = ctx.env_input(\"WITH_EFFECT_FLAG\")\n    let graph_value = ctx.args()[1]\n    if fs.write_text(\"out/effect.txt\", value ++ \"/\" ++ graph_value) != 0:\n        return 1\n    let argv: List[str] = List.new()\n    argv.push(ctx.args()[0].clone())\n    argv.push(\"version\")\n    let result = ctx.process_runner().run_capture(argv, \"out/proc.stdout\", \"out/proc.stderr\", 120000)\n    result.rc\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let graph_value = ctx.env_input(\"WITH_GRAPH_FLAG\")\n    var out = ctx.new_build()\n    var target = target_new(.Action, \"effect\", \"\").output(\"out/effect.txt\")\n    target.action = generate\n    target = target.write_scope(\"out\")\n    target = target.arg(\"" ++ compiler_path ++ "\")\n    target = target.arg(graph_value)\n    out = out.add_target(target)\n    out.default(\"effect\")\n", "effect audit build")
     if rc != 0: return rc
 
-    var env_one = ProcessEnv { vars: Vec.new() }
+    var env_one = ProcessEnv { vars: List.new() }
     env_one.vars.push(ProcessEnvVar { name: "WITH_EFFECT_FLAG", value: "one" })
     env_one.vars.push(ProcessEnvVar { name: "WITH_GRAPH_FLAG", value: "graph-one" })
-    let build_args: Vec[str] = Vec.new()
+    let build_args: List[str] = List.new()
     build_args |> push("build")
     build_args |> push(":effect")
     let first = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-first", build_args, 120000, case_dir, env_one)
@@ -2727,7 +2727,7 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/effect.txt"), "one/graph-one", "effects first output")
     if rc != 0: return rc
 
-    let audit_args: Vec[str] = Vec.new()
+    let audit_args: List[str] = List.new()
     audit_args |> push("build")
     audit_args |> push(":effects")
     let audit = bs_run_cli_capture_cwd(ctx, compiler_path, "effects-audit", audit_args, 120000, case_dir)
@@ -2744,7 +2744,7 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     rc = bs_assert_contains(ctx, audit.stdout, "process", "effects_audit_process")
     if rc != 0: return rc
 
-    var env_two = ProcessEnv { vars: Vec.new() }
+    var env_two = ProcessEnv { vars: List.new() }
     env_two.vars.push(ProcessEnvVar { name: "WITH_EFFECT_FLAG", value: "two" })
     env_two.vars.push(ProcessEnvVar { name: "WITH_GRAPH_FLAG", value: "graph-two" })
     let second = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-second", build_args, 120000, case_dir, env_two)
@@ -2756,13 +2756,13 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     let strict_dir = bs_join(case_dir, "strict")
     rc = bs_write_project_manifest(ctx, strict_dir, "effectstrict")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(strict_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let argv: Vec[str] = Vec.new()\n    argv.push(\"" ++ compiler_path ++ "\")\n    argv.push(\"version\")\n    let _ = ctx.process_runner().run_capture(argv, \"out/strict.stdout\", \"out/strict.stderr\", 120000)\n    ctx.new_build()\n", "strict effects build")
+    rc = bs_write_fixture(ctx, bs_join(strict_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let argv: List[str] = List.new()\n    argv.push(\"" ++ compiler_path ++ "\")\n    argv.push(\"version\")\n    let _ = ctx.process_runner().run_capture(argv, \"out/strict.stdout\", \"out/strict.stderr\", 120000)\n    ctx.new_build()\n", "strict effects build")
     if rc != 0: return rc
-    let strict_args: Vec[str] = Vec.new()
+    let strict_args: List[str] = List.new()
     strict_args |> push("build")
     strict_args |> push("--strict-effects")
     strict_args |> push(":bad")
-    var env_strict = ProcessEnv { vars: Vec.new() }
+    var env_strict = ProcessEnv { vars: List.new() }
     env_strict.vars.push(ProcessEnvVar { name: "WITH_EFFECT_FLAG", value: "one" })
     env_strict.vars.push(ProcessEnvVar { name: "WITH_GRAPH_FLAG", value: "graph-one" })
     let strict = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-strict", strict_args, 120000, strict_dir, env_strict)
@@ -2776,7 +2776,7 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(strict_env_dir, "build.w"), "use std.build\nuse std.os\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let _ = env(\"WITH_UNDECLARED_GRAPH_ENV\")\n    ctx.new_build()\n", "strict env effects build")
     if rc != 0: return rc
-    let strict_env_args: Vec[str] = Vec.new()
+    let strict_env_args: List[str] = List.new()
     strict_env_args |> push("build")
     strict_env_args |> push("--strict-effects")
     strict_env_args |> push(":bad")
@@ -2863,14 +2863,14 @@ fn bs_edge_assert_exact(ctx: &ActionCtx, actual: &str, expected: &str, label: &s
         return 0
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ stream_name ++ " mismatch for " ++ label ++ "\nexpected: '" ++ expected ++ "'\nactual: '" ++ actual ++ "'")
 
-fn bs_edge_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &Vec[str]) -> SelfhostRunResult:
+fn bs_edge_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 120000, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": edge selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
 
-fn bs_edge_build_obj_args(src: &str, obj: &str) -> Vec[str]:
-    let args: Vec[str] = Vec.new()
+fn bs_edge_build_obj_args(src: &str, obj: &str) -> List[str]:
+    let args: List[str] = List.new()
     args |> push("build")
     args |> push(selfhost_owned_text(src))
     args |> push("--emit-obj")
@@ -2897,7 +2897,7 @@ fn bs_check_prelude_output_functions(ctx: &ActionCtx, compiler_path: &str, case_
     let src = bs_join(case_dir, "prelude_output_functions.w")
     var rc = bs_write_fixture(ctx, src, "use std.builtins\n\nfn main:\n    write(\"A\")\n    print(\"B\")\n    write(\"C\")\n    ewrite(\"D\")\n    eprint(\"E\")\n    ewrite(\"F\")\n", "prelude output source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("run")
     args |> push(bs_abs(root, src))
     let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "prelude-output-functions", args)
@@ -2915,14 +2915,14 @@ fn bs_check_unit_tail_value_not_returned(ctx: &ActionCtx, compiler_path: &str, c
         "    label: i32,\n" ++
         "}\n\n" ++
         "fn callee -> Unit:\n" ++
-        "    var v: Vec[Frame] = Vec.new()\n" ++
+        "    var v: List[Frame] = List.new()\n" ++
         "    v.push(Frame { kind: 1, label: 2 })\n" ++
         "    v.pop()\n\n" ++
         "fn main:\n" ++
         "    callee()\n"
     var rc = bs_write_fixture(ctx, src, source, "unit tail value source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push("--dump-mir")
     args |> push(bs_abs(root, src))
@@ -2950,7 +2950,7 @@ fn bs_check_unsafe_prefix_redundant_warning(ctx: &ActionCtx, compiler_path: &str
         "        assert(y == 1)\n"
     var rc = bs_write_fixture(ctx, src, source, "unsafe prefix warning source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(bs_abs(root, src))
     let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "unsafe-prefix-redundant-warning", args)
@@ -2976,7 +2976,7 @@ fn bs_check_c_export_header(ctx: &ActionCtx, compiler_path: &str, case_dir: &str
         "    print(\"ok\")\n"
     var rc = bs_write_fixture(ctx, src, source, "c_export header source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("emit-c-header")
     args |> push(bs_abs(root, src))
     let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "c-export-header", args)
@@ -3003,7 +3003,7 @@ fn bs_check_loop_string_concat_warning(ctx: &ActionCtx, compiler_path: &str, cas
         "    let done = acc\n"
     var rc = bs_write_fixture(ctx, src, source, "loop string concat warning source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(bs_abs(root, src))
     let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "loop-string-concat-warning", args)
@@ -3037,7 +3037,7 @@ fn bs_check_by_value_read_only_warning(ctx: &ActionCtx, compiler_path: &str, cas
         "    assert(inspect_drop(d) == 2)\n"
     var rc = bs_write_fixture(ctx, src, source, "by-value read-only warning source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(bs_abs(root, src))
     let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "by-value-read-only-warning", args)
@@ -3063,7 +3063,7 @@ fn bs_check_global_data_race_unsafe_warning(ctx: &ActionCtx, compiler_path: &str
         "    bump()\n"
     var rc = bs_write_fixture(ctx, src, source, "global data-race unsafe warning source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(bs_abs(root, src))
     let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "global-data-race-unsafe-warning", args)
@@ -3083,7 +3083,7 @@ fn bs_check_not_in_lint(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) ->
         "    assert(not (true and false))\n"
     var rc = bs_write_fixture(ctx, warn_src, warn_source, "not-in lint warning source")
     if rc != 0: return rc
-    var warn_args: Vec[str] = Vec.new()
+    var warn_args: List[str] = List.new()
     warn_args |> push("check")
     warn_args |> push(bs_abs(root, warn_src))
     let warned = bs_edge_expect_success(ctx, compiler_path, case_dir, "not-in-lint-warning", warn_args)
@@ -3102,7 +3102,7 @@ fn bs_check_not_in_lint(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) ->
         "    assert(not (true and false))\n"
     rc = bs_write_fixture(ctx, clean_src, clean_source, "not-in lint clean source")
     if rc != 0: return rc
-    var clean_args: Vec[str] = Vec.new()
+    var clean_args: List[str] = List.new()
     clean_args |> push("check")
     clean_args |> push(bs_abs(root, clean_src))
     let clean = bs_edge_expect_success(ctx, compiler_path, case_dir, "not-in-lint-clean", clean_args)
@@ -3124,7 +3124,7 @@ fn bs_check_partial_statement_match_lint(ctx: &ActionCtx, compiler_path: &str, c
     let default_src = bs_join(default_dir, "src/main.w")
     rc = bs_write_fixture(ctx, default_src, bs_partial_statement_match_source(), "partial statement match default source")
     if rc != 0: return rc
-    var default_args: Vec[str] = Vec.new()
+    var default_args: List[str] = List.new()
     default_args |> push("check")
     default_args |> push(bs_abs(root, default_src))
     let default_result = bs_project_expect_success(ctx, compiler_path, default_dir, "partial-statement-match-default", default_args)
@@ -3138,7 +3138,7 @@ fn bs_check_partial_statement_match_lint(ctx: &ActionCtx, compiler_path: &str, c
     let lint_src = bs_join(lint_dir, "src/main.w")
     rc = bs_write_fixture(ctx, lint_src, bs_partial_statement_match_source(), "partial statement match lint source")
     if rc != 0: return rc
-    var lint_args: Vec[str] = Vec.new()
+    var lint_args: List[str] = List.new()
     lint_args |> push("check")
     lint_args |> push(bs_abs(root, lint_src))
     let lint_result = bs_project_expect_success(ctx, compiler_path, lint_dir, "partial-statement-match-lint", lint_args)
@@ -3165,7 +3165,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     if rc != 0: return rc
 
     let bin_path = bs_join(case_dir, "hello_build_options")
-    var build_args: Vec[str] = Vec.new()
+    var build_args: List[str] = List.new()
     build_args |> push("build")
     build_args |> push(bs_abs(root, src))
     build_args |> push("-O1")
@@ -3182,7 +3182,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     if rc != 0: return rc
 
     let c_path = bs_join(case_dir, "hello_build_options.c")
-    var emit_c_args: Vec[str] = Vec.new()
+    var emit_c_args: List[str] = List.new()
     emit_c_args |> push("build")
     emit_c_args |> push(bs_abs(root, src))
     emit_c_args |> push("--emit-c")
@@ -3194,7 +3194,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
         return bs_fail(ctx, "build options emit-c output missing: " ++ c_path)
 
     let obj_path = bs_join(case_dir, "hello_build_options.o")
-    var emit_obj_args: Vec[str] = Vec.new()
+    var emit_obj_args: List[str] = List.new()
     emit_obj_args |> push("build")
     emit_obj_args |> push(bs_abs(root, src))
     emit_obj_args |> push("--emit-obj")
@@ -3205,7 +3205,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     if not ctx.fs().exists(obj_path):
         return bs_fail(ctx, "build options emit-obj output missing: " ++ obj_path)
 
-    var release_args: Vec[str] = Vec.new()
+    var release_args: List[str] = List.new()
     release_args |> push("build")
     release_args |> push(bs_abs(root, src))
     release_args |> push("--release")
@@ -3214,7 +3214,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     let release_build = bs_edge_expect_success(ctx, compiler_path, case_dir, "build-options-release", release_args)
     if release_build.rc != 0: return release_build.rc
 
-    var conflict_args: Vec[str] = Vec.new()
+    var conflict_args: List[str] = List.new()
     conflict_args |> push("build")
     conflict_args |> push(bs_abs(root, src))
     conflict_args |> push("--emit-c")
@@ -3225,7 +3225,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     rc = bs_assert_contains(ctx, conflict.stderr, "--emit-c and --emit-obj are mutually exclusive", "build_options_emit_conflict")
     if rc != 0: return rc
 
-    var bad_prelude_args: Vec[str] = Vec.new()
+    var bad_prelude_args: List[str] = List.new()
     bad_prelude_args |> push("build")
     bad_prelude_args |> push(bs_abs(root, src))
     bad_prelude_args |> push("--prelude=bogus")
@@ -3237,7 +3237,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
 
     // --target native (space form) builds and runs (§18.5)
     let target_native_bin = bs_join(case_dir, "hello_target_native")
-    var target_native_args: Vec[str] = Vec.new()
+    var target_native_args: List[str] = List.new()
     target_native_args |> push("build")
     target_native_args |> push(bs_abs(root, src))
     target_native_args |> push("--target")
@@ -3255,7 +3255,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     // --target=<host triple> (= form) is accepted as the native selection
     let host_triple = bs_host_target_triple()
     if host_triple.len() > 0:
-        var target_host_args: Vec[str] = Vec.new()
+        var target_host_args: List[str] = List.new()
         target_host_args |> push("build")
         target_host_args |> push(bs_abs(root, src))
         target_host_args |> push("--target=" ++ host_triple)
@@ -3266,7 +3266,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
 
     // Representable non-native target must fail loudly and leave no artifact
     let cross_bin = bs_join(case_dir, "hello_target_cross")
-    var cross_args: Vec[str] = Vec.new()
+    var cross_args: List[str] = List.new()
     cross_args |> push("build")
     cross_args |> push(bs_abs(root, src))
     cross_args |> push("--target")
@@ -3284,7 +3284,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
         return bs_fail(ctx, "cross-target build produced a native artifact: " ++ cross_bin)
 
     // Unrepresentable triple must fail loudly, never fall back to native
-    var unknown_target_args: Vec[str] = Vec.new()
+    var unknown_target_args: List[str] = List.new()
     unknown_target_args |> push("build")
     unknown_target_args |> push(bs_abs(root, src))
     unknown_target_args |> push("--target")
@@ -3296,7 +3296,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     if rc != 0: return rc
 
     // --target with no value must fail loudly
-    var missing_target_args: Vec[str] = Vec.new()
+    var missing_target_args: List[str] = List.new()
     missing_target_args |> push("build")
     missing_target_args |> push(bs_abs(root, src))
     missing_target_args |> push("--target")
@@ -3319,7 +3319,7 @@ fn bs_check_whole_program_extern_var_redecl(ctx: &ActionCtx, compiler_path: &str
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, main_src, "use user\nuse defs\n\nfn main:\n    if read_counter() == 42:\n        print(\"ok\")\n    else:\n        print(\"bad\")\n", "extern redecl main")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("build")
     args |> push(bs_abs(root, main_src))
     args |> push("-o")
@@ -3341,7 +3341,7 @@ fn bs_check_imported_module_dependency_order(ctx: &ActionCtx, compiler_path: &st
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, user_src, "use m\nfn main: let _ = 0\n", "dependency order user")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(bs_abs(root, user_src))
     let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "imported-module-dependency-order", args)
@@ -3358,7 +3358,7 @@ fn bs_check_c_import_header_cache_tracks_contents(ctx: &ActionCtx, compiler_path
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, first_src, "use c_import(\"answer.h\")\n\nfn main:\n    assert(ANSWER == 1)\n    print(\"ok\")\n", "c_import cache first source")
     if rc != 0: return rc
-    var first_args: Vec[str] = Vec.new()
+    var first_args: List[str] = List.new()
     first_args |> push("run")
     first_args |> push(bs_abs(root, first_src))
     let first = bs_edge_expect_success(ctx, compiler_path, case_dir, "c-import-header-cache-first", first_args)
@@ -3370,7 +3370,7 @@ fn bs_check_c_import_header_cache_tracks_contents(ctx: &ActionCtx, compiler_path
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, second_src, "use c_import(\"answer.h\")\n\nfn main:\n    assert(ANSWER == 2)\n    print(\"ok\")\n", "c_import cache second source")
     if rc != 0: return rc
-    var second_args: Vec[str] = Vec.new()
+    var second_args: List[str] = List.new()
     second_args |> push("run")
     second_args |> push(bs_abs(root, second_src))
     let second = bs_edge_expect_success(ctx, compiler_path, case_dir, "c-import-header-cache-second", second_args)
@@ -3398,7 +3398,7 @@ fn bs_check_c_import_names_reset_between_compilations(ctx: &ActionCtx, compiler_
     rc = bs_write_fixture(ctx, second_src, second_text, "c_import second compiler session")
     if rc != 0: return rc
 
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("test")
     args |> push("--quiet")
     args |> push(bs_abs(root, first_src))
@@ -3429,8 +3429,8 @@ fn bs_emit_c_needs_fiber_runtime(c_text: &str) -> bool:
         if line.contains("with_fiber_") or line.contains("with_channel_"): return true
     false
 
-fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, platform_obj: &str, libm: bool, fibers: bool) -> Vec[str]:
-    var cc_args: Vec[str] = Vec.new()
+fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, platform_obj: &str, libm: bool, fibers: bool) -> List[str]:
+    var cc_args: List[str] = List.new()
     cc_args.push(bs_c_compiler())
     cc_args.push("-O1")
     // Mirror the real link path: dead-strip removes unreferenced runtime
@@ -3489,7 +3489,7 @@ fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: 
         "    0\n"
     var rc = bs_write_fixture(ctx, src, source, "emit-c receiver ABI source")
     if rc != 0: return rc
-    var emit_args: Vec[str] = Vec.new()
+    var emit_args: List[str] = List.new()
     emit_args |> push("build")
     emit_args |> push(bs_abs(root, src))
     emit_args |> push("--emit-c")
@@ -3507,7 +3507,7 @@ fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: 
 
 // #668: HashSet one-arg insert, receiver-canonical key sizes, and
 // tuple index/destructure projections through emit -> cc -> run.
-// D27: Vec.get returns an element address and borrowed Option/Result
+// D27: List.get returns an element address and borrowed Option/Result
 // eliminators return payload addresses rather than fabricated pointers.
 fn bs_emit_c_collections_source() -> str:
     "use std.collections.HashSet\n" ++
@@ -3522,10 +3522,10 @@ fn bs_emit_c_collections_source() -> str:
         "    names.insert(\"alpha\")\n" ++
         "    var m: HashMap[i32, str] = HashMap.new()\n" ++
         "    m.insert(5, \"five\")\n" ++
-        "    var opts: Vec[Option[i32]] = Vec.new()\n" ++
+        "    var opts: List[Option[i32]] = List.new()\n" ++
         "    opts.push(Some(23))\n" ++
         "    let opt_view = opts[0].unwrap()\n" ++
-        "    var results: Vec[Result[i32, str]] = Vec.new()\n" ++
+        "    var results: List[Result[i32, str]] = List.new()\n" ++
         "    results.push(Ok(29))\n" ++
         "    let result_view = results[0].expect(\"present\")\n" ++
         "    let t = pair()\n" ++
@@ -3634,7 +3634,7 @@ type EcCase {
     src: str,
     native: bool,
     // flags between `--emit-c` and `-o`
-    emit_flags: Vec[str],
+    emit_flags: List[str],
     emit_timeout_ms: i32,
     libm: bool,
     // text the emitted C must not contain ("" for none)
@@ -3643,14 +3643,14 @@ type EcCase {
     check_stdout: bool,
     expect_stdout: str,
     trim_stdout: bool,
-    stderr_needles: Vec[str],
+    stderr_needles: List[str],
 }
 
 fn ec_case(name: &str, dir: &str, src: &str) -> EcCase:
     EcCase {
         name: name.clone(), dir: dir.clone(), src: src.clone(), native: false,
-        emit_flags: Vec.new(), emit_timeout_ms: 120000, libm: true, forbid_in_c: "",
-        expect_rc: 0, check_stdout: true, expect_stdout: "ok", trim_stdout: true, stderr_needles: Vec.new(),
+        emit_flags: List.new(), emit_timeout_ms: 120000, libm: true, forbid_in_c: "",
+        expect_rc: 0, check_stdout: true, expect_stdout: "ok", trim_stdout: true, stderr_needles: List.new(),
     }
 
 fn ec_c_path(c: &EcCase): bs_join(c.dir, "program.c")
@@ -3663,17 +3663,17 @@ fn ec_read(ctx: &ActionCtx, path: &str): ctx.fs().read_text_opt(path).unwrap_or(
 // window (build/par.w); within a case emit precedes compile precedes run.
 // Returns the report of every failing case ("" when all pass) with the
 // number that failed, after every child is reaped.
-fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases: &Vec[EcCase]) -> (i32, str):
+fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases: &List[EcCase]) -> (i32, str):
     let root = ctx.project_info().project_root()
     let fs = ctx.fs()
 
-    var jobs: Vec[ParJob] = Vec.new()
-    var native_job: Vec[i32] = Vec.new()
-    var emit_job: Vec[i32] = Vec.new()
+    var jobs: List[ParJob] = List.new()
+    var native_job: List[i32] = List.new()
+    var emit_job: List[i32] = List.new()
     for i in 0..cases.len() as i32:
         let c = &cases[i]
         if c.native:
-            var argv: Vec[str] = Vec.new()
+            var argv: List[str] = List.new()
             argv.push(compiler_path.clone())
             argv.push("test")
             argv.push(bs_abs(root, c.src))
@@ -3681,7 +3681,7 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases:
             jobs.push(par_job(argv, bs_capture_path(root, c.dir, "native", "stdout"), bs_capture_path(root, c.dir, "native", "stderr"), 300000))
         else:
             native_job.push(-1)
-        var argv: Vec[str] = Vec.new()
+        var argv: List[str] = List.new()
         argv.push(compiler_path.clone())
         argv.push("build")
         argv.push(bs_abs(root, c.src))
@@ -3695,8 +3695,8 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases:
 
     var failed = 0
     var report = ""
-    var cc_jobs: Vec[ParJob] = Vec.new()
-    var cc_case: Vec[i32] = Vec.new()
+    var cc_jobs: List[ParJob] = List.new()
+    var cc_case: List[i32] = List.new()
     for i in 0..cases.len() as i32:
         let c = &cases[i]
         let ni = native_job[i]
@@ -3739,7 +3739,7 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases:
             failed += 1
             report = report ++ "\n" ++ c.name ++ ": the C compiler did not produce " ++ bin
             continue
-        var argv: Vec[str] = Vec.new()
+        var argv: List[str] = List.new()
         argv.push(bs_abs(root, bin))
         let run = ctx.process_runner().run_capture(argv, bs_capture_path(root, c.dir, "run", "stdout"), bs_capture_path(root, c.dir, "run", "stderr"), 120000)
         let actual = if c.trim_stdout: bs_trim_trailing_line_endings(run.stdout) else: run.stdout.clone()
@@ -3772,7 +3772,7 @@ fn bs_check_emit_c_array_fill_rvalue(ctx: &ActionCtx, compiler_path: &str, case_
         "    0\n"
     var rc = bs_write_fixture(ctx, src, source, "emit-c array fill rvalue source")
     if rc != 0: return rc
-    var emit_args: Vec[str] = Vec.new()
+    var emit_args: List[str] = List.new()
     emit_args |> push("build")
     emit_args |> push(bs_abs(root, src))
     emit_args |> push("--emit-c")
@@ -3803,7 +3803,7 @@ fn bs_check_emit_c_array_ref(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
         "    0\n"
     var rc = bs_write_fixture(ctx, src, source, "emit-c array reference source")
     if rc != 0: return rc
-    var emit_args: Vec[str] = Vec.new()
+    var emit_args: List[str] = List.new()
     emit_args |> push("build")
     emit_args |> push(bs_abs(root, src))
     emit_args |> push("--emit-c")
@@ -3866,7 +3866,7 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
         "direct aggregate ABI source")
     if rc != 0: return rc
 
-    var build_args: Vec[str] = Vec.new()
+    var build_args: List[str] = List.new()
     build_args |> push("build")
     build_args |> push(bs_abs(root, src))
     build_args |> push("--emit-obj")
@@ -3879,7 +3879,7 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
 
     let cc_stdout = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-cc", "stdout")
     let cc_stderr = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-cc", "stderr")
-    var cc_args: Vec[str] = Vec.new()
+    var cc_args: List[str] = List.new()
     cc_args = bs_push_c_compiler(move cc_args)
     cc_args |> push("-c")
     cc_args |> push(bs_abs(root, helper_c))
@@ -3894,7 +3894,7 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
         return bs_fail(ctx, "unsupported host runtime object for direct aggregate ABI test: " ++ os() ++ "/" ++ arch())
     let link_stdout = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-link", "stdout")
     let link_stderr = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-link", "stderr")
-    var link_args: Vec[str] = Vec.new()
+    var link_args: List[str] = List.new()
     link_args = bs_push_c_compiler(move link_args)
     link_args |> push("-o")
     link_args |> push(bs_abs(root, bin))
@@ -3948,7 +3948,7 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     let platform_obj = bs_host_platform_runtime_object()
     if platform_obj.len() == 0:
         return bs_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
-    var cases: Vec[EcCase] = Vec.new()
+    var cases: List[EcCase] = List.new()
 
     var hello = ec_case("hello", bs_join(output_dir, "hello"), inputs[1])
     hello.emit_flags.push("--no-prelude")
@@ -4097,7 +4097,7 @@ pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
     if bs_write_fixture(ctx, src, "@[test]\nfn attr_only:\n    assert(1 == 1)\n", "parallel same-source test") != 0:
         return 1
 
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("test")
     args |> push(bs_abs(root, src))
     let single = bs_run_cli_capture_cwd(ctx, compiler_path, "parallel-same-source-single", args, 120000, root)
@@ -4106,13 +4106,13 @@ pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
     if single.stderr.len() != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": single run produced stderr\n" ++ single.stderr)
 
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(compiler_path)
     argv |> push("test")
     argv |> push(bs_abs(root, src))
 
     let jobs = 32
-    let pids: Vec[i32] = Vec.new()
+    let pids: List[i32] = List.new()
     for i in 0..jobs:
         let stdout_rel = bs_join(output_dir, f"job-{i}.stdout")
         let stderr_rel = bs_join(output_dir, f"job-{i}.stderr")
@@ -4180,7 +4180,7 @@ fn bs_count_occurrences(text: &str, needle: &str) -> i32:
         offset = offset + found + needle.len() as i32
     count
 
-fn bs_migrate_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &Vec[str]) -> SelfhostRunResult:
+fn bs_migrate_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 180000, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": migrator selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
@@ -4201,7 +4201,7 @@ fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, c
     let out_w = bs_join(case_dir, "evidence.w")
     var rc = bs_write_fixture(ctx, src, "#include <assert.h>\n#include <stdlib.h>\ntypedef int (*cb_t)(int);\nstruct holder { cb_t stored; };\nstatic struct holder g;\nstatic int hidden(cb_t cb, int x) { if (cb == NULL) return -2; return cb(x); }\nint via_hidden(int x) { return hidden(NULL, x); }\nint handled(cb_t cb, int x) { if (cb == NULL) return -1; return cb(x); }\nint contract(cb_t cb, int x) { assert(cb != NULL); return cb(x); }\nint direct(cb_t cb, int x) { return cb(x); }\nint forwarded(cb_t cb, int x) { return direct(cb, x); }\nint stored(cb_t cb) { g.stored = cb; return 0; }\nint via_handled(cb_t cb, int x) { return handled(cb, x); }\nint caller(int x) { return direct(NULL, x); }\nint add1(int x) { return x + 1; }\nint run(void) { return handled(add1, 1) + contract(add1, 2) + direct(add1, 3) + forwarded(add1, 4) + via_handled(add1, 5); }\n", "nullable by evidence fixture")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4235,7 +4235,7 @@ fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "contract(add1,", "evidence: caller passes a bare fn to a non-null callee")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-nullable-by-evidence", check_args)
@@ -4247,7 +4247,7 @@ fn bs_check_migrate_zeroed_records(ctx: &ActionCtx, compiler_path: &str, case_di
     let out_w = bs_join(case_dir, "zeroed.w")
     var rc = bs_write_fixture(ctx, src, "#include <string.h>\nstruct P { int x; int y; const char *name; };\nstatic struct P g = {0};\nint f(void) {\n    struct P a = {0};\n    struct P b;\n    memset(&b, 0, sizeof b);\n    struct P *q = &a;\n    memset(q, 0, sizeof(*q));\n    memset(q, 0, sizeof(struct P));\n    unsigned char bits[32];\n    memset(bits, 0, sizeof bits);\n    memset(&b, 255, sizeof b);\n    return a.x + b.y + g.x;\n}\n", "zeroed records fixture")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4268,7 +4268,7 @@ fn bs_check_migrate_zeroed_records(ctx: &ActionCtx, compiler_path: &str, case_di
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "(255 as c_int)", "zeroed_records non-zero fill keeps memset")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-zeroed-records", check_args)
@@ -4280,7 +4280,7 @@ fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_
     let out_w = bs_join(case_dir, "initlist.w")
     var rc = bs_write_fixture(ctx, src, "typedef int (*callback_t)(int);\ntypedef unsigned short ushort_t;\ntypedef struct inner { callback_t cb; void *data; } inner;\ntypedef struct outer { inner in; int limit; } outer;\ntypedef struct config_s { int good_length; int max_lazy; int nice_length; int max_chain; callback_t func; } config_s;\ntypedef struct desc_s { const int *values; int *mutable_values; int count; } desc_s;\ntypedef union code_len { ushort_t code; ushort_t len; } code_len;\ntypedef struct tree_entry { code_len fc; code_len dl; } tree_entry;\nint add1(int x) { return x + 1; }\nconst int static_values[3] = {1, 2, 3};\nint mutable_values[2] = {4, 5};\nouter g = { { add1, 0 }, 7 };\nconfig_s table[10] = {{0, 0, 0, 0, add1}, {4, 4, 8, 4, add1}, {4, 5, 16, 8, add1}, {4, 6, 32, 32, add1}, {4, 4, 16, 16, add1}, {8, 16, 32, 32, add1}, {8, 16, 128, 128, add1}, {8, 32, 128, 256, add1}, {32, 128, 258, 1024, add1}, {32, 258, 258, 4096, add1}};\ndesc_s desc = {static_values, mutable_values, 3};\nconst tree_entry static_tree[2] = {{{12}, {8}}, {{140}, {9}}};\n", "migrate global init list")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4298,7 +4298,7 @@ fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "mutable_values: (&raw const mutable_values[0] as *mut c_int)", "global_init_list")
     if rc != 0: return rc
-    var ir_args: Vec[str] = Vec.new()
+    var ir_args: List[str] = List.new()
     ir_args |> push("ir")
     ir_args |> push(bs_abs(root, out_w))
     let ir = bs_migrate_expect_success(ctx, compiler_path, case_dir, "ir-global-init-list", ir_args)
@@ -4318,7 +4318,7 @@ fn bs_check_migrate_nullable_fn_pointer(ctx: &ActionCtx, compiler_path: &str, ca
     let c_text = "typedef int (*op_t)(int);\nstruct box { op_t f; int n; };\nstatic int add1(int x) { return x + 1; }\nint call_box(struct box *b, int x) { if (b->f) return b->f(x); return 0; }\nvoid arm_box(struct box *b) { b->f = add1; }\nop_t copy_box(struct box *b) { op_t f = b->f; return f; }\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate nullable function pointer")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
      |> push("migrate")
      |> push(bs_abs(root, src))
      |> push("--no-c-export")
@@ -4341,7 +4341,7 @@ fn bs_check_migrate_compound_array_whole_values(ctx: &ActionCtx, compiler_path: 
     let c_text = "typedef struct pair { int x; int y; } pair;\nextern int pair_sum(const pair *items, int count);\npair flat_pairs[2] = {1, 2, 3, 4};\nint whole_pair_array(pair a, pair b, pair c) {\n  int out = 0;\n  if (a.x == 0) goto done;\n  out = pair_sum((const pair[]){a, b, c}, 3);\ndone:\n  return out;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate compound array whole values")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4365,7 +4365,7 @@ fn bs_check_migrate_host_header_compat(ctx: &ActionCtx, compiler_path: &str, cas
     let c_text = "#if defined HAVE_CONFIG_H\n#include \"config.h\"\n#endif\n\n#ifndef HAVE_UNISTD_H\n#error \"missing HAVE_UNISTD_H\"\n#endif\n\n#ifdef HAVE_UNISTD_H\n#include <unistd.h>\n#endif\n\n#include <stdio.h>\n\nint tty_status(FILE *f) { return isatty(fileno(f)); }\n"
     rc = bs_write_fixture(ctx, src, c_text, "migrate host header source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("-I")
@@ -4385,7 +4385,7 @@ fn bs_check_migrate_assignment_compat(ctx: &ActionCtx, compiler_path: &str, case
     let c_text = "typedef unsigned int c_uint;\ntypedef unsigned long c_ulong;\ntypedef struct {\n  c_uint *groupinfo;\n  c_uint *parsed_pattern;\n} compile_block;\n\nvoid f(void) {\n  compile_block cb;\n  c_uint stack_groupinfo[32];\n  c_uint stack_parsed_pattern[64];\n  c_uint pp = 0;\n  c_uint skipatstart = 0;\n  c_ulong total = 0;\n  c_ulong chunk = 1;\n  cb.groupinfo = stack_groupinfo;\n  cb.parsed_pattern = stack_parsed_pattern;\n  skipatstart = (pp = pp + 1);\n  total += chunk;\n  while (chunk--) {\n    total += chunk;\n  }\n  chunk = 3;\n  do {\n    if (total == 0) {\n      continue;\n    }\n    total += chunk;\n  } while (--chunk != 0);\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate assignment compat")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4420,7 +4420,7 @@ fn bs_check_migrate_assignment_compat(ctx: &ActionCtx, compiler_path: &str, case
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "                continue\n            }\n            break", "assignment_compat")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check_result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-assignment-compat", check_args)
@@ -4434,7 +4434,7 @@ fn bs_check_migrate_compound_small_int_promotion(ctx: &ActionCtx, compiler_path:
     let c_text = "typedef unsigned short ushort;\n\nint issue_zlib_left(unsigned len) {\n  ushort count[16] = {0};\n  count[1] = 5;\n  int left = 3;\n  left -= count[len];\n  if (left < 0) return 1;\n  return 0;\n}\n\nint main(void) {\n  return issue_zlib_left(1) == 1 ? 0 : 2;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate compound small-int promotion")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4446,12 +4446,12 @@ fn bs_check_migrate_compound_small_int_promotion(ctx: &ActionCtx, compiler_path:
     let out_text = ctx.fs().read_text(out_w)
     rc = bs_assert_contains(ctx, out_text, "__local_left - (__local_count[__param_len] as c_int)", "compound_small_int_promotion")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-compound-small-int-promotion", check_args)
     if check.rc != 0: return check.rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-compound-small-int-promotion", run_args)
@@ -4471,7 +4471,7 @@ fn bs_check_migrate_enum_constants_are_int(ctx: &ActionCtx, compiler_path: &str,
     let c_text = "enum { ESC_A = 1, ESC_B };\ntypedef enum { RED, GREEN = 5 } color;\nenum { SMALL = 2, BIG = 0x80000000u };\nstatic const short int escapes[] = { -ESC_A, -ESC_B };\n\nint pick(color c) { return c == GREEN ? -ESC_B : 0; }\nunsigned masked(unsigned flags) { return flags & GREEN; }\n\nint main(void) {\n  if (escapes[1] != -2) return 1;\n  if (pick(GREEN) != -2) return 2;\n  if (masked(7u) != 5u) return 3;\n  if (BIG != 2147483648u) return 4;\n  if (-SMALL < 0) return 5;\n  return 0;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate enum constants are int")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4490,7 +4490,7 @@ fn bs_check_migrate_enum_constants_are_int(ctx: &ActionCtx, compiler_path: &str,
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "type color = c_uint", "enum_constants_are_int")
     if rc != 0: return rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-enum-constants-are-int", run_args)
@@ -4508,7 +4508,7 @@ fn bs_check_migrate_offsetof(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     let c_text = "#include <stddef.h>\ntypedef struct frame { unsigned char tag; const char *eptr; unsigned long ovector[4]; } frame;\ntypedef struct real_md { int a; frame inner; } md_t;\n#define md md_t\n#define OVECTOR_AT offsetof(frame, ovector)\nstatic const unsigned long eptr_at = offsetof(frame, eptr);\n\nunsigned long frame_size(int extra) {\n  return (unsigned long)offsetof(frame, ovector) + (unsigned long)extra * sizeof(unsigned long);\n}\n\nunsigned long nested_at(void) { return offsetof(md, inner.ovector); }\n\nint main(void) {\n  frame f;\n  md_t m;\n  if (nested_at() != (unsigned long)((char *)&m.inner.ovector[0] - (char *)&m)) return 5;\n  if (eptr_at != (unsigned long)((char *)&f.eptr - (char *)&f)) return 1;\n  if (OVECTOR_AT != (unsigned long)((char *)&f.ovector[0] - (char *)&f)) return 2;\n  if (frame_size(4) != sizeof(frame)) return 3;\n  return 0;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate offsetof")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4525,7 +4525,7 @@ fn bs_check_migrate_offsetof(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "= 16", "offsetof: folded host offset")
     if rc != 0: return rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-offsetof", run_args)
@@ -4539,7 +4539,7 @@ fn bs_check_migrate_rvalue_sequencing(ctx: &ActionCtx, compiler_path: &str, case
     let c_text = "typedef unsigned char u8;\n\nstatic int issue120_id(int x) { return x; }\n\nint init_expr(void) {\n  const u8 *buf = (const u8 *)\"AB\";\n  const u8 *p = buf;\n  int c = *p++;\n  return c * 10 + (int)(p - buf);\n}\n\nint assign_expr(void) {\n  const u8 *buf = (const u8 *)\"AB\";\n  const u8 *p = buf;\n  int c = 0;\n  c = *p++;\n  return c * 10 + (int)(p - buf);\n}\n\nint binary_expr(void) {\n  const u8 *buf = (const u8 *)\"AB\";\n  const u8 *p = buf;\n  int c = (*p++) + 0;\n  return c * 10 + (int)(p - buf);\n}\n\nint call_arg_expr(void) {\n  const u8 *buf = (const u8 *)\"AB\";\n  const u8 *p = buf;\n  int c = issue120_id(*p++);\n  return c * 10 + (int)(p - buf);\n}\n\n#define ISSUE120_GETCHARINCTEST(ch, ptr) ch = *ptr++; if (utf && ch >= 66u) ch += 1000\n\nint macro_expr(int utf) {\n  const u8 *buf = (const u8 *)\"BA\";\n  const u8 *p = buf;\n  int c = 0;\n  ISSUE120_GETCHARINCTEST(c, p);\n  return c * 10 + (int)(p - buf);\n}\n\nstatic unsigned int issue120_ord2utf(unsigned int c, u8 *p) {\n  *p = (u8)c;\n  return 1;\n}\n\n#define ISSUE120_PUTCHAR(c, p) ((utf && c > 127u) ? issue120_ord2utf(c, p) : (*p = c, 1))\n\nint macro_ternary_comma_expr(int utf) {\n  u8 buf[1] = { 0 };\n  u8 *p = buf;\n  unsigned int c = 65u;\n  p += ISSUE120_PUTCHAR(c, p);\n  return ((int)buf[0]) * 10 + (int)(p - buf);\n}\n\nint main(void) {\n  if (init_expr() != 651) return 1;\n  if (assign_expr() != 651) return 2;\n  if (binary_expr() != 651) return 3;\n  if (call_arg_expr() != 651) return 4;\n  if (macro_expr(0) != 661) return 5;\n  if (macro_expr(1) != 10661) return 6;\n  if (macro_ternary_comma_expr(0) != 651) return 7;\n  return 0;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate rvalue sequencing")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4558,12 +4558,12 @@ fn bs_check_migrate_rvalue_sequencing(ctx: &ActionCtx, compiler_path: &str, case
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "((unsafe *__local_p) = ((__local_c as u8)))", "rvalue_sequencing")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check_result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-rvalue-sequencing", check_args)
     if check_result.rc != 0: return check_result.rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run_result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-rvalue-sequencing", run_args)
@@ -4578,7 +4578,7 @@ fn bs_check_migrate_directory_progress(ctx: &ActionCtx, compiler_path: &str, cas
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(src_dir, "b.c"), "int b_value(void) { return 2; }\n", "directory progress b")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src_dir))
     args |> push("--no-c-export")
@@ -4599,7 +4599,7 @@ fn bs_check_migrate_cross_file_global_owner_arrays(ctx: &ActionCtx, compiler_pat
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "user.c"), "#include \"tables.h\"\n\nint issue121_sum(void) {\n  return issue121_table[2] + issue121_value(1);\n}\n", "cross file user")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, case_dir))
     args |> push("--no-c-export")
@@ -4617,17 +4617,17 @@ fn bs_check_migrate_cross_file_global_owner_arrays(ctx: &ActionCtx, compiler_pat
     if rc != 0: return rc
     rc = bs_file_forbids(ctx, user_w, "issue121_table: *", "cross_file_global_owner_arrays user")
     if rc != 0: return rc
-    var owner_check_args: Vec[str] = Vec.new()
+    var owner_check_args: List[str] = List.new()
     owner_check_args |> push("check")
     owner_check_args |> push(bs_abs(root, owner_w))
     let owner_check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-cross-file-owner", owner_check_args)
     if owner_check.rc != 0: return owner_check.rc
-    var user_check_args: Vec[str] = Vec.new()
+    var user_check_args: List[str] = List.new()
     user_check_args |> push("check")
     user_check_args |> push(bs_abs(root, user_w))
     let user_check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-cross-file-user", user_check_args)
     if user_check.rc != 0: return user_check.rc
-    var owner_build_args: Vec[str] = Vec.new()
+    var owner_build_args: List[str] = List.new()
     owner_build_args |> push("build")
     owner_build_args |> push(bs_abs(root, owner_w))
     owner_build_args |> push("--emit-obj")
@@ -4635,7 +4635,7 @@ fn bs_check_migrate_cross_file_global_owner_arrays(ctx: &ActionCtx, compiler_pat
     owner_build_args |> push(bs_abs(root, bs_join(generated_dir, "owner.o")))
     let owner_build = bs_migrate_expect_success(ctx, compiler_path, case_dir, "build-cross-file-owner", owner_build_args)
     if owner_build.rc != 0: return owner_build.rc
-    var user_build_args: Vec[str] = Vec.new()
+    var user_build_args: List[str] = List.new()
     user_build_args |> push("build")
     user_build_args |> push(bs_abs(root, user_w))
     user_build_args |> push("--emit-obj")
@@ -4652,7 +4652,7 @@ fn bs_check_migrate_shared_defs_ownerless_extern(ctx: &ActionCtx, compiler_path:
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "owner.c"), "#include \"tables.h\"\n\nconst unsigned char issue140_owned_table[] = {3, 5, 8};\n\nint issue140_read_owned(void) {\n  return issue140_owned_table[1];\n}\n", "shared defs owner")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, case_dir))
     args |> push("--no-c-export")
@@ -4686,7 +4686,7 @@ fn bs_check_migrate_shared_defs_cross_module_test(ctx: &ActionCtx, compiler_path
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "example.c"), "#include \"api.h\"\n#include <string.h>\n\nint main(void) {\n  return issue141_add((int)strlen(\"abc\")) == 4 ? 0 : 1;\n}\n", "shared defs cross module example")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, case_dir))
     args |> push("--no-c-export")
@@ -4717,7 +4717,7 @@ fn bs_check_migrate_shared_defs_cross_module_test(ctx: &ActionCtx, compiler_path
         return bs_fail(ctx, "could not write shared_defs_cross_module_test lib")
     if fs.write_text(bs_join(check_dir, "main.w"), fs.read_text(example_w)) != 0:
         return bs_fail(ctx, "could not write shared_defs_cross_module_test main")
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push("main.w")
     let check = bs_migrate_expect_success(ctx, compiler_path, check_dir, "check-shared-defs-cross-module-test", check_args)
@@ -4731,7 +4731,7 @@ fn bs_check_migrate_switch_macro_case_values(ctx: &ActionCtx, compiler_path: &st
     let c_text = "#define A 10\n#define B (A + 2)\n\nint f(int x) {\n  switch (x) {\n    case A: return 1;\n    case B: return 2;\n    default: return 3;\n  }\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "switch macro case values")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4748,7 +4748,7 @@ fn bs_check_migrate_switch_macro_case_values(ctx: &ActionCtx, compiler_path: &st
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let B: c_int = 12", "switch_macro_case_values")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-switch-macro-case-values", check_args)
@@ -4762,7 +4762,7 @@ fn bs_check_migrate_sizeof_pointer_width(ctx: &ActionCtx, compiler_path: &str, c
     let c_text = "int sizes(char *p, const char *q, char **r) {\n  return (int)(sizeof(char *) + sizeof(const char *) + sizeof(p) + sizeof(q) + sizeof(*r));\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "sizeof pointer width")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4775,7 +4775,7 @@ fn bs_check_migrate_sizeof_pointer_width(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "sizeof[*", "sizeof_pointer_width")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-sizeof-pointer-width", check_args)
@@ -4792,7 +4792,7 @@ fn bs_check_migrate_void_omits_unit(ctx: &ActionCtx, compiler_path: &str, case_d
     let out_w = bs_join(case_dir, "void_omits_unit.w")
     var rc = bs_write_fixture(ctx, src, "void stop(void);\nvoid noop(void) {}\nstatic inline void tick(int *p) { *p += 1; }\nint bump(int *p) {\n  tick(p);\n  noop();\n  stop();\n  return *p;\n}\n", "void function renderings")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4809,7 +4809,7 @@ fn bs_check_migrate_void_omits_unit(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "-> Unit", "void_omits_unit")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-void-omits-unit", check_args)
@@ -4832,7 +4832,7 @@ fn bs_check_migrate_c_model(ctx: &ActionCtx, compiler_path: &str, case_dir: &str
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, src, "#include <string.h>\n#include <stdio.h>\nint model_mark(void) { return MODEL_MARK; }\n", "a unit that reads the model's macro")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--c-target")
@@ -4864,7 +4864,7 @@ fn bs_check_migrate_void_tail_is_unit(ctx: &ActionCtx, compiler_path: &str, case
     let out_w = bs_join(case_dir, "void_tail_is_unit.w")
     var rc = bs_write_fixture(ctx, src, "int f(void);\nstatic int g;\nstatic void only_cast(void *p) { (void)p; }\nstatic void cast_then_store(void *p) { (void)p; g = 2; }\nstatic void store_then_cast(void *p) { g = 2; (void)p; }\nvoid effect_cast(void) { (void)f(); }\nvoid value_tail(void) { f(); }\nvoid pure_ops(int a, int b) { (void)(a + b); (void)a; }\ntypedef void (*cb_fn)(void *);\ncb_fn get_only(void) { return &only_cast; }\ncb_fn get_cts(void) { return &cast_then_store; }\ncb_fn get_stc(void) { return &store_then_cast; }\n", "void tail renderings")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4889,7 +4889,7 @@ fn bs_check_migrate_void_tail_is_unit(ctx: &ActionCtx, compiler_path: &str, case
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "pub fn value_tail() -> Unit:\n", "void_tail_is_unit")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-void-tail-is-unit", check_args)
@@ -4905,7 +4905,7 @@ fn bs_check_migrate_unprototyped_declaration(ctx: &ActionCtx, compiler_path: &st
     let out_w = bs_join(case_dir, "unprototyped.w")
     var rc = bs_write_fixture(ctx, src, "int knr();\n\nint twice(signed char c, float f) {\n  return knr(c, f) * 2 + knr(1, 2.5);\n}\n", "unprototyped declaration")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4918,7 +4918,7 @@ fn bs_check_migrate_unprototyped_declaration(ctx: &ActionCtx, compiler_path: &st
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "fn knr(...)", "unprototyped_declaration")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-unprototyped-declaration", check_args)
@@ -4927,7 +4927,7 @@ fn bs_check_migrate_unprototyped_declaration(ctx: &ActionCtx, compiler_path: &st
     let bad_w = bs_join(case_dir, "unprototyped_disagree.w")
     rc = bs_write_fixture(ctx, bad_src, "int knr();\n\nint both(void) {\n  return knr(1) + knr(1, 2);\n}\n", "unprototyped disagreeing calls")
     if rc != 0: return rc
-    var bad_args: Vec[str] = Vec.new()
+    var bad_args: List[str] = List.new()
     bad_args |> push("migrate")
     bad_args |> push(bs_abs(root, bad_src))
     bad_args |> push("--no-c-export")
@@ -4945,7 +4945,7 @@ fn bs_check_migrate_variadic_stdarg(ctx: &ActionCtx, compiler_path: &str, case_d
     let c_text = "#include <stdarg.h>\n\nint touch(int count, ...) {\n  va_list ap;\n  va_start(ap, count);\n  va_end(ap);\n  return count;\n}\n\nconst char *mentions_va_arg(void) {\n  return \"va_arg(\";\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "variadic stdarg definition")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -4969,12 +4969,12 @@ fn bs_check_migrate_variadic_stdarg(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "\"va_arg(\"", "variadic_stdarg")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-variadic-stdarg", check_args)
     if check.rc != 0: return check.rc
-    var ir_args: Vec[str] = Vec.new()
+    var ir_args: List[str] = List.new()
     ir_args |> push("ir")
     ir_args |> push(bs_abs(root, out_w))
     let ir = bs_migrate_expect_success(ctx, compiler_path, case_dir, "ir-variadic-stdarg", ir_args)
@@ -4985,7 +4985,7 @@ fn bs_check_migrate_variadic_stdarg(ctx: &ActionCtx, compiler_path: &str, case_d
     let va_arg_text = "#include <stdarg.h>\n\nint total(int count, ...) {\n  va_list ap;\n  va_start(ap, count);\n  int value = va_arg(ap, int);\n  va_end(ap);\n  return value;\n}\n"
     rc = bs_write_fixture(ctx, va_arg_src, va_arg_text, "variadic va_arg definition")
     if rc != 0: return rc
-    var va_arg_args: Vec[str] = Vec.new()
+    var va_arg_args: List[str] = List.new()
     va_arg_args |> push("migrate")
     va_arg_args |> push(bs_abs(root, va_arg_src))
     va_arg_args |> push("--no-c-export")
@@ -4999,7 +4999,7 @@ fn bs_check_migrate_variadic_stdarg(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, va_arg_text_out, "__local_ap.arg[c_int]()", "variadic_va_arg")
     if rc != 0: return rc
-    var va_arg_check_args: Vec[str] = Vec.new()
+    var va_arg_check_args: List[str] = List.new()
     va_arg_check_args |> push("check")
     va_arg_check_args |> push(bs_abs(root, va_arg_out))
     let va_arg_check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-variadic-va-arg", va_arg_check_args)
@@ -5012,7 +5012,7 @@ fn bs_check_migrate_setjmp_rejected(ctx: &ActionCtx, compiler_path: &str, case_d
     let c_text = "#include <setjmp.h>\n\nstatic jmp_buf g_env;\n\nint guarded(int x) {\n  if (setjmp(g_env) != 0) {\n    return -1;\n  }\n  return x + 1;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "setjmp definition")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5034,7 +5034,7 @@ fn bs_check_migrate_abort_goto(ctx: &ActionCtx, compiler_path: &str, case_dir: &
     let c_text = "#include <stdlib.h>\n\nvoid panic_goto(int condition) {\n  goto body;\nbody:\n  if (condition) {\n    abort();\n  }\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "abort goto definition")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5047,7 +5047,7 @@ fn bs_check_migrate_abort_goto(ctx: &ActionCtx, compiler_path: &str, case_dir: &
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "abort()", "abort_goto")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-abort-goto", check_args)
@@ -5061,7 +5061,7 @@ fn bs_check_migrate_goto_cycle_return(ctx: &ActionCtx, compiler_path: &str, case
     let c_text = "typedef struct CycleValue { int value; } CycleValue;\nstatic CycleValue cycle_or_return(int condition) {\n  CycleValue result = {0};\n  goto entry;\nentry:\n  if (condition > 0) return result;\n  goto loop;\nloop:\n  if (condition < 0) return result;\n  goto entry;\n}\nint main(void) { return cycle_or_return(1).value; }\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate cyclic non-Unit goto")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5071,12 +5071,12 @@ fn bs_check_migrate_goto_cycle_return(ctx: &ActionCtx, compiler_path: &str, case
     if result.rc != 0: return result.rc
     rc = bs_file_contains(ctx, out_w, "    unreachable()", "goto_cycle_impossible_end")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-goto-cycle-return", check_args)
     if check.rc != 0: return check.rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-goto-cycle-return", run_args)
@@ -5090,7 +5090,7 @@ fn bs_check_migrate_longjmp_rejected(ctx: &ActionCtx, compiler_path: &str, case_
     let c_text = "#include <setjmp.h>\n\nextern jmp_buf g_env;\n\nvoid bail(int code) {\n  longjmp(g_env, code);\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "longjmp definition")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5112,7 +5112,7 @@ fn bs_check_migrate_unsupported_statement_rejected(ctx: &ActionCtx, compiler_pat
     let c_text = "int translated_first(int x) { return x + 1; }\n\nint unsupported_asm(int x) {\n  __asm__(\"nop\");\n  return x;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "unsupported statement definition")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5134,7 +5134,7 @@ fn bs_check_migrate_macro_body_string_literal(ctx: &ActionCtx, compiler_path: &s
     let c_text = "#include <stdio.h>\n#define CHECK_ERR(err, msg) { if ((err) != 0) { fprintf(stderr, \"%s error: %d\\n\", msg, err); } }\nvoid f(int err) { CHECK_ERR(err, \"compress\"); }\n"
     var rc = bs_write_fixture(ctx, src, c_text, "macro body string literal")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5151,7 +5151,7 @@ fn bs_check_migrate_macro_body_string_literal(ctx: &ActionCtx, compiler_path: &s
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "fprintf(" ++ stderr_sym ++ ", c\"compress\".ptr", "macro_body_string_literal")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-macro-body-string-literal", check_args)
@@ -5242,7 +5242,7 @@ fn bs_check_migrate_libc_ctype(ctx: &ActionCtx, compiler_path: &str, case_dir: &
     let c_text = "#include <ctype.h>\n\nint classify(int c) {\n  return isalpha(c) + isdigit(c) + isalnum(c) + isspace(c) +\n    isupper(c) + islower(c) + isxdigit(c) + isprint(c) +\n    isgraph(c) + ispunct(c) + iscntrl(c) + tolower(c) + toupper(c);\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "libc ctype source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5252,7 +5252,7 @@ fn bs_check_migrate_libc_ctype(ctx: &ActionCtx, compiler_path: &str, case_dir: &
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-libc-ctype", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    let required: Vec[str] = Vec.new()
+    let required: List[str] = List.new()
     required |> push("extern fn isalpha(c: i32) -> i32")
     required |> push("extern fn tolower(c: i32) -> i32")
     required |> push("isalpha(__param_c)")
@@ -5262,14 +5262,14 @@ fn bs_check_migrate_libc_ctype(ctx: &ActionCtx, compiler_path: &str, case_dir: &
     for i in 0..required.len() as i32:
         rc = bs_assert_contains(ctx, out_text, required[i], "libc_ctype_calls")
         if rc != 0: return rc
-    let forbidden: Vec[str] = Vec.new()
+    let forbidden: List[str] = List.new()
     forbidden |> push("is_alpha(__param_c)")
     forbidden |> push("is_alnum(__param_c)")
     forbidden |> push("to_lower(__param_c)")
     for i in 0..forbidden.len() as i32:
         rc = bs_assert_not_contains(ctx, out_text, forbidden[i], "libc_ctype_calls")
         if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-libc-ctype", check_args)
@@ -5303,7 +5303,7 @@ fn bs_check_migrate_macro_unsigned_minus(ctx: &ActionCtx, compiler_path: &str, c
     let c_text = "typedef unsigned long size_t;\n\n#define MY_SIZE_MAX ((size_t)-1)\n#define COPY_ONE(dst_, src_, length_) do { size_t chkmc_length = length_; if (chkmc_length > 0) { (dst_)[0] = (src_)[0]; } } while (0)\n\nint too_large(size_t current, size_t need) {\n  return current > (MY_SIZE_MAX - need) / 2;\n}\n\nint repeat_too_large(size_t replen, size_t need, int count) {\n  return count > 0 && replen > (MY_SIZE_MAX - need) / count;\n}\n\nint copy_after_goto(char *dst, const char *src, int flag) {\n  if (flag) goto copy;\n  return 0;\ncopy:\n  COPY_ONE(dst, src, 3);\n  return (int)dst[0];\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "macro unsigned source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5323,7 +5323,7 @@ fn bs_check_migrate_macro_unsigned_minus(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "= ((3 as c_ulong))", "macro_initializer_unsigned_minus")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-macro-unsigned-minus", check_args)
@@ -5337,7 +5337,7 @@ fn bs_check_migrate_ulong_max_width(ctx: &ActionCtx, compiler_path: &str, case_d
     let c_text = "#include <limits.h>\n#include <stdlib.h>\n\nint cmp_ulong_max(unsigned long x) {\n  return x == ULONG_MAX;\n}\n\nint parse_overflow(char *s) {\n  char *end;\n  unsigned long value = strtoul(s, &end, 10);\n  return value == ULONG_MAX;\n}\n\ndouble parse_decimal(char *s) {\n  char *end;\n  return strtod(s, &end);\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "ulong max width source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5355,7 +5355,7 @@ fn bs_check_migrate_ulong_max_width(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "strtod(", "ulong_max_width")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-ulong-max-width", check_args)
@@ -5368,7 +5368,7 @@ fn bs_check_migrate_tentative_global_owner(ctx: &ActionCtx, compiler_path: &str,
     let out_w = bs_join(case_dir, "tentative_global_owner.w")
     var rc = bs_write_fixture(ctx, src, "typedef struct ctx { int x; } ctx;\nctx g;\nint issue127_read(void) { return g.x; }\n", "tentative global owner")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5380,7 +5380,7 @@ fn bs_check_migrate_tentative_global_owner(ctx: &ActionCtx, compiler_path: &str,
     if rc != 0: return rc
     rc = bs_file_forbids(ctx, out_w, "extern var g: ctx", "tentative_global_owner")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-tentative-global-owner", check_args)
@@ -5394,7 +5394,7 @@ fn bs_check_migrate_emit_c_reserved_symbols(ctx: &ActionCtx, compiler_path: &str
     let c_text = "typedef signed char c_char;\ntypedef long long c_longlong;\ntypedef struct with_str { const c_char *ptr; c_longlong len; } with_str;\n#define WITH_STR_LIT(s) ((with_str){(s), (c_longlong)(sizeof(s) - 1)})\nstatic int __with_global_counter = 2;\nstatic with_str __with_global_source = WITH_STR_LIT(\"// text containing /* comment markers */ and STR_NAME STRING_NAME\");\nstatic int __with_checked_add(int a, int b) { return a + b; }\nint main(void) { return __with_checked_add(__with_global_counter, 3) == 5 && __with_global_source.len > 0 ? 0 : 1; }\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate emit-C reserved symbols")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5408,12 +5408,12 @@ fn bs_check_migrate_emit_c_reserved_symbols(ctx: &ActionCtx, compiler_path: &str
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "var __with_global_source: with_str", "emit_c_reserved_string_global")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-emit-c-reserved-symbols", check_args)
     if check.rc != 0: return check.rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-emit-c-reserved-symbols", run_args)
@@ -5427,7 +5427,7 @@ fn bs_check_migrate_builtin_overflow(ctx: &ActionCtx, compiler_path: &str, case_
     let c_text = "static int add_or_neg1(int a, int b) { int r; if (__builtin_add_overflow(a, b, &r)) return -1; return r; }\nstatic int sub_or_neg1(int a, int b) { int r; if (__builtin_sub_overflow(a, b, &r)) return -1; return r; }\nstatic int mul_or_neg1(int a, int b) { int r; if (__builtin_mul_overflow(a, b, &r)) return -1; return r; }\nstatic unsigned add_or_7(unsigned a, unsigned b) { unsigned r; if (__builtin_add_overflow(a, b, &r)) return 7; return r; }\nstatic unsigned sub_or_7(unsigned a, unsigned b) { unsigned r; if (__builtin_sub_overflow(a, b, &r)) return 7; return r; }\nstatic unsigned mul_or_7(unsigned a, unsigned b) { unsigned r; if (__builtin_mul_overflow(a, b, &r)) return 7; return r; }\nstatic int umul128_overflows(unsigned __int128 a, unsigned __int128 b) { unsigned __int128 r; return __builtin_mul_overflow(a, b, &r); }\nstatic int smul128_overflows(__int128 a, __int128 b) { __int128 r; return __builtin_mul_overflow(a, b, &r); }\nint main(void) { return add_or_neg1(20, 22) == 42 && add_or_neg1(2147483647, 1) == -1 && sub_or_neg1(-2147483647 - 1, 1) == -1 && mul_or_neg1(50000, 50000) == -1 && add_or_7(4294967295u, 1u) == 7u && sub_or_7(0u, 1u) == 7u && mul_or_7(4294967295u, 2u) == 7u && umul128_overflows(((unsigned __int128)1) << 64, ((unsigned __int128)1) << 64) == 1 && umul128_overflows(((unsigned __int128)1) << 63, 2) == 0 && smul128_overflows(((__int128)1) << 126, 2) == 1 && smul128_overflows(-(((__int128)1) << 126), 2) == 0 ? 0 : 1; }\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate compiler overflow builtins")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5453,12 +5453,12 @@ fn bs_check_migrate_builtin_overflow(ctx: &ActionCtx, compiler_path: &str, case_
         return bs_fail(ctx, "builtin_overflow: the 128-bit helper region was not found in the migrated output")
     rc = bs_assert_not_contains(ctx, out_text.slice(wide_start as i64, wide_end as i64), " / ", "builtin_overflow_128_division_free")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-builtin-overflow", check_args)
     if check.rc != 0: return check.rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-builtin-overflow", run_args)
@@ -5467,7 +5467,7 @@ fn bs_check_migrate_builtin_overflow(ctx: &ActionCtx, compiler_path: &str, case_
     let rejected_out = bs_join(case_dir, "unsupported_builtin.w")
     rc = bs_write_fixture(ctx, rejected_src, "unsigned reverse_bits(unsigned value) { return __builtin_bitreverse32(value); }\n", "unsupported compiler builtin")
     if rc != 0: return rc
-    var rejected_args: Vec[str] = Vec.new()
+    var rejected_args: List[str] = List.new()
     rejected_args |> push("migrate")
     rejected_args |> push(bs_abs(root, rejected_src))
     rejected_args |> push("--no-c-export")
@@ -5492,7 +5492,7 @@ fn bs_check_migrate_paste_suffix_macros(ctx: &ActionCtx, compiler_path: &str, ca
     let project_aliases = "\n#define PROJECT_INTMAX_MAX INTMAX_MAX\n#define PROJECT_UINTMAX_MAX UINTMAX_MAX\n#define PROJECT_INTMAX_MIN INTMAX_MIN\n#define PROJECT_INTMAX_C INTMAX_C\n"
     var rc = bs_write_fixture(ctx, src, c_text ++ project_aliases, "migrate paste-suffix macros")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5530,12 +5530,12 @@ fn bs_check_migrate_paste_suffix_macros(ctx: &ActionCtx, compiler_path: &str, ca
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let X_MAX: c_longlong = 9223372036854775807", "paste_suffix_user_macro_probe_folds")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-paste-suffix", check_args)
     if check.rc != 0: return check.rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-paste-suffix", run_args)
@@ -5548,7 +5548,7 @@ fn bs_check_migrate_direct_runtime_memory_calls(ctx: &ActionCtx, compiler_path: 
     let c_text = "extern void with_free(void *ptr);\nextern void *with_memcpy(void *dst, const void *src, unsigned long n);\nextern void *with_memmove(void *dst, const void *src, unsigned long n);\nextern void *with_memset(void *ptr, int value, unsigned long n);\nextern int with_memcmp(const void *left, const void *right, unsigned long n);\nstatic void release_pointer(void *ptr) { with_free((void *)ptr); }\nint main(void) {\n  char source[2] = {42, 0};\n  char target[2] = {0, 0};\n  with_memset((void *)target, 0, sizeof(target));\n  with_memcpy((void *)target, (const void *)source, sizeof(target));\n  with_memmove((void *)(target + 1), (const void *)target, 1);\n  release_pointer((void *)0);\n  return with_memcmp((const void *)target, (const void *)source, 1) == 0 && target[1] == 42 ? 0 : 1;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate direct runtime memory calls")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5563,12 +5563,12 @@ fn bs_check_migrate_direct_runtime_memory_calls(ctx: &ActionCtx, compiler_path: 
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "as *const c_void) as *const u8)", "direct_runtime_memory_const_ptr_normalized")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-direct-runtime-memory-calls", check_args)
     if check.rc != 0: return check.rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-direct-runtime-memory-calls", run_args)
@@ -5582,7 +5582,7 @@ fn bs_check_migrate_runtime_cabi_aliases(ctx: &ActionCtx, compiler_path: &str, c
     let c_text = "typedef struct { const char *ptr; long long len; } with_str;\nextern void with_panic(with_str message, with_str file, int line);\nextern with_str with_i64_to_str(long long n);\nextern long long with_str_len(with_str text);\nextern with_str with_str_concat_n(const with_str *parts, long long count);\nextern with_str i32_to_str(int n);\nextern with_str i64_to_string(long long n);\nextern with_str str_from_byte(int byte);\nextern void with_free(void *ptr);\nint main(void) {\n  with_str text = with_i64_to_str(42);\n  with_str i32_text = i32_to_str(7);\n  with_str i64_text = i64_to_string(8);\n  with_str byte_text = str_from_byte(65);\n  int ok = with_str_len(text) == 2 && with_str_len(i32_text) == 1 && with_str_len(i64_text) == 1 && with_str_len(byte_text) == 1;\n  with_free((void *)text.ptr);\n  with_free((void *)i32_text.ptr);\n  with_free((void *)i64_text.ptr);\n  with_free((void *)byte_text.ptr);\n  return ok ? 0 : 1;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate runtime C ABI aliases")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5612,12 +5612,12 @@ fn bs_check_migrate_runtime_cabi_aliases(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "return __with_cabi_with_str_concat_n((self as *const with_str), __param_count)", "runtime_cabi_member_wrapper_alias")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-runtime-cabi-aliases", check_args)
     if check.rc != 0: return check.rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-runtime-cabi-aliases", run_args)
@@ -5628,10 +5628,10 @@ fn bs_check_migrate_w_prefixed_user_type(ctx: &ActionCtx, compiler_path: &str, c
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "w_prefixed_user_type.c")
     let out_w = bs_join(case_dir, "w_prefixed_user_type.w")
-    let c_text = "typedef struct WithVec {\n  unsigned char *ptr;\n  long long len;\n  long long cap;\n  long long elem_size;\n} WithVec;\n\nlong long vector_data(long long raw) {\n  if (raw == 0) return 0;\n  const WithVec *value = (const WithVec *)raw;\n  return (long long)value->ptr;\n}\n\nint main(void) {\n  WithVec value = {0};\n  return vector_data((long long)&value) == 0 ? 0 : 1;\n}\n"
+    let c_text = "typedef struct WithList {\n  unsigned char *ptr;\n  long long len;\n  long long cap;\n  long long elem_size;\n} WithList;\n\nlong long vector_data(long long raw) {\n  if (raw == 0) return 0;\n  const WithList *value = (const WithList *)raw;\n  return (long long)value->ptr;\n}\n\nint main(void) {\n  WithList value = {0};\n  return vector_data((long long)&value) == 0 ? 0 : 1;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate W-prefixed user type")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5640,14 +5640,14 @@ fn bs_check_migrate_w_prefixed_user_type(ctx: &ActionCtx, compiler_path: &str, c
     args |> push(bs_abs(root, out_w))
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-w-prefixed-user-type", args)
     if result.rc != 0: return result.rc
-    rc = bs_file_contains(ctx, out_w, "type WithVec", "w_prefixed_user_type")
+    rc = bs_file_contains(ctx, out_w, "type WithList", "w_prefixed_user_type")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-w-prefixed-user-type", check_args)
     if check.rc != 0: return check.rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-w-prefixed-user-type", run_args)
@@ -5661,7 +5661,7 @@ fn bs_check_migrate_posix_path_calls(ctx: &ActionCtx, compiler_path: &str, case_
     let c_text = "#include <stdlib.h>\n#include <unistd.h>\n\nextern int raw_path_op(const char *path);\n\nint use_posix_path_calls(void) {\n  char template_path[] = \"/tmp/with_posix_XXXXXX\";\n  char resolved[4096];\n  int fd = mkstemp(template_path);\n  char *result = realpath(\".\", resolved);\n  int raw_result = raw_path_op(\"/tmp/with_posix_missing\");\n  return fd + (result != 0) + raw_result;\n}\n\nint main(void) {\n  return 0;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate POSIX path calls")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5681,7 +5681,7 @@ fn bs_check_migrate_posix_path_calls(ctx: &ActionCtx, compiler_path: &str, case_
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "unsafe { raw_path_op", "posix_path_calls_safety")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-posix-path-calls", check_args)
@@ -5704,7 +5704,7 @@ fn bs_check_migrate_anon_union_init(ctx: &ActionCtx, compiler_path: &str, case_d
     let c_text = "struct pair { union { int a; int b; } fc; union { int c; int d; } dl; };\nstatic const struct pair T[2] = {{{12},{8}}, {{34},{9}}};\nint main(void) {\n  return (T[0].fc.a - 12) + (T[0].dl.c - 8) + (T[1].fc.a - 34) + (T[1].dl.c - 9);\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate anon-union init")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5715,7 +5715,7 @@ fn bs_check_migrate_anon_union_init(ctx: &ActionCtx, compiler_path: &str, case_d
     let out_text = ctx.fs().read_text(out_w)
     rc = bs_assert_not_contains(ctx, out_text, "fc: 12", "anon_union_init_not_flattened")
     if rc != 0: return rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-anon-union-init", run_args)
@@ -5729,7 +5729,7 @@ fn bs_check_migrate_prelude_collision_libc_call(ctx: &ActionCtx, compiler_path: 
     let c_text = "#include <unistd.h>\n\nlong wr_plain(int fd, const void *buf, unsigned long n) {\n  return write(fd, buf, n);\n}\n\nint wr_goto(int fd, const void *buf, unsigned long n) {\n  int total = 0;\n  int i = 0;\nloop:\n  if (i >= 2) goto done;\n  total = total + (int)write(fd, buf, n);\n  i = i + 1;\n  goto loop;\ndone:\n  return total;\n}\n\nint main(void) { return 0; }\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate prelude-collision libc call")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5744,7 +5744,7 @@ fn bs_check_migrate_prelude_collision_libc_call(ctx: &ActionCtx, compiler_path: 
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "write_(", "prelude_collision_libc_call_no_rename")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-prelude-collision-libc-call", check_args)
@@ -5758,7 +5758,7 @@ fn bs_check_migrate_cross_file_tentative_global_owner(ctx: &ActionCtx, compiler_
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "b.c"), "int issue127_counter;\nint issue127_bump(void) {\n  issue127_counter = issue127_counter + 1;\n  return issue127_counter;\n}\n", "cross tentative b")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, case_dir))
     args |> push("--no-c-export")
@@ -5772,12 +5772,12 @@ fn bs_check_migrate_cross_file_tentative_global_owner(ctx: &ActionCtx, compiler_
     if rc != 0: return rc
     rc = bs_file_contains(ctx, b_w, "extern var issue127_counter: c_int", "cross_file_tentative_global_owner")
     if rc != 0: return rc
-    var check_a_args: Vec[str] = Vec.new()
+    var check_a_args: List[str] = List.new()
     check_a_args |> push("check")
     check_a_args |> push(bs_abs(root, a_w))
     let check_a = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-cross-file-tentative-a", check_a_args)
     if check_a.rc != 0: return check_a.rc
-    var check_b_args: Vec[str] = Vec.new()
+    var check_b_args: List[str] = List.new()
     check_b_args |> push("check")
     check_b_args |> push(bs_abs(root, b_w))
     let check_b = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-cross-file-tentative-b", check_b_args)
@@ -5791,7 +5791,7 @@ fn bs_check_migrate_noop_pointer_casts(ctx: &ActionCtx, compiler_path: &str, cas
     let c_text = "typedef struct ctx { int x; } ctx;\nctx g;\n\nctx *ret_ctx(void) { return (ctx *)(&g); }\n\nint f(ctx *ccontext) {\n  ctx *local = (ctx *)(&g);\n  ccontext = (ctx *)(&g);\n  return local->x + ccontext->x;\n}\n\nstatic void callback(void *p) { (void)p; }\n\ntypedef void (*callback_fn)(void *);\n\ncallback_fn ret_callback(void) { return &callback; }\n"
     var rc = bs_write_fixture(ctx, src, c_text, "noop pointer casts")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5800,7 +5800,7 @@ fn bs_check_migrate_noop_pointer_casts(ctx: &ActionCtx, compiler_path: &str, cas
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-noop-pointer-casts", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    let required: Vec[str] = Vec.new()
+    let required: List[str] = List.new()
     required |> push("fn ret_ctx() -> *mut ctx:")
     required |> push("return ((&raw mut g as *mut ctx))")
     required |> push("var __local_local: *mut ctx = ((&raw mut g as *mut ctx))")
@@ -5812,14 +5812,14 @@ fn bs_check_migrate_noop_pointer_casts(ctx: &ActionCtx, compiler_path: &str, cas
     for i in 0..required.len() as i32:
         rc = bs_assert_contains(ctx, out_text, required[i], "noop_pointer_cast_exprs")
         if rc != 0: return rc
-    let forbidden: Vec[str] = Vec.new()
+    let forbidden: List[str] = List.new()
     forbidden |> push("extern fn ret_ctx()")
     forbidden |> push("as *mut ctx)) as *mut ctx")
     forbidden |> push("&raw const callback")
     for i in 0..forbidden.len() as i32:
         rc = bs_assert_not_contains(ctx, out_text, forbidden[i], "noop_pointer_cast_exprs")
         if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-noop-pointer-casts", check_args)
@@ -5832,7 +5832,7 @@ fn bs_check_migrate_raw_pointer_index(ctx: &ActionCtx, compiler_path: &str, case
     let out_w = bs_join(case_dir, "raw_pointer_index_unsafe.w")
     var rc = bs_write_fixture(ctx, src, "int issue146_ptr_ops(int *p, int *q) {\n  int *r = p + 1;\n  int d = (int)(q - p);\n  r[0] = r[0] + d;\n  return p[1];\n}\n", "raw pointer index")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5853,7 +5853,7 @@ fn bs_check_migrate_raw_pointer_index(ctx: &ActionCtx, compiler_path: &str, case
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "(__param_p[1])", "raw_pointer_index_unsafe")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-raw-pointer-index", check_args)
@@ -5866,7 +5866,7 @@ fn bs_check_migrate_array_pointer_deref(ctx: &ActionCtx, compiler_path: &str, ca
     let out_w = bs_join(case_dir, "array_pointer_deref.w")
     var rc = bs_write_fixture(ctx, src, "typedef struct holder { const unsigned char *slots[2]; } holder;\nint read_slot(holder *h, int i) { return *h->slots[i]; }\n", "array pointer deref")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5876,7 +5876,7 @@ fn bs_check_migrate_array_pointer_deref(ctx: &ActionCtx, compiler_path: &str, ca
     if result.rc != 0: return result.rc
     rc = bs_file_contains(ctx, out_w, "as *const u8)", "array_pointer_deref")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-array-pointer-deref", check_args)
@@ -5890,7 +5890,7 @@ fn bs_check_migrate_prefer_brace_ws(ctx: &ActionCtx, compiler_path: &str, case_d
     let c_text = "int prefer_brace_ws(int *p) {\n  while (*p != 0) {\n    if (*p < 3) {\n      p++;\n      continue;\n    }\n    p++;\n  }\n  return 0;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "prefer brace source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5934,7 +5934,7 @@ fn bs_check_migrate_prefer_brace_ws(ctx: &ActionCtx, compiler_path: &str, case_d
         return bs_fail(ctx, "prefer_brace_ws missing brace-style while")
     if not saw_if_brace:
         return bs_fail(ctx, "prefer_brace_ws missing brace-style if")
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-prefer-brace-ws", check_args)
@@ -5948,7 +5948,7 @@ fn bs_check_migrate_typed_cast_macros(ctx: &ActionCtx, compiler_path: &str, case
     let c_text = "typedef unsigned long usize;\n#define ZERO_TERM ((usize)-1)\n\nint f(usize patlen) {\n  int zero_terminated = 0;\n  if ((zero_terminated = (patlen == ZERO_TERM)))\n    patlen = 7;\n  return zero_terminated + (int)patlen;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "typed cast macros")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -5961,7 +5961,7 @@ fn bs_check_migrate_typed_cast_macros(ctx: &ActionCtx, compiler_path: &str, case
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "patlen == ((-1 as c_ulong))", "typed_cast_macros")
     if rc != 0: return rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-typed-cast-macros", check_args)
@@ -6001,7 +6001,7 @@ fn bs_check_migrate_switch_case_scope(ctx: &ActionCtx, compiler_path: &str, case
         "}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate switch case scope")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("migrate")
     args |> push(bs_abs(root, src))
     args |> push("--no-c-export")
@@ -6010,12 +6010,12 @@ fn bs_check_migrate_switch_case_scope(ctx: &ActionCtx, compiler_path: &str, case
     args |> push(bs_abs(root, out_w))
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-switch-case-scope", args)
     if result.rc != 0: return result.rc
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-switch-case-scope", check_args)
     if check.rc != 0: return check.rc
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("run")
     run_args |> push(bs_abs(root, out_w))
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-switch-case-scope", run_args)
@@ -6093,8 +6093,8 @@ fn bs_build_w_write_fixture(ctx: &ActionCtx, path: &str, contents: &str, _target
 fn bs_argv_append(argv_blob: &str, arg: &str) -> str:
     argv_blob ++ arg ++ "\0"
 
-fn bs_blob_to_args(blob: &str) -> Vec[str]:
-    let args: Vec[str] = Vec.new()
+fn bs_blob_to_args(blob: &str) -> List[str]:
+    let args: List[str] = List.new()
     var start = 0
     for i in 0..blob.len() as i32:
         if blob[i] == 0:
@@ -6103,7 +6103,7 @@ fn bs_blob_to_args(blob: &str) -> Vec[str]:
             start = i + 1
     args
 
-fn bs_build_w_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &Vec[str]) -> SelfhostRunResult:
+fn bs_build_w_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 120000, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": build.w selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
@@ -6120,7 +6120,7 @@ fn bs_build_w_nm_smoke(ctx: &ActionCtx, obj_path: &str, label: &str) -> i32:
     let output_dir = ctx.output()
     let stdout_rel = bs_join(output_dir, label ++ ".nm.stdout")
     let stderr_rel = bs_join(output_dir, label ++ ".nm.stderr")
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push(bs_build_w_tool_from_env("NM", "nm"))
     args |> push(bs_abs(root, obj_path))
     let result = ctx.process_runner().run_capture(args, bs_abs(root, stdout_rel), bs_abs(root, stderr_rel), 120000)
@@ -6222,7 +6222,7 @@ fn bs_force_comptime_evaluator(ctx: &ActionCtx, case_dir: &str) -> i32:
 // built runner links nothing, so the marker alone does not keep the action
 // out of it. The case's runner store is its own and empty, and the driver
 // must say the actions evaluate at comptime.
-fn bs_build_w_in_evaluator(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &Vec[str]) -> SelfhostRunResult:
+fn bs_build_w_in_evaluator(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
     let env = process_env().set("WITH_BUILD_RUNNER_DIR", bs_abs(ctx.project_info().project_root(), bs_join(case_dir, ".runners")))
     let result = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, label, args, 120000, case_dir, &env)
     if result.rc != 0:
@@ -6425,10 +6425,10 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    let opts = MigrateOptions {\n" ++
         "        source_path: \"csrc\",\n" ++
         "        output_path: \"out/migrated\",\n" ++
-        "        include_paths: Vec.new(),\n" ++
-        "        forced_includes: Vec.new(),\n" ++
-        "        defines: Vec.new(),\n" ++
-        "        exclude_basenames: Vec.new(),\n" ++
+        "        include_paths: List.new(),\n" ++
+        "        forced_includes: List.new(),\n" ++
+        "        defines: List.new(),\n" ++
+        "        exclude_basenames: List.new(),\n" ++
         "        check_mode: false,\n" ++
         "        diff_mode: false,\n" ++
         "        stats_mode: false,\n" ++
@@ -6664,7 +6664,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "        match move envelope.message:\n" ++
         "            CompilerMessage.PreLink(command) =>\n" ++
         "                var replacement = command\n" ++
-        "                let empty: Vec[str] = Vec.new()\n" ++
+        "                let empty: List[str] = List.new()\n" ++
         "                replacement.outputs = empty\n" ++
         "                ws.set_link_command(replacement)\n" ++
         "            CompilerMessage.Complete(_) => ctx.diagnostics().error(\"drop outputs prelink missing\")\n" ++
@@ -6798,7 +6798,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    var opts = ws.options()\n" ++
         "    opts.output_path = \"out/bin/parallel-single\"\n" ++
         "    ws.set_options(opts)\n" ++
-        "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
+        "    let workspaces: List[Workspace] = List.new()\n" ++
         "    workspaces.push(ws)\n" ++
         "    let results = parallel(workspaces)\n" ++
         "    if results.len() != 1:\n" ++
@@ -6825,7 +6825,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ws1.add_string(\"src/parallel_a.w\", \"fn main:\\n    print(\\\"a\\\")\\n\")\n" ++
         "    let ws2 = ctx.create_workspace(\"parallel-b\")\n" ++
         "    ws2.add_string(\"src/parallel_b.w\", \"fn main:\\n    print(\\\"b\\\")\\n\")\n" ++
-        "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
+        "    let workspaces: List[Workspace] = List.new()\n" ++
         "    workspaces.push(ws1)\n" ++
         "    workspaces.push(ws2)\n" ++
         "    let results = parallel(workspaces)\n" ++
@@ -6853,36 +6853,36 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "comptime with BuildCtx as ctx:\n" ++
         "pub fn build -> Build:\n" ++
         "    let ws0 = ctx.create_workspace(\"stress-0\")\n" ++
-        "    ws0.add_string(\"src/stress_0.w\", \"fn main:\\n    let xs: Vec[i32] = Vec.new()\\n    xs.push(0)\\n    xs.push(1)\\n    print(\\\"stress-0\\\")\\n\")\n" ++
+        "    ws0.add_string(\"src/stress_0.w\", \"fn main:\\n    let xs: List[i32] = List.new()\\n    xs.push(0)\\n    xs.push(1)\\n    print(\\\"stress-0\\\")\\n\")\n" ++
         "    var opts0 = ws0.options()\n" ++
         "    opts0.output_path = \"out/bin/stress-0\"\n" ++
         "    ws0.set_options(opts0)\n" ++
         "    let ws1 = ctx.create_workspace(\"stress-1\")\n" ++
-        "    ws1.add_string(\"src/stress_1.w\", \"fn main:\\n    let xs: Vec[i32] = Vec.new()\\n    xs.push(1)\\n    xs.push(2)\\n    print(\\\"stress-1\\\")\\n\")\n" ++
+        "    ws1.add_string(\"src/stress_1.w\", \"fn main:\\n    let xs: List[i32] = List.new()\\n    xs.push(1)\\n    xs.push(2)\\n    print(\\\"stress-1\\\")\\n\")\n" ++
         "    var opts1 = ws1.options()\n" ++
         "    opts1.output_path = \"out/bin/stress-1\"\n" ++
         "    ws1.set_options(opts1)\n" ++
         "    let ws2 = ctx.create_workspace(\"stress-2\")\n" ++
-        "    ws2.add_string(\"src/stress_2.w\", \"fn main:\\n    let xs: Vec[i32] = Vec.new()\\n    xs.push(2)\\n    xs.push(3)\\n    print(\\\"stress-2\\\")\\n\")\n" ++
+        "    ws2.add_string(\"src/stress_2.w\", \"fn main:\\n    let xs: List[i32] = List.new()\\n    xs.push(2)\\n    xs.push(3)\\n    print(\\\"stress-2\\\")\\n\")\n" ++
         "    var opts2 = ws2.options()\n" ++
         "    opts2.output_path = \"out/bin/stress-2\"\n" ++
         "    ws2.set_options(opts2)\n" ++
         "    let ws3 = ctx.create_workspace(\"stress-3\")\n" ++
-        "    ws3.add_string(\"src/stress_3.w\", \"fn main:\\n    let xs: Vec[i32] = Vec.new()\\n    xs.push(3)\\n    xs.push(4)\\n    print(\\\"stress-3\\\")\\n\")\n" ++
+        "    ws3.add_string(\"src/stress_3.w\", \"fn main:\\n    let xs: List[i32] = List.new()\\n    xs.push(3)\\n    xs.push(4)\\n    print(\\\"stress-3\\\")\\n\")\n" ++
         "    var opts3 = ws3.options()\n" ++
         "    opts3.output_path = \"out/bin/stress-3\"\n" ++
         "    ws3.set_options(opts3)\n" ++
         "    let ws4 = ctx.create_workspace(\"stress-4\")\n" ++
-        "    ws4.add_string(\"src/stress_4.w\", \"fn main:\\n    let xs: Vec[i32] = Vec.new()\\n    xs.push(4)\\n    xs.push(5)\\n    print(\\\"stress-4\\\")\\n\")\n" ++
+        "    ws4.add_string(\"src/stress_4.w\", \"fn main:\\n    let xs: List[i32] = List.new()\\n    xs.push(4)\\n    xs.push(5)\\n    print(\\\"stress-4\\\")\\n\")\n" ++
         "    var opts4 = ws4.options()\n" ++
         "    opts4.output_path = \"out/bin/stress-4\"\n" ++
         "    ws4.set_options(opts4)\n" ++
         "    let ws5 = ctx.create_workspace(\"stress-5\")\n" ++
-        "    ws5.add_string(\"src/stress_5.w\", \"fn main:\\n    let xs: Vec[i32] = Vec.new()\\n    xs.push(5)\\n    xs.push(6)\\n    print(\\\"stress-5\\\")\\n\")\n" ++
+        "    ws5.add_string(\"src/stress_5.w\", \"fn main:\\n    let xs: List[i32] = List.new()\\n    xs.push(5)\\n    xs.push(6)\\n    print(\\\"stress-5\\\")\\n\")\n" ++
         "    var opts5 = ws5.options()\n" ++
         "    opts5.output_path = \"out/bin/stress-5\"\n" ++
         "    ws5.set_options(opts5)\n" ++
-        "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
+        "    let workspaces: List[Workspace] = List.new()\n" ++
         "    workspaces.push(ws0)\n" ++
         "    workspaces.push(ws1)\n" ++
         "    workspaces.push(ws2)\n" ++
@@ -6940,7 +6940,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    opts2.output_path = \"out/bin/parallel-intercept-b\"\n" ++
         "    ws2.set_options(opts2)\n" ++
         "    ws2.begin_intercept()\n" ++
-        "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
+        "    let workspaces: List[Workspace] = List.new()\n" ++
         "    workspaces.push(ws1)\n" ++
         "    workspaces.push(ws2)\n" ++
         "    let results = parallel(workspaces)\n" ++
@@ -6991,7 +6991,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ws.add_string(\"src/parallel_partial_intercept.w\", \"fn main:\\n    print(\\\"parallel partial intercept\\\")\\n\")\n" ++
         "    ws.begin_intercept()\n" ++
         "    let _first = ws.wait_for_message()\n" ++
-        "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
+        "    let workspaces: List[Workspace] = List.new()\n" ++
         "    workspaces.push(ws)\n" ++
         "    let _results = parallel(workspaces)\n" ++
         "    ctx.new_build()\n"
@@ -7020,7 +7020,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    var bad_opts = bad.options()\n" ++
         "    bad_opts.output_path = \"out/bin/parallel-bad\"\n" ++
         "    bad.set_options(bad_opts)\n" ++
-        "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
+        "    let workspaces: List[Workspace] = List.new()\n" ++
         "    workspaces.push(ok)\n" ++
         "    workspaces.push(bad)\n" ++
         "    let results = parallel(workspaces)\n" ++
@@ -7125,8 +7125,8 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    Phase(7)\n\n" ++
         "comptime fn public_message -> CompilerMessage:\n" ++
         "    let unknown = SourceSpan { file: \"\", start: -1, end: -1, line: -1, column: -1 }\n" ++
-        "    let summary = DeclSummary { version: 1, kind: DeclKind.function, module_name: \"main\", name: \"build\", qualified_name: \"main.build\", public_value: true, docs: \"\", type_text: \"fn\", return_type_text: \"Build\", param_count: 0, generic_param_count: 0, receiver_type_text: \"\", source: unknown, notes: Vec.new() }\n" ++
-        "    var decls: Vec[DeclSummary] = Vec.new()\n" ++
+        "    let summary = DeclSummary { version: 1, kind: DeclKind.function, module_name: \"main\", name: \"build\", qualified_name: \"main.build\", public_value: true, docs: \"\", type_text: \"fn\", return_type_text: \"Build\", param_count: 0, generic_param_count: 0, receiver_type_text: \"\", source: unknown, notes: List.new() }\n" ++
+        "    var decls: List[DeclSummary] = List.new()\n" ++
         "    decls.push(summary)\n" ++
         "    CompilerMessage.Typechecked(decls)\n\n" ++
         "comptime with BuildCtx as ctx:\n" ++
@@ -7290,7 +7290,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "fixtures/tree/a.txt"), "tree", ctx.target_name(), "toolfs ok tree fixture")
     if rc != 0: return rc
-    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/toolfs\") == 0)\n    assert(fs.write_text(\"out/toolfs/value.txt\", \"inside\") == 0)\n    assert(fs.read_text(\"out/toolfs/value.txt\") == \"inside\")\n    let bytes: Vec[u8] = Vec.new()\n    bytes.push(0 as u8)\n    bytes.push(65 as u8)\n    bytes.push(255 as u8)\n    assert(fs.write_binary(\"out/toolfs/binary.bin\", bytes) == 0)\n    let loaded = fs.read_binary(\"out/toolfs/binary.bin\")\n    assert(loaded.len() == 3)\n    assert(loaded[0] == 0 as u8)\n    assert(loaded[1] == 65 as u8)\n    assert(loaded[2] == 255 as u8)\n    let archive_entries: Vec[ArchiveEntry] = Vec.new()\n    archive_entries.push(archive_dir_entry(\"pkg\", 0o755))\n    archive_entries.push(archive_dir_entry(\"pkg/nested/\", 0o755))\n    archive_entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/nested/a.txt\", 0o644))\n    archive_entries.push(archive_file_entry(\"out/toolfs/binary.bin\", \"pkg/binary.bin\", 0o600))\n    assert(fs.write_tar(\"out/toolfs/archive.tar\", archive_entries) == 0)\n    assert(fs.extract_tar(\"out/toolfs/archive.tar\", \"out/toolfs/extracted\") == 0)\n    assert(fs.read_text(\"out/toolfs/extracted/pkg/nested/a.txt\") == \"tree\")\n    let extracted_bin = fs.read_binary(\"out/toolfs/extracted/pkg/binary.bin\")\n    assert(extracted_bin.len() == 3)\n    assert(extracted_bin[0] == 0 as u8)\n    assert(extracted_bin[1] == 65 as u8)\n    assert(extracted_bin[2] == 255 as u8)\n    let files = fs.list_files(\"fixtures/tree\")\n    assert(files.len() == 1)\n    assert(files[0] == \"fixtures/tree/a.txt\")\n    assert(fs.sha256_file(\"fixtures/tree/a.txt\") == \"dc9c5edb8b2d479e697b4b0b8ab874f32b325138598ce9e7b759eb8292110622\")\n    let host_path = ctx.project_info().project_root() ++ \"/fixtures/tree/a.txt\"\n    assert(fs.host_read_text(host_path) == \"tree\")\n    assert(fs.copy_file(\"fixtures/tree/a.txt\", \"out/toolfs/copied-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/copied-file.txt\") == \"tree\")\n    assert(fs.chmod(\"out/toolfs/copied-file.txt\", 0o644) == 0)\n    assert(fs.rename(\"out/toolfs/copied-file.txt\", \"out/toolfs/renamed-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/renamed-file.txt\") == \"tree\")\n    assert(fs.copy_tree(\"fixtures/tree\", \"out/toolfs/tree-copy\") == 0)\n    assert(fs.read_text(\"out/toolfs/tree-copy/a.txt\") == \"tree\")\n    assert(fs.symlink(\"fixtures/tree/a.txt\", \"out/toolfs/link-a.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/link-a.txt\") == \"tree\")\n    assert(fs.remove_tree(\"out/toolfs/tree-copy\") == 0)\n    assert(not fs.exists(\"out/toolfs/tree-copy/a.txt\"))\n    ctx.new_build().executable(\"toolfs-ok\", \"src/main.w\")\n", ctx.target_name(), "toolfs ok build.w")
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/toolfs\") == 0)\n    assert(fs.write_text(\"out/toolfs/value.txt\", \"inside\") == 0)\n    assert(fs.read_text(\"out/toolfs/value.txt\") == \"inside\")\n    let bytes: List[u8] = List.new()\n    bytes.push(0 as u8)\n    bytes.push(65 as u8)\n    bytes.push(255 as u8)\n    assert(fs.write_binary(\"out/toolfs/binary.bin\", bytes) == 0)\n    let loaded = fs.read_binary(\"out/toolfs/binary.bin\")\n    assert(loaded.len() == 3)\n    assert(loaded[0] == 0 as u8)\n    assert(loaded[1] == 65 as u8)\n    assert(loaded[2] == 255 as u8)\n    let archive_entries: List[ArchiveEntry] = List.new()\n    archive_entries.push(archive_dir_entry(\"pkg\", 0o755))\n    archive_entries.push(archive_dir_entry(\"pkg/nested/\", 0o755))\n    archive_entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/nested/a.txt\", 0o644))\n    archive_entries.push(archive_file_entry(\"out/toolfs/binary.bin\", \"pkg/binary.bin\", 0o600))\n    assert(fs.write_tar(\"out/toolfs/archive.tar\", archive_entries) == 0)\n    assert(fs.extract_tar(\"out/toolfs/archive.tar\", \"out/toolfs/extracted\") == 0)\n    assert(fs.read_text(\"out/toolfs/extracted/pkg/nested/a.txt\") == \"tree\")\n    let extracted_bin = fs.read_binary(\"out/toolfs/extracted/pkg/binary.bin\")\n    assert(extracted_bin.len() == 3)\n    assert(extracted_bin[0] == 0 as u8)\n    assert(extracted_bin[1] == 65 as u8)\n    assert(extracted_bin[2] == 255 as u8)\n    let files = fs.list_files(\"fixtures/tree\")\n    assert(files.len() == 1)\n    assert(files[0] == \"fixtures/tree/a.txt\")\n    assert(fs.sha256_file(\"fixtures/tree/a.txt\") == \"dc9c5edb8b2d479e697b4b0b8ab874f32b325138598ce9e7b759eb8292110622\")\n    let host_path = ctx.project_info().project_root() ++ \"/fixtures/tree/a.txt\"\n    assert(fs.host_read_text(host_path) == \"tree\")\n    assert(fs.copy_file(\"fixtures/tree/a.txt\", \"out/toolfs/copied-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/copied-file.txt\") == \"tree\")\n    assert(fs.chmod(\"out/toolfs/copied-file.txt\", 0o644) == 0)\n    assert(fs.rename(\"out/toolfs/copied-file.txt\", \"out/toolfs/renamed-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/renamed-file.txt\") == \"tree\")\n    assert(fs.copy_tree(\"fixtures/tree\", \"out/toolfs/tree-copy\") == 0)\n    assert(fs.read_text(\"out/toolfs/tree-copy/a.txt\") == \"tree\")\n    assert(fs.symlink(\"fixtures/tree/a.txt\", \"out/toolfs/link-a.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/link-a.txt\") == \"tree\")\n    assert(fs.remove_tree(\"out/toolfs/tree-copy\") == 0)\n    assert(not fs.exists(\"out/toolfs/tree-copy/a.txt\"))\n    ctx.new_build().executable(\"toolfs-ok\", \"src/main.w\")\n", ctx.target_name(), "toolfs ok build.w")
     if rc != 0: return rc
     let toolfs_ok = bs_build_w_expect_success(ctx, compiler_path, toolfs_ok_dir, "build-w-toolfs-ok", bs_blob_to_args(bs_argv_append("", "build")))
     if toolfs_ok.rc != 0: return toolfs_ok.rc
@@ -7304,7 +7304,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_archive_dir, "fixtures/tree/a.txt"), "tree", ctx.target_name(), "toolfs archive fixture")
     if rc != 0: return rc
-    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_archive_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/archive\") == 0)\n    let entries: Vec[ArchiveEntry] = Vec.new()\n    entries.push(archive_dir_entry(\"pkg\", 0o755))\n    entries.push(archive_dir_entry(\"pkg/nested\", 0o755))\n    entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/nested/a.txt\", 0o644))\n    entries.push(archive_symlink_entry(\"nested/a.txt\", \"pkg/link-a.txt\", 0o777))\n    // Longer than the 100-byte name field: the USTAR prefix carries the rest,\n    // in the evaluator's writer as in std.build's.\n    entries.push(archive_dir_entry(\"pkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\", 0o755))\n    entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/a.txt\", 0o644))\n    assert(fs.write_tar(\"out/archive/sample.tar\", entries) == 0)\n    assert(fs.write_tar_gz(\"out/archive/sample.tar.gz\", entries) == 0)\n    let gzip = fs.read_binary(\"out/archive/sample.tar.gz\")\n    assert(gzip.len() > 10)\n    assert(gzip[0] == 31 as u8)\n    assert(gzip[1] == 139 as u8)\n    // Deflated, as std.build's writer does, not stored blocks: the\n    // first block's BTYPE (bits 1-2 of byte 10) is fixed or dynamic Huffman.\n    assert(((gzip[10] as i32) >> 1) & 3 != 0)\n    assert(fs.extract_tar(\"out/archive/sample.tar\", \"out/archive/extracted\") == 0)\n    assert(fs.read_text(\"out/archive/extracted/pkg/nested/a.txt\") == \"tree\")\n    assert(fs.read_text(\"out/archive/extracted/pkg/link-a.txt\") == \"tree\")\n    assert(fs.read_text(\"out/archive/extracted/pkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/a.txt\") == \"tree\")\n    var out = ctx.new_build().executable(\"toolfs-archive\", \"src/main.w\")\n    out = out.extract_tar_gz(\"extract-gzip\", \"out/archive/sample.tar.gz\", \"out/archive/extracted-gz\")\n    var all = target_new(.Group, \"all\", \"\")\n    all = all.dep(\"toolfs-archive\")\n    all = all.dep(\"extract-gzip\")\n    out = out.add_target(all)\n    out.default(\"all\")\n", ctx.target_name(), "toolfs archive build.w")
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_archive_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/archive\") == 0)\n    let entries: List[ArchiveEntry] = List.new()\n    entries.push(archive_dir_entry(\"pkg\", 0o755))\n    entries.push(archive_dir_entry(\"pkg/nested\", 0o755))\n    entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/nested/a.txt\", 0o644))\n    entries.push(archive_symlink_entry(\"nested/a.txt\", \"pkg/link-a.txt\", 0o777))\n    // Longer than the 100-byte name field: the USTAR prefix carries the rest,\n    // in the evaluator's writer as in std.build's.\n    entries.push(archive_dir_entry(\"pkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\", 0o755))\n    entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/a.txt\", 0o644))\n    assert(fs.write_tar(\"out/archive/sample.tar\", entries) == 0)\n    assert(fs.write_tar_gz(\"out/archive/sample.tar.gz\", entries) == 0)\n    let gzip = fs.read_binary(\"out/archive/sample.tar.gz\")\n    assert(gzip.len() > 10)\n    assert(gzip[0] == 31 as u8)\n    assert(gzip[1] == 139 as u8)\n    // Deflated, as std.build's writer does, not stored blocks: the\n    // first block's BTYPE (bits 1-2 of byte 10) is fixed or dynamic Huffman.\n    assert(((gzip[10] as i32) >> 1) & 3 != 0)\n    assert(fs.extract_tar(\"out/archive/sample.tar\", \"out/archive/extracted\") == 0)\n    assert(fs.read_text(\"out/archive/extracted/pkg/nested/a.txt\") == \"tree\")\n    assert(fs.read_text(\"out/archive/extracted/pkg/link-a.txt\") == \"tree\")\n    assert(fs.read_text(\"out/archive/extracted/pkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/a.txt\") == \"tree\")\n    var out = ctx.new_build().executable(\"toolfs-archive\", \"src/main.w\")\n    out = out.extract_tar_gz(\"extract-gzip\", \"out/archive/sample.tar.gz\", \"out/archive/extracted-gz\")\n    var all = target_new(.Group, \"all\", \"\")\n    all = all.dep(\"toolfs-archive\")\n    all = all.dep(\"extract-gzip\")\n    out = out.add_target(all)\n    out.default(\"all\")\n", ctx.target_name(), "toolfs archive build.w")
     if rc != 0: return rc
     let toolfs_archive = bs_build_w_expect_success(ctx, compiler_path, toolfs_archive_dir, "build-w-toolfs-archive", bs_blob_to_args(bs_argv_append("", "build")))
     if toolfs_archive.rc != 0: return toolfs_archive.rc
@@ -7402,7 +7402,7 @@ fn bs_check_comptime_string_budget(ctx: &ActionCtx, compiler_path: &str, case_di
     let source_path = bs_join(case_dir, "budget.w")
     var rc = bs_write_fixture(ctx, source_path, source, "comptime string budget source")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(source_path)
     var child_env = process_env()
@@ -7525,7 +7525,7 @@ fn bs_check_build_w_graph_v2(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     if selected.rc != 0: return selected.rc
     rc = bs_assert_not_contains(ctx, selected.stdout, "target\t12\thelper-o", "build_w_graph_selected")
     if rc != 0: return rc
-    var no_deps_args: Vec[str] = Vec.new()
+    var no_deps_args: List[str] = List.new()
     no_deps_args |> push("build")
     no_deps_args |> push(":two")
     no_deps_args |> push("--no-deps")
@@ -7664,7 +7664,7 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: &str, case_dir
         "    assert(ctx.fs().mkdir_all(\"out/action\") == 0)\n" ++
         "    assert(ctx.fs().write_text(ctx.output(), \"action:\" ++ ctx.args()[0]) == 0)\n" ++
         "    assert(ctx.fs().write_text(ctx.outputs()[1], \"extra:\" ++ ctx.args()[0]) == 0)\n" ++
-        "    var env_args: Vec[str] = Vec.new()\n" ++
+        "    var env_args: List[str] = List.new()\n" ++
         "    env_args |> push(\"/usr/bin/env\")\n" ++
         "    var child_env = process_env()\n" ++
         "    child_env = child_env.set(\"WITH_ACTION_TEST_ENV\", \"present\")\n" ++
@@ -7689,7 +7689,7 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: &str, case_dir
         "    let timeout_spec = process_spec(\"/bin/sleep\").arg(\"1\").timeout(1)\n" ++
         "    let timeout_result = ctx.process_runner().run_spec(timeout_spec, \"out/action/spec-timeout.txt\", \"out/action/spec-timeout.err\")\n" ++
         "    assert(timeout_result.timed_out)\n" ++
-        "    var direct_args: Vec[str] = Vec.new()\n" ++
+        "    var direct_args: List[str] = List.new()\n" ++
         "    direct_args |> push(\"/bin/echo\")\n" ++
         "    direct_args |> push(\"streamed-process-run\")\n" ++
         "    assert(ctx.process_runner().run(direct_args) == 0)\n" ++
@@ -7783,7 +7783,7 @@ fn bs_check_build_w_action_no_deps(ctx: &ActionCtx, compiler_path: &str, case_di
     rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "build.w"), build_text, ctx.target_name(), "action no-deps build.w")
     if rc != 0: return rc
 
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("build")
     args |> push(":leaf")
     args |> push("--no-deps")
@@ -7794,7 +7794,7 @@ fn bs_check_build_w_action_no_deps(ctx: &ActionCtx, compiler_path: &str, case_di
     if ctx.fs().exists(bs_join(case_dir, "out/action/prepare.txt")):
         ctx.diagnostics().error("error: build_w_action_no_deps unexpectedly ran dependency action")
 
-    var dep_args: Vec[str] = Vec.new()
+    var dep_args: List[str] = List.new()
     dep_args |> push("build")
     dep_args |> push(":leaf")
     let with_deps = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-with-deps-fails", dep_args, 120000, case_dir)
@@ -7933,7 +7933,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     let network_build =
         "use std.build\n\n" ++
         "fn bad_network(ctx: ActionCtx) -> i32:\n" ++
-        "    let args: Vec[str] = Vec.new()\n" ++
+        "    let args: List[str] = List.new()\n" ++
         "    args.push(\"curl\")\n" ++
         "    args.push(\"--version\")\n" ++
         "    let _ = ctx.process_runner().run_capture(args, \"out/action/stdout.txt\", \"out/action/stderr.txt\", 120000)\n" ++
@@ -7962,7 +7962,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     let network_helper_build =
         "use std.build\n\n" ++
         "fn bad_network(ctx: ActionCtx) -> i32:\n" ++
-        "    let args: Vec[str] = Vec.new()\n" ++
+        "    let args: List[str] = List.new()\n" ++
         "    args.push(\"out/tools/https_fetch\")\n" ++
         "    args.push(\"https://example.invalid/file\")\n" ++
         "    args.push(\"out/action/download\")\n" ++
@@ -7994,7 +7994,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
         "fn allowed_network(ctx: ActionCtx) -> i32:\n" ++
         "    let fs = ctx.fs()\n" ++
         "    assert(fs.mkdir_all(\"out/action\") == 0)\n" ++
-        "    let args: Vec[str] = Vec.new()\n" ++
+        "    let args: List[str] = List.new()\n" ++
         "    args.push(\"curl\")\n" ++
         "    args.push(\"--version\")\n" ++
         "    let result = ctx.process_runner().run_capture(args, \"out/action/stdout.txt\", \"out/action/stderr.txt\", 120000)\n" ++
@@ -8026,7 +8026,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     let capture_build =
         "use std.build\n\n" ++
         "fn bad_capture(ctx: ActionCtx) -> i32:\n" ++
-        "    let args: Vec[str] = Vec.new()\n" ++
+        "    let args: List[str] = List.new()\n" ++
         "    args.push(\"/bin/echo\")\n" ++
         "    args.push(\"bad\")\n" ++
         "    let _ = ctx.process_runner().run_capture(args, \"out/other/stdout.txt\", \"out/other/stderr.txt\", 120000)\n" ++
@@ -8124,7 +8124,7 @@ pub fn run_build_helper_programs_action(ctx: ActionCtx) -> i32:
         let name = if base.ends_with(".w"): base.slice(0, base.len() - 2) else: base
         let stdout_path = bs_capture_path(root, output_dir, name, "stdout")
         let stderr_path = bs_capture_path(root, output_dir, name, "stderr")
-        var args: Vec[str] = Vec.new()
+        var args: List[str] = List.new()
         args |> push(selfhost_owned_text(compiler_path))
         args |> push("build")
         args |> push(bs_abs(root, source))
@@ -8245,7 +8245,7 @@ fn bs_drop_first_lines(text: &str, count: i32) -> str:
         return text.slice(line_start as i64, text.len())
     ""
 
-fn bs_pcre2_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &Vec[str]) -> SelfhostRunResult:
+fn bs_pcre2_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 180000, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": pcre2 prep selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
@@ -8269,7 +8269,7 @@ fn bs_check_pcre2_prepare_shared_externs(ctx: &ActionCtx, base_dir: &str) -> i32
     rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_compile_class.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nextern var _pcre2_utf8_table1: *c_int\nextern var _pcre2_posix_class_maps8: *c_int\n", "shared externs compile class")
     if rc != 0: return rc
 
-    let files: Vec[str] = Vec.new()
+    let files: List[str] = List.new()
     files |> push("defs.w")
     files |> push("pcre2_tables.w")
     files |> push("pcre2_compile.w")
@@ -8313,7 +8313,7 @@ fn bs_check_pcre2_prepare_width_prunes(ctx: &ActionCtx, compiler_path: &str, bas
     let wrapper_text = ctx.fs().read_text(bs_join(generated_dir, "defs.w")) ++ bs_drop_first_lines(ctx.fs().read_text(bs_join(generated_dir, "pcre2_compile.w")), 2) ++ "\nfn main { print(\"ok\") }\n"
     rc = bs_write_fixture(ctx, wrapper, wrapper_text, "width prune wrapper")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(bs_abs(root, wrapper))
     let result = bs_pcre2_expect_success(ctx, compiler_path, base_dir, "width-prunes-whole-decls", args)
@@ -8332,7 +8332,7 @@ fn bs_check_pcre2_prepare_shared_lets(ctx: &ActionCtx, base_dir: &str) -> i32:
     rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_match.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nlet MATCH_ONLY: c_uint = 8\n", "shared lets match")
     if rc != 0: return rc
 
-    let files: Vec[str] = Vec.new()
+    let files: List[str] = List.new()
     files |> push("defs.w")
     files |> push("pcre2_tables.w")
     files |> push("pcre2_compile.w")
@@ -8363,7 +8363,7 @@ fn bs_check_std_re_shared_dependency_imports(ctx: &ActionCtx, compiler_path: &st
     let src = bs_join(base_dir, "main.w")
     var rc = bs_write_fixture(ctx, src, "use std.re.defs\nuse std.re.pcre2_compile\nuse std.re.pcre2_match\n\nfn main:\n    print(\"ok\")\n", "std re dependency imports")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(bs_abs(root, src))
     let result = bs_pcre2_expect_success(ctx, compiler_path, base_dir, "std-re-shared-dependency-imports", args)
@@ -8375,7 +8375,7 @@ fn bs_check_opaque_field_access_rejected(ctx: &ActionCtx, compiler_path: &str, b
     let src = bs_join(base_dir, "opaque_field_access.w")
     var rc = bs_write_fixture(ctx, src, "type T = opaque\n\nunsafe fn f(p: *mut T):\n    unsafe { p.x = 1 }\n\nfn main:\n    let _ = 0\n", "opaque field access")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(bs_abs(root, src))
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, "opaque-field-access", args, 120000, base_dir)
@@ -8392,7 +8392,7 @@ fn bs_check_pcre2_match_heapframe(ctx: &ActionCtx, compiler_path: &str, base_dir
     rc = bs_assert_not_contains(ctx, match_text, "type heapframe_align = opaque", "pcre2 match heapframe")
     if rc != 0: return rc
     let obj = bs_join(base_dir, "pcre2_match_issue111.o")
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("build")
     args |> push(bs_abs(root, match_path))
     args |> push("--emit-obj")
@@ -8410,7 +8410,7 @@ fn bs_check_pcre2_compile_builds(ctx: &ActionCtx, compiler_path: &str, base_dir:
     let bin = bs_join(base_dir, "pcre2_compile_builds")
     var rc = bs_write_fixture(ctx, src, "use std.re.defs\nuse std.re.pcre2_compile\n\nfn main:\n    let _ = unsafe { pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8)) }\n    print(\"ok\")\n", "pcre2 compile builds")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("build")
     args |> push(bs_abs(root, src))
     args |> push("-o")
@@ -8437,7 +8437,7 @@ fn bs_check_pcre2_jit_no_support(ctx: &ActionCtx, compiler_path: &str, base_dir:
     // migrator exports the surface (`pub unsafe fn`, #662 resolved), so the
     // fixture builds against it and runs to exit 0. (Between #660 and #662
     // this case guarded the module-private surface instead.)
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("build")
     args |> push(bs_abs(root, src))
     args |> push("-o")
@@ -8463,7 +8463,7 @@ fn bs_check_std_module_two_sources(ctx: &ActionCtx, compiler_path: &str, base_di
     let src = bs_join(re_dir, "harness.w")
     rc = bs_write_fixture(ctx, src, "use std.re.defs\n\nfn main -> i32:\n    let n: c_int = 0\n    n\n", "std module two sources harness")
     if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(bs_abs(root, src))
     args |> push("--bundle-corpus")
@@ -8473,7 +8473,7 @@ fn bs_check_std_module_two_sources(ctx: &ActionCtx, compiler_path: &str, base_di
         return bs_fail(ctx, "compiled std.re.defs from two files in one compilation")
     rc = bs_assert_contains(ctx, result.stderr, "module 'std.re.defs' is loaded from two files in one compilation", "std_module_two_sources")
     if rc != 0: return rc
-    var ok_args: Vec[str] = Vec.new()
+    var ok_args: List[str] = List.new()
     ok_args |> push("check")
     ok_args |> push(bs_abs(root, src))
     ok_args |> push("--bundle-corpus")
@@ -8540,8 +8540,8 @@ pub fn run_cli_selfhost_pcre2_prep_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     bs_check_pcre2_generated_existing_main(ctx, compiler_path, bs_join(output_dir, "pcre2_generated_existing_main_case"))
 
-fn bs_split_words(line: &str) -> Vec[str]:
-    let words: Vec[str] = Vec.new()
+fn bs_split_words(line: &str) -> List[str]:
+    let words: List[str] = List.new()
     var start = 0
     var in_word = false
     var i = 0
@@ -8560,8 +8560,8 @@ fn bs_split_words(line: &str) -> Vec[str]:
         i = i + 1
     words
 
-fn bs_split_nonempty_lines(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn bs_split_nonempty_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     var start = 0
     var i = 0
     while i <= text.len() as i32:
@@ -8602,7 +8602,7 @@ fn bs_nm_output(ctx: &ActionCtx, nm_tool: &str, obj_path: &str, label: &str) -> 
     let output_dir = ctx.output()
     let stdout_rel = bs_join(output_dir, label ++ ".nm.stdout")
     let stderr_rel = bs_join(output_dir, label ++ ".nm.stderr")
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(selfhost_owned_text(nm_tool))
     argv |> push(bs_abs(root, obj_path))
     var result = ctx.process_runner().run_capture(argv, bs_abs(root, stdout_rel), bs_abs(root, stderr_rel), 120000)
@@ -8675,7 +8675,7 @@ fn bs_expect_file_contains(ctx: &ActionCtx, path: &str, needle: &str, label: &st
     bs_fail(ctx, "file mismatch for " ++ label ++ ": missing '" ++ needle ++ "' in " ++ path)
 
 fn bs_build_emit_obj(ctx: &ActionCtx, compiler_path: &str, label: &str, src_path: &str, obj_path: &str) -> i32:
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("build")
     args |> push(selfhost_owned_text(src_path))
     args |> push("--emit-obj")
@@ -8805,8 +8805,8 @@ fn bs_nm_module_prefix(nm_text: &str, base: &str) -> str:
             return selfhost_owned_text(name.slice(at as i64, name.len() - base.len()))
     ""
 
-fn bs_bundle_build_args(src: &str, bundle: &str, out: &str, emit_obj: bool) -> Vec[str]:
-    var args: Vec[str] = Vec.new()
+fn bs_bundle_build_args(src: &str, bundle: &str, out: &str, emit_obj: bool) -> List[str]:
+    var args: List[str] = List.new()
     args |> push("build")
     args |> push(selfhost_owned_text(src))
     if emit_obj:
@@ -8819,7 +8819,7 @@ fn bs_bundle_build_args(src: &str, bundle: &str, out: &str, emit_obj: bool) -> V
     args
 
 fn bs_expect_wi_check_error(ctx: &ActionCtx, compiler_path: &str, label: &str, wi_path: &str, needle: &str) -> i32:
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(selfhost_owned_text(wi_path))
     let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
@@ -8828,7 +8828,7 @@ fn bs_expect_wi_check_error(ctx: &ActionCtx, compiler_path: &str, label: &str, w
     bs_assert_contains(ctx, result.stderr, needle, label)
 
 fn bs_dump_abi(ctx: &ActionCtx, compiler_path: &str, label: &str, src: &str, bundle: &str) -> SelfhostRunResult:
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(selfhost_owned_text(src))
     args |> push("--dump-abi")
@@ -8857,7 +8857,7 @@ fn bs_dump_abi_pass_mode(line: &str) -> str:
 // The bundle build of one corpus module with the D39 emitter: the object,
 // the .wi (--emit-bundle-interface) and the source-side fingerprint.
 fn bs_build_bundle(ctx: &ActionCtx, compiler_path: &str, label: &str, src_path: &str, corpus: &str, obj_path: &str, wi_path: &str, fingerprint_path: &str, manifest_path: &str) -> SelfhostRunResult:
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("build")
     args |> push(selfhost_owned_text(src_path))
     args |> push("--emit-obj")
@@ -8877,7 +8877,7 @@ fn bs_build_bundle(ctx: &ActionCtx, compiler_path: &str, label: &str, src_path: 
 // `with check <wi> --bundle-corpus … --bundle-fingerprint <out>`: the
 // interface-side fingerprint pass, out of process like the bundle build's.
 fn bs_check_wi_fingerprint(ctx: &ActionCtx, compiler_path: &str, label: &str, wi_path: &str, corpus: &str, fingerprint_path: &str) -> SelfhostRunResult:
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args |> push("check")
     args |> push(selfhost_owned_text(wi_path))
     args |> push("--bundle-corpus")
@@ -9025,17 +9025,17 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     // (3c) Each declaration-level change to the interface changes the
     // fingerprint: a dropped field, a discriminant, a borrow flipped to a
     // consume.
-    var mutation_names: Vec[str] = Vec.new()
+    var mutation_names: List[str] = List.new()
     mutation_names |> push("drop-field")
     mutation_names |> push("discriminant")
     mutation_names |> push("ref-to-owned")
     mutation_names |> push("once-dropped")
-    var mutation_from: Vec[str] = Vec.new()
+    var mutation_from: List[str] = List.new()
     mutation_from |> push("pub type Pair { pub a: i32, pub b: i32 }")
     mutation_from |> push("High = 200")
     mutation_from |> push("pub fn add(p: &Pair) -> i32")
     mutation_from |> push("pub fn call_once(f: once fn() -> i32) -> i32")
-    var mutation_to: Vec[str] = Vec.new()
+    var mutation_to: List[str] = List.new()
     mutation_to |> push("pub type Pair { pub a: i32 }")
     mutation_to |> push("High = 201")
     mutation_to |> push("pub fn add(p: Pair) -> i32")
@@ -9058,7 +9058,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     // identity (every compiler binary the chain links is stamped, C3.0), the
     // object, the fingerprint, the interface-sha --link-bundle pairs against,
     // and the object's prefix.
-    var abi_args: Vec[str] = Vec.new()
+    var abi_args: List[str] = List.new()
     abi_args |> push("version")
     abi_args |> push("--abi-sha")
     let abi = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-abi-sha", abi_args, 120000)
@@ -9144,10 +9144,10 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
 
     // §12.4 (D75): across the boundary a consuming closure may reach only a
     // parameter the interface declares `once`; `call_twice` does not.
-    // The capture is a Vec: a str is a value (D111), so a closure that
+    // The capture is a List: a str is a value (D111), so a closure that
     // passes one on copies it and may run twice.
     let twice_src = bs_join(case_dir, "consume_twice.w")
-    rc = bs_write_fixture(ctx, twice_src, "use std.wi_demo\nfn owned_len(v: Vec[i32]) -> i32: v.len() as i32\nfn main:\n    let word: Vec[i32] = [1, 2, 3, 4]\n    print(call_twice(() => owned_len(word)))\n", "consuming closure to a plain bundle parameter")
+    rc = bs_write_fixture(ctx, twice_src, "use std.wi_demo\nfn owned_len(v: List[i32]) -> i32: v.len() as i32\nfn main:\n    let word: List[i32] = [1, 2, 3, 4]\n    print(call_twice(() => owned_len(word)))\n", "consuming closure to a plain bundle parameter")
     if rc != 0: return rc
     let twice_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-once-refused", bs_bundle_build_args(twice_src, bundle, bs_join(case_dir, "consume_twice"), false), 120000)
     if twice_build.rc == 0: return bs_fail(ctx, "a consuming closure passed across the bundle boundary to a parameter not declared `once` was accepted")
@@ -9250,7 +9250,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     if source_dump.rc != 0: return bs_fail(ctx, "--dump-abi from source failed")
     rc = bs_assert_contains(ctx, bs_dump_abi_param_line(iface_dump.stdout, "take"), "eff=[consume]", "interface take consumes by declaration")
     if rc != 0: return rc
-    var names: Vec[str] = Vec.new()
+    var names: List[str] = List.new()
     names |> push("add")
     names |> push("take")
     names |> push("table_at")
@@ -9262,7 +9262,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
             return bs_fail(ctx, "pass mode of interface fn '" ++ name ++ "' differs from its source twin: '" ++ iface_mode ++ "' vs '" ++ source_mode ++ "'")
 
     // The consumer's cross-layer audit against the interface.
-    var analyze_args: Vec[str] = Vec.new()
+    var analyze_args: List[str] = List.new()
     analyze_args |> push("analyze")
     analyze_args |> push(selfhost_owned_text(main_src))
     analyze_args |> push("audit:all")

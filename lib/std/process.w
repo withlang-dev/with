@@ -36,10 +36,10 @@ pub fn exit_code(code: i32) -> Never:
 pub fn pid -> i32:
     with_getpid()
 
-/// Get command-line arguments as a Vec of strings.
-pub fn args -> Vec[str]:
+/// Get command-line arguments as a List of strings.
+pub fn args -> List[str]:
     let n = with_arg_count()
-    let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    let out: List[str] = List{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
     with_vec_new_out((&raw mut out) as *mut u8, 16)
     var i = 0
     while i < n:
@@ -56,14 +56,14 @@ pub fn env(name: &str) -> str:
 pub fn set_env(name: &str, value: &str) -> i32:
     with_setenv_str(name, value)
 
-fn argv_blob(items: &Vec[str]) -> str:
+fn argv_blob(items: &List[str]) -> str:
     var out = ""
     for i in 0..items.len() as i32:
         out = out ++ items[i] ++ "\0"
     out
 
 /// Execute an argument vector. The first item is the program name.
-pub fn run(argv: &Vec[str]) -> i32:
+pub fn run(argv: &List[str]) -> i32:
     with_exec_argv(argv_blob(argv))
 
 /// How a child run with its output sent to files finished.
@@ -85,7 +85,7 @@ pub type Finished {
 /// The wait ends within 0.1% of the child's run time (and never later than
 /// 1 ms), so wall-clock timing around the call measures the child: a
 /// stopwatch, not a scheduler tick.
-pub fn run_to_files(argv: &Vec[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> Finished:
+pub fn run_to_files(argv: &List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> Finished:
     let pid = with_exec_argv_capture_spawn(argv_blob(argv), stdout_path, stderr_path)
     if pid <= 0: return Finished { code: -1, timed_out: false, peak_rss: 0 }
     if timeout_ms <= 0: return finished(with_exec_wait(pid, 0), false)
@@ -109,7 +109,7 @@ pub fn run_to_files(argv: &Vec[str], stdout_path: &str, stderr_path: &str, timeo
 
 /// Run an argument vector from the directory `cwd`, with its stdout and
 /// stderr written to the named files, and wait for it however long it runs.
-pub fn run_to_files_in(cwd: &str, argv: &Vec[str], stdout_path: &str, stderr_path: &str) -> Finished:
+pub fn run_to_files_in(cwd: &str, argv: &List[str], stdout_path: &str, stderr_path: &str) -> Finished:
     finished(with_exec_argv_capture_cwd(argv_blob(argv), stdout_path, stderr_path, 0, cwd), false)
 
 // The peak comes from the reap; a child never reaped (-1, or killed at its
@@ -118,19 +118,19 @@ fn finished(code: i32, timed_out: bool): Finished { code, timed_out, peak_rss: i
 
 /// An argv-based command wrapper.
 pub type Command  {
-    args: Vec[str],
+    args: List[str],
 }
 
 /// Create a Command from a program path or name.
 pub fn command(program: str) -> Command:
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push(program)
     Command { args: argv }
 
 /// Append one argument and return the updated command.
 impl Command:
     pub fn arg(arg: str) -> Command:
-        var argv: Vec[str] = Vec.new()
+        var argv: List[str] = List.new()
         for i in 0..self.args.len() as i32:
             argv.push(with_str_clone_ref(self.args[i]))
         argv.push(arg)

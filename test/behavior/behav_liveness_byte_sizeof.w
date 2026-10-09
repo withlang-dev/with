@@ -6,7 +6,7 @@
 
 // §2.5.1 / D72 (#1431): the hidden liveness byte is added only to a `Drop`
 // struct whose all-zero storage can be a live value; a struct with no Drop
-// impl keeps its size. D82 (#1944): an owning field (a str, a Vec, a Box)
+// impl keeps its size. D82 (#1944): an owning field (a str, a List, a Box)
 // can be vacated by an explicit `move v.field` while `v` stays live, so its
 // all-zero storage IS a live value and the struct carries the byte (and its
 // alignment padding) too; only a field no vacate can zero — a raw pointer,
@@ -28,7 +28,7 @@ type Text { s: str }
 impl Drop for Text:
     move fn drop(): print("x")
 
-type Items { v: Vec[i32] }
+type Items { v: List[i32] }
 impl Drop for Items:
     move fn drop(): print("x")
 

@@ -14,7 +14,7 @@ extern fn with_sysinfo_arch() -> str
 fn green_join(dir: &str, name: &str) -> str: if dir.ends_with("/"): dir ++ name else: dir ++ "/" ++ name
 
 // What git prints for `args` run in `root`, or "" when git fails.
-fn green_git_output(root: &str, args: &Vec[str], label: &str) -> str:
+fn green_git_output(root: &str, args: &List[str], label: &str) -> str:
     let dir = green_join(root, "out/command/install-gate")
     if runtime_mkdir_p(dir) != 0: return ""
     let stdout_path = green_join(dir, label ++ ".stdout")
@@ -48,14 +48,14 @@ pub fn green_identity_inputs(top_level: &str) -> str:
 // The identity of the inputs as committed: the git object name of the
 // filtered listing, or "" when git fails.
 fn green_inputs_identity(root: &str) -> str:
-    let top_args: Vec[str] = Vec.new()
+    let top_args: List[str] = List.new()
     top_args.push("ls-tree")
     top_args.push("HEAD")
     let top_level = green_git_output(root, &top_args, "ls-tree")
     if top_level.len() == 0: return ""
     let listing = green_join(green_join(root, "out/command/install-gate"), "green-inputs.txt")
     if runtime_write_file(listing, green_identity_inputs(top_level)) != 0: return ""
-    let hash_args: Vec[str] = Vec.new()
+    let hash_args: List[str] = List.new()
     hash_args.push("hash-object")
     hash_args.push(listing)
     green_first_line(green_git_output(root, &hash_args, "hash-object"))
@@ -74,7 +74,7 @@ pub fn green_status_is_not_input(status_line: &str) -> bool:
 
 // Every build input is as committed, and nothing untracked could be one.
 fn green_worktree_is_clean(root: &str) -> bool:
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push("status")
     args.push("--porcelain")
     let status_lines = green_git_output(root, &args, "status").split("\n")

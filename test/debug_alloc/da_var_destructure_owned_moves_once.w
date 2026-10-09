@@ -6,27 +6,27 @@
 
 // #1354: a `var` destructure of non-Copy parts moves each part into its
 // binding exactly once. The bindings are then mutated in place (`push`),
-// replaced (`s = s ++ ...`, `v = Vec.new()` drops the old buffer), and
+// replaced (`s = s ++ ...`, `v = List.new()` drops the old buffer), and
 // dropped at scope exit; the subject aggregate owns nothing afterwards. The
 // wildcard's `str` still drops once. A refutable `var` pattern moves the
 // payload only on the success path. (The failure path of a let-else over an
 // owned Err payload is #1365.)
 
-type Bag { items: Vec[i32], name: str, n: i32 }
+type Bag { items: List[i32], name: str, n: i32 }
 
-fn make -> (Vec[i32], str):
-    var v: Vec[i32] = Vec.new()
+fn make -> (List[i32], str):
+    var v: List[i32] = List.new()
     v.push(1)
     (v, "a")
 
 fn make_bag -> Bag:
-    var items: Vec[i32] = Vec.new()
+    var items: List[i32] = List.new()
     items.push(7)
     Bag { items, name: "bag", n: 1 }
 
-fn items(k: i32) -> Option[Vec[str]]:
+fn items(k: i32) -> Option[List[str]]:
     if k == 0: return None
-    var v: Vec[str] = Vec.new()
+    var v: List[str] = List.new()
     v.push("a")
     Some(v)
 
@@ -42,7 +42,7 @@ fn main:
     v.push(3)
     s = s ++ "b"
     print(f"{v.len()} {v[2]} {s}")
-    v = Vec.new()
+    v = List.new()
     print(f"{v.len()}")
 
     var Bag { items, name, n } = make_bag()

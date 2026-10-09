@@ -7,7 +7,7 @@
 //
 // Covered here (executable): array-literal membership, fixed-size array value
 // membership, `not in`, integer and char ranges, substring-in-string,
-// char-in-string, Vec / HashMap / HashSet membership, user-defined Contains
+// char-in-string, List / HashMap / HashSet membership, user-defined Contains
 // dispatch, enum-variant-in-array, compound conditions, `in` match patterns,
 // membership filters inside comprehensions / pipeline `filter`, the literal-array
 // optimization's semantic equivalence, and the distinction between a
@@ -62,9 +62,9 @@ fn test_char_in_string:
     assert('@' in email)
     assert('!' not in email)
 
-// Vec membership via the Contains trait.
-fn test_vec_membership:
-    var names: Vec[str] = Vec.new()
+// List membership via the Contains trait.
+fn test_list_membership:
+    var names: List[str] = List.new()
     names.push("alice")
     names.push("bob")
     assert("alice" in names)
@@ -119,7 +119,7 @@ fn test_comprehension_membership_filter:
     assert(prime_squares[5] == 169)
 
 fn test_pipeline_membership_filter:
-    let nums: Vec[i32] = Vec.new()
+    let nums: List[i32] = List.new()
     nums.push(1)
     nums.push(2)
     nums.push(4)
@@ -127,7 +127,7 @@ fn test_pipeline_membership_filter:
     let evens = nums.iter_ref()
         |> filter(x => *x in [2, 4, 6])
         |> map(x => *x)
-        |> collect[Vec]()
+        |> collect[List]()
     assert(evens.len() == 2)
     assert(evens[0] == 2)
     assert(evens[1] == 4)

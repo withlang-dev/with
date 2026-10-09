@@ -8,7 +8,7 @@
 // over a freed data pointer — the materialized Result's scope-exit drop freed
 // the payload the result owned. Past the allocator's large threshold the
 // buffer is unmapped, so reading it faulted (SIGSEGV); a small one read
-// garbage. unwrap_or_else and `??` take the same path; a Vec payload too.
+// garbage. unwrap_or_else and `??` take the same path; a List payload too.
 use std.fs
 
 fn chunk(): "abcdefgh" ++ ""
@@ -40,9 +40,9 @@ fn main:
     let missing = read_file("out/tmp/behav_unwrap_or_large_str_payload.missing").unwrap_or("")
     print(f"{missing.len()} ok")
 
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     for i in 0..500000: xs.push(i)
-    let o: Option[Vec[i32]] = Some(xs)
-    let w = o.unwrap_or(Vec.new())
+    let o: Option[List[i32]] = Some(xs)
+    let w = o.unwrap_or(List.new())
     print(f"{w.len()} ok")
     let _rm = remove_file(path)

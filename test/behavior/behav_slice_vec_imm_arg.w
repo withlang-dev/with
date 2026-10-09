@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// #604 stage 1: Vec and array arguments coerce to an immutable []T parameter
+// #604 stage 1: List and array arguments coerce to an immutable []T parameter
 // with zero annotation — the first collection→slice call-site coercion.
 
 fn total(xs: []i32) -> i32:
@@ -11,7 +11,7 @@ fn total(xs: []i32) -> i32:
 
 fn main:
     let a = [1, 2, 3]
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     v.push(10)
     v.push(20)
     assert(total(a) == 6)

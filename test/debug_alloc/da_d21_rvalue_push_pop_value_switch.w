@@ -16,13 +16,13 @@ fn new_w(slot: *mut i32) -> W:
 fn bare_chain(slot: *mut i32):
     // The receiver remains the final pipeline value but is not captured, so
     // the hidden place and both live elements drop at statement end.
-    Vec[W].new() |> push(new_w(slot)) |> push(new_w(slot))
+    List[W].new() |> push(new_w(slot)) |> push(new_w(slot))
 
 fn run(slot: *mut i32):
-    // `push` keeps carrying the hidden Vec place; `pop` switches the carried
-    // value to Option[W]. The Vec temporary therefore drops at statement end,
+    // `push` keeps carrying the hidden List place; `pop` switches the carried
+    // value to Option[W]. The List temporary therefore drops at statement end,
     // while `item` owns the removed W until this scope exits.
-    let item: Option[W] = Vec[W].new() |> push(new_w(slot)) |> pop()
+    let item: Option[W] = List[W].new() |> push(new_w(slot)) |> pop()
     assert(item.is_some())
 
 fn main:

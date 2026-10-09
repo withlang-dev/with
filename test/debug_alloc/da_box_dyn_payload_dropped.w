@@ -1,7 +1,7 @@
 //! expect-debug-alloc: leak count=0
 // #1847: a Box[dyn T] frees its cell and drops what it holds (a str field,
-// a Drop struct, boxes in a Vec and a struct field, moved, reassigned,
-// returned, consumed through the vtable). On base the Vec and field cases
+// a Drop struct, boxes in a List and a struct field, moved, reassigned,
+// returned, consumed through the vtable). On base the List and field cases
 // aborted codegen; without them, 7 blocks leaked (the cells and the str).
 
 use std.box.Box
@@ -69,9 +69,9 @@ fn main:
         b = Box.new(Tok { n: 6 })
         print(f"name {b.name()}")
     }
-    // In a Vec: the Vec's drop drops each box.
+    // In a List: the List's drop drops each box.
     {
-        var v: Vec[Box[dyn Named]] = Vec.new()
+        var v: List[Box[dyn Named]] = List.new()
         v.push(Box.new(Tok { n: 7 }))
         v.push(Box.new(Label { text: "x" ++ "y" }))
         print(f"len {v.len()}")

@@ -1,10 +1,10 @@
 //! D22-NON-COMPLIANT
 //! owner-stage: 6
 //! required-verdict: compile-and-run under `--debug-alloc`
-//! exact-type: generic direct and pattern forwarding are uniformly `Option[&V]` for `i32` and `Vec[i64]`
+//! exact-type: generic direct and pattern forwarding are uniformly `Option[&V]` for `i32` and `List[i64]`
 //! expected-diagnostic: none
 //! origin-set: each forwarded result has only its receiver map origin
-//! drop-behavior: lookup never creates an owner; remove transfers the Vec; all allocations drop once; leak count=0
+//! drop-behavior: lookup never creates an owner; remove transfers the List; all allocations drop once; leak count=0
 //! expect-debug-alloc: leak count=0
 
 use std.collections.HashMap
@@ -24,13 +24,13 @@ fn main:
     let patterned_count: Option[&i32] = find_through_pattern(&counts, 1)
     assert(patterned_count.unwrap() == 71)
 
-    var jobs: HashMap[i32, Vec[i64]] = HashMap.new()
-    let stored: Vec[i64] = Vec.new()
+    var jobs: HashMap[i32, List[i64]] = HashMap.new()
+    let stored: List[i64] = List.new()
     stored.push(72)
     jobs.insert(1, move stored)
-    let job: Option[&Vec[i64]] = find(&jobs, 1)
+    let job: Option[&List[i64]] = find(&jobs, 1)
     assert(job.unwrap()[0] == 72)
-    let patterned_job: Option[&Vec[i64]] = find_through_pattern(&jobs, 1)
+    let patterned_job: Option[&List[i64]] = find_through_pattern(&jobs, 1)
     assert(patterned_job.unwrap()[0] == 72)
 
     let owned = jobs.remove(1).unwrap()

@@ -24,6 +24,6 @@ fn main:
     let built = p7_run(case_dir, "gnuarchive_build", "build\0")
     p7_assert_success(built, "program linking libgnuarchive.a")
     // The program prints ok itself (its stdout is this test's).
-    var exe: Vec[str] = Vec.new()
+    var exe: List[str] = List.new()
     exe.push(p7_join(case_dir, "out/bin/gnuarchive.exe"))
     assert(run(&exe) == 0)

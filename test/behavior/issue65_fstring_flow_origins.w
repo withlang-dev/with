@@ -47,11 +47,11 @@ fn main:
     assert(f"{nest.holder.err}" == "Empty")
     assert(f"{nest.holder.tok}" == "Text(nest)")
 
-    let errs: Vec[E] = Vec.new()
+    let errs: List[E] = List.new()
     errs.push(E.Bad("vec"))
     assert(f"{errs.remove(0)}" == "Bad(vec)")
 
-    let toks: Vec[Token] = Vec.new()
+    let toks: List[Token] = List.new()
     toks.push(Token.Text("bag"))
     assert(f"{toks.remove(0)}" == "Text(bag)")
 

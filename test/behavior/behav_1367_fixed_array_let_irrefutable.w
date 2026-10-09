@@ -8,7 +8,7 @@
 // #1367 (§9.7): a slice pattern over a fixed-size array is decided at compile
 // time, so one that always matches is irrefutable: `let` needs no else. Rest
 // forms (D115: a rest names the remaining elements), a nested array inside a tuple, a
-// struct field, `var`, and a parameter pattern. Brackets make a Vec (D113),
+// struct field, `var`, and a parameter pattern. Brackets make a List (D113),
 // so each array here is demanded: by `sum3`'s parameter, an annotation, or a
 // field.
 type Grid { row: [i32; 3] }

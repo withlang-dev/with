@@ -13,7 +13,7 @@
 //   s.repeat(n)     → str    — string repeated n times
 //   s.slice(a, b)   → str    — substring from index a to b
 //   s.replace(o, n) → str    — replace all occurrences of o with n
-//   s.split(delim)  → Vec[str] — split by delimiter
+//   s.split(delim)  → List[str] — split by delimiter
 //
 // This module provides additional utility functions.
 // No c_import — uses with_* runtime functions.
@@ -34,20 +34,20 @@ extern fn with_free(ptr: *mut u8) -> Unit
 ///
 /// `++` is fine for short expressions, but repeated `out = out ++ part`
 /// copies the whole prefix on every append. StringBuilder stores bytes in a
-/// Vec[u8], so appending N total bytes grows geometrically and finishes with
+/// List[u8], so appending N total bytes grows geometrically and finishes with
 /// one materialized str.
 pub type StringBuilder {
-    bytes: Vec[u8],
+    bytes: List[u8],
 }
 
 /// Create an empty builder.
 pub fn StringBuilder.new() -> Self:
-    StringBuilder { bytes: Vec[u8].new() }
+    StringBuilder { bytes: List[u8].new() }
 
 /// Create an empty builder with room for at least `capacity` bytes.
 pub fn StringBuilder.with_capacity(capacity: i64) -> Self:
     let cap = if capacity > 0: capacity else: 0
-    StringBuilder { bytes: Vec[u8].with_capacity(cap) }
+    StringBuilder { bytes: List[u8].with_capacity(cap) }
 
 /// Append raw UTF-8 bytes from a string.
 impl StringBuilder:
@@ -385,9 +385,9 @@ pub fn to_upper(c: i32) -> i32:
 pub fn string_to_int(s: &str) -> i64:
     with_parse_i64_ref(s)
 
-/// Split text into lines. Returns a Vec of strings, one per line.
-pub fn lines(s: &str) -> Vec[str]:
-    var out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+/// Split text into lines. Returns a List of strings, one per line.
+pub fn lines(s: &str) -> List[str]:
+    var out: List[str] = List{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
     with_lines_out_ref((&raw mut out) as *mut u8, s)
     out
 

@@ -5,7 +5,7 @@
 
 type Thing {
     name: str,
-    items: Vec[str],
+    items: List[str],
 }
 
 impl Thing:
@@ -26,7 +26,7 @@ impl Wrapper:
         out
 
 fn main:
-    var t = Thing { name: "test", items: Vec.new() }
+    var t = Thing { name: "test", items: List.new() }
     t = t.add("hello")
     t = t.add("world")
     assert(t.items.len() == 2)

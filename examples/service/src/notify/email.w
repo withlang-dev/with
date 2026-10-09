@@ -36,7 +36,7 @@ impl NotificationService for EmailNotifier:
         print(f"Sending email to {notif.recipient} (priority={priority_num})")
         true
 
-    async fn send_batch(self: &EmailNotifier, notifs: Vec[Notification]) -> i32:
+    async fn send_batch(self: &EmailNotifier, notifs: List[Notification]) -> i32:
         var sent = 0
         // In production: batch send with rate limiting
         sent

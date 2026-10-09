@@ -13,10 +13,10 @@ This is a regression alarm, not an asymptotic proof or a microbenchmark ranking.
 
 | Case | Expected result |
 |---|---|
-| Vec push/access/pop; borrowed iteration | PASS |
+| List push/access/pop; borrowed iteration | PASS |
 | SlotMap fill/remove/refill, including stale/live handles | PASS after #936 |
 | HashMap and HashSet insert/lookup/remove | PASS |
-| Vec consuming iteration | XFAIL #938 |
+| List consuming iteration | XFAIL #938 |
 | BTreeMap/BTreeSet ascending and descending workloads | XFAIL #937 |
 | HashMap removal without allocating temporary buffers | PASS after #939 (D96: a removal leaves a tombstone) |
 | `stdin.lines()` and `read_all()` (a child run of the fixture per sample, stdin from a file) | PASS after #1352 |
@@ -26,7 +26,7 @@ timeouts, missing trace markers, and invalid controls fail the lane. An XPASS
 also fails: update its expectation in the same change that fixes the engine.
 
 Allocation checks use `with run --trace-alloc stdlib.w allocations`. An empty
-marked span must report zero requests; a Vec allocation control must report at
+marked span must report zero requests; a List allocation control must report at
 least one. A marked colliding-key HashMap removal checks the no-allocation
 contract without confusing temporary allocations with leaks or reserved slabs.
 The result and all remaining keys are checked after removal.

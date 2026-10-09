@@ -7,6 +7,6 @@
 fn keep(f: fn() -> i32) -> fn() -> i32: f
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     let g = keep(() => xs.len32())
     print(g())

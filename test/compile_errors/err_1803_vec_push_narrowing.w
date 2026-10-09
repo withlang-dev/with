@@ -4,6 +4,6 @@
 // as at an annotated `let`. This position accepted it and truncated.
 fn main:
     let s: i64 = 5
-    var a: Vec[i32] = Vec.new()
+    var a: List[i32] = List.new()
     a.push(s)
     print(f"{a[0]}")

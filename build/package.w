@@ -93,12 +93,12 @@ fn pkg_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
-fn pkg_sort_strings(items: Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
+fn pkg_sort_strings(items: List[str]) -> List[str]:
+    var sorted: List[str] = List.new()
     for i in 0..items.len() as i32:
         let item = items[i]
         var inserted = false
-        var out: Vec[str] = Vec.new()
+        var out: List[str] = List.new()
         for j in 0..sorted.len() as i32:
             let existing = sorted[j]
             if not inserted and pkg_str_compare(item, existing) < 0:
@@ -110,7 +110,7 @@ fn pkg_sort_strings(items: Vec[str]) -> Vec[str]:
         sorted = out
     sorted
 
-fn pkg_add_unique(items: Vec[str], item: &str) -> Vec[str]:
+fn pkg_add_unique(items: List[str], item: &str) -> List[str]:
     var out = items
     for i in 0..out.len() as i32:
         if out[i] == item:
@@ -126,7 +126,7 @@ fn pkg_rel_path(root: &str, path: &str) -> str:
         return normalized_path.slice(prefix.len(), normalized_path.len())
     ""
 
-fn pkg_add_parent_dirs(dirs: Vec[str], top_dir: &str, rel_path: &str) -> Vec[str]:
+fn pkg_add_parent_dirs(dirs: List[str], top_dir: &str, rel_path: &str) -> List[str]:
     var out = pkg_add_unique(move dirs, top_dir)
     for i in 0..rel_path.len() as i32:
         if rel_path[i] == 47:
@@ -195,7 +195,7 @@ fn pkg_ascii_lower(text: &str) -> str:
 
 fn pkg_forbidden_dependency(text: &str, platform: &str) -> str:
     let lower = pkg_ascii_lower(text)
-    let needles: Vec[str] = Vec.new()
+    let needles: List[str] = List.new()
     needles.push("clang")
     needles.push("llvm")
     needles.push("libz")
@@ -216,7 +216,7 @@ fn pkg_forbidden_dependency(text: &str, platform: &str) -> str:
             return package_owned_text(needle)
     ""
 
-fn pkg_run_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], timeout_ms: i32) -> ToolProcessResult:
+fn pkg_run_capture(ctx: &ActionCtx, label: &str, argv: List[str], timeout_ms: i32) -> ToolProcessResult:
     let root = ctx.project_info().project_root()
     let command_dir = "out/command/" ++ ctx.target_name()
     let _mkdir = ctx.fs().mkdir_all(command_dir)
@@ -226,7 +226,7 @@ fn pkg_run_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], timeout_ms: i32
 
 fn pkg_run_asset_version(ctx: &ActionCtx, asset_path: &str, version: &str) -> i32:
     let root = ctx.project_info().project_root()
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(pkg_abs(root, asset_path))
     args.push("version")
     let result = pkg_run_capture(ctx, "asset-version", args, 120000)
@@ -242,7 +242,7 @@ fn pkg_check_dynamic_dependencies(ctx: &ActionCtx, asset_path: &str, platform: &
     let readobj = pkg_llvm_tool(ctx, "WITH_LLVM_READOBJ", "LLVM_READOBJ", "llvm-readobj")
     if not pkg_path_exists(ctx, readobj):
         return pkg_fail(ctx, "missing With-owned llvm-readobj: " ++ readobj)
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(pkg_process_path(root, readobj))
     if platform == "windows-x86_64":
         args.push("--coff-imports")
@@ -264,7 +264,7 @@ fn pkg_check_static_libclang_symbol(ctx: &ActionCtx, asset_path: &str, platform:
     let nm = pkg_llvm_tool(ctx, "WITH_LLVM_NM", "LLVM_NM", "llvm-nm")
     if not pkg_path_exists(ctx, nm):
         return pkg_fail(ctx, "missing With-owned llvm-nm: " ++ nm)
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(pkg_process_path(root, nm))
     args.push("-g")
     args.push(pkg_abs(root, asset_path))
@@ -280,7 +280,7 @@ fn pkg_strip_release_binary(ctx: &ActionCtx, asset_path: &str) -> i32:
     let strip = pkg_llvm_tool(ctx, "WITH_LLVM_STRIP", "LLVM_STRIP", "llvm-strip")
     if not pkg_path_exists(ctx, strip):
         return pkg_fail(ctx, "missing With-owned llvm-strip: " ++ strip)
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(pkg_process_path(root, strip))
     args.push(pkg_abs(root, asset_path))
     let result = pkg_run_capture(ctx, "strip", args, 300000)
@@ -318,7 +318,7 @@ fn pkg_emit_c(ctx: &ActionCtx, compiler_path: &str, source: &str, output: &str, 
     let dir = pkg_dirname(output)
     if dir != "." and fs.mkdir_all(dir) != 0:
         return pkg_fail(ctx, "could not create directory: " ++ dir)
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(pkg_abs(root, compiler_path))
     args.push("build")
     args.push(package_owned_text(source))
@@ -415,7 +415,7 @@ fn pkg_compile_gzip_helper(ctx: &ActionCtx, compiler_path: &str, helper_bin: &st
     let command_dir = "out/command/" ++ ctx.target_name()
     if fs.mkdir_all(command_dir) != 0:
         return pkg_fail(ctx, "could not create command capture directory: " ++ command_dir)
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(pkg_abs(root, compiler_path))
     args.push("build")
     args.push("build/zlib_gzip.w")
@@ -436,7 +436,7 @@ fn pkg_run_gzip_helper(ctx: &ActionCtx, helper_bin: &str, input_tar: &str, outpu
     let command_dir = "out/command/" ++ ctx.target_name()
     if fs.mkdir_all(command_dir) != 0:
         return pkg_fail(ctx, "could not create command capture directory: " ++ command_dir)
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(pkg_abs(root, helper_bin))
     args.push(pkg_abs(root, input_tar))
     args.push(pkg_abs(root, output_path))
@@ -450,14 +450,14 @@ fn pkg_run_gzip_helper(ctx: &ActionCtx, helper_bin: &str, input_tar: &str, outpu
 fn pkg_write_archive(ctx: &ActionCtx, compiler_path: &str, stage_root: &str, top_dir: &str, output_path: &str) -> i32:
     let fs = ctx.fs()
     let files = pkg_sort_strings(fs.list_files(stage_root))
-    var dirs: Vec[str] = Vec.new()
+    var dirs: List[str] = List.new()
     for i in 0..files.len() as i32:
         let rel = pkg_rel_path(stage_root, files[i])
         if rel.len() == 0:
             return pkg_fail(ctx, "package file is outside stage root: " ++ files[i])
         dirs = pkg_add_parent_dirs(move dirs, top_dir, rel)
     dirs = pkg_sort_strings(dirs)
-    let entries: Vec[ArchiveEntry] = Vec.new()
+    let entries: List[ArchiveEntry] = List.new()
     for i in 0..dirs.len() as i32:
         entries.push(archive_dir_entry(package_owned_text(dirs[i]), 0o755))
     for i in 0..files.len() as i32:

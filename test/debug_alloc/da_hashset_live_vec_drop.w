@@ -2,8 +2,8 @@
 
 use std.collections.HashSet
 fn main:
-    var set: HashSet[Vec[i64]] = HashSet.new()
-    let values: Vec[i64] = Vec.new()
+    var set: HashSet[List[i64]] = HashSet.new()
+    let values: List[i64] = List.new()
     values.push(7)
     values.push(9)
     set.insert(move values)

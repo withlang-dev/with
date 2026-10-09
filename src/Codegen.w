@@ -78,7 +78,7 @@ const TYPE_BODY_DEFINED: i32 = 3
 
 // Verification / emission
 
-// Vec data pointer
+// List data pointer
 
 // Entry alloca helper
 
@@ -111,7 +111,7 @@ pub type Codegen {
     pool: AstPool,
     intern: InternPool,
     sema: Sema,
-    sema_symbol_texts: Vec[str],
+    sema_symbol_texts: List[str],
     overflow_mode: i32,
     analysis_enabled: i32,
     // The route mir_build_bin_op took for the operator it last lowered, and
@@ -124,16 +124,16 @@ pub type Codegen {
     // D65 phase 2 (#1647): per mode-provenance site, the decisions taken,
     // those where the owner's fact and the LLVM type disagree, and the first
     // such disagreement.
-    mode_site_decisions: Vec[i32],
-    mode_site_disagree: Vec[i32],
-    mode_site_first: Vec[str],
+    mode_site_decisions: List[i32],
+    mode_site_disagree: List[i32],
+    mode_site_first: List[str],
     // #2043 (D65 phase 5): codegen's own derivations of a fact Sema owns —
     // an AST type node resolved, a constant expression evaluated — counted
     // per kind where they decide, with the first one. A derivation run as
     // verification (verify_ast_type) decides nothing and is not counted;
     // nested calls belong to the outermost (ast_derivation_depth).
-    ast_derivation_counts: Vec[i32],
-    ast_derivation_first: Vec[str],
+    ast_derivation_counts: List[i32],
+    ast_derivation_first: List[str],
     ast_derivation_depth: i32,
     ast_verifying: i32,
 
@@ -181,7 +181,7 @@ pub type Codegen {
     result_ok_tag: i64,
     result_err_tag: i64,
     // Pre-interned symbols for O(1) dispatch (avoid string comparisons)
-    sym_vec: i32,
+    sym_list: i32,
     sym_option: i32,
     sym_result: i32,
     sym_hashmap: i32,
@@ -191,10 +191,10 @@ pub type Codegen {
     sym_handle: i32,
     sym_slotmap: i32,
     sym_slotmapslot: i32,
-    sym_vecslot: i32,
-    sym_vecrange: i32,
-    sym_veciterref: i32,
-    sym_veciterplace: i32,
+    sym_listslot: i32,
+    sym_listrange: i32,
+    sym_listiterref: i32,
+    sym_listiterplace: i32,
     sym_box: i32,
     sym_context_error: i32,
     sym_Self: i32,
@@ -243,8 +243,8 @@ pub type Codegen {
     fn_values: HashMap[i32, i64],
     fn_fn_types: HashMap[i32, i64],
     generated_mir_body_syms: HashMap[i32, i32],
-    fn_abis: Vec[FnAbi],
-    fn_abi_args: Vec[ArgAbi],
+    fn_abis: List[FnAbi],
+    fn_abi_args: List[ArgAbi],
     fn_abi_cache: HashMap[str, i32],
     fn_abi_symbols: HashMap[i32, i32],
     fn_abi_callables: HashMap[i64, i32],
@@ -266,15 +266,15 @@ pub type Codegen {
     // type lookup knows to ask Sema which declaration a type node means.
     nominal_alias_by_tid: HashMap[i32, i32],
     nominal_split_names: HashMap[i32, i32],
-    struct_llvm_types: Vec[i64],
-    struct_index_syms: Vec[i32],
-    struct_field_starts: Vec[i32],
-    struct_field_counts: Vec[i32],
-    struct_field_names: Vec[i32],
-    struct_field_types: Vec[i64],
-    struct_field_type_nodes: Vec[i32],
-    struct_field_defaults: Vec[i32],
-    struct_llvm_field_indices: Vec[i32],
+    struct_llvm_types: List[i64],
+    struct_index_syms: List[i32],
+    struct_field_starts: List[i32],
+    struct_field_counts: List[i32],
+    struct_field_names: List[i32],
+    struct_field_types: List[i64],
+    struct_field_type_nodes: List[i32],
+    struct_field_defaults: List[i32],
+    struct_llvm_field_indices: List[i32],
 
     // Bitpacked struct tracking: which struct indices are bitpacked,
     // and per-field bit offsets/widths for shift/mask codegen
@@ -289,15 +289,15 @@ pub type Codegen {
     // reads them); padded bodies by (literal body, positions), so two tuples
     // with one padded literal never share a position table.
     tuple_elem_index_starts: HashMap[i64, i32],
-    tuple_elem_indices: Vec[i32],
+    tuple_elem_indices: List[i32],
     tuple_padded_types: HashMap[str, i64],
     bitpacked_backing_types: HashMap[i32, i64],  // struct_idx → LLVM iN type (64-bit pointer)
     bitpacked_by_llvm_type: HashMap[i64, i32],  // LLVM iN type → struct_idx (reverse lookup)
     // D72 (§2.5.1): LLVM struct type → the index of its hidden liveness byte
     // (Sema decided the struct carries one: struct_needs_liveness_byte).
     liveness_byte_indices: HashMap[i64, i32],
-    bitpacked_field_bit_offsets: Vec[i32],  // indexed by bp_info_start + field_idx
-    bitpacked_field_bit_widths: Vec[i32],   // indexed by bp_info_start + field_idx
+    bitpacked_field_bit_offsets: List[i32],  // indexed by bp_info_start + field_idx
+    bitpacked_field_bit_widths: List[i32],   // indexed by bp_info_start + field_idx
     // Per-place bitpacked projection: when a place resolves to a bitpacked field,
     // stores (bit_offset << 16 | bit_width) keyed by place_id.
     // mir_eval_operand checks this after loading to apply shift+mask extraction.
@@ -305,11 +305,11 @@ pub type Codegen {
 
     // Enum types: sym → index into enum_* arrays
     enum_type_map: HashMap[i32, i32],
-    enum_llvm_types: Vec[i64],
-    enum_variant_starts: Vec[i32],
-    enum_variant_counts: Vec[i32],
-    enum_variant_names: Vec[i32],
-    enum_variant_payloads: Vec[i64],
+    enum_llvm_types: List[i64],
+    enum_variant_starts: List[i32],
+    enum_variant_counts: List[i32],
+    enum_variant_names: List[i32],
+    enum_variant_payloads: List[i64],
 
     // Enum by LLVM type (for match lookups)
     enum_by_llvm: HashMap[i64, i32],
@@ -320,15 +320,15 @@ pub type Codegen {
 
     // Discriminant enums: sym → index into disc_enum_* arrays
     disc_enum_type_map: HashMap[i32, i32],
-    disc_enum_name_syms: Vec[i32],
-    disc_enum_repr_types: Vec[i64],
-    disc_enum_repr_unsigned: Vec[i32],
-    disc_enum_variant_starts: Vec[i32],
-    disc_enum_variant_counts: Vec[i32],
-    disc_enum_variant_names: Vec[i32],
-    disc_enum_variant_values: Vec[i64],
-    disc_enum_has_payload: Vec[i32],
-    disc_enum_variant_payloads: Vec[i64],
+    disc_enum_name_syms: List[i32],
+    disc_enum_repr_types: List[i64],
+    disc_enum_repr_unsigned: List[i32],
+    disc_enum_variant_starts: List[i32],
+    disc_enum_variant_counts: List[i32],
+    disc_enum_variant_names: List[i32],
+    disc_enum_variant_values: List[i64],
+    disc_enum_has_payload: List[i32],
+    disc_enum_variant_payloads: List[i64],
 
     // #1430: named type bodies, defined in dependency order. Per declaration
     // index: its registered type symbol and TYPE_BODY_* state; per symbol: the
@@ -336,8 +336,8 @@ pub type Codegen {
     // is done, which makes the reference hook free). type_layout_complete
     // memoizes the LLVM types proven to hold no opaque placeholder by value.
     type_body_decl: HashMap[i32, i32],
-    type_body_sym: Vec[i32],
-    type_body_state: Vec[i32],
+    type_body_sym: List[i32],
+    type_body_state: List[i32],
     type_bodies_pending: i32,
     type_layout_complete: HashMap[i64, i32],
 
@@ -352,9 +352,9 @@ pub type Codegen {
     mono_struct_base: HashMap[i32, i32],
     mono_struct_tp_starts: HashMap[i32, i32],
     mono_struct_tp_counts: HashMap[i32, i32],
-    mono_struct_tp_flat_syms: Vec[i32],
-    mono_struct_tp_flat_types: Vec[i64],
-    mono_struct_tp_flat_sema_types: Vec[i32],
+    mono_struct_tp_flat_syms: List[i32],
+    mono_struct_tp_flat_types: List[i64],
+    mono_struct_tp_flat_sema_types: List[i32],
 
     // Monomorphization cache: mangled_hash → value/type
     mono_values: HashMap[i64, i64],
@@ -366,31 +366,31 @@ pub type Codegen {
     // Module constants: sym → LLVM global
     module_constants: HashMap[i32, i64],
     // Module constants that require runtime reconstruction before user main.
-    module_runtime_init_syms: Vec[i32],
-    module_runtime_init_nodes: Vec[i32],
-    module_runtime_init_type_ids: Vec[i32],
-    module_runtime_init_globals: Vec[i64],
-    module_runtime_init_fns: Vec[i64],
-    module_runtime_init_types: Vec[i64],
+    module_runtime_init_syms: List[i32],
+    module_runtime_init_nodes: List[i32],
+    module_runtime_init_type_ids: List[i32],
+    module_runtime_init_globals: List[i64],
+    module_runtime_init_fns: List[i64],
+    module_runtime_init_types: List[i64],
     // #777: writable module globals with droppable types; the exit wrapper
     // drops them (reverse order) after with_runtime_run, before shutdown.
-    module_drop_global_syms: Vec[i32],
-    module_drop_global_tids: Vec[i32],
+    module_drop_global_syms: List[i32],
+    module_drop_global_tids: List[i32],
     // Constant integer values: parallel arrays for sym → i64 value lookup
     // #839: LLVM names declared for With-BODIED fns (interned), so the
     // extern declare path can distinguish "a With body occupies my C
     // symbol" (move it aside) from c_import's deliberate same-symbol
     // different-prototype reuse (keep, marshal via recorded transforms).
     with_fn_link_names: HashMap[i32, i32],
-    const_int_syms: Vec[i32],
-    const_int_vals: Vec[i64],
-    decl_source_paths: Vec[str],
+    const_int_syms: List[i32],
+    const_int_vals: List[i64],
+    decl_source_paths: List[str],
     current_decl_source_file: str,
     module_object_mode: i32,
     // D38: module link-name prefixes provided by embedded .wo bundles. A
     // function from such a module is declared under its module link name,
     // never defined, in this unit (docs/spec/toolchain/wo_bundles.md "Declarations only").
-    bundle_prefixes: Vec[str],
+    bundle_prefixes: List[str],
     // D38 batch C3: `--bundle-corpus <rel>` — this object IS the bundle of
     // the corpus, so every module whose canonical path lies under it is
     // owned here (defined), whatever unit imported it; "" outside a bundle
@@ -399,7 +399,7 @@ pub type Codegen {
     // A bundle build's owned globals whose initializer did not fold to data
     // ("<canonical module>\t<name>"): omitted from the interface and the
     // object (CodegenTraits.gen_module_constant).
-    bundle_unlowered_globals: Vec[str],
+    bundle_unlowered_globals: List[str],
     // #2219: why each of those did not fold — keyed by the global's name
     // symbol, the sub-expression `try_eval_const_llvm` stopped at — so a
     // body that reads the global is refused naming it (mir_bind_global_locals).
@@ -408,24 +408,24 @@ pub type Codegen {
     // fold (0 when it folded); reset by gen_module_constant per global.
     const_fold_unfolded_node: i32,
 
-    // Loop stack (fixed-size arrays via Vec)
-    loop_break_bbs: Vec[i64],
-    loop_continue_bbs: Vec[i64],
-    loop_result_allocas: Vec[i64],
-    loop_labels: Vec[i32],
+    // Loop stack (fixed-size arrays via List)
+    loop_break_bbs: List[i64],
+    loop_continue_bbs: List[i64],
+    loop_result_allocas: List[i64],
+    loop_labels: List[i32],
     loop_depth: i32,
 
     // Tail recursion
     tailrec_body_bb: i64,
     tailrec_fn_sym: i32,
-    tailrec_param_allocas: Vec[i64],
+    tailrec_param_allocas: List[i64],
 
     // Closures
     closure_counter: i32,
 
     // Defer stack
-    defer_stack: Vec[i32],
-    errdefer_stack: Vec[i32],
+    defer_stack: List[i32],
+    errdefer_stack: List[i32],
 
     // Reference pointee types
     ref_pointee_types: HashMap[i32, i64],
@@ -452,17 +452,17 @@ pub type Codegen {
 
     // Trait info: sym → index into trait_* arrays
     trait_map: HashMap[i32, i32],
-    trait_idx_syms: Vec[i32],
-    trait_vtable_types: Vec[i64],
-    trait_method_starts: Vec[i32],
-    trait_method_counts: Vec[i32],
-    trait_method_names: Vec[i32],
-    trait_method_flags: Vec[i32],
-    trait_method_ret_types: Vec[i64],
-    trait_method_param_counts: Vec[i32],
-    trait_method_param_starts: Vec[i32],
-    trait_method_ret_nodes: Vec[i32],
-    trait_method_default_bodies: Vec[i32],
+    trait_idx_syms: List[i32],
+    trait_vtable_types: List[i64],
+    trait_method_starts: List[i32],
+    trait_method_counts: List[i32],
+    trait_method_names: List[i32],
+    trait_method_flags: List[i32],
+    trait_method_ret_types: List[i64],
+    trait_method_param_counts: List[i32],
+    trait_method_param_starts: List[i32],
+    trait_method_ret_nodes: List[i32],
+    trait_method_default_bodies: List[i32],
 
     // Trait decl nodes: sym → trait_decl_node
     trait_decl_nodes: HashMap[i32, i32],
@@ -470,14 +470,14 @@ pub type Codegen {
     // Trait type params: trait name_sym → flat start/count in trait_tp_flat_syms
     trait_tp_starts: HashMap[i32, i32],
     trait_tp_counts: HashMap[i32, i32],
-    trait_tp_flat_syms: Vec[i32],
+    trait_tp_flat_syms: List[i32],
 
     // VTable globals: hash(type,trait) → global
     vtable_globals: HashMap[i32, i64],
     // #1847: the vtables' drop slots (dyn_drop_slot) and the concrete Sema
     // type each drops, their bodies emitted by define_dyn_drop_thunks.
-    dyn_drop_thunks: Vec[i64],
-    dyn_drop_thunk_types: Vec[i32],
+    dyn_drop_thunks: List[i64],
+    dyn_drop_thunk_types: List[i32],
 
     // Trait-typed locals
     trait_locals: HashMap[i32, i32],
@@ -486,7 +486,7 @@ pub type Codegen {
 
     // Fn dyn params: fn_sym → start/count in flat array
     fn_dyn_param_starts: HashMap[i32, i32],
-    fn_dyn_param_data: Vec[i32],
+    fn_dyn_param_data: List[i32],
 
     // Fn ref params: fn_sym → start/count in flat array
 
@@ -505,13 +505,13 @@ pub type Codegen {
     task_locals: HashMap[i32, i32],
     uses_async: bool,
     async_block_counter: i32,
-    async_block_captures: Vec[i32],
+    async_block_captures: List[i32],
     async_block_rbuf: i64,
 
     // Scope locals for drop
-    scope_local_syms: Vec[i32],
-    scope_local_allocas: Vec[i64],
-    scope_local_types: Vec[i64],
+    scope_local_syms: List[i32],
+    scope_local_allocas: List[i64],
+    scope_local_types: List[i64],
     scope_local_count: i32,
 
     // Error messages
@@ -535,10 +535,10 @@ pub type Codegen {
     gen_yield_count: i32,
     gen_current_yield: i32,
 
-    // Vec type cache
-    // Vec type cache
-    vec_cache_map: HashMap[i64, i64],
-    vec_is_vec: HashMap[i64, i32],
+    // List type cache
+    // List type cache
+    list_cache_map: HashMap[i64, i64],
+    list_is_list: HashMap[i64, i32],
     // HashMap type cache
     hm_cache_map: HashMap[i64, i64],
     hm_is_hm: HashMap[i64, i32],
@@ -549,8 +549,8 @@ pub type Codegen {
     slotmap_cache_map: HashMap[i64, i64],
 
     // Active type bindings (for monomorphization)
-    type_binding_syms: Vec[i32],
-    type_binding_types: Vec[i64],
+    type_binding_syms: List[i32],
+    type_binding_types: List[i64],
     type_bindings_len: i32,
 
     // Fn param defaults: fn_sym → start/count in flat array
@@ -561,7 +561,7 @@ pub type Codegen {
     source_file: str,
     source_text: str,
     tracked_input_root: str,
-    tracked_input_paths: Vec[str],
+    tracked_input_paths: List[str],
 
     // Debug info (DWARF)
     debug_info: i32,
@@ -596,8 +596,8 @@ pub type Codegen {
     mir_local_types: HashMap[i32, i64],
     mir_indirect_value_local_types: HashMap[i32, i64],
     mir_ref_capture_local_types: HashMap[i32, i64],
-    mir_bb_values: Vec[i64],
-    mir_default_unreachable_bbs: Vec[i64],
+    mir_bb_values: List[i64],
+    mir_default_unreachable_bbs: List[i64],
 }
 
 pub type DynArgInfo {
@@ -617,10 +617,10 @@ pub type StrLiteralOperand {
 }
 
 type LoopState {
-    break_bbs: Vec[i64],
-    continue_bbs: Vec[i64],
-    result_allocas: Vec[i64],
-    labels: Vec[i32],
+    break_bbs: List[i64],
+    continue_bbs: List[i64],
+    result_allocas: List[i64],
+    labels: List[i32],
     depth: i32,
 }
 
@@ -659,13 +659,13 @@ fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: I
     cg.sema = sema
     cg.overflow_mode = overflow_mode
     cg.tracked_input_root = with_str_clone_ref(cg.sema.tracked_input_root)
-    let tracked_paths: Vec[str] = Vec.new()
+    let tracked_paths: List[str] = List.new()
     for tpi in 0..cg.sema.tracked_input_paths.len() as i32:
         tracked_paths.push(with_str_clone_ref(cg.sema.tracked_input_paths[tpi]))
     cg.tracked_input_paths = tracked_paths
     cg.capture_sema_symbol_texts()
     // Pre-intern dispatch symbols for O(1) comparisons
-    cg.sym_vec = cg.intern.intern("Vec")
+    cg.sym_list = cg.intern.intern("List")
     cg.sym_option = cg.intern.intern("Option")
     cg.option_some_index = cg.sema.std_option_variant_index(cg.sema.syms.some)
     cg.option_none_index = cg.sema.std_option_variant_index(cg.sema.syms.none)
@@ -681,10 +681,10 @@ fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: I
     cg.sym_handle = cg.intern.intern("Handle")
     cg.sym_slotmap = cg.intern.intern("SlotMap")
     cg.sym_slotmapslot = cg.intern.intern("SlotMapSlot")
-    cg.sym_vecslot = cg.intern.intern("VecSlot")
-    cg.sym_vecrange = cg.intern.intern("VecRange")
-    cg.sym_veciterref = cg.intern.intern("VecIterRef")
-    cg.sym_veciterplace = cg.intern.intern("VecIterPlace")
+    cg.sym_listslot = cg.intern.intern("ListSlot")
+    cg.sym_listrange = cg.intern.intern("ListRange")
+    cg.sym_listiterref = cg.intern.intern("ListIterRef")
+    cg.sym_listiterplace = cg.intern.intern("ListIterPlace")
     cg.sym_box = cg.intern.intern("Box")
     cg.sym_context_error = cg.intern.intern("ContextError")
     cg.sym_Self = cg.intern.intern("Self")
@@ -1105,7 +1105,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         pool: AstPool.new(),
         intern: InternPool.init(),
         sema: Sema.init(InternPool.init(), DiagnosticList.init(), AstPool.new()),
-        sema_symbol_texts: Vec.new(),
+        sema_symbol_texts: List.new(),
         overflow_mode: overflow_mode_default(),
         analysis_enabled: 0,
         binop_route: "",
@@ -1113,11 +1113,11 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         analysis_query: "",
         analysis_report: AnalysisReport.init(),
         analysis_last_marshal_strategy: AnalysisMarshalStrategy.DirectValue,
-        mode_site_decisions: Vec.new(),
-        mode_site_disagree: Vec.new(),
-        mode_site_first: Vec.new(),
-        ast_derivation_counts: Vec.new(),
-        ast_derivation_first: Vec.new(),
+        mode_site_decisions: List.new(),
+        mode_site_disagree: List.new(),
+        mode_site_first: List.new(),
+        ast_derivation_counts: List.new(),
+        ast_derivation_first: List.new(),
         ast_derivation_depth: 0,
         ast_verifying: 0,
         current_ret_type: 0,
@@ -1134,9 +1134,9 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         current_drop_needs_guard: true,
         member_drop_depth: 0,
         option_some_index: -1, option_none_index: -1, option_some_tag: -1, option_none_tag: -1, result_ok_tag: -1, result_err_tag: -1,
-        sym_vec: 0, sym_option: 0, sym_result: 0, sym_hashmap: 0,
+        sym_list: 0, sym_option: 0, sym_result: 0, sym_hashmap: 0,
         sym_hashset: 0, sym_btreemap: 0, sym_btreeset: 0, sym_handle: 0, sym_slotmap: 0, sym_slotmapslot: 0,
-        sym_vecslot: 0, sym_vecrange: 0, sym_veciterref: 0, sym_veciterplace: 0,
+        sym_listslot: 0, sym_listrange: 0, sym_listiterref: 0, sym_listiterplace: 0,
         sym_box: 0, sym_context_error: 0,
         sym_Self: 0, sym_self: 0, sym_unit: 0,
         sym_bool: 0, sym_usize: 0, sym_isize: 0, sym_void: 0,
@@ -1156,8 +1156,8 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         fn_values: HashMap.new(),
         fn_fn_types: HashMap.new(),
         generated_mir_body_syms: HashMap.new(),
-        fn_abis: Vec.new(),
-        fn_abi_args: Vec.new(),
+        fn_abis: List.new(),
+        fn_abi_args: List.new(),
         fn_abi_cache: HashMap.new(),
         fn_abi_symbols: HashMap.new(),
         fn_abi_callables: HashMap.new(),
@@ -1167,50 +1167,50 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         shadow_alias_map: HashMap.new(),
         nominal_alias_by_tid: HashMap.new(),
         nominal_split_names: HashMap.new(),
-        struct_llvm_types: Vec.new(),
-        struct_index_syms: Vec.new(),
-        struct_field_starts: Vec.new(),
-        struct_field_counts: Vec.new(),
-        struct_field_names: Vec.new(),
-        struct_field_types: Vec.new(),
-        struct_field_type_nodes: Vec.new(),
-        struct_field_defaults: Vec.new(),
-        struct_llvm_field_indices: Vec.new(),
+        struct_llvm_types: List.new(),
+        struct_index_syms: List.new(),
+        struct_field_starts: List.new(),
+        struct_field_counts: List.new(),
+        struct_field_names: List.new(),
+        struct_field_types: List.new(),
+        struct_field_type_nodes: List.new(),
+        struct_field_defaults: List.new(),
+        struct_llvm_field_indices: List.new(),
         bitpacked_structs: HashMap.new(),
         bitpacked_total_bits: HashMap.new(),
         struct_declared_align: HashMap.new(),
         tuple_elem_index_starts: HashMap.new(),
-        tuple_elem_indices: Vec.new(),
+        tuple_elem_indices: List.new(),
         tuple_padded_types: HashMap.new(),
         bitpacked_backing_types: HashMap.new(),
         bitpacked_by_llvm_type: HashMap.new(),
         liveness_byte_indices: HashMap.new(),
-        bitpacked_field_bit_offsets: Vec.new(),
-        bitpacked_field_bit_widths: Vec.new(),
+        bitpacked_field_bit_offsets: List.new(),
+        bitpacked_field_bit_widths: List.new(),
         bitpacked_place_proj: HashMap.new(),
         enum_type_map: HashMap.new(),
-        enum_llvm_types: Vec.new(),
-        enum_variant_starts: Vec.new(),
-        enum_variant_counts: Vec.new(),
-        enum_variant_names: Vec.new(),
-        enum_variant_payloads: Vec.new(),
+        enum_llvm_types: List.new(),
+        enum_variant_starts: List.new(),
+        enum_variant_counts: List.new(),
+        enum_variant_names: List.new(),
+        enum_variant_payloads: List.new(),
         enum_by_llvm: HashMap.new(),
         generic_enum_inst_types: HashMap.new(),
         generic_enum_inst_syms: HashMap.new(),
         generic_struct_inst_types: HashMap.new(),
         disc_enum_type_map: HashMap.new(),
-        disc_enum_name_syms: Vec.new(),
-        disc_enum_repr_types: Vec.new(),
-        disc_enum_repr_unsigned: Vec.new(),
-        disc_enum_variant_starts: Vec.new(),
-        disc_enum_variant_counts: Vec.new(),
-        disc_enum_variant_names: Vec.new(),
-        disc_enum_variant_values: Vec.new(),
-        disc_enum_has_payload: Vec.new(),
-        disc_enum_variant_payloads: Vec.new(),
+        disc_enum_name_syms: List.new(),
+        disc_enum_repr_types: List.new(),
+        disc_enum_repr_unsigned: List.new(),
+        disc_enum_variant_starts: List.new(),
+        disc_enum_variant_counts: List.new(),
+        disc_enum_variant_names: List.new(),
+        disc_enum_variant_values: List.new(),
+        disc_enum_has_payload: List.new(),
+        disc_enum_variant_payloads: List.new(),
         type_body_decl: HashMap.new(),
-        type_body_sym: Vec.new(),
-        type_body_state: Vec.new(),
+        type_body_sym: List.new(),
+        type_body_state: List.new(),
         type_bodies_pending: 0,
         type_layout_complete: HashMap.new(),
         generic_fns: HashMap.new(),
@@ -1221,43 +1221,43 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         mono_struct_base: HashMap.new(),
         mono_struct_tp_starts: HashMap.new(),
         mono_struct_tp_counts: HashMap.new(),
-        mono_struct_tp_flat_syms: Vec.new(),
-        mono_struct_tp_flat_types: Vec.new(),
-        mono_struct_tp_flat_sema_types: Vec.new(),
+        mono_struct_tp_flat_syms: List.new(),
+        mono_struct_tp_flat_types: List.new(),
+        mono_struct_tp_flat_sema_types: List.new(),
         mono_values: HashMap.new(),
         mono_types: HashMap.new(),
         type_aliases: HashMap.new(),
         module_constants: HashMap.new(),
-        module_runtime_init_syms: Vec.new(),
-        module_runtime_init_nodes: Vec.new(),
-        module_runtime_init_type_ids: Vec.new(),
-        module_runtime_init_globals: Vec.new(),
-        module_runtime_init_fns: Vec.new(),
-        module_runtime_init_types: Vec.new(),
-        module_drop_global_syms: Vec.new(),
-        module_drop_global_tids: Vec.new(),
+        module_runtime_init_syms: List.new(),
+        module_runtime_init_nodes: List.new(),
+        module_runtime_init_type_ids: List.new(),
+        module_runtime_init_globals: List.new(),
+        module_runtime_init_fns: List.new(),
+        module_runtime_init_types: List.new(),
+        module_drop_global_syms: List.new(),
+        module_drop_global_tids: List.new(),
         with_fn_link_names: HashMap.new(),
-        const_int_syms: Vec.new(),
-        const_int_vals: Vec.new(),
-        decl_source_paths: Vec.new(),
+        const_int_syms: List.new(),
+        const_int_vals: List.new(),
+        decl_source_paths: List.new(),
         current_decl_source_file: "<unknown>",
         module_object_mode: 0,
         bundle_prefixes: embedded_bundle_prefixes(),
         bundle_corpus: "",
-        bundle_unlowered_globals: Vec.new(),
+        bundle_unlowered_globals: List.new(),
         unlowered_global_reasons: HashMap.new(),
         const_fold_unfolded_node: 0,
-        loop_break_bbs: Vec.new(),
-        loop_continue_bbs: Vec.new(),
-        loop_result_allocas: Vec.new(),
-        loop_labels: Vec.new(),
+        loop_break_bbs: List.new(),
+        loop_continue_bbs: List.new(),
+        loop_result_allocas: List.new(),
+        loop_labels: List.new(),
         loop_depth: 0,
         tailrec_body_bb: 0,
         tailrec_fn_sym: 0,
-        tailrec_param_allocas: Vec.new(),
+        tailrec_param_allocas: List.new(),
         closure_counter: 0,
-        defer_stack: Vec.new(),
-        errdefer_stack: Vec.new(),
+        defer_stack: List.new(),
+        errdefer_stack: List.new(),
         ref_pointee_types: HashMap.new(),
         expected_type: 0,
         expected_type_node: 0,
@@ -1268,29 +1268,29 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         drop_fn_values: HashMap.new(),
         drop_fn_types: HashMap.new(),
         trait_map: HashMap.new(),
-        trait_idx_syms: Vec.new(),
-        trait_vtable_types: Vec.new(),
-        dyn_drop_thunks: Vec.new(),
-        dyn_drop_thunk_types: Vec.new(),
-        trait_method_starts: Vec.new(),
-        trait_method_counts: Vec.new(),
-        trait_method_names: Vec.new(),
-        trait_method_flags: Vec.new(),
-        trait_method_ret_types: Vec.new(),
-        trait_method_param_counts: Vec.new(),
-        trait_method_param_starts: Vec.new(),
-        trait_method_ret_nodes: Vec.new(),
-        trait_method_default_bodies: Vec.new(),
+        trait_idx_syms: List.new(),
+        trait_vtable_types: List.new(),
+        dyn_drop_thunks: List.new(),
+        dyn_drop_thunk_types: List.new(),
+        trait_method_starts: List.new(),
+        trait_method_counts: List.new(),
+        trait_method_names: List.new(),
+        trait_method_flags: List.new(),
+        trait_method_ret_types: List.new(),
+        trait_method_param_counts: List.new(),
+        trait_method_param_starts: List.new(),
+        trait_method_ret_nodes: List.new(),
+        trait_method_default_bodies: List.new(),
         trait_decl_nodes: HashMap.new(),
         trait_tp_starts: HashMap.new(),
         trait_tp_counts: HashMap.new(),
-        trait_tp_flat_syms: Vec.new(),
+        trait_tp_flat_syms: List.new(),
         vtable_globals: HashMap.new(),
         trait_locals: HashMap.new(),
         trait_local_concrete_types: HashMap.new(),
         dyn_fat_ptr_type: 0,
         fn_dyn_param_starts: HashMap.new(),
-        fn_dyn_param_data: Vec.new(),
+        fn_dyn_param_data: List.new(),
         fn_result_err_symbols: HashMap.new(),
         fn_returns_result: HashMap.new(),
         fn_result_unit_returns: HashMap.new(),
@@ -1303,11 +1303,11 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         task_locals: HashMap.new(),
         uses_async: false,
         async_block_counter: 0,
-        async_block_captures: Vec.new(),
+        async_block_captures: List.new(),
         async_block_rbuf: 0,
-        scope_local_syms: Vec.new(),
-        scope_local_allocas: Vec.new(),
-        scope_local_types: Vec.new(),
+        scope_local_syms: List.new(),
+        scope_local_allocas: List.new(),
+        scope_local_types: List.new(),
         scope_local_count: 0,
         comptime_error_msg: "",
         codegen_error_detail: "",
@@ -1321,21 +1321,21 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         gen_payload_type: 0,
         gen_yield_count: 0,
         gen_current_yield: 0,
-        vec_cache_map: HashMap.new(),
-        vec_is_vec: HashMap.new(),
+        list_cache_map: HashMap.new(),
+        list_is_list: HashMap.new(),
         hm_cache_map: HashMap.new(),
         hm_is_hm: HashMap.new(),
         hs_cache_map: HashMap.new(),
         slotmap_cache_map: HashMap.new(),
-        type_binding_syms: Vec.new(),
-        type_binding_types: Vec.new(),
+        type_binding_syms: List.new(),
+        type_binding_types: List.new(),
         type_bindings_len: 0,
         fn_default_starts: HashMap.new(),
         fn_default_counts: HashMap.new(),
         source_file: "<unknown>",
         source_text: "",
         tracked_input_root: "",
-        tracked_input_paths: Vec.new(),
+        tracked_input_paths: List.new(),
         mir_dispatch_count: 0,
         mir_ptr: 0,
         unit_total: 0,
@@ -1348,8 +1348,8 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         mir_local_types: HashMap.new(),
         mir_indirect_value_local_types: HashMap.new(),
         mir_ref_capture_local_types: HashMap.new(),
-        mir_bb_values: Vec.new(),
-        mir_default_unreachable_bbs: Vec.new(),
+        mir_bb_values: List.new(),
+        mir_default_unreachable_bbs: List.new(),
         debug_info: 1,
         di_builder: 0,
         di_compile_unit: 0,
@@ -1365,7 +1365,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
 impl Codegen:
     // #685 inc-2 (retired by D22/#691 drop widening): the manual
     // dispose_tables free list is gone. Codegen's own drop glue frees every
-    // Vec/HashMap table exactly once when the consumed receiver drops at
+    // List/HashMap table exactly once when the consumed receiver drops at
     // deinit's end; a manual free list on top of it double-frees.
     // #685 inc-2: deinit CONSUMES the Codegen — dispose the LLVM resources
     // (they read self), then the consumed receiver's drop frees the tables.
@@ -1577,7 +1577,7 @@ impl Codegen:
         if entry_term == 0:
             return
         let local_count = body.local_names.len() as i32
-        var first_spans: Vec[i32] = Vec.new()
+        var first_spans: List[i32] = List.new()
         for _ in 0..local_count: first_spans.push(0)
         for si in 0..body.stmt_kinds.len() as i32:
             if body.stmt_kinds[si] != StmtKind.Assign: continue
@@ -1718,10 +1718,10 @@ impl Codegen:
             // TypeKind.TY_STR: { ptr, len }, so a debugger shows the bytes.
             let byte_ty = wl_di_create_basic_type(self.di_builder, "u8", 8, wl_dwarf_ate_unsigned_char())
             let len_ty = wl_di_create_basic_type(self.di_builder, "i64", 64, wl_dwarf_ate_signed())
-            let members: Vec[i64] = Vec.new()
+            let members: List[i64] = List.new()
             members.push(wl_di_create_member_type(self.di_builder, self.di_file, "ptr", self.di_file, 0, 64, 64, 0, wl_di_create_pointer_type(self.di_builder, byte_ty, 64)))
             members.push(wl_di_create_member_type(self.di_builder, self.di_file, "len", self.di_file, 0, 64, 64, 64, len_ty))
-            return wl_di_create_struct_type(self.di_builder, self.di_file, "str", self.di_file, 0, 128, 64, vec_data_i64(&members), 2)
+            return wl_di_create_struct_type(self.di_builder, self.di_file, "str", self.di_file, 0, 128, 64, list_data_i64(&members), 2)
         if kind == 4:
             // TypeKind.TY_VOID
             return wl_di_create_unspecified_type(self.di_builder, "void")
@@ -1846,7 +1846,7 @@ impl Codegen:
 
     fn mir_bodies_len() -> i64: unsafe { (*(self.mir_ptr as *const MirModule)).bodies.len() }
     // Codegen only observes bodies owned by the frozen MirModule. Returning an
-    // owned MirBody here would shallow-copy every Vec field and make the local
+    // owned MirBody here would shallow-copy every List field and make the local
     // copy's scope-exit drop free storage still owned by the module.
     fn mir_body_at(i: i64) -> &MirBody:
         let mir = self.mir_ptr as *const MirModule
@@ -1952,10 +1952,10 @@ impl Codegen:
         if self.dyn_fat_ptr_type != 0:
             return self.dyn_fat_ptr_type
         let ptr_ty = wl_ptr_type(self.context)
-        let fat_types: Vec[i64] = Vec.new()
+        let fat_types: List[i64] = List.new()
         fat_types.push(ptr_ty)
         fat_types.push(ptr_ty)
-        self.dyn_fat_ptr_type = wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
+        self.dyn_fat_ptr_type = wl_struct_type(self.context, list_data_i64(&fat_types), 2, 0)
         self.dyn_fat_ptr_type
 
     fn llvm_type_is_dyn_fat_ptr(ty: i64) -> i32:
@@ -2182,7 +2182,7 @@ impl Codegen:
                 msg = msg ++ f" llvm_name={struct_name}"
         with_eprint(msg)
 
-    // Save/restore: the four Vec fields transfer OUT of self here and the
+    // Save/restore: the four List fields transfer OUT of self here and the
     // caller installs fresh ones (reset_loop_state) before restoring. That is
     // a mutation of self, so the receiver is `mut` and the transfers are
     // spelled — the same correction save_label_registry needed (#691 flip).
@@ -2196,10 +2196,10 @@ impl Codegen:
         }
 
     mut fn reset_loop_state():
-        self.loop_break_bbs = Vec.new()
-        self.loop_continue_bbs = Vec.new()
-        self.loop_result_allocas = Vec.new()
-        self.loop_labels = Vec.new()
+        self.loop_break_bbs = List.new()
+        self.loop_continue_bbs = List.new()
+        self.loop_result_allocas = List.new()
+        self.loop_labels = List.new()
         self.loop_depth = 0
 
     // Consumes: fields move back into self (see restore_label_registry).
@@ -2215,7 +2215,7 @@ impl Codegen:
 
     mut fn push_loop_context(break_bb: i64, continue_bb: i64, result_alloca: i64, label_sym: i32):
         let idx: i32 = self.loop_depth
-        var labels: Vec[i32] = move self.loop_labels
+        var labels: List[i32] = move self.loop_labels
         with_codegen_loop_set_break(idx, break_bb)
         with_codegen_loop_set_continue(idx, continue_bb)
         with_codegen_loop_set_result(idx, result_alloca)
@@ -2224,7 +2224,7 @@ impl Codegen:
         self.loop_depth = idx + 1
 
     mut fn pop_loop_context():
-        var labels: Vec[i32] = move self.loop_labels
+        var labels: List[i32] = move self.loop_labels
         let _ = labels.pop()
         self.loop_labels = labels
         self.loop_depth = self.loop_depth - 1
@@ -2643,8 +2643,8 @@ impl Codegen:
                             return alias_known.unwrap()
         0
 
-    mut fn coerce_call_args_for_fn_value(fn_sym: i32, fn_val: i64, args_start: i32, arg_node_base_index: i32, args: &Vec[i64], arg_count: i32, call_context: &str, call_node: i32) -> Vec[i64]:
-        let out: Vec[i64] = Vec.new()
+    mut fn coerce_call_args_for_fn_value(fn_sym: i32, fn_val: i64, args_start: i32, arg_node_base_index: i32, args: &List[i64], arg_count: i32, call_context: &str, call_node: i32) -> List[i64]:
+        let out: List[i64] = List.new()
         let param_count = wl_count_params(fn_val)
         let sret_opt = self.fn_abi_has_sret(fn_sym)
         let has_sret = if sret_opt.is_some(): sret_opt.unwrap() else: 0
@@ -2677,7 +2677,7 @@ impl Codegen:
             out.push(arg_val)
         out
 
-    mut fn build_call_fn_value(fn_sym: i32, fn_val: i64, fn_ty: i64, args_start: i32, arg_node_base_index: i32, args: &Vec[i64], arg_count: i32, call_context: &str, call_node: i32) -> i64:
+    mut fn build_call_fn_value(fn_sym: i32, fn_val: i64, fn_ty: i64, args_start: i32, arg_node_base_index: i32, args: &List[i64], arg_count: i32, call_context: &str, call_node: i32) -> i64:
         let sret_opt = self.fn_abi_has_sret(fn_sym)
         let has_sret = if sret_opt.is_some(): sret_opt.unwrap() else: 0
         var sret_ty: i64 = 0
@@ -2686,18 +2686,18 @@ impl Codegen:
             if sret_ty_opt.is_some():
                 sret_ty = sret_ty_opt.unwrap() as i64
         let coerced = self.coerce_call_args_for_fn_value(fn_sym, fn_val, args_start, arg_node_base_index, args, arg_count, call_context, call_node)
-        let final_args: Vec[i64] = Vec.new()
+        let final_args: List[i64] = List.new()
         var sret_buf: i64 = 0
         if has_sret != 0 and sret_ty != 0:
             sret_buf = self.create_entry_alloca(sret_ty)
             final_args.push(sret_buf)
         for i in 0..coerced.len() as i32:
             final_args.push(coerced[i])
-        let call_val = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&final_args), final_args.len() as i32)
-        var byval_types: Vec[i64] = Vec.new()
+        let call_val = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&final_args), final_args.len() as i32)
+        var byval_types: List[i64] = List.new()
         let byval_types_opt = self.fn_abi_symbol_byval_attr_types(fn_sym)
         if byval_types_opt.is_some():
-            byval_types = vec_copy_i64(byval_types_opt.unwrap())
+            byval_types = list_copy_i64(byval_types_opt.unwrap())
         self.apply_c_abi_call_attrs(call_val, has_sret, sret_ty, byval_types, arg_count, 0)
         if has_sret != 0 and sret_buf != 0 and sret_ty != 0:
             return wl_build_load(self.builder, sret_ty, sret_buf)
@@ -2803,15 +2803,15 @@ impl Codegen:
             return source_fi
         self.struct_llvm_field_indices[map_idx]
 
-    fn vec_contains_i32(values: &Vec[i32], needle: i32) -> bool:
+    fn list_contains_i32(values: &List[i32], needle: i32) -> bool:
         for i in 0..values.len() as i32:
             if values[i] == needle:
                 return true
         false
 
     fn struct_reaches_type(start_idx: i32, target_ty: i64) -> bool:
-        var queue: Vec[i32] = Vec.new()
-        var visited: Vec[i32] = Vec.new()
+        var queue: List[i32] = List.new()
+        var visited: List[i32] = List.new()
         queue.push(start_idx)
         visited.push(start_idx)
 
@@ -2827,7 +2827,7 @@ impl Codegen:
                 if f_ty == target_ty:
                     return true
                 let next_idx = self.find_struct_index_by_type(f_ty)
-                if next_idx >= 0 and not self.vec_contains_i32(visited, next_idx):
+                if next_idx >= 0 and not self.list_contains_i32(visited, next_idx):
                     visited.push(next_idx)
                     queue.push(next_idx)
         false
@@ -2896,13 +2896,13 @@ impl Codegen:
     // with_str_eq_ref / with_str_cmp_ref take two `&str` views, `{ptr, len}`
     // each by value (#1810).
     mut fn ensure_with_str_eq_declared() -> i64:
-        let param_types: Vec[i64] = Vec.new()
+        let param_types: List[i64] = List.new()
         param_types.push(self.str_llvm_type())
         param_types.push(self.str_llvm_type())
         self.ensure_internal_runtime_fn("with_str_eq_ref", param_types, 2, wl_i32_type(self.context))
 
     mut fn ensure_with_str_cmp_declared() -> i64:
-        let param_types: Vec[i64] = Vec.new()
+        let param_types: List[i64] = List.new()
         param_types.push(self.str_llvm_type())
         param_types.push(self.str_llvm_type())
         self.ensure_internal_runtime_fn("with_str_cmp_ref", param_types, 2, wl_i32_type(self.context))
@@ -2911,7 +2911,7 @@ impl Codegen:
         let fn_val = self.ensure_with_str_eq_declared()
         let fn_sym = self.intern.intern("with_str_eq_ref")
         let fn_ty = self.fn_fn_types.get(fn_sym).unwrap() as i64
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(self.str_view_arg(lhs))
         args.push(self.str_view_arg(rhs))
         let cmp = self.build_call_fn_value(fn_sym, fn_val, fn_ty, -1, 0, args, 2, "with_str_eq_ref", 0)
@@ -2924,7 +2924,7 @@ impl Codegen:
         let fn_val = self.ensure_with_str_cmp_declared()
         let fn_sym = self.intern.intern("with_str_cmp_ref")
         let fn_ty = self.fn_fn_types.get(fn_sym).unwrap() as i64
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(self.str_view_arg(lhs))
         args.push(self.str_view_arg(rhs))
         let cmp = self.build_call_fn_value(fn_sym, fn_val, fn_ty, -1, 0, args, 2, "with_str_cmp_ref", 0)
@@ -2943,11 +2943,11 @@ impl Codegen:
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
         let i64_ty = wl_i64_type(self.context)
-        let param_types: Vec[i64] = Vec.new()
+        let param_types: List[i64] = List.new()
         param_types.push(ptr_ty)
         param_types.push(ptr_ty)
         param_types.push(i64_ty)
-        wl_function_type(i32_ty, vec_data_i64(&param_types), 3, 0)
+        wl_function_type(i32_ty, list_data_i64(&param_types), 3, 0)
 
     fn ensure_memcmp_declared() -> i64:
         let existing = wl_get_named_function(self.llmod, "memcmp")
@@ -3035,14 +3035,14 @@ impl Codegen:
         let ptr_ty = wl_ptr_type(self.context)
         let lhs_ptr = wl_build_bitcast(self.builder, lhs_slot, ptr_ty)
         let rhs_ptr = wl_build_bitcast(self.builder, rhs_slot, ptr_ty)
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(lhs_ptr)
         args.push(rhs_ptr)
         args.push(wl_const_int(wl_i64_type(self.context), byte_size, 0))
 
         let memcmp_fn = self.ensure_memcmp_declared()
         let memcmp_ty = self.get_memcmp_fn_type()
-        let cmp = wl_build_call(self.builder, memcmp_ty, memcmp_fn, vec_data_i64(&args), 3)
+        let cmp = wl_build_call(self.builder, memcmp_ty, memcmp_fn, list_data_i64(&args), 3)
         let zero = wl_const_int(wl_i32_type(self.context), 0, 0)
         if op == BinaryOp.OP_EQ:
             return wl_build_icmp(self.builder, wl_int_eq(), cmp, zero)
@@ -3061,19 +3061,19 @@ impl Codegen:
             wl_set_alignment(slot, declared)
         slot
 
-pub fn vec_data_i64(v: &Vec[i64]) -> i64:
-    wl_vec_data_ptr(v as i64)
+pub fn list_data_i64(v: &List[i64]) -> i64:
+    wl_list_data_ptr(v as i64)
 
 // Element-wise copy so a caller can hand an owned vector to a consuming
 // sink (e.g. record_c_abi_transform) more than once under spec §3.8.
-pub fn vec_copy_i64(src: &Vec[i64]) -> Vec[i64]:
-    let out: Vec[i64] = Vec.new()
+pub fn list_copy_i64(src: &List[i64]) -> List[i64]:
+    let out: List[i64] = List.new()
     for i in 0..src.len() as i32:
         out.push(src[i])
     out
 
-pub fn vec_zeros_i64(n: i32) -> Vec[i64]:
-    let out: Vec[i64] = Vec.new()
+pub fn list_zeros_i64(n: i32) -> List[i64]:
+    let out: List[i64] = List.new()
     for _i in 0..n:
         out.push(0)
     out
@@ -3085,7 +3085,7 @@ fn codegen_owned_text(text: &str) -> str:
 
 impl Codegen:
     mut fn capture_sema_symbol_texts():
-        let texts: Vec[str] = Vec.new()
+        let texts: List[str] = List.new()
         for i in 0..self.sema.pool.state.symbol_texts.len() as i32:
             texts.push(codegen_owned_text(self.sema.pool.state.symbol_texts[i]))
         self.sema_symbol_texts = texts
@@ -3195,10 +3195,10 @@ impl Codegen:
         if kind == NodeKind.NK_TYPE_FN:
             // Function type → fat pointer {fn_ptr, ctx_ptr}
             let ptr_ty = wl_ptr_type(self.context)
-            let fat_types: Vec[i64] = Vec.new()
+            let fat_types: List[i64] = List.new()
             fat_types.push(ptr_ty)
             fat_types.push(ptr_ty)
-            return wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
+            return wl_struct_type(self.context, list_data_i64(&fat_types), 2, 0)
 
         if kind == NodeKind.NK_TYPE_EXTERN_FN:
             return wl_ptr_type(self.context)
@@ -3213,7 +3213,7 @@ impl Codegen:
             // active monomorphization frame, just like NK_TYPE_GENERIC.
             let base = self.pool.get_data0(type_node)
             if self.pool.kind(base) == NodeKind.NK_IDENT:
-                let args: Vec[i32] = Vec.new()
+                let args: List[i32] = List.new()
                 args.push(self.pool.get_data1(type_node))
                 if self.pool.get_data2(type_node) != 0: args.push(self.pool.get_data2(type_node))
                 return self.resolve_generic_type_nodes(self.pool.get_data0(base), args, type_node)
@@ -3229,10 +3229,10 @@ impl Codegen:
             let elem_node = self.pool.get_data0(type_node)
             self.resolve_type(elem_node)
             // Slice is {ptr, i64} like str
-            let body_types: Vec[i64] = Vec.new()
+            let body_types: List[i64] = List.new()
             body_types.push(wl_ptr_type(self.context))
             body_types.push(wl_i64_type(self.context))
-            return wl_struct_type(self.context, vec_data_i64(&body_types), 2, 0)
+            return wl_struct_type(self.context, list_data_i64(&body_types), 2, 0)
 
         if kind == NodeKind.NK_TYPE_OPTIONAL:
             let inner_node = self.pool.get_data0(type_node)
@@ -3243,7 +3243,7 @@ impl Codegen:
         if kind == NodeKind.NK_TYPE_TUPLE:
             let extra_start = self.pool.get_data0(type_node)
             let elem_count = self.pool.get_data1(type_node)
-            let elem_types: Vec[i64] = Vec.new()
+            let elem_types: List[i64] = List.new()
             for i in 0..elem_count:
                 let et_node = self.pool.get_extra(extra_start + i)
                 // A Unit element is a zero-size member (#1994), not the
@@ -3262,7 +3262,7 @@ impl Codegen:
             let name_sym = self.pool.get_data0(type_node)
             let g_extra = self.pool.get_data1(type_node)
             let g_count = self.pool.get_data2(type_node)
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             for i in 0..g_count: args.push(self.pool.get_extra(g_extra + i))
             return self.resolve_generic_type_nodes(name_sym, args, type_node)
 
@@ -3309,7 +3309,7 @@ impl Codegen:
         with_eprint(f"warning: [type-resolve] unhandled type node kind={kind} node={type_node} span={self.pool.get_start(type_node)}..{self.pool.get_end(type_node)} in={ctx_fn} owner={ctx_owner}")
         self.type_fallback()
 
-    mut fn resolve_generic_type_nodes(name_sym: i32, args: &Vec[i32], type_node: i32) -> i64:
+    mut fn resolve_generic_type_nodes(name_sym: i32, args: &List[i32], type_node: i32) -> i64:
         let count = args.len()
         if self.sema.type_symbol_is_std_box(name_sym) != 0 and count == 1:
             if self.pool.kind(args[0]) == NodeKind.NK_TYPE_TRAIT_OBJ: return self.get_dyn_fat_ptr_type()
@@ -3322,9 +3322,9 @@ impl Codegen:
         if name_sym == self.sym_option and count == 1:
             let inner = self.resolve_type(args[0])
             if inner != 0: return self.get_or_create_option_type(0, inner)
-        if name_sym == self.sym_vec and count == 1:
+        if name_sym == self.sym_list and count == 1:
             let inner = self.resolve_type(args[0])
-            if inner != 0: return self.get_or_create_vec_type(0, inner)
+            if inner != 0: return self.get_or_create_list_type(0, inner)
         if name_sym == self.sym_result and count == 2:
             let ok = self.resolve_type(args[0])
             let err = self.resolve_type(args[1])
@@ -3339,7 +3339,7 @@ impl Codegen:
         if self.generic_structs.contains(name_sym):
             // #1647 (D65): a generic struct instance is Sema's. The arguments
             // name it through the active bindings; an LLVM layout never does.
-            let inst_args: Vec[i32] = Vec.new()
+            let inst_args: List[i32] = List.new()
             for ai in 0..count:
                 let arg_sema = self.type_expr_to_sema_type(args[ai])
                 if arg_sema <= 0: break
@@ -3381,10 +3381,10 @@ impl Codegen:
     // resolved Sema types. An i8 array would lose the C alignment.
     fn c_va_list_llvm_type() -> i64:
         if type_layout_c_va_list_kind() == C_VA_LIST_POINTER: return wl_ptr_type(self.context)
-        var fields: Vec[i64] = Vec.new()
+        var fields: List[i64] = List.new()
         for i in 0..(type_layout_c_va_list_size() / 8) as i32:
             fields.push(wl_i64_type(self.context))
-        wl_struct_type(self.context, vec_data_i64(&fields), fields.len() as i32, 0)
+        wl_struct_type(self.context, list_data_i64(&fields), fields.len() as i32, 0)
 
     // ── D75 (§16.2b.5): C variadic definitions ─────────────────────────
     // `var ap = va_start()` is llvm.va_start on the binding's storage, the
@@ -3394,15 +3394,15 @@ impl Codegen:
     // every target this compiler emits (AAPCS64 Linux, Windows' 8-byte slots).
 
     mut fn emit_c_va_list_marker(intrinsic_name: &str, list_ptr: i64):
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
-        let ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+        let ft = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 1, 0)
         var func = wl_get_named_function(self.llmod, intrinsic_name)
         if func == 0:
             func = wl_add_function(self.llmod, intrinsic_name, ft)
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(list_ptr)
-        let _ = wl_build_call(self.builder, ft, func, vec_data_i64(&args), 1)
+        let _ = wl_build_call(self.builder, ft, func, list_data_i64(&args), 1)
 
     // The next argument of the list at `list_ptr` as `ty` — an integer at
     // least as wide as C's int, a double or a pointer (Sema refused every
@@ -3426,9 +3426,9 @@ impl Codegen:
         8
 
     fn c_va_byte_offset(base: i64, offset: i64) -> i64:
-        let indices: Vec[i64] = Vec.new()
+        let indices: List[i64] = List.new()
         indices.push(offset)
-        wl_build_gep(self.builder, wl_i8_type(self.context), base, vec_data_i64(&indices), 1)
+        wl_build_gep(self.builder, wl_i8_type(self.context), base, list_data_i64(&indices), 1)
 
     // Takes the stack slot a list's stack pointer (the field at
     // `stack_field`) points at and advances the pointer one 8-byte slot.
@@ -3439,13 +3439,13 @@ impl Codegen:
 
     fn c_va_arg_join(reg_addr: i64, reg_bb: i64, stack_addr: i64, stack_bb: i64) -> i64:
         let phi = wl_build_phi(self.builder, wl_ptr_type(self.context))
-        let vals: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
         vals.push(reg_addr)
         vals.push(stack_addr)
-        let bbs: Vec[i64] = Vec.new()
+        let bbs: List[i64] = List.new()
         bbs.push(reg_bb)
         bbs.push(stack_bb)
-        wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+        wl_add_incoming(phi, list_data_i64(&vals), list_data_i64(&bbs), 2)
         phi
 
     // A char* list (Darwin arm64, Windows, WebAssembly): each argument has
@@ -3474,12 +3474,12 @@ impl Codegen:
     fn c_va_arg_sysv_x86_64_addr(list_ptr: i64, is_fp: bool) -> i64:
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
-        let fields: Vec[i64] = Vec.new()
+        let fields: List[i64] = List.new()
         fields.push(i32_ty)
         fields.push(i32_ty)
         fields.push(ptr_ty)
         fields.push(ptr_ty)
-        let tag_ty = wl_struct_type(self.context, vec_data_i64(&fields), 4, 0)
+        let tag_ty = wl_struct_type(self.context, list_data_i64(&fields), 4, 0)
         let offset_field = wl_build_struct_gep(self.builder, tag_ty, list_ptr, if is_fp: 1 else: 0)
         let offset = wl_build_load(self.builder, i32_ty, offset_field)
         let fits = wl_build_icmp(self.builder, wl_int_ule(), offset, wl_const_int(i32_ty, if is_fp: 160 else: 40, 0))
@@ -3508,13 +3508,13 @@ impl Codegen:
     fn c_va_arg_aapcs64_addr(list_ptr: i64, is_fp: bool) -> i64:
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
-        let fields: Vec[i64] = Vec.new()
+        let fields: List[i64] = List.new()
         fields.push(ptr_ty)
         fields.push(ptr_ty)
         fields.push(ptr_ty)
         fields.push(i32_ty)
         fields.push(i32_ty)
-        let list_ty = wl_struct_type(self.context, vec_data_i64(&fields), 5, 0)
+        let list_ty = wl_struct_type(self.context, list_data_i64(&fields), 5, 0)
         let offs_field = wl_build_struct_gep(self.builder, list_ty, list_ptr, if is_fp: 4 else: 3)
         let offs = wl_build_load(self.builder, i32_ty, offs_field)
         let function = wl_get_insert_function(self.builder)
@@ -3613,8 +3613,8 @@ impl Codegen:
     // Record every declaration Pass 0b defines, under the symbol it registers.
     mut fn register_type_bodies():
         self.type_body_decl = HashMap.new()
-        self.type_body_sym = Vec.new()
-        self.type_body_state = Vec.new()
+        self.type_body_sym = List.new()
+        self.type_body_state = List.new()
         self.type_bodies_pending = 0
         for i in 0..self.pool.decl_count():
             self.type_body_sym.push(0)
@@ -3662,8 +3662,8 @@ impl Codegen:
         let saved_len: i32 = self.type_bindings_len
         let saved_syms = move self.type_binding_syms
         let saved_types = move self.type_binding_types
-        self.type_binding_syms = Vec.new()
-        self.type_binding_types = Vec.new()
+        self.type_binding_syms = List.new()
+        self.type_binding_types = List.new()
         self.type_bindings_len = 0
         self.sync_decl_context(di)
         let decl = self.pool.get_decl(di)
@@ -3740,7 +3740,7 @@ impl Codegen:
                 return self.sema.find_exact_type(TypeKind.TY_SLICE, inner, self.pool.get_data1(type_node), 0) as i32
             let option_sym = self.sema.pool_lookup_symbol("Option")
             if option_sym != 0:
-                let args: Vec[i32] = Vec.new()
+                let args: List[i32] = List.new()
                 args.push(inner)
                 return self.sema.find_generic_inst_type(option_sym, args, 1) as i32
             return 0
@@ -3752,7 +3752,7 @@ impl Codegen:
         if kind == NodeKind.NK_TYPE_TUPLE:
             let start = self.pool.get_data0(type_node)
             let count = self.pool.get_data1(type_node)
-            let elems: Vec[i32] = Vec.new()
+            let elems: List[i32] = List.new()
             for ei in 0..count:
                 let elem = self.type_expr_to_sema_type(self.pool.get_extra(start + ei))
                 if elem == 0:
@@ -3766,7 +3766,7 @@ impl Codegen:
             let base_sym = if sema_base != 0: sema_base else: raw_base
             let arg_start = self.pool.get_data1(type_node)
             let arg_count = self.pool.get_data2(type_node)
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             for ai in 0..arg_count:
                 let arg = self.type_expr_to_sema_type(self.pool.get_extra(arg_start + ai))
                 if arg == 0:
@@ -3836,13 +3836,13 @@ impl Codegen:
         let inner_tid = self.sema.get_generic_inst_arg(sema_tid, arg_idx)
         self.sema_type_to_llvm(inner_tid)
 
-    mut fn generic_enum_payload_llvm_type(payload_tys: &Vec[i32]) -> i64:
+    mut fn generic_enum_payload_llvm_type(payload_tys: &List[i32]) -> i64:
         let count = payload_tys.len() as i32
         if count <= 0:
             return 0
         if count == 1:
             return self.sema_type_to_llvm(payload_tys[0])
-        let fields: Vec[i64] = Vec.new()
+        let fields: List[i64] = List.new()
         for pi in 0..count:
             var field_ty = self.sema_type_to_llvm(payload_tys[pi])
             if field_ty == 0:
@@ -3931,7 +3931,7 @@ impl Codegen:
 
         // §2's shape from the model (#1438): { i32 tag, [n x unit] }.
         let body = self.enum_body_from_layout(wl_i32_type(self.context), self.sema.type_layout_size_of_frozen(resolved), self.sema.type_layout_align_of_frozen(resolved))
-        wl_struct_set_body(enum_type, vec_data_i64(&body), body.len() as i32, 0)
+        wl_struct_set_body(enum_type, list_data_i64(&body), body.len() as i32, 0)
         self.check_enum_layout("generic enum", resolved, enum_type)
         self.enum_variant_starts[enum_idx] = v_start
         self.enum_variant_counts[enum_idx] = variant_count
@@ -3945,7 +3945,7 @@ impl Codegen:
             return 0
         let tp_flat_start = tp_start_opt.unwrap()
         let tp_count = tp_count_opt.unwrap()
-        let sema_args: Vec[i32] = Vec.new()
+        let sema_args: List[i32] = List.new()
         for ti in 0..tp_count:
             var arg_sema = 0
             if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
@@ -3984,20 +3984,20 @@ impl Codegen:
             let arg_count = self.sema.get_generic_inst_arg_count(resolved_tid)
             let base_name = self.sema_symbol_text(base_sym)
             if base_name == "Sender" or base_name == "Receiver":
-                let ch_fields: Vec[i64] = Vec.new()
+                let ch_fields: List[i64] = List.new()
                 ch_fields.push(wl_i64_type(self.context))
-                return wl_struct_type(self.context, vec_data_i64(&ch_fields), 1, 0)
+                return wl_struct_type(self.context, list_data_i64(&ch_fields), 1, 0)
             if self.sema.type_symbol_is_std_box(base_sym) != 0 and arg_count == 1:
                 let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
                 let elem_resolved = self.sema.resolve_alias(elem_tid)
                 if self.sema.get_type_kind(elem_resolved) == TypeKind.TY_TRAIT_OBJ:
                     return self.get_dyn_fat_ptr_type()
                 return wl_ptr_type(self.context)
-            if cg_base_sym == self.sym_vec and arg_count > 0:
+            if cg_base_sym == self.sym_list and arg_count > 0:
                 let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
                 let elem_ty = self.sema_type_to_llvm(elem_tid)
                 if elem_ty != 0:
-                    return self.get_or_create_vec_type(resolved_tid, elem_ty)
+                    return self.get_or_create_list_type(resolved_tid, elem_ty)
             if cg_base_sym == self.sym_hashmap and arg_count > 1:
                 let key_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
                 let val_tid = self.sema.get_generic_inst_arg(resolved_tid, 1)
@@ -4016,10 +4016,10 @@ impl Codegen:
                 if elem_ty != 0:
                     return self.get_or_create_slotmap_type(resolved_tid, elem_ty)
             if cg_base_sym == self.sym_handle:
-                let h_fields: Vec[i64] = Vec.new()
+                let h_fields: List[i64] = List.new()
                 h_fields.push(wl_i32_type(self.context))
                 h_fields.push(wl_i32_type(self.context))
-                return wl_struct_type(self.context, vec_data_i64(&h_fields), 2, 0)
+                return wl_struct_type(self.context, list_data_i64(&h_fields), 2, 0)
             if cg_base_sym == self.sym_option and arg_count > 0:
                 let payload_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
                 let payload_ty = self.sema_type_to_llvm(payload_tid)
@@ -4032,40 +4032,40 @@ impl Codegen:
                 let err_ty = self.sema_type_to_llvm(err_tid)
                 if ok_ty != 0 and err_ty != 0:
                     return self.get_or_create_result_type(resolved_tid, ok_ty, err_ty)
-            // VecSlot[T] = { data_ptr: i64, index: i64 }
-            if cg_base_sym == self.sym_vecslot:
-                let vs_fields: Vec[i64] = Vec.new()
+            // ListSlot[T] = { data_ptr: i64, index: i64 }
+            if cg_base_sym == self.sym_listslot:
+                let vs_fields: List[i64] = List.new()
                 vs_fields.push(wl_i64_type(self.context))
                 vs_fields.push(wl_i64_type(self.context))
-                return wl_struct_type(self.context, vec_data_i64(&vs_fields), 2, 0)
+                return wl_struct_type(self.context, list_data_i64(&vs_fields), 2, 0)
             // SlotMapSlot[T] = { map_ptr: i64, index: u32, generation: u32 }
             if cg_base_sym == self.sym_slotmapslot:
-                let sms_fields: Vec[i64] = Vec.new()
+                let sms_fields: List[i64] = List.new()
                 sms_fields.push(wl_i64_type(self.context))
                 sms_fields.push(wl_i32_type(self.context))
                 sms_fields.push(wl_i32_type(self.context))
-                return wl_struct_type(self.context, vec_data_i64(&sms_fields), 3, 0)
-            // VecRange[T] = { data_ptr: i64, offset: i64, len: i64 }
-            if cg_base_sym == self.sym_vecrange:
-                let vr_fields: Vec[i64] = Vec.new()
+                return wl_struct_type(self.context, list_data_i64(&sms_fields), 3, 0)
+            // ListRange[T] = { data_ptr: i64, offset: i64, len: i64 }
+            if cg_base_sym == self.sym_listrange:
+                let vr_fields: List[i64] = List.new()
                 vr_fields.push(wl_i64_type(self.context))
                 vr_fields.push(wl_i64_type(self.context))
                 vr_fields.push(wl_i64_type(self.context))
-                return wl_struct_type(self.context, vec_data_i64(&vr_fields), 3, 0)
-            // VecIterRef[T] = { data_ptr: i64, len: i64, idx: i64 }
-            if cg_base_sym == self.sym_veciterref:
-                let vir_fields: Vec[i64] = Vec.new()
+                return wl_struct_type(self.context, list_data_i64(&vr_fields), 3, 0)
+            // ListIterRef[T] = { data_ptr: i64, len: i64, idx: i64 }
+            if cg_base_sym == self.sym_listiterref:
+                let vir_fields: List[i64] = List.new()
                 vir_fields.push(wl_i64_type(self.context))
                 vir_fields.push(wl_i64_type(self.context))
                 vir_fields.push(wl_i64_type(self.context))
-                return wl_struct_type(self.context, vec_data_i64(&vir_fields), 3, 0)
-            // VecIterPlace[T] = { data_ptr: i64, len: i64, idx: i64 }
-            if cg_base_sym == self.sym_veciterplace:
-                let vip_fields: Vec[i64] = Vec.new()
+                return wl_struct_type(self.context, list_data_i64(&vir_fields), 3, 0)
+            // ListIterPlace[T] = { data_ptr: i64, len: i64, idx: i64 }
+            if cg_base_sym == self.sym_listiterplace:
+                let vip_fields: List[i64] = List.new()
                 vip_fields.push(wl_i64_type(self.context))
                 vip_fields.push(wl_i64_type(self.context))
                 vip_fields.push(wl_i64_type(self.context))
-                return wl_struct_type(self.context, vec_data_i64(&vip_fields), 3, 0)
+                return wl_struct_type(self.context, list_data_i64(&vip_fields), 3, 0)
             if base_sym != 0 and self.sema.named_types.contains(base_sym):
                 let base_tid: i32 = self.sema.named_types.get(base_sym).unwrap()
                 if self.sema.get_type_kind(base_tid) == TypeKind.TY_ENUM:
@@ -4128,7 +4128,7 @@ impl Codegen:
         if tk == TypeKind.TY_TUPLE:
             let elem_start = self.sema.get_type_d0(resolved_tid)
             let elem_count = self.sema.get_type_d1(resolved_tid)
-            let elem_types: Vec[i64] = Vec.new()
+            let elem_types: List[i64] = List.new()
             for i in 0..elem_count:
                 let elem_tid: i32 = self.sema.type_extra[(elem_start + i)]
                 var elem_ty = self.sema_type_to_llvm(elem_tid)
@@ -4137,7 +4137,7 @@ impl Codegen:
                 elem_types.push(elem_ty)
             if elem_count > 0:
                 // #1964: the body is TypeLayout's placement, then proven.
-                let offsets: Vec[i64] = Vec.new()
+                let offsets: List[i64] = List.new()
                 for i in 0..elem_count:
                     offsets.push(self.sema.type_layout_tuple_elem_offset_frozen(resolved_tid, i))
                 let tuple_ty = self.tuple_type_from_layout(&elem_types, &offsets, self.sema.type_layout_size_of_frozen(resolved_tid), self.sema.type_layout_align_of_frozen(resolved_tid))
@@ -4153,11 +4153,11 @@ impl Codegen:
             // like every bool field, to i1 — MIR types the place `bool`, and
             // an i8 here disagreed with it (audit:codegen, #1413). Both
             // occupy one byte, so the layout is unchanged.
-            let range_fields: Vec[i64] = Vec.new()
+            let range_fields: List[i64] = List.new()
             range_fields.push(elem_ty)
             range_fields.push(elem_ty)
             range_fields.push(self.sema_type_to_llvm(self.sema.ty_bool as i32))
-            return wl_struct_type(self.context, vec_data_i64(&range_fields), 3, 0)
+            return wl_struct_type(self.context, list_data_i64(&range_fields), 3, 0)
         if tk == TypeKind.TY_ARRAY:
             let elem_tid = self.sema.get_type_d0(resolved_tid)
             let arr_len = self.sema.get_type_d1(resolved_tid)
@@ -4178,17 +4178,17 @@ impl Codegen:
             return wl_ptr_type(self.context)
         if tk == TypeKind.TY_FN:
             let ptr_ty = wl_ptr_type(self.context)
-            let fat_types: Vec[i64] = Vec.new()
+            let fat_types: List[i64] = List.new()
             fat_types.push(ptr_ty)
             fat_types.push(ptr_ty)
-            return wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
+            return wl_struct_type(self.context, list_data_i64(&fat_types), 2, 0)
         if tk == TypeKind.TY_EXTERN_FN:
             return wl_ptr_type(self.context)
         if tk == TypeKind.TY_SLICE:
-            let slice_fields: Vec[i64] = Vec.new()
+            let slice_fields: List[i64] = List.new()
             slice_fields.push(wl_ptr_type(self.context))
             slice_fields.push(wl_i64_type(self.context))
-            return wl_struct_type(self.context, vec_data_i64(&slice_fields), 2, 0)
+            return wl_struct_type(self.context, list_data_i64(&slice_fields), 2, 0)
         0
 
     // Reverse map: LLVM type → sema TypeId (for primitives and str)
@@ -4235,7 +4235,7 @@ impl Codegen:
                 if mono_base_opt.is_some() and tp_start_opt.is_some() and tp_count_opt.is_some():
                     let tp_flat_start = tp_start_opt.unwrap()
                     let tp_count = tp_count_opt.unwrap()
-                    let sema_args: Vec[i32] = Vec.new()
+                    let sema_args: List[i32] = List.new()
                     for ti in 0..tp_count:
                         var arg_sema = 0
                         if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
@@ -4635,7 +4635,7 @@ impl Codegen:
             self.struct_field_defaults.push(0)
             self.struct_llvm_field_indices.push(fi)
 
-        let field_types: Vec[i64] = Vec.new()
+        let field_types: List[i64] = List.new()
         for fi in 0..field_count:
             let field_tid = self.codegen_get_type_extra(extra_start + fi * 3 + 1)
             let field_ty = self.mir_sema_type_to_llvm(field_tid)
@@ -4643,7 +4643,7 @@ impl Codegen:
                 sema_phase_bug(f"BUG: generator value field {fi} lacks an LLVM type (state type {resolved})")
             self.struct_field_types[field_start + fi] = field_ty
             field_types.push(field_ty)
-        wl_struct_set_body(st_type, vec_data_i64(&field_types), field_count, 0)
+        wl_struct_set_body(st_type, list_data_i64(&field_types), field_count, 0)
 
     mut fn declare_generator_state_types():
         for si in 0..self.sema.sig_names.len() as i32:
@@ -4792,7 +4792,7 @@ impl Codegen:
         let field_start = self.reserve_struct_fields(idx, extra_start, field_count, false)
 
         // Parse fields: [field_name, field_type, field_default]*
-        let ft_vec: Vec[i64] = Vec.new()
+        let ft_list: List[i64] = List.new()
         var invalid_layout = 0
         let struct_tid = self.type_decl_sema_tid(type_node)
         for fi in 0..field_count:
@@ -4818,7 +4818,7 @@ impl Codegen:
                 self.had_error = 1
 
             self.struct_field_types[field_start + fi] = f_ty
-            ft_vec.push(f_ty)
+            ft_list.push(f_ty)
 
         if invalid_layout != 0:
             return
@@ -4841,7 +4841,7 @@ impl Codegen:
             var total_bits: i32 = 0
             let bp_field_start = self.bitpacked_field_bit_offsets.len() as i32
             for fi in 0..field_count:
-                let f_ty = ft_vec[fi]
+                let f_ty = ft_list[fi]
                 var field_bits: i32 = 0
                 let f_tk = wl_get_type_kind(f_ty)
                 if f_tk == wl_integer_type_kind():
@@ -4877,14 +4877,14 @@ impl Codegen:
         // struct_declared_align, never a layout query: this runs while
         // bodies are still being defined, and asking a field's ABI alignment
         // here sized a record holding a not-yet-bodied recursive type by
-        // value (`JV { … Vec[JV] }`, the #1430 guard). A record with a
+        // value (`JV { … List[JV] }`, the #1430 guard). A record with a
         // declared alignment always has its body already (its declaration
         // set it), so the lookup is complete.
         let pack_cap = type_decl_pack_cap(packed_kind) as i64
         var needs_padding = has_alignment or pack_cap > 0
         if not needs_padding and is_packed == 0:
             for fi in 0..field_count:
-                if self.holds_declared_align(ft_vec[fi]):
+                if self.holds_declared_align(ft_list[fi]):
                     needs_padding = true
                     break
 
@@ -4894,13 +4894,13 @@ impl Codegen:
             // to match the C ABI layout specified by @[align(N)] annotations,
             // a packing cap, and fields whose declared alignment exceeds
             // their LLVM alignment (a repr(packed(N)) record).
-            let padded_types: Vec[i64] = Vec.new()
+            let padded_types: List[i64] = List.new()
             var byte_offset: i64 = 0
             var use_packed = pack_cap > 0
             var max_align: i64 = 1
 
             for fi in 0..field_count:
-                let f_ty = ft_vec[fi]
+                let f_ty = ft_list[fi]
                 let explicit_align = field_align_value(self.pool.get_extra(align_base + fi)) as i64
                 let natural_align = self.declared_align_of(f_ty)
                 var field_align = if explicit_align > 0: explicit_align else: natural_align
@@ -4941,7 +4941,7 @@ impl Codegen:
                     padded_types.push(wl_array_type(wl_i8_type(self.context), pad_size))
 
             let packed_flag = if use_packed: 1 else: 0
-            wl_struct_set_body(st_type, vec_data_i64(&padded_types), padded_types.len() as i32, packed_flag)
+            wl_struct_set_body(st_type, list_data_i64(&padded_types), padded_types.len() as i32, packed_flag)
             if max_align > self.abi_align_of(st_type):
                 self.struct_declared_align.insert(st_type, max_align)
             // TypeLayout owns the record's size; the padded body must agree
@@ -4958,9 +4958,9 @@ impl Codegen:
             // hidden liveness byte appended (Sema decided; the source field
             // indices are unchanged).
             if self.sema.struct_liveness_byte_frozen(self.codegen_sema_sym_for(name_sym)) != 0:
-                ft_vec.push(wl_i8_type(self.context))
+                ft_list.push(wl_i8_type(self.context))
                 self.liveness_byte_indices.insert(st_type, field_count)
-            wl_struct_set_body(st_type, vec_data_i64(&ft_vec), ft_vec.len() as i32, is_packed)
+            wl_struct_set_body(st_type, list_data_i64(&ft_list), ft_list.len() as i32, is_packed)
 
     // ── Declare union type ────────────────────────────────────────────
 
@@ -5022,11 +5022,11 @@ impl Codegen:
         if rem != 0:
             max_size = max_size + (max_align - rem)
 
-        let body: Vec[i64] = Vec.new()
+        let body: List[i64] = List.new()
         body.push(max_align_ty)
         if max_size > max_align_size:
             body.push(wl_array_type(wl_i8_type(self.context), max_size - max_align_size))
-        wl_struct_set_body(st_type, vec_data_i64(&body), body.len() as i32, 0)
+        wl_struct_set_body(st_type, list_data_i64(&body), body.len() as i32, 0)
 
     // §2 (#1438): the integer whose alignment is `align` — the unit a tagged
     // enum's payload area is built from, so LLVM aligns the record and places
@@ -5048,8 +5048,8 @@ impl Codegen:
     // payload_offset and size by construction; check_enum_layout proves it
     // for every emitted enum. Nothing here measures a payload: the model is
     // the one owner of enum layout, codegen materializes it.
-    mut fn enum_body_from_layout(tag_ty: i64, size: i64, align: i64) -> Vec[i64]:
-        let body: Vec[i64] = Vec.new()
+    mut fn enum_body_from_layout(tag_ty: i64, size: i64, align: i64) -> List[i64]:
+        let body: List[i64] = List.new()
         body.push(tag_ty)
         let unit = self.enum_payload_unit_type(align)
         let shape = type_layout_enum_shape(self.abi_size_of(tag_ty), self.abi_align_of(tag_ty), 0, align)
@@ -5089,10 +5089,10 @@ impl Codegen:
     // The model places; codegen materializes, and every tuple access reads
     // the positions through tuple_elem_index. Named, so two tuples whose
     // padded bodies are one literal never share a position table.
-    mut fn tuple_type_from_layout(elem_tys0: &Vec[i64], offsets: &Vec[i64], size: i64, align: i64) -> i64:
+    mut fn tuple_type_from_layout(elem_tys0: &List[i64], offsets: &List[i64], size: i64, align: i64) -> i64:
         let elem_tys = self.tuple_member_types(elem_tys0)
         let n = elem_tys.len() as i32
-        let literal = wl_struct_type(self.context, vec_data_i64(&elem_tys), n, 0)
+        let literal = wl_struct_type(self.context, list_data_i64(&elem_tys), n, 0)
         if self.tuple_measures(literal, offsets, size, align):
             return literal
         var key = f"{literal}/{size}/{align}"
@@ -5102,8 +5102,8 @@ impl Codegen:
         if cached != 0:
             return cached
         let i8_ty = wl_i8_type(self.context)
-        let body: Vec[i64] = Vec.new()
-        let positions: Vec[i32] = Vec.new()
+        let body: List[i64] = List.new()
+        let positions: List[i32] = List.new()
         var at: i64 = 0
         var packed = 0
         for i in 0..n:
@@ -5125,7 +5125,7 @@ impl Codegen:
         if size > at:
             body.push(wl_array_type(i8_ty, size - at))
         let named = wl_struct_create_named(self.context, "tuple")
-        wl_struct_set_body(named, vec_data_i64(&body), body.len() as i32, packed)
+        wl_struct_set_body(named, list_data_i64(&body), body.len() as i32, packed)
         self.tuple_elem_index_starts.insert(named, self.tuple_elem_indices.len() as i32)
         self.tuple_elem_indices.push(n)
         for i in 0..n:
@@ -5140,9 +5140,9 @@ impl Codegen:
     // element types, each at declared_align_of (§16.4/§4.3d — the alignment
     // TypeLayout gives the type it was emitted from), so both paths produce
     // one type, as #1958's Sema-less Option does.
-    mut fn tuple_type_from_elems(elem_tys0: &Vec[i64]) -> i64:
+    mut fn tuple_type_from_elems(elem_tys0: &List[i64]) -> i64:
         let elem_tys = self.tuple_member_types(elem_tys0)
-        let offsets: Vec[i64] = Vec.new()
+        let offsets: List[i64] = List.new()
         var at: i64 = 0
         var align: i64 = 1
         for i in 0..elem_tys.len() as i32:
@@ -5159,8 +5159,8 @@ impl Codegen:
     // no bytes in a layout) as the empty struct `{}` rather than the `void`
     // its value type lowers to — `void` is no member LLVM can place or size.
     // The element keeps its position, at its offset, occupying nothing.
-    fn tuple_member_types(elem_tys: &Vec[i64]) -> Vec[i64]:
-        let members: Vec[i64] = Vec.new()
+    fn tuple_member_types(elem_tys: &List[i64]) -> List[i64]:
+        let members: List[i64] = List.new()
         for i in 0..elem_tys.len() as i32:
             let elem = elem_tys[i]
             if elem != 0 and wl_get_type_kind(elem) == wl_void_type_kind():
@@ -5171,7 +5171,7 @@ impl Codegen:
 
     // Whether LLVM type `ty` (a tuple body) measures `size` bytes aligned
     // `align` with element i at offsets[i].
-    mut fn tuple_measures(ty: i64, offsets: &Vec[i64], size: i64, align: i64) -> bool:
+    mut fn tuple_measures(ty: i64, offsets: &List[i64], size: i64, align: i64) -> bool:
         if self.abi_size_of(ty) != size or self.declared_align_of(ty) != align:
             return false
         let dl = wl_get_module_data_layout(self.llmod)
@@ -5214,7 +5214,7 @@ impl Codegen:
     mut fn check_tuple_layout(sema_tid: i32, tuple_ty: i64):
         if sema_tid <= 0 or tuple_ty == 0:
             return
-        let offsets: Vec[i64] = Vec.new()
+        let offsets: List[i64] = List.new()
         var at = ""
         for i in 0..self.sema.get_type_d1(sema_tid):
             let off = self.sema.type_layout_tuple_elem_offset_frozen(sema_tid, i)
@@ -5287,7 +5287,7 @@ impl Codegen:
             var payload_ty: i64 = 0
             if v_payload_count > 0:
                 // Build all payload field types into a struct
-                let payload_fields: Vec[i64] = Vec.new()
+                let payload_fields: List[i64] = List.new()
                 for pi in 0..v_payload_count:
                     let payload_type_node = self.pool.get_extra(offset + pi)
                     let field_ty = self.field_llvm_type(self.sema_enum_payload_type(sema_tid, vi, pi), payload_type_node, name_sym, vi * 1000 + pi)
@@ -5311,7 +5311,7 @@ impl Codegen:
         let idx: i32 = self.enum_type_map.get(name_sym).unwrap()
         let enum_type: i64 = self.enum_llvm_types[idx]
         let body = self.enum_body_from_layout(wl_i32_type(self.context), self.sema.type_layout_size_of_frozen(sema_tid), self.sema.type_layout_align_of_frozen(sema_tid))
-        wl_struct_set_body(enum_type, vec_data_i64(&body), body.len() as i32, 0)
+        wl_struct_set_body(enum_type, list_data_i64(&body), body.len() as i32, 0)
         self.check_enum_layout("enum", sema_tid, enum_type)
 
         self.enum_variant_starts[idx] = v_starts
@@ -5377,7 +5377,7 @@ impl Codegen:
             var payload_ty: i64 = 0
             if payload_count > 0:
                 let template = self.type_decl_tp_count(type_node) > 0
-                let payload_fields: Vec[i64] = Vec.new()
+                let payload_fields: List[i64] = List.new()
                 var payload_ok = true
                 for pi in 0..payload_count:
                     let payload_type_node = self.pool.get_extra(offset + 3 + pi)
@@ -5407,7 +5407,7 @@ impl Codegen:
             let enum_type: i64 = self.enum_llvm_types[enum_idx]
             // §2's shape from the model (#1438): { repr tag, [n x unit] }.
             let body = self.enum_body_from_layout(repr_ty, self.sema.type_layout_size_of_frozen(sema_tid), self.sema.type_layout_align_of_frozen(sema_tid))
-            wl_struct_set_body(enum_type, vec_data_i64(&body), body.len() as i32, 0)
+            wl_struct_set_body(enum_type, list_data_i64(&body), body.len() as i32, 0)
             self.check_enum_layout("enum", sema_tid, enum_type)
             // Register variant info in regular enum tables for payload extraction
             let enum_v_start = self.enum_variant_names.len() as i32
@@ -5565,7 +5565,7 @@ impl Codegen:
     // D39: the prefixes of `--link-bundle` manifests join the embedded ones,
     // so a compiler with an empty embedded index (stage1) compiles exactly
     // what a compiler with the bundle embedded compiles.
-    mut fn add_bundle_prefixes(prefixes: &Vec[str]):
+    mut fn add_bundle_prefixes(prefixes: &List[str]):
         for i in 0..prefixes.len() as i32:
             let prefix = prefixes[i]
             if not self.bundle_prefixes.contains(prefix):
@@ -5771,7 +5771,7 @@ impl Codegen:
         let sema_sig_idx = self.sema.get_sig(name_sym)
 
         // Resolve param types
-        let param_types: Vec[i64] = Vec.new()
+        let param_types: List[i64] = List.new()
 
         // Set method owner before resolving return type so Self can resolve
         let saved_owner: i32 = self.current_method_owner_sym
@@ -5812,7 +5812,7 @@ impl Codegen:
         let cc_name = self.fn_callconv_name(meta)
         let uses_c_abi = self.fn_uses_c_abi(cc_name)
         let is_variadic = (flags / FnFlags.VARIADIC) % 2
-        let places: Vec[i32] = Vec.new()
+        let places: List[i32] = List.new()
         for api in 0..param_count:
             places.push(self.sig_abi_param_flags(sema_sig_idx, api))
         let abi_index = self.compute_fn_abi(ret_ty, param_types, places, fn_abi_definition_convention(uses_c_abi, is_variadic != 0), is_variadic)
@@ -5991,7 +5991,7 @@ impl Codegen:
     // types, declared place modes, and convention, so concrete specializations
     // cannot reuse a template's descriptor. Pointer handles are lookup-only;
     // neither hash iteration nor their numeric values affect emitted code.
-    mut fn compute_fn_abi(ret_ty: i64, source_types: &Vec[i64], places: &Vec[i32], convention: i32, variadic: i32) -> i32:
+    mut fn compute_fn_abi(ret_ty: i64, source_types: &List[i64], places: &List[i32], convention: i32, variadic: i32) -> i32:
         var key = f"{convention}:{variadic}:{ret_ty}"
         for pi in 0..source_types.len():
             key = key ++ f"/{source_types[pi]}:{places[pi]}"
@@ -6014,10 +6014,10 @@ impl Codegen:
         ret.pass = fn_abi_return_pass(convention, wl_get_type_kind(ret_ty) != wl_void_type_kind(), indirect_return)
         if ret.pass == PM_INDIRECT:
             ret.llvm_ty = wl_void_type(self.context)
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         if convention == FN_ABI_CLOSURE: params.push(ptr_ty)
         if ret.pass == PM_INDIRECT: params.push(ptr_ty)
-        let classified: Vec[ArgAbi] = Vec.new()
+        let classified: List[ArgAbi] = List.new()
         // System V x86_64: a struct goes in registers only if all of it fits in
         // the ones still free; otherwise all of it goes to the stack (§3.2.3).
         let sysv = convention == FN_ABI_C and codegen_c_abi_sysv_x86_64()
@@ -6062,7 +6062,7 @@ impl Codegen:
         let abi = FnAbi {
             arg_start: start, arg_count: source_types.len() as i32,
             ret, convention,
-            llvm_ty: wl_function_type(ret.llvm_ty, vec_data_i64(&params), params.len() as i32, variadic),
+            llvm_ty: wl_function_type(ret.llvm_ty, list_data_i64(&params), params.len() as i32, variadic),
         }
         let index = self.fn_abis.len() as i32
         self.fn_abis.push(abi)
@@ -6071,8 +6071,8 @@ impl Codegen:
 
     mut fn gen_fn_abi_thunk(fn_val: i64, fat_ty: i64, target_index: i32) -> i64:
         let target: FnAbi = self.fn_abis[target_index]
-        let sources: Vec[i64] = Vec.new()
-        let places: Vec[i32] = Vec.new()
+        let sources: List[i64] = List.new()
+        let places: List[i32] = List.new()
         for pi in 0..target.arg_count:
             let arg = self.fn_abi_arg(target_index, pi)
             sources.push(arg.source_ty)
@@ -6089,7 +6089,7 @@ impl Codegen:
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = function
         wl_position_at_end(self.builder, wl_append_bb(self.context, function, "entry"))
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         var result_buf: i64 = 0
         let has_sret = if target.ret.pass == PM_INDIRECT: 1 else: 0
         if has_sret != 0:
@@ -6102,7 +6102,7 @@ impl Codegen:
             if incoming.pass == PM_INDIRECT:
                 value = wl_build_load(self.builder, incoming.source_ty, value)
             args.push(self.push_call_arg(target_index, pi, value, if outgoing.pass == PM_INDIRECT_PLACE: value else: 0))
-        let call = wl_build_call(self.builder, target.llvm_ty, fn_val, vec_data_i64(&args), args.len() as i32)
+        let call = wl_build_call(self.builder, target.llvm_ty, fn_val, list_data_i64(&args), args.len() as i32)
         let target_byval = self.fn_abi_byval_attr_types(target_index)
         self.apply_c_abi_call_attrs(call, has_sret, target.ret.source_ty, target_byval, target.arg_count, 0)
         if target.ret.pass == PM_IGNORE:
@@ -6163,16 +6163,16 @@ impl Codegen:
 
     // The source type of each argument passed as a pointer to a copy (0 for
     // the rest): what the callee's prologue reads through the pointer.
-    fn fn_abi_byval_types(abi: i32) -> Vec[i64]:
-        let result: Vec[i64] = Vec.new()
+    fn fn_abi_byval_types(abi: i32) -> List[i64]:
+        let result: List[i64] = List.new()
         for pi in 0..self.fn_abis[abi].arg_count:
             let arg = self.fn_abi_arg(abi, pi)
             result.push(if arg.pass == PM_INDIRECT and not arg.owned_place: arg.source_ty else: 0)
         result
 
     // The subset of those copies that carry LLVM's byval attribute.
-    fn fn_abi_byval_attr_types(abi: i32) -> Vec[i64]:
-        if self.fn_abi_byval(abi): self.fn_abi_byval_types(abi) else: vec_zeros_i64(self.fn_abis[abi].arg_count)
+    fn fn_abi_byval_attr_types(abi: i32) -> List[i64]:
+        if self.fn_abi_byval(abi): self.fn_abi_byval_types(abi) else: list_zeros_i64(self.fn_abis[abi].arg_count)
 
     fn bind_fn_abi_owned_place(body: &MirBody, sym: i32, pi: i32, name: i32, incoming: i64) -> bool:
         let index = self.fn_abi_symbols.get(sym) ?? -1
@@ -6185,8 +6185,8 @@ impl Codegen:
         self.record_codegen_param_binding(body, sym, pi, AnalysisMarshalStrategy.CalleeOwnedPlace, incoming, incoming)
         true
 
-    fn fn_abi_direct_types(abi: i32) -> Vec[i64]:
-        let result: Vec[i64] = Vec.new()
+    fn fn_abi_direct_types(abi: i32) -> List[i64]:
+        let result: List[i64] = List.new()
         for pi in 0..self.fn_abis[abi].arg_count:
             let arg = self.fn_abi_arg(abi, pi)
             result.push(if arg.pass == PM_DIRECT and arg.llvm_ty != arg.source_ty: arg.source_ty else: 0)
@@ -6215,12 +6215,12 @@ impl Codegen:
         if ret_ty == 0:
             ret_ty = self.type_fallback()
         let param_count = self.sema.sig_get_param_count(sig_idx)
-        let param_types: Vec[i64] = Vec.new()
+        let param_types: List[i64] = List.new()
         for pi in 0..param_count:
             let p_ty = self.abi_param_source_type(sig_idx, pi)
             param_types.push(p_ty)
 
-        let places: Vec[i32] = Vec.new()
+        let places: List[i32] = List.new()
         for pi in 0..param_count: places.push(self.sig_abi_param_flags(sig_idx, pi))
         let abi_index = self.compute_fn_abi(ret_ty, param_types, places, fn_abi_definition_convention(false, self.sema.sig_is_variadic(sig_idx) != 0), self.sema.sig_is_variadic(sig_idx))
         let abi = self.fn_abis[abi_index]
@@ -6433,8 +6433,8 @@ impl Codegen:
     // stored in a field, a global, an escaping closure, or a channel, so the
     // callee never retains its address. LLVM learns that as `captures(none)`
     // and can then prove a caller's stack value is not reachable through any
-    // loaded pointer: a Vec header stays in registers across a loop that
-    // stores through the Vec's buffer (bench nbody ran 3x slower than C
+    // loaded pointer: a List header stays in registers across a loop that
+    // stores through the List's buffer (bench nbody ran 3x slower than C
     // reloading and re-checking the header after every store). Three shapes
     // still let the reference outlive the call and get no attribute: a
     // returned ephemeral value may be the parameter itself; an ephemeral
@@ -6540,9 +6540,9 @@ impl Codegen:
     // Intrinsic iterator adapters synthesize one owned argument at a time.
     // Their declarations and calls still consume the same interned descriptor.
     mut fn closure_value_arg_abi(val_ty: i64) -> i32:
-        let sources: Vec[i64] = Vec.new()
+        let sources: List[i64] = List.new()
         sources.push(val_ty)
-        let places: Vec[i32] = Vec.new()
+        let places: List[i32] = List.new()
         places.push(0)
         self.compute_fn_abi(wl_void_type(self.context), sources, places, FN_ABI_CLOSURE, 0)
 
@@ -6680,10 +6680,10 @@ impl Codegen:
         let classes = self.c_abi_sysv_classify(ty, 0, 0)
         if classes <= 0: return 0
         if size <= 8: return self.c_abi_sysv_eightbyte_type(classes & 3, size)
-        let parts: Vec[i64] = Vec.new()
+        let parts: List[i64] = List.new()
         parts.push(self.c_abi_sysv_eightbyte_type(classes & 3, 8))
         parts.push(self.c_abi_sysv_eightbyte_type((classes / 4) & 3, size - 8))
-        wl_struct_type(self.context, vec_data_i64(&parts), 2, 0)
+        wl_struct_type(self.context, list_data_i64(&parts), 2, 0)
 
     // Register cost of a classified value: INTEGER registers * 16 + SSE.
     fn c_abi_sysv_register_cost(abi_ty: i64) -> i32:
@@ -6753,12 +6753,12 @@ impl Codegen:
         let cached = self.fn_values.get(sym)
         if cached.is_some():
             return cached.unwrap() as i64
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         params.push(second)
         params.push(wl_i64_type(self.context))
         params.push(wl_i1_type(self.context))
-        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 4, 0)
+        let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 4, 0)
         var fn_val = wl_get_named_function(self.llmod, name)
         if fn_val == 0:
             fn_val = wl_add_function(self.llmod, name, fn_ty)
@@ -6772,12 +6772,12 @@ impl Codegen:
     fn emit_llvm_memcpy(dst: i64, src: i64, byte_count: i64):
         let fn_val = self.ensure_llvm_memcpy_declared()
         let fn_ty = wl_global_get_value_type(fn_val)
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(dst)
         args.push(src)
         args.push(wl_const_int(wl_i64_type(self.context), byte_count, 0))
         args.push(wl_const_int(wl_i1_type(self.context), 0, 0))
-        let _ = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
+        let _ = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 4)
 
     mut fn c_abi_pack_direct_value(value: i64, abi_ty: i64) -> i64:
         if value == 0 or abi_ty == 0:
@@ -6817,17 +6817,17 @@ impl Codegen:
         if index < 0 or self.fn_abis[index].ret.pass != PM_INDIRECT: return .None
         .Some(self.fn_abis[index].ret.source_ty)
 
-    fn fn_abi_symbol_byval_types(sym: i32) -> Option[Vec[i64]]:
+    fn fn_abi_symbol_byval_types(sym: i32) -> Option[List[i64]]:
         let index = self.fn_abi_symbols.get(sym) ?? -1
         if index < 0: return .None
         .Some(self.fn_abi_byval_types(index))
 
-    fn fn_abi_symbol_byval_attr_types(sym: i32) -> Option[Vec[i64]]:
+    fn fn_abi_symbol_byval_attr_types(sym: i32) -> Option[List[i64]]:
         let index = self.fn_abi_symbols.get(sym) ?? -1
         if index < 0: return .None
         .Some(self.fn_abi_byval_attr_types(index))
 
-    fn fn_abi_direct_param_types(sym: i32) -> Option[Vec[i64]]:
+    fn fn_abi_direct_param_types(sym: i32) -> Option[List[i64]]:
         let index = self.fn_abi_symbols.get(sym) ?? -1
         if index < 0: return .None
         .Some(self.fn_abi_direct_types(index))
@@ -6839,7 +6839,7 @@ impl Codegen:
         if ret.pass != PM_DIRECT or ret.llvm_ty == ret.source_ty: return .None
         .Some(ret.source_ty)
 
-    fn apply_c_abi_byval_attrs(function: i64, byval_types: &Vec[i64], param_count: i32, param_offset: i32):
+    fn apply_c_abi_byval_attrs(function: i64, byval_types: &List[i64], param_count: i32, param_offset: i32):
         if function == 0:
             return
         if not codegen_c_abi_needs_byval_attr():
@@ -6852,7 +6852,7 @@ impl Codegen:
                 continue
             wl_add_param_byval_attr(self.context, function, pi + param_offset, byval_ty)
 
-    fn apply_c_abi_call_attrs(call_val: i64, has_sret: i32, sret_ty: i64, byval_types: &Vec[i64], original_arg_count: i32, arg_prefix_count: i32):
+    fn apply_c_abi_call_attrs(call_val: i64, has_sret: i32, sret_ty: i64, byval_types: &List[i64], original_arg_count: i32, arg_prefix_count: i32):
         if call_val == 0:
             return
         var byval_offset = arg_prefix_count
@@ -6877,7 +6877,7 @@ impl Codegen:
     // Every symbol bound to the function value `old_fn` is bound to `new_fn`
     // (#1850). The result does not depend on the map's order.
     mut fn redirect_fn_value(old_fn: i64, new_fn: i64):
-        let syms: Vec[i32] = Vec.new()
+        let syms: List[i32] = List.new()
         for (sym, value) in self.fn_values:
             if value == old_fn:
                 syms.push(sym)
@@ -6912,7 +6912,7 @@ impl Codegen:
         let cc_name = self.fn_callconv_name(meta)
         let uses_internal_abi = codegen_extern_uses_internal_abi(name_str, cc_name)
 
-        let orig_param_types: Vec[i64] = Vec.new()
+        let orig_param_types: List[i64] = List.new()
         for pi in 0..param_count:
             let param_fact = self.abi_param_source_type(sema_sig_idx, pi)
             orig_param_types.push(self.verify_ast_type(MODE_SITE_DECL_TYPE_NODE, param_fact, self.pool.fn_param_type(param_start, pi), name_sym, pi))
@@ -6920,7 +6920,7 @@ impl Codegen:
         // ABI transformation for C interop on aarch64:
         // - Struct params > 16 bytes → ptr (caller passes pointer to copy)
         // - Struct returns > 16 bytes → void return + hidden sret ptr first param
-        let places: Vec[i32] = Vec.new()
+        let places: List[i32] = List.new()
         for pi in 0..param_count:
             places.push(self.sig_abi_param_flags(sema_sig_idx, pi))
         let abi_index = self.compute_fn_abi(ret_ty, orig_param_types, places, if uses_internal_abi: FN_ABI_WITH else: FN_ABI_C, is_variadic)
@@ -7162,7 +7162,7 @@ impl Codegen:
             size = shape.size
             align = shape.align
         let body = self.enum_body_from_layout(wl_i32_type(self.context), size, align)
-        let opt_type = wl_struct_type(self.context, vec_data_i64(&body), body.len() as i32, 0)
+        let opt_type = wl_struct_type(self.context, list_data_i64(&body), body.len() as i32, 0)
         self.option_cache_map.insert(cache_key, opt_type)
         self.check_enum_layout("Option", sema_tid, opt_type)
         opt_type
@@ -7192,14 +7192,14 @@ impl Codegen:
             size = shape.size
             align = shape.align
         let body = self.enum_body_from_layout(wl_i32_type(self.context), size, align)
-        let res_type = wl_struct_type(self.context, vec_data_i64(&body), body.len() as i32, 0)
+        let res_type = wl_struct_type(self.context, list_data_i64(&body), body.len() as i32, 0)
         self.result_cache_map.insert(cache_key, res_type)
         self.check_enum_layout("Result", sema_tid, res_type)
         res_type
 
     mut fn get_or_create_context_error_type(source_ty: i64) -> i64:
         // ContextError[E] = { message: str, source: E }
-        let body: Vec[i64] = Vec.new()
+        let body: List[i64] = List.new()
         let str_sym = self.intern.intern("str")
         let st_opt = self.struct_type_map.get(str_sym)
         if st_opt.is_some():
@@ -7208,9 +7208,9 @@ impl Codegen:
         else:
             body.push(self.type_fallback())
         body.push(source_ty)
-        wl_struct_type(self.context, vec_data_i64(&body), 2, 0)
+        wl_struct_type(self.context, list_data_i64(&body), 2, 0)
 
-    // ── Vec/HashMap/HashSet type construction ─────────────────────────
+    // ── List/HashMap/HashSet type construction ─────────────────────────
 
     fn deterministic_type_tag(ty: i64) -> str:
         let kind = wl_get_type_kind(ty)
@@ -7240,41 +7240,41 @@ impl Codegen:
     // structs and the call-site store rejects it. The structural key (the
     // element llvm type handle, a pointer, so it cannot collide with small
     // tid keys) unifies them; a tid hit stays the fast path.
-    fn get_or_create_vec_type(sema_tid: i32, elem_ty: i64) -> i64:
+    fn get_or_create_list_type(sema_tid: i32, elem_ty: i64) -> i64:
         if sema_tid > 0:
-            let tid_hit = self.vec_cache_map.get(sema_tid as i64)
+            let tid_hit = self.list_cache_map.get(sema_tid as i64)
             if tid_hit.is_some():
                 return tid_hit.unwrap()
-        let struct_hit = self.vec_cache_map.get(elem_ty)
+        let struct_hit = self.list_cache_map.get(elem_ty)
         if struct_hit.is_some():
             let existing: i64 = struct_hit.unwrap()
             if sema_tid > 0:
-                self.vec_cache_map.insert(sema_tid as i64, existing)
+                self.list_cache_map.insert(sema_tid as i64, existing)
             return existing
-        // Vec[T] = { ptr, i64, i64 } — ptr, len, cap (elem_size at runtime)
-        let body: Vec[i64] = Vec.new()
+        // List[T] = { ptr, i64, i64 } — ptr, len, cap (elem_size at runtime)
+        let body: List[i64] = List.new()
         body.push(wl_ptr_type(self.context))
         body.push(wl_i64_type(self.context))
         body.push(wl_i64_type(self.context))
         body.push(wl_i64_type(self.context))
-        let name = self.collection_wrapper_name_1("__with.Vec", elem_ty)
-        let vec_ty = wl_struct_create_named(self.context, name)
-        wl_struct_set_body(vec_ty, vec_data_i64(&body), 4, 0)
-        self.cache_vec_type(sema_tid, elem_ty, vec_ty)
-        vec_ty
+        let name = self.collection_wrapper_name_1("__with.List", elem_ty)
+        let list_ty = wl_struct_create_named(self.context, name)
+        wl_struct_set_body(list_ty, list_data_i64(&body), 4, 0)
+        self.cache_list_type(sema_tid, elem_ty, list_ty)
+        list_ty
 
-    fn cache_vec_type(sema_tid: i32, elem_ty: i64, vec_ty: i64) -> i64:
-        let struct_hit = self.vec_cache_map.get(elem_ty)
+    fn cache_list_type(sema_tid: i32, elem_ty: i64, list_ty: i64) -> i64:
+        let struct_hit = self.list_cache_map.get(elem_ty)
         if struct_hit.is_some():
             let existing: i64 = struct_hit.unwrap()
-            if sema_tid > 0 and not self.vec_cache_map.get(sema_tid as i64).is_some():
-                self.vec_cache_map.insert(sema_tid as i64, existing)
+            if sema_tid > 0 and not self.list_cache_map.get(sema_tid as i64).is_some():
+                self.list_cache_map.insert(sema_tid as i64, existing)
             return existing
-        self.vec_cache_map.insert(elem_ty, vec_ty)
+        self.list_cache_map.insert(elem_ty, list_ty)
         if sema_tid > 0:
-            self.vec_cache_map.insert(sema_tid as i64, vec_ty)
-        self.vec_is_vec.insert(vec_ty, 1)
-        vec_ty
+            self.list_cache_map.insert(sema_tid as i64, list_ty)
+        self.list_is_list.insert(list_ty, 1)
+        list_ty
 
     fn get_or_create_hashmap_type(sema_tid: i32, key_ty: i64, val_ty: i64) -> i64:
         let struct_key = (key_ty *% 65537) +% val_ty
@@ -7292,11 +7292,11 @@ impl Codegen:
                     self.hm_cache_map.insert(sema_tid as i64, existing)
                 return existing
         // HashMap is opaque { ptr }
-        let body: Vec[i64] = Vec.new()
+        let body: List[i64] = List.new()
         body.push(wl_ptr_type(self.context))
         let name = self.collection_wrapper_name_2("__with.HashMap", key_ty, val_ty)
         let hm_ty = wl_struct_create_named(self.context, name)
-        wl_struct_set_body(hm_ty, vec_data_i64(&body), 1, 0)
+        wl_struct_set_body(hm_ty, list_data_i64(&body), 1, 0)
         self.cache_hashmap_type(sema_tid, key_ty, val_ty, hm_ty)
         hm_ty
 
@@ -7326,11 +7326,11 @@ impl Codegen:
             if sema_tid > 0:
                 self.hs_cache_map.insert(sema_tid as i64, existing)
             return existing
-        let body: Vec[i64] = Vec.new()
+        let body: List[i64] = List.new()
         body.push(wl_ptr_type(self.context))
         let name = self.collection_wrapper_name_1("__with.HashSet", elem_ty)
         let hs_ty = wl_struct_create_named(self.context, name)
-        wl_struct_set_body(hs_ty, vec_data_i64(&body), 1, 0)
+        wl_struct_set_body(hs_ty, list_data_i64(&body), 1, 0)
         self.hs_cache_map.insert(elem_ty, hs_ty)
         if sema_tid > 0:
             self.hs_cache_map.insert(sema_tid as i64, hs_ty)
@@ -7347,11 +7347,11 @@ impl Codegen:
             if sema_tid > 0:
                 self.slotmap_cache_map.insert(sema_tid as i64, existing)
             return existing
-        let body: Vec[i64] = Vec.new()
+        let body: List[i64] = List.new()
         body.push(wl_ptr_type(self.context))
         let name = self.collection_wrapper_name_1("__with.SlotMap", elem_ty)
         let sm_ty = wl_struct_create_named(self.context, name)
-        wl_struct_set_body(sm_ty, vec_data_i64(&body), 1, 0)
+        wl_struct_set_body(sm_ty, list_data_i64(&body), 1, 0)
         self.slotmap_cache_map.insert(elem_ty, sm_ty)
         if sema_tid > 0:
             self.slotmap_cache_map.insert(sema_tid as i64, sm_ty)
@@ -7411,12 +7411,12 @@ impl Codegen:
             self.had_error = 1
             return self.type_fallback()
 
-        let tp_syms: Vec[i32] = Vec.new()
+        let tp_syms: List[i32] = List.new()
         var tp_pos = self.type_decl_tp_start(type_node)
         for ti in 0..tp_count:
             tp_syms.push(self.pool.get_extra(tp_pos))
             tp_pos = tp_pos + 2 + self.pool.get_extra(tp_pos + 1)
-        let arg_types: Vec[i64] = Vec.new()
+        let arg_types: List[i64] = List.new()
         let base_name: str = with_str_clone_ref(self.intern.resolve(cg_base_sym))
         var mangled = with_str_clone_ref(base_name)
         for ti in 0..tp_count:
@@ -7454,7 +7454,7 @@ impl Codegen:
             self.had_error = 1
             return mono_ty
         let field_start = self.reserve_struct_fields(mono_idx, decl_extra_start, field_count, false)
-        let ft_vec: Vec[i64] = Vec.new()
+        let ft_list: List[i64] = List.new()
         var invalid_layout = 0
         for fi in 0..field_count:
             let f_sema = self.sema.type_reflection_field_type_frozen(resolved, fi)
@@ -7466,13 +7466,13 @@ impl Codegen:
                 self.had_error = 1
                 f_ty = self.type_fallback()
             self.struct_field_types[field_start + fi] = f_ty
-            ft_vec.push(f_ty)
+            ft_list.push(f_ty)
         if invalid_layout == 0:
             // D72: decided per declaration, so every instance agrees.
             if self.sema.struct_liveness_byte_frozen(self.codegen_sema_sym_for(cg_base_sym)) != 0:
-                ft_vec.push(wl_i8_type(self.context))
+                ft_list.push(wl_i8_type(self.context))
                 self.liveness_byte_indices.insert(mono_ty, field_count)
-            wl_struct_set_body(mono_ty, vec_data_i64(&ft_vec), ft_vec.len() as i32, 0)
+            wl_struct_set_body(mono_ty, list_data_i64(&ft_list), ft_list.len() as i32, 0)
         mono_ty
 
 // ── Monomorphize generic struct method ───────────────────────────
@@ -7530,8 +7530,8 @@ impl Codegen:
             self.had_error = 1
             return self.invalid_concrete_mir_function()
         let ret_ty = if ret_sema != 0: self.sema_type_to_llvm(ret_sema) else: wl_void_type(self.context)
-        let sources: Vec[i64] = Vec.new()
-        let places: Vec[i32] = Vec.new()
+        let sources: List[i64] = List.new()
+        let places: List[i32] = List.new()
         for pi in 0..param_count:
             sources.push(self.abi_param_source_type(sig_idx, pi))
             places.push(self.sig_abi_param_flags(sig_idx, pi))
@@ -7571,7 +7571,7 @@ impl Codegen:
             self.gen_function_mir_mono(mono_sym, 0, body)
         ConcreteMirFunction { sym: mono_sym, value: function, fn_type, sig: sig_idx }
 
-    mut fn call_concrete_mir_function(concrete: &ConcreteMirFunction, args_start: i32, arg_node_base_index: i32, args: &Vec[i64], arg_count: i32, call_context: &str, call_node: i32) -> i64:
+    mut fn call_concrete_mir_function(concrete: &ConcreteMirFunction, args_start: i32, arg_node_base_index: i32, args: &List[i64], arg_count: i32, call_context: &str, call_node: i32) -> i64:
         if self.sema.task_fns.contains(concrete.sym):
             let task_sema = self.sema.sig_return_type(concrete.sig)
             let task_ty = self.sema_type_to_llvm(task_sema)
@@ -7583,12 +7583,12 @@ impl Codegen:
             return self.emit_async_fn_spawn_task_value(concrete.sym, concrete.value, concrete.fn_type, &coerced, task_ty)
         self.build_call_fn_value(concrete.sym, concrete.value, concrete.fn_type, args_start, arg_node_base_index, args, arg_count, call_context, call_node)
 
-    mut fn monomorphize_struct_method_core(mono_type_sym: i32, method_name: &str, _decl: i32, obj: i64, obj_ptr: i64, obj_node: i32, obj_ty: i64, args_start: i32, arg_count: i32, call_node: i32, concrete_sig: i32, concrete_sym: i32, pre_args: &Vec[i64]) -> i64:
+    mut fn monomorphize_struct_method_core(mono_type_sym: i32, method_name: &str, _decl: i32, obj: i64, obj_ptr: i64, obj_node: i32, obj_ty: i64, args_start: i32, arg_count: i32, call_node: i32, concrete_sig: i32, concrete_sym: i32, pre_args: &List[i64]) -> i64:
         let fallback = self.intern.intern(self.intern.resolve(mono_type_sym) ++ "." ++ method_name)
         let concrete = self.ensure_concrete_mir_function(call_node, concrete_sig, concrete_sym, fallback, "method " ++ method_name)
         if concrete.sym == 0:
             return wl_get_undef(wl_i32_type(self.context))
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         if self.is_ref_param(concrete.sym, 0):
             args.push(if obj_ptr != 0: obj_ptr else: self.get_mutable_receiver_ptr(obj_node, obj, obj_ty))
         else:
@@ -7597,7 +7597,7 @@ impl Codegen:
             args.push(pre_args[ai])
         self.call_concrete_mir_function(concrete, args_start, 1, args, arg_count + 1, "method " ++ method_name, call_node)
 
-    mut fn monomorphize_struct_static_method_core(mono_type_sym: i32, method_name: &str, _decl: i32, args_start: i32, arg_count: i32, call_node: i32, concrete_sig: i32, concrete_sym: i32, pre_args: &Vec[i64]) -> i64:
+    mut fn monomorphize_struct_static_method_core(mono_type_sym: i32, method_name: &str, _decl: i32, args_start: i32, arg_count: i32, call_node: i32, concrete_sig: i32, concrete_sym: i32, pre_args: &List[i64]) -> i64:
         let fallback = self.intern.intern(self.intern.resolve(mono_type_sym) ++ "." ++ method_name)
         let concrete = self.ensure_concrete_mir_function(call_node, concrete_sig, concrete_sym, fallback, "static method " ++ method_name)
         if concrete.sym == 0:
@@ -7762,9 +7762,9 @@ impl Codegen:
                 let dft = self.drop_fn_types.get(type_sym)
                 if dfv.is_some() and dft.is_some():
                     let val = wl_build_load(self.builder, ty, alloca)
-                    let args: Vec[i64] = Vec.new()
+                    let args: List[i64] = List.new()
                     args.push(val)
-                    wl_build_call(self.builder, dft.unwrap() as i64, dfv.unwrap() as i64, vec_data_i64(&args), 1)
+                    wl_build_call(self.builder, dft.unwrap() as i64, dfv.unwrap() as i64, list_data_i64(&args), 1)
             i = i - 1
         self.scope_local_count = watermark
 
@@ -8012,18 +8012,18 @@ impl Codegen:
         let i64_ty = wl_i64_type(self.context)
         var config_fn = wl_get_named_function(self.llmod, "with_runtime_configure_fibers")
         if config_fn == 0:
-            let params: Vec[i64] = Vec.new()
+            let params: List[i64] = List.new()
             params.push(i64_ty)
             params.push(i32_ty)
             params.push(i32_ty)
-            let ft = wl_function_type(i32_ty, vec_data_i64(&params), 3, 0)
+            let ft = wl_function_type(i32_ty, list_data_i64(&params), 3, 0)
             config_fn = wl_add_function(self.llmod, "with_runtime_configure_fibers", ft)
         let config_ft = wl_global_get_value_type(config_fn)
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(wl_const_int(i64_ty, stack_size, 0))
         args.push(wl_const_int(i32_ty, pool_size as i64, 0))
         args.push(wl_const_int(i32_ty, worker_count as i64, 0))
-        let rc = wl_build_call(self.builder, config_ft, config_fn, vec_data_i64(&args), 3)
+        let rc = wl_build_call(self.builder, config_ft, config_fn, list_data_i64(&args), 3)
         let failed = wl_build_icmp(self.builder, wl_int_ne(), rc, wl_const_int(i32_ty, 0, 0))
         let panic_bb = wl_append_bb(self.context, wrapper, "runtime.config.panic")
         let ok_bb = wl_append_bb(self.context, wrapper, "runtime.config.ok")
@@ -8065,24 +8065,24 @@ impl Codegen:
             self.debug_enter_entry_wrapper(wrapper, "_start")
             let argc_slot = wl_build_alloca(self.builder, i32_ty)
             let argv_slot = wl_build_alloca(self.builder, ptr_ty)
-            let startup_params: Vec[i64] = Vec.new()
+            let startup_params: List[i64] = List.new()
             startup_params.push(ptr_ty)
             startup_params.push(ptr_ty)
-            let startup_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&startup_params), 2, 0)
+            let startup_ft = wl_function_type(wl_void_type(self.context), list_data_i64(&startup_params), 2, 0)
             var startup_fn = wl_get_named_function(self.llmod, "with_wasm_startup")
             if startup_fn == 0:
                 startup_fn = wl_add_function(self.llmod, "with_wasm_startup", startup_ft)
-            let startup_args: Vec[i64] = Vec.new()
+            let startup_args: List[i64] = List.new()
             startup_args.push(argc_slot)
             startup_args.push(argv_slot)
-            wl_build_call(self.builder, wl_global_get_value_type(startup_fn), startup_fn, vec_data_i64(&startup_args), 2)
+            wl_build_call(self.builder, wl_global_get_value_type(startup_fn), startup_fn, list_data_i64(&startup_args), 2)
             argc_val = wl_build_load(self.builder, i32_ty, argc_slot)
             argv_val = wl_build_load(self.builder, ptr_ty, argv_slot)
         else:
-            let wrapper_params: Vec[i64] = Vec.new()
+            let wrapper_params: List[i64] = List.new()
             wrapper_params.push(i32_ty)
             wrapper_params.push(ptr_ty)
-            let wrapper_ft = wl_function_type(i32_ty, vec_data_i64(&wrapper_params), 2, 0)
+            let wrapper_ft = wl_function_type(i32_ty, list_data_i64(&wrapper_params), 2, 0)
             wrapper = wl_add_function(self.llmod, "main", wrapper_ft)
             let bb = wl_append_bb(self.context, wrapper, "entry")
             wl_position_at_end(self.builder, bb)
@@ -8092,16 +8092,16 @@ impl Codegen:
 
         var set_argv_fn = wl_get_named_function(self.llmod, "with_runtime_set_argv")
         if set_argv_fn == 0:
-            let set_argv_params: Vec[i64] = Vec.new()
+            let set_argv_params: List[i64] = List.new()
             set_argv_params.push(i32_ty)
             set_argv_params.push(ptr_ty)
-            let set_argv_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&set_argv_params), 2, 0)
+            let set_argv_ft = wl_function_type(wl_void_type(self.context), list_data_i64(&set_argv_params), 2, 0)
             set_argv_fn = wl_add_function(self.llmod, "with_runtime_set_argv", set_argv_ft)
         let set_argv_ft = wl_global_get_value_type(set_argv_fn)
-        let set_argv_args: Vec[i64] = Vec.new()
+        let set_argv_args: List[i64] = List.new()
         set_argv_args.push(argc_val)
         set_argv_args.push(argv_val)
-        wl_build_call(self.builder, set_argv_ft, set_argv_fn, vec_data_i64(&set_argv_args), 2)
+        wl_build_call(self.builder, set_argv_ft, set_argv_fn, list_data_i64(&set_argv_args), 2)
 
         self.emit_runtime_fiber_config(wrapper)
 
@@ -8127,10 +8127,10 @@ impl Codegen:
         if main_param_count == 0:
             main_call = wl_build_call(self.builder, main_ft, main_fn, 0, 0)
         else if main_param_count == 2:
-            let main_args: Vec[i64] = Vec.new()
+            let main_args: List[i64] = List.new()
             main_args.push(self.coerce_value_to_type(argc_val, wl_get_fn_param_type(main_ft, 0)))
             main_args.push(self.coerce_value_to_type(argv_val, wl_get_fn_param_type(main_ft, 1)))
-            main_call = wl_build_call(self.builder, main_ft, main_fn, vec_data_i64(&main_args), 2)
+            main_call = wl_build_call(self.builder, main_ft, main_fn, list_data_i64(&main_args), 2)
         else:
             with_eprint("error: main must take either zero parameters or argc/argv")
             self.had_error = 1
@@ -8189,15 +8189,15 @@ impl Codegen:
             else:
                 self.coerce_int(main_call, i32_ty)
         if is_wasm:
-            let exit_params: Vec[i64] = Vec.new()
+            let exit_params: List[i64] = List.new()
             exit_params.push(i32_ty)
-            let exit_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&exit_params), 1, 0)
+            let exit_ft = wl_function_type(wl_void_type(self.context), list_data_i64(&exit_params), 1, 0)
             var exit_fn = wl_get_named_function(self.llmod, "with_wasm_exit")
             if exit_fn == 0:
                 exit_fn = wl_add_function(self.llmod, "with_wasm_exit", exit_ft)
-            let exit_args: Vec[i64] = Vec.new()
+            let exit_args: List[i64] = List.new()
             exit_args.push(exit_val)
-            wl_build_call(self.builder, wl_global_get_value_type(exit_fn), exit_fn, vec_data_i64(&exit_args), 1)
+            wl_build_call(self.builder, wl_global_get_value_type(exit_fn), exit_fn, list_data_i64(&exit_args), 1)
             let _ = wl_build_ret_void(self.builder)
             self.debug_clear_location()
             return

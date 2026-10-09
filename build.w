@@ -55,7 +55,7 @@ fn with_object_target(name: &str, compiler: &str, source: &str, output: &str, op
 // run_write_runtime_producer_action); src/compiler/Link.w links them only
 // into programs of that generation, and a stamped compiler carries the
 // .producer of the set it embeds (`runtime-producer=`).
-fn runtime_producer_target(name: &str, compiler: &str, dir: &str, object_targets: &Vec[str]) -> Target:
+fn runtime_producer_target(name: &str, compiler: &str, dir: &str, object_targets: &List[str]) -> Target:
     var target = target_new(.Action, build_owned_text(name), "").output(dir ++ "/.producer")
     target.action = run_write_runtime_producer_action
     target = target.compiler(compiler)
@@ -112,8 +112,8 @@ fn cross_wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle) -> Build
     wo_bundle_targets(move out, ctx, plan, release_compiler_bin("with"), "build")
 
 // Every registered corpus's plan for one cross tag, in registry order.
-fn cross_wo_plans(ctx: &BuildCtx, host_plans: &Vec[WoBundle], tag: &str) -> Vec[WoBundle]:
-    var plans: Vec[WoBundle] = Vec.new()
+fn cross_wo_plans(ctx: &BuildCtx, host_plans: &List[WoBundle], tag: &str) -> List[WoBundle]:
+    var plans: List[WoBundle] = List.new()
     for pi in 0..host_plans.len() as i32:
         plans.push(cross_wo_plan(ctx, host_plans[pi], tag))
     plans
@@ -144,8 +144,8 @@ fn cross_platform_symbol(tag: &str) -> str:
 // (#2131). Parallel lists built with push rather than tuples or literals:
 // the build layer runs on the pinned seed, whose evaluator predates
 // destructuring in a `for` and `len()` on a collection literal (#1122).
-fn wasm32_runtime_suffixes() -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn wasm32_runtime_suffixes() -> List[str]:
+    let out: List[str] = List.new()
     out.push("rt-core-object")
     out.push("rt-platform-object")
     out.push("compat-runtime-object")
@@ -153,8 +153,8 @@ fn wasm32_runtime_suffixes() -> Vec[str]:
     out.push("fiber-stubs-object")
     out
 
-fn wasm32_runtime_sources() -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn wasm32_runtime_sources() -> List[str]:
+    let out: List[str] = List.new()
     out.push("rt/rt_core.w")
     out.push("rt/wasm.w")
     out.push("out/gen/compat_runtime.w")
@@ -162,8 +162,8 @@ fn wasm32_runtime_sources() -> Vec[str]:
     out.push("rt/fiber_stubs.w")
     out
 
-fn wasm32_runtime_obj_names() -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn wasm32_runtime_obj_names() -> List[str]:
+    let out: List[str] = List.new()
     out.push("rt_core.o")
     out.push("rt_wasm.o")
     out.push("compat_runtime.o")
@@ -222,7 +222,7 @@ fn target_with_empty_wasm32_runtime_blobs(target: Target, prefix: &str, dir: &st
         out = out.arg(sym)
     out
 
-fn add_cross_wasm_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str, plans: &Vec[WoBundle]) -> Build:
+fn add_cross_wasm_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str, plans: &List[WoBundle]) -> Build:
     var out = out0
     // Compiled by stage2 (not the release) so the release binary can embed
     // them: the release's own native runtime objects are stage2's too.
@@ -283,7 +283,7 @@ fn cross_fiber_asm_source(tag: &str) -> str:
 // Register the full cross runtime/bridge/embed/rsp target set for one
 // cross tag under name prefix `p`, grouped as `group_name`; `wo` is the
 // tag's bundle plan, built here and embedded by the tag's compiler.
-fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_name: &str, plans: &Vec[WoBundle]) -> Build:
+fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_name: &str, plans: &List[WoBundle]) -> Build:
     var out = out0
     let dir = cross_dir(tag)
     let triple = cross_triple(tag)
@@ -376,7 +376,7 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     cross_ld_rsp = cross_ld_rsp.write_scope("out/command/" ++ p ++ "llvm-link-metadata")
     out = out.add_target(cross_ld_rsp)
 
-    var objects: Vec[str] = Vec.new()
+    var objects: List[str] = List.new()
     for suffix in "rt-core-object rt-platform-object cimport-stubs-object compat-runtime-object panic-runtime-object fiber-stubs-object channel-runtime-object fiber-runtime-object fiber-core-object fiber-asm-object llvm-bridge-object clang-bridge-object embedded-objects-object llvm-link-metadata".split(" "):
         objects.push(p ++ suffix)
     out = out.add_target(runtime_producer_target(p ++ "runtime-producer", release_compiler_bin("with"), dir, &objects))
@@ -431,11 +431,11 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
 // link; out/bootstrap-lib is the seed's generation and serves stage1 only.
 // Group `stage1-runtime`, part of `:dev` so stage1 run by hand links through
 // it (Link.w's <compiler_dir>/../lib candidate).
-fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpus_plans: &Vec[WoBundle], wasm_plans: &Vec[WoBundle]) -> Build:
+fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpus_plans: &List[WoBundle], wasm_plans: &List[WoBundle]) -> Build:
     var out = out0
     let dir = "out/bootstrap/lib"
     let stage1 = bootstrap_compiler_bin("with-stage1")
-    let objects: Vec[str] = Vec.new()
+    let objects: List[str] = List.new()
     out = out.add_target(with_object_target("stage1-rt-core-object", stage1, "rt/rt_core.w", dir ++ "/rt_core.o", "-O1", "stage1"))
     objects.push("stage1-rt-core-object")
     out = out.add_target(with_object_target("stage1-rt-platform-object", stage1, host_runtime.platform_source, dir ++ "/" ++ host_runtime.platform_install_object, "-O1", "stage1"))
@@ -491,7 +491,7 @@ fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpu
     // built. --link-bundle links code into a compiler; it does not embed the
     // object/interface/manifest for that compiler's consumers.
     var embedded = target_new(.EmbedObjectFiles, "stage-embedded-objects-asm", "").output("out/stage/lib/embedded_objects.s")
-    let names: Vec[str] = Vec.new()
+    let names: List[str] = List.new()
     names.push("cimport_stubs")
     names.push("compat_runtime")
     names.push("panic_runtime")
@@ -552,8 +552,8 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let lib_files = fs.host_list_files(lib_dir)
     if lib_files.len() == 0:
         ctx.diagnostics().error("cross-llvm-link-metadata: could not list: " ++ lib_dir)
-    var clang_archives: Vec[str] = Vec.new()
-    var llvm_archives: Vec[str] = Vec.new()
+    var clang_archives: List[str] = List.new()
+    var llvm_archives: List[str] = List.new()
     for i in 0..lib_files.len() as i32:
         let path = lib_files[i]
         let name = comp_path_basename(path)
@@ -628,8 +628,8 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let lib_files = fs.host_list_files(lib_dir)
     if lib_files.len() == 0:
         ctx.diagnostics().error("cross-windows-llvm-link-metadata: could not list: " ++ lib_dir)
-    var clang_archives: Vec[str] = Vec.new()
-    var llvm_archives: Vec[str] = Vec.new()
+    var clang_archives: List[str] = List.new()
+    var llvm_archives: List[str] = List.new()
     for i in 0..lib_files.len() as i32:
         let path = lib_files[i]
         let name = comp_path_basename(path)
@@ -690,8 +690,8 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let lib_files = fs.host_list_files(lib_dir)
     if lib_files.len() == 0:
         ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: could not list: " ++ lib_dir)
-    var clang_archives: Vec[str] = Vec.new()
-    var llvm_archives: Vec[str] = Vec.new()
+    var clang_archives: List[str] = List.new()
+    var llvm_archives: List[str] = List.new()
     for i in 0..lib_files.len() as i32:
         let path = lib_files[i]
         let name = comp_path_basename(path)
@@ -743,8 +743,8 @@ fn embedded_objects_object(name: &str, embed: &Target, triple: &str) -> Target:
 // references it -- the failure surfaces far away, as
 // `lld-link/ld.lld: undefined symbol: with_embedded_rt_<platform>_o_start`
 // while linking stage1. Adding a platform means adding it here and in Link.w.
-fn embedded_platform_symbols() -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn embedded_platform_symbols() -> List[str]:
+    let out: List[str] = List.new()
     out.push("rt_darwin_aarch64_o")
     out.push("rt_linux_x86_64_o")
     out.push("rt_linux_aarch64_o")
@@ -803,8 +803,8 @@ fn empty_platform_blob_target(prefix: &str, sym: &str) -> str:
 // stage1 is linked before the tree's bundle exists — carries zero-length
 // blobs, which the compiler reads as "not present"
 // (src/compiler/EmbeddedBundles.w).
-fn wo_blob_kinds() -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn wo_blob_kinds() -> List[str]:
+    let out: List[str] = List.new()
     out.push("o")
     out.push("manifest")
     out.push("wi")
@@ -885,7 +885,7 @@ fn target_with_embedded_runtime_inputs(target: Target, ctx: &BuildCtx) -> Target
 
 fn target_with_compiler_c_export_audit_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
-    let roots: Vec[str] = Vec.new()
+    let roots: List[str] = List.new()
     roots.push("src")
     roots.push("rt")
     roots.push("lib/std")
@@ -902,7 +902,7 @@ fn target_with_compiler_source_inputs(target: Target, ctx: &BuildCtx) -> Target:
     // #679/#1665: only compiler self-compiles inherit this regression budget.
     // Use the wire spelling until the pinned seed includes Target.rss_limit.
     out = out.arg("rss-limit-bytes=1073741824")
-    let roots: Vec[str] = Vec.new()
+    let roots: List[str] = List.new()
     roots.push("src")
     roots.push("rt")
     roots.push("lib/std")
@@ -995,7 +995,7 @@ fn target_with_live_targets(target: Target, graph: &Build) -> Target:
 // graph is evaluated once per build-source hash (D19/#702), so the ledger is
 // read here at evaluation time and the battery deletes the evaluated-graph
 // cache when it rewrites the ledger; the next invocation re-reads it.
-fn gate_fixed_targets() -> Vec[str]:
+fn gate_fixed_targets() -> List[str]:
     // `selfcheck` is the stage2 self-check of src/main.w; there is no stage1
     // variant, and `build` has already built stage2. `reseed-check-build-w`
     // checks build.w with the fresh release binary, whose embedded stdlib is
@@ -1003,7 +1003,7 @@ fn gate_fixed_targets() -> Vec[str]:
     // `use` (the public-return-type rule applies to it as an entry).
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
-    var fixed: Vec[str] = Vec.new()
+    var fixed: List[str] = List.new()
     for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-integrity-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
     fixed
 
@@ -1013,11 +1013,11 @@ fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
 // targets only. A Group's deps are its members; a lane's own deps (stage2,
 // build, with-sha256) are prerequisites, never tests. The evidence recorder
 // and the driver gate are the battery's, not the gate's.
-fn gate_test_lanes(graph: &Build) -> Vec[str]:
-    var lanes: Vec[str] = Vec.new()
-    var pending: Vec[str] = Vec.new()
+fn gate_test_lanes(graph: &Build) -> List[str]:
+    var lanes: List[str] = List.new()
+    var pending: List[str] = List.new()
     pending.push("test")
-    var seen: Vec[str] = Vec.new()
+    var seen: List[str] = List.new()
     var next = 0
     while next < pending.len() as i32:
         let name = pending[next].clone()
@@ -1048,12 +1048,12 @@ fn gate_whole_seconds(text: &str) -> i32:
         digits = digits + 1
     if digits == 0: -1 else: n
 
-fn gate_measured_targets(ctx: &BuildCtx, graph: &Build, fixed: &Vec[str]) -> Vec[str]:
+fn gate_measured_targets(ctx: &BuildCtx, graph: &Build, fixed: &List[str]) -> List[str]:
     let fs = ctx.fs()
     let ledger = gate_times_ledger_path()
     let text = if fs.exists(ledger): fs.read_text(ledger) else: ""
     let lanes = gate_test_lanes(graph)
-    var out: Vec[str] = Vec.new()
+    var out: List[str] = List.new()
     for line in text.split("\n"):
         let cols = line.split("\t")
         if cols.len() < 2: continue
@@ -1806,7 +1806,7 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
 
     let stdout_path = build_project_abs(root, build_project_join(output_dir, "check.stdout"))
     let stderr_path = build_project_abs(root, build_project_join(output_dir, "check.stderr"))
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push(compiler_path)
     check_args |> push("check")
     check_args |> push("src/main.w")
@@ -1834,7 +1834,7 @@ fn invariance_run_check(ctx: &ActionCtx, compiler_path: &str, repo_copy: &str, l
     let root = ctx.project_info().project_root()
     let stdout_path = build_project_abs(root, build_project_join(ctx.output(), label ++ ".stdout"))
     let stderr_path = build_project_abs(root, build_project_join(ctx.output(), label ++ ".stderr"))
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args |> push(build_owned_text(compiler_path))
     check_args |> push("check")
     check_args |> push("src/main.w")
@@ -1939,12 +1939,12 @@ fn run_validate_all_async_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("validate-all-async: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
     let compiler = build_project_abs(root, inputs[0])
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args.push(build_owned_text(compiler))
     args.push("test")
     args.push("--validate-all")
     args.push("--quiet")
-    var dirs: Vec[str] = Vec.new()
+    var dirs: List[str] = List.new()
     dirs.push("test/behavior")
     dirs.push("test/spec")
     dirs.push("test/debug_alloc")
@@ -1985,7 +1985,7 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
     let compiler = build_project_abs(root, inputs[0])
     let driver_bin = build_project_abs(root, build_project_join(out_dir, "debug_drop"))
 
-    var build_args: Vec[str] = Vec.new()
+    var build_args: List[str] = List.new()
     build_args.push(build_owned_text(compiler))
     build_args.push("build")
     build_args.push("tools/debug_drop.w")
@@ -1998,7 +1998,7 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error(f"debug-alloc-tests: driver build failed rc={br.rc}; stderr={berr}")
 
     let fixtures = fs.list_files("test/debug_alloc")
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args.push(driver_bin)
     check_args.push("check")
     check_args.push(compiler)
@@ -2029,8 +2029,8 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
 // analyzed by their project-relative path, so the snapshots' paths are
 // stable. Regenerate a snapshot by copying the `.contract.stdout` the run
 // leaves in out/contract-view-tests after reading the diff.
-fn contract_view_directives(text: &str, prefix: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn contract_view_directives(text: &str, prefix: &str) -> List[str]:
+    var out: List[str] = List.new()
     let lines = text.split("\n")
     for i in 0..lines.len() as i32:
         let line = lines[i]
@@ -2039,7 +2039,7 @@ fn contract_view_directives(text: &str, prefix: &str) -> Vec[str]:
     out
 
 fn contract_view_run(ctx: &ActionCtx, root: &str, compiler: &str, fixture: &str, out_dir: &str, name: &str, request: &str) -> (i32, str):
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(build_owned_text(compiler))
     args.push("analyze")
     args.push(build_owned_text(fixture))
@@ -2088,7 +2088,7 @@ fn uat_tests_normalize_host(text: &str) -> str:
     out ++ rest
 
 fn uat_tests_run(ctx: &ActionCtx, root: &str, compiler: &str, out_dir: &str, name: &str, list: bool) -> (i32, str):
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(build_owned_text(compiler))
     args.push("uat")
     if list:
@@ -2152,7 +2152,7 @@ fn run_release_uat_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("release-uat: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
     let compiler = build_project_abs(root, inputs[0])
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(compiler.clone())
     args.push("uat")
     var envs = process_env()
@@ -2263,7 +2263,7 @@ fn run_drop_audit_action(ctx: ActionCtx) -> i32:
     let root = ctx.project_info().project_root()
     let candidate = build_project_abs(root, ctx.inputs()[0])
     let baseline = build_project_abs(root, "src/main")
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args.push(build_owned_text(candidate))
     args.push("run")
     args.push("tools/drop_audit.w")
@@ -2292,7 +2292,7 @@ fn run_unit_return_review_action(ctx: ActionCtx) -> i32:
     let root = ctx.project_info().project_root()
     // git diff includes tracked edits and staged new files. Refuse untracked
     // source rather than silently omit it from this review gate.
-    var untracked_args: Vec[str] = Vec.new()
+    var untracked_args: List[str] = List.new()
     untracked_args.push("git")
     untracked_args.push("ls-files")
     untracked_args.push("--others")
@@ -2302,7 +2302,7 @@ fn run_unit_return_review_action(ctx: ActionCtx) -> i32:
     let untracked = ctx.process_runner().run_capture_cwd(untracked_args, build_project_abs(root, build_project_join(out_dir, "untracked.stdout")), build_project_abs(root, build_project_join(out_dir, "untracked.stderr")), 60000, root)
     if untracked.rc != 0 or untracked.stdout.trim().len() > 0:
         ctx.diagnostics().error("unit-return-review: stage new source files so they are included in the review diff\n" ++ untracked.stdout ++ untracked.stderr)
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args.push(build_project_abs(root, ctx.inputs()[0]))
     args.push("run")
     args.push("tools/unit_return_review.w")
@@ -2326,7 +2326,7 @@ fn run_ceremony_check_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0: return 1
     let root = ctx.project_info().project_root()
     let compiler = build_project_abs(root, ctx.inputs()[0])
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args.push(compiler.clone())
     args.push("run")
     args.push("tools/ceremony_audit.w")
@@ -2354,7 +2354,7 @@ fn ceremony_census_run(ctx: ActionCtx, record: bool) -> i32:
     if fs.mkdir_all(out_dir) != 0: return 1
     let root = ctx.project_info().project_root()
     let compiler = build_project_abs(root, ctx.inputs()[0])
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args.push(compiler.clone())
     args.push("run")
     args.push("tools/ceremony_census.w")
@@ -2382,7 +2382,7 @@ fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("rt-decl-audit: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
     let compiler = build_project_abs(root, ctx.inputs()[0])
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args.push(build_owned_text(compiler))
     args.push("run")
     args.push("tools/rt_decl_audit.w")
@@ -2413,7 +2413,7 @@ fn run_move_audit_action(ctx: ActionCtx) -> i32:
     let root = ctx.project_info().project_root()
     let candidate = build_project_abs(root, ctx.inputs()[0])
     let baseline = build_project_abs(root, "src/main")
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args.push(build_owned_text(candidate))
     args.push("run")
     args.push("tools/move_audit.w")
@@ -2459,7 +2459,7 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
     // Build-layer code is compiled by the SEED (docs/meetings/2026-07-17-D14-verification-tiering-iterate-on-one-stage-battery-gates.md D14; the
     // seed-gated build-layer rule): a collection literal with moved element
     // temporaries is #1122 under seeds before 9ccd1e2d, so argv is pushed.
-    var compile_args: Vec[str] = Vec.new()
+    var compile_args: List[str] = List.new()
     compile_args.push(compiler.clone())
     compile_args.push("build")
     compile_args.push("test/complexity/stdlib.w")
@@ -2473,7 +2473,7 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
         ctx.diagnostics().error(f"stdlib-complexity: compiler {compiler} exited {compiled.rc}; stdout={stdout_rel} stderr={stderr_rel}\n" ++ fs.read_text(stdout_rel) ++ fs.read_text(stderr_rel))
     let timing_out = build_project_join(output, "timing.stdout")
     let timing_err = build_project_join(output, "timing.stderr")
-    var timing_args: Vec[str] = Vec.new()
+    var timing_args: List[str] = List.new()
     timing_args.push(binary.clone())
     let timed = ctx.process_runner().run_capture_cwd(timing_args,
         build_project_abs(root, timing_out), build_project_abs(root, timing_err), 120000, root)
@@ -2484,7 +2484,7 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
     let alloc_err = build_project_join(output, "allocation.stderr")
     // The CLI enables the runtime trace only for this child. Compilation and
     // process startup fall outside the marked spans, as in the timing probe.
-    var allocation_args: Vec[str] = Vec.new()
+    var allocation_args: List[str] = List.new()
     allocation_args.push(compiler.clone())
     allocation_args.push("run")
     allocation_args.push("-O1")
@@ -2523,7 +2523,7 @@ fn run_fixpoint_diff_action(ctx: ActionCtx) -> i32:
     let left = build_project_abs(root, stage_compiler_obj("with-stage2-fixpoint.o"))
     let right = build_project_abs(root, stage_compiler_obj("with-stage3-fixpoint.o"))
     let err_path = build_project_abs(root, build_project_join(out_dir, "stderr.txt"))
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args.push(compiler)
     args.push("fixpoint-diff")
     args.push(left)
@@ -2534,7 +2534,7 @@ fn run_fixpoint_diff_action(ctx: ActionCtx) -> i32:
     0
 
 fn deep_debug_tool_expect(ctx: &ActionCtx, root: &str, compiler: &str, source_path: &str, out_dir: &str, name: &str, opt_a: &str, opt_b: &str, needle: &str) -> i32:
-    var args: Vec[str] = Vec.new()
+    var args: List[str] = List.new()
     args.push(build_owned_text(compiler))
     args.push("check")
     if opt_a.len() > 0:
@@ -2555,7 +2555,7 @@ fn deep_debug_tool_expect(ctx: &ActionCtx, root: &str, compiler: &str, source_pa
     0
 
 fn deep_debug_analyze_expect(ctx: &ActionCtx, root: &str, compiler: &str, source_path: &str, out_dir: &str, name: &str, request: &str, needle: &str) -> i32:
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(build_owned_text(compiler))
     args.push("analyze")
     args.push(build_owned_text(source_path))
@@ -2574,7 +2574,7 @@ fn deep_debug_analyze_expect(ctx: &ActionCtx, root: &str, compiler: &str, source
 // #2198: a flag `check` does not know is refused, never ignored: the removed
 // `--dump-drop-flags` printed `ok` for a dump that never ran.
 fn deep_debug_unknown_flag_refused(ctx: &ActionCtx, root: &str, compiler: &str, source_path: &str, out_dir: &str) -> i32:
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(build_owned_text(compiler))
     args.push("check")
     args.push(build_owned_text(source_path))
@@ -2592,7 +2592,7 @@ fn deep_debug_unknown_flag_refused(ctx: &ActionCtx, root: &str, compiler: &str, 
 // the defect (`needle`) and stay silent about the clean cases (`absent`). A
 // green verdict over the planted defect is the failure this guards.
 fn deep_debug_analyze_expect_violation(ctx: &ActionCtx, root: &str, compiler: &str, source_path: &str, out_dir: &str, name: &str, request: &str, needle: &str, absent: &str) -> i32:
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(build_owned_text(compiler))
     args.push("analyze")
     args.push(build_owned_text(source_path))
@@ -2631,7 +2631,7 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         "    missing_symbol\n"
     if fs.write_text(reduce_input, reduce_source) != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write reducer fixture")
-    var reduce_args: Vec[str] = Vec.new()
+    var reduce_args: List[str] = List.new()
     reduce_args.push(build_owned_text(compiler))
     reduce_args.push("reduce")
     reduce_args.push(build_project_abs(root, reduce_input))
@@ -2661,11 +2661,11 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         "// the red test needs both of its lines\n" ++
         "fn test_green: assert(1 + 1 == 2)\n\n" ++
         "fn test_red:\n" ++
-        "    let xs: Vec[i32] = Vec.new()\n" ++
+        "    let xs: List[i32] = List.new()\n" ++
         "    assert(xs.len() == 1)\n"
     if fs.write_text(reduce_test_input, reduce_test_source) != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write reduce --test fixture")
-    var reduce_test_args: Vec[str] = Vec.new()
+    var reduce_test_args: List[str] = List.new()
     reduce_test_args.push(build_owned_text(compiler))
     reduce_test_args.push("reduce")
     reduce_test_args.push(build_project_abs(root, reduce_test_input))
@@ -2679,7 +2679,7 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     if reduce_test_result.rc != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: reduce --test failed; stderr=" ++ reduce_test_stderr)
     let reduced_test = fs.read_text(reduce_test_output)
-    let want_reduced = "fn test_red:\n    let xs: Vec[i32] = Vec.new()\n    assert(xs.len() == 1)\n"
+    let want_reduced = "fn test_red:\n    let xs: List[i32] = List.new()\n    assert(xs.len() == 1)\n"
     if reduced_test != want_reduced:
         ctx.diagnostics().error("deep-debug-tool-tests: reduce --test kept the wrong lines:\n" ++ reduced_test)
     if not reduce_test_result.stdout.contains("(3 lines)"):
@@ -2690,7 +2690,7 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     let report = build_project_join(out_dir, "fixpoint-diff.txt")
     if fs.write_text(left, "abc") != 0 or fs.write_text(right, "abd") != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write diff fixtures")
-    var diff_args: Vec[str] = Vec.new()
+    var diff_args: List[str] = List.new()
     diff_args.push(build_owned_text(compiler))
     diff_args.push("fixpoint-diff")
     diff_args.push(build_project_abs(root, left))
@@ -2753,14 +2753,14 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     let rebind_input = build_project_join(out_dir, "rebind-input.w")
     let rebind_source =
         "type Pair { a: i32, b: i32 }\n\n" ++
-        "pub type P { vars: Vec[i32] }\n\n" ++
+        "pub type P { vars: List[i32] }\n\n" ++
         "pub fn P.set(move self: Self, v: i32) -> P:\n" ++
         "    var owned = self\n" ++
         "    let pair = Pair { a: v, b: v }\n" ++
         "    owned.vars.push(pair.a)\n" ++
         "    owned\n\n" ++
         "fn main:\n" ++
-        "    var p = P { vars: Vec.new() }\n" ++
+        "    var p = P { vars: List.new() }\n" ++
         "    p = p.set(1)\n" ++
         "    print(f\"{p.vars.len()}\")\n"
     if fs.write_text(rebind_input, rebind_source) != 0:
@@ -2830,11 +2830,11 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         return 1
     // #2023: analyze compiles its file as the root, like check: top-level
     // statements are the implicit main (it refused them: "expected
-    // declaration"). The program passes a Vec element view to str.slice's
+    // declaration"). The program passes a List element view to str.slice's
     // i64 parameters, which reached codegen unmaterialized.
     let implicit_main_input = build_project_join(out_dir, "implicit-main-input.w")
     let implicit_main_source =
-        "var ss: Vec[i64] = Vec.new()\n" ++
+        "var ss: List[i64] = List.new()\n" ++
         "ss.push(1)\n" ++
         "let s = ss[0]\n" ++
         "print(\"ab\".slice(0, s) ++ \"ab\".slice(0, ss[0]))\n"
@@ -2861,7 +2861,7 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     // parameter, a leak at return, a drop after a move, a reset of an
     // unmoved local) or a false verdict, until it validates in every build
     // (#2043).
-    let ownership_programs: Vec[str] = Vec.new()
+    let ownership_programs: List[str] = List.new()
     ownership_programs.push("async_tuple_await")
     ownership_programs.push("behav_1974_eliminator_owned_at_ref_param")
     ownership_programs.push("behav_async_tuple_await")
@@ -3474,7 +3474,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-embedded-objects-object")
     // #1815: the seed's generation compiled out/bootstrap-lib, so it links
     // only stage1 (the seed's own link) and is what stage1 embeds.
-    var bootstrap_object_targets: Vec[str] = Vec.new()
+    var bootstrap_object_targets: List[str] = List.new()
     for bdi in 0..bootstrap_runtime.deps.len() as i32:
         bootstrap_object_targets.push(build_owned_text(bootstrap_runtime.deps[bdi]))
     out = out.add_target(runtime_producer_target("bootstrap-runtime-producer", "seed", "out/bootstrap-lib", &bootstrap_object_targets))
@@ -3843,7 +3843,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(embedded_objects_obj)
 
     // #1815: stage2's generation compiled out/lib (and its bridges).
-    let lib_objects: Vec[str] = Vec.new()
+    let lib_objects: List[str] = List.new()
     lib_objects.push("embedded-objects-object")
     lib_objects.push("llvm-link-metadata")
     out = out.add_target(runtime_producer_target("runtime-producer", stage_compiler_bin("with-stage2"), "out/lib", &lib_objects))
@@ -4587,7 +4587,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     issue61_regression = issue61_regression.dep("build")
     out = out.add_target(issue61_regression)
 
-    let invariance_labels: Vec[str] = Vec.new()
+    let invariance_labels: List[str] = List.new()
     invariance_labels.push("comment-sema")
     invariance_labels.push("let-sema")
     invariance_labels.push("two-lets-sema")
@@ -4645,7 +4645,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // The release compiler checks the build system's own source: the reseed
     // gate (`:install-user`, #745) runs exactly this, and nothing earlier did,
     // so a battery went green on sources whose compiler could not become the
-    // seed (2026-09-22: build/sdk.w pushed a `&str` into a Vec[str]). A green
+    // seed (2026-09-22: build/sdk.w pushed a `&str` into a List[str]). A green
     // must be reseedable.
     var reseed_check = target_new(.RunCorpusTest, "reseed-check-build-w", release_compiler_bin("with"))
     reseed_check = reseed_check.output("out/corpus/reseed-check-build-w")

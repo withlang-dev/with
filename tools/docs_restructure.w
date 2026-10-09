@@ -194,15 +194,15 @@ fn move_table -> str:
 
 type Pair { key: str, value: str }
 
-fn parse_pairs(table: &str) -> Vec[Pair]:
-    var out: Vec[Pair] = Vec.new()
+fn parse_pairs(table: &str) -> List[Pair]:
+    var out: List[Pair] = List.new()
     for line in table.split("\n"):
         if line.len() == 0: continue
         let parts = line.split(" ")
         out.push(Pair { key: parts[0].clone(), value: parts[1].clone() })
     out
 
-fn lookup(pairs: &Vec[Pair], key: &str) -> str:
+fn lookup(pairs: &List[Pair], key: &str) -> str:
     for i in 0..pairs.len() as i32:
         if pairs[i].key == key: return pairs[i].value.clone()
     ""
@@ -275,21 +275,21 @@ fn dirname(path: &str) -> str:
     if last < 0: return ""
     path.slice(0, last)
 
-fn write_lines(path: &str, lines: &Vec[str]):
+fn write_lines(path: &str, lines: &List[str]):
     let dir = dirname(path)
     if dir.len() > 0: assert(mkdir_p(dir) == 0)
     assert(write_file(path, lines.join("\n")) == 0)
 
-fn read_lines(path: &str) -> Vec[str]:
+fn read_lines(path: &str) -> List[str]:
     let text = read_file(path) ?? ""
     if text.len() == 0:
         eprint("error: could not read " ++ path)
         exit_code(1)
-    var out: Vec[str] = Vec.new()
+    var out: List[str] = List.new()
     for line in text.split("\n"): out.push(line.clone())
     out
 
-fn push_range(dst: Vec[str], src: &Vec[str], from: i32, to: i32) -> Vec[str]:
+fn push_range(dst: List[str], src: &List[str], from: i32, to: i32) -> List[str]:
     var out = dst
     for i in from..to: out.push(src[i].clone())
     out
@@ -302,7 +302,7 @@ fn rfind_byte(text: &str, c: i32) -> i32:
 
 // Index of the next heading line at or after `from` that is outside a code fence
 // (fence state is tracked from `start`), or `end`.
-fn next_heading(lines: &Vec[str], start: i32, from: i32, end: i32) -> i32:
+fn next_heading(lines: &List[str], start: i32, from: i32, end: i32) -> i32:
     var fence = false
     for i in start..end:
         if is_fence(lines[i]): fence = not fence
@@ -328,7 +328,7 @@ fn split_spec:
             break
     assert(part_start > 0)
 
-    var readme: Vec[str] = Vec.new()
+    var readme: List[str] = List.new()
     readme = push_range(move readme, lines, 0, part_start)
     readme.push("## Table of Contents")
     readme.push("")
@@ -369,12 +369,12 @@ fn split_spec:
     assert(remove_file("docs/with-specification.md") == 0)
     print("split-spec: wrote docs/spec/README.md and the chapter files")
 
-fn part_line_index(lines: &Vec[str], heading: &str, from: i32, to: i32) -> i32:
+fn part_line_index(lines: &List[str], heading: &str, from: i32, to: i32) -> i32:
     for i in from..to:
         if lines[i] == heading: return i
     -1
 
-fn emit_chapter(lines: &Vec[str], start: i32, end: i32, id: &str, chapters: &Vec[Pair], sections: &Vec[Pair], toc: Vec[str]) -> Vec[str]:
+fn emit_chapter(lines: &List[str], start: i32, end: i32, id: &str, chapters: &List[Pair], sections: &List[Pair], toc: List[str]) -> List[str]:
     var readme = toc
     let file = lookup(chapters, id)
     if file.len() == 0:
@@ -383,7 +383,7 @@ fn emit_chapter(lines: &Vec[str], start: i32, end: i32, id: &str, chapters: &Vec
     let heading = lines[start].clone()
     let title = heading.slice(3, heading.len())
     readme.push("- [§" ++ title ++ "](" ++ file ++ ")")
-    var out: Vec[str] = Vec.new()
+    var out: List[str] = List.new()
     out.push("# " ++ title)
     var i = start + 1
     while i < end:
@@ -393,7 +393,7 @@ fn emit_chapter(lines: &Vec[str], start: i32, end: i32, id: &str, chapters: &Vec
             let send = next_heading(lines, start, i + 1, end)
             let stitle = lines[i].slice(4, lines[i].len())
             let stext = stitle.slice(sid.len() + 1, stitle.len())
-            var sec: Vec[str] = Vec.new()
+            var sec: List[str] = List.new()
             sec.push("# " ++ stitle)
             sec = push_range(move sec, lines, i + 1, send)
             write_lines("docs/spec/" ++ sfile, sec)
@@ -427,9 +427,9 @@ fn link_target(line: &str) -> str:
     if close < 0: return ""
     rest.slice(0, close)
 
-fn reassemble_spec -> Vec[str]:
+fn reassemble_spec -> List[str]:
     let readme = read_lines("docs/spec/README.md")
-    var out: Vec[str] = Vec.new()
+    var out: List[str] = List.new()
     var toc = -1
     for i in 0..readme.len() as i32:
         if readme[i] == "## Table of Contents":
@@ -452,7 +452,7 @@ fn reassemble_spec -> Vec[str]:
         i = i + 1
     out
 
-fn inline_chapter(path: &str, acc: Vec[str]) -> Vec[str]:
+fn inline_chapter(path: &str, acc: List[str]) -> List[str]:
     var out = acc
     let lines = read_lines(path)
     out.push("#" ++ lines[0])
@@ -469,7 +469,7 @@ fn inline_chapter(path: &str, acc: Vec[str]) -> Vec[str]:
         i = i + 1
     out
 
-fn report_compare(label: &str, rebuilt: &Vec[str], original_path: &str) -> i32:
+fn report_compare(label: &str, rebuilt: &List[str], original_path: &str) -> i32:
     let original = read_lines(original_path)
     let rebuilt_text = rebuilt.join("\n")
     let original_text = original.join("\n")
@@ -487,7 +487,7 @@ fn report_compare(label: &str, rebuilt: &Vec[str], original_path: &str) -> i32:
 
 // ---------------------------------------------------------------- split-decisions
 
-fn entry_date(lines: &Vec[str], start: i32, end: i32) -> str:
+fn entry_date(lines: &List[str], start: i32, end: i32) -> str:
     for i in start..end:
         if lines[i].starts_with("**Date:** "): return lines[i].slice(10, 20)
     ""
@@ -502,7 +502,7 @@ fn entry_id(title: &str) -> str:
 fn split_decisions:
     let lines = read_lines("docs/decisions.md")
     let n = lines.len() as i32
-    var readme: Vec[str] = Vec.new()
+    var readme: List[str] = List.new()
     var first = -1
     var fence = false
     for i in 0..n:
@@ -531,7 +531,7 @@ fn split_decisions:
             let id = entry_id(title)
             let rest = if id.len() > 0: title.slice(id.len() + 3, title.len()) else: title.clone()
             let file = if id.len() > 0: date ++ "-" ++ id ++ "-" ++ slug(rest) ++ ".md" else: date ++ "-" ++ slug(rest) ++ ".md"
-            var entry: Vec[str] = Vec.new()
+            var entry: List[str] = List.new()
             entry.push("# " ++ title)
             entry = push_range(move entry, lines, start + 1, i)
             write_lines("docs/meetings/" ++ file, entry)
@@ -542,9 +542,9 @@ fn split_decisions:
     assert(remove_file("docs/decisions.md") == 0)
     print("split-decisions: wrote docs/meetings/README.md and the decision files")
 
-fn reassemble_decisions -> Vec[str]:
+fn reassemble_decisions -> List[str]:
     let readme = read_lines("docs/meetings/README.md")
-    var out: Vec[str] = Vec.new()
+    var out: List[str] = List.new()
     var idx = -1
     for i in 0..readme.len() as i32:
         if readme[i] == "## Decisions":
@@ -587,7 +587,7 @@ fn list_moves:
 
 // The spec file that holds a cited section: the longest known prefix of the
 // section id (18.5b.6 -> 18.5b -> cli-one-liners.md; 4.3a.1 -> chapter 4).
-fn spec_file_for(id: &str, chapters: &Vec[Pair], sections: &Vec[Pair]) -> str:
+fn spec_file_for(id: &str, chapters: &List[Pair], sections: &List[Pair]) -> str:
     var probe = id.clone()
     while probe.len() > 0:
         let hit = lookup(sections, probe)
@@ -650,8 +650,8 @@ fn nearest_decision_ref(line: &str, pos: i64) -> str:
         best_before = id
     best_before
 
-fn meeting_files -> Vec[Pair]:
-    var out: Vec[Pair] = Vec.new()
+fn meeting_files -> List[Pair]:
+    var out: List[Pair] = List.new()
     for entry in list_files_text("docs/meetings").split("\n"):
         let name = if entry.contains("/"): entry.slice(rfind_byte(entry, '/') + 1, entry.len()) else: entry.clone()
         if name.len() < 12 or not name.ends_with(".md"): continue
@@ -667,7 +667,7 @@ fn replace_all(text: &str, old: &str, new_text: &str) -> str:
     if not text.contains(old): return text.clone()
     text.replace(old, new_text)
 
-fn rewrite_line(line: &str, moves: &Vec[Pair], chapters: &Vec[Pair], sections: &Vec[Pair], meetings: &Vec[Pair]) -> str:
+fn rewrite_line(line: &str, moves: &List[Pair], chapters: &List[Pair], sections: &List[Pair], meetings: &List[Pair]) -> str:
     var out = line.clone()
     let spec = "docs/with-specification.md"
     while out.contains(spec):
@@ -695,7 +695,7 @@ fn text_file(path: &str) -> bool:
 fn rewrite_refs:
     var moves = parse_pairs(move_table())
     // Longest old path first, so no old path is rewritten inside a longer one.
-    var sorted: Vec[Pair] = Vec.new()
+    var sorted: List[Pair] = List.new()
     while moves.len() > 0:
         var best = 0
         for i in 0..moves.len() as i32:
@@ -717,7 +717,7 @@ fn rewrite_refs:
         let text = read_file(path) ?? ""
         if not text.contains("docs/"): continue
         files = files + 1
-        var out: Vec[str] = Vec.new()
+        var out: List[str] = List.new()
         var edits = 0
         for line in text.split("\n"):
             let fixed = rewrite_line(line, sorted, chapters, sections, meetings)

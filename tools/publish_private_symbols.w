@@ -50,15 +50,15 @@ fn declares(line: &str, sym: &str) -> bool:
     if not name_word.starts_with(sym): return false
     name_word.len() == sym.len() or not is_ident_char(name_word[sym.len()])
 
-fn vec_contains(v: &Vec[str], s: &str) -> bool:
+fn list_contains(v: &List[str], s: &str) -> bool:
     for i in 0..v.len():
         if v[i] == s: return true
     false
 
 // Every `.w` file under `dir`, recursively. (A plain file lists as itself,
 // so an extensionless file such as `src/version` is a leaf, not a directory.)
-fn source_files(dir: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn source_files(dir: &str) -> List[str]:
+    var out: List[str] = List.new()
     for entry in list_files_text(dir).split("\n"):
         if entry.len() == 0 or entry == dir: continue
         if entry.ends_with(".w"): out.push(entry.clone())
@@ -68,7 +68,7 @@ fn source_files(dir: &str) -> Vec[str]:
 
 // The module (under `roots`) whose top level declares `sym`; "" when none or
 // more than one does.
-fn owning_module(sym: &str, roots: &Vec[str]) -> str:
+fn owning_module(sym: &str, roots: &List[str]) -> str:
     var found = ""
     var count = 0
     for root in roots:
@@ -83,7 +83,7 @@ fn owning_module(sym: &str, roots: &Vec[str]) -> str:
 let argv = args()
 var apply = false
 var log_path = ""
-var roots: Vec[str] = Vec.new()
+var roots: List[str] = List.new()
 var i = 1
 while i < argv.len():
     let a = argv[i]
@@ -99,9 +99,9 @@ if log_path.len() == 0:
 if roots.len() == 0: roots.push("src")
 
 // (module, symbol) pairs, deduplicated, in first-seen order.
-var pair_owners: Vec[str] = Vec.new()
-var pair_symbols: Vec[str] = Vec.new()
-var unresolved: Vec[str] = Vec.new()
+var pair_owners: List[str] = List.new()
+var pair_symbols: List[str] = List.new()
+var unresolved: List[str] = List.new()
 let log = read_file(log_path) ?? ""
 for line in log.split("\n"):
     if not line.starts_with("error:"): continue
@@ -117,7 +117,7 @@ for line in log.split("\n"):
     else if line.contains("' is not visible from this module") or line.contains("' in its signature; a public signature names only public types"):
         owner = owning_module(sym, &roots)
         if owner.len() == 0:
-            if not vec_contains(&unresolved, sym): unresolved.push(sym.clone())
+            if not list_contains(&unresolved, sym): unresolved.push(sym.clone())
             continue
     else:
         continue
@@ -129,14 +129,14 @@ for line in log.split("\n"):
         pair_symbols.push(sym)
 
 // Distinct modules, then one rewrite pass per module.
-var owners: Vec[str] = Vec.new()
+var owners: List[str] = List.new()
 for m in pair_owners:
-    if not vec_contains(&owners, m): owners.push(m.clone())
+    if not list_contains(&owners, m): owners.push(m.clone())
 
 var published = 0
 var missing = 0
 for owner in owners:
-    var wanted: Vec[str] = Vec.new()
+    var wanted: List[str] = List.new()
     for k in 0..pair_owners.len():
         if pair_owners[k] == owner: wanted.push(pair_symbols[k].clone())
     let text = match read_file(owner):
@@ -145,14 +145,14 @@ for owner in owners:
             eprint(f"{owner}: {e.message()}")
             exit_code(1)
     var out = ""
-    var done: Vec[str] = Vec.new()
+    var done: List[str] = List.new()
     var nr = 0
     for line in text.split("\n"):
         nr = nr + 1
         var emitted: str = line.clone()
         for sym in wanted:
             if declares(line, sym):
-                if vec_contains(&done, sym):
+                if list_contains(&done, sym):
                     eprint(f"{owner}:{nr}: second top-level declaration of '{sym}'")
                     exit_code(1)
                 emitted = "pub " ++ line
@@ -162,7 +162,7 @@ for owner in owners:
         out = out ++ emitted ++ "\n"
     if text.ends_with("\n") and out.ends_with("\n\n"): out = out.slice(0, out.len() - 1)
     for sym in wanted:
-        if not vec_contains(&done, sym):
+        if not list_contains(&done, sym):
             eprint(f"{owner}: no top-level declaration of '{sym}' (already pub, or not a top-level fn/type/enum/let/var/const)")
             missing = missing + 1
     if apply and out != text:

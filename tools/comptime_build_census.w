@@ -18,8 +18,8 @@ use std.process
 use Lexer
 use Token
 
-fn census_files() -> Vec[str]:
-    var files: Vec[str] = Vec.new()
+fn census_files() -> List[str]:
+    var files: List[str] = List.new()
     files.push("build.w")
     files.push("lib/std/build.w")
     for name in list_files_text("build").split("\n"):
@@ -27,8 +27,8 @@ fn census_files() -> Vec[str]:
     files
 
 /// The identifiers spelled between `.` and `(` in `text`, in source order.
-fn method_calls(text: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn method_calls(text: &str) -> List[str]:
+    var out: List[str] = List.new()
     var lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
     let n = tokens.len()
@@ -40,8 +40,8 @@ fn method_calls(text: &str) -> Vec[str]:
     out
 
 /// The names the evaluator dispatches on: every `method == "name"` arm.
-fn evaluator_methods() -> Vec[str]:
-    var names: Vec[str] = Vec.new()
+fn evaluator_methods() -> List[str]:
+    var names: List[str] = List.new()
     let key = "method == \""
     let text = read_file("src/ComptimeEval.w").unwrap()
     for line in text.split("\n"):
@@ -58,8 +58,8 @@ fn evaluator_methods() -> Vec[str]:
 /// The names a file defines itself (`fn name`, `fn Type.name`), so a call
 /// to one is a user method the evaluator runs from its declaration; and the
 /// fn-typed fields it declares (`name: fn(`), called through the fn value.
-fn defined_fns(text: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn defined_fns(text: &str) -> List[str]:
+    var out: List[str] = List.new()
     var lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
     let n = tokens.len()
@@ -75,12 +75,12 @@ fn defined_fns(text: &str) -> Vec[str]:
         out.push(text.slice(tokens.get_start(at) as i64, tokens.get_end(at) as i64))
     out
 
-fn contains_name(names: &Vec[str], name: &str) -> bool:
+fn contains_name(names: &List[str], name: &str) -> bool:
     for i in 0..names.len() as i32:
         if names[i] == name: return true
     false
 
-fn index_of_name(names: &Vec[str], name: &str) -> i32:
+fn index_of_name(names: &List[str], name: &str) -> i32:
     for i in 0..names.len() as i32:
         if names[i] == name: return i
     -1
@@ -88,12 +88,12 @@ fn index_of_name(names: &Vec[str], name: &str) -> i32:
 let argv = args()
 let missing_only = argv.len() > 1 and argv[1] == "--missing"
 let evaluable = evaluator_methods()
-var names: Vec[str] = Vec.new()
-var counts: Vec[i32] = Vec.new()
-var user_defined: Vec[str] = Vec.new()
+var names: List[str] = List.new()
+var counts: List[i32] = List.new()
+var user_defined: List[str] = List.new()
 // A stdlib method (IoError.message, CString.as_cstr) evaluates through the
 // same user-method path as a build-layer one.
-var stdlib_defined: Vec[str] = Vec.new()
+var stdlib_defined: List[str] = List.new()
 for path in list_files_text("lib/std").split("\n"):
     if not path.ends_with(".w"): continue
     for name in defined_fns(read_file(path).unwrap()):
@@ -111,7 +111,7 @@ for path in census_files():
             counts[found] = counts[found] + 1
 // Alphabetical, so the table is stable across runs: pick the least
 // remaining name each round.
-var taken: Vec[bool] = Vec.new()
+var taken: List[bool] = List.new()
 for i in 0..names.len() as i32: taken.push(false)
 var gaps = 0
 for round in 0..names.len() as i32:

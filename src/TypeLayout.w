@@ -114,8 +114,8 @@ impl Sema:
         let field_count = self.ast.get_extra(extra_start)
         if field_index < 0 or field_index >= field_count:
             return 0
-        let saved_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
-        let saved_subst_types = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_subst_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_subst_types = sema_clone_i32_list(&self.generic_subst_type_ids)
         var field_tid = 0
         if self.setup_generic_inst_substitution(resolved as i32, base_sym) == 0:
             if self.named_types.contains(base_sym):
@@ -223,7 +223,7 @@ impl Sema:
         self.get_type_kind(self.resolve_alias(template as TypeId))
 
     // The generic records the compiler builds with no declaration
-    // (Codegen.sema_type_to_llvm): `VecRange[T]` and `VecIterRef[T]` are
+    // (Codegen.sema_type_to_llvm): `ListRange[T]` and `ListIterRef[T]` are
     // `{ data_ptr: i64, offset|len: i64, len|idx: i64 }`; `chan[T]`'s
     // `Sender[T]` and `Receiver[T]` are `{ handle: i64 }`. Size -1 for any
     // other instance.
@@ -231,7 +231,7 @@ impl Sema:
         let base_sym = self.get_generic_inst_base(tid)
         if base_sym == 0:
             return SizeAlign { size: -1, align: 1 }
-        if base_sym == self.syms.vecrange or base_sym == self.syms.veciterref:
+        if base_sym == self.syms.listrange or base_sym == self.syms.listiterref:
             return SizeAlign { size: 24, align: 8 }
         let base_name = self.pool_resolve(base_sym)
         if base_name == "Sender" or base_name == "Receiver":
@@ -383,7 +383,7 @@ impl Sema:
             let name_sym: i32 = self.type_extra[pos]
             let payload_count: i32 = self.type_extra[(pos + 1)]
             if payload_count > 0:
-                let payload_types: Vec[i32] = if generic: self.resolve_generic_enum_payload(resolved as i32, self.get_generic_inst_base(resolved as i32), name_sym, payload_count) else: Vec.new()
+                let payload_types: List[i32] = if generic: self.resolve_generic_enum_payload(resolved as i32, self.get_generic_inst_base(resolved as i32), name_sym, payload_count) else: List.new()
                 var payload_size: i64 = 0
                 var payload_align: i64 = 1
                 for pi in 0..payload_count:

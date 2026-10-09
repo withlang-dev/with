@@ -9,7 +9,7 @@ use std.process
 
 fn main:
     let program = "/usr/bin/true".to_owned()
-    let argv: Vec[str] = Vec.new()
+    let argv: List[str] = List.new()
     argv.push(program.slice(0, program.len()))
     let rc = run(&argv)
     assert(rc == 0)

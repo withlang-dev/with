@@ -1,6 +1,6 @@
-//! expect-error: method 'Vec.push' requires a mutable receiver
+//! expect-error: method 'List.push' requires a mutable receiver
 
 fn main:
-    let items: Vec[i32] = Vec.new()
+    let items: List[i32] = List.new()
     let shared = &items
     shared.push(1)

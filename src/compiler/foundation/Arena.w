@@ -16,12 +16,12 @@ pub type ArenaSlot {
 }
 
 pub type Arena {
-    slots: Vec[ArenaSlot],
+    slots: List[ArenaSlot],
 }
 
 pub fn Arena.init -> Arena:
     var a = Arena {
-        slots: Vec.new(),
+        slots: List.new(),
     }
     // Slot 0 reserved for invalid handle.
     a.slots.push(ArenaSlot {

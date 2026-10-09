@@ -46,7 +46,7 @@ fn version_for(lock: &str, asset: &str) -> str:
 /// The asset named by the pin block whose version line is `lines[i]`: the
 /// asset line within the next few lines (every block shape names the asset
 /// after the version and before the digest).
-fn block_asset(lines: &Vec[str], i: i64) -> str:
+fn block_asset(lines: &List[str], i: i64) -> str:
     var j = i + 1
     while j < lines.len() and j <= i + 4:
         for akey in ["seed_asset:", "WITH_SEED_ASSET:"]:
@@ -55,8 +55,8 @@ fn block_asset(lines: &Vec[str], i: i64) -> str:
     ""
 
 /// The file's lines without their terminators: LF or CRLF, one form.
-fn pin_lines(text: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn pin_lines(text: &str) -> List[str]:
+    var out: List[str] = List.new()
     for line in text.split("\n"):
         if line.ends_with("\r"): out.push(line.slice(0, line.len() - 1))
         else: out.push(line ++ "")

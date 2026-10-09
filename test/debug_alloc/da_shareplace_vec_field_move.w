@@ -1,5 +1,5 @@
 //! expect-debug-alloc: leak count=0
-// #697: a Vec field (Drop-bearing elements) moved out through a share-place
+// #697: a List field (Drop-bearing elements) moved out through a share-place
 // receiver via the temp-local idiom, no restore. The caller's scope-exit drop
 // must see a blanked header — not the stale one — or the elements double-drop
 // and the buffer double-frees.
@@ -14,12 +14,12 @@ impl Drop for Resource:
             with_free(self.ptr)
             *self.slot = *self.slot + 1
 
-type HolderV { items: Vec[Resource], tag: i32 }
+type HolderV { items: List[Resource], tag: i32 }
 
 fn new_resource(slot: *mut i32) -> Resource:
     unsafe { Resource { ptr: with_alloc(32), slot } }
 
-fn eat(v: Vec[Resource]):
+fn eat(v: List[Resource]):
     let w = v
 
 extend HolderV:
@@ -30,7 +30,7 @@ extend HolderV:
 fn main:
     var drops = 0
     {
-        var h = HolderV { items: Vec.new(), tag: 5 }
+        var h = HolderV { items: List.new(), tag: 5 }
         h.items.push(new_resource(&raw mut drops))
         h.items.push(new_resource(&raw mut drops))
         h.feed()

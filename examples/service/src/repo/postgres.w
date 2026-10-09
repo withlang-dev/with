@@ -30,9 +30,9 @@ impl UserRepository for PgUserRepo:
         // In production: SELECT ... FROM users WHERE email = $1
         None
 
-    async fn list_active(self: &PgUserRepo, limit: i32, offset: i32) -> Vec[User]:
+    async fn list_active(self: &PgUserRepo, limit: i32, offset: i32) -> List[User]:
         // In production: SELECT ... FROM users WHERE active = true LIMIT $1 OFFSET $2
-        Vec.new()
+        List.new()
 
     async fn insert(self: &PgUserRepo, user: User) -> UserId:
         // In production: INSERT INTO users ... RETURNING id
@@ -40,7 +40,7 @@ impl UserRepository for PgUserRepo:
 
     async fn update(self: &PgUserRepo, id: UserId, fields: UserUpdate) -> bool:
         // Build SET clause dynamically
-        let sets = with Vec.new() as mut parts:
+        let sets = with List.new() as mut parts:
             if fields.name.is_some():
                 parts.push("name = $2")
             if fields.email.is_some():

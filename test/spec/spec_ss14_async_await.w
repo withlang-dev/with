@@ -26,7 +26,7 @@ fn parallel_tuple_await -> i32:
     left.unwrap() + right.unwrap()
 
 fn task_is_storable:
-    var tasks = Vec[Task[Result[i32, str]]].new()
+    var tasks = List[Task[Result[i32, str]]].new()
     tasks.push(fetch_data(1))
     tasks.push(fetch_data(2))
     assert(tasks.len() == 2)

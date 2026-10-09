@@ -48,7 +48,7 @@ nebula/
 - **`select await biased`**: Priority-based multiplexing (IO before timeout)
 - **`let ... else`**: `let Ok(n) = bytes_read else break` — flat early exit
 - **Chained `if let`**: `if let Some(a) = ..., let Some(b) = ...:` — no pyramid
-- **Pipeline operators**: `extract_packets(&buf) |> filter_map(...) |> collect[Vec]()`
+- **Pipeline operators**: `extract_packets(&buf) |> filter_map(...) |> collect[List]()`
 - **`traverse`**: Map + collect-or-fail for batch parsing
 - **`not in`**: `p.status not in [.Fatal(code: 1), .Fatal(code: 2)]`
 - **`defer` with `with`**: Guaranteed arena cleanup across error paths

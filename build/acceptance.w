@@ -38,13 +38,13 @@ pub fn run_d_acceptance_corpus_action(ctx: ActionCtx) -> i32:
     let work = "out/d-acceptance/work"
     // Pushed, not a literal: the pinned seed frees a literal's moved
     // temporaries (#1122).
-    var dirs: Vec[str] = Vec.new()
+    var dirs: List[str] = List.new()
     dirs.push(corpus.clone())
     dirs.push(work.clone())
     for dir in dirs:
         if fs.exists(dir) and fs.remove_tree(dir) != 0: return acc_fail(&ctx, "cannot remove " ++ dir)
         if fs.mkdir_all(dir) != 0: return acc_fail(&ctx, "cannot create " ++ dir)
-    var files: Vec[str] = Vec.new()
+    var files: List[str] = List.new()
     for path in fs.list_files("test/d_acceptance"):
         if not path.ends_with(".w") or path.slice("test/d_acceptance/".len(), path.len()).contains("/"): continue
         let dest = corpus ++ "/" ++ acc_basename(path)
@@ -55,7 +55,7 @@ pub fn run_d_acceptance_corpus_action(ctx: ActionCtx) -> i32:
     if fs.copy_tree("test/behavior/lib", corpus ++ "/lib") != 0: return acc_fail(&ctx, "cannot copy test/behavior/lib")
 
     let tool = work ++ "/insert_std_uses"
-    var build_argv: Vec[str] = Vec.new()
+    var build_argv: List[str] = List.new()
     build_argv.push(compiler.clone())
     build_argv.push("build")
     build_argv.push(acc_abs(&ctx, "tools/insert_std_uses.w"))
@@ -66,9 +66,9 @@ pub fn run_d_acceptance_corpus_action(ctx: ActionCtx) -> i32:
 
     var pass = 0
     while true:
-        var jobs: Vec[ParJob] = Vec.new()
+        var jobs: List[ParJob] = List.new()
         for i in 0..files.len() as i32:
-            var argv: Vec[str] = Vec.new()
+            var argv: List[str] = List.new()
             argv.push(compiler.clone())
             argv.push("check")
             argv.push(acc_abs(&ctx, files[i]))
@@ -86,7 +86,7 @@ pub fn run_d_acceptance_corpus_action(ctx: ActionCtx) -> i32:
             return acc_fail(&ctx, f"the insert-use fix-it did not converge after {ACC_MAX_PASSES} passes ({gated} files still gated; see " ++ work ++ ")")
         let diags_path = work ++ f"/pass-{pass}.diagnostics"
         if fs.write_text(diags_path, diagnostics) != 0: return acc_fail(&ctx, "cannot write " ++ diags_path)
-        var apply_argv: Vec[str] = Vec.new()
+        var apply_argv: List[str] = List.new()
         apply_argv.push(acc_abs(&ctx, tool))
         apply_argv.push("--apply")
         apply_argv.push(acc_abs(&ctx, diags_path))

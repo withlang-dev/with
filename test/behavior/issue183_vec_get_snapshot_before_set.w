@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 fn main:
-    var values = Vec[i32].new()
+    var values = List[i32].new()
     values.push(10)
     values.push(20)
     values.push(30)

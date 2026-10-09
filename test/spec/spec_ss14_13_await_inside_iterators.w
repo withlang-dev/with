@@ -6,8 +6,8 @@ async fn double(n: i32) -> i32:
 async fn count_for(id: i32) -> i32:
     id + 1
 
-fn numbers -> Vec[i32]:
-    let values: Vec[i32] = Vec.new()
+fn numbers -> List[i32]:
+    let values: List[i32] = List.new()
     values.push(1)
     values.push(2)
     values.push(3)

@@ -10,8 +10,8 @@ use std.build
 
 fn abi_owned_text(s: &str): s ++ ""
 
-fn abi_split_lines(text: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn abi_split_lines(text: &str) -> List[str]:
+    let out: List[str] = List.new()
     var start: i64 = 0
     var i: i64 = 0
     while i < text.len():

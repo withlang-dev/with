@@ -1,12 +1,12 @@
 //! expect-stdout: ok
 
-use std.collections.VecIter
+use std.collections.ListIter
 use std.collections.FilterIter
 
-fn make_iter(xs: &Vec[i32]) -> VecIter[i32]:
+fn make_iter(xs: &List[i32]) -> ListIter[i32]:
     xs.iter()
 
-fn sum_iter(iter: VecIter[i32]) -> i32:
+fn sum_iter(iter: ListIter[i32]) -> i32:
     var total = 0
     var done = false
     while not done:
@@ -17,17 +17,17 @@ fn sum_iter(iter: VecIter[i32]) -> i32:
             done = true
     total
 
-fn make_filtered(xs: &Vec[i32]) -> FilterIter[VecIter[i32], i32]:
+fn make_filtered(xs: &List[i32]) -> FilterIter[ListIter[i32], i32]:
     xs.iter().filter(x => x % 2 == 0)
 
 fn main:
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)
     xs.push(4)
     assert(sum_iter(make_iter(&xs)) == 10)
-    let evens = make_filtered(&xs) |> collect[Vec]()
+    let evens = make_filtered(&xs) |> collect[List]()
     assert(evens.len() == 2)
     assert(evens[0] == 2)
     assert(evens[1] == 4)

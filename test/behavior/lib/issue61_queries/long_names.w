@@ -2,7 +2,7 @@ use std.collections.HashMap
 pub type MonumentallyVerboseCarrierForCompilerOwnedStringStability {
     extraordinarily_verbose_lookup_field_name_that_must_remain_stable: HashMap[str, i32],
     extraordinarily_verbose_alias_field_name_that_must_remain_stable: Option[str],
-    extraordinarily_verbose_numbers_field_name_that_must_remain_stable: Vec[i32],
+    extraordinarily_verbose_numbers_field_name_that_must_remain_stable: List[i32],
 }
 
 pub fn make_monumentally_verbose_carrier_for_compiler_owned_string_stability() -> MonumentallyVerboseCarrierForCompilerOwnedStringStability:
@@ -10,7 +10,7 @@ pub fn make_monumentally_verbose_carrier_for_compiler_owned_string_stability() -
     lookup.insert("alpha_alpha_alpha_alpha_alpha_alpha_alpha", 9)
     lookup.insert("beta_beta_beta_beta_beta_beta_beta", 12)
 
-    let numbers: Vec[i32] = Vec.new()
+    let numbers: List[i32] = List.new()
     numbers.push(1)
     numbers.push(2)
     numbers.push(3)

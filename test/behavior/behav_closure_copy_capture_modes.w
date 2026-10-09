@@ -27,7 +27,7 @@ fn main:
     assert(moved_result == 11)
     assert(m == 10)
 
-    var values: Vec[i32] = Vec.new()
+    var values: List[i32] = List.new()
     values.push(1)
     var offset = 4
     let mixed_result = call_value(() =>

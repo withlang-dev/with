@@ -137,13 +137,13 @@ fn contract_row(report: &AnalysisReport, sema: &Sema, site: &ContractSite, paren
     let flags = class | CONTRACT_FACT | (if provenance.starts_with("default:"): CONTRACT_DEFAULT else: 0)
     contract_fact(report, sema, site, parent, flags, node, symbol, owner, index, key, key ++ ": " ++ value ++ "  [" ++ provenance ++ "]")
 
-fn contract_join(parts: &Vec[str], sep: &str) -> str:
+fn contract_join(parts: &List[str], sep: &str) -> str:
     var out = ""
     for i in 0..parts.len() as i32:
         out = out ++ (if i > 0: with_str_clone_ref(sep) else: "") ++ parts[i].clone()
     out
 
-fn contract_push_unique(xs0: Vec[str], x: &str) -> Vec[str]:
+fn contract_push_unique(xs0: List[str], x: &str) -> List[str]:
     var xs = xs0
     for i in 0..xs.len() as i32:
         if xs[i] == x: return xs
@@ -153,8 +153,8 @@ fn contract_push_unique(xs0: Vec[str], x: &str) -> Vec[str]:
 // A list of operations for the view. Compiler runtime seams (`with_*`, which
 // no user program calls) are counted, not named, so a library's own
 // operations stay readable.
-fn contract_list(names: &Vec[str], empty: &str) -> str:
-    let shown: Vec[str] = Vec.new()
+fn contract_list(names: &List[str], empty: &str) -> str:
+    let shown: List[str] = List.new()
     var seams = 0
     for i in 0..names.len() as i32:
         if names[i].starts_with("with_"): seams = seams + 1
@@ -174,13 +174,13 @@ fn contract_resource_name(sema: &Sema, ri: i32) -> str: sema.safe_symbol_text(se
 // The resources a parameter receives, as `Database` / `Database|Statement`.
 fn contract_received(sema: &Sema, fn_sym: i32, pi: i32) -> str:
     let recv = sema.facade_param_receives(fn_sym, pi)
-    let names: Vec[str] = Vec.new()
+    let names: List[str] = List.new()
     for i in 0..recv.len() as i32: names.push(contract_resource_name(sema, recv[i]))
     contract_join(&names, "|")
 
 fn contract_thread_caps(caps: i32) -> str:
     if caps == 0: return "creator"
-    let parts: Vec[str] = Vec.new()
+    let parts: List[str] = List.new()
     if (caps & 1) != 0: parts.push("creator")
     if (caps & 2) != 0: parts.push("send")
     if (caps & 4) != 0: parts.push("share")
@@ -291,8 +291,8 @@ fn contract_collect_resource(report: &AnalysisReport, sema: &Sema, ri: i32, sour
             let recv = sema.facade_param_receives(c.fn_sym, c.returns_borrow_from)
             if recv.len() == 1 and recv[0] == ri:
                 contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, c.node, c.fn_sym, owner, c.returns_borrow_from, "view", f"CStr from {fname}, dependent on {contract_param(sema, c.fn_sym, c.returns_borrow_from)}", contract_item_at(sema, &site, "fn", c.node))
-    var invalidators: Vec[str] = Vec.new()
-    var preservers: Vec[str] = Vec.new()
+    var invalidators: List[str] = List.new()
+    var preservers: List[str] = List.new()
     for ei in 0..sema.facade_call_effects.len() as i32:
         let e = &sema.facade_call_effects[ei]
         let sig = sema.get_sig(e.fn_sym)
@@ -423,7 +423,7 @@ fn contract_collect_fn(report: &AnalysisReport, sema: &Sema, ci: i32, source_pat
     for k in 0..c.preserves_domains.len() as i32:
         let clause = contract_clause(sema, node, FACADE_CLAUSE_PRESERVES, c.preserves_params.len() as i32 + k)
         contract_row(report, sema, &site, subject, CONTRACT_FN, clause, c.fn_sym, owner, -1, "preserves", "domain " ++ sema.safe_symbol_text(c.preserves_domains[k]), contract_clause_at(sema, &site, clause))
-    let touched: Vec[str] = Vec.new()
+    let touched: List[str] = List.new()
     for pi in 0..count:
         if sema.facade_param_receives(c.fn_sym, pi).len() != 1: continue
         var kept = false
@@ -536,14 +536,14 @@ fn contract_collect_domain(report: &AnalysisReport, sema: &Sema, di: i32, source
     let scope = if kind == "thread": "views inherit the thread restriction" else if kind == "static": "static data does not participate in invalidation" else if kind == "process": "process-wide state" else: "state of a resource"
     contract_row(report, sema, &site, subject, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, "scope", f"{kind}; {scope}", contract_item_at(sema, &site, "domain", d.node))
     contract_row(report, sema, &site, subject, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, "library", f"{d.files.len() as i32} imported translation unit(s) whose every operation touches it unless it preserves it", "default:the coarse library domain (§16.2b.7)")
-    let views: Vec[str] = Vec.new()
-    var preservers: Vec[str] = Vec.new()
+    let views: List[str] = List.new()
+    var preservers: List[str] = List.new()
     for ci in 0..sema.foreign_contracts.len() as i32:
         let c = &sema.foreign_contracts[ci]
         if c.returns_borrow_domain == d.name: views.push(sema.safe_symbol_text(c.fn_sym))
         for k in 0..c.preserves_domains.len() as i32:
             if c.preserves_domains[k] == d.name: preservers = contract_push_unique(move preservers, sema.safe_symbol_text(c.fn_sym))
-    var invalidators: Vec[str] = Vec.new()
+    var invalidators: List[str] = List.new()
     for ei in 0..sema.facade_call_effects.len() as i32:
         let e = &sema.facade_call_effects[ei]
         if e.sig != sema.get_sig(e.fn_sym): continue
@@ -567,7 +567,7 @@ fn contract_collect_conventions(report: &AnalysisReport, sema: &Sema, source_pat
         let node = sema.facade_convention_nodes[k]
         let site = contract_convention_site(sema, node, source_path, source_text)
         let start = sema.ast.get_data0(node)
-        let parts: Vec[str] = Vec.new()
+        let parts: List[str] = List.new()
         for i in 0..sema.ast.get_data1(node): parts.push(sema.safe_symbol_text(sema.ast.get_extra(start + i)))
         let path = contract_join(&parts, ".")
         let at = contract_item_at(sema, &site, "use convention", node)
@@ -614,8 +614,8 @@ pub fn analysis_collect_foreign_contracts(report: &AnalysisReport, sema: &Sema, 
 // are unchanged — and an explicit `lend` records the author's review and
 // silences it.
 
-fn contract_destroy_words() -> Vec[str]:
-    let words: Vec[str] = Vec.new()
+fn contract_destroy_words() -> List[str]:
+    let words: List[str] = List.new()
     for w in ["close", "free", "destroy", "release", "finalize", "delete", "unref", "dispose", "dealloc", "shutdown", "terminate", "term", "fini", "deinit", "teardown", "cleanup", "kill", "end", "finish", "exit"]:
         words.push(with_str_clone_ref(w))
     words
@@ -801,7 +801,7 @@ pub fn analysis_audit_contract(report: &AnalysisReport, sema: &Sema, source_path
 // text a `select:kind=foreign-contract` query returns.
 
 pub fn contract_view_render(report: &AnalysisReport) -> str:
-    let lines: Vec[str] = Vec.new()
+    let lines: List[str] = List.new()
     lines.push("foreign-contract view\tv1\n")
     var subjects = 0
     for i in 0..report.facts.len() as i32:

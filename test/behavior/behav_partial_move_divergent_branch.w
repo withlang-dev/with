@@ -25,9 +25,9 @@ fn pick_whole(cond: bool) -> D:
         return d
     d
 
-// Vec field variant (the exact shape the #691 flip needs).
-fn pick_vec(cond: bool) -> Vec[i32]:
-    var v: Vec[i32] = Vec.new()
+// List field variant (the exact shape the #691 flip needs).
+fn pick_list(cond: bool) -> List[i32]:
+    var v: List[i32] = List.new()
     v.push(1)
     v.push(2)
     if cond:
@@ -38,6 +38,6 @@ fn main:
     assert(pick_field(false).id == 7)
     assert(pick_field(true).id == 7)
     assert(pick_whole(false).id == 9)
-    assert(pick_vec(false)[1] == 2)
-    assert(pick_vec(true)[0] == 1)
+    assert(pick_list(false)[1] == 2)
+    assert(pick_list(true)[0] == 1)
     print("ok")

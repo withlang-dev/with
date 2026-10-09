@@ -2,7 +2,7 @@
 
 use std.sync
 
-var bad: Atomic[Vec[i32]]
+var bad: Atomic[List[i32]]
 
 fn main:
     ()

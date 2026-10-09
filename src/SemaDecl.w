@@ -195,9 +195,9 @@ impl Sema:
     // `extend` or `trait` block, or one spelled `T.m`, is skipped.
     mut fn report_function_named_like_global():
         let globals: HashMap[i64, i32] = HashMap.new()
-        let block_files: Vec[i32] = Vec.new()
-        let block_starts: Vec[i32] = Vec.new()
-        let block_ends: Vec[i32] = Vec.new()
+        let block_files: List[i32] = List.new()
+        let block_starts: List[i32] = List.new()
+        let block_ends: List[i32] = List.new()
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             let kind = self.ast.kind(decl)
@@ -326,8 +326,8 @@ impl Sema:
 
     mut fn prepare_interface_demand():
         let decl_count = self.ast.decl_count()
-        self.decl_is_iface = sema_new_vec_i32()
-        self.decl_iface_demanded = sema_new_vec_i32()
+        self.decl_is_iface = sema_new_list_i32()
+        self.decl_iface_demanded = sema_new_list_i32()
         self.iface_mentioned = sema_new_map_i32_i32()
         let iface_files = sema_new_map_i32_i32()
         // Type names the program's own source declares. A mention of such a
@@ -776,7 +776,7 @@ impl Sema:
     // D100 (§18.3): a `pub` field's alignment slot carries
     // FIELD_PUB_ALIGN_FLAG; Sema keeps the `pub` ones by (declaration, field
     // name).
-    mut fn record_pub_fields(node: i32, extra_start: i32, field_count: i32, field_names: &Vec[i32]):
+    mut fn record_pub_fields(node: i32, extra_start: i32, field_count: i32, field_names: &List[i32]):
         let align_base = extra_start + 1 + field_count * 3
         for fi in 0..field_count:
             if field_slot_is_pub(self.ast.get_extra(align_base + fi)): self.pub_field_keys.insert(sema_field_key(node, field_names[fi]))
@@ -1035,12 +1035,12 @@ impl Sema:
 
     // #1344: a variant name listed twice gave `E.A` two meanings and the
     // compiler picked one silently (`enum E: A, A`, `error E = | A | A`).
-    mut fn check_duplicate_variant(enum_name: i32, seen: &Vec[i32], v_name: i32, node: i32):
+    mut fn check_duplicate_variant(enum_name: i32, seen: &List[i32], v_name: i32, node: i32):
         if seen.contains(v_name):
             self.emit_error(f"duplicate variant `{self.pool_resolve(v_name)}` in `{self.pool_resolve(enum_name)}`", node)
 
     // #2066: a field name listed twice gave `v.x` two meanings.
-    mut fn check_duplicate_field(type_name: i32, seen: &Vec[i32], f_name: i32, node: i32):
+    mut fn check_duplicate_field(type_name: i32, seen: &List[i32], f_name: i32, node: i32):
         if seen.contains(f_name):
             self.emit_error(f"duplicate field `{self.pool_resolve(f_name)}` in `{self.pool_resolve(type_name)}`", node)
 
@@ -1070,9 +1070,9 @@ impl Sema:
             let field_count = self.ast.get_extra(extra_start)
             // Resolve all field types first — resolve_type_expr can push to type_extra
             // (e.g. for generic instances), so we must capture te_start AFTER resolving.
-            let field_names: Vec[i32] = Vec.new()
-            let field_tids: Vec[i32] = Vec.new()
-            let field_defaults: Vec[i32] = Vec.new()
+            let field_names: List[i32] = List.new()
+            let field_tids: List[i32] = List.new()
+            let field_defaults: List[i32] = List.new()
             for fi in 0..field_count:
                 let base = extra_start + 1 + fi * 3
                 let f_name = self.ast.get_extra(base)
@@ -1141,9 +1141,9 @@ impl Sema:
 
         if sub_kind == TypeDeclKind.Enum:
             let variant_count = self.ast.get_extra(extra_start)
-            let variant_names: Vec[i32] = Vec.new()
-            let payload_counts: Vec[i32] = Vec.new()
-            let payload_tids: Vec[i32] = Vec.new()
+            let variant_names: List[i32] = List.new()
+            let payload_counts: List[i32] = List.new()
+            let payload_tids: List[i32] = List.new()
             var epos = extra_start + 1
             for vi in 0..variant_count:
                 let v_name = self.ast.get_extra(epos)
@@ -1193,9 +1193,9 @@ impl Sema:
             let repr_type_node = self.ast.get_extra(extra_start)
             let repr_type_tid = self.resolve_type_expr(repr_type_node)
             let variant_count = self.ast.get_extra(extra_start + 1)
-            let variant_names: Vec[i32] = Vec.new()
-            let payload_counts: Vec[i32] = Vec.new()
-            let payload_tids: Vec[i32] = Vec.new()
+            let variant_names: List[i32] = List.new()
+            let payload_counts: List[i32] = List.new()
+            let payload_tids: List[i32] = List.new()
             var epos = extra_start + 2
             // §4.4a: each variant's discriminant is its `= N` literal, else the
             // previous value plus one (doubled under @[flags]), from 0 (1 under
@@ -1206,7 +1206,7 @@ impl Sema:
             let repr_is_int = self.get_type_kind(repr_resolved) == TypeKind.TY_INT
             let repr_bits = if repr_is_int: self.get_type_d0(repr_resolved) else: 64
             let repr_signed = not repr_is_int or self.get_type_d1(repr_resolved) != 0
-            var disc_vals: Vec[i64] = Vec.new()
+            var disc_vals: List[i64] = List.new()
             for vi in 0..variant_count:
                 let v_name = self.ast.get_extra(epos)
                 epos = epos + 1
@@ -1340,9 +1340,9 @@ impl Sema:
         if sub_kind == TypeDeclKind.Union:
             // Union type: register fields like a struct (codegen handles layout)
             let field_count = self.ast.get_extra(extra_start)
-            let field_names: Vec[i32] = Vec.new()
-            let field_tids: Vec[i32] = Vec.new()
-            let field_defaults: Vec[i32] = Vec.new()
+            let field_names: List[i32] = List.new()
+            let field_tids: List[i32] = List.new()
+            let field_defaults: List[i32] = List.new()
             for fi in 0..field_count:
                 let base = extra_start + 1 + fi * 3
                 let f_name = self.ast.get_extra(base)
@@ -1386,7 +1386,7 @@ impl Sema:
     // Pointers, references, slices and functions are indirections — not
     // followed. A generic instance embeds its declaration, and each argument
     // the declaration holds by value (#1439: `Option[E]` holds E by value, so
-    // `enum E: A(o: Option[E])` is infinite; `Vec[E]` / `Box[E]` hold it
+    // `enum E: A(o: Option[E])` is infinite; `List[E]` / `Box[E]` hold it
     // behind a pointer and stay legal).
     fn collect_value_type_deps(type_node: i32):
         if type_node == 0:
@@ -1429,8 +1429,8 @@ impl Sema:
 
     // The type nodes a declaration holds by value: struct fields, enum
     // payloads, an alias's or distinct type's target.
-    fn type_decl_value_type_nodes(decl: i32) -> Vec[i32]:
-        let out: Vec[i32] = Vec.new()
+    fn type_decl_value_type_nodes(decl: i32) -> List[i32]:
+        let out: List[i32] = List.new()
         let extra_start = self.ast.get_data1(decl)
         let sub_kind = type_decl_sub_kind(self.ast.get_data2(decl))
         if sub_kind == TypeDeclKind.Struct:
@@ -1499,7 +1499,7 @@ impl Sema:
     mut fn check_type_cycles():
         // Build directed graph: for each type decl, find value-type deps.
         // Use self.cycle_dep_syms/cycle_dep_nodes as accumulators (must go through
-        // self for mutation to be visible — Vec params are pass-by-value).
+        // self for mutation to be visible — List params are pass-by-value).
 
         // Accumulate all edges into cycle_dep_syms (flat: [from, to, from, to, ...])
         // and cycle_dep_nodes (flat: [edge_node, edge_node, ...]) using a stride of 2.
@@ -1510,8 +1510,8 @@ impl Sema:
         // Instead, accumulate edges directly. For each field type, call
         // collect_value_type_deps which pushes to self.cycle_dep_syms/nodes,
         // then read them back.
-        self.cycle_dep_syms = Vec.new()
-        self.cycle_dep_nodes = Vec.new()
+        self.cycle_dep_syms = List.new()
+        self.cycle_dep_nodes = List.new()
 
         // Phase 1: collect all edges. Each edge is 3 consecutive entries:
         // cycle_dep_syms: [from_sym, to_sym, from_sym, to_sym, ...]
@@ -1520,9 +1520,9 @@ impl Sema:
         // dep_edge_count tracks how many edges we've collected.
 
         // Actually simplest: save len before collect, push owner info after.
-        var edge_from: Vec[i32] = Vec.new()
-        var edge_to: Vec[i32] = Vec.new()
-        var edge_node: Vec[i32] = Vec.new()
+        var edge_from: List[i32] = List.new()
+        var edge_to: List[i32] = List.new()
+        var edge_node: List[i32] = List.new()
 
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
@@ -1567,7 +1567,7 @@ impl Sema:
             if color.contains(name) and color.get(name).unwrap() != 0:
                 continue
             // Iterative DFS using explicit stack.
-            var stack: Vec[i32] = Vec.new()
+            var stack: List[i32] = List.new()
             stack.push(name)
             while stack.len() > 0:
                 let cur: i32 = stack[stack.len() - 1]
@@ -1596,8 +1596,8 @@ impl Sema:
 
     mut fn emit_type_cycle_error(cycle_start: i32, cycle_end: i32, closing_edge_node: i32, parent_sym: &HashMap[i32, i32], parent_edge: &HashMap[i32, i32]):
         // Reconstruct cycle path: cycle_start → ... → cycle_end → cycle_start
-        var path_syms: Vec[i32] = Vec.new()
-        var path_edges: Vec[i32] = Vec.new()
+        var path_syms: List[i32] = List.new()
+        var path_edges: List[i32] = List.new()
 
         // Walk from cycle_end back to cycle_start via parent chain.
         var cur = cycle_end
@@ -1613,8 +1613,8 @@ impl Sema:
         path_syms.push(cycle_start)
 
         // Reverse to get forward order: cycle_start → ... → cycle_end
-        var fwd_syms: Vec[i32] = Vec.new()
-        var fwd_edges: Vec[i32] = Vec.new()
+        var fwd_syms: List[i32] = List.new()
+        var fwd_edges: List[i32] = List.new()
         for i in 0..path_syms.len() as i32:
             fwd_syms.push(path_syms[(path_syms.len() as i32 - 1 - i)])
         for i in 0..path_edges.len() as i32:
@@ -1722,7 +1722,7 @@ impl Sema:
 
         let state_name = f"__with_generator_state_{fn_sym}"
         let state_sym = self.pool_intern(state_name)
-        let field_types: Vec[i32] = Vec.new()
+        let field_types: List[i32] = List.new()
         for pi in 0..param_count:
             let param_ty = self.sig_params[(sig_param_start + pi)]
             field_types.push(if pi == 0 and borrow_receiver: self.ensure_exact_type(TypeKind.TY_REF, param_ty as TypeId, 0, 0) as i32 else: param_ty)
@@ -1787,7 +1787,7 @@ impl Sema:
     // The body a generator hands each element to: fn(T) -> bool, where
     // `false` stops the generator at its `yield` (§13.4).
     mut fn generator_body_fn_type(yield_ty: i32) -> i32:
-        let params: Vec[i32] = Vec.new()
+        let params: List[i32] = List.new()
         params.push(yield_ty)
         self.ensure_fn_type(&params, 1, self.ty_bool) as i32
 
@@ -1905,7 +1905,7 @@ impl Sema:
     mut fn fn_signature_return_type(flags: i32, declared_ret_type: TypeId) -> TypeId:
         if (flags / FnFlags.ASYNC) % 2 == 0:
             return declared_ret_type
-        let task_args: Vec[i32] = Vec.new()
+        let task_args: List[i32] = List.new()
         task_args.push(declared_ret_type as i32)
         let task_ty = self.ensure_generic_inst_type(self.pool_intern("Task"), task_args, 1)
         if task_ty != 0: task_ty else: declared_ret_type
@@ -2132,7 +2132,7 @@ impl Sema:
 
         // Resolve param types
         let sig_param_start = self.sig_params.len() as i32
-        let implicit_type_ids: Vec[i32] = Vec.new()
+        let implicit_type_ids: List[i32] = List.new()
         for pi in 0..param_count:
             let p_name_sym = self.ast.fn_param_name(param_start, pi)
             if is_local != 0:
@@ -2586,8 +2586,8 @@ impl Sema:
         let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
         let saved_subst_syms = move self.generic_subst_param_syms
         let saved_subst_tys = move self.generic_subst_type_ids
-        self.generic_subst_param_syms = Vec.new()
-        self.generic_subst_type_ids = Vec.new()
+        self.generic_subst_param_syms = List.new()
+        self.generic_subst_type_ids = List.new()
         if impl_type_tid != 0:
             self.named_types.insert(self.syms.self_type, impl_type_tid)
         self.install_trait_default_type_args(trait_sym, impl_node)
@@ -2807,7 +2807,7 @@ impl Sema:
         for bi in 0..self.blanket_trait_syms.len() as i32:
             if self.blanket_trait_syms[bi] != trait_sym:
                 continue
-            // If the blanket targets a specific type (e.g. impl[T] Trait for Vec[T]),
+            // If the blanket targets a specific type (e.g. impl[T] Trait for List[T]),
             // it only overlaps if this direct impl is for that same base type.
             let target_base = self.blanket_target_base_syms[bi]
             if target_base != 0 and target_base != type_name:
@@ -3033,7 +3033,7 @@ impl Sema:
             self.blanket_trait_syms.push(trait_sym)
             self.blanket_bound_starts.push(bound_start)
             self.blanket_bound_counts.push(total_bounds)
-            // Store target base sym for generic blanket impls (e.g., impl[T] Trait for Vec[T])
+            // Store target base sym for generic blanket impls (e.g., impl[T] Trait for List[T])
             let target_type_nd = self.ast.find_impl_target_type_node(node)
             var target_base_sym = 0
             if target_type_nd != 0 and self.ast.kind(target_type_nd) == NodeKind.NK_TYPE_GENERIC:
@@ -3044,7 +3044,7 @@ impl Sema:
             self.check_blanket_overlap(trait_sym, bound_start, total_bounds, target_base_sym, node)
             return
 
-        // If the impl target is a generic type (e.g., impl Trait for Vec[i32]),
+        // If the impl target is a generic type (e.g., impl Trait for List[i32]),
         // resolve the full type and record it for exact-match trait selection.
         let target_type_node = self.ast.find_impl_target_type_node(node)
         var exact_generic_impl = 0
@@ -3367,15 +3367,15 @@ impl Sema:
         if kind == NodeKind.NK_TYPE_GENERIC and (self.is_vector_symbol(self.ast.get_data0(node)) or self.is_mask_symbol(self.ast.get_data0(node))) and self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, self.ast.get_data0(node)) == 0:
             // §4.3d: `Vector[N, T]` / `Mask[N, W]` — N (and W) a compile-time
             // integer; T may be a type parameter.
-            let vec_extra = self.ast.get_data1(node)
+            let list_extra = self.ast.get_data1(node)
             if self.ast.get_data2(node) >= 1:
-                let count_node = self.ast.get_extra(vec_extra)
+                let count_node = self.ast.get_extra(list_extra)
                 let count_kind = self.ast.kind(count_node)
                 let count_is_param = (count_kind == NodeKind.NK_TYPE_NAMED or count_kind == NodeKind.NK_IDENT) and self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, self.ast.get_data0(count_node)) != 0
                 if self.int_literal_i64_value(count_node).ok == 0 and not count_is_param:
                     self.emit_error("a vector's lane count must be a compile-time integer constant or a generic parameter (`fn dot[N](a: Vector[N, f32])`, §4.3d)", count_node)
             if self.ast.get_data2(node) == 2 and self.is_vector_symbol(self.ast.get_data0(node)):
-                self.validate_type_expr_with_impl_type_params(self.ast.get_extra(vec_extra + 1), tp_start, tp_count, impl_node)
+                self.validate_type_expr_with_impl_type_params(self.ast.get_extra(list_extra + 1), tp_start, tp_count, impl_node)
             return
 
         if kind == NodeKind.NK_TYPE_GENERIC:

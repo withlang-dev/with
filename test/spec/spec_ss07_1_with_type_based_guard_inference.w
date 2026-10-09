@@ -10,7 +10,7 @@ fn test_scoped_type_binds_payload:
     assert(val == 43)
 
 fn test_non_scoped_mut_binding_is_builder:
-    let v = with Vec.new() as mut v:
+    let v = with List.new() as mut v:
         v.push(1)
         v.push(2)
     assert(v.len() == 2)

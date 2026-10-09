@@ -5,14 +5,14 @@ impl Drop for W:
     fn drop(move self: Self):
         unsafe:
             *self.slot = *self.slot + 1
-type H { items: Vec[W] }
-fn mkw(s: *mut i32) -> Vec[W]:
-    let v: Vec[W] = Vec.new()
+type H { items: List[W] }
+fn mkw(s: *mut i32) -> List[W]:
+    let v: List[W] = List.new()
     v.push(W { slot: s })
     v.push(W { slot: s })
     v
 fn run(s: *mut i32):
-    let v: Vec[W] = mkw(s)
+    let v: List[W] = mkw(s)
     let h = H { items: v }
     ()
 fn main:

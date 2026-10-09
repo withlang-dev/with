@@ -27,7 +27,7 @@ gen fn pairs[A: Clone, B: Clone](a: A, b: B, n: i32) -> (A, B):
     for _ in 0..n:
         yield (a, b)
 
-gen fn over[T](xs: &Vec[T]) -> &T:
+gen fn over[T](xs: &List[T]) -> &T:
     for x in xs:
         yield x
 
@@ -49,7 +49,7 @@ impl Counter:
             yield f"d{i}"
 
 type Tree {
-    vals: Vec[i32],
+    vals: List[i32],
 }
 
 gen fn Tree.walk(self: &Tree) -> i32:
@@ -57,7 +57,7 @@ gen fn Tree.walk(self: &Tree) -> i32:
         yield v
 
 type Stack[T] {
-    items: Vec[T],
+    items: List[T],
 }
 
 impl[T] Stack[T]:
@@ -95,17 +95,17 @@ fn main:
         break
     print(f"pairs{ps}")
 
-    let nums: Vec[i64] = [4, 5, 6]
+    let nums: List[i64] = [4, 5, 6]
     var sum: i64 = 0
     for x in over(&nums):
         sum += x
-    let letters: Vec[str] = ["a", "c", "e"]
+    let letters: List[str] = ["a", "c", "e"]
     var joined = ""
     for s in over(&letters):
         joined = joined ++ s
     print(f"over {sum} {joined}")
 
-    let firsts = pairs(3, 4, 9) |> map(p => p.0 * p.1) |> take(2) |> collect[Vec]()
+    let firsts = pairs(3, 4, 9) |> map(p => p.0 * p.1) |> take(2) |> collect[List]()
     print(f"pipeline {firsts[0]} {firsts[1]}")
     let comp = [x + 1 for x in over(&nums)]
     print(f"comp {comp[0]} {comp[1]} {comp[2]}")

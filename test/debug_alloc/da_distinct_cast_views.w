@@ -15,19 +15,19 @@
 // cast through a reference (`r as str` with `r: &Name`), borrows and yields
 // a view — the owner keeps its value and frees it once. Before, a cast
 // through a reference read the value into an owned temporary that was freed
-// again (a double free, an invalid free for a Vec), and `s as &Name` cast
+// again (a double free, an invalid free for a List), and `s as &Name` cast
 // the string header to a pointer (printed garbage).
 type Name = distinct str
-type Bag = distinct Vec[i32]
+type Bag = distinct List[i32]
 type Rec { s: str }
 type RecD = distinct Rec
 
 fn show(n: &Name): print(n as str)
-fn bag_len(b: &Bag): print((b as Vec[i32]).len())
+fn bag_len(b: &Bag): print((b as List[i32]).len())
 fn rec_show(r: &RecD): print((r as Rec).s)
 
-fn vec3() -> Vec[i32]:
-    var v: Vec[i32] = Vec.new()
+fn vec3() -> List[i32]:
+    var v: List[i32] = List.new()
     v.push(1)
     v.push(2)
     v.push(3)
@@ -45,7 +45,7 @@ fn main:
     show(as_name)
     let b = vec3() as Bag
     bag_len(b)
-    let bv = b as &Vec[i32]
+    let bv = b as &List[i32]
     print(bv.len())
     let d = Rec { s: "rec" } as RecD
     rec_show(d)

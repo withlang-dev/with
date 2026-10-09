@@ -27,7 +27,7 @@ fn main:
     var src = program_source("main")
     src.ir_text = "param a in [N] i32\nparam out out [N] i32\n%0 = const i32 0\n%1 = const i32 3\n%2 = const i32 0\nparallel 0 %0 %1 1\nblock_begin 1\n%5 = load a [@0]\n%6 = lt %5 %2\n%7 = select %6 %2 %5\nstore out [@0] %7\nblock_end 1\nreturn\n"
     let prog = compile(default_device(), src).unwrap()
-    let entries: Vec[BindEntry] = Vec.new()
+    let entries: List[BindEntry] = List.new()
     entries.push(bind("out", view_contiguous(out_mem, shape1(n), .Int32)))
     entries.push(bind("a", view_contiguous(a_mem, shape1(n), .Int32)))
     let stream = stream_create(default_device())

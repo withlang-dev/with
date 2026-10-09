@@ -18,7 +18,7 @@ c facade dbf:
     fn db_close_v2
         destroys
 
-type Holder { stmts: Vec[Statement], n: i32 }
+type Holder { stmts: List[Statement], n: i32 }
 
 fn main:
     print("x")

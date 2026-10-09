@@ -14,7 +14,13 @@
 //
 // Dry-run prints `old -> new  count` per renamed identifier; --apply writes
 // the files. --strings lists every string literal that says `Vec` (as
-// `path:line: literal`), for the reviewed pass.
+// `path:line: literal`), for the reviewed pass. --apply-text rewrites the
+// reviewed pass inside string literals and comments only: a capitalized
+// `Vec` word or compound part (`Vec`, `VecIter`, `SortedVec`) becomes
+// `List`; `Vec<` (Rust), `Vector`, `Vec2` and lowercase `vec` (runtime
+// symbol names, pinned by the seed) are kept.
+//
+//   with run tools/rename_vec_to_list.w --apply-text FILE...
 
 use std.fs
 use std.process
@@ -26,16 +32,18 @@ fn is_lower(c: u8) -> bool: (c >= 'a' and c <= 'z') or (c >= '0' and c <= '9')
 
 fn renamed_part(part: &str, types_only: bool) -> str:
     if part == "Vec": "List"
-    else if types_only: part.clone()
+    else if types_only: part
     else if part == "vec": "list"
     else if part == "VEC": "LIST"
-    else: part.clone()
+    // One-word lowercase names of the List types (`syms.veciter`).
+    else if part == "veciter" or part == "vecslot" or part == "vecrange" or part == "veciterref" or part == "veciterplace" or part == "veclit" or part == "vecintoiter": "list" ++ part.slice(3, part.len())
+    else: part
 
 fn renamed(ident: &str, types_only: bool) -> str:
-    if ident.starts_with("with_") or ident == "splat_vec": return ident.clone()
+    if ident.starts_with("with_") or ident == "splat_vec": return ident
     var out = ""
-    var start = 0
-    let n = ident.len() as i32
+    var start: i64 = 0
+    let n = ident.len()
     for i in 0..n + 1:
         if i == n or ident[i] == '_':
             out = out ++ renamed_part(ident.slice(start, i), types_only)
@@ -47,13 +55,52 @@ fn renamed(ident: &str, types_only: bool) -> str:
     out
 
 let argv = args()
+fn text_renamed(text: &str) -> str:
+    var out: str = text
+    for _ in 0..64:
+        let next = /(?<=[a-z])Vec\b/.replace(/\bVec(?=[A-Z][a-z])/.replace(/\bVec\b(?!<)/.replace(out, "List"), "List"), "List")
+        if next == out: return out
+        out = next
+    out
+
+fn is_text_token(tag: i32) -> bool:
+    tag == TokenKind.TK_STRING_LIT or tag == TokenKind.TK_STRING_START or tag == TokenKind.TK_STRING_END or tag == TokenKind.TK_STRING_FRAGMENT or tag == TokenKind.TK_COMMENT
+
 var apply = false
+var apply_text = false
 var strings = false
-var files: Vec[str] = []
+var files: List[str] = []
 for i in 1..argv.len():
     if argv[i] == "--apply": apply = true
     else if argv[i] == "--strings": strings = true
-    else: files.push(argv[i].clone())
+    else if argv[i] == "--apply-text": apply_text = true
+    else: files.push(argv[i])
+
+if apply_text:
+    var changed_files = 0
+    for path in files:
+        let text = read_file(path) ?? ""
+        var lexer = Lexer.init(text, 0)
+        let tokens = lexer.tokenize_with_comments()
+        var out = ""
+        var at = 0
+        for t in 0..tokens.len():
+            if not is_text_token(tokens.get_tag(t)): continue
+            let start = tokens.get_start(t)
+            let end = tokens.get_end(t)
+            let old = text.slice(start, end)
+            let new = text_renamed(old)
+            if new == old: continue
+            out = out ++ text.slice(at, start) ++ new
+            at = end
+        if at > 0:
+            out = out ++ text.slice(at, text.len())
+            if write_file(path, out) != 0:
+                print(f"rename-vec-to-list: cannot write {path}")
+                exit_code(1)
+            changed_files += 1
+    print(f"rename-vec-to-list: rewrote text in {changed_files} files")
+    exit_code(0)
 
 fn line_of(text: &str, at: i32) -> i32:
     var line = 1
@@ -63,7 +110,7 @@ fn line_of(text: &str, at: i32) -> i32:
 
 if strings:
     for path in files:
-        let text = read_file(path).unwrap_or("".clone())
+        let text = read_file(path) ?? ""
         var lexer = Lexer.init(text, 0)
         let tokens = lexer.tokenize()
         for t in 0..tokens.len():
@@ -76,7 +123,7 @@ if strings:
 
 var counts: HashMap[str, i32] = HashMap.new()
 for path in files:
-    let text = read_file(path).unwrap_or("".clone())
+    let text = read_file(path) ?? ""
     let types_only = path.ends_with("Vector.w")
     var lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
@@ -84,8 +131,10 @@ for path in files:
     var at = 0
     var changed = false
     for t in 0..tokens.len():
-        if tokens.get_tag(t) != TokenKind.TK_IDENT: continue
-        let start = tokens.get_start(t)
+        let tag = tokens.get_tag(t)
+        if tag != TokenKind.TK_IDENT and tag != TokenKind.TK_DOT_IDENT: continue
+        // A dot-identifier (`.Vec`, `.VEC_NEW`) carries its dot.
+        let start = if tag == TokenKind.TK_DOT_IDENT: tokens.get_start(t) + 1 else: tokens.get_start(t)
         let end = tokens.get_end(t)
         let old = text.slice(start, end)
         let new = renamed(old, types_only)

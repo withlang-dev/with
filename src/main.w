@@ -144,23 +144,23 @@ type CliOneLiner {
     ok: bool,
     mode: i32,
     error_msg: str,
-    code_parts: Vec[str],
-    args: Vec[str],
+    code_parts: List[str],
+    args: List[str],
     opt_level: i32,
 }
 
 type CliSyntheticSource {
     source: str,
-    gen_starts: Vec[i32],
-    gen_ends: Vec[i32],
-    source_names: Vec[str],
-    source_texts: Vec[str],
+    gen_starts: List[i32],
+    gen_ends: List[i32],
+    source_names: List[str],
+    source_texts: List[str],
 }
 
 type TestDiscovery {
     parse_ok: bool,
     has_main: bool,
-    test_names: Vec[str],
+    test_names: List[str],
 }
 
 type TestDirectives {
@@ -168,21 +168,21 @@ type TestDirectives {
     // is one whole line, in order, and no other line prints. A substring
     // match let `drop 1` pass on `drop 10`, a double drop's repeated line,
     // and drops printed after `end`.
-    expect_stdout: Vec[str],
+    expect_stdout: List[str],
     // `//! expect-stdout-contains:` fragments, each somewhere in stdout: for
     // output no run repeats (timings, addresses). Never beside expect-stdout.
-    expect_stdout_contains: Vec[str],
-    expect_stderr: Vec[str],
-    expect_check_stdout: Vec[str],
-    expect_check_stdout_not: Vec[str],
+    expect_stdout_contains: List[str],
+    expect_stderr: List[str],
+    expect_check_stdout: List[str],
+    expect_check_stdout_not: List[str],
     expect_check_fail: str,
     // Diagnostics a failing check must not print (#1336: an arity fixture
     // passed while `unknown type 'T'` led its stderr).
-    expect_check_fail_not: Vec[str],
+    expect_check_fail_not: List[str],
     expect_build_fail: str,
     // #1447: a build that must succeed and print these on its stderr (the
     // warnings a build renders after codegen).
-    expect_build_stderr: Vec[str],
+    expect_build_stderr: List[str],
     has_expect_exit: bool,
     expect_exit: i32,
     check_only: bool,
@@ -197,7 +197,7 @@ type TestDirectives {
     // `//! env: NAME=VALUE` pairs, set for the test's compile+run and
     // restored after (the harness compiles in-process, so env-gated
     // compiler modes like WITH_RT_IN_UNIT are testable per file).
-    env_pairs: Vec[str],
+    env_pairs: List[str],
 }
 
 type TestRunResult {
@@ -209,23 +209,23 @@ type TestRunResult {
 type BenchDiscovery {
     parse_ok: bool,
     has_main: bool,
-    bench_names: Vec[str],
+    bench_names: List[str],
 }
 
 fn empty_test_discovery -> TestDiscovery:
-    TestDiscovery { parse_ok: false, has_main: false, test_names: Vec.new() }
+    TestDiscovery { parse_ok: false, has_main: false, test_names: List.new() }
 
 fn empty_test_directives -> TestDirectives:
     TestDirectives {
-        expect_stdout: Vec.new(),
-        expect_stdout_contains: Vec.new(),
-        expect_stderr: Vec.new(),
-        expect_check_stdout: Vec.new(),
-        expect_check_stdout_not: Vec.new(),
+        expect_stdout: List.new(),
+        expect_stdout_contains: List.new(),
+        expect_stderr: List.new(),
+        expect_check_stdout: List.new(),
+        expect_check_stdout_not: List.new(),
         expect_check_fail: "",
-        expect_check_fail_not: Vec.new(),
+        expect_check_fail_not: List.new(),
         expect_build_fail: "",
-        expect_build_stderr: Vec.new(),
+        expect_build_stderr: List.new(),
         has_expect_exit: false,
         expect_exit: 0,
         check_only: false,
@@ -234,7 +234,7 @@ fn empty_test_directives -> TestDirectives:
         directive_error: "",
         extra_args: "",
         known_issue: "",
-        env_pairs: Vec.new(),
+        env_pairs: List.new(),
     }
 
 fn cli_options_default -> CliOptions:
@@ -304,7 +304,7 @@ fn cli_value_or_prefix(argc: i32, flag: &str, prefix: &str) -> str:
 
 // Every flag the driver reads, for any command (#2198). A flag is known by
 // its name, the part before any `=`.
-fn cli_known_flags() -> Vec[str]:
+fn cli_known_flags() -> List[str]:
     ["--abi-sha", "--alloc", "--bundle-corpus", "--bundle-fingerprint", "--c-export-functions", "--c-export", "--c-sysroot", "--c-target", "--ceremony-census", "--check", "--contains", "--convert-goto-to-structured", "--debug-alloc-filter", "--debug-alloc", "--deterministic", "--diff", "--dry-run", "--dump-abi", "--dump-ast", "--dump-async-mir", "--dump-drop-plan", "--dump-drop-state", "--dump-mir", "--dump-place-map", "--dump-project-info", "--dump-resolved", "--dump-tokens", "--dump-typed", "--emit-bundle-interface", "--emit-bundle-manifest", "--emit-c", "--emit-obj", "--exclude", "--exit-code", "--explain-mir-origin", "--explain", "--fail-fast", "--filter", "--force-reinstall", "--force", "--freestanding", "--from-source", "--generation", "--graph", "--help", "--ir-roundtrip", "--keep-binary", "--lib", "--link-bundle", "--link-object", "--migrate-one", "--name", "--no-c-export", "--no-deps", "--no-prelude", "--no-runtime", "--no-std", "--open", "--out", "--output", "--overflow", "--prefer-brace", "--prefer-colon", "--prefer-curly", "--prelude", "--quiet", "--release", "--runtime-generation", "--self-id", "--sema-body-order-reverse", "--shared-defs", "--shared-fragment", "--stats", "--strict-effects", "--target", "--test", "--trace-alloc", "--trace-cleanup-edge", "--trace-ownership", "--trace-place", "--validate-all", "--validate-ownership", "--verbose", "--version", "--width-slice", "-D", "-e", "-f", "-g0", "-h", "-I", "-include", "-l", "-n", "-o", "-O0", "-O1", "-O2", "-O3", "-p", "-q", "-v", "-w"]
 
 // The first argument that looks like a flag and names none the driver
@@ -480,8 +480,8 @@ fn cli_one_liner_default(argc: i32) -> CliOneLiner:
         ok: true,
         mode: CliOneLinerMode.None,
         error_msg: "",
-        code_parts: Vec.new(),
-        args: Vec.new(),
+        code_parts: List.new(),
+        args: List.new(),
         opt_level: cli_default_opt_level(argc),
     }
 
@@ -719,9 +719,9 @@ fn cli_one_liner_source_name(mode: i32, count: i32) -> str:
         return "<cli " ++ name ++ " #1>"
     "<cli " ++ name ++ ">"
 
-fn cli_build_args_binding(args: &Vec[str]) -> str:
+fn cli_build_args_binding(args: &List[str]) -> str:
     var out = StringBuilder.new()
-    out.push_str("let args: Vec[str] = Vec.new()\n")
+    out.push_str("let args: List[str] = List.new()\n")
     for i in 0..args.len() as i32:
         let escaped = cli_escape_with_string(args[i])
         out.push_str("args.push(\"")
@@ -732,10 +732,10 @@ fn cli_build_args_binding(args: &Vec[str]) -> str:
 fn cli_synthetic_source_new -> CliSyntheticSource:
     CliSyntheticSource {
         source: "",
-        gen_starts: Vec.new(),
-        gen_ends: Vec.new(),
-        source_names: Vec.new(),
-        source_texts: Vec.new(),
+        gen_starts: List.new(),
+        gen_ends: List.new(),
+        source_names: List.new(),
+        source_texts: List.new(),
     }
 
 fn cli_synthetic_add_mapping(syn: CliSyntheticSource, start: i32, text: &str, source_name: &str) -> CliSyntheticSource:
@@ -784,8 +784,8 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     // A part's leading `use` declarations are the program's, not the loop
     // body's (#2015): they are hoisted above the loop, and blanked to spaces
     // in the body so every byte after them keeps its line and column.
-    var rewritten_parts: Vec[str] = Vec.new()
-    var use_lens: Vec[i32] = Vec.new()
+    var rewritten_parts: List[str] = List.new()
+    var use_lens: List[i32] = List.new()
     for i in 0..one.code_parts.len():
         let rewritten = cli_rewrite_semicolons(one.code_parts[i])
         let use_len = cli_leading_use_len(rewritten)
@@ -913,13 +913,13 @@ fn run_cli(full_argc: i32) -> i32:
             with_eprint(f"error: unknown option `{unknown}` for `with {cli_cmd}`{hint}")
             return 2
     if cli_command(argc) == "__framework-stubs":
-        let stub_args: Vec[str] = Vec.new()
+        let stub_args: List[str] = List.new()
         for i in 2..argc: stub_args.push(with_arg_at(i))
         return with_framework_stubs_main(&stub_args)
     // `with __windows-import-libs <dir> <name>...`: the import libraries of
     // in-box DLLs `with get` writes for a package that links them (#1915).
     if cli_command(argc) == "__windows-import-libs":
-        let lib_args: Vec[str] = Vec.new()
+        let lib_args: List[str] = List.new()
         for i in 2..argc: lib_args.push(with_arg_at(i))
         return with_windows_import_libs_main(&lib_args)
     // `with __ar qc lib.a a.o b.o` / `with __ranlib lib.a`: what CMake asks of
@@ -931,7 +931,7 @@ fn run_cli(full_argc: i32) -> i32:
         if argc < 5:
             with_eprint("usage: with __ar <qc|rc|rcs> <archive> <object>...")
             return 2
-        let named: Vec[str] = Vec.new()
+        let named: List[str] = List.new()
         for i in 4..argc: named.push(with_arg_at(i))
         // `@objects.rsp`: the members a build system wrote to a file because
         // the command line would be too long.
@@ -1230,7 +1230,7 @@ fn run_cli(full_argc: i32) -> i32:
     if cli_command(argc) == "init":
         return run_init_command(argc)
     if cli_command(argc) == "uat":
-        var uat_argv: Vec[str] = Vec.new()
+        var uat_argv: List[str] = List.new()
         for ai in 0..argc: uat_argv.push(with_arg_at(ai))
         return run_uat_command(uat_argv)
     if cli_command(argc) == "get":
@@ -1369,7 +1369,7 @@ fn test_child_env_prefix(test_name: &str, quiet: bool) -> str:
 
 // `rerun_tests` names one child run per failure: the test name, or "" for
 // a whole-binary run (a fixture with a main or run expectations).
-fn finish_test_binary(bin_path: &str, keep: bool, rerun_tests: &Vec[str], quiet: bool):
+fn finish_test_binary(bin_path: &str, keep: bool, rerun_tests: &List[str], quiet: bool):
     if not keep:
         cleanup_binary_artifacts(bin_path)
         return
@@ -1378,8 +1378,8 @@ fn finish_test_binary(bin_path: &str, keep: bool, rerun_tests: &Vec[str], quiet:
     for ti in 0..rerun_tests.len() as i32:
         with_eprint("rerun: " ++ test_child_env_prefix(rerun_tests[ti], quiet) ++ kept)
 
-fn single_run_reruns(rc: i32) -> Vec[str]:
-    let reruns: Vec[str] = Vec.new()
+fn single_run_reruns(rc: i32) -> List[str]:
+    let reruns: List[str] = List.new()
     if rc != 0:
         reruns.push("")
     reruns
@@ -1422,8 +1422,8 @@ fn reduce_exit_want(argc: i32) -> i32:
         return 0
     test_parse_i32(v)
 
-fn reduce_split_lines_keep_empty(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn reduce_split_lines_keep_empty(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     var start = 0
     var i = 0
     while i <= text.len() as i32:
@@ -1441,7 +1441,7 @@ fn reduce_split_lines_keep_empty(text: &str) -> Vec[str]:
         i = i + 1
     lines
 
-fn reduce_join_lines(lines: &Vec[str], skip_idx: i32) -> str:
+fn reduce_join_lines(lines: &List[str], skip_idx: i32) -> str:
     var out = ""
     for i in 0..lines.len() as i32:
         if i == skip_idx:
@@ -1710,13 +1710,13 @@ type BuildGraphLoadResult {
 
 type BuildActionRunResult {
     rc: i32,
-    effects: Vec[str],
+    effects: List[str],
 }
 
 fn build_action_run_result(rc: i32) -> BuildActionRunResult:
-    BuildActionRunResult { rc: rc, effects: Vec.new() }
+    BuildActionRunResult { rc: rc, effects: List.new() }
 
-fn build_action_run_result_with_effects(rc: i32, effects: Vec[str]) -> BuildActionRunResult:
+fn build_action_run_result_with_effects(rc: i32, effects: List[str]) -> BuildActionRunResult:
     BuildActionRunResult { rc: rc, effects: effects }
 
 fn build_action_safe_label(text: &str) -> str:
@@ -1794,7 +1794,7 @@ fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
     runner_options.opt_level = 1
     comp.configure_options(move runner_options)
     comp.set_tool_mode_entry_path(entry_path)
-    let no_settings: Vec[str] = Vec.new()
+    let no_settings: List[str] = List.new()
     // #1797/#1906: the runner links exactly as stage1 does — against a
     // runtime root the build names (WITH_RUNTIME_ROOT), which Link.w refuses
     // when its .producer is another generation and never trades for another
@@ -1849,7 +1849,7 @@ fn build_runner_copy(from: &str, to: &str) -> bool:
 // root explicitly (WITH_RUNTIME_ROOT), so a directory of another
 // generation is never a candidate, whatever is on disk beside it.
 fn build_runner_link_root(root: &str) -> str:
-    let dirs: Vec[str] = Vec.new()
+    let dirs: List[str] = List.new()
     dirs.push("out/bootstrap-lib")
     dirs.push("out/lib")
     let platform_object = link_stage_host_platform_runtime_object()
@@ -1888,8 +1888,8 @@ fn build_runner_explain_no_root(root: &str, target_name: &str, skipped_root_prep
 fn build_runner_fallback_list_path(root: &str) -> str:
     resolve_join(root, "out/.build-state/runner-fallback.list")
 
-fn build_runner_load_fallback(root: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn build_runner_load_fallback(root: &str) -> List[str]:
+    var out: List[str] = List.new()
     let text = with_fs_read_file(build_runner_fallback_list_path(root))
     let lines = text.split("\n")
     for i in 0..lines.len() as i32:
@@ -1904,7 +1904,7 @@ fn build_runner_note_fallback(root: &str, name: &str):
         return
     let _w = with_fs_write_file(path, existing ++ name ++ "\n")
 
-fn build_runner_target_eligible(target: &BuildGraphTarget, options: &BuildCommandOptions, runner_path: &str, fallback: &Vec[str]) -> bool:
+fn build_runner_target_eligible(target: &BuildGraphTarget, options: &BuildCommandOptions, runner_path: &str, fallback: &List[str]) -> bool:
     if runner_path.len() == 0 or target.kind != 23 or options.strict_effects:
         return false
     for i in 0..fallback.len() as i32:
@@ -1920,8 +1920,8 @@ fn build_runner_effects_path(root: &str, target_name: &str) -> str:
 // The runner's effect records: the log's lines, and (#1899) one `read` record
 // per path the action read through ToolFs, each kept in its own file beside
 // the log (ToolFs.record_read).
-fn build_runner_read_effects(path: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn build_runner_read_effects(path: &str) -> List[str]:
+    var out: List[str] = List.new()
     let text = with_fs_read_file(path)
     let lines = text.split("\n")
     for i in 0..lines.len() as i32:
@@ -1974,7 +1974,7 @@ fn run_build_action_runner_process(runner_path: &str, target: &BuildGraphTarget,
 // the log names each one, so a half-written output never reaches a
 // dependent (pcre2's heap-8 test once ran a pcre2test from such a state).
 fn build_runner_discard_partial_outputs(root: &str, target: &BuildGraphTarget):
-    var paths: Vec[str] = Vec.new()
+    var paths: List[str] = List.new()
     if target.output.len() > 0: paths.push(target.output.clone())
     for oi in 0..target.extra_outputs.len() as i32: paths.push(target.extra_outputs[oi].clone())
     for pi in 0..paths.len() as i32:
@@ -2000,7 +2000,7 @@ fn build_runner_postprocess(root: &str, target: &BuildGraphTarget, raw_rc: i32, 
     let out_rc = build_runner_validate_outputs(root, target)
     if out_rc != 0:
         return out_rc
-    let no_inputs: Vec[str] = Vec.new()
+    let no_inputs: List[str] = List.new()
     build_cache_record(root, target, no_inputs, build_runner_read_effects(effects_path))
     0
 
@@ -2148,23 +2148,23 @@ type PoolRetireResult { rc: i32, name: str, spent: i64, maxrss: i64, via_runner:
 // outlived (three lanes reporting an identical 88.9s), which misread the
 // pool's critical path. Output replay stays FIFO; only the clocks moved.
 type PoolState {
-    names: Vec[str],
-    pids: Vec[i32],
-    t0s: Vec[i64],
-    outs: Vec[str],
-    errs: Vec[str],
-    timeouts: Vec[i32],
-    via_runner: Vec[i32],
-    effects_paths: Vec[str],
-    done: Vec[i32],
-    done_rcs: Vec[i32],
-    done_ats: Vec[i64],
-    done_rsss: Vec[i64],
+    names: List[str],
+    pids: List[i32],
+    t0s: List[i64],
+    outs: List[str],
+    errs: List[str],
+    timeouts: List[i32],
+    via_runner: List[i32],
+    effects_paths: List[str],
+    done: List[i32],
+    done_rcs: List[i32],
+    done_ats: List[i64],
+    done_rsss: List[i64],
     oldest: i32,
 }
 
 fn PoolState.new() -> Self:
-    PoolState { names: Vec.new(), pids: Vec.new(), t0s: Vec.new(), outs: Vec.new(), errs: Vec.new(), timeouts: Vec.new(), via_runner: Vec.new(), effects_paths: Vec.new(), done: Vec.new(), done_rcs: Vec.new(), done_ats: Vec.new(), done_rsss: Vec.new(), oldest: 0 }
+    PoolState { names: List.new(), pids: List.new(), t0s: List.new(), outs: List.new(), errs: List.new(), timeouts: List.new(), via_runner: List.new(), effects_paths: List.new(), done: List.new(), done_rcs: List.new(), done_ats: List.new(), done_rsss: List.new(), oldest: 0 }
 
 impl PoolState:
     fn has_live(): self.oldest < self.names.len() as i32
@@ -2324,9 +2324,9 @@ unsafe fn run_build_action_from_build_w(root: &str, cfg: &ProjectConfig, target:
     if target.action_fn == 0:
         with_eprint("error: action target '" ++ target.name ++ "' is missing an evaluator action function")
         return build_action_run_result(1)
-    // The evaluator consumes its Vec params (write_scope frees them); the
+    // The evaluator consumes its List params (write_scope frees them); the
     // target still owns these buffers, so pass independent clones (#715 class).
-    var result = comptime_eval_tool_action_result(sema_ptr, (*sema_ptr).ast, (*sema_ptr).pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, bg_clone_str_vec(&target.inputs), target.output, bg_clone_str_vec(&target.extra_outputs), bg_clone_str_vec(&target.args), bg_clone_str_vec(&target.write_scopes), target.timeout_ms, target.cwd, bg_clone_str_vec(&target.env), target.network, if options.strict_effects: 1 else: 0)
+    var result = comptime_eval_tool_action_result(sema_ptr, (*sema_ptr).ast, (*sema_ptr).pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, bg_clone_str_list(&target.inputs), target.output, bg_clone_str_list(&target.extra_outputs), bg_clone_str_list(&target.args), bg_clone_str_list(&target.write_scopes), target.timeout_ms, target.cwd, bg_clone_str_list(&target.env), target.network, if options.strict_effects: 1 else: 0)
     if result.runtime_exit_code != 0:
         if result.runtime_stderr.len() > 0:
             with_ewrite(result.runtime_stderr)
@@ -2532,7 +2532,7 @@ fn build_graph_early_cutoff_enabled() -> bool: with_getenv_str("WITH_BUILD_NO_EA
 
 // Whether dependency `dep_name`, which ran in this invocation, left its
 // declared outputs byte-identical to what they were when it was dispatched.
-fn build_graph_dep_outputs_unchanged(root: &str, graph: &BuildGraph, dep_name: &str, names: &Vec[str], digests: &Vec[str]) -> bool:
+fn build_graph_dep_outputs_unchanged(root: &str, graph: &BuildGraph, dep_name: &str, names: &List[str], digests: &List[str]) -> bool:
     if not build_graph_early_cutoff_enabled(): return false
     var before = ""
     for i in 0..names.len() as i32:
@@ -2558,7 +2558,7 @@ fn build_graph_refuse_shared_gen_dir(root: &str) -> i32:
     1
 
 // The first dependency of `target` that failed or was skipped, or "".
-fn build_graph_first_broken_dep(target: &BuildGraphTarget, failed: &Vec[str]) -> str:
+fn build_graph_first_broken_dep(target: &BuildGraphTarget, failed: &List[str]) -> str:
     for dep in target.deps:
         if failed.contains(dep): return dep.clone()
     ""
@@ -2583,14 +2583,14 @@ fn build_graph_enforce_rss(root: &str, graph: &BuildGraph, name: &str, peak: i64
     1
 
 unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, action_sema: *mut Sema, options: &BuildCommandOptions, survey: bool, skipped_root_prepare: bool) -> i32:
-    let no_strings: Vec[str] = Vec.new()
+    let no_strings: List[str] = List.new()
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
         return 1
     // --survey: keep going past test/action target failures, report the
     // full matrix at the end. Evidence recorders (test-green/last-green)
     // are skipped once anything has failed.
-    var survey_failed: Vec[str] = Vec.new()
+    var survey_failed: List[str] = List.new()
     let force_action_worker_target = build_action_force_env_enabled()
     let output_rc = build_graph_validate_outputs(root, graph, options.output_path)
     if output_rc != 0:
@@ -2601,20 +2601,20 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     let generated_rc = build_graph_write_generated_sources(root, graph)
     if generated_rc != 0:
         return generated_rc
-    let completed_targets: Vec[str] = Vec.new()
-    let skipped_targets: Vec[str] = Vec.new()
+    let completed_targets: List[str] = List.new()
+    let skipped_targets: List[str] = List.new()
     // Early cutoff: a target's output digest taken when it was dispatched, by
     // name. A dependency that re-ran and produced the same bytes has not
     // changed anything its dependents can see (Go's content ID).
-    var cutoff_names: Vec[str] = Vec.new()
-    var cutoff_digests: Vec[str] = Vec.new()
+    var cutoff_names: List[str] = List.new()
+    var cutoff_digests: List[str] = List.new()
     // Per-target wall time: only the top-level driver records/reports; worker
     // re-entries (forced action / test workers) stay silent.
     let times_top_level = not force_action_worker_target and not build_test_worker_env_enabled()
     let run_t0 = with_clock_nanos()
-    let timed_names: Vec[str] = Vec.new()
-    let timed_ns: Vec[i64] = Vec.new()
-    let timed_rss: Vec[i64] = Vec.new()
+    let timed_names: List[str] = List.new()
+    let timed_ns: List[i64] = List.new()
+    let timed_rss: List[i64] = List.new()
     var timing_name = ""
     var timing_rss0: i64 = 0
     var timing_t0: i64 = 0
@@ -2628,7 +2628,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     // Action target so non-action invocations never pay its compile.
     var runner_checked = false
     var runner_path = ""
-    var runner_fallback: Vec[str] = Vec.new()
+    var runner_fallback: List[str] = List.new()
     // #1075/#1074/#1797/#1906: the runner links against a runtime root of
     // this driver's generation (build_runner_link_root: the seed's
     // out/bootstrap-lib, or out/lib under a tree compiler), named to the
@@ -3248,8 +3248,8 @@ fn build_command_validate_target(options: &BuildCommandOptions, cfg: &ProjectCon
 // with what was there put back after. Returns the NAME=old pairs to restore.
 // (The driver once dropped it for in-process compiles, so with-sha256's debug
 // map named the worktree its WITH_FILE_PREFIX_MAP was declared to hide.)
-fn build_graph_apply_target_env(target: &BuildGraphTarget) -> Vec[str]:
-    var saved: Vec[str] = Vec.new()
+fn build_graph_apply_target_env(target: &BuildGraphTarget) -> List[str]:
+    var saved: List[str] = List.new()
     for i in 0..target.env.len() as i32:
         let entry = target.env[i]
         let eq = entry.find("=")
@@ -3259,7 +3259,7 @@ fn build_graph_apply_target_env(target: &BuildGraphTarget) -> Vec[str]:
         let _set = with_setenv_str(name, entry.slice(eq + 1, entry.len()))
     saved
 
-fn build_graph_restore_target_env(saved: &Vec[str]):
+fn build_graph_restore_target_env(saved: &List[str]):
     var i = saved.len() as i32 - 1
     while i >= 0:
         let entry = saved[i]
@@ -3953,7 +3953,7 @@ fn discover_test_functions(text: &str) -> TestDiscovery:
     intern = parser.intern
     diags = move parser.diags
 
-    let test_names: Vec[str] = Vec.new()
+    let test_names: List[str] = List.new()
     if diags.has_errors():
         return TestDiscovery { parse_ok: false, has_main: false, test_names }
 
@@ -3984,7 +3984,7 @@ fn discover_bench_functions(text: &str) -> BenchDiscovery:
     intern = parser.intern
     diags = move parser.diags
 
-    let bench_names: Vec[str] = Vec.new()
+    let bench_names: List[str] = List.new()
     if diags.has_errors():
         return BenchDiscovery { parse_ok: false, has_main: false, bench_names }
 
@@ -4004,7 +4004,7 @@ fn discover_bench_functions(text: &str) -> BenchDiscovery:
                 bench_names.push(with_str_clone_ref(fn_name))
     BenchDiscovery { parse_ok: true, has_main, bench_names }
 
-fn synthesize_bench_main_source(text: &str, bench_names: &Vec[str]) -> str:
+fn synthesize_bench_main_source(text: &str, bench_names: &List[str]) -> str:
     var out = StringBuilder.with_capacity(text.len())
     out.push_str(text)
     if text.len() > 0 and text[text.len() - 1] != 10:
@@ -4027,7 +4027,7 @@ fn synthesize_bench_main_source(text: &str, bench_names: &Vec[str]) -> str:
         out.push_str("\")\n")
     out.to_str()
 
-fn synthesize_test_main_source(text: &str, test_names: &Vec[str]) -> str:
+fn synthesize_test_main_source(text: &str, test_names: &List[str]) -> str:
     var out = StringBuilder.with_capacity(text.len())
     out.push_str(text)
     if text.len() > 0 and text[text.len() - 1] != 10:
@@ -4516,8 +4516,8 @@ fn test_effective_prelude_mode(default_mode: i32, args: &str) -> i32:
         return PreludeMode.FullMode as i32
     default_mode
 
-fn split_nonempty_lines(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn split_nonempty_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     let text_len = text.len() as i32
     var start = 0
     var i = 0
@@ -4616,7 +4616,7 @@ fn run_test_process(bin_path: &str, test_name: &str, quiet: bool) -> TestRunResu
             with_ewrite(err_text)
     TestRunResult { rc, stdout: out_text, stderr: err_text }
 
-fn test_validate_output(stream_name: &str, actual: &str, expected_values: &Vec[str], target: &str, test_name: &str) -> bool:
+fn test_validate_output(stream_name: &str, actual: &str, expected_values: &List[str], target: &str, test_name: &str) -> bool:
     for ei in 0..expected_values.len() as i32:
         let expected = expected_values[ei]
         if not actual.contains(expected):
@@ -4626,8 +4626,8 @@ fn test_validate_output(stream_name: &str, actual: &str, expected_values: &Vec[s
 
 // The lines of a captured stream: `\n` ends a line, a `\r` before it is the
 // platform's, and a last line without `\n` still counts.
-fn test_output_lines(text: &str) -> Vec[str]:
-    var lines: Vec[str] = Vec.new()
+fn test_output_lines(text: &str) -> List[str]:
+    var lines: List[str] = List.new()
     let n = text.len() as i32
     var start = 0
     while start < n:
@@ -4639,24 +4639,24 @@ fn test_output_lines(text: &str) -> Vec[str]:
         start = end + 1
     lines
 
-fn test_line_count(lines: &Vec[str], wanted: &str) -> i32:
+fn test_line_count(lines: &List[str], wanted: &str) -> i32:
     var n = 0
     for i in 0..lines.len() as i32:
         if lines[i] == wanted: n = n + 1
     n
 
-fn test_line_containing(lines: &Vec[str], fragment: &str) -> str:
+fn test_line_containing(lines: &List[str], fragment: &str) -> str:
     for i in 0..lines.len() as i32:
         if lines[i].contains(fragment): return lines[i].clone()
     ""
 
 // The number of leading lines the two agree on.
-fn test_lines_agree(expected: &Vec[str], actual: &Vec[str]) -> i32:
+fn test_lines_agree(expected: &List[str], actual: &List[str]) -> i32:
     var k = 0
     while k < expected.len() as i32 and k < actual.len() as i32 and expected[k] == actual[k]: k = k + 1
     k
 
-fn test_lines_in_order(expected: &Vec[str], actual: &Vec[str]) -> bool:
+fn test_lines_in_order(expected: &List[str], actual: &List[str]) -> bool:
     var k = 0
     for i in 0..actual.len() as i32:
         if k < expected.len() as i32 and actual[i] == expected[k]: k = k + 1
@@ -4667,7 +4667,7 @@ fn test_lines_in_order(expected: &Vec[str], actual: &Vec[str]) -> bool:
 // nowhere, a line printed only inside a longer one (`drop 1` in `drop 10`),
 // a line printed more or fewer times than listed (a double drop), the lines
 // out of order, and lines the expectations do not list.
-fn test_stdout_mismatch(expected: &Vec[str], actual: &Vec[str], stdout: &str) -> str:
+fn test_stdout_mismatch(expected: &List[str], actual: &List[str], stdout: &str) -> str:
     for i in 0..expected.len() as i32:
         if not stdout.contains(expected[i]): return "missing expected output: " ++ expected[i]
     for i in 0..expected.len() as i32:
@@ -4680,11 +4680,11 @@ fn test_stdout_mismatch(expected: &Vec[str], actual: &Vec[str], stdout: &str) ->
     if not test_lines_in_order(expected, actual): return "the expected lines print in a different order"
     "stdout has lines the expectations do not list"
 
-fn stdout_line_at(lines: &Vec[str], k: i32):
+fn stdout_line_at(lines: &List[str], k: i32):
     if k < lines.len() as i32: "`" ++ lines[k] ++ "`" else: "no more lines"
 
 // A window of `lines` from just before line `k`, numbered from 1.
-fn test_eprint_lines(label: &str, lines: &Vec[str], k: i32):
+fn test_eprint_lines(label: &str, lines: &List[str], k: i32):
     let total = lines.len() as i32
     with_eprint(f" = {label} ({total} lines):")
     var from = k - 3
@@ -4697,7 +4697,7 @@ fn test_eprint_lines(label: &str, lines: &Vec[str], k: i32):
 
 // `//! expect-stdout:` lines are the program's stdout: every line, in order,
 // and nothing else (#1855).
-fn test_validate_stdout_lines(stdout: &str, expected: &Vec[str], target: &str, test_name: &str) -> bool:
+fn test_validate_stdout_lines(stdout: &str, expected: &List[str], target: &str, test_name: &str) -> bool:
     let actual = test_output_lines(stdout)
     let k = test_lines_agree(expected, actual)
     if k == expected.len() as i32 and k == actual.len() as i32: return true
@@ -4738,7 +4738,7 @@ fn run_test_binary_checked(bin_path: &str, target: &str, test_name: &str, quiet:
 // known-bug model): the fixture documents an open bug and MUST stay red.
 // Both directions are enforced — a red is tolerated (loudly), and a green
 // fails the file until the directive is removed with the issue's fix.
-fn run_test_file_with_build_settings(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str], link_search_paths: &Vec[str], link_rpaths: &Vec[str]) -> i32:
+fn run_test_file_with_build_settings(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str], link_search_paths: &List[str], link_rpaths: &List[str]) -> i32:
     var directives = parse_test_directives_for_target(target)
     // These are directive verdicts, not outcomes of executing a known bug.
     // A skip is neither an unexpected pass nor an expected failure; malformed
@@ -4755,13 +4755,13 @@ fn run_test_file_with_build_settings(target: &str, opt_level: i32, no_std: bool,
     with_eprint("[known-issue " ++ known_issue ++ "] " ++ target ++ " red as expected")
     0
 
-fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str], link_search_paths: &Vec[str], link_rpaths: &Vec[str]) -> i32:
+fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str], link_search_paths: &List[str], link_rpaths: &List[str]) -> i32:
     // `//! env:` pairs apply to the compile (in-process) and the run
     // (inherited), and restore after so one test cannot poison the next.
     let env_directives = parse_test_directives_for_target(target)
     if env_directives.env_pairs.len() == 0:
         return run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, link_search_paths, link_rpaths)
-    let saved: Vec[str] = Vec.new()
+    let saved: List[str] = List.new()
     for ei in 0..env_directives.env_pairs.len() as i32:
         let pair = env_directives.env_pairs[ei]
         let eq = pair.find("=")
@@ -4809,7 +4809,7 @@ fn run_test_validate_all(target: &str, directives: &TestDirectives) -> i32:
     emit_test_child_stderr(result.stdout ++ result.stderr)
     1
 
-fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str], link_search_paths: &Vec[str], link_rpaths: &Vec[str]) -> i32:
+fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str], link_search_paths: &List[str], link_rpaths: &List[str]) -> i32:
     let directives = parse_test_directives_for_target(target)
     if cli_has_flag(with_arg_count(), "--validate-all") and run_test_validate_all(target, &directives) != 0:
         print_test_summary(target, 0, 1, quiet)
@@ -4859,7 +4859,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
             print_test_summary(target, 0, 1, run_quiet)
             return 1
         var passed = 0
-        let failed_tests: Vec[str] = Vec.new()
+        let failed_tests: List[str] = List.new()
         var run_quiet = quiet
         if verbose:
             run_quiet = false
@@ -4894,16 +4894,16 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
     run_rc
 
 fn run_test_file(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str) -> i32:
-    let include_paths: Vec[str] = Vec.new()
-    let defines: Vec[str] = Vec.new()
-    let link_libs: Vec[str] = Vec.new()
+    let include_paths: List[str] = List.new()
+    let defines: List[str] = List.new()
+    let link_libs: List[str] = List.new()
     run_test_file_with_build_settings(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, include_paths, include_paths)
 
 fn test_command_option_takes_value(arg: &str) -> bool:
     arg == "-f" or arg == "--filter" or cli_option_takes_value(arg)
 
-fn test_command_collect_targets(argc: i32) -> Vec[str]:
-    let targets: Vec[str] = Vec.new()
+fn test_command_collect_targets(argc: i32) -> List[str]:
+    let targets: List[str] = List.new()
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
@@ -4942,7 +4942,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
     // cached machine-wide. Before, the files ran one after another and the
     // first failure ended the run, so a set of tests took their sum and
     // hid every failure after the first.
-    var files: Vec[str] = Vec.new()
+    var files: List[str] = List.new()
     for ti in 0..targets.len() as i32:
         let target = targets[ti]
         if test_target_is_directory(target):
@@ -4962,8 +4962,8 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
 
 // The options each file's run takes: every argument that is not a test file
 // or directory, a value-taking option with its value.
-fn test_command_pass_through_args(argc: i32) -> Vec[str]:
-    var args: Vec[str] = Vec.new()
+fn test_command_pass_through_args(argc: i32) -> List[str]:
+    var args: List[str] = List.new()
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
@@ -5326,7 +5326,7 @@ fn doc_extract_comment(text: &str, decl_start: i32) -> str:
     var pos = decl_start - 1
     while pos >= 0 and (text[pos] == 32 or text[pos] == 9 or text[pos] == 13 or text[pos] == 10):
         pos = pos - 1
-    let lines: Vec[str] = Vec.new()
+    let lines: List[str] = List.new()
     while pos >= 0:
         var line_start = pos
         while line_start > 0 and text[(line_start - 1)] != 10:
@@ -5384,14 +5384,14 @@ fn doc_collect_modules(info: &str, root: &str, source_path: &str) -> str:
         out = out ++ "- `" ++ path ++ "`\n"
     out
 
-fn doc_path_seen(paths: &Vec[str], path: &str) -> bool:
+fn doc_path_seen(paths: &List[str], path: &str) -> bool:
     for i in 0..paths.len() as i32:
         if paths[i] == path:
             return true
     false
 
-fn doc_module_paths(info: &str, root: &str, source_path: &str) -> Vec[str]:
-    let paths: Vec[str] = Vec.new()
+fn doc_module_paths(info: &str, root: &str, source_path: &str) -> List[str]:
+    let paths: List[str] = List.new()
     let lines = split_nonempty_lines(info)
     for i in 0..lines.len() as i32:
         let line = lines[i]
@@ -5595,7 +5595,7 @@ fn run_fmt_command(argc: i32) -> i32:
     var fmt_style = 0
     if prefer_brace: fmt_style = 2
     if prefer_colon: fmt_style = 1
-    var files: Vec[str] = Vec.new()
+    var files: List[str] = List.new()
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
@@ -6185,8 +6185,8 @@ fn cli_remove_manifest_dep(toml: &str, pkg_name: &str) -> CliManifestRemoveResul
         i = i + 1
     CliManifestRemoveResult { ok: removed, text: out }
 
-fn cli_manifest_c_deps(toml: &str) -> Vec[CliManifestDep]:
-    let deps: Vec[CliManifestDep] = Vec.new()
+fn cli_manifest_c_deps(toml: &str) -> List[CliManifestDep]:
+    let deps: List[CliManifestDep] = List.new()
     var in_deps = false
     var start = 0
     var i = 0

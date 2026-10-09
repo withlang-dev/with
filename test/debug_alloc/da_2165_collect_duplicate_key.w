@@ -6,7 +6,7 @@ use std.collections.BTreeSet
 use std.collections.BTreeMap
 
 fn main:
-    let names: Vec[str] = ["A".to_lower(), "A".to_lower(), "B".to_lower()]
+    let names: List[str] = ["A".to_lower(), "A".to_lower(), "B".to_lower()]
     let set = names.iter() |> map(n => n.clone()) |> collect[HashSet[str]]()
     assert(set.len() == 2)
     let map = names.iter() |> map(n => (n.clone(), n.to_upper())) |> collect[HashMap[str, str]]()

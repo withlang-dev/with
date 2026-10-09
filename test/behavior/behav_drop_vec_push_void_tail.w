@@ -13,7 +13,7 @@ impl Drop for W:
         COUNT = COUNT + 1
 
 fn body():
-    let xs: Vec[W] = Vec.new()
+    let xs: List[W] = List.new()
     xs.push(W { tag: 1 })
 
 fn main:

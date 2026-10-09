@@ -5,14 +5,14 @@
 // not the owner's type). This fixture pins the VALUE semantics through
 // branch/loop/early-return control flow; drop-exactly-once for user-Drop
 // owners is pinned in test/debug_alloc/da_self_replace_user_drop.w. The
-// POD Vec buffers here follow local-reassignment parity: not freed under
+// POD List buffers here follow local-reassignment parity: not freed under
 // the provisional A5/#608 ruling until the #691 wide flip.
 
-type Buf { data: Vec[i32], tag: i32 }
+type Buf { data: List[i32], tag: i32 }
 
 extend Buf:
     mut fn reset(new_tag: i32):
-        var d: Vec[i32] = Vec.new()
+        var d: List[i32] = List.new()
         d.push(new_tag)
         self = Buf { data: d, tag: new_tag }
     mut fn reset_if(new_tag: i32, go: bool):
@@ -22,7 +22,7 @@ extend Buf:
     move fn consume() -> i32: self.tag
 
 fn make(tag: i32) -> Buf:
-    var d: Vec[i32] = Vec.new()
+    var d: List[i32] = List.new()
     d.push(tag)
     Buf { data: d, tag: tag }
 

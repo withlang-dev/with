@@ -31,7 +31,7 @@ fn main:
     print(f"box128 {(&raw const big.n as i64) % 128 == 0} {big.n}")
     // Several in a row: the allocator's 16-aligned payloads land at both
     // residues mod 32, so one lucky cell proves nothing.
-    var boxes: Vec[Box[Al]] = Vec.new()
+    var boxes: List[Box[Al]] = List.new()
     for i in 0..8: boxes.push(Box.new(Al { a: 2, v: i as i64 }))
     var ok = 0
     for i in 0..boxes.len() as i32:

@@ -1,9 +1,9 @@
 //! expect-stdout: ok
 
-// Test: for-loop over Vec with break and continue.
+// Test: for-loop over List with break and continue.
 
 fn main:
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     v.push(1)
     v.push(2)
     v.push(3)

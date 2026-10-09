@@ -2,11 +2,11 @@
 
 use std.collections.HashMap
 fn main:
-    var map: HashMap[i32, Vec[i64]] = HashMap.new()
-    let values: Vec[i64] = Vec.new()
+    var map: HashMap[i32, List[i64]] = HashMap.new()
+    let values: List[i64] = List.new()
     values.push(7)
     values.push(9)
     map.insert(1, move values)
-    let removed: Option[Vec[i64]] = map.remove(1)
+    let removed: Option[List[i64]] = map.remove(1)
     let owned = removed.unwrap()
     assert(owned.len() == 2)

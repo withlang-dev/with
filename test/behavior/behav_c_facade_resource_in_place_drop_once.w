@@ -12,7 +12,7 @@
 // address to the facade's `drop` — and the destructor runs exactly once on
 // every path: scope exit,
 // early return, moved into a function, moved out and returned, held in a
-// Vec. Each stream remembers a counter the initializer is handed and `z_end`
+// List. Each stream remembers a counter the initializer is handed and `z_end`
 // bumps it; the counter is never freed, so it stays readable. The resource
 // needs no `unsafe`; the observer does, because c_import translates a
 // static inline body that reads through a pointer as an `unsafe fn`.
@@ -62,7 +62,7 @@ fn main:
     let gs = state(g)
     drop(g)
     print(f"moved-out {gs} ends={unsafe { *ends }}")
-    var v: Vec[Stream] = Vec.new()
+    var v: List[Stream] = List.new()
     v.push(Stream.init(ends))
     v.push(Stream.init(ends))
     let s0 = state(v[0])

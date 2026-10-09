@@ -2,7 +2,7 @@
 //! expect-stdout: ok
 
 fn main:
-    let parts: Vec[str] = Vec.new()
+    let parts: List[str] = List.new()
     parts.push("left")
     parts.push("right")
     let joined = parts.join(":")

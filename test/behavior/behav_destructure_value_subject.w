@@ -87,10 +87,10 @@ fn main:
     else:
         (1, 0)
     print(f"17 {a17} {b17}")
-    var v: Vec[(i32, i32)] = Vec.new()
+    var v: List[(i32, i32)] = List.new()
     v.push(lc(1))
     v.push(if b > 0: lc(b) else: (1, 0))
-    let w: Vec[(i32, i32)] = Vec.new()
+    let w: List[(i32, i32)] = List.new()
     for (x, y) in if b > 0: v else: w:
         print(f"18 {x} {y}")
     with if b > 0: lc(b) else: (1, 0) as (x, y):

@@ -11,5 +11,5 @@ async fn worker -> i32: 1
 
 @[entry]
 fn start -> i32:
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     v.len()

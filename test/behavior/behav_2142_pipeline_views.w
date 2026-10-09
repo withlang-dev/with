@@ -4,9 +4,9 @@
 // value it observes; `sum` and `max` over views of a Copy element yield the
 // element.
 fn main:
-    let names: Vec[str] = ["b".to_lower(), "a".to_lower()]
+    let names: List[str] = ["b".to_lower(), "a".to_lower()]
     let at = names.iter() |> position(it == "a")
-    let kept = names.iter() |> filter(it.len() > 0) |> collect[Vec]()
+    let kept = names.iter() |> filter(it.len() > 0) |> collect[List]()
     let xs = [1, 2, 3]
     let total = xs.iter_ref() |> sum()
     let top = (xs.iter_ref() |> max()) ?? 0

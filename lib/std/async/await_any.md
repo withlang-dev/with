@@ -2,16 +2,16 @@
 
 ## Signature
 ```with
-pub async fn await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, Vec[E]]
+pub async fn await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, List[E]]
 ```
 
 ## Behavior
 - Returns `Ok(T)` once one successful result is found.
-- If all tasks fail, returns `Err(Vec[E])`.
+- If all tasks fail, returns `Err(List[E])`.
 - Error vector order for all-fail is input order.
 
 ## Empty input
-- `await_any([])` returns `Err(Vec.new())`.
+- `await_any([])` returns `Err(List.new())`.
 
 ## Cancellation
 - On first success, remaining owned tasks are cancelled and joined before return.
@@ -24,7 +24,7 @@ pub async fn await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result
 
 ## Example
 ```with
-let tasks = Vec.new()
+let tasks = List.new()
 tasks.push(query_a())
 tasks.push(query_b())
 let result = await_any(tasks)

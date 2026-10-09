@@ -55,12 +55,12 @@ fn cc_lbrace -> str:
 fn cc_rbrace -> str:
     str_from_byte(125)
 
-let CC_PSEUDO_TID_VEC = 1900001
+let CC_PSEUDO_TID_LIST = 1900001
 let CC_PSEUDO_TID_FMT_BUF = 1900002
 
 enum CcPlaceKind: i32:
     UNKNOWN
-    VEC
+    LIST
     HASHMAP
     OPTION
 
@@ -70,14 +70,14 @@ impl Copy for CcPlaceKind
 
 enum CcBuiltin: i32:
     NONE
-    VEC_NEW
-    VEC_PUSH
-    VEC_GET
-    VEC_LEN
-    VEC_IS_EMPTY
+    LIST_NEW
+    LIST_PUSH
+    LIST_GET
+    LIST_LEN
+    LIST_IS_EMPTY
 
-    VEC_REMOVE
-    VEC_CLEAR
+    LIST_REMOVE
+    LIST_CLEAR
     MAP_NEW
     MAP_INSERT
     MAP_GET
@@ -87,7 +87,7 @@ enum CcBuiltin: i32:
     OPT_IS_SOME
     OPT_UNWRAP
     OPT_EXPECT
-    VEC_POP
+    LIST_POP
     STR_LEN
     STR_BYTE_AT
     STR_SLICE
@@ -98,7 +98,7 @@ enum CcBuiltin: i32:
     STR_FIND
     MAP_CLEAR
     VECITER_NEXT
-    VEC_ITER
+    LIST_ITER
     OPT_IS_NONE
     STR_SPLIT
     STR_TO_UPPER
@@ -109,20 +109,20 @@ enum CcBuiltin: i32:
     MAP_DECREMENT
     MAP_UPDATE
     MAP_SLOT_WALK
-    VEC_MAP
-    VEC_FILTER
-    VEC_FOLD
-    VEC_CONTAINS
+    LIST_MAP
+    LIST_FILTER
+    LIST_FOLD
+    LIST_CONTAINS
     STR_REPEAT
     ARR_LEN
     GENERIC_CALL
-    VEC_JOIN
+    LIST_JOIN
     DYN_VTABLE_CMP
     DYN_DOWNCAST
     OPT_FILTER
     ROTATE_LEFT
     ROTATE_RIGHT
-    VEC_WITH_CAPACITY
+    LIST_WITH_CAPACITY
     FMT_TO_STR
     FMT_DEBUG_STR
     FMT_DEBUG
@@ -136,7 +136,7 @@ enum CcBuiltin: i32:
     MAX
     ABS
     FMA
-    VEC_SLOT
+    LIST_SLOT
     VECSLOT_GET
     VECSLOT_SET
     FMT_BUF_NEW
@@ -156,13 +156,13 @@ enum CcBuiltin: i32:
     ATOMIC_CAS
     ATOMIC_CAS_WEAK
     ATOMIC_FENCE
-    VEC_GET_DISJOINT
+    LIST_GET_DISJOINT
     DYN_CALL
     SLOTMAP
     MULTI_INDEX
-    VEC_LEN32
-    VEC_LEN64
-    VEC_ULEN32
+    LIST_LEN32
+    LIST_LEN64
+    LIST_ULEN32
     MAP_LEN32
     MAP_LEN64
     MAP_ULEN32
@@ -186,25 +186,25 @@ enum CcBuiltin: i32:
 
 impl Copy for CcBuiltin
 
-fn cc_builtin_uses_vec_receiver(kind: CcBuiltin) -> bool:
-    if kind == CcBuiltin.VEC_PUSH: return true
-    if kind == CcBuiltin.VEC_GET: return true
-    if kind == CcBuiltin.VEC_LEN: return true
-    if kind == CcBuiltin.VEC_IS_EMPTY: return true
-    if kind == CcBuiltin.VEC_LEN32: return true
-    if kind == CcBuiltin.VEC_LEN64: return true
-    if kind == CcBuiltin.VEC_ULEN32: return true
-    if kind == CcBuiltin.VEC_REMOVE: return true
-    if kind == CcBuiltin.VEC_CLEAR: return true
-    if kind == CcBuiltin.VEC_POP: return true
-    if kind == CcBuiltin.VEC_ITER: return true
-    if kind == CcBuiltin.VEC_MAP: return true
-    if kind == CcBuiltin.VEC_FILTER: return true
-    if kind == CcBuiltin.VEC_FOLD: return true
-    if kind == CcBuiltin.VEC_CONTAINS: return true
-    if kind == CcBuiltin.VEC_JOIN: return true
-    if kind == CcBuiltin.VEC_SLOT: return true
-    if kind == CcBuiltin.VEC_GET_DISJOINT: return true
+fn cc_builtin_uses_list_receiver(kind: CcBuiltin) -> bool:
+    if kind == CcBuiltin.LIST_PUSH: return true
+    if kind == CcBuiltin.LIST_GET: return true
+    if kind == CcBuiltin.LIST_LEN: return true
+    if kind == CcBuiltin.LIST_IS_EMPTY: return true
+    if kind == CcBuiltin.LIST_LEN32: return true
+    if kind == CcBuiltin.LIST_LEN64: return true
+    if kind == CcBuiltin.LIST_ULEN32: return true
+    if kind == CcBuiltin.LIST_REMOVE: return true
+    if kind == CcBuiltin.LIST_CLEAR: return true
+    if kind == CcBuiltin.LIST_POP: return true
+    if kind == CcBuiltin.LIST_ITER: return true
+    if kind == CcBuiltin.LIST_MAP: return true
+    if kind == CcBuiltin.LIST_FILTER: return true
+    if kind == CcBuiltin.LIST_FOLD: return true
+    if kind == CcBuiltin.LIST_CONTAINS: return true
+    if kind == CcBuiltin.LIST_JOIN: return true
+    if kind == CcBuiltin.LIST_SLOT: return true
+    if kind == CcBuiltin.LIST_GET_DISJOINT: return true
     false
 
 fn cc_builtin_uses_option_receiver(kind: CcBuiltin) -> bool:
@@ -217,10 +217,10 @@ fn cc_builtin_uses_option_receiver(kind: CcBuiltin) -> bool:
 
 enum CcCalleeHint: i32:
     NONE
-    VEC_RECV
+    LIST_RECV
     MAP_RECV
     OPT_RECV
-    VEC_NEW
+    LIST_NEW
     MAP_NEW
     OPT_NEW
 
@@ -241,28 +241,28 @@ fn cc_len_method_builtin(base: CcBuiltin, method: &str) -> CcBuiltin:
     if method == "len":
         return base
     if method == "len32":
-        if base == CcBuiltin.VEC_LEN: return CcBuiltin.VEC_LEN32
+        if base == CcBuiltin.LIST_LEN: return CcBuiltin.LIST_LEN32
         if base == CcBuiltin.MAP_LEN: return CcBuiltin.MAP_LEN32
         if base == CcBuiltin.STR_LEN: return CcBuiltin.STR_LEN32
         if base == CcBuiltin.ARR_LEN: return CcBuiltin.ARR_LEN32
     if method == "len64":
-        if base == CcBuiltin.VEC_LEN: return CcBuiltin.VEC_LEN64
+        if base == CcBuiltin.LIST_LEN: return CcBuiltin.LIST_LEN64
         if base == CcBuiltin.MAP_LEN: return CcBuiltin.MAP_LEN64
         if base == CcBuiltin.STR_LEN: return CcBuiltin.STR_LEN64
         if base == CcBuiltin.ARR_LEN: return CcBuiltin.ARR_LEN64
     if method == "ulen32":
-        if base == CcBuiltin.VEC_LEN: return CcBuiltin.VEC_ULEN32
+        if base == CcBuiltin.LIST_LEN: return CcBuiltin.LIST_ULEN32
         if base == CcBuiltin.MAP_LEN: return CcBuiltin.MAP_ULEN32
         if base == CcBuiltin.STR_LEN: return CcBuiltin.STR_ULEN32
         if base == CcBuiltin.ARR_LEN: return CcBuiltin.ARR_ULEN32
     CcBuiltin.NONE
 
 fn cc_builtin_len_mode(kind: CcBuiltin) -> CcLenMode:
-    if kind == CcBuiltin.VEC_LEN32 or kind == CcBuiltin.MAP_LEN32 or kind == CcBuiltin.STR_LEN32 or kind == CcBuiltin.ARR_LEN32:
+    if kind == CcBuiltin.LIST_LEN32 or kind == CcBuiltin.MAP_LEN32 or kind == CcBuiltin.STR_LEN32 or kind == CcBuiltin.ARR_LEN32:
         return CcLenMode.I32
-    if kind == CcBuiltin.VEC_LEN64 or kind == CcBuiltin.MAP_LEN64 or kind == CcBuiltin.STR_LEN64 or kind == CcBuiltin.ARR_LEN64:
+    if kind == CcBuiltin.LIST_LEN64 or kind == CcBuiltin.MAP_LEN64 or kind == CcBuiltin.STR_LEN64 or kind == CcBuiltin.ARR_LEN64:
         return CcLenMode.I64
-    if kind == CcBuiltin.VEC_ULEN32 or kind == CcBuiltin.MAP_ULEN32 or kind == CcBuiltin.STR_ULEN32 or kind == CcBuiltin.ARR_ULEN32:
+    if kind == CcBuiltin.LIST_ULEN32 or kind == CcBuiltin.MAP_ULEN32 or kind == CcBuiltin.STR_ULEN32 or kind == CcBuiltin.ARR_ULEN32:
         return CcLenMode.U32
     CcLenMode.USIZE
 
@@ -278,8 +278,8 @@ fn cc_len_result_c_type(mode: CcLenMode) -> str:
 fn cc_builtin_is_map_len(kind: CcBuiltin) -> bool:
     kind == CcBuiltin.MAP_LEN or kind == CcBuiltin.MAP_LEN32 or kind == CcBuiltin.MAP_LEN64 or kind == CcBuiltin.MAP_ULEN32
 
-fn cc_builtin_is_vec_len(kind: CcBuiltin) -> bool:
-    kind == CcBuiltin.VEC_LEN or kind == CcBuiltin.VEC_LEN32 or kind == CcBuiltin.VEC_LEN64 or kind == CcBuiltin.VEC_ULEN32
+fn cc_builtin_is_list_len(kind: CcBuiltin) -> bool:
+    kind == CcBuiltin.LIST_LEN or kind == CcBuiltin.LIST_LEN32 or kind == CcBuiltin.LIST_LEN64 or kind == CcBuiltin.LIST_ULEN32
 
 fn cc_builtin_is_str_len(kind: CcBuiltin) -> bool:
     kind == CcBuiltin.STR_LEN or kind == CcBuiltin.STR_LEN32 or kind == CcBuiltin.STR_LEN64 or kind == CcBuiltin.STR_ULEN32
@@ -318,17 +318,17 @@ type CCodegen {
     fn_pointer_param_cache: HashMap[i64, i32],
     sig_idx_cache: HashMap[i32, i32],
     infer_local_depth: i32,
-    active_local_body_fns: Vec[i32],
-    active_local_ids: Vec[i32],
-    active_method_syms: Vec[i32],
-    active_method_args: Vec[i32],
-    active_method_dests: Vec[i32],
-    active_direct_args: Vec[i32],
-    active_direct_dests: Vec[i32],
+    active_local_body_fns: List[i32],
+    active_local_ids: List[i32],
+    active_method_syms: List[i32],
+    active_method_args: List[i32],
+    active_method_dests: List[i32],
+    active_direct_args: List[i32],
+    active_direct_dests: List[i32],
     call_infer_cache: HashMap[str, i32],
-    field_cache_struct_tids: Vec[i32],
-    field_cache_syms: Vec[i32],
-    field_cache_tids: Vec[i32],
+    field_cache_struct_tids: List[i32],
+    field_cache_syms: List[i32],
+    field_cache_tids: List[i32],
     field_cache_ready: i32,
     in_field_cache_build: i32,
     local_infer_cache: HashMap[i64, i32],
@@ -346,8 +346,8 @@ type CCodegen {
     // value registers a static C thunk here; definitions are emitted between
     // the prototypes and the function bodies, in first-use order so emission
     // stays deterministic.
-    fat_thunk_syms: Vec[i32],
-    fat_thunk_tids: Vec[i32],
+    fat_thunk_syms: List[i32],
+    fat_thunk_tids: List[i32],
     fat_thunk_keys: HashMap[i64, i32],
     // Set by resolve_call_named_callee when the callee resolved to an
     // observing `_ref` str-builtin runtime fn (unqualified_builtin_method_name):
@@ -357,13 +357,13 @@ type CCodegen {
     // #1484: globals initialized before `main` (prepare_global_init_bodies):
     // each global's symbol, its declaration index (the order they run in,
     // §9.1c) and its synthesized initializer body's function symbol.
-    global_init_syms: Vec[i32],
-    global_init_decl_indices: Vec[i32],
-    global_init_fn_syms: Vec[i32],
+    global_init_syms: List[i32],
+    global_init_decl_indices: List[i32],
+    global_init_fn_syms: List[i32],
     // §16.3c, D47: the C strings a call lends its `const char *` parameters
     // (call_args_text): each a `with_cstr_lend` of a str or `&str` view,
     // held in a temp for the call and released after it (emit_term).
-    call_lends: Vec[str],
+    call_lends: List[str],
     // #1766: every closure of the module (a CK_CLOSURE constant: an
     // NK_CLOSURE, or the NK_FOR whose body is a Gen[T]'s `each` closure,
     // D69), registered up front in body order so names are deterministic.
@@ -373,11 +373,11 @@ type CCodegen {
     // body (closure_parents[N]) by the mode Sema decided on the node
     // (closure_env_kind): the pair {fn, ctx} is the LLVM backend's, tag
     // bits included (CodegenDispatch.gen_closure, D63).
-    closure_syms: Vec[i32],
-    closure_parents: Vec[i32],
-    closure_nodes: Vec[i32],
-    closure_in_loop: Vec[i32],
-    closure_env_kinds: Vec[i32],
+    closure_syms: List[i32],
+    closure_parents: List[i32],
+    closure_nodes: List[i32],
+    closure_in_loop: List[i32],
+    closure_env_kinds: List[i32],
     closure_index_by_sym: HashMap[i32, i32],
 }
 
@@ -411,17 +411,17 @@ pub fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema:
         fn_pointer_param_cache: HashMap.new(),
         sig_idx_cache: HashMap.new(),
         infer_local_depth: 0,
-        active_local_body_fns: Vec.new(),
-        active_local_ids: Vec.new(),
-        active_method_syms: Vec.new(),
-        active_method_args: Vec.new(),
-        active_method_dests: Vec.new(),
-        active_direct_args: Vec.new(),
-        active_direct_dests: Vec.new(),
+        active_local_body_fns: List.new(),
+        active_local_ids: List.new(),
+        active_method_syms: List.new(),
+        active_method_args: List.new(),
+        active_method_dests: List.new(),
+        active_direct_args: List.new(),
+        active_direct_dests: List.new(),
         call_infer_cache: HashMap.new(),
-        field_cache_struct_tids: Vec.new(),
-        field_cache_syms: Vec.new(),
-        field_cache_tids: Vec.new(),
+        field_cache_struct_tids: List.new(),
+        field_cache_syms: List.new(),
+        field_cache_tids: List.new(),
         field_cache_ready: 0,
         in_field_cache_build: 0,
         local_infer_cache: HashMap.new(),
@@ -434,19 +434,19 @@ pub fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema:
         local_value_use_cache: HashMap.new(),
         place_kind_cache: HashMap.new(),
         callee_hint_cache: HashMap.new(),
-        fat_thunk_syms: Vec.new(),
-        fat_thunk_tids: Vec.new(),
+        fat_thunk_syms: List.new(),
+        fat_thunk_tids: List.new(),
         fat_thunk_keys: HashMap.new(),
         callee_is_str_builtin_ref: 0,
-        global_init_syms: Vec.new(),
-        global_init_decl_indices: Vec.new(),
-        global_init_fn_syms: Vec.new(),
-        call_lends: Vec.new(),
-        closure_syms: Vec.new(),
-        closure_parents: Vec.new(),
-        closure_nodes: Vec.new(),
-        closure_in_loop: Vec.new(),
-        closure_env_kinds: Vec.new(),
+        global_init_syms: List.new(),
+        global_init_decl_indices: List.new(),
+        global_init_fn_syms: List.new(),
+        call_lends: List.new(),
+        closure_syms: List.new(),
+        closure_parents: List.new(),
+        closure_nodes: List.new(),
+        closure_in_loop: List.new(),
+        closure_env_kinds: List.new(),
         closure_index_by_sym: HashMap.new(),
     }
     for i in 0..cg.mir_mod.body_fn_syms.len() as i32:
@@ -727,14 +727,14 @@ fn cc_cstr_literal_bytes_initializer(text: &str) -> str:
         out = out ++ ", "
     out ++ "0" ++ cc_rbrace()
 
-fn cc_str_vec_contains(values: &Vec[str], needle: &str) -> bool:
+fn cc_str_list_contains(values: &List[str], needle: &str) -> bool:
     for i in 0..values.len() as i32:
         if values[i] == needle:
             return true
     false
 
-fn cc_push_unique_str(values: Vec[str], value: &str) -> Vec[str]:
-    if cc_str_vec_contains(&values, value):
+fn cc_push_unique_str(values: List[str], value: &str) -> List[str]:
+    if cc_str_list_contains(&values, value):
         return values
     values.push(with_str_clone_ref(value))
     values
@@ -924,7 +924,7 @@ fn cc_base_name(raw: &str) -> str:
         return with_str_clone_ref(raw)
     raw.slice((dot + 1) as i64, raw.len() as i64)
 
-fn cc_is_vec_method_name(name: &str) -> i32:
+fn cc_is_list_method_name(name: &str) -> i32:
     if name == "new":
         return 1
     if name == "push" or name == "get" or name == "len":
@@ -1074,7 +1074,7 @@ fn cc_path_find(text: &str, needle: &str) -> i32:
 
 fn cc_line_directive_path(path: &str) -> str:
     let p = cc_path_with_slashes(path)
-    let anchors: Vec[str] = Vec.new()
+    let anchors: List[str] = List.new()
     anchors.push("/out/gen/")
     anchors.push("/src/")
     anchors.push("/lib/")
@@ -1863,10 +1863,10 @@ impl CCodegen:
                 if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
                     tid = self.sema.get_type_d0(resolved)
                     continue
-                let vec_elem_tid = self.vec_element_tid(tid)
-                let effective_vec_elem_tid = if vec_elem_tid != 0: vec_elem_tid else: self.vec_local_element_tid(body, lid)
-                if effective_vec_elem_tid != 0:
-                    tid = effective_vec_elem_tid
+                let list_elem_tid = self.list_element_tid(tid)
+                let effective_list_elem_tid = if list_elem_tid != 0: list_elem_tid else: self.list_local_element_tid(body, lid)
+                if effective_list_elem_tid != 0:
+                    tid = effective_list_elem_tid
                     continue
                 return 0
             if pk == ProjKind.PK_DEREF:
@@ -1967,10 +1967,10 @@ impl CCodegen:
                 if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
                     tid = self.sema.get_type_d0(resolved)
                     continue
-                let vec_elem_tid = self.vec_element_tid(tid)
-                let effective_vec_elem_tid = if vec_elem_tid != 0: vec_elem_tid else: self.vec_local_element_tid(body, lid)
-                if effective_vec_elem_tid != 0:
-                    tid = effective_vec_elem_tid
+                let list_elem_tid = self.list_element_tid(tid)
+                let effective_list_elem_tid = if list_elem_tid != 0: list_elem_tid else: self.list_local_element_tid(body, lid)
+                if effective_list_elem_tid != 0:
+                    tid = effective_list_elem_tid
                     continue
                 return 0
             if pk == ProjKind.PK_DEREF:
@@ -2066,9 +2066,9 @@ impl CCodegen:
                 if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
                     tid = self.sema.get_type_d0(resolved)
                     continue
-                let vec_elem_tid = self.vec_element_tid(tid)
-                if vec_elem_tid != 0:
-                    tid = vec_elem_tid
+                let list_elem_tid = self.list_element_tid(tid)
+                if list_elem_tid != 0:
+                    tid = list_elem_tid
                     continue
                 return 0
             if pk == ProjKind.PK_DEREF:
@@ -2155,12 +2155,12 @@ impl CCodegen:
         cand
 
     mut fn c_type(tid: i32, as_return: i32) -> str:
-        if tid == CC_PSEUDO_TID_VEC:
+        if tid == CC_PSEUDO_TID_LIST:
             return "with_vec"
         if tid == CC_PSEUDO_TID_FMT_BUF:
             return "uint8_t*"
         let resolved = self.sema.resolve_alias(tid)
-        if resolved == CC_PSEUDO_TID_VEC:
+        if resolved == CC_PSEUDO_TID_LIST:
             return "with_vec"
         if resolved == CC_PSEUDO_TID_FMT_BUF:
             return "uint8_t*"
@@ -2236,10 +2236,10 @@ impl CCodegen:
                 return "const " ++ base ++ "*"
             return base ++ "*"
         if tk == TypeKind.TY_GENERIC_INST:
-            // Generic instances: Vec[T] → with_vec, HashMap[K,V] → void* (opaque handle)
+            // Generic instances: List[T] → with_vec, HashMap[K,V] → void* (opaque handle)
             let base_sym = self.sema.get_type_d0(resolved)
             let base_name = cc_intern_resolve(self.intern, base_sym)
-            if base_name == "Vec":
+            if base_name == "List":
                 return "with_vec"
             if base_name == "HashMap":
                 return "int64_t"  // opaque handle, passed as int64_t to runtime functions
@@ -2343,7 +2343,7 @@ impl CCodegen:
     // `uint16_t* arr()` returning `_0` — a pointer to its own dead frame —
     // and assigned the result to an array, which no C compiler accepts.
     fn returns_array(ret_tid: i32) -> bool:
-        if ret_tid <= 0 or ret_tid == CC_PSEUDO_TID_VEC or ret_tid == CC_PSEUDO_TID_FMT_BUF:
+        if ret_tid <= 0 or ret_tid == CC_PSEUDO_TID_LIST or ret_tid == CC_PSEUDO_TID_FMT_BUF:
             return false
         self.sema.get_type_kind(self.sema.resolve_alias(ret_tid)) == TypeKind.TY_ARRAY
 
@@ -2371,30 +2371,30 @@ impl CCodegen:
             return self.c_decl(ret_tid, declarator)
         self.c_type(ret_tid, 1) ++ " " ++ declarator
 
-    fn vec_element_tid(tid: i32) -> i32:
+    fn list_element_tid(tid: i32) -> i32:
         let resolved = self.sema.resolve_alias(tid)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
         let base_sym = self.sema.get_generic_inst_base(resolved as i32)
         let base_name = cc_intern_resolve(self.intern, base_sym)
-        if base_name != "Vec":
+        if base_name != "List":
             return 0
         if self.sema.get_generic_inst_arg_count(resolved as i32) <= 0:
             return 0
         self.sema.get_generic_inst_arg(resolved as i32, 0)
 
-    fn vec_synthetic_field_tid(vec_tid: i32, field_sym: i32) -> i32:
-        let resolved = self.sema.resolve_alias(vec_tid as TypeId) as i32
+    fn list_synthetic_field_tid(list_tid: i32, field_sym: i32) -> i32:
+        let resolved = self.sema.resolve_alias(list_tid as TypeId) as i32
         if self.sema.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
             return 0
-        if self.generic_inst_base_name(resolved) != "Vec":
+        if self.generic_inst_base_name(resolved) != "List":
             return 0
         let field_name = cc_intern_resolve(self.intern, field_sym)
         if field_name == "len" or field_name == "cap" or field_name == "elem_size":
             return self.sema.ty_i64 as i32
         if field_name != "ptr":
             return 0
-        let elem_tid = self.vec_element_tid(resolved)
+        let elem_tid = self.list_element_tid(resolved)
         if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
             return 0
         let const_ptr = self.sema.find_exact_type(TypeKind.TY_PTR, elem_tid, 0, 0) as i32
@@ -2405,15 +2405,15 @@ impl CCodegen:
             return mut_ptr
         self.sema.find_exact_type(TypeKind.TY_PTR, elem_tid, 0, 0) as i32
 
-    mut fn vec_new_elem_size_text(body: &MirBody, dest_place: i32) -> str:
-        var vec_tid = self.place_tid_no_infer(body, dest_place)
-        var elem_tid = self.vec_element_tid(vec_tid)
+    mut fn list_new_elem_size_text(body: &MirBody, dest_place: i32) -> str:
+        var list_tid = self.place_tid_no_infer(body, dest_place)
+        var elem_tid = self.list_element_tid(list_tid)
         if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
-            vec_tid = self.call_dest_expected_tid(body, dest_place)
-            elem_tid = self.vec_element_tid(vec_tid)
+            list_tid = self.call_dest_expected_tid(body, dest_place)
+            elem_tid = self.list_element_tid(list_tid)
         if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
             let dst_local = self.place_local_id(body, dest_place)
-            elem_tid = self.vec_local_element_tid(body, dst_local)
+            elem_tid = self.list_local_element_tid(body, dst_local)
         if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
             "0"
         else:
@@ -2428,11 +2428,11 @@ impl CCodegen:
 
     fn generic_inst_needs_struct_def(tid: i32) -> i32:
         let base_name = self.generic_inst_base_name(tid)
-        if base_name == "VecSlot":
+        if base_name == "ListSlot":
             return 1
-        if base_name == "VecIter":
+        if base_name == "ListIter":
             return 1
-        if base_name == "VecIterPlace":
+        if base_name == "ListIterPlace":
             return 1
         if base_name == "HashMapEntry":
             return 1
@@ -2447,7 +2447,7 @@ impl CCodegen:
     // An instance of a declared generic struct (`Wrap[str]`, std's
     // `Box[Node]`, `BTreeMap[i32, str]`): Sema's reflection names its fields
     // and their instantiated types. The containers the C backend models
-    // itself (Vec, HashMap, HashSet, SlotMap, the synthetic structs above)
+    // itself (List, HashMap, HashSet, SlotMap, the synthetic structs above)
     // and payload enums have their own representations (#1562).
     fn generic_inst_is_declared_struct(tid: i32) -> bool:
         let resolved = self.sema.resolve_alias(tid)
@@ -2456,7 +2456,7 @@ impl CCodegen:
         if self.generic_inst_needs_struct_def(resolved as i32) != 0 or self.type_is_payload_enum(resolved as i32) != 0:
             return false
         let base_name = self.generic_inst_base_name(resolved as i32)
-        if base_name == "Vec" or base_name == "HashMap" or base_name == "HashSet" or base_name == "SlotMap":
+        if base_name == "List" or base_name == "HashMap" or base_name == "HashSet" or base_name == "SlotMap":
             return false
         let base_tid = self.sema.generic_inst_template_tid(resolved as i32)
         base_tid != 0 and self.sema.get_type_kind(self.sema.resolve_alias(base_tid as TypeId)) == TypeKind.TY_STRUCT
@@ -2488,15 +2488,15 @@ impl CCodegen:
         kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_TUPLE or self.type_is_payload_enum(resolved) != 0 or self.generic_inst_is_declared_struct(resolved)
 
     // A field of a generic instance: a declared struct's own field, or a
-    // field the backend synthesizes for a modeled container (Vec's ptr/len).
+    // field the backend synthesizes for a modeled container (List's ptr/len).
     fn generic_inst_field_tid(tid: i32, field_sym: i32) -> i32:
-        if self.generic_inst_is_declared_struct(tid): self.generic_struct_field_tid(tid, field_sym) else: self.vec_synthetic_field_tid(tid, field_sym)
+        if self.generic_inst_is_declared_struct(tid): self.generic_struct_field_tid(tid, field_sym) else: self.list_synthetic_field_tid(tid, field_sym)
 
-    fn vecslot_element_tid(tid: i32) -> i32:
+    fn listslot_element_tid(tid: i32) -> i32:
         let resolved = self.sema.resolve_alias(tid)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
-        if self.generic_inst_base_name(resolved as i32) != "VecSlot":
+        if self.generic_inst_base_name(resolved as i32) != "ListSlot":
             return 0
         if self.sema.get_generic_inst_arg_count(resolved as i32) <= 0:
             return 0
@@ -2543,7 +2543,7 @@ impl CCodegen:
     fn option_tid_for_payload(payload_tid: i32) -> i32:
         if payload_tid == 0 or self.is_void_tid(payload_tid) != 0:
             return 0
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         args.push(payload_tid)
         self.sema.find_generic_inst_type(self.sema.syms.option, args, 1) as i32
 
@@ -2590,7 +2590,7 @@ impl CCodegen:
                 return 0
         out
 
-    mut fn vec_local_element_tid(body: &MirBody, local_id: i32) -> i32:
+    mut fn list_local_element_tid(body: &MirBody, local_id: i32) -> i32:
         if local_id < 0:
             return 0
         var out = 0
@@ -2616,7 +2616,7 @@ impl CCodegen:
                         let src_place = body.operand_d0[src_operand]
                         if self.place_is_direct_local(body, src_place, local_id) != 0:
                             continue
-                let src_elem_tid = self.vec_element_tid(self.operand_tid(body, src_operand))
+                let src_elem_tid = self.list_element_tid(self.operand_tid(body, src_operand))
                 if src_elem_tid == 0 or self.is_void_tid(src_elem_tid) != 0:
                     continue
                 if out == 0:
@@ -2626,7 +2626,7 @@ impl CCodegen:
             if body.term_kind(bb) != TermKind.TK_CALL:
                 continue
             let args_id = body.term_data1(bb)
-            if cc_builtin_from_mir_intrinsic(body.call_intrinsic(args_id)) != CcBuiltin.VEC_PUSH:
+            if cc_builtin_from_mir_intrinsic(body.call_intrinsic(args_id)) != CcBuiltin.LIST_PUSH:
                 continue
             if self.call_arg_count(body, args_id) < 2:
                 continue
@@ -2896,13 +2896,13 @@ impl CCodegen:
         self.local_downcast_option_cache.insert(cache_key, out)
         out
 
-fn cc_zero_i32_vec(count: i32) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+fn cc_zero_i32_list(count: i32) -> List[i32]:
+    let out: List[i32] = List.new()
     for i in 0..count:
         out.push(0)
     out
 
-fn cc_vec_tid_at(values: &Vec[i32], local_id: i32) -> i32:
+fn cc_list_tid_at(values: &List[i32], local_id: i32) -> i32:
     if local_id < 0 or local_id >= values.len() as i32:
         return 0
     let value = values[local_id]
@@ -2911,7 +2911,7 @@ fn cc_vec_tid_at(values: &Vec[i32], local_id: i32) -> i32:
     value
 
 impl CCodegen:
-    fn record_local_tid(values: Vec[i32], local_id: i32, tid: i32) -> Vec[i32]:
+    fn record_local_tid(values: List[i32], local_id: i32, tid: i32) -> List[i32]:
         if local_id < 0 or local_id >= values.len() as i32:
             return values
         if tid == 0 or self.is_void_tid(tid) != 0:
@@ -2926,8 +2926,8 @@ impl CCodegen:
             values[local_id] = -1
         values
 
-    mut fn body_downcast_option_tids(body: &MirBody) -> Vec[i32]:
-        var out = cc_zero_i32_vec(body.local_count())
+    mut fn body_downcast_option_tids(body: &MirBody) -> List[i32]:
+        var out = cc_zero_i32_list(body.local_count())
         for bb in 0..body.block_count():
             let start = body.bb_stmt_starts[bb]
             let count = body.bb_stmt_counts[bb]
@@ -2957,8 +2957,8 @@ impl CCodegen:
                 out = self.record_local_tid(move out, src_local, opt_tid)
         out
 
-    mut fn body_copied_payload_enum_tids(body: &MirBody, downcast_option_tids: &Vec[i32]) -> Vec[i32]:
-        var out = cc_zero_i32_vec(body.local_count())
+    mut fn body_copied_payload_enum_tids(body: &MirBody, downcast_option_tids: &List[i32]) -> List[i32]:
+        var out = cc_zero_i32_list(body.local_count())
         for bb in 0..body.block_count():
             let start = body.bb_stmt_starts[bb]
             let count = body.bb_stmt_counts[bb]
@@ -2987,14 +2987,14 @@ impl CCodegen:
                     continue
                 var src_tid = self.local_direct_call_return_tid(body, src_local)
                 if src_tid == 0:
-                    src_tid = cc_vec_tid_at(downcast_option_tids, src_local)
+                    src_tid = cc_list_tid_at(downcast_option_tids, src_local)
                 if self.type_is_payload_enum(src_tid) == 0:
                     continue
                 out = self.record_local_tid(move out, dst_local, src_tid)
         out
 
-    mut fn body_ref_target_tids(body: &MirBody) -> Vec[i32]:
-        var out = cc_zero_i32_vec(body.local_count())
+    mut fn body_ref_target_tids(body: &MirBody) -> List[i32]:
+        var out = cc_zero_i32_list(body.local_count())
         for li in 0..body.local_count():
             out = self.record_local_tid(move out, li, self.local_ref_target_tid(body, li))
         out
@@ -3330,12 +3330,12 @@ impl CCodegen:
                     out = f"({out}).ptr[_{pd}]"
                     current_tid = self.sema.get_type_d0(resolved)
                     continue
-                // Vec or other generic container: use with_vec_get_ptr runtime call
+                // List or other generic container: use with_vec_get_ptr runtime call
                 let base_c = self.c_type(current_tid, 0)
                 if base_c == "with_vec":
-                    var elem_tid = self.vec_element_tid(current_tid)
+                    var elem_tid = self.list_element_tid(current_tid)
                     if elem_tid == 0:
-                        elem_tid = self.vec_local_element_tid(body, base_local)
+                        elem_tid = self.list_local_element_tid(body, base_local)
                     let elem_c = if elem_tid != 0: self.c_type(elem_tid, 0) else: "int64_t"
                     out = "(*((" ++ elem_c ++ "*)with_vec_get_ptr(&(" ++ out ++ f"), (int64_t)(_{pd}))))"
                     current_tid = if elem_tid != 0: elem_tid else: self.sema.ty_i64 as i32
@@ -3470,8 +3470,8 @@ impl CCodegen:
         let tid = if target_tid != 0: target_tid else: self.sema.ty_cstr_view as i32
         "((" ++ self.c_type(tid, 0) ++ ")&" ++ cc_cstr_literal_view_name(text) ++ ")"
 
-    mut fn collect_cstr_literal_texts() -> Vec[str]:
-        var texts: Vec[str] = Vec.new()
+    mut fn collect_cstr_literal_texts() -> List[str]:
+        var texts: List[str] = List.new()
         let used_globals = self.collect_referenced_global_syms()
         if self.had_error != 0:
             return texts
@@ -3936,7 +3936,7 @@ impl CCodegen:
         if rk == RvalueKind.RK_LEN:
             let p = self.place_text(body, d0)
             let pt = self.place_tid(body, d0)
-            if pt == CC_PSEUDO_TID_VEC:
+            if pt == CC_PSEUDO_TID_LIST:
                 return "with_vec_len(&(" ++ p ++ "))"
             let resolved_pt = self.sema.resolve_alias(pt)
             if self.sema.get_type_kind(resolved_pt) == TypeKind.TY_ARRAY:
@@ -4159,7 +4159,7 @@ impl CCodegen:
                 return "(*(" ++ recv ++ "))"
         recv
 
-    mut fn vec_recv_ptr_text(body: &MirBody, args_id: i32) -> str:
+    mut fn list_recv_ptr_text(body: &MirBody, args_id: i32) -> str:
         let recv_operand = self.call_arg_operand(body, args_id, 0)
         let recv = self.operand_text(body, recv_operand)
         let recv_tid = self.sema.resolve_alias(self.operand_tid(body, recv_operand))
@@ -4374,17 +4374,17 @@ impl CCodegen:
         if base == "new":
             if cc_str_contains(owner, "HashMap") != 0 or cc_str_contains(raw, "HashMap") != 0:
                 out = CcCalleeHint.MAP_NEW
-            else if cc_str_contains(owner, "Vec") != 0 or cc_str_contains(raw, "Vec") != 0:
-                out = CcCalleeHint.VEC_NEW
+            else if cc_str_contains(owner, "List") != 0 or cc_str_contains(raw, "List") != 0:
+                out = CcCalleeHint.LIST_NEW
             else if cc_str_contains(owner, "Option") != 0 or cc_str_contains(raw, "Option") != 0:
                 out = CcCalleeHint.OPT_NEW
         else if owner.len() > 0:
             if cc_str_contains(owner, "HashMap") != 0:
                 if base == "insert" or base == "get" or base == "contains" or cc_is_len_method(base) or base == "remove":
                     out = CcCalleeHint.MAP_RECV
-            else if cc_str_contains(owner, "Vec") != 0:
+            else if cc_str_contains(owner, "List") != 0:
                 if base == "push" or base == "get" or cc_is_len_method(base) or base == "remove" or base == "clear" or base == "pop":
-                    out = CcCalleeHint.VEC_RECV
+                    out = CcCalleeHint.LIST_RECV
             else if cc_str_contains(owner, "Option") != 0:
                 if base == "is_some" or base == "unwrap" or base == "expect":
                     out = CcCalleeHint.OPT_RECV
@@ -4396,7 +4396,7 @@ impl CCodegen:
         if place_id < 0 or place_id >= body.place_locals.len() as i32:
             return CcPlaceKind.UNKNOWN
 
-        var vec_score = 0
+        var list_score = 0
         var map_score = 0
         var opt_score = 0
 
@@ -4411,7 +4411,7 @@ impl CCodegen:
             if method.len() == 0:
                 continue
             if method == "push" or method == "clear" or method == "pop":
-                vec_score = vec_score + 3
+                list_score = list_score + 3
                 continue
             if method == "insert":
                 map_score = map_score + 3
@@ -4420,20 +4420,20 @@ impl CCodegen:
                 opt_score = opt_score + 3
                 continue
             if method == "get" or cc_is_len_method(method):
-                vec_score = vec_score + 1
+                list_score = list_score + 1
                 map_score = map_score + 1
                 continue
             if method == "contains" or method == "remove":
                 map_score = map_score + 1
                 continue
             if method == "new":
-                vec_score = vec_score + 1
+                list_score = list_score + 1
                 map_score = map_score + 1
                 continue
-        if vec_score <= 0 and map_score <= 0 and opt_score <= 0:
+        if list_score <= 0 and map_score <= 0 and opt_score <= 0:
             return CcPlaceKind.UNKNOWN
-        if vec_score >= map_score and vec_score >= opt_score:
-            return CcPlaceKind.VEC
+        if list_score >= map_score and list_score >= opt_score:
+            return CcPlaceKind.LIST
         if map_score >= opt_score:
             return CcPlaceKind.HASHMAP
         CcPlaceKind.OPTION
@@ -4452,7 +4452,7 @@ impl CCodegen:
         if depth > 1:
             return CcPlaceKind.UNKNOWN
 
-        var vec_score = 0
+        var list_score = 0
         var map_score = 0
         var opt_score = 0
 
@@ -4467,7 +4467,7 @@ impl CCodegen:
             if method.len() == 0:
                 continue
             if method == "push" or method == "clear" or method == "pop":
-                vec_score = vec_score + 4
+                list_score = list_score + 4
                 continue
             if method == "insert" or method == "contains":
                 map_score = map_score + 4
@@ -4476,12 +4476,12 @@ impl CCodegen:
                 opt_score = opt_score + 4
                 continue
             if method == "get" or cc_is_len_method(method):
-                vec_score = vec_score + 1
+                list_score = list_score + 1
                 map_score = map_score + 1
                 continue
             if method == "remove":
                 map_score = map_score + 2
-                vec_score = vec_score + 1
+                list_score = list_score + 1
                 continue
 
         for bb in 0..body.block_count():
@@ -4514,25 +4514,25 @@ impl CCodegen:
                     continue
                 if src_local == local_id:
                     let k = self.local_place_kind_depth(body, dst_local, depth + 1)
-                    if k == CcPlaceKind.VEC:
-                        vec_score = vec_score + 2
+                    if k == CcPlaceKind.LIST:
+                        list_score = list_score + 2
                     else if k == CcPlaceKind.HASHMAP:
                         map_score = map_score + 2
                     else if k == CcPlaceKind.OPTION:
                         opt_score = opt_score + 2
                 if dst_local == local_id:
                     let k = self.local_place_kind_depth(body, src_local, depth + 1)
-                    if k == CcPlaceKind.VEC:
-                        vec_score = vec_score + 2
+                    if k == CcPlaceKind.LIST:
+                        list_score = list_score + 2
                     else if k == CcPlaceKind.HASHMAP:
                         map_score = map_score + 2
                     else if k == CcPlaceKind.OPTION:
                         opt_score = opt_score + 2
 
-        if vec_score <= 0 and map_score <= 0 and opt_score <= 0:
+        if list_score <= 0 and map_score <= 0 and opt_score <= 0:
             return CcPlaceKind.UNKNOWN
-        if vec_score >= map_score and vec_score >= opt_score:
-            return CcPlaceKind.VEC
+        if list_score >= map_score and list_score >= opt_score:
+            return CcPlaceKind.LIST
         if map_score >= opt_score:
             return CcPlaceKind.HASHMAP
         CcPlaceKind.OPTION
@@ -4544,7 +4544,7 @@ impl CCodegen:
         let dest_tid = self.place_local_tid(body, dest_place)
         if self.in_field_cache_build != 0:
             return dest_tid
-        if dest_tid == CC_PSEUDO_TID_VEC:
+        if dest_tid == CC_PSEUDO_TID_LIST:
             return dest_tid
         let dst_local = self.place_local_id(body, dest_place)
         if dst_local < 0:
@@ -5486,10 +5486,10 @@ impl CCodegen:
         let callee_hint = self.callee_field_hint(callee_sym)
         let first_owner_tid = self.call_first_arg_resolved_tid(body, args_id)
         let first_owner = self.type_owner_text(first_owner_tid)
-        let recv_is_vec =
-            if callee_hint == CcCalleeHint.VEC_RECV:
+        let recv_is_list =
+            if callee_hint == CcCalleeHint.LIST_RECV:
                 1
-            else if cc_str_contains(first_owner, "Vec") != 0:
+            else if cc_str_contains(first_owner, "List") != 0:
                 1
             else:
                 0
@@ -5507,31 +5507,31 @@ impl CCodegen:
                 1
             else:
                 0
-        let recv_is_vecslot = if cc_str_contains(first_owner, "VecSlot") != 0: 1 else: 0
+        let recv_is_listslot = if cc_str_contains(first_owner, "ListSlot") != 0: 1 else: 0
 
         if method == "new":
             let concrete_new_sym = self.canonical_body_sym(callee_sym)
             if concrete_new_sym != 0:
                 let concrete_name = cc_intern_resolve(self.intern, concrete_new_sym)
                 let concrete_owner = cc_owner_prefix(concrete_name)
-                if cc_str_contains(concrete_owner, "Vec") == 0 and cc_str_contains(concrete_owner, "HashMap") == 0:
+                if cc_str_contains(concrete_owner, "List") == 0 and cc_str_contains(concrete_owner, "HashMap") == 0:
                     return CcBuiltin.NONE
             var dst_kind = self.infer_place_kind(body, dest_place)
             if dst_kind == CcPlaceKind.UNKNOWN:
                 let dst_local = self.place_local_id(body, dest_place)
                 if dst_local >= 0:
                     dst_kind = self.local_place_kind(body, dst_local)
-            if dst_kind == CcPlaceKind.VEC:
-                return CcBuiltin.VEC_NEW
+            if dst_kind == CcPlaceKind.LIST:
+                return CcBuiltin.LIST_NEW
             if dst_kind == CcPlaceKind.HASHMAP:
                 return CcBuiltin.MAP_NEW
-            if callee_hint == CcCalleeHint.VEC_NEW:
-                return CcBuiltin.VEC_NEW
+            if callee_hint == CcCalleeHint.LIST_NEW:
+                return CcBuiltin.LIST_NEW
             if callee_hint == CcCalleeHint.MAP_NEW:
                 return CcBuiltin.MAP_NEW
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted == CC_PSEUDO_TID_VEC:
-                return CcBuiltin.VEC_NEW
+            if hinted == CC_PSEUDO_TID_LIST:
+                return CcBuiltin.LIST_NEW
             return CcBuiltin.NONE
 
         let argc = self.call_arg_count(body, args_id)
@@ -5553,7 +5553,7 @@ impl CCodegen:
             else:
                 0
         let allow_place_kind_guess = if first_owner.len() == 0: 1 else: 0
-        let recv_kind_is_vec = if recv_is_vec != 0 or (allow_place_kind_guess != 0 and place_kind == CcPlaceKind.VEC): 1 else: 0
+        let recv_kind_is_list = if recv_is_list != 0 or (allow_place_kind_guess != 0 and place_kind == CcPlaceKind.LIST): 1 else: 0
         let recv_kind_is_map = if recv_is_map != 0 or (allow_place_kind_guess != 0 and place_kind == CcPlaceKind.HASHMAP): 1 else: 0
         let recv_kind_is_opt = if recv_is_opt != 0 or (allow_place_kind_guess != 0 and place_kind == CcPlaceKind.OPTION): 1 else: 0
 
@@ -5607,25 +5607,25 @@ impl CCodegen:
             return CcBuiltin.NONE
 
         if method == "slot":
-            if recv_kind_is_vec != 0:
-                return CcBuiltin.VEC_SLOT
+            if recv_kind_is_list != 0:
+                return CcBuiltin.LIST_SLOT
             return CcBuiltin.NONE
         if method == "get_disjoint":
-            if recv_kind_is_vec != 0:
-                return CcBuiltin.VEC_GET_DISJOINT
+            if recv_kind_is_list != 0:
+                return CcBuiltin.LIST_GET_DISJOINT
             return CcBuiltin.NONE
 
         if method == "push":
-            if recv_kind_is_vec != 0:
-                return CcBuiltin.VEC_PUSH
+            if recv_kind_is_list != 0:
+                return CcBuiltin.LIST_PUSH
             return CcBuiltin.NONE
         if method == "clear":
-            if recv_kind_is_vec != 0:
-                return CcBuiltin.VEC_CLEAR
+            if recv_kind_is_list != 0:
+                return CcBuiltin.LIST_CLEAR
             return CcBuiltin.NONE
         if method == "pop":
-            if recv_kind_is_vec != 0:
-                return CcBuiltin.VEC_POP
+            if recv_kind_is_list != 0:
+                return CcBuiltin.LIST_POP
             return CcBuiltin.NONE
         if method == "insert":
             if recv_kind_is_map != 0:
@@ -5645,17 +5645,17 @@ impl CCodegen:
             return CcBuiltin.NONE
 
         if method == "set":
-            if recv_is_vecslot != 0:
+            if recv_is_listslot != 0:
                 return CcBuiltin.VECSLOT_SET
             return CcBuiltin.NONE
 
         if method == "get":
-            if recv_is_vecslot != 0:
+            if recv_is_listslot != 0:
                 return CcBuiltin.VECSLOT_GET
             if recv_kind_is_map != 0:
                 return CcBuiltin.MAP_GET
-            if recv_kind_is_vec != 0:
-                return CcBuiltin.VEC_GET
+            if recv_kind_is_list != 0:
+                return CcBuiltin.LIST_GET
             return CcBuiltin.NONE
 
         if method == "len":
@@ -5663,8 +5663,8 @@ impl CCodegen:
                 return CcBuiltin.NONE
             if recv_kind_is_map != 0:
                 return CcBuiltin.MAP_LEN
-            if recv_kind_is_vec != 0:
-                return CcBuiltin.VEC_LEN
+            if recv_kind_is_list != 0:
+                return CcBuiltin.LIST_LEN
             return CcBuiltin.NONE
 
         if method == "contains":
@@ -5677,8 +5677,8 @@ impl CCodegen:
         if method == "remove":
             if recv_kind_is_map != 0:
                 return CcBuiltin.MAP_REMOVE
-            if recv_kind_is_vec != 0:
-                return CcBuiltin.VEC_REMOVE
+            if recv_kind_is_list != 0:
+                return CcBuiltin.LIST_REMOVE
             return CcBuiltin.NONE
 
         CcBuiltin.NONE
@@ -5690,8 +5690,8 @@ impl CCodegen:
             kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
         if kind == CcBuiltin.NONE:
             return 0
-        if kind == CcBuiltin.VEC_NEW:
-            return CC_PSEUDO_TID_VEC
+        if kind == CcBuiltin.LIST_NEW:
+            return CC_PSEUDO_TID_LIST
         // The slot walk's destinations are MirLower's typed temps (#1434).
         if kind == CcBuiltin.MAP_SLOT_WALK:
             return self.place_tid_no_infer(body, dest_place)
@@ -5699,7 +5699,7 @@ impl CCodegen:
         // end's i32 status temp — each destination is typed by MirLower.
         if kind == CcBuiltin.VA_START or kind == CcBuiltin.VA_ARG or kind == CcBuiltin.VA_END:
             return self.place_tid_no_infer(body, dest_place)
-        if kind == CcBuiltin.VEC_SLOT:
+        if kind == CcBuiltin.LIST_SLOT:
             let hinted = self.call_dest_expected_tid(body, dest_place)
             if hinted != 0 and self.is_void_tid(hinted) == 0:
                 return hinted
@@ -5707,7 +5707,7 @@ impl CCodegen:
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
             return self.sema.ty_i64 as i32
-        if kind == CcBuiltin.VEC_PUSH:
+        if kind == CcBuiltin.LIST_PUSH:
             let dst = self.place_local_tid(body, dest_place)
             if dst != 0 and self.is_void_tid(dst) != 0:
                 return self.sema.ty_void as i32
@@ -5717,7 +5717,7 @@ impl CCodegen:
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
             return self.operand_tid(body, self.call_arg_operand(body, args_id, 0))
-        if kind == CcBuiltin.VEC_REMOVE or kind == CcBuiltin.VEC_CLEAR:
+        if kind == CcBuiltin.LIST_REMOVE or kind == CcBuiltin.LIST_CLEAR:
             return self.sema.ty_void as i32
         if kind == CcBuiltin.VECSLOT_SET:
             return self.sema.ty_void as i32
@@ -5726,14 +5726,14 @@ impl CCodegen:
             if hinted != 0 and self.is_void_tid(hinted) == 0:
                 return hinted
             let slot_tid = self.operand_tid(body, self.call_arg_operand(body, args_id, 0))
-            let elem_tid = self.vecslot_element_tid(slot_tid)
+            let elem_tid = self.listslot_element_tid(slot_tid)
             if elem_tid != 0:
                 return elem_tid
             let dst = self.place_local_tid(body, dest_place)
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
             return self.sema.ty_i64 as i32
-        if kind == CcBuiltin.VEC_POP:
+        if kind == CcBuiltin.LIST_POP:
             let hinted = self.call_dest_expected_tid(body, dest_place)
             if hinted != 0 and self.is_void_tid(hinted) == 0:
                 return hinted
@@ -5741,7 +5741,7 @@ impl CCodegen:
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
             return self.sema.ty_i64 as i32
-        if kind == CcBuiltin.VEC_GET:
+        if kind == CcBuiltin.LIST_GET:
             let hinted = self.call_dest_expected_tid(body, dest_place)
             if hinted != 0 and self.is_void_tid(hinted) == 0:
                 return hinted
@@ -5749,24 +5749,24 @@ impl CCodegen:
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
             return self.sema.ty_i64 as i32
-        if kind == CcBuiltin.VEC_LEN:
+        if kind == CcBuiltin.LIST_LEN:
             return self.sema.ty_usize as i32
-        if kind == CcBuiltin.VEC_IS_EMPTY:
+        if kind == CcBuiltin.LIST_IS_EMPTY:
             return self.sema.ty_bool as i32
-        if kind == CcBuiltin.VEC_LEN32:
+        if kind == CcBuiltin.LIST_LEN32:
             return self.sema.ty_i32 as i32
-        if kind == CcBuiltin.VEC_LEN64:
+        if kind == CcBuiltin.LIST_LEN64:
             return self.sema.ty_i64 as i32
-        if kind == CcBuiltin.VEC_ULEN32:
+        if kind == CcBuiltin.LIST_ULEN32:
             return self.sema.ty_u32 as i32
-        if kind == CcBuiltin.VEC_ITER:
+        if kind == CcBuiltin.LIST_ITER:
             let hinted = self.call_dest_expected_tid(body, dest_place)
             if hinted != 0 and self.is_void_tid(hinted) == 0:
                 return hinted
             let dst = self.place_local_tid(body, dest_place)
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
-            return CC_PSEUDO_TID_VEC
+            return CC_PSEUDO_TID_LIST
         if kind == CcBuiltin.VECITER_NEXT:
             let hinted = self.call_dest_expected_tid(body, dest_place)
             if hinted != 0 and self.is_void_tid(hinted) == 0:
@@ -5775,12 +5775,12 @@ impl CCodegen:
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
             return self.sema.ty_i64 as i32
-        if kind == CcBuiltin.VEC_CONTAINS:
+        if kind == CcBuiltin.LIST_CONTAINS:
             return self.sema.ty_bool as i32
-        if kind == CcBuiltin.VEC_JOIN:
+        if kind == CcBuiltin.LIST_JOIN:
             return self.sema.ty_str as i32
-        if kind == CcBuiltin.VEC_WITH_CAPACITY:
-            return CC_PSEUDO_TID_VEC
+        if kind == CcBuiltin.LIST_WITH_CAPACITY:
+            return CC_PSEUDO_TID_LIST
         if kind == CcBuiltin.MAP_NEW:
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.MAP_INSERT:
@@ -5860,7 +5860,7 @@ impl CCodegen:
             if dst_atomic != 0 and self.is_void_tid(dst_atomic) == 0:
                 return dst_atomic
             let payload = self.atomic_recv_value_tid(body, args_id)
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             args.push(payload)
             args.push(payload)
             return self.sema.find_generic_inst_type(self.sema.syms.result, args, 2) as i32
@@ -5895,7 +5895,7 @@ impl CCodegen:
             let dst = self.place_local_tid(body, dest_place)
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
-            return CC_PSEUDO_TID_VEC
+            return CC_PSEUDO_TID_LIST
         if kind == CcBuiltin.STR_TO_UPPER or kind == CcBuiltin.STR_TO_LOWER or kind == CcBuiltin.STR_REPLACE or kind == CcBuiltin.STR_REPEAT:
             return self.sema.ty_str as i32
         if kind == CcBuiltin.ARR_LEN:
@@ -6192,9 +6192,9 @@ impl CCodegen:
                 // Don't infer container type if this local is the call destination (it's the result, not the receiver)
                 if allow_container_receiver_infer != 0 and self.place_is_direct_local(body, recv_place, local_id) != 0 and self.place_is_direct_local(body, dest_place, local_id) == 0:
                     let kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
-                    if kind == CcBuiltin.VEC_NEW or kind == CcBuiltin.VEC_PUSH or kind == CcBuiltin.VEC_GET or kind == CcBuiltin.VEC_LEN or kind == CcBuiltin.VEC_REMOVE or kind == CcBuiltin.VEC_CLEAR or kind == CcBuiltin.VEC_POP:
+                    if kind == CcBuiltin.LIST_NEW or kind == CcBuiltin.LIST_PUSH or kind == CcBuiltin.LIST_GET or kind == CcBuiltin.LIST_LEN or kind == CcBuiltin.LIST_REMOVE or kind == CcBuiltin.LIST_CLEAR or kind == CcBuiltin.LIST_POP:
                         if recv_hint == 0:
-                            recv_hint = CC_PSEUDO_TID_VEC
+                            recv_hint = CC_PSEUDO_TID_LIST
                     if kind == CcBuiltin.MAP_NEW or kind == CcBuiltin.MAP_INSERT or kind == CcBuiltin.MAP_GET or kind == CcBuiltin.MAP_CONTAINS or kind == CcBuiltin.MAP_LEN or kind == CcBuiltin.MAP_REMOVE:
                         if recv_hint == 0:
                             recv_hint = self.sema.ty_i64 as i32
@@ -6573,19 +6573,19 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.VA_START: return CcBuiltin.VA_START
     if intrinsic == MirIntrinsic.VA_ARG: return CcBuiltin.VA_ARG
     if intrinsic == MirIntrinsic.VA_END: return CcBuiltin.VA_END
-    if intrinsic == MirIntrinsic.VEC_NEW: return CcBuiltin.VEC_NEW
-    if intrinsic == MirIntrinsic.VEC_PUSH: return CcBuiltin.VEC_PUSH
-    if intrinsic == MirIntrinsic.VEC_GET: return CcBuiltin.VEC_GET
-    if intrinsic == MirIntrinsic.VEC_GET_REF: return CcBuiltin.VEC_GET
-    if intrinsic == MirIntrinsic.VEC_LEN: return CcBuiltin.VEC_LEN
-    if intrinsic == MirIntrinsic.VEC_IS_EMPTY: return CcBuiltin.VEC_IS_EMPTY
-    if intrinsic == MirIntrinsic.VEC_LEN32: return CcBuiltin.VEC_LEN32
-    if intrinsic == MirIntrinsic.VEC_LEN64: return CcBuiltin.VEC_LEN64
-    if intrinsic == MirIntrinsic.VEC_ULEN32: return CcBuiltin.VEC_ULEN32
+    if intrinsic == MirIntrinsic.LIST_NEW: return CcBuiltin.LIST_NEW
+    if intrinsic == MirIntrinsic.LIST_PUSH: return CcBuiltin.LIST_PUSH
+    if intrinsic == MirIntrinsic.LIST_GET: return CcBuiltin.LIST_GET
+    if intrinsic == MirIntrinsic.LIST_GET_REF: return CcBuiltin.LIST_GET
+    if intrinsic == MirIntrinsic.LIST_LEN: return CcBuiltin.LIST_LEN
+    if intrinsic == MirIntrinsic.LIST_IS_EMPTY: return CcBuiltin.LIST_IS_EMPTY
+    if intrinsic == MirIntrinsic.LIST_LEN32: return CcBuiltin.LIST_LEN32
+    if intrinsic == MirIntrinsic.LIST_LEN64: return CcBuiltin.LIST_LEN64
+    if intrinsic == MirIntrinsic.LIST_ULEN32: return CcBuiltin.LIST_ULEN32
 
-    if intrinsic == MirIntrinsic.VEC_REMOVE: return CcBuiltin.VEC_REMOVE
-    if intrinsic == MirIntrinsic.VEC_CLEAR: return CcBuiltin.VEC_CLEAR
-    if intrinsic == MirIntrinsic.VEC_POP: return CcBuiltin.VEC_POP
+    if intrinsic == MirIntrinsic.LIST_REMOVE: return CcBuiltin.LIST_REMOVE
+    if intrinsic == MirIntrinsic.LIST_CLEAR: return CcBuiltin.LIST_CLEAR
+    if intrinsic == MirIntrinsic.LIST_POP: return CcBuiltin.LIST_POP
     if intrinsic == MirIntrinsic.MAP_NEW: return CcBuiltin.MAP_NEW
     if intrinsic == MirIntrinsic.MAP_INSERT: return CcBuiltin.MAP_INSERT
     if intrinsic == MirIntrinsic.MAP_GET: return CcBuiltin.MAP_GET
@@ -6625,7 +6625,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.STR_FIND: return CcBuiltin.STR_FIND
     if intrinsic == MirIntrinsic.MAP_CLEAR: return CcBuiltin.MAP_CLEAR
     if intrinsic == MirIntrinsic.VECITER_NEXT: return CcBuiltin.VECITER_NEXT
-    if intrinsic == MirIntrinsic.VEC_ITER: return CcBuiltin.VEC_ITER
+    if intrinsic == MirIntrinsic.LIST_ITER: return CcBuiltin.LIST_ITER
     if intrinsic == MirIntrinsic.OPT_IS_NONE: return CcBuiltin.OPT_IS_NONE
     if intrinsic == MirIntrinsic.STR_SPLIT: return CcBuiltin.STR_SPLIT
     if intrinsic == MirIntrinsic.STR_TO_UPPER: return CcBuiltin.STR_TO_UPPER
@@ -6636,30 +6636,30 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.MAP_DECREMENT: return CcBuiltin.MAP_DECREMENT
     if intrinsic == MirIntrinsic.MAP_UPDATE: return CcBuiltin.MAP_UPDATE
     if intrinsic == MirIntrinsic.MAP_CAPACITY or intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED or intrinsic == MirIntrinsic.MAP_KEY_AT or intrinsic == MirIntrinsic.MAP_VALUE_AT or intrinsic == MirIntrinsic.MAP_TAKE_AT: return CcBuiltin.MAP_SLOT_WALK
-    if intrinsic == MirIntrinsic.VEC_MAP: return CcBuiltin.VEC_MAP
-    if intrinsic == MirIntrinsic.VEC_FILTER: return CcBuiltin.VEC_FILTER
-    if intrinsic == MirIntrinsic.VEC_FOLD: return CcBuiltin.VEC_FOLD
+    if intrinsic == MirIntrinsic.LIST_MAP: return CcBuiltin.LIST_MAP
+    if intrinsic == MirIntrinsic.LIST_FILTER: return CcBuiltin.LIST_FILTER
+    if intrinsic == MirIntrinsic.LIST_FOLD: return CcBuiltin.LIST_FOLD
     if intrinsic == MirIntrinsic.ITER_MAP or intrinsic == MirIntrinsic.ITER_FILTER or intrinsic == MirIntrinsic.ITER_FILTER_MAP or intrinsic == MirIntrinsic.ITER_TAKE or intrinsic == MirIntrinsic.ITER_DROP or intrinsic == MirIntrinsic.ITER_TAKE_WHILE or intrinsic == MirIntrinsic.ITER_DROP_WHILE or intrinsic == MirIntrinsic.ITER_ZIP or intrinsic == MirIntrinsic.ITER_ENUMERATE or intrinsic == MirIntrinsic.ITER_CHAIN or intrinsic == MirIntrinsic.ITER_ZIP_WITH or intrinsic == MirIntrinsic.ITER_STEP_BY or intrinsic == MirIntrinsic.ITER_FLAT_MAP:
         return CcBuiltin.GENERIC_CALL
     if intrinsic == MirIntrinsic.ITER_FOLD or intrinsic == MirIntrinsic.ITER_REDUCE or intrinsic == MirIntrinsic.ITER_SUM or intrinsic == MirIntrinsic.ITER_PRODUCT or intrinsic == MirIntrinsic.ITER_MIN or intrinsic == MirIntrinsic.ITER_MAX or intrinsic == MirIntrinsic.ITER_MIN_BY or intrinsic == MirIntrinsic.ITER_MAX_BY or intrinsic == MirIntrinsic.ITER_FIND or intrinsic == MirIntrinsic.ITER_POSITION or intrinsic == MirIntrinsic.ITER_ANY or intrinsic == MirIntrinsic.ITER_ALL or intrinsic == MirIntrinsic.ITER_NONE or intrinsic == MirIntrinsic.ITER_FOR_EACH or intrinsic == MirIntrinsic.ITER_COUNT or intrinsic == MirIntrinsic.ITER_COLLECT or intrinsic == MirIntrinsic.ITER_PARTITION or intrinsic == MirIntrinsic.ITER_UNZIP:
         return CcBuiltin.GENERIC_CALL
     if intrinsic == MirIntrinsic.MAPITER_NEXT or intrinsic == MirIntrinsic.FILTERITER_NEXT or intrinsic == MirIntrinsic.FILTERMAPITER_NEXT or intrinsic == MirIntrinsic.TAKEITER_NEXT or intrinsic == MirIntrinsic.DROPITER_NEXT or intrinsic == MirIntrinsic.TAKEWHILEITER_NEXT or intrinsic == MirIntrinsic.DROPWHILEITER_NEXT or intrinsic == MirIntrinsic.ZIPITER_NEXT or intrinsic == MirIntrinsic.ENUMERATEITER_NEXT or intrinsic == MirIntrinsic.CHAINITER_NEXT or intrinsic == MirIntrinsic.ZIPWITHITER_NEXT or intrinsic == MirIntrinsic.STEPBYITER_NEXT or intrinsic == MirIntrinsic.FLATMAPITER_NEXT:
         return CcBuiltin.GENERIC_CALL
-    if intrinsic == MirIntrinsic.VEC_CONTAINS: return CcBuiltin.VEC_CONTAINS
+    if intrinsic == MirIntrinsic.LIST_CONTAINS: return CcBuiltin.LIST_CONTAINS
     if intrinsic == MirIntrinsic.STR_REPEAT: return CcBuiltin.STR_REPEAT
     if intrinsic == MirIntrinsic.ARR_LEN: return CcBuiltin.ARR_LEN
     if intrinsic == MirIntrinsic.ARR_LEN32: return CcBuiltin.ARR_LEN32
     if intrinsic == MirIntrinsic.ARR_LEN64: return CcBuiltin.ARR_LEN64
     if intrinsic == MirIntrinsic.ARR_ULEN32: return CcBuiltin.ARR_ULEN32
     if intrinsic == MirIntrinsic.GENERIC_CALL: return CcBuiltin.GENERIC_CALL
-    if intrinsic == MirIntrinsic.VEC_JOIN: return CcBuiltin.VEC_JOIN
+    if intrinsic == MirIntrinsic.LIST_JOIN: return CcBuiltin.LIST_JOIN
     if intrinsic == MirIntrinsic.DYN_VTABLE_CMP: return CcBuiltin.DYN_VTABLE_CMP
     if intrinsic == MirIntrinsic.DYN_DOWNCAST: return CcBuiltin.DYN_DOWNCAST
     if intrinsic == MirIntrinsic.DYN_CALL: return CcBuiltin.DYN_CALL
     if intrinsic == MirIntrinsic.OPT_FILTER: return CcBuiltin.OPT_FILTER
     if intrinsic == MirIntrinsic.ROTATE_LEFT: return CcBuiltin.ROTATE_LEFT
     if intrinsic == MirIntrinsic.ROTATE_RIGHT: return CcBuiltin.ROTATE_RIGHT
-    if intrinsic == MirIntrinsic.VEC_WITH_CAPACITY: return CcBuiltin.VEC_WITH_CAPACITY
+    if intrinsic == MirIntrinsic.LIST_WITH_CAPACITY: return CcBuiltin.LIST_WITH_CAPACITY
     if intrinsic == MirIntrinsic.FMT_TO_STR: return CcBuiltin.FMT_TO_STR
     if intrinsic == MirIntrinsic.FMT_DEBUG_STR: return CcBuiltin.FMT_DEBUG_STR
     if intrinsic == MirIntrinsic.FMT_DEBUG: return CcBuiltin.FMT_DEBUG
@@ -6670,8 +6670,8 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.STR_CLONE_REF: return CcBuiltin.STR_CLONE_REF
     if intrinsic == MirIntrinsic.FMT_BUF_WRITE_FMT: return CcBuiltin.FMT_BUF_WRITE_FMT
     if intrinsic == MirIntrinsic.FMT_BUF_FINISH: return CcBuiltin.FMT_BUF_FINISH
-    if intrinsic == MirIntrinsic.VEC_SLOT: return CcBuiltin.VEC_SLOT
-    if intrinsic == MirIntrinsic.VEC_GET_DISJOINT: return CcBuiltin.VEC_GET_DISJOINT
+    if intrinsic == MirIntrinsic.LIST_SLOT: return CcBuiltin.LIST_SLOT
+    if intrinsic == MirIntrinsic.LIST_GET_DISJOINT: return CcBuiltin.LIST_GET_DISJOINT
     if intrinsic == MirIntrinsic.VECSLOT_GET: return CcBuiltin.VECSLOT_GET
     if intrinsic == MirIntrinsic.VECSLOT_SET: return CcBuiltin.VECSLOT_SET
     if intrinsic == MirIntrinsic.SLOTMAP_NEW: return CcBuiltin.SLOTMAP
@@ -6714,7 +6714,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     CcBuiltin.NONE
 
 impl CCodegen:
-    mut fn emit_builtin_vec_core_call_term(body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+    mut fn emit_builtin_list_core_call_term(body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
         if kind == CcBuiltin.DYN_CALL:
             self.fail("C backend is LLVM-only for dyn trait method dispatch by design (#301); compile this program with the LLVM backend")
             return "    abort();"
@@ -6723,17 +6723,17 @@ impl CCodegen:
             self.fail("C backend is LLVM-only for MultiIndex intrinsics by design (#301); compile this program with the LLVM backend")
             return "    abort();"
 
-        if kind == CcBuiltin.VEC_NEW:
+        if kind == CcBuiltin.LIST_NEW:
             var out = ""
             if has_ret != 0:
-                let elem_size = self.vec_new_elem_size_text(body, dest_place)
+                let elem_size = self.list_new_elem_size_text(body, dest_place)
                 out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (with_vec)" ++ cc_lbrace() ++ " .ptr = NULL, .len = 0, .cap = 0, .elem_size = " ++ elem_size ++ " " ++ cc_rbrace() ++ ";\n"
             else:
                 out = out ++ "    (void)0;\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.VEC_SLOT:
+        if kind == CcBuiltin.LIST_SLOT:
             if argc < 2:
                 self.fail("vec.slot expects two arguments")
                 return "    abort();"
@@ -6750,10 +6750,10 @@ impl CCodegen:
             return out
 
         // See the LLVM-only-by-design note above (#301). get_disjoint / SlotMap /
-        // VecRange (and their *_LEN32/64/ULEN32 variants, which route here) are
+        // ListRange (and their *_LEN32/64/ULEN32 variants, which route here) are
         // intentionally unsupported in the C backend.
-        if kind == CcBuiltin.VEC_GET_DISJOINT:
-            self.fail("C backend is LLVM-only for Vec.get_disjoint by design (#301); compile this program with the LLVM backend")
+        if kind == CcBuiltin.LIST_GET_DISJOINT:
+            self.fail("C backend is LLVM-only for List.get_disjoint by design (#301); compile this program with the LLVM backend")
             return "    abort();"
 
         if kind == CcBuiltin.SLOTMAP:
@@ -6761,17 +6761,17 @@ impl CCodegen:
             return "    abort();"
 
         if kind == CcBuiltin.VECRANGE:
-            self.fail("C backend is LLVM-only for VecRange intrinsics by design (#301); compile this program with the LLVM backend")
+            self.fail("C backend is LLVM-only for ListRange intrinsics by design (#301); compile this program with the LLVM backend")
             return "    abort();"
 
         if kind == CcBuiltin.VECSLOT_GET:
             if argc < 1:
-                self.fail("VecSlot.get expects one argument")
+                self.fail("ListSlot.get expects one argument")
                 return "    abort();"
             let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
             var elem_tid = ret_tid
             if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
-                elem_tid = self.vecslot_element_tid(self.operand_tid(body, self.call_arg_operand(body, args_id, 0)))
+                elem_tid = self.listslot_element_tid(self.operand_tid(body, self.call_arg_operand(body, args_id, 0)))
             if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
                 elem_tid = self.sema.ty_i64 as i32
             let elem_ty = self.c_type(elem_tid, 0)
@@ -6785,14 +6785,14 @@ impl CCodegen:
 
         if kind == CcBuiltin.VECSLOT_SET:
             if argc < 2:
-                self.fail("VecSlot.set expects two arguments")
+                self.fail("ListSlot.set expects two arguments")
                 return "    abort();"
             let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
             let val_operand = self.call_arg_operand(body, args_id, 1)
             let val = self.operand_text(body, val_operand)
             var elem_tid = self.operand_tid(body, val_operand)
             if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
-                elem_tid = self.vecslot_element_tid(self.operand_tid(body, self.call_arg_operand(body, args_id, 0)))
+                elem_tid = self.listslot_element_tid(self.operand_tid(body, self.call_arg_operand(body, args_id, 0)))
             if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
                 elem_tid = self.sema.ty_i64 as i32
             let elem_ty = self.c_type(elem_tid, 0)
@@ -6800,11 +6800,11 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.VEC_PUSH:
+        if kind == CcBuiltin.LIST_PUSH:
             if argc < 2:
                 self.fail("vec.push expects two arguments")
                 return "    abort();"
-            let recv_ptr = self.vec_recv_ptr_text(body, args_id)
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
             let elem_operand = self.call_arg_operand(body, args_id, 1)
             let elem_text = self.operand_text(body, elem_operand)
             var elem_tid = self.operand_tid(body, elem_operand)
@@ -6815,11 +6815,11 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.VEC_GET:
+        if kind == CcBuiltin.LIST_GET:
             if argc < 2:
                 self.fail("vec.get expects two arguments")
                 return "    abort();"
-            let recv_ptr = self.vec_recv_ptr_text(body, args_id)
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
             let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             let dst = self.place_text(body, dest_place)
             let get_ret_resolved = self.sema.resolve_alias(ret_tid as TypeId)
@@ -6836,50 +6836,50 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if cc_builtin_is_vec_len(kind):
+        if cc_builtin_is_list_len(kind):
             if argc < 1:
                 self.fail("vec.len expects one argument")
                 return "    abort();"
-            let recv_ptr = self.vec_recv_ptr_text(body, args_id)
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
             var out = self.emit_len_result(body, dest_place, "with_vec_len(" ++ recv_ptr ++ ")", kind, has_ret)
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.VEC_IS_EMPTY:
+        if kind == CcBuiltin.LIST_IS_EMPTY:
             if argc < 1:
                 self.fail("vec.is_empty expects one argument")
                 return "    abort();"
-            let recv_ptr = self.vec_recv_ptr_text(body, args_id)
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
             var out = ""
             if has_ret != 0:
                 out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_vec_len(" ++ recv_ptr ++ ") == 0;\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.VEC_REMOVE:
+        if kind == CcBuiltin.LIST_REMOVE:
             if argc < 2:
                 self.fail("vec.remove expects two arguments")
                 return "    abort();"
-            let recv_ptr = self.vec_recv_ptr_text(body, args_id)
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
             let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             var out = "    with_vec_remove(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ "));\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.VEC_CLEAR:
+        if kind == CcBuiltin.LIST_CLEAR:
             if argc < 1:
                 self.fail("vec.clear expects one argument")
                 return "    abort();"
-            let recv_ptr = self.vec_recv_ptr_text(body, args_id)
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
             var out = "    with_vec_clear(" ++ recv_ptr ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.VEC_POP:
+        if kind == CcBuiltin.LIST_POP:
             if argc < 1:
                 self.fail("vec.pop expects one argument")
                 return "    abort();"
-            let recv_ptr = self.vec_recv_ptr_text(body, args_id)
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
             var out = "    " ++ cc_lbrace() ++ " int64_t __with_n = with_vec_len(" ++ recv_ptr ++ ");\n"
             if has_ret != 0:
                 let dst = self.place_text(body, dest_place)
@@ -6888,7 +6888,7 @@ impl CCodegen:
                     let some_variant = self.payload_enum_single_payload_variant(dst_tid)
                     let none_variant = self.payload_enum_single_unit_variant(dst_tid)
                     if some_variant < 0 or none_variant < 0:
-                        self.fail("Vec.pop Option result requires one payload variant and one unit variant")
+                        self.fail("List.pop Option result requires one payload variant and one unit variant")
                         return "    abort();"
                     let payload_tid = self.sema.type_reflection_variant_payload_type_frozen(dst_tid, some_variant, 0)
                     let payload_c = self.c_type(payload_tid, 0)
@@ -7559,7 +7559,7 @@ impl CCodegen:
             out = "    (void)" ++ value ++ ";\n"
         out ++ f"    goto bb{next_bb};"
 
-    mut fn emit_builtin_vec_extra_call_term(body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+    mut fn emit_builtin_list_extra_call_term(body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
         if kind == CcBuiltin.MAP_CLEAR:
             if argc < 1:
                 self.fail("map.clear expects one argument")
@@ -7616,8 +7616,8 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.VEC_ITER:
-            // Vec is its own iterator in C — return the vec as the iterator value
+        if kind == CcBuiltin.LIST_ITER:
+            // List is its own iterator in C — return the vec as the iterator value
             if argc < 1:
                 self.fail("vec.iter expects one argument")
                 return "    abort();"
@@ -7637,7 +7637,7 @@ impl CCodegen:
             if argc < 1:
                 self.fail("veciter.next expects one argument")
                 return "    abort();"
-            let recv_ptr = self.vec_recv_ptr_text(body, args_id)
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
             let dst = self.place_text(body, dest_place)
             var out = "    " ++ cc_lbrace() ++ " int64_t __with_n = with_vec_len(" ++ recv_ptr ++ "); int64_t __with_i = 0;"
             out = out ++ " if (__with_i < __with_n) " ++ cc_lbrace()
@@ -7648,11 +7648,11 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.VEC_CONTAINS:
+        if kind == CcBuiltin.LIST_CONTAINS:
             if argc < 2:
                 self.fail("vec.contains expects two arguments")
                 return "    abort();"
-            let recv_ptr = self.vec_recv_ptr_text(body, args_id)
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
             let elem_operand = self.call_arg_operand(body, args_id, 1)
             let elem_text = self.operand_text(body, elem_operand)
             var elem_tid = self.operand_tid(body, elem_operand)
@@ -7671,11 +7671,11 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.VEC_JOIN:
+        if kind == CcBuiltin.LIST_JOIN:
             if argc < 2:
                 self.fail("vec.join expects two arguments")
                 return "    abort();"
-            let recv_ptr = self.vec_recv_ptr_text(body, args_id)
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
             let sep_op = self.call_arg_operand(body, args_id, 1)
             // The separator is a `&str` view: the `{ptr, len}` value itself
             // (#1810; with_runtime.h `with_str sep`), never its address.
@@ -7703,10 +7703,10 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.VEC_WITH_CAPACITY:
+        if kind == CcBuiltin.LIST_WITH_CAPACITY:
             var out = ""
             if has_ret != 0:
-                let elem_size = self.vec_new_elem_size_text(body, dest_place)
+                let elem_size = self.list_new_elem_size_text(body, dest_place)
                 let cap_operand = if argc > 0: self.call_arg_operand(body, args_id, 0) else: -1
                 let cap_text = if cap_operand >= 0: self.operand_text(body, cap_operand) else: "0"
                 out = out ++ "    with_vec_new_with_capacity_out(&(" ++ self.place_text(body, dest_place) ++ "), " ++ elem_size ++ ", (int64_t)(" ++ cap_text ++ "));\n"
@@ -8120,15 +8120,15 @@ impl CCodegen:
             self.fail("emit-c does not support opt.filter (requires closure support)")
             return "\n"
 
-        if kind == CcBuiltin.VEC_MAP:
+        if kind == CcBuiltin.LIST_MAP:
             self.fail("emit-c does not support vec.map (requires closure support)")
             return "\n"
 
-        if kind == CcBuiltin.VEC_FILTER:
+        if kind == CcBuiltin.LIST_FILTER:
             self.fail("emit-c does not support vec.filter (requires closure support)")
             return "\n"
 
-        if kind == CcBuiltin.VEC_FOLD:
+        if kind == CcBuiltin.LIST_FOLD:
             self.fail("emit-c does not support vec.fold (requires closure support)")
             return "\n"
 
@@ -8231,7 +8231,7 @@ impl CCodegen:
         self.fail("emit-c does not support generic intrinsic " ++ if name.len() > 0: name else: "<unknown>")
         "\n"
 
-    // `[a, b]` into a Vec or HashSet and `[k: v]` into a HashMap (MirLower's
+    // `[a, b]` into a List or HashSet and `[k: v]` into a HashMap (MirLower's
     // COLLECTION_LITERAL / MAP_LITERAL): the collection built empty and each
     // element pushed or inserted in order, as the LLVM backend's
     // mir_emit_collection_literal_intrinsic_call and this backend's own
@@ -8243,7 +8243,7 @@ impl CCodegen:
         let argc = self.call_arg_count(body, args_id)
         let dst = self.place_text(body, dest_place)
         var out = "    " ++ cc_lbrace()
-        if intrinsic == MirIntrinsic.COLLECTION_LITERAL and base == "Vec":
+        if intrinsic == MirIntrinsic.COLLECTION_LITERAL and base == "List":
             let elem_tid = self.sema.get_generic_inst_arg(resolved, 0)
             let elem_ty = self.c_type(elem_tid, 0)
             out = out ++ " " ++ self.c_type(dst_tid, 0) ++ " __with_lit; with_vec_new_out((uint8_t*)&__with_lit, sizeof(" ++ elem_ty ++ "));"
@@ -8335,7 +8335,7 @@ impl CCodegen:
         // permanent — reaching parity is NOT a goal. If the compiler ever starts using
         // one of these, `make emit-c-fixpoint` fails loudly and points here. Keep the
         // loud fail; never add a silent fallback to make --emit-c pass.
-        var out = self.emit_builtin_vec_core_call_term(body, kind, args_id, dest_place, next_bb, argc, ret_tid, has_ret)
+        var out = self.emit_builtin_list_core_call_term(body, kind, args_id, dest_place, next_bb, argc, ret_tid, has_ret)
         if out.len() > 0:
             return out
         out = self.emit_builtin_map_call_term(body, kind, args_id, dest_place, next_bb, argc, ret_tid, has_ret)
@@ -8346,7 +8346,7 @@ impl CCodegen:
             return out
         if kind == CcBuiltin.GENERIC_CALL:
             return self.emit_builtin_generic_call_term(body, callee_operand, args_id, dest_place, next_bb)
-        out = self.emit_builtin_vec_extra_call_term(body, kind, args_id, dest_place, next_bb, argc, ret_tid, has_ret)
+        out = self.emit_builtin_list_extra_call_term(body, kind, args_id, dest_place, next_bb, argc, ret_tid, has_ret)
         if out.len() > 0:
             return out
         out = self.emit_builtin_numeric_format_call_term(body, kind, args_id, dest_place, next_bb, argc, ret_tid, has_ret)
@@ -8505,8 +8505,8 @@ impl CCodegen:
                     continue
 
                 if recv_is_field != 0:
-                    if hint == CcCalleeHint.VEC_RECV:
-                        self.record_field_tid_from_place(body, recv_place, CC_PSEUDO_TID_VEC)
+                    if hint == CcCalleeHint.LIST_RECV:
+                        self.record_field_tid_from_place(body, recv_place, CC_PSEUDO_TID_LIST)
                         continue
                     if hint == CcCalleeHint.MAP_RECV:
                         self.record_field_tid_from_place(body, recv_place, self.sema.ty_i64)
@@ -8519,8 +8519,8 @@ impl CCodegen:
                     if hint == CcCalleeHint.MAP_NEW:
                         self.record_field_tid_from_place(body, dest_place, self.sema.ty_i64)
                         continue
-                    if hint == CcCalleeHint.VEC_NEW:
-                        self.record_field_tid_from_place(body, dest_place, CC_PSEUDO_TID_VEC)
+                    if hint == CcCalleeHint.LIST_NEW:
+                        self.record_field_tid_from_place(body, dest_place, CC_PSEUDO_TID_LIST)
                         continue
                     if hint == CcCalleeHint.OPT_NEW:
                         self.record_field_tid_from_place(body, dest_place, self.sema.ty_i64)
@@ -8708,7 +8708,7 @@ impl CCodegen:
                 if field_name == "root_source_dir":
                     return self.sema.ty_str as i32
                 if field_name == "module_paths" or field_name == "module_dirs" or field_name == "module_file_ids" or field_name == "module_decl_counts" or field_name == "module_import_starts" or field_name == "module_import_counts" or field_name == "module_scope_ids" or field_name == "module_processed":
-                    return CC_PSEUDO_TID_VEC
+                    return CC_PSEUDO_TID_LIST
                 if field_name == "module_map" or field_name == "link_lib_set" or field_name == "binding_map":
                     return self.sema.ty_i64 as i32
         raw_field_tid
@@ -8774,9 +8774,9 @@ impl CCodegen:
         0
 
     mut fn zero_value_text(tid: i32) -> str:
-        // MIR can retain the backend's pseudo Vec type for compiler-created
-        // carrier/reset locals. It has the same C representation as Vec[T].
-        if tid == CC_PSEUDO_TID_VEC:
+        // MIR can retain the backend's pseudo List type for compiler-created
+        // carrier/reset locals. It has the same C representation as List[T].
+        if tid == CC_PSEUDO_TID_LIST:
             return "(with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
         let resolved = self.sema.resolve_alias(tid)
         let tk = self.sema.get_type_kind(resolved)
@@ -8789,7 +8789,7 @@ impl CCodegen:
             return "(with_str)" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             return "NULL"
-        if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_base_name(resolved as i32) == "Vec":
+        if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_base_name(resolved as i32) == "List":
             return "(with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
         if tk == TypeKind.TY_GENERIC_INST and (self.generic_inst_needs_struct_def(resolved as i32) != 0 or self.generic_inst_is_declared_struct(resolved as i32)):
             return "(" ++ self.c_type(resolved, 0) ++ ")" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
@@ -8893,13 +8893,13 @@ impl CCodegen:
                 let variant_index = self.payload_enum_variant_for_payload_tid(dst_tid, rv_tid_for_payload)
                 if variant_index >= 0:
                     return "    " ++ dst_place ++ " = " ++ self.payload_enum_literal(dst_tid, variant_index, rval) ++ ";"
-            // Vec zero-init: c_type returns "with_vec" for TY_GENERIC_INST(Vec)
+            // List zero-init: c_type returns "with_vec" for TY_GENERIC_INST(List)
             if (rval == "0" or rval == "0LL") and self.c_type(dst_tid, 0) == "with_vec":
                 return "    " ++ dst_place ++ " = (with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";"
             // If destination is struct/str/vec and rvalue looks like a scalar, wrap it
             let dst_c_type = self.c_type(dst_tid, 0)
             let dst_is_distinct = self.type_is_distinct(dst_tid)
-            let dst_is_compound = (dst_tk == TypeKind.TY_STRUCT and dst_is_distinct == 0) or dst_tk == TypeKind.TY_TUPLE or dst_tk == TypeKind.TY_STR or dst_tid == CC_PSEUDO_TID_VEC or dst_resolved == CC_PSEUDO_TID_VEC or dst_c_type == "with_str" or dst_c_type == "with_vec"
+            let dst_is_compound = (dst_tk == TypeKind.TY_STRUCT and dst_is_distinct == 0) or dst_tk == TypeKind.TY_TUPLE or dst_tk == TypeKind.TY_STR or dst_tid == CC_PSEUDO_TID_LIST or dst_resolved == CC_PSEUDO_TID_LIST or dst_c_type == "with_str" or dst_c_type == "with_vec"
             if dst_is_compound:
                 if rval == "0" or rval == "0LL":
                     return "    " ++ dst_place ++ " = " ++ self.zero_value_text(dst_tid) ++ ";"
@@ -8909,8 +8909,8 @@ impl CCodegen:
                 let rv_tk = if rv_resolved != 0: self.sema.get_type_kind(rv_resolved) else: 0
                 var needs_wrap = rv_tk == TypeKind.TY_INT or rv_tk == TypeKind.TY_BOOL or rv_tk == TypeKind.TY_ENUM
                 if not needs_wrap and rv_resolved != 0 and rv_resolved != dst_resolved:
-                    // Check C type strings before assuming incompatibility — pseudo Vec and
-                    // real Vec[T] have different sema type kinds but the same C type.
+                    // Check C type strings before assuming incompatibility — pseudo List and
+                    // real List[T] have different sema type kinds but the same C type.
                     let dst_c = self.c_type(dst_tid, 0)
                     let rv_c = self.c_type(rv_tid, 0)
                     if dst_c != rv_c:
@@ -8960,7 +8960,7 @@ impl CCodegen:
         if sk == StmtKind.Drop:
             let p = self.place_text(body, d0)
             let pt = self.place_tid(body, d0)
-            if pt == CC_PSEUDO_TID_VEC:
+            if pt == CC_PSEUDO_TID_LIST:
                 return "    with_vec_clear(&(" ++ p ++ "));"
             return "    /* drop(" ++ p ++ "); */"
         if sk == StmtKind.Nop:
@@ -9049,7 +9049,7 @@ impl CCodegen:
             if callee == "/*unresolved_call*/" or callee == "/*ambiguous_call*/" or callee == "/*ambiguous_method*/":
                 let _ = ret_tid
                 return "    abort();"
-            self.call_lends = Vec.new()
+            self.call_lends = List.new()
             var args = if self.callee_is_str_builtin_ref != 0: self.builtin_method_ref_args_text(body, d1) else: self.call_args_text(body, d1, d0)
             // #1817 (array_out_param): the leading arguments in the one
             // order every signature declares them — the fat pair's context
@@ -9085,7 +9085,7 @@ impl CCodegen:
             let p = self.place_text(body, d0)
             let pt = self.place_tid(body, d0)
             var out = ""
-            if pt == CC_PSEUDO_TID_VEC:
+            if pt == CC_PSEUDO_TID_LIST:
                 out = out ++ "    with_vec_clear(&(" ++ p ++ "));\n"
             else:
                 out = out ++ "    /* drop(" ++ p ++ "); */\n"
@@ -9099,22 +9099,22 @@ impl CCodegen:
 // recursive walk be a method with `mut self: Self` instead of taking two
 // separate `&mut` accumulators.
 type CollectStructTypes {
-    out: Vec[i32],
+    out: List[i32],
     seen_names: HashMap[i32, i32],
     seen_c_names: HashMap[str, i32],
 }
 
 fn CollectStructTypes.new -> CollectStructTypes:
-    CollectStructTypes { out: Vec.new(), seen_names: HashMap.new(), seen_c_names: HashMap.new() }
+    CollectStructTypes { out: List.new(), seen_names: HashMap.new(), seen_c_names: HashMap.new() }
 
 type CollectFnTypes {
-    out: Vec[i32],
+    out: List[i32],
     seen_names: HashMap[i32, i32],
     seen_types: HashMap[i32, i32],
 }
 
 fn CollectFnTypes.new -> CollectFnTypes:
-    CollectFnTypes { out: Vec.new(), seen_names: HashMap.new(), seen_types: HashMap.new() }
+    CollectFnTypes { out: List.new(), seen_names: HashMap.new(), seen_types: HashMap.new() }
 
 impl CCodegen:
     mut fn collect_struct_types_from_tid(acc: CollectStructTypes, tid: i32) -> CollectStructTypes:
@@ -9165,7 +9165,7 @@ impl CCodegen:
                 for fi in 0..field_tids.len() as i32:
                     generic_acc = self.collect_struct_types_from_tid(move generic_acc, field_tids[fi])
                 return generic_acc
-            if base_name == "Vec" or base_name == "HashMap" or base_name == "HashSet":
+            if base_name == "List" or base_name == "HashMap" or base_name == "HashSet":
                 return acc
             if self.generic_inst_is_declared_struct(resolved as i32):
                 let cname = self.struct_c_name(resolved as i32)
@@ -9193,8 +9193,8 @@ impl CCodegen:
             return self.collect_struct_types_from_tid(move acc, box_pointee)
         acc
 
-    fn synthetic_generic_struct_field_tids(tid: i32) -> Vec[i32]:
-        let fields: Vec[i32] = Vec.new()
+    fn synthetic_generic_struct_field_tids(tid: i32) -> List[i32]:
+        let fields: List[i32] = List.new()
         let resolved = self.sema.resolve_alias(tid as TypeId) as i32
         if self.sema.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
             return fields
@@ -9256,7 +9256,7 @@ impl CCodegen:
             return cur
         cur
 
-    mut fn collect_used_fn_types() -> Vec[i32]:
+    mut fn collect_used_fn_types() -> List[i32]:
         var acc = CollectFnTypes.new()
         for bi in 0..self.mir_mod.bodies.len() as i32:
             if self.check_interrupted() != 0:
@@ -9272,7 +9272,7 @@ impl CCodegen:
                     acc = self.collect_fn_types_from_tid(move acc, self.sema.sig_param_type(sig_idx, pi))
         return move acc.out
 
-    mut fn collect_used_struct_types() -> Vec[i32]:
+    mut fn collect_used_struct_types() -> List[i32]:
         var acc = CollectStructTypes.new()
         if self.collect_cstr_literal_texts().len() as i32 > 0:
             acc = self.collect_struct_types_from_tid(move acc, self.sema.ty_cstr as i32)
@@ -9433,7 +9433,7 @@ impl CCodegen:
         if struct_tids.len() as i32 == 0:
             return self.emit_fn_type_defs()
 
-        let ordered: Vec[i32] = Vec.new()
+        let ordered: List[i32] = List.new()
         let emitted_names: HashMap[i32, i32] = HashMap.new()
         while ordered.len() as i32 < struct_tids.len() as i32:
             if self.check_interrupted() != 0:
@@ -9559,7 +9559,7 @@ impl CCodegen:
                 let start = self.sema.get_type_d0(resolved)
                 let count = self.sema.get_type_d1(resolved)
                 out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
-                var elem_names: Vec[str] = Vec.new()
+                var elem_names: List[str] = List.new()
                 for ti in 0..count:
                     if self.check_interrupted() != 0:
                         return ""
@@ -9572,7 +9572,7 @@ impl CCodegen:
             let generic_base_name = self.generic_inst_base_name(resolved as i32)
             if self.sema.is_opaque_value_type(resolved as i32) != 0:
                 continue
-            if generic_base_name == "VecSlot":
+            if generic_base_name == "ListSlot":
                 out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
                 out = out ++ "    int64_t data_ptr;\n"
                 out = out ++ "    int64_t index;\n"
@@ -9609,7 +9609,7 @@ impl CCodegen:
                     out = out ++ "    " ++ cc_rbrace() ++ ";\n"
                 out = out ++ cc_rbrace() ++ ";\n\n"
                 continue
-            if generic_base_name == "VecIter" or generic_base_name == "VecIterPlace":
+            if generic_base_name == "ListIter" or generic_base_name == "ListIterPlace":
                 out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
                 out = out ++ "    int64_t data_ptr;\n"
                 out = out ++ "    int64_t len;\n"
@@ -9631,7 +9631,7 @@ impl CCodegen:
                 continue
             if self.generic_inst_is_declared_struct(resolved as i32):
                 out = out ++ self.record_keyword(resolved as i32) ++ " " ++ name ++ " " ++ cc_lbrace() ++ "\n"
-                var field_names: Vec[str] = Vec.new()
+                var field_names: List[str] = List.new()
                 for fi in 0..self.sema.type_reflection_field_count(resolved as i32):
                     let field_name = cc_intern_resolve(self.intern, self.sema.type_reflection_field_name(resolved as i32, fi))
                     out = out ++ "    " ++ self.c_decl(self.sema.type_reflection_field_type_frozen(resolved as i32, fi), field_name) ++ ";\n"
@@ -9653,7 +9653,7 @@ impl CCodegen:
                 out = out ++ "typedef " ++ self.c_decl(field_tid, name) ++ ";\n\n"
                 continue
             out = out ++ self.record_keyword(resolved as i32) ++ " " ++ name ++ " " ++ cc_lbrace() ++ "\n"
-            var field_names: Vec[str] = Vec.new()
+            var field_names: List[str] = List.new()
             for fi in 0..count:
                 if self.check_interrupted() != 0:
                     return ""
@@ -9690,7 +9690,7 @@ impl CCodegen:
     // difference is a C compile error naming the type, never a program that
     // silently reads its fields elsewhere than the LLVM backend does. A
     // fact the model never registered is not asserted.
-    fn layout_static_asserts(tid: i32, c_type: &str, field_names: &Vec[str]) -> str:
+    fn layout_static_asserts(tid: i32, c_type: &str, field_names: &List[str]) -> str:
         let label = cc_escape_c_string(self.sema.type_name(tid))
         var out = ""
         let size_opt = self.sema.layout_size_cache.get(tid)
@@ -10233,7 +10233,7 @@ impl CCodegen:
     mut fn local_originates_from_map_get(body: &MirBody, local_id: i32) -> bool:
         self.local_originates_from_map_get_depth(body, local_id, 0)
 
-    mut fn local_used_as_vec_receiver(body: &MirBody, local_id: i32) -> bool:
+    mut fn local_used_as_list_receiver(body: &MirBody, local_id: i32) -> bool:
         if local_id < 0:
             return false
         for bb in 0..body.block_count():
@@ -10245,7 +10245,7 @@ impl CCodegen:
             var kind = cc_builtin_from_mir_intrinsic(body.call_intrinsic(args_id))
             if kind == CcBuiltin.NONE:
                 kind = self.call_builtin_kind(body, callee_op, args_id, dest_place)
-            if not cc_builtin_uses_vec_receiver(kind):
+            if not cc_builtin_uses_list_receiver(kind):
                 continue
             let recv_place = self.call_first_arg_place_id(body, args_id)
             if self.place_is_direct_local(body, recv_place, local_id) != 0:
@@ -10271,7 +10271,7 @@ impl CCodegen:
                 return true
         false
 
-fn cc_mark_local_repr(flags_in: Vec[i32], local_id: i32, mark: i32) -> Vec[i32]:
+fn cc_mark_local_repr(flags_in: List[i32], local_id: i32, mark: i32) -> List[i32]:
     var flags = flags_in
     if local_id < 0 or local_id >= flags.len() as i32:
         return flags
@@ -10283,8 +10283,8 @@ fn cc_mark_local_repr(flags_in: Vec[i32], local_id: i32, mark: i32) -> Vec[i32]:
     flags
 
 impl CCodegen:
-    mut fn encoded_option_local_flags(body: &MirBody) -> Vec[i32]:
-        var flags: Vec[i32] = Vec.new()
+    mut fn encoded_option_local_flags(body: &MirBody) -> List[i32]:
+        var flags: List[i32] = List.new()
         for _i in 0..body.local_count():
             flags.push(0)
 
@@ -10299,7 +10299,7 @@ impl CCodegen:
                 let recv_place = self.call_first_arg_place_id(body, args_id)
                 let recv_local = self.place_local_id(body, recv_place)
                 if self.place_is_direct_local(body, recv_place, recv_local) != 0:
-                    if cc_builtin_uses_vec_receiver(kind):
+                    if cc_builtin_uses_list_receiver(kind):
                         flags = cc_mark_local_repr(move flags, recv_local, 2)
                     else if cc_builtin_uses_option_receiver(kind):
                         flags = cc_mark_local_repr(move flags, recv_local, 1)
@@ -10332,7 +10332,7 @@ impl CCodegen:
     mut fn local_used_as_encoded_option(body: &MirBody, local_id: i32) -> bool:
         if local_id < 0:
             return false
-        if self.local_used_as_vec_receiver(body, local_id):
+        if self.local_used_as_list_receiver(body, local_id):
             return false
         if self.local_used_as_option_receiver(body, local_id):
             return true
@@ -10690,8 +10690,8 @@ impl CCodegen:
         out.write(fn_sig ++ " " ++ cc_lbrace() ++ "\n")
         out.write(prologue)
         out.write(self.closure_env_locals_text(body))
-        let call_override_locals: Vec[i32] = Vec.new()
-        let call_override_tids: Vec[i32] = Vec.new()
+        let call_override_locals: List[i32] = List.new()
+        let call_override_tids: List[i32] = List.new()
         for bb in 0..body.block_count():
             if self.check_interrupted() != 0:
                 return ""
@@ -10768,10 +10768,10 @@ impl CCodegen:
                     if declared_kind_for_override != override_kind or self.strict_type_match(declared_tid, override_tid) == 0:
                         use_tid = override_tid
                     break
-            let downcast_opt_tid = cc_vec_tid_at(downcast_option_tids, li)
+            let downcast_opt_tid = cc_list_tid_at(downcast_option_tids, li)
             if downcast_opt_tid != 0 and self.is_void_tid(downcast_opt_tid) == 0:
                 use_tid = downcast_opt_tid
-            let copied_payload_enum_tid = cc_vec_tid_at(copied_payload_enum_tids, li)
+            let copied_payload_enum_tid = cc_list_tid_at(copied_payload_enum_tids, li)
             if copied_payload_enum_tid != 0 and self.is_void_tid(copied_payload_enum_tid) == 0:
                 use_tid = copied_payload_enum_tid
             let use_resolved_before_infer = self.sema.resolve_alias(use_tid)
@@ -10792,7 +10792,7 @@ impl CCodegen:
             let use_kind = self.sema.get_type_kind(use_resolved)
             var local_ty = if li == 0 and self.is_void_tid(use_tid) != 0: "int32_t" else: self.c_type(use_tid, 0)
             // If this local is assigned from RK_REF/RK_ADDR_OF, declare as pointer
-            let ref_target_tid = cc_vec_tid_at(ref_target_tids, li)
+            let ref_target_tid = cc_list_tid_at(ref_target_tids, li)
             if ref_target_tid != 0 and use_kind != TypeKind.TY_PTR and use_kind != TypeKind.TY_REF:
                 local_ty = self.c_type(ref_target_tid, 0)
                 let use_kind_for_ref = self.sema.get_type_kind(self.sema.resolve_alias(ref_target_tid))

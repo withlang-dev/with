@@ -2,7 +2,7 @@
 
 // #2116: what stays legal. An owned field or element reached through a
 // borrowed receiver or parameter is returned as a view of that argument.
-type Holder { name: str, items: Vec[str] }
+type Holder { name: str, items: List[str] }
 
 impl Holder:
     fn name_view(self: &Self) -> &str: self.name

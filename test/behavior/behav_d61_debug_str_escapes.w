@@ -3,19 +3,19 @@
 // §15.4.7 / D61: a `str` under `:?` is quoted and escaped — `"` as `\"`, `\`
 // as `\\`, U+0000–U+001F and U+007F as `\n` `\t` `\r` `\0` or `\xHH` — and
 // every other character, printable non-ASCII included, appears as itself.
-// The same text at every depth: top level, a struct field, a Vec element,
+// The same text at every depth: top level, a struct field, a List element,
 // an enum payload, and two levels down. Every cell is exact.
 
 type Label { text: str }
-type Shelf { labels: Vec[Label], note: Option[str] }
+type Shelf { labels: List[Label], note: Option[str] }
 
 fn check(got: &str, want: &str):
     if got != want:
         print(f"mismatch\n  got:  {got}\n  want: {want}")
         assert(false)
 
-fn controls() -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn controls() -> List[str]:
+    let out: List[str] = List.new()
     out.push("\0")
     out.push("\x01")
     out.push("\x02")
@@ -52,8 +52,8 @@ fn controls() -> Vec[str]:
     out
 
 // The escape each control character takes, in `controls()` order.
-fn escapes() -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn escapes() -> List[str]:
+    let out: List[str] = List.new()
     out.push(r"\0")
     for b in 1..9:
         out.push(f"\\x0{b}")
@@ -86,7 +86,7 @@ fn main:
         let esc = want[i]
         check(f"{s:?}", f"\"{esc}\"")
         joined = joined ++ (if i > 0: ", " else: "") ++ f"\"{esc}\""
-    // Depth 1: the same strings as Vec elements.
+    // Depth 1: the same strings as List elements.
     check(f"{all:?}", "[" ++ joined ++ "]")
     // Quote, backslash, printable ASCII that is not escaped, non-ASCII, empty.
     let quote = "say \"hi\""
@@ -109,8 +109,8 @@ fn main:
     check(f"{label:?}", r#"Label { text: "tab\there" }"#)
     let some: Option[str] = Some("line\nbreak")
     check(f"{some:?}", r#"Some("line\nbreak")"#)
-    // Depth 2: a struct in a Vec in a struct, and a payload in a field.
-    let labels: Vec[Label] = Vec.new()
+    // Depth 2: a struct in a List in a struct, and a payload in a field.
+    let labels: List[Label] = List.new()
     labels.push(Label { text: "q\"t" })
     labels.push(Label { text: "" })
     let shelf = Shelf { labels, note: Some("back\\slash") }

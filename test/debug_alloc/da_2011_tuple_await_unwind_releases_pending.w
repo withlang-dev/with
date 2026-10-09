@@ -14,7 +14,7 @@ var resumed: Atomic[i32]
 
 async fn tick() -> i32: 1
 
-async fn wait_forever(value: i32) -> Vec[i32]:
+async fn wait_forever(value: i32) -> List[i32]:
     while true:
         let _ = tick().await
     [value]

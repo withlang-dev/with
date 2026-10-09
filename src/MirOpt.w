@@ -41,39 +41,39 @@ type MirMove {
 
 type MirOptFunction {
     name: str,
-    calls: Vec[MirCallSite],
-    allocations: Vec[MirAllocation],
-    moves: Vec[MirMove],
+    calls: List[MirCallSite],
+    allocations: List[MirAllocation],
+    moves: List[MirMove],
 }
 
 fn MirOptFunction.init(name: &str) -> MirOptFunction:
     MirOptFunction {
         name,
-        calls: Vec.new(),
-        allocations: Vec.new(),
-        moves: Vec.new(),
+        calls: List.new(),
+        allocations: List.new(),
+        moves: List.new(),
     }
 
 type MirOptTypeDecl {
     name: str,
-    fields: Vec[MirField],
+    fields: List[MirField],
 }
 
 fn MirOptTypeDecl.init(name: &str) -> MirOptTypeDecl:
     MirOptTypeDecl {
         name,
-        fields: Vec.new(),
+        fields: List.new(),
     }
 
 type MirOptModule {
-    functions: Vec[MirOptFunction],
-    types: Vec[MirOptTypeDecl],
+    functions: List[MirOptFunction],
+    types: List[MirOptTypeDecl],
 }
 
 fn MirOptModule.init -> MirOptModule:
     MirOptModule {
-        functions: Vec.new(),
-        types: Vec.new(),
+        functions: List.new(),
+        types: List.new(),
     }
 
 // No-op: reserved for future manual memory management.

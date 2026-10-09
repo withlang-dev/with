@@ -4,12 +4,12 @@
 // A block tail that reads through an element place of a local the block
 // drops (`let t = table(); t[id].arity`) reads before the scope-exit drop.
 // Before the fix the drop was scheduled first and the read saw the freed
-// Vec ("index out of bounds").
+// List ("index out of bounds").
 
 type Row { name: str, arity: i32 }
 
-fn table() -> Vec[Row]:
-    let t: Vec[Row] = Vec.new()
+fn table() -> List[Row]:
+    let t: List[Row] = List.new()
     t.push(Row { name: "sin", arity: 1 })
     t.push(Row { name: "cos", arity: 2 })
     t

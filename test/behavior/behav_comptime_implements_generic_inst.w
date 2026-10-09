@@ -11,5 +11,5 @@ fn main:
     assert(comptime Arc[i32].implements(Send))
     assert(not comptime Rc[i32].implements(Send))
     assert(not comptime Arc[Rc[i32]].implements(Send))
-    assert(comptime Vec[Vec[i32]].implements(Send))
+    assert(comptime List[List[i32]].implements(Send))
     print("ok")

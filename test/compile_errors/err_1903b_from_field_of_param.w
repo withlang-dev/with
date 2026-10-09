@@ -3,10 +3,10 @@
 // #1903 (§21.1 rule 6, spec v7.18): `a.b` in a `from` clause is a
 // module-qualified global, never a field of parameter `a`.
 
-type H { v: Vec[i32] }
+type H { v: List[i32] }
 
-fn field(h: &H) -> &Vec[i32] from h.v: &h.v
+fn field(h: &H) -> &List[i32] from h.v: &h.v
 
 fn main:
-    let h = H { v: Vec.new() }
+    let h = H { v: List.new() }
     print(field(&h).len())

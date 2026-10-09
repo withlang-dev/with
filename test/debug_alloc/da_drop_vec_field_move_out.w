@@ -1,5 +1,5 @@
 //! expect-debug-alloc: leak count=0
-// #607: a transitive-Drop field (Vec[W]) moved out of a non-Drop struct via
+// #607: a transitive-Drop field (List[W]) moved out of a non-Drop struct via
 // let / return-tail / move-self / destructure. The moved elements and the
 // sibling field are each freed exactly once — no leak, no double free.
 use std.builtins.print_i32
@@ -13,22 +13,22 @@ impl Drop for W:
             with_free(self.ptr)
             *self.slot = *self.slot + 1
 
-type Holder { a: Vec[W], b: W }
+type Holder { a: List[W], b: W }
 
 fn new_w(s: *mut i32) -> W:
     unsafe { W { ptr: with_alloc(24), slot: s } }
 
 fn mk(s: *mut i32) -> Holder:
-    let v: Vec[W] = Vec.new()
+    let v: List[W] = List.new()
     v.push(new_w(s))
     v.push(new_w(s))
     Holder { a: v, b: new_w(s) }
 
-fn Holder.into_values(move self: Holder) -> Vec[W]:
+fn Holder.into_values(move self: Holder) -> List[W]:
     var owned = self
     return move owned.a
 
-fn take(h: Holder) -> Vec[W]:
+fn take(h: Holder) -> List[W]:
     var owned = h
     return move owned.a
 

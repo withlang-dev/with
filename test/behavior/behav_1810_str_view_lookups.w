@@ -22,7 +22,7 @@
 
 use std.collections.HashMap
 
-fn find_first(xs: &Vec[str]) -> Option[&str]:
+fn find_first(xs: &List[str]) -> Option[&str]:
     if xs.len() == 0: return None
     Some(xs[0])
 
@@ -48,13 +48,13 @@ fn main:
     print(m.get(9) ?? d)
     print(f"{m.get(1)}")
     print(f"{m.get(5)}")
-    var xs: Vec[str] = Vec.new()
+    var xs: List[str] = List.new()
     xs.push("a")
     print("first " ++ find_first(&xs).unwrap())
     if let Some(v) = maybe(true, "b"): print("opt " ++ v)
     let o: Option[&str] = Some("ok")
     print("some-ref " ++ first_some(&o))
-    var ys: Vec[str] = Vec.new()
+    var ys: List[str] = List.new()
     ys.push("one")
     ys.push("two")
     var acc = "iterref"
@@ -63,18 +63,18 @@ fn main:
     var acc2 = "iter"
     for y in ys.iter(): acc2 = acc2 ++ " " ++ y
     print(acc2)
-    var zs: Vec[str] = Vec.new()
+    var zs: List[str] = List.new()
     zs.push("a")
     zs.push("bb")
     zs.push("ccc")
-    let lens: Vec[i64] = zs.iter() |> map(it.len()) |> collect[Vec]()
+    let lens: List[i64] = zs.iter() |> map(it.len()) |> collect[List]()
     print(f"lens {lens[0]} {lens[1]} {lens[2]}")
-    let two: Vec[str] = zs.iter() |> filter(it.len() == 2) |> map(it.clone()) |> collect[Vec]()
+    let two: List[str] = zs.iter() |> filter(it.len() == 2) |> map(it.clone()) |> collect[List]()
     print("filtered " ++ two[0])
     var kv: HashMap[str, str] = HashMap.new()
     kv.insert("a", "x")
     for (k, v) in kv: print(f"map {k}={v}")
-    var parts: Vec[str] = Vec.new()
+    var parts: List[str] = List.new()
     parts.push("p")
     parts.push("q")
     let sep: &str = "-"

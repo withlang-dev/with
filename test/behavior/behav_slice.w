@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 // Behavior test: slices — creation, indexing, len
-// Tests slices via array slicing and Vec usage.
+// Tests slices via array slicing and List usage.
 
 fn test_array_basics:
     let arr = [10, 20, 30, 40, 50]
@@ -22,8 +22,8 @@ fn test_array_in_loop:
         sum = sum + arr[i]
     assert(sum == 60)
 
-fn test_vec_as_dynamic_slice:
-    let v: Vec[i32] = Vec.new()
+fn test_list_as_dynamic_slice:
+    let v: List[i32] = List.new()
     v.push(100)
     v.push(200)
     v.push(300)
@@ -44,6 +44,6 @@ fn main:
     test_array_basics()
     test_array_len()
     test_array_in_loop()
-    test_vec_as_dynamic_slice()
+    test_list_as_dynamic_slice()
     test_empty_array()
     print("ok")

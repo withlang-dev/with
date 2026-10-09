@@ -33,7 +33,7 @@ fn task_wait_for_progress():
     if with_runtime_has_fibers() != 0:
         with_runtime_run_one_step()
 
-fn task_first_completed[T](pending: &Vec[Task[T]], finished: &Vec[i32]) -> i32:
+fn task_first_completed[T](pending: &List[Task[T]], finished: &List[i32]) -> i32:
     var winner = -1
     var winner_sequence: i64 = 0
     var i = 0
@@ -46,17 +46,17 @@ fn task_first_completed[T](pending: &Vec[Task[T]], finished: &Vec[i32]) -> i32:
         i = i + 1
     winner
 
-/// Await all tasks. Returns Vec[T] in input order.
+/// Await all tasks. Returns List[T] in input order.
 /// Fails fast on first Err.
-pub fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[Vec[T], E]:
-    let pending: Vec[Task[Result[T, E]]] = Vec.new()
+pub fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[List[T], E]:
+    let pending: List[Task[Result[T, E]]] = List.new()
     for task in tasks.into_iter():
         pending.push(task)
 
     let total = pending.len() as i32
-    let finished: Vec[i32] = Vec.new()
-    let order: Vec[i32] = Vec.new()
-    let values: Vec[Option[T]] = Vec.new()
+    let finished: List[i32] = List.new()
+    let order: List[i32] = List.new()
+    let values: List[Option[T]] = List.new()
     var i = 0
     while i < total:
         finished.push(0)
@@ -94,18 +94,18 @@ pub fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[Vec[T
         else:
             return Err(result.err().unwrap())
 
-    let ordered: Vec[T] = Vec.new()
+    let ordered: List[T] = List.new()
     while values.len() > 0:
         ordered.push(values.remove(0).unwrap())
     Ok(ordered)
 
-/// Await all tasks (infallible version). Returns Vec[T] in input order.
-pub fn await_all[T](tasks: impl IntoIter[Task[T]]) -> Vec[T]:
-    let pending: Vec[Task[T]] = Vec.new()
+/// Await all tasks (infallible version). Returns List[T] in input order.
+pub fn await_all[T](tasks: impl IntoIter[Task[T]]) -> List[T]:
+    let pending: List[Task[T]] = List.new()
     for task in tasks.into_iter():
         pending.push(task)
 
-    let values: Vec[T] = Vec.new()
+    let values: List[T] = List.new()
     var cleanup_i = 0
     defer:
         // Awaited tasks were removed, so everything live is un-awaited.
@@ -120,7 +120,7 @@ pub fn await_all[T](tasks: impl IntoIter[Task[T]]) -> Vec[T]:
 
 /// Return the result of the first task to complete.
 pub fn await_first[T](tasks: impl IntoIter[Task[T]]) -> T:
-    let pending: Vec[Task[T]] = Vec.new()
+    let pending: List[Task[T]] = List.new()
     for task in tasks.into_iter():
         pending.push(task)
 
@@ -128,7 +128,7 @@ pub fn await_first[T](tasks: impl IntoIter[Task[T]]) -> T:
         todo("await_first: empty input")
 
     let total = pending.len() as i32
-    let finished: Vec[i32] = Vec.new()
+    let finished: List[i32] = List.new()
     var i = 0
     while i < total:
         finished.push(0)
@@ -156,19 +156,19 @@ pub fn await_first[T](tasks: impl IntoIter[Task[T]]) -> T:
 
 /// Return the first successful result.
 /// Fails only if all tasks fail.
-pub fn await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, Vec[E]]:
-    let pending: Vec[Task[Result[T, E]]] = Vec.new()
+pub fn await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, List[E]]:
+    let pending: List[Task[Result[T, E]]] = List.new()
     for task in tasks.into_iter():
         pending.push(task)
 
     let total = pending.len() as i32
     if pending.is_empty():
-        let empty: Vec[E] = Vec.new()
+        let empty: List[E] = List.new()
         return Err(empty)
 
-    let finished: Vec[i32] = Vec.new()
-    let order: Vec[i32] = Vec.new()
-    let errors: Vec[Option[E]] = Vec.new()
+    let finished: List[i32] = List.new()
+    let order: List[i32] = List.new()
+    let errors: List[Option[E]] = List.new()
     var i = 0
     while i < total:
         finished.push(0)
@@ -203,18 +203,18 @@ pub fn await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, Ve
         with errors.slot(orig) as mut slot:
             slot.set(Some(result.err().unwrap()))
 
-    let ordered: Vec[E] = Vec.new()
+    let ordered: List[E] = List.new()
     while errors.len() > 0:
         ordered.push(errors.remove(0).unwrap())
     Err(ordered)
 
 /// Await all tasks and return all results (including errors).
-pub fn await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Vec[Result[T, E]]:
-    let pending: Vec[Task[Result[T, E]]] = Vec.new()
+pub fn await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> List[Result[T, E]]:
+    let pending: List[Task[Result[T, E]]] = List.new()
     for task in tasks.into_iter():
         pending.push(task)
 
-    let settled: Vec[Result[T, E]] = Vec.new()
+    let settled: List[Result[T, E]] = List.new()
     var cleanup_i = 0
     defer:
         // Awaited tasks were removed, so everything live is un-awaited.

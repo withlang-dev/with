@@ -2,7 +2,7 @@
 // D51 stage 9 (ruling §45; spec §16.2b.9) under the debug allocator: a
 // retained callback's userdata is owned by the resource — boxed, handed to
 // C as the pointer — and released after the resource is destroyed, once,
-// on every path (scope end, early return, several registrations, a Vec of
+// on every path (scope end, early return, several registrations, a List of
 // databases). Released twice is a DOUBLE FREE; never, a LEAK.
 use c_import("../behavior/c_facade_callbacks.h")
 
@@ -43,7 +43,7 @@ fn main:
     assert(log_len(l) == 3 and log_at(l, 2) == 1021)
     log_reset(l)
     if true:
-        var all: Vec[Database] = Vec.new()
+        var all: List[Database] = List.new()
         for i in 1..4:
             var d = Database.new(l, 30 + i).unwrap()
             assert(d.register(on, Ctx { log: l, id: 30 + i, text: "vec" }) == 1)

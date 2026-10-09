@@ -1,39 +1,39 @@
 //! expect-stdout: ok
 
-comptime fn build_i64_vec() -> Vec[i64]:
-    var v = Vec[i64].new()
+comptime fn build_i64_list() -> List[i64]:
+    var v = List[i64].new()
     v.push(1000000000000)
     v.push(-9223372036854775807)
     v.push(9223372036854775807)
     v
 
 comptime fn i64_len() -> i64:
-    var v = Vec[i64].new()
+    var v = List[i64].new()
     v.push(100)
     v.push(200)
     v.push(300)
     v.len()
 
 comptime fn i64_contains_hit() -> bool:
-    var v = Vec[i64].new()
+    var v = List[i64].new()
     v.push(1000000000000)
     v.push(2000000000000)
     v.contains(2000000000000)
 
 comptime fn i64_contains_miss() -> bool:
-    var v = Vec[i64].new()
+    var v = List[i64].new()
     v.push(1000000000000)
     v.contains(999)
 
 comptime fn i64_pop_val() -> i64:
-    var v = Vec[i64].new()
+    var v = List[i64].new()
     v.push(100)
     v.push(200)
     v.push(300)
     v.pop().unwrap()
 
 comptime fn i64_pop_len() -> i64:
-    var v = Vec[i64].new()
+    var v = List[i64].new()
     v.push(100)
     v.push(200)
     v.push(300)
@@ -41,20 +41,20 @@ comptime fn i64_pop_len() -> i64:
     v.len()
 
 comptime fn i64_remove_val() -> i64:
-    var v = Vec[i64].new()
+    var v = List[i64].new()
     v.push(111)
     v.push(222)
     v.push(333)
     v.remove(1)
 
 comptime fn i64_clear_len() -> i64:
-    var v = Vec[i64].new()
+    var v = List[i64].new()
     v.push(1)
     v.push(2)
     v.clear()
     v.len()
 
-const I64S: Vec[i64] = comptime build_i64_vec()
+const I64S: List[i64] = comptime build_i64_list()
 const I64_LEN: i64 = comptime i64_len()
 const I64_HIT: bool = comptime i64_contains_hit()
 const I64_MISS: bool = comptime i64_contains_miss()

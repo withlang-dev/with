@@ -23,12 +23,12 @@ fn run_once(i: i32) -> i32:
 
 fn main:
     let dir = p7_prepare_case("run_concurrent_same_program", "runconcurrent")
-    p7_write(dir, "prog.w", "fn main:\n    let v: Vec[i32] = Vec.new()\n    v.push(7)\n    print(f\"ran {v[0]}\")\n")
+    p7_write(dir, "prog.w", "fn main:\n    let v: List[i32] = List.new()\n    v.push(7)\n    print(f\"ran {v[0]}\")\n")
     let previous_out = env("WITH_OUT_DIR")
     assert(set_env("WITH_OUT_DIR", p7_join(dir, "out")) == 0)
     // One closure site per run: a closure made in a loop captures the loop's
     // Copy local by place, so every thread saw the last index (#1471).
-    var handles: Vec[JoinHandle] = Vec.new()
+    var handles: List[JoinHandle] = List.new()
     handles.push(spawn_os(() => run_once(0)))
     handles.push(spawn_os(() => run_once(1)))
     handles.push(spawn_os(() => run_once(2)))

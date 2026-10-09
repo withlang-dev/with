@@ -4,7 +4,7 @@
 // before its body has met `&G[0]`; the fixpoint completes the set ({G}), so
 // `r` views G and `G.push(n)` under it is refused. No `from` is needed.
 
-var G: Vec[i32] = Vec.new()
+var G: List[i32] = List.new()
 
 fn deep(n: i32) -> &i32:
     if n > 0:

@@ -25,8 +25,8 @@ pub fn kind_name_b(k: Kind) -> str:
         .Lo => "b-lo"
         .Hi => "b-hi"
 pub fn show_b(i: &Item) -> Unit: print(f"b {i.s} {i.k} {i.sum_b()}")
-pub fn items_b() -> Vec[Item]:
-    var v: Vec[Item] = Vec.new()
+pub fn items_b() -> List[Item]:
+    var v: List[Item] = List.new()
     v.push(Item { s: "p", k: 1 })
     v.push(Item { s: "qq", k: 2 })
     v

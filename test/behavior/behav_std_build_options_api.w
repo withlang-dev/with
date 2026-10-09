@@ -13,9 +13,9 @@ fn main:
         overflow_mode: OverflowMode.Default,
         deterministic: false,
         target: BuildTarget.native,
-        include_paths: Vec.new(),
-        defines: Vec.new(),
-        link_libs: Vec.new(),
+        include_paths: List.new(),
+        defines: List.new(),
+        link_libs: List.new(),
         compiler_hooks_enabled: true,
     }
     assert(options.output_kind == BuildOutputKind.Binary)
@@ -34,10 +34,10 @@ fn main:
     let migrate = MigrateOptions {
         source_path: "input.c",
         output_path: "out",
-        include_paths: Vec.new(),
-        forced_includes: Vec.new(),
-        defines: Vec.new(),
-        exclude_basenames: Vec.new(),
+        include_paths: List.new(),
+        forced_includes: List.new(),
+        defines: List.new(),
+        exclude_basenames: List.new(),
         check_mode: false,
         diff_mode: false,
         stats_mode: false,

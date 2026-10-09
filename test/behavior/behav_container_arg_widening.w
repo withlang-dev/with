@@ -18,8 +18,8 @@
 // §4.2.6: an unsigned value widens into a wider element, key or value type
 // by zero extension on every container argument, as it does at a `let` or
 // a call. The container intrinsics took the LLVM value and sign-extended
-// (`v.push(u8 200)` into a Vec[i16] read -56, a u32 key 4000000000 missed
-// its i64 entry), and VecSlot/VecRange/Entry/Sender stored the narrow value
+// (`v.push(u8 200)` into a List[i16] read -56, a u32 key 4000000000 missed
+// its i64 entry), and ListSlot/ListRange/Entry/Sender stored the narrow value
 // at its own width, writing one byte of a two-byte element.
 use std.collections.SlotMap
 use std.collections.HashMap
@@ -42,17 +42,17 @@ async fn consume(rx: Receiver[i64]):
 async fn main:
     let s: u8 = 200
     let u: u32 = 4000000000
-    var v: Vec[i16] = Vec.new()
+    var v: List[i16] = List.new()
     v.push(s)
     print(f"push {v[0]}")
-    let lit: Vec[i16] = [s, s]
+    let lit: List[i16] = [s, s]
     print(f"veclit {lit[0]} {lit[1]}")
-    var v64: Vec[i64] = Vec.new()
+    var v64: List[i64] = List.new()
     v64.push(u)
     print(f"push64 {v64[0]}")
     print(f"contains {v64.contains(u)}")
 
-    let w: Vec[i16] = Vec.new()
+    let w: List[i16] = List.new()
     w.push(-1)
     w.push(-1)
     with w.slot(0) as mut slot:

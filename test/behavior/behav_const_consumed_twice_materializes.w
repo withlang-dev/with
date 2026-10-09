@@ -8,7 +8,7 @@
 const NAME: str = "a.units"
 fn owned(s: &str): s ++ ""
 fn take(s: str) -> i64: s.len()
-type T { inputs: Vec[str], extra: Vec[str] }
+type T { inputs: List[str], extra: List[str] }
 impl T:
     move fn input(path: str) -> T:
         var t = self
@@ -21,7 +21,7 @@ impl T:
 fn main:
     let a = take(NAME)
     let b = take(NAME)
-    var t = T { inputs: Vec.new(), extra: Vec.new() }
+    var t = T { inputs: List.new(), extra: List.new() }
     t = t.input(owned(NAME)).input(owned(NAME))
     t = t.extra_output(NAME)
     print(f"{a} {b} {t.inputs.len()} {t.extra.len()}")

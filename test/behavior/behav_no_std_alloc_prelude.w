@@ -9,5 +9,5 @@ fn on_panic -> Never: unreachable()
 
 @[entry]
 fn start -> i32:
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     v.len() as i32

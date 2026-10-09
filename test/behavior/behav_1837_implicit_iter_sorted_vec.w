@@ -3,12 +3,12 @@
 
 // §13.5 (#1837): "When it does not implement `Iter[T]` but has an `.iter()`
 // method that returns an `Iter[T]`, the compiler inserts `.iter()`
-// automatically." SortedVec is a std collection with no `next()` and an
+// automatically." SortedList is a std collection with no `next()` and an
 // `iter()` returning SortedVecIter[T]; the bare spelling is the spelled one.
-use std.collections.sorted_vec
+use std.collections.sorted_list
 
 fn main:
-    var s: SortedVec[i32] = SortedVec.new()
+    var s: SortedList[i32] = SortedList.new()
     s.insert(7)
     s.insert(1)
     s.insert(3)

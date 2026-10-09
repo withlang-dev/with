@@ -45,12 +45,12 @@ let out_dir = argv[2].clone()
 let source_dir = if argv.len() > 3: argv[3].clone() else: "test/compile_errors"
 let allowlist = if argv.len() > 4: argv[4].clone() else: "test/sema_order_allowlist.txt"
 assert(mkdir_p(out_dir) == 0)
-var allow: Vec[str] = Vec.new()
+var allow: List[str] = List.new()
 for raw in read(allowlist).split("\n"):
     let line = raw.trim()
     if line.len() > 0 and not line.starts_with("#"):
         allow.push(line.clone())
-var sources: Vec[str] = Vec.new()
+var sources: List[str] = List.new()
 for f in list_files_text(source_dir).split("\n"):
     if f.ends_with(".w"):
         sources.push(if f.starts_with(source_dir ++ "/") or f.starts_with("/"): f.clone() else: source_dir ++ "/" ++ base_name(f))
@@ -58,8 +58,8 @@ if sources.len() == 0:
     print("sema-order-check: no fixtures found in " ++ source_dir)
     exit_code(2)
 // Sixteen checks in flight.
-var pids: Vec[i32] = Vec.new()
-var codes: Vec[i32] = Vec.new()
+var pids: List[i32] = List.new()
+var codes: List[i32] = List.new()
 var next_wait = 0
 for source in sources:
     let b = base_name(source)

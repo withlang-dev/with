@@ -4,7 +4,7 @@
 // round (§13.5), and `next` writes G while an element view of G is live.
 // A call writes every global its callee writes.
 
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 type Count { n: i32 }
 

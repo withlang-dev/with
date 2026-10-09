@@ -7,7 +7,7 @@
 
 use std.generators.{take, collect}
 
-gen fn words(all: Vec[str]) -> str:
+gen fn words(all: List[str]) -> str:
     for s in all:
         yield s
 

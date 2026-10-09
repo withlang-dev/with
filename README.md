@@ -133,9 +133,9 @@ The signature says whether a function borrows or takes ownership. The call
 site says nothing:
 
 ```
-fn total(xs: &Vec[i32]): xs.iter() |> sum()                      // &T borrows
+fn total(xs: &List[i32]): xs.iter() |> sum()                      // &T borrows
 
-fn archive(xs: Vec[i32]): print(f"archived {xs.len()} values")   // T takes ownership
+fn archive(xs: List[i32]): print(f"archived {xs.len()} values")   // T takes ownership
 
 fn main:
     let xs = [1, 2, 3]
@@ -158,7 +158,7 @@ The compiler tracks where each view comes from:
 fn longest(a: &str, b: &str) -> &str:
     if a.len() >= b.len(): a else: b
 
-fn first(xs: &Vec[i32]) -> &i32: xs[0]
+fn first(xs: &List[i32]) -> &i32: xs[0]
 ```
 
 and it refuses a view that would outlive what it points into:
@@ -257,14 +257,14 @@ impl Area for Shape:
             .Rect(w, h) => w * h
             .Unit => 0.0
 
-fn largest[T: Area](items: &Vec[T]):
+fn largest[T: Area](items: &List[T]):
     let biggest = items.iter() |> map(it.area()) |> max()
     biggest ?? 0.0                       // an empty list has no largest
 
 fn main:
     let shapes = [.Circle(1.0), .Rect(2.0, 3.0), .Unit]
     print(largest(shapes))                                                   // 6
-    let big = shapes.iter() |> filter(it.area() > 1.0) |> map(it.area()) |> collect[Vec]()
+    let big = shapes.iter() |> filter(it.area() > 1.0) |> map(it.area()) |> collect[List]()
     let squares = [x * x for x in 1..6 if x % 2 == 1]                        // 1, 9, 25
 ```
 

@@ -143,7 +143,7 @@ extend UserService:
 // --- Helper: describe changes between two users ---
 
 pub fn describe_changes(old: &User, new_user: &User) -> str:
-    let changes = with Vec.new() as mut changes:
+    let changes = with List.new() as mut changes:
         if old.name != new_user.name:
             changes.push("name changed")
         if old.email != new_user.email:

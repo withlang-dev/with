@@ -19,8 +19,8 @@ fn plus_one(x: i32) -> i32:
 fn add_i32(x: i32, y: i32) -> i32:
     x + y
 
-fn test_vec_methods_in_pipeline:
-    var v: Vec[str] = Vec.new()
+fn test_list_methods_in_pipeline:
+    var v: List[str] = List.new()
     v |> push("a")
     v |> push("b")
     assert((v |> len()) == 2)
@@ -44,7 +44,7 @@ fn test_method_wins_over_free_function:
     assert((box |> choose()) == 1)
 
 fn main:
-    test_vec_methods_in_pipeline()
+    test_list_methods_in_pipeline()
     test_string_methods_in_pipeline()
     test_user_methods_in_pipeline()
     test_free_function_pipeline_still_works()

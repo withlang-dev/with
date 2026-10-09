@@ -6,16 +6,16 @@
 // writes HIDDEN, may not run while `r` is live (§21.1 rule 1). It compiled,
 // and the read after `grow` saw the buffer `grow` freed.
 
-var HIDDEN: Vec[i32] = Vec.new()
+var HIDDEN: List[i32] = List.new()
 
 fn grow():
     for i in 0..1000: HIDDEN.push(i)
 
-fn first(p: &Vec[i32]) -> &i32: &HIDDEN[0]
+fn first(p: &List[i32]) -> &i32: &HIDDEN[0]
 
 fn main:
     HIDDEN.push(41)
-    let x: Vec[i32] = Vec.new()
+    let x: List[i32] = List.new()
     let r = first(&x)
     grow()
     print(*r)

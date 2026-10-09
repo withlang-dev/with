@@ -436,12 +436,12 @@ type LspDocument {
     cached_pool: AstPool,
     cached_intern: InternPool,
     cached_diags: DiagnosticList,
-    cached_decl_paths: Vec[str],
+    cached_decl_paths: List[str],
     // Sema data (built during ensure_analyzed while Compilation is alive)
     // Maps byte offset of expression → resolved type name
     cached_type_at: HashMap[i32, str],
     // Maps type name → list of trait method names
-    cached_trait_methods: HashMap[str, Vec[str]],
+    cached_trait_methods: HashMap[str, List[str]],
     cached_text_len: i32,
     cache_valid: bool,
 }
@@ -456,7 +456,7 @@ fn LspDocument.new(uri: &str, path: &str, text: &str, version: i32) -> LspDocume
         cached_pool: AstPool.new(),
         cached_intern: InternPool.init(),
         cached_diags: DiagnosticList.init(),
-        cached_decl_paths: Vec.new(),
+        cached_decl_paths: List.new(),
         cached_type_at: HashMap.new(),
         cached_trait_methods: HashMap.new(),
         cached_text_len: 0,
@@ -512,7 +512,7 @@ impl LspDocument:
                 continue
             let start = sema.impl_starts[ii]
             let count = sema.impl_counts[ii]
-            var methods: Vec[str] = Vec.new()
+            var methods: List[str] = List.new()
             let existing = self.cached_trait_methods.get(type_name)
             if existing.is_some():
                 let prior = existing.unwrap()
@@ -553,17 +553,17 @@ impl LspDocument:
         ""
 
     // Get trait methods for a type via cached sema data.
-    fn trait_methods_for_type(type_name: &str) -> Vec[str]:
+    fn trait_methods_for_type(type_name: &str) -> List[str]:
         if not self.cache_valid:
-            return Vec.new()
+            return List.new()
         let opt = self.cached_trait_methods.get(type_name)
         if opt.is_some():
             let prior = opt.unwrap()
-            let methods: Vec[str] = Vec.new()
+            let methods: List[str] = List.new()
             for method_i in 0..prior.len() as i32:
                 methods.push("" ++ prior[method_i])
             return methods
-        Vec.new()
+        List.new()
 
     mut fn invalidate():
         self.cache_valid = false
@@ -571,11 +571,11 @@ impl LspDocument:
 
 type LspState {
     initialized: bool,
-    documents: Vec[LspDocument],
+    documents: List[LspDocument],
 }
 
 fn LspState.new() -> LspState:
-    LspState { initialized: false, documents: Vec.new() }
+    LspState { initialized: false, documents: List.new() }
 
 impl LspState:
     fn find_doc(uri: &str) -> i32:
@@ -682,7 +682,7 @@ impl LspState:
             self.ensure_doc_analyzed(idx)
 
         // Read diagnostics through a view. Copying cached_diags (or comp.zcu's
-        // list) into an owned local bit-copied the Vec header, and the local's
+        // list) into an owned local bit-copied the List header, and the local's
         // drop freed the document's buffers while the document kept its pointer
         // (the lsp-use-std shutdown crash). comp stays at function scope so the
         // fresh branch's view outlives its use.
@@ -739,7 +739,7 @@ impl LspState:
             self.ensure_doc_analyzed(idx)
         let empty_pool = AstPool.new()
         let empty_intern = InternPool.init()
-        let empty_paths: Vec[str] = Vec.new()
+        let empty_paths: List[str] = List.new()
         let slow_valid = idx >= 0 and (&self.documents[idx]).cache_valid
         let slow_pool = if slow_valid: &self.documents[idx].cached_pool else: &empty_pool
         let slow_intern = if slow_valid: &self.documents[idx].cached_intern else: &empty_intern
@@ -796,7 +796,7 @@ fn lsp_extract_doc_comment(text: &str, decl_start: i32) -> str:
     while pos >= 0 and (text[pos] == 32 or text[pos] == 9 or text[pos] == 13 or text[pos] == 10):
         pos = pos - 1
     // Collect doc comment lines (walking backward)
-    var doc_lines: Vec[str] = Vec.new()
+    var doc_lines: List[str] = List.new()
     while pos >= 0:
         // Find start of this line
         var line_start = pos
@@ -914,7 +914,7 @@ impl LspState:
             if cidx >= 0 and (&self.documents[cidx]).cache_valid:
                 type_name = (&self.documents[cidx]).type_at_offset(recv_start)
 
-        // Build items JSON inline (Vec is pass-by-value, can't use helpers)
+        // Build items JSON inline (List is pass-by-value, can't use helpers)
         var items = jarr_start()
         var first = true
 
@@ -931,13 +931,13 @@ impl LspState:
                     items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
                     sm_start = smi + 1
 
-        else if type_name == "Vec":
-            let vec_methods = "push,pop,get,len,is_empty,contains,clear"
+        else if type_name == "List":
+            let list_methods = "push,pop,get,len,is_empty,contains,clear"
             var vm_start = 0
-            for vmi in 0..vec_methods.len() as i32:
-                if vec_methods[vmi] == 44 or vmi == vec_methods.len() as i32 - 1:
-                    let vm_end = if vec_methods[vmi] == 44: vmi else: vmi + 1
-                    let m = vec_methods.slice(vm_start as i64, vm_end as i64)
+            for vmi in 0..list_methods.len() as i32:
+                if list_methods[vmi] == 44 or vmi == list_methods.len() as i32 - 1:
+                    let vm_end = if list_methods[vmi] == 44: vmi else: vmi + 1
+                    let m = list_methods.slice(vm_start as i64, vm_end as i64)
                     if not first: items = items ++ ","
                     first = false
                     items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
@@ -1086,7 +1086,7 @@ fn lsp_resolve_receiver_type(pool: AstPool, intern: InternPool, receiver: &str, 
                         let callee = pool.get_data0(value as NodeId)
                         if callee != 0:
                             let ck = pool.kind(callee as NodeId)
-                            // Vec.new(), HashMap.new() — Type.method() pattern
+                            // List.new(), HashMap.new() — Type.method() pattern
                             if ck == NodeKind.NK_FIELD_ACCESS:
                                 let base = pool.get_data0(callee as NodeId)
                                 if base != 0 and pool.kind(base as NodeId) == NodeKind.NK_IDENT:
@@ -1200,7 +1200,7 @@ impl LspState:
         let parse_pool = parsed.pool
         let parse_intern = parsed.intern
         let enclosing_fn = lsp_find_enclosing_fn(parse_pool, offset)
-        var scope_names: Vec[str] = Vec.new()
+        var scope_names: List[str] = List.new()
         if enclosing_fn as i32 != 0:
             let params = lsp_collect_fn_params(parse_pool, parse_intern, enclosing_fn)
             for pi in 0..params.len() as i32:
@@ -1253,7 +1253,7 @@ impl LspState:
 
         // Prelude builtins (always available without explicit import)
         let prelude_fns = "print,eprint,write,ewrite,print_i32,print_i64,print_bool,assert,require,check,int_to_string"
-        let prelude_types = "Vec,HashMap,HashSet,Option,Result,Some,None,Ok,Err"
+        let prelude_types = "List,HashMap,HashSet,Option,Result,Some,None,Ok,Err"
         items = lsp_append_csv_items(items, prelude_fns, 3, first)
         if prelude_fns.len() > 0:
             first = false
@@ -1321,8 +1321,8 @@ fn lsp_find_enclosing_fn(pool: AstPool, offset: i32) -> NodeId:
             best = decl
     best
 
-fn lsp_collect_fn_params(pool: AstPool, intern: InternPool, fn_node: NodeId) -> Vec[str]:
-    let names: Vec[str] = Vec.new()
+fn lsp_collect_fn_params(pool: AstPool, intern: InternPool, fn_node: NodeId) -> List[str]:
+    let names: List[str] = List.new()
     let meta = pool.find_fn_meta(fn_node)
     if meta < 0:
         return names
@@ -1336,8 +1336,8 @@ fn lsp_collect_fn_params(pool: AstPool, intern: InternPool, fn_node: NodeId) -> 
                 names.push(with_str_clone_ref(pname))
     names
 
-fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset: i32) -> Vec[str]:
-    let empty: Vec[str] = Vec.new()
+fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset: i32) -> List[str]:
+    let empty: List[str] = List.new()
     if node == 0:
         return empty
     let nid = node as NodeId
@@ -1351,7 +1351,7 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
             if sym != 0:
                 let name = intern.resolve(sym)
                 if name.len() > 0:
-                    let result: Vec[str] = Vec.new()
+                    let result: List[str] = List.new()
                     result.push(with_str_clone_ref(name))
                     return result
         return empty
@@ -1363,7 +1363,7 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
         return empty
 
     if kind == NodeKind.NK_FOR:
-        var result: Vec[str] = Vec.new()
+        var result: List[str] = List.new()
         if node_start < offset and offset <= node_end and not pool.for_binding_is_pattern(nid):
             let sym = pool.get_data0(nid)
             if sym != 0:
@@ -1381,7 +1381,7 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
         let extra_start = pool.get_data0(nid)
         let stmt_count = pool.get_data1(nid)
         let tail = pool.get_data2(nid)
-        var result: Vec[str] = Vec.new()
+        var result: List[str] = List.new()
         for i in 0..stmt_count:
             let stmt = pool.get_extra(extra_start + i)
             let inner = lsp_collect_bindings_rec(pool, intern, stmt, offset)
@@ -1396,7 +1396,7 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
     if kind == NodeKind.NK_IF_EXPR:
         let then_body = pool.get_data1(nid)
         let else_body = pool.get_data2(nid)
-        var result: Vec[str] = Vec.new()
+        var result: List[str] = List.new()
         if then_body != 0 and offset >= pool.get_start(then_body as NodeId) and offset <= pool.get_end(then_body as NodeId):
             let inner = lsp_collect_bindings_rec(pool, intern, then_body, offset)
             for ii in 0..inner.len() as i32:
@@ -1438,12 +1438,12 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
 
     empty
 
-fn lsp_list_embedded_modules(prefix: &str) -> Vec[str]:
+fn lsp_list_embedded_modules(prefix: &str) -> List[str]:
     // Query the embedded stdlib listing and filter by prefix.
     // Returns module names without prefix or .w extension.
     // e.g. prefix="std/" returns ["collections", "fmt", "fs", ...]
     let listing = embedded_std_list_modules()
-    let result: Vec[str] = Vec.new()
+    let result: List[str] = List.new()
     if listing.len() == 0:
         return result
     // Split by newline and filter
@@ -1464,8 +1464,8 @@ fn lsp_list_embedded_modules(prefix: &str) -> Vec[str]:
         i = i + 1
     result
 
-fn lsp_keywords() -> Vec[str]:
-    let k: Vec[str] = Vec.new()
+fn lsp_keywords() -> List[str]:
+    let k: List[str] = List.new()
     k.push("fn")
     k.push("let")
     k.push("var")
@@ -1546,7 +1546,7 @@ impl LspState:
         // Look up the function declaration in the parsed AST (cached)
         let parsed = self.get_parsed(uri, text)
         var sig_label = ""
-        let param_labels: Vec[str] = Vec.new()
+        let param_labels: List[str] = List.new()
 
         for di in 0..parsed.pool.decl_count():
             let decl = parsed.pool.get_decl(di)
@@ -1676,7 +1676,7 @@ impl LspState:
         let idx = self.find_doc(uri)
         if idx >= 0:
             self.ensure_doc_analyzed(idx)
-        let empty_paths: Vec[str] = Vec.new()
+        let empty_paths: List[str] = List.new()
         let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
         let cached_paths = if use_cache: &self.documents[idx].cached_decl_paths else: &empty_paths
         if cached_paths.len() > 0:
@@ -1832,7 +1832,7 @@ impl LspState:
         let cidx = self.find_doc(uri)
         if cidx >= 0:
             self.ensure_doc_analyzed(cidx)
-        let empty_paths: Vec[str] = Vec.new()
+        let empty_paths: List[str] = List.new()
         let use_cache = cidx >= 0 and (&self.documents[cidx]).cache_valid
         let cached_paths = if use_cache: &self.documents[cidx].cached_decl_paths else: &empty_paths
         if cached_paths.len() > 0:

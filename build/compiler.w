@@ -459,7 +459,7 @@ pub fn comp_host_sdk_path(ctx: &ActionCtx):
 // can read; the build keeps no second list of architectures.
 fn comp_sdk_link_probe(ctx: &ActionCtx, llvm_ld: &str, sdk_path: &str, label: &str) -> ToolProcessResult:
     let capture_dir = comp_join("out/command", ctx.target_name())
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push(compiler_owned_text(llvm_ld))
     argv.push("-arch")
     argv.push("arm64")
@@ -585,7 +585,7 @@ pub fn run_sdk_host_link_check_action(ctx: ActionCtx) -> i32:
         return comp_fail(ctx, "could not write: " ++ output_path)
     0
 
-fn comp_arg_value(args: &Vec[str], prefix: &str) -> str:
+fn comp_arg_value(args: &List[str], prefix: &str) -> str:
     for i in 0..args.len() as i32:
         let arg = args[i]
         if arg.starts_with(prefix):
@@ -697,7 +697,7 @@ pub fn compiler_file_prefix_map(root: &str) -> str: root ++ "=/with-src"
 // relative response-file path against its working directory.
 pub fn comp_root_relative_text(root: &str, text: &str) -> str: comp_replace_all(text, root ++ "/", "")
 
-fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32:
+fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: List[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32:
     let root = ctx.project_info().project_root()
     var process_env = process_env()
     process_env = process_env.set("WITH_OUT_DIR", comp_abs(root, "out"))
@@ -804,10 +804,10 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
     let _stderr = fs.write_text(stderr_path, result.stderr ++ "\n")
     0
 
-fn comp_compile_args(ctx: &ActionCtx, command: &str, compiler_path: &str, source_path: &str) -> Vec[str]:
+fn comp_compile_args(ctx: &ActionCtx, command: &str, compiler_path: &str, source_path: &str) -> List[str]:
     let root = ctx.project_info().project_root()
     let args = ctx.args()
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(comp_path_for_process(root, compiler_path))
     argv |> push(compiler_owned_text(command))
     argv |> push(comp_abs(root, source_path))
@@ -827,7 +827,7 @@ fn comp_remove_tree_if_exists(fs: &ToolFs, path: &str) -> i32:
         return 0
     fs.remove_tree(path)
 
-fn comp_run_first_line(ctx: &ActionCtx, capture_dir: &str, label: &str, argv: Vec[str], timeout_ms: i32) -> str:
+fn comp_run_first_line(ctx: &ActionCtx, capture_dir: &str, label: &str, argv: List[str], timeout_ms: i32) -> str:
     let root = ctx.project_info().project_root()
     let stdout_path = comp_join(capture_dir, label ++ ".stdout")
     let stderr_path = comp_join(capture_dir, label ++ ".stderr")
@@ -847,7 +847,7 @@ fn comp_parse_nonnegative_i32(text: &str) -> i32:
         value = value * 10 + (ch - 48)
     value
 
-fn comp_stack_binary_format(bytes: Vec[u8]) -> str:
+fn comp_stack_binary_format(bytes: List[u8]) -> str:
     if bytes.len() >= 2:
         if bytes[0] == 77 as u8 and bytes[1] == 90 as u8:
             return "pe"
@@ -868,7 +868,7 @@ fn comp_stack_binary_format(bytes: Vec[u8]) -> str:
             return "macho"
     "unknown"
 
-fn comp_stack_collect_after_marker(text: &str, marker: &str, sizes: Vec[i32]) -> Vec[i32]:
+fn comp_stack_collect_after_marker(text: &str, marker: &str, sizes: List[i32]) -> List[i32]:
     var out = sizes
     var start = 0
     while start < text.len() as i32:
@@ -905,7 +905,7 @@ fn comp_stack_collect_after_marker(text: &str, marker: &str, sizes: Vec[i32]) ->
         start = pos + 1
     out
 
-fn comp_stack_summarize(path: &str, format: &str, sizes: Vec[i32]) -> StackBudgetReport:
+fn comp_stack_summarize(path: &str, format: &str, sizes: List[i32]) -> StackBudgetReport:
     var max_frame = 0
     var ge_16k = 0
     var ge_64k = 0
@@ -995,12 +995,12 @@ fn comp_check_c_export_path(ctx: &ActionCtx, path: &str) -> i32:
         ctx.diagnostics().warn(path ++ f": @[c_export] count is now {count}; tighten compiler c_export budget from {budget}")
     0
 
-fn comp_compiler_c_export_audit_files(fs: &ToolFs) -> Vec[str]:
-    let roots: Vec[str] = Vec.new()
+fn comp_compiler_c_export_audit_files(fs: &ToolFs) -> List[str]:
+    let roots: List[str] = List.new()
     roots.push("src")
     roots.push("rt")
     roots.push("lib/std")
-    let files: Vec[str] = Vec.new()
+    let files: List[str] = List.new()
     for ri in 0..roots.len() as i32:
         let listing = fs.list_files(roots[ri])
         for fi in 0..listing.len() as i32:
@@ -1020,8 +1020,8 @@ fn comp_write_ok_output(ctx: &ActionCtx) -> i32:
         return comp_fail(ctx, "could not write: " ++ output)
     0
 
-fn comp_split_lines(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn comp_split_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     var start: i64 = 0
     var i: i64 = 0
     while i <= text.len():
@@ -1035,13 +1035,13 @@ fn comp_split_lines(text: &str) -> Vec[str]:
         i = i + 1
     lines
 
-fn comp_vec_contains(items: &Vec[str], item: &str) -> bool:
+fn comp_list_contains(items: &List[str], item: &str) -> bool:
     for i in 0..items.len() as i32:
         if items[i] == item:
             return true
     false
 
-fn comp_add_words(items: Vec[str], text: &str) -> Vec[str]:
+fn comp_add_words(items: List[str], text: &str) -> List[str]:
     var out = items
     var start = -1
     for i in 0..text.len() as i32:
@@ -1050,14 +1050,14 @@ fn comp_add_words(items: Vec[str], text: &str) -> Vec[str]:
         if ws:
             if start >= 0:
                 let word = text.slice(start as i64, i as i64)
-                if word.len() > 0 and not comp_vec_contains(out, word):
+                if word.len() > 0 and not comp_list_contains(out, word):
                     out.push(word)
                 start = -1
         else if start < 0:
             start = i
     if start >= 0:
         let word = text.slice(start as i64, text.len())
-        if word.len() > 0 and not comp_vec_contains(out, word):
+        if word.len() > 0 and not comp_list_contains(out, word):
             out.push(word)
     out
 
@@ -1105,8 +1105,8 @@ fn comp_first_fenced_block(text: &str) -> str:
         return ""
     text.slice(body_start as i64, end as i64)
 
-fn comp_collect_quoted_after(text: &str, prefix: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn comp_collect_quoted_after(text: &str, prefix: &str) -> List[str]:
+    var out: List[str] = List.new()
     var start = 0
     while start < text.len() as i32:
         let at = comp_find_from(text, prefix, start)
@@ -1117,12 +1117,12 @@ fn comp_collect_quoted_after(text: &str, prefix: &str) -> Vec[str]:
         if value_end < 0:
             break
         let item = text.slice(value_start as i64, value_end as i64)
-        if item.len() > 0 and not comp_vec_contains(out, item):
+        if item.len() > 0 and not comp_list_contains(out, item):
             out.push(item)
         start = value_end + 1
     out
 
-fn comp_collect_attr_names(items: Vec[str], text: &str) -> Vec[str]:
+fn comp_collect_attr_names(items: List[str], text: &str) -> List[str]:
     var out = items
     var start = 0
     while start < text.len() as i32:
@@ -1135,22 +1135,22 @@ fn comp_collect_attr_names(items: Vec[str], text: &str) -> Vec[str]:
             while name_end < text.len() as i32 and comp_is_ident_continue(text[name_end]):
                 name_end = name_end + 1
             let item = text.slice(name_start as i64, name_end as i64)
-            if item.len() > 0 and not comp_vec_contains(out, item):
+            if item.len() > 0 and not comp_list_contains(out, item):
                 out.push(item)
             start = name_end
         else:
             start = at + 2
     out
 
-fn comp_spec_keywords(spec: &str) -> Vec[str]:
-    comp_add_words(Vec.new(), comp_first_fenced_block(comp_spec_subsection(spec, "### 29.11 Reserved Keywords")))
+fn comp_spec_keywords(spec: &str) -> List[str]:
+    comp_add_words(List.new(), comp_first_fenced_block(comp_spec_subsection(spec, "### 29.11 Reserved Keywords")))
 
-fn comp_impl_keywords(fs: &ToolFs) -> Vec[str]:
+fn comp_impl_keywords(fs: &ToolFs) -> List[str]:
     comp_collect_quoted_after(fs.read_text("src/Token.w"), "if s == \"")
 
-fn comp_spec_public_attributes(spec: &str) -> Vec[str]:
+fn comp_spec_public_attributes(spec: &str) -> List[str]:
     let lines = comp_split_lines(comp_spec_subsection(spec, "### 29.14 Attribute Index"))
-    var attrs: Vec[str] = Vec.new()
+    var attrs: List[str] = List.new()
     for i in 0..lines.len() as i32:
         let line = lines[i]
         if line.starts_with("| `@["):
@@ -1163,9 +1163,9 @@ fn comp_spec_public_attributes(spec: &str) -> Vec[str]:
                 attrs = comp_collect_attr_names(move attrs, line.slice(1, end as i64))
     attrs
 
-fn comp_spec_internal_attributes(spec: &str) -> Vec[str]:
+fn comp_spec_internal_attributes(spec: &str) -> List[str]:
     let lines = comp_split_lines(comp_spec_subsection(spec, "### 29.14 Attribute Index"))
-    var attrs: Vec[str] = Vec.new()
+    var attrs: List[str] = List.new()
     for i in 0..lines.len() as i32:
         let line = lines[i]
         if line.starts_with("**Implementation-internal"):
@@ -1175,7 +1175,7 @@ fn comp_spec_internal_attributes(spec: &str) -> Vec[str]:
                 j = j + 1
     attrs
 
-fn comp_impl_attributes(fs: &ToolFs) -> Vec[str]:
+fn comp_impl_attributes(fs: &ToolFs) -> List[str]:
     var text = fs.read_text("src/Parser.w")
     // D7 moved these into `impl Parser` — the old `fn Parser.*` anchors
     // stopped matching and the scan silently widened to the whole file,
@@ -1186,7 +1186,7 @@ fn comp_impl_attributes(fs: &ToolFs) -> Vec[str]:
     if start < 0 or marker <= start:
         // Loud sentinel: an unmatched anchor renders as an unspec'd
         // "attribute" so the inventory fails instead of silently widening.
-        var missing: Vec[str] = Vec.new()
+        var missing: List[str] = List.new()
         missing.push("PARSER_ATTRIBUTE_WINDOW_ANCHOR_MISSING")
         return missing
     text = text.slice(start as i64, marker as i64)
@@ -1194,7 +1194,7 @@ fn comp_impl_attributes(fs: &ToolFs) -> Vec[str]:
     let more = comp_collect_quoted_after(text, "attr_text == \"")
     for i in 0..more.len() as i32:
         let item = more[i]
-        if item.len() > 0 and not comp_vec_contains(attrs, item):
+        if item.len() > 0 and not comp_list_contains(attrs, item):
             attrs.push(compiler_owned_text(item))
     attrs
 
@@ -1212,8 +1212,8 @@ fn comp_first_shell_word(text: &str) -> str:
             return trimmed.slice(0, i as i64)
     trimmed
 
-fn comp_spec_cli_commands(spec: &str) -> Vec[str]:
-    var commands: Vec[str] = Vec.new()
+fn comp_spec_cli_commands(spec: &str) -> List[str]:
+    var commands: List[str] = List.new()
     commands.push("version")
     commands.push("help")
     let block = comp_first_fenced_block(comp_spec_subsection(spec, "# 18.5 Toolchain"))
@@ -1232,7 +1232,7 @@ fn comp_spec_cli_commands(spec: &str) -> Vec[str]:
                     part = comp_trim(part.slice(5, part.len()))
                 let token = comp_first_shell_word(part)
                 if token.len() > 0 and not token.starts_with("[") and not token.starts_with("-"):
-                    if not comp_vec_contains(commands, token):
+                    if not comp_list_contains(commands, token):
                         commands.push(token)
                 part_start = pi + 1
             pi = pi + 1
@@ -1249,30 +1249,30 @@ fn comp_spec_cli_commands(spec: &str) -> Vec[str]:
         if span.starts_with("with "):
             let token = comp_first_shell_word(comp_trim(span.slice(5, span.len())))
             if token.len() > 0 and not token.starts_with("-"):
-                if not comp_vec_contains(commands, token):
+                if not comp_list_contains(commands, token):
                     commands.push(token)
         tick = close + 1
     commands
 
 fn comp_spec_cli_flags():
-    var flags: Vec[str] = Vec.new()
+    var flags: List[str] = List.new()
     let defaults = "--release --target --emit-c --emit-obj --overflow --no-std --strict-effects --debug-alloc --trace-alloc --dump-drop-state -O0 -O1 -O2 -O3 --open -e -n -p --fail-fast --abi-sha --self-id"
     comp_add_words(move flags, defaults)
 
-fn comp_impl_commands(fs: &ToolFs) -> Vec[str]:
+fn comp_impl_commands(fs: &ToolFs) -> List[str]:
     let raw = comp_collect_quoted_after(fs.read_text("src/main.w"), "cli_command(argc) == \"")
-    var commands: Vec[str] = Vec.new()
+    var commands: List[str] = List.new()
     for i in 0..raw.len() as i32:
         let cmd = raw[i]
         // `__`-prefixed subcommands are the compiler invoking itself
         // (D24 `__workspace-compile` process isolation) — internal ABI
         // like `with_*` symbols, not user CLI surface the spec lists.
         if not cmd.starts_with("-") and not cmd.starts_with("__"):
-            if cmd.len() > 0 and not comp_vec_contains(commands, cmd):
+            if cmd.len() > 0 and not comp_list_contains(commands, cmd):
                 commands.push(compiler_owned_text(cmd))
     commands
 
-fn comp_collect_string_literal_flags(items: Vec[str], text: &str) -> Vec[str]:
+fn comp_collect_string_literal_flags(items: List[str], text: &str) -> List[str]:
     var flags = items
     var i = 0
     while i < text.len() as i32:
@@ -1303,13 +1303,13 @@ fn comp_collect_string_literal_flags(items: Vec[str], text: &str) -> Vec[str]:
                         break
                     end = end + 1
                 let item = literal.slice(0, end as i64)
-                if item.len() > 0 and not comp_vec_contains(flags, item):
+                if item.len() > 0 and not comp_list_contains(flags, item):
                     flags.push(item)
         i = j + 1
     flags
 
-fn comp_impl_flags(fs: &ToolFs) -> Vec[str]:
-    comp_collect_string_literal_flags(Vec.new(), fs.read_text("src/main.w") ++ "\n" ++ fs.read_text("src/compiler/DriverOptions.w"))
+fn comp_impl_flags(fs: &ToolFs) -> List[str]:
+    comp_collect_string_literal_flags(List.new(), fs.read_text("src/main.w") ++ "\n" ++ fs.read_text("src/compiler/DriverOptions.w"))
 
 fn comp_known_missing_flag(item: &str) -> str:
     if item == "--target": return "#425"
@@ -1346,12 +1346,12 @@ fn comp_internal_flag(item: &str) -> bool:
 fn comp_internal_module(item: &str) -> bool:
     item == "std.builtins" or item == "std.channel" or item == "std.cfg" or item == "std.async" or item == "std.compiler" or item == "std.component" or item == "std.generators" or item == "std.iter" or item == "std.libc" or item == "std.option" or item == "std.prelude" or item == "std.prelude_alloc" or item == "std.prelude_core" or item == "std.result" or item == "std.str" or item == "std.str_abi" or item == "std.sys" or item == "std.sysinfo" or item == "std.task" or item == "std.tls" or item == "std.traits"
 
-fn comp_inventory_add_errors(errors: Vec[str], label: &str, spec_items: Vec[str], impl_items: Vec[str], known_missing_kind: &str, internal_kind: &str) -> Vec[str]:
+fn comp_inventory_add_errors(errors: List[str], label: &str, spec_items: List[str], impl_items: List[str], known_missing_kind: &str, internal_kind: &str) -> List[str]:
     var out = errors
     let sorted_spec = comp_sort_strings(spec_items)
     for i in 0..sorted_spec.len() as i32:
         let item = sorted_spec[i]
-        if comp_vec_contains(impl_items, item):
+        if comp_list_contains(impl_items, item):
             continue
         let known =
             if known_missing_kind == "flag":
@@ -1369,7 +1369,7 @@ fn comp_inventory_add_errors(errors: Vec[str], label: &str, spec_items: Vec[str]
     let sorted_impl = comp_sort_strings(impl_items)
     for j in 0..sorted_impl.len() as i32:
         let item = sorted_impl[j]
-        if comp_vec_contains(sorted_spec, item):
+        if comp_list_contains(sorted_spec, item):
             continue
         let internal =
             if internal_kind == "command":
@@ -1384,8 +1384,8 @@ fn comp_inventory_add_errors(errors: Vec[str], label: &str, spec_items: Vec[str]
             out.push(label ++ ": implementation has unspec'd " ++ item)
     out
 
-fn comp_inventory_known_lines() -> Vec[str]:
-    var items: Vec[str] = Vec.new()
+fn comp_inventory_known_lines() -> List[str]:
+    var items: List[str] = List.new()
     items.push("--open\t#537")
     items.push("--target\t#425")
     items.push("align\t#449")
@@ -1395,7 +1395,7 @@ fn comp_inventory_known_lines() -> Vec[str]:
     items.push("target\t#479")
     comp_sort_strings(items)
 
-fn comp_inventory_error_text(errors: Vec[str]) -> str:
+fn comp_inventory_error_text(errors: List[str]) -> str:
     var out = ""
     for i in 0..errors.len() as i32:
         out = out ++ "spec inventory: " ++ errors[i] ++ "\n"
@@ -1420,8 +1420,8 @@ pub fn run_check_compiler_no_new_c_export_action(ctx: ActionCtx) -> i32:
 // callee, a lowering or a type's identity is Sema's record. A comparison
 // against a string literal in src/MirLower.w is such a decision; the count
 // was 178 before the conversion and is held at 0.
-fn comp_mirlower_name_compare_lines(text: &str) -> Vec[i32]:
-    let hits: Vec[i32] = Vec.new()
+fn comp_mirlower_name_compare_lines(text: &str) -> List[i32]:
+    let hits: List[i32] = List.new()
     var line_no = 1
     for line in text.split("\n"):
         let t = line.trim()
@@ -1627,8 +1627,8 @@ pub fn run_check_libc_surface_action(ctx: ActionCtx) -> i32:
 
 /// The process-global C state the ruling names (§16.2b.14, D76), each by
 /// the name a domain over it would take.
-fn comp_process_states() -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn comp_process_states() -> List[str]:
+    let out: List[str] = List.new()
     out.push("signals")
     out.push("cwd")
     out.push("fds")
@@ -1682,8 +1682,8 @@ fn comp_process_state_views(text: &str) -> str:
     out
 
 /// The foreign externs a runtime source reaches, each "name|link|line".
-fn comp_runtime_foreign_externs(text: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn comp_runtime_foreign_externs(text: &str) -> List[str]:
+    let out: List[str] = List.new()
     let lines = comp_split_lines(text)
     var pending_attr = false
     var pending_link = ""
@@ -1707,8 +1707,8 @@ fn comp_runtime_foreign_externs(text: &str) -> Vec[str]:
 /// The runtime audit's record of process-global effects (D76): one line per
 /// foreign seam that alters such state, "path: fn <name> (C symbol <link>):
 /// alters <states>".
-fn comp_runtime_effect_record(path: &str, text: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn comp_runtime_effect_record(path: &str, text: &str) -> List[str]:
+    let out: List[str] = List.new()
     let seams = comp_runtime_foreign_externs(text)
     for i in 0..seams.len() as i32:
         let parts = seams[i].split("|")
@@ -1720,8 +1720,8 @@ fn comp_runtime_effect_record(path: &str, text: &str) -> Vec[str]:
 /// The lane's verdicts on one runtime source, each "path:line: message".
 /// `viewed` is "|S|…|": the process-global states some facade the toolchain
 /// ships presents a safe view over, each therefore a domain.
-fn comp_runtime_domain_violations(path: &str, text: &str, viewed: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn comp_runtime_domain_violations(path: &str, text: &str, viewed: &str) -> List[str]:
+    let out: List[str] = List.new()
     let lines = comp_split_lines(text)
     let seams = comp_runtime_foreign_externs(text)
     var rows = "|"
@@ -1903,7 +1903,7 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     for path in fs.glob(spec_dir ++ "/*/*.md"): chapters.push(compiler_owned_text(path))
     var spec = ""
     for path in chapters: spec = spec ++ fs.read_text(path) ++ "\n"
-    var errors: Vec[str] = Vec.new()
+    var errors: List[str] = List.new()
 
     errors = comp_inventory_add_errors(move errors, "keywords", comp_spec_keywords(spec), comp_impl_keywords(fs), "", "")
 
@@ -1911,7 +1911,7 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     let internal_attrs = comp_spec_internal_attributes(spec)
     for ai in 0..internal_attrs.len() as i32:
         let item = internal_attrs[ai]
-        if item.len() > 0 and not comp_vec_contains(allowed_attrs, item):
+        if item.len() > 0 and not comp_list_contains(allowed_attrs, item):
             allowed_attrs.push(compiler_owned_text(item))
     errors = comp_inventory_add_errors(move errors, "attributes", allowed_attrs, comp_impl_attributes(fs), "attribute", "")
 
@@ -1962,7 +1962,7 @@ pub fn run_stack_budget_check_action(ctx: ActionCtx) -> i32:
 
     let stdout_path = comp_abs(root, comp_join(output_dir, "tool.stdout"))
     let stderr_path = comp_abs(root, comp_join(output_dir, "tool.stderr"))
-    let argv: Vec[str] = Vec.new()
+    let argv: List[str] = List.new()
     argv.push(tool_path)
     if format == "pe":
         argv.push("--unwind")
@@ -1978,7 +1978,7 @@ pub fn run_stack_budget_check_action(ctx: ActionCtx) -> i32:
             ctx.diagnostics().error(result.stderr.clone())
         return comp_fail(ctx, f"stack inspection failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
 
-    var sizes: Vec[i32] = Vec.new()
+    var sizes: List[i32] = List.new()
     if format == "pe":
         sizes = comp_stack_collect_after_marker(result.stdout, "ALLOC_SMALL size=", move sizes)
         sizes = comp_stack_collect_after_marker(result.stdout, "ALLOC_LARGE size=", move sizes)
@@ -2097,7 +2097,7 @@ fn comp_debug_lines_check_anchor(ctx: &ActionCtx, tool_path: &str, dwarf_path: &
     // The stage builds name the checkout /with-src (WITH_FILE_PREFIX_MAP, D50).
     let expected_file = "/with-src/" ++ source
     let label = comp_replace_all(symbol, ".", "_")
-    let name_argv: Vec[str] = Vec.new()
+    let name_argv: List[str] = List.new()
     name_argv.push(compiler_owned_text(tool_path))
     name_argv.push("--name=" ++ symbol)
     name_argv.push(compiler_owned_text(dwarf_path))
@@ -2117,7 +2117,7 @@ fn comp_debug_lines_check_anchor(ctx: &ActionCtx, tool_path: &str, dwarf_path: &
     if decl_line != f"{expected_line}":
         comp_fail(ctx, f"anchor {symbol}: DW_AT_decl_line is {decl_line}, expected {expected_line} (`{decl_text}` in {source})")
         return ""
-    let lookup_argv: Vec[str] = Vec.new()
+    let lookup_argv: List[str] = List.new()
     lookup_argv.push(compiler_owned_text(tool_path))
     lookup_argv.push("--lookup=" ++ low_pc)
     lookup_argv.push(compiler_owned_text(dwarf_path))
@@ -2135,7 +2135,7 @@ fn comp_debug_lines_check_anchor(ctx: &ActionCtx, tool_path: &str, dwarf_path: &
 fn comp_debug_lines_check_vars(ctx: &ActionCtx, tool_path: &str, dwarf_path: &str, capture_dir: &str, symbol: &str, names: &str) -> str:
     let root = ctx.project_info().project_root()
     let label = comp_replace_all(symbol, ".", "_") ++ ".vars"
-    let argv: Vec[str] = Vec.new()
+    let argv: List[str] = List.new()
     argv.push(compiler_owned_text(tool_path))
     argv.push("--name=" ++ symbol)
     argv.push("--show-children")
@@ -2173,7 +2173,7 @@ fn comp_json_escape(text: &str) -> str:
 fn comp_resolve_command_file(ctx: &ActionCtx, capture_dir: &str, path: &str) -> str:
     if path != "with":
         return comp_abs(ctx.project_info().project_root(), path)
-    let which_args: Vec[str] = Vec.new()
+    let which_args: List[str] = List.new()
     which_args.push("which")
     which_args.push("with")
     let resolved = comp_run_first_line(ctx, capture_dir, "seed-which", which_args, 30000)
@@ -2183,7 +2183,7 @@ fn comp_resolve_command_file(ctx: &ActionCtx, capture_dir: &str, path: &str) -> 
 
 fn comp_sha256_file(ctx: &ActionCtx, capture_dir: &str, label: &str, path: &str) -> str:
     let root = ctx.project_info().project_root()
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(comp_abs(root, "out/bin/with-sha256" ++ comp_host_exe_suffix()))
     args.push(compiler_owned_text(path))
     let output = comp_run_first_line(ctx, capture_dir, label ++ "-sha256", args, 120000)
@@ -2196,7 +2196,7 @@ fn comp_record_seed_input(ctx: &ActionCtx, compiler_path: &str, capture_dir: &st
     if fs.mkdir_all("out/.build-state") != 0:
         return comp_fail(ctx, "could not create out/.build-state")
     let root = ctx.project_info().project_root()
-    let version_args: Vec[str] = Vec.new()
+    let version_args: List[str] = List.new()
     version_args.push(comp_path_for_process(root, compiler_path))
     version_args.push("version")
     let version = comp_run_first_line(ctx, capture_dir, "seed-version", version_args, 60000)
@@ -2356,7 +2356,7 @@ pub fn run_print_version_action(ctx: ActionCtx) -> i32:
 // stamped by the commit-tracking `build` target so the expensive link stays
 // cached across commits (#650).
 fn comp_output_is_stamped_compiler(ctx: &ActionCtx, output_path: &str) -> bool:
-    not output_path.ends_with(".unstamped") and not comp_vec_contains(ctx.args(), "--emit-obj")
+    not output_path.ends_with(".unstamped") and not comp_list_contains(ctx.args(), "--emit-obj")
 
 fn comp_stamp_compiler_binary(ctx: &ActionCtx, unstamped: &str, output_path: &str) -> i32:
     let version = comp_resolve_compiler_version(ctx)
@@ -2403,9 +2403,9 @@ pub fn compiler_sha256_text(fs: &ToolFs, text: &str) -> str:
     fs.sha256_file(staged)
 
 // The .w files under dir, bytewise by path.
-pub fn compiler_w_files(fs: &ToolFs, dir: &str) -> Vec[str]:
+pub fn compiler_w_files(fs: &ToolFs, dir: &str) -> List[str]:
     let listing = fs.list_files(dir)
-    let out: Vec[str] = Vec.new()
+    let out: List[str] = List.new()
     for i in 0..listing.len() as i32:
         if listing[i].ends_with(".w"):
             out.push(compiler_owned_text(listing[i]))
@@ -2433,8 +2433,8 @@ pub fn compiler_generation(fs: &ToolFs) -> str:
         record = record ++ dirs[di] ++ " " ++ compiler_tree_sha(fs, dirs[di]) ++ "\n"
     compiler_sha256_text(fs, record)
 
-pub fn compiler_generation_dirs() -> Vec[str]:
-    let dirs: Vec[str] = Vec.new()
+pub fn compiler_generation_dirs() -> List[str]:
+    let dirs: List[str] = List.new()
     dirs.push("src")
     dirs.push("rt")
     dirs
@@ -2561,7 +2561,7 @@ pub fn comp_patch_version_binary(ctx: &ActionCtx, input_path: &str, output_path:
         let capture_dir = comp_join("out/command", ctx.target_name())
         if fs.mkdir_all(capture_dir) != 0:
             return comp_fail(ctx, "could not create codesign capture directory: " ++ capture_dir)
-        var codesign_args: Vec[str] = Vec.new()
+        var codesign_args: List[str] = List.new()
         codesign_args.push("/usr/bin/codesign")
         codesign_args.push("--sign")
         codesign_args.push("-")
@@ -2624,7 +2624,7 @@ pub fn comp_wasm_backend_alias_lines(has_wasm_backend: bool, target_os: &str, dr
     if has_wasm_backend:
         return ""
     let stand_in = "with_llvm_wasm_backend_missing"
-    let names: Vec[str] = Vec.new()
+    let names: List[str] = List.new()
     names.push("LLVMInitializeWebAssemblyTargetInfo")
     names.push("LLVMInitializeWebAssemblyTarget")
     names.push("LLVMInitializeWebAssemblyTargetMC")
@@ -2655,8 +2655,8 @@ pub fn comp_darwin_sysroot_abs(root: &str) -> str: comp_join(root, comp_darwin_s
 // GNU-named archives, #1915); a Windows compiler cross-linked from another
 // host, or from a Visual Studio-built SDK (lldCommon.lib), links none and
 // runs the SDK's lld-link as before.
-pub fn comp_sdk_lld_flavors(fs: &ToolFs, llvm_lib_dir: &str, target_os: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn comp_sdk_lld_flavors(fs: &ToolFs, llvm_lib_dir: &str, target_os: &str) -> List[str]:
+    let out: List[str] = List.new()
     if (target_os == "Windows" and os() != "Windows") or not fs.host_exists(llvm_lib_dir ++ "/liblldCommon.a"):
         return out
     let flavors = comp_lld_all_flavors()
@@ -2673,8 +2673,8 @@ pub fn comp_sdk_lld_flavors(fs: &ToolFs, llvm_lib_dir: &str, target_os: &str) ->
     out
 
 // Pushed one by one: the build layer runs on the pinned seed (#1122).
-fn comp_lld_all_flavors() -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn comp_lld_all_flavors() -> List[str]:
+    let out: List[str] = List.new()
     out.push("macho")
     out.push("elf")
     out.push("coff")
@@ -2694,14 +2694,14 @@ fn comp_lld_link_itanium(flavor: &str) -> str:
     let ns = if flavor == "macho": "5macho" else if flavor == "elf": "3elf" else if flavor == "coff": "4coff" else if flavor == "mingw": "5mingw" else: "4wasm"
     "_ZN3lld" ++ ns ++ "4linkEN4llvm8ArrayRefIPKcEERNS1_11raw_ostreamES7_bb"
 
-fn comp_contains(items: &Vec[str], item: &str) -> bool:
+fn comp_contains(items: &List[str], item: &str) -> bool:
     for i in 0..items.len() as i32:
         if items[i] == item:
             return true
     false
 
 // The archives the lld flavors need, for the compiler link's response file.
-pub fn comp_lld_archive_lines(flavors: &Vec[str], llvm_lib_dir: &str) -> str:
+pub fn comp_lld_archive_lines(flavors: &List[str], llvm_lib_dir: &str) -> str:
     if flavors.len() == 0:
         return ""
     var out = comp_rsp_path(llvm_lib_dir ++ "/liblldCommon.a") ++ "\n"
@@ -2714,10 +2714,10 @@ pub fn comp_lld_archive_lines(flavors: &Vec[str], llvm_lib_dir: &str) -> str:
 // runtime symbol the link already has, as with_clang_main is, and the
 // generated embedded_lld_flavors() fact (build/clang_resource.w) tells the
 // driver not to call it. `driver_form` spells the lines for a C driver.
-pub fn comp_lld_alias_lines(flavors: &Vec[str], target_os: &str, driver_form: bool) -> str:
+pub fn comp_lld_alias_lines(flavors: &List[str], target_os: &str, driver_form: bool) -> str:
     let stand_in = "with_alloc"
-    let plain: Vec[str] = Vec.new()
-    let real: Vec[str] = Vec.new()
+    let plain: List[str] = List.new()
+    let real: List[str] = List.new()
     let all = comp_lld_all_flavors()
     for i in 0..all.len() as i32:
         plain.push("with_lld_" ++ all[i] ++ "_link")
@@ -2854,7 +2854,7 @@ pub fn run_write_runtime_producer_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(capture_dir) != 0:
         return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
     let compiler_path = comp_resolve_command_file(ctx, capture_dir, comp_compiler_path(ctx, compiler_arg))
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push(comp_path_for_process(root, compiler_path))
     argv.push("version")
     argv.push("--generation")
@@ -2912,8 +2912,8 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let lib_files = fs.host_list_files(llvm_lib_dir)
     if lib_files.len() == 0:
         return comp_fail(ctx, "could not list: " ++ llvm_lib_dir)
-    var clang_archives: Vec[str] = Vec.new()
-    var llvm_archives: Vec[str] = Vec.new()
+    var clang_archives: List[str] = List.new()
+    var llvm_archives: List[str] = List.new()
     for i in 0..lib_files.len() as i32:
         let path = lib_files[i]
         let name = comp_path_basename(path)
@@ -3025,7 +3025,7 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         // compiler-rt and the in-box DLLs as for every program. Nothing of
         // Visual Studio or a Windows Kit.
         let libc_lib = llvm_prefix ++ "/libc/windows/" ++ (if arch() == "aarch64": "aarch64" else: "x86_64") ++ "-w64-mingw32/lib"
-        let cxx_libs: Vec[str] = Vec.new()
+        let cxx_libs: List[str] = List.new()
         cxx_libs.push(libc_lib ++ "/libc++.a")
         cxx_libs.push(libc_lib ++ "/libunwind.a")
         for i in 0..cxx_libs.len() as i32:
@@ -3236,12 +3236,12 @@ pub fn run_bless_manifest_action(ctx: ActionCtx) -> i32:
     0
 
 fn comp_build_source_manifest(fs: &ToolFs) -> str:
-    let dirs: Vec[str] = Vec.new()
+    let dirs: List[str] = List.new()
     dirs.push("src")
     dirs.push("rt")
     dirs.push("lib/std")
     dirs.push("build")
-    let all_files: Vec[str] = Vec.new()
+    let all_files: List[str] = List.new()
     for di in 0..dirs.len() as i32:
         let dir = dirs[di]
         let listing = fs.list_files(dir)
@@ -3304,12 +3304,12 @@ fn comp_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
-pub fn comp_sort_strings(items: Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
+pub fn comp_sort_strings(items: List[str]) -> List[str]:
+    var sorted: List[str] = List.new()
     for i in 0..items.len() as i32:
         let item = items[i]
         var inserted = false
-        var out: Vec[str] = Vec.new()
+        var out: List[str] = List.new()
         for j in 0..sorted.len() as i32:
             let existing = sorted[j]
             if not inserted and comp_str_compare(item, existing) < 0:

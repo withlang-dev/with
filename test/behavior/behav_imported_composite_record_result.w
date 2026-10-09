@@ -10,7 +10,7 @@ fn make_source(entry: str) -> Result[ProgramSource, E]:
         ir: empty_ir(),
         ir_text: "",
         entry,
-        spec_constants: Vec.new(),
+        spec_constants: List.new(),
     })
 
 fn main:

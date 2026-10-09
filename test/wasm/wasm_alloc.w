@@ -6,7 +6,7 @@
 use std.collections.HashMap
 
 fn main:
-    var v: Vec[i64] = Vec.new()
+    var v: List[i64] = List.new()
     for i in 0..100000:
         v.push(i as i64 * 3)
     var total: i64 = 0

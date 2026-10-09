@@ -29,7 +29,7 @@ fn generic_owner(early: bool):
     if early: return
 
 fn elements:
-    var children: Vec[Child] = Vec.new()
+    var children: List[Child] = List.new()
     children.push(Child {})
     children.push(Child {})
 

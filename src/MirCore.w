@@ -91,13 +91,13 @@ pub enum ConstKind: i32:
 
 
 pub fn mir_intrinsic_is_len32(intrinsic: MirIntrinsic) -> bool:
-    intrinsic == MirIntrinsic.VEC_LEN32 or intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.STR_LEN32 or intrinsic == MirIntrinsic.ARR_LEN32 or intrinsic == MirIntrinsic.VECRANGE_LEN32 or intrinsic == MirIntrinsic.SLOTMAP_LEN32
+    intrinsic == MirIntrinsic.LIST_LEN32 or intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.STR_LEN32 or intrinsic == MirIntrinsic.ARR_LEN32 or intrinsic == MirIntrinsic.VECRANGE_LEN32 or intrinsic == MirIntrinsic.SLOTMAP_LEN32
 
 pub fn mir_intrinsic_is_len64(intrinsic: MirIntrinsic) -> bool:
-    intrinsic == MirIntrinsic.VEC_LEN64 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.STR_LEN64 or intrinsic == MirIntrinsic.ARR_LEN64 or intrinsic == MirIntrinsic.VECRANGE_LEN64 or intrinsic == MirIntrinsic.SLOTMAP_LEN64
+    intrinsic == MirIntrinsic.LIST_LEN64 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.STR_LEN64 or intrinsic == MirIntrinsic.ARR_LEN64 or intrinsic == MirIntrinsic.VECRANGE_LEN64 or intrinsic == MirIntrinsic.SLOTMAP_LEN64
 
 pub fn mir_intrinsic_is_ulen32(intrinsic: MirIntrinsic) -> bool:
-    intrinsic == MirIntrinsic.VEC_ULEN32 or intrinsic == MirIntrinsic.MAP_ULEN32 or intrinsic == MirIntrinsic.STR_ULEN32 or intrinsic == MirIntrinsic.ARR_ULEN32 or intrinsic == MirIntrinsic.VECRANGE_ULEN32 or intrinsic == MirIntrinsic.SLOTMAP_ULEN32
+    intrinsic == MirIntrinsic.LIST_ULEN32 or intrinsic == MirIntrinsic.MAP_ULEN32 or intrinsic == MirIntrinsic.STR_ULEN32 or intrinsic == MirIntrinsic.ARR_ULEN32 or intrinsic == MirIntrinsic.VECRANGE_ULEN32 or intrinsic == MirIntrinsic.SLOTMAP_ULEN32
 
 // ── Projection kinds ─────────────────────────────────────────────
 
@@ -142,120 +142,120 @@ pub type MirBody {
     anonymous_capture_count: i32,
     // The creating body's local each capture (locals 1..count) is taken
     // from, by id (codegen builds the environment from these).
-    anonymous_capture_sources: Vec[i32],
+    anonymous_capture_sources: List[i32],
     // ... and how MIR materialized each (MIR_CAPTURE_*): the local itself,
     // a snapshot copy, a reference to an alias place, or a protocol capture
     // MIR adds by place (a gen-loop's flag, return slot and producer).
     // audit:resolution judges the first three against Sema's capture mode
     // (D62); a protocol capture is MIR's own and follows Sema's record.
-    anonymous_capture_kinds: Vec[i32],
+    anonymous_capture_kinds: List[i32],
 
     // Locals
-    local_type_ids: Vec[i32],
-    local_mutables: Vec[i32],
-    local_names: Vec[i32],
-    local_is_user_var: Vec[i32],
-    local_is_global: Vec[i32],   // 1: MirLower's proxy for module-level storage, never a user local that shares the name
+    local_type_ids: List[i32],
+    local_mutables: List[i32],
+    local_names: List[i32],
+    local_is_user_var: List[i32],
+    local_is_global: List[i32],   // 1: MirLower's proxy for module-level storage, never a user local that shares the name
     // 1: a parameter naming the caller's place (a `mut self`/`&self` receiver,
     // a share-place parameter, a Drop body's self). The callee writes through
     // it and the caller drops it: MirLower schedules no drop for it (#1822).
-    local_is_caller_place: Vec[i32],
+    local_is_caller_place: List[i32],
     // MirLower scheduled owned-value cleanup, even if every emitted drop was
     // later cancelled. The validator must not infer ownership from surviving
     // Drop statements: that misses a compiler that omits all of them (#1944).
-    owned_cleanup_locals: Vec[i32],
+    owned_cleanup_locals: List[i32],
     n_params: i32,
     // Blocks ending in mutual tail calls (marked by mutual TCO pass).
-    mutual_tail_bbs: Vec[i32],
+    mutual_tail_bbs: List[i32],
 
     // Basic blocks
-    bb_stmt_starts: Vec[i32],
-    bb_stmt_counts: Vec[i32],
-    bb_term_kinds: Vec[i32],
-    bb_term_d0: Vec[i32],
-    bb_term_d1: Vec[i32],
-    bb_term_d2: Vec[i32],
-    bb_term_d3: Vec[i32],
-    bb_is_cleanup: Vec[i32],
-    bb_term_spans: Vec[i32],
-    bb_no_suspend_nodes: Vec[i32],
+    bb_stmt_starts: List[i32],
+    bb_stmt_counts: List[i32],
+    bb_term_kinds: List[i32],
+    bb_term_d0: List[i32],
+    bb_term_d1: List[i32],
+    bb_term_d2: List[i32],
+    bb_term_d3: List[i32],
+    bb_is_cleanup: List[i32],
+    bb_term_spans: List[i32],
+    bb_no_suspend_nodes: List[i32],
 
     // Statements
-    stmt_kinds: Vec[i32],
-    stmt_d0: Vec[i32],
-    stmt_d1: Vec[i32],
-    stmt_spans: Vec[i32],
+    stmt_kinds: List[i32],
+    stmt_d0: List[i32],
+    stmt_d1: List[i32],
+    stmt_spans: List[i32],
 
     // Places
-    place_locals: Vec[i32],
-    place_sema_types: Vec[i32],
-    place_proj_starts: Vec[i32],
-    place_proj_counts: Vec[i32],
-    proj_kinds: Vec[i32],
-    proj_d0: Vec[i32],
+    place_locals: List[i32],
+    place_sema_types: List[i32],
+    place_proj_starts: List[i32],
+    place_proj_counts: List[i32],
+    proj_kinds: List[i32],
+    proj_d0: List[i32],
     // A PK_FIELD projection of a named struct field: the field's position in
     // the struct declaration Sema resolved its owner to (D65, #1647); -1 for
     // every other projection (a tuple element, a variant payload, a
     // compiler-laid-out record's positional field), whose proj_d0 is the
     // position.
-    proj_decl: Vec[i32],
+    proj_decl: List[i32],
 
     // Rvalues
-    rval_kinds: Vec[i32],
-    rval_d0: Vec[i32],
-    rval_d1: Vec[i32],
-    rval_d2: Vec[i32],
+    rval_kinds: List[i32],
+    rval_d0: List[i32],
+    rval_d1: List[i32],
+    rval_d2: List[i32],
 
     // Operands
-    operand_kinds: Vec[i32],
-    operand_d0: Vec[i32],
+    operand_kinds: List[i32],
+    operand_d0: List[i32],
 
     // Constants
-    const_kinds: Vec[i32],
-    const_d0: Vec[i32],
-    const_d1: Vec[i32],
-    const_d2: Vec[i32],
-    const_types: Vec[i32],
+    const_kinds: List[i32],
+    const_d0: List[i32],
+    const_d1: List[i32],
+    const_d2: List[i32],
+    const_types: List[i32],
 
     // Switch tables
-    switch_table_starts: Vec[i32],
-    switch_table_counts: Vec[i32],
-    switch_table_vals: Vec[i64],
-    switch_table_targets: Vec[i32],
+    switch_table_starts: List[i32],
+    switch_table_counts: List[i32],
+    switch_table_vals: List[i64],
+    switch_table_targets: List[i32],
 
     // Aggregate field tables
-    agg_field_starts: Vec[i32],
-    agg_field_counts: Vec[i32],
-    agg_field_operands: Vec[i32],
-    agg_field_name_syms: Vec[i32],
+    agg_field_starts: List[i32],
+    agg_field_counts: List[i32],
+    agg_field_operands: List[i32],
+    agg_field_name_syms: List[i32],
 
     // Call argument tables
-    call_arg_starts: Vec[i32],
-    call_arg_counts: Vec[i32],
-    call_arg_operands: Vec[i32],
+    call_arg_starts: List[i32],
+    call_arg_counts: List[i32],
+    call_arg_operands: List[i32],
 
     // Call intrinsic markers (parallel to call_arg_starts)
-    call_intrinsic_kinds: Vec[MirIntrinsic],
+    call_intrinsic_kinds: List[MirIntrinsic],
     // D111: what a consumed copy operand takes (MirLower decides; codegen
     // applies it where it evaluates the operand): MIR_HOLD_RETAIN, a hold on
     // every str it carries; MIR_HOLD_TAKE, the value itself at the source's last
     // use (the source is blanked: no retain, no release).
     operand_holds: HashMap[i32, i32],
     // MathBuiltins row id for MATH_FN calls (parallel; -1 otherwise)
-    call_math_fn_ids: Vec[i32],
+    call_math_fn_ids: List[i32],
     // AST call node for generic calls (parallel to call_arg_starts, 0 if N/A)
-    call_ast_nodes: Vec[i32],
+    call_ast_nodes: List[i32],
     // Concrete semantic contract captured at lowering time. AST call nodes are
     // shared by every generic specialization and their Sema sidecars are
     // overwritten; MIR must retain its own specialization-specific values.
-    call_sig_indices: Vec[i32],
-    call_mono_syms: Vec[i32],
+    call_sig_indices: List[i32],
+    call_mono_syms: List[i32],
     // User-defined generic calls must carry the concrete contract above.
     // Builtin generic dispatch shares MirIntrinsic.GENERIC_CALL but does not.
-    call_contract_required: Vec[i32],
+    call_contract_required: List[i32],
     // D21: for a Unit-returning `mut self` pipeline stage, the exact receiver
     // place carried after this call. -1 for ordinary return-value calls.
-    call_pipeline_receiver_places: Vec[i32],
+    call_pipeline_receiver_places: List[i32],
     // D65 (#1647, interim until phase 5): 1 on a GENERIC_CALL that carries no
     // contract because MirLower's single decision point
     // (require_generic_call_contract) classified it as language machinery
@@ -263,42 +263,42 @@ pub type MirBody {
     // endpoint or Atomic method, `track`, `spawn`, `join`). The typed
     // validator and audit:resolution recognize the call by this mark; the
     // unresolved-bare-function branch that produced #1635 never sets it.
-    call_machinery_dispatch: Vec[i32],
+    call_machinery_dispatch: List[i32],
     // #2019: an intrinsic call that invokes a closure Sema says may suspend
     // (call_site_may_suspend): codegen leaves its loop when an invocation
     // left by a cancellation unwind, and MirLower checks after the call.
-    call_may_cancel: Vec[i32],
+    call_may_cancel: List[i32],
     // D65 (#1647): call nodes Sema resolved that this body materializes
     // without a call — `for x in v.iter()` and a comprehension over it are
     // the index loop (`.iter()` is the implicit form, §13). MIR states the
     // elision instead of staying silent; audit:resolution joins Sema's
     // resolved call to it.
-    elided_call_nodes: Vec[i32],
+    elided_call_nodes: List[i32],
     // D65 phase 3 (#1647): each place lowered from a source field access,
     // with its AST node and the base place it projects from. audit:
     // resolution joins Sema's facts for the node to the place.
-    field_place_nodes: Vec[i32],
-    field_place_places: Vec[i32],
-    field_place_bases: Vec[i32],
+    field_place_nodes: List[i32],
+    field_place_places: List[i32],
+    field_place_bases: List[i32],
     // ... and each `let` binding with MIR's materialization: 1 when the
     // name aliases a place, 0 when it owns a local.
-    let_binding_nodes: Vec[i32],
+    let_binding_nodes: List[i32],
     // D65 (operand types): each operand MirLower.lower_expr produced from a
     // source expression, with Sema's type for the node in this body's
     // instance and the type of the operand MIR made. audit:resolution
     // judges that the two agree.
-    expr_operand_nodes: Vec[i32],
-    expr_operand_sema_types: Vec[i32],
-    expr_operand_mir_types: Vec[i32],
-    let_binding_aliases: Vec[i32],
+    expr_operand_nodes: List[i32],
+    expr_operand_sema_types: List[i32],
+    expr_operand_mir_types: List[i32],
+    let_binding_aliases: List[i32],
     // ... the place an aliasing `let` names (-1 for an owning local), whose
     // root audit:resolution joins to Sema's view origins for the value.
-    let_binding_places: Vec[i32],
+    let_binding_places: List[i32],
     // ... and each place lowered from a source index expression, with the
     // base place it indexes.
-    index_place_nodes: Vec[i32],
-    index_place_places: Vec[i32],
-    index_place_bases: Vec[i32],
+    index_place_nodes: List[i32],
+    index_place_places: List[i32],
+    index_place_bases: List[i32],
     // The Sema symbol of the specialization whose body this is, or that
     // encloses it (a closure, a gen loop body, a generator's producer); 0
     // outside a specialization. Sema keys the facts it records per instance
@@ -310,22 +310,22 @@ pub type MirBody {
     // site during lowering. A drop of a local NOT in this set can never observe
     // the reset sentinel, so codegen elides its null guard and emits an
     // unconditional drop (the zero-cost common case).
-    ever_moved_locals: Vec[i32],
+    ever_moved_locals: List[i32],
 }
 
 pub type MirModule {
-    bodies: Vec[MirBody],
-    body_fn_syms: Vec[i32],
+    bodies: List[MirBody],
+    body_fn_syms: List[i32],
     body_index_by_fn_sym: HashMap[i32, i32],
     // Snapshot of sema type tables at lowering time.
-    // MirLower takes sema by value; its Vec reallocs can free
+    // MirLower takes sema by value; its List reallocs can free
     // the shared buffer that the caller's sema copy points to.
     // Codegen reads these instead of sema.type_kinds/d0/d1.
-    sema_type_kinds: Vec[i32],
-    sema_type_d0: Vec[i32],
-    sema_type_d1: Vec[i32],
-    sema_type_d2: Vec[i32],
-    sema_type_extra: Vec[i32],
+    sema_type_kinds: List[i32],
+    sema_type_d0: List[i32],
+    sema_type_d1: List[i32],
+    sema_type_d2: List[i32],
+    sema_type_extra: List[i32],
     sema_bitpacked_types: HashMap[i32, i32],
     sema_disc_repr_types: HashMap[i32, i32],
     sema_distinct_type_names: HashMap[i32, i32],
@@ -371,7 +371,7 @@ pub type MirModule {
     // ownership of its argument — a plain `T` that is no in-place receiver
     // (value_ref_abi), not a `&T` or a raw pointer.
     sema_sig_param_starts: HashMap[i32, i32],
-    sema_sig_param_data: Vec[i32],
+    sema_sig_param_data: List[i32],
     // #1742: every function whose signature returns Never (with_panic): a
     // call to it has no continuation for the caller's drops to run on.
     sema_never_returning_syms: HashMap[i32, i32],
@@ -388,14 +388,14 @@ impl Copy for MirCallableClass
 
 fn MirModule.init -> MirModule:
     MirModule {
-        bodies: Vec.new(),
-        body_fn_syms: Vec.new(),
+        bodies: List.new(),
+        body_fn_syms: List.new(),
         body_index_by_fn_sym: HashMap.new(),
-        sema_type_kinds: Vec.new(),
-        sema_type_d0: Vec.new(),
-        sema_type_d1: Vec.new(),
-        sema_type_d2: Vec.new(),
-        sema_type_extra: Vec.new(),
+        sema_type_kinds: List.new(),
+        sema_type_d0: List.new(),
+        sema_type_d1: List.new(),
+        sema_type_d2: List.new(),
+        sema_type_extra: List.new(),
         sema_bitpacked_types: HashMap.new(),
         sema_disc_repr_types: HashMap.new(),
         sema_distinct_type_names: HashMap.new(),
@@ -410,7 +410,7 @@ fn MirModule.init -> MirModule:
         sema_uninstantiated_generic_types: HashMap.new(),
         sema_callable_syms: HashMap.new(),
         sema_sig_param_starts: HashMap.new(),
-        sema_sig_param_data: Vec.new(),
+        sema_sig_param_data: List.new(),
         sema_never_returning_syms: HashMap.new(),
     }
 
@@ -497,85 +497,85 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         lowering_failed: 0,
         anonymous_type: 0,
         anonymous_capture_count: 0,
-        anonymous_capture_sources: Vec.new(),
-        anonymous_capture_kinds: Vec.new(),
-        local_type_ids: Vec.new(),
-        local_mutables: Vec.new(),
-        local_names: Vec.new(),
-        local_is_user_var: Vec.new(),
-        local_is_global: Vec.new(),
-        local_is_caller_place: Vec.new(),
-        owned_cleanup_locals: Vec.new(),
+        anonymous_capture_sources: List.new(),
+        anonymous_capture_kinds: List.new(),
+        local_type_ids: List.new(),
+        local_mutables: List.new(),
+        local_names: List.new(),
+        local_is_user_var: List.new(),
+        local_is_global: List.new(),
+        local_is_caller_place: List.new(),
+        owned_cleanup_locals: List.new(),
         n_params: 0,
-        mutual_tail_bbs: Vec.new(),
-        bb_stmt_starts: Vec.new(),
-        bb_stmt_counts: Vec.new(),
-        bb_term_kinds: Vec.new(),
-        bb_term_d0: Vec.new(),
-        bb_term_d1: Vec.new(),
-        bb_term_d2: Vec.new(),
-        bb_term_d3: Vec.new(),
-        bb_is_cleanup: Vec.new(),
-        bb_term_spans: Vec.new(),
-        bb_no_suspend_nodes: Vec.new(),
-        stmt_kinds: Vec.new(),
-        stmt_d0: Vec.new(),
-        stmt_d1: Vec.new(),
-        stmt_spans: Vec.new(),
-        place_locals: Vec.new(),
-        place_sema_types: Vec.new(),
-        place_proj_starts: Vec.new(),
-        place_proj_counts: Vec.new(),
-        proj_kinds: Vec.new(),
-        proj_d0: Vec.new(),
-        proj_decl: Vec.new(),
-        rval_kinds: Vec.new(),
-        rval_d0: Vec.new(),
-        rval_d1: Vec.new(),
-        rval_d2: Vec.new(),
-        operand_kinds: Vec.new(),
-        operand_d0: Vec.new(),
-        const_kinds: Vec.new(),
-        const_d0: Vec.new(),
-        const_d1: Vec.new(),
-        const_d2: Vec.new(),
-        const_types: Vec.new(),
-        switch_table_starts: Vec.new(),
-        switch_table_counts: Vec.new(),
-        switch_table_vals: Vec.new(),
-        switch_table_targets: Vec.new(),
-        agg_field_starts: Vec.new(),
-        agg_field_counts: Vec.new(),
-        agg_field_operands: Vec.new(),
-        agg_field_name_syms: Vec.new(),
-        call_arg_starts: Vec.new(),
-        call_arg_counts: Vec.new(),
-        call_arg_operands: Vec.new(),
-        call_intrinsic_kinds: Vec.new(),
+        mutual_tail_bbs: List.new(),
+        bb_stmt_starts: List.new(),
+        bb_stmt_counts: List.new(),
+        bb_term_kinds: List.new(),
+        bb_term_d0: List.new(),
+        bb_term_d1: List.new(),
+        bb_term_d2: List.new(),
+        bb_term_d3: List.new(),
+        bb_is_cleanup: List.new(),
+        bb_term_spans: List.new(),
+        bb_no_suspend_nodes: List.new(),
+        stmt_kinds: List.new(),
+        stmt_d0: List.new(),
+        stmt_d1: List.new(),
+        stmt_spans: List.new(),
+        place_locals: List.new(),
+        place_sema_types: List.new(),
+        place_proj_starts: List.new(),
+        place_proj_counts: List.new(),
+        proj_kinds: List.new(),
+        proj_d0: List.new(),
+        proj_decl: List.new(),
+        rval_kinds: List.new(),
+        rval_d0: List.new(),
+        rval_d1: List.new(),
+        rval_d2: List.new(),
+        operand_kinds: List.new(),
+        operand_d0: List.new(),
+        const_kinds: List.new(),
+        const_d0: List.new(),
+        const_d1: List.new(),
+        const_d2: List.new(),
+        const_types: List.new(),
+        switch_table_starts: List.new(),
+        switch_table_counts: List.new(),
+        switch_table_vals: List.new(),
+        switch_table_targets: List.new(),
+        agg_field_starts: List.new(),
+        agg_field_counts: List.new(),
+        agg_field_operands: List.new(),
+        agg_field_name_syms: List.new(),
+        call_arg_starts: List.new(),
+        call_arg_counts: List.new(),
+        call_arg_operands: List.new(),
+        call_intrinsic_kinds: List.new(),
         operand_holds: HashMap.new(),
-        call_math_fn_ids: Vec.new(),
-        call_ast_nodes: Vec.new(),
-        call_sig_indices: Vec.new(),
-        call_mono_syms: Vec.new(),
-        call_contract_required: Vec.new(),
-        call_pipeline_receiver_places: Vec.new(),
-        call_machinery_dispatch: Vec.new(),
-        call_may_cancel: Vec.new(),
-        elided_call_nodes: Vec.new(),
-        field_place_nodes: Vec.new(),
-        field_place_places: Vec.new(),
-        field_place_bases: Vec.new(),
-        let_binding_nodes: Vec.new(),
-        expr_operand_nodes: Vec.new(),
-        expr_operand_sema_types: Vec.new(),
-        expr_operand_mir_types: Vec.new(),
-        let_binding_aliases: Vec.new(),
-        let_binding_places: Vec.new(),
-        index_place_nodes: Vec.new(),
-        index_place_places: Vec.new(),
-        index_place_bases: Vec.new(),
+        call_math_fn_ids: List.new(),
+        call_ast_nodes: List.new(),
+        call_sig_indices: List.new(),
+        call_mono_syms: List.new(),
+        call_contract_required: List.new(),
+        call_pipeline_receiver_places: List.new(),
+        call_machinery_dispatch: List.new(),
+        call_may_cancel: List.new(),
+        elided_call_nodes: List.new(),
+        field_place_nodes: List.new(),
+        field_place_places: List.new(),
+        field_place_bases: List.new(),
+        let_binding_nodes: List.new(),
+        expr_operand_nodes: List.new(),
+        expr_operand_sema_types: List.new(),
+        expr_operand_mir_types: List.new(),
+        let_binding_aliases: List.new(),
+        let_binding_places: List.new(),
+        index_place_nodes: List.new(),
+        index_place_places: List.new(),
+        index_place_bases: List.new(),
         instance_sym: 0,
-        ever_moved_locals: Vec.new(),
+        ever_moved_locals: List.new(),
     }
 
     // Local 0 is always the return place.
@@ -776,7 +776,7 @@ pub fn mir_const_int_value(body: &MirBody, const_id: i32) -> i64:
     )
 
 impl MirBody:
-    mut fn new_switch_table(vals: &Vec[i64], targets: &Vec[i32]) -> i32:
+    mut fn new_switch_table(vals: &List[i64], targets: &List[i32]) -> i32:
         let id = self.switch_table_starts.len() as i32
         let start = self.switch_table_vals.len() as i32
         let count = vals.len() as i32
@@ -792,7 +792,7 @@ impl MirBody:
 
         id
 
-    mut fn new_agg_fields(operands: &Vec[i32], name_syms: &Vec[i32]) -> i32:
+    mut fn new_agg_fields(operands: &List[i32], name_syms: &List[i32]) -> i32:
         let id = self.agg_field_starts.len() as i32
         let start = self.agg_field_operands.len() as i32
         let count = operands.len() as i32
@@ -803,7 +803,7 @@ impl MirBody:
             self.agg_field_name_syms.push(name_syms[i])
         id
 
-    mut fn new_call_args(operands: &Vec[i32]) -> i32:
+    mut fn new_call_args(operands: &List[i32]) -> i32:
         if with_getenv_str("WITH_TRACE_RESETS").len() > 0:
             for __i in 0..operands.len():
                 let __op = operands[__i]
@@ -1123,18 +1123,18 @@ pub enum MirDropState: i32:
 const MIR_DROP_STATE_CHUNK = 128
 
 pub type MirDropStateKeys {
-    names: Vec[str],
+    names: List[str],
     // Scope-owned values remain ownership obligations after StorageDead;
     // a block tail can transfer them immediately after that marker.
-    owned_cleanup: Vec[i32],
+    owned_cleanup: List[i32],
     // Base local of each key (a local's own key has itself).
-    base_local: Vec[i32],
+    base_local: List[i32],
     // Projection keys grouped by base local (CSR over local id): the
     // descendants a whole-local mark also sets.
-    child_starts: Vec[i32],
-    children: Vec[i32],
+    child_starts: List[i32],
+    children: List[i32],
     // Key id of every MIR place id, so a transfer never renders place text.
-    place_key: Vec[i32],
+    place_key: List[i32],
     index: HashMap[str, i32],
     // Keys per chunk, and the chunk store: chunk `id` is
     // `chunk_data[id * chunk ..]`, padded with Absent past the last key.
@@ -1142,9 +1142,9 @@ pub type MirDropStateKeys {
     // `chunk_next` chains the rest), so two stored chunks with equal content
     // always have one id.
     chunk: i32,
-    chunk_data: Vec[i32],
+    chunk_data: List[i32],
     chunk_heads: HashMap[i64, i32],
-    chunk_next: Vec[i32],
+    chunk_next: List[i32],
     // join_chunks memo: (a << 32 | b) → the stored join of chunks a and b.
     chunk_joins: HashMap[i64, i32],
 }
@@ -1160,8 +1160,8 @@ impl MirDropStateKeys:
             None => -1
 
     fn initial(body: &MirBody) -> MirDropStateMap:
-        var own: Vec[i32] = Vec.new()
-        var refs: Vec[i32] = Vec.new()
+        var own: List[i32] = List.new()
+        var refs: List[i32] = List.new()
         for c in 0..self.chunk_count():
             refs.push(-(c + 1))
         for id in 0..self.chunk_count() * self.chunk:
@@ -1179,7 +1179,7 @@ impl MirDropStateKeys:
 
     // The id of the stored chunk equal to `src[start .. start + CHUNK]`,
     // storing it first if no stored chunk has that content.
-    mut fn intern_chunk(src: &Vec[i32], start: i32) -> i32:
+    mut fn intern_chunk(src: &List[i32], start: i32) -> i32:
         var hash: i64 = 0
         for r in 0..self.chunk:
             hash = hash *% 31 +% src[start + r]
@@ -1218,7 +1218,7 @@ impl MirDropStateKeys:
             None => -1
         if memo >= 0:
             return memo
-        var out: Vec[i32] = Vec.new()
+        var out: List[i32] = List.new()
         let a_base = a * self.chunk
         let b_base = b * self.chunk
         for k in 0..self.chunk:
@@ -1228,11 +1228,11 @@ impl MirDropStateKeys:
         joined
 
 pub fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
-    var names: Vec[str] = Vec.new()
-    var base_local: Vec[i32] = Vec.new()
+    var names: List[str] = List.new()
+    var base_local: List[i32] = List.new()
     var index: HashMap[str, i32] = HashMap.new()
     let local_count = body.local_count()
-    var owned_cleanup: Vec[i32] = Vec.new()
+    var owned_cleanup: List[i32] = List.new()
     for li in 0..local_count:
         let name = mir_drop_state_local_key(li)
         index.insert(name ++ "", li)
@@ -1242,7 +1242,7 @@ pub fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
     for li in body.owned_cleanup_locals:
         if li >= 0 and li < local_count:
             owned_cleanup[li] = 1
-    var place_key: Vec[i32] = Vec.new()
+    var place_key: List[i32] = List.new()
     for p in 0..body.place_locals.len() as i32:
         let base: i32 = body.place_locals[p]
         if body.place_proj_counts[p] == 0:
@@ -1258,21 +1258,21 @@ pub fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
             names.push(text)
             base_local.push(base)
         place_key.push(id)
-    var child_counts: Vec[i32] = Vec.new()
+    var child_counts: List[i32] = List.new()
     for _ in 0..local_count:
         child_counts.push(0)
     for id in local_count..names.len() as i32:
         let base: i32 = base_local[id]
         child_counts[base] = child_counts[base] + 1
-    var child_starts: Vec[i32] = Vec.new()
-    var fill: Vec[i32] = Vec.new()
+    var child_starts: List[i32] = List.new()
+    var fill: List[i32] = List.new()
     var total = 0
     for li in 0..local_count:
         child_starts.push(total)
         fill.push(total)
         total = total + child_counts[li]
     child_starts.push(total)
-    var children: Vec[i32] = Vec.new()
+    var children: List[i32] = List.new()
     for _ in 0..total:
         children.push(0)
     for id in local_count..names.len() as i32:
@@ -1282,15 +1282,15 @@ pub fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
         fill[base] = slot + 1
     let key_count = names.len() as i32
     let chunk = if key_count >= MIR_DROP_STATE_CHUNK: MIR_DROP_STATE_CHUNK else if key_count > 0: key_count else: 1
-    MirDropStateKeys { names, owned_cleanup, base_local, child_starts, children, place_key, index, chunk, chunk_data: Vec.new(), chunk_heads: HashMap.new(), chunk_next: Vec.new(), chunk_joins: HashMap.new() }
+    MirDropStateKeys { names, owned_cleanup, base_local, child_starts, children, place_key, index, chunk, chunk_data: List.new(), chunk_heads: HashMap.new(), chunk_next: List.new(), chunk_joins: HashMap.new() }
 
 // One chunk ref per chunk of keys: `id >= 0` is a stored chunk of the key
 // table, `-(slot + 1)` a chunk private to this map in `own`. The first write
 // that changes a stored chunk copies it into `own`; storing the map interns
 // its private chunks back.
 type MirDropStateMap {
-    refs: Vec[i32],
-    own: Vec[i32],
+    refs: List[i32],
+    own: List[i32],
 }
 
 fn mir_drop_state_join(a: i32, b: i32) -> i32:
@@ -1547,7 +1547,7 @@ pub fn mir_drop_state_name(state: i32) -> str:
 // Memoized: "_{local_id}" is a pure function of local_id (body-independent), so
 // cache it globally to avoid reconstructing the same key string on every body.
 // Pure memo of a deterministic function → no effect on compiler output/fixpoint.
-var mir_local_key_cache: Vec[str] = Vec.new()
+var mir_local_key_cache: List[str] = List.new()
 var mir_local_key_cache_lock: Atomic[i32]
 
 pub fn mir_drop_state_local_key(local_id: i32) -> str:
@@ -1556,7 +1556,7 @@ pub fn mir_drop_state_local_key(local_id: i32) -> str:
     // Comptime parallel() lowers MIR on concurrent threads that share this global
     // cache; an unguarded push races vec_grow (double free of the old buffer,
     // #617), and a get during another thread's grow reads a freed buffer, so the
-    // lock must bracket both. The returned str stays valid across grows — the Vec
+    // lock must bracket both. The returned str stays valid across grows — the List
     // buffer holds handles, not the string bytes.
     while mir_local_key_cache_lock.swap(1, .Acquire) != 0:
         let _ = 0
@@ -1630,8 +1630,8 @@ pub fn mir_drop_state_block_has_successor(body: &MirBody, pred: i32, target: i32
 
 // The successors a terminator can transfer to, in the same order
 // mir_drop_state_block_has_successor recognizes them.
-fn mir_drop_state_block_successors(body: &MirBody, bb: i32) -> Vec[i32]:
-    var out: Vec[i32] = Vec.new()
+fn mir_drop_state_block_successors(body: &MirBody, bb: i32) -> List[i32]:
+    var out: List[i32] = List.new()
     let kind = body.term_kind(bb)
     let d0 = body.term_data0(bb)
     let d1 = body.term_data1(bb)
@@ -1662,11 +1662,11 @@ fn mir_drop_state_block_successors(body: &MirBody, bb: i32) -> Vec[i32]:
 // predecessors are a slice, not a terminator scan.
 pub type MirDropStateBlocks {
     keys: MirDropStateKeys,
-    rows: Vec[i32],
+    rows: List[i32],
     // The entry state's stored chunk ids (keys.initial, interned once: an
     // unreachable block reads it too, and rebuilding it per read cost a
     // full key-width pass each time).
-    entry: Vec[i32],
+    entry: List[i32],
     // The state being computed: load_input fills it in place, so a visit
     // allocates only the chunks its statements change.
     scratch: MirDropStateMap,
@@ -1675,11 +1675,11 @@ pub type MirDropStateBlocks {
     // "all Uninit" — that was the single-pass driver's blind spot: a join block
     // numbered before its arm blocks, as lower_match allocates them, saw no
     // computed predecessor and took the entry state instead).
-    computed: Vec[i32],
-    pred_starts: Vec[i32],
-    preds: Vec[i32],
-    succ_starts: Vec[i32],
-    succs: Vec[i32],
+    computed: List[i32],
+    pred_starts: List[i32],
+    preds: List[i32],
+    succ_starts: List[i32],
+    succs: List[i32],
 }
 
 impl MirDropStateBlocks:
@@ -1687,11 +1687,11 @@ impl MirDropStateBlocks:
 
     // The stored out-state of `bb`, sharing the stored chunks.
     fn load_block(bb: i32) -> MirDropStateMap:
-        var refs: Vec[i32] = Vec.new()
+        var refs: List[i32] = List.new()
         let base = bb * self.width()
         for c in 0..self.width():
             refs.push(self.rows[base + c])
-        MirDropStateMap { refs, own: Vec.new() }
+        MirDropStateMap { refs, own: List.new() }
 
     // Whether `bb` has an input this sweep: the entry block always does; any
     // other block needs at least one computed predecessor. Feeding an
@@ -1740,7 +1740,7 @@ impl MirDropStateBlocks:
     // The input state of `bb` (see load_input), sharing the stored chunks.
     mut fn input(bb: i32) -> MirDropStateMap:
         self.load_input(bb)
-        MirDropStateMap { refs: self.scratch.refs.clone(), own: Vec.new() }
+        MirDropStateMap { refs: self.scratch.refs.clone(), own: List.new() }
 
     // Recompute the out-state of `bb` in `scratch`; store it and return true
     // when it differs from the stored one (or none was stored yet).
@@ -1781,26 +1781,26 @@ impl MirDropStateBlocks:
 fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
     let bb_count = body.block_count()
     var keys = mir_drop_state_keys_new(body)
-    var absent: Vec[i32] = Vec.new()
+    var absent: List[i32] = List.new()
     for _ in 0..keys.chunk:
         absent.push(MirDropState.Absent)
     let absent_id = keys.intern_chunk(absent, 0)
-    var rows: Vec[i32] = Vec.new()
+    var rows: List[i32] = List.new()
     for _ in 0..bb_count * keys.chunk_count():
         rows.push(absent_id)
     let initial = keys.initial(body)
-    var entry: Vec[i32] = Vec.new()
+    var entry: List[i32] = List.new()
     for c in 0..keys.chunk_count():
         entry.push(keys.intern_chunk(initial.own, c * keys.chunk))
-    var computed: Vec[i32] = Vec.new()
-    var pred_counts: Vec[i32] = Vec.new()
+    var computed: List[i32] = List.new()
+    var pred_counts: List[i32] = List.new()
     for _ in 0..bb_count:
         computed.push(0)
         pred_counts.push(0)
     // Successor CSR straight from the terminators; predecessor CSR by counting
     // then filling (two passes, O(blocks + edges)).
-    var succ_starts: Vec[i32] = Vec.new()
-    var succs: Vec[i32] = Vec.new()
+    var succ_starts: List[i32] = List.new()
+    var succs: List[i32] = List.new()
     for bb in 0..bb_count:
         succ_starts.push(succs.len() as i32)
         let targets = mir_drop_state_block_successors(body, bb)
@@ -1810,15 +1810,15 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
                 succs.push(s)
                 pred_counts[s] = pred_counts[s] + 1
     succ_starts.push(succs.len() as i32)
-    var pred_starts: Vec[i32] = Vec.new()
-    var fill: Vec[i32] = Vec.new()
+    var pred_starts: List[i32] = List.new()
+    var fill: List[i32] = List.new()
     var total = 0
     for bb in 0..bb_count:
         pred_starts.push(total)
         fill.push(total)
         total = total + pred_counts[bb]
     pred_starts.push(total)
-    var preds: Vec[i32] = Vec.new()
+    var preds: List[i32] = List.new()
     for _ in 0..total:
         preds.push(0)
     for bb in 0..bb_count:
@@ -1829,7 +1829,7 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
             let slot: i32 = fill[s]
             preds[slot] = bb
             fill[s] = slot + 1
-    let scratch = MirDropStateMap { refs: entry.clone(), own: Vec.new() }
+    let scratch = MirDropStateMap { refs: entry.clone(), own: List.new() }
     MirDropStateBlocks { keys, rows, entry, scratch, computed, pred_starts, preds, succ_starts, succs }
 
 // Every block's out-state at the dataflow fixpoint. One sweep in block order is
@@ -1850,7 +1850,7 @@ pub fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
     // of its predecessors changed (or on the first sweep), so a loop-free body
     // costs one pass plus the blocks that were numbered before their
     // predecessors — not a whole extra sweep of every block.
-    var dirty: Vec[i32] = Vec.new()
+    var dirty: List[i32] = List.new()
     for _ in 0..bb_count:
         dirty.push(1)
     var sweeps: i64 = 0
@@ -2014,7 +2014,7 @@ pub fn mir_elaborate_dead_drops(body: MirBody) -> MirBody:
         pre = pre + 1
     if not has_drop:
         return body
-    var to_nop: Vec[i32] = Vec.new()
+    var to_nop: List[i32] = List.new()
     var blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
         var state = blocks.input(bb)
@@ -2140,8 +2140,8 @@ fn mir_drop_state_moved_rank(state: i32) -> i32:
     -1
 
 // The first MIR place naming each drop-state key, -1 for none.
-fn mir_drop_state_key_places(keys: &MirDropStateKeys) -> Vec[i32]:
-    var out: Vec[i32] = Vec.new()
+fn mir_drop_state_key_places(keys: &MirDropStateKeys) -> List[i32]:
+    var out: List[i32] = List.new()
     for _ in 0..keys.len():
         out.push(-1)
     for p in 0..keys.place_key.len() as i32:
@@ -2158,7 +2158,7 @@ fn mir_drop_state_key_places(keys: &MirDropStateKeys) -> Vec[i32]:
 // every sub-place alike, and a Moved place's drop is elided. #1363 was this:
 // `_8 = move _6<as v0>.f0` on the success arm, then `drop(_6)` at the join —
 // the enum drop glue freed the payload the result owned.
-fn mir_drop_vacated_subplace(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, key_places: &Vec[i32], place_id: i32) -> i32:
+fn mir_drop_vacated_subplace(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, key_places: &List[i32], place_id: i32) -> i32:
     let place_rank = mir_drop_state_moved_rank(state.place(keys, place_id))
     if place_rank < 0 or place_rank == 2:
         return -1
@@ -2192,7 +2192,7 @@ fn mir_drop_vacated_message(keys: &MirDropStateKeys, state: &MirDropStateMap, bo
 // place Maybe (mark_place): the drop-before-overwrite of a field keeps the
 // whole value. A field dropped and not rewritten is freed again by the
 // whole value's drop glue; this is where that shows.
-fn mir_drop_redropped_subplace(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, key_places: &Vec[i32], place_id: i32) -> i32:
+fn mir_drop_redropped_subplace(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, key_places: &List[i32], place_id: i32) -> i32:
     if body.place_proj_counts[place_id] != 0:
         return -1
     let place_key: i32 = keys.place_key[place_id]
@@ -2244,8 +2244,8 @@ fn mir_move_through_reference(mir_mod: &MirModule, body: &MirBody, operand_id: i
     ""
 
 // The operands a statement's rvalue reads, decoded as note_rvalue does.
-fn mir_rvalue_operands(body: &MirBody, rval_id: i32) -> Vec[i32]:
-    var ops: Vec[i32] = Vec.new()
+fn mir_rvalue_operands(body: &MirBody, rval_id: i32) -> List[i32]:
+    var ops: List[i32] = List.new()
     if rval_id < 0 or rval_id >= body.rval_kinds.len():
         return ops
     let kind: i32 = body.rval_kinds[rval_id]
@@ -2268,9 +2268,9 @@ fn mir_rvalue_operands(body: &MirBody, rval_id: i32) -> Vec[i32]:
     ops
 
 // The operands a terminator reads, decoded as transfer_term does.
-fn mir_term_operands(body: &MirBody, bb: i32) -> Vec[i32]:
+fn mir_term_operands(body: &MirBody, bb: i32) -> List[i32]:
     let tk = body.term_kind(bb)
-    var term_ops: Vec[i32] = Vec.new()
+    var term_ops: List[i32] = List.new()
     if tk == TermKind.TK_SWITCH_INT:
         term_ops.push(body.term_data0(bb))
     else if tk == TermKind.TK_CALL:
@@ -2290,7 +2290,7 @@ fn mir_term_operands(body: &MirBody, bb: i32) -> Vec[i32]:
 // Statement moves and call arguments alike (#1505): a receiver the callee
 // borrows (`ch in s`, IndexPlace get/set) is lowered as the read it is, so
 // an OK_MOVE argument is a move.
-fn mir_move_of_moved_place(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, ops: &Vec[i32]) -> str:
+fn mir_move_of_moved_place(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, ops: &List[i32]) -> str:
     for oi in 0..ops.len():
         let op = ops[oi]
         if op < 0 or op >= body.operand_kinds.len() or body.operand_kinds[op] != OperandKind.OK_MOVE:
@@ -2349,7 +2349,7 @@ fn mir_whole_drop_verdict(mir_mod: &MirModule, body: &MirBody, place_id: i32, dr
 // its scope's StorageDead by contract (`_23 = move _27` after
 // `StorageDead(_27)`; materialize_tail_field_move keeps whole-local moves
 // lazy). A projection is not judged: its key is Absent until touched.
-fn mir_read_of_uninit_place(body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, ops: &Vec[i32]) -> str:
+fn mir_read_of_uninit_place(body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, ops: &List[i32]) -> str:
     for oi in 0..ops.len():
         let op: i32 = ops[oi]
         if op < 0 or op >= body.operand_kinds.len():
@@ -2377,7 +2377,7 @@ fn mir_read_of_uninit_place(body: &MirBody, keys: &MirDropStateKeys, state: &Mir
 // transported by `move` and read again legally (a loop's enum passed twice).
 // MaybeMoved is not judged here (a conditional move's join), nor a
 // projection (its key is Absent until touched).
-fn mir_read_of_moved_owned_local(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, ops: &Vec[i32], owned: &Vec[i32]) -> str:
+fn mir_read_of_moved_owned_local(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, ops: &List[i32], owned: &List[i32]) -> str:
     for oi in 0..ops.len():
         let op: i32 = ops[oi]
         if op < 0 or op >= body.operand_kinds.len():
@@ -2426,10 +2426,10 @@ pub fn mir_sig_param_consumes(mir_mod: &MirModule, sym: i32, pi: i32) -> bool:
 // Whether a whole drop of `local` is reachable from block `from` before
 // any statement writes it (a re-initialization or a reset blank).
 fn mir_drop_reachable_before_write(body: &MirBody, from: i32, local: i32) -> bool:
-    var seen: Vec[i32] = Vec.new()
+    var seen: List[i32] = List.new()
     for _ in 0..body.block_count():
         seen.push(0)
-    var work: Vec[i32] = Vec.new()
+    var work: List[i32] = List.new()
     work.push(from)
     while work.len() > 0:
         let bb: i32 = work.pop().unwrap()
@@ -2464,11 +2464,11 @@ fn mir_drop_reachable_before_write(body: &MirBody, from: i32, local: i32) -> boo
 // anything writes it. A callee that returns Never (with_panic) has no
 // such path. `g.pull()` lowered its receiver as a method receiver (`copy` of the
 // generator temp) into `gen_pull(g: impl Gen[T])`, the caller's scope-exit
-// drop freed the generator's Vec again — DOUBLE FREE — and validate-all
+// drop freed the generator's List again — DOUBLE FREE — and validate-all
 // and audit:all both passed. The callee is a direct `const fn`, or a
 // generic call's specialization; machinery dispatch and templates are not
 // judged (their callee name is no signature).
-fn mir_copy_into_consuming_param(mir_mod: &MirModule, body: &MirBody, bb: i32, dropped_local: &Vec[i32]) -> str:
+fn mir_copy_into_consuming_param(mir_mod: &MirModule, body: &MirBody, bb: i32, dropped_local: &List[i32]) -> str:
     let call_id = body.term_data1(bb)
     if call_id < 0 or call_id >= body.call_arg_starts.len():
         return ""
@@ -2547,20 +2547,20 @@ fn mir_whole_drop_local(body: &MirBody, place: i32) -> i32:
 // The locals every path has dropped, one flag per slot (slot[local] >= 0
 // for each local some whole drop targets).
 type MirDroppedSet {
-    flags: Vec[i32],
+    flags: List[i32],
 }
 
 impl MirDroppedSet:
-    fn has(slot: &Vec[i32], local: i32) -> bool:
+    fn has(slot: &List[i32], local: i32) -> bool:
         local >= 0 and local < slot.len() and slot[local] >= 0 and self.flags[slot[local]] != 0
 
-    mut fn mark(slot: &Vec[i32], local: i32, dropped: i32):
+    mut fn mark(slot: &List[i32], local: i32, dropped: i32):
         if local >= 0 and local < slot.len() and slot[local] >= 0:
             self.flags[slot[local]] = dropped
 
     // One statement's effect; reads are judged before it. A whole write or a
     // StorageLive gives the local a new value (or fresh storage).
-    mut fn transfer_stmt(body: &MirBody, slot: &Vec[i32], stmt_id: i32):
+    mut fn transfer_stmt(body: &MirBody, slot: &List[i32], stmt_id: i32):
         let kind = body.stmt_kind(stmt_id)
         let d0 = body.stmt_data0(stmt_id)
         if kind == StmtKind.StorageLive:
@@ -2570,7 +2570,7 @@ impl MirDroppedSet:
         else if kind == StmtKind.Assign:
             self.mark(slot, mir_whole_drop_local(body, d0), 0)
 
-    mut fn transfer_term(body: &MirBody, slot: &Vec[i32], bb: i32):
+    mut fn transfer_term(body: &MirBody, slot: &List[i32], bb: i32):
         let kind = body.term_kind(bb)
         if kind == TermKind.TK_DROP_AND_GOTO:
             self.mark(slot, mir_whole_drop_local(body, body.term_data0(bb)), 1)
@@ -2581,7 +2581,7 @@ impl MirDroppedSet:
 // that every path reaching it has dropped and nothing rewrote. The value is
 // gone: the drop freed what the read dereferences. The pre-#1968 lowering
 // left a block tail `t[id].arity` a lazy place operand and emitted
-// `drop(_2); _0 = copy _2[_4].f`; the Vec's drop cleared its length and the
+// `drop(_2); _0 = copy _2[_4].f`; the List's drop cleared its length and the
 // read panicked "index out of bounds" (the seed-built stage1's
 // math_fn_arity), and validate-all said ok: the drop-state lattice marks a
 // dropped place Uninit, as StorageDead does, and judges only whole-local
@@ -2594,7 +2594,7 @@ fn validate_read_after_drop(body: &MirBody) -> str:
     if local_count <= 0 or block_count <= 0:
         return ""
     // Only locals some whole drop targets can be read after a drop.
-    var slot: Vec[i32] = Vec.new()
+    var slot: List[i32] = List.new()
     for _ in 0..local_count:
         slot.push(-1)
     var width = 0
@@ -2614,14 +2614,14 @@ fn validate_read_after_drop(body: &MirBody) -> str:
         return ""
     // Forward must-analysis: a block's input is the meet (AND) of its
     // reachable predecessors' outputs; the entry starts with nothing dropped.
-    var reached: Vec[i32] = Vec.new()
+    var reached: List[i32] = List.new()
     for _ in 0..block_count:
         reached.push(0)
-    var work: Vec[i32] = Vec.new()
+    var work: List[i32] = List.new()
     work.push(0)
     reached[0] = 1
-    var edge_from: Vec[i32] = Vec.new()
-    var edge_to: Vec[i32] = Vec.new()
+    var edge_from: List[i32] = List.new()
+    var edge_to: List[i32] = List.new()
     while work.len() > 0:
         let bb: i32 = work.pop().unwrap()
         for next in mir_drop_state_block_successors(body, bb):
@@ -2633,7 +2633,7 @@ fn validate_read_after_drop(body: &MirBody) -> str:
                 reached[next] = 1
                 work.push(next)
     // Predecessors of block b: pred_list[pred_start[b]..pred_start[b + 1]].
-    var pred_start: Vec[i32] = Vec.new()
+    var pred_start: List[i32] = List.new()
     for _ in 0..block_count + 1:
         pred_start.push(0)
     for e in 0..edge_to.len():
@@ -2641,14 +2641,14 @@ fn validate_read_after_drop(body: &MirBody) -> str:
     for b in 0..block_count:
         pred_start[b + 1] += pred_start[b]
     var fill = pred_start.clone()
-    var pred_list: Vec[i32] = Vec.new()
+    var pred_list: List[i32] = List.new()
     for _ in 0..edge_to.len():
         pred_list.push(0)
     for e in 0..edge_to.len():
         pred_list[fill[edge_to[e]]] = edge_from[e]
         fill[edge_to[e]] += 1
     // out rows: block_count × width, all-dropped (the meet's top) until computed.
-    var out: Vec[i32] = Vec.new()
+    var out: List[i32] = List.new()
     for _ in 0..block_count * width:
         out.push(1)
     var changed = true
@@ -2683,8 +2683,8 @@ fn validate_read_after_drop(body: &MirBody) -> str:
 
 // A block's dropped set on entry: nothing at the entry block, else the AND
 // of its predecessors' outputs.
-fn mir_dropped_input(out: &Vec[i32], pred_start: &Vec[i32], pred_list: &Vec[i32], bb: i32, width: i32) -> MirDroppedSet:
-    var flags: Vec[i32] = Vec.new()
+fn mir_dropped_input(out: &List[i32], pred_start: &List[i32], pred_list: &List[i32], bb: i32, width: i32) -> MirDroppedSet:
+    var flags: List[i32] = List.new()
     for _ in 0..width:
         flags.push(if bb == 0: 0 else: 1)
     if bb != 0:
@@ -2704,14 +2704,14 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
         return read_after_drop
     var blocks = mir_drop_state_compute_blocks(body)
     let key_places = mir_drop_state_key_places(blocks.keys)
-    var dropped_local: Vec[i32] = Vec.new()
+    var dropped_local: List[i32] = List.new()
     for _ in 0..body.local_type_ids.len():
         dropped_local.push(0)
     for li in body.owned_cleanup_locals:
         if li < 0 or li >= dropped_local.len():
             return f"fn sym{body.fn_sym}: owned cleanup local _{li} is out of range"
         dropped_local[li] = 1
-    var owned_local: Vec[i32] = Vec.new()
+    var owned_local: List[i32] = List.new()
     for _ in 0..body.local_type_ids.len():
         owned_local.push(0)
     for li in body.owned_cleanup_locals:
@@ -2961,8 +2961,8 @@ fn mir_local_of_place(body: &MirBody, place: i32) -> i32:
 // that is the aggregate kind, for a binop the operator, for a ref the borrow
 // kind — so operand 0 of the body (a move-self function's `self`) was
 // "read" after its reset blank, and every D32 rebind builder audited red.
-fn mir_rvalue_read_locals(body: &MirBody, rv: i32) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+fn mir_rvalue_read_locals(body: &MirBody, rv: i32) -> List[i32]:
+    let out: List[i32] = List.new()
     if rv < 0 or rv >= body.rval_kinds.len():
         return out
     let k = body.rval_kinds[rv]
@@ -2970,7 +2970,7 @@ fn mir_rvalue_read_locals(body: &MirBody, rv: i32) -> Vec[i32]:
     let d1 = body.rval_d1[rv]
     let d2 = body.rval_d2[rv]
     // Collect candidate locals (-1 = none), then keep the real ones.
-    let cands: Vec[i32] = Vec.new()
+    let cands: List[i32] = List.new()
     if k == RvalueKind.RK_USE or k == RvalueKind.RK_CAST or k == RvalueKind.RK_ARRAY_FILL:
         cands.push(mir_local_of_operand(body, d0))
     else if k == RvalueKind.RK_BIN_OP:
@@ -3017,8 +3017,8 @@ fn validate_use_after_kill_body(body: &MirBody, pool: &InternPool) -> str:
     let local_count = body.local_type_ids.len() as i32
     if local_count <= 0 or local_count > 20000:
         return ""
-    let killed: Vec[i32] = Vec.new()
-    let killed_bb: Vec[i32] = Vec.new()
+    let killed: List[i32] = List.new()
+    let killed_bb: List[i32] = List.new()
     for _i in 0..local_count:
         killed.push(0)
         killed_bb.push(-1)
@@ -4078,7 +4078,7 @@ fn mir_validate_type_is_scalar(mir_mod: &MirModule, resolved: i32) -> bool:
 // The terminals and `next` calls that drive a lazy adapter chain are the
 // same: the chain's closures run inside them.
 pub fn mir_intrinsic_invokes_closure(intrinsic: MirIntrinsic) -> bool:
-    if intrinsic == MirIntrinsic.VEC_MAP or intrinsic == MirIntrinsic.VEC_FILTER or intrinsic == MirIntrinsic.VEC_FOLD:
+    if intrinsic == MirIntrinsic.LIST_MAP or intrinsic == MirIntrinsic.LIST_FILTER or intrinsic == MirIntrinsic.LIST_FOLD:
         return true
     if intrinsic == MirIntrinsic.ITER_FOLD or intrinsic == MirIntrinsic.ITER_REDUCE or intrinsic == MirIntrinsic.ITER_SUM or intrinsic == MirIntrinsic.ITER_PRODUCT or intrinsic == MirIntrinsic.ITER_MIN or intrinsic == MirIntrinsic.ITER_MAX or intrinsic == MirIntrinsic.ITER_MIN_BY or intrinsic == MirIntrinsic.ITER_MAX_BY or intrinsic == MirIntrinsic.ITER_FIND or intrinsic == MirIntrinsic.ITER_POSITION or intrinsic == MirIntrinsic.ITER_ANY or intrinsic == MirIntrinsic.ITER_ALL or intrinsic == MirIntrinsic.ITER_NONE or intrinsic == MirIntrinsic.ITER_FOR_EACH or intrinsic == MirIntrinsic.ITER_COUNT or intrinsic == MirIntrinsic.ITER_COLLECT or intrinsic == MirIntrinsic.ITER_PARTITION or intrinsic == MirIntrinsic.ITER_UNZIP:
         return true
@@ -4613,8 +4613,8 @@ pub fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValida
             let dest_ty = mir_validate_place_type(mir_mod, body, d2)
             let resolved_dest = mir_mod.mir_resolve_alias(dest_ty)
             let dest_is_unit = dest_ty > 0 and mir_mod.mir_get_type_kind(resolved_dest) == TypeKind.TY_VOID
-            if body.call_intrinsic(d1) == MirIntrinsic.VEC_PUSH and not dest_is_unit:
-                return mir_validation_fail(body.fn_sym, span, "Vec.push call destination must be Unit")
+            if body.call_intrinsic(d1) == MirIntrinsic.LIST_PUSH and not dest_is_unit:
+                return mir_validation_fail(body.fn_sym, span, "List.push call destination must be Unit")
             let task_operand = mir_validate_task_operand(mir_mod, body, d1)
             if task_operand.len() > 0:
                 return mir_validation_fail(body.fn_sym, span, task_operand)

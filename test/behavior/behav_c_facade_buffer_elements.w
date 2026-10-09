@@ -39,7 +39,7 @@ fn main:
     var output: [i32; 4] = [0; 4]
     assert(fill(output).unwrap() == 2)
     assert(output.len() == 4 and output[0] == 11 and output[1] == 13)
-    var seen: Vec[i32] = Vec.new()
+    var seen: List[i32] = List.new()
     each(values, collect, value => seen.push(value))
     assert(seen.len() == 3 and seen[0] == 3 and seen[2] == 7)
     assert(fill_each(output, collect, value => seen.push(value)) == 1)

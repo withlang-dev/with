@@ -20,8 +20,8 @@
 // global, a recursive callee that writes nothing, and an argument that
 // views a global its callee never writes.
 
-var G: Vec[str] = Vec.new()
-var B: Vec[str] = Vec.new()
+var G: List[str] = List.new()
+var B: List[str] = List.new()
 
 fn grow():
     for i in 0..64: G.push(f"item{i}")

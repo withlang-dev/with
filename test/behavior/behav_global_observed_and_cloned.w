@@ -3,9 +3,9 @@
 // #1242: reading, cloning and mutating a global in place stay legal; only a
 // transfer out of it is rejected. The clone is an independent owner.
 
-var g: Vec[str] = Vec.new()
+var g: List[str] = List.new()
 
-fn snapshot() -> Vec[str]: g.clone()
+fn snapshot() -> List[str]: g.clone()
 
 fn first() -> &str: g[0]
 

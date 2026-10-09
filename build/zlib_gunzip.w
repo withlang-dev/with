@@ -9,8 +9,8 @@ const ZLIB_MAX_OUTPUT: i64 = 8589934592
 const ZLIB_CHUNK_SIZE: i64 = 4 * 1024 * 1024
 const ZLIB_MAX_INPUT = (0 as c_uint) -% 1
 
-fn bytes_from_str(data: &str) -> Vec[u8]:
-    let out: Vec[u8] = Vec.new()
+fn bytes_from_str(data: &str) -> List[u8]:
+    let out: List[u8] = List.new()
     var i: i64 = 0
     while i < data.len():
         out.push(data[i])
@@ -43,7 +43,7 @@ fn zlib_error_message(code: i32) -> str:
         return "zlib version mismatch"
     "zlib operation failed"
 
-fn write_all(file: &OutputFile, bytes: &Vec[u8], len: i64):
+fn write_all(file: &OutputFile, bytes: &List[u8], len: i64):
     assert(len >= 0 and len <= bytes.len())
     var written: i64 = 0
     while written < len:
@@ -54,8 +54,8 @@ fn write_all(file: &OutputFile, bytes: &Vec[u8], len: i64):
         written = written + n as i64
     true
 
-fn inflate_gzip(data: &Vec[u8], file: &OutputFile, max_output_len: i64):
-    var output = Vec[u8].with_capacity(ZLIB_CHUNK_SIZE)
+fn inflate_gzip(data: &List[u8], file: &OutputFile, max_output_len: i64):
+    var output = List[u8].with_capacity(ZLIB_CHUNK_SIZE)
     for _ in 0..ZLIB_CHUNK_SIZE: output.push(0)
     var stream: z_stream_s
     // zlib requires a stable stream address. It stays in this scope from
@@ -97,7 +97,7 @@ fn inflate_gzip(data: &Vec[u8], file: &OutputFile, max_output_len: i64):
         if produced == 0 and stream.avail_in == 0 and source_offset >= data.len():
             return zlib_error_message(Z_BUF_ERROR)
 
-fn decompress_gzip_to_file(data: &Vec[u8], output_path: &str, max_output_len: i64):
+fn decompress_gzip_to_file(data: &List[u8], output_path: &str, max_output_len: i64):
     if max_output_len < 0:
         return "zlib maximum output length must be non-negative"
     let output_cstr = match output_path.to_cstring():

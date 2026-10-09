@@ -5,22 +5,22 @@
 // stays a borrow (#712) and the source survives. Exhausting an empty
 // iterator runs the body zero times.
 
-type P { data: Vec[i32] }
+type P { data: List[i32] }
 
 fn head(p: &P): *p.data[0]
 
 fn mk(n: i32) -> P:
-    var d: Vec[i32] = Vec.new()
+    var d: List[i32] = List.new()
     d.push(n)
     P { data: d }
 
 fn main:
     // owned transfer: elements land whole in the sink
-    var xs: Vec[P] = Vec.new()
+    var xs: List[P] = List.new()
     xs.push(mk(1))
     xs.push(mk(2))
     xs.push(mk(3))
-    var sink: Vec[P] = Vec.new()
+    var sink: List[P] = List.new()
     for p in xs.into_iter():
         sink.push(p)
     assert(sink.len() == 3)
@@ -30,21 +30,21 @@ fn main:
     assert(total == 6)
 
     // borrow default unchanged: source intact after the implicit form
-    var ys: Vec[P] = Vec.new()
+    var ys: List[P] = List.new()
     ys.push(mk(7))
     for p in ys:
         assert(p.data[0] == 7)
     assert(ys.len() == 1)
 
     // empty source: zero iterations
-    var es: Vec[P] = Vec.new()
+    var es: List[P] = List.new()
     var count = 0
     for p in es.into_iter():
         count = count + 1
     assert(count == 0)
 
     // manual drive: next() transfers front-to-back, then None
-    var zs: Vec[P] = Vec.new()
+    var zs: List[P] = List.new()
     zs.push(mk(21))
     zs.push(mk(22))
     var driver = zs.into_iter()

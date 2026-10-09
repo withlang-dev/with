@@ -9,7 +9,7 @@ fn view(n: &Name) -> &str: n as str
 fn main:
     var n = ("ad" ++ "a") as Name
     let a = own(&n)
-    var v: Vec[str] = Vec.new()
+    var v: List[str] = List.new()
     v.push(&n as str)
     n = "bob" as Name
     print(f"{a} {v[0]} {view(&n)}")

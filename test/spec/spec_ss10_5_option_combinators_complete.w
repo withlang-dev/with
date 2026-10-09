@@ -73,7 +73,7 @@ fn main:
     let cloned_widget = borrowed_widget.cloned()
     assert(cloned_widget.unwrap().id == 33)
 
-    var seen_values: Vec[i32] = Vec.new()
+    var seen_values: List[i32] = List.new()
     let inspect_source: Option[i32] = Some(44)
     let inspected = inspect_source.inspect(_value => seen_values.push(1))
     assert(inspected.unwrap() == 44)

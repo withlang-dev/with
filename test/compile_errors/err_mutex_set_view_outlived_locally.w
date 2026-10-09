@@ -1,7 +1,7 @@
 //! expect-check-fail: may originate from `x`, which no longer lives here
 
 // #1778 (§21.1 rule 6, D22): a view stored through `Mutex.set` into a local
-// mutex makes the mutex a holder of the view's origin, as `Vec.push` does:
+// mutex makes the mutex a holder of the view's origin, as `List.push` does:
 // reading the mutex after `x` died reads a dangling reference and is
 // refused.
 use std.sync

@@ -2,11 +2,11 @@
 
 // D27 E3: assignment to an owned Thing place cannot consume an element view.
 
-type Thing { vals: Vec[i32] }
+type Thing { vals: List[i32] }
 
 fn main:
-    var items: Vec[Thing] = Vec.new()
-    items.push(Thing { vals: Vec.new() })
-    var slot = Thing { vals: Vec.new() }
+    var items: List[Thing] = List.new()
+    items.push(Thing { vals: List.new() })
+    var slot = Thing { vals: List.new() }
     slot = items[0]
     assert(slot.vals.len() == 0)

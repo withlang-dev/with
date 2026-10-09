@@ -2,7 +2,7 @@
 
 // A6: nested aggregate-in-struct-field drop. A Drop value embedded in an
 // aggregate that is itself a struct field drops exactly once when the owner
-// goes out of scope — across plain, tuple, array, Option, Vec, and two-level
+// goes out of scope — across plain, tuple, array, Option, List, and two-level
 // nested shapes. Distinct ids summed per shape: an exact count means no leak
 // AND no double-free.
 
@@ -19,7 +19,7 @@ type HPlain { w: W }
 type HTuple { pair: (W, W) }
 type HArray { items: [W; 2] }
 type HOption { opt: Option[W] }
-type HVec { items: Vec[W] }
+type HVec { items: List[W] }
 type Inner { pair: (W, W) }
 type Outer { inner: Inner }
 
@@ -35,8 +35,8 @@ fn run_array(s: *mut i32):
 fn run_option(s: *mut i32):
     let h = HOption { opt: Some(new_w(1, s)) }
 
-fn run_vec(s: *mut i32):
-    let v: Vec[W] = Vec.new()
+fn run_list(s: *mut i32):
+    let v: List[W] = List.new()
     v.push(new_w(1, s))
     v.push(new_w(2, s))
     let h = HVec { items: v }
@@ -58,7 +58,7 @@ fn main:
     run_option(&raw mut c)
     assert(c == 1)
     c = 0
-    run_vec(&raw mut c)
+    run_list(&raw mut c)
     assert(c == 3)
     c = 0
     run_two_level(&raw mut c)

@@ -9,20 +9,20 @@
 // view into the argument, and an owned element computed from it.
 use std.task.Pulled
 
-gen fn nonempty(lines: &Vec[str]) -> &str:
+gen fn nonempty(lines: &List[str]) -> &str:
     for line in lines:
         if line.len() > 0:
             yield line
 
-gen fn lens(lines: &Vec[str]) -> i64:
+gen fn lens(lines: &List[str]) -> i64:
     for line in lines:
         if line.len() > 0:
             yield line.len()
 
-fn lockstep[A, B](left: impl Iter[A], right: impl Iter[B]) -> Vec[(A, B)]:
+fn lockstep[A, B](left: impl Iter[A], right: impl Iter[B]) -> List[(A, B)]:
     var l = left
     var r = right
-    var out: Vec[(A, B)] = Vec.new()
+    var out: List[(A, B)] = List.new()
     while true:
         match l.next():
             None => break
@@ -33,7 +33,7 @@ fn lockstep[A, B](left: impl Iter[A], right: impl Iter[B]) -> Vec[(A, B)]:
     out
 
 fn main:
-    let v: Vec[str] = ["a", "", "c"]
+    let v: List[str] = ["a", "", "c"]
     var p = nonempty(&v).pull()
     print(p.next().unwrap())
     print(p.next().unwrap())

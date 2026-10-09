@@ -12,7 +12,7 @@
 // shape (one parameter, a single-payload variant), and the MIR validator
 // guessed the payload of `G[i64].A` to be `i64`, not `H[i64]`. Matrix: H[T]
 // by value and through `&` (i64 and owned str), a user `Maybe[T]` (the shape
-// the guess was for), Maybe[T] / Vec[T] / (T, T) payloads of one enum.
+// the guess was for), Maybe[T] / List[T] / (T, T) payloads of one enum.
 
 enum H[T]:
     X(t: T)
@@ -28,7 +28,7 @@ enum Maybe[T]:
 
 enum Wrap[T]:
     One(m: Maybe[T])
-    Many(v: Vec[T])
+    Many(v: List[T])
     Pair(p: (T, T))
 
 fn show_h(h: H[i64]) -> str:
@@ -73,7 +73,7 @@ fn main:
     print(gs_text(gs))
     print(maybe_text(Maybe.Just(7)))
     print(wrap_text(Wrap.One(Maybe.Just(8))))
-    let xs: Vec[i64] = Vec.new()
+    let xs: List[i64] = List.new()
     xs.push(1)
     xs.push(2)
     print(wrap_text(Wrap.Many(xs)))

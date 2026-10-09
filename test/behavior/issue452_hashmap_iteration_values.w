@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// D44: values() and iter() observe; an owned Vec is collected where it is
+// D44: values() and iter() observe; an owned List is collected where it is
 // wanted. D96: entries keep the position of their first insertion.
 use std.collections.HashMap
 fn test_hashmap_values:
@@ -12,7 +12,7 @@ fn test_hashmap_values:
     map.insert("beta", 2)
     map.insert("alpha", 3)
 
-    let values = map.values() |> map(it.clone()) |> collect[Vec]()
+    let values = map.values() |> map(it.clone()) |> collect[List]()
     assert(values == [3, 2])
 
 fn test_hashmap_iter:

@@ -18,17 +18,17 @@ impl Copy for Velocity
 impl Copy for Health
 impl Copy for Damage
 
-fn filled[T](value: T, count: i32) -> Vec[T]:
-    var slots: Vec[T] = Vec.with_capacity(count)
+fn filled[T](value: T, count: i32) -> List[T]:
+    var slots: List[T] = List.with_capacity(count)
     for _ in 0..count: slots.push(value)
     slots
 
 type World {
-    mask: Vec[u8],
-    pos: Vec[Position],
-    vel: Vec[Velocity],
-    hp: Vec[Health],
-    dmg: Vec[Damage],
+    mask: List[u8],
+    pos: List[Position],
+    vel: List[Velocity],
+    hp: List[Health],
+    dmg: List[Damage],
     count: i32 = 0,
 }
 

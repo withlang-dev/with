@@ -20,7 +20,7 @@ fn pair(n: i32) -> (Unit, i32): (unit(), n)
 fn main:
     let t: (Unit, i32) = (unit(), 5)
     print(f"{t.1} {comptime TU.size()}/{size_of[TU]()}")
-    var v: Vec[(i64, Unit)] = Vec.new()
+    var v: List[(i64, Unit)] = List.new()
     v.push((1, unit()))
     let (n, _) = v[0]
     print(f"{v.len()} {n} {comptime TV.size()}/{size_of[TV]()}")

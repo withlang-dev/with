@@ -8,5 +8,5 @@ pub type ProgramSource {
     ir: IRProgram,
     ir_text: str,
     entry: str,
-    spec_constants: Vec[ConstantDesc],
+    spec_constants: List[ConstantDesc],
 }

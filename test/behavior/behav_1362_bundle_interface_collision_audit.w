@@ -6,7 +6,7 @@
 // user's function ("finalized source type or LLVM parameter disagrees with
 // FnAbi") and codegen failed. `collide` pulls std.re and std.zl (the
 // behavior fixture itself, audited clean); `corpora` pulls std.c_algorithms
-// (SortedVec) and std.tommyds (hash_index) as well. `corpora` still carries
+// (SortedList) and std.tommyds (hash_index) as well. `corpora` still carries
 // the "receiver requirement" violation every program reaching std.box
 // reports (#1300), so it asserts only that no FnAbi or codegen violation
 // names a declaration.
@@ -29,11 +29,11 @@ fn main:
     p7_assert_success(audited, "audit:all over user fns named like std.re/std.zl interface fns")
     assert(audited.stdout.contains("violations=0"))
 
-    let corpora = "use std.collections.sorted_vec.SortedVec\nuse std.collections.hash_index\n" ++ helpers_text() ++
+    let corpora = "use std.collections.sorted_vec.SortedList\nuse std.collections.hash_index\n" ++ helpers_text() ++
         "fn main:\n" ++
         "    assert(is_alpha(1) and is_digit(2) and is_alnum(4) and to_lower(1) == 2)\n" ++
         "    assert(u128_mul_would_overflow(6, 7) == 42 and __ci_unreachable() == 11)\n" ++
-        "    var s: SortedVec[i32] = SortedVec.new()\n" ++
+        "    var s: SortedList[i32] = SortedList.new()\n" ++
         "    s.insert(3)\n" ++
         "    s.insert(1)\n" ++
         "    assert(s.len() == 2)\n" ++

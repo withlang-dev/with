@@ -4,7 +4,7 @@
 // callable parameter; the function a caller passes for it writes G.
 // A call writes every global its callee writes.
 
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 fn grow():
     for i in 0..64: G.push(f"item{i}")

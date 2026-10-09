@@ -7,7 +7,7 @@
 
 // #1439: the type-cycle check follows a generic's by-value arguments
 // (Option[E] is infinite); recursion behind an indirection stays legal —
-// Vec[E], Option[Box[E]], HashMap[str, E], a user generic holding Box[E],
+// List[E], Option[Box[E]], HashMap[str, E], a user generic holding Box[E],
 // a generic node behind Option[Box[..]], and a user type named `T` beside
 // Option[T] (a generic's parameter is not that type).
 use std.box.Box
@@ -21,7 +21,7 @@ type Wrap[V] { w: V }
 
 enum Tree:
     Leaf(n: i64)
-    Branch(kids: Vec[Tree])
+    Branch(kids: List[Tree])
 
 enum Chain:
     Cons(v: i64, next: Option[Box[Chain]])
@@ -57,7 +57,7 @@ fn main:
     print(t.x ?? 0)
     let n = Node { next: None, v: 5 }
     print(n.v)
-    let kids: Vec[Tree] = Vec.new()
+    let kids: List[Tree] = List.new()
     kids.push(Tree.Leaf(1))
     kids.push(Tree.Leaf(2))
     print(tree_sum(Tree.Branch(kids)))

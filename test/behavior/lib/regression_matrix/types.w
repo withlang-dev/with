@@ -4,7 +4,7 @@ pub type ImportedEntry {
 }
 
 pub type ImportedBindings {
-    entries: Vec[ImportedEntry],
+    entries: List[ImportedEntry],
 }
 
 pub error ImportedErr = ImportedBad

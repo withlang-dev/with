@@ -464,8 +464,8 @@ fn analysis_ast_child_role(sema: &Sema, node: i32, child_index: i32) -> str:
     if kind == NodeKind.NK_TYPE_TYPEOF: return "expression"
     f"child[{child_index}]"
 
-fn analysis_node_subject(sema: &Sema, node: i32, fallback_path: &str, fallback_source: &str) -> Vec[str]:
-    let result: Vec[str] = Vec.new()
+fn analysis_node_subject(sema: &Sema, node: i32, fallback_path: &str, fallback_source: &str) -> List[str]:
+    let result: List[str] = List.new()
     var path = fallback_path
     var source = with_str_clone_ref(fallback_source)
     // The parser owns a node's source identity. A diagnostic may itself
@@ -696,7 +696,7 @@ fn analysis_collect_specializations(report: &AnalysisReport, sema: &Sema, source
         let sig = sema.concrete_specialization_sigs[si]
         let subst_start = sema.concrete_specialization_subst_starts[si]
         let subst_count = sema.concrete_specialization_subst_counts[si]
-        let parts: Vec[str] = Vec.new()
+        let parts: List[str] = List.new()
         for ti in 0..subst_count:
             if ti > 0: parts.push(", ")
             let param = sema.concrete_specialization_subst_syms[(subst_start + ti)]
@@ -1470,8 +1470,8 @@ fn analysis_audit_phase(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModul
 //                  chains) that is read — or written through — after a call to
 //                  a grower with no reassignment in between, on any CFG path.
 // Out of scope, by design: a view stored into an aggregate or returned by a
-// builtin (`Vec.get`), and a view into a container the function owns (the
-// caller's `&Vec[str]` parameter) — those are not pool views.
+// builtin (`List.get`), and a view into a container the function owns (the
+// caller's `&List[str]` parameter) — those are not pool views.
 
 fn analysis_place_local(body: &MirBody, place: i32) -> i32:
     if place < 0 or place >= body.place_locals.len() as i32: return -1
@@ -1526,8 +1526,8 @@ fn analysis_call_callee_sym(body: &MirBody, sema: &Sema, bb: i32) -> i32:
     if sig >= 0 and sig < sema.sig_names.len() as i32: return sema.sig_names[sig]
     0
 
-fn analysis_operand_list_locals(body: &MirBody, start: i32, count: i32, operands: &Vec[i32]) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+fn analysis_operand_list_locals(body: &MirBody, start: i32, count: i32, operands: &List[i32]) -> List[i32]:
+    let out: List[i32] = List.new()
     for i in 0..count:
         let opi = start + i
         if opi >= 0 and opi < operands.len() as i32:
@@ -1535,8 +1535,8 @@ fn analysis_operand_list_locals(body: &MirBody, start: i32, count: i32, operands
     out
 
 // Every local an rvalue reads (as a bare operand or as the base of a place).
-fn analysis_rvalue_read_locals(body: &MirBody, rv: i32) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+fn analysis_rvalue_read_locals(body: &MirBody, rv: i32) -> List[i32]:
+    let out: List[i32] = List.new()
     if rv < 0 or rv >= body.rval_kinds.len() as i32: return out
     let k = body.rval_kinds[rv]
     let d0 = body.rval_d0[rv]
@@ -1566,8 +1566,8 @@ fn analysis_rvalue_read_locals(body: &MirBody, rv: i32) -> Vec[i32]:
     out
 
 // Every local a terminator reads: the switch subject, the call arguments.
-fn analysis_term_read_locals(body: &MirBody, bb: i32) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+fn analysis_term_read_locals(body: &MirBody, bb: i32) -> List[i32]:
+    let out: List[i32] = List.new()
     let kind = body.term_kind(bb)
     if kind == TermKind.TK_SWITCH_INT:
         out.push(analysis_operand_local(body, body.term_data0(bb)))
@@ -1577,8 +1577,8 @@ fn analysis_term_read_locals(body: &MirBody, bb: i32) -> Vec[i32]:
             return analysis_operand_list_locals(body, body.call_arg_starts[args_id], body.call_arg_counts[args_id], body.call_arg_operands)
     out
 
-fn analysis_term_successors(body: &MirBody, bb: i32) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+fn analysis_term_successors(body: &MirBody, bb: i32) -> List[i32]:
+    let out: List[i32] = List.new()
     let kind = body.term_kind(bb)
     if kind == TermKind.TK_GOTO:
         out.push(body.term_data0(bb))
@@ -1600,11 +1600,11 @@ fn analysis_term_successors(body: &MirBody, bb: i32) -> Vec[i32]:
 // field token the view points into (a producer's is its own field). Bare
 // `copy` chains inherit both. With `any_field`, every indexed field counts
 // (producer discovery); otherwise only the known pool fields.
-type PoolViewOrigins { origin: Vec[i32], field: Vec[i32] }
+type PoolViewOrigins { origin: List[i32], field: List[i32] }
 
 fn analysis_pool_view_locals(body: &MirBody, sema: &Sema, producers: &HashMap[i32, i32], fields: &HashMap[i32, i32], any_field: bool) -> PoolViewOrigins:
-    var origin: Vec[i32] = Vec.new()
-    var field: Vec[i32] = Vec.new()
+    var origin: List[i32] = List.new()
+    var field: List[i32] = List.new()
     for li in 0..body.local_count():
         origin.push(0)
         field.push(-1)
@@ -1645,8 +1645,8 @@ fn analysis_pool_view_locals(body: &MirBody, sema: &Sema, producers: &HashMap[i3
 // The pool fields a body grows directly: it mutates a place ending in the
 // field in place (receiver of a `mut fn`/`move fn`, or a mutating container
 // intrinsic) or assigns the whole field.
-fn analysis_body_grown_fields(body: &MirBody, sema: &Sema, fields: &HashMap[i32, i32]) -> Vec[i32]:
-    let grown: Vec[i32] = Vec.new()
+fn analysis_body_grown_fields(body: &MirBody, sema: &Sema, fields: &HashMap[i32, i32]) -> List[i32]:
+    let grown: List[i32] = List.new()
     for bb in 0..body.block_count():
         if body.term_kind(bb) != TermKind.TK_CALL: continue
         let args_id = body.term_data1(bb)
@@ -1656,8 +1656,8 @@ fn analysis_body_grown_fields(body: &MirBody, sema: &Sema, fields: &HashMap[i32,
         let field = analysis_place_last_field(body, body.operand_d0[receiver])
         if field < 0 or not fields.contains(field) or grown.contains(field): continue
         let intrinsic = body.call_intrinsic(args_id)
-        if intrinsic == MirIntrinsic.VEC_PUSH or intrinsic == MirIntrinsic.VEC_SET or intrinsic == MirIntrinsic.VEC_REMOVE or
-                intrinsic == MirIntrinsic.VEC_CLEAR or intrinsic == MirIntrinsic.VEC_POP or intrinsic == MirIntrinsic.MAP_INSERT or
+        if intrinsic == MirIntrinsic.LIST_PUSH or intrinsic == MirIntrinsic.LIST_SET or intrinsic == MirIntrinsic.LIST_REMOVE or
+                intrinsic == MirIntrinsic.LIST_CLEAR or intrinsic == MirIntrinsic.LIST_POP or intrinsic == MirIntrinsic.MAP_INSERT or
                 intrinsic == MirIntrinsic.MAP_REMOVE or intrinsic == MirIntrinsic.MAP_CLEAR:
             grown.push(field)
             continue
@@ -1680,7 +1680,7 @@ fn analysis_audit_pool_views(report: &AnalysisReport, sema: &Sema, mir_mod: &Mir
     let bodies = mir_mod.bodies.len() as i32
     // 1. Producers and pool fields, to a fixpoint over wrapper chains.
     let fields: HashMap[i32, i32] = HashMap.new()
-    var field_list: Vec[i32] = Vec.new()
+    var field_list: List[i32] = List.new()
     let producers: HashMap[i32, i32] = HashMap.new()
     var changed = true
     while changed:
@@ -1750,15 +1750,15 @@ fn analysis_audit_pool_views(report: &AnalysisReport, sema: &Sema, mir_mod: &Mir
                 view_locals = view_locals + 1
         if not any: continue
         let blocks = body.block_count()
-        var state: Vec[i32] = Vec.new()
+        var state: List[i32] = List.new()
         for i in 0..blocks * locals: state.push(0)
         let seen: HashMap[i32, i32] = HashMap.new()
         let fn_name = with_str_clone_ref(sema.pool_resolve(body.fn_sym))
         let fn_path = analysis_sig_path(sema, body.fn_sym, source_path)
         let fn_source = analysis_source_for_path(sema, fn_path, source_text)
-        var worklist: Vec[i32] = Vec.new()
-        var queued: Vec[i32] = Vec.new()
-        var visited: Vec[i32] = Vec.new()
+        var worklist: List[i32] = List.new()
+        var queued: List[i32] = List.new()
+        var visited: List[i32] = List.new()
         for bb in 0..blocks:
             queued.push(0)
             visited.push(0)
@@ -1770,7 +1770,7 @@ fn analysis_audit_pool_views(report: &AnalysisReport, sema: &Sema, mir_mod: &Mir
             wi = wi + 1
             queued[bb] = 0
             visited[bb] = 1
-            var cur: Vec[i32] = Vec.new()
+            var cur: List[i32] = List.new()
             for li in 0..locals: cur.push(state[bb * locals + li])
             if trace:
                 var in_text = ""
@@ -2033,11 +2033,11 @@ fn analysis_seam_place_is_unowned_root(sema: &Sema, body: &MirBody, place_id: i3
         return 1
     0
 
-fn analysis_seam_retention_rows(sema: &Sema, body: &MirBody, fn_name: &str, path: &str) -> Vec[str]:
-    let rows: Vec[str] = Vec.new()
-    let candidate_locals: Vec[i32] = Vec.new()
-    let candidate_spans: Vec[i32] = Vec.new()
-    let candidate_types: Vec[i32] = Vec.new()
+fn analysis_seam_retention_rows(sema: &Sema, body: &MirBody, fn_name: &str, path: &str) -> List[str]:
+    let rows: List[str] = List.new()
+    let candidate_locals: List[i32] = List.new()
+    let candidate_spans: List[i32] = List.new()
+    let candidate_types: List[i32] = List.new()
     // Pass 1: calls whose result is a Drop non-Copy value read from an unowned container.
     for bb in 0..body.block_count():
         if body.term_kind(bb) != TermKind.TK_CALL:
@@ -2125,8 +2125,8 @@ fn analysis_seam_retention_rows(sema: &Sema, body: &MirBody, fn_name: &str, path
 fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str) -> str:
     let _ = source_path
     var out = "path\toffset\tfn\tclass\ttier\tcontext\tplace\ttype\n"
-    let report_lines: Vec[str] = Vec.new()
-    let counts: Vec[i32] = Vec.new()
+    let report_lines: List[str] = List.new()
+    let counts: List[i32] = List.new()
     for _ci in 0..7:
         counts.push(0)
     var escapes = 0
@@ -2151,8 +2151,8 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
             if rv < 0 or rv >= body.rval_kinds.len() as i32:
                 continue
             let rk = body.rval_kinds[rv]
-            let pending: Vec[i32] = Vec.new()
-            let contexts: Vec[str] = Vec.new()
+            let pending: List[i32] = List.new()
+            let contexts: List[str] = List.new()
             if rk == RvalueKind.RK_AGGREGATE:
                 let fid = body.rval_d1[rv]
                 if fid >= 0 and fid < body.agg_field_starts.len() as i32:
@@ -2194,7 +2194,7 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
                     continue
                 var context = "call-arg"
                 // Builtin callee (no signature): its receiver is still a place,
-                // not a copy — but its real arguments (Vec.push's element) do
+                // not a copy — but its real arguments (List.push's element) do
                 // retain, so only the receiver slot is exempt.
                 if sig < 0 and ai == 0:
                     continue
@@ -2352,7 +2352,7 @@ fn analysis_explain_origin(sema: &Sema, target: &str, source_path: &str) -> str:
     var out = f"explain:origin {target}\n"
     var found = 0
     // A body Sema checks more than once records each fact again: print one.
-    var seen: Vec[str] = Vec.new()
+    var seen: List[str] = List.new()
     for si in 0..sema.sig_names.len() as i32:
         if not analysis_origin_fn_matches(sema, sema.sig_names[si], fn_name): continue
         let pc = sema.sig_get_param_count(si)
@@ -2414,7 +2414,7 @@ fn analysis_explain_request(request: &str) -> str:
     analysis_fact_explain_query(kind, wanted)
 
 fn analysis_lldb_recipe(report: &AnalysisReport, query: &str) -> str:
-    let lines: Vec[str] = Vec.new()
+    let lines: List[str] = List.new()
     lines.push("# Generated from live compiler-analysis facts.\n")
     var hits = 0
     for i in 0..report.facts.len() as i32:
@@ -2463,7 +2463,7 @@ fn analysis_call_path(report: &AnalysisReport, from: &str, to: &str) -> str:
     let target = analysis_find_symbol(report, to)
     if start == 0 or target == 0:
         return f"call-path: unresolved endpoint from={from} to={to}\n"
-    let queue: Vec[i32] = Vec.new()
+    let queue: List[i32] = List.new()
     let pred: HashMap[i32, i32] = HashMap.new()
     queue.push(start)
     pred.insert(start, 0)
@@ -2479,12 +2479,12 @@ fn analysis_call_path(report: &AnalysisReport, from: &str, to: &str) -> str:
             queue.push(fact.symbol)
     if not pred.contains(target):
         return f"call-path: no path from {from} to {to}\n"
-    let reverse: Vec[i32] = Vec.new()
+    let reverse: List[i32] = List.new()
     var at = target
     while at != 0:
         reverse.push(at)
         at = pred.get(at).unwrap()
-    let lines: Vec[str] = Vec.new()
+    let lines: List[str] = List.new()
     lines.push(f"call-path: {from} -> {to}\n")
     var i = reverse.len() as i32 - 1
     while i >= 0:
@@ -2498,7 +2498,7 @@ fn analysis_call_closure(report: &AnalysisReport, root: &str) -> str:
     let start = analysis_find_symbol(report, root)
     if start == 0:
         return f"call-closure: unresolved root {root}\n"
-    let queue: Vec[i32] = Vec.new()
+    let queue: List[i32] = List.new()
     let pred: HashMap[i32, i32] = HashMap.new()
     queue.push(start)
     pred.insert(start, 0)
@@ -2512,7 +2512,7 @@ fn analysis_call_closure(report: &AnalysisReport, root: &str) -> str:
                 continue
             pred.insert(fact.symbol, caller)
             queue.push(fact.symbol)
-    let lines: Vec[str] = Vec.new()
+    let lines: List[str] = List.new()
     lines.push(f"call-closure: root={root} reachable={queue.len() as i32}\n")
     for i in 0..queue.len() as i32:
         let sym = queue[i]

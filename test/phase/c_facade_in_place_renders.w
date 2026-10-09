@@ -55,6 +55,6 @@ fn main:
         Err(InflateStreamError.Failed(status)) => status
     let (dstatus, deflater) = DeflateStream.deflateInit(9, 6)
     let ctx = Ctx.ctx_init()
-    let held: Vec[DeflateStream] = Vec.new()
+    let held: List[DeflateStream] = List.new()
     held.push(deflater)
     print(f"{reset} {dstatus} {ctx.live}")

@@ -1,36 +1,36 @@
 //! expect-stdout: ok
 
-comptime fn build_bool_vec() -> Vec[bool]:
-    var v = Vec[bool].new()
+comptime fn build_bool_list() -> List[bool]:
+    var v = List[bool].new()
     v.push(true)
     v.push(false)
     v.push(true)
     v
 
 comptime fn bool_len() -> i64:
-    var v = Vec[bool].new()
+    var v = List[bool].new()
     v.push(true)
     v.push(false)
     v.len()
 
 comptime fn bool_contains_hit() -> bool:
-    var v = Vec[bool].new()
+    var v = List[bool].new()
     v.push(true)
     v.contains(true)
 
 comptime fn bool_contains_miss() -> bool:
-    var v = Vec[bool].new()
+    var v = List[bool].new()
     v.push(true)
     v.contains(false)
 
 comptime fn bool_pop_val() -> bool:
-    var v = Vec[bool].new()
+    var v = List[bool].new()
     v.push(true)
     v.push(false)
     v.pop().unwrap()
 
 comptime fn bool_pop_len() -> i64:
-    var v = Vec[bool].new()
+    var v = List[bool].new()
     v.push(true)
     v.push(false)
     v.push(true)
@@ -38,20 +38,20 @@ comptime fn bool_pop_len() -> i64:
     v.len()
 
 comptime fn bool_remove_val() -> bool:
-    var v = Vec[bool].new()
+    var v = List[bool].new()
     v.push(true)
     v.push(false)
     v.push(true)
     v.remove(1)
 
 comptime fn bool_clear_len() -> i64:
-    var v = Vec[bool].new()
+    var v = List[bool].new()
     v.push(true)
     v.push(false)
     v.clear()
     v.len()
 
-const BOOLS: Vec[bool] = comptime build_bool_vec()
+const BOOLS: List[bool] = comptime build_bool_list()
 const BOOL_LEN: i64 = comptime bool_len()
 const BOOL_HIT: bool = comptime bool_contains_hit()
 const BOOL_MISS: bool = comptime bool_contains_miss()

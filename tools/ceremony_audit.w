@@ -38,7 +38,7 @@ type Candidate { line: i32, kind: str, replacement: str, detail: str }
 fn dump_of(compiler: &str, path: &str, dir: &str) -> Option[str]:
     let out = f"{dir}/dump.out"
     let err = f"{dir}/dump.err"
-    let argv: Vec[str] = [compiler.clone(), "check", path.clone(), "--dump-typed"]
+    let argv: List[str] = [compiler.clone(), "check", path.clone(), "--dump-typed"]
     let done = run_to_files(&argv, out, err, 120000)
     if done.code != 0: return None
     Some(normalized(read_file(out).unwrap_or("")))
@@ -57,7 +57,7 @@ fn without_ids(line: &str, key: &str) -> str:
 // The dump without source offsets and node ids: removing text moves every
 // later span and renumbers every later node.
 fn normalized(dump: str) -> str:
-    var kept: Vec[str] = Vec.new()
+    var kept: List[str] = List.new()
     for raw in dump.split("\n"):
         let line = without_ids(raw, "node=")
         // An inferred return type is printed on a line of its own; the
@@ -102,7 +102,7 @@ fn without_annotation(line: &str) -> str:
     line.slice(0, colon) ++ line.slice(eq, line.len())
 
 // `var acc = init` / `for x in xs: acc += e` / `acc` at lines i, i+1, i+2.
-fn accumulator_at(lines: &Vec[str], i: i32) -> str:
+fn accumulator_at(lines: &List[str], i: i32) -> str:
     if i + 2 >= lines.len() as i32: return ""
     let head = lines[i].trim()
     if not head.starts_with("var "): return ""
@@ -123,8 +123,8 @@ fn accumulator_at(lines: &Vec[str], i: i32) -> str:
     if term == item: return f"{source}.iter() |> sum()"
     f"{source}.iter() |> map({term.replace(item, "it")}) |> sum()"
 
-fn candidates(lines: &Vec[str]) -> Vec[Candidate]:
-    var out: Vec[Candidate] = Vec.new()
+fn candidates(lines: &List[str]) -> List[Candidate]:
+    var out: List[Candidate] = List.new()
     for i in 0..lines.len() as i32:
         let shorter = without_return_type(lines[i])
         if shorter.len() > 0: out.push(Candidate { line: i, kind: "return-type", replacement: shorter, detail: "the body decides the return type" })
@@ -132,18 +132,18 @@ fn candidates(lines: &Vec[str]) -> Vec[Candidate]:
         if bare.len() > 0: out.push(Candidate { line: i, kind: "annotation", replacement: bare, detail: "the initializer decides the type" })
     out
 
-fn with_line(lines: &Vec[str], at: i32, replacement: &str) -> str:
-    var out: Vec[str] = Vec.new()
+fn with_line(lines: &List[str], at: i32, replacement: &str) -> str:
+    var out: List[str] = List.new()
     for i in 0..lines.len() as i32: out.push(if i == at: replacement.clone() else: lines[i].clone())
     out.join("\n")
 
 // The fenced With blocks of a Markdown file, each with the line it starts on.
-fn blocks_of(path: &str, text: &str) -> Vec[Source]:
-    var out: Vec[Source] = Vec.new()
+fn blocks_of(path: &str, text: &str) -> List[Source]:
+    var out: List[Source] = List.new()
     var inside = false
     var audited = false
     var start = 0
-    var body: Vec[str] = Vec.new()
+    var body: List[str] = List.new()
     var number = 0
     for line in text.split("\n"):
         number += 1
@@ -156,7 +156,7 @@ fn blocks_of(path: &str, text: &str) -> Vec[Source]:
                 let info = line.slice(3, line.len()).trim().to_owned()
                 audited = info.len() == 0 or info == "with"
                 start = number + 1
-                body = Vec.new()
+                body = List.new()
             continue
         if inside: body.push(line.clone())
     out
@@ -166,7 +166,7 @@ fn audit(compiler: &str, source: &Source, dir: &str, fix_path: &str) -> i32:
     write_file(path, source.text)
     let Some(baseline) = dump_of(compiler, path, dir) else:
         return -1
-    var lines: Vec[str] = Vec.new()
+    var lines: List[str] = List.new()
     for line in source.text.split("\n"): lines.push(line.clone())
     var findings = 0
     for candidate in candidates(&lines):
@@ -188,7 +188,7 @@ fn audit(compiler: &str, source: &Source, dir: &str, fix_path: &str) -> i32:
 fn main:
     let argv = args()
     var compiler = "with"
-    var files: Vec[str] = Vec.new()
+    var files: List[str] = List.new()
     var fix = false
     var scratch = ""
     var i = 1
@@ -214,7 +214,7 @@ fn main:
     var fragments = 0
     for file in files:
         let text = read_file(file).unwrap_or("")
-        var sources: Vec[Source] = Vec.new()
+        var sources: List[Source] = List.new()
         if file.ends_with(".md"): sources = blocks_of(file, text)
         else: sources.push(Source { label: file.clone(), first_line: 1, text: text })
         for source in sources:

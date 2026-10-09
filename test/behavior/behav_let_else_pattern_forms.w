@@ -9,7 +9,7 @@
 // #1373: a let pattern is the pattern grammar a match arm accepts (§9.7,
 // §30.4 LET_STMT, §30.6): qualified `Type.Variant(..)`, qualified unit,
 // bare variant, nested, `var`, annotated, literals, ranges, or, at-binding.
-// Struct patterns with literal fields are left to #1388; slice patterns over &Vec to #1389.
+// Struct patterns with literal fields are left to #1388; slice patterns over &List to #1389.
 
 enum Shape:
     Named(i32)

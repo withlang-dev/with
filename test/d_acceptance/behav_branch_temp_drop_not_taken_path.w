@@ -5,10 +5,10 @@
 // drop landed in the join block, and the not-taken path freed an
 // uninitialized temp (invalid free of stack garbage; release-only via -O1
 // slot reuse). The else path here must run clean.
-type Big { a: Vec[str], b: Vec[str] }
+type Big { a: List[str], b: List[str] }
 
-fn cl(v: &Vec[str]) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn cl(v: &List[str]) -> List[str]:
+    let out: List[str] = List.new()
     for i in 0..v.len() as i32:
         out.push(v[i].clone())
     out
@@ -20,10 +20,10 @@ fn consume(b: Big) -> i32:
     b.a.len() as i32
 
 fn main:
-    let seed: Vec[str] = Vec.new()
+    let seed: List[str] = List.new()
     seed.push("x")
     var big = Big { a: cl(&seed), b: cl(&seed) }
-    var results: Vec[i32] = Vec.new()
+    var results: List[i32] = List.new()
     if big.a.len() as i32 == 99:
         results.push(consume(clone_big(&big)))
     else:

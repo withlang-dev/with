@@ -1,5 +1,5 @@
 pub type Tape {
-    chunks: Vec[i32],
+    chunks: List[i32],
     label: str,
 }
 
@@ -21,7 +21,7 @@ pub fn MeterBox.head(self: &MeterBox) -> i32:
     self.width
 
 pub fn build_tape() -> Tape:
-    let chunks: Vec[i32] = Vec.new()
+    let chunks: List[i32] = List.new()
     chunks.push(9)
     chunks.push(11)
     Tape {

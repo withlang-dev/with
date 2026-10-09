@@ -59,7 +59,7 @@ trait objects with `Task[T]` return types need no boxing.
 
 ### Object-safe CacheService (byte-level trait + generic free functions)
 
-Generic methods (`get[T: Deserialize]`) can't go in trait objects because each `T` would need its own vtable slot. The solution in `traits.w`: the trait defines `get_bytes`/`set_bytes` operating on `Vec[u8]`, and free functions `cache_get[T]`/`cache_set[T]` handle serialization outside the trait. This keeps `CacheService` object-safe while callers still get type-safe generics.
+Generic methods (`get[T: Deserialize]`) can't go in trait objects because each `T` would need its own vtable slot. The solution in `traits.w`: the trait defines `get_bytes`/`set_bytes` operating on `List[u8]`, and free functions `cache_get[T]`/`cache_set[T]` handle serialization outside the trait. This keeps `CacheService` object-safe while callers still get type-safe generics.
 
 ### Cache-through with structured concurrency
 
@@ -111,7 +111,7 @@ This example exercises the following spec features:
 | Trait definitions with async methods | §11.5 | traits.w — all four service traits |
 | Trait objects (`dyn Trait`) | §11.3 | service.w — `Box[dyn UserRepository]`, etc. |
 | `with` type-inferred guards | §7.1 | service.w, tests.w — lock access |
-| `with` builder pattern | §7.2 | notify/email.w — SmtpMessage; service.w — Vec |
+| `with` builder pattern | §7.2 | notify/email.w — SmtpMessage; service.w — List |
 | `with` scoped binding | §7.3 | service.w — `describe_changes` |
 | `with` record update | §7.4 | service.w — builder setters, partial user updates |
 | `@[no_await_guard]` rule | §7.9 | Locks use `with` without `.await`; pools use `with` with `.await` |

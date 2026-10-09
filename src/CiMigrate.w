@@ -62,13 +62,13 @@ pub fn ci_migrate_is_width_family_name(name: &str) -> bool:
 //   2. Redirects duplicated top-level declarations to a shared buffer
 //   3. After all files, emits a defs.w containing preamble + shared decls
 var g_migrate_shared_defs_prefix: str = ""
-var g_migrate_shared_decl_buf: Vec[str] = Vec.new()
+var g_migrate_shared_decl_buf: List[str] = List.new()
 var g_migrate_shared_decl_keys: str = ""
-var g_migrate_shared_decl_records: Vec[str] = Vec.new()
+var g_migrate_shared_decl_records: List[str] = List.new()
 var g_migrate_directory_one_basename: str = ""
 var g_migrate_shared_fragment_path: str = ""
-var g_migrate_include_paths: Vec[str] = Vec.new()
-var g_migrate_forced_includes: Vec[str] = Vec.new()
+var g_migrate_include_paths: List[str] = List.new()
+var g_migrate_forced_includes: List[str] = List.new()
 var g_migrate_directory_input_dir: str = ""
 
 type CiMigratePendingSharedExternVar {
@@ -77,7 +77,7 @@ type CiMigratePendingSharedExternVar {
     rendered: str = "",
 }
 
-var g_migrate_shared_pending_extern_vars: Vec[CiMigratePendingSharedExternVar] = Vec.new()
+var g_migrate_shared_pending_extern_vars: List[CiMigratePendingSharedExternVar] = List.new()
 var g_migrate_shared_usage_idents: str = ""
 var g_migrate_libc_symbols_used: str = ""
 // D29 (#750): discriminates migrate translation from in-place c_import. The
@@ -119,8 +119,8 @@ pub fn migrate_reset_options():
     ci_migrate_shared_defs_reset()
     g_migrate_directory_one_basename = ""
     g_migrate_shared_fragment_path = ""
-    g_migrate_include_paths = Vec.new()
-    g_migrate_forced_includes = Vec.new()
+    g_migrate_include_paths = List.new()
+    g_migrate_forced_includes = List.new()
     g_migrate_directory_input_dir = ""
     g_migrate_defines = ""
     g_migrate_file_error = ""
@@ -149,10 +149,10 @@ pub fn ci_migrate_shared_defs_targets_std_zone() -> bool:
     ci_starts_with(g_migrate_shared_defs_prefix, "std.")
 
 fn ci_migrate_shared_defs_reset:
-    g_migrate_shared_decl_buf = Vec.new()
+    g_migrate_shared_decl_buf = List.new()
     g_migrate_shared_decl_keys = ""
-    g_migrate_shared_decl_records = Vec.new()
-    g_migrate_shared_pending_extern_vars = Vec.new()
+    g_migrate_shared_decl_records = List.new()
+    g_migrate_shared_pending_extern_vars = List.new()
     g_migrate_shared_usage_idents = ""
 
 fn ci_migrate_shared_decl_key(kind: &str, name: &str) -> str:
@@ -673,7 +673,7 @@ fn ci_migrate_merge_shared_fragment_text(text: &str):
             ci_migrate_merge_usage_keys(body)
         pos = body_end + 7
 
-fn ci_migrate_merge_shared_fragment_texts(output_dir: &str, fragments: &Vec[str]):
+fn ci_migrate_merge_shared_fragment_texts(output_dir: &str, fragments: &List[str]):
     ci_migrate_shared_defs_reset()
     var i = 0
     while i < fragments.len() as i32:
@@ -1041,7 +1041,7 @@ impl CiProject:
 
     // Every unit of the migration is a module before any file is scanned,
     // so a header's owner resolves whatever the scan order.
-    mut fn register_modules(files: &Vec[str]):
+    mut fn register_modules(files: &List[str]):
         for path in files: let _ = self.ensure_module(path)
 
     mut fn migrate_scan_file(input_path: &str) -> i32:
@@ -1267,7 +1267,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
         g_migrate_macro_session = macro_session
         ci_capture_macro_values(macro_session)
 
-    let output_parts: Vec[str] = Vec.new()
+    let output_parts: List[str] = List.new()
 
     // C3: in shared-defs mode, skip the preamble and emit `use <prefix>` instead.
     // The preamble goes into defs.w (written by ci_migrate_write_shared_defs).
@@ -1400,7 +1400,7 @@ pub fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
     ci_migrate_writes_reset()
     // D107: a lone unit is its own corpus — its definitions' body evidence
     // and NULL callers decide their function-pointer parameters.
-    var one: Vec[str] = Vec.new()
+    var one: List[str] = List.new()
     one.push(input_path.clone())
     project.register_modules(&one)
     if project.migrate_scan_file(input_path) != 0: return 1
@@ -1501,8 +1501,8 @@ fn ci_migrate_file_before(a: &str, b: &str) -> bool:
         return arank < brank
     ci_str_compare(abase, bbase) < 0
 
-fn ci_migrate_sorted_files(files: &Vec[str]) -> Vec[str]:
-    let sorted: Vec[str] = Vec.new()
+fn ci_migrate_sorted_files(files: &List[str]) -> List[str]:
+    let sorted: List[str] = List.new()
     var rank = 10
     while rank <= 320:
         var i = 0
@@ -1523,7 +1523,7 @@ fn ci_migrate_sorted_files(files: &Vec[str]) -> Vec[str]:
 fn ci_migrate_directory_output_path(input_dir: &str, output_dir: &str, file_path: &str):
     output_dir ++ "/" ++ ci_migrate_module_relative_path(input_dir, file_path) ++ ".w"
 
-fn ci_migrate_validate_module_paths(input_dir: &str, files: &Vec[str]):
+fn ci_migrate_validate_module_paths(input_dir: &str, files: &List[str]):
     var owners: HashMap[str, str] = HashMap.new()
     for path in files:
         let module_path = ci_migrate_module_relative_path(input_dir, path)
@@ -1558,8 +1558,8 @@ fn ci_migrate_basename_is_hidden(path: &str) -> bool:
     let base = ci_migrate_path_basename(path)
     base.len() > 0 and base[0] == 46
 
-fn ci_migrate_sorted_insert(files: &Vec[str], path: &str) -> Vec[str]:
-    let sorted: Vec[str] = Vec.new()
+fn ci_migrate_sorted_insert(files: &List[str], path: &str) -> List[str]:
+    let sorted: List[str] = List.new()
     var inserted = false
     var i = 0
     while i < files.len() as i32:
@@ -1573,8 +1573,8 @@ fn ci_migrate_sorted_insert(files: &Vec[str], path: &str) -> Vec[str]:
         sorted.push(with_str_clone_ref(path))
     sorted
 
-fn ci_migrate_collect_c_files(input_dir: &str, exclude_basenames: &str) -> Vec[str]:
-    var files: Vec[str] = Vec.new()
+fn ci_migrate_collect_c_files(input_dir: &str, exclude_basenames: &str) -> List[str]:
+    var files: List[str] = List.new()
     let listing = with_fs_list_files(input_dir)
     var pos = 0
     let n = listing.len() as i32
@@ -1596,9 +1596,9 @@ fn ci_migrate_collect_c_files(input_dir: &str, exclude_basenames: &str) -> Vec[s
 // CImport: one entry per corpus function, `bits` holding one char per
 // parameter ('1' Option, '0' non-null, '?' not a function pointer) and
 // `reasons` the one-line reason per parameter, `|`-separated.
-var g_migrate_fn_nullable_names: Vec[str] = Vec.new()
-var g_migrate_fn_nullable_bits: Vec[str] = Vec.new()
-var g_migrate_fn_nullable_reasons: Vec[str] = Vec.new()
+var g_migrate_fn_nullable_names: List[str] = List.new()
+var g_migrate_fn_nullable_bits: List[str] = List.new()
+var g_migrate_fn_nullable_reasons: List[str] = List.new()
 
 fn ci_migrate_fn_nullable_index(name: &str) -> i32:
     for i in 0..g_migrate_fn_nullable_names.len() as i32:
@@ -1631,7 +1631,7 @@ impl CiProject:
     // where it passes or stores its own parameters.
     mut fn record_fn_evidence(session: i64, decl_idx: i32, cursor: i32, symbol_id: i32):
         let count = with_cimport_fn_param_count(session, decl_idx)
-        var names: Vec[str] = Vec.new()
+        var names: List[str] = List.new()
         for pi in 0..count:
             names.push(ci_escape_reserved(with_cimport_fn_param_name(session, decl_idx, pi)))
         self.symbols[symbol_id].grow_params(count)
@@ -1667,7 +1667,7 @@ impl CiProject:
     // calls: a NULL it passes to a corpus function is caller evidence
     // (pcre2test's `pcre2_jit_stack_assign(ctx, NULL, NULL)`).
     mut fn record_call_evidence(session: i64, cursor: i32, fname: &str):
-        let none: Vec[str] = Vec.new()
+        let none: List[str] = List.new()
         for line in ci_body_call_evidence(session, cursor, &none).split("\n"):
             let parts = line.split(":")
             if parts.len() != 3 or parts[0] != "null": continue
@@ -1773,9 +1773,9 @@ impl CiProject:
 
     // Export the verdicts for CImport and say each one once.
     fn export_fn_ptr_nullability(verbose: bool):
-        g_migrate_fn_nullable_names = Vec.new()
-        g_migrate_fn_nullable_bits = Vec.new()
-        g_migrate_fn_nullable_reasons = Vec.new()
+        g_migrate_fn_nullable_names = List.new()
+        g_migrate_fn_nullable_bits = List.new()
+        g_migrate_fn_nullable_reasons = List.new()
         for si in 0..self.symbols.len() as i32:
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
             var bits = ""
@@ -1793,13 +1793,13 @@ impl CiProject:
             g_migrate_fn_nullable_bits.push(bits)
             g_migrate_fn_nullable_reasons.push(reasons)
 
-fn ci_index_of_name(names: &Vec[str], name: &str) -> i32:
+fn ci_index_of_name(names: &List[str], name: &str) -> i32:
     for i in 0..names.len() as i32:
         if names[i] == name: return i
     -1
 
-fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &Vec[str]) -> i32:
-    let fragments: Vec[str] = Vec.new()
+fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List[str]) -> i32:
+    let fragments: List[str] = List.new()
     with_fs_mkdir_p(output_dir)
     var migrated = 0
     var i = 0
@@ -1934,16 +1934,16 @@ pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_ba
 // no local shadows a global. A write the scan misses is no hazard: the
 // bundle build refuses the function with the literal fix-it. A
 // one-file migration (migrate_one) sees only that file's callees.
-var g_migrate_writes_fn_names: Vec[str] = Vec.new()
-var g_migrate_writes_fn_bodies: Vec[str] = Vec.new()
-var g_migrate_writes_paths: Vec[str] = Vec.new()
+var g_migrate_writes_fn_names: List[str] = List.new()
+var g_migrate_writes_fn_bodies: List[str] = List.new()
+var g_migrate_writes_paths: List[str] = List.new()
 
 fn ci_migrate_writes_mark(name: &str) -> str: "@@with-writes:" ++ name ++ "@@"
 
 fn ci_migrate_writes_reset():
-    g_migrate_writes_fn_names = Vec.new()
-    g_migrate_writes_fn_bodies = Vec.new()
-    g_migrate_writes_paths = Vec.new()
+    g_migrate_writes_fn_names = List.new()
+    g_migrate_writes_fn_bodies = List.new()
+    g_migrate_writes_paths = List.new()
 
 fn ci_migrate_writes_note_path(path: &str):
     if not g_migrate_writes_paths.contains(path):
@@ -2001,8 +2001,8 @@ fn ci_migrate_apply_writes_clauses() -> i32:
     for fi in 0..g_migrate_writes_fn_names.len() as i32:
         fn_index.insert(with_str_clone_ref(g_migrate_writes_fn_names[fi]), fi)
     // Each function's direct writes and corpus callees, "|a|b|" sets.
-    var writes: Vec[str] = Vec.new()
-    var callees: Vec[str] = Vec.new()
+    var writes: List[str] = List.new()
+    var callees: List[str] = List.new()
     for fi in 0..g_migrate_writes_fn_bodies.len() as i32:
         let body = g_migrate_writes_fn_bodies[fi]
         var lexer = Lexer.init(body, 0)
@@ -2049,7 +2049,7 @@ fn ci_migrate_apply_writes_clauses() -> i32:
                 continue
             // Sorted by name, so the clause is deterministic.
             let parts = writes[fi].split("|")
-            var used: Vec[bool] = Vec.new()
+            var used: List[bool] = List.new()
             for wi in 0..parts.len() as i32:
                 used.push(parts[wi].len() == 0)
             var clause = ""

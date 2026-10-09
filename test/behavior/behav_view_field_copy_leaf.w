@@ -4,10 +4,10 @@
 // D22 rule 3 permits contextual Copy materialization.
 
 use std.builtins.int_to_string
-type Outer { v: Vec[i32], n: i32 }
+type Outer { v: List[i32], n: i32 }
 
 fn main:
-    var o = Outer { v: Vec.new(), n: 7 }
+    var o = Outer { v: List.new(), n: 7 }
     o.v.push(1)
     let r = &o
     let leaf = r.n

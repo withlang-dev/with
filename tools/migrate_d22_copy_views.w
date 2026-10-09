@@ -59,10 +59,10 @@ fn source_line_end(text: &str, start: i32) -> i32:
     i
 
 type Edits {
-    paths: Vec[str],
-    lines: Vec[i32],
-    names: Vec[str],
-    types: Vec[str],
+    paths: List[str],
+    lines: List[i32],
+    names: List[str],
+    types: List[str],
 }
 
 fn edit_key(path: &str, line: i32, name: &str) -> str: path ++ ":" ++ line.to_string() ++ ":" ++ name
@@ -74,7 +74,7 @@ fn has_edit(edits: &Edits, path: &str, line: i32, name: &str) -> bool:
     false
 
 fn parse_diagnostics(text: &str) -> Edits:
-    var edits = Edits { paths: Vec.new(), lines: Vec.new(), names: Vec.new(), types: Vec.new() }
+    var edits = Edits { paths: List.new(), lines: List.new(), names: List.new(), types: List.new() }
     let error_prefix = "error: cannot mutate `"
     var pos: i64 = 0
     while true:
@@ -185,7 +185,7 @@ fn main:
     let _ = mkdir_p("out/tmp")
     let out_path = "out/tmp/with-d22-migrate.stdout"
     let err_path = "out/tmp/with-d22-migrate.stderr"
-    var cmd: Vec[str] = Vec.new()
+    var cmd: List[str] = List.new()
     cmd.push("/bin/sh")
     cmd.push("-c")
     cmd.push("\"$0\" check \"$1\" > \"$2\" 2> \"$3\"")

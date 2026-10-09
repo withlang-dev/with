@@ -13,8 +13,8 @@ fn get(i: i32) -> Result[Entry, str]:
     if i > 5: return Err("big")
     Ok(Entry { name: f"e{i}", size: i as i64 })
 
-fn all(n: i32) -> Result[Vec[Entry], str]:
-    var out: Vec[Entry] = Vec.new()
+fn all(n: i32) -> Result[List[Entry], str]:
+    var out: List[Entry] = List.new()
     var i = 0
     while i < n:
         out.push(get(i)?)

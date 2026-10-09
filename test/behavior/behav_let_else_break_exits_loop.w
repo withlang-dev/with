@@ -8,13 +8,13 @@
 // whether `while true` / `loop` / a labeled block falls through with a walk
 // of the syntax that never looked inside a let-else, so it read these loops
 // as never exiting: the function's result was never stored (a garbage
-// `i32`, an empty leaked `Vec`) and the labeled block typed as `Never`.
+// `i32`, an empty leaked `List`) and the labeled block typed as `Never`.
 
 fn below(n: i32, lim: i32) -> Option[i32]: if n < lim: Some(n * 10 + 7) else: None
 
 fn count_to(lim: i32) -> i32:
     var n = 0
-    var out: Vec[i32] = Vec.new()
+    var out: List[i32] = List.new()
     while true:
         let Some(x) = below(n, lim) else: break
         out.push(x)
@@ -24,8 +24,8 @@ fn count_to(lim: i32) -> i32:
     print(f"while {out.len()} {sum}")
     out.len() as i32
 
-fn words_from(start: i32) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn words_from(start: i32) -> List[str]:
+    var out: List[str] = List.new()
     var i = start
     loop:
         let Some(w) = (if i < start + 4: Some(f"{i}!") else: None) else: break

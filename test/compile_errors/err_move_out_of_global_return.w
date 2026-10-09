@@ -3,9 +3,9 @@
 // #1242: a returned global is not routed through the consume arm; the
 // return walker rejects it the same way (tail and explicit `return`).
 
-var g: Vec[str] = Vec.new()
+var g: List[str] = List.new()
 
-fn tail() -> Vec[str]: g
+fn tail() -> List[str]: g
 
 fn main:
     g.push("a")

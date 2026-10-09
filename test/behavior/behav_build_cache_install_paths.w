@@ -12,7 +12,7 @@ fn check_install(root: &str, destination: str):
     target.entry = "source"
     target.output = destination
     let path = build_graph_expand_install_path(root, target.output)
-    let empty: Vec[str] = Vec.new()
+    let empty: List[str] = List.new()
     assert(build_graph_install_file(root, target) == 0)
     build_cache_record(root, target, empty, empty)
     let reason = build_cache_freshness_reason(root, target, false)

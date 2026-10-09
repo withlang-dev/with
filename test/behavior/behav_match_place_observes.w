@@ -92,7 +92,7 @@ fn main:
     let (k2, _) = q.pair else: return
     print(f"let-else {k1} {k2}")
 
-    var v: Vec[Option[Tok]] = Vec.new()
+    var v: List[Option[Tok]] = List.new()
     v.push(Some(.S("e")))
     let e1 = match v[0] { Some(.S(_)) => true, _ => false }
     let e2 = match v[0] { Some(.S(_)) => true, _ => false }

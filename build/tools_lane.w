@@ -56,11 +56,11 @@ pub fn run_tools_tests_action(ctx: ActionCtx) -> i32:
     if not fs.exists(inputs[0]):
         ctx.diagnostics().error("tools-tests: missing compiler: " ++ inputs[0])
     let compiler = tl_abs(root, inputs[0])
-    var jobs: Vec[ParJob] = Vec.new()
-    var labels: Vec[str] = Vec.new()
+    var jobs: List[ParJob] = List.new()
+    var labels: List[str] = List.new()
     for source in fs.glob("tools/*.w"):
         let slug = tl_slug(source)
-        var args: Vec[str] = Vec.new()
+        var args: List[str] = List.new()
         args.push(compiler.clone())
         var label = ""
         var timeout_ms = 600000

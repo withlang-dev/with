@@ -332,7 +332,7 @@ with build :debug-alloc-tests
 ```
 
 The report prints allocator verdicts such as `DOUBLE FREE`, `LEAK`, and
-`origin=Vec/channel/fiber/with_alloc`. Compiler-emitted drops also report
+`origin=List/channel/fiber/with_alloc`. Compiler-emitted drops also report
 `first_drop=` and `second_drop=` tags when a double-free is observed. To
 resolve source sites for a flagged address:
 

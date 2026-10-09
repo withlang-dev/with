@@ -3,7 +3,7 @@
 // #1567 / §12.2: the same escape through a let-bound closure returned with
 // an explicit `return`.
 fn counter() -> fn() -> i32:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     let f = () =>
         xs.push(1)
         xs.len32()

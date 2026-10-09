@@ -20,11 +20,11 @@ fn new_w(drops: *mut i32, n: i32) -> W:
 
 fn main:
     var drops = 0
-    var xs: Vec[W] = Vec.new()
+    var xs: List[W] = List.new()
     xs.push(new_w(&raw mut drops, 1))
     xs.push(new_w(&raw mut drops, 2))
     xs.push(new_w(&raw mut drops, 3))
-    var sink: Vec[W] = Vec.new()
+    var sink: List[W] = List.new()
     var total = 0
     for w in xs.into_iter():
         total = total + w.n

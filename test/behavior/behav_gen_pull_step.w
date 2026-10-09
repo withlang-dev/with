@@ -18,7 +18,7 @@ gen fn powers(base: i64, count: i32) -> i64:
         yield v
         v = v * base
 
-gen fn tagged(names: Vec[str]) -> str:
+gen fn tagged(names: List[str]) -> str:
     var n = 3
     for name in names:
         yield f"{name}-{n}"
@@ -35,7 +35,7 @@ type Parser {
 impl Parser:
     mut fn take(): self.toks.next().unwrap()
 
-gen fn doubled(words: Vec[str]) -> str:
+gen fn doubled(words: List[str]) -> str:
     for w in words:
         yield w ++ w
 

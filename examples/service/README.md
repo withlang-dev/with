@@ -50,7 +50,7 @@ NotifyError =` generates the wrappers and conversions that let `?` propagate acr
 boundaries, and declares the service's own variants beside them.
 
 **Testability** — `MockUserRepo`, `MockCache`, `MockNotifier` implement the same traits.
-`NotificationLog = Arc[Mutex[Vec[Notification]]]` gives tests a handle to assert on side effects.
+`NotificationLog = Arc[Mutex[List[Notification]]]` gives tests a handle to assert on side effects.
 
 ## Language Features
 

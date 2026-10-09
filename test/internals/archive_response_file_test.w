@@ -9,7 +9,7 @@ use std.fs
 // and failed "cannot read member"; it now reads the members the file names,
 // by the host's quoting as llvm-ar does.
 
-fn eq(got: &Vec[str], want: &Vec[str]) -> bool:
+fn eq(got: &List[str], want: &List[str]) -> bool:
     if got.len() != want.len(): return false
     for i in 0..got.len() as i32:
         if got[i] != want[i]: return false

@@ -25,7 +25,7 @@
 // #1810: a `&str` is a `{ptr, len}` view value — passed, returned and held
 // by value, never a pointer to a str header. Every producer of a view into
 // a `&str` parameter (explicit `&`, auto-reference of a local, a literal, a
-// field, a Vec element, iteration), forwarding, returning a parameter view,
+// field, a List element, iteration), forwarding, returning a parameter view,
 // generic and callable consumers, str receivers (`fn` reads a view, `mut fn`
 // takes the caller's place), a closure capturing a view, a reference to a
 // view, raw pointers to a header, and a distinct type over str.
@@ -67,7 +67,7 @@ fn main:
     let nm = Named { name: "gamma", n: 1 }
     show(nm.name)
     print(nm.name_view())
-    var xs: Vec[str] = Vec.new()
+    var xs: List[str] = List.new()
     xs.push("d0")
     xs.push("d1")
     show(xs[1])

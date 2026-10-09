@@ -7,8 +7,8 @@
 //   .ulen32() -> u32     (panics if the length exceeds u32 range)
 
 use std.collections.HashMap
-fn make_vec -> Vec[i32]:
-    var items: Vec[i32] = Vec.new()
+fn make_list -> List[i32]:
+    var items: List[i32] = List.new()
     items.push(10)
     items.push(20)
     items.push(30)
@@ -17,26 +17,26 @@ fn make_vec -> Vec[i32]:
     items
 
 // PASS: .len() returns Int (i64)
-fn test_vec_len_int:
-    let items = make_vec()
+fn test_list_len_int:
+    let items = make_list()
     let count: Int = items.len()
     assert(count == 5)
 
 // PASS: .len32() returns i32
-fn test_vec_len32_i32:
-    let items = make_vec()
+fn test_list_len32_i32:
+    let items = make_list()
     let count: i32 = items.len32()
     assert(count == 5)
 
 // PASS: .len64() returns i64
-fn test_vec_len64_i64:
-    let items = make_vec()
+fn test_list_len64_i64:
+    let items = make_list()
     let count: i64 = items.len64()
     assert(count == 5)
 
 // PASS: .ulen32() returns u32
-fn test_vec_ulen32_u32:
-    let items = make_vec()
+fn test_list_ulen32_u32:
+    let items = make_list()
     let count: u32 = items.ulen32()
     assert(count == 5)
 
@@ -67,6 +67,6 @@ fn test_map_len_family:
 
 // PASS: the narrowing accessors compose in expressions
 fn test_len32_in_expression:
-    let items = make_vec()
+    let items = make_list()
     let doubled: i32 = items.len32() * 2
     assert(doubled == 10)

@@ -106,13 +106,13 @@ fn pairs_switch_otherwise_value(body: &MirBody, table: i32) -> i64:
         if body.switch_table_vals[(start + i)] == 0: has_zero = true
     if has_zero: 1 else: 0
 
-fn pairs_vec_i32(count: i32, value: i32) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+fn pairs_list_i32(count: i32, value: i32) -> List[i32]:
+    let out: List[i32] = List.new()
     for _ in 0..count: out.push(value)
     out
 
-fn pairs_vec_i64(count: i32, value: i64) -> Vec[i64]:
-    let out: Vec[i64] = Vec.new()
+fn pairs_list_i64(count: i32, value: i64) -> List[i64]:
+    let out: List[i64] = List.new()
     for _ in 0..count: out.push(value)
     out
 
@@ -130,40 +130,40 @@ type PairsBody {
     keys: MirDropStateKeys,
     // Per key: the pair resource an owned place is, or -1; 1 when the key
     // is a reference to one.
-    key_resource: Vec[i32],
+    key_resource: List[i32],
     // A projection through a reference local (`(*h).x`, the receiver of a
     // call on `h: &Handle`) is that local: its key, or -1.
-    key_alias: Vec[i32],
-    key_is_ref: Vec[i32],
+    key_alias: List[i32],
+    key_is_ref: List[i32],
     // A reference key's referent key (RK_REF), -2 before any is seen, -1
     // when it is assigned from two places.
-    ref_origin: Vec[i32],
+    ref_origin: List[i32],
     // 1 for keys a userdata setter retains (the referent of its `&U`
     // argument): their moves and deaths are steps.
-    origin_key: Vec[i32],
+    origin_key: List[i32],
     // The block of the setter call that retained each origin: where a
     // dying or moving origin is reported.
-    origin_bb: Vec[i32],
+    origin_bb: List[i32],
     // A local a setter's status was copied into: the status key it stands
     // for in a comparison (-1: none).
-    guard_alias: Vec[i32],
+    guard_alias: List[i32],
     // Keys holding a setter's status, and the success value each compares
     // against (-1: none).
-    guard_ok: Vec[i64],
+    guard_ok: List[i64],
     // Keys holding `status == OK` / `status != OK`: the guard and the sense.
-    cond_guard: Vec[i32],
-    cond_is_eq: Vec[i32],
-    steps: Vec[ForeignPairStep],
-    sites: Vec[PairsStepSite],
-    starts: Vec[i32],
-    counts: Vec[i32],
-    edges: Vec[ForeignPairEdge],
+    cond_guard: List[i32],
+    cond_is_eq: List[i32],
+    steps: List[ForeignPairStep],
+    sites: List[PairsStepSite],
+    starts: List[i32],
+    counts: List[i32],
+    edges: List[ForeignPairEdge],
 }
 
 fn pairs_body_new(body: &MirBody) -> PairsBody:
     let keys = mir_drop_state_keys_new(body)
     let width = keys.len()
-    PairsBody { keys: move keys, key_resource: pairs_vec_i32(width, -1), key_alias: pairs_vec_i32(width, -1), key_is_ref: pairs_vec_i32(width, 0), ref_origin: pairs_vec_i32(width, -2), origin_key: pairs_vec_i32(width, 0), origin_bb: pairs_vec_i32(width, -1), guard_alias: pairs_vec_i32(width, -1), guard_ok: pairs_vec_i64(width, -1), cond_guard: pairs_vec_i32(width, -1), cond_is_eq: pairs_vec_i32(width, 1), steps: Vec.new(), sites: Vec.new(), starts: Vec.new(), counts: Vec.new(), edges: Vec.new() }
+    PairsBody { keys: move keys, key_resource: pairs_list_i32(width, -1), key_alias: pairs_list_i32(width, -1), key_is_ref: pairs_list_i32(width, 0), ref_origin: pairs_list_i32(width, -2), origin_key: pairs_list_i32(width, 0), origin_bb: pairs_list_i32(width, -1), guard_alias: pairs_list_i32(width, -1), guard_ok: pairs_list_i64(width, -1), cond_guard: pairs_list_i32(width, -1), cond_is_eq: pairs_list_i32(width, 1), steps: List.new(), sites: List.new(), starts: List.new(), counts: List.new(), edges: List.new() }
 
 impl PairsBody:
     fn width(): self.key_resource.len() as i32
@@ -604,7 +604,7 @@ fn pairs_dump(sema: &Sema, body: &MirBody, pb: &PairsBody, flow: &ForeignPairPla
 
 // The module's findings, collected body by body.
 pub type PairsReport {
-    findings: Vec[PairsFinding],
+    findings: List[PairsFinding],
 }
 
 impl PairsReport:
@@ -625,8 +625,8 @@ impl PairsReport:
         let flow = foreign_pair_place_flow(pb.starts, pb.counts, pb.steps, pb.edges, entry)
         if pairs_dump_enabled():
             pairs_dump(sema, body, pb, flow)
-        let reported_starts: Vec[i32] = Vec.new()
-        let reported_kinds: Vec[i32] = Vec.new()
+        let reported_starts: List[i32] = List.new()
+        let reported_kinds: List[i32] = List.new()
         for vi in 0..flow.violations.len() as i32:
             let si = flow.violations[vi]
             let site = pb.sites[si]
@@ -649,7 +649,7 @@ pub fn pairs_dump_enabled() -> bool: with_getenv_str("WITH_DUMP_PAIR_FLOW").len(
 // (compiler/Compilation.w run_mir_lower): a module with no callback pair
 // costs one table lookup.
 pub fn check_foreign_pairs(mir_mod: &MirModule, ast: AstPool, sema: &Sema) -> PairsReport:
-    var report = PairsReport { findings: Vec.new() }
+    var report = PairsReport { findings: List.new() }
     if sema.facade_pair_ops.len() == 0:
         return report
     for bi in 0..mir_mod.bodies.len() as i32:

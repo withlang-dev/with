@@ -35,6 +35,6 @@ fn main:
     let n = d.count()
     let status = d.close_v2(n)
     let t = Texture.load("a.png")
-    let held: Vec[Texture] = Vec.new()
+    let held: List[Texture] = List.new()
     held.push(t)
     print(f"{status}")

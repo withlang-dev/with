@@ -33,7 +33,7 @@ fn test_task_values_can_be_passed_and_stored:
     let passed = pass_task(move task)
     assert(passed.await == 10)
 
-    var tasks = Vec[Task[i32]].new()
+    var tasks = List[Task[i32]].new()
     tasks.push(fetch_data(1))
     tasks.push(fetch_data(2))
     assert(tasks.len() == 2)

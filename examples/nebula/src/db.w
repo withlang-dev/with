@@ -73,7 +73,7 @@ extend Database:
     // Bulk insert through the SqlRecord trait. Any type implementing
     // SqlRecord can be inserted — the caller doesn't need to
     // know the concrete type.
-    pub fn insert_bulk[R: SqlRecord](records: &Vec[R]) -> Result[Unit, DbError]:
+    pub fn insert_bulk[R: SqlRecord](records: &List[R]) -> Result[Unit, DbError]:
         if not self.open:
             return Err(.Query("database not open"))
 

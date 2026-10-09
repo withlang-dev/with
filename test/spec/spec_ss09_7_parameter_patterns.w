@@ -52,7 +52,7 @@ fn test_refutable_param_clauses:
     assert(option_value(None) == 0)
 
 fn test_for_loop_destructure:
-    var pairs: Vec[(i32, i32)] = Vec.new()
+    var pairs: List[(i32, i32)] = List.new()
     pairs.push((1, 10))
     pairs.push((2, 20))
     var sum = 0

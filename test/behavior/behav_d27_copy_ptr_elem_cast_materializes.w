@@ -5,7 +5,7 @@
 
 fn main:
     let x = 5
-    var v: Vec[*const i32] = Vec.new()
+    var v: List[*const i32] = List.new()
     let p = &raw const x
     v.push(p)
     let direct = p as i64

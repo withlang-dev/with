@@ -3,7 +3,7 @@
 // #1954: one argument that is not a range is refused the same way.
 
 fn main:
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     v.push(1)
     let n: i32 = 1
     let r = v.range(n)

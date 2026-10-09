@@ -20,8 +20,8 @@ enum JsonValue {
     | Bool(bool)
     | Number(f64)
     | Str(str)
-    | Array(Vec[JsonValue])
-    | Object(Vec[JsonKV])
+    | Array(List[JsonValue])
+    | Object(List[JsonKV])
 }
 
 type JsonKV {
@@ -249,7 +249,7 @@ extend Parser:
 
     // Called after '[' was consumed.
     mut fn parse_array() -> Result[JsonValue, JsonError]:
-        var items = Vec.new()
+        var items = List.new()
         // empty array
         if is_rbracket(&self.current):
             self.advance()?
@@ -272,7 +272,7 @@ extend Parser:
 
     // Called after '{' was consumed.
     mut fn parse_object() -> Result[JsonValue, JsonError]:
-        var entries = Vec.new()
+        var entries = List.new()
         // empty object
         if is_rbrace(&self.current):
             self.advance()?
@@ -324,13 +324,13 @@ fn json_to_string(val: &JsonValue) -> str:
         .Number(n)  => f"{n}"
         .Str(s)     => "\"" ++ s ++ "\""
         .Array(items) =>
-            var parts = Vec.new()
+            var parts = List.new()
             for item in items:
                 parts.push(json_to_string(item))
             let inner = parts.join(", ")
             "[" ++ inner ++ "]"
         .Object(entries) =>
-            var parts = Vec.new()
+            var parts = List.new()
             for entry in entries:
                 let v = json_to_string(&entry.value)
                 parts.push("\"" ++ entry.key ++ "\": " ++ v)

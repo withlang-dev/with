@@ -13,7 +13,7 @@ fn main:
         return
     assert(set_env("WITH_BEHAV_RELATIVE_CHILD", "1") == 0)
     let argv = args()
-    var child: Vec[str] = Vec.new()
+    var child: List[str] = List.new()
     child.push(argv[0] ++ "")
     let rc = run(&child)
     assert(rc == 0)

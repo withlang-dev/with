@@ -1,8 +1,8 @@
-//! expect-check-fail: Vec.new allocates here
+//! expect-check-fail: List.new allocates here
 
 use std.collections
 
 @[no_alloc]
 fn main:
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     v.len()

@@ -2,23 +2,23 @@
 
 use std.zlib
 
-fn bytes_from_str(s: str) -> Vec[u8]:
-    let out: Vec[u8] = Vec.new()
+fn bytes_from_str(s: str) -> List[u8]:
+    let out: List[u8] = List.new()
     var i: i64 = 0
     while i < s.len():
         out.push(s.byte_at(i) as u8)
         i = i + 1
     out
 
-fn assert_bytes_eq(actual: &Vec[u8], expected: &Vec[u8]):
+fn assert_bytes_eq(actual: &List[u8], expected: &List[u8]):
     assert(actual.len() == expected.len())
     var i: i64 = 0
     while i < expected.len():
         assert(actual[i] == expected[i])
         i = i + 1
 
-fn gzip_hello_fixture() -> Vec[u8]:
-    let out: Vec[u8] = Vec.new()
+fn gzip_hello_fixture() -> List[u8]:
+    let out: List[u8] = List.new()
     out.push(31 as u8)
     out.push(139 as u8)
     out.push(8 as u8)

@@ -1,5 +1,5 @@
 use std.collections
-use std.collections.sorted_vec.SortedVec
+use std.collections.sorted_list.SortedList
 use std.collections.binary_heap.BinaryHeap
 use std.collections.trie.Trie
 use std.collections.hash_index.HashIndex
@@ -15,7 +15,7 @@ extern fn with_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_pat
 
 fn slotmap_work(n: i32):
     var slots = SlotMap[i32].new()
-    let handles: Vec[Handle[i32]] = Vec.new()
+    let handles: List[Handle[i32]] = List.new()
     for i in 0..n: handles.push(slots.insert(i))
     for i in 0..n:
         if i % 2 == 0: assert(slots.remove(handles[i]).unwrap() == i)
@@ -26,8 +26,8 @@ fn slotmap_work(n: i32):
     assert(slots.len() == n)
     n
 
-fn vec_work(n: i32):
-    let values: Vec[i32] = Vec.new()
+fn list_work(n: i32):
+    let values: List[i32] = List.new()
     for i in 0..n: values.push(i)
     var sum = 0
     for i in 0..n:
@@ -38,7 +38,7 @@ fn vec_work(n: i32):
     sum
 
 fn borrowed_work(n: i32):
-    let values: Vec[i32] = Vec.new()
+    let values: List[i32] = List.new()
     for i in 0..n: values.push(i)
     var iterator = values.iter()
     var sum = 0
@@ -52,7 +52,7 @@ fn borrowed_work(n: i32):
     sum
 
 fn consuming_work(n: i32):
-    let values: Vec[i32] = Vec.new()
+    let values: List[i32] = List.new()
     for i in 0..n: values.push(i)
     var iterator = values.into_iter()
     var sum = 0
@@ -124,11 +124,11 @@ fn btree_set_work(n: i32, descending: bool):
     n
 
 // Phase 1 facades over the c-algorithms corpus (docs/proposals/stdlib_sourcing_plan.md).
-// SortedVec: ascending insertion appends (no shifting), lookups are binary
+// SortedList: ascending insertion appends (no shifting), lookups are binary
 // searches; a descending fill is O(n) per insert by contract and is not
 // measured here.
-fn sorted_vec_work(n: i32):
-    var sorted = SortedVec[i32].new()
+fn sorted_list_work(n: i32):
+    var sorted = SortedList[i32].new()
     for i in 0..n: sorted.insert(i)
     for i in 0..n: assert(sorted.index_of(&i).unwrap() == i)
     for i in 0..n: assert(*sorted.get(i) == i)
@@ -196,7 +196,7 @@ fn read_all_child(n: i32):
 
 // Quadratic by construction: each step scans everything pushed so far.
 fn quadratic_work(n: i32):
-    var seen: Vec[i32] = Vec.new()
+    var seen: List[i32] = List.new()
     var hits = 0
     for i in 0..n:
         let probe = (i * 7) % n
@@ -257,7 +257,7 @@ fn allocations:
     eprint("complexity: empty begin")
     eprint("complexity: empty end")
     eprint("complexity: control begin")
-    let values: Vec[i32] = Vec.new()
+    let values: List[i32] = List.new()
     values.push(42)
     eprint("complexity: control end")
     assert(values[0] == 42)
@@ -280,7 +280,7 @@ else if args().len() > 2 and args()[1] == "stdin-lines":
 else if args().len() > 2 and args()[1] == "read-all":
     read_all_child(parse(args()[2]))
 else:
-    measure("vec", vec_work, 4000, 0)
+    measure("vec", list_work, 4000, 0)
     measure("vec-iter", borrowed_work, 4000, 0)
     measure("slotmap", slotmap_work, 2000, 0)
     measure("hashmap", hashmap_work, 4000, 0)
@@ -290,7 +290,7 @@ else:
     measure("btree-map-descending", btree_map_descending, 128, 937)
     measure("btree-set-ascending", btree_set_ascending, 1000, 937)
     measure("btree-set-descending", btree_set_descending, 1000, 937)
-    measure("sorted-vec", sorted_vec_work, 4000, 0)
+    measure("sorted-vec", sorted_list_work, 4000, 0)
     measure("binary-heap", binary_heap_work, 4000, 0)
     measure("trie", trie_work, 2000, 0)
     measure("stdin-lines", stdin_lines_work, 10000, 0)

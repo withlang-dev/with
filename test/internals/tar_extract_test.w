@@ -34,12 +34,12 @@ fn header(name: &str, size: i64, kind: &str, link: &str) -> str:
 fn entry(name: &str, kind: &str, body: &str, link: &str) -> str:
     padded(header(name, body.len(), kind, link) ++ body, 512 + ((body.len() + 511) / 512) * 512)
 
-fn bytes(text: &str) -> Vec[u8]:
-    let out: Vec[u8] = Vec.new()
+fn bytes(text: &str) -> List[u8]:
+    let out: List[u8] = List.new()
     for i in 0..text.len(): out.push(text[i])
     out
 
-fn text(v: &Vec[u8]) -> str:
+fn text(v: &List[u8]) -> str:
     var out = ""
     for i in 0..v.len() as i32: out = out ++ str_from_byte(v[i] as i32)
     out

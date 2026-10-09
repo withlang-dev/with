@@ -54,8 +54,8 @@ type CfgEdge {
 // pattern, truthfully Copy) so the build_* walkers can grow the graph
 // through plain parameters under spec §3.8.
 type CfgGraphState {
-    nodes: Vec[CfgNode],
-    edges: Vec[CfgEdge],
+    nodes: List[CfgNode],
+    edges: List[CfgEdge],
     entry: i32,
     exit: i32,
 }
@@ -68,12 +68,12 @@ impl Copy for CfgGraph
 extern fn with_alloc(size: i64) -> *mut u8
 
 fn CfgGraph.init -> CfgGraph:
-    // Two Vec headers plus two i32s; allocate generously like the other
+    // Two List headers plus two i32s; allocate generously like the other
     // handle states.
     let ptr = with_alloc(128) as *mut CfgGraphState
     unsafe *ptr = CfgGraphState {
-        nodes: Vec.new(),
-        edges: Vec.new(),
+        nodes: List.new(),
+        edges: List.new(),
         entry: 0,
         exit: 0,
     }

@@ -9,13 +9,13 @@
 
 use std.collections.HashMap
 use std.collections.HashSet
-fn values(n: i64) -> Vec[i64]:
-    let out: Vec[i64] = Vec.new()
+fn values(n: i64) -> List[i64]:
+    let out: List[i64] = List.new()
     out.push(n)
     out
 
 fn main:
-    var values_by_id: HashMap[i32, Vec[i64]] = HashMap.new()
+    var values_by_id: HashMap[i32, List[i64]] = HashMap.new()
     values_by_id.insert(1, values(1))
     values_by_id.insert(1, values(2))
     assert(values_by_id.get(1).unwrap()[0] == 2)

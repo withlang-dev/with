@@ -1,9 +1,9 @@
-//! expect-error: wrong argument type in call to 'Vec.push'
+//! expect-error: wrong argument type in call to 'List.push'
 
 type Inner {
-    tags: Vec[i32],
+    tags: List[i32],
 }
 
 fn main:
-    var items: Vec[Inner] = Vec.new()
+    var items: List[Inner] = List.new()
     items.push(1)

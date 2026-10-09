@@ -21,8 +21,8 @@ type Holder { n: i32, name: str }
 
 fn compute(s: &str): s ++ "!"
 
-fn nums -> Vec[i32]:
-    var v: Vec[i32] = Vec.new()
+fn nums -> List[i32]:
+    var v: List[i32] = List.new()
     v.push(1)
     v.push(2)
     v
@@ -31,8 +31,8 @@ fn local_str -> str:
     var s = "a"
     s = compute("hi")
 
-fn local_vec -> Vec[i32]:
-    var v: Vec[i32] = Vec.new()
+fn local_list -> List[i32]:
+    var v: List[i32] = List.new()
     v.push(9)
     v = nums()
 

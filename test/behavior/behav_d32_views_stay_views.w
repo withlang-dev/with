@@ -4,13 +4,13 @@
 // a field binds the view, and a view-typed return escapes; neither is a
 // field move, so neither trips the D32 error.
 
-type Holder { v: Vec[i32], n: i32 }
+type Holder { v: List[i32], n: i32 }
 
 impl Holder:
-    fn peek(self: &Self) -> &Vec[i32]: self.v
+    fn peek(self: &Self) -> &List[i32]: self.v
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(7)
     let h = Holder { v: xs, n: 1 }
     let view = h.v

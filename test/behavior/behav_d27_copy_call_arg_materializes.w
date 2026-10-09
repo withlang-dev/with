@@ -6,6 +6,6 @@
 fn add_one(n: i32) -> i32: n + 1
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(6)
     assert(add_one(xs[0]) == 7)

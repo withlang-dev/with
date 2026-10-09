@@ -28,7 +28,7 @@ fn cmd_safe(path: &str) -> bool:
     true
 
 fn junction(link: &str, target: &str):
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push("cmd")
     argv.push("/c mklink /J " ++ link ++ " " ++ target ++ " >nul")
     assert(run(&argv) == 0)

@@ -9,11 +9,11 @@ impl Drop for Item:
 
 fn vector:
     let word = "compiler"
-    let arguments: Vec[str] = [word, "build"]
+    let arguments: List[str] = [word, "build"]
     let other = "overwritten"
     assert(arguments[0] == "compiler")
     assert(word == "compiler" and other == "overwritten")
-    let items: Vec[Item] = [Item { text: "first" }, Item { text: "second" }]
+    let items: List[Item] = [Item { text: "first" }, Item { text: "second" }]
     assert(DROPS == 0 and items[1].text == "second")
     assert("second" == items[1].text and items[0].text < items[1].text)
     assert(items[0].text != "second" and items[1].text > "first")

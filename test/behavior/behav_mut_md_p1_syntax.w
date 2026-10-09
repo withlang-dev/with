@@ -54,7 +54,7 @@ fn test_raw_addr_of_mut:
 
 fn test_nll_last_use_in_block:
     // §8.4 NLL — borrow ends at last use within the block, not at scope end.
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(0)
     let r = &xs[0]
     let v = *r          // last use of r
@@ -63,7 +63,7 @@ fn test_nll_last_use_in_block:
     assert(xs.len() == 2)
 
 fn test_nll_last_use_in_nested_if:
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(0)
     let r = &xs[0]
     if true:
@@ -72,7 +72,7 @@ fn test_nll_last_use_in_nested_if:
     assert(xs.len() == 2)
 
 fn test_nll_last_use_after_loop:
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(0)
     xs.push(1)
     let r = &xs[0]
@@ -91,9 +91,9 @@ fn test_global_var_rebind:
     assert(g_rebindable == 11)
 
 fn test_method_call_normal:
-    // §15.4 — `Vec.push` as a value is rejected; ordinary method-call
+    // §15.4 — `List.push` as a value is rejected; ordinary method-call
     // dispatch on a mutable place works as expected.
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(7)
     xs.push(11)
     assert(xs.len() == 2)

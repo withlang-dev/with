@@ -48,7 +48,7 @@ fn main:
     print(Pt { x: 7 })
     let n = 5
     print(&n)
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(8)
     for v in xs:
         print(v)

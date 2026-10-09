@@ -1,4 +1,4 @@
-//! expect-error: in call to 'Vec.push'
+//! expect-error: in call to 'List.push'
 fn main:
-    let v: Vec[i32] = Vec.new()
+    let v: List[i32] = List.new()
     v.push("hello")

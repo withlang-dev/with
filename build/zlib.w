@@ -23,15 +23,15 @@ pub fn zlib_corpus() -> Corpus:
         // takes the .gz scratch file as its one argument, spelled inside the
         // drift dir so the harness never writes at the root
         harness: ["example", "minigzip"], drift_harness: "example.w", drift_harness_arg: "out/wo-drift/zlib/example.gz",
-        module_floor: 21, defines: Vec.new(), excludes: Vec.new(), declared_externs: Vec.new(),
+        module_floor: 21, defines: List.new(), excludes: List.new(), declared_externs: List.new(),
         promote_after: ["zlib-test"], test_lane: "",
-        fresh_test_lanes: ["zlib-test"], extra_generated_dirs: Vec.new(),
+        fresh_test_lanes: ["zlib-test"], extra_generated_dirs: List.new(),
         prepare_reference: corpus_no_prepare, stage: zlib_stage,
         migrate: zlib_migrate, finish_generated: corpus_no_finish,
         verify_generated: corpus_no_verify, lanes: zlib_lanes,
     }
 
-fn zlib_source_files() -> Vec[str]:
+fn zlib_source_files() -> List[str]:
     ["adler32.c", "compress.c", "crc32.c", "crc32.h", "deflate.c", "deflate.h",
      "gzclose.c", "gzguts.h", "gzlib.c", "gzread.c", "gzwrite.c", "infback.c",
      "inffast.c", "inffast.h", "inffixed.h", "inflate.c", "inflate.h",
@@ -44,7 +44,7 @@ fn zlib_source_files() -> Vec[str]:
 // setjmp/longjmp, which zipAlreadyThere uses as its out-of-memory landing
 // pad and the migrator refuses. The two command-line programs and the Win32
 // stream layer (iowin32) stay out.
-fn zlib_minizip_files() -> Vec[str]:
+fn zlib_minizip_files() -> List[str]:
     ["crypt.h", "ints.h", "ioapi.c", "ioapi.h", "mztools.c", "mztools.h",
      "unzip.c", "unzip.h"]
 
@@ -119,7 +119,7 @@ pub fn run_zlib_test_action(ctx: ActionCtx) -> i32:
     if corpus_provenance(ctx, output, minigzip_bin) != 0: return 1
     let run_dir = output ++ "/current"
     if corpus_reset_dir(ctx, run_dir) != 0: return 1
-    var example_args: Vec[str] = Vec.new()
+    var example_args: List[str] = List.new()
     example_args.push(corpus_abs(ctx, example_bin))
     example_args.push("foo.gz")
     let example = ctx.process_runner().run_capture_cwd(example_args, corpus_abs(ctx, run_dir ++ "/example.stdout"), corpus_abs(ctx, run_dir ++ "/example.stderr"), 120000, corpus_abs(ctx, run_dir))
@@ -127,13 +127,13 @@ pub fn run_zlib_test_action(ctx: ActionCtx) -> i32:
         return corpus_fail(ctx, f"zlib example failed with exit code {example.rc}; stdout=" ++ run_dir ++ "/example.stdout stderr=" ++ run_dir ++ "/example.stderr")
     let input_path = run_dir ++ "/minigzip-input.txt"
     if fs.write_text(input_path, "hello, hello!\n") != 0: return corpus_fail(ctx, "could not write minigzip input")
-    var gzip_args: Vec[str] = Vec.new()
+    var gzip_args: List[str] = List.new()
     gzip_args.push(corpus_abs(ctx, minigzip_bin))
     gzip_args.push("minigzip-input.txt")
     let gzip = ctx.process_runner().run_capture_cwd(gzip_args, corpus_abs(ctx, run_dir ++ "/minigzip-compress.stdout"), corpus_abs(ctx, run_dir ++ "/minigzip-compress.stderr"), 120000, corpus_abs(ctx, run_dir))
     if gzip.rc != 0: return corpus_fail(ctx, f"minigzip compress failed with exit code {gzip.rc}")
     if not fs.exists(run_dir ++ "/minigzip-input.txt.gz"): return corpus_fail(ctx, "minigzip did not produce compressed file")
-    var gunzip_args: Vec[str] = Vec.new()
+    var gunzip_args: List[str] = List.new()
     gunzip_args.push(corpus_abs(ctx, minigzip_bin))
     gunzip_args.push("-d")
     gunzip_args.push("minigzip-input.txt.gz")

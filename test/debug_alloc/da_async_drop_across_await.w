@@ -28,15 +28,15 @@ async fn struct_across(slot: *mut i32) -> i32:
     consume(r)                   // moved + dropped after the suspend
     x
 
-async fn vec_across(slot: *mut i32) -> i32:
-    var v: Vec[Resource] = Vec.new()
+async fn list_across(slot: *mut i32) -> i32:
+    var v: List[Resource] = List.new()
     v.push(new_resource(slot))
     v.push(new_resource(slot))
-    let x = ping().await         // Vec[Drop] live across the suspend
+    let x = ping().await         // List[Drop] live across the suspend
     v.len() as i32               // dropped (elements + buffer) at scope exit
 
 async fn main:
     var drops = 0
     let a = struct_across(&raw mut drops).await
-    let b = vec_across(&raw mut drops).await
-    print_i32(drops)             // 3: one struct + two Vec elements
+    let b = list_across(&raw mut drops).await
+    print_i32(drops)             // 3: one struct + two List elements

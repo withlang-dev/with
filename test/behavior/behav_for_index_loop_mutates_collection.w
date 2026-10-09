@@ -13,7 +13,7 @@
 // use precedes the push.
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)
@@ -21,7 +21,7 @@ fn main:
         xs.push(i as i32)
     print(f"{xs.len()}")
 
-    var ys: Vec[i32] = Vec.new()
+    var ys: List[i32] = List.new()
     ys.push(7)
     var i = 0
     while i < ys.len() and i < 6:
@@ -29,7 +29,7 @@ fn main:
         i += 1
     print(f"{ys.len()}")
 
-    var zs: Vec[i32] = Vec.new()
+    var zs: List[i32] = List.new()
     zs.push(2)
     zs.push(3)
     for j in 0..2:

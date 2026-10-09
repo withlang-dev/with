@@ -9,21 +9,21 @@ use std.encoding.base64
 use std.encoding.base64url
 
 fn corpus(length: i64):
-    let out = Vec[u8].with_capacity(length)
+    let out = List[u8].with_capacity(length)
     var i: i64 = 0
     while i < length:
         out.push(((i * 73 + length * 29 + 17) % 256) as u8)
         i = i + 1
     out
 
-fn assert_bytes_eq(actual: &Vec[u8], expected: &Vec[u8]):
+fn assert_bytes_eq(actual: &List[u8], expected: &List[u8]):
     assert(actual.len() == expected.len())
     var i: i64 = 0
     while i < expected.len():
         assert(actual[i] == expected[i])
         i = i + 1
 
-fn assert_base16_round_trip(data: Vec[u8]):
+fn assert_base16_round_trip(data: List[u8]):
     let encoded = base16_encode(data)
     assert(encoded.len() == data.len() * 2)
     assert_bytes_eq(&base16_decode(encoded).unwrap(), &data)
@@ -43,7 +43,7 @@ fn test_base16_borrowed_inputs:
     assert(base16_encode(values) == "68B1FA")
     assert(values.len() == 3)
 
-fn assert_base32_round_trips(data: Vec[u8]):
+fn assert_base32_round_trips(data: List[u8]):
     let encoded = base32_encode(data)
     let encoded_hex = base32hex_encode(data)
     assert(encoded.len() == ((data.len() + 4) / 5) * 8)
@@ -102,7 +102,7 @@ fn test_base32_borrowed_inputs:
     assert(base32hex_encode(values).len() == 8)
     assert(values.len() == 5)
 
-fn assert_base64_round_trips(data: Vec[u8]):
+fn assert_base64_round_trips(data: List[u8]):
     let encoded = base64_encode(data)
     let encoded_url = base64url_encode(data)
     assert(encoded.len() == ((data.len() + 2) / 3) * 4)

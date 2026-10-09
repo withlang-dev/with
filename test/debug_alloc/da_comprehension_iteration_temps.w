@@ -17,7 +17,7 @@
 //   was never registered as moved, so the last key was dropped again at the
 //   comprehension's end (DOUBLE FREE).
 // - a filter's temporaries (`f"{i}" != "1"`) leaked the same way.
-// - `[check(w)? for w in ws]` and `[f(w) for w in ws]` over `ws: &Vec[str]`
+// - `[check(w)? for w in ws]` and `[f(w) for w in ws]` over `ws: &List[str]`
 //   failed MIR lowering.
 
 use std.collections.{HashMap}
@@ -26,14 +26,14 @@ fn check(w: &str) -> Result[str, str]:
     if w == "w2": return Err(w)
     Ok(w ++ "!")
 
-fn all_checked(ws: &Vec[str]) -> Result[Vec[str], str]:
+fn all_checked(ws: &List[str]) -> Result[List[str], str]:
     let v = [check(w)? for w in ws]
     Ok(v)
 
-fn shouted(ws: &Vec[str]) -> Vec[str]: [w ++ "!" for w in ws]
+fn shouted(ws: &List[str]) -> List[str]: [w ++ "!" for w in ws]
 
-fn words(csv: &str) -> Vec[str]:
-    var ws: Vec[str] = Vec.new()
+fn words(csv: &str) -> List[str]:
+    var ws: List[str] = List.new()
     for n in csv.split(","): ws.push(n)
     ws
 

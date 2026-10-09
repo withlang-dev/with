@@ -18,24 +18,24 @@ fn raw_text(bytes: []u8):
         i = i + 1
     out.to_str()
 
-fn expect_invalid_length(result: Result[Vec[u8], DecodeError], length: i64):
+fn expect_invalid_length(result: Result[List[u8], DecodeError], length: i64):
     match result:
         Err(.InvalidLength(actual)) => assert(actual == length)
         _ => assert(false)
 
-fn expect_invalid_byte(result: Result[Vec[u8], DecodeError], offset: i64, byte: u8):
+fn expect_invalid_byte(result: Result[List[u8], DecodeError], offset: i64, byte: u8):
     match result:
         Err(.InvalidByte(actual_offset, actual_byte)) =>
             assert(actual_offset == offset)
             assert(actual_byte == byte)
         _ => assert(false)
 
-fn expect_invalid_padding(result: Result[Vec[u8], DecodeError], offset: i64):
+fn expect_invalid_padding(result: Result[List[u8], DecodeError], offset: i64):
     match result:
         Err(.InvalidPadding(actual)) => assert(actual == offset)
         _ => assert(false)
 
-fn expect_noncanonical(result: Result[Vec[u8], DecodeError], offset: i64):
+fn expect_noncanonical(result: Result[List[u8], DecodeError], offset: i64):
     match result:
         Err(.NonCanonicalBits(actual)) => assert(actual == offset)
         _ => assert(false)

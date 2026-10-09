@@ -29,7 +29,7 @@ extend World:
     // Reads input events, updates InputState components.
     // Writes: input_states
 
-    mut fn run_input_events(events: &Vec[InputEvent]):
+    mut fn run_input_events(events: &List[InputEvent]):
         for si in 0..self.input_states.len():
             for event in events:
                 match event:
@@ -98,11 +98,11 @@ extend World:
 fn run_collision(
     transforms: &DenseStorage[Transform],
     colliders: &DenseStorage[Collider],
-) -> Vec[CollisionEvent]:
-    var events = Vec.new()
+) -> List[CollisionEvent]:
+    var events = List.new()
 
     // Gather entities that have both Transform and Collider.
-    var candidates = Vec.new()
+    var candidates = List.new()
     for eid in colliders.dense_entities:
         if transforms.contains(Entity.new(eid)):
             candidates.push(eid)
@@ -162,7 +162,7 @@ fn run_render(
     sprites: &DenseStorage[Sprite],
 ):
     // Build render list by iterating sprites and probing transforms
-    var entries = Vec.new()
+    var entries = List.new()
     for i in 0..sprites.len():
         let eid = sprites.dense_entities[i]
         let entity = Entity.new(eid)
@@ -207,7 +207,7 @@ fn run_collision_response(world: &World):
 // ===================================================================
 
 extend World:
-    pub mut fn run_frame(input_events: &Vec[InputEvent]):
+    pub mut fn run_frame(input_events: &List[InputEvent]):
         // Phase 1: Input (writes input_states, velocities)
         self.run_input_events(input_events)
         self.run_player_controller(200.0)

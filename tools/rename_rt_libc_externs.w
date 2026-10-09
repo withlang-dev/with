@@ -34,7 +34,7 @@ fn process(path: &str) -> i32:
     let n = tokens.len() as i32
 
     // Pass 1: collect the bare extern names declared in this file.
-    var names: Vec[str] = Vec.new()
+    var names: List[str] = List.new()
     for i in 0..n:
         if tokens.get_tag(i) != TokenKind.TK_KW_EXTERN:
             continue

@@ -67,12 +67,12 @@ fn path_compare(a: &str, b: &str) -> i32:
     if a.len() < b.len(): return -1
     1
 
-fn sort_paths(paths: Vec[str]):
-    var sorted: Vec[str] = Vec.new()
+fn sort_paths(paths: List[str]):
+    var sorted: List[str] = List.new()
     for i in 0..paths.len() as i32:
         let path = paths[i]
         var inserted = false
-        var next: Vec[str] = Vec.new()
+        var next: List[str] = List.new()
         for j in 0..sorted.len() as i32:
             let existing = sorted[j]
             if not inserted and path_compare(path, existing) < 0:
@@ -87,7 +87,7 @@ fn sort_paths(paths: Vec[str]):
 fn stdlib_tree_files(dir: &str):
     let listing = with_fs_list_files(dir)
     let excluded = dir ++ "/re/"
-    var paths: Vec[str] = Vec.new()
+    var paths: List[str] = List.new()
     var start = 0
     for i in 0..listing.len() as i32 + 1:
         if i == listing.len() as i32 or listing[i] as i32 == 10:
@@ -112,7 +112,7 @@ fn main:
         exit(1)
     let root = with_arg_at(if tree_mode: 2 else: 1)
     let out_path = with_arg_at(if tree_mode: 3 else: 2)
-    var paths: Vec[str] = Vec.new()
+    var paths: List[str] = List.new()
     if tree_mode:
         paths = stdlib_tree_files(with_arg_at(4))
     else:

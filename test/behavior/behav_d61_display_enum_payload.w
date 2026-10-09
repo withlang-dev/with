@@ -7,7 +7,7 @@
 type Point { label: str, x: i32 }
 enum Found:
     At(Point)
-    Many(Vec[Point])
+    Many(List[Point])
     Nowhere
 
 fn check(got: &str, want: &str):
@@ -22,7 +22,7 @@ fn main:
     check(f"{text}", "Some(plain)")
     let at = Found.At(Point { label: "a", x: 2 })
     check(f"{at}", r#"At(Point { label: "a", x: 2 })"#)
-    let pts: Vec[Point] = Vec.new()
+    let pts: List[Point] = List.new()
     pts.push(Point { label: "m", x: 3 })
     let many = Found.Many(pts)
     check(f"{many}", r#"Many([Point { label: "m", x: 3 }])"#)

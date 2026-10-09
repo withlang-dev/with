@@ -1,13 +1,13 @@
 //! expect-stdout: ok
 
-use std.collections.Vec
+use std.collections.List
 
 fn observe(source: &str):
     let value = *source
     assert(value == "alpha")
 
 fn main:
-    var values: Vec[str] = Vec.new()
+    var values: List[str] = List.new()
     values.push("alpha")
     values.push("gamma")
     for i in 0..32:

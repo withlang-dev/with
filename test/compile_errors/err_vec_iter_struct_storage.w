@@ -1,18 +1,18 @@
 //! expect-check-fail: ephemeral
 
-use std.collections.VecIter
+use std.collections.ListIter
 
 use std.collections.SlotMapSlot
-type BadVecIterBox {
-    iter: VecIter[i32],
+type BadListIterBox {
+    iter: ListIter[i32],
 }
 
 type BadFilterIterBox {
-    iter: FilterIter[VecIter[i32], i32],
+    iter: FilterIter[ListIter[i32], i32],
 }
 
-type BadVecSlotBox {
-    slot: VecSlot[i32],
+type BadListSlotBox {
+    slot: ListSlot[i32],
 }
 
 type BadHashMapEntryBox {

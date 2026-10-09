@@ -11,7 +11,7 @@
 // `extra_start`, the slot the `in` node records for its operand. A view on
 // either side of `in`, and the same method called directly.
 
-type Bag[T] { items: Vec[T] }
+type Bag[T] { items: List[T] }
 
 impl[T] Bag[T]:
     fn contains(value: &T) -> bool:
@@ -20,7 +20,7 @@ impl[T] Bag[T]:
         false
 
 fn main:
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     v.push(3)
     let b: Bag[i32] = Bag { items: v }
     let k: &i32 = &b.items[0]

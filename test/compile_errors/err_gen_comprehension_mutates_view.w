@@ -4,7 +4,7 @@
 // the comprehension while the generator runs, so its element cannot mutate a
 // place the generator views.
 type Counter {
-    items: Vec[i32],
+    items: List[i32],
 }
 
 impl Counter:
@@ -12,7 +12,7 @@ impl Counter:
         self.items.push(x)
         x
 
-gen fn over(xs: &Vec[i32]) -> i32:
+gen fn over(xs: &List[i32]) -> i32:
     for x in xs:
         yield x
 

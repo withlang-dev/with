@@ -6,7 +6,7 @@
 // invalidates the view (err_assign_field_under_live_field_view,
 // err_assign_parent_under_live_field_view).
 type Inner { text: str, count: i32 }
-type Lexer { source: str, pos: i32, inner: Inner, items: Vec[str] }
+type Lexer { source: str, pos: i32, inner: Inner, items: List[str] }
 impl Lexer:
     mut fn scan() -> i32:
         let src = self.source
@@ -24,7 +24,7 @@ impl Lexer:
         self.inner.count = self.inner.count + 1
         first.len() as i32
 fn main:
-    var lx = Lexer { source: "ab" ++ "cd", pos: 0, inner: Inner { text: "x" ++ "y", count: 0 }, items: Vec.new() }
+    var lx = Lexer { source: "ab" ++ "cd", pos: 0, inner: Inner { text: "x" ++ "y", count: 0 }, items: List.new() }
     lx.items.push("abc" ++ "")
     let n = lx.scan()
     let pos: i32 = lx.pos

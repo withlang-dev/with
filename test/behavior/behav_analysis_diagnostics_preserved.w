@@ -11,7 +11,7 @@ fn main:
     let dir = f"out/tmp/analysis-diagnostics-{pid()}"
     assert(mkdir_p(dir) == 0)
     for reverse in [false, true]:
-        var argv: Vec[str] = Vec.new()
+        var argv: List[str] = List.new()
         argv.push(compiler)
         argv.push("analyze")
         argv.push("test/compile_errors/err_d21_mut_receiver_owned_escape.w")

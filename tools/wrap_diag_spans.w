@@ -9,7 +9,7 @@
 //
 // Handled kinds (clones are CORRECT under the flip; #748 view tokens
 // recover the copies later):
-//   1 wrong argument type in call to 'Vec.push'      (span = argument)
+//   1 wrong argument type in call to 'List.push'      (span = argument)
 //   2 D22 §13.6 field-through-borrow — call argument (span = field read;
 //     a span directly inside with_str_clone(...) renames the call to
 //     with_str_clone_ref instead of double-cloning)
@@ -37,9 +37,9 @@ type Site {
 }
 
 type EditPlan {
-    starts: Vec[i64],
-    ends: Vec[i64],
-    texts: Vec[str],
+    starts: List[i64],
+    ends: List[i64],
+    texts: List[str],
 }
 
 fn parse_int(text: &str) -> i32:
@@ -64,7 +64,7 @@ fn owned_fn_name(path: &str) -> str:
     path.slice(start, end).replace("-", "_") ++ "_owned_text"
 
 fn classify(line: &str) -> i32:
-    if line == "error: wrong argument type in call to 'Vec.push'": return 1
+    if line == "error: wrong argument type in call to 'List.push'": return 1
     if line.starts_with("error: cannot take ownership of a non-Copy field through a borrow"):
         if line.ends_with("— call argument"): return 2
         if line.ends_with("— struct literal field"): return 3
@@ -128,8 +128,8 @@ fn kind_name(kind: i32) -> str:
     if kind == 9: return "typed-binding"
     "return"
 
-fn load_skips(skip_path: &str) -> Vec[str]:
-    var skips: Vec[str] = Vec.new()
+fn load_skips(skip_path: &str) -> List[str]:
+    var skips: List[str] = List.new()
     if skip_path.len() == 0: return skips
     let skip_text = read_file(skip_path ++ "") ?? ""
     let skip_lines = skip_text.split("\n")
@@ -138,9 +138,9 @@ fn load_skips(skip_path: &str) -> Vec[str]:
         if s.len() > 0: skips.push(s ++ "")
     skips
 
-// Vec.push sites must carry a `has type &str` label when any type label is
+// List.push sites must carry a `has type &str` label when any type label is
 // present at all; labels follow the caret line as `  = ` continuations.
-fn push_label_ok(dlines: &Vec[str], caret_idx: i32) -> bool:
+fn push_label_ok(dlines: &List[str], caret_idx: i32) -> bool:
     var li = caret_idx + 1
     var label_seen = 0
     var label_ok = 0
@@ -155,7 +155,7 @@ fn push_label_ok(dlines: &Vec[str], caret_idx: i32) -> bool:
 
 // A wrong-argument site is wrappable only when the argument is a &str
 // meeting a consuming owned-str parameter (labels follow the caret line).
-fn wrong_arg_label_ok(dlines: &Vec[str], caret_idx: i32) -> bool:
+fn wrong_arg_label_ok(dlines: &List[str], caret_idx: i32) -> bool:
     var li = caret_idx + 1
     var borrowed_arg = 0
     var owned_param = 0
@@ -167,9 +167,9 @@ fn wrong_arg_label_ok(dlines: &Vec[str], caret_idx: i32) -> bool:
         li = li + 1
     borrowed_arg == 1 and owned_param == 1
 
-fn collect_sites(dlines: &Vec[str]) -> Vec[Site]:
-    var sites: Vec[Site] = Vec.new()
-    var seen_keys: Vec[str] = Vec.new()
+fn collect_sites(dlines: &List[str]) -> List[Site]:
+    var sites: List[Site] = List.new()
+    var seen_keys: List[str] = List.new()
     var i = 0
     while (i as i64) < dlines.len():
         let line = dlines[i]
@@ -210,8 +210,8 @@ fn collect_sites(dlines: &Vec[str]) -> Vec[Site]:
         sites.push(Site { path, line_no, col, span_len, kind })
     sites
 
-fn unique_files(sites: &Vec[Site]) -> Vec[str]:
-    var files: Vec[str] = Vec.new()
+fn unique_files(sites: &List[Site]) -> List[str]:
+    var files: List[str] = List.new()
     for si in 0..sites.len() as i32:
         let p = sites[si].path
         var have = false
@@ -220,25 +220,25 @@ fn unique_files(sites: &Vec[Site]) -> Vec[str]:
         if not have: files.push(p ++ "")
     files
 
-fn in_list(items: &Vec[str], key: &str) -> bool:
+fn in_list(items: &List[str], key: &str) -> bool:
     for i in 0..items.len() as i32:
         if items[i] == key: return true
     false
 
-fn line_offsets(flines: &Vec[str]) -> Vec[i64]:
-    var offsets: Vec[i64] = Vec.new()
+fn line_offsets(flines: &List[str]) -> List[i64]:
+    var offsets: List[i64] = List.new()
     var acc: i64 = 0
     for li in 0..flines.len() as i32:
         offsets.push(acc)
         acc = acc + flines[li].len() + 1
     offsets
 
-fn plan_edits(path: &str, text: &str, sites: &Vec[Site], skips: &Vec[str]) -> EditPlan:
+fn plan_edits(path: &str, text: &str, sites: &List[Site], skips: &List[str]) -> EditPlan:
     let flines = text.split("\n")
     let offsets = line_offsets(&flines)
-    var starts: Vec[i64] = Vec.new()
-    var ends: Vec[i64] = Vec.new()
-    var texts: Vec[str] = Vec.new()
+    var starts: List[i64] = List.new()
+    var ends: List[i64] = List.new()
+    var texts: List[str] = List.new()
     let clone_fn = owned_fn_name(path)
     for si in 0..sites.len() as i32:
         let site = sites[si]
@@ -322,7 +322,7 @@ fn plan_edits(path: &str, text: &str, sites: &Vec[Site], skips: &Vec[str]) -> Ed
 fn apply_edits(text_in: str, plan: &EditPlan) -> str:
     var text = text_in
     let edit_count = plan.starts.len() as i32
-    var order: Vec[i32] = Vec.new()
+    var order: List[i32] = List.new()
     for ei in 0..edit_count: order.push(ei)
     for a in 0..edit_count:
         var best = a
@@ -382,7 +382,7 @@ fn finalize_existing(path: &str) -> i32:
     print("finalized " ++ path)
     0
 
-fn process_file(path: &str, sites: &Vec[Site], skips: &Vec[str], apply: i32) -> i32:
+fn process_file(path: &str, sites: &List[Site], skips: &List[str], apply: i32) -> i32:
     var text = read_file(path ++ "") ?? ""
     if text.len() == 0:
         print("wrap-diag-spans: could not read source " ++ path)

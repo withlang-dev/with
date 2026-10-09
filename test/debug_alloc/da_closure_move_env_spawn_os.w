@@ -13,15 +13,15 @@
 // ended), and the environment is destroyed before `join` returns.
 use std.thread
 
-type P { n: i32, v: Vec[i32] }
+type P { n: i32, v: List[i32] }
 impl Drop for P:
     move fn drop(): print(f"drop P {self.n}")
 
 fn main:
-    let d = P { n: 1, v: Vec.new() }
+    let d = P { n: 1, v: List.new() }
     let h = spawn_os(move () => d.n)
     print(join(h))
-    let e = P { n: 2, v: Vec.new() }
+    let e = P { n: 2, v: List.new() }
     let g = spawn_os(move () =>
         let mine = e
         mine.n

@@ -2,7 +2,7 @@
 
 // #1594 / §12.4: the same store through a let-bound closure.
 fn main:
-    var fs: Vec[fn() -> i32] = Vec.new()
+    var fs: List[fn() -> i32] = List.new()
     if true:
         let n = 7
         let f = () => n * 10

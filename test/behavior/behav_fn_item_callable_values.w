@@ -36,7 +36,7 @@ fn main:
     let holder = Holder { f: double }
     print(f"{(holder.f)(6)}")
     print(f"{apply_c(double, 7)}")
-    var fs: Vec[fn(i32) -> i32] = Vec.new()
+    var fs: List[fn(i32) -> i32] = List.new()
     fs.push(double)
     fs.push(g)
     print(f"{fs[0](10)} {fs[1](11)}")

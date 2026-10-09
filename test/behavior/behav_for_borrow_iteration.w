@@ -1,10 +1,10 @@
 //! expect-stdout: ok
 
-fn doubled(xs: &Vec[i32]) -> Vec[i32]:
+fn doubled(xs: &List[i32]) -> List[i32]:
     xs.map(it * 2)
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)
@@ -20,7 +20,7 @@ fn main:
     for v in doubled(&xs):
         rsum = rsum + v
     assert(rsum == 12)
-    var names: Vec[str] = Vec.new()
+    var names: List[str] = List.new()
     names.push("a")
     names.push("bb")
     var total = 0

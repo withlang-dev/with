@@ -4,7 +4,7 @@
 use std.builtins.int_to_string
 fn main:
     // For-loop over vec.iter() — desugared through hardcoded MIR path
-    let nums: Vec[i32] = Vec.new()
+    let nums: List[i32] = List.new()
     nums.push(1)
     nums.push(2)
     nums.push(3)
@@ -15,8 +15,8 @@ fn main:
         sum = sum + x
     print(int_to_string(sum as i64))
 
-    // For-loop directly over Vec
-    let words: Vec[str] = Vec.new()
+    // For-loop directly over List
+    let words: List[str] = List.new()
     words.push("done")
     for w in words:
         print(w)

@@ -31,26 +31,26 @@
 // observes the payload; the payload moves once, into the kept `Some`, and a
 // rejected payload is dropped once. The predicate used to receive the
 // payload by value while the kept `Some` took it again, and the receiver
-// temp's enum drop freed it under the result: DOUBLE FREE (Vec, struct),
+// temp's enum drop freed it under the result: DOUBLE FREE (List, struct),
 // a silent second str free.
-// Covers: Vec / str / struct / i32 payload × keep / reject / None, a call
+// Covers: List / str / struct / i32 payload × keep / reject / None, a call
 // result subject, a named `fn(&T) -> bool` predicate, an explicitly typed
 // `(q: &P)` closure, an Option[&T] payload, a filter feeding map, and the
 // other observing combinators (Option.inspect, Result.inspect /
 // inspect_err / context / with_context) on both paths.
 
-type P { name: str, xs: Vec[i32] }
+type P { name: str, xs: List[i32] }
 
-fn mkv(n: i32) -> Vec[i32]:
-    var xs: Vec[i32] = Vec.new()
+fn mkv(n: i32) -> List[i32]:
+    var xs: List[i32] = List.new()
     for i in 0..n: xs.push(i)
     xs
 
-fn some_vec(n: i32) -> Option[Vec[i32]]: Some(mkv(n))
+fn some_list(n: i32) -> Option[List[i32]]: Some(mkv(n))
 
-fn nonempty(v: &Vec[i32]) -> bool: v.len() > 0
+fn nonempty(v: &List[i32]) -> bool: v.len() > 0
 
-fn show_vec(tag: &str, o: &Option[Vec[i32]]):
+fn show_list(tag: &str, o: &Option[List[i32]]):
     match o:
         Some(v) => print(f"{tag} {v.len()}")
         None => print(f"{tag} none")
@@ -60,26 +60,26 @@ fn show_str(tag: &str, o: &Option[str]):
         Some(s) => print(f"{tag} {s}")
         None => print(f"{tag} none")
 
-fn rvv(ok: bool) -> Result[Vec[i32], Vec[i32]]:
+fn rvv(ok: bool) -> Result[List[i32], List[i32]]:
     if ok: return Ok(mkv(3))
     Err(mkv(2))
 
-fn rvs(ok: bool) -> Result[Vec[i32], str]:
+fn rvs(ok: bool) -> Result[List[i32], str]:
     if ok: return Ok(mkv(3))
     Err("bad" ++ "")
 
-fn show_res(tag: &str, r: &Result[Vec[i32], Vec[i32]]):
+fn show_res(tag: &str, r: &Result[List[i32], List[i32]]):
     match r:
         Ok(v) => print(f"{tag} {v.len()}")
         Err(v) => print(f"{tag} {v.len()}")
 
 fn main:
-    let a: Option[Vec[i32]] = Some(mkv(3))
-    show_vec("vec keep", &a.filter((v) => v.len() > 0))
-    let b: Option[Vec[i32]] = Some(mkv(3))
-    show_vec("vec reject", &b.filter((v) => v.len() > 5))
-    let c: Option[Vec[i32]] = None
-    show_vec("vec none", &c.filter((v) => v.len() > 0))
+    let a: Option[List[i32]] = Some(mkv(3))
+    show_list("vec keep", &a.filter((v) => v.len() > 0))
+    let b: Option[List[i32]] = Some(mkv(3))
+    show_list("vec reject", &b.filter((v) => v.len() > 5))
+    let c: Option[List[i32]] = None
+    show_list("vec none", &c.filter((v) => v.len() > 0))
 
     let s: Option[str] = Some("abc" ++ "def")
     show_str("str keep", &s.filter((t) => t.len() == 6))
@@ -95,9 +95,9 @@ fn main:
         Some(q) => print(f"struct reject {q.name}")
         None => print("struct reject none")
 
-    show_vec("call keep", &some_vec(3).filter((v) => v.len() == 3))
-    let n: Option[Vec[i32]] = Some(mkv(3))
-    show_vec("named keep", &n.filter(nonempty))
+    show_list("call keep", &some_list(3).filter((v) => v.len() == 3))
+    let n: Option[List[i32]] = Some(mkv(3))
+    show_list("named keep", &n.filter(nonempty))
     let t: Option[P] = Some(P { name: "t" ++ "", xs: mkv(3) })
     match t.filter((q: &P) => q.xs.len() == 3):
         Some(q) => print(f"typed keep {q.xs.len()}")
@@ -111,12 +111,12 @@ fn main:
         None => print("i32 reject none")
 
     let owner = mkv(3)
-    let r: Option[&Vec[i32]] = Some(&owner)
+    let r: Option[&List[i32]] = Some(&owner)
     match r.filter((v) => v.len() == 3):
         Some(v) => print(f"ref keep {v.len()}")
         None => print("ref keep none")
 
-    let m: Option[Vec[i32]] = Some(mkv(4))
+    let m: Option[List[i32]] = Some(mkv(4))
     print(f"chain {m.filter((v) => v.len() > 1).map((v) => v.len()).unwrap_or(0)}")
 
     // The other observers decompose their subject the same way: `inspect`
@@ -124,10 +124,10 @@ fn main:
     // Err payload, and `context` / `with_context` move the Ok payload
     // through (the Err payload into the context error). Each was a DOUBLE
     // FREE of the moved payload.
-    let io: Option[Vec[i32]] = Some(mkv(3))
-    show_vec("inspect some", &io.inspect((v) => print(f"saw {v.len()}")))
-    let inone: Option[Vec[i32]] = None
-    show_vec("inspect none", &inone.inspect((v) => print(f"saw {v.len()}")))
+    let io: Option[List[i32]] = Some(mkv(3))
+    show_list("inspect some", &io.inspect((v) => print(f"saw {v.len()}")))
+    let inone: Option[List[i32]] = None
+    show_list("inspect none", &inone.inspect((v) => print(f"saw {v.len()}")))
     show_res("R inspect ok", &rvv(true).inspect((v) => print(f"ok {v.len()}")))
     show_res("R inspect err", &rvv(false).inspect((v) => print(f"ok {v.len()}")))
     show_res("R inspect_err err", &rvv(false).inspect_err((v) => print(f"err {v.len()}")))

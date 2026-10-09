@@ -7,7 +7,7 @@ fn double(x: i32) -> i32:
     x * 2
 
 fn main:
-    var items: Vec[i32] = Vec.new()
+    var items: List[i32] = List.new()
     items.push(10)
     items.push(20)
     items.push(30)

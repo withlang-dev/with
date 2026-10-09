@@ -48,8 +48,8 @@ fn rp_basename(path: &str) -> str:
 fn rp_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
 
-fn rp_split_commas(text: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn rp_split_commas(text: &str) -> List[str]:
+    var out: List[str] = List.new()
     for part in text.split(","):
         let p = part.trim()
         if p.len() > 0: out.push(p ++ "")
@@ -57,8 +57,8 @@ fn rp_split_commas(text: &str) -> Vec[str]:
 
 /// `gh release <sub> <tag> --repo <repo> <rest...>` as an argv (owned copies:
 /// an array literal would move its str elements).
-fn rp_release_args(sub: &str, tag: &str, repo: &str, rest: &Vec[str]) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn rp_release_args(sub: &str, tag: &str, repo: &str, rest: &List[str]) -> List[str]:
+    var out: List[str] = List.new()
     out.push("release")
     out.push(sub ++ "")
     out.push(tag ++ "")
@@ -68,17 +68,17 @@ fn rp_release_args(sub: &str, tag: &str, repo: &str, rest: &Vec[str]) -> Vec[str
     out
 
 /// `gh <args...>` captured; the result carries rc, stdout and stderr.
-fn rp_gh(ctx: &ActionCtx, scratch: &str, label: &str, args: &Vec[str]) -> ToolProcessResult:
+fn rp_gh(ctx: &ActionCtx, scratch: &str, label: &str, args: &List[str]) -> ToolProcessResult:
     let root = ctx.project_info().project_root()
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push("gh")
     for a in args: argv.push(a ++ "")
     let out_path = rp_join(scratch, label ++ ".stdout")
     let err_path = rp_join(scratch, label ++ ".stderr")
     ctx.process_runner().run_capture(argv, rp_join(root, out_path), rp_join(root, err_path), 600000)
 
-fn rp_trim_lines(text: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn rp_trim_lines(text: &str) -> List[str]:
+    var out: List[str] = List.new()
     for line in text.split("\n"):
         let l = line.trim()
         if l.len() > 0: out.push(l ++ "")
@@ -93,7 +93,7 @@ fn rp_sidecar_digest(fs: &ToolFs, asset: &str) -> str:
 
 /// The release notes: what a reader needs to trust each asset, regenerated
 /// from the provenance sidecars present on the release after every upload.
-fn rp_notes(channel: &str, version: &str, source_sha: &str, rows: &Vec[str]) -> str:
+fn rp_notes(channel: &str, version: &str, source_sha: &str, rows: &List[str]) -> str:
     let publication = if channel == "release": "release" else: "prerelease"
     let automation = if channel == "release": "Automated compiler " else: "Automated " ++ channel ++ " compiler "
     var notes = automation ++ publication ++ ".\n\n" ++
@@ -140,14 +140,14 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     // Every later step reads a gh failure as an answer ("not on the repo");
     // a host without gh must say so instead (the linux-aarch64 container had
     // none, and a pushed commit was reported as unpushed).
-    let gh_version: Vec[str] = Vec.new()
+    let gh_version: List[str] = List.new()
     gh_version.push("--version")
     let probe = rp_gh(&ctx, scratch, "gh-version", &gh_version)
     if probe.rc != 0:
         return rp_fail(&ctx, f"gh does not run on this host (exit {probe.rc}); install the GitHub CLI to publish")
 
     if source_sha.len() == 0:
-        var argv: Vec[str] = Vec.new()
+        var argv: List[str] = List.new()
         argv.push("git")
         argv.push("rev-parse")
         argv.push("HEAD")
@@ -158,7 +158,7 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
         return rp_fail(&ctx, "the source commit must have at least 12 hex characters: '" ++ source_sha ++ "'")
     // A release can only point at a commit the repository has; a local
     // build of an unpushed commit says so instead of a 422 from the API.
-    var commit_args: Vec[str] = Vec.new()
+    var commit_args: List[str] = List.new()
     commit_args.push("api")
     commit_args.push("repos/" ++ repo ++ "/commits/" ++ source_sha)
     commit_args.push("--jq")
@@ -183,16 +183,16 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     // publishes at an existing `v*` tag; the other channels create the tag
     // at the source commit. Two platforms racing to create it: the loser
     // sees "already exists" and carries on with the upload.
-    var view_rest: Vec[str] = Vec.new()
+    var view_rest: List[str] = List.new()
     view_rest.push("--json")
     view_rest.push("isPrerelease,targetCommitish")
     let view_args = rp_release_args("view", tag, repo, &view_rest)
     var view = rp_gh(&ctx, scratch, "view", &view_args)
     if view.rc != 0:
         let notes_path = rp_join(scratch, "notes.md")
-        let no_rows: Vec[str] = Vec.new()
+        let no_rows: List[str] = List.new()
         let _ = fs.write_text(notes_path, rp_notes(channel, tag, source_sha, &no_rows))
-        var create_rest: Vec[str] = Vec.new()
+        var create_rest: List[str] = List.new()
         create_rest.push("--target")
         create_rest.push(source_sha ++ "")
         create_rest.push("--title")
@@ -213,7 +213,7 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
         return rp_fail(&ctx, tag ++ " is a stable release; a " ++ channel ++ " build cannot publish into it")
 
     // Add-only: the names already on the release are off limits.
-    var names_rest: Vec[str] = Vec.new()
+    var names_rest: List[str] = List.new()
     names_rest.push("--json")
     names_rest.push("assets")
     names_rest.push("--jq")
@@ -230,7 +230,7 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     // Extra files (the SDK archive and sidecars) are shared between the
     // platforms that reuse the same SDK; one already present is skipped,
     // never replaced.
-    var extras_to_upload: Vec[str] = Vec.new()
+    var extras_to_upload: List[str] = List.new()
     for extra in extras:
         let name = rp_basename(extra)
         var already = false
@@ -239,9 +239,9 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
         if not already: extras_to_upload.push(extra ++ "")
 
     // Provenance sidecars, then one upload of everything.
-    let no_rest: Vec[str] = Vec.new()
+    let no_rest: List[str] = List.new()
     var upload = rp_release_args("upload", tag, repo, &no_rest)
-    var date_args: Vec[str] = Vec.new()
+    var date_args: List[str] = List.new()
     date_args.push("date")
     date_args.push("-u")
     date_args.push("+%Y-%m-%dT%H:%M:%SZ")
@@ -273,7 +273,7 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     let after = rp_gh(&ctx, scratch, "names-after", &names_args)
     if after.rc != 0: return rp_fail(&ctx, "could not list the assets of " ++ tag ++ " after the upload: " ++ after.stderr)
     let present_after = rp_trim_lines(after.stdout)
-    var expected: Vec[str] = Vec.new()
+    var expected: List[str] = List.new()
     for asset in assets:
         expected.push(rp_basename(asset))
         expected.push(rp_basename(asset) ++ ".sha256")
@@ -292,7 +292,7 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
         // The REST API, not `gh release view --json assets`: gh before 2.68
         // (Ubuntu 24.04 ships 2.45) has no asset digest field and printed
         // nothing, which read as a mismatch after a good upload.
-        var digest_args: Vec[str] = Vec.new()
+        var digest_args: List[str] = List.new()
         digest_args.push("api")
         digest_args.push("repos/" ++ repo ++ "/releases/tags/" ++ tag)
         digest_args.push("--jq")
@@ -302,20 +302,20 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
             return rp_fail(&ctx, name ++ ": published digest '" ++ published.stdout.trim() ++ "' does not match the sidecar")
 
     // Notes: regenerated from every provenance sidecar now on the release.
-    var prov_rest: Vec[str] = Vec.new()
+    var prov_rest: List[str] = List.new()
     prov_rest.push("--json")
     prov_rest.push("assets")
     prov_rest.push("--jq")
     prov_rest.push(".assets[] | select(.name | endswith(\".provenance\")) | .name")
     let prov_args = rp_release_args("view", tag, repo, &prov_rest)
     let prov_names = rp_gh(&ctx, scratch, "provenance-names", &prov_args)
-    var rows: Vec[str] = Vec.new()
+    var rows: List[str] = List.new()
     if prov_names.rc == 0:
         let prov_dir = rp_join(scratch, "provenance")
         let _rm = fs.remove_tree(prov_dir)
         let _mk = fs.mkdir_all(prov_dir)
         for pname in rp_trim_lines(prov_names.stdout):
-            var dl_rest: Vec[str] = Vec.new()
+            var dl_rest: List[str] = List.new()
             dl_rest.push("--pattern")
             dl_rest.push(pname ++ "")
             dl_rest.push("--dir")
@@ -336,7 +336,7 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     let notes_path = rp_join(scratch, "notes.md")
     if fs.write_text(notes_path, rp_notes(channel, tag, source_sha, &rows)) != 0:
         return rp_fail(&ctx, "could not write " ++ notes_path)
-    var edit_rest: Vec[str] = Vec.new()
+    var edit_rest: List[str] = List.new()
     edit_rest.push("--notes-file")
     edit_rest.push(notes_path ++ "")
     let edit = rp_release_args("edit", tag, repo, &edit_rest)

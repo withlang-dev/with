@@ -57,8 +57,8 @@ pub fn embedded_bundle_present(index: i32) -> bool:
 // its `prefix <p> <path>` lines. Codegen emits declarations only for
 // functions whose module carries one of these; the link stage selects the
 // bundle when an undefined symbol does.
-pub fn bundle_manifest_prefixes(manifest: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn bundle_manifest_prefixes(manifest: &str) -> List[str]:
+    let out: List[str] = List.new()
     var start: i64 = 0
     while start < manifest.len():
         var end = start
@@ -77,8 +77,8 @@ pub fn bundle_manifest_prefixes(manifest: &str) -> Vec[str]:
 
 // The canonical module paths a manifest lists — the `<path>` of its
 // `prefix <p> <path>` lines.
-pub fn bundle_manifest_paths(manifest: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn bundle_manifest_paths(manifest: &str) -> List[str]:
+    let out: List[str] = List.new()
     var start: i64 = 0
     while start < manifest.len():
         var end = start
@@ -96,8 +96,8 @@ pub fn bundle_manifest_paths(manifest: &str) -> Vec[str]:
     out
 
 // Every prefix any embedded bundle provides.
-pub fn embedded_bundle_prefixes() -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn embedded_bundle_prefixes() -> List[str]:
+    let out: List[str] = List.new()
     for bi in 0..embedded_bundle_count():
         let prefixes = bundle_manifest_prefixes(embedded_bundle_manifest_text(bi))
         for pi in 0..prefixes.len() as i32:

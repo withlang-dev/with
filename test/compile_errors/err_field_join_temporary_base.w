@@ -3,10 +3,10 @@
 // #1408 (§3.8 join rule 4): "An owned temporary is never implicitly borrowed
 // merely to force a reference result." A field of a call's result is no
 // place, so the join stays owned and the arm is an implicit field move.
-// A Vec field, not a str: a str field read copies (D111).
+// A List field, not a str: a str field read copies (D111).
 use std.process
 
-type S { s: Vec[i32] }
+type S { s: List[i32] }
 
 fn mk() -> S: S { s: [1] }
 

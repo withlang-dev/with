@@ -87,10 +87,10 @@ fn main:
     let record = Snapshot { value: view }
     let tuple: (i32, i32) = (view, 120)
     let array: [1]i32 = [view]
-    let collection: Vec[i32] = [view]
-    let direct_collection = Vec[i32][view]
+    let collection: List[i32] = [view]
+    let direct_collection = List[i32][view]
     let reference_values: [1]&i32 = [view]
-    let comprehended: Vec[i32] = [item for item in reference_values]
+    let comprehended: List[i32] = [item for item in reference_values]
     let reference_pairs: [1](&i32, &i32) = [(view, view)]
     let comprehended_map: HashMap[i32, i32] = [key: item for (key, item) in reference_pairs]
     let wrapped: Wrapped = Wrapped.Value(view)

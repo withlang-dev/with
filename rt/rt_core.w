@@ -528,7 +528,7 @@ fn cstr_len(s: *const u8) -> i64:
 // ── Memory helpers ─────────────────────────────────────────────────
 
 // Non-overlapping copy, a word at a time then the tail bytes. The byte loop
-// it replaces was the cost of every Vec growth copy (bench grow).
+// it replaces was the cost of every List growth copy (bench grow).
 fn rt_memcpy(dst: *mut u8, src: *const u8, n: i64):
     var i: i64 = 0
     while i + 8 <= n:
@@ -1067,7 +1067,7 @@ let DBG_ENTRY_WORDS: i64 = 9        // addr, size, freed, alloc_origin, first_dr
 
 let DBG_ORIGIN_UNKNOWN: i64 = 0
 let DBG_ORIGIN_WITH_ALLOC: i64 = 1
-let DBG_ORIGIN_VEC: i64 = 2
+let DBG_ORIGIN_LIST: i64 = 2
 let DBG_ORIGIN_CHANNEL: i64 = 3
 let DBG_ORIGIN_FIBER: i64 = 4
 
@@ -1111,7 +1111,7 @@ fn dbg_on() -> i32:
     0
 
 // Scribble-on-free (use-after-free poisoning) is opt-in via WITH_DEBUG_ALLOC_SCRIBBLE.
-// It is OFF by default because, for a Vec[Drop] buffer, poisoning the freed payload
+// It is OFF by default because, for a List[Drop] buffer, poisoning the freed payload
 // turns a subsequent double-drop's element read into a use-after-free crash *before*
 // the ledger reports the buffer's double-free — so it would mask the clean
 // double-free verdict. Turn it on to hunt use-after-free specifically.
@@ -1513,8 +1513,8 @@ fn dbg_put_root_reason(e: i64):
 fn dbg_put_origin(origin: i64):
     if origin == DBG_ORIGIN_WITH_ALLOC:
         dbg_puts("with_alloc" as *const u8, 10)
-    else if origin == DBG_ORIGIN_VEC:
-        dbg_puts("Vec" as *const u8, 3)
+    else if origin == DBG_ORIGIN_LIST:
+        dbg_puts("List" as *const u8, 3)
     else if origin == DBG_ORIGIN_CHANNEL:
         dbg_puts("channel" as *const u8, 7)
     else if origin == DBG_ORIGIN_FIBER:
@@ -3074,10 +3074,10 @@ pub fn with_str_from_bytes(s: *const u8, len: i64) -> str:
 
 pub fn with_str_from_vec_u8(v: *const u8) -> str:
     let vp = v as *mut u8
-    let len = vec_get_len(vp)
+    let len = list_get_len(vp)
     if len <= 0:
         return make_str("" as *const u8, 0)
-    alloc_str(vec_get_ptr_field(vp), len)
+    alloc_str(list_get_ptr_field(vp), len)
 
 // FNV-1a, unkeyed: the same on every run, for names derived from text
 // (the compiler's symbol names). A map key is hashed with the keyed hasher.
@@ -3222,63 +3222,63 @@ pub fn with_getenv_str(name: &str) -> str:
 
 // with_setenv_str: provided by compat_runtime.w (needs libc)
 
-// ── Vec operations ─────────────────────────────────────────────────
+// ── List operations ─────────────────────────────────────────────────
 //
-// Vec layout: { ptr: *mut u8, len: i64, cap: i64, elem_size: i64 }
-// We access it via pointer casts since we can't import the Vec type.
+// List layout: { ptr: *mut u8, len: i64, cap: i64, elem_size: i64 }
+// We access it via pointer casts since we can't import the List type.
 
-// Offsets into Vec struct (each field is 8 bytes):
+// Offsets into List struct (each field is 8 bytes):
 // 0: ptr, 8: len, 16: cap, 24: elem_size
 
-fn vec_get_ptr_field(v: *mut u8) -> *mut u8:
+fn list_get_ptr_field(v: *mut u8) -> *mut u8:
     unsafe *(v as *const *mut u8)
 
-fn vec_set_ptr_field(v: *mut u8, p: *mut u8):
+fn list_set_ptr_field(v: *mut u8, p: *mut u8):
     unsafe *(v as *mut *mut u8) = p
 
-fn vec_get_len(v: *mut u8) -> i64:
+fn list_get_len(v: *mut u8) -> i64:
     unsafe *((v as i64 + 8) as *const i64)
 
-fn vec_set_len(v: *mut u8, n: i64):
+fn list_set_len(v: *mut u8, n: i64):
     unsafe *((v as i64 + 8) as *mut i64) = n
 
-fn vec_get_cap(v: *mut u8) -> i64:
+fn list_get_cap(v: *mut u8) -> i64:
     unsafe *((v as i64 + 16) as *const i64)
 
-fn vec_set_cap(v: *mut u8, n: i64):
+fn list_set_cap(v: *mut u8, n: i64):
     unsafe *((v as i64 + 16) as *mut i64) = n
 
-fn vec_get_elem_size(v: *mut u8) -> i64:
+fn list_get_elem_size(v: *mut u8) -> i64:
     unsafe *((v as i64 + 24) as *const i64)
 
-fn vec_set_elem_size(v: *mut u8, n: i64):
+fn list_set_elem_size(v: *mut u8, n: i64):
     unsafe *((v as i64 + 24) as *mut i64) = n
 
 pub fn with_vec_new_out(out: *mut u8, elem_size: i64):
-    vec_set_ptr_field(out, 0 as *mut u8)
-    vec_set_len(out, 0)
-    vec_set_cap(out, 0)
-    vec_set_elem_size(out, elem_size)
+    list_set_ptr_field(out, 0 as *mut u8)
+    list_set_len(out, 0)
+    list_set_cap(out, 0)
+    list_set_elem_size(out, elem_size)
 
 pub fn with_vec_new(elem_size: i64) -> (*mut u8, i64, i64, i64):
-    // Return a tuple that matches Vec layout
+    // Return a tuple that matches List layout
     (0 as *mut u8, 0 as i64, 0 as i64, elem_size)
 
 pub fn with_vec_new_with_capacity_out(out: *mut u8, elem_size: i64, cap: i64):
-    vec_set_elem_size(out, elem_size)
-    vec_set_len(out, 0)
-    vec_set_cap(out, cap)
+    list_set_elem_size(out, elem_size)
+    list_set_len(out, 0)
+    list_set_cap(out, cap)
     if cap > 0:
-        vec_set_ptr_field(out, vec_buffer_alloc(cap * elem_size, elem_size))
+        list_set_ptr_field(out, list_buffer_alloc(cap * elem_size, elem_size))
     else:
-        vec_set_ptr_field(out, 0 as *mut u8)
+        list_set_ptr_field(out, 0 as *mut u8)
 
-// #2022: a Vec buffer is aligned for its element. The header carries only the
+// #2022: a List buffer is aligned for its element. The header carries only the
 // element size (with-abi.md §3), and TypeLayout rounds every size up to its
 // type's alignment (§2), so the largest power of two dividing the size, at
 // most §16.4's 65536, is at least the element's alignment. The exact
 // alignment would need a header word §3 does not have (#2039).
-fn vec_buffer_align(es: i64) -> i64:
+fn list_buffer_align(es: i64) -> i64:
     if es <= 0:
         return RT_ALLOC_HEADER_SIZE
     var align = RT_ALLOC_HEADER_SIZE
@@ -3286,22 +3286,22 @@ fn vec_buffer_align(es: i64) -> i64:
         align = align * 2
     align
 
-fn vec_buffer_alloc(bytes: i64, es: i64) -> *mut u8:
-    rt_alloc_aligned_with_origin(bytes, vec_buffer_align(es), DBG_ORIGIN_VEC)
+fn list_buffer_alloc(bytes: i64, es: i64) -> *mut u8:
+    rt_alloc_aligned_with_origin(bytes, list_buffer_align(es), DBG_ORIGIN_LIST)
 
-fn vec_grow(v: *mut u8):
-    let old_cap = vec_get_cap(v)
+fn list_grow(v: *mut u8):
+    let old_cap = list_get_cap(v)
     let new_cap = if old_cap < 8: 8 as i64 else: old_cap * 2
-    let es = vec_get_elem_size(v)
-    let new_ptr = vec_buffer_alloc(new_cap * es, es)
-    let old_ptr = vec_get_ptr_field(v)
-    let vlen = vec_get_len(v)
+    let es = list_get_elem_size(v)
+    let new_ptr = list_buffer_alloc(new_cap * es, es)
+    let old_ptr = list_get_ptr_field(v)
+    let vlen = list_get_len(v)
     if old_ptr as i64 != 0 and vlen > 0:
         rt_memcpy(new_ptr, old_ptr as *const u8, vlen * es)
     if old_ptr as i64 != 0 and old_cap > 0:
         rt_free_sized(old_ptr, old_cap * es)
-    vec_set_ptr_field(v, new_ptr)
-    vec_set_cap(v, new_cap)
+    list_set_ptr_field(v, new_ptr)
+    list_set_cap(v, new_cap)
 
 // #919 (D34-C interim): bulk byte append for StringBuilder — the old
 // per-byte push was one bounds-checked call per byte (and several
@@ -3312,44 +3312,44 @@ pub fn with_vec_append_bytes(v: *mut u8, s: &str) -> Unit:
     let n = str_length(s)
     if n <= 0:
         return
-    if vec_get_elem_size(v) != 1:
+    if list_get_elem_size(v) != 1:
         with_panic_core(make_str("with_vec_append_bytes requires a byte vector" as *const u8, 44), make_str("" as *const u8, 0), 0)
-    let vlen = vec_get_len(v)
-    var vcap = vec_get_cap(v)
+    let vlen = list_get_len(v)
+    var vcap = list_get_cap(v)
     while vcap < vlen + n:
-        vec_grow(v)
-        vcap = vec_get_cap(v)
-    let dst = (vec_get_ptr_field(v) as i64 + vlen) as *mut u8
+        list_grow(v)
+        vcap = list_get_cap(v)
+    let dst = (list_get_ptr_field(v) as i64 + vlen) as *mut u8
     rt_memcpy(dst, str_data(s), n)
-    vec_set_len(v, vlen + n)
+    list_set_len(v, vlen + n)
 
 pub fn with_vec_push(v: *mut u8, elem: *const u8):
-    let vlen = vec_get_len(v)
-    let vcap = vec_get_cap(v)
+    let vlen = list_get_len(v)
+    let vcap = list_get_cap(v)
     if vlen >= vcap:
-        vec_grow(v)
-    let es = vec_get_elem_size(v)
-    let dst = (vec_get_ptr_field(v) as i64 + vlen * es) as *mut u8
+        list_grow(v)
+    let es = list_get_elem_size(v)
+    let dst = (list_get_ptr_field(v) as i64 + vlen * es) as *mut u8
     rt_memcpy(dst, elem, es)
-    vec_set_len(v, vlen + 1)
+    list_set_len(v, vlen + 1)
 
 pub fn with_vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8:
-    let vlen = vec_get_len(v)
+    let vlen = list_get_len(v)
     if idx < 0 or idx >= vlen:
-        with_panic_core(make_str("Vec index out of bounds" as *const u8, 23), make_str("" as *const u8, 0), 0)
-    let es = vec_get_elem_size(v)
-    (vec_get_ptr_field(v) as i64 + idx * es) as *mut u8
+        with_panic_core(make_str("List index out of bounds" as *const u8, 23), make_str("" as *const u8, 0), 0)
+    let es = list_get_elem_size(v)
+    (list_get_ptr_field(v) as i64 + idx * es) as *mut u8
 
 pub fn with_vec_len(v: *mut u8) -> i64:
-    vec_get_len(v)
+    list_get_len(v)
 
 pub fn with_vec_clear(v: *mut u8):
-    vec_set_len(v, 0)
+    list_set_len(v, 0)
 
-// #606: free a Vec's heap buffer and zero its header. Called by the codegen
+// #606: free a List's heap buffer and zero its header. Called by the codegen
 // scope-exit drop path for Drop-element Vecs (after element dtors have run).
-// Free a Vec's buffer given the header's words by value. Codegen's drop glue
-// reads the header inline and calls this, so an aggregate holding a Vec
+// Free a List's buffer given the header's words by value. Codegen's drop glue
+// reads the header inline and calls this, so an aggregate holding a List
 // never has its address taken by a call: LLVM can promote the whole struct
 // to registers, as it does for the same program in C or Rust (the ECS
 // benchmark reloaded five headers after every store before this).
@@ -3358,20 +3358,20 @@ pub fn with_vec_free_buffer(p: *mut u8, cap: i64, es: i64) -> Unit:
         rt_free_sized(p, cap * es)
 
 pub fn with_vec_free(v: *mut u8) -> Unit:
-    with_vec_free_buffer(vec_get_ptr_field(v), vec_get_cap(v), vec_get_elem_size(v))
-    vec_set_ptr_field(v, 0 as *mut u8)
-    vec_set_len(v, 0)
-    vec_set_cap(v, 0)
+    with_vec_free_buffer(list_get_ptr_field(v), list_get_cap(v), list_get_elem_size(v))
+    list_set_ptr_field(v, 0 as *mut u8)
+    list_set_len(v, 0)
+    list_set_cap(v, 0)
 
 pub fn with_vec_free_drop_origin(v: *mut u8, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
-    with_vec_free_buffer_drop_origin(vec_get_ptr_field(v), vec_get_cap(v), vec_get_elem_size(v), drop_origin, drop_origin_len)
-    vec_set_ptr_field(v, 0 as *mut u8)
-    vec_set_len(v, 0)
-    vec_set_cap(v, 0)
+    with_vec_free_buffer_drop_origin(list_get_ptr_field(v), list_get_cap(v), list_get_elem_size(v), drop_origin, drop_origin_len)
+    list_set_ptr_field(v, 0 as *mut u8)
+    list_set_len(v, 0)
+    list_set_cap(v, 0)
 
 pub fn with_vec_free_buffer_drop_origin(p: *mut u8, cap: i64, es: i64, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
     if p as i64 != 0 and cap > 0 and es > 0:
-        // A header whose cap*elem_size overflows is not a Vec anymore: the
+        // A header whose cap*elem_size overflows is not a List anymore: the
         // memory was freed and reused under us (the lsp-use-std hunt read
         // response-JSON bytes here and trapped on the bare multiply, which
         // disguised heap corruption as arithmetic). Name the corruption.
@@ -3453,7 +3453,7 @@ pub fn with_vec_get_i64(v: *mut u8, idx: i64) -> i64:
 
 pub fn with_vec_push_str(v: *mut u8, val: str):
     with_vec_push(v, &val as *const u8)
-    // with_vec_push bit-copies raw element bytes. The Vec now owns this str
+    // with_vec_push bit-copies raw element bytes. The List now owns this str
     // header, so disarm the by-value local before its scope cleanup runs.
     unsafe *(&raw mut val as *mut str) = make_str("" as *const u8, 0)
 
@@ -3473,34 +3473,34 @@ pub fn with_ptr_get_i32(ptr: *const u8, index: i64) -> i32:
     unsafe *((ptr as i64 + index * 4) as *const i32)
 
 pub fn with_vec_set_i32(v: *mut u8, idx: i64, val: i32):
-    let vlen = vec_get_len(v)
+    let vlen = list_get_len(v)
     if idx >= 0 and idx < vlen:
-        let es = vec_get_elem_size(v)
-        unsafe *((vec_get_ptr_field(v) as i64 + idx * es) as *mut i32) = val
+        let es = list_get_elem_size(v)
+        unsafe *((list_get_ptr_field(v) as i64 + idx * es) as *mut i32) = val
 
 pub fn with_vec_set_i64(v: *mut u8, idx: i64, val: i64):
-    let vlen = vec_get_len(v)
+    let vlen = list_get_len(v)
     if idx >= 0 and idx < vlen:
-        let es = vec_get_elem_size(v)
-        unsafe *((vec_get_ptr_field(v) as i64 + idx * es) as *mut i64) = val
+        let es = list_get_elem_size(v)
+        unsafe *((list_get_ptr_field(v) as i64 + idx * es) as *mut i64) = val
 
 pub fn with_vec_remove(v: *mut u8, idx: i64):
-    let vlen = vec_get_len(v)
+    let vlen = list_get_len(v)
     if idx < 0 or idx >= vlen: return
-    let base = vec_get_ptr_field(v)
-    let es = vec_get_elem_size(v)
+    let base = list_get_ptr_field(v)
+    let es = list_get_elem_size(v)
     var i = idx
     while i < vlen - 1:
         rt_memcpy((base as i64 + i * es) as *mut u8, (base as i64 + (i + 1) * es) as *const u8, es)
         i = i + 1
-    vec_set_len(v, vlen - 1)
+    list_set_len(v, vlen - 1)
 
 pub fn with_vec_pop_i32(v: *mut u8) -> i32:
-    let vlen = vec_get_len(v)
+    let vlen = list_get_len(v)
     if vlen == 0: return 0
-    vec_set_len(v, vlen - 1)
-    let es = vec_get_elem_size(v)
-    unsafe *((vec_get_ptr_field(v) as i64 + (vlen - 1) * es) as *const i32)
+    list_set_len(v, vlen - 1)
+    let es = list_get_elem_size(v)
+    unsafe *((list_get_ptr_field(v) as i64 + (vlen - 1) * es) as *const i32)
 
 // ── SlotMap operations ────────────────────────────────────────────
 // Header: values, next, generations, len, cap, elem_size (six words),
@@ -4454,7 +4454,7 @@ pub fn with_lines_out_ref(out: *mut u8, s: &str) -> Unit:
     with_lines_data_out(out, unsafe *(s as *const str as *const *const u8), s.len())
 
 pub fn with_str_join(parts: *mut u8, sep: &str) -> str:
-    let plen = vec_get_len(parts)
+    let plen = list_get_len(parts)
     if plen == 0:
         return make_str("" as *const u8, 0)
     let sep_p = str_data(sep)
@@ -4493,7 +4493,7 @@ pub fn with_vec_str_join(parts: *mut u8, sep: &str) -> str:
 // (see with_str_slice) — a view part at offset 0 double-freed the source
 // buffer when the parts vec dropped, and every part dangled after the
 // source's own drop.
-fn str_split_vec_ref(out: *mut u8, s: &str, delim: &str) -> Unit:
+fn str_split_list_ref(out: *mut u8, s: &str, delim: &str):
     with_vec_new_out(out, 16)  // sizeof(str) = 16
     let sl = str_length(s)
     if sl == 0: return
@@ -4518,7 +4518,7 @@ fn str_split_vec_ref(out: *mut u8, s: &str, delim: &str) -> Unit:
     with_vec_push_str(out, move last)
 
 pub fn with_str_split_vec_ref(out: *mut u8, s: &str, delim: &str) -> Unit:
-    str_split_vec_ref(out, s, delim)
+    str_split_list_ref(out, s, delim)
 
 // ── Time ───────────────────────────────────────────────────────────
 

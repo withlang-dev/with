@@ -95,9 +95,9 @@ fn main:
             print(f"v8 {lanes8(w)} | sum {sum}")
         .None => print("v8 none")
 
-    var als: Vec[Al] = Vec.new()
+    var als: List[Al] = List.new()
     als.push(Al { a: 5, b: 6 })
-    var vs: Vec[V8] = Vec.new()
+    var vs: List[V8] = List.new()
     vs.push(V8.splat(8))
     let pa = als.pop().unwrap()
     let pv = vs.pop().unwrap()

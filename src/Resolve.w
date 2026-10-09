@@ -28,8 +28,8 @@ fn resolve_owned_text(text: &str) -> str:
         return ""
     runtime_str_clone(text)
 
-fn resolve_new_vec_str -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn resolve_new_list_str -> List[str]:
+    let out: List[str] = List.new()
     out
 
 enum ImportKind: i32:
@@ -128,24 +128,24 @@ pub type ResolvedUse {
 impl Copy for ResolvedUse
 
 pub type ResolveResult {
-    modules: Vec[ResolvedModule],
-    imports: Vec[ResolvedImport],
-    defs: Vec[ResolvedDef],
-    scopes: Vec[ResolvedScope],
-    bindings: Vec[ResolvedBinding],
-    uses: Vec[ResolvedUse],
-    link_libs: Vec[i32],
+    modules: List[ResolvedModule],
+    imports: List[ResolvedImport],
+    defs: List[ResolvedDef],
+    scopes: List[ResolvedScope],
+    bindings: List[ResolvedBinding],
+    uses: List[ResolvedUse],
+    link_libs: List[i32],
 }
 
 fn ResolveResult.init -> ResolveResult:
     ResolveResult {
-        modules: Vec.new(),
-        imports: Vec.new(),
-        defs: Vec.new(),
-        scopes: Vec.new(),
-        bindings: Vec.new(),
-        uses: Vec.new(),
-        link_libs: Vec.new(),
+        modules: List.new(),
+        imports: List.new(),
+        defs: List.new(),
+        scopes: List.new(),
+        bindings: List.new(),
+        uses: List.new(),
+        link_libs: List.new(),
     }
 
 pub type ResolveArtifacts {
@@ -159,14 +159,14 @@ type ResolveState {
     diags: DiagnosticList,
     result: ResolveResult,
 
-    module_paths: Vec[str],
-    module_dirs: Vec[str],
-    module_file_ids: Vec[i32],
-    module_decl_counts: Vec[i32],
-    module_import_starts: Vec[i32],
-    module_import_counts: Vec[i32],
-    module_scope_ids: Vec[i32],
-    module_processed: Vec[i32],
+    module_paths: List[str],
+    module_dirs: List[str],
+    module_file_ids: List[i32],
+    module_decl_counts: List[i32],
+    module_import_starts: List[i32],
+    module_import_counts: List[i32],
+    module_scope_ids: List[i32],
+    module_processed: List[i32],
 
     module_map: HashMap[str, i32],
     link_lib_set: HashMap[i32, i32],
@@ -280,14 +280,14 @@ fn ResolveState.init(pool: InternPool, diags: DiagnosticList, emit_resolve_diags
         pool,
         diags,
         result: ResolveResult.init(),
-        module_paths: resolve_new_vec_str(),
-        module_dirs: resolve_new_vec_str(),
-        module_file_ids: Vec.new(),
-        module_decl_counts: Vec.new(),
-        module_import_starts: Vec.new(),
-        module_import_counts: Vec.new(),
-        module_scope_ids: Vec.new(),
-        module_processed: Vec.new(),
+        module_paths: resolve_new_list_str(),
+        module_dirs: resolve_new_list_str(),
+        module_file_ids: List.new(),
+        module_decl_counts: List.new(),
+        module_import_starts: List.new(),
+        module_import_counts: List.new(),
+        module_scope_ids: List.new(),
+        module_processed: List.new(),
         module_map: HashMap.new(),
         link_lib_set: HashMap.new(),
         binding_map: HashMap.new(),
@@ -339,8 +339,8 @@ impl ResolveState:
         self.module_processed.push(0)
         id
 
-    fn build_module_table() -> Vec[ResolvedModule]:
-        var out: Vec[ResolvedModule] = Vec.new()
+    fn build_module_table() -> List[ResolvedModule]:
+        var out: List[ResolvedModule] = List.new()
         for mid in 0..self.module_paths.len() as i32:
             out.push(ResolvedModule {
                 module_id: mid,
@@ -363,8 +363,8 @@ impl ResolveState:
         let module_scope = self.add_scope(module_id, -1, -1, ScopeKind.SK_MODULE)
         self.module_scope_ids[module_id] = module_scope
 
-        var pending_fn_nodes: Vec[i32] = Vec.new()
-        var pending_fn_defs: Vec[i32] = Vec.new()
+        var pending_fn_nodes: List[i32] = List.new()
+        var pending_fn_defs: List[i32] = List.new()
 
         var import_index = 0
 
@@ -1525,7 +1525,7 @@ pub fn resolve_canonical_module_key(path: &str) -> str:
         let cwd = runtime_cwd()
         if cwd.len() > 0:
             p = cwd ++ "/" ++ p
-    let parts: Vec[str] = Vec.new()
+    let parts: List[str] = List.new()
     let is_abs = runtime_path_is_absolute(p)
     let root_parts = runtime_path_root_part_count(p)
     var start = 0

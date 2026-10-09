@@ -6,14 +6,14 @@
 // exactly as a tail view is.
 use std.generators.{map, collect}
 
-gen fn over(xs: &Vec[i64]) -> &i64:
+gen fn over(xs: &List[i64]) -> &i64:
     for x in xs:
         yield x
 
 fn main:
     let staged = {
-        let v: Vec[i64] = [4, 5, 6]
+        let v: List[i64] = [4, 5, 6]
         over(&v) |> map(it * 3)
     }
-    let all = staged |> collect[Vec]()
+    let all = staged |> collect[List]()
     print(all.len())

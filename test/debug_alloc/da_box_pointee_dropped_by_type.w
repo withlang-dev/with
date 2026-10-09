@@ -3,7 +3,7 @@
 // parameter, a payload moved out of a match, a reassigned var) drops its
 // pointee by type, then frees. By its LLVM type alone an enum pointee found
 // no fields and no Drop impl, so Box.new(L.Cons(5, Box.new(L.Nil))) leaked
-// the inner box; Box[str], Box[Vec[str]], a Box of a struct with owned
+// the inner box; Box[str], Box[List[str]], a Box of a struct with owned
 // fields and Box[Option[str]] leaked their pointee too (23 leaks here on
 // base).
 
@@ -15,9 +15,9 @@ enum L:
 
 enum T:
     Leaf(s: str)
-    Node(kids: Vec[Box[T]])
+    Node(kids: List[Box[T]])
 
-type Rec { name: str, tags: Vec[str] }
+type Rec { name: str, tags: List[str] }
 
 fn take(b: Box[L]) -> i64:
     match b.as_ref():
@@ -43,25 +43,25 @@ fn main:
     print(take(Box.new(L.Cons(6, Box.new(L.Cons(7, Box.new(L.Nil)))))))
     let s = Box.new("boxed")
     print(s.as_ref().len())
-    let strs: Vec[str] = Vec.new()
+    let strs: List[str] = List.new()
     strs.push("a")
     strs.push("b")
     let bv = Box.new(strs)
     print(bv.as_ref().len())
-    let tags: Vec[str] = Vec.new()
+    let tags: List[str] = List.new()
     tags.push("t")
     let rec = Box.new(Rec { name: "r", tags })
     print(rec.as_ref().name)
     let opt = Box.new(Some("maybe"))
     print(opt.as_ref().is_some())
-    let kids: Vec[Box[T]] = Vec.new()
+    let kids: List[Box[T]] = List.new()
     kids.push(Box.new(T.Leaf("x")))
     kids.push(Box.new(T.Leaf("y")))
     let tree = Box.new(T.Node(kids))
     match tree.as_ref():
         .Node(k) => print(k.len())
         .Leaf(_) => print(0)
-    let list: Vec[Box[L]] = Vec.new()
+    let list: List[Box[L]] = List.new()
     list.push(Box.new(L.Cons(8, Box.new(L.Nil))))
     print(list.len())
     var re = Box.new(L.Cons(9, Box.new(L.Nil)))

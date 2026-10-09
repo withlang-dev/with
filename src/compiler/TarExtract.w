@@ -73,12 +73,12 @@ fn te_dirname(path: &str) -> str:
 // Unpacks the tar image `data` into `dest`, dropping the first `strip`
 // components of every name. "" on success, else why not.
 pub fn tar_extract_text(data: &str, dest: &str, strip: i32) -> str:
-    let all: Vec[str] = Vec.new()
+    let all: List[str] = List.new()
     tar_extract_text_keep(data, dest, strip, &all)
 
 // Whether the stripped name `rel` is under one of `keep`; every name is when
 // `keep` is empty.
-fn te_kept(rel: &str, keep: &Vec[str]) -> bool:
+fn te_kept(rel: &str, keep: &List[str]) -> bool:
     if keep.len() == 0: return true
     for prefix in keep:
         if rel.starts_with(prefix) or prefix == rel ++ "/": return true
@@ -87,7 +87,7 @@ fn te_kept(rel: &str, keep: &Vec[str]) -> bool:
 // tar_extract_text, writing only the entries whose stripped name starts with
 // one of `keep`: the few directories of a large source archive a step needs
 // (compiler.WindowsImportLibs).
-pub fn tar_extract_text_keep(data: &str, dest: &str, strip: i32, keep: &Vec[str]) -> str:
+pub fn tar_extract_text_keep(data: &str, dest: &str, strip: i32, keep: &List[str]) -> str:
     if runtime_mkdir_p(dest) != 0: return "could not create " ++ dest
     var at: i64 = 0
     var long_name = ""
@@ -151,14 +151,14 @@ pub fn tar_extract_text_keep(data: &str, dest: &str, strip: i32, keep: &Vec[str]
         // Device, fifo and other entries have no place in a package.
     ""
 
-fn te_bytes(text: &str) -> Vec[u8]:
-    let out: Vec[u8] = Vec.with_capacity(text.len())
+fn te_bytes(text: &str) -> List[u8]:
+    let out: List[u8] = List.with_capacity(text.len())
     for i in 0..text.len(): out.push(text[i])
     out
 
 // Unpacks the gzip-compressed tar `archive` into `dest`. "" or why not.
 pub fn tar_gz_extract(archive: &str, dest: &str, strip: i32) -> str:
-    let all: Vec[str] = Vec.new()
+    let all: List[str] = List.new()
     tar_gz_extract_keep(archive, dest, strip, &all)
 
 // Unpacks the gzip-compressed tar image `packed` (bytes in memory, an
@@ -172,7 +172,7 @@ pub fn tar_gz_extract_data(packed: &str, dest: &str, strip: i32) -> str:
         .Err(e) => "an embedded archive: " ++ e.message
 
 // tar_gz_extract, writing only the entries under one of `keep`.
-pub fn tar_gz_extract_keep(archive: &str, dest: &str, strip: i32, keep: &Vec[str]) -> str:
+pub fn tar_gz_extract_keep(archive: &str, dest: &str, strip: i32, keep: &List[str]) -> str:
     let packed = runtime_read_file(archive)
     if packed.len() == 0: return "could not read " ++ archive
     match decompress_gzip_with_limit(&te_bytes(packed), 8589934592):

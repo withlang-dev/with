@@ -3,8 +3,8 @@
 
 use std.builtins.int_to_string
 fn main:
-    // VecIter[T] implements Iter[T] — test via for-loop over .iter()
-    let nums: Vec[i32] = Vec.new()
+    // ListIter[T] implements Iter[T] — test via for-loop over .iter()
+    let nums: List[i32] = List.new()
     nums.push(1)
     nums.push(2)
     nums.push(3)
@@ -15,8 +15,8 @@ fn main:
         sum = sum + x
     print(int_to_string(sum as i64))
 
-    // Manual .next() on VecIter
-    let words: Vec[str] = Vec.new()
+    // Manual .next() on ListIter
+    let words: List[str] = List.new()
     words.push("a")
     words.push("b")
     words.push("c")

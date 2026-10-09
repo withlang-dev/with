@@ -3,8 +3,8 @@
 // used before their origin reallocates; independent values cross the
 // mutation as clones. Every str is freed exactly once and nothing leaks.
 
-fn mkv() -> Vec[str]:
-    var v: Vec[str] = Vec.new()
+fn mkv() -> List[str]:
+    var v: List[str] = List.new()
     v.push("alpha")
     v.push("beta")
     v

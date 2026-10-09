@@ -40,21 +40,21 @@ fn normalize(line: &str) -> str:
     s = /(^|[\t ])lib\/std\//g.replace(s, "$1<embedded-std>/std/")
     s
 
-fn run_side(compiler: &str, file: &str, query: &str, label: &str) -> Vec[str]:
+fn run_side(compiler: &str, file: &str, query: &str, label: &str) -> List[str]:
     let out_path = "out/tmp/gen_diff_" ++ label ++ ".txt"
-    let argv: Vec[str] = [compiler.to_owned(), "analyze".to_owned(), file.to_owned(), query.to_owned()]
+    let argv: List[str] = [compiler.to_owned(), "analyze".to_owned(), file.to_owned(), query.to_owned()]
     let finished = run_to_files(&argv, out_path, out_path ++ ".stderr", 600000)
     if finished.code != 0:
         eprint(f"gen_diff: {label}: `" ++ compiler ++ "` exited {finished.code}; its stderr is in " ++ out_path ++ ".stderr (the diff below is over what it printed)")
-    var lines: Vec[str] = Vec.new()
+    var lines: List[str] = List.new()
     for l in read_file(out_path).unwrap_or("").split("\n"):
         if l.len() > 0: lines.push(normalize(l))
     lines
 
-fn only_in(a: &Vec[str], b: &Vec[str]) -> Vec[str]:
+fn only_in(a: &List[str], b: &List[str]) -> List[str]:
     var counts: HashMap[str, i32] = HashMap.new()
     for l in b: counts.insert(l.clone(), (counts.get(l) ?? 0) + 1)
-    var out: Vec[str] = Vec.new()
+    var out: List[str] = List.new()
     for l in a:
         let n = counts.get(l) ?? 0
         if n > 0: counts.insert(l.clone(), n - 1)

@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
-// A5: assigning a new Vec into a mut-self field drops the old Vec tail before
-// replacing it, then drops the new Vec when the owner leaves scope.
+// A5: assigning a new List into a mut-self field drops the old List tail before
+// replacing it, then drops the new List when the owner leaves scope.
 
 use std.builtins.print_i32
 type W { slot: *mut i32 }
@@ -10,10 +10,10 @@ impl Drop for W:
         unsafe:
             *self.slot = *self.slot + 1
 
-type Holder { values: Vec[W] }
+type Holder { values: List[W] }
 
-fn make_values(slot: *mut i32) -> Vec[W]:
-    let values: Vec[W] = Vec.new()
+fn make_values(slot: *mut i32) -> List[W]:
+    let values: List[W] = List.new()
     values.push(W { slot: slot })
     values
 

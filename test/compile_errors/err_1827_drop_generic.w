@@ -5,7 +5,7 @@
 // A call writes every global its callee writes, and a drop every global
 // its Drop impls write (§2.4).
 
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 type Guard[T]:
     v: T

@@ -6,7 +6,7 @@
 // stale read compiled.
 
 fn main:
-    var v: Vec[str] = Vec.new()
+    var v: List[str] = List.new()
     v.push("a".clone())
     let s = &v
     v.push("b".clone())

@@ -3,12 +3,12 @@
 // D27 E3: the unannotated binding preserves &Thing. The later call is the
 // independently established owned demand and fails at that site.
 
-type Thing { vals: Vec[i32] }
+type Thing { vals: List[i32] }
 
 fn consume(t: Thing) -> i64: t.vals.len()
 
 fn main:
-    var items: Vec[Thing] = Vec.new()
-    items.push(Thing { vals: Vec.new() })
+    var items: List[Thing] = List.new()
+    items.push(Thing { vals: List.new() })
     let t = items[0]
     assert(consume(t) == 0)

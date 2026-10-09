@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-type Payload { text: str, numbers: Vec[i32] }
+type Payload { text: str, numbers: List[i32] }
 
 fn direct(text: &str) -> Result[str, str]: text.clone()
 
@@ -13,12 +13,12 @@ fn selected(text: &str, tag: i32) -> Result[str, str]:
         0 => text.clone()
         _ => text.slice(0, text.len())
 
-fn vector(left: bool) -> Result[Vec[i32], str]:
+fn vector(left: bool) -> Result[List[i32], str]:
     if left:
-        let values: Vec[i32] = [11, 22, 33]
+        let values: List[i32] = [11, 22, 33]
         values
     else:
-        let values: Vec[i32] = [44, 55, 66]
+        let values: List[i32] = [44, 55, 66]
         values
 
 fn aggregate(text: &str, left: bool) -> Result[Payload, str]:

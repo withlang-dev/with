@@ -1,14 +1,14 @@
 use issue61_queries.shared
 use std.collections.HashMap
 
-pub type IntList = Vec[i32]
+pub type IntList = List[i32]
 
 pub type StateBox[T] {
     value: T,
 }
 
 pub fn make_alias_list() -> IntList:
-    let values: IntList = Vec.new()
+    let values: IntList = List.new()
     values.push(2)
     values.push(4)
     values.push(8)

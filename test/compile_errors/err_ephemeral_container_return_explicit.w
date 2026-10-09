@@ -2,7 +2,7 @@
 // §5.2 (#625): same escape via explicit `return`.
 type View ephemeral { p: &i32 }
 
-fn leak() -> Vec[View]:
+fn leak() -> List[View]:
     let x = 5
     return [View { p: &x }]
 

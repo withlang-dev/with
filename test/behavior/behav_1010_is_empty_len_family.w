@@ -8,7 +8,7 @@
 
 // #1010: `is_empty()` on a receiver whose `len()` is an intrinsic (str,
 // arrays, slices, HashMap, HashSet, SlotMap) type-checked as bool, then
-// aborted the compiler in validate_generic_call_contracts: only Vec and
+// aborted the compiler in validate_generic_call_contracts: only List and
 // FixedString had an is_empty lowering. It lowers as `len() == 0`.
 
 use std.collections.HashMap

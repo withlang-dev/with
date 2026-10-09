@@ -5,18 +5,18 @@
 
 type T { id: str }
 
-fn tail_form() -> Vec[i32]:
-    with Vec.new() as mut out:
+fn tail_form() -> List[i32]:
+    with List.new() as mut out:
         out.push(1)
         out.push(2)
 
-fn loop_form(count: i32) -> Vec[T]:
-    with Vec.new() as mut out:
+fn loop_form(count: i32) -> List[T]:
+    with List.new() as mut out:
         for i in 0..count:
             out.push(T { id: f"dev-{i}" })
 
 fn main:
-    let v = with Vec.new() as mut v:
+    let v = with List.new() as mut v:
         v.push(1)
         v.push(2)
     let s = with "" as mut acc:

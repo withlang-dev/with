@@ -13,6 +13,6 @@ var counter: i32 = 0
 
 fn main:
     counter = counter + 1
-    let ts: Vec[Task[Result[i32, str]]] = Vec.new()
+    let ts: List[Task[Result[i32, str]]] = List.new()
     let _ = ts |> await_all
     print_i32(counter)

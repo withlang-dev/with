@@ -4,7 +4,7 @@
 // included. The hole's sub-parser saw `it` and dropped the fact, so the
 // argument never became a closure ("undefined variable" on `__it`).
 fn main:
-    let nums: Vec[i32] = [1, 2, 3]
-    let plain: Vec[str] = nums.iter() |> map(f"{it}") |> collect[Vec]()
-    let wrapped: Vec[str] = nums.iter() |> map(f"<{it}>") |> collect[Vec]()
+    let nums: List[i32] = [1, 2, 3]
+    let plain: List[str] = nums.iter() |> map(f"{it}") |> collect[List]()
+    let wrapped: List[str] = nums.iter() |> map(f"<{it}>") |> collect[List]()
     print(plain.join(" ") ++ " | " ++ wrapped.join(" "))

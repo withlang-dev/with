@@ -3,7 +3,7 @@
 // allocator: userdata consumed with a destroy callback is boxed by the
 // rendered method, handed to C, and destroyed by C through the compiler's
 // destroy fn — once: when C replaces it, and when the database closes on
-// every path (scope end, early return, a Vec of databases). A userdata
+// every path (scope end, early return, a List of databases). A userdata
 // destroyed twice is a DOUBLE FREE; one never destroyed is a LEAK.
 use c_import("../behavior/c_facade_callbacks.h")
 
@@ -37,7 +37,7 @@ fn main:
     assert(log_len(l) == 3 and log_at(l, 1) == 1021)
     log_reset(l)
     if true:
-        var all: Vec[Database] = Vec.new()
+        var all: List[Database] = List.new()
         for i in 1..4:
             let d = Database.new(l, 30 + i).unwrap()
             assert(d.set_owned(Ctx { log: l, id: 30 + i, text: "vec" }) == 2)

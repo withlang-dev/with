@@ -18,8 +18,8 @@
 // last use is before the drop that writes its global, and a callable of
 // another type than the global's writer.
 
-var G: Vec[str] = Vec.new()
-var B: Vec[str] = Vec.new()
+var G: List[str] = List.new()
+var B: List[str] = List.new()
 
 type Tok:
     n: i32

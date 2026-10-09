@@ -7,35 +7,35 @@ fn maybe_positive(x: i32) -> Option[i32]:
 fn checked_positive(x: i32) -> Result[i32, str]:
     if x > 0: Ok(x) else: Err("negative")
 
-fn assert_vec_123(xs: Vec[i32]):
+fn assert_list_123(xs: List[i32]):
     assert(xs.len() == 3)
     assert(xs[0] == 1)
     assert(xs[1] == 2)
     assert(xs[2] == 3)
 
 fn test_sequence_option_some:
-    let xs: Vec[Option[i32]] = Vec.new()
+    let xs: List[Option[i32]] = List.new()
     xs.push(Some(1))
     xs.push(Some(2))
     xs.push(Some(3))
-    assert_vec_123(xs.sequence().unwrap())
+    assert_list_123(xs.sequence().unwrap())
 
 fn test_sequence_option_none:
-    let xs: Vec[Option[i32]] = Vec.new()
+    let xs: List[Option[i32]] = List.new()
     xs.push(Some(1))
     xs.push(None)
     xs.push(Some(3))
     assert(xs.sequence().is_none())
 
 fn test_sequence_result_ok:
-    let xs: Vec[Result[i32, str]] = Vec.new()
+    let xs: List[Result[i32, str]] = List.new()
     xs.push(Ok(1))
     xs.push(Ok(2))
     xs.push(Ok(3))
-    assert_vec_123(xs.sequence().unwrap())
+    assert_list_123(xs.sequence().unwrap())
 
 fn test_sequence_result_err:
-    let xs: Vec[Result[i32, str]] = Vec.new()
+    let xs: List[Result[i32, str]] = List.new()
     xs.push(Ok(1))
     xs.push(Err("bad"))
     xs.push(Ok(3))
@@ -44,28 +44,28 @@ fn test_sequence_result_err:
         Ok(_) => assert(false)
 
 fn test_traverse_option_some:
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)
-    assert_vec_123(xs.traverse(x => maybe_positive(x)).unwrap())
+    assert_list_123(xs.traverse(x => maybe_positive(x)).unwrap())
 
 fn test_traverse_option_none:
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(1)
     xs.push(-2)
     xs.push(3)
     assert(xs.traverse(x => maybe_positive(x)).is_none())
 
 fn test_traverse_result_ok:
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)
-    assert_vec_123(xs.traverse(x => checked_positive(x)).unwrap())
+    assert_list_123(xs.traverse(x => checked_positive(x)).unwrap())
 
 fn test_traverse_result_err:
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(1)
     xs.push(-2)
     xs.push(3)

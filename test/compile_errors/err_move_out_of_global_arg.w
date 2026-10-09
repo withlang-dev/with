@@ -3,9 +3,9 @@
 // #1242: a consuming parameter and a `move self` receiver take the global's
 // value the same way a binding does.
 
-var g: Vec[str] = Vec.new()
+var g: List[str] = List.new()
 
-fn consume(v: Vec[str]) -> i64: v.len()
+fn consume(v: List[str]) -> i64: v.len()
 
 fn main:
     g.push("a")

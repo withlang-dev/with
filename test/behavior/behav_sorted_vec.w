@@ -1,11 +1,11 @@
 //! expect-stdout: ok
 
-// SortedVec[T] over the c-algorithms sorted array (docs/proposals/stdlib_sourcing_plan.md
+// SortedList[T] over the c-algorithms sorted array (docs/proposals/stdlib_sourcing_plan.md
 // Phase 1): ordered insertion, observing views, transfers, binary search,
 // and exactly-once drops of Drop-class values.
 
 use std.builtins.print_i32
-use std.collections.sorted_vec.SortedVec
+use std.collections.sorted_list.SortedList
 
 type Tag { id: i32, slot: *mut i32 }
 impl Ord for Tag:
@@ -17,7 +17,7 @@ impl Drop for Tag:
             *self.slot = *self.slot + self.id
 
 fn ints():
-    var sorted = SortedVec[i32].new()
+    var sorted = SortedList[i32].new()
     for v in [5, 1, 4, 1, 3]: sorted.insert(v)
     assert(sorted.len() == 5)
     var expected = [1, 1, 3, 4, 5]
@@ -36,7 +36,7 @@ fn ints():
     assert(sorted.is_empty())
 
 fn drops(slot: *mut i32):
-    var sorted = SortedVec[Tag].new()
+    var sorted = SortedList[Tag].new()
     sorted.insert(Tag { id: 20, slot })
     sorted.insert(Tag { id: 10, slot })
     sorted.insert(Tag { id: 30, slot })

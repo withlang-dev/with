@@ -1,16 +1,16 @@
 type Inner {
-    tags: Vec[i32],
+    tags: List[i32],
 }
 
-type InnerList = Vec[Inner]
+type InnerList = List[Inner]
 
 type Outer {
-    items: Vec[Inner],
+    items: List[Inner],
 }
 
-fn seed_items() -> Vec[Inner]:
-    let items: Vec[Inner] = Vec.new()
-    items.push(Inner { tags: Vec.new() })
+fn seed_items() -> List[Inner]:
+    let items: List[Inner] = List.new()
+    items.push(Inner { tags: List.new() })
     items
 
 fn main:

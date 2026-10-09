@@ -39,7 +39,7 @@ tracked inside an `async scope`. The scope guarantees every fiber completes befo
 | `select await` | `collect_results` — recv vs timeout; `demo_select` — 3-way |
 | `let ... else` in select branches | `collect_results`, `demo_select` — `let Some(msg) = opt else break` |
 | `async:` blocks | `demo_select` — inline producer fibers |
-| `with` blocks (mutation) | `collect_results`, `demo_fan_out` — building Vec, HashMap |
+| `with` blocks (mutation) | `collect_results`, `demo_fan_out` — building List, HashMap |
 | Pipeline operators `\|>` | `compute_stats` — filter/count chains |
 | Default field values | `Stats { total: i64 = 0, ... }` |
 | String interpolation | `"task-{i}"`, `"fast-{i}"`, worker output |

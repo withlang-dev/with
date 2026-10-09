@@ -14,7 +14,7 @@ type EmitCParam {
 type EmitCFunction {
     symbol: str,
     return_type: str,
-    params: Vec[EmitCParam],
+    params: List[EmitCParam],
     ok: i32,
 }
 
@@ -103,11 +103,11 @@ fn emitc_c_compiler(ctx: &ActionCtx) -> str:
         return "clang++.exe"
     "cc"
 
-fn emitc_push_c_compiler(ctx: &ActionCtx, argv: Vec[str]) -> Vec[str]:
+fn emitc_push_c_compiler(ctx: &ActionCtx, argv: List[str]) -> List[str]:
     argv.push(emitc_c_compiler(ctx))
     argv
 
-fn emitc_push_c_source(argv: Vec[str], path: &str) -> Vec[str]:
+fn emitc_push_c_source(argv: List[str], path: &str) -> List[str]:
     argv |> push("-x")
     argv |> push("c")
     argv |> push(emit_c_owned_text(path))
@@ -130,7 +130,7 @@ fn emitc_host_platform_runtime_object() -> str:
         return "rt_windows_aarch64.o"
     ""
 
-fn emitc_push_host_c_flags(argv: Vec[str]) -> Vec[str]:
+fn emitc_push_host_c_flags(argv: List[str]) -> List[str]:
     if os() == "Linux":
         argv |> push("-no-pie")
         argv |> push("-fuse-ld=lld")
@@ -189,7 +189,7 @@ fn emitc_windows_msvc_lib(name: &str) -> str:
     if dir.len() > 0: return dir ++ "/" ++ name
     "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/" ++ emitc_windows_lib_arch() ++ "/" ++ name
 
-fn emitc_push_system_libs(argv: Vec[str]) -> Vec[str]:
+fn emitc_push_system_libs(argv: List[str]) -> List[str]:
     if os() == "Windows":
         argv |> push(emitc_windows_msvc_lib("libcpmt.lib"))
         argv |> push(emitc_windows_msvc_lib("libcmt.lib"))
@@ -232,8 +232,8 @@ fn emitc_index_of(text: &str, needle: &str) -> i32:
         i = i + 1
     -1
 
-fn emitc_split_lines(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn emitc_split_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     var start = 0
     var i = 0
     while i <= text.len() as i32:
@@ -287,9 +287,9 @@ fn emitc_c_type(with_type: &str) -> str:
     // #1810), as the emitted definitions declare it; #785's header pointer
     // predates that and made every call conflict with this prototype.
     if with_type == "&str": return "with_str"
-    if with_type == "WithVec": return "with_vec"
-    if with_type == "*const WithVec": return "const with_vec *"
-    if with_type == "*mut WithVec": return "with_vec *"
+    if with_type == "WithList": return "with_vec"
+    if with_type == "*const WithList": return "const with_vec *"
+    if with_type == "*mut WithList": return "with_vec *"
     if with_type == "*const u8": return "const uint8_t *"
     if with_type == "*mut u8": return "uint8_t *"
     if with_type == "*const i8": return "const int8_t *"
@@ -326,8 +326,8 @@ fn emitc_parse_param(param_text: &str) -> EmitCParam:
     let with_type = emitc_trim(trimmed.slice((colon + 1) as i64, type_end as i64))
     EmitCParam { name, c_type: emitc_c_type(with_type) }
 
-fn emitc_parse_params(text: &str) -> Vec[EmitCParam]:
-    let params: Vec[EmitCParam] = Vec.new()
+fn emitc_parse_params(text: &str) -> List[EmitCParam]:
+    let params: List[EmitCParam] = List.new()
     var start = 0
     var i = 0
     while i <= text.len() as i32:
@@ -341,7 +341,7 @@ fn emitc_parse_params(text: &str) -> Vec[EmitCParam]:
     params
 
 fn emitc_parse_export_function(symbol: &str, line: &str) -> EmitCFunction:
-    let params: Vec[EmitCParam] = Vec.new()
+    let params: List[EmitCParam] = List.new()
     let fn_at = emitc_index_of(line, "fn ")
     if fn_at < 0:
         return EmitCFunction { symbol: emit_c_owned_text(symbol), return_type: "", params, ok: 0 }
@@ -385,8 +385,8 @@ fn emitc_parse_export_function(symbol: &str, line: &str) -> EmitCFunction:
             return EmitCFunction { symbol: emit_c_owned_text(symbol), return_type: "", params: parsed_params, ok: 0 }
     EmitCFunction { symbol: emit_c_owned_text(symbol), return_type, params: parsed_params, ok: 1 }
 
-fn emitc_collect_exports_from_text(ctx: &ActionCtx, text: &str, source_path: &str) -> Vec[EmitCFunction]:
-    let exports: Vec[EmitCFunction] = Vec.new()
+fn emitc_collect_exports_from_text(ctx: &ActionCtx, text: &str, source_path: &str) -> List[EmitCFunction]:
+    let exports: List[EmitCFunction] = List.new()
     let lines = emitc_split_lines(text)
     var pending_symbol = ""
     for li in 0..lines.len() as i32:
@@ -400,16 +400,16 @@ fn emitc_collect_exports_from_text(ctx: &ActionCtx, text: &str, source_path: &st
                 let fn_sig = emitc_parse_export_function(pending_symbol, line)
                 if fn_sig.ok == 0:
                     let _ = emitc_fail(ctx, "could not parse c_export signature for " ++ pending_symbol ++ " in " ++ source_path)
-                    return Vec.new()
+                    return List.new()
                 exports.push(fn_sig)
                 pending_symbol = ""
                 continue
             if line.len() > 0 and not line.starts_with("//"):
                 let _ = emitc_fail(ctx, "c_export is not followed by a function in " ++ source_path ++ ": " ++ pending_symbol)
-                return Vec.new()
+                return List.new()
     if pending_symbol.len() > 0:
         let _ = emitc_fail(ctx, "unterminated c_export in " ++ source_path ++ ": " ++ pending_symbol)
-        return Vec.new()
+        return List.new()
     exports
 
 fn emitc_public_function_name(line: &str) -> str:
@@ -433,8 +433,8 @@ fn emitc_public_function_name(line: &str) -> str:
 fn emitc_is_bridge_abi_symbol(name: &str) -> bool:
     name.starts_with("wl_") or name.starts_with("with_cimport_") or name.starts_with("with_ci_")
 
-fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: &str) -> Vec[EmitCFunction]:
-    let exports: Vec[EmitCFunction] = Vec.new()
+fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: &str) -> List[EmitCFunction]:
+    let exports: List[EmitCFunction] = List.new()
     let lines = emitc_split_lines(text)
     for li in 0..lines.len() as i32:
         let line = emitc_trim(lines[li])
@@ -444,38 +444,38 @@ fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: 
         let fn_sig = emitc_parse_export_function(name, line)
         if fn_sig.ok == 0:
             let _ = emitc_fail(ctx, "could not parse public ABI signature for " ++ name ++ " in " ++ source_path)
-            return Vec.new()
+            return List.new()
         exports.push(fn_sig)
     exports
 
-fn emitc_collect_public_abi(ctx: &ActionCtx, sources: Vec[str]) -> Vec[EmitCFunction]:
-    let all: Vec[EmitCFunction] = Vec.new()
+fn emitc_collect_public_abi(ctx: &ActionCtx, sources: List[str]) -> List[EmitCFunction]:
+    let all: List[EmitCFunction] = List.new()
     let fs = ctx.fs()
     for si in 0..sources.len() as i32:
         let source_path = sources[si]
         let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
         if text.len() == 0:
             let _ = emitc_fail(ctx, "could not read source for ABI scan: " ++ source_path)
-            return Vec.new()
+            return List.new()
         var exports = emitc_collect_public_abi_from_text(ctx, text, source_path)
         if exports.len() == 0:
-            return Vec.new()
+            return List.new()
         while exports.len() > 0:
             all.push(exports.remove(0))
     all
 
-fn emitc_collect_exports(ctx: &ActionCtx, sources: Vec[str]) -> Vec[EmitCFunction]:
-    let all: Vec[EmitCFunction] = Vec.new()
+fn emitc_collect_exports(ctx: &ActionCtx, sources: List[str]) -> List[EmitCFunction]:
+    let all: List[EmitCFunction] = List.new()
     let fs = ctx.fs()
     for si in 0..sources.len() as i32:
         let source_path = sources[si]
         let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
         if text.len() == 0:
             let _ = emitc_fail(ctx, "could not read source for export scan: " ++ source_path)
-            return Vec.new()
+            return List.new()
         var exports = emitc_collect_exports_from_text(ctx, text, source_path)
         if exports.len() == 0:
-            return Vec.new()
+            return List.new()
         while exports.len() > 0:
             all.push(exports.remove(0))
     all
@@ -499,7 +499,7 @@ fn emitc_decls_beside(main_c: &str): emitc_join(emitc_dirname(main_c), "wl_decls
 // them: each emit-c target owns its own (#2014: bootstrap-c-emit-sources,
 // emit-c-test and emit-c-roundtrip all once wrote out/gen/wl_decls.h).
 fn emitc_generate_stub_files(ctx: &ActionCtx, dir: &str) -> i32:
-    let bridge_sources: Vec[str] = Vec.new()
+    let bridge_sources: List[str] = List.new()
     bridge_sources |> push("src/compiler/LlvmBridge.w")
     bridge_sources |> push("src/compiler/ClangBridge.w")
     let stub_exports = emitc_collect_public_abi(ctx, bridge_sources)
@@ -536,10 +536,10 @@ fn emitc_generate_stub_files(ctx: &ActionCtx, dir: &str) -> i32:
 fn emitc_capture_rel(ctx: &ActionCtx, label: &str, suffix: &str) -> str:
     emitc_join(emitc_join("out/command", ctx.target_name()), label ++ "." ++ suffix)
 
-fn emitc_run_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], timeout_ms: i32) -> i32:
+fn emitc_run_capture(ctx: &ActionCtx, label: &str, argv: List[str], timeout_ms: i32) -> i32:
     emitc_run_capture_env(ctx, label, argv, timeout_ms, "", "")
 
-fn emitc_run_capture_env(ctx: &ActionCtx, label: &str, argv: Vec[str], timeout_ms: i32, extra_key: &str, extra_val: &str) -> i32:
+fn emitc_run_capture_env(ctx: &ActionCtx, label: &str, argv: List[str], timeout_ms: i32, extra_key: &str, extra_val: &str) -> i32:
     let root = ctx.project_info().project_root()
     let fs = ctx.fs()
     let capture_dir = emitc_join("out/command", ctx.target_name())
@@ -570,7 +570,7 @@ fn emitc_expect_same_version(ctx: &ActionCtx, expected_compiler: &str, actual_co
         return emitc_fail(ctx, "could not create capture directory: " ++ capture_dir)
     let expected_stdout = emitc_capture_rel(ctx, "native-version", "stdout")
     let expected_stderr = emitc_capture_rel(ctx, "native-version", "stderr")
-    var expected_args: Vec[str] = Vec.new()
+    var expected_args: List[str] = List.new()
     expected_args.push(emitc_abs(root, expected_compiler))
     expected_args.push("--version")
     let expected = ctx.process_runner().run_capture(expected_args, emitc_abs(root, expected_stdout), emitc_abs(root, expected_stderr), 120000)
@@ -579,7 +579,7 @@ fn emitc_expect_same_version(ctx: &ActionCtx, expected_compiler: &str, actual_co
 
     let actual_stdout = emitc_capture_rel(ctx, "with-from-c-version", "stdout")
     let actual_stderr = emitc_capture_rel(ctx, "with-from-c-version", "stderr")
-    var actual_args: Vec[str] = Vec.new()
+    var actual_args: List[str] = List.new()
     actual_args.push(emitc_abs(root, actual_compiler))
     actual_args.push("--version")
     let actual = ctx.process_runner().run_capture(actual_args, emitc_abs(root, actual_stdout), emitc_abs(root, actual_stderr), 120000)
@@ -593,7 +593,7 @@ fn emitc_expect_same_version(ctx: &ActionCtx, expected_compiler: &str, actual_co
     fs.remove_file(actual_stderr)
     0
 
-fn emitc_compile_runtime_args(root: &str, argv: Vec[str], platform_obj: &str) -> Vec[str]:
+fn emitc_compile_runtime_args(root: &str, argv: List[str], platform_obj: &str) -> List[str]:
     argv |> push(emitc_abs(root, "out/lib/rt_core.o"))
     argv |> push(emitc_abs(root, "out/lib/" ++ platform_obj))
     argv |> push(emitc_abs(root, "out/lib/compat_runtime.o"))
@@ -610,7 +610,7 @@ fn emitc_compile_runtime_args(root: &str, argv: Vec[str], platform_obj: &str) ->
 // (docs/spec/toolchain/wo_bundles.md "Retiring the shim", #955).
 fn emitc_build_compiler_c(ctx: &ActionCtx, compiler_path: &str, main_c: &str) -> i32:
     let root = ctx.project_info().project_root()
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(emitc_abs(root, compiler_path))
     argv |> push("build")
     argv |> push(emitc_abs(root, "out/gen/versioned_main.w"))
@@ -643,7 +643,7 @@ fn emitc_compile_c_compiler(ctx: &ActionCtx, main_c: &str, output_path: &str) ->
     let llvm_rsp = "out/lib/llvm_link.rsp"
     if not fs.exists(llvm_rsp) or fs.read_text(llvm_rsp).len() == 0:
         return emitc_fail(ctx, "missing LLVM link metadata: " ++ llvm_rsp)
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv = emitc_push_c_compiler(ctx, move argv)
     argv |> push("-O1")
     argv = emitc_push_host_c_flags(move argv)
@@ -669,7 +669,7 @@ fn emitc_compile_c_compiler_with_bridges(ctx: &ActionCtx, main_c: &str, output_p
     let cc_path = emitc_trim(cc_raw)
     if cc_path.len() == 0:
         return emitc_fail(ctx, "missing LLVM compiler metadata: out/lib/llvm_cc")
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(emitc_abs(root, cc_path))
     argv |> push("-O1")
     argv = emitc_push_host_c_flags(move argv)
@@ -688,7 +688,7 @@ fn emitc_compile_c_compiler_with_bridges(ctx: &ActionCtx, main_c: &str, output_p
 
 fn emitc_migrate_compiler_c(ctx: &ActionCtx, compiler_path: &str, main_c: &str, output_w: &str) -> i32:
     let root = ctx.project_info().project_root()
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(emitc_abs(root, compiler_path))
     argv |> push("migrate")
     argv |> push(emitc_abs(root, main_c))
@@ -703,7 +703,7 @@ fn emitc_migrate_compiler_c(ctx: &ActionCtx, compiler_path: &str, main_c: &str, 
 
 fn emitc_build_with_compiler(ctx: &ActionCtx, compiler_path: &str, source_w: &str, output_path: &str, label: &str) -> i32:
     let root = ctx.project_info().project_root()
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(emitc_abs(root, compiler_path))
     argv |> push("build")
     argv |> push(emitc_abs(root, source_w))
@@ -714,15 +714,15 @@ fn emitc_build_with_compiler(ctx: &ActionCtx, compiler_path: &str, source_w: &st
 
 fn emitc_run_single_test(ctx: &ActionCtx, compiler_path: &str, test_path: &str, label: &str) -> i32:
     let root = ctx.project_info().project_root()
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(emitc_abs(root, compiler_path))
     argv |> push("test")
     argv |> push("--quiet")
     argv |> push(emitc_abs(root, test_path))
     emitc_run_capture(ctx, label, argv, 300000)
 
-fn emitc_test_target_files(ctx: &ActionCtx, entry: &str) -> Vec[str]:
-    let files: Vec[str] = Vec.new()
+fn emitc_test_target_files(ctx: &ActionCtx, entry: &str) -> List[str]:
+    let files: List[str] = List.new()
     let star = emitc_index_of(entry, "*")
     if star < 0:
         files.push(emit_c_owned_text(entry))
@@ -764,7 +764,7 @@ fn emitc_run_compiler_test_suite(ctx: &ActionCtx, compiler_path: &str, label: &s
 
 fn emitc_build_hello_c(ctx: &ActionCtx, compiler_path: &str, hello_c: &str) -> i32:
     let root = ctx.project_info().project_root()
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(emitc_abs(root, compiler_path))
     argv |> push("build")
     argv |> push(emitc_abs(root, "test/hello.w"))
@@ -779,7 +779,7 @@ fn emitc_compile_hello(ctx: &ActionCtx, hello_c: &str, output_path: &str) -> i32
     let platform_obj = emitc_host_platform_runtime_object()
     if platform_obj.len() == 0:
         return emitc_fail(ctx, "unsupported host runtime object for emit-c hello compile: " ++ os() ++ "/" ++ arch())
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv = emitc_push_c_compiler(ctx, move argv)
     argv |> push("-O1")
     argv = emitc_push_host_c_flags(move argv)
@@ -797,7 +797,7 @@ fn emitc_run_hello(ctx: &ActionCtx, hello_path: &str) -> i32:
     let fs = ctx.fs()
     let stdout_rel = emitc_capture_rel(ctx, "hello", "stdout")
     let stderr_rel = emitc_capture_rel(ctx, "hello", "stderr")
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv |> push(emitc_abs(root, hello_path))
     let result = ctx.process_runner().run_capture(argv, emitc_abs(root, stdout_rel), emitc_abs(root, stderr_rel), 120000)
     if result.rc != 0:

@@ -76,10 +76,10 @@ fn parse_telemetry(raw: &str) -> Option[Telemetry]:
 // --- Batch Parser ---
 //
 // Parses a list of raw strings into telemetry records.
-// Uses a with-block for scoped mutable access to the result Vec.
+// Uses a with-block for scoped mutable access to the result List.
 
-fn parse_batch(lines: &Vec[str]) -> Result[Vec[Telemetry], SessionError]:
-    with Vec.new() as mut results:
+fn parse_batch(lines: &List[str]) -> Result[List[Telemetry], SessionError]:
+    with List.new() as mut results:
         for line in lines:
             let t = parse_telemetry(line) ?? return Err(.ParseFailed("invalid input"))
             results.push(t)
@@ -135,7 +135,7 @@ pub type SessionStats {
     total_packets: i32,
 }
 
-pub fn compute_stats(sessions: &Vec[Session]) -> SessionStats:
+pub fn compute_stats(sessions: &List[Session]) -> SessionStats:
     var total: i32 = 0
     for s in sessions:
         total += s.packets_received

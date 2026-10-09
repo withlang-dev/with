@@ -10,14 +10,14 @@ impl Drop for W:
             with_free(self.ptr)
             *self.slot = *self.slot + 1
 
-type Inner { items: Vec[W] }
+type Inner { items: List[W] }
 type Outer { inner: Inner }
 
 fn new_w(s: *mut i32) -> W:
     unsafe { W { ptr: with_alloc(24), slot: s } }
 
-fn mkw(s: *mut i32) -> Vec[W]:
-    let v: Vec[W] = Vec.new()
+fn mkw(s: *mut i32) -> List[W]:
+    let v: List[W] = List.new()
     v.push(new_w(s))
     v.push(new_w(s))
     v

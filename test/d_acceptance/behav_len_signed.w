@@ -6,7 +6,7 @@
 // i64 indexing directly.
 
 fn main:
-    let empty: Vec[i32] = Vec.new()
+    let empty: List[i32] = List.new()
     assert(empty.len() - 1 == -1)
 
     let s = ""
@@ -21,7 +21,7 @@ fn main:
     assert(bmap.len() - 3 == -1)
 
     // The countdown idiom: no casts, no wrap, index feeds get() directly.
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     v.push(1)
     v.push(2)
     v.push(3)

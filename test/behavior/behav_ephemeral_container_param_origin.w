@@ -3,8 +3,8 @@
 // not outlive its origin — Rust-legal, and allowed here.
 use std.builtins.print_i32
 type View ephemeral { p: &i32 }
-fn collect_one(src: &i32) -> Vec[View]:
-    var v = Vec.new()
+fn collect_one(src: &i32) -> List[View]:
+    var v = List.new()
     v.push(View { p: src })
     v
 fn main:

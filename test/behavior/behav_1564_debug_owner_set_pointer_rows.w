@@ -57,7 +57,7 @@ fn main:
     print(f"{tagged:?}")
     var inner: HashSet[str] = HashSet.new()
     inner.insert("q")
-    let sets: Vec[HashSet[str]] = [inner]
+    let sets: List[HashSet[str]] = [inner]
     print(f"{sets:?}")
 
     let x = 42

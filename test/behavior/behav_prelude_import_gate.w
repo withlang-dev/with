@@ -3,7 +3,7 @@
 
 // D29 #750 scaffolding: non-§18.2 prelude-closure names resolve only through
 // an explicit import. HashMap/StringBuilder/int_to_string are import-gated;
-// the §18.2 names (Vec, Option, print, assert…) stay ambient; a regex literal
+// the §18.2 names (List, Option, print, assert…) stay ambient; a regex literal
 // is compiler lowering and never needs the import.
 use std.collections.HashMap
 use std.string.StringBuilder
@@ -15,7 +15,7 @@ fn main:
     var sb = StringBuilder.new()
     sb.push_str(int_to_string((m.get(1).unwrap() + 1) as i64))
     assert(sb.to_str() == "42", "gated names work through explicit imports")
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(7)
     assert(xs[0] == 7, "§18.2 names stay ambient")
     let r = /ab+c/

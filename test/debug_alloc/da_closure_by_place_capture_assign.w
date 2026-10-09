@@ -28,7 +28,7 @@ fn main:
     run_unit(() => c = compute("x"))
     print(c)
 
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     v.push(1)
     run_unit(() => v = [7, 8, 9])
     print(v.len())

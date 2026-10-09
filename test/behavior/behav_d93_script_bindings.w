@@ -3,7 +3,7 @@
 
 // D93 (§4.3c rule 1) in a script: a top-level binding takes its type from
 // its uses as a binding in a function does.
-fn total(xs: &Vec[i32]): xs.iter() |> sum()
+fn total(xs: &List[i32]): xs.iter() |> sum()
 
 let xs = [1, 2, 3]
 print(total(xs))

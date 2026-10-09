@@ -23,7 +23,7 @@ fn main:
     assert(filler_1(Err("bad")) == 0)
     assert(filler_2(Ok(9)) == 9)
 
-    let xs: Vec[i32] = Vec.new()
+    let xs: List[i32] = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)

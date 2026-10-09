@@ -8,7 +8,7 @@
 // no path drops or moves it (a leak)". Owned payloads, ignored owned parts
 // and named subjects are the other shapes of the same statement.
 
-type Pair { name: str, tags: Vec[str] }
+type Pair { name: str, tags: List[str] }
 
 fn owned(s: &str): s
 
@@ -16,9 +16,9 @@ fn int_or_err(k: i32) -> Result[i32, str]:
     if k == 0: return Err(owned("none"))
     k
 
-fn vec_or_err(k: i32) -> Result[Vec[str], str]:
+fn list_or_err(k: i32) -> Result[List[str], str]:
     if k == 0: return Err(owned("none"))
-    var v: Vec[str] = Vec.new()
+    var v: List[str] = List.new()
     for i in 0..k: v.push(f"w{i}")
     v
 
@@ -28,14 +28,14 @@ fn tuple_or_err(k: i32) -> Result[(str, i32), str]:
 
 fn pair_or_err(k: i32) -> Result[Pair, str]:
     if k == 0: return Err(owned("none"))
-    Ok(Pair { name: owned("p"), tags: Vec.new() })
+    Ok(Pair { name: owned("p"), tags: List.new() })
 
 fn copy_payload(k: i32) -> i32:
     let Ok(v) = int_or_err(k) else: return -1
     v
 
 fn owned_payload(k: i32) -> i32:
-    let Ok(v) = vec_or_err(k) else: return -1
+    let Ok(v) = list_or_err(k) else: return -1
     v.len() as i32
 
 fn ignored_owned_part(k: i32) -> i32:

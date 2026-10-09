@@ -18,7 +18,7 @@ fn test_assignment_tail_returns_builder:
     assert(c.retries == 3)
 
 fn test_unit_call_tail_returns_builder:
-    let v = with Vec.new() as mut v:
+    let v = with List.new() as mut v:
         v.push(1)
         v.push(2)
         v.push(3)
@@ -27,7 +27,7 @@ fn test_unit_call_tail_returns_builder:
     assert(v[2] == 3)
 
 fn test_non_unit_tail_returns_builder:
-    let v = with Vec.new() as mut v:
+    let v = with List.new() as mut v:
         v.push(1)
         v.push(2)
         v.len()
@@ -45,7 +45,7 @@ fn test_non_unit_hashmap_tail_returns_builder:
     assert(m.get("b").unwrap() == 2)
 
 fn test_form3_still_returns_body_value:
-    let len = with Vec[i32].new() as v:
+    let len = with List[i32].new() as v:
         v.len()
     assert(len == 0)
 

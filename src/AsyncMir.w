@@ -21,22 +21,22 @@ pub type AsyncMirBody {
     flavor: i32,
     state_count: i32,
 
-    suspend_kinds: Vec[i32],
-    suspend_span_starts: Vec[i32],
-    suspend_span_ends: Vec[i32],
-    suspend_resume_bbs: Vec[i32],
-    suspend_state_from: Vec[i32],
-    suspend_state_to: Vec[i32],
+    suspend_kinds: List[i32],
+    suspend_span_starts: List[i32],
+    suspend_span_ends: List[i32],
+    suspend_resume_bbs: List[i32],
+    suspend_state_from: List[i32],
+    suspend_state_to: List[i32],
 
     // Storage/drop accounting snapshot near each suspend boundary.
-    suspend_live_locals: Vec[i32],
-    suspend_storage_dead: Vec[i32],
-    suspend_drop_counts: Vec[i32],
+    suspend_live_locals: List[i32],
+    suspend_storage_dead: List[i32],
+    suspend_drop_counts: List[i32],
 }
 
 pub type AsyncMirModule {
-    bodies: Vec[AsyncMirBody],
-    body_fn_syms: Vec[i32],
+    bodies: List[AsyncMirBody],
+    body_fn_syms: List[i32],
 }
 
 fn AsyncMirBody.init(fn_sym: i32, flavor: i32) -> AsyncMirBody:
@@ -44,15 +44,15 @@ fn AsyncMirBody.init(fn_sym: i32, flavor: i32) -> AsyncMirBody:
         fn_sym,
         flavor,
         state_count: 1,
-        suspend_kinds: Vec.new(),
-        suspend_span_starts: Vec.new(),
-        suspend_span_ends: Vec.new(),
-        suspend_resume_bbs: Vec.new(),
-        suspend_state_from: Vec.new(),
-        suspend_state_to: Vec.new(),
-        suspend_live_locals: Vec.new(),
-        suspend_storage_dead: Vec.new(),
-        suspend_drop_counts: Vec.new(),
+        suspend_kinds: List.new(),
+        suspend_span_starts: List.new(),
+        suspend_span_ends: List.new(),
+        suspend_resume_bbs: List.new(),
+        suspend_state_from: List.new(),
+        suspend_state_to: List.new(),
+        suspend_live_locals: List.new(),
+        suspend_storage_dead: List.new(),
+        suspend_drop_counts: List.new(),
     }
 
 impl AsyncMirBody:
@@ -82,8 +82,8 @@ impl AsyncMirBody:
 
 fn AsyncMirModule.init -> AsyncMirModule:
     AsyncMirModule {
-        bodies: Vec.new(),
-        body_fn_syms: Vec.new(),
+        bodies: List.new(),
+        body_fn_syms: List.new(),
     }
 
 // No-op: reserved for future manual memory management.

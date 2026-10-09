@@ -15,7 +15,7 @@ extern fn with_runtime_run_one_step()
 var resumed: Atomic[i32]
 var item_drops: Atomic[i32]
 
-type Item { data: Vec[i32] }
+type Item { data: List[i32] }
 impl Drop for Item:
     move fn drop():
         item_drops.fetch_add(1, .SeqCst)
@@ -33,13 +33,13 @@ async fn forever_value(n: i32) -> i32:
     n
 
 async fn map_parent -> i32:
-    let xs: Vec[i32] = [1, 2, 3]
+    let xs: List[i32] = [1, 2, 3]
     let items = xs.map(n => forever_item(n).await)
     resumed.fetch_add(1, .SeqCst)
     items.len() as i32
 
 async fn fold_parent -> i32:
-    let xs: Vec[i32] = [1, 2, 3]
+    let xs: List[i32] = [1, 2, 3]
     let total = xs.fold(0, (acc, n) => acc + forever_value(n).await)
     resumed.fetch_add(1, .SeqCst)
     total

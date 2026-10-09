@@ -7,11 +7,11 @@ pub type IRInst {
 }
 
 pub type IRProgram {
-    insts: Vec[IRInst],
+    insts: List[IRInst],
 }
 
 pub fn empty_program() -> IRProgram:
-    IRProgram { insts: Vec.new() }
+    IRProgram { insts: List.new() }
 
 pub fn push_inst(prog: &IRProgram, inst: IRInst):
     prog.insts.push(move inst)

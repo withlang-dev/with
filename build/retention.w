@@ -87,8 +87,8 @@ fn ret_first_line(text: &str) -> str:
             break
     ret_trim(text.slice(0, end as i64))
 
-fn ret_split_lines(text: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ret_split_lines(text: &str) -> List[str]:
+    let out: List[str] = List.new()
     var start = 0
     for i in 0..text.len() as i32:
         let ch = text[i]
@@ -139,7 +139,7 @@ fn ret_short(text: &str, n: i32) -> str:
         return retention_owned_text(text)
     text.slice(0, n as i64)
 
-fn ret_run_first_line(ctx: &ActionCtx, label: &str, args: &Vec[str], timeout_ms: i32) -> str:
+fn ret_run_first_line(ctx: &ActionCtx, label: &str, args: &List[str], timeout_ms: i32) -> str:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let dir = ret_join("out/command", ctx.target_name())
@@ -152,20 +152,20 @@ fn ret_run_first_line(ctx: &ActionCtx, label: &str, args: &Vec[str], timeout_ms:
         return ""
     ret_first_line(result.stdout)
 
-fn ret_run_lines(ctx: &ActionCtx, label: &str, args: &Vec[str], timeout_ms: i32) -> Vec[str]:
+fn ret_run_lines(ctx: &ActionCtx, label: &str, args: &List[str], timeout_ms: i32) -> List[str]:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let dir = ret_join("out/command", ctx.target_name())
     if fs.mkdir_all(dir) != 0:
-        return Vec.new()
+        return List.new()
     let stdout_path = ret_join(dir, label ++ ".stdout")
     let stderr_path = ret_join(dir, label ++ ".stderr")
     let result = ctx.process_runner().run_capture(args, ret_abs(root, stdout_path), ret_abs(root, stderr_path), timeout_ms)
     if result.rc != 0:
-        return Vec.new()
+        return List.new()
     ret_split_lines(result.stdout)
 
-fn ret_run_status(ctx: &ActionCtx, label: &str, args: &Vec[str], timeout_ms: i32) -> i32:
+fn ret_run_status(ctx: &ActionCtx, label: &str, args: &List[str], timeout_ms: i32) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let dir = ret_join("out/command", ctx.target_name())
@@ -185,7 +185,7 @@ fn ret_sha256_tool(root: &str) -> str:
 fn ret_sha256_file(ctx: &ActionCtx, label: &str, path: &str) -> str:
     let root = ctx.project_info().project_root()
     let target_path = ret_abs(root, path)
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(ret_sha256_tool(root))
     args.push(target_path)
     let line = ret_run_first_line(ctx, label ++ "-sha256", args, 120000)
@@ -219,12 +219,12 @@ fn ret_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
-fn ret_sorted_strings(items: Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
+fn ret_sorted_strings(items: List[str]) -> List[str]:
+    var sorted: List[str] = List.new()
     for i in 0..items.len() as i32:
         let item = items[i]
         var inserted = false
-        let next: Vec[str] = Vec.new()
+        let next: List[str] = List.new()
         for j in 0..sorted.len() as i32:
             let existing = sorted[j]
             if not inserted and ret_str_compare(item, existing) < 0:
@@ -283,12 +283,12 @@ fn ret_release_version_compare(a: &str, b: &str) -> i32:
         return 0
     ret_str_compare(a, b)
 
-fn ret_sorted_release_versions(items: Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
+fn ret_sorted_release_versions(items: List[str]) -> List[str]:
+    var sorted: List[str] = List.new()
     for i in 0..items.len() as i32:
         let item = items[i]
         var inserted = false
-        let next: Vec[str] = Vec.new()
+        let next: List[str] = List.new()
         for j in 0..sorted.len() as i32:
             let existing = sorted[j]
             if not inserted and ret_release_version_compare(item, existing) < 0:
@@ -300,8 +300,8 @@ fn ret_sorted_release_versions(items: Vec[str]) -> Vec[str]:
         sorted = next
     sorted
 
-fn ret_direct_w_files(fs: &ToolFs, dir: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ret_direct_w_files(fs: &ToolFs, dir: &str) -> List[str]:
+    let out: List[str] = List.new()
     let files = fs.list_files(dir)
     for i in 0..files.len() as i32:
         let path = files[i]
@@ -309,8 +309,8 @@ fn ret_direct_w_files(fs: &ToolFs, dir: &str) -> Vec[str]:
             out.push(retention_owned_text(path))
     ret_sorted_strings(out)
 
-fn ret_sha256_hex_list(ctx: &ActionCtx, label: &str, files: &Vec[str]) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ret_sha256_hex_list(ctx: &ActionCtx, label: &str, files: &List[str]) -> List[str]:
+    let out: List[str] = List.new()
     let manifest = ret_sha256_files_manifest(ctx, label, files)
     if manifest.len() == 0:
         return out
@@ -337,7 +337,7 @@ fn ret_expected_test_marker(ctx: &ActionCtx, target_name: &str, entry: &str) -> 
     text = text ++ "target-kind:0\n"
     text = text ++ "arg:compiler=" ++ compiler_path ++ "\n"
     text = text ++ "compiler:" ++ compiler_path ++ "\n"
-    let comp_files: Vec[str] = Vec.new()
+    let comp_files: List[str] = List.new()
     comp_files.push(compiler_path)
     let comp_hexes = ret_sha256_hex_list(ctx, ret_safe_label(target_name) ++ "-marker-compiler", comp_files)
     if comp_hexes.len() as i32 != 1:
@@ -380,7 +380,7 @@ fn ret_append_state_file(ctx: &ActionCtx, combined: &str, target_name: &str) -> 
         ctx.diagnostics().error(ctx.target_name() ++ ": missing build state " ++ state_path ++ "; run `with build :test`")
     combined ++ "state:" ++ target_name ++ "\n" ++ state ++ "\n"
 
-fn ret_sha256_files_manifest(ctx: &ActionCtx, label: &str, files: &Vec[str]) -> str:
+fn ret_sha256_files_manifest(ctx: &ActionCtx, label: &str, files: &List[str]) -> str:
     if files.len() == 0:
         return ""
     // #679: this runs under the comptime action evaluator, where the old
@@ -389,8 +389,8 @@ fn ret_sha256_files_manifest(ctx: &ActionCtx, label: &str, files: &Vec[str]) -> 
     // — 77s of test-green wall for ~0.2s of native hashing. StringBuilder
     // + 250-file batches keep it linear and the spawns rare.
     var out = StringBuilder.new()
-    var batch: Vec[str] = Vec.new()
-    var batch_names: Vec[str] = Vec.new()
+    var batch: List[str] = List.new()
+    var batch_names: List[str] = List.new()
     var batch_index = 0
     let root = ctx.project_info().project_root()
     for i in 0..files.len() as i32:
@@ -401,7 +401,7 @@ fn ret_sha256_files_manifest(ctx: &ActionCtx, label: &str, files: &Vec[str]) -> 
         // argv is capped at 255 entries by the runtime spawn path — stay under
         // it (tool + slack) while keeping spawns rare.
         if batch.len() as i32 >= 250 or last:
-            let args: Vec[str] = Vec.new()
+            let args: List[str] = List.new()
             args.push(ret_sha256_tool(root))
             for bi in 0..batch.len() as i32:
                 args.push(retention_owned_text(batch[bi]))
@@ -416,12 +416,12 @@ fn ret_sha256_files_manifest(ctx: &ActionCtx, label: &str, files: &Vec[str]) -> 
                 out.push_str("  ")
                 out.push_str(batch_names[li])
                 out.push_str("\n")
-            batch = Vec.new()
-            batch_names = Vec.new()
+            batch = List.new()
+            batch_names = List.new()
             batch_index = batch_index + 1
     out.to_str()
 
-fn ret_append_file_hashes(combined: &str, ctx: &ActionCtx, label: &str, files: &Vec[str]) -> str:
+fn ret_append_file_hashes(combined: &str, ctx: &ActionCtx, label: &str, files: &List[str]) -> str:
     let manifest = ret_sha256_files_manifest(ctx, label, files)
     if files.len() > 0 and manifest.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not hash " ++ label ++ " files")
@@ -429,7 +429,7 @@ fn ret_append_file_hashes(combined: &str, ctx: &ActionCtx, label: &str, files: &
 
 fn ret_build_driver_sources_manifest(ctx: &ActionCtx) -> str:
     let fs = ctx.fs()
-    let files: Vec[str] = Vec.new()
+    let files: List[str] = List.new()
     files.push("build.w")
     let build_files = ret_sorted_strings(fs.list_files("build"))
     for i in 0..build_files.len() as i32:
@@ -505,7 +505,7 @@ fn ret_test_green_fingerprint(ctx: &ActionCtx) -> str:
     ret_sha256_text(ctx, "test-green-inputs", combined)
 
 fn ret_git_commit(ctx: &ActionCtx) -> str:
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push("git")
     args.push("rev-parse")
     args.push("HEAD")
@@ -541,7 +541,7 @@ fn ret_status_is_not_input(status_line: &str) -> bool:
 
 /// Every build input is as committed, and nothing untracked could be one.
 fn ret_worktree_is_clean(ctx: &ActionCtx) -> bool:
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push("git")
     args.push("status")
     args.push("--porcelain")
@@ -571,7 +571,7 @@ fn ret_green_identity_inputs(top_level: &str) -> str:
         kept = kept ++ line ++ "\n"
     kept
 
-fn ret_run_all(ctx: &ActionCtx, label: &str, args: &Vec[str], timeout_ms: i32) -> str:
+fn ret_run_all(ctx: &ActionCtx, label: &str, args: &List[str], timeout_ms: i32) -> str:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let dir = ret_join("out/command", ctx.target_name())
@@ -582,7 +582,7 @@ fn ret_run_all(ctx: &ActionCtx, label: &str, args: &Vec[str], timeout_ms: i32) -
 
 pub fn ret_source_identity(ctx: &ActionCtx, driver_sha: &str) -> str:
     if driver_sha.len() != 64 or not ret_worktree_is_clean(ctx): return ""
-    let top_args: Vec[str] = Vec.new()
+    let top_args: List[str] = List.new()
     top_args.push("git")
     top_args.push("ls-tree")
     top_args.push("HEAD")
@@ -590,7 +590,7 @@ pub fn ret_source_identity(ctx: &ActionCtx, driver_sha: &str) -> str:
     if top_level.len() == 0: return ""
     let listing = ret_join(ret_join("out/command", ctx.target_name()), "green-inputs.txt")
     if ctx.fs().write_text(listing, ret_green_identity_inputs(top_level)) != 0: return ""
-    let hash_args: Vec[str] = Vec.new()
+    let hash_args: List[str] = List.new()
     hash_args.push("git")
     hash_args.push("hash-object")
     hash_args.push(listing)
@@ -609,19 +609,19 @@ fn ret_green_store_line(store: &str, identity: &str) -> str:
 
 fn ret_compiler_version(ctx: &ActionCtx, compiler_path: &str) -> str:
     let root = ctx.project_info().project_root()
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push(ret_abs(root, compiler_path))
     args.push("version")
     ret_run_first_line(ctx, "compiler-version", args, 60000)
 
-fn ret_vec_contains(items: &Vec[str], item: &str) -> bool:
+fn ret_list_contains(items: &List[str], item: &str) -> bool:
     for i in 0..items.len() as i32:
         if items[i] == item:
             return true
     false
 
-fn ret_add_unique(items: Vec[str], item: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ret_add_unique(items: List[str], item: &str) -> List[str]:
+    let out: List[str] = List.new()
     var found = item.len() == 0
     for i in 0..items.len() as i32:
         let existing = items[i]
@@ -632,23 +632,23 @@ fn ret_add_unique(items: Vec[str], item: &str) -> Vec[str]:
         out.push(retention_owned_text(item))
     out
 
-fn ret_manifest_lines_without(manifest: Vec[str], skip: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ret_manifest_lines_without(manifest: List[str], skip: &str) -> List[str]:
+    let out: List[str] = List.new()
     for i in 0..manifest.len() as i32:
         let item = manifest[i]
         if item != skip:
             out.push(retention_owned_text(item))
     out
 
-fn ret_join_lines(items: Vec[str]) -> str:
+fn ret_join_lines(items: List[str]) -> str:
     var out = ""
     for i in 0..items.len() as i32:
         out = out ++ items[i] ++ "\n"
     out
 
-fn ret_seed_manifest_entries(fs: &ToolFs) -> Vec[str]:
+fn ret_seed_manifest_entries(fs: &ToolFs) -> List[str]:
     if not fs.exists("out/seed-archive/manifest.tsv"):
-        return Vec.new()
+        return List.new()
     ret_split_lines(fs.read_text("out/seed-archive/manifest.tsv"))
 
 fn ret_archive_verified_seed(ctx: &ActionCtx, version: &str, commit: &str, sha256: &str) -> i32:
@@ -667,7 +667,7 @@ fn ret_archive_verified_seed(ctx: &ActionCtx, version: &str, commit: &str, sha25
         let remove_path = entries[0]
         if fs.exists(remove_path):
             let _remove_old_seed = fs.remove_file(remove_path)
-        let trimmed: Vec[str] = Vec.new()
+        let trimmed: List[str] = List.new()
         for i in 1..entries.len() as i32:
             trimmed.push(retention_owned_text(entries[i]))
         entries = trimmed
@@ -742,12 +742,12 @@ fn ret_driver_ancestry_verdict(ctx: &ActionCtx, expected: &str, version: &str) -
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let capture_dir = ret_join("out/command", ctx.target_name())
-    let probe: Vec[str] = Vec.new()
+    let probe: List[str] = List.new()
     probe.push("sh")
     probe.push("-c")
     probe.push("p=$PPID; n=0; while [ \"$p\" -gt 1 ] && [ $n -lt 8 ]; do e=$(readlink /proc/$p/exe 2>/dev/null || ps -o comm= -p $p 2>/dev/null); echo \"$e\"; p=$(ps -o ppid= -p $p 2>/dev/null | tr -d ' '); [ -n \"$p\" ] || break; n=$((n+1)); done")
     let ancestors = ret_run_lines(ctx, "driver-ancestry", probe, 30000)
-    var seen: Vec[str] = Vec.new()
+    var seen: List[str] = List.new()
     for i in 0..ancestors.len() as i32:
         var exe: str = ancestors[i].clone()
         if exe.len() == 0: continue
@@ -755,7 +755,7 @@ fn ret_driver_ancestry_verdict(ctx: &ActionCtx, expected: &str, version: &str) -
         // A bare name is a PATH lookup (`with build`): resolve it the way the
         // shell did, so the installed compiler is named, not skipped.
         if not exe.contains("/"):
-            let which: Vec[str] = Vec.new()
+            let which: List[str] = List.new()
             which.push("which")
             which.push(exe.clone())
             exe = ret_run_first_line(ctx, f"driver-ancestry-which-{i}", which, 30000)
@@ -1031,8 +1031,8 @@ pub fn run_require_last_green_action(ctx: ActionCtx) -> i32:
             return ret_fail(ctx, "could not write " ++ output)
     0
 
-fn ret_live_targets(args: &Vec[str]) -> Vec[str]:
-    let live: Vec[str] = Vec.new()
+fn ret_live_targets(args: &List[str]) -> List[str]:
+    let live: List[str] = List.new()
     let prefix = "live-target="
     for i in 0..args.len() as i32:
         let arg = args[i]
@@ -1046,7 +1046,7 @@ fn ret_state_target_name(path: &str) -> str:
     let base = ret_basename(path)
     base.slice(0, base.len() - 6)
 
-fn ret_add_stale_state_files(fs: &ToolFs, live_targets: Vec[str], candidates: Vec[str]) -> Vec[str]:
+fn ret_add_stale_state_files(fs: &ToolFs, live_targets: List[str], candidates: List[str]) -> List[str]:
     var out = candidates
     if live_targets.len() == 0 or not fs.exists("out/.build-state"):
         return out
@@ -1054,11 +1054,11 @@ fn ret_add_stale_state_files(fs: &ToolFs, live_targets: Vec[str], candidates: Ve
     for i in 0..files.len() as i32:
         let path = files[i]
         let target_name = ret_state_target_name(path)
-        if target_name.len() > 0 and not ret_vec_contains(live_targets, target_name):
+        if target_name.len() > 0 and not ret_list_contains(live_targets, target_name):
             out = ret_add_unique(out, path)
     out
 
-fn ret_add_old_seed_archives(fs: &ToolFs, candidates: Vec[str]) -> Vec[str]:
+fn ret_add_old_seed_archives(fs: &ToolFs, candidates: List[str]) -> List[str]:
     var out = candidates
     let entries = ret_seed_manifest_entries(fs)
     var keep_from = entries.len() as i32 - RET_SEED_KEEP
@@ -1088,8 +1088,8 @@ fn ret_release_artifact_version(path: &str) -> str:
             return version
     ""
 
-fn ret_release_artifact_versions(fs: &ToolFs) -> Vec[str]:
-    var versions: Vec[str] = Vec.new()
+fn ret_release_artifact_versions(fs: &ToolFs) -> List[str]:
+    var versions: List[str] = List.new()
     if not fs.exists("out/release"):
         return versions
     let files = fs.list_files("out/release")
@@ -1098,9 +1098,9 @@ fn ret_release_artifact_versions(fs: &ToolFs) -> Vec[str]:
         versions = ret_add_unique(versions, version)
     ret_sorted_release_versions(versions)
 
-fn ret_stale_release_artifact_versions(fs: &ToolFs) -> Vec[str]:
+fn ret_stale_release_artifact_versions(fs: &ToolFs) -> List[str]:
     let versions = ret_release_artifact_versions(fs)
-    let stale: Vec[str] = Vec.new()
+    let stale: List[str] = List.new()
     let stale_count = versions.len() as i32 - RET_RELEASE_VERSION_KEEP
     if stale_count <= 0:
         return stale
@@ -1108,7 +1108,7 @@ fn ret_stale_release_artifact_versions(fs: &ToolFs) -> Vec[str]:
         stale.push(retention_owned_text(versions[i]))
     stale
 
-fn ret_add_old_release_artifacts(fs: &ToolFs, candidates: Vec[str]) -> Vec[str]:
+fn ret_add_old_release_artifacts(fs: &ToolFs, candidates: List[str]) -> List[str]:
     var out = candidates
     let stale_versions = ret_stale_release_artifact_versions(fs)
     if stale_versions.len() == 0 or not fs.exists("out/release"):
@@ -1117,19 +1117,19 @@ fn ret_add_old_release_artifacts(fs: &ToolFs, candidates: Vec[str]) -> Vec[str]:
     for i in 0..files.len() as i32:
         let path = files[i]
         let version = ret_release_artifact_version(path)
-        if ret_vec_contains(stale_versions, version):
+        if ret_list_contains(stale_versions, version):
             out = ret_add_unique(out, path)
     out
 
-fn ret_small_prune_candidates(ctx: &ActionCtx) -> Vec[str]:
+fn ret_small_prune_candidates(ctx: &ActionCtx) -> List[str]:
     let fs = ctx.fs()
-    var candidates: Vec[str] = Vec.new()
+    var candidates: List[str] = List.new()
     candidates = ret_add_stale_state_files(fs, ret_live_targets(ctx.args()), move candidates)
     candidates = ret_add_old_seed_archives(fs, move candidates)
     candidates = ret_add_old_release_artifacts(fs, move candidates)
     ret_sorted_strings(candidates)
 
-fn ret_apply_small_prune(ctx: &ActionCtx, candidates: Vec[str]) -> i32:
+fn ret_apply_small_prune(ctx: &ActionCtx, candidates: List[str]) -> i32:
     let fs = ctx.fs()
     var removed = 0
     for i in 0..candidates.len() as i32:
@@ -1144,8 +1144,8 @@ fn ret_apply_small_prune(ctx: &ActionCtx, candidates: Vec[str]) -> i32:
     print(f"[prune] removed {removed} stale retained artifact(s)")
     0
 
-fn ret_immediate_children(fs: &ToolFs, dir: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ret_immediate_children(fs: &ToolFs, dir: &str) -> List[str]:
+    let out: List[str] = List.new()
     if not fs.exists(dir):
         return out
     let files = fs.list_files(dir)
@@ -1155,8 +1155,8 @@ fn ret_immediate_children(fs: &ToolFs, dir: &str) -> Vec[str]:
             out.push(retention_owned_text(path))
     ret_sorted_strings(out)
 
-fn ret_temp_bin_candidates(fs: &ToolFs) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ret_temp_bin_candidates(fs: &ToolFs) -> List[str]:
+    let out: List[str] = List.new()
     let files = ret_immediate_children(fs, "out/bin")
     for i in 0..files.len() as i32:
         let path = files[i]
@@ -1168,8 +1168,8 @@ fn ret_temp_bin_candidates(fs: &ToolFs) -> Vec[str]:
             out.push(retention_owned_text(path))
     ret_sorted_strings(out)
 
-fn ret_temp_archive_candidates(fs: &ToolFs, dir: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ret_temp_archive_candidates(fs: &ToolFs, dir: &str) -> List[str]:
+    let out: List[str] = List.new()
     let files = ret_immediate_children(fs, dir)
     for i in 0..files.len() as i32:
         let path = files[i]
@@ -1178,8 +1178,8 @@ fn ret_temp_archive_candidates(fs: &ToolFs, dir: &str) -> Vec[str]:
             out.push(retention_owned_text(path))
     ret_sorted_strings(out)
 
-fn ret_issue61_stale_candidates(fs: &ToolFs) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ret_issue61_stale_candidates(fs: &ToolFs) -> List[str]:
+    let out: List[str] = List.new()
     let files = ret_immediate_children(fs, "out/test-graph/issue61-regression")
     for i in 0..files.len() as i32:
         let path = files[i]
@@ -1187,14 +1187,14 @@ fn ret_issue61_stale_candidates(fs: &ToolFs) -> Vec[str]:
             out.push(retention_owned_text(path))
     ret_sorted_strings(out)
 
-fn ret_embedded_compiler_candidates(fs: &ToolFs) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn ret_embedded_compiler_candidates(fs: &ToolFs) -> List[str]:
+    let out: List[str] = List.new()
     let path = "out/test-graph/embedded-runtime-regression/with"
     if fs.exists(path) and not fs.is_dir(path):
         out.push(path)
     out
 
-fn ret_remove_prune_candidates(ctx: &ActionCtx, candidates: &Vec[str]) -> i32:
+fn ret_remove_prune_candidates(ctx: &ActionCtx, candidates: &List[str]) -> i32:
     let fs = ctx.fs()
     for i in 0..candidates.len() as i32:
         let path = candidates[i]
@@ -1203,7 +1203,7 @@ fn ret_remove_prune_candidates(ctx: &ActionCtx, candidates: &Vec[str]) -> i32:
             return ret_fail(ctx, "could not remove stale artifact: " ++ path)
     0
 
-fn ret_append_all_prune_candidates(out: Vec[str], candidates: &Vec[str]) -> Vec[str]:
+fn ret_append_all_prune_candidates(out: List[str], candidates: &List[str]) -> List[str]:
     var combined = out
     for i in 0..candidates.len() as i32:
         combined = ret_add_unique(combined, candidates[i])
@@ -1216,7 +1216,7 @@ fn ret_apply_large_prune(ctx: &ActionCtx) -> i32:
     let bootstrap = ret_temp_archive_candidates(fs, "out/bootstrap-lib")
     let issue61 = ret_issue61_stale_candidates(fs)
     let embedded = ret_embedded_compiler_candidates(fs)
-    var all: Vec[str] = Vec.new()
+    var all: List[str] = List.new()
     all = ret_append_all_prune_candidates(move all, bin)
     all = ret_append_all_prune_candidates(move all, lib)
     all = ret_append_all_prune_candidates(move all, bootstrap)
@@ -1231,7 +1231,7 @@ fn ret_apply_large_prune(ctx: &ActionCtx) -> i32:
     print(f"[prune] removed retained embedded runtime compiler copies: {embedded.len()}")
     0
 
-fn ret_report_prune(candidates: Vec[str]):
+fn ret_report_prune(candidates: List[str]):
     print(f"[prune] {candidates.len()} stale state/seed/release artifact(s) would be removed")
     var shown = 0
     for i in 0..candidates.len() as i32:
@@ -1254,7 +1254,7 @@ fn ret_report_large_prune(ctx: &ActionCtx):
     print(f"[prune] temp out/bootstrap-lib archives: {bootstrap.len()}")
     print(f"[prune] stale issue61 regression directories: {issue61.len()}")
     print(f"[prune] retained embedded runtime compiler copies: {embedded.len()}")
-    var examples: Vec[str] = Vec.new()
+    var examples: List[str] = List.new()
     examples = ret_append_all_prune_candidates(move examples, bin)
     examples = ret_append_all_prune_candidates(move examples, lib)
     examples = ret_append_all_prune_candidates(move examples, bootstrap)

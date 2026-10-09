@@ -7,7 +7,7 @@
 // returned `const ()` instead of the reference. This pins the reborrow for a
 // struct owner, a scalar owner, and the &raw mut form that writes through.
 
-type T { xs: Vec[i64], tag: i32 }
+type T { xs: List[i64], tag: i32 }
 
 fn view(p: i64) -> &T:
     unsafe { &(*(p as *const T)) }
@@ -21,7 +21,7 @@ fn bump(p: i64):
         *r = *r + 1
 
 fn main:
-    var t = T { xs: Vec.new(), tag: 7 }
+    var t = T { xs: List.new(), tag: 7 }
     t.xs.push(9)
     let p = &raw const t as i64
     assert(view(p).xs[0] == 9)

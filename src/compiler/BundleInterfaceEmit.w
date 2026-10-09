@@ -57,42 +57,42 @@ pub type BundleInterfaceModel {
     corpus: str,
     // canonical corpus module paths, sorted bytewise, and the resolver's
     // spelling of each (the module-graph key)
-    modules: Vec[str],
-    module_sources: Vec[str],
-    exports: Vec[BundleExport],
-    errors: Vec[str],
+    modules: List[str],
+    module_sources: List[str],
+    exports: List[BundleExport],
+    errors: List[str],
     // source pass only: a declaration whose body-inferred effects disagree
     // with what it declares (D39: the boundary exposes the mistaken
     // declaration)
-    warnings: Vec[str],
+    warnings: List[str],
     // D39 Level 0: generic functions stay corpus-internal — omitted from the
     // interface, named here ("<module>\t<name>\tgeneric-fn") for the
     // manifest's `omitted` lines
-    omitted: Vec[str],
+    omitted: List[str],
     // "<module>\t<canonical path>" per module OUTSIDE the corpus whose type a
     // declaration of <module> names: the only non-corpus `use` lines a
     // section carries (a body's imports are implementation, never interface)
-    needed_imports: Vec[str],
+    needed_imports: List[str],
 }
 
 type BundleEmitter {
     corpus: str,
     // "<canonical module>\t<name>" per owned global codegen could not fold
     // to data (Codegen.bundle_unlowered_globals); empty on the .wi pass
-    unlowered_globals: Vec[str],
-    errors: Vec[str],
-    warnings: Vec[str],
+    unlowered_globals: List[str],
+    errors: List[str],
+    warnings: List[str],
     // canonical module path per decl index ("" outside the corpus)
-    decl_modules: Vec[str],
-    modules: Vec[str],
-    module_sources: Vec[str],
+    decl_modules: List[str],
+    modules: List[str],
+    module_sources: List[str],
     // corpus type declarations: name symbol → decl index
     type_decl_index: HashMap[i32, i32],
     // impl blocks in the corpus: target type symbol and decl index, parallel
-    impl_type_syms: Vec[i32],
-    impl_decl_indices: Vec[i32],
+    impl_type_syms: List[i32],
+    impl_decl_indices: List[i32],
     // the type closure worklist: name symbols a printed declaration named
-    named_type_syms: Vec[i32],
+    named_type_syms: List[i32],
     named_type_seen: HashMap[i32, i32],
     // every type declaration in the compilation: name symbol → canonical
     // module path, so a named non-corpus type finds the `use` it needs
@@ -100,17 +100,17 @@ type BundleEmitter {
     // the module whose declaration is being printed, and per module the
     // type symbols its declarations named ("<module>\t<sym>" deduped)
     current_module: str,
-    named_in_module_paths: Vec[str],
-    named_in_module_syms: Vec[i32],
+    named_in_module_paths: List[str],
+    named_in_module_syms: List[i32],
     named_in_module_seen: HashMap[str, i32],
-    exports: Vec[BundleExport],
+    exports: List[BundleExport],
     // "<module>: <declaration>" for messages
     context: str,
     // a refusal fired inside the current declaration
     failed: bool,
     // the fingerprint row of the method fn_text last printed for an impl
     last_fn_row: str,
-    omitted: Vec[str],
+    omitted: List[str],
     // Sema's call graph by caller, for each function's global effects
     // (fn_global_effects; D39 / §21.1 rule 1)
     call_index: SemaGlobalCallIndex,
@@ -127,34 +127,34 @@ type BundleEmitter {
 
 pub type BundleInterfaceText {
     text: str,
-    errors: Vec[str],
+    errors: List[str],
 }
 
-fn bx_new_emitter(corpus: &str, unlowered_globals: &Vec[str]) -> BundleEmitter:
+fn bx_new_emitter(corpus: &str, unlowered_globals: &List[str]) -> BundleEmitter:
     BundleEmitter {
         corpus: with_str_clone_ref(corpus),
-        unlowered_globals: sema_clone_str_vec(unlowered_globals),
-        errors: Vec.new(),
-        warnings: Vec.new(),
-        decl_modules: Vec.new(),
-        modules: Vec.new(),
-        module_sources: Vec.new(),
+        unlowered_globals: sema_clone_str_list(unlowered_globals),
+        errors: List.new(),
+        warnings: List.new(),
+        decl_modules: List.new(),
+        modules: List.new(),
+        module_sources: List.new(),
         type_decl_index: HashMap.new(),
-        impl_type_syms: Vec.new(),
-        impl_decl_indices: Vec.new(),
-        named_type_syms: Vec.new(),
+        impl_type_syms: List.new(),
+        impl_decl_indices: List.new(),
+        named_type_syms: List.new(),
         named_type_seen: HashMap.new(),
         type_decl_paths: HashMap.new(),
         current_module: "",
-        named_in_module_paths: Vec.new(),
-        named_in_module_syms: Vec.new(),
+        named_in_module_paths: List.new(),
+        named_in_module_syms: List.new(),
         named_in_module_seen: HashMap.new(),
-        exports: Vec.new(),
+        exports: List.new(),
         context: "",
         failed: false,
         last_fn_row: "",
-        omitted: Vec.new(),
-        call_index: SemaGlobalCallIndex { head: HashMap.new(), next: Vec.new() },
+        omitted: List.new(),
+        call_index: SemaGlobalCallIndex { head: HashMap.new(), next: List.new() },
         corpus_global_names: HashMap.new(),
         origin_global_names: HashMap.new(),
     }
@@ -162,11 +162,11 @@ fn bx_new_emitter(corpus: &str, unlowered_globals: &Vec[str]) -> BundleEmitter:
 fn bx_str_less(a: &str, b: &str) -> bool: with_str_cmp_ref(a, b) < 0
 
 // Insertion-sorted copy (bytewise); the model is small.
-fn bx_sorted_strings(items: &Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
+fn bx_sorted_strings(items: &List[str]) -> List[str]:
+    var sorted: List[str] = List.new()
     for i in 0..items.len() as i32:
         let item = items[i]
-        var out: Vec[str] = Vec.new()
+        var out: List[str] = List.new()
         var inserted = false
         for j in 0..sorted.len() as i32:
             let existing = sorted[j]
@@ -230,8 +230,8 @@ impl BundleEmitter:
     // The non-corpus `use` lines each section needs: a module outside the
     // corpus is imported by a section only when one of that section's
     // declarations names a type it declares.
-    fn needed_imports() -> Vec[str]:
-        var out: Vec[str] = Vec.new()
+    fn needed_imports() -> List[str]:
+        var out: List[str] = List.new()
         for ni in 0..self.named_in_module_syms.len() as i32:
             let sym = self.named_in_module_syms[ni]
             if not self.type_decl_paths.contains(sym):
@@ -754,8 +754,8 @@ impl BundleEmitter:
     // sorted "<module>#<name>" entries — empty for no clause. A clause
     // naming a global that is no bundle export is refused: only exported
     // globals are part of the interface, and a consumer could not resolve it.
-    mut fn declared_global_writes(sema: &Sema, node: i32) -> Vec[str]:
-        var out: Vec[str] = Vec.new()
+    mut fn declared_global_writes(sema: &Sema, node: i32) -> List[str]:
+        var out: List[str] = List.new()
         let syms = sema.declared_global_write_syms(node)
         for si in 0..syms.len() as i32:
             let entries = self.exported_global_entries(sema, syms[si])
@@ -796,9 +796,9 @@ impl BundleEmitter:
     // only fails the build loudly, never lets a view dangle), else another
     // bundle's interface global a `use` brought in (§21.1 rule 1, D39: a
     // call of that bundle's function wrote it through its declared set).
-    fn exported_global_entries(sema: &Sema, sym: i32) -> Vec[str]:
+    fn exported_global_entries(sema: &Sema, sym: i32) -> List[str]:
         let name = with_str_clone_ref(sema.pool_resolve(sym))
-        var out: Vec[str] = Vec.new()
+        var out: List[str] = List.new()
         for xi in 0..self.exports.len() as i32:
             let export = self.exports[xi]
             if export.kind == BX_GLOBAL and export.name == name:
@@ -825,9 +825,9 @@ impl BundleEmitter:
     // global is not part of the interface.
     // The refusal offers the literal fix: "add 'writes COUNTER' to bump's
     // declaration", or the name to append to an existing clause.
-    mut fn check_declared_global_writes(sema: &Sema, sig: i32, declared: &Vec[str], fn_name: &str, has_clause: bool):
+    mut fn check_declared_global_writes(sema: &Sema, sig: i32, declared: &List[str], fn_name: &str, has_clause: bool):
         let written = sema.fn_global_effects(sig, &self.call_index)
-        var actual: Vec[str] = Vec.new()
+        var actual: List[str] = List.new()
         for wi in 0..written.len() as i32:
             let sym = written[wi]
             let name = with_str_clone_ref(sema.pool_resolve(sym))
@@ -942,8 +942,8 @@ impl BundleEmitter:
                 self.refuse("targets a generic instantiation; a bundle boundary is Level 0 (docs/spec/abi/abi_roadmap.md)")
                 continue
             // methods: every fn decl Sema associated with this impl, by name
-            var method_names: Vec[str] = Vec.new()
-            var method_decls: Vec[i32] = Vec.new()
+            var method_names: List[str] = List.new()
+            var method_decls: List[i32] = List.new()
             for mdi in 0..ast.decl_count():
                 if not sema.method_decl_impl_nodes.contains(mdi):
                     continue
@@ -1293,11 +1293,11 @@ impl BundleEmitter:
         self.current_module = ""
 
 // Build the exported-declaration model of the corpus modules in `sema`.
-pub fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &Vec[str]) -> BundleInterfaceModel:
+pub fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &List[str]) -> BundleInterfaceModel:
     var em = bx_new_emitter(corpus, unlowered_globals)
     em.walk(sema)
     let ordered = bx_sorted_strings(&em.modules)
-    var sources: Vec[str] = Vec.new()
+    var sources: List[str] = List.new()
     for oi in 0..ordered.len() as i32:
         for mi in 0..em.modules.len() as i32:
             if em.modules[mi] == ordered[oi]:
@@ -1316,10 +1316,10 @@ pub fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &Vec
     }
 
 // The export indices of one module in canonical order: kind, then name.
-fn bx_module_export_order(model: &BundleInterfaceModel, mod_path: &str) -> Vec[i32]:
-    var order: Vec[i32] = Vec.new()
+fn bx_module_export_order(model: &BundleInterfaceModel, mod_path: &str) -> List[i32]:
+    var order: List[i32] = List.new()
     for kind in 0..7:
-        var names: Vec[str] = Vec.new()
+        var names: List[str] = List.new()
         for ei in 0..model.exports.len() as i32:
             let e = model.exports[ei]
             if e.kind == kind and e.mod_path == mod_path:
@@ -1337,7 +1337,7 @@ fn bx_module_export_order(model: &BundleInterfaceModel, mod_path: &str) -> Vec[i
 // the module's `use` lines in import order, then its exports.
 pub fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> BundleInterfaceText:
     var out = StringBuilder.new()
-    var errors: Vec[str] = Vec.new()
+    var errors: List[str] = List.new()
     for mi in 0..model.modules.len() as i32:
         let mod_path = model.modules[mi]
         let source_path = model.module_sources[mi]

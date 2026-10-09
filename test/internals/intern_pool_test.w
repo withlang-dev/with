@@ -56,11 +56,11 @@ fn main:
     assert(type_id_raw(gp_t0) == type_id_raw(gp_t0_2))
     assert(type_id_raw(gp_t0) != type_id_raw(gp_u0))
 
-    let vec_i32_0 = p.intern_type(type_key_generic_apply2("Vec", ty_i32, ty_i32, 1))
-    let vec_i32_1 = p.intern_type(type_key_generic_apply2("Vec", ty_i32, ty_i32, 1))
+    let list_i32_0 = p.intern_type(type_key_generic_apply2("List", ty_i32, ty_i32, 1))
+    let list_i32_1 = p.intern_type(type_key_generic_apply2("List", ty_i32, ty_i32, 1))
     let map_i32_i32 = p.intern_type(type_key_generic_apply2("HashMap", ty_i32, ty_i32, 2))
-    assert(type_id_raw(vec_i32_0) == type_id_raw(vec_i32_1))
-    assert(type_id_raw(vec_i32_0) != type_id_raw(map_i32_i32))
+    assert(type_id_raw(list_i32_0) == type_id_raw(list_i32_1))
+    assert(type_id_raw(list_i32_0) != type_id_raw(map_i32_i32))
 
     let tupn0 = p.intern_type(type_key_tuplen(type_key_pack3(ty_i32, ty_i32, ty_i32), 3))
     let tupn1 = p.intern_type(type_key_tuplen(type_key_pack3(ty_i32, ty_i32, ty_i32), 3))

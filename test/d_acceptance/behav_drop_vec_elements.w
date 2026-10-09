@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// #606 A5: Vec owns its buffer and its elements. Dropping a Vec, clearing it,
+// #606 A5: List owns its buffer and its elements. Dropping a List, clearing it,
 // removing an element, popping an element, or storing it inside a struct must
 // drop each live Drop element exactly once.
 
@@ -10,32 +10,32 @@ impl Drop for W:
         unsafe:
             *self.slot = *self.slot + 1
 
-type Holder { items: Vec[W] }
+type Holder { items: List[W] }
 
 fn scope_drop(slot: *mut i32):
-    let xs: Vec[W] = Vec.new()
+    let xs: List[W] = List.new()
     xs.push(W { slot: slot })
     xs.push(W { slot: slot })
 
 fn clear_drop(slot: *mut i32):
-    let xs: Vec[W] = Vec.new()
+    let xs: List[W] = List.new()
     xs.push(W { slot: slot })
     xs.push(W { slot: slot })
     xs.clear()
 
 fn remove_drop(slot: *mut i32):
-    let xs: Vec[W] = Vec.new()
+    let xs: List[W] = List.new()
     xs.push(W { slot: slot })
     xs.push(W { slot: slot })
     let removed = xs.remove(0)
 
 fn pop_moves(slot: *mut i32):
-    let xs: Vec[W] = Vec.new()
+    let xs: List[W] = List.new()
     xs.push(W { slot: slot })
     let popped = xs.pop().unwrap()
 
 fn moved_into_struct(slot: *mut i32):
-    let xs: Vec[W] = Vec.new()
+    let xs: List[W] = List.new()
     xs.push(W { slot: slot })
     let holder = Holder { items: xs }
 

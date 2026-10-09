@@ -10,7 +10,7 @@ fn main:
     let with_path = p7_compiler_path()
     var build_text = "use std.build\n\n"
     build_text = build_text ++ "fn generate(ctx: ActionCtx) -> i32:\n"
-    build_text = build_text ++ "    var args: Vec[str] = Vec.new()\n"
+    build_text = build_text ++ "    var args: List[str] = List.new()\n"
     build_text = build_text ++ "    args |> push(\"" ++ with_path ++ "\")\n"
     build_text = build_text ++ "    args |> push(\"version\")\n"
     build_text = build_text ++ "    var child_env = process_env()\n"

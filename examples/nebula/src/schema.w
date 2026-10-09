@@ -102,8 +102,8 @@ pub fn should_alert(sev: Severity) -> bool:
 // Uses `with ... as mut` for scoped mutation to build a telemetry batch
 // (§7.2: the block returns the builder).
 
-pub fn build_test_batch(count: usize) -> Vec[Telemetry]:
-    with Vec.new() as mut batch:
+pub fn build_test_batch(count: usize) -> List[Telemetry]:
+    with List.new() as mut batch:
         for i in 0..count:
             let status = if i % 10 == 0: .Fatal(code: 99)
                          else if i % 5 == 0: .Warning("periodic check")

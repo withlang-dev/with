@@ -2,7 +2,7 @@
 
 // D21: direct `push` calls return Unit and mutate `xs` in place. Two statements
 // followed by a read leave the single receiver owner live until scope exit,
-// where both elements and the Vec buffer drop exactly once.
+// where both elements and the List buffer drop exactly once.
 
 use std.builtins.print_i32
 var COUNT = 0
@@ -13,7 +13,7 @@ impl Drop for W:
         COUNT = COUNT + 1
 
 fn body() -> i64:
-    let xs: Vec[W] = Vec.new()
+    let xs: List[W] = List.new()
     xs.push(W { tag: 1 })
     xs.push(W { tag: 2 })
     // receiver still live and reusable after the push statements:

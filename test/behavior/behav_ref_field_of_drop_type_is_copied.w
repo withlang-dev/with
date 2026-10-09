@@ -11,12 +11,12 @@ impl Drop for Db:
 type Stmt = ephemeral { parent: &Db, n: i32 }
 impl Stmt:
     fn step(): self.parent.n * 100 + self.n
-type Cache = ephemeral { db: &Db, stmts: Vec[Stmt] }
+type Cache = ephemeral { db: &Db, stmts: List[Stmt] }
 impl Cache:
     mut fn step(id: i32) -> i32:
         self.stmts.push(Stmt { parent: self.db, n: id })
         self.stmts[self.stmts.len() as i32 - 1].step()
-fn Cache.over(db: &Db) -> Cache: Cache { db: db, stmts: Vec.new() }
+fn Cache.over(db: &Db) -> Cache: Cache { db: db, stmts: List.new() }
 fn main:
     let db = Db { n: 1, live: true }
     var cache = Cache.over(db)

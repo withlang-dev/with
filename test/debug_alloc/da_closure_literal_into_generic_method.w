@@ -32,7 +32,7 @@ fn main:
     let h = Holder { v: 1 }
     let s = "hello"
     print(f"apply {h.apply(3, move (x: i32) -> i32 => x + s.len() as i32)}")
-    let doubled = nums() |> map(p => p * 2) |> take(2) |> collect[Vec]()
+    let doubled = nums() |> map(p => p * 2) |> take(2) |> collect[List]()
     print(f"collect {doubled[0]} {doubled[1]}")
-    let firsts = nums() |> take(2) |> collect[Vec]()
+    let firsts = nums() |> take(2) |> collect[List]()
     print(f"take {firsts.len()}")

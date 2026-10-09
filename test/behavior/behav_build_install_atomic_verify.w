@@ -17,7 +17,7 @@ const PROBE_OUTPUT: str = "install-probe\n"
 fn text(path: &str): read_file(path) ?? ""
 
 fn hard_link(existing: &str, alias: &str) -> bool:
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push("/bin/ln")
     argv.push(existing)
     argv.push(alias)

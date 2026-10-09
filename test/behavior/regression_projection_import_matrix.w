@@ -8,11 +8,11 @@ type LocalEntry {
 }
 
 type LocalBindings {
-    entries: Vec[LocalEntry],
+    entries: List[LocalEntry],
 }
 
-fn make_local_entries(name0: str, rank0: i32, name1: str, rank1: i32) -> Vec[LocalEntry]:
-    let entries: Vec[LocalEntry] = Vec.new()
+fn make_local_entries(name0: str, rank0: i32, name1: str, rank1: i32) -> List[LocalEntry]:
+    let entries: List[LocalEntry] = List.new()
     entries.push(LocalEntry { name: name0, rank: rank0 })
     entries.push(LocalEntry { name: name1, rank: rank1 })
     entries
@@ -20,8 +20,8 @@ fn make_local_entries(name0: str, rank0: i32, name1: str, rank1: i32) -> Vec[Loc
 fn make_local_bindings(name0: str, rank0: i32, name1: str, rank1: i32) -> LocalBindings:
     LocalBindings { entries: make_local_entries(name0, rank0, name1, rank1) }
 
-fn make_imported_entries(name0: str, rank0: i32, name1: str, rank1: i32) -> Vec[ImportedEntry]:
-    let entries: Vec[ImportedEntry] = Vec.new()
+fn make_imported_entries(name0: str, rank0: i32, name1: str, rank1: i32) -> List[ImportedEntry]:
+    let entries: List[ImportedEntry] = List.new()
     entries.push(ImportedEntry { name: name0, rank: rank0 })
     entries.push(ImportedEntry { name: name1, rank: rank1 })
     entries
@@ -29,10 +29,10 @@ fn make_imported_entries(name0: str, rank0: i32, name1: str, rank1: i32) -> Vec[
 fn make_imported_bindings(name0: str, rank0: i32, name1: str, rank1: i32) -> ImportedBindings:
     ImportedBindings { entries: make_imported_entries(name0, rank0, name1, rank1) }
 
-fn local_vec_name_eq(entries: Vec[LocalEntry]) -> bool:
+fn local_list_name_eq(entries: List[LocalEntry]) -> bool:
     entries[0].name == entries[1].name
 
-fn local_vec_rank_eq(entries: Vec[LocalEntry]) -> bool:
+fn local_list_rank_eq(entries: List[LocalEntry]) -> bool:
     entries[0].rank == entries[1].rank
 
 fn local_nested_name_eq(bindings: LocalBindings) -> bool:
@@ -57,10 +57,10 @@ fn local_loop_find_rank(bindings: LocalBindings, target: i32) -> bool:
         i = i + 1
     false
 
-fn imported_vec_name_eq(entries: Vec[ImportedEntry]) -> bool:
+fn imported_list_name_eq(entries: List[ImportedEntry]) -> bool:
     entries[0].name == entries[1].name
 
-fn imported_vec_rank_eq(entries: Vec[ImportedEntry]) -> bool:
+fn imported_list_rank_eq(entries: List[ImportedEntry]) -> bool:
     entries[0].rank == entries[1].rank
 
 fn imported_nested_name_eq(bindings: ImportedBindings) -> bool:
@@ -86,10 +86,10 @@ fn imported_loop_find_rank(bindings: ImportedBindings, target: i32) -> bool:
     false
 
 fn test_local_projection_matrix:
-    assert(local_vec_name_eq(make_local_entries("same", 1, "same", 2)))
-    assert(not local_vec_name_eq(make_local_entries("left", 1, "right", 2)))
-    assert(local_vec_rank_eq(make_local_entries("left", 7, "right", 7)))
-    assert(not local_vec_rank_eq(make_local_entries("left", 7, "right", 8)))
+    assert(local_list_name_eq(make_local_entries("same", 1, "same", 2)))
+    assert(not local_list_name_eq(make_local_entries("left", 1, "right", 2)))
+    assert(local_list_rank_eq(make_local_entries("left", 7, "right", 7)))
+    assert(not local_list_rank_eq(make_local_entries("left", 7, "right", 8)))
 
     assert(local_nested_name_eq(make_local_bindings("same", 1, "same", 2)))
     assert(not local_nested_name_eq(make_local_bindings("left", 1, "right", 2)))
@@ -102,10 +102,10 @@ fn test_local_projection_matrix:
     assert(not local_loop_find_rank(make_local_bindings("lhs", 1, "rhs", 22), 99))
 
 fn test_imported_projection_matrix:
-    assert(imported_vec_name_eq(make_imported_entries("same", 1, "same", 2)))
-    assert(not imported_vec_name_eq(make_imported_entries("left", 1, "right", 2)))
-    assert(imported_vec_rank_eq(make_imported_entries("left", 7, "right", 7)))
-    assert(not imported_vec_rank_eq(make_imported_entries("left", 7, "right", 8)))
+    assert(imported_list_name_eq(make_imported_entries("same", 1, "same", 2)))
+    assert(not imported_list_name_eq(make_imported_entries("left", 1, "right", 2)))
+    assert(imported_list_rank_eq(make_imported_entries("left", 7, "right", 7)))
+    assert(not imported_list_rank_eq(make_imported_entries("left", 7, "right", 8)))
 
     assert(imported_nested_name_eq(make_imported_bindings("same", 1, "same", 2)))
     assert(not imported_nested_name_eq(make_imported_bindings("left", 1, "right", 2)))

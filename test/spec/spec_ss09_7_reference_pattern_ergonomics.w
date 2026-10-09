@@ -20,7 +20,7 @@ fn test_borrowed_tuple_let:
     assert(*a + *b == 3)
 
 fn test_for_loop_destructuring_auto_borrows:
-    let items: Vec[(i32, i32)] = Vec.new()
+    let items: List[(i32, i32)] = List.new()
     items.push((1, 2))
     items.push((3, 4))
 

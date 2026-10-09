@@ -9,8 +9,8 @@ fn main:
     assert(twin == some and twin == Some("a"))
     let none: Option[str] = None
     assert(none.clone() == None)
-    let nested: Option[Vec[str]] = Some([a(), a()])
-    assert((nested.clone() ?? Vec.new()).len() == 2)
+    let nested: Option[List[str]] = Some([a(), a()])
+    assert((nested.clone() ?? List.new()).len() == 2)
     let ok: Result[str, str] = Ok(a())
     let failed: Result[str, str] = Err("bad".to_lower())
     assert(ok.clone() == Ok("a") and failed.clone() == Err("bad"))

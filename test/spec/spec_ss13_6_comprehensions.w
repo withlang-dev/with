@@ -5,7 +5,7 @@ use std.collections.HashSet
 use std.collections.HashMap
 use std.collections.BTreeSet
 use std.collections.BTreeMap
-fn assert_vec_i32(xs: Vec[i32], a: i32, b: i32, c: i32):
+fn assert_list_i32(xs: List[i32], a: i32, b: i32, c: i32):
     assert(xs.len() == 3)
     assert(xs[0] == a)
     assert(xs[1] == b)
@@ -46,18 +46,18 @@ fn test_nested:
     assert(pairs[4] == 20)
     assert(pairs[5] == 21)
 
-fn test_vec_source:
-    let nums: Vec[i32] = Vec.new()
+fn test_list_source:
+    let nums: List[i32] = List.new()
     nums.push(2)
     nums.push(4)
     nums.push(6)
     let doubled = [x * 2 for x in nums]
-    assert_vec_i32(doubled, 4, 8, 12)
+    assert_list_i32(doubled, 4, 8, 12)
 
 fn test_pattern_binding:
     let src = [(1, 2), (3, 4), (5, 6)]
     let sums = [a + b for (a, b) in src]
-    assert_vec_i32(sums, 3, 7, 11)
+    assert_list_i32(sums, 3, 7, 11)
 
 fn test_hashset_target:
     let values: HashSet[i32] = [x for x in 0..6 if x % 2 == 0]
@@ -95,7 +95,7 @@ fn test_btreemap_expected_type:
     assert(index.len() == 2)
     assert(index.get("a").unwrap() == 2)
     assert(index.get("b").unwrap() == 8)
-    let keys = index.keys() |> collect[Vec]()
+    let keys = index.keys() |> collect[List]()
     assert(keys[0] == "a")
     assert(keys[1] == "b")
 
@@ -111,7 +111,7 @@ fn main:
     test_filter()
     test_membership_filter()
     test_nested()
-    test_vec_source()
+    test_list_source()
     test_pattern_binding()
     test_hashset_target()
     test_hashmap_default()

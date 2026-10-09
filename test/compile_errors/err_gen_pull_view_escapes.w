@@ -5,13 +5,13 @@
 // scope of the viewed place.
 use std.task.Pulled
 
-gen fn nonempty(lines: &Vec[str]) -> &str:
+gen fn nonempty(lines: &List[str]) -> &str:
     for line in lines:
         if line.len() > 0:
             yield line
 
 fn escaped() -> Pulled[&str]:
-    let v: Vec[str] = ["a".clone(), "c".clone()]
+    let v: List[str] = ["a".clone(), "c".clone()]
     nonempty(&v).pull()
 
 fn main:

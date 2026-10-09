@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-var G: Vec[i32] = Vec.new()
+var G: List[i32] = List.new()
 
 fn main:
     G.push(7)

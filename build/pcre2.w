@@ -64,8 +64,8 @@ fn pcre2_abs(root: &str, path: &str) -> str:
         return pcre2_owned_text(path)
     pcre2_join(root, path)
 
-fn pcre2_split_lines(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn pcre2_split_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     var start = 0
     var i = 0
     while i <= text.len() as i32:
@@ -316,7 +316,7 @@ pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, compil
     if not fs.exists(pcre2test):
         return pcre2_fail(ctx, "missing pcre2test.w for cohesive check: " ++ pcre2test)
     let root = ctx.project_info().project_root()
-    var argv: Vec[str] = Vec.new()
+    var argv: List[str] = List.new()
     argv.push(pcre2_abs(root, compiler))
     argv.push("check")
     argv.push(pcre2_abs(root, pcre2test))
@@ -399,7 +399,7 @@ pub fn run_pcre2_migrate_smoke_action(ctx: ActionCtx) -> i32:
     let corpus = pcre2_corpus()
     var options = corpus_migrate_options(corpus, compile_c, out_w)
     options.include_paths = [pcre2_owned_text(source_dir)]
-    options.exclude_basenames = Vec.new()
+    options.exclude_basenames = List.new()
     if corpus_run_migration(ctx, "pcre2-migrate-smoke", options) != 0:
         return pcre2_fail(ctx, "pcre2_compile.c migration smoke failed")
     if not fs.exists(out_w):
@@ -445,7 +445,7 @@ pub fn run_pcre2_test_smoke_action(ctx: ActionCtx) -> i32:
 
     let run_stdout = pcre2_abs(root, pcre2_join(output_dir, "run.stdout"))
     let run_stderr = pcre2_abs(root, pcre2_join(output_dir, "run.stderr"))
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("/bin/bash")
     run_args |> push(pcre2_abs(root, run_test_path))
     run_args |> push("-8")
@@ -500,7 +500,7 @@ pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
     // compiler (`--bundle-corpus std/re`, as the cohesive check above):
     // through the Workspace API the embedded std.re bundle would stand in
     // for the sources just copied.
-    var build_argv: Vec[str] = Vec.new()
+    var build_argv: List[str] = List.new()
     build_argv.push(pcre2_abs(root, compiler))
     build_argv.push("build")
     build_argv.push(pcre2_abs(root, pcre2test_src))
@@ -551,7 +551,7 @@ pub fn run_pcre2_test_action(ctx: ActionCtx) -> i32:
         return pcre2_fail(ctx, "could not create pcre2-test output directory: " ++ run_dir)
     let stdout_path = pcre2_abs(root, pcre2_join(run_dir, "stdout.txt"))
     let stderr_path = pcre2_abs(root, pcre2_join(run_dir, "stderr.txt"))
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args |> push("/bin/bash")
     run_args |> push(pcre2_abs(root, run_test_path))
     run_args |> push("-8")
@@ -580,9 +580,9 @@ pub fn pcre2_corpus() -> Corpus:
         module_floor: 30,
         defines: ["PCRE2_CODE_UNIT_WIDTH=8", "HAVE_CONFIG_H=1"],
         excludes: ["pcre2demo.c", "pcre2grep.c", "pcre2posix_test.c", "pcre2_jit_test.c", "pcre2_dftables.c", "pcre2_fuzzsupport.c"],
-        declared_externs: Vec.new(),
+        declared_externs: List.new(),
         promote_after: ["pcre2-test"], test_lane: "",
-        fresh_test_lanes: ["pcre2-test"], extra_generated_dirs: Vec.new(),
+        fresh_test_lanes: ["pcre2-test"], extra_generated_dirs: List.new(),
         prepare_reference: pcre2_prepare, stage: pcre2_stage,
         migrate: corpus_migrate_directory, finish_generated: pcre2_finish,
         verify_generated: pcre2_verify, lanes: pcre2_lanes,

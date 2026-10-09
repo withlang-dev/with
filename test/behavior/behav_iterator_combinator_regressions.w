@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
-fn test_vec_filter_uses_element_type:
-    let words: Vec[str] = Vec.new()
+fn test_list_filter_uses_element_type:
+    let words: List[str] = List.new()
     words.push("a")
     words.push("bb")
     words.push("c")
@@ -11,8 +11,8 @@ fn test_vec_filter_uses_element_type:
     assert(short[0] == "a")
     assert(short[1] == "c")
 
-fn test_vec_fold_uses_accumulator_and_element_types:
-    let nums: Vec[i64] = Vec.new()
+fn test_list_fold_uses_accumulator_and_element_types:
+    let nums: List[i64] = List.new()
     nums.push(10i64)
     nums.push(20i64)
     nums.push(30i64)
@@ -21,6 +21,6 @@ fn test_vec_fold_uses_accumulator_and_element_types:
     assert(sum == 60i64)
 
 fn main:
-    test_vec_filter_uses_element_type()
-    test_vec_fold_uses_accumulator_and_element_types()
+    test_list_filter_uses_element_type()
+    test_list_fold_uses_accumulator_and_element_types()
     print("ok")

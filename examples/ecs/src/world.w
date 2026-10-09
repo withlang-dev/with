@@ -16,9 +16,9 @@ use storage.DenseStorage
 
 pub type World {
     // Entity pool: names indexed by entity id, generation tracking
-    entity_names: Vec[str],
-    entity_generations: Vec[i32],
-    entity_alive: Vec[bool],
+    entity_names: List[str],
+    entity_generations: List[i32],
+    entity_alive: List[bool],
     next_id: i32,
 
     // Component storages -- one field per component type.
@@ -29,8 +29,8 @@ pub type World {
     input_states: DenseStorage[InputState],
 
     // Events -- produced by systems, consumed by others
-    collision_events: Vec[CollisionEvent],
-    despawn_queue: Vec[Entity],
+    collision_events: List[CollisionEvent],
+    despawn_queue: List[Entity],
 
     // Per-frame state
     dt: f32,
@@ -40,17 +40,17 @@ pub type World {
 
 pub fn World.new() -> World:
     World {
-        entity_names: Vec.new(),
-        entity_generations: Vec.new(),
-        entity_alive: Vec.new(),
+        entity_names: List.new(),
+        entity_generations: List.new(),
+        entity_alive: List.new(),
         next_id: 0,
         transforms: DenseStorage.new(),
         velocities: DenseStorage.new(),
         colliders: DenseStorage.new(),
         sprites: DenseStorage.new(),
         input_states: DenseStorage.new(),
-        collision_events: Vec.new(),
-        despawn_queue: Vec.new(),
+        collision_events: List.new(),
+        despawn_queue: List.new(),
         dt: 0.0,
         time: 0.0,
         frame: 0,

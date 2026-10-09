@@ -53,7 +53,7 @@ enum ValidateError: i32:
     DuplicateModule = 2
 
 // Validate project scaffold. Returns ValidateError.Ok on success.
-fn validate_scaffold(spec_names: Vec[str], spec_paths: Vec[str]) -> i32:
+fn validate_scaffold(spec_names: List[str], spec_paths: List[str]) -> i32:
     for ri in 0..required_module_count():
         let req = required_module(ri)
         var count = 0

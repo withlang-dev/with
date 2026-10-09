@@ -13,13 +13,13 @@ fn apply(f: fn(i32) -> i32, x: i32) -> i32: f(x)
 
 type C {
     count: i32,
-    items: Vec[i32],
+    items: List[i32],
 }
 
 impl C:
     fn plus(x: i32) -> i32: apply(y => y + self.count, x)
     fn plus_bare(x: i32) -> i32: apply(y => y + count, x)
-    fn shifted -> Vec[i32]: items.iter() |> map(it + count) |> collect[Vec]()
+    fn shifted -> List[i32]: items.iter() |> map(it + count) |> collect[List]()
     mut fn plus_mut(x: i32) -> i32: apply(y => y + self.count, x)
 
 fn main:

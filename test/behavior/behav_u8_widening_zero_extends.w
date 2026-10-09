@@ -21,7 +21,7 @@ fn take(x: i64) -> i64: x
 fn take32(x: i32) -> i32: x
 
 fn main:
-    var v: Vec[u8] = Vec.new()
+    var v: List[u8] = List.new()
     v.push(255 as u8)
     let b: u8 = v[0]
     let w: i64 = b

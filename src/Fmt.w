@@ -168,8 +168,8 @@ pub fn format_source_styled(source: &str, style: i32) -> str:
     var prev_was_newline = false
     var line_indent = 0
     var block_kw_active = false
-    var close_stack: Vec[i32] = Vec.new()
-    var suppress_stack: Vec[i32] = Vec.new()
+    var close_stack: List[i32] = List.new()
+    var suppress_stack: List[i32] = List.new()
     var brace_depth = 0
     var semi_indent = -1
     // prefer-brace: `}`s owed on this line by inline `: expr` conversions

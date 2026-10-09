@@ -15,8 +15,8 @@
 // binding declared outside the block; only the function body's tail is a
 // return (the block-tail check used to treat every block as one).
 
-fn mkv() -> Vec[str]:
-    var v: Vec[str] = Vec.new()
+fn mkv() -> List[str]:
+    var v: List[str] = List.new()
     v.push("a")
     v.push("b")
     v
@@ -63,9 +63,9 @@ fn plain_block_tail():
     }
     print(x)
 
-fn pick(v: &Vec[str], c: bool) -> &str: if c: v[0] else: v[1]
+fn pick(v: &List[str], c: bool) -> &str: if c: v[0] else: v[1]
 
-fn pick_arm_block(v: &Vec[str], c: bool) -> &str:
+fn pick_arm_block(v: &List[str], c: bool) -> &str:
     if c:
         let i = 0
         v[i]
@@ -79,7 +79,7 @@ fn cloned_across_mutation(c: bool):
     print(f"{x} {v[0]}")
 
 fn copy_join(c: bool):
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     v.push(1)
     v.push(2)
     let x: i32 = if c: v[0] else: v[1]

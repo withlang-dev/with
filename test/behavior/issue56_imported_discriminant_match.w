@@ -8,7 +8,7 @@ fn decode(kind: i32) -> str:
         _ => "other"
 
 fn main:
-    let kinds: Vec[i32] = Vec.new()
+    let kinds: List[i32] = List.new()
     kinds.push(TypeKind.TY_INT as i32)
     kinds.push(TypeKind.TY_STR as i32)
     assert(decode(kinds[0]) == "int")

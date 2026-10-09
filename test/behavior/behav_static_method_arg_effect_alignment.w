@@ -8,11 +8,11 @@ type R { id: i32 }
 impl Drop for R:
     move fn drop(): print(f"drop {self.id}")
 
-type PS { xs: Vec[i32] }
+type PS { xs: List[i32] }
 type P { state: *mut PS }
 impl Copy for P
 
-type DL { items: Vec[R] }
+type DL { items: List[R] }
 
 type SM { p: P, d: DL }
 
@@ -23,7 +23,7 @@ type Z { pool: P, last: SM }
 
 extend Z:
     mut fn clear():
-        self.last = SM.holder(self.pool, DL { items: Vec.new() })
+        self.last = SM.holder(self.pool, DL { items: List.new() })
 
 fn main:
     print("ok")

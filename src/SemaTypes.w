@@ -95,7 +95,7 @@ pub enum CastMode: i32:
 // D61 (§15.4.7): how `:?` formats one registered type (Sema.debug_fmt_*).
 pub enum DebugFmtKind: i32:
     // A formatter MirLower synthesizes: struct, enum, tuple, array, slice,
-    // Vec, Box — each component formatted with `:?`.
+    // List, Box — each component formatted with `:?`.
     SYNTH = 1
     // An explicit `impl Debug`: its debug_str, at every depth.
     IMPL = 2
@@ -109,7 +109,7 @@ pub enum DebugFmtKind: i32:
 
 pub enum MirIntrinsic: i32:
     NONE
-    VEC_NEW
+    LIST_NEW
     FIXED_STRING_NEW
     FIXED_STRING_LEN
     FIXED_STRING_LEN32
@@ -121,14 +121,14 @@ pub enum MirIntrinsic: i32:
     FIXED_STRING_PUSH_STR
     FIXED_STRING_AS_VIEW
     FIXED_STRING_EQUALS
-    VEC_PUSH
-    VEC_GET
-    VEC_LEN
-    VEC_IS_EMPTY
-    VEC_SET
-    VEC_REMOVE
-    VEC_CLEAR
-    VEC_POP
+    LIST_PUSH
+    LIST_GET
+    LIST_LEN
+    LIST_IS_EMPTY
+    LIST_SET
+    LIST_REMOVE
+    LIST_CLEAR
+    LIST_POP
     MAP_NEW
     MAP_INSERT
     MAP_GET
@@ -150,7 +150,7 @@ pub enum MirIntrinsic: i32:
     STR_FIND
     MAP_CLEAR
     VECITER_NEXT
-    VEC_ITER
+    LIST_ITER
     OPT_IS_NONE
     STR_SPLIT
     STR_TO_UPPER
@@ -160,9 +160,9 @@ pub enum MirIntrinsic: i32:
     MAP_INCREMENT
     MAP_DECREMENT
     MAP_UPDATE
-    VEC_MAP
-    VEC_FILTER
-    VEC_FOLD
+    LIST_MAP
+    LIST_FILTER
+    LIST_FOLD
     ITER_MAP
     ITER_FILTER
     ITER_FILTER_MAP
@@ -207,17 +207,17 @@ pub enum MirIntrinsic: i32:
     ZIPWITHITER_NEXT
     STEPBYITER_NEXT
     FLATMAPITER_NEXT
-    VEC_CONTAINS
+    LIST_CONTAINS
     STR_REPEAT
     ARR_LEN
     GENERIC_CALL
-    VEC_JOIN
+    LIST_JOIN
     DYN_VTABLE_CMP
     DYN_DOWNCAST
     OPT_FILTER
     ROTATE_LEFT
     ROTATE_RIGHT
-    VEC_WITH_CAPACITY
+    LIST_WITH_CAPACITY
     FMT_TO_STR
     FMT_DEBUG_STR
     FMT_DEBUG
@@ -272,25 +272,25 @@ pub enum MirIntrinsic: i32:
     FMT_BUF_WRITE_STR
     FMT_BUF_WRITE_FMT
     FMT_BUF_FINISH
-    VEC_SLOT
+    LIST_SLOT
     VECSLOT_GET
     VECSLOT_SET
-    VEC_ITER_PLACE
+    LIST_ITER_PLACE
     VECITERPLACE_NEXT
     MAP_ENTRY
     ENTRY_OR_INSERT
     ENTRY_GET
     ENTRY_SET
-    VEC_GET_DISJOINT
-    VEC_RANGE
+    LIST_GET_DISJOINT
+    LIST_RANGE
     SPLIT_AT
     SPLIT_AT_MUT
     VECRANGE_GET
     VECRANGE_SET
     VECRANGE_LEN
-    VEC_ITER_REF
+    LIST_ITER_REF
     VECITERREF_NEXT
-    VEC_GET_REF
+    LIST_GET_REF
     DYN_CALL
     SLOTMAP_NEW
     SLOTMAP_INSERT
@@ -306,9 +306,9 @@ pub enum MirIntrinsic: i32:
     FIBER_SELECT_BIASED
     FIBER_DETACH
     FIBER_DETACH_CANCEL
-    VEC_LEN32
-    VEC_LEN64
-    VEC_ULEN32
+    LIST_LEN32
+    LIST_LEN64
+    LIST_ULEN32
     MAP_LEN32
     MAP_LEN64
     MAP_ULEN32
@@ -370,7 +370,7 @@ pub enum MirIntrinsic: i32:
     SIMD_MASK_LANE_SET
 
 // Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
-// Vec/HashMap, and compared throughout MIR lowering and codegen.
+// List/HashMap, and compared throughout MIR lowering and codegen.
 impl Copy for MirIntrinsic
 
 // D44: the std-only slot accessors a map traversal walks (std.collections).
@@ -385,10 +385,10 @@ pub fn mir_map_slot_intrinsic(name: &str) -> MirIntrinsic:
 pub fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: &str) -> MirIntrinsic:
     if method_name == "len":
         return base
-    if base == MirIntrinsic.VEC_LEN:
-        if method_name == "len32": return MirIntrinsic.VEC_LEN32
-        if method_name == "len64": return MirIntrinsic.VEC_LEN64
-        if method_name == "ulen32": return MirIntrinsic.VEC_ULEN32
+    if base == MirIntrinsic.LIST_LEN:
+        if method_name == "len32": return MirIntrinsic.LIST_LEN32
+        if method_name == "len64": return MirIntrinsic.LIST_LEN64
+        if method_name == "ulen32": return MirIntrinsic.LIST_ULEN32
     if base == MirIntrinsic.MAP_LEN:
         if method_name == "len32": return MirIntrinsic.MAP_LEN32
         if method_name == "len64": return MirIntrinsic.MAP_LEN64
@@ -443,8 +443,8 @@ pub enum MethodLowering: i32:
     ResErr
     ResTranspose
     TaskJoinCleanup
-    VecSequence
-    VecTraverse
+    ListSequence
+    ListTraverse
     BTreeNew
     UnwrapOr
     UnwrapOrElse
@@ -458,7 +458,9 @@ impl Copy for MethodLowering
 // the instance's declaration — never by a later stage reading its name.
 pub enum StdGeneric: i32:
     None = 0
-    Vec
+    // `List` (D118). Spelled `Sequence` while the step-(a) seed drives the
+    // build: its `List` alias misses a member name after a dot (#2296).
+    Sequence
     HashMap
     HashSet
     BTreeMap

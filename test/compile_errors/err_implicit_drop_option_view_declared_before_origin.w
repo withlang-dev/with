@@ -5,7 +5,7 @@
 // value runs that value's destructor when it drops. Declared before its
 // origin, `keep` drops after `db`, so its Stmt's destructor would read `db`
 // after it is destroyed. Only the bare Drop type was checked before, so the
-// `Option` (or a Vec, or a tuple) of it was accepted.
+// `Option` (or a List, or a tuple) of it was accepted.
 
 type Db { n: i32, live: bool }
 impl Drop for Db:

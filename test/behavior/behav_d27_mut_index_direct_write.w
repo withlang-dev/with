@@ -3,7 +3,7 @@
 // D27 E1: IndexPlace writes through the physical element place.
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(1)
     xs[0] = 5
     assert(xs[0] == 5)

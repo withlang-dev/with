@@ -26,7 +26,7 @@ enum Slot:
 
 fn main:
     var drops = 0
-    var opts: Vec[Option[W]] = Vec.new()
+    var opts: List[Option[W]] = List.new()
     opts.push(Some(w(&raw mut drops, 1)))
     opts.push(None)
     opts.push(Some(w(&raw mut drops, 2)))
@@ -35,7 +35,7 @@ fn main:
     assert(drops == 0)
 
     var drops2 = 0
-    var pairs: Vec[(i32, W)] = Vec.new()
+    var pairs: List[(i32, W)] = List.new()
     pairs.push((0, w(&raw mut drops2, 1)))
     pairs.push((1, w(&raw mut drops2, 2)))
     pairs.push((0, w(&raw mut drops2, 4)))
@@ -44,7 +44,7 @@ fn main:
     assert(drops2 == 2)
 
     var drops3 = 0
-    var slots: Vec[Slot] = Vec.new()
+    var slots: List[Slot] = List.new()
     slots.push(Slot.Full(w(&raw mut drops3, 1)))
     slots.push(Slot.Held("h"))
     slots.push(Slot.Empty)
@@ -53,7 +53,7 @@ fn main:
     assert(full.len() == 2)
     assert(drops3 == 3)
 
-    var names: Vec[(i32, str)] = Vec.new()
+    var names: List[(i32, str)] = List.new()
     names.push((0, "a"))
     names.push((1, "b"))
     let named = [s for (0, s) in names.into_iter()]

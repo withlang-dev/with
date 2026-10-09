@@ -29,7 +29,7 @@ fn worktree(base: &str, name: &str) -> str:
     root
 
 fn run(root: &str, target: &BuildGraphTarget, text: &str):
-    let empty: Vec[str] = Vec.new()
+    let empty: List[str] = List.new()
     assert(write_file(root ++ "/" ++ target.output, text) == 0)
     build_cache_record(root, target, empty, empty)
     assert(build_cache_freshness_reason(root, target, false) == "fresh")

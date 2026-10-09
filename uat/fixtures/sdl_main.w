@@ -16,7 +16,7 @@ fn main:
         print(f"sdl UAT failed: no renderer: {sdl_error()}")
         return 1
 
-    var bars: Vec[SDL_FRect] = Vec.new()
+    var bars: List[SDL_FRect] = List.new()
     for i in 0..8: bars.push(SDL_FRect { x: 40.0 + 70.0 * (i as f32), y: 200.0, w: 50.0, h: 80.0 })
 
     var drawn = 0

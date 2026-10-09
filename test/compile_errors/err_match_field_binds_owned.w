@@ -3,9 +3,9 @@
 // #1302: a match arm that binds a non-Copy payload BY VALUE out of a field
 // place is an implicit field move (§2.2, D32) — the fix-its are `move self.cur`
 // to vacate the field or `&self.cur` / `.clone()` to observe it. Non-binding
-// patterns on the same place observe it and are not an error. A Vec payload,
+// patterns on the same place observe it and are not an error. A List payload,
 // not a str: a str payload is copied (D111).
-enum Tok { LBrace | S(Vec[i32]) }
+enum Tok { LBrace | S(List[i32]) }
 type P { cur: Option[Tok] = Some(.LBrace) }
 extend P:
     mut fn peek_len() -> i32:

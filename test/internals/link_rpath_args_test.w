@@ -7,7 +7,7 @@ use BuildGraphCache
 use std.fs
 
 fn main:
-    var paths: Vec[str] = Vec.new()
+    var paths: List[str] = List.new()
     paths.push("$ORIGIN/native libs")
     paths.push("@executable_path/lib,more")
     paths.push("relative $literal")

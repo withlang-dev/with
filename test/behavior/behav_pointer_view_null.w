@@ -16,7 +16,7 @@ fn test_pointer_views_compare_with_null:
     assert(null != node.children[1])
     let observed = node.children[1]
     assert(observed != null)
-    let values: Vec[*mut PointerNode] = [null, &raw mut child]
+    let values: List[*mut PointerNode] = [null, &raw mut child]
     assert(values[0] == null)
     assert(null != values[1])
     let mapping: HashMap[i32, *mut PointerNode] = [1: &raw mut child]

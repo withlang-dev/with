@@ -5,7 +5,7 @@
 // not its payload — in generic and non-generic bodies alike.
 
 fn generic_slot_set[T](x: T) -> T:
-    let values: Vec[Option[T]] = Vec.new()
+    let values: List[Option[T]] = List.new()
     let empty: Option[T] = None
     values.push(empty)
     with values.slot(0) as mut slot:
@@ -13,19 +13,19 @@ fn generic_slot_set[T](x: T) -> T:
     values.remove(0).unwrap()
 
 fn main:
-    // generic body, VecSlot.set
+    // generic body, ListSlot.set
     assert(generic_slot_set(5) == 5)
 
-    // non-generic VecSlot.set
-    let vs: Vec[Option[i32]] = Vec.new()
+    // non-generic ListSlot.set
+    let vs: List[Option[i32]] = List.new()
     let e1: Option[i32] = None
     vs.push(e1)
     with vs.slot(0) as mut s1:
         s1.set(Some(11))
     assert(vs.remove(0).unwrap() == 11)
 
-    // VecRange.set value argument
-    let vr: Vec[Option[i32]] = Vec.new()
+    // ListRange.set value argument
+    let vr: List[Option[i32]] = List.new()
     let e2: Option[i32] = None
     let e3: Option[i32] = None
     vr.push(e2)

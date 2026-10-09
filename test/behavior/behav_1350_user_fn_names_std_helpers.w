@@ -21,8 +21,8 @@ fn is_print(ch: u8) -> bool: ch > 1
 fn to_lower(ch: u8) -> u8: ch
 fn to_upper(ch: u8) -> u8: ch
 
-fn bytes_from_str(s: str) -> Vec[u8]:
-    let out: Vec[u8] = Vec.new()
+fn bytes_from_str(s: str) -> List[u8]:
+    let out: List[u8] = List.new()
     for i in 0..s.len():
         out.push(s.byte_at(i) as u8)
     out

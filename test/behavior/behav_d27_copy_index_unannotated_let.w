@@ -4,7 +4,7 @@
 // The vec remains the owner; no element drop is introduced.
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(7)
     let n = xs[0]
     assert(n + 1 == 8)

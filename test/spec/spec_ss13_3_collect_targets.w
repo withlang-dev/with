@@ -5,30 +5,30 @@ use std.collections.HashSet
 use std.collections.HashMap
 use std.collections.BTreeSet
 use std.collections.BTreeMap
-fn numbers() -> Vec[i32]:
-    let xs: Vec[i32] = Vec.new()
+fn numbers() -> List[i32]:
+    let xs: List[i32] = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)
     xs
 
-fn pairs() -> Vec[(str, i32)]:
-    let xs: Vec[(str, i32)] = Vec.new()
+fn pairs() -> List[(str, i32)]:
+    let xs: List[(str, i32)] = List.new()
     xs.push(("a", 1))
     xs.push(("b", 2))
     xs.push(("a", 3))
     xs
 
-fn bytes() -> Vec[u8]:
-    let xs: Vec[u8] = Vec.new()
+fn bytes() -> List[u8]:
+    let xs: List[u8] = List.new()
     xs.push(65)
     xs.push(66)
     xs.push(67)
     xs
 
-fn test_collect_vec:
+fn test_collect_list:
     let xs = numbers()
-    let copied = xs.iter().collect[Vec[i32]]()
+    let copied = xs.iter().collect[List[i32]]()
     assert(copied.len() == 3)
     assert(copied[0] == 1)
     assert(copied[1] == 2)
@@ -67,7 +67,7 @@ fn test_collect_btreemap:
     assert(map.len() == 2)
     assert(map.get("a").unwrap() == 3)
     assert(map.get("b").unwrap() == 2)
-    let keys = map.keys() |> collect[Vec]()
+    let keys = map.keys() |> collect[List]()
     assert(keys[0] == "a")
     assert(keys[1] == "b")
 
@@ -77,7 +77,7 @@ fn test_collect_string:
     assert(text == "ABC")
 
 fn main:
-    test_collect_vec()
+    test_collect_list()
     test_collect_hashset()
     test_collect_hashmap()
     test_collect_btreeset()

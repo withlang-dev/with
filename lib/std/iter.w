@@ -10,8 +10,8 @@ extern fn with_vec_get_str(v: *mut u8, index: i64) -> str
 extern fn with_vec_push_i32(v: *mut u8, val: i32) -> Unit
 extern fn with_vec_new_out(v: *mut u8, elem_size: i64) -> Unit
 
-/// Sum all elements in a Vec[i32].
-pub fn sum(arr: Vec[i32]) -> i32:
+/// Sum all elements in a List[i32].
+pub fn sum(arr: List[i32]) -> i32:
     var total: i32 = 0
     var i: i64 = 0
     let n = with_vec_len((&raw mut arr) as *mut u8)
@@ -20,9 +20,9 @@ pub fn sum(arr: Vec[i32]) -> i32:
         i = i + 1
     total
 
-/// Apply a function to each element, returning a new Vec of results.
-pub fn map(arr: Vec[str], f: fn(str) -> i32) -> Vec[i32]:
-    let result: Vec[i32] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+/// Apply a function to each element, returning a new List of results.
+pub fn map(arr: List[str], f: fn(str) -> i32) -> List[i32]:
+    let result: List[i32] = List{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
     with_vec_new_out((&raw mut result) as *mut u8, 4)
     var i: i64 = 0
     let n = with_vec_len((&raw mut arr) as *mut u8)
@@ -34,8 +34,8 @@ pub fn map(arr: Vec[str], f: fn(str) -> i32) -> Vec[i32]:
     result
 
 /// Keep only elements where `pred` returns true.
-pub fn filter(arr: Vec[i32], pred: fn(i32) -> bool) -> Vec[i32]:
-    let result: Vec[i32] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+pub fn filter(arr: List[i32], pred: fn(i32) -> bool) -> List[i32]:
+    let result: List[i32] = List{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
     with_vec_new_out((&raw mut result) as *mut u8, 4)
     var i: i64 = 0
     let n = with_vec_len((&raw mut arr) as *mut u8)
@@ -56,8 +56,8 @@ pub fn contains(arr: [i32], target: i32) -> bool:
         if x == target: return true
     false
 
-/// Sum all elements from a VecIter[i32].
-pub fn iter_sum(iter: VecIter[i32]) -> i32:
+/// Sum all elements from a ListIter[i32].
+pub fn iter_sum(iter: ListIter[i32]) -> i32:
     var total = 0
     var done = false
     while not done:

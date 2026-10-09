@@ -5,13 +5,13 @@ type BindEntry {
 }
 
 type Bindings {
-    entries: Vec[BindEntry],
+    entries: List[BindEntry],
 }
 
-fn bindings_from(entries: Vec[BindEntry]) -> Bindings:
+fn bindings_from(entries: List[BindEntry]) -> Bindings:
     Bindings { entries }
 
 fn main:
-    let bindings = bindings_from(Vec.new())
+    let bindings = bindings_from(List.new())
     if bindings.entries.len() == 0:
         print("ok")

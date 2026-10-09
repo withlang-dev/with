@@ -4,7 +4,7 @@
 // runs one of the method's impls, which one decided when the program runs:
 // it counts as running every impl of the method in this compilation. `W`'s
 // `grow` reallocates `G` while `r` views its first element.
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 trait Grow:
     fn grow(self: &Self)

@@ -10,22 +10,22 @@ pub type ProjectConfig {
     manifest_error: str,
     package_name: str,
     package_version: str,
-    c_import_include_paths: Vec[str],
-    c_import_defines: Vec[str],
+    c_import_include_paths: List[str],
+    c_import_defines: List[str],
     c_import_sdk_path: str,
-    link_libs: Vec[str],
-    link_search_paths: Vec[str],
-    link_rpaths: Vec[str],
-    dep_link_libs: Vec[str],
-    dep_link_args: Vec[str],
-    dep_loaded: Vec[str],
-    dep_names: Vec[str],
-    dep_constraints: Vec[str],
-    c_dep_metadata_names: Vec[str],
-    manual_c_dep_names: Vec[str],
-    feature_default: Vec[str],
-    feature_names: Vec[str],
-    feature_values: Vec[str],
+    link_libs: List[str],
+    link_search_paths: List[str],
+    link_rpaths: List[str],
+    dep_link_libs: List[str],
+    dep_link_args: List[str],
+    dep_loaded: List[str],
+    dep_names: List[str],
+    dep_constraints: List[str],
+    c_dep_metadata_names: List[str],
+    manual_c_dep_names: List[str],
+    feature_default: List[str],
+    feature_names: List[str],
+    feature_values: List[str],
     target_default: str,
     runtime_fiber_stack_size: i64,
     runtime_fiber_pool_size: i32,
@@ -46,22 +46,22 @@ pub fn project_config_default -> ProjectConfig:
         manifest_error: "",
         package_name: "",
         package_version: "",
-        c_import_include_paths: Vec.new(),
-        c_import_defines: Vec.new(),
+        c_import_include_paths: List.new(),
+        c_import_defines: List.new(),
         c_import_sdk_path: "",
-        link_libs: Vec.new(),
-        link_search_paths: Vec.new(),
-        link_rpaths: Vec.new(),
-        dep_link_libs: Vec.new(),
-        dep_link_args: Vec.new(),
-        dep_loaded: Vec.new(),
-        dep_names: Vec.new(),
-        dep_constraints: Vec.new(),
-        c_dep_metadata_names: Vec.new(),
-        manual_c_dep_names: Vec.new(),
-        feature_default: Vec.new(),
-        feature_names: Vec.new(),
-        feature_values: Vec.new(),
+        link_libs: List.new(),
+        link_search_paths: List.new(),
+        link_rpaths: List.new(),
+        dep_link_libs: List.new(),
+        dep_link_args: List.new(),
+        dep_loaded: List.new(),
+        dep_names: List.new(),
+        dep_constraints: List.new(),
+        c_dep_metadata_names: List.new(),
+        manual_c_dep_names: List.new(),
+        feature_default: List.new(),
+        feature_names: List.new(),
+        feature_values: List.new(),
         target_default: "",
         runtime_fiber_stack_size: 0,
         runtime_fiber_pool_size: 0,
@@ -80,8 +80,8 @@ fn project_config_clone_str(s: &str) -> str:
         return ""
     runtime_str_clone(s)
 
-fn project_config_clone_str_vec(values: &Vec[str]) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn project_config_clone_str_list(values: &List[str]) -> List[str]:
+    let out: List[str] = List.new()
     for i in 0..values.len() as i32:
         out.push(project_config_clone_str(values[i]))
     out
@@ -93,22 +93,22 @@ pub fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
         manifest_error: project_config_clone_str(cfg.manifest_error),
         package_name: project_config_clone_str(cfg.package_name),
         package_version: project_config_clone_str(cfg.package_version),
-        c_import_include_paths: project_config_clone_str_vec(&cfg.c_import_include_paths),
-        c_import_defines: project_config_clone_str_vec(&cfg.c_import_defines),
+        c_import_include_paths: project_config_clone_str_list(&cfg.c_import_include_paths),
+        c_import_defines: project_config_clone_str_list(&cfg.c_import_defines),
         c_import_sdk_path: project_config_clone_str(cfg.c_import_sdk_path),
-        link_libs: project_config_clone_str_vec(&cfg.link_libs),
-        link_search_paths: project_config_clone_str_vec(&cfg.link_search_paths),
-        link_rpaths: project_config_clone_str_vec(&cfg.link_rpaths),
-        dep_link_libs: project_config_clone_str_vec(&cfg.dep_link_libs),
-        dep_link_args: project_config_clone_str_vec(&cfg.dep_link_args),
-        dep_loaded: project_config_clone_str_vec(&cfg.dep_loaded),
-        dep_names: project_config_clone_str_vec(&cfg.dep_names),
-        dep_constraints: project_config_clone_str_vec(&cfg.dep_constraints),
-        c_dep_metadata_names: project_config_clone_str_vec(&cfg.c_dep_metadata_names),
-        manual_c_dep_names: project_config_clone_str_vec(&cfg.manual_c_dep_names),
-        feature_default: project_config_clone_str_vec(&cfg.feature_default),
-        feature_names: project_config_clone_str_vec(&cfg.feature_names),
-        feature_values: project_config_clone_str_vec(&cfg.feature_values),
+        link_libs: project_config_clone_str_list(&cfg.link_libs),
+        link_search_paths: project_config_clone_str_list(&cfg.link_search_paths),
+        link_rpaths: project_config_clone_str_list(&cfg.link_rpaths),
+        dep_link_libs: project_config_clone_str_list(&cfg.dep_link_libs),
+        dep_link_args: project_config_clone_str_list(&cfg.dep_link_args),
+        dep_loaded: project_config_clone_str_list(&cfg.dep_loaded),
+        dep_names: project_config_clone_str_list(&cfg.dep_names),
+        dep_constraints: project_config_clone_str_list(&cfg.dep_constraints),
+        c_dep_metadata_names: project_config_clone_str_list(&cfg.c_dep_metadata_names),
+        manual_c_dep_names: project_config_clone_str_list(&cfg.manual_c_dep_names),
+        feature_default: project_config_clone_str_list(&cfg.feature_default),
+        feature_names: project_config_clone_str_list(&cfg.feature_names),
+        feature_values: project_config_clone_str_list(&cfg.feature_values),
         target_default: project_config_clone_str(cfg.target_default),
         runtime_fiber_stack_size: cfg.runtime_fiber_stack_size,
         runtime_fiber_pool_size: cfg.runtime_fiber_pool_size,
@@ -311,11 +311,11 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: &str, key: &str, valu
                 // C package dependency: c.sqlite3 = "3.45"
                 let pkg_name = key.slice(2, key.len())
                 if pkg_name.len() > 0:
-                    if project_config_vec_contains(out.manual_c_dep_names, pkg_name):
+                    if project_config_list_contains(out.manual_c_dep_names, pkg_name):
                         if out.manifest_error.len() == 0:
                             out.manifest_error = "dependency c." ++ pkg_name ++ " is declared both as a Conan dependency and a manual [deps.c." ++ pkg_name ++ "] table"
                     else:
-                        if not project_config_vec_contains(out.c_dep_metadata_names, pkg_name):
+                        if not project_config_list_contains(out.c_dep_metadata_names, pkg_name):
                             out.c_dep_metadata_names.push(with_str_clone_ref(pkg_name))
                         out = project_config_load_dep_metadata(move out, pkg_name, constraint)
             else if out.manifest_error.len() == 0:
@@ -324,10 +324,10 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: &str, key: &str, valu
 
 fn project_config_apply_manual_c_dep_entry(cfg: ProjectConfig, dep_name: &str, key: &str, value: &str) -> ProjectConfig:
     var out = cfg
-    if project_config_vec_contains(out.c_dep_metadata_names, dep_name):
+    if project_config_list_contains(out.c_dep_metadata_names, dep_name):
         if out.manifest_error.len() == 0:
             out.manifest_error = "dependency c." ++ dep_name ++ " is declared both as a Conan dependency and a manual [deps.c." ++ dep_name ++ "] table"
-    if not project_config_vec_contains(out.manual_c_dep_names, dep_name):
+    if not project_config_list_contains(out.manual_c_dep_names, dep_name):
         // Manual C deps are local manifest inputs, not fetched artifacts.
         out.manual_c_dep_names.push(with_str_clone_ref(dep_name))
     if key == "include":
@@ -402,7 +402,7 @@ fn project_config_parse_nonnegative_i64(value: &str) -> i64:
         out = out * 10 + (ch - 48) as i64
     out
 
-fn project_config_vec_contains(values: &Vec[str], needle: &str) -> bool:
+fn project_config_list_contains(values: &List[str], needle: &str) -> bool:
     for i in 0..values.len() as i32:
         if values[i] == needle:
             return true
@@ -439,7 +439,7 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
             out.manifest_error = "missing metadata for dependency c." ++ name ++ "@" ++ version ++ " at " ++ meta_path ++ "; run 'with get c." ++ name ++ "@" ++ version ++ "'"
         return out
     let package_key = name ++ "/" ++ version
-    if not project_config_vec_contains(&out.dep_loaded, package_key):
+    if not project_config_list_contains(&out.dep_loaded, package_key):
         out.dep_loaded.push(package_key.clone())
         // What c_import reads, and the framework stubs `with get` wrote for
         // this package (#1915, compiler.FrameworkStubs), relative to it.
@@ -453,23 +453,23 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
         for i in 0..framework_paths.len() as i32:
             out.dep_link_args.push("-F" ++ dep_dir ++ "/" ++ framework_paths[i])
     let components = project_config_json_str_array(meta, "components")
-    var wanted: Vec[str] = Vec.new()
+    var wanted: List[str] = List.new()
     if components.len() == 0: wanted.push("")
-    else if component.len() > 0 and project_config_vec_contains(&components, component): wanted.push(component.to_owned())
+    else if component.len() > 0 and project_config_list_contains(&components, component): wanted.push(component.to_owned())
     else:
         for i in 0..components.len() as i32: wanted.push(with_str_clone_ref(components[i]))
     for wi in 0..wanted.len() as i32:
         let key = package_key ++ ":" ++ wanted[wi]
-        if project_config_vec_contains(&out.dep_loaded, key): continue
+        if project_config_list_contains(&out.dep_loaded, key): continue
         out.dep_loaded.push(key)
         let suffix = if wanted[wi].len() == 0: "" else: ":" ++ wanted[wi]
         let lib_paths = project_config_json_str_array(meta, "lib_paths" ++ suffix)
         for i in 0..lib_paths.len() as i32:
             let path = dep_dir ++ "/" ++ lib_paths[i]
-            if not project_config_vec_contains(&out.link_search_paths, path): out.link_search_paths.push(path)
+            if not project_config_list_contains(&out.link_search_paths, path): out.link_search_paths.push(path)
         let libs = project_config_json_str_array(meta, "libs" ++ suffix)
         for i in 0..libs.len() as i32:
-            if not project_config_vec_contains(&out.dep_link_libs, libs[i]): out.dep_link_libs.push(with_str_clone_ref(libs[i]))
+            if not project_config_list_contains(&out.dep_link_libs, libs[i]): out.dep_link_libs.push(with_str_clone_ref(libs[i]))
         let link_args = project_config_json_str_array(meta, "link_args" ++ suffix)
         for i in 0..link_args.len() as i32:
             out.dep_link_args.push(with_str_clone_ref(link_args[i]))
@@ -488,9 +488,9 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
             out = project_config_load_dep_component(move out, req_name, req_version, req_component)
     out
 
-pub fn project_config_json_str_array(json: &str, key: &str) -> Vec[str]:
+pub fn project_config_json_str_array(json: &str, key: &str) -> List[str]:
     // Simple JSON array extractor: find "key": [...] and extract string values.
-    var result: Vec[str] = Vec.new()
+    var result: List[str] = List.new()
     let needle = "\"" ++ key ++ "\""
     let json_len = json.len() as i32
     var pos = 0
@@ -596,15 +596,15 @@ fn project_config_value_complete(value: &str) -> bool:
     // Bare values are complete
     true
 
-fn project_config_parse_path_array(value: &str, root_dir: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn project_config_parse_path_array(value: &str, root_dir: &str) -> List[str]:
+    let out: List[str] = List.new()
     let entries = project_config_parse_string_array(value)
     for i in 0..entries.len() as i32:
         out.push(project_config_resolve_path(root_dir, entries[i]))
     out
 
-fn project_config_parse_string_array(value: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn project_config_parse_string_array(value: &str) -> List[str]:
+    let out: List[str] = List.new()
     var i = 0
     let total = value.len() as i32
     while i < total:

@@ -7,7 +7,7 @@
 // parameter (success with a handle, failure with none, failure that still
 // produced a handle — its Drop destroys it — success without one, a void
 // producer), and in place (the pinned cell freed after its destroyer). Values
-// move through a Vec, a function argument and a return.
+// move through a List, a function argument and a return.
 use c_import("void *malloc(unsigned long size);
 void free(void *p);
 typedef struct db { int tag; } db;
@@ -44,7 +44,7 @@ fn opened(mode: c_int) -> Option[Database]:
     d
 
 fn main:
-    var v: Vec[Database] = Vec.new()
+    var v: List[Database] = List.new()
     v.push(Database.new(1).unwrap())
     let none = Database.new(-1)
     for mode in 0..4:
@@ -56,7 +56,7 @@ fn main:
     let made = Database.make(1)
     let nothing = Database.make(0)
     let (_, s) = Stream.init(4)
-    var cells: Vec[Stream] = Vec.new()
+    var cells: List[Stream] = List.new()
     cells.push(s)
     let (_, t) = Stream.init(2)
     let moved = move t

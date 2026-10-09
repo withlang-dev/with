@@ -18,8 +18,8 @@ async fn struct_across(slot: *mut i32) -> i32:
     consume(r)
     x
 
-async fn vec_across(slot: *mut i32) -> i32:
-    var v: Vec[Resource] = Vec.new()
+async fn list_across(slot: *mut i32) -> i32:
+    var v: List[Resource] = List.new()
     v.push(Resource { id: 1, slot })
     v.push(Resource { id: 1, slot })
     let x = ping().await
@@ -28,7 +28,7 @@ async fn vec_across(slot: *mut i32) -> i32:
 async fn main:
     var drops = 0
     let a = struct_across(&raw mut drops).await
-    let b = vec_across(&raw mut drops).await
+    let b = list_across(&raw mut drops).await
     assert(a == 1)
     assert(b == 2)
     assert(drops == 3)

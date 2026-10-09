@@ -3,7 +3,7 @@
 use std.alloc
 
 type Holder {
-    xs: ArenaVec[i32],
+    xs: ArenaList[i32],
 }
 
 fn main:

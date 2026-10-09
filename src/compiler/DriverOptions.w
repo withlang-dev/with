@@ -40,19 +40,19 @@ pub type BuildCommandOptions {
     strict_effects: bool,
     target_kind: i32,
     target_explicit: bool,
-    include_paths: Vec[str],
-    defines: Vec[str],
-    link_libs: Vec[str],
-    link_search_paths: Vec[str],
-    link_rpaths: Vec[str],
+    include_paths: List[str],
+    defines: List[str],
+    link_libs: List[str],
+    link_search_paths: List[str],
+    link_rpaths: List[str],
     // D38: extra objects handed straight to the link (`--link-object <path>`,
     // repeatable) — how build.w gives a stage link its .wo bundle objects.
-    link_objects: Vec[str],
+    link_objects: List[str],
     // D39: `--link-bundle <prefix>` (repeatable): `<prefix>.o` joins the link,
     // `<prefix>.manifest` names the modules codegen declares only, and
     // `<prefix>.wi` is the interface the resolver reads for them — how a
     // compiler with an empty embedded index (stage1) links a bundle.
-    link_bundles: Vec[str],
+    link_bundles: List[str],
     // D38: with --emit-obj, also write the .wo bundle manifest here
     // (`--emit-bundle-manifest <path>`): the compiler's abi-sha, the target,
     // and one link-name prefix per module compiled into the object.
@@ -89,10 +89,10 @@ pub type TestCommandOptions {
 pub type MigrateCommandOptions {
     source_path: str,
     output_path: str,
-    include_paths: Vec[str],
-    forced_includes: Vec[str],
-    defines: Vec[str],
-    exclude_basenames: Vec[str],
+    include_paths: List[str],
+    forced_includes: List[str],
+    defines: List[str],
+    exclude_basenames: List[str],
     check_mode: bool,
     diff_mode: bool,
     stats_mode: bool,
@@ -136,13 +136,13 @@ pub fn build_command_options_default -> BuildCommandOptions:
         strict_effects: false,
         target_kind: 0,
         target_explicit: false,
-        include_paths: Vec.new(),
-        defines: Vec.new(),
-        link_libs: Vec.new(),
-        link_search_paths: Vec.new(),
-        link_rpaths: Vec.new(),
-        link_objects: Vec.new(),
-        link_bundles: Vec.new(),
+        include_paths: List.new(),
+        defines: List.new(),
+        link_libs: List.new(),
+        link_search_paths: List.new(),
+        link_rpaths: List.new(),
+        link_objects: List.new(),
+        link_bundles: List.new(),
         bundle_manifest_path: "",
         bundle_interface_path: "",
         bundle_fingerprint_path: "",
@@ -155,8 +155,8 @@ pub fn driver_clone_str(s: &str) -> str:
         return ""
     with_str_clone_ref(s)
 
-pub fn driver_clone_str_vec(values: &Vec[str]) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn driver_clone_str_list(values: &List[str]) -> List[str]:
+    let out: List[str] = List.new()
     for i in 0..values.len() as i32:
         out.push(driver_clone_str(values[i]))
     out
@@ -177,13 +177,13 @@ pub fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOp
         strict_effects: base.strict_effects,
         target_kind: base.target_kind,
         target_explicit: base.target_explicit,
-        include_paths: driver_clone_str_vec(&base.include_paths),
-        defines: driver_clone_str_vec(&base.defines),
-        link_libs: driver_clone_str_vec(&base.link_libs),
-        link_search_paths: driver_clone_str_vec(&base.link_search_paths),
-        link_rpaths: driver_clone_str_vec(&base.link_rpaths),
-        link_objects: driver_clone_str_vec(&base.link_objects),
-        link_bundles: driver_clone_str_vec(&base.link_bundles),
+        include_paths: driver_clone_str_list(&base.include_paths),
+        defines: driver_clone_str_list(&base.defines),
+        link_libs: driver_clone_str_list(&base.link_libs),
+        link_search_paths: driver_clone_str_list(&base.link_search_paths),
+        link_rpaths: driver_clone_str_list(&base.link_rpaths),
+        link_objects: driver_clone_str_list(&base.link_objects),
+        link_bundles: driver_clone_str_list(&base.link_bundles),
         bundle_manifest_path: with_str_clone_ref(base.bundle_manifest_path),
         bundle_interface_path: with_str_clone_ref(base.bundle_interface_path),
         bundle_fingerprint_path: with_str_clone_ref(base.bundle_fingerprint_path),
@@ -205,10 +205,10 @@ pub fn migrate_command_options_default -> MigrateCommandOptions:
     MigrateCommandOptions {
         source_path: "",
         output_path: "",
-        include_paths: Vec.new(),
-        forced_includes: Vec.new(),
-        defines: Vec.new(),
-        exclude_basenames: Vec.new(),
+        include_paths: List.new(),
+        forced_includes: List.new(),
+        defines: List.new(),
+        exclude_basenames: List.new(),
         check_mode: false,
         diff_mode: false,
         stats_mode: false,
@@ -240,8 +240,8 @@ fn driver_has_flag(argc: i32, flag: &str) -> bool:
     false
 
 // Every value following an occurrence of `flag` (`--flag a --flag b` → [a, b]).
-fn driver_flag_values(argc: i32, flag: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn driver_flag_values(argc: i32, flag: &str) -> List[str]:
+    let out: List[str] = List.new()
     var i = 1
     while i + 1 < argc:
         if with_arg_at(i) == flag:
@@ -253,7 +253,7 @@ fn driver_flag_values(argc: i32, flag: &str) -> Vec[str]:
 
 // D39: `--link-bundle <prefix>` values, for every command that compiles
 // (build, check, analyze).
-pub fn driver_link_bundle_args(argc: i32) -> Vec[str]:
+pub fn driver_link_bundle_args(argc: i32) -> List[str]:
     driver_flag_values(argc, "--link-bundle")
 
 fn driver_first_flag_value(argc: i32, flag: &str) -> str:

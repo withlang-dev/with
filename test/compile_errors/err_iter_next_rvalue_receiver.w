@@ -5,10 +5,10 @@
 // iterator (`var iter = items.iter()`) to advance it.
 
 type Inner {
-    tags: Vec[i32],
+    tags: List[i32],
 }
 
 fn main:
-    var items: Vec[Inner] = Vec.new()
-    items.push(Inner { tags: Vec.new() })
+    var items: List[Inner] = List.new()
+    items.push(Inner { tags: List.new() })
     items.iter().next().unwrap().tags.push(3)

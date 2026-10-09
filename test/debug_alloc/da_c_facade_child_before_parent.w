@@ -4,7 +4,7 @@
 // malloc and free is in the ledger: a statement never finalized is a LEAK,
 // one finalized twice a DOUBLE FREE. A statement depends on its database,
 // so it is finalized before the database closes on every path — scope end,
-// early return, `?`, a loop's break, a Vec of statements, an Option, a
+// early return, `?`, a loop's break, a List of statements, an Option, a
 // helper that borrows the database — and a finalize reads its database
 // (which a closed database marks, logging 9999). The order is asserted, so
 // a late finalize fails the lane even without scribble.
@@ -79,7 +79,7 @@ fn main:
     check_order(l, 1)
     if true:
         let db = Database.new(l, 5).unwrap()
-        var all: Vec[Statement] = Vec.new()
+        var all: List[Statement] = List.new()
         for i in 1..4:
             all.push(Statement.new(db, 50 + i).unwrap())
         assert(all.len() == 3)

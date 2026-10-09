@@ -1,13 +1,13 @@
 //! expect-stdout: ok
 
-// [A5] #607: sound borrow-iteration over a Vec[Drop], both `for w in &xs` / `for w in
+// [A5] #607: sound borrow-iteration over a List[Drop], both `for w in &xs` / `for w in
 // &h.field` and the underlying `.iter_ref()` form. The loop variable is `&W` (each
 // element borrowed via VEC_GET_REF — no copy, no move), so:
-//   - under-fire/soundness: each element drops EXACTLY once (the Vec's own drop),
+//   - under-fire/soundness: each element drops EXACTLY once (the List's own drop),
 //     never double (copy-then-drop) and never leaked;
-//   - over-fire guard: borrowing does NOT consume the Vec, so it stays usable after
-//     the loop and drops normally; non-Drop Vec iteration is unchanged.
-// Floor-blind on both directions (no other Vec[Drop] on the floor), and single-field
+//   - over-fire guard: borrowing does NOT consume the List, so it stays usable after
+//     the loop and drops normally; non-Drop List iteration is unchanged.
+// Floor-blind on both directions (no other List[Drop] on the floor), and single-field
 // / owner_receiver greens don't catch field-vs-local — hence multi-element AND a
 // field receiver here. Consuming `for w in xs` is intentionally NOT exercised (#607).
 
@@ -19,10 +19,10 @@ impl Drop for W:
     fn drop(move self: Self):
         DROPS = DROPS + 1
 
-type H { items: Vec[W] }
+type H { items: List[W] }
 
-fn mk(a: i32, b: i32, c: i32) -> Vec[W]:
-    let v: Vec[W] = Vec.new()
+fn mk(a: i32, b: i32, c: i32) -> List[W]:
+    let v: List[W] = List.new()
     v.push(W { tag: a })
     v.push(W { tag: b })
     v.push(W { tag: c })
@@ -30,7 +30,7 @@ fn mk(a: i32, b: i32, c: i32) -> Vec[W]:
 
 // `for w in &xs` over a local: read fields through &W; xs still usable afterwards.
 fn local_amp() -> i32:
-    let xs: Vec[W] = mk(1, 2, 3)
+    let xs: List[W] = mk(1, 2, 3)
     var s = 0
     for w in &xs:
         s = s + w.tag
@@ -53,9 +53,9 @@ fn field_iter_ref() -> i32:
         s = s + w.tag
     s
 
-// Non-Drop Vec iteration must be unchanged (by-value, POD elements).
+// Non-Drop List iteration must be unchanged (by-value, POD elements).
 fn pod_iter() -> i32:
-    let ns: Vec[i32] = Vec.new()
+    let ns: List[i32] = List.new()
     ns.push(4)
     ns.push(5)
     var s = 0

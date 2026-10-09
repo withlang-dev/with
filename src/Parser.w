@@ -24,7 +24,7 @@ fn parser_active_arch() -> str:
 
 // The variants of `Target.os` or `Target.arch` (std.os's OsKind and
 // ArchKind), and the active target's, by the names those enums use.
-fn parser_target_variants(field: &str) -> Vec[str]: if field == "os": target_spec_os_kinds() else: target_spec_arch_kinds()
+fn parser_target_variants(field: &str) -> List[str]: if field == "os": target_spec_os_kinds() else: target_spec_arch_kinds()
 fn parser_target_enum(field: &str): if field == "os": "OsKind" else: "ArchKind"
 fn parser_target_variant_list(field: &str): [f".{v}" for v in parser_target_variants(field)].join(", ")
 fn parser_active_target(field: &str): if field == "os": target_spec_os() else: target_spec_arch_kind()
@@ -81,11 +81,11 @@ pub type Parser {
     pending_callconv: i32,
     pending_stack_size: i32,
     pending_target: i32,
-    pending_effect_params: Vec[i32],
-    pending_effect_bits: Vec[i32],
+    pending_effect_params: List[i32],
+    pending_effect_bits: List[i32],
     pending_compiler_hook_phase: i32,
-    pending_comptime_with_names: Vec[i32],
-    pending_comptime_with_types: Vec[i32],
+    pending_comptime_with_names: List[i32],
+    pending_comptime_with_types: List[i32],
     // D7 eliminate-self: receiver mode for the next method's synthetic `self`
     // (0 none, 1 read `self: &Self`, 2 `mut self: Self`, 3 `move self: Self`).
     pending_receiver_mode: i32,
@@ -101,11 +101,11 @@ pub type Parser {
     last_where_count: i32,
     if_chain_form: i32,
     suppress_fat_arrow_closure: i32,
-    pending_post_decls: Vec[i32],
+    pending_post_decls: List[i32],
     implicit_main_mode: i32,
     implicit_main_has_main_hint: i32,
     implicit_main_has_exec_stmt: i32,
-    top_level_stmts: Vec[i32],
+    top_level_stmts: List[i32],
     explicit_main_decl: i32,
     // §18.5b (D74): the imported module this parse is of, "" for an entry
     // source. A module file holds declarations; a statement at its top
@@ -127,9 +127,9 @@ pub type Parser {
 // flat `name, payload_count, payload_type...` records plus each name's span.
 type EnumVariantList {
     count: i32,
-    records: Vec[i32],
-    name_starts: Vec[i32],
-    name_ends: Vec[i32],
+    records: List[i32],
+    name_starts: List[i32],
+    name_ends: List[i32],
 }
 
 type InterpolatedExprParseAttempt {
@@ -199,11 +199,11 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         pending_callconv: 0,
         pending_stack_size: 0,
         pending_target: 0,
-        pending_effect_params: Vec.new(),
-        pending_effect_bits: Vec.new(),
+        pending_effect_params: List.new(),
+        pending_effect_bits: List.new(),
         pending_compiler_hook_phase: 0,
-        pending_comptime_with_names: Vec.new(),
-        pending_comptime_with_types: Vec.new(),
+        pending_comptime_with_names: List.new(),
+        pending_comptime_with_types: List.new(),
         pending_receiver_mode: 0,
         synth_recv_type: 0,
         pending_unsafe_fn: 0,
@@ -217,11 +217,11 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         last_where_count: 0,
         if_chain_form: 0,
         suppress_fat_arrow_closure: 0,
-        pending_post_decls: Vec.new(),
+        pending_post_decls: List.new(),
         implicit_main_mode: 0,
         implicit_main_has_main_hint: 0,
         implicit_main_has_exec_stmt: 0,
-        top_level_stmts: Vec.new(),
+        top_level_stmts: List.new(),
         explicit_main_decl: 0,
         module_label: "",
         interface_mode: 0,
@@ -508,16 +508,10 @@ impl Parser:
         self.emit_error("expected identifier")
         0
 
-    // D118 step (a), transitional: the identifier `List` interns as `Vec`, so
-    // the seed cut from this compiler accepts the new name everywhere the old
-    // one is special-cased. Step (c) makes `List` the type's own name and
-    // deletes this (#2296).
     fn intern_current() -> i32:
         let s = self.current_start()
         let e = self.current_end()
         let text = self.source.slice(s as i64, e as i64)
-        if text == "List":
-            return self.intern.intern("Vec")
         self.intern.intern(text)
 
     fn is_ident_named(name: &str) -> bool:
@@ -705,11 +699,11 @@ impl Parser:
         self.pending_callconv = 0
         self.pending_stack_size = 0
         self.pending_target = 0
-        self.pending_effect_params = Vec.new()
-        self.pending_effect_bits = Vec.new()
+        self.pending_effect_params = List.new()
+        self.pending_effect_bits = List.new()
         self.pending_iter_of_self = 0
         self.pending_compiler_hook_phase = 0
-        var derive_syms: Vec[i32] = Vec.new()
+        var derive_syms: List[i32] = List.new()
 
         while self.peek() == TokenKind.TK_AT:
             let saved = self.pos
@@ -1003,7 +997,7 @@ impl Parser:
 
     mut fn parse_module() -> AstPool:
         self.skip_separators()
-        self.top_level_stmts = Vec.new()
+        self.top_level_stmts = List.new()
         self.explicit_main_decl = 0
 
         // The optional module declaration: its last segment is the module's
@@ -1234,7 +1228,7 @@ impl Parser:
             self.emit_error("a comptime match needs its arms indented below it")
             return
         let active = parser_active_target(field)
-        var named: Vec[str] = Vec.new()
+        var named: List[str] = List.new()
         var wildcard = false
         var decided = false
         while self.peek() != TokenKind.TK_EOF and column_of(self.source, self.current_start()) == arm_col:
@@ -1260,7 +1254,7 @@ impl Parser:
             if taken: decided = true
             self.skip_newlines()
         if not wildcard:
-            var missing: Vec[str] = Vec.new()
+            var missing: List[str] = List.new()
             for variant in parser_target_variants(field):
                 if not named.contains(variant): missing.push(f".{variant}")
             if missing.len() > 0:
@@ -1299,7 +1293,7 @@ impl Parser:
             self.parse_top_level_item()
         if not taken:
             self.pool.truncate_decls(decl_start)
-            self.pending_post_decls = Vec.new()
+            self.pending_post_decls = List.new()
             self.explicit_main_decl = main_before
             while self.top_level_stmts.len() as i32 > stmts_before: let _ = self.top_level_stmts.pop()
 
@@ -1308,8 +1302,8 @@ impl Parser:
     mut fn attach_pending_effect_pins(fn_node: NodeId):
         for i in 0..self.pending_effect_params.len() as i32:
             self.pool.add_fn_effect_pin(fn_node, self.pending_effect_params[i], self.pending_effect_bits[i])
-        self.pending_effect_params = Vec.new()
-        self.pending_effect_bits = Vec.new()
+        self.pending_effect_params = List.new()
+        self.pending_effect_bits = List.new()
 
     // §21.1 rule 1 (D39, Eric 2026-09-29): `writes COUNTER, other.TOTAL`,
     // a function's declared global write set — a checked contract, the same
@@ -1324,7 +1318,7 @@ impl Parser:
     // The entries return as (qualifier sym or 0, name sym) pairs, held by
     // the declaration's parse until its node exists (attach_global_writes):
     // a nested `fn` in the body parses clauses of its own in between.
-    mut fn parse_optional_writes_clause() -> Vec[i32]: self.parse_optional_name_clause("writes", "a global's name")
+    mut fn parse_optional_writes_clause() -> List[i32]: self.parse_optional_name_clause("writes", "a global's name")
 
     // §21.1 rule 6 (#1903, Eric 2026-10-03): `-> &T from p, other.G`, the
     // origins of a returned view — a parameter (`self` for the receiver) or
@@ -1333,11 +1327,11 @@ impl Parser:
     // it opens the clause only when a name follows. Sema checks the clause
     // against the body (check_declared_view_origins); entries are
     // (qualifier sym or 0, name sym) pairs (attach_view_origins).
-    mut fn parse_optional_from_clause() -> Vec[i32]: self.parse_optional_name_clause("from", "a parameter's or a global's name")
+    mut fn parse_optional_from_clause() -> List[i32]: self.parse_optional_name_clause("from", "a parameter's or a global's name")
 
     // A contextual clause `<word> NAME, ns.NAME, ...` (`writes`, `from`).
-    mut fn parse_optional_name_clause(word: &str, what: &str) -> Vec[i32]:
-        var out: Vec[i32] = Vec.new()
+    mut fn parse_optional_name_clause(word: &str, what: &str) -> List[i32]:
+        var out: List[i32] = List.new()
         if not self.is_ident_named(word):
             return out
         if self.pos + 1 >= self.tokens.len() or self.tokens.get_tag(self.pos + 1) != TokenKind.TK_IDENT:
@@ -1347,7 +1341,7 @@ impl Parser:
             if self.peek() != TokenKind.TK_IDENT:
                 self.emit_error(f"expected {what} in the `{word}` clause")
                 return out
-            var segments: Vec[str] = Vec.new()
+            var segments: List[str] = List.new()
             segments.push(self.source.slice(self.current_start() as i64, self.current_end() as i64))
             self.advance()
             while true:
@@ -1372,14 +1366,14 @@ impl Parser:
 
     // The clause's entries onto the declaration (Ast.add_fn_global_write),
     // read by Sema (resolve_declared_global_writes) and the bundle emitter.
-    mut fn attach_global_writes(fn_node: NodeId, writes: &Vec[i32]):
+    mut fn attach_global_writes(fn_node: NodeId, writes: &List[i32]):
         var wi = 0
         while wi + 1 < writes.len() as i32:
             self.pool.add_fn_global_write(fn_node, writes[wi], writes[wi + 1])
             wi = wi + 2
 
     // The `from` clause's entries onto the declaration (Ast.add_fn_view_origin).
-    mut fn attach_view_origins(fn_node: NodeId, origins: &Vec[i32]):
+    mut fn attach_view_origins(fn_node: NodeId, origins: &List[i32]):
         var oi = 0
         while oi + 1 < origins.len() as i32:
             self.pool.add_fn_view_origin(fn_node, origins[oi], origins[oi + 1])
@@ -1412,8 +1406,8 @@ impl Parser:
            t != TokenKind.TK_KW_FN and t != TokenKind.TK_KW_UNSAFE and t != TokenKind.TK_KW_COMPTIME and
            t != TokenKind.TK_KW_ASYNC and t != TokenKind.TK_KW_GEN and t != TokenKind.TK_KW_EXTERN:
             self.emit_error("effect attribute can only be used on functions and extern functions")
-            self.pending_effect_params = Vec.new()
-            self.pending_effect_bits = Vec.new()
+            self.pending_effect_params = List.new()
+            self.pending_effect_bits = List.new()
         if t == TokenKind.TK_KW_FN:
             return self.parse_fn_decl(is_pub, start, 0, 0, 0)
         if t == TokenKind.TK_KW_UNSAFE:
@@ -1495,8 +1489,8 @@ impl Parser:
         false
 
     mut fn clear_pending_comptime_with_params():
-        self.pending_comptime_with_names = Vec.new()
-        self.pending_comptime_with_types = Vec.new()
+        self.pending_comptime_with_names = List.new()
+        self.pending_comptime_with_types = List.new()
 
     mut fn parse_comptime_with_clause() -> i32:
         if self.expect(TokenKind.TK_KW_WITH) == 0:
@@ -1558,7 +1552,7 @@ impl Parser:
     mut fn flush_pending_post_decls():
         for i in 0..self.pending_post_decls.len() as i32:
             self.pool.add_decl((self.pending_post_decls[i]) as NodeId)
-        self.pending_post_decls = Vec.new()
+        self.pending_post_decls = List.new()
 
     mut fn mark_decl_comptime(decl: NodeId):
         if decl == 0:
@@ -1814,8 +1808,8 @@ impl Parser:
             let ev_type = self.parse_type_expr()
             if self.pending_effect_params.len() > 0:
                 self.emit_error("effect attribute can only be used on functions and extern functions")
-                self.pending_effect_params = Vec.new()
-                self.pending_effect_bits = Vec.new()
+                self.pending_effect_params = List.new()
+                self.pending_effect_bits = List.new()
             return self.pool.add_node(NodeKind.NK_EXTERN_VAR, start, self.prev_end(), ev_name, ev_type, is_mut)
         if self.expect(TokenKind.TK_KW_FN) == 0:
             return self.poisoned_expr()
@@ -2207,8 +2201,8 @@ impl Parser:
     mut fn parse_struct_body() -> i32:
         self.advance()  // consume {
         self.skip_newlines()
-        var fields: Vec[i32] = Vec.new()
-        var aligns: Vec[i32] = Vec.new()
+        var fields: List[i32] = List.new()
+        var aligns: List[i32] = List.new()
         var field_count = 0
 
         while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
@@ -2270,8 +2264,8 @@ impl Parser:
         extra_start
 
     mut fn parse_struct_body_block() -> i32:
-        var fields: Vec[i32] = Vec.new()
-        var aligns: Vec[i32] = Vec.new()
+        var fields: List[i32] = List.new()
+        var aligns: List[i32] = List.new()
         var field_count = 0
         var field_col = -1
 
@@ -2369,7 +2363,7 @@ impl Parser:
 
     // Writes the enum-variant extras block: the count, then each variant's
     // `name, payload_count, payload_type...` record.
-    mut fn add_enum_variant_extras(count: i32, records: &Vec[i32]) -> i32:
+    mut fn add_enum_variant_extras(count: i32, records: &List[i32]) -> i32:
         let extra_start = self.pool.extra_len()
         self.pool.add_extra(count)
         for vi in 0..records.len() as i32:
@@ -2379,9 +2373,9 @@ impl Parser:
     // Parses `| A | B(payload, ...)` variants without writing extras, so an
     // `error E from X =` declaration can put its generated wrappers first (D57).
     mut fn parse_enum_variant_list() -> EnumVariantList:
-        var variants: Vec[i32] = Vec.new()
-        var name_starts: Vec[i32] = Vec.new()
-        var name_ends: Vec[i32] = Vec.new()
+        var variants: List[i32] = List.new()
+        var name_starts: List[i32] = List.new()
+        var name_ends: List[i32] = List.new()
         var variant_count = 0
 
         if self.peek() == TokenKind.TK_PIPE:
@@ -2392,7 +2386,7 @@ impl Parser:
             name_starts.push(self.current_start())
             name_ends.push(self.current_end())
             let vname = self.expect_ident()
-            var payloads: Vec[i32] = Vec.new()
+            var payloads: List[i32] = List.new()
 
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
@@ -2439,7 +2433,7 @@ impl Parser:
     // pcount, payloads...)*], `pending_inferred_disc_repr` recording the
     // synthesized backing so the caller marks the declaration a disc enum;
     // any other is the plain ADT format [count, (name, pcount, payloads...)*].
-    mut fn add_backingless_enum_extras(as_disc: bool, synth_pos: i32, names: &Vec[i32], discs: &Vec[i32], pcounts: &Vec[i32], payloads_flat: &Vec[i32]) -> i32:
+    mut fn add_backingless_enum_extras(as_disc: bool, synth_pos: i32, names: &List[i32], discs: &List[i32], pcounts: &List[i32], payloads_flat: &List[i32]) -> i32:
         var i32_repr = 0
         if as_disc:
             i32_repr = self.pool.add_node(NodeKind.NK_TYPE_NAMED, synth_pos, self.prev_end(), self.intern.intern("i32"), 0, 0) as i32
@@ -2468,10 +2462,10 @@ impl Parser:
         let synth_pos = self.current_start()
         self.advance()
         self.skip_newlines()
-        var names: Vec[i32] = Vec.new()
-        var discs: Vec[i32] = Vec.new()
-        var pcounts: Vec[i32] = Vec.new()
-        var payloads_flat: Vec[i32] = Vec.new()
+        var names: List[i32] = List.new()
+        var discs: List[i32] = List.new()
+        var pcounts: List[i32] = List.new()
+        var payloads_flat: List[i32] = List.new()
         var has_payload = false
         var has_disc = false
 
@@ -2536,10 +2530,10 @@ impl Parser:
         // stays a plain ADT enum.
         self.pending_inferred_disc_repr = 0
         let synth_pos = self.current_start()
-        var names: Vec[i32] = Vec.new()
-        var discs: Vec[i32] = Vec.new()
-        var pcounts: Vec[i32] = Vec.new()
-        var payloads_flat: Vec[i32] = Vec.new()
+        var names: List[i32] = List.new()
+        var discs: List[i32] = List.new()
+        var pcounts: List[i32] = List.new()
+        var payloads_flat: List[i32] = List.new()
         var variant_col = -1
         var has_payload = false
         var has_disc = false
@@ -2620,7 +2614,7 @@ impl Parser:
         self.pool.add_node(NodeKind.NK_UNARY, start, self.prev_end(), UnaryOp.UOP_NEGATE, lit as i32, 0) as i32
 
     mut fn parse_disc_enum_variants(repr_type_node: i32) -> i32:
-        var variants: Vec[i32] = Vec.new()
+        var variants: List[i32] = List.new()
         var variant_count = 0
 
         if self.peek() == TokenKind.TK_PIPE:
@@ -2631,7 +2625,7 @@ impl Parser:
             let vname = self.expect_ident()
 
             // Optional payload
-            var payloads: Vec[i32] = Vec.new()
+            var payloads: List[i32] = List.new()
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
                 while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
@@ -2688,7 +2682,7 @@ impl Parser:
     mut fn parse_disc_enum_variants_braced(repr_type_node: i32) -> i32:
         self.advance()
         self.skip_newlines()
-        var variants: Vec[i32] = Vec.new()
+        var variants: List[i32] = List.new()
         var variant_count = 0
 
         while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
@@ -2699,7 +2693,7 @@ impl Parser:
             let vname = self.expect_ident()
             if vname == 0:
                 break
-            var payloads: Vec[i32] = Vec.new()
+            var payloads: List[i32] = List.new()
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
                 while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
@@ -2748,7 +2742,7 @@ impl Parser:
         extra_start
 
     mut fn parse_disc_enum_variants_block(repr_type_node: i32) -> i32:
-        var variants: Vec[i32] = Vec.new()
+        var variants: List[i32] = List.new()
         var variant_count = 0
         var variant_col = -1
 
@@ -2763,7 +2757,7 @@ impl Parser:
             let vname = self.expect_ident()
             if vname == 0:
                 break
-            var payloads: Vec[i32] = Vec.new()
+            var payloads: List[i32] = List.new()
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
                 while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
@@ -2918,16 +2912,16 @@ impl Parser:
         let header_sym = self.intern.intern(raw)
         self.advance()
 
-        let links: Vec[i32] = Vec.new()
-        let allow_untranslated: Vec[i32] = Vec.new()
-        let no_methods_types: Vec[i32] = Vec.new()
+        let links: List[i32] = List.new()
+        let allow_untranslated: List[i32] = List.new()
+        let no_methods_types: List[i32] = List.new()
         var no_methods_all = 0
-        let only_names: Vec[i32] = Vec.new()
+        let only_names: List[i32] = List.new()
         var strict_flag = 0
         var cxx_flag = 0
-        let owns_entries: Vec[i32] = Vec.new()
-        let borrows_entries: Vec[i32] = Vec.new()
-        let retains_entries: Vec[i32] = Vec.new()
+        let owns_entries: List[i32] = List.new()
+        let borrows_entries: List[i32] = List.new()
+        let retains_entries: List[i32] = List.new()
 
         while self.peek() == TokenKind.TK_COMMA:
             self.advance()
@@ -3061,8 +3055,8 @@ impl Parser:
             else if key == "owns" or key == "borrows" or key == "retains":
                 // #357/#602: ownership annotations — owns: ["ctor -> dtor"],
                 // borrows: ["fn(pi) -> ctor"], retains: ["fn(pi)"]. String or
-                // string array. (Two branches on push, not an aliased Vec binding:
-                // a copied Vec header would take the pushes and leave the original
+                // string array. (Two branches on push, not an aliased List binding:
+                // a copied List header would take the pushes and leave the original
                 // stale.)
                 if self.peek() == TokenKind.TK_L_BRACKET:
                     self.advance()
@@ -3359,10 +3353,10 @@ impl Parser:
             return self.poisoned_expr()
 
         // error Name from OtherError, ...   (§10.9: one wrapper variant each)
-        var records: Vec[i32] = Vec.new()
+        var records: List[i32] = List.new()
         var wrapper_count = 0
-        var wrapper_names: Vec[i32] = Vec.new()
-        var wrapped_types: Vec[i32] = Vec.new()
+        var wrapper_names: List[i32] = List.new()
+        var wrapped_types: List[i32] = List.new()
         if self.is_ident_named("from"):
             self.advance()
             while true:
@@ -3405,7 +3399,7 @@ impl Parser:
             records.push(written.records[ri])
         self.add_error_decl(start, err_name, is_pub, wrapper_count + written.count, &records)
 
-    mut fn add_error_decl(start: i32, err_name: i32, is_pub: i32, variant_count: i32, records: &Vec[i32]) -> NodeId:
+    mut fn add_error_decl(start: i32, err_name: i32, is_pub: i32, variant_count: i32, records: &List[i32]) -> NodeId:
         let extra_start = self.add_enum_variant_extras(variant_count, records)
         self.pool.add_extra(is_pub)
         self.pool.add_extra(0)
@@ -3518,20 +3512,20 @@ impl Parser:
             return
         let trait_braced = form == DeclBody.Braced
 
-        var method_names: Vec[i32] = Vec.new()
-        var method_flags: Vec[i32] = Vec.new()
-        var method_param_starts: Vec[i32] = Vec.new()
-        var method_param_counts: Vec[i32] = Vec.new()
-        var method_ret_types: Vec[i32] = Vec.new()
-        var method_bodies: Vec[i32] = Vec.new()
-        var method_starts: Vec[i32] = Vec.new()
-        var method_ends: Vec[i32] = Vec.new()
+        var method_names: List[i32] = List.new()
+        var method_flags: List[i32] = List.new()
+        var method_param_starts: List[i32] = List.new()
+        var method_param_counts: List[i32] = List.new()
+        var method_ret_types: List[i32] = List.new()
+        var method_bodies: List[i32] = List.new()
+        var method_starts: List[i32] = List.new()
+        var method_ends: List[i32] = List.new()
 
-        var assoc_names: Vec[i32] = Vec.new()
-        var assoc_bound_starts: Vec[i32] = Vec.new()
-        var assoc_bound_counts: Vec[i32] = Vec.new()
-        var assoc_default_types: Vec[i32] = Vec.new()
-        var assoc_bounds_flat: Vec[i32] = Vec.new()
+        var assoc_names: List[i32] = List.new()
+        var assoc_bound_starts: List[i32] = List.new()
+        var assoc_bound_counts: List[i32] = List.new()
+        var assoc_default_types: List[i32] = List.new()
+        var assoc_bounds_flat: List[i32] = List.new()
 
         while self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_TYPE or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_MUT or self.peek() == TokenKind.TK_KW_MOVE or (trait_braced and self.peek() == TokenKind.TK_R_BRACE):
             if trait_braced and self.peek() == TokenKind.TK_R_BRACE:
@@ -3680,7 +3674,7 @@ impl Parser:
     // ── impl/extend block ────────────────────────────────────────────
 
     // Parse optional generic type args after an impl target type name.
-    // e.g., for `impl Trait for Vec[i32]`, parses `[i32]` after "Vec".
+    // e.g., for `impl Trait for List[i32]`, parses `[i32]` after "List".
     // Returns NodeKind.NK_TYPE_GENERIC node if args present, 0 otherwise.
     mut fn parse_optional_impl_target_args(type_name: i32) -> NodeId:
         if self.peek() != TokenKind.TK_L_BRACKET:
@@ -3688,7 +3682,7 @@ impl Parser:
         let start = self.current_start()
         self.advance()
         self.skip_newlines()
-        var args: Vec[i32] = Vec.new()
+        var args: List[i32] = List.new()
         while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
             let ty = self.parse_type_expr()
             args.push(ty as i32)
@@ -3744,7 +3738,7 @@ impl Parser:
             // a tuple argument (`Iter[(K, V)]`) pushes its own elements while
             // it parses, which split the argument run when they were pushed
             // one by one (#1746 found `impl Iter[(A, B)]` rejected).
-            var trait_args: Vec[i32] = Vec.new()
+            var trait_args: List[i32] = List.new()
             while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
                 trait_args.push(self.parse_type_expr() as i32)
                 self.skip_newlines()
@@ -3800,8 +3794,8 @@ impl Parser:
             return
         let impl_braced = form == DeclBody.Braced
 
-        var impl_assoc_names: Vec[i32] = Vec.new()
-        var impl_assoc_types: Vec[i32] = Vec.new()
+        var impl_assoc_names: List[i32] = List.new()
+        var impl_assoc_types: List[i32] = List.new()
         let extra_start = self.pool.extra_len()
         var method_count = 0
 
@@ -3971,7 +3965,7 @@ impl Parser:
         if impl_tp_count > 0:
             self.pool.add_impl_type_params(impl_node, impl_tp_start, impl_tp_count)
 
-        // Store impl target type node if generic (e.g., impl Trait for Vec[i32])
+        // Store impl target type node if generic (e.g., impl Trait for List[i32])
         if target_type_node != 0:
             self.pool.add_impl_target_type_node(impl_node, target_type_node)
 
@@ -4552,7 +4546,7 @@ impl Parser:
         if name == 0: return self.poisoned_expr()
         // `c facade sqlite error SqliteError:` (§16.2b.4, D97): one error
         // type for every fallible operation the facade presents.
-        let items: Vec[i32] = Vec.new()
+        let items: List[i32] = List.new()
         if self.peek() == TokenKind.TK_KW_ERROR:
             let error_start = self.current_start()
             self.advance()
@@ -4600,7 +4594,7 @@ impl Parser:
             name = name ++ "." ++ self.intern.resolve(seg)
         if self.expect(TokenKind.TK_COLON) == 0: return self.poisoned_expr()
         self.skip_newlines()
-        let rules: Vec[i32] = Vec.new()
+        let rules: List[i32] = List.new()
         while self.peek() != TokenKind.TK_EOF:
             let col = column_of(self.source, self.current_start())
             if col == 0: break
@@ -4642,7 +4636,7 @@ impl Parser:
         let tstart = self.current_start()
         var is_fn = 0
         var kind = 0
-        let ops: Vec[i32] = Vec.new()
+        let ops: List[i32] = List.new()
         if self.peek() == TokenKind.TK_KW_FN:
             self.advance()
             is_fn = 1
@@ -4712,7 +4706,7 @@ impl Parser:
             self.advance()
             let first = self.expect_ident()
             if first == 0: return 0
-            let path: Vec[i32] = Vec.new()
+            let path: List[i32] = List.new()
             path.push(first)
             while self.peek() == TokenKind.TK_DOT:
                 self.advance()
@@ -4799,9 +4793,9 @@ impl Parser:
     // The clauses indented deeper than their item. Collected first and written
     // to extra by the caller: a clause operand may be a type expression, whose
     // own extras must not interleave with the clause list.
-    mut fn parse_facade_clauses(item_col: i32, in_resource: bool) -> (Vec[i32], bool):
+    mut fn parse_facade_clauses(item_col: i32, in_resource: bool) -> (List[i32], bool):
         self.skip_newlines()
-        let clauses: Vec[i32] = Vec.new()
+        let clauses: List[i32] = List.new()
         while self.peek() != TokenKind.TK_EOF:
             let col = column_of(self.source, self.current_start())
             if col <= item_col: break
@@ -4852,7 +4846,7 @@ impl Parser:
             return 0
         let word = self.current_text()
         self.advance()
-        let ops: Vec[i32] = Vec.new()
+        let ops: List[i32] = List.new()
         var kind = 0
         if word == "from":
             kind = FACADE_CLAUSE_FROM
@@ -5207,7 +5201,7 @@ impl Parser:
             let p = self.parse_facade_param_ref()
             if p == 0: return 0
             if self.expect(TokenKind.TK_COLON) == 0: return 0
-            let cases: Vec[i32] = Vec.new()
+            let cases: List[i32] = List.new()
             self.skip_newlines()
             while self.peek() != TokenKind.TK_EOF:
                 let col = column_of(self.source, self.current_start())
@@ -5384,9 +5378,9 @@ impl Parser:
         // seg_kinds: 0=literal, 1=expr
         // seg_data1: sym (literal) or expr_node (expr)
         // seg_data2: 0 (literal) or spec_node (expr)
-        let seg_kinds: Vec[i32] = Vec.new()
-        let seg_data1: Vec[i32] = Vec.new()
-        let seg_data2: Vec[i32] = Vec.new()
+        let seg_kinds: List[i32] = List.new()
+        let seg_data1: List[i32] = List.new()
+        let seg_data2: List[i32] = List.new()
         var seg_start = 0
         var i = 0
         while i < clen:
@@ -6085,8 +6079,8 @@ impl Parser:
         let saved_suppress_brace: i32 = self.suppress_brace
         self.suppress_brace = 0
         self.skip_newlines()
-        var args: Vec[i32] = Vec.new()
-        var arg_names: Vec[i32] = Vec.new()  // 0 = positional, sym = named
+        var args: List[i32] = List.new()
+        var arg_names: List[i32] = List.new()  // 0 = positional, sym = named
         var has_named = 0
         var seen_named = 0
         if self.peek() != TokenKind.TK_R_PAREN:
@@ -6138,7 +6132,7 @@ impl Parser:
                     placeholder_count = placeholder_count + 1
 
         let extra_start = self.pool.extra_len()
-        var partial_param_syms: Vec[i32] = Vec.new()
+        var partial_param_syms: List[i32] = List.new()
         for ai in 0..arg_count:
             let arg = args[ai]
             if self.pool.kind(arg) == NodeKind.NK_IDENT:
@@ -6217,7 +6211,7 @@ impl Parser:
         if self.is_positional_struct_literal() != 0:
             return self.parse_positional_struct_literal(lhs, struct_name)
 
-        var fields: Vec[i32] = Vec.new()
+        var fields: List[i32] = List.new()
         var field_count = 0
         while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
             let fname = self.expect_ident()
@@ -6246,7 +6240,7 @@ impl Parser:
         self.pool.add_node(NodeKind.NK_STRUCT_LIT, self.pool.get_start(lhs), self.prev_end(), struct_name, extra_start, field_count)
 
     mut fn parse_positional_struct_literal(lhs: i32, struct_name: i32) -> NodeId:
-        var fields: Vec[i32] = Vec.new()
+        var fields: List[i32] = List.new()
         var field_count = 0
         while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
             // A field that is no expression (`left: n` after a positional
@@ -6275,7 +6269,7 @@ impl Parser:
         self.advance()  // consume :
         self.skip_newlines()
         let block_col = column_of(self.source, self.current_start())
-        var fields: Vec[i32] = Vec.new()
+        var fields: List[i32] = List.new()
         var field_count = 0
         while self.peek() != TokenKind.TK_EOF:
             let cur_col = column_of(self.source, self.current_start())
@@ -6449,7 +6443,7 @@ impl Parser:
         self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), expr, stop, INDEX_SLICE * INDEX_KIND_SHIFT)
 
     mut fn parse_multi_index(base: i32) -> NodeId:
-        let specs: Vec[i32] = Vec.new()
+        let specs: List[i32] = List.new()
         while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
             specs.push(self.parse_single_index_spec() as i32)
             self.skip_newlines()
@@ -6468,7 +6462,7 @@ impl Parser:
     mut fn parse_multi_index_with_first(base: i32, first_expr: NodeId, has_colon: i32) -> NodeId:
         // First spec already partially parsed: we have first_expr, possibly followed by ':'
         let start = self.pool.get_start(first_expr)
-        let specs: Vec[i32] = Vec.new()
+        let specs: List[i32] = List.new()
         if has_colon != 0:
             // first_expr: ... → slice starting at first_expr
             self.advance()  // consume ':'
@@ -6520,7 +6514,7 @@ impl Parser:
             self.advance()
         else:
             member = self.expect_ident()
-        var args: Vec[i32] = Vec.new()
+        var args: List[i32] = List.new()
         var has_call = 0
         if self.peek() == TokenKind.TK_L_PAREN:
             has_call = 1
@@ -6550,7 +6544,7 @@ impl Parser:
         let text = self.source.slice((start + 1) as i64, end as i64)
         let sym = self.intern.intern(text)
         self.advance()
-        var args: Vec[i32] = Vec.new()
+        var args: List[i32] = List.new()
         if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
             self.skip_newlines()
@@ -6602,7 +6596,7 @@ impl Parser:
 
         let first = self.parse_expr()
         if self.peek() == TokenKind.TK_COMMA:
-            var elems: Vec[i32] = Vec.new()
+            var elems: List[i32] = List.new()
             elems.push(first as i32)
             while self.peek() == TokenKind.TK_COMMA:
                 self.advance()
@@ -6656,8 +6650,8 @@ impl Parser:
         if operand == 0:
             return self.pool.add_node(NodeKind.NK_UNARY, start, self.prev_end(), op, operand, 0)
 
-        let cast_targets: Vec[i32] = Vec.new()
-        let cast_ends: Vec[i32] = Vec.new()
+        let cast_targets: List[i32] = List.new()
+        let cast_ends: List[i32] = List.new()
         var inner = operand
         while inner != 0 and self.pool.kind(inner) == NodeKind.NK_CAST:
             cast_targets.push(self.pool.get_data1(inner))
@@ -6780,7 +6774,7 @@ impl Parser:
         // Store clauses as flat triples: (kind, data0, data1).
         // kind=0 → let clause (data0=pattern, data1=subject)
         // kind=1 → cond clause (data0=cond_expr, data1=0)
-        var clauses: Vec[i32] = Vec.new()
+        var clauses: List[i32] = List.new()
         clauses.push(0)
         clauses.push(pat as i32)
         clauses.push(subject as i32)
@@ -6901,7 +6895,7 @@ impl Parser:
     // Operand index for an asm {name} placeholder: position of `name_sym` in the
     // operand-name table (outputs in declaration order, then inputs). Returns -1
     // if not found.
-    fn asm_operand_index(names: &Vec[i32], name_sym: i32) -> i32:
+    fn asm_operand_index(names: &List[i32], name_sym: i32) -> i32:
         for i in 0..names.len() as i32:
             if names[i] == name_sym:
                 return i
@@ -6911,7 +6905,7 @@ impl Parser:
     // references. `{{`/`}}` are literal braces; a bare `$` is escaped to `$$` so
     // user text cannot accidentally form an LLVM substitution. Unknown names are a
     // compile error.
-    mut fn rewrite_asm_template(tmpl: &str, names: &Vec[i32]) -> str:
+    mut fn rewrite_asm_template(tmpl: &str, names: &List[i32]) -> str:
         var out = ""
         var i = 0
         let n = tmpl.len() as i32
@@ -6976,9 +6970,9 @@ impl Parser:
         // order, then inputs (clobbers are not numbered).
         var constraints_str = ""
         var has_output = false
-        let output_type_nodes: Vec[NodeId] = Vec.new()
-        let input_exprs: Vec[NodeId] = Vec.new()
-        let operand_names: Vec[i32] = Vec.new()
+        let output_type_nodes: List[NodeId] = List.new()
+        let input_exprs: List[NodeId] = List.new()
+        let operand_names: List[i32] = List.new()
         var first_constraint = true
         // Section 1: outputs (comma-separated `name("constraint") -> type`,
         // or a single read-write `name("+r")`).
@@ -7193,7 +7187,7 @@ impl Parser:
             self.advance()
         self.skip_newlines()
 
-        var arm_entries: Vec[i32] = Vec.new()
+        var arm_entries: List[i32] = List.new()
         var arm_count = 0
         var arm_col = -1
 
@@ -7426,11 +7420,11 @@ impl Parser:
     // For-comprehension: for x in a; y in b(x): yield f(x, y)
     // Desugars to nested match on Option (Some/None).
     mut fn parse_for_comprehension(start: i32, first_binding: i32, first_expr: NodeId) -> NodeId:
-        // Collect all bindings: Vec of (binding_sym, source_expr)
-        let bind_syms: Vec[i32] = Vec.new()
-        let bind_exprs: Vec[i32] = Vec.new()
+        // Collect all bindings: List of (binding_sym, source_expr)
+        let bind_syms: List[i32] = List.new()
+        let bind_exprs: List[i32] = List.new()
         // 0 = binding, 1 = guard
-        let bind_kinds: Vec[i32] = Vec.new()
+        let bind_kinds: List[i32] = List.new()
         bind_syms.push(first_binding)
         bind_exprs.push(first_expr as i32)
         bind_kinds.push(0)
@@ -7486,8 +7480,8 @@ impl Parser:
 
         // Nested matches, one per clause (AstPool.build_comprehension_match).
         // The failure arm `___fail_i @ _` captures the whole clause value.
-        let pats: Vec[i32] = Vec.new()
-        let fail_syms: Vec[i32] = Vec.new()
+        let pats: List[i32] = List.new()
+        let fail_syms: List[i32] = List.new()
         for bi in 0..bind_syms.len() as i32:
             let binds = bind_kinds[bi] == 0
             pats.push(if binds: self.pool.add_node(NodeKind.NK_PAT_IDENT, start, start, bind_syms[bi], 0, 0) else: 0)
@@ -7625,7 +7619,7 @@ impl Parser:
         self.pool.add_node(NodeKind.NK_MATCH, start, self.prev_end(), subject, extra_start, arm_count)
 
     mut fn parse_match_arms() -> i32:
-        var arms: Vec[i32] = Vec.new()
+        var arms: List[i32] = List.new()
         var arm_col = -1
         let saved_block_indent: i32 = self.block_indent
 
@@ -7717,7 +7711,7 @@ impl Parser:
         arm_count
 
     mut fn parse_inline_match_arms() -> i32:
-        var arms: Vec[i32] = Vec.new()
+        var arms: List[i32] = List.new()
         self.skip_newlines()
         while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
             let arm_start = self.current_start()
@@ -7785,7 +7779,7 @@ impl Parser:
         let start = self.current_start()
         let first = self.parse_pattern()
         if self.peek() != TokenKind.TK_PIPE: return first
-        let or_patterns: Vec[i32] = Vec.new()
+        let or_patterns: List[i32] = List.new()
         or_patterns.push(first as i32)
         while self.peek() == TokenKind.TK_PIPE:
             self.advance()
@@ -7913,7 +7907,7 @@ impl Parser:
                 if self.peek() == TokenKind.TK_L_PAREN:
                     self.advance()
                     self.skip_newlines()
-                    let payload_patterns: Vec[i32] = Vec.new()
+                    let payload_patterns: List[i32] = List.new()
                     while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                         let inner = self.parse_pattern()
                         payload_patterns.push(inner as i32)
@@ -7937,7 +7931,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
                 self.skip_newlines()
-                let payload_patterns: Vec[i32] = Vec.new()
+                let payload_patterns: List[i32] = List.new()
                 while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                     let inner = self.parse_pattern()
                     payload_patterns.push(inner as i32)
@@ -7978,7 +7972,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
                 self.skip_newlines()
-                let payload_patterns: Vec[i32] = Vec.new()
+                let payload_patterns: List[i32] = List.new()
                 while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                     let inner = self.parse_pattern()
                     payload_patterns.push(inner as i32)
@@ -7998,7 +7992,7 @@ impl Parser:
         if t == TokenKind.TK_L_PAREN:
             self.advance()
             self.skip_newlines()
-            let tuple_patterns: Vec[i32] = Vec.new()
+            let tuple_patterns: List[i32] = List.new()
             var saw_comma = false
             if self.peek() != TokenKind.TK_R_PAREN:
                 let p = self.parse_pattern()
@@ -8037,7 +8031,7 @@ impl Parser:
     mut fn parse_struct_pattern(type_name: i32, start: i32) -> NodeId:
         self.advance()  // consume {
         self.skip_newlines()
-        let field_entries: Vec[i32] = Vec.new()
+        let field_entries: List[i32] = List.new()
         var has_rest = 0
 
         while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
@@ -8076,7 +8070,7 @@ impl Parser:
         var head_count = 0
         var rest_sym = 0
         var has_rest = 0
-        let tail_syms: Vec[i32] = Vec.new()
+        let tail_syms: List[i32] = List.new()
         // Placeholder slots: has_rest, head_count will be set after
         let has_rest_idx = self.pool.add_extra(0)
 
@@ -8288,9 +8282,9 @@ impl Parser:
         // Existing syntax: with expr as name: body
         // Multi-binding syntax is represented as nested single-binding nodes so
         // sema and MIR only need to reason about one scoped binding at a time.
-        let item_sources: Vec[i32] = Vec.new()
-        let item_payloads: Vec[i32] = Vec.new()
-        let item_is_tuple: Vec[i32] = Vec.new()
+        let item_sources: List[i32] = List.new()
+        let item_payloads: List[i32] = List.new()
+        let item_is_tuple: List[i32] = List.new()
 
         var keep_parsing_items = 1
         while keep_parsing_items != 0:
@@ -8308,7 +8302,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
                 self.skip_newlines()
-                let names: Vec[i32] = Vec.new()
+                let names: List[i32] = List.new()
                 while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                     if self.peek() == TokenKind.TK_IDENT:
                         let n_sym = self.intern_current()
@@ -8378,7 +8372,7 @@ impl Parser:
         if self.peek() == TokenKind.TK_KW_WITH:
             return self.finish_record_update(start, last_expr)
 
-        var stmts: Vec[i32] = Vec.new()
+        var stmts: List[i32] = List.new()
         while true:
             let cur = self.peek()
             if cur == TokenKind.TK_EOF or cur == TokenKind.TK_R_BRACE:
@@ -8421,7 +8415,7 @@ impl Parser:
         self.advance()  // consume 'with'
         self.skip_newlines()
 
-        var fields: Vec[i32] = Vec.new()
+        var fields: List[i32] = List.new()
         var field_count = 0
         while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
             let fname = self.expect_ident()
@@ -8451,7 +8445,7 @@ impl Parser:
         let start = self.current_start()
         self.advance()  // consume [
         self.skip_newlines()
-        var elems: Vec[i32] = Vec.new()
+        var elems: List[i32] = List.new()
 
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
@@ -8464,8 +8458,8 @@ impl Parser:
             let first = self.parse_expr()
 
             if self.peek() == TokenKind.TK_COLON:
-                let keys: Vec[i32] = Vec.new()
-                let values: Vec[i32] = Vec.new()
+                let keys: List[i32] = List.new()
+                let values: List[i32] = List.new()
                 keys.push(first as i32)
                 while true:
                     if self.peek() != TokenKind.TK_COLON:
@@ -8475,8 +8469,8 @@ impl Parser:
                     self.skip_newlines()
                     let value_expr = self.parse_expr()
                     if self.peek() == TokenKind.TK_KW_FOR:
-                        let patterns: Vec[i32] = Vec.new()
-                        let iterables: Vec[i32] = Vec.new()
+                        let patterns: List[i32] = List.new()
+                        let iterables: List[i32] = List.new()
                         var filter: NodeId = 0 as NodeId
 
                         while self.peek() == TokenKind.TK_KW_FOR:
@@ -8559,8 +8553,8 @@ impl Parser:
 
             // Comprehension: [expr for pattern in iter ... if filter]
             if self.peek() == TokenKind.TK_KW_FOR:
-                let patterns: Vec[i32] = Vec.new()
-                let iterables: Vec[i32] = Vec.new()
+                let patterns: List[i32] = List.new()
+                let iterables: List[i32] = List.new()
                 var filter: NodeId = 0 as NodeId
 
                 while self.peek() == TokenKind.TK_KW_FOR:
@@ -8660,10 +8654,10 @@ impl Parser:
 
     // A closure's parameters are (name, type node) pairs in the extras pool.
     // They are written after every annotation is parsed: a generic
-    // annotation (`&Vec[i32]`) writes its own argument list to the pool, and
+    // annotation (`&List[i32]`) writes its own argument list to the pool, and
     // pairs written as they were parsed interleaved with it, so the type slot
     // read back held the argument, `i32` (#1402).
-    mut fn add_closure_params(params: &Vec[i32]) -> i32:
+    mut fn add_closure_params(params: &List[i32]) -> i32:
         let extra_start = self.pool.extra_len()
         for pi in 0..params.len() as i32:
             self.pool.add_extra(params[pi])
@@ -8675,7 +8669,7 @@ impl Parser:
         let start = self.current_start()
         self.advance()  // consume (
         self.skip_newlines()
-        var params: Vec[i32] = Vec.new()
+        var params: List[i32] = List.new()
         while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
             if self.peek() == TokenKind.TK_KW_IT:
                 self.emit_error_code("'it' is a reserved keyword and cannot be used as a parameter name", "E0953")
@@ -8723,7 +8717,7 @@ impl Parser:
     mut fn parse_closure() -> NodeId:
         let start = self.current_start()
         self.expect(TokenKind.TK_PIPE)
-        var params: Vec[i32] = Vec.new()
+        var params: List[i32] = List.new()
         while self.peek() != TokenKind.TK_PIPE and self.peek() != TokenKind.TK_EOF:
             if self.peek() == TokenKind.TK_KW_IT:
                 self.emit_error_code("'it' is a reserved keyword and cannot be used as a parameter name", "E0953")
@@ -8819,7 +8813,7 @@ impl Parser:
         body
 
     mut fn parse_indented_block(block_col: i32) -> NodeId:
-        var stmts: Vec[i32] = Vec.new()
+        var stmts: List[i32] = List.new()
         var last_expr = self.parse_expr()
 
         while true:
@@ -8885,7 +8879,7 @@ impl Parser:
         // statement's own line is the level a colon body inside it must
         // exceed (#1391).
         let saved_block_indent: i32 = self.block_indent
-        var stmts: Vec[i32] = Vec.new()
+        var stmts: List[i32] = List.new()
         self.block_indent = line_indent_of(self.source, self.current_start())
         var last_expr = self.parse_expr()
 
@@ -8929,7 +8923,7 @@ impl Parser:
         self.advance()
         self.expect(TokenKind.TK_L_PAREN)
         self.skip_newlines()
-        var params: Vec[i32] = Vec.new()
+        var params: List[i32] = List.new()
         // #1832: a trailing `...` makes a C variadic function-pointer type.
         var variadic = false
         if self.peek() == TokenKind.TK_DOT_DOT_DOT:
@@ -9044,7 +9038,7 @@ impl Parser:
         if t == TokenKind.TK_L_PAREN:
             self.advance()
             self.skip_newlines()
-            var elems: Vec[i32] = Vec.new()
+            var elems: List[i32] = List.new()
             if self.peek() != TokenKind.TK_R_PAREN:
                 let ty = self.parse_type_expr()
                 elems.push(ty as i32)
@@ -9183,7 +9177,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_L_BRACKET:
                 self.advance()
                 self.skip_newlines()
-                var args: Vec[i32] = Vec.new()
+                var args: List[i32] = List.new()
                 if self.peek() != TokenKind.TK_R_BRACKET:
                     while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
                         // A length argument is a value, not a type:
@@ -9310,8 +9304,8 @@ impl Parser:
         1
 
     mut fn parse_param_list() -> i32:
-        var params: Vec[i32] = Vec.new()
-        var default_nodes: Vec[i32] = Vec.new()
+        var params: List[i32] = List.new()
+        var default_nodes: List[i32] = List.new()
         let pattern_start = self.pool.fn_param_patterns_len()
         var pattern_count = 0
         var required_count = 0
@@ -9561,7 +9555,7 @@ impl Parser:
                 // node between two bounds would break.
                 self.advance()
                 self.skip_newlines()
-                var args: Vec[i32] = Vec.new()
+                var args: List[i32] = List.new()
                 while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
                     args.push(self.parse_type_expr() as i32)
                     self.skip_newlines()
@@ -9606,10 +9600,10 @@ impl Parser:
             return
         self.advance()
         // Collect all where clause entries into local vecs first
-        var wp_syms: Vec[i32] = Vec.new()
-        var wp_bound_starts: Vec[i32] = Vec.new()
-        var wp_bound_counts: Vec[i32] = Vec.new()
-        var wp_bounds_flat: Vec[i32] = Vec.new()
+        var wp_syms: List[i32] = List.new()
+        var wp_bound_starts: List[i32] = List.new()
+        var wp_bound_counts: List[i32] = List.new()
+        var wp_bounds_flat: List[i32] = List.new()
         while self.peek() == TokenKind.TK_IDENT:
             let type_param = self.intern_current()
             self.advance()

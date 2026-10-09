@@ -16,7 +16,7 @@ c facade sums:
         ok SUM_OK
 
 fn main:
-    let none: Vec[u8] = Vec.new()
+    let none: List[u8] = List.new()
     print(f"empty: {sum_bytes(none).is_ok()}")
     let zero: [2]u8 = [0, 9]
     print(f"zero: {sum_bytes(zero).is_ok()}")

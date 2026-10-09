@@ -93,7 +93,7 @@ fn libc_facade_source() -> str:
         preserves domain strerror_text
 "
 
-fn libc_facade_has(names: &Vec[str], name: &str) -> bool:
+fn libc_facade_has(names: &List[str], name: &str) -> bool:
     for i in 0..names.len() as i32:
         if names[i] == name:
             return true
@@ -112,15 +112,15 @@ fn libc_facade_operand(line: &str) -> str:
 // first. A declaration of another shape — a program's own `fopen` over
 // `void *` — is not described: it stays the raw surface, which removes
 // capability and never asserts a contract the declarations do not carry.
-pub fn libc_facade_select(pool: AstPool, intern: InternPool, ci: &Vec[i32], claimed: &Vec[str]) -> str:
+pub fn libc_facade_select(pool: AstPool, intern: InternPool, ci: &List[i32], claimed: &List[str]) -> str:
     let lines = libc_facade_source().split("\n")
-    var kept_names: Vec[str] = Vec.new()
-    var kept_reprs: Vec[str] = Vec.new()
+    var kept_names: List[str] = List.new()
+    var kept_reprs: List[str] = List.new()
     // Domain lines are kept when a kept item names the domain (a
     // `from domain D` or `preserves domain D` clause) and the program's own
     // facades do not declare it.
-    var domain_lines: Vec[str] = Vec.new()
-    var domain_names: Vec[str] = Vec.new()
+    var domain_lines: List[str] = List.new()
+    var domain_names: List[str] = List.new()
     var body = ""
     var i = 1
     while i < lines.len() as i32:
@@ -128,7 +128,7 @@ pub fn libc_facade_select(pool: AstPool, intern: InternPool, ci: &Vec[i32], clai
         i = i + 1
         if header.trim().len() == 0:
             continue
-        var clauses: Vec[str] = Vec.new()
+        var clauses: List[str] = List.new()
         while i < lines.len() as i32 and lines[i].starts_with("        "):
             clauses.push(lines[i].clone())
             i = i + 1

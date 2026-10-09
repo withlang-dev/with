@@ -1,14 +1,14 @@
 //! expect-stdout: ok
 
 fn main:
-    let ints: Vec[i32] = Vec.new()
+    let ints: List[i32] = List.new()
     ints.push(1)
     ints.push(2)
     assert(ints.contains(1))
     assert(ints.contains(2))
     assert(not ints.contains(3))
 
-    let strs: Vec[str] = Vec.new()
+    let strs: List[str] = List.new()
     strs.push("alpha")
     strs.push("beta")
     assert(strs.contains("alpha"))

@@ -25,7 +25,7 @@ fn main -> i32:
     let argv = args()
     var apply = false
     var deny_path = ""
-    var files: Vec[str] = Vec.new()
+    var files: List[str] = List.new()
     for i in 1..argv.len():
         let a = argv[i]
         if a == "--apply": apply = true
@@ -34,7 +34,7 @@ fn main -> i32:
     if files.len() == 0:
         eprint("usage: migrate_param_borrows [--apply] <denylist> <file.w>...")
         return 2
-    var denied: Vec[str] = Vec.new()
+    var denied: List[str] = List.new()
     for line in read_file(deny_path).split("\n"):
         if line.len() > 0: denied.push(owned_text(line))
     var total = 0
@@ -46,8 +46,8 @@ fn main -> i32:
         let tokens = lexer.tokenize()
         let n = tokens.len()
         // Collect insertion offsets (byte positions where "&" goes).
-        var offsets: Vec[i32] = Vec.new()
-        var labels: Vec[str] = Vec.new()
+        var offsets: List[i32] = List.new()
+        var labels: List[str] = List.new()
         var i = 0
         while i < n:
             if tokens.get_tag(i) != TokenKind.TK_KW_FN:
@@ -100,7 +100,7 @@ fn main -> i32:
                     continue
                 if depth == 1 and at_param_start and t == TokenKind.TK_IDENT:
                     // NAME : TYPE — rewrite only when TYPE is exactly `str`
-                    // followed by , ) or = (skips *str, &str, Vec[str], self).
+                    // followed by , ) or = (skips *str, &str, List[str], self).
                     let pname = text.slice(tokens.get_start(k) as i64, tokens.get_end(k) as i64)
                     if k + 2 < n and tokens.get_tag(k + 1) == TokenKind.TK_COLON and tokens.get_tag(k + 2) == TokenKind.TK_IDENT and text.slice(tokens.get_start(k + 2) as i64, tokens.get_end(k + 2) as i64) == "str":
                         let after = if k + 3 < n: tokens.get_tag(k + 3) else: TokenKind.TK_R_PAREN

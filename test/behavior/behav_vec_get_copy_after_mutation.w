@@ -1,5 +1,5 @@
 fn main:
-    var xs = Vec.new()
+    var xs = List.new()
     xs.push(1)
 
     let last = xs.len() - 1

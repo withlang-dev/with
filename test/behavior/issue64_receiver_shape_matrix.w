@@ -4,14 +4,14 @@
 // bindings — with mutations spelled at the place and reads through views.
 
 type Inner {
-    tags: Vec[i32],
+    tags: List[i32],
     label: str,
 }
 
-type InnerList = Vec[Inner]
+type InnerList = List[Inner]
 
 type Outer {
-    items: Vec[Inner],
+    items: List[Inner],
 }
 
 type Context {
@@ -19,10 +19,10 @@ type Context {
 }
 
 fn make_inner(label: str) -> Inner:
-    Inner { tags: Vec.new(), label }
+    Inner { tags: List.new(), label }
 
-fn make_items() -> Vec[Inner]:
-    let items: Vec[Inner] = Vec.new()
+fn make_items() -> List[Inner]:
+    let items: List[Inner] = List.new()
     items.push(make_inner("left"))
     items.push(make_inner("right"))
     items

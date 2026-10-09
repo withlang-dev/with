@@ -30,13 +30,13 @@ c facade dbf:
     fn st_db_or_null
         returns borrow Database from param 0
 
-type Seen { ids: Vec[i64] }
+type Seen { ids: List[i64] }
 
 impl Drop for Seen:
     move fn drop():
         print(f"dropped {self.ids.len()}")
 
-var seen = Seen { ids: Vec.new() }
+var seen = Seen { ids: List.new() }
 
 fn main:
     let l = log_new()

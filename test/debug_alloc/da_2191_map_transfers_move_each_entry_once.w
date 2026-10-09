@@ -19,7 +19,7 @@ match keys.next():
     None => print("none")
 
 var m = names()
-let all = m.drain() |> collect[Vec]()
+let all = m.drain() |> collect[List]()
 m.insert("delta".to_owned(), "four".to_owned())
 m.insert("eps".to_owned(), "five".to_owned())
 print(m.len())

@@ -4,7 +4,7 @@
 fn run(f: fn() -> i32) -> i32: f()
 fn main:
     let i = 1
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(10)
     xs.push(20)
     print(run(() => xs[i]))

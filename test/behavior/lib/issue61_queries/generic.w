@@ -8,7 +8,7 @@ pub fn Cell.wrap(value: T) -> Self:
 pub fn Cell.get(self: &Self) -> T:
     self.value
 
-pub fn cell_sum(cells: Vec[Cell[i32]]) -> i32:
+pub fn cell_sum(cells: List[Cell[i32]]) -> i32:
     var total = 0
     var i = 0
     while i < cells.len():

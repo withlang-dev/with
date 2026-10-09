@@ -39,14 +39,14 @@ pub fn build_graph_resolve_project_path(root: &str, path: &str) -> str:
         return with_str_clone_ref(path)
     resolve_join(root, path)
 
-pub fn build_graph_resolve_paths(root: &str, paths: &Vec[str]) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn build_graph_resolve_paths(root: &str, paths: &List[str]) -> List[str]:
+    let out: List[str] = List.new()
     for i in 0..paths.len() as i32:
         out.push(build_graph_resolve_project_path(root, paths[i]))
     out
 
-pub fn build_graph_clone_strings(values: &Vec[str]) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+pub fn build_graph_clone_strings(values: &List[str]) -> List[str]:
+    let out: List[str] = List.new()
     for i in 0..values.len() as i32:
         out.push(runtime_str_clone(values[i]))
     out
@@ -294,8 +294,8 @@ pub fn build_graph_validate_process_args(target: &BuildGraphTarget) -> i32:
             return 1
     0
 
-fn build_graph_split_nonempty_lines(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     let text_len = text.len() as i32
     var start = 0
     var i = 0
@@ -328,12 +328,12 @@ fn build_graph_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
-pub fn build_graph_sorted_strings(items: &Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
+pub fn build_graph_sorted_strings(items: &List[str]) -> List[str]:
+    var sorted: List[str] = List.new()
     for i in 0..items.len() as i32:
         let item = items[i]
         var inserted = false
-        var out: Vec[str] = Vec.new()
+        var out: List[str] = List.new()
         for j in 0..sorted.len() as i32:
             let existing = sorted[j]
             if not inserted and build_graph_str_compare(item, existing) < 0:
@@ -345,12 +345,12 @@ pub fn build_graph_sorted_strings(items: &Vec[str]) -> Vec[str]:
         sorted = out
     sorted
 
-pub fn collect_test_files(target_dir: &str) -> Vec[str]:
+pub fn collect_test_files(target_dir: &str) -> List[str]:
     let listing = build_graph_rt_list_files(target_dir)
     if listing.len() == 0:
-        return Vec.new()
+        return List.new()
     let all_files = build_graph_split_nonempty_lines(listing)
-    let w_files: Vec[str] = Vec.new()
+    let w_files: List[str] = List.new()
     for i in 0..all_files.len() as i32:
         let path = all_files[i]
         if path.ends_with(".w"):
@@ -361,7 +361,7 @@ pub fn build_graph_time_fmt(ns: i64) -> str:
     let tenths = ns / 100000000
     f"{tenths / 10}.{tenths % 10}s"
 
-fn build_graph_time_picked(picked: &Vec[i64], idx: i64) -> bool:
+fn build_graph_time_picked(picked: &List[i64], idx: i64) -> bool:
     for i in 0..picked.len() as i32:
         if picked[i] == idx:
             return true
@@ -392,7 +392,7 @@ pub fn build_graph_rss_budget_error(graph: &BuildGraph, name: &str, peak: i64) -
         return ""
     ""
 
-pub fn build_graph_times_report(root: &str, names: &Vec[str], ns_list: &Vec[i64], rss_list: &Vec[i64], total_ns: i64) -> Unit:
+pub fn build_graph_times_report(root: &str, names: &List[str], ns_list: &List[i64], rss_list: &List[i64], total_ns: i64):
     if names.len() == 0:
         return
     var text = "target\tseconds\tpeak_rss\n"
@@ -404,7 +404,7 @@ pub fn build_graph_times_report(root: &str, names: &Vec[str], ns_list: &Vec[i64]
     let _mkdir = build_graph_rt_mkdir_p(state_dir)
     let _write = build_graph_rt_write_file(resolve_join(state_dir, "build-times.tsv"), text)
     var summary = "[times] total " ++ build_graph_time_fmt(total_ns) ++ f" across {names.len() as i32} executed; slowest:"
-    let picked: Vec[i64] = Vec.new()
+    let picked: List[i64] = List.new()
     while picked.len() < 5 and picked.len() < names.len():
         var best: i64 = -1
         for i in 0..names.len() as i32:

@@ -15,8 +15,8 @@ type BuildGraphExternalTestJob {
     pid: i32,
 }
 
-pub fn build_graph_test_target_files(root: &str, entry: &str) -> Vec[str]:
-    let files: Vec[str] = Vec.new()
+pub fn build_graph_test_target_files(root: &str, entry: &str) -> List[str]:
+    let files: List[str] = List.new()
     if not build_graph_path_has_glob(entry):
         files.push(resolve_join(root, entry))
         return files
@@ -151,13 +151,13 @@ fn build_graph_finish_external_test_job(target: &BuildGraphTarget, job: &BuildGr
     let _remove_stderr = build_graph_rt_remove_file(job.stderr_path)
     0
 
-pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_files: &Vec[str]) -> i32:
+pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_files: &List[str]) -> i32:
     build_graph_run_test_files_pool(root, target, compiler_path, test_files, false)
 
 // `echo` is `with test`'s view (a person at a terminal): each file runs
 // without a forced --quiet and its output is printed as it finishes. A lane
 // keeps the captures to itself and prints only failures.
-pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_files: &Vec[str], echo: bool) -> i32:
+pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_files: &List[str], echo: bool) -> i32:
     let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
     if build_graph_rt_mkdir_p(capture_dir) != 0:
         build_graph_rt_eprint("error: could not create test output directory for target '" ++ target.name ++ "': " ++ capture_dir)
@@ -172,10 +172,10 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
     let compiler_fp = build_cache_test_compiler_fingerprint(compiler_path)
     let argv_shape = build_graph_argv_append(build_graph_append_test_args(build_graph_argv_append("", "test"), target), "--quiet")
     let prior = build_cache_load_test_verdicts(root, compiler_fp, target.name)
-    var pass_keys: Vec[str] = Vec.new()
-    var pass_paths: Vec[str] = Vec.new()
-    var run_files: Vec[str] = Vec.new()
-    var run_keys: Vec[str] = Vec.new()
+    var pass_keys: List[str] = List.new()
+    var pass_paths: List[str] = List.new()
+    var run_files: List[str] = List.new()
+    var run_keys: List[str] = List.new()
     var cached_count = 0
     for i in 0..test_files.len() as i32:
         let test_path = test_files[i]
@@ -192,15 +192,15 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
     // sweep on the first one (fail-fast over alphabetically ordered files
     // is how ten gate chains each surfaced exactly one bug).
     let jobs_limit = build_graph_test_jobs()
-    var failed_paths: Vec[str] = Vec.new()
+    var failed_paths: List[str] = List.new()
     var first_failure = 0
     var next = 0
     var finished = 0
-    let active: Vec[BuildGraphExternalTestJob] = Vec.new()
-    let active_keys: Vec[str] = Vec.new()
-    let started_ns: Vec[i64] = Vec.new()
+    let active: List[BuildGraphExternalTestJob] = List.new()
+    let active_keys: List[str] = List.new()
+    let started_ns: List[i64] = List.new()
     // Indices into `active` of the children still running (at most jobs_limit).
-    var live: Vec[i32] = Vec.new()
+    var live: List[i32] = List.new()
     // Sliding window: keep jobs_limit children in flight and refill a slot the
     // moment ANY child exits. Retiring only the oldest held the window behind
     // one slow file: a lane's 43 s test near the front of the alphabet let the

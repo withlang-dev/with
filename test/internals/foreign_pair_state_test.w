@@ -6,14 +6,14 @@ fn block(action: i32, guard: i32, invokes: bool) -> ForeignPairBlock:
     ForeignPairBlock { action, ty: 17, origin: 41, guard, can_fail: true, preserves_on_failure: false, invokes }
 
 fn failure_cleanup_flow:
-    var blocks: Vec[ForeignPairBlock] = Vec.new()
+    var blocks: List[ForeignPairBlock] = List.new()
     blocks.push(block(FOREIGN_PAIR_CALLBACK, 10, false))
     blocks.push(block(FOREIGN_PAIR_USERDATA, 11, false))
     blocks.push(block(FOREIGN_PAIR_INVOKE, -1, true))
     blocks.push(block(FOREIGN_PAIR_DESTROY, -1, true))
     blocks.push(block(FOREIGN_PAIR_RESET, -1, false))
     blocks.push(block(FOREIGN_PAIR_RESET, -1, false))
-    let edges: Vec[ForeignPairEdge] = Vec.new()
+    let edges: List[ForeignPairEdge] = List.new()
     edges.push(ForeignPairEdge { from: 0, to: 1, guard: 10, succeeded: true })
     edges.push(ForeignPairEdge { from: 0, to: 5, guard: 10, succeeded: false })
     edges.push(ForeignPairEdge { from: 1, to: 2, guard: 11, succeeded: true })
@@ -33,11 +33,11 @@ fn failure_cleanup_flow:
 
     // A destroyed value is absent, not an unreachable control-flow path.
     // Reusing its storage next iteration must establish a fresh default.
-    let loop_blocks: Vec[ForeignPairBlock] = Vec.new()
+    let loop_blocks: List[ForeignPairBlock] = List.new()
     loop_blocks.push(block(FOREIGN_PAIR_CREATE, -1, false))
     loop_blocks.push(block(FOREIGN_PAIR_DESTROY, -1, true))
     loop_blocks.push(block(FOREIGN_PAIR_KEEP, -1, false))
-    let loop_edges: Vec[ForeignPairEdge] = Vec.new()
+    let loop_edges: List[ForeignPairEdge] = List.new()
     loop_edges.push(ForeignPairEdge { from: 0, to: 1, guard: -1, succeeded: true })
     loop_edges.push(ForeignPairEdge { from: 1, to: 2, guard: -1, succeeded: true })
     loop_edges.push(ForeignPairEdge { from: 2, to: 0, guard: -1, succeeded: false })

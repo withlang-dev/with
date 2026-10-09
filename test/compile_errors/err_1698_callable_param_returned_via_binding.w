@@ -6,7 +6,7 @@ fn wrap(f: fn() -> i32) -> Option[fn() -> i32]:
     let g = f
     Some(g)
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(1)
     let g = wrap(() => xs.len32())
     print(g.unwrap()())

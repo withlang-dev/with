@@ -44,9 +44,9 @@ pub type TypeInfo {
 }
 
 pub type ProjectInfo {
-    module_items: Vec[ModuleInfo],
-    function_items: Vec[FunctionInfo],
-    type_items: Vec[TypeInfo],
+    module_items: List[ModuleInfo],
+    function_items: List[FunctionInfo],
+    type_items: List[TypeInfo],
 }
 
 pub type Diagnostics {
@@ -156,9 +156,9 @@ pub fn TypeInfo.location(self: &Self) -> &SourceLocation:
 
 pub fn ProjectInfo.new() -> ProjectInfo:
     ProjectInfo {
-        module_items: Vec.new(),
-        function_items: Vec.new(),
-        type_items: Vec.new(),
+        module_items: List.new(),
+        function_items: List.new(),
+        type_items: List.new(),
     }
 
 impl ProjectInfo:
@@ -177,11 +177,11 @@ impl ProjectInfo:
         out.type_items.push(type_info)
         out
 
-pub fn ProjectInfo.modules(self: &Self) -> &Vec[ModuleInfo]:
+pub fn ProjectInfo.modules(self: &Self) -> &List[ModuleInfo]:
     &self.module_items
 
-pub fn ProjectInfo.functions(self: &Self) -> &Vec[FunctionInfo]:
+pub fn ProjectInfo.functions(self: &Self) -> &List[FunctionInfo]:
     &self.function_items
 
-pub fn ProjectInfo.types(self: &Self) -> &Vec[TypeInfo]:
+pub fn ProjectInfo.types(self: &Self) -> &List[TypeInfo]:
     &self.type_items

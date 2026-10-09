@@ -24,9 +24,9 @@ extern fn with_fs_write_file(path: &str, data: &str) -> i32
 fn slice(text: &str, a: i32, b: i32): text.slice(a as i64, b as i64)
 
 type ReceiverModeFacts {
-    lines: Vec[i32],
-    columns: Vec[i32],
-    modes: Vec[str],
+    lines: List[i32],
+    columns: List[i32],
+    modes: List[str],
     unproven: i32,
 }
 
@@ -61,9 +61,9 @@ fn exact_mode(facts: &ReceiverModeFacts, line: i32, column: i32) -> str:
 fn compiler_receiver_modes(path: &str) -> ReceiverModeFacts:
     let result = compiler_analyze_file(path, "select:kind=declaration")
     var facts = ReceiverModeFacts {
-        lines: Vec.new(),
-        columns: Vec.new(),
-        modes: Vec.new(),
+        lines: List.new(),
+        columns: List.new(),
+        modes: List.new(),
         unproven: 0,
     }
     for i in 0..result.report.facts.len() as i32:
@@ -97,9 +97,9 @@ fn annotate_file(path: &str, exact_facts: &ReceiverModeFacts) -> i32:
     let n = tokens.len()
 
     // (start, end, replacement) splices, ascending.
-    var starts: Vec[i32] = Vec.new()
-    var ends: Vec[i32] = Vec.new()
-    var repls: Vec[str] = Vec.new()
+    var starts: List[i32] = List.new()
+    var ends: List[i32] = List.new()
+    var repls: List[str] = List.new()
     var count = 0
     var candidates = 0
 
@@ -254,13 +254,13 @@ fn file_has_mode_less_receiver(path: &str) -> bool:
         i = i + 1
     false
 
-fn path_excluded(path: &str, excludes: &Vec[str]) -> bool:
+fn path_excluded(path: &str, excludes: &List[str]) -> bool:
     for i in 0..excludes.len() as i32:
         if path == excludes[i]:
             return true
     false
 
-fn annotate_integrated_file(path: &str, excludes: &Vec[str]) -> i32:
+fn annotate_integrated_file(path: &str, excludes: &List[str]) -> i32:
     if path_excluded(path, excludes) or not file_has_mode_less_receiver(path):
         return 0
     let facts = compiler_receiver_modes(path)
@@ -272,7 +272,7 @@ fn annotate_integrated_file(path: &str, excludes: &Vec[str]) -> i32:
         return -1
     annotate_file(path, &facts)
 
-fn annotate_integrated_path(path: &str, excludes: &Vec[str]) -> i32:
+fn annotate_integrated_path(path: &str, excludes: &List[str]) -> i32:
     if path.ends_with(".w"):
         return annotate_integrated_file(path, excludes)
     let listing = unsafe { with_fs_list_files(path) }
@@ -301,8 +301,8 @@ fn main:
     if argv.len() < 2:
         print("usage: annotate_receivers [--exclude file.w ...] <file-or-dir> [file-or-dir ...]")
         exit_code(1)
-    let excludes: Vec[str] = Vec.new()
-    let paths: Vec[str] = Vec.new()
+    let excludes: List[str] = List.new()
+    let paths: List[str] = List.new()
     var arg = 1
     while arg < argv.len() as i32:
         if argv[arg] == "--exclude":

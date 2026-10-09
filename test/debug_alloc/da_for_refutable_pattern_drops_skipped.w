@@ -5,7 +5,7 @@
 // the elements it skips — `(1, "b")` is moved out of the iterator and
 // nothing else owns it.
 fn main:
-    var ps: Vec[(i32, str)] = Vec.new()
+    var ps: List[(i32, str)] = List.new()
     ps.push((0, "a"))
     ps.push((1, "b"))
     var n = 0

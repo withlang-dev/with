@@ -192,8 +192,8 @@ fn resolution_audit_calls(report: &AnalysisReport, sema: &Sema, mir_mod: &MirMod
 
 // The indices 0..keys.len() ordered by key (heap sort). The stdlib has no
 // sort yet; this is the analyzer's own and stays here.
-fn resolution_sorted_by_key(keys: &Vec[i64]):
-    var order: Vec[i32] = Vec.new()
+fn resolution_sorted_by_key(keys: &List[i64]):
+    var order: List[i32] = List.new()
     let n = keys.len() as i32
     for i in 0..n: order.push(i)
     // Empty and singleton inputs have no heap parent (n / 2 - 1 is -1).
@@ -243,9 +243,9 @@ fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mo
     let lowered_nodes: HashMap[i32, i32] = HashMap.new()
     let elided_nodes: HashMap[i32, i32] = HashMap.new()
     var elided = 0
-    let span_keys: Vec[i64] = Vec.new()
-    let span_end_keys: Vec[i64] = Vec.new()
-    let span_bodies: Vec[i32] = Vec.new()
+    let span_keys: List[i64] = List.new()
+    let span_end_keys: List[i64] = List.new()
+    let span_bodies: List[i32] = List.new()
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = &mir_mod.bodies[bi]
         for ci in 0..body.call_ast_nodes.len() as i32:
@@ -268,7 +268,7 @@ fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mo
     // prefix_max_end[i]: the greatest end key among order[0..=i], so the
     // backward walk from a binary-search hit stops as soon as no earlier
     // span can still contain the node.
-    let prefix_max_end: Vec[i64] = Vec.new()
+    let prefix_max_end: List[i64] = List.new()
     var running: i64 = -1
     for i in 0..order.len() as i32:
         let e = span_end_keys[order[i]]

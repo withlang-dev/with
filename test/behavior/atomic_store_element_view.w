@@ -16,7 +16,7 @@ use std.sync
 var a: Atomic[i32] = Atomic.new(0)
 
 fn main:
-    var order = Vec.new()
+    var order = List.new()
     order.push(1)
     order.push(2)
     order.push(3)

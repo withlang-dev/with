@@ -1,7 +1,7 @@
 //! expect-stdout: 246
 use std.builtins.int_to_string
 fn main:
-    var items: Vec[i32] = Vec.new()
+    var items: List[i32] = List.new()
     items.push(1)
     items.push(2)
     items.push(3)

@@ -15,7 +15,7 @@ impl Resource:
     fn drop(move self: Self): ()
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     let push_one = () => xs.push(1)
     push_one()
     push_one()

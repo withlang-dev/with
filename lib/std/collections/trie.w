@@ -76,7 +76,7 @@ impl[V] Trie[V]:
     /// Values of every key that starts with `prefix`, in byte order of the
     /// keys (an empty prefix visits the whole trie).
     pub fn iter_prefix(prefix: &str) -> TrieValues[V]:
-        var values: TrieValues[V] = TrieValues { nodes: Vec.new(), children: Vec.new() }
+        var values: TrieValues[V] = TrieValues { nodes: List.new(), children: List.new() }
         let start = unsafe { self.prefix_node(prefix) }
         if start as i64 != 0:
             values.nodes.push(start as i64)
@@ -104,7 +104,7 @@ impl[V] Drop for Trie[V]:
 /// `next()` yields `Some(&V)` per key in byte order, then `None`. Each
 /// frame is a node and the index of the next child to visit (-1: the node
 /// itself has not been yielded yet).
-pub type TrieValues[V] { nodes: Vec[i64], children: Vec[i32] }
+pub type TrieValues[V] { nodes: List[i64], children: List[i32] }
 
 impl[V] TrieValues[V]:
     pub mut fn next() -> Option[&V]:

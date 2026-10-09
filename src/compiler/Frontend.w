@@ -98,8 +98,8 @@ fn interface_name_token(line: &str, start: i64) -> str:
         end = end + 1
     frontend_owned_text(line.slice(start, end))
 
-fn frontend_new_vec_str -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+fn frontend_new_list_str -> List[str]:
+    let out: List[str] = List.new()
     out
 
 fn frontend_normalize_source_text(text: &str) -> str:
@@ -180,7 +180,7 @@ impl Zcu:
         if runtime_read_file(path).len() == 0:
             return
         // #747 instance C: capture by move, not copy — an unspelled field
-        // read left the field's stale Vec header live while insert_unique
+        // read left the field's stale List header live while insert_unique
         // consumed (and freed) the buffer; the NEXT call iterated recycled
         // memory (release-lane c_import SEGV: quoted-path text read as a
         // str header in tracked_input_str_compare).
@@ -301,18 +301,18 @@ fn frontend_dump_type_decl_names(stage: &str, pool: AstPool, intern: InternPool)
 
 impl Sema:
     mut fn init_module_graph(resolved: &ResolveResult) -> Unit:
-        self.module_paths = sema_new_vec_str()
-        self.module_import_starts = sema_new_vec_i32()
-        self.module_import_counts = sema_new_vec_i32()
-        self.module_import_targets = sema_new_vec_i32()
-        self.module_import_paths = sema_new_vec_str()
-        self.module_import_selected = sema_new_vec_str()
-        self.module_import_offsets = sema_new_vec_i32()
-        self.ns_modules = sema_new_vec_i32()
-        self.ns_names = sema_new_vec_str()
-        self.ns_fulls = sema_new_vec_str()
-        self.ns_targets = sema_new_vec_i32()
-        self.ns_offsets = sema_new_vec_i32()
+        self.module_paths = sema_new_list_str()
+        self.module_import_starts = sema_new_list_i32()
+        self.module_import_counts = sema_new_list_i32()
+        self.module_import_targets = sema_new_list_i32()
+        self.module_import_paths = sema_new_list_str()
+        self.module_import_selected = sema_new_list_str()
+        self.module_import_offsets = sema_new_list_i32()
+        self.ns_modules = sema_new_list_i32()
+        self.ns_names = sema_new_list_str()
+        self.ns_fulls = sema_new_list_str()
+        self.ns_targets = sema_new_list_i32()
+        self.ns_offsets = sema_new_list_i32()
         self.module_index_by_path = HashMap.new()
         self.global_visible_module_paths = HashMap.new()
         self.module_visibility_cache = HashMap.new()
@@ -340,7 +340,7 @@ impl Sema:
             self.module_import_counts.push(visible_count)
             self.module_index_by_path.insert(frontend_owned_text(mod.path), mod.module_id)
         if resolved.modules.len() > 0:
-            let global_frontier: Vec[i32] = Vec.new()
+            let global_frontier: List[i32] = List.new()
             let root = resolved.modules[0]
             for ii in 0..root.import_count:
                 let imp = resolved.imports[(root.import_start + ii)]
@@ -375,10 +375,10 @@ impl Sema:
 impl Zcu:
     mut fn expand_c_imports_frontend(pool: AstPool) -> AstPool:
         var out = pool
-        let ordered: Vec[i32] = Vec.new()
-        let ordered_paths = frontend_new_vec_str()
-        let ordered_file_ids: Vec[i32] = Vec.new()
-        let ordered_ci: Vec[i32] = Vec.new()
+        let ordered: List[i32] = List.new()
+        let ordered_paths = frontend_new_list_str()
+        let ordered_file_ids: List[i32] = List.new()
+        let ordered_ci: List[i32] = List.new()
         let base_count = out.decl_count()
         var has_c_import = 0
         var c_import_count = 0
@@ -493,7 +493,7 @@ impl Zcu:
                     let nm_packed = out.get_data2(decl)
                     let nm_start = out.get_data1(decl)
                     let nm_base = nm_start + c_import_link_count(nm_packed) + c_import_allow_count(nm_packed)
-                    let nm_types = frontend_new_vec_str()
+                    let nm_types = frontend_new_list_str()
                     for nmi in 0..c_import_no_methods_count(nm_packed):
                         nm_types.push(frontend_owned_text(self.pool.resolve(out.get_extra(nm_base + nmi))))
                     ci_set_no_methods(c_import_no_methods_all(nm_packed), move nm_types)
@@ -633,7 +633,7 @@ impl Zcu:
     // facades state are left to them.
     mut fn inject_toolchain_facades_frontend(pool: AstPool) -> AstPool:
         var out = self.project_owned_annotations_frontend(pool)
-        var claimed = frontend_new_vec_str()
+        var claimed = frontend_new_list_str()
         var owner = -1
         for i in 0..out.decl_count():
             let decl = out.get_decl(i)
@@ -731,7 +731,7 @@ impl Zcu:
 
     // The names a program's facade block states: its resources, its
     // producers, and its fn items.
-    fn collect_facade_claims_frontend(pool: AstPool, facade: i32, claimed: Vec[str]) -> Vec[str]:
+    fn collect_facade_claims_frontend(pool: AstPool, facade: i32, claimed: List[str]) -> List[str]:
         let extra_start = pool.get_data1(facade as NodeId)
         for i in 0..pool.get_data2(facade as NodeId):
             let item = pool.get_extra(extra_start + i)
@@ -905,8 +905,8 @@ fn cimport_deps_str_compare(a: &str, b: &str) -> i32:
         i = i + 1
     (al - bl) as i32
 
-fn cimport_deps_sorted_unique_paths(files: &str) -> Vec[str]:
-    var out = frontend_new_vec_str()
+fn cimport_deps_sorted_unique_paths(files: &str) -> List[str]:
+    var out = frontend_new_list_str()
     var pos = 0
     let total = files.len() as i32
     while pos < total:
@@ -921,7 +921,7 @@ fn cimport_deps_sorted_unique_paths(files: &str) -> Vec[str]:
                     exists = true
             if not exists:
                 var inserted = false
-                let next = frontend_new_vec_str()
+                let next = frontend_new_list_str()
                 for i in 0..out.len() as i32:
                     let existing = out[i]
                     if not inserted and cimport_deps_str_compare(path, existing) < 0:
@@ -985,8 +985,8 @@ fn c_import_deps_manifest_entries_valid(manifest: &str) -> bool:
         pos = line_end + 1
     saw_header
 
-fn c_import_deps_manifest_paths(manifest: &str) -> Vec[str]:
-    var out = frontend_new_vec_str()
+fn c_import_deps_manifest_paths(manifest: &str) -> List[str]:
+    var out = frontend_new_list_str()
     var pos = 0
     let total = manifest.len() as i32
     while pos < total:
@@ -1048,8 +1048,8 @@ fn c_import_fs_cache_store(cache_key: &str, value: &str, warnings: &str):
 // `unsafe fn name(`, `extern fn name(`, with or without `pub`). A declared
 // omission is a stub: the body was given up on, yet a declaration binds the
 // name and a call reaches nothing.
-fn c_import_declared_and_omitted(synthetic: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn c_import_declared_and_omitted(synthetic: &str) -> List[str]:
+    var out: List[str] = List.new()
     let prefix = "// @with-cimport-omitted|"
     for line in synthetic.split("\n"):
         if not c_import_starts_with(line, prefix): continue
@@ -1805,7 +1805,7 @@ impl Zcu:
             self.diagnostics.emit(Diagnostic.err("rt-in-unit: no runtime platform source for target '" ++ target_spec_name() ++ "'", Span { file: 0, start: 0, end: 0 }))
             return merged_pool
         let fiber_core = if platform.starts_with("rt/windows"): "rt/fiber_core_windows.w" else: "rt/fiber_core_darwin.w"
-        let files: Vec[str] = Vec.new()
+        let files: List[str] = List.new()
         files.push("rt/rt_core.w")
         files.push(with_str_clone_ref(platform))
         files.push("rt/panic_runtime.w")
@@ -1899,13 +1899,13 @@ impl Zcu:
     mut fn new_module_sema(text: &str, pool: AstPool) -> Sema:
         var sema = self.configure_tracked_input_sema(Sema.init(self.pool, move self.diagnostics, pool))
         sema.source_text = with_str_clone_ref(text)
-        sema.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
+        sema.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
         sema.package_keys = self.package_key_map()
-        sema.decl_source_file_ids = sema_clone_i32_vec(&self.decl_source_file_ids)
-        sema.decl_is_c_import = sema_clone_i32_vec(&self.decl_is_c_import)
-        sema.source_text_file_ids = sema_clone_i32_vec(&self.source_text_file_ids)
-        sema.source_text_names = sema_clone_str_vec(&self.source_text_names)
-        sema.source_texts = sema_clone_str_vec(&self.source_texts)
+        sema.decl_source_file_ids = sema_clone_i32_list(&self.decl_source_file_ids)
+        sema.decl_is_c_import = sema_clone_i32_list(&self.decl_is_c_import)
+        sema.source_text_file_ids = sema_clone_i32_list(&self.source_text_file_ids)
+        sema.source_text_names = sema_clone_str_list(&self.source_text_names)
+        sema.source_texts = sema_clone_str_list(&self.source_texts)
         sema.ci_omitted_symbols = sema_clone_str_str_hashmap(&self.c_import_omitted_symbols)
         sema.tool_mode_entry_path = frontend_owned_text(self.tool_mode_entry_path)
         sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
@@ -2062,8 +2062,8 @@ impl Zcu:
         if self.pending_iface_paths.len() as i32 > 0:
             let pending_paths = move self.pending_iface_paths
             let pending_texts = move self.pending_iface_texts
-            self.pending_iface_paths = frontend_new_vec_str()
-            self.pending_iface_texts = frontend_new_vec_str()
+            self.pending_iface_paths = frontend_new_list_str()
+            self.pending_iface_texts = frontend_new_list_str()
             pool = self.merge_interface_sections_on_demand(pool, &pending_paths, &pending_texts, root_local_decl_count)
         let t_cimport = runtime_clock_nanos()
         self.trace_c_import_cache = self.read_trace_c_import_cache_frontend()
@@ -2099,13 +2099,13 @@ impl Zcu:
                 runtime_eprint("[frontend] compile_source:comptime-transform")
             var pre_sema = self.configure_tracked_input_sema(Sema.init(self.pool, move self.diagnostics, pool))
             pre_sema.source_text = with_str_clone_ref(text)
-            pre_sema.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
+            pre_sema.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
             pre_sema.package_keys = self.package_key_map()
-            pre_sema.decl_source_file_ids = sema_clone_i32_vec(&self.decl_source_file_ids)
-            pre_sema.decl_is_c_import = sema_clone_i32_vec(&self.decl_is_c_import)
-            pre_sema.source_text_file_ids = sema_clone_i32_vec(&self.source_text_file_ids)
-            pre_sema.source_text_names = sema_clone_str_vec(&self.source_text_names)
-            pre_sema.source_texts = sema_clone_str_vec(&self.source_texts)
+            pre_sema.decl_source_file_ids = sema_clone_i32_list(&self.decl_source_file_ids)
+            pre_sema.decl_is_c_import = sema_clone_i32_list(&self.decl_is_c_import)
+            pre_sema.source_text_file_ids = sema_clone_i32_list(&self.source_text_file_ids)
+            pre_sema.source_text_names = sema_clone_str_list(&self.source_text_names)
+            pre_sema.source_texts = sema_clone_str_list(&self.source_texts)
             // PR#713: clone — the same map is handed to pre_sema AND sema below;
             // a shared header is a teardown double-free.
             pre_sema.ci_omitted_symbols = sema_clone_str_str_hashmap(&self.c_import_omitted_symbols)
@@ -2143,12 +2143,12 @@ impl Zcu:
                 let transform_ns = runtime_clock_nanos() - t_transform
                 runtime_eprint(f"[profile] frontend.comptime.transform  {transform_ns / 1000000}.{(transform_ns % 1000000) / 1000} ms")
             self.diagnostics = move pre_sema.diags
-            self.decl_source_paths = sema_clone_str_vec(&pre_sema.decl_source_paths)
-            self.decl_source_file_ids = sema_clone_i32_vec(&pre_sema.decl_source_file_ids)
-            self.decl_is_c_import = sema_clone_i32_vec(&pre_sema.decl_is_c_import)
-            self.source_text_file_ids = sema_clone_i32_vec(&pre_sema.source_text_file_ids)
-            self.source_text_names = sema_clone_str_vec(&pre_sema.source_text_names)
-            self.source_texts = sema_clone_str_vec(&pre_sema.source_texts)
+            self.decl_source_paths = sema_clone_str_list(&pre_sema.decl_source_paths)
+            self.decl_source_file_ids = sema_clone_i32_list(&pre_sema.decl_source_file_ids)
+            self.decl_is_c_import = sema_clone_i32_list(&pre_sema.decl_is_c_import)
+            self.source_text_file_ids = sema_clone_i32_list(&pre_sema.source_text_file_ids)
+            self.source_text_names = sema_clone_str_list(&pre_sema.source_text_names)
+            self.source_texts = sema_clone_str_list(&pre_sema.source_texts)
             self.c_import_omitted_symbols = sema_clone_str_str_hashmap(&pre_sema.ci_omitted_symbols)
             var tracked_paths = move self.tracked_input_paths
             self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &pre_sema.tracked_input_paths)
@@ -2170,7 +2170,7 @@ impl Zcu:
         // on the final pool (the comptime transform may replace it).
         // A c_import's translation and a rendered `c facade` are the
         // compiler's own text: the rule is for modules people write.
-        let generated_files: Vec[i32] = Vec.new()
+        let generated_files: List[i32] = List.new()
         for si in 0..self.source_text_names.len() as i32:
             let text_name = self.source_text_names[si]
             if text_name.starts_with("<c_import ") or text_name.starts_with("<facade ") or text_name.starts_with("<toolchain facade "):
@@ -2193,7 +2193,7 @@ impl Zcu:
         // program one that is checked twice: first to hear what the uses
         // demand, with nothing reported, then with every such field at the
         // type decided. A program without one is checked once, as before.
-        var field_decisions: Vec[i32] = Vec.new()
+        var field_decisions: List[i32] = List.new()
         if frontend_has_inferred_numeric_fields(pool):
             let reported = self.diagnostics.count()
             var probe = self.new_module_sema(text, pool)
@@ -2204,7 +2204,7 @@ impl Zcu:
             self.diagnostics.truncate(reported)
         let reported_before_check = self.diagnostics.count()
         var sema = self.new_module_sema(text, pool)
-        sema.field_decisions = sema_clone_i32_vec(&field_decisions)
+        sema.field_decisions = sema_clone_i32_list(&field_decisions)
         sema.check_module()
         // D93 (§4.3c rule 1): a binding whose literal takes its type from
         // its uses makes the program one that is checked twice, as D89's
@@ -2303,18 +2303,18 @@ impl Zcu:
     // and indented bodies after them. Keep that whole declaration together:
     // an attribute or method must never be parsed without its owner.
     // Unclassified declarations are always parsed so errors stay visible.
-    mut fn merge_interface_sections_on_demand(pool: AstPool, paths: &Vec[str], texts: &Vec[str], root_tail: i32) -> AstPool:
+    mut fn merge_interface_sections_on_demand(pool: AstPool, paths: &List[str], texts: &List[str], root_tail: i32) -> AstPool:
         var out = pool
         let base = out.decl_count()
         let t_start = runtime_clock_nanos()
         self.iface_mentioned = HashMap.new()
         self.note_interface_mentions(&out, 0, out.node_count())
-        let line_section: Vec[i32] = Vec.new()
-        let line_texts = frontend_new_vec_str()
-        let line_names = frontend_new_vec_str()
-        let line_kinds: Vec[i32] = Vec.new()
-        let line_done: Vec[i32] = Vec.new()
-        let line_counts: Vec[i32] = Vec.new()
+        let line_section: List[i32] = List.new()
+        let line_texts = frontend_new_list_str()
+        let line_names = frontend_new_list_str()
+        let line_kinds: List[i32] = List.new()
+        let line_done: List[i32] = List.new()
+        let line_counts: List[i32] = List.new()
         var decl_lines = 0
         for si in 0..paths.len() as i32:
             let lines = texts[si].split("\n")
@@ -2379,20 +2379,20 @@ impl Zcu:
         // takes the last root_tail entries. The chunks go before them.
         let total = out.decl_count()
         if root_tail > 0 and total > base and base >= root_tail:
-            let order: Vec[i32] = Vec.new()
+            let order: List[i32] = List.new()
             for di in 0..(base - root_tail):
                 order.push(di)
             for di in base..total:
                 order.push(di)
             for di in (base - root_tail)..base:
                 order.push(di)
-            let decls: Vec[i32] = Vec.new()
+            let decls: List[i32] = List.new()
             for di in 0..total:
                 decls.push(out.get_decl(di) as i32)
-            let ordered: Vec[i32] = Vec.new()
-            let ordered_paths = frontend_new_vec_str()
-            let ordered_file_ids: Vec[i32] = Vec.new()
-            let ordered_ci: Vec[i32] = Vec.new()
+            let ordered: List[i32] = List.new()
+            let ordered_paths = frontend_new_list_str()
+            let ordered_file_ids: List[i32] = List.new()
+            let ordered_ci: List[i32] = List.new()
             for oi in 0..total:
                 let di = order[oi]
                 ordered.push(decls[di])
@@ -2489,9 +2489,9 @@ impl Zcu:
     // precedence (resolve_displaced_fn_ident: the importer's to its wrapper,
     // std.re's to its own import).
     fn displace_c_import_wrappers(pool: AstPool):
-        var extern_names: Vec[i32] = Vec.new()
-        var extern_paths: Vec[str] = Vec.new()
-        var extern_imports: Vec[bool] = Vec.new()
+        var extern_names: List[i32] = List.new()
+        var extern_paths: List[str] = List.new()
+        var extern_imports: List[bool] = List.new()
         for di in 0..pool.decl_count():
             let decl = pool.get_decl(di) as i32
             if pool.kind(decl) == NodeKind.NK_EXTERN_FN:
@@ -2636,10 +2636,10 @@ impl Zcu:
         if has_use == 0:
             return out
 
-        let ordered: Vec[i32] = Vec.new()
-        let ordered_paths = frontend_new_vec_str()
-        let ordered_file_ids: Vec[i32] = Vec.new()
-        let ordered_c_import: Vec[i32] = Vec.new()
+        let ordered: List[i32] = List.new()
+        let ordered_paths = frontend_new_list_str()
+        let ordered_file_ids: List[i32] = List.new()
+        let ordered_c_import: List[i32] = List.new()
         for i in 0..out.decl_count():
             let decl = out.get_decl(i)
             if out.kind(decl) != NodeKind.NK_USE_DECL or out.get_data2(decl) > 0:
@@ -2671,18 +2671,18 @@ impl Zcu:
             let root_src_path = self.decl_source_path_frontend(0)
             if root_src_path.len() > 0 and self.has_imported_path(root_src_path) == 0:
                 self.add_imported_path(root_src_path)
-        var prelude_ordered: Vec[i32] = Vec.new()
-        var prelude_paths = frontend_new_vec_str()
-        var prelude_file_ids: Vec[i32] = Vec.new()
-        var prelude_c_import: Vec[i32] = Vec.new()
-        var user_import_ordered: Vec[i32] = Vec.new()
-        var user_import_paths = frontend_new_vec_str()
-        var user_import_file_ids: Vec[i32] = Vec.new()
-        var user_import_c_import: Vec[i32] = Vec.new()
-        var root_ordered: Vec[i32] = Vec.new()
-        var root_paths = frontend_new_vec_str()
-        var root_file_ids: Vec[i32] = Vec.new()
-        var root_c_import: Vec[i32] = Vec.new()
+        var prelude_ordered: List[i32] = List.new()
+        var prelude_paths = frontend_new_list_str()
+        var prelude_file_ids: List[i32] = List.new()
+        var prelude_c_import: List[i32] = List.new()
+        var user_import_ordered: List[i32] = List.new()
+        var user_import_paths = frontend_new_list_str()
+        var user_import_file_ids: List[i32] = List.new()
+        var user_import_c_import: List[i32] = List.new()
+        var root_ordered: List[i32] = List.new()
+        var root_paths = frontend_new_list_str()
+        var root_file_ids: List[i32] = List.new()
+        var root_c_import: List[i32] = List.new()
 
         // Phase 1: Expand prelude USE (position 0) and its transitive imports.
         let has_prelude = self.prelude_mode != PRELUDE_NONE() and initial_count > 0 and merged_pool.kind(merged_pool.get_decl(0)) == NodeKind.NK_USE_DECL
@@ -2807,21 +2807,21 @@ impl Zcu:
         user_import_c_import = move user_reordered.ci_flags
 
         // Collect fn names from higher-priority tiers for deduplication.
-        var root_fn_names: Vec[i32] = Vec.new()
+        var root_fn_names: List[i32] = List.new()
         for ri in 0..root_ordered.len() as i32:
             let rd = root_ordered[ri]
             let rk = merged_pool.kind(rd)
             if rk == NodeKind.NK_FN_DECL or rk == NodeKind.NK_EXTERN_FN:
                 root_fn_names.push(merged_pool.get_data0(rd))
 
-        var user_fn_names: Vec[i32] = Vec.new()
+        var user_fn_names: List[i32] = List.new()
         for ui in 0..user_import_ordered.len() as i32:
             let ud = user_import_ordered[ui]
             let uk = merged_pool.kind(ud)
             if uk == NodeKind.NK_FN_DECL or uk == NodeKind.NK_EXTERN_FN:
                 user_fn_names.push(merged_pool.get_data0(ud))
 
-        var higher_type_names: Vec[i32] = Vec.new()
+        var higher_type_names: List[i32] = List.new()
         for ri in 0..root_ordered.len() as i32:
             let rd = root_ordered[ri]
             if merged_pool.kind(rd) == NodeKind.NK_TYPE_DECL:
@@ -2835,11 +2835,11 @@ impl Zcu:
         // Drop fn/extern_fn decls shadowed by a higher-priority tier.
         while merged_pool.decl_count() > 0:
             merged_pool.state.decls.pop()
-        let rebuilt_paths = frontend_new_vec_str()
-        let rebuilt_file_ids: Vec[i32] = Vec.new()
-        let rebuilt_c_import: Vec[i32] = Vec.new()
+        let rebuilt_paths = frontend_new_list_str()
+        let rebuilt_file_ids: List[i32] = List.new()
+        let rebuilt_c_import: List[i32] = List.new()
         // Combine user + root fn names for prelude cross-tier shadowing.
-        var higher_fn_names: Vec[i32] = Vec.new()
+        var higher_fn_names: List[i32] = List.new()
         for hi in 0..root_fn_names.len() as i32:
             higher_fn_names.push(root_fn_names[hi])
         for hi in 0..user_fn_names.len() as i32:
@@ -2849,8 +2849,8 @@ impl Zcu:
         // extern is the redundant one (its symbol resolves in-unit) and is
         // dropped from the higher tier instead. Higher-tier BODIED fns
         // still shadow normally. Empty outside the WITH_RT_IN_UNIT lane.
-        var embedded_rt_fn_names: Vec[i32] = Vec.new()
-        var higher_bodied_fn_names: Vec[i32] = Vec.new()
+        var embedded_rt_fn_names: List[i32] = List.new()
+        var higher_bodied_fn_names: List[i32] = List.new()
         for oi in 0..prelude_ordered.len() as i32:
             let pd = prelude_ordered[oi]
             if merged_pool.kind(pd) == NodeKind.NK_FN_DECL and prelude_paths[oi].starts_with("<embedded-rt>/"):
@@ -2878,9 +2878,9 @@ impl Zcu:
             let id = prelude_ordered[oi]
             let ik = merged_pool.kind(id)
             let prelude_path = prelude_paths[oi]
-            if frontend_path_is_std_box_module(prelude_path) and frontend_vec_contains_i32(higher_type_names, self.pool.intern("Box")):
+            if frontend_path_is_std_box_module(prelude_path) and frontend_list_contains_i32(higher_type_names, self.pool.intern("Box")):
                 continue
-            if frontend_path_is_std_rc_module(prelude_path) and (frontend_vec_contains_i32(higher_type_names, self.pool.intern("Rc")) or frontend_vec_contains_i32(higher_type_names, self.pool.intern("Arc"))):
+            if frontend_path_is_std_rc_module(prelude_path) and (frontend_list_contains_i32(higher_type_names, self.pool.intern("Rc")) or frontend_list_contains_i32(higher_type_names, self.pool.intern("Arc"))):
                 continue
             // Runtime defs ignore higher-tier EXTERNS (def-wins: the extern
             // is dropped from its tier instead) but keep within-tier dedupe
@@ -2913,7 +2913,7 @@ impl Zcu:
         for oi in 0..user_import_ordered.len() as i32:
             let id = user_import_ordered[oi]
             let ik = merged_pool.kind(id)
-            if ik == NodeKind.NK_EXTERN_FN and frontend_vec_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
+            if ik == NodeKind.NK_EXTERN_FN and frontend_list_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
                 continue
             let user_verdict = if ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN: frontend_fn_tier_verdict(user_import_ordered, user_import_paths, merged_pool, self.pool, oi, root_fn_names) else: FRONTEND_FN_KEEP
             if user_verdict == FRONTEND_FN_DROP:
@@ -2930,7 +2930,7 @@ impl Zcu:
         for oi in 0..root_ordered.len() as i32:
             let id = root_ordered[oi]
             let ik = merged_pool.kind(id)
-            if ik == NodeKind.NK_EXTERN_FN and frontend_vec_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
+            if ik == NodeKind.NK_EXTERN_FN and frontend_list_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
                 continue
             if ik == NodeKind.NK_EXTERN_VAR and frontend_extern_var_shadowed_in_tier(root_ordered, merged_pool, self.pool, oi):
                 continue
@@ -2957,7 +2957,7 @@ fn frontend_path_is_std_rc_module(path: &str) -> bool:
         return true
     false
 
-fn frontend_name_shadowed_by_extern(tier: &Vec[i32], pool: AstPool, name: i32) -> bool:
+fn frontend_name_shadowed_by_extern(tier: &List[i32], pool: AstPool, name: i32) -> bool:
     for i in 0..tier.len() as i32:
         let d = tier[i]
         if pool.kind(d) == NodeKind.NK_EXTERN_FN and pool.get_data0(d) == name:
@@ -2997,14 +2997,14 @@ let FRONTEND_FN_DISPLACE = 2
 // (one global C symbol in every tier), an interface decl (displaced by the
 // on-demand interface merge instead: displace_colliding_interface_fns,
 // #1362) and a c_export fn (one exported C name) keep the drop.
-fn frontend_fn_tier_verdict(tier: &Vec[i32], paths: &Vec[str], pool: AstPool, intern: InternPool, idx: i32, higher_names: &Vec[i32]) -> i32:
+fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: AstPool, intern: InternPool, idx: i32, higher_names: &List[i32]) -> i32:
     let current = tier[idx]
     let current_kind = pool.kind(current)
     if frontend_fn_decl_is_method(pool, intern, current):
         return FRONTEND_FN_KEEP
     let iname = pool.get_data0(current)
     let displaceable = frontend_fn_decl_is_displaceable(pool, intern, current)
-    if frontend_vec_contains_i32(higher_names, iname):
+    if frontend_list_contains_i32(higher_names, iname):
         return if displaceable: FRONTEND_FN_DISPLACE else: FRONTEND_FN_DROP
 
     // Within-tier precedence:
@@ -3112,13 +3112,13 @@ fn frontend_extern_var_matches_decl(pool: AstPool, intern: InternPool, decl: i32
         return false
     other_type == decl_type
 
-fn frontend_extern_var_shadowed_by_tier(tier: &Vec[i32], pool: AstPool, intern: InternPool, decl: i32) -> bool:
+fn frontend_extern_var_shadowed_by_tier(tier: &List[i32], pool: AstPool, intern: InternPool, decl: i32) -> bool:
     for i in 0..tier.len() as i32:
         if frontend_extern_var_matches_decl(pool, intern, decl, tier[i]):
             return true
     false
 
-fn frontend_extern_var_shadowed_in_tier(tier: &Vec[i32], pool: AstPool, intern: InternPool, idx: i32) -> bool:
+fn frontend_extern_var_shadowed_in_tier(tier: &List[i32], pool: AstPool, intern: InternPool, idx: i32) -> bool:
     let decl = tier[idx]
     for j in 0..tier.len() as i32:
         if j == idx:
@@ -3135,7 +3135,7 @@ fn frontend_extern_var_shadowed_in_tier(tier: &Vec[i32], pool: AstPool, intern: 
         j = j + 1
     false
 
-fn frontend_vec_contains_i32(v: &Vec[i32], target: i32) -> bool:
+fn frontend_list_contains_i32(v: &List[i32], target: i32) -> bool:
     for i in 0..v.len() as i32:
         if v[i] == target:
             return true
@@ -3150,7 +3150,7 @@ impl Zcu:
         -1
 
 type DepOrderAccumState {
-    order: Vec[str],
+    order: List[str],
     seen: HashMap[str, i32],
 }
 
@@ -3162,14 +3162,14 @@ impl Copy for DepOrderAccum
 fn DepOrderAccum.new() -> DepOrderAccum:
     let ptr = with_alloc(64) as *mut DepOrderAccumState
     unsafe:
-        *ptr = DepOrderAccumState { order: Vec.new(), seen: HashMap.new() }
+        *ptr = DepOrderAccumState { order: List.new(), seen: HashMap.new() }
     DepOrderAccum { state: ptr }
 
 type ReorderedTier {
-    decls: Vec[i32],
-    paths: Vec[str],
-    file_ids: Vec[i32],
-    ci_flags: Vec[i32],
+    decls: List[i32],
+    paths: List[str],
+    file_ids: List[i32],
+    ci_flags: List[i32],
 }
 
 impl Zcu:
@@ -3191,9 +3191,9 @@ impl Zcu:
                     self.collect_module_dependency_order_frontend(dep.path, wanted_paths, accum)
         accum.state.order.push(frontend_owned_text(path))
 
-    fn reorder_import_tier_frontend(decls: &Vec[i32], paths: &Vec[str], file_ids: &Vec[i32], ci_flags: &Vec[i32]) -> ReorderedTier:
+    fn reorder_import_tier_frontend(decls: &List[i32], paths: &List[str], file_ids: &List[i32], ci_flags: &List[i32]) -> ReorderedTier:
         let wanted_paths: HashMap[str, i32] = HashMap.new()
-        let first_seen_paths = frontend_new_vec_str()
+        let first_seen_paths = frontend_new_list_str()
         for i in 0..paths.len() as i32:
             let path = paths[i]
             if path.len() == 0:
@@ -3208,10 +3208,10 @@ impl Zcu:
             self.collect_module_dependency_order_frontend(first_seen_paths[i], wanted_paths, accum)
 
         let module_order = accum.state.order
-        let out_decls: Vec[i32] = Vec.new()
-        let out_paths = frontend_new_vec_str()
-        let out_file_ids: Vec[i32] = Vec.new()
-        let out_c_import: Vec[i32] = Vec.new()
+        let out_decls: List[i32] = List.new()
+        let out_paths = frontend_new_list_str()
+        let out_file_ids: List[i32] = List.new()
+        let out_c_import: List[i32] = List.new()
         for oi in 0..module_order.len() as i32:
             let module_path = module_order[oi]
             for di in 0..decls.len() as i32:

@@ -8,7 +8,7 @@ use issue1903.hidden
 fn main:
     seed(41)
     let HIDDEN = 3
-    let x: Vec[i32] = Vec.new()
+    let x: List[i32] = List.new()
     let r = first(&x)
     grow()
     print(*r + HIDDEN)

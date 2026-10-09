@@ -16,7 +16,7 @@ extern fn with_runtime_run_one_step()
 var resumed: Atomic[i32]
 var batch_drops: Atomic[i32]
 
-type Batch { values: Vec[i32] }
+type Batch { values: List[i32] }
 impl Drop for Batch:
     move fn drop():
         batch_drops.fetch_add(1, .SeqCst)
@@ -29,34 +29,34 @@ async fn wait_forever(value: i32) -> i32:
     value
 
 // A sync fn that suspends: it awaits each task.
-fn eat(tasks: Vec[Task[i32]]) -> Batch:
+fn eat(tasks: List[Task[i32]]) -> Batch:
     let pending = tasks
     defer:
         while pending.len() > 0: pending.remove(0).join_cleanup()
-    let values: Vec[i32] = Vec.new()
+    let values: List[i32] = List.new()
     while pending.len() > 0:
         values.push(pending.remove(0).await)
     Batch { values }
 
-fn two_tasks -> Vec[Task[i32]]:
-    let tasks: Vec[Task[i32]] = Vec.new()
+fn two_tasks -> List[Task[i32]]:
+    let tasks: List[Task[i32]] = List.new()
     tasks.push(wait_forever(1))
     tasks.push(wait_forever(2))
     tasks
 
-fn apply(f: fn(Vec[Task[i32]]) -> Batch, tasks: Vec[Task[i32]]) -> Batch: f(tasks)
+fn apply(f: fn(List[Task[i32]]) -> Batch, tasks: List[Task[i32]]) -> Batch: f(tasks)
 
-type Holder { f: fn(Vec[Task[i32]]) -> Batch }
+type Holder { f: fn(List[Task[i32]]) -> Batch }
 
 trait Eater:
-    fn eat_tasks(self: &Self, tasks: Vec[Task[i32]]) -> Batch
+    fn eat_tasks(self: &Self, tasks: List[Task[i32]]) -> Batch
 
 type Glutton { n: i32 }
 impl Eater for Glutton:
-    fn eat_tasks(self: &Self, tasks: Vec[Task[i32]]) -> Batch: eat(tasks)
+    fn eat_tasks(self: &Self, tasks: List[Task[i32]]) -> Batch: eat(tasks)
 
 async fn closure_parent -> i32:
-    let c = (tasks: Vec[Task[i32]]) => eat(tasks)
+    let c = (tasks: List[Task[i32]]) => eat(tasks)
     let batch = c(two_tasks())
     resumed.fetch_add(1, .SeqCst)
     batch.values.len() as i32

@@ -1,23 +1,23 @@
 //! expect-stdout: ok
 // Spec test: Section 13.3 — Collection Operations.
 
-fn vec_123() -> Vec[i32]:
-    let xs: Vec[i32] = Vec.new()
+fn list_123() -> List[i32]:
+    let xs: List[i32] = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)
     xs
 
-fn vec_1_to_4() -> Vec[i32]:
-    let xs: Vec[i32] = Vec.new()
+fn list_1_to_4() -> List[i32]:
+    let xs: List[i32] = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)
     xs.push(4)
     xs
 
-fn vec_1_to_10() -> Vec[i32]:
-    let xs: Vec[i32] = Vec.new()
+fn list_1_to_10() -> List[i32]:
+    let xs: List[i32] = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)
@@ -41,38 +41,38 @@ var FOREACH_TOTAL: i32 = 0
 fn add_foreach(x: i32):
     FOREACH_TOTAL = FOREACH_TOTAL + x
 
-fn assert_vec_i32(xs: Vec[i32], a: i32, b: i32, c: i32):
+fn assert_list_i32(xs: List[i32], a: i32, b: i32, c: i32):
     assert(xs.len() == 3)
     assert(xs[0] == a)
     assert(xs[1] == b)
     assert(xs[2] == c)
 
 fn test_reduce:
-    let nums = vec_1_to_4()
+    let nums = list_1_to_4()
     let sum = nums.iter() |> reduce((a, b) => a + b)
     assert(sum.is_some())
     assert(sum.unwrap() == 10)
 
 fn test_fold:
-    let nums = vec_123()
+    let nums = list_123()
     let sum = nums.iter() |> fold(0, (acc, x) => acc + x)
     assert(sum == 6)
 
 fn test_map_collect:
-    let nums = vec_123()
+    let nums = list_123()
     let doubled = nums.iter()
         |> map(x => x * 2)
-        |> collect[Vec]()
-    assert_vec_i32(doubled, 2, 4, 6)
+        |> collect[List]()
+    assert_list_i32(doubled, 2, 4, 6)
 
 fn test_flat_map:
-    let lines: Vec[str] = Vec.new()
+    let lines: List[str] = List.new()
     lines.push("hello world")
     lines.push("foo bar")
 
     let words = lines.iter()
         |> flat_map(s => s.split(" "))
-        |> collect[Vec]()
+        |> collect[List]()
 
     assert(words.len() == 4)
     assert(words[0] == "hello")
@@ -81,17 +81,17 @@ fn test_flat_map:
     assert(words[3] == "bar")
 
 fn test_zip:
-    let nums: Vec[i32] = Vec.new()
+    let nums: List[i32] = List.new()
     nums.push(1)
     nums.push(2)
 
-    let names: Vec[str] = Vec.new()
+    let names: List[str] = List.new()
     names.push("a")
     names.push("b")
 
     let pairs = nums.iter()
         |> zip(names.iter())
-        |> collect[Vec]()
+        |> collect[List]()
 
     assert(pairs.len() == 2)
     let (n0, s0) = pairs[0]
@@ -102,7 +102,7 @@ fn test_zip:
     assert(s1 == "b")
 
 fn test_partition:
-    let nums = vec_1_to_4()
+    let nums = list_1_to_4()
     let (evens, odds) = nums.iter()
         |> partition(x => x % 2 == 0)
 
@@ -114,7 +114,7 @@ fn test_partition:
     assert(odds[1] == 3)
 
 fn test_complex_pipeline:
-    let nums = vec_1_to_10()
+    let nums = list_1_to_10()
     let result = nums.iter()
         |> filter(x => x % 2 == 0)
         |> map(x => x * x)
@@ -124,20 +124,20 @@ fn test_complex_pipeline:
     assert(result == 56)
 
 fn test_membership_filter_pipeline:
-    let nums = vec_1_to_10()
+    let nums = list_1_to_10()
     let values = nums.iter()
         |> filter(x => x in [2, 4, 6])
-        |> collect[Vec]()
-    assert_vec_i32(values, 2, 4, 6)
+        |> collect[List]()
+    assert_list_i32(values, 2, 4, 6)
 
     let refs = nums.iter_ref()
         |> filter(x => *x in [2, 4, 6])
         |> map(x => *x)
-        |> collect[Vec]()
-    assert_vec_i32(refs, 2, 4, 6)
+        |> collect[List]()
+    assert_list_i32(refs, 2, 4, 6)
 
 fn test_adapter_next:
-    let nums = vec_123()
+    let nums = list_123()
     let mapped = nums.iter()
         |> map(x => x * 10)
 
@@ -155,26 +155,26 @@ fn test_adapter_next:
     assert(done.is_none())
 
 fn test_filter_map_and_skip_adapters:
-    let mapped = vec_1_to_4().iter()
+    let mapped = list_1_to_4().iter()
         |> filter_map(maybe_even_double)
-        |> collect[Vec]()
+        |> collect[List]()
     assert(mapped.len() == 2)
     assert(mapped[0] == 4)
     assert(mapped[1] == 8)
 
-    let window = vec_1_to_10().iter()
+    let window = list_1_to_10().iter()
         |> drop(2)
         |> take_while(x => x < 7)
         |> drop_while(x => x < 5)
-        |> collect[Vec]()
+        |> collect[List]()
     assert(window.len() == 2)
     assert(window[0] == 5)
     assert(window[1] == 6)
 
 fn test_enumerate_chain_zip_with_step_by:
-    let enumerated = vec_123().iter()
+    let enumerated = list_123().iter()
         |> enumerate()
-        |> collect[Vec]()
+        |> collect[List]()
     assert(enumerated.len() == 3)
     let (i0, v0) = enumerated[0]
     let (i2, v2) = enumerated[2]
@@ -183,23 +183,23 @@ fn test_enumerate_chain_zip_with_step_by:
     assert(i2 == 2)
     assert(v2 == 3)
 
-    let chained = vec_123().iter()
-        |> chain(vec_1_to_4().iter())
+    let chained = list_123().iter()
+        |> chain(list_1_to_4().iter())
         |> step_by(2)
-        |> collect[Vec]()
+        |> collect[List]()
     assert(chained.len() == 4)
     assert(chained[0] == 1)
     assert(chained[1] == 3)
     assert(chained[2] == 2)
     assert(chained[3] == 4)
 
-    let combined = vec_123().iter()
-        |> zip_with(vec_1_to_4().iter(), (a, b) => a * 10 + b)
-        |> collect[Vec]()
-    assert_vec_i32(combined, 11, 22, 33)
+    let combined = list_123().iter()
+        |> zip_with(list_1_to_4().iter(), (a, b) => a * 10 + b)
+        |> collect[List]()
+    assert_list_i32(combined, 11, 22, 33)
 
 fn test_eager_consumers:
-    let nums = vec_1_to_4()
+    let nums = list_1_to_4()
     assert(nums.iter() |> product() == 24)
     assert((nums.iter() |> min()).unwrap() == 1)
     assert((nums.iter() |> max()).unwrap() == 4)
@@ -218,12 +218,12 @@ fn test_eager_consumers:
 fn test_unzip:
     // §5.2: iterators are ephemeral views; their source vectors must
     // outlive them, so they are bound rather than statement temporaries.
-    let left_src = vec_123()
-    let right_src = vec_1_to_4()
+    let left_src = list_123()
+    let right_src = list_1_to_4()
     let pairs = left_src.iter() |> zip(right_src.iter())
     let (lefts, rights) = pairs.unzip()
-    assert_vec_i32(lefts, 1, 2, 3)
-    assert_vec_i32(rights, 1, 2, 3)
+    assert_list_i32(lefts, 1, 2, 3)
+    assert_list_i32(rights, 1, 2, 3)
 
 fn main:
     test_reduce()

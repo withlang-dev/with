@@ -51,7 +51,7 @@ impl Zcu:
         // Cloned, never moved (here and at the other Codegen seams): the root
         // file's warnings render after codegen (#1447).
         cg.source_text = with_str_clone_ref(self.current_source_text)
-        cg.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
+        cg.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
         cg.add_bundle_prefixes(&self.link_bundle_prefixes)
         cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
@@ -74,7 +74,7 @@ impl Zcu:
         let result = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)
         var tracked_paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &cg.tracked_input_paths)
-        self.last_bundle_unlowered_globals = sema_clone_str_vec(&cg.bundle_unlowered_globals)
+        self.last_bundle_unlowered_globals = sema_clone_str_list(&cg.bundle_unlowered_globals)
         if result != 0:
             self.last_sema = cg.take_sema()
             runtime_eprint(codegen_failure_message("error: code generation failed", &cg.codegen_error_detail))
@@ -145,7 +145,7 @@ impl Zcu:
             var cg = Codegen.init_with_opt_and_intern(f"with_module_u{k}", opt_level, move backend_intern, move self.last_sema)
             cg.source_file = with_str_clone_ref(self.current_source_path)
             cg.source_text = with_str_clone_ref(self.current_source_text)
-            cg.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
+            cg.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
             cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
             cg.add_bundle_prefixes(&self.link_bundle_prefixes)
             cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
@@ -216,7 +216,7 @@ impl Zcu:
         var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, move backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
         cg.source_text = with_str_clone_ref(self.current_source_text)
-        cg.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
+        cg.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
         cg.add_bundle_prefixes(&self.link_bundle_prefixes)
         cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
@@ -261,7 +261,7 @@ impl Zcu:
         var cg = Codegen.init_with_opt_and_intern("with_analysis", opt_level, move backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
         cg.source_text = with_str_clone_ref(self.current_source_text)
-        cg.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
+        cg.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
         cg.add_bundle_prefixes(&self.link_bundle_prefixes)
         cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)

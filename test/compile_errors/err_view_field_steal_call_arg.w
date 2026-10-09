@@ -4,13 +4,13 @@
 // satisfied from a non-Copy field reached through a shared view.
 
 use std.builtins.int_to_string
-type Outer { v: Vec[i32], n: i32 }
+type Outer { v: List[i32], n: i32 }
 
-fn takes_owned(x: Vec[i32]) -> i64:
+fn takes_owned(x: List[i32]) -> i64:
     x.len()
 
 fn main:
-    var o = Outer { v: Vec.new(), n: 7 }
+    var o = Outer { v: List.new(), n: 7 }
     o.v.push(1)
     let r = &o
     print(int_to_string(takes_owned(r.v)))

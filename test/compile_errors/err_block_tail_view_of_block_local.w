@@ -3,8 +3,8 @@
 // #1406: an inner block's tail may yield a view of a binding declared outside
 // it, never of one declared inside it — `w` is dropped when the block ends.
 
-fn mkv() -> Vec[str]:
-    var v: Vec[str] = Vec.new()
+fn mkv() -> List[str]:
+    var v: List[str] = List.new()
     v.push("a".clone())
     v.push("b".clone())
     v

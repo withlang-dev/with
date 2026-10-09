@@ -5,12 +5,12 @@
 // each borrow row, or an earlier body's depth keeps this dead view live.
 
 type Item { value: i32 }
-type Owner { items: Vec[Item] }
+type Owner { items: List[Item] }
 
 fn identity(owner: Owner) -> Owner: owner
 
 fn main:
-    var owner = Owner { items: Vec.new() }
+    var owner = Owner { items: List.new() }
     owner.items.push(Item { value: 41 })
     let view = owner.items[0]
     assert(view.value == 41)

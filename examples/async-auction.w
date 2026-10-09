@@ -202,7 +202,7 @@ async fn run_auction() -> AuctionResult:
 
     // --- Phase 8: await all tasks ---
     print("phase 8: await all")
-    var valuations = Vec.new()
+    var valuations = List.new()
     valuations.push(base_valuation(1))
     valuations.push(base_valuation(2))
     valuations.push(base_valuation(3))
@@ -215,7 +215,7 @@ async fn run_auction() -> AuctionResult:
 
     // --- Phase 9: await first ---
     print("phase 9: await first")
-    var racers = Vec.new()
+    var racers = List.new()
     racers.push(base_valuation(10))
     racers.push(base_valuation(20))
     let first = await_first(racers)

@@ -4,7 +4,7 @@ fn accepts_unit(_value: Unit):
     let _ = _value
 
 fn main:
-    var v: Vec[i32] = Vec.new()
+    var v: List[i32] = List.new()
     accepts_unit(v.push(1))
     v |> push(2) |> clear() |> push(40) |> push(2)
     assert(v.len() == 2)
@@ -17,7 +17,7 @@ fn main:
     assert(v[2] == 40)
     assert(v[3] == 40)
 
-    let built: Vec[i32] = Vec.new() |> push(20) |> push(22)
+    let built: List[i32] = List.new() |> push(20) |> push(22)
     assert(built.len() == 2)
     assert(built[0] + built[1] == 42)
     print("ok")

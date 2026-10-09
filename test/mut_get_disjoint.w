@@ -1,7 +1,7 @@
-// Test: Vec.get_disjoint(i, j) returns (VecSlot[T], VecSlot[T])
+// Test: List.get_disjoint(i, j) returns (ListSlot[T], ListSlot[T])
 
 fn test_basic_swap:
-    var xs = Vec.new()
+    var xs = List.new()
     xs.push(10)
     xs.push(20)
     xs.push(30)
@@ -15,7 +15,7 @@ fn test_basic_swap:
     assert(xs[2] == 10)
 
 fn test_independent_mutation:
-    var xs = Vec.new()
+    var xs = List.new()
     xs.push(1)
     xs.push(2)
     xs.push(3)
@@ -27,7 +27,7 @@ fn test_independent_mutation:
     assert(xs[2] == 3)
 
 fn test_read_only:
-    var xs = Vec.new()
+    var xs = List.new()
     xs.push(5)
     xs.push(10)
     xs.push(15)

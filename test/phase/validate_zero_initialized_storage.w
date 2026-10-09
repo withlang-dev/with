@@ -4,6 +4,6 @@
 use std.collections
 
 fn empty():
-    var values: Vec[str]
+    var values: List[str]
 
 fn main: empty()

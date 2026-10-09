@@ -1,7 +1,7 @@
 //! expect-stdout: 15
 //! expect-stdout: hello world
 fn main:
-    let nums: Vec[i32] = Vec.new()
+    let nums: List[i32] = List.new()
     nums.push(1)
     nums.push(2)
     nums.push(3)
@@ -18,8 +18,8 @@ fn main:
             done = true
     print(int_to_string(total as i64))
 
-    // VecIter[str]
-    let words: Vec[str] = Vec.new()
+    // ListIter[str]
+    let words: List[str] = List.new()
     words.push("hello")
     words.push(" ")
     words.push("world")

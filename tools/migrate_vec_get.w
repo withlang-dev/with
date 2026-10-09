@@ -1,6 +1,6 @@
-// Rewrite `xs.get(i)` on a Vec to `xs[i]` (D71: a positional collection has
+// Rewrite `xs.get(i)` on a List to `xs[i]` (D71: a positional collection has
 // no `get`; `xs[i]` is the one spelling). Sema owns the selection: every site
-// is the compiler's own "Vec has no 'get'" diagnostic (its location and caret
+// is the compiler's own "List has no 'get'" diagnostic (its location and caret
 // span, read from a `with check` log); this tool only matches the call's
 // parentheses with the Lexer and applies the byte edits. Dry-run is default.
 //
@@ -20,7 +20,7 @@ fn source_path(path: &str) -> str:
     let embedded = "<embedded-std>/"
     if path.starts_with(embedded): "lib/" ++ slice(path, embedded.len() as i32, path.len() as i32) else: path.clone()
 
-let message = "error: Vec has no 'get': element access is spelled 'xs[i]' (§ Element access, D71)"
+let message = "error: List has no 'get': element access is spelled 'xs[i]' (§ Element access, D71)"
 
 fn parse_i32(s: &str) -> i32:
     var out = 0
@@ -53,10 +53,10 @@ fn count_carets(line: &str) -> i32:
 
 // A site is three log lines: the message, ` --> path:line:col`, the source
 // line, then the caret line whose `^` count is the span's byte length.
-fn collect_sites(log_path: &str) -> Vec[GetSite]:
+fn collect_sites(log_path: &str) -> List[GetSite]:
     let log = read_file(log_path).unwrap_or("".clone())
     let lines = log.split("\n")
-    let sites: Vec[GetSite] = Vec.new()
+    let sites: List[GetSite] = List.new()
     var li = 0
     while li < lines.len() as i32:
         if lines[li] == message and li + 3 < lines.len() as i32 and lines[(li + 1)].starts_with(" --> "):
@@ -112,7 +112,7 @@ fn collect_sites(log_path: &str) -> Vec[GetSite]:
 fn is_open(tag: i32): tag == TokenKind.TK_L_PAREN or tag == TokenKind.TK_L_BRACKET or tag == TokenKind.TK_L_BRACE
 fn is_close(tag: i32): tag == TokenKind.TK_R_PAREN or tag == TokenKind.TK_R_BRACKET or tag == TokenKind.TK_R_BRACE
 
-fn migrate_file(path: &str, sites: &Vec[GetSite], apply: bool) -> i32:
+fn migrate_file(path: &str, sites: &List[GetSite], apply: bool) -> i32:
     let text = read_file(path).unwrap_or("".clone())
     if text.len() == 0:
         print("migrate-vec-get: cannot read " ++ path)
@@ -120,9 +120,9 @@ fn migrate_file(path: &str, sites: &Vec[GetSite], apply: bool) -> i32:
     var lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
     // Parallel edit lists: byte position, byte length, replacement (0 = `[`, 1 = `]`).
-    let pos: Vec[i32] = Vec.new()
-    let lens: Vec[i32] = Vec.new()
-    let kinds: Vec[i32] = Vec.new()
+    let pos: List[i32] = List.new()
+    let lens: List[i32] = List.new()
+    let kinds: List[i32] = List.new()
     for i in 0..sites.len() as i32:
         let site = sites[i]
         if site.path != path: continue
@@ -197,7 +197,7 @@ fn migrate_file(path: &str, sites: &Vec[GetSite], apply: bool) -> i32:
     let count = (pos.len() / 2) as i32
     print(f"{path}\t{count}")
     if not apply or count == 0: return count
-    let chunks: Vec[str] = Vec.new()
+    let chunks: List[str] = List.new()
     var cursor = 0
     for ei in 0..pos.len() as i32:
         chunks.push(slice(text, cursor, pos[ei]))
@@ -212,14 +212,14 @@ fn migrate_file(path: &str, sites: &Vec[GetSite], apply: bool) -> i32:
 fn main:
     let argv = args()
     var apply = false
-    let logs: Vec[str] = Vec.new()
+    let logs: List[str] = List.new()
     for ai in 1..argv.len() as i32:
         if argv[ai] == "--apply": apply = true
         else: logs.push(argv[ai].clone())
     if logs.len() == 0:
         print("usage: migrate_vec_get [--apply] <check.log>...")
         exit_code(1)
-    let sites: Vec[GetSite] = Vec.new()
+    let sites: List[GetSite] = List.new()
     for li in 0..logs.len() as i32:
         let found = collect_sites(logs[li])
         for fi in 0..found.len() as i32:
@@ -229,7 +229,7 @@ fn main:
                     dup = true
             if not dup:
                 sites.push(GetSite { path: found[fi].path.clone(), start: found[fi].start, end: found[fi].end })
-    let paths: Vec[str] = Vec.new()
+    let paths: List[str] = List.new()
     for si in 0..sites.len() as i32:
         var seen = false
         for pi in 0..paths.len() as i32:

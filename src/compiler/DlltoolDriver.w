@@ -35,7 +35,7 @@ pub fn with_dlltool_cli_main() -> i32:
     if not with_dlltool_available():
         runtime_eprint("error: this build of `with` has no dlltool: only a Windows compiler linked against a windows-gnu LLVM SDK carries one (#1915)")
         return 127
-    let args: Vec[str] = Vec.new()
+    let args: List[str] = List.new()
     args.push("llvm-dlltool")
     for i in 2..with_arg_count(): args.push(with_arg_at(i))
     unsafe:

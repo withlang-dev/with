@@ -17,8 +17,8 @@ fn alloc_mark_unit() -> i64:
 
 pub type Arena {
     block_size: i32,
-    blocks: Vec[i64],
-    block_sizes: Vec[i32],
+    blocks: List[i64],
+    block_sizes: List[i32],
     current: *i8,
     offset: i32,
     capacity: i32,
@@ -27,8 +27,8 @@ pub type Arena {
 
 pub type FrameArena {
     block_size: i32,
-    blocks: Vec[i64],
-    block_sizes: Vec[i32],
+    blocks: List[i64],
+    block_sizes: List[i32],
     current: *i8,
     offset: i32,
     capacity: i32,
@@ -53,15 +53,15 @@ pub type ArenaScope ephemeral {
 pub type Pool {
     item_size: i32,
     slab_capacity: i32,
-    slabs: Vec[i64],
-    free_list: Vec[i64],
+    slabs: List[i64],
+    free_list: List[i64],
 }
 
 pub type PoolAllocator {
     pool: Pool,
 }
 
-pub type ArenaVec[T] ephemeral {
+pub type ArenaList[T] ephemeral {
     arena: *mut Arena,
     ptr: *mut T,
     len_value: i32,
@@ -71,8 +71,8 @@ pub type ArenaVec[T] ephemeral {
 pub fn arena_new(block_size: i32) -> Arena:
     Arena {
         block_size: alloc_default_block_size(block_size),
-        blocks: Vec.new(),
-        block_sizes: Vec.new(),
+        blocks: List.new(),
+        block_sizes: List.new(),
         current: 0 as *i8,
         offset: 0,
         capacity: 0,
@@ -82,8 +82,8 @@ pub fn arena_new(block_size: i32) -> Arena:
 pub fn frame_arena_new(block_size: i32) -> FrameArena:
     FrameArena {
         block_size: alloc_default_block_size(block_size),
-        blocks: Vec.new(),
-        block_sizes: Vec.new(),
+        blocks: List.new(),
+        block_sizes: List.new(),
         current: 0 as *i8,
         offset: 0,
         capacity: 0,
@@ -164,8 +164,8 @@ pub fn Arena.reset_to(mut self: Arena, mark: i64) -> Unit:
     let block_index = mark / alloc_mark_unit()
     let mark_offset = (mark - block_index * alloc_mark_unit()) as i32
     let n = self.blocks.len() as i32
-    var new_blocks: Vec[i64] = Vec.new()
-    var new_sizes: Vec[i32] = Vec.new()
+    var new_blocks: List[i64] = List.new()
+    var new_sizes: List[i32] = List.new()
     for i in 0..n:
         let raw = self.blocks[i]
         let size = self.block_sizes[i]
@@ -201,8 +201,8 @@ pub fn FrameArena.reset(mut self: FrameArena) -> Unit:
         let raw = self.blocks[i]
         if raw != 0:
             free_mem(raw as *i8)
-    let new_blocks: Vec[i64] = Vec.new()
-    let new_sizes: Vec[i32] = Vec.new()
+    let new_blocks: List[i64] = List.new()
+    let new_sizes: List[i32] = List.new()
     new_blocks.push(first)
     new_sizes.push(first_size)
     self.blocks = new_blocks
@@ -216,8 +216,8 @@ impl Drop for Arena:
         for raw in self.blocks:
             if raw != 0:
                 free_mem(raw as *i8)
-        self.blocks = Vec.new()
-        self.block_sizes = Vec.new()
+        self.blocks = List.new()
+        self.block_sizes = List.new()
         self.current = 0 as *i8
         self.offset = 0
         self.capacity = 0
@@ -227,8 +227,8 @@ impl Drop for FrameArena:
         for raw in self.blocks:
             if raw != 0:
                 free_mem(raw as *i8)
-        self.blocks = Vec.new()
-        self.block_sizes = Vec.new()
+        self.blocks = List.new()
+        self.block_sizes = List.new()
         self.current = 0 as *i8
         self.offset = 0
         self.capacity = 0
@@ -309,8 +309,8 @@ pub fn pool_new(item_size: i32, capacity: i32) -> Pool:
     var pool = Pool {
         item_size: pool_effective_item_size(item_size),
         slab_capacity: if capacity > 0: capacity else: 1,
-        slabs: Vec.new(),
-        free_list: Vec.new(),
+        slabs: List.new(),
+        free_list: List.new(),
     }
     pool.add_slab()
     pool
@@ -335,8 +335,8 @@ impl Drop for Pool:
         for raw in self.slabs:
             if raw != 0:
                 free_mem(raw as *i8)
-        self.slabs = Vec.new()
-        self.free_list = Vec.new()
+        self.slabs = List.new()
+        self.free_list = List.new()
 
 pub fn PoolAllocator.alloc(mut self: PoolAllocator) -> *i8:
     self.pool.alloc()
@@ -350,13 +350,13 @@ impl Drop for PoolAllocator:
         // self.pool.drop() here would double-free it.
         ()
 
-pub fn arena_vec_new_in[T](arena: *mut Arena) -> ArenaVec[T]:
-    ArenaVec { arena: arena, ptr: 0 as *mut T, len_value: 0, cap_value: 0 }
+pub fn arena_list_new_in[T](arena: *mut Arena) -> ArenaList[T]:
+    ArenaList { arena: arena, ptr: 0 as *mut T, len_value: 0, cap_value: 0 }
 
-pub unsafe fn arena_vec_len[T](xs: *const ArenaVec[T]) -> i32:
+pub unsafe fn arena_list_len[T](xs: *const ArenaList[T]) -> i32:
     (*xs).len_value
 
-unsafe fn arena_vec_grow[T](xs: *mut ArenaVec[T]):
+unsafe fn arena_list_grow[T](xs: *mut ArenaList[T]):
     let cap = (*xs).cap_value
     let new_cap = if cap < 8: 8 else: cap * 2
     let bytes = new_cap * (sizeof[T]() as i32)
@@ -369,15 +369,15 @@ unsafe fn arena_vec_grow[T](xs: *mut ArenaVec[T]):
     ((*xs).ptr = next)
     ((*xs).cap_value = new_cap)
 
-pub unsafe fn arena_vec_push[T](xs: *mut ArenaVec[T], value: T) -> Unit:
+pub unsafe fn arena_list_push[T](xs: *mut ArenaList[T], value: T):
     if (*xs).len_value >= (*xs).cap_value:
-        arena_vec_grow(xs)
+        arena_list_grow(xs)
     let len = (*xs).len_value
     let dst = (*xs).ptr + (len as usize)
     mem_copy(dst as *i8, &value as *const T as *i8, sizeof[T]() as i32)
-    ((*xs).len_value = len + 1)
+    (*xs).len_value = len + 1
 
-pub unsafe fn arena_vec_get[T](xs: *const ArenaVec[T], index: i32) -> T:
+pub unsafe fn arena_list_get[T](xs: *const ArenaList[T], index: i32) -> T:
     if index < 0 or index >= (*xs).len_value:
-        panic("ArenaVec index out of bounds")
+        panic("ArenaList index out of bounds")
     *((*xs).ptr + (index as usize))

@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
-// A5: moving a Vec field out through a move-self receiver transfers ownership
-// to the returned Vec. The consumed owner must not also drop the moved field.
+// A5: moving a List field out through a move-self receiver transfers ownership
+// to the returned List. The consumed owner must not also drop the moved field.
 
 type W { slot: *mut i32 }
 impl Drop for W:
@@ -9,14 +9,14 @@ impl Drop for W:
         unsafe:
             *self.slot = *self.slot + 1
 
-type Holder { values: Vec[W] }
+type Holder { values: List[W] }
 
 fn make_holder(slot: *mut i32) -> Holder:
-    let values: Vec[W] = Vec.new()
+    let values: List[W] = List.new()
     values.push(W { slot: slot })
     Holder { values: values }
 
-fn Holder.into_values(move self: Holder) -> Vec[W]:
+fn Holder.into_values(move self: Holder) -> List[W]:
     // D32: field vacates need a mutable path — rebind the consumed self.
     var owned = self
     return move owned.values

@@ -10,10 +10,10 @@ fn days_per_year() -> f64: 365.24
 type Body { x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, mass: f64 }
 impl Copy for Body
 
-type System { bodies: Vec[Body] }
+type System { bodies: List[Body] }
 
 fn solar_system() -> System:
-    var bodies: Vec[Body] = Vec.with_capacity(5)
+    var bodies: List[Body] = List.with_capacity(5)
     bodies.push(Body { x: 0.0, y: 0.0, z: 0.0, vx: 0.0, vy: 0.0, vz: 0.0, mass: solar_mass() })
     bodies.push(Body {
         x: 4.84143144246472090e+00, y: -1.16032004402742839e+00, z: -1.03622044471123109e-01,

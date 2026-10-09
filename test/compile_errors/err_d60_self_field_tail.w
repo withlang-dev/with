@@ -2,12 +2,12 @@
 
 // §9.1 / D60 with D32: the tail assignment yields a read of `self.items`,
 // and a field never moves out implicitly — the error the tail `self.items`
-// gets. A Vec field, not a str: a str field is copied (D111).
+// gets. A List field, not a str: a str field is copied (D111).
 
-type Holder { n: i32, items: Vec[i32] }
+type Holder { n: i32, items: List[i32] }
 extend Holder:
-    mut fn replace(v: Vec[i32]) -> Vec[i32]: self.items = v
+    mut fn replace(v: List[i32]) -> List[i32]: self.items = v
 
 fn main:
-    var h = Holder { n: 0, items: Vec.new() }
+    var h = Holder { n: 0, items: List.new() }
     print(h.replace([1]).len())

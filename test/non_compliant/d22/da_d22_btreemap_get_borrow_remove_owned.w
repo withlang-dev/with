@@ -1,10 +1,10 @@
 //! D22-NON-COMPLIANT
 //! owner-stage: 6
 //! required-verdict: compile-and-run under `--debug-alloc`
-//! exact-type: `found` is `Option[&Vec[i64]]`; `view` is `&Vec[i64]`; `removed` is `Option[Vec[i64]]`
+//! exact-type: `found` is `Option[&List[i64]]`; `view` is `&List[i64]`; `removed` is `Option[List[i64]]`
 //! expected-diagnostic: none
 //! origin-set: `view` has `{map}`; removed values have `{}`
-//! drop-behavior: replaced, removed, and retained Vec buffers drop exactly once; leak count=0
+//! drop-behavior: replaced, removed, and retained List buffers drop exactly once; leak count=0
 //! expect-debug-alloc: leak count=0
 
 // D22 gives BTreeMap the same ownership split as HashMap: get borrows map
@@ -12,26 +12,26 @@
 // every non-Copy value exactly once.
 use std.collections.BTreeMap
 fn values(a: i64, b: i64):
-    let out: Vec[i64] = Vec.new()
+    let out: List[i64] = List.new()
     out.push(a)
     out.push(b)
     out
 
 fn main:
-    let map: BTreeMap[i32, Vec[i64]] = BTreeMap.new()
+    let map: BTreeMap[i32, List[i64]] = BTreeMap.new()
     map.insert(30, values(30, 31))
     map.insert(10, values(10, 11))
     map.insert(20, values(20, 21))
     map.insert(20, values(200, 201))
     assert(map.len() == 3)
 
-    let found: Option[&Vec[i64]] = map.get(20)
+    let found: Option[&List[i64]] = map.get(20)
     assert(found.is_some())
     let view = found.unwrap()
     assert(view.len() == 2)
     assert(view[0] == 200)
 
-    let removed: Option[Vec[i64]] = map.remove(20)
+    let removed: Option[List[i64]] = map.remove(20)
     assert(removed.is_some())
     let owned = removed.unwrap()
     assert(owned.len() == 2)

@@ -4,11 +4,11 @@
 // D61: an expect on Err panics with its message and the error's `:?` form.
 
 enum ConfigError:
-    Missing(Vec[str])
+    Missing(List[str])
     Unreadable
 
 fn load() -> Result[i32, ConfigError]:
-    let tried: Vec[str] = Vec.new()
+    let tried: List[str] = List.new()
     tried.push("a.toml")
     tried.push("b.toml")
     Err(.Missing(tried))

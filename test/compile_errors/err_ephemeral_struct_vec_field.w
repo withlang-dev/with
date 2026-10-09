@@ -5,7 +5,7 @@ type Token = ephemeral {
 }
 
 type Module {
-    tokens: Vec[Token],
+    tokens: List[Token],
 }
 
 fn main:

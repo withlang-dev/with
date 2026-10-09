@@ -7,5 +7,5 @@ async fn process(value: &i32) -> i32:
 fn main:
     let value = 42
     let task = process(&value)
-    var tasks = Vec[Task[i32]].new()
+    var tasks = List[Task[i32]].new()
     tasks.push(task)

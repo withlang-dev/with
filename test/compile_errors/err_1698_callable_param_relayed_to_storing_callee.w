@@ -6,7 +6,7 @@
 type Cnt { f: fn() -> i32 }
 fn relay(f: fn() -> i32) -> Cnt: wrap(f)
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(1)
     let c = relay(() => xs.len32())
     print(c.f())

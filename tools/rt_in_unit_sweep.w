@@ -9,7 +9,7 @@ use std.fs
 
 fn owned(s: &str): s ++ ""     // #762: .clone() on a &str view
 
-fn arg_or(argv: &Vec[str], i: i32, fallback: &str) -> str:
+fn arg_or(argv: &List[str], i: i32, fallback: &str) -> str:
     if argv.len() as i32 > i:
         return owned(argv[i])
     owned(fallback)
@@ -23,11 +23,11 @@ fn in_glob(path: &str) -> bool:
     not path.slice(ROOT.len(), path.len()).contains("/")
 
 fn sweep(out_path: &str) -> i32:
-    var fails: Vec[str] = Vec.new()
+    var fails: List[str] = List.new()
     var ran = 0
     for line in list_files_text("test/behavior").split("\n"):
         if not in_glob(line): continue
-        var cmd: Vec[str] = Vec.new()
+        var cmd: List[str] = List.new()
         cmd.push("with")
         cmd.push("test")
         cmd.push("--quiet")

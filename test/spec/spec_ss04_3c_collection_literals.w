@@ -9,14 +9,14 @@ fn test_fixed_array_default:
     assert(xs[1] == 2)
     assert(xs[2] == 3)
 
-fn test_vec_expected_type:
-    let xs: Vec[i32] = [1, 2, 3]
+fn test_list_expected_type:
+    let xs: List[i32] = [1, 2, 3]
     assert(xs.len() == 3)
     assert(xs[0] == 1)
     assert(xs[1] == 2)
     assert(xs[2] == 3)
 
-    let empty: Vec[i32] = []
+    let empty: List[i32] = []
     assert(empty.len() == 0)
 
 fn test_hashset_expected_type:
@@ -36,7 +36,7 @@ fn test_hashmap_default_and_empty:
 
 fn main:
     test_fixed_array_default()
-    test_vec_expected_type()
+    test_list_expected_type()
     test_hashset_expected_type()
     test_hashmap_default_and_empty()
     print("ok")

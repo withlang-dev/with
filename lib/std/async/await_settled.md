@@ -2,7 +2,7 @@
 
 ## Signature
 ```with
-pub async fn await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Vec[Result[T, E]]
+pub async fn await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> List[Result[T, E]]
 ```
 
 ## Behavior
@@ -21,7 +21,7 @@ pub async fn await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Ve
 
 ## Example
 ```with
-let tasks = Vec.new()
+let tasks = List.new()
 tasks.push(fetch_a())
 tasks.push(fetch_b())
 let settled = await_settled(tasks)

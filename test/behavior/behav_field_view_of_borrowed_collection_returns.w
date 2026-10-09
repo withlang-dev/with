@@ -15,9 +15,9 @@
 
 use std.collections
 
-enum JV { Null | Str(str) | Object(Vec[KV]) }
+enum JV { Null | Str(str) | Object(List[KV]) }
 type KV { key: str, value: JV }
-type Bag { items: Vec[KV], counts: HashMap[str, KV] }
+type Bag { items: List[KV], counts: HashMap[str, KV] }
 
 fn get_for(val: &JV, key: str) -> Option[&JV]:
     match val:
@@ -38,7 +38,7 @@ fn get_idx(val: &JV, key: str) -> Option[&JV]:
             None
         _ => None
 
-fn key_for(v: &Vec[KV], i: i32) -> &str:
+fn key_for(v: &List[KV], i: i32) -> &str:
     for e in v:
         if e.key == v[i].key:
             return &e.key
@@ -71,17 +71,17 @@ fn show(v: Option[&JV]):
         None => print("none")
 
 fn main:
-    var kvs: Vec[KV] = Vec.new()
+    var kvs: List[KV] = List.new()
     kvs.push(KV { key: "a", value: .Str("x") })
     kvs.push(KV { key: "b", value: .Str("y") })
     let jv = JV.Object(kvs)
     show(get_for(jv, "b"))
     show(get_idx(jv, "a"))
     show(get_idx(jv, "c"))
-    var inner: Vec[KV] = Vec.new()
+    var inner: List[KV] = List.new()
     inner.push(KV { key: "p", value: .Null })
     inner.push(KV { key: "q", value: .Null })
-    var items: Vec[KV] = Vec.new()
+    var items: List[KV] = List.new()
     items.push(KV { key: "obj", value: .Object(inner) })
     items.push(KV { key: "b", value: .Str("y") })
     var counts: HashMap[str, KV] = HashMap.new()

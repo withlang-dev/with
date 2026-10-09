@@ -26,7 +26,7 @@ fn main:
     print(f"sum: {sum_bytes(arr[..])}")
     let empty: [u8; 0] = []
     print(f"empty: {sum_bytes(empty[..])}")
-    var v: Vec[u8] = Vec.new()
+    var v: List[u8] = List.new()
     v.push(1)
     v.push(2)
     v.push(3)

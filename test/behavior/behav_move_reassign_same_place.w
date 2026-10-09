@@ -1,18 +1,18 @@
 type Options {
     name: str,
-    values: Vec[i32],
+    values: List[i32],
 }
 
 fn normalize(options: Options) -> Options:
     var out = options
     out
 
-fn normalize_values(values: Vec[i32]) -> Vec[i32]:
+fn normalize_values(values: List[i32]) -> List[i32]:
     var out = values
     out
 
 fn main:
-    var options = Options { name: "kept", values: Vec.new() }
+    var options = Options { name: "kept", values: List.new() }
     options.values.push(1)
     options = normalize(move options)
     if options.name != "kept":

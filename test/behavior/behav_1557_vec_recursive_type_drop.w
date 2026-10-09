@@ -1,9 +1,9 @@
 //! expect-stdout: 7 7
 //! expect-stdout: 7
-// #1557: a type recursive through a Vec (`N { next: Vec[N] }`). Codegen
-// inlined each element's drop glue into the Vec's element loop, so N's glue
-// expanded N -> Vec[N] -> N without end and the compiler overflowed its
-// stack (exit 139) on the first drop of a Vec[N]. The element drop now calls
+// #1557: a type recursive through a List (`N { next: List[N] }`). Codegen
+// inlined each element's drop glue into the List's element loop, so N's glue
+// expanded N -> List[N] -> N without end and the compiler overflowed its
+// stack (exit 139) on the first drop of a List[N]. The element drop now calls
 // N's named drop fn. Every node drops exactly once: seven Tags, seven drops.
 
 global var dropped = 0
@@ -13,9 +13,9 @@ impl Drop for Tag:
     move fn drop():
         dropped = dropped + 1
 
-type N { tag: Tag, next: Vec[N] }
+type N { tag: Tag, next: List[N] }
 
-fn node(id: i32, kids: Vec[N]) -> N: N { tag: Tag { id: id }, next: kids }
+fn node(id: i32, kids: List[N]) -> N: N { tag: Tag { id: id }, next: kids }
 
 fn count(t: &N) -> i32:
     var total = 1
@@ -24,13 +24,13 @@ fn count(t: &N) -> i32:
     total
 
 fn main:
-    let empty: Vec[N] = Vec.new()
-    var leaves: Vec[N] = Vec.new()
+    let empty: List[N] = List.new()
+    var leaves: List[N] = List.new()
     for i in 0..4:
-        leaves.push(node(10 + i, Vec.new()))
-    var mid: Vec[N] = Vec.new()
+        leaves.push(node(10 + i, List.new()))
+    var mid: List[N] = List.new()
     mid.push(node(2, leaves))
-    mid.push(node(3, Vec.new()))
+    mid.push(node(3, List.new()))
     let root = node(1, mid)
     let before = count(&root)
     drop(root)

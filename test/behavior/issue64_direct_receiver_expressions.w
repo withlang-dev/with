@@ -1,11 +1,11 @@
 type Inner {
-    tags: Vec[i32],
+    tags: List[i32],
 }
 
-fn make_items() -> Vec[Inner]:
-    let items: Vec[Inner] = Vec.new()
-    items.push(Inner { tags: Vec.new() })
-    items.push(Inner { tags: Vec.new() })
+fn make_items() -> List[Inner]:
+    let items: List[Inner] = List.new()
+    items.push(Inner { tags: List.new() })
+    items.push(Inner { tags: List.new() })
     items
 
 fn main:

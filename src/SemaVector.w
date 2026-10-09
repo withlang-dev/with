@@ -20,7 +20,7 @@ impl Sema:
     // Called once while the primitive names are registered: every alias
     // names its Vector or Mask type.
     mut fn register_vector_aliases():
-        let lanes: Vec[i32] = Vec.new()
+        let lanes: List[i32] = List.new()
         lanes.push(self.ty_i8 as i32)
         lanes.push(self.ty_i16 as i32)
         lanes.push(self.ty_i32 as i32)

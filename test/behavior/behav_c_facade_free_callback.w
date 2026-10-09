@@ -35,8 +35,8 @@ fn main:
     apply_void(add, context)
     assert(context.base == 35)
     // An ordinary closure carries a mutable capture safely through typed
-    // userdata. The shared userdata is the callable, not a mutable Vec.
-    var seen: Vec[i32] = Vec.new()
+    // userdata. The shared userdata is the callable, not a mutable List.
+    var seen: List[i32] = List.new()
     let sink = value => { seen.push(value); 0 }
     assert(apply(collect, sink, 7) == 0)
     assert(apply(collect, sink, 9) == 0)

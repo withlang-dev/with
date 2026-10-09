@@ -4,7 +4,7 @@
 // trait. The parser previously demanded `for` after the generic arguments (it
 // assumed any `impl[..] Name[..]` was a trait impl). D7 P3 needs this: relocating
 // top-level `fn Type.method(self)` into impl blocks requires it for generic types
-// like `Vec[T]`. Associated functions (no receiver) stay at top level.
+// like `List[T]`. Associated functions (no receiver) stay at top level.
 
 type Box[T] { val: T }
 

@@ -24,7 +24,7 @@ fn main:
     assert(generic_own(3) == 6)
     assert(owner_label() == "owner" and importer_label() == "importer")
     assert(not importer_is_digit(33) and importer_is_digit(57))
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(48)
     xs.push(33)
     xs.push(57)

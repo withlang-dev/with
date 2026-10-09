@@ -24,7 +24,7 @@ pub async fn await_first[T](tasks: impl IntoIter[Task[T]]) -> T
 
 ## Example
 ```with
-let tasks = Vec.new()
+let tasks = List.new()
 tasks.push(fetch_primary())
 tasks.push(fetch_fallback())
 let winner = await_first(tasks)

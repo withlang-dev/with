@@ -1,6 +1,6 @@
 //! expect-debug-alloc: leak count=0
 
-// D61: every `:?` formatter — synthesized struct/enum/Vec/array/tuple/Box
+// D61: every `:?` formatter — synthesized struct/enum/List/array/tuple/Box
 // bodies, a std map's formatter, an explicit impl's debug_str — returns one
 // owned str that the buffer copies and the statement drops. Nothing leaks.
 
@@ -9,7 +9,7 @@ use std.collections.BTreeMap
 use std.box.Box
 
 type Inner { text: str, n: i32 }
-type Outer { inner: Inner, tags: Vec[str], pair: (str, i32) }
+type Outer { inner: Inner, tags: List[str], pair: (str, i32) }
 enum Wire:
     Raw(str)
     Packed(Outer)
@@ -22,18 +22,18 @@ enum Chain:
     End
 
 fn main:
-    let tags: Vec[str] = Vec.new()
+    let tags: List[str] = List.new()
     tags.push("a")
     tags.push("b")
     let outer = Outer { inner: Inner { text: "in", n: 1 }, tags, pair: ("p", 2) }
     let s1 = f"{outer:?}"
-    let wire = Wire.Packed(Outer { inner: Inner { text: "w", n: 2 }, tags: Vec.new(), pair: ("q", 3) })
+    let wire = Wire.Packed(Outer { inner: Inner { text: "w", n: 2 }, tags: List.new(), pair: ("q", 3) })
     let s2 = f"{wire:?} {Wire.Raw("r"):?} {Wire.Off:?}"
-    var map: HashMap[str, Vec[Custom]] = HashMap.new()
-    let customs: Vec[Custom] = Vec.new()
+    var map: HashMap[str, List[Custom]] = HashMap.new()
+    let customs: List[Custom] = List.new()
     customs.push(Custom { text: "c" })
     map.insert("k", customs)
-    map.insert("j", Vec.new())
+    map.insert("j", List.new())
     let s3 = f"{map:?}"
     var tree: BTreeMap[i32, Custom] = BTreeMap.new()
     tree.insert(2, Custom { text: "t" })

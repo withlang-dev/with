@@ -4,7 +4,7 @@
 // which cannot be stored into that reference-typed binding.
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(50)
     var off = xs[0]
     off = off + 1

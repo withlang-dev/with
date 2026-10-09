@@ -6,15 +6,15 @@ type Entry {
 }
 
 type Wrapper[T] {
-    items: Vec[T],
+    items: List[T],
 }
 
 type Outer[T] {
     wrapped: Wrapper[T],
 }
 
-fn make_entries(name0: str, rank0: i32, name1: str, rank1: i32) -> Vec[Entry]:
-    let items: Vec[Entry] = Vec.new()
+fn make_entries(name0: str, rank0: i32, name1: str, rank1: i32) -> List[Entry]:
+    let items: List[Entry] = List.new()
     items.push(Entry { name: name0, rank: rank0 })
     items.push(Entry { name: name1, rank: rank1 })
     items
@@ -29,10 +29,10 @@ fn make_outer(name0: str, rank0: i32, name1: str, rank1: i32) -> Outer[Entry]:
     let out: Outer[Entry] = Outer { wrapped }
     out
 
-fn vec_name_eq(w: &Wrapper[Entry]) -> bool:
+fn list_name_eq(w: &Wrapper[Entry]) -> bool:
     w.items[0].name == w.items[1].name
 
-fn vec_rank_eq(w: &Wrapper[Entry]) -> bool:
+fn list_rank_eq(w: &Wrapper[Entry]) -> bool:
     w.items[0].rank == w.items[1].rank
 
 fn nested_name_eq(o: &Outer[Entry]) -> bool:
@@ -59,8 +59,8 @@ fn loop_find_rank(o: &Outer[Entry], target: i32) -> bool:
 
 fn main:
     let same_names = make_wrapper("x", 1, "x", 2)
-    assert(vec_name_eq(same_names))
-    assert(not vec_rank_eq(same_names))
+    assert(list_name_eq(same_names))
+    assert(not list_rank_eq(same_names))
 
     let same_ranks = make_outer("a", 9, "b", 9)
     assert(not nested_name_eq(same_ranks))

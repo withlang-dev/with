@@ -7,7 +7,7 @@
 use std.collections.HashMap
 
 fn names(m: &HashMap[str, i32]) -> str:
-    var out: Vec[str] = Vec.new()
+    var out: List[str] = List.new()
     for (name, _) in m: out.push(name)
     out.join(" ")
 
@@ -23,6 +23,6 @@ fn main:
     for n in [3, 1, 4, 1, 3]: seen.insert(n, true)
     for i in 0..200: seen.insert(1000 + i, true)
     for i in 0..200: let _ = seen.remove(1000 + i)
-    var order: Vec[str] = Vec.new()
+    var order: List[str] = List.new()
     for (n, _) in seen: order.push(f"{n}")
     print(order.join(" "))

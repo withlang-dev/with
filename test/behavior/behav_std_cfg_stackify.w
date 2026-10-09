@@ -2,8 +2,8 @@
 
 use std.cfg.stackify
 
-fn no_args -> Vec[i32]:
-    Vec.new()
+fn no_args -> List[i32]:
+    List.new()
 
 fn count_kind(tree: &StackifyTree, kind: i32) -> i32:
     var count = 0
@@ -30,7 +30,7 @@ fn test_straight_line:
     assert(b0 == 0)
     assert(b1 == 1)
     g.set_br(b0, b1, no_args())
-    let values: Vec[i32] = Vec.new()
+    let values: List[i32] = List.new()
     values.push(7)
     g.set_return(b1, values)
 
@@ -74,8 +74,8 @@ fn test_natural_loop:
     assert(has_node_for_block(&result.tree, StackifyNodeKind.Loop, header))
     assert(count_kind(&result.tree, StackifyNodeKind.Br) >= 1)
 
-fn one_arg(value: i32) -> Vec[i32]:
-    let args: Vec[i32] = Vec.new()
+fn one_arg(value: i32) -> List[i32]:
+    let args: List[i32] = List.new()
     args.push(value)
     args
 

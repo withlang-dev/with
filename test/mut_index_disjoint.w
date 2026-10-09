@@ -6,7 +6,7 @@ fn read_val(r: &Item) -> i32:
     r.val
 
 fn test_disjoint_constant_indices:
-    var xs = Vec.new()
+    var xs = List.new()
     xs.push(10)
     xs.push(20)
     xs.push(30)
@@ -16,7 +16,7 @@ fn test_disjoint_constant_indices:
     assert(*b == 20)
 
 fn test_borrow_and_assign_disjoint:
-    var items = Vec.new()
+    var items = List.new()
     items.push(Item { val: 10 })
     items.push(Item { val: 20 })
     items.push(Item { val: 30 })

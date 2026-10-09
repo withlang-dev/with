@@ -86,7 +86,7 @@ fn wo_abs(root: &str, path: &str) -> str:
         return wo_owned_text(path)
     root ++ "/" ++ path
 
-pub fn wo_arg_value(args: &Vec[str], prefix: &str) -> str:
+pub fn wo_arg_value(args: &List[str], prefix: &str) -> str:
     for i in 0..args.len() as i32:
         let arg = args[i]
         if arg.starts_with(prefix):
@@ -252,7 +252,7 @@ pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: 
 
     // Published in this order so the manifest — the record the presence
     // check trusts — lands after the files it describes.
-    let exts: Vec[str] = Vec.new()
+    let exts: List[str] = List.new()
     exts.push("o")
     exts.push("wi")
     exts.push("manifest")
@@ -327,7 +327,7 @@ pub fn wo_drift_target(ctx: &BuildCtx, plan: &WoBundle, compiler: &str, compiler
     target = target.arg("dir=" ++ dir)
     target = target.input(wo_owned_text(compiler))
     target = target.input(wo_owned_text(harness))
-    let kinds: Vec[str] = Vec.new()
+    let kinds: List[str] = List.new()
     kinds.push("o")
     kinds.push("wi")
     kinds.push("manifest")
@@ -364,7 +364,7 @@ pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
 
     // The rebuild: same corpus, same ABI, this compiler generation, the
     // prelude off as in the bundle build.
-    var build_args: Vec[str] = Vec.new()
+    var build_args: List[str] = List.new()
     build_args.push(wo_abs(root, compiler))
     build_args.push("build")
     build_args.push(wo_abs(root, root_path))
@@ -388,7 +388,7 @@ pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
         return wo_fail(ctx, "declaration drift: " ++ scratch ++ ".wi rebuilt by " ++ compiler ++ " differs from " ++ stored ++ ".wi (corpus and ABI unchanged); diff them before anything else")
     let stored_manifest = fs.read_text(stored ++ ".manifest")
     let scratch_manifest = fs.read_text(scratch ++ ".manifest")
-    let fields: Vec[str] = Vec.new()
+    let fields: List[str] = List.new()
     fields.push("abi-sha")
     fields.push("target")
     fields.push("fingerprint")
@@ -424,7 +424,7 @@ pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
 fn wo_drift_run_harness(ctx: &ActionCtx, compiler: &str, harness: &str, harness_arg: &str, harness_bin: &str, bundle: &str, label: &str) -> i32:
     let root = ctx.project_info().project_root()
     let capture_dir = "out/command/" ++ ctx.target_name()
-    var harness_args: Vec[str] = Vec.new()
+    var harness_args: List[str] = List.new()
     harness_args.push(wo_abs(root, compiler))
     harness_args.push("build")
     harness_args.push(wo_abs(root, harness))
@@ -437,7 +437,7 @@ fn wo_drift_run_harness(ctx: &ActionCtx, compiler: &str, harness: &str, harness_
     let built = wo_run(ctx, "harness-build-" ++ label, &harness_args, ctx.timeout())
     if built.rc != 0:
         return wo_fail(ctx, f"harness build against the {label} bundle failed with exit code {built.rc}; captures under {capture_dir}" ++ wo_captured_output(&built))
-    var run_args: Vec[str] = Vec.new()
+    var run_args: List[str] = List.new()
     run_args.push(wo_abs(root, harness_bin))
     if harness_arg.len() > 0:
         run_args.push(wo_owned_text(harness_arg))
@@ -448,7 +448,7 @@ fn wo_drift_run_harness(ctx: &ActionCtx, compiler: &str, harness: &str, harness_
 
 // "" when the slot holds a coherent bundle of this corpus, else why not.
 fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &str, abi_sha: &str, compiler_src_sha: &str) -> str:
-    let exts: Vec[str] = Vec.new()
+    let exts: List[str] = List.new()
     exts.push("o")
     exts.push("wi")
     exts.push("manifest")
@@ -477,7 +477,7 @@ fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &st
         return store_prefix ++ ".o (sha256 " ++ object_sha ++ ") is not the object the stored manifest was built with"
     ""
 
-fn wo_run(ctx: &ActionCtx, label: &str, argv: &Vec[str], timeout_ms: i32) -> ToolProcessResult:
+fn wo_run(ctx: &ActionCtx, label: &str, argv: &List[str], timeout_ms: i32) -> ToolProcessResult:
     let root = ctx.project_info().project_root()
     let capture_dir = "out/command/" ++ ctx.target_name()
     var process_env = process_env()
@@ -525,7 +525,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     // Present: the slot holds this corpus, coherently — copy it in.
     let missing = wo_slot_status(fs, store_prefix, corpus_sha, target, abi_sha, compiler_src_sha)
     if missing.len() == 0:
-        let exts: Vec[str] = Vec.new()
+        let exts: List[str] = List.new()
         exts.push("o")
         exts.push("wi")
         exts.push("manifest")
@@ -539,7 +539,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
 
     // Only the compiler carrying the slot's ABI identity builds a bundle; an
     // unstamped binary carries the sentinel and never matches.
-    var abi_args: Vec[str] = Vec.new()
+    var abi_args: List[str] = List.new()
     abi_args.push(wo_abs(root, compiler))
     abi_args.push("version")
     abi_args.push("--abi-sha")
@@ -563,7 +563,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     // std.regex reaches the corpus too and the interface emitter's module
     // lookup fails (#954); the object and interface are byte-identical
     // either way.
-    var build_args: Vec[str] = Vec.new()
+    var build_args: List[str] = List.new()
     build_args.push(wo_abs(root, compiler))
     build_args.push("build")
     build_args.push(wo_abs(root, root_path))
@@ -591,7 +591,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     // D39: the interface must reproduce the source's exported-declaration
     // graph exactly — the second fingerprint pass, out of process, under the
     // same target (layouts are the target's).
-    var check_args: Vec[str] = Vec.new()
+    var check_args: List[str] = List.new()
     check_args.push(wo_abs(root, compiler))
     check_args.push("check")
     check_args.push(wo_abs(root, tmp_wi))

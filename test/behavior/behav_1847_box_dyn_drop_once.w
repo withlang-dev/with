@@ -4,7 +4,7 @@
 // its owner's drop point, then frees the cell. The vtable carries the
 // concrete type's drop glue; a dyn method call borrows its receiver unless
 // the method consumes it. On base, `Tok`'s Drop never ran (every `dropN`
-// missing), a Box[Concrete] pushed onto a Vec[Box[dyn T]] or stored in a
+// missing), a Box[Concrete] pushed onto a List[Box[dyn T]] or stored in a
 // Box[dyn T] field aborted codegen, and a call through the box moved it.
 // One trace line pins order and count (expect-stdout is substring-matched,
 // #1855).
@@ -78,9 +78,9 @@ fn main:
         b = Box.new(Tok { n: 6 })
         note(f"name{b.name()}")
     }
-    // In a Vec: the Vec's drop drops each box.
+    // In a List: the List's drop drops each box.
     {
-        var v: Vec[Box[dyn Named]] = Vec.new()
+        var v: List[Box[dyn Named]] = List.new()
         v.push(Box.new(Tok { n: 7 }))
         v.push(Box.new(Label { text: "x" ++ "y" }))
         note(f"len{v.len()}")

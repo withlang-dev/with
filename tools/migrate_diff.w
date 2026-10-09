@@ -39,20 +39,20 @@ fn normalize(line: &str) -> str:
     /_[0-9]+/g.replace(out, "_")
 
 // name → normalized body lines, from one `--dump-mir` text, in name order.
-fn split_bodies(dump: &str) -> BTreeMap[str, Vec[str]]:
-    var out: BTreeMap[str, Vec[str]] = BTreeMap.new()
+fn split_bodies(dump: &str) -> BTreeMap[str, List[str]]:
+    var out: BTreeMap[str, List[str]] = BTreeMap.new()
     var name = ""
-    var body: Vec[str] = Vec.new()
+    var body: List[str] = List.new()
     for line in dump.split("\n"):
         if line.starts_with("fn sym") and line.ends_with(") {"):
             if name.len() > 0: out.insert(name.clone(), move body)
-            body = Vec.new()
+            body = List.new()
             let open = line.find("(")
             name = line[open + 1..line.len() - 3].to_owned()
         else if name.len() > 0:
             if line == "}":
                 out.insert(name.clone(), move body)
-                body = Vec.new()
+                body = List.new()
                 name = ""
             else:
                 body.push(normalize(line))
@@ -75,7 +75,7 @@ fn dump_side(label: &str, src_dir: &str, main: &str, sub: &str) -> str:
     // dump holds no corpus body at all, and with the prelude on its
     // std.regex reaches the checkout's lib/std/re beside this tree (refused:
     // one std module, one source).
-    let argv: Vec[str] = ["with", "check", "lib/std/" ++ sub ++ "/" ++ main, "--dump-mir", "--bundle-corpus", "std/" ++ sub, "--no-prelude"]
+    let argv: List[str] = ["with", "check", "lib/std/" ++ sub ++ "/" ++ main, "--dump-mir", "--bundle-corpus", "std/" ++ sub, "--no-prelude"]
     let out_path = root ++ "/mir.txt"
     let finished = run_to_files_in(root, &argv, out_path, root ++ "/mir.stderr")
     if finished.code != 0:
@@ -83,10 +83,10 @@ fn dump_side(label: &str, src_dir: &str, main: &str, sub: &str) -> str:
     read_or_fail(out_path)
 
 // The lines of `a` not in `b` (as a multiset), in order.
-fn only_in(a: &Vec[str], b: &Vec[str]) -> Vec[str]:
+fn only_in(a: &List[str], b: &List[str]) -> List[str]:
     var counts: HashMap[str, i32] = HashMap.new()
     for l in b: counts.insert(l.clone(), (counts.get(l) ?? 0) + 1)
-    var out: Vec[str] = Vec.new()
+    var out: List[str] = List.new()
     for l in a:
         let n = counts.get(l) ?? 0
         if n > 0: counts.insert(l.clone(), n - 1)
@@ -96,8 +96,8 @@ fn only_in(a: &Vec[str], b: &Vec[str]) -> Vec[str]:
 // #2230: the rules a migration applied, by function (`rules.tsv` beside
 // the migrator's output: `rule<TAB>function<TAB>detail`); "" when the side
 // has none (a promoted corpus carries only its .w files).
-fn rules_by_function(dir: &str) -> HashMap[str, Vec[str]]:
-    var out: HashMap[str, Vec[str]] = HashMap.new()
+fn rules_by_function(dir: &str) -> HashMap[str, List[str]]:
+    var out: HashMap[str, List[str]] = HashMap.new()
     let text = match read_file(dir ++ "/rules.tsv"):
         Ok(t) => t
         Err(_) => "".to_owned()
@@ -121,14 +121,14 @@ let old_rules = rules_by_function(argv[1])
 let new_rules = rules_by_function(argv[2])
 // The rules the new migration applied to `name` (and the old one's it no
 // longer applies): a difference beyond these is not a rewrite's.
-fn print_rules(name: &str, old_rules: &HashMap[str, Vec[str]], new_rules: &HashMap[str, Vec[str]]):
-    let applied: Vec[str] = match new_rules.get(name):
+fn print_rules(name: &str, old_rules: &HashMap[str, List[str]], new_rules: &HashMap[str, List[str]]):
+    let applied: List[str] = match new_rules.get(name):
         Some(v) => v.clone()
-        None => Vec.new()
+        None => List.new()
     for r in applied: print("    rule " ++ r)
-    let before: Vec[str] = match old_rules.get(name):
+    let before: List[str] = match old_rules.get(name):
         Some(v) => v.clone()
-        None => Vec.new()
+        None => List.new()
     for r in before:
         if not applied.contains(r): print("    rule (old side only) " ++ r)
     if applied.len() == 0 and before.len() == 0 and (new_rules.len() > 0 or old_rules.len() > 0):

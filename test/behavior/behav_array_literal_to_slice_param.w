@@ -18,7 +18,7 @@ fn total(xs: []str) -> i64:
     for x in xs: n = n + x.len()
     n
 
-fn count(xs: []Vec[i32]) -> i32:
+fn count(xs: []List[i32]) -> i32:
     var n = 0
     for x in xs: n = n + x.len() as i32
     n
@@ -27,9 +27,9 @@ fn main:
     print(f"{first([5, 6])}")
     print(f"{first([])}")
     print(f"{total(["ab", "cde"])}")
-    var a: Vec[i32] = Vec.new()
+    var a: List[i32] = List.new()
     a.push(1)
-    var b: Vec[i32] = Vec.new()
+    var b: List[i32] = List.new()
     b.push(2)
     b.push(3)
     print(f"{count([a, b])}")

@@ -1,11 +1,11 @@
 //! expect-stdout: ok
 
 type Payload {
-    values: Vec[i32],
+    values: List[i32],
 }
 
 type Bag {
-    items: Vec[Payload],
+    items: List[Payload],
 }
 
 impl Bag:
@@ -13,8 +13,8 @@ impl Bag:
         self.items.push(move item)
 
 fn transfer(flag: bool) -> i32:
-    var bag = Bag { items: Vec.new() }
-    let pending = Payload { values: Vec.new() }
+    var bag = Bag { items: List.new() }
+    let pending = Payload { values: List.new() }
     pending.values.push(42)
     if flag:
         bag.emit(move pending)

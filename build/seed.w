@@ -35,8 +35,8 @@ fn seed_abs(root: &str, path: &str) -> str:
 fn seed_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
 
-fn seed_split_nonempty_lines(text: &str) -> Vec[str]:
-    let lines: Vec[str] = Vec.new()
+fn seed_split_nonempty_lines(text: &str) -> List[str]:
+    let lines: List[str] = List.new()
     var start = 0
     for i in 0..text.len() as i32:
         if text[i] == 10:
@@ -118,7 +118,7 @@ fn seed_gunzip_to_tar(ctx: &ActionCtx, scratch_dir: &str, archive_path: &str, ta
     var rc = seed_compile_binary(ctx, "deps-gunzip-helper", "build/zlib_gunzip.w", gunzip_bin)
     if rc != 0:
         return rc
-    var gunzip_args: Vec[str] = Vec.new()
+    var gunzip_args: List[str] = List.new()
     gunzip_args.push(seed_abs(root, gunzip_bin))
     gunzip_args.push(seed_abs(root, archive_path))
     gunzip_args.push(seed_abs(root, tar_path))
@@ -421,7 +421,7 @@ pub fn seed_lock_version_for(lock: &str, asset: &str) -> str:
 /// line): the `seed_asset:`/`WITH_SEED_ASSET:` line within the next few
 /// lines — every block shape we have names the asset after the version and
 /// before the digest.
-fn seed_lock_block_asset(lines: &Vec[str], i: i64) -> str:
+fn seed_lock_block_asset(lines: &List[str], i: i64) -> str:
     var j = i + 1
     while j < lines.len() and j <= i + 4:
         let line = lines[j]
@@ -435,8 +435,8 @@ fn seed_lock_block_asset(lines: &Vec[str], i: i64) -> str:
 /// that disagree ("file:line: <line>"), empty when all agree. A version line
 /// is checked against its block's asset (see seed_lock_block_asset), a
 /// digest line against the asset named since.
-pub fn seed_lock_workflow_drift(fs: &ToolFs, lock: &str) -> Vec[str]:
-    var drift: Vec[str] = Vec.new()
+pub fn seed_lock_workflow_drift(fs: &ToolFs, lock: &str) -> List[str]:
+    var drift: List[str] = List.new()
     let dir = ".github/workflows"
     for path in fs.list_files(dir):
         if not path.ends_with(".yml"): continue
@@ -470,8 +470,8 @@ pub fn seed_lock_workflow_drift(fs: &ToolFs, lock: &str) -> Vec[str]:
 /// against `<asset>=`, `<asset>.sha256=` and `<asset>.manifest=` of the
 /// asset named since. An asset a workflow pins that the lock does not is
 /// drift too: the lock names every SDK the tree is verified with.
-pub fn sdk_lock_workflow_drift(fs: &ToolFs, lock: &str) -> Vec[str]:
-    var drift: Vec[str] = Vec.new()
+pub fn sdk_lock_workflow_drift(fs: &ToolFs, lock: &str) -> List[str]:
+    var drift: List[str] = List.new()
     for path in fs.list_files(".github/workflows"):
         if not path.ends_with(".yml"): continue
         let lines = fs.read_text(path).split("\n")
@@ -501,7 +501,7 @@ pub fn sdk_lock_workflow_drift(fs: &ToolFs, lock: &str) -> Vec[str]:
     drift
 
 /// The SDK asset named within the few lines after a release line.
-fn sdk_lock_block_asset(lines: &Vec[str], i: i64) -> str:
+fn sdk_lock_block_asset(lines: &List[str], i: i64) -> str:
     var j = i + 1
     while j < lines.len() and j <= i + 4:
         let line = lines[j]

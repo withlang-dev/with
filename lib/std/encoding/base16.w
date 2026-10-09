@@ -28,7 +28,7 @@ pub fn base16_encode(data: []u8) -> str:
     out.to_str()
 
 /// Decode case-insensitive RFC 4648 Base16, rejecting every non-alphabet byte.
-pub fn base16_decode(text: &str) -> Result[Vec[u8], DecodeError]:
+pub fn base16_decode(text: &str) -> Result[List[u8], DecodeError]:
     if text.len() % 2 != 0:
         return Err(.InvalidLength(text.len()))
     var validate_i: i64 = 0
@@ -37,7 +37,7 @@ pub fn base16_decode(text: &str) -> Result[Vec[u8], DecodeError]:
         if base16_value(byte) < 0:
             return Err(.InvalidByte(validate_i, byte as u8))
         validate_i = validate_i + 1
-    let out = Vec[u8].with_capacity(text.len() / 2)
+    let out = List[u8].with_capacity(text.len() / 2)
     var i: i64 = 0
     while i < text.len():
         let high = base16_value(text[i])

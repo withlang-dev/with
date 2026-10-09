@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 // Test: explicit use import shadows prelude-provided functions.
-// The prelude imports std.iter which provides map(Vec[str], fn(str)->i32).
+// The prelude imports std.iter which provides map(List[str], fn(str)->i32).
 // An explicit `use shadow_helper` that also defines map must shadow
 // the prelude's map.
 

@@ -1,14 +1,14 @@
 type Pair {
-    a: Vec[i32],
-    b: Vec[i32],
+    a: List[i32],
+    b: List[i32],
 }
 
 fn singleton(value: i32):
-    let out: Vec[i32] = Vec.new()
+    let out: List[i32] = List.new()
     out.push(value)
     out
 
-fn consume(values: Vec[i32]) -> i32:
+fn consume(values: List[i32]) -> i32:
     values[0]
 
 fn main:

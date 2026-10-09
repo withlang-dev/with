@@ -7,7 +7,7 @@ type DeclSummary {
 }
 
 enum CompilerMessage:
-    Typechecked(Vec[DeclSummary])
+    Typechecked(List[DeclSummary])
     Diagnostic(str)
     Artifact(Artifact)
 

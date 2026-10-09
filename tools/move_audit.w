@@ -30,9 +30,9 @@
 //   drop  — a Drop struct: single-ownership NOW, flip-independent. These cells
 //           carry the real move-checker ground truth and would have caught #696
 //           the day #613 landed.
-//   vec   — Vec[i32] (POD elements): copy-on-move TODAY (#607/A5), so its moves
+//   vec   — List[i32] (POD elements): copy-on-move TODAY (#607/A5), so its moves
 //           never invalidate and true-positive cells EXPECT OK. The #691 wide
-//           flip makes Vec single-owner; when it lands, flip the vec
+//           flip makes List single-owner; when it lands, flip the vec
 //           true-positive expectations to MOVE-ERR (mirrors drop_audit's
 //           POD-EXPECT-LEAK cells). Until then these pin that the flip has NOT
 //           silently half-landed.
@@ -78,12 +78,12 @@ fn shape_prelude(shape: &str) -> str:
             "fn consume(d: D): ()\n" ++
             "fn mk() -> D: D { id: 1 }\n"
     if shape == "vec":
-        return "fn consume(v: Vec[i32]): ()\n" ++
-            "fn mk() -> Vec[i32]:\n    var v: Vec[i32] = Vec.new()\n    v.push(1)\n    v\n"
+        return "fn consume(v: List[i32]): ()\n" ++
+            "fn mk() -> List[i32]:\n    var v: List[i32] = List.new()\n    v.push(1)\n    v\n"
     ""
 
 fn shape_ty(shape: &str) -> str:
-    if shape == "vec": return "Vec[i32]"
+    if shape == "vec": return "List[i32]"
     if shape == "str": return "str"
     "D"
 
@@ -290,8 +290,8 @@ fn sc_field(shape: &str, base: &str, form: &str) -> str:
 // verdict ∈ { "OK", "MOVE-ERR", "FIELD-ERR" }.
 type Cell { name: str, source: str, expect: str }
 
-fn build_cells() -> Vec[Cell]:
-    var cells: Vec[Cell] = Vec.new()
+fn build_cells() -> List[Cell]:
+    var cells: List[Cell] = List.new()
 
     // drop shape: single-ownership NOW → stable ground truth (flip-independent).
     cells.push(Cell { name: "before_loop_continue/drop", source: sc_before_loop_continue("drop"), expect: "OK" })       // #696
@@ -305,7 +305,7 @@ fn build_cells() -> Vec[Cell]:
     cells.push(Cell { name: "before_loopkw_continue/drop", source: sc_before_loopkw_continue("drop"), expect: "OK" }) // #696 (loop)
     cells.push(Cell { name: "divergent_branch/drop", source: sc_divergent_branch("drop"), expect: "OK" })             // #695
 
-    // vec shape: #691 made every Vec single-owner, so the LOOP-CARRIED checks
+    // vec shape: #691 made every List single-owner, so the LOOP-CARRIED checks
     // (the cells the old copy-on-move #607 world reported OK) now demand
     // MOVE-ERR — this is the pre-planned [FLIP:->ERR] pin flip. An explicit
     // `move x` invalidates the BINDING regardless of shape/needs_drop, so a
@@ -324,7 +324,7 @@ fn build_cells() -> Vec[Cell]:
 
     // #1395: a field value reaching an owned result, on every base.
     // D111: a str is a value; reading its field anywhere copies it, so a
-    // str field never makes an implicit move (OK on every form). A Vec
+    // str field never makes an implicit move (OK on every form). A List
     // keeps D32: only the view forms, `.clone()` and `move` are OK.
     for shape in ["str", "vec"]:
         for base in ["mutrecv", "readrecv", "local"]:

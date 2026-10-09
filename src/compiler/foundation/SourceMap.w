@@ -5,14 +5,14 @@ use compiler.foundation.Source
 use std.collections.HashMap
 
 pub type SourceMap {
-    sources: Vec[Source],
+    sources: List[Source],
     path_index: HashMap[str, i32],
     next_file_raw: i32,
 }
 
 pub fn SourceMap.init -> SourceMap:
     var sm = SourceMap {
-        sources: Vec.new(),
+        sources: List.new(),
         path_index: HashMap.new(),
         next_file_raw: 1,
     }

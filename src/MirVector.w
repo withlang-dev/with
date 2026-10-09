@@ -61,14 +61,14 @@ impl MirBuilder:
         let lane = self.sema.vector_element_type(vec_ty)
         let lane_op = self.lower_vector_lane_operand(scalar, lane, span)
         let lane_place = self.materialize_operand(lane_op, lane, span)
-        let lanes: Vec[i32] = Vec.new()
+        let lanes: List[i32] = List.new()
         for _ in 0..self.sema.vector_lane_count(vec_ty):
             lanes.push(self.body.new_operand(OperandKind.OK_COPY, lane_place))
         self.lower_vector_aggregate(lanes, vec_ty, span)
 
-    mut fn lower_vector_aggregate(lanes: &Vec[i32], vec_ty: i32, span: i32) -> i32:
+    mut fn lower_vector_aggregate(lanes: &List[i32], vec_ty: i32, span: i32) -> i32:
         // A lane has no name.
-        let names: Vec[i32] = Vec.new()
+        let names: List[i32] = List.new()
         for _ in 0..lanes.len():
             names.push(0)
         let fid = self.body.new_agg_fields(lanes, names)
@@ -86,7 +86,7 @@ impl MirBuilder:
         self.assign_operand_to_place(idx_place, idx_op, span)
         self.body.new_index_place(base_place, idx_local, lane_ty)
 
-    mut fn lower_vector_intrinsic(kind: MirIntrinsic, args: &Vec[i32], ret_ty: i32, node: i32) -> i32:
+    mut fn lower_vector_intrinsic(kind: MirIntrinsic, args: &List[i32], ret_ty: i32, node: i32) -> i32:
         let args_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(args_id, kind)
         self.body.set_call_ast_node(args_id, node)
@@ -113,7 +113,7 @@ impl MirBuilder:
         let arg_count = self.ast.get_data2(node)
         if op == VectorOp.CONSTRUCT as i32:
             let lane = self.sema.vector_element_type(ty)
-            let lanes: Vec[i32] = Vec.new()
+            let lanes: List[i32] = List.new()
             for ai in 0..arg_count:
                 let arg = self.lower_expr(self.ast.get_extra(extra_start + ai))
                 lanes.push(self.lower_vector_lane_operand(arg, lane, span))
@@ -121,7 +121,7 @@ impl MirBuilder:
         if op == VectorOp.SPLAT as i32:
             let splat_arg = self.lower_expr(self.ast.get_extra(extra_start))
             return self.lower_vector_splat(splat_arg, ty, span)
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         var kind = MirIntrinsic.NONE
         if op == VectorOp.FROM_BITS as i32:
             args.push(self.lower_expr(self.ast.get_extra(extra_start)))
@@ -187,7 +187,7 @@ impl MirBuilder:
         while base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(base_ty as TypeId)) == TypeKind.TY_REF:
             base = self.new_deref_place(base)
             base_ty = self.sema.get_type_d0(self.sema.resolve_alias(base_ty as TypeId))
-        let args: Vec[i32] = Vec.new()
+        let args: List[i32] = List.new()
         let idx = self.lower_expr(self.ast.get_data1(place_expr))
         let value = self.lower_expr(rhs_expr)
         args.push(self.body.new_operand(OperandKind.OK_COPY, base))
@@ -208,7 +208,7 @@ impl MirBuilder:
         let base_ty = self.operand_type(base)
         let base_place = self.materialize_operand(base, base_ty, span)
         let lane_ty = self.sema.vector_lane_type(base_ty)
-        let lanes: Vec[i32] = Vec.new()
+        let lanes: List[i32] = List.new()
         for ci in 0..lanes_text.len() as i32:
             let lane = (lanes_text[ci] - '0') as i32
             let lane_place = self.vector_lane_place(base_place, lane, lane_ty, span)

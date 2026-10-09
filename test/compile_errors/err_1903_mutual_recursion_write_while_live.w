@@ -5,7 +5,7 @@
 // both), computed by fixpoint whatever order their bodies are checked in.
 // No `from` is needed; a write of G while `up`'s view is live is refused.
 
-var G: Vec[i32] = Vec.new()
+var G: List[i32] = List.new()
 
 fn down(n: i32) -> &i32:
     if n == 0: &G[0] else: up(n - 1)

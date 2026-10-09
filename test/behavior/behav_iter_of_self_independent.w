@@ -9,7 +9,7 @@ fn fancy(n: i64, cb: fn(i32) -> i32) -> i32:
     cb(n as i32)
 
 fn main:
-    var xs: Vec[i32] = Vec.new()
+    var xs: List[i32] = List.new()
     xs.push(1)
     let n = fancy(xs.len(), item => xs.push(item))
     let _ = n

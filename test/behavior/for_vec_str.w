@@ -1,9 +1,9 @@
 //! expect-stdout: ok
 
-// Test: for-loop iteration over Vec[str].
+// Test: for-loop iteration over List[str].
 
 fn main:
-    let v: Vec[str] = Vec.new()
+    let v: List[str] = List.new()
     v.push("hello")
     v.push("world")
 

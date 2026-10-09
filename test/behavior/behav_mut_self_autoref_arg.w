@@ -4,7 +4,7 @@
 // &T parameter must pass the struct pointer, not the address of the
 // slot holding it. Before the fix this corrupted memory and crashed.
 
-type Big { a: Vec[i32], names: Vec[i32] }
+type Big { a: List[i32], names: List[i32] }
 
 fn find_in(big: &Big, x: i32) -> i32:
     for i in 0..big.names.len() as i32:
@@ -18,7 +18,7 @@ fn Big.poke(mut self: Big, x: i32) -> i32:
     idx
 
 fn main:
-    var b = Big { a: Vec.new(), names: Vec.new() }
+    var b = Big { a: List.new(), names: List.new() }
     b.names.push(7)
     b.names.push(9)
     let i1 = b.poke(9)

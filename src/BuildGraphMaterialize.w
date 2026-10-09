@@ -12,10 +12,10 @@ extern fn with_str_clone_ref(s: &str) -> str
 
 type BuildGraphMaterializer {
     sema: Sema,
-    extras: Vec[ComptimeValue],
+    extras: List[ComptimeValue],
 }
 
-fn build_graph_materializer(sema: Sema, extras: Vec[ComptimeValue]) -> BuildGraphMaterializer:
+fn build_graph_materializer(sema: Sema, extras: List[ComptimeValue]) -> BuildGraphMaterializer:
     BuildGraphMaterializer { sema, extras }
 
 impl BuildGraphMaterializer:
@@ -54,10 +54,10 @@ impl BuildGraphMaterializer:
             return comptime_value_invalid()
         field
 
-    fn string_vec_field(value: &ComptimeValue, field_name: &str) -> Vec[str]:
-        let out: Vec[str] = Vec.new()
+    fn string_list_field(value: &ComptimeValue, field_name: &str) -> List[str]:
+        let out: List[str] = List.new()
         let field = self.field_value(value, field_name)
-        if field.kind != ComptimeValueKind.CV_VEC and field.kind != ComptimeValueKind.CV_ARRAY:
+        if field.kind != ComptimeValueKind.CV_LIST and field.kind != ComptimeValueKind.CV_ARRAY:
             return out
         for i in 0..field.extra_count:
             let item = self.extras[(field.extra_start + i)]
@@ -73,24 +73,24 @@ fn build_graph_materialized_target(kind: i32, name: &str, entry: &str, target_ki
         output: with_str_clone_ref(output),
         target_kind,
         optimize_mode,
-        system_libs: Vec.new(),
-        library_paths: Vec.new(),
-        rpaths: Vec.new(),
-        include_paths: Vec.new(),
-        defines: Vec.new(),
-        inputs: Vec.new(),
-        extra_outputs: Vec.new(),
-        write_scopes: Vec.new(),
-        deps: Vec.new(),
-        args: Vec.new(),
+        system_libs: List.new(),
+        library_paths: List.new(),
+        rpaths: List.new(),
+        include_paths: List.new(),
+        defines: List.new(),
+        inputs: List.new(),
+        extra_outputs: List.new(),
+        write_scopes: List.new(),
+        deps: List.new(),
+        args: List.new(),
         action_fn: 0,
         timeout_ms: 0,
         rss_limit_bytes: 0,
         cwd: "",
-        env: Vec.new(),
+        env: List.new(),
         network: 0,
         parallel: 0,
-        action_source_paths: Vec.new(),
+        action_source_paths: List.new(),
     }
 
 impl BuildGraphMaterializer:
@@ -135,23 +135,23 @@ impl BuildGraphMaterializer:
             out.error_msg = "build target '" ++ name_value.text ++ "' has invalid target platform"
             return out
         var target = build_graph_materialized_target(kind, name_value.text, entry_value.text, target_kind, optimize_value.data0 as i32, output_value.text)
-        target.system_libs = self.string_vec_field(value, "system_libs")
-        target.library_paths = self.string_vec_field(value, "library_paths")
-        target.rpaths = self.string_vec_field(value, "rpaths")
-        target.include_paths = self.string_vec_field(value, "include_paths")
-        target.defines = self.string_vec_field(value, "defines")
-        target.inputs = self.string_vec_field(value, "inputs")
-        target.extra_outputs = self.string_vec_field(value, "extra_outputs")
-        target.write_scopes = self.string_vec_field(value, "write_scopes")
-        target.deps = self.string_vec_field(value, "deps")
-        target.args = self.string_vec_field(value, "args")
+        target.system_libs = self.string_list_field(value, "system_libs")
+        target.library_paths = self.string_list_field(value, "library_paths")
+        target.rpaths = self.string_list_field(value, "rpaths")
+        target.include_paths = self.string_list_field(value, "include_paths")
+        target.defines = self.string_list_field(value, "defines")
+        target.inputs = self.string_list_field(value, "inputs")
+        target.extra_outputs = self.string_list_field(value, "extra_outputs")
+        target.write_scopes = self.string_list_field(value, "write_scopes")
+        target.deps = self.string_list_field(value, "deps")
+        target.args = self.string_list_field(value, "args")
         let timeout_field = self.field_value(value, "timeout_ms")
         if timeout_field.kind == ComptimeValueKind.CV_INT:
             target.timeout_ms = timeout_field.data0 as i32
         let cwd_field = self.field_value(value, "cwd")
         if cwd_field.kind == ComptimeValueKind.CV_STR:
             target.cwd = with_str_clone_ref(cwd_field.text)
-        target.env = self.string_vec_field(value, "env")
+        target.env = self.string_list_field(value, "env")
         let network_field = self.field_value(value, "network")
         if network_field.kind == ComptimeValueKind.CV_BOOL:
             target.network = if network_field.data0 != 0: 1 else: 0
@@ -178,8 +178,8 @@ impl BuildGraphMaterializer:
     // file-granular over-approximation of the call closure: it can
     // over-invalidate, never under-invalidate. Empty result = caller falls
     // back to hashing all build-graph sources.
-    fn action_source_closure(action_sym: i32) -> Vec[str]:
-        let empty: Vec[str] = Vec.new()
+    fn action_source_closure(action_sym: i32) -> List[str]:
+        let empty: List[str] = List.new()
         let found = self.sema.fn_decl_source_paths.get(action_sym)
         if not found.is_some():
             build_graph_rt_eprint("[graph] action closure MISS (no source path) for '" ++ self.sema.pool_resolve(action_sym) ++ "'")
@@ -193,8 +193,8 @@ impl BuildGraphMaterializer:
         if start_module < 0:
             build_graph_rt_eprint("[graph] action closure MISS (module not found) for '" ++ self.sema.pool_resolve(action_sym) ++ "' defined in '" ++ defining ++ "'")
             return empty
-        let visited: Vec[i32] = Vec.new()
-        let queue: Vec[i32] = Vec.new()
+        let visited: List[i32] = List.new()
+        let queue: List[i32] = List.new()
         visited.push(start_module)
         queue.push(start_module)
         var qi = 0
@@ -215,7 +215,7 @@ impl BuildGraphMaterializer:
                 if not seen:
                     visited.push(t)
                     queue.push(t)
-        let paths: Vec[str] = Vec.new()
+        let paths: List[str] = List.new()
         for i in 0..visited.len() as i32:
             paths.push(with_str_clone_ref(self.sema.module_paths[visited[i]]))
         paths
@@ -265,7 +265,7 @@ impl BuildGraphMaterializer:
             with_eprint("[graph] after-assign dt=" ++ graph.default_target)
 
         let generated_sources = self.field_value(value, "generated_sources")
-        if generated_sources.kind != ComptimeValueKind.CV_VEC and generated_sources.kind != ComptimeValueKind.CV_ARRAY:
+        if generated_sources.kind != ComptimeValueKind.CV_LIST and generated_sources.kind != ComptimeValueKind.CV_ARRAY:
             return self.error("Build.generated_sources is not a vector")
         for i in 0..generated_sources.extra_count:
             graph = self.materialize_generated_source(self.extras[(generated_sources.extra_start + i)], move graph)
@@ -273,7 +273,7 @@ impl BuildGraphMaterializer:
                 return graph
 
         let targets = self.field_value(value, "targets")
-        if targets.kind != ComptimeValueKind.CV_VEC and targets.kind != ComptimeValueKind.CV_ARRAY:
+        if targets.kind != ComptimeValueKind.CV_LIST and targets.kind != ComptimeValueKind.CV_ARRAY:
             return self.error("Build.targets is not a vector")
         for i in 0..targets.extra_count:
             graph = self.materialize_target(self.extras[(targets.extra_start + i)], move graph)
@@ -295,7 +295,7 @@ impl BuildGraphMaterializer:
 // Returns the materialized graph alongside the Sema handed in: the
 // materializer stores the Sema (refs cannot be struct fields), so the
 // caller gets it back instead of reusing a moved value (§3.8).
-pub fn materialize_build_graph_from_comptime(sema: Sema, value: &ComptimeValue, extras: Vec[ComptimeValue]) -> BuildGraphMaterializeResult:
+pub fn materialize_build_graph_from_comptime(sema: Sema, value: &ComptimeValue, extras: List[ComptimeValue]) -> BuildGraphMaterializeResult:
     var mat = build_graph_materializer(move sema, move extras)
     let graph = mat.materialize_build(value)
     BuildGraphMaterializeResult { graph, sema: move mat.sema }

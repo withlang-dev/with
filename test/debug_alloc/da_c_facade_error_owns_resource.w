@@ -59,7 +59,7 @@ fn main:
     drop(up)
     assert(counter_get(closes) == 1)
     // Matched and taken out: the new owner destroys it.
-    var kept: Vec[FailedDatabase] = Vec.new()
+    var kept: List[FailedDatabase] = List.new()
     match open(closes, 2):
         Err(DatabaseError.FailedWithResource(status, failed)) =>
             assert(status == 14)

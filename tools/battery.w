@@ -187,8 +187,8 @@ fn step_live(name: &str, cmd: &str, log: &str, status: &str) -> i32:
 // the header and TOTAL lines are not targets.
 fn merge_times(ledger: &str, times: &str):
     if not file_exists(times): return
-    var names: Vec[str] = Vec.new()
-    var lines: Vec[str] = Vec.new()
+    var names: List[str] = List.new()
+    var lines: List[str] = List.new()
     for source in [ledger, times]:
         for line in (read_file(source) ?? "").split("\n"):
             let cols = line.split("\t")
@@ -203,7 +203,7 @@ fn merge_times(ledger: &str, times: &str):
                 lines.push(line.clone())
     var text = "target\tseconds\tpeak_rss\n"
     var remaining = lines.len() as i32
-    var taken: Vec[i32] = Vec.new()
+    var taken: List[i32] = List.new()
     for i in 0..names.len() as i32: taken.push(0)
     while remaining > 0:
         var best = -1

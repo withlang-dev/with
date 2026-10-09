@@ -4,8 +4,8 @@
 // #1548: a generator's owned named local is dropped once when the generator
 // is exhausted — by the next body's scope exit — and the generator value's
 // own drop then finds the state field blanked.
-fn words() -> Vec[str]:
-    var v: Vec[str] = Vec.new()
+fn words() -> List[str]:
+    var v: List[str] = List.new()
     v.push("a")
     v.push("bb")
     v.push("ccc")

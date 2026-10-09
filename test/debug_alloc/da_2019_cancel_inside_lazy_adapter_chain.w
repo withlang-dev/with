@@ -16,7 +16,7 @@ extern fn with_runtime_run_one_step()
 var resumed: Atomic[i32]
 var item_drops: Atomic[i32]
 
-type Item { data: Vec[i32] }
+type Item { data: List[i32] }
 impl Drop for Item:
     move fn drop():
         item_drops.fetch_add(1, .SeqCst)
@@ -36,63 +36,63 @@ async fn forever_value(n: i32) -> i32:
 fn sink(n: i32): resumed.fetch_add(n, .SeqCst)
 
 async fn collect_parent -> i32:
-    let xs: Vec[i32] = [1, 2, 3]
-    let items: Vec[Item] = xs.iter().map(n => forever_item(n).await).collect()
+    let xs: List[i32] = [1, 2, 3]
+    let items: List[Item] = xs.iter().map(n => forever_item(n).await).collect()
     resumed.fetch_add(1, .SeqCst)
     items.len() as i32
 
 async fn bound_parent -> i32:
-    let xs: Vec[i32] = [1, 2, 3]
+    let xs: List[i32] = [1, 2, 3]
     let chain = xs.iter().map(n => forever_item(n).await)
-    let items: Vec[Item] = chain.collect()
+    let items: List[Item] = chain.collect()
     resumed.fetch_add(1, .SeqCst)
     items.len() as i32
 
 async fn next_parent -> i32:
-    let xs: Vec[i32] = [1, 2, 3]
+    let xs: List[i32] = [1, 2, 3]
     var chain = xs.iter().map(n => forever_item(n).await)
     let first = chain.next()
     resumed.fetch_add(1, .SeqCst)
     if first.is_some(): 1 else: 0
 
 async fn fold_parent -> i32:
-    let xs: Vec[i32] = [1, 2, 3]
+    let xs: List[i32] = [1, 2, 3]
     let total = xs.iter().fold(0, (acc, n) => acc + forever_value(n).await)
     resumed.fetch_add(1, .SeqCst)
     total
 
 async fn map_fold_parent -> i32:
-    let xs: Vec[i32] = [1, 2, 3]
+    let xs: List[i32] = [1, 2, 3]
     let total = xs.iter().map(n => forever_value(n).await).fold(0, (a, b) => a + b)
     resumed.fetch_add(1, .SeqCst)
     total
 
 async fn reduce_parent -> i32:
-    let xs: Vec[i32] = [1, 2, 3]
+    let xs: List[i32] = [1, 2, 3]
     let total = xs.iter().map(n => forever_value(n).await).reduce((a, b) => a + b)
     resumed.fetch_add(1, .SeqCst)
     if total.is_some(): 1 else: 0
 
 async fn filter_count_parent -> i32:
-    let xs: Vec[i32] = [1, 2, 3]
+    let xs: List[i32] = [1, 2, 3]
     let n = xs.iter().filter(n => forever_value(n).await > 0).count()
     resumed.fetch_add(1, .SeqCst)
     n as i32
 
 async fn find_parent -> i32:
-    let xs: Vec[i32] = [1, 2, 3]
+    let xs: List[i32] = [1, 2, 3]
     let found = xs.iter().find(n => forever_value(n).await > 0)
     resumed.fetch_add(1, .SeqCst)
     if found.is_some(): 1 else: 0
 
 async fn any_parent -> i32:
-    let xs: Vec[i32] = [1, 2, 3]
+    let xs: List[i32] = [1, 2, 3]
     let hit = xs.iter().any(n => forever_value(n).await > 0)
     resumed.fetch_add(1, .SeqCst)
     if hit: 1 else: 0
 
 async fn for_each_parent -> i32:
-    let xs: Vec[i32] = [1, 2, 3]
+    let xs: List[i32] = [1, 2, 3]
     xs.iter().for_each(n => sink(forever_value(n).await))
     resumed.fetch_add(1, .SeqCst)
     0

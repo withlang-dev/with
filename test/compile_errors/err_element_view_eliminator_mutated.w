@@ -3,8 +3,8 @@
 // #1406 (§3.8, D22): `??` and `unwrap_or` are eliminators; the element view
 // on the fallback side keeps its origin `v`.
 
-fn mkv() -> Vec[str]:
-    var v: Vec[str] = Vec.new()
+fn mkv() -> List[str]:
+    var v: List[str] = List.new()
     v.push("a".clone())
     v
 

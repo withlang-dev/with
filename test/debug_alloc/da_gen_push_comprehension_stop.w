@@ -34,7 +34,7 @@ fn check(w: &str) -> Result[str, str]:
     if w == "w2": return Err(w)
     Ok(w ++ "!")
 
-fn all_checked() -> Result[Vec[str], str]:
+fn all_checked() -> Result[List[str], str]:
     let v = [check(&w)? for w in words(5)]
     Ok(v)
 

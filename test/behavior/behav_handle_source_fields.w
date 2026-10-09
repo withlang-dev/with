@@ -33,6 +33,6 @@ fn test_handle_fields_preserve_source_identity:
     let handles = [handle, returned]
     handles[0].generation = 5
     assert(handles[0].generation == 5 and handles[1].generation == 4294967295)
-    let vec_handles: Vec[Handle[i32]] = [handle, returned]
-    vec_handles[0].generation = 6
-    assert(vec_handles[0].generation == 6 and vec_handles[1].generation == 4294967295)
+    let list_handles: List[Handle[i32]] = [handle, returned]
+    list_handles[0].generation = 6
+    assert(list_handles[0].generation == 6 and list_handles[1].generation == 4294967295)

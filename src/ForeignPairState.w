@@ -16,7 +16,7 @@ pub type ForeignPairAlternative {
 impl Copy for ForeignPairAlternative
 
 pub type ForeignPairState {
-    alternatives: Vec[ForeignPairAlternative],
+    alternatives: List[ForeignPairAlternative],
 }
 
 fn foreign_pair_alternative_equal(a: &ForeignPairAlternative, b: &ForeignPairAlternative) -> bool:
@@ -28,13 +28,13 @@ fn foreign_pair_add(state: &ForeignPairState, alternative: ForeignPairAlternativ
     state.alternatives.push(alternative)
 
 pub fn foreign_pair_initial(defaults: bool) -> ForeignPairState:
-    let state = ForeignPairState { alternatives: Vec.new() }
+    let state = ForeignPairState { alternatives: List.new() }
     let ty = if defaults: 0 else: -1
     foreign_pair_add(state, ForeignPairAlternative { callback_type: ty, userdata_type: ty, userdata_origin: -1, guard: -1, succeeded: true })
     state
 
 pub fn foreign_pair_join(a: &ForeignPairState, b: &ForeignPairState) -> ForeignPairState:
-    let result = ForeignPairState { alternatives: Vec.new() }
+    let result = ForeignPairState { alternatives: List.new() }
     for i in 0..a.alternatives.len(): foreign_pair_add(result, a.alternatives[i])
     for i in 0..b.alternatives.len(): foreign_pair_add(result, b.alternatives[i])
     result
@@ -52,7 +52,7 @@ pub fn foreign_pair_equal(a: &ForeignPairState, b: &ForeignPairState) -> bool:
 // contract explicitly supplies that guarantee. Otherwise both components
 // become unknown/incompatible and a modeled reset is required.
 pub fn foreign_pair_set(state: &ForeignPairState, callback: bool, ty: i32, origin: i32, guard: i32, can_fail: bool, preserves_on_failure: bool) -> ForeignPairState:
-    let result = ForeignPairState { alternatives: Vec.new() }
+    let result = ForeignPairState { alternatives: List.new() }
     for i in 0..state.alternatives.len():
         let previous = &state.alternatives[i]
         foreign_pair_add(result, ForeignPairAlternative {
@@ -76,7 +76,7 @@ pub fn foreign_pair_set(state: &ForeignPairState, callback: bool, ty: i32, origi
     result
 
 pub fn foreign_pair_on_edge(state: &ForeignPairState, guard: i32, succeeded: bool) -> ForeignPairState:
-    let result = ForeignPairState { alternatives: Vec.new() }
+    let result = ForeignPairState { alternatives: List.new() }
     for i in 0..state.alternatives.len():
         let alternative = &state.alternatives[i]
         if guard < 0 or alternative.guard != guard or alternative.succeeded == succeeded:
@@ -109,7 +109,7 @@ pub const FOREIGN_PAIR_CREATE: i32 = 6
 pub const FOREIGN_PAIR_UNKNOWN: i32 = 7
 
 pub fn foreign_pair_unknown(state: &ForeignPairState) -> ForeignPairState:
-    let result = ForeignPairState { alternatives: Vec.new() }
+    let result = ForeignPairState { alternatives: List.new() }
     for i in 0..state.alternatives.len():
         foreign_pair_add(result, ForeignPairAlternative { callback_type: -2, userdata_type: -3, userdata_origin: state.alternatives[i].userdata_origin, guard: -1, succeeded: true })
     result
@@ -122,7 +122,7 @@ pub fn foreign_pair_retains_any(state: &ForeignPairState) -> bool:
     false
 
 pub fn foreign_pair_absent() -> ForeignPairState:
-    let state = ForeignPairState { alternatives: Vec.new() }
+    let state = ForeignPairState { alternatives: List.new() }
     foreign_pair_add(state, ForeignPairAlternative { callback_type: -4, userdata_type: -4, userdata_origin: -1, guard: -1, succeeded: true })
     state
 
@@ -146,8 +146,8 @@ pub type ForeignPairEdge {
 impl Copy for ForeignPairEdge
 
 pub type ForeignPairFlow {
-    inputs: Vec[ForeignPairState],
-    violations: Vec[i32],
+    inputs: List[ForeignPairState],
+    violations: List[i32],
 }
 
 fn foreign_pair_transfer(state: &ForeignPairState, block: &ForeignPairBlock) -> ForeignPairState:
@@ -164,17 +164,17 @@ fn foreign_pair_transfer(state: &ForeignPairState, block: &ForeignPairBlock) -> 
 // Every predecessor, including backwards edges, contributes until the finite
 // set stops growing. Report requirements only after convergence: an early
 // sweep's empty row is unreachable, not evidence that cleanup is safe.
-pub fn foreign_pair_flow(blocks: &Vec[ForeignPairBlock], edges: &Vec[ForeignPairEdge], entry: &ForeignPairState) -> ForeignPairFlow:
-    var inputs: Vec[ForeignPairState] = Vec.new()
-    var outputs: Vec[ForeignPairState] = Vec.new()
+pub fn foreign_pair_flow(blocks: &List[ForeignPairBlock], edges: &List[ForeignPairEdge], entry: &ForeignPairState) -> ForeignPairFlow:
+    var inputs: List[ForeignPairState] = List.new()
+    var outputs: List[ForeignPairState] = List.new()
     for i in 0..blocks.len():
-        inputs.push(ForeignPairState { alternatives: Vec.new() })
-        outputs.push(ForeignPairState { alternatives: Vec.new() })
+        inputs.push(ForeignPairState { alternatives: List.new() })
+        outputs.push(ForeignPairState { alternatives: List.new() })
     var changed = true
     while changed:
         changed = false
         for bi in 0..blocks.len() as i32:
-            var incoming = if bi == 0: foreign_pair_on_edge(entry, -1, true) else: ForeignPairState { alternatives: Vec.new() }
+            var incoming = if bi == 0: foreign_pair_on_edge(entry, -1, true) else: ForeignPairState { alternatives: List.new() }
             for ei in 0..edges.len():
                 let edge = &edges[ei]
                 if edge.to != bi: continue
@@ -185,7 +185,7 @@ pub fn foreign_pair_flow(blocks: &Vec[ForeignPairBlock], edges: &Vec[ForeignPair
             if not foreign_pair_equal(outgoing, outputs[bi]): changed = true
             inputs[bi] = move incoming
             outputs[bi] = outgoing
-    let violations: Vec[i32] = Vec.new()
+    let violations: List[i32] = List.new()
     for bi in 0..blocks.len() as i32:
         let block = &blocks[bi]
         if (block.action == FOREIGN_PAIR_INVOKE or block.invokes) and not foreign_pair_can_invoke(inputs[bi]):
@@ -198,16 +198,16 @@ pub fn foreign_pair_flow(blocks: &Vec[ForeignPairBlock], edges: &Vec[ForeignPair
 // Multiple possible targets require a weak update: either resource may have
 // been left unchanged. This deliberately loses correlation, never safety.
 pub type ForeignPairPlaces {
-    values: Vec[ForeignPairState],
-    references: Vec[Vec[i32]],
+    values: List[ForeignPairState],
+    references: List[List[i32]],
 }
 
 pub fn foreign_pair_places(width: i32) -> ForeignPairPlaces:
-    let values: Vec[ForeignPairState] = Vec.new()
-    let references: Vec[Vec[i32]] = Vec.new()
+    let values: List[ForeignPairState] = List.new()
+    let references: List[List[i32]] = List.new()
     for key in 0..width:
         values.push(foreign_pair_absent())
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         targets.push(key)
         references.push(targets)
     ForeignPairPlaces { values, references }
@@ -216,7 +216,7 @@ pub fn foreign_pair_places_clone(source: &ForeignPairPlaces) -> ForeignPairPlace
     var result = foreign_pair_places(source.values.len() as i32)
     for key in 0..source.values.len():
         result.values[key] = foreign_pair_on_edge(source.values[key], -1, true)
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         for i in 0..source.references[key].len():
             targets.push(source.references[key][i])
         result.references[key] = targets
@@ -227,7 +227,7 @@ pub fn foreign_pair_places_join(a: &ForeignPairPlaces, b: &ForeignPairPlaces) ->
     var result = foreign_pair_places_clone(a)
     for key in 0..a.values.len():
         result.values[key] = foreign_pair_join(a.values[key], b.values[key])
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         for i in 0..a.references[key].len(): targets.push(a.references[key][i])
         for i in 0..b.references[key].len():
             let target = b.references[key][i]
@@ -238,7 +238,7 @@ pub fn foreign_pair_places_join(a: &ForeignPairPlaces, b: &ForeignPairPlaces) ->
 impl ForeignPairPlaces:
     mut fn borrow(dest: i32, source: i32):
         // Snapshot before replacing: assigning a reference to itself is valid.
-        let targets: Vec[i32] = Vec.new()
+        let targets: List[i32] = List.new()
         for i in 0..self.references[source].len(): targets.push(self.references[source][i])
         self.references[dest] = targets
 
@@ -298,10 +298,10 @@ pub type ForeignPairStep {
 impl Copy for ForeignPairStep
 
 pub type ForeignPairPlaceFlow {
-    inputs: Vec[ForeignPairPlaces],
-    reachable: Vec[bool],
+    inputs: List[ForeignPairPlaces],
+    reachable: List[bool],
     // Global step indices, so the MIR adapter can recover exact spans.
-    violations: Vec[i32],
+    violations: List[i32],
 }
 
 fn foreign_pair_execute_step(places: &ForeignPairPlaces, step: &ForeignPairStep) -> (ForeignPairPlaces, bool):
@@ -330,11 +330,11 @@ fn foreign_pair_places_edge(source: &ForeignPairPlaces, edge: &ForeignPairEdge) 
         if result.values[key].alternatives.len() == 0: reachable = false
     (move result, reachable)
 
-pub fn foreign_pair_place_flow(starts: &Vec[i32], counts: &Vec[i32], steps: &Vec[ForeignPairStep], edges: &Vec[ForeignPairEdge], entry: &ForeignPairPlaces) -> ForeignPairPlaceFlow:
+pub fn foreign_pair_place_flow(starts: &List[i32], counts: &List[i32], steps: &List[ForeignPairStep], edges: &List[ForeignPairEdge], entry: &ForeignPairPlaces) -> ForeignPairPlaceFlow:
     assert(starts.len() == counts.len())
-    var inputs: Vec[ForeignPairPlaces] = Vec.new()
-    var outputs: Vec[ForeignPairPlaces] = Vec.new()
-    var reachable: Vec[bool] = Vec.new()
+    var inputs: List[ForeignPairPlaces] = List.new()
+    var outputs: List[ForeignPairPlaces] = List.new()
+    var reachable: List[bool] = List.new()
     for bi in 0..starts.len():
         inputs.push(foreign_pair_places(entry.values.len() as i32))
         outputs.push(foreign_pair_places(entry.values.len() as i32))
@@ -361,7 +361,7 @@ pub fn foreign_pair_place_flow(starts: &Vec[i32], counts: &Vec[i32], steps: &Vec
             reachable[bi] = true
             inputs[bi] = move incoming
             outputs[bi] = move outgoing
-    let violations: Vec[i32] = Vec.new()
+    let violations: List[i32] = List.new()
     for bi in 0..starts.len() as i32:
         if not reachable[bi]: continue
         var current = foreign_pair_places_clone(inputs[bi])

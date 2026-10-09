@@ -2,9 +2,9 @@
 
 // #782 arm 2: `let (a, b) = t` consumes the tuple (MIR moves every
 // element), so a later projection reads blanked storage and must be
-// rejected. A Vec element, not a str: a str is a value and is copied (D111).
+// rejected. A List element, not a str: a str is a value and is copied (D111).
 
-fn pair() -> (i32, Vec[i32]): (42, [1, 2])
+fn pair() -> (i32, List[i32]): (42, [1, 2])
 
 fn main:
     let t = pair()

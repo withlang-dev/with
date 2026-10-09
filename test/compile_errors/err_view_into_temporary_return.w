@@ -1,4 +1,4 @@
-//! expect-check-fail: returns a view into a temporary `Vec[str]` that is freed when this statement ends
+//! expect-check-fail: returns a view into a temporary `List[str]` that is freed when this statement ends
 
 fn second(line: &str) -> &str: line.split("\t")[1]
 

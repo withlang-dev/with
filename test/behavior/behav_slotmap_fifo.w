@@ -24,7 +24,7 @@ fn test_fifo_reuses_every_free_slot_before_returning_to_one:
 
 fn test_fifo_growth_and_removal_order:
     var map = SlotMap[i32].new()
-    let handles: Vec[Handle[i32]] = Vec.new()
+    let handles: List[Handle[i32]] = List.new()
     for i in 0..128: handles.push(map.insert(i))
     assert(runtime_capacity(map) == 128)
     for i in [71, 3, 99, 0]: assert(map.remove(handles[i]).unwrap() == i)

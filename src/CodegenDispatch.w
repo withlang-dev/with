@@ -164,7 +164,7 @@ impl Codegen:
         if tk == TypeKind.TY_TUPLE:
             let start = self.mir_type_d0_at(resolved)
             let count = self.mir_type_d1_at(resolved)
-            let elems: Vec[i32] = Vec.new()
+            let elems: List[i32] = List.new()
             for ei in 0..count:
                 let elem = self.mir_type_to_live_sema_type(self.mir_type_extra_at(start + ei))
                 if elem == 0:
@@ -179,7 +179,7 @@ impl Codegen:
                 return 0
             let arg_start = self.mir_type_d1_at(resolved)
             let arg_count = self.mir_type_d2_at(resolved)
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             for ai in 0..arg_count:
                 let arg = self.mir_type_to_live_sema_type(self.mir_type_extra_at(arg_start + ai))
                 if arg == 0:
@@ -250,14 +250,14 @@ impl Codegen:
             let base_sym = self.mir_type_d0_at(resolved)
             let base_name = self.sema_symbol_text(base_sym)
             if base_name == "Sender" or base_name == "Receiver":
-                let fields: Vec[i64] = Vec.new()
+                let fields: List[i64] = List.new()
                 fields.push(wl_i64_type(self.context))
-                return wl_struct_type(self.context, vec_data_i64(&fields), 1, 0)
+                return wl_struct_type(self.context, list_data_i64(&fields), 1, 0)
             return self.sema_type_to_llvm(resolved)
         if tk == TypeKind.TY_TUPLE:
             let te_start = self.mir_type_d0_at(resolved)
             let te_count = self.mir_type_d1_at(resolved)
-            let elem_types: Vec[i64] = Vec.new()
+            let elem_types: List[i64] = List.new()
             for i in 0..te_count:
                 let elem_tid = self.mir_type_extra_at(te_start + i)
                 var elem_llvm = self.mir_sema_type_to_llvm(elem_tid)
@@ -280,11 +280,11 @@ impl Codegen:
                 range_elem_llvm = wl_i32_type(self.context)
             // Range struct: {start: Elem, end: Elem, inclusive: bool}, the
             // flag lowered as the bool it is (#1413; see sema_type_to_llvm).
-            let range_fields: Vec[i64] = Vec.new()
+            let range_fields: List[i64] = List.new()
             range_fields.push(range_elem_llvm)
             range_fields.push(range_elem_llvm)
             range_fields.push(self.mir_sema_type_to_llvm(self.sema.ty_bool as i32))
-            return wl_struct_type(self.context, vec_data_i64(&range_fields), 3, 0)
+            return wl_struct_type(self.context, list_data_i64(&range_fields), 3, 0)
         if tk == TypeKind.TY_ARRAY:
             let arr_elem_tid = self.mir_type_d0_at(resolved)
             let arr_len = self.mir_type_d1_at(resolved)
@@ -305,20 +305,20 @@ impl Codegen:
             return wl_ptr_type(self.context)
         if tk == TypeKind.TY_FN:
             let ptr_ty = wl_ptr_type(self.context)
-            let fat_types: Vec[i64] = Vec.new()
+            let fat_types: List[i64] = List.new()
             fat_types.push(ptr_ty)
             fat_types.push(ptr_ty)
-            return wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
+            return wl_struct_type(self.context, list_data_i64(&fat_types), 2, 0)
         if tk == TypeKind.TY_EXTERN_FN:
             return wl_ptr_type(self.context)
         if tk == TypeKind.TY_SLICE:
-            let body_types: Vec[i64] = Vec.new()
+            let body_types: List[i64] = List.new()
             body_types.push(wl_ptr_type(self.context))
             body_types.push(wl_i64_type(self.context))
-            return wl_struct_type(self.context, vec_data_i64(&body_types), 2, 0)
+            return wl_struct_type(self.context, list_data_i64(&body_types), 2, 0)
         0
 
-    mut fn mir_vec_storage_elem_type(elem_tid: i32) -> i64:
+    mut fn mir_list_storage_elem_type(elem_tid: i32) -> i64:
         let resolved = self.mir_resolve_alias_at(elem_tid)
         if self.mir_type_kind_at(resolved) == TypeKind.TY_STR:
             let str_ty = self.str_llvm_type()
@@ -414,7 +414,7 @@ impl Codegen:
         if literal_fn == 0 or cap_fn == 0:
             return self.build_default_value(regex_ty)
         let literal_ft = wl_global_get_value_type(literal_fn)
-        let literal_args: Vec[i64] = Vec.new()
+        let literal_args: List[i64] = List.new()
         literal_args.push(code_global)
         // __literal_code takes `pattern: &str`, a view `{ptr, len}` (#1810):
         // the literal's own value, passed as its FnAbi descriptor says (D6 —
@@ -424,11 +424,11 @@ impl Codegen:
             sema_phase_bug("BUG: Regex.__literal_code has no FnAbi descriptor")
         literal_args.push(self.push_call_arg(literal_abi, 1, self.gen_string_literal_raw(pattern), 0))
         literal_args.push(wl_const_int(i32_ty, options as i64, 0))
-        let code_ptr = wl_build_call(self.builder, literal_ft, literal_fn, vec_data_i64(&literal_args), 3)
+        let code_ptr = wl_build_call(self.builder, literal_ft, literal_fn, list_data_i64(&literal_args), 3)
         let cap_ft = wl_global_get_value_type(cap_fn)
-        let cap_args: Vec[i64] = Vec.new()
+        let cap_args: List[i64] = List.new()
         cap_args.push(code_ptr)
-        let capture_count = wl_build_call(self.builder, cap_ft, cap_fn, vec_data_i64(&cap_args), 1)
+        let capture_count = wl_build_call(self.builder, cap_ft, cap_fn, list_data_i64(&cap_args), 1)
 
         var result = self.build_default_value(regex_ty)
         result = wl_build_insert_value(self.builder, result, code_ptr, 0)
@@ -463,8 +463,8 @@ impl Codegen:
             with_eprint("error: unresolved callable return type in FnAbi")
             self.had_error = 1
             return -1
-        let sources: Vec[i64] = Vec.new()
-        let places: Vec[i32] = Vec.new()
+        let sources: List[i64] = List.new()
+        let places: List[i32] = List.new()
         for pi in 0..count:
             let tid: i32 = self.sema.type_extra[start + pi]
             let source_ty = self.mir_sema_type_to_llvm(tid)
@@ -526,15 +526,15 @@ impl Codegen:
         if local_id >= 0:
             self.mir_memory_locals.insert(local_id, 1)
 
-    fn mir_i32_vec_fill(count: i32, value: i32) -> Vec[i32]:
+    fn mir_i32_list_fill(count: i32, value: i32) -> List[i32]:
         let _ = self
-        let out: Vec[i32] = Vec.new()
+        let out: List[i32] = List.new()
         for _ in 0..count:
             out.push(value)
         out
 
-fn mir_scan_vec_fill(count: i32, value: i32) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+fn mir_scan_list_fill(count: i32, value: i32) -> List[i32]:
+    let out: List[i32] = List.new()
     for _ in 0..count:
         out.push(value)
     out
@@ -545,7 +545,7 @@ extern fn with_alloc(size: i64) -> *mut u8
 // design (AstPool pattern, truthfully Copy) so the successor helpers can
 // push through plain parameters under spec §3.8.
 type MirBlockStackState {
-    xs: Vec[i32],
+    xs: List[i32],
 }
 
 type MirBlockStack {
@@ -554,9 +554,9 @@ type MirBlockStack {
 impl Copy for MirBlockStack
 
 fn MirBlockStack.new -> MirBlockStack:
-    // One Vec header; allocate generously like the other handle states.
+    // One List header; allocate generously like the other handle states.
     let ptr = with_alloc(64) as *mut MirBlockStackState
-    unsafe *ptr = MirBlockStackState { xs: Vec.new() }
+    unsafe *ptr = MirBlockStackState { xs: List.new() }
     MirBlockStack { state: ptr }
 
 impl MirBlockStack:
@@ -580,12 +580,12 @@ impl MirBlockStack:
 // pattern, truthfully Copy) so the scan helpers can mutate the per-local
 // tables through plain parameters under spec §3.8.
 type MirValueScanState {
-    blockers: Vec[i32],
-    read_counts: Vec[i32],
-    first_read_bb: Vec[i32],
-    first_read_order: Vec[i32],
-    second_read_bb: Vec[i32],
-    second_read_order: Vec[i32],
+    blockers: List[i32],
+    read_counts: List[i32],
+    first_read_bb: List[i32],
+    first_read_order: List[i32],
+    second_read_bb: List[i32],
+    second_read_order: List[i32],
 }
 
 type MirValueScan {
@@ -594,16 +594,16 @@ type MirValueScan {
 impl Copy for MirValueScan
 
 fn MirValueScan.new(local_count: i32) -> MirValueScan:
-    // Six Vec headers; allocate generously like the other handle states
+    // Six List headers; allocate generously like the other handle states
     // (InternPool uses 256 for a 7-field state).
     let ptr = with_alloc(256) as *mut MirValueScanState
     unsafe *ptr = MirValueScanState {
-        blockers: mir_scan_vec_fill(local_count, 0),
-        read_counts: mir_scan_vec_fill(local_count, 0),
-        first_read_bb: mir_scan_vec_fill(local_count, -1),
-        first_read_order: mir_scan_vec_fill(local_count, -1),
-        second_read_bb: mir_scan_vec_fill(local_count, -1),
-        second_read_order: mir_scan_vec_fill(local_count, -1),
+        blockers: mir_scan_list_fill(local_count, 0),
+        read_counts: mir_scan_list_fill(local_count, 0),
+        first_read_bb: mir_scan_list_fill(local_count, -1),
+        first_read_order: mir_scan_list_fill(local_count, -1),
+        second_read_bb: mir_scan_list_fill(local_count, -1),
+        second_read_order: mir_scan_list_fill(local_count, -1),
     }
     MirValueScan { state: ptr }
 
@@ -674,7 +674,7 @@ impl Codegen:
             return -1
         stmt_id - body.bb_stmt_starts[bb]
 
-    fn mir_add_successor(body: &MirBody, stack: MirBlockStack, visited: &Vec[i32], succ: i32):
+    fn mir_add_successor(body: &MirBody, stack: MirBlockStack, visited: &List[i32], succ: i32):
         let _ = self
         if succ < 0 or succ >= body.block_count():
             return
@@ -682,7 +682,7 @@ impl Codegen:
             return
         stack.push(succ)
 
-    fn mir_push_successors(body: &MirBody, bb: i32, stack: MirBlockStack, visited: &Vec[i32]):
+    fn mir_push_successors(body: &MirBody, bb: i32, stack: MirBlockStack, visited: &List[i32]):
         if bb < 0 or bb >= body.block_count():
             return
         let kind = body.term_kind(bb)
@@ -707,8 +707,8 @@ impl Codegen:
                     self.mir_add_successor(body, stack, visited, body.switch_table_targets[(start + ti)])
             self.mir_add_successor(body, stack, visited, d2)
 
-    fn mir_reachable_blocks(body: &MirBody) -> Vec[i32]:
-        let visited = self.mir_i32_vec_fill(body.block_count(), 0)
+    fn mir_reachable_blocks(body: &MirBody) -> List[i32]:
+        let visited = self.mir_i32_list_fill(body.block_count(), 0)
         let stack = MirBlockStack.new()
         if body.block_count() > 0:
             stack.push(0)
@@ -727,7 +727,7 @@ impl Codegen:
             return false
         if avoid_bb == 0:
             return false
-        let visited = self.mir_i32_vec_fill(body.block_count(), 0)
+        let visited = self.mir_i32_list_fill(body.block_count(), 0)
         let stack = MirBlockStack.new()
         stack.push(0)
         while stack.len() > 0:
@@ -896,8 +896,8 @@ impl Codegen:
                 self.mir_memory_locals.insert(all_li, 1)
             return
         let scan = MirValueScan.new(local_count)
-        let def_counts = self.mir_i32_vec_fill(local_count, 0)
-        let def_stmts = self.mir_i32_vec_fill(local_count, -1)
+        let def_counts = self.mir_i32_list_fill(local_count, 0)
+        let def_stmts = self.mir_i32_list_fill(local_count, -1)
 
         if local_count > 0:
             scan.block_local(0)
@@ -1105,9 +1105,9 @@ impl Codegen:
                 if self.sema.pool_resolve_symbol(name) == field_text and fi < elem_count:
                     return fi
 
-        // Vec types are created dynamically and not registered in the struct field
+        // List types are created dynamically and not registered in the struct field
         // registry. Resolve their field names by layout: {ptr, len, cap, elem_size}.
-        if self.vec_is_vec.contains(agg_ty):
+        if self.list_is_list.contains(agg_ty):
             if normalized_field == self.sym_ptr: return 0
             if normalized_field == self.sym_len: return 1
             if normalized_field == self.sym_cap: return 2
@@ -1357,16 +1357,16 @@ impl Codegen:
                 // For projected_type, we need the variant's payload struct type.
                 var dc_found = false
                 if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
-                    let wrap: Vec[i64] = Vec.new()
+                    let wrap: List[i64] = List.new()
                     wrap.push(cur_ty)
-                    cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
+                    cur_ty = wl_struct_type(self.context, list_data_i64(&wrap), 1, 0)
                     dc_found = true
                 if not dc_found:
                     let builtin_payload = self.mir_builtin_variant_payload_llvm_type(cur_sema_ty, pd)
                     if builtin_payload != 0:
-                        let wrap: Vec[i64] = Vec.new()
+                        let wrap: List[i64] = List.new()
                         wrap.push(builtin_payload)
-                        cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
+                        cur_ty = wl_struct_type(self.context, list_data_i64(&wrap), 1, 0)
                         dc_found = true
                 // Check disc enums first
                 let enum_sym_opt = self.enum_by_llvm.get(cur_ty)
@@ -1387,9 +1387,9 @@ impl Codegen:
                     if dc_sema_payload > 0:
                         let dc_sema_llvm = self.mir_sema_type_to_llvm(dc_sema_payload)
                         if dc_sema_llvm != 0:
-                            let wrap: Vec[i64] = Vec.new()
+                            let wrap: List[i64] = List.new()
                             wrap.push(dc_sema_llvm)
-                            cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
+                            cur_ty = wl_struct_type(self.context, list_data_i64(&wrap), 1, 0)
                             dc_found = true
                 active_variant_idx = pd
             else:
@@ -1520,10 +1520,10 @@ impl Codegen:
                 else if wl_get_type_kind(cur_ty) == wl_array_type_kind():
                     // Array field access: GEP with [0, index]
                     let arr_elem_ty = wl_get_element_type(cur_ty)
-                    let gep_indices: Vec[i64] = Vec.new()
+                    let gep_indices: List[i64] = List.new()
                     gep_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
                     gep_indices.push(wl_const_int(wl_i32_type(self.context), fi as i64, 0))
-                    cur_ptr = wl_build_gep(self.builder, cur_ty, cur_ptr, vec_data_i64(&gep_indices), 2)
+                    cur_ptr = wl_build_gep(self.builder, cur_ty, cur_ptr, list_data_i64(&gep_indices), 2)
                     cur_ty = arr_elem_ty
                 else:
                     let llvm_fi = self.get_llvm_field_index(cur_ty, fi)
@@ -1606,11 +1606,11 @@ impl Codegen:
                         idx_val = wl_build_sext(self.builder, idx_val, i64_ty)
                 // The storage may hold a POINTER to the indexed value — a
                 // by-place closure capture or a reference local — while Sema
-                // says the value is a Vec/str/slice/array. Sema owns the
+                // says the value is a List/str/slice/array. Sema owns the
                 // meaning (D65): only a raw-pointer Sema type is pointer
                 // indexing. Load through the pointer and index what it
                 // names, as the field projection above does; keying on the
-                // LLVM `ptr` alone read `xs[1]` through a captured Vec as
+                // LLVM `ptr` alone read `xs[1]` through a captured List as
                 // `p[1]` — the high half of the data pointer.
                 if self.mode_decide(MODE_SITE_INDEX_THROUGH_ADDRESS, self.mir_place_step_holds_address(base_local, i == 0, cur_sema_ty) and not self.mir_sema_type_is_raw_pointer(cur_sema_ty), wl_get_type_kind(cur_ty) == wl_pointer_type_kind() and cur_sema_ty > 0 and self.mir_type_kind_at(self.mir_resolve_alias_at(cur_sema_ty)) != TypeKind.TY_PTR, body.fn_sym, place_id):
                     cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
@@ -1631,9 +1631,9 @@ impl Codegen:
                         cur_sema_ty = elem_sema
                 else if wl_get_type_kind(cur_ty) == wl_array_type_kind():
                     self.mir_emit_debug_index_bounds_check(idx_val, idx_sema_ty, self.mir_index_len_value(index_base_sema_ty, cur_ty, cur_ptr))
-                    let indices: Vec[i64] = Vec.new()
+                    let indices: List[i64] = List.new()
                     indices.push(idx_val)
-                    cur_ptr = wl_build_gep(self.builder, elem_llvm, cur_ptr, vec_data_i64(&indices), 1)
+                    cur_ptr = wl_build_gep(self.builder, elem_llvm, cur_ptr, list_data_i64(&indices), 1)
                     cur_ty = elem_llvm
                     if elem_sema > 0:
                         cur_sema_ty = elem_sema
@@ -1642,22 +1642,22 @@ impl Codegen:
                     if elem_llvm == 0:
                         return 0
                     let raw_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
-                    let indices: Vec[i64] = Vec.new()
+                    let indices: List[i64] = List.new()
                     indices.push(idx_val)
-                    cur_ptr = wl_build_gep(self.builder, elem_llvm, raw_ptr, vec_data_i64(&indices), 1)
+                    cur_ptr = wl_build_gep(self.builder, elem_llvm, raw_ptr, list_data_i64(&indices), 1)
                     cur_ty = elem_llvm
                     if elem_sema > 0:
                         cur_sema_ty = elem_sema
                 else:
-                    // Vec, str, and slices all store their data pointer in field 0.
+                    // List, str, and slices all store their data pointer in field 0.
                     if elem_llvm == 0:
                         return 0
                     self.mir_emit_debug_index_bounds_check(idx_val, idx_sema_ty, self.mir_index_len_value(index_base_sema_ty, cur_ty, cur_ptr))
                     let data_gep = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, 0)
                     let raw_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), data_gep)
-                    let indices: Vec[i64] = Vec.new()
+                    let indices: List[i64] = List.new()
                     indices.push(idx_val)
-                    cur_ptr = wl_build_gep(self.builder, elem_llvm, raw_ptr, vec_data_i64(&indices), 1)
+                    cur_ptr = wl_build_gep(self.builder, elem_llvm, raw_ptr, list_data_i64(&indices), 1)
                     cur_ty = elem_llvm
                     if elem_sema > 0:
                         cur_sema_ty = elem_sema
@@ -1666,9 +1666,9 @@ impl Codegen:
                 // GEP to field 1 of enum/option/result struct for payload access.
                 var dc_handled = false
                 if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
-                    let wrap: Vec[i64] = Vec.new()
+                    let wrap: List[i64] = List.new()
                     wrap.push(cur_ty)
-                    cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
+                    cur_ty = wl_struct_type(self.context, list_data_i64(&wrap), 1, 0)
                     dc_handled = true
                 if not dc_handled:
                     let builtin_payload = self.mir_builtin_variant_payload_llvm_type(cur_sema_ty, pd)
@@ -1676,9 +1676,9 @@ impl Codegen:
                         let area = self.option_payload_ptr(cur_ty, cur_ptr)
                         if area != 0:
                             cur_ptr = area
-                        let wrap: Vec[i64] = Vec.new()
+                        let wrap: List[i64] = List.new()
                         wrap.push(builtin_payload)
-                        cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
+                        cur_ty = wl_struct_type(self.context, list_data_i64(&wrap), 1, 0)
                         dc_handled = true
                 // Disc enums: { repr_type, [max_payload x i8] }
                 let dc_enum_sym_opt = self.enum_by_llvm.get(cur_ty)
@@ -1707,9 +1707,9 @@ impl Codegen:
                         if area != 0:
                             cur_ptr = area
                         if dc_pp_llvm != 0:
-                            let wrap: Vec[i64] = Vec.new()
+                            let wrap: List[i64] = List.new()
                             wrap.push(dc_pp_llvm)
-                            cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
+                            cur_ty = wl_struct_type(self.context, list_data_i64(&wrap), 1, 0)
                         else:
                             cur_ty = 0
                         dc_handled = true
@@ -2051,7 +2051,7 @@ impl Codegen:
                 // Don't coerce between incompatible struct types — the local's
                 // LLVM type (from a prior store, e.g. intrinsic result) is
                 // authoritative over sema type hints that may differ
-                // (e.g., VecIter.next() stores Option[T] but sema says T).
+                // (e.g., ListIter.next() stores Option[T] but sema says T).
                 let lk = wl_get_type_kind(ptr_ty)
                 let ek = wl_get_type_kind(expected_ty)
                 if lk == wl_struct_type_kind() and ek == wl_struct_type_kind() and ptr_ty != expected_ty:
@@ -2327,7 +2327,7 @@ impl Codegen:
         self.coerce_value_to_type(val, llvm_ty)
 
     // #293's &str-compares-as-str rule applied to ORDERING ops: the BTree
-    // walk compares a Vec.get &str view against an owned str key; without
+    // walk compares a List.get &str view against an owned str key; without
     // this route the mixed operands fell through to a raw `icmp slt ptr,
     // %str` (invalid IR, surfaced by the post-SROA verifier in every
     // generic str-keyed map instantiation).
@@ -2426,9 +2426,9 @@ impl Codegen:
                 self.had_error = 1
                 return wl_get_undef(wl_i1_type(self.context))
             let key_ret = self.sema.sig_return_type(key_sig)
-            let left_args: Vec[i64] = [lp]
+            let left_args: List[i64] = [lp]
             let left = self.build_call_fn_value(concrete.sym, concrete.value, concrete.fn_type, -1, 0, left_args, 1, "key projection", 0)
-            let right_args: Vec[i64] = [rp]
+            let right_args: List[i64] = [rp]
             let right = self.build_call_fn_value(concrete.sym, concrete.value, concrete.fn_type, -1, 0, right_args, 1, "key projection", 0)
             let key_ty = wl_type_of(left)
             let left_tmp = self.create_entry_alloca(key_ty)
@@ -2445,7 +2445,7 @@ impl Codegen:
             let concrete = self.ensure_concrete_mir_function(0, eq_sig, eq_sym, 0, "Eq.eq")
             if concrete.sym == 0:
                 return wl_get_undef(wl_i1_type(self.context))
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(lp)
             args.push(rp)
             let ret = self.build_call_fn_value(concrete.sym, concrete.value, concrete.fn_type, -1, 0, args, 2, "structural ==", 0)
@@ -2465,21 +2465,21 @@ impl Codegen:
         if tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
             let walk = self.mir_eq_fn(resolved, ty)
             if walk != 0:
-                let args: Vec[i64] = Vec.new()
+                let args: List[i64] = List.new()
                 args.push(lp)
                 args.push(rp)
-                return wl_build_call(self.builder, self.mir_eq_fn_type(), walk, vec_data_i64(&args), 2)
+                return wl_build_call(self.builder, self.mir_eq_fn_type(), walk, list_data_i64(&args), 2)
         self.compare_value_eq(wl_build_load(self.builder, ty, lp), wl_build_load(self.builder, ty, rp), ty, BinaryOp.OP_EQ)
 
     fn mir_eq_fn_type() -> i64:
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         params.push(wl_ptr_type(self.context))
-        wl_function_type(wl_i1_type(self.context), vec_data_i64(&params), 2, 0)
+        wl_function_type(wl_i1_type(self.context), list_data_i64(&params), 2, 0)
 
     // The walk of one aggregate type: `__with_eq_<type>(l, r) -> i1`,
     // declared before its body is emitted so a type recursive through a Box
-    // or a Vec compares through a call (ensure_structural_drop_fn's reason).
+    // or a List compares through a call (ensure_structural_drop_fn's reason).
     // 0 when the type has no walk: a representation Sema describes no parts
     // of (a union, a bit-packed struct, an opaque runtime handle) compares
     // by value.
@@ -2523,7 +2523,7 @@ impl Codegen:
         let tk = self.sema.get_type_kind(resolved as TypeId)
         if tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY:
             return true
-        if self.mir_sema_type_is_std_vec(resolved) or self.mir_eq_type_is_box(resolved):
+        if self.mir_sema_type_is_std_list(resolved) or self.mir_eq_type_is_box(resolved):
             return true
         if self.mir_enum_variant_count(resolved) > 0:
             return true
@@ -2555,22 +2555,22 @@ impl Codegen:
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_sgt(), count, zero), loop_bb, done_bb)
         wl_position_at_end(self.builder, loop_bb)
         let idx = wl_build_phi(self.builder, i64_ty)
-        let indices: Vec[i64] = Vec.new()
+        let indices: List[i64] = List.new()
         indices.push(idx)
-        let le = wl_build_gep(self.builder, elem_ty, lbuf, vec_data_i64(&indices), 1)
-        let re = wl_build_gep(self.builder, elem_ty, rbuf, vec_data_i64(&indices), 1)
+        let le = wl_build_gep(self.builder, elem_ty, lbuf, list_data_i64(&indices), 1)
+        let re = wl_build_gep(self.builder, elem_ty, rbuf, list_data_i64(&indices), 1)
         let equal = self.mir_emit_eq_ptrs(le, re, elem_ty, elem_sema)
         wl_build_cond_br(self.builder, equal, step_bb, differ)
         wl_position_at_end(self.builder, step_bb)
         let next_idx = wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0))
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_slt(), next_idx, count), loop_bb, done_bb)
-        let phi_vals: Vec[i64] = Vec.new()
+        let phi_vals: List[i64] = List.new()
         phi_vals.push(zero)
         phi_vals.push(next_idx)
-        let phi_bbs: Vec[i64] = Vec.new()
+        let phi_bbs: List[i64] = List.new()
         phi_bbs.push(entry_bb)
         phi_bbs.push(step_bb)
-        wl_add_incoming(idx, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+        wl_add_incoming(idx, list_data_i64(&phi_vals), list_data_i64(&phi_bbs), 2)
         wl_position_at_end(self.builder, done_bb)
 
     mut fn mir_emit_eq_walk(lp: i64, rp: i64, ty: i64, resolved: i32, differ: i64):
@@ -2590,11 +2590,11 @@ impl Codegen:
             let count = self.sema.get_type_d1(resolved as TypeId)
             self.mir_eq_elements(lp, rp, wl_get_element_type(ty), elem_sema, wl_const_int(i64_ty, count as i64, 0), differ)
             return
-        if self.mir_sema_type_is_std_vec(resolved):
-            let elem_sema = self.mir_vec_elem_sema_type_from_sema_type(resolved)
+        if self.mir_sema_type_is_std_list(resolved):
+            let elem_sema = self.mir_list_elem_sema_type_from_sema_type(resolved)
             let elem_ty = self.mir_sema_type_to_llvm(elem_sema)
-            let llen = self.mir_vec_len_inline(lp)
-            self.mir_eq_require(wl_build_icmp(self.builder, wl_int_eq(), llen, self.mir_vec_len_inline(rp)), differ)
+            let llen = self.mir_list_len_inline(lp)
+            self.mir_eq_require(wl_build_icmp(self.builder, wl_int_eq(), llen, self.mir_list_len_inline(rp)), differ)
             if elem_sema > 0 and elem_ty != 0:
                 self.mir_eq_elements(wl_build_load(self.builder, ptr_ty, lp), wl_build_load(self.builder, ptr_ty, rp), elem_ty, elem_sema, llen, differ)
             return
@@ -2752,8 +2752,8 @@ impl Codegen:
         wl_build_select(self.builder, lt, wl_const_int(i32_ty, -1, 1), greater)
 
     fn mir_cmp_fn_type() -> i64:
-        let params: Vec[i64] = [wl_ptr_type(self.context), wl_ptr_type(self.context)]
-        wl_function_type(wl_i32_type(self.context), vec_data_i64(&params), 2, 0)
+        let params: List[i64] = [wl_ptr_type(self.context), wl_ptr_type(self.context)]
+        wl_function_type(wl_i32_type(self.context), list_data_i64(&params), 2, 0)
 
     // The order of the values of With type `sema_ty` at `lp` and `rp`, as an
     // i32 (-1, 0, 1).
@@ -2767,7 +2767,7 @@ impl Codegen:
             let concrete = self.ensure_concrete_mir_function(0, cmp_sig, cmp_sym, 0, "Ord.cmp")
             if concrete.sym == 0:
                 return self.mir_bug_undef(f"the cmp Sema recorded for type {resolved} has no function", i32_ty)
-            let args: Vec[i64] = [lp, rp]
+            let args: List[i64] = [lp, rp]
             let ret = self.build_call_fn_value(concrete.sym, concrete.value, concrete.fn_type, -1, 0, args, 2, "structural order", 0)
             return self.coerce_value_to_type(ret, i32_ty)
         let observes_str = tk == TypeKind.TY_REF and self.sema.get_type_kind(self.sema.resolve_alias(self.sema.get_type_d0(resolved as TypeId) as TypeId)) == TypeKind.TY_STR
@@ -2777,7 +2777,7 @@ impl Codegen:
             let fn_val = self.ensure_with_str_cmp_declared()
             let fn_sym = self.intern.intern("with_str_cmp_ref")
             let fn_ty = self.fn_fn_types.get(fn_sym).unwrap() as i64
-            let args: Vec[i64] = [self.str_view_arg(lv), self.str_view_arg(rv)]
+            let args: List[i64] = [self.str_view_arg(lv), self.str_view_arg(rv)]
             let order = self.build_call_fn_value(fn_sym, fn_val, fn_ty, -1, 0, args, 2, "with_str_cmp_ref", 0)
             let zero = wl_const_int(wl_type_of(order), 0, 0)
             return self.mir_three_way(wl_build_icmp(self.builder, wl_int_slt(), order, zero), wl_build_icmp(self.builder, wl_int_sgt(), order, zero))
@@ -2798,11 +2798,11 @@ impl Codegen:
         if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved as TypeId)):
             // §4.5: a distinct has its inner type's representation and order.
             return self.mir_emit_cmp_ptrs(lp, rp, ty, self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)])
-        if (tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and not self.mir_sema_type_is_std_vec(resolved):
+        if (tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and not self.mir_sema_type_is_std_list(resolved):
             let walk = self.mir_cmp_fn(resolved, ty)
             if walk != 0:
-                let args: Vec[i64] = [lp, rp]
-                return wl_build_call(self.builder, self.mir_cmp_fn_type(), walk, vec_data_i64(&args), 2)
+                let args: List[i64] = [lp, rp]
+                return wl_build_call(self.builder, self.mir_cmp_fn_type(), walk, list_data_i64(&args), 2)
         self.mir_bug_undef(f"`<` reached a part of type {self.sema.type_name(resolved)}, which has no order (§11.8)", i32_ty)
 
     mut fn mir_cmp_fn(resolved: i32, ty: i64) -> i64:
@@ -2878,10 +2878,10 @@ impl Codegen:
             wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_slt(), index, wl_const_int(i64_ty, count as i64, 0)), body_bb, done)
             wl_position_at_end(self.builder, body_bb)
             let zero = wl_const_int(i64_ty, 0, 0)
-            let l_idx: Vec[i64] = [zero, index]
-            let r_idx: Vec[i64] = [zero, index]
-            let le = wl_build_gep(self.builder, ty, lp, vec_data_i64(&l_idx), 2)
-            let re = wl_build_gep(self.builder, ty, rp, vec_data_i64(&r_idx), 2)
+            let l_idx: List[i64] = [zero, index]
+            let r_idx: List[i64] = [zero, index]
+            let le = wl_build_gep(self.builder, ty, lp, list_data_i64(&l_idx), 2)
+            let re = wl_build_gep(self.builder, ty, rp, list_data_i64(&r_idx), 2)
             let order = self.mir_emit_cmp_ptrs(le, re, elem_ty, elem_sema)
             self.mir_cmp_require(order, decided, result_slot)
             wl_build_store(self.builder, wl_build_add(self.builder, index, wl_const_int(i64_ty, 1, 0)), index_slot)
@@ -3022,8 +3022,8 @@ impl Codegen:
         if kind == 2 and key_ty != 0:
             hash_fn = self.mir_map_key_hash_fn(key_sema, key_ty)
             eq_fn = self.mir_map_key_eq_fn(key_sema, key_ty)
-        let params: Vec[i64] = [i64_ty, i64_ty, i64_ty, ptr_ty, ptr_ty]
-        let args: Vec[i64] = [wl_const_int(i64_ty, key_size, 0), wl_const_int(i64_ty, val_size, 0), wl_const_int(i64_ty, kind as i64, 0), hash_fn, eq_fn]
+        let params: List[i64] = [i64_ty, i64_ty, i64_ty, ptr_ty, ptr_ty]
+        let args: List[i64] = [wl_const_int(i64_ty, key_size, 0), wl_const_int(i64_ty, val_size, 0), wl_const_int(i64_ty, kind as i64, 0), hash_fn, eq_fn]
         self.call_runtime_checked("with_hashmap_new_keyed", ptr_ty, &params, &args)
 
     // `__with_keyhash_<type>(key) -> i64`: a keyed hasher fed the key.
@@ -3035,8 +3035,8 @@ impl Codegen:
             return existing
         let i64_ty = wl_i64_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
-        let params: Vec[i64] = [ptr_ty]
-        let helper = wl_add_function(self.llmod, fn_name, wl_function_type(i64_ty, vec_data_i64(&params), 1, 0))
+        let params: List[i64] = [ptr_ty]
+        let helper = wl_add_function(self.llmod, fn_name, wl_function_type(i64_ty, list_data_i64(&params), 1, 0))
         wl_set_linkage(helper, wl_internal_linkage())
         let saved_fn: i64 = self.current_function
         let saved_fn_name_sym: i32 = self.current_function_name_sym
@@ -3050,11 +3050,11 @@ impl Codegen:
         wl_position_at_end(self.builder, wl_append_bb(self.context, helper, "entry"))
         // A hasher is 56 bytes the caller owns (rt_core: SIP_SIZE).
         let state = self.create_entry_alloca(wl_array_type(i64_ty, 7))
-        let init_params: Vec[i64] = [ptr_ty]
-        let init_args: Vec[i64] = [state]
+        let init_params: List[i64] = [ptr_ty]
+        let init_args: List[i64] = [state]
         let _ = self.call_runtime_checked("with_hasher_init", wl_void_type(self.context), &init_params, &init_args)
         self.mir_emit_hash_ptrs(wl_get_param(helper, 0), key_ty, key_sema, state)
-        let finish_args: Vec[i64] = [state]
+        let finish_args: List[i64] = [state]
         let _ = wl_build_ret(self.builder, self.call_runtime_checked("with_hasher_finish", i64_ty, &init_params, &finish_args))
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
@@ -3072,8 +3072,8 @@ impl Codegen:
         if existing != 0:
             return existing
         let i32_ty = wl_i32_type(self.context)
-        let params: Vec[i64] = [wl_ptr_type(self.context), wl_ptr_type(self.context)]
-        let helper = wl_add_function(self.llmod, fn_name, wl_function_type(i32_ty, vec_data_i64(&params), 2, 0))
+        let params: List[i64] = [wl_ptr_type(self.context), wl_ptr_type(self.context)]
+        let helper = wl_add_function(self.llmod, fn_name, wl_function_type(i32_ty, list_data_i64(&params), 2, 0))
         wl_set_linkage(helper, wl_internal_linkage())
         let saved_fn: i64 = self.current_function
         let saved_fn_name_sym: i32 = self.current_function_name_sym
@@ -3099,8 +3099,8 @@ impl Codegen:
     mut fn mir_hash_write(state: i64, p: i64, size: i64):
         let ptr_ty = wl_ptr_type(self.context)
         let i64_ty = wl_i64_type(self.context)
-        let params: Vec[i64] = [ptr_ty, ptr_ty, i64_ty]
-        let args: Vec[i64] = [state, p, wl_const_int(i64_ty, size, 0)]
+        let params: List[i64] = [ptr_ty, ptr_ty, i64_ty]
+        let args: List[i64] = [state, p, wl_const_int(i64_ty, size, 0)]
         let _ = self.call_runtime_checked("with_hasher_write", wl_void_type(self.context), &params, &args)
 
     // Feeds a value (a tag, a length, a marker) to the hasher.
@@ -3123,7 +3123,7 @@ impl Codegen:
             let concrete = self.ensure_concrete_mir_function(0, key_sig, key_sym, 0, "Key.key")
             if concrete.sym == 0:
                 return
-            let args: Vec[i64] = [p]
+            let args: List[i64] = [p]
             let projected = self.build_call_fn_value(concrete.sym, concrete.value, concrete.fn_type, -1, 0, args, 1, "key projection", 0)
             let key_ret = self.sema.sig_return_type(key_sig)
             let tmp = self.create_entry_alloca(wl_type_of(projected))
@@ -3134,11 +3134,11 @@ impl Codegen:
         let observes_str = tk == TypeKind.TY_REF and self.sema.get_type_kind(self.sema.resolve_alias(self.sema.get_type_d0(resolved as TypeId) as TypeId)) == TypeKind.TY_STR
         if tk == TypeKind.TY_STR or observes_str:
             let v = self.mir_coerce_compare_operand(wl_build_load(self.builder, ty, p), resolved)
-            let params: Vec[i64] = [wl_ptr_type(self.context), self.str_llvm_type()]
+            let params: List[i64] = [wl_ptr_type(self.context), self.str_llvm_type()]
             let fn_val = self.ensure_internal_runtime_fn("with_hasher_write_str", params, 2, wl_void_type(self.context))
             let fn_sym = self.intern.intern("with_hasher_write_str")
             let fn_ty = self.fn_fn_types.get(fn_sym).unwrap() as i64
-            let args: Vec[i64] = [state, self.str_view_arg(v)]
+            let args: List[i64] = [state, self.str_view_arg(v)]
             let _ = self.build_call_fn_value(fn_sym, fn_val, fn_ty, -1, 0, args, 2, "with_hasher_write_str", 0)
             return
         if tk == TypeKind.TY_REF:
@@ -3150,15 +3150,15 @@ impl Codegen:
         if tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
             let walk = self.mir_hash_fn(resolved, ty)
             if walk != 0:
-                let args: Vec[i64] = [p, state]
-                let _ = wl_build_call(self.builder, self.mir_hash_fn_type(), walk, vec_data_i64(&args), 2)
+                let args: List[i64] = [p, state]
+                let _ = wl_build_call(self.builder, self.mir_hash_fn_type(), walk, list_data_i64(&args), 2)
                 return
         let size = self.abi_size_of(ty)
         self.mir_hash_write(state, p, size)
 
     fn mir_hash_fn_type() -> i64:
-        let params: Vec[i64] = [wl_ptr_type(self.context), wl_ptr_type(self.context)]
-        wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 2, 0)
+        let params: List[i64] = [wl_ptr_type(self.context), wl_ptr_type(self.context)]
+        wl_function_type(wl_void_type(self.context), list_data_i64(&params), 2, 0)
 
     // `__with_hash_<type>(p, state)`: one aggregate type's parts, fed to the
     // hasher. 0 when the type has no walk (mir_eq_type_has_walk): its bytes
@@ -3202,15 +3202,15 @@ impl Codegen:
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_sgt(), count, zero), loop_bb, done_bb)
         wl_position_at_end(self.builder, loop_bb)
         let idx = wl_build_phi(self.builder, i64_ty)
-        let indices: Vec[i64] = [idx]
-        let element = wl_build_gep(self.builder, elem_ty, buf, vec_data_i64(&indices), 1)
+        let indices: List[i64] = [idx]
+        let element = wl_build_gep(self.builder, elem_ty, buf, list_data_i64(&indices), 1)
         self.mir_emit_hash_ptrs(element, elem_ty, elem_sema, state)
         let step_bb = wl_get_insert_block(self.builder)
         let next_idx = wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0))
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_slt(), next_idx, count), loop_bb, done_bb)
-        let phi_vals: Vec[i64] = [zero, next_idx]
-        let phi_bbs: Vec[i64] = [entry_bb, step_bb]
-        wl_add_incoming(idx, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+        let phi_vals: List[i64] = [zero, next_idx]
+        let phi_bbs: List[i64] = [entry_bb, step_bb]
+        wl_add_incoming(idx, list_data_i64(&phi_vals), list_data_i64(&phi_bbs), 2)
         wl_position_at_end(self.builder, done_bb)
 
     // The parts mir_emit_eq_walk compares, fed to the hasher in its order.
@@ -3231,10 +3231,10 @@ impl Codegen:
             let count = self.sema.get_type_d1(resolved as TypeId)
             self.mir_hash_elements(p, wl_get_element_type(ty), elem_sema, wl_const_int(i64_ty, count as i64, 0), state)
             return
-        if self.mir_sema_type_is_std_vec(resolved):
-            let elem_sema = self.mir_vec_elem_sema_type_from_sema_type(resolved)
+        if self.mir_sema_type_is_std_list(resolved):
+            let elem_sema = self.mir_list_elem_sema_type_from_sema_type(resolved)
             let elem_ty = self.mir_sema_type_to_llvm(elem_sema)
-            let len = self.mir_vec_len_inline(p)
+            let len = self.mir_list_len_inline(p)
             self.mir_hash_write_value(state, len)
             if elem_sema > 0 and elem_ty != 0:
                 let data = wl_build_load(self.builder, ptr_ty, p)
@@ -3391,21 +3391,21 @@ impl Codegen:
             let sat_fv = self.fn_values.get(sat_sym)
             let sat_ft = self.fn_fn_types.get(sat_sym)
             if sat_fv.is_some() and sat_ft.is_some():
-                let sat_args: Vec[i64] = Vec.new()
+                let sat_args: List[i64] = List.new()
                 sat_args.push(l)
                 sat_args.push(r)
-                return wl_build_call(self.builder, sat_ft.unwrap() as i64, sat_fv.unwrap() as i64, vec_data_i64(&sat_args), 2)
-            let sat_pts: Vec[i64] = Vec.new()
+                return wl_build_call(self.builder, sat_ft.unwrap() as i64, sat_fv.unwrap() as i64, list_data_i64(&sat_args), 2)
+            let sat_pts: List[i64] = List.new()
             sat_pts.push(wider_ty)
             sat_pts.push(wider_ty)
-            let sat_fnt = wl_function_type(wider_ty, vec_data_i64(&sat_pts), 2, 0)
+            let sat_fnt = wl_function_type(wider_ty, list_data_i64(&sat_pts), 2, 0)
             let sat_func = wl_add_function(self.llmod, sat_fn_name, sat_fnt)
             self.fn_values.insert(sat_sym, sat_func)
             self.fn_fn_types.insert(sat_sym, sat_fnt)
-            let sat_args: Vec[i64] = Vec.new()
+            let sat_args: List[i64] = List.new()
             sat_args.push(l)
             sat_args.push(r)
-            return wl_build_call(self.builder, sat_fnt, sat_func, vec_data_i64(&sat_args), 2)
+            return wl_build_call(self.builder, sat_fnt, sat_func, list_data_i64(&sat_args), 2)
 
         // Widening multiply + clamp: multiply in 2x width, clamp to [MIN, MAX], truncate.
         let ms_width = wl_get_int_type_width(wider_ty)
@@ -3456,14 +3456,14 @@ impl Codegen:
             self.had_error = 1
             self.codegen_error_detail = "missing LLVM overflow intrinsic " ++ name
             return wl_get_undef(wider_ty)
-        let overloads: Vec[i64] = Vec.new()
+        let overloads: List[i64] = List.new()
         overloads.push(wider_ty)
-        let fn_val = wl_get_intrinsic_decl(self.llmod, intrinsic_id, vec_data_i64(&overloads), 1)
-        let fn_ty = wl_intrinsic_get_type(self.context, intrinsic_id, vec_data_i64(&overloads), 1)
-        let args: Vec[i64] = Vec.new()
+        let fn_val = wl_get_intrinsic_decl(self.llmod, intrinsic_id, list_data_i64(&overloads), 1)
+        let fn_ty = wl_intrinsic_get_type(self.context, intrinsic_id, list_data_i64(&overloads), 1)
+        let args: List[i64] = List.new()
         args.push(l)
         args.push(r)
-        let pair = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 2)
+        let pair = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 2)
         let result = wl_build_extract_value(self.builder, pair, 0)
         let overflow = wl_build_extract_value(self.builder, pair, 1)
         let panic_bb = wl_append_bb(self.context, self.current_function, "arith.overflow")
@@ -3522,13 +3522,13 @@ impl Codegen:
             let ok_end = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb)
             let phi = wl_build_phi(self.builder, wider_ty)
-            let vals: Vec[i64] = Vec.new()
+            let vals: List[i64] = List.new()
             vals.push(overflow_value)
             vals.push(normal_value)
-            let bbs: Vec[i64] = Vec.new()
+            let bbs: List[i64] = List.new()
             bbs.push(overflow_end)
             bbs.push(ok_end)
-            wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+            wl_add_incoming(phi, list_data_i64(&vals), list_data_i64(&bbs), 2)
             return phi
 
         let panic_bb = wl_append_bb(self.context, self.current_function, "arith.divoverflow")
@@ -3567,9 +3567,9 @@ impl Codegen:
             if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB:
                 self.binop_route = "pointer-arith"
                 let idx_val = if op == BinaryOp.OP_SUB: wl_build_neg(self.builder, rhs) else: rhs
-                let indices: Vec[i64] = Vec.new()
+                let indices: List[i64] = List.new()
                 indices.push(idx_val)
-                return wl_build_gep(self.builder, wl_i8_type(self.context), lhs, vec_data_i64(&indices), 1)
+                return wl_build_gep(self.builder, wl_i8_type(self.context), lhs, list_data_i64(&indices), 1)
 
         if self.is_str_type(wl_type_of(lhs)) and self.is_str_type(wl_type_of(rhs)):
             self.binop_route = "str"
@@ -3724,10 +3724,10 @@ impl Codegen:
     // nothing and drops nothing.
     mut fn mir_str_concat(lhs: i64, rhs: i64) -> i64:
         let str_ty = self.str_llvm_type()
-        let param_types: Vec[i64] = Vec.new()
+        let param_types: List[i64] = List.new()
         param_types.push(str_ty)
         param_types.push(str_ty)
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(self.str_view_arg(lhs))
         args.push(self.str_view_arg(rhs))
         self.call_internal_runtime_fn("with_str_concat_ref", param_types, args, 2, str_ty)
@@ -3765,16 +3765,16 @@ impl Codegen:
             // #293/#747: a &str part loads its pointee header, not the pointer.
             let value_sema = self.mir_operand_sema_type(body, op_id)
             let value = self.mir_coerce_compare_operand(value_raw, value_sema)
-            let indices: Vec[i64] = Vec.new()
+            let indices: List[i64] = List.new()
             indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
             indices.push(wl_const_int(wl_i32_type(self.context), i as i64, 0))
-            let slot = wl_build_gep(self.builder, arr_ty, arr_alloca, vec_data_i64(&indices), 2)
+            let slot = wl_build_gep(self.builder, arr_ty, arr_alloca, list_data_i64(&indices), 2)
             wl_build_store(self.builder, self.coerce_value_to_type(value, str_ty), slot)
 
-        let data_indices: Vec[i64] = Vec.new()
+        let data_indices: List[i64] = List.new()
         data_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
         data_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
-        let parts_ptr = wl_build_gep(self.builder, arr_ty, arr_alloca, vec_data_i64(&data_indices), 2)
+        let parts_ptr = wl_build_gep(self.builder, arr_ty, arr_alloca, list_data_i64(&data_indices), 2)
 
         let concat_name = if move_first != 0: "with_str_concat_n_move_first" else: "with_str_concat_n"
         let concat_sym = self.intern.intern(concat_name)
@@ -3784,17 +3784,17 @@ impl Codegen:
         if fv.is_some() and ft.is_some():
             let fn_value: i64 = fv.unwrap()
             let fn_type: i64 = ft.unwrap()
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(parts_ptr)
             args.push(wl_const_int(wl_i64_type(self.context), arg_count as i64, 0))
             result = self.build_call_fn_value(concat_sym, fn_value, fn_type, -1, 0, args, 2, concat_name, 0)
         else:
-            let param_types: Vec[i64] = Vec.new()
+            let param_types: List[i64] = List.new()
             param_types.push(wl_ptr_type(self.context))
             param_types.push(wl_i64_type(self.context))
             let func = self.ensure_internal_runtime_fn(concat_name, param_types, 2, str_ty)
             let fn_type: i64 = self.fn_fn_types.get(concat_sym).unwrap()
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(parts_ptr)
             args.push(wl_const_int(wl_i64_type(self.context), arg_count as i64, 0))
             result = self.build_call_fn_value(concat_sym, func, fn_type, -1, 0, args, 2, concat_name, 0)
@@ -3999,11 +3999,11 @@ impl Codegen:
                 // #1922: a 128-bit value keeps both words.
                 let i32_ty = wl_i32_type(self.context)
                 let i64_ty = wl_i64_type(self.context)
-                let pts: Vec[i64] = Vec.new()
+                let pts: List[i64] = List.new()
                 pts.push(i64_ty)
                 pts.push(i64_ty)
                 pts.push(i32_ty)
-                let a: Vec[i64] = Vec.new()
+                let a: List[i64] = List.new()
                 a.push(self.int128_word(val, false))
                 a.push(self.int128_word(val, true))
                 a.push(wl_const_int(i32_ty, if is_unsigned: 1 else: 0, 0))
@@ -4032,12 +4032,12 @@ impl Codegen:
         if fv.is_some() and ft.is_some():
             let fn_value: i64 = fv.unwrap()
             let fn_type: i64 = ft.unwrap()
-            let a: Vec[i64] = Vec.new()
+            let a: List[i64] = List.new()
             a.push(coerced)
             return self.build_call_fn_value(sym, fn_value, fn_type, -1, 0, a, 1, fn_name, 0)
-        let pts: Vec[i64] = Vec.new()
+        let pts: List[i64] = List.new()
         pts.push(arg_ty)
-        let a: Vec[i64] = Vec.new()
+        let a: List[i64] = List.new()
         a.push(coerced)
         self.call_internal_runtime_fn(fn_name, pts, a, 1, str_ty)
 
@@ -4045,9 +4045,9 @@ impl Codegen:
     // value, which it never owns. The `&str` is the value's own `{ptr, len}`
     // (#1810), not the address of a spilled header.
     mut fn call_runtime_str_fn_ref(fn_name: &str, arg: i64, str_ty: i64) -> i64:
-        let pts: Vec[i64] = Vec.new()
+        let pts: List[i64] = List.new()
         pts.push(self.str_llvm_type())
-        let a: Vec[i64] = Vec.new()
+        let a: List[i64] = List.new()
         a.push(self.str_view_arg(arg))
         self.call_internal_runtime_fn(fn_name, pts, a, 1, str_ty)
 
@@ -4058,21 +4058,21 @@ impl Codegen:
         if fv.is_some() and ft.is_some():
             let fn_value: i64 = fv.unwrap()
             let fn_type: i64 = ft.unwrap()
-            let a: Vec[i64] = Vec.new()
+            let a: List[i64] = List.new()
             a.push(arg)
             return self.build_call_fn_value(sym, fn_value, fn_type, -1, 0, a, 1, fn_name, 0)
-        let pts: Vec[i64] = Vec.new()
+        let pts: List[i64] = List.new()
         pts.push(wl_type_of(arg))
-        let a: Vec[i64] = Vec.new()
+        let a: List[i64] = List.new()
         a.push(arg)
         self.call_internal_runtime_fn(fn_name, pts, a, 1, str_ty)
 
-    mut fn ensure_internal_runtime_fn(name: &str, orig_param_types: &Vec[i64], param_count: i32, ret_ty: i64) -> i64:
+    mut fn ensure_internal_runtime_fn(name: &str, orig_param_types: &List[i64], param_count: i32, ret_ty: i64) -> i64:
         let sym = self.intern.intern(name)
         let fv = self.fn_values.get(sym)
         if fv.is_some():
             return fv.unwrap() as i64
-        let places: Vec[i32] = Vec.new()
+        let places: List[i32] = List.new()
         for pi in 0..param_count: places.push(0)
         let abi_index = self.compute_fn_abi(ret_ty, orig_param_types, places, FN_ABI_WITH, 0)
         let abi = self.fn_abis[abi_index]
@@ -4089,7 +4089,7 @@ impl Codegen:
         self.fn_fn_types.insert(sym, fn_type)
         func
 
-    mut fn call_internal_runtime_fn(name: &str, orig_param_types: &Vec[i64], args: &Vec[i64], arg_count: i32, ret_ty: i64) -> i64:
+    mut fn call_internal_runtime_fn(name: &str, orig_param_types: &List[i64], args: &List[i64], arg_count: i32, ret_ty: i64) -> i64:
         let sym = self.intern.intern(name)
         let func = self.ensure_internal_runtime_fn(name, orig_param_types, arg_count, ret_ty)
         let ft = self.fn_fn_types.get(sym).unwrap() as i64
@@ -4210,7 +4210,7 @@ impl Codegen:
             sema_phase_bug(f"BUG: `:?` formatter for type {resolved} has no function (D61)")
         let slot = self.create_entry_alloca(wl_type_of(val))
         wl_build_store(self.builder, val, slot)
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(slot)
         self.build_call_fn_value(callee.sym, callee.value, callee.fn_type, -1, 0, args, 1, name, 0)
 
@@ -4316,7 +4316,7 @@ impl Codegen:
         let i64_ty = wl_i64_type(self.context)
 
         if vk == wl_integer_type_kind() and wl_get_int_type_width(val_ty) > 64:
-            let pts: Vec[i64] = Vec.new()
+            let pts: List[i64] = List.new()
             pts.push(i64_ty)
             pts.push(i64_ty)
             pts.push(i32_ty)
@@ -4324,7 +4324,7 @@ impl Codegen:
             pts.push(i32_ty)
             pts.push(i32_ty)
             pts.push(i32_ty)
-            let a: Vec[i64] = Vec.new()
+            let a: List[i64] = List.new()
             a.push(self.int128_word(val, false))
             a.push(self.int128_word(val, true))
             a.push(wl_const_int(i32_ty, if is_unsigned: 1 else: 0, 0))
@@ -4345,7 +4345,7 @@ impl Codegen:
             if fv.is_some() and ft.is_some():
                 let fn_value: i64 = fv.unwrap()
                 let fn_type: i64 = ft.unwrap()
-                let a: Vec[i64] = Vec.new()
+                let a: List[i64] = List.new()
                 a.push(coerced_val)
                 a.push(wl_const_int(i32_ty, unsigned_flag, 0))
                 a.push(wl_const_int(i64_ty, flags as i64, 0))
@@ -4353,14 +4353,14 @@ impl Codegen:
                 a.push(wl_const_int(i32_ty, precision as i64, 0))
                 a.push(wl_const_int(i32_ty, mode as i64, 0))
                 return self.build_call_fn_value(sym, fn_value, fn_type, -1, 0, a, 6, fn_name, 0)
-            let pts: Vec[i64] = Vec.new()
+            let pts: List[i64] = List.new()
             pts.push(i64_ty)
             pts.push(i32_ty)
             pts.push(i64_ty)
             pts.push(i32_ty)
             pts.push(i32_ty)
             pts.push(i32_ty)
-            let a: Vec[i64] = Vec.new()
+            let a: List[i64] = List.new()
             a.push(coerced_val)
             a.push(wl_const_int(i32_ty, unsigned_flag, 0))
             a.push(wl_const_int(i64_ty, flags as i64, 0))
@@ -4380,20 +4380,20 @@ impl Codegen:
             if fv.is_some() and ft.is_some():
                 let fn_value: i64 = fv.unwrap()
                 let fn_type: i64 = ft.unwrap()
-                let a: Vec[i64] = Vec.new()
+                let a: List[i64] = List.new()
                 a.push(coerced_val)
                 a.push(wl_const_int(i64_ty, flags as i64, 0))
                 a.push(wl_const_int(i32_ty, width as i64, 0))
                 a.push(wl_const_int(i32_ty, precision as i64, 0))
                 a.push(wl_const_int(i32_ty, mode as i64, 0))
                 return self.build_call_fn_value(sym, fn_value, fn_type, -1, 0, a, 5, fn_name, 0)
-            let pts: Vec[i64] = Vec.new()
+            let pts: List[i64] = List.new()
             pts.push(f64_ty)
             pts.push(i64_ty)
             pts.push(i32_ty)
             pts.push(i32_ty)
             pts.push(i32_ty)
-            let a: Vec[i64] = Vec.new()
+            let a: List[i64] = List.new()
             a.push(coerced_val)
             a.push(wl_const_int(i64_ty, flags as i64, 0))
             a.push(wl_const_int(i32_ty, width as i64, 0))
@@ -4404,12 +4404,12 @@ impl Codegen:
         // String spec: with_fmt_str_spec(val, flags, width, precision)
         if val_ty == str_ty:
             // #761: observing form — pass the `&str` view.
-            let pts: Vec[i64] = Vec.new()
+            let pts: List[i64] = List.new()
             pts.push(str_ty)
             pts.push(i64_ty)
             pts.push(i32_ty)
             pts.push(i32_ty)
-            let a: Vec[i64] = Vec.new()
+            let a: List[i64] = List.new()
             a.push(self.str_view_arg(val))
             a.push(wl_const_int(i64_ty, flags as i64, 0))
             a.push(wl_const_int(i32_ty, width as i64, 0))
@@ -4426,7 +4426,7 @@ impl Codegen:
     // compiles to hardware instructions where available (fsqrt on ARM64)
     // and eliminates the libm dependency for these functions.
 
-    mut fn try_emit_llvm_math_intrinsic(fn_sym: i32, args: &Vec[i64], dest_place: i32, body: &MirBody, next_bb: i32) -> bool:
+    mut fn try_emit_llvm_math_intrinsic(fn_sym: i32, args: &List[i64], dest_place: i32, body: &MirBody, next_bb: i32) -> bool:
         if fn_sym == 0 or args.len() == 0:
             return false
         let name = self.intern.resolve(fn_sym)
@@ -4473,10 +4473,10 @@ impl Codegen:
         if cached.is_some():
             func = cached.unwrap() as i64
         else:
-            let pts: Vec[i64] = Vec.new()
+            let pts: List[i64] = List.new()
             for i in 0..arg_count:
                 pts.push(f64_ty)
-            let ft = wl_function_type(f64_ty, vec_data_i64(&pts), arg_count, 0)
+            let ft = wl_function_type(f64_ty, list_data_i64(&pts), arg_count, 0)
             func = wl_add_function(self.llmod, intrinsic_name, ft)
             self.fn_values.insert(isym, func)
             self.fn_fn_types.insert(isym, ft)
@@ -4484,7 +4484,7 @@ impl Codegen:
         let ft = self.fn_fn_types.get(isym).unwrap() as i64
 
         // Build call args (cast to f64 if needed)
-        let call_args: Vec[i64] = Vec.new()
+        let call_args: List[i64] = List.new()
         for i in 0..arg_count:
             let a = args[i]
             let ak = wl_get_type_kind(wl_type_of(a))
@@ -4493,7 +4493,7 @@ impl Codegen:
             else:
                 call_args.push(a)
 
-        let result = wl_build_call(self.builder, ft, func, vec_data_i64(&call_args), arg_count)
+        let result = wl_build_call(self.builder, ft, func, list_data_i64(&call_args), arg_count)
 
         // Store result to dest
         if dest_place >= 0 and result != 0:
@@ -4509,7 +4509,7 @@ impl Codegen:
             wl_build_br(self.builder, next_val)
         true
 
-    fn try_emit_llvm_va_intrinsic(fn_sym: i32, args: &Vec[i64], next_bb: i32) -> bool:
+    fn try_emit_llvm_va_intrinsic(fn_sym: i32, args: &List[i64], next_bb: i32) -> bool:
         if fn_sym == 0 or args.len() != 1:
             return false
         let name = self.intern.resolve(fn_sym)
@@ -4523,42 +4523,42 @@ impl Codegen:
 
         let ptr_ty = wl_ptr_type(self.context)
         let void_ty = wl_void_type(self.context)
-        let pts: Vec[i64] = Vec.new()
+        let pts: List[i64] = List.new()
         pts.push(ptr_ty)
-        let ft = wl_function_type(void_ty, vec_data_i64(&pts), 1, 0)
+        let ft = wl_function_type(void_ty, list_data_i64(&pts), 1, 0)
         var func = wl_get_named_function(self.llmod, intrinsic_name)
         if func == 0:
             func = wl_add_function(self.llmod, intrinsic_name, ft)
-        let call_args: Vec[i64] = Vec.new()
+        let call_args: List[i64] = List.new()
         call_args.push(args[0])
-        let _ = wl_build_call(self.builder, ft, func, vec_data_i64(&call_args), 1)
+        let _ = wl_build_call(self.builder, ft, func, list_data_i64(&call_args), 1)
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values[next_bb])
         true
 
     // ── FmtBuffer codegen helpers ────────────────────────────────────
 
-    mut fn ensure_fmt_buf_fn(name: &str, param_types: &Vec[i64], param_count: i32, ret_ty: i64) -> i64:
+    mut fn ensure_fmt_buf_fn(name: &str, param_types: &List[i64], param_count: i32, ret_ty: i64) -> i64:
         self.ensure_internal_runtime_fn(name, param_types, param_count, ret_ty)
 
     mut fn gen_fmt_buf_new() -> i64:
         let ptr_ty = wl_ptr_type(self.context)
-        let pts: Vec[i64] = Vec.new()
+        let pts: List[i64] = List.new()
         let func = self.ensure_fmt_buf_fn("with_fmt_buf_new", pts, 0, ptr_ty)
         let ft_sym = self.intern.intern("with_fmt_buf_new")
         let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         self.build_call_fn_value(ft_sym, func, ft, -1, 0, args, 0, "with_fmt_buf_new", 0)
 
     // `s` is a `&str` view, `{ptr, len}` (#1810).
     mut fn gen_fmt_buf_write_str_ref(buf: i64, s: i64):
-        let pts: Vec[i64] = Vec.new()
+        let pts: List[i64] = List.new()
         pts.push(wl_ptr_type(self.context))
         pts.push(self.str_llvm_type())
         let func = self.ensure_fmt_buf_fn("with_fmt_buf_write_str_ref", pts, 2, wl_void_type(self.context))
         let ft_sym = self.intern.intern("with_fmt_buf_write_str_ref")
         let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(buf)
         args.push(s)
         self.build_call_fn_value(ft_sym, func, ft, -1, 0, args, 2, "with_fmt_buf_write_str_ref", 0)
@@ -4566,12 +4566,12 @@ impl Codegen:
     // `s` is a `&str` view, `{ptr, len}` (#1810); the result is an owned copy.
     mut fn gen_str_clone_ref(s: i64) -> i64:
         let str_ty = self.str_llvm_type()
-        let pts: Vec[i64] = Vec.new()
+        let pts: List[i64] = List.new()
         pts.push(str_ty)
         let func = self.ensure_fmt_buf_fn("with_str_clone_ref", pts, 1, str_ty)
         let ft_sym = self.intern.intern("with_str_clone_ref")
         let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(s)
         self.build_call_fn_value(ft_sym, func, ft, -1, 0, args, 1, "with_str_clone_ref", 0)
 
@@ -4587,7 +4587,7 @@ impl Codegen:
         let unsigned_flag: i64 = if is_unsigned: 1 else: 0
 
         if vk == wl_integer_type_kind() and wl_get_int_type_width(val_ty) > 64:
-            let pts: Vec[i64] = Vec.new()
+            let pts: List[i64] = List.new()
             pts.push(ptr_ty)
             pts.push(i64_ty)
             pts.push(i64_ty)
@@ -4599,7 +4599,7 @@ impl Codegen:
             let func = self.ensure_fmt_buf_fn("with_fmt_buf_write_int128_spec", pts, 8, wl_void_type(self.context))
             let ft_sym = self.intern.intern("with_fmt_buf_write_int128_spec")
             let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(buf)
             args.push(self.int128_word(val, false))
             args.push(self.int128_word(val, true))
@@ -4613,7 +4613,7 @@ impl Codegen:
         else if vk == wl_integer_type_kind():
             // Integer: with_fmt_buf_write_i64_spec(buf, val, is_unsigned, flags, width, precision, mode)
             let coerced = self.coerce_int_ext(val, i64_ty, is_unsigned)
-            let pts: Vec[i64] = Vec.new()
+            let pts: List[i64] = List.new()
             pts.push(ptr_ty)
             pts.push(i64_ty)
             pts.push(i32_ty)
@@ -4624,7 +4624,7 @@ impl Codegen:
             let func = self.ensure_fmt_buf_fn("with_fmt_buf_write_i64_spec", pts, 7, wl_void_type(self.context))
             let ft_sym = self.intern.intern("with_fmt_buf_write_i64_spec")
             let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(buf)
             args.push(coerced)
             args.push(wl_const_int(i32_ty, unsigned_flag, 0))
@@ -4638,7 +4638,7 @@ impl Codegen:
             // Float: with_fmt_buf_write_f64_spec(buf, val, flags, width, precision, mode)
             let f64_ty = wl_f64_type(self.context)
             let coerced = if vk == wl_float_type_kind(): wl_build_fp_cast(self.builder, val, f64_ty) else: val
-            let pts: Vec[i64] = Vec.new()
+            let pts: List[i64] = List.new()
             pts.push(ptr_ty)
             pts.push(f64_ty)
             pts.push(i64_ty)
@@ -4648,7 +4648,7 @@ impl Codegen:
             let func = self.ensure_fmt_buf_fn("with_fmt_buf_write_f64_spec", pts, 6, wl_void_type(self.context))
             let ft_sym = self.intern.intern("with_fmt_buf_write_f64_spec")
             let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(buf)
             args.push(coerced)
             args.push(wl_const_int(i64_ty, flags as i64, 0))
@@ -4659,7 +4659,7 @@ impl Codegen:
 
         else:
             // #761: observing form — with_fmt_buf_write_str_spec_ref(buf, &val, ...)
-            let pts: Vec[i64] = Vec.new()
+            let pts: List[i64] = List.new()
             pts.push(ptr_ty)
             pts.push(self.str_llvm_type())
             pts.push(i64_ty)
@@ -4668,7 +4668,7 @@ impl Codegen:
             let func = self.ensure_fmt_buf_fn("with_fmt_buf_write_str_spec_ref", pts, 5, wl_void_type(self.context))
             let ft_sym = self.intern.intern("with_fmt_buf_write_str_spec_ref")
             let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(buf)
             args.push(self.str_view_arg(val))
             args.push(wl_const_int(i64_ty, flags as i64, 0))
@@ -4679,12 +4679,12 @@ impl Codegen:
     mut fn gen_fmt_buf_finish(buf: i64) -> i64:
         let ptr_ty = wl_ptr_type(self.context)
         let str_ty = self.resolve_named_type(self.intern.intern("str"))
-        let pts: Vec[i64] = Vec.new()
+        let pts: List[i64] = List.new()
         pts.push(ptr_ty)
         let func = self.ensure_fmt_buf_fn("with_fmt_buf_finish", pts, 1, str_ty)
         let ft_sym = self.intern.intern("with_fmt_buf_finish")
         let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(buf)
         self.build_call_fn_value(ft_sym, func, ft, -1, 0, args, 1, "with_fmt_buf_finish", 0)
 
@@ -4784,14 +4784,14 @@ impl Codegen:
                     return wl_build_sub(self.builder, lhs_i, rhs_i)
                 if (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF) and lhs_llvm_tk == wl_pointer_type_kind() and rhs_llvm_tk == wl_integer_type_kind():
                     let elem_ty = self.mir_pointer_elem_llvm_type(lhs_sema)
-                    let indices: Vec[i64] = Vec.new()
+                    let indices: List[i64] = List.new()
                     indices.push(if d0 == BinaryOp.OP_SUB: wl_build_neg(self.builder, rhs) else: rhs)
-                    return wl_build_gep(self.builder, if elem_ty != 0: elem_ty else: wl_i8_type(self.context), lhs, vec_data_i64(&indices), 1)
+                    return wl_build_gep(self.builder, if elem_ty != 0: elem_ty else: wl_i8_type(self.context), lhs, list_data_i64(&indices), 1)
                 if d0 == BinaryOp.OP_ADD and (rhs_tk == TypeKind.TY_PTR or rhs_tk == TypeKind.TY_REF) and rhs_llvm_tk == wl_pointer_type_kind() and lhs_llvm_tk == wl_integer_type_kind():
                     let elem_ty = self.mir_pointer_elem_llvm_type(rhs_sema)
-                    let indices: Vec[i64] = Vec.new()
+                    let indices: List[i64] = List.new()
                     indices.push(lhs)
-                    return wl_build_gep(self.builder, if elem_ty != 0: elem_ty else: wl_i8_type(self.context), rhs, vec_data_i64(&indices), 1)
+                    return wl_build_gep(self.builder, if elem_ty != 0: elem_ty else: wl_i8_type(self.context), rhs, list_data_i64(&indices), 1)
             let is_unsigned = self.mir_operand_is_unsigned(body, d1)
             let out = self.mir_build_bin_op(d0, lhs, rhs, is_unsigned, lhs_sema, rhs_sema)
             if self.analysis_enabled != 0: self.record_operator_fact(body, rval_id, d0, lhs_sema, rhs_sema, lhs, rhs)
@@ -4895,8 +4895,8 @@ impl Codegen:
         if rk == RvalueKind.RK_AGGREGATE:
             // §4.3d: a vector's lanes, in order.
             if dest_sema_ty > 0 and self.cg_sema_is_vector_or_mask(dest_sema_ty) and d1 >= 0 and d1 < body.agg_field_starts.len() as i32:
-                let agg_vec_ty = self.mir_sema_type_to_llvm(dest_sema_ty)
-                return self.mir_build_vector_aggregate(body, body.agg_field_starts[d1], body.agg_field_counts[d1], agg_vec_ty)
+                let agg_list_ty = self.mir_sema_type_to_llvm(dest_sema_ty)
+                return self.mir_build_vector_aggregate(body, body.agg_field_starts[d1], body.agg_field_counts[d1], agg_list_ty)
             // d1 = fields_id — index into agg_field_starts/counts/operands
             let agg_fields_id = d1
             if agg_fields_id >= 0 and agg_fields_id < body.agg_field_starts.len() as i32:
@@ -4932,10 +4932,10 @@ impl Codegen:
                     for i in 0..agg_count:
                         let op_id = body.agg_field_operands[(agg_start + i)]
                         let val = self.mir_eval_operand(body, op_id, elem_ty)
-                        let indices: Vec[i64] = Vec.new()
+                        let indices: List[i64] = List.new()
                         indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
                         indices.push(wl_const_int(wl_i32_type(self.context), i as i64, 0))
-                        let gep = wl_build_gep(self.builder, struct_ty, alloca, vec_data_i64(&indices), 2)
+                        let gep = wl_build_gep(self.builder, struct_ty, alloca, list_data_i64(&indices), 2)
                         wl_build_store(self.builder, self.coerce_value_to_type(val, elem_ty), gep)
                     return wl_build_load(self.builder, struct_ty, alloca)
                 if d0 == 1 and struct_ty != 0 and wl_get_type_kind(struct_ty) == wl_pointer_type_kind():
@@ -5109,9 +5109,9 @@ impl Codegen:
         if rk == RvalueKind.RK_CAST:
             // §4.3d: a lane-wise conversion between vectors.
             if d1 > 0 and self.cg_sema_is_vector(d1):
-                let vec_src = self.mir_eval_operand(body, d0, 0)
-                let vec_src_sema = if d2 > 0: d2 else: self.mir_operand_sema_type(body, d0)
-                return self.mir_build_vector_cast(vec_src, vec_src_sema, d1)
+                let list_src = self.mir_eval_operand(body, d0, 0)
+                let list_src_sema = if d2 > 0: d2 else: self.mir_operand_sema_type(body, d0)
+                return self.mir_build_vector_cast(list_src, list_src_sema, d1)
             if d1 > 0 and self.cg_sema_is_vector_or_mask(d1):
                 let mask_src = self.mir_eval_operand(body, d0, 0)
                 let mask_dst_ty = self.mir_sema_type_to_llvm(d1)
@@ -5293,17 +5293,17 @@ impl Codegen:
                 return wl_get_undef(fallback_ty)
             var data_ptr = wl_const_null(wl_ptr_type(self.context))
             if base_ty != 0 and wl_get_type_kind(base_ty) == wl_array_type_kind():
-                let indices: Vec[i64] = Vec.new()
+                let indices: List[i64] = List.new()
                 indices.push(start_val)
-                data_ptr = wl_build_gep(self.builder, elem_ty, base_ptr, vec_data_i64(&indices), 1)
+                data_ptr = wl_build_gep(self.builder, elem_ty, base_ptr, list_data_i64(&indices), 1)
             else if base_ty != 0 and wl_get_type_kind(base_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(base_ty) > 0:
                 let data_gep = wl_build_struct_gep(self.builder, base_ty, base_ptr, 0)
                 let raw_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), data_gep)
                 if base_is_str:
                     self.mir_emit_str_slice_checks(start_val, end_val, base_len, raw_ptr)
-                let indices: Vec[i64] = Vec.new()
+                let indices: List[i64] = List.new()
                 indices.push(start_val)
-                data_ptr = wl_build_gep(self.builder, elem_ty, raw_ptr, vec_data_i64(&indices), 1)
+                data_ptr = wl_build_gep(self.builder, elem_ty, raw_ptr, list_data_i64(&indices), 1)
             else:
                 self.had_error = 1
                 self.codegen_error_detail = "slice base has no bounds metadata"
@@ -5345,20 +5345,20 @@ impl Codegen:
                     let ms_sym = self.intern.intern("llvm.memset.p0.i64")
                     let ms_func = self.ensure_llvm_memset_declared()
                     let ms_ft = self.fn_fn_types.get(ms_sym).unwrap() as i64
-                    let ms_args: Vec[i64] = Vec.new()
+                    let ms_args: List[i64] = List.new()
                     ms_args.push(af_alloca)
                     ms_args.push(af_fill_val)
                     ms_args.push(af_len_val)
                     ms_args.push(af_is_volatile)
-                    wl_build_call(self.builder, ms_ft, ms_func, vec_data_i64(&ms_args), 4)
+                    wl_build_call(self.builder, ms_ft, ms_func, list_data_i64(&ms_args), 4)
                 else:
                     wl_build_store(self.builder, self.build_default_value(af_ty), af_alloca)
                     let af_coerced = self.coerce_value_to_type(af_val, af_elem_ty)
                     for i in 0..fill_count:
-                        let af_indices: Vec[i64] = Vec.new()
+                        let af_indices: List[i64] = List.new()
                         af_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
                         af_indices.push(wl_const_int(wl_i32_type(self.context), i as i64, 0))
-                        let af_gep = wl_build_gep(self.builder, af_ty, af_alloca, vec_data_i64(&af_indices), 2)
+                        let af_gep = wl_build_gep(self.builder, af_ty, af_alloca, list_data_i64(&af_indices), 2)
                         wl_build_store(self.builder, af_coerced, af_gep)
                 return wl_build_load(self.builder, af_ty, af_alloca)
 
@@ -5416,22 +5416,22 @@ impl Codegen:
         var free_fn = wl_get_named_function(self.llmod, "with_free_drop_origin")
         if free_fn != 0:
             return free_fn
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         params.push(wl_ptr_type(self.context))
         params.push(wl_i64_type(self.context))
-        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 3, 0)
+        let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 3, 0)
         wl_add_function(self.llmod, "with_free_drop_origin", fn_ty)
 
-    fn ensure_with_vec_free_drop_origin_fn() -> i64:
+    fn ensure_with_list_free_drop_origin_fn() -> i64:
         var free_fn = wl_get_named_function(self.llmod, "with_vec_free_drop_origin")
         if free_fn != 0:
             return free_fn
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         params.push(wl_ptr_type(self.context))
         params.push(wl_i64_type(self.context))
-        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 3, 0)
+        let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 3, 0)
         let function = wl_add_function(self.llmod, "with_vec_free_drop_origin", fn_ty)
         wl_add_param_attr(self.context, function, 0, "captures")
         function
@@ -5443,18 +5443,18 @@ impl Codegen:
             let free_fn = self.ensure_with_free_drop_origin_fn()
             if free_fn == 0:
                 return
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(ptr)
             args.push(self.current_drop_origin_ptr)
             args.push(self.current_drop_origin_len)
-            let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&args), 3)
+            let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(&args), 3)
             return
         let free_fn = self.ensure_box_free_fn()
         if free_fn == 0:
             return
-        let args2: Vec[i64] = Vec.new()
+        let args2: List[i64] = List.new()
         args2.push(ptr)
-        let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&args2), 1)
+        let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(&args2), 1)
 
     // Reset-on-move niche guard (spec §2.5.1). A moved-out value is zeroed; a user
     // `Drop` body may deref fields the reset nulled (e.g. `*self.slot`), so running
@@ -5475,9 +5475,9 @@ impl Codegen:
             return
         let arg = self.fn_abi_arg(index, 0)
         let value = if arg.owned_place or arg.pass == PM_INDIRECT_PLACE: 0 else: wl_build_load(self.builder, ty, ptr)
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(self.push_call_arg(index, 0, value, ptr))
-        let call = wl_build_call(self.builder, abi.llvm_ty, function, vec_data_i64(&args), 1)
+        let call = wl_build_call(self.builder, abi.llvm_ty, function, list_data_i64(&args), 1)
         let byval_types = self.fn_abi_byval_attr_types(index)
         self.apply_c_abi_call_attrs(call, 0, 0, byval_types, 1, 0)
 
@@ -5602,10 +5602,10 @@ impl Codegen:
         self.member_drop_depth = self.member_drop_depth + 1
         var i = elem_count - 1
         while i >= 0:
-            let gep_indices: Vec[i64] = Vec.new()
+            let gep_indices: List[i64] = List.new()
             gep_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
             gep_indices.push(wl_const_int(wl_i32_type(self.context), i as i64, 0))
-            let elem_ptr = wl_build_gep(self.builder, ty, ptr, vec_data_i64(&gep_indices), 2)
+            let elem_ptr = wl_build_gep(self.builder, ty, ptr, list_data_i64(&gep_indices), 2)
             self.mir_emit_drop_ptr_for_sema_type(elem_ptr, elem_llvm, elem_sema)
             i = i - 1
         self.member_drop_depth = self.member_drop_depth - 1
@@ -5728,11 +5728,11 @@ impl Codegen:
     // load folds into the caller's loop; the runtime call it replaced cost a
     // call per `advance` step in the nbody benchmark and hid the header from
     // LLVM's alias analysis.
-    fn mir_vec_len_inline(recv_ptr: i64) -> i64:
+    fn mir_list_len_inline(recv_ptr: i64) -> i64:
         let i64_ty = wl_i64_type(self.context)
-        let indices: Vec[i64] = Vec.new()
+        let indices: List[i64] = List.new()
         indices.push(wl_const_int(i64_ty, 8, 0))
-        let len_ptr = wl_build_gep(self.builder, wl_i8_type(self.context), recv_ptr, vec_data_i64(&indices), 1)
+        let len_ptr = wl_build_gep(self.builder, wl_i8_type(self.context), recv_ptr, list_data_i64(&indices), 1)
         wl_build_load(self.builder, i64_ty, len_ptr)
 
     // The reset-on-move sentinel test (§2.5.1): 1 when every byte of the value
@@ -5747,25 +5747,25 @@ impl Codegen:
             let first = wl_build_load(self.builder, i64_ty, ptr)
             var word = first
             if size == 16:
-                let indices: Vec[i64] = Vec.new()
+                let indices: List[i64] = List.new()
                 indices.push(wl_const_int(i64_ty, 8, 0))
-                let second_ptr = wl_build_gep(self.builder, wl_i8_type(self.context), ptr, vec_data_i64(&indices), 1)
+                let second_ptr = wl_build_gep(self.builder, wl_i8_type(self.context), ptr, list_data_i64(&indices), 1)
                 let second = wl_build_load(self.builder, i64_ty, second_ptr)
                 word = wl_build_or(self.builder, first, second)
             let zero = wl_build_icmp(self.builder, wl_int_eq(), word, wl_const_int(i64_ty, 0, 0))
             return wl_build_zext(self.builder, zero, i32_ty)
         let ptr_ty = wl_ptr_type(self.context)
-        let zparams: Vec[i64] = Vec.new()
+        let zparams: List[i64] = List.new()
         zparams.push(ptr_ty)
         zparams.push(i64_ty)
-        let zargs: Vec[i64] = Vec.new()
+        let zargs: List[i64] = List.new()
         zargs.push(ptr)
         zargs.push(wl_const_int(i64_ty, size, 0))
         self.call_internal_runtime_fn("rt_value_is_zero", zparams, zargs, 2, i32_ty)
 
-    // #606: recognize a std Vec[T] sema type (one type arg, base symbol == Vec),
+    // #606: recognize a std List[T] sema type (one type arg, base symbol == List),
     // using the MIR snapshot when available and falling back to live sema tables.
-    fn mir_sema_type_is_std_vec(sema_ty: i32) -> bool:
+    fn mir_sema_type_is_std_list(sema_ty: i32) -> bool:
         if sema_ty <= 0:
             return false
         var resolved = self.mir_resolve_alias_at(sema_ty)
@@ -5785,10 +5785,10 @@ impl Codegen:
             self.sema.get_generic_inst_base(resolved)
         else:
             self.mir_type_d0_at(resolved)
-        base_sym == self.sema.syms.vec
+        base_sym == self.sema.syms.list
 
-    // #606: element sema type of a std Vec[T] (peeling one ref/ptr), or 0.
-    fn mir_vec_elem_sema_type_from_sema_type(sema_ty: i32) -> i32:
+    // #606: element sema type of a std List[T] (peeling one ref/ptr), or 0.
+    fn mir_list_elem_sema_type_from_sema_type(sema_ty: i32) -> i32:
         if sema_ty <= 0:
             return 0
         var resolved = self.mir_resolve_alias_at(sema_ty)
@@ -5805,19 +5805,19 @@ impl Codegen:
             self.sema.get_generic_inst_base(resolved)
         else:
             self.mir_type_d0_at(resolved)
-        if base_sym != self.sema.syms.vec:
+        if base_sym != self.sema.syms.list:
             return 0
         if resolved >= self.mir_type_kinds_len() as i32:
             return self.sema.get_generic_inst_arg(resolved, 0)
         let te_start = self.mir_type_d1_at(resolved)
         self.mir_type_extra_at(te_start)
 
-    // #606: emit a [0..len) loop that drops each live element of a Vec via the
+    // #606: emit a [0..len) loop that drops each live element of a List via the
     // runtime accessors, then leaves the buffer for mir_emit_vec_free_ptr.
-    mut fn mir_emit_vec_element_drops_ptr(ptr: i64, vec_sema_ty: i32) -> Unit:
-        if ptr == 0 or vec_sema_ty <= 0:
+    mut fn mir_emit_list_element_drops_ptr(ptr: i64, list_sema_ty: i32):
+        if ptr == 0 or list_sema_ty <= 0:
             return
-        let elem_sema = self.mir_vec_elem_sema_type_from_sema_type(vec_sema_ty)
+        let elem_sema = self.mir_list_elem_sema_type_from_sema_type(list_sema_ty)
         if elem_sema <= 0 or self.sema.type_needs_drop_frozen(elem_sema) == 0:
             return
         let elem_ty = self.mir_sema_type_to_llvm(elem_sema)
@@ -5827,7 +5827,7 @@ impl Codegen:
         let ptr_ty = wl_ptr_type(self.context)
         // Length and buffer read inline: the header's address stays out of
         // every call so the enclosing aggregate can be promoted.
-        let len_val = self.mir_vec_len_inline(ptr)
+        let len_val = self.mir_list_len_inline(ptr)
         let buffer = wl_build_load(self.builder, ptr_ty, ptr)
         let zero = wl_const_int(i64_ty, 0, 0)
         let has_elems = wl_build_icmp(self.builder, wl_int_sgt(), len_val, zero)
@@ -5838,9 +5838,9 @@ impl Codegen:
 
         wl_position_at_end(self.builder, loop_bb)
         let idx_phi = wl_build_phi(self.builder, i64_ty)
-        let elem_indices: Vec[i64] = Vec.new()
+        let elem_indices: List[i64] = List.new()
         elem_indices.push(idx_phi)
-        let elem_ptr = wl_build_gep(self.builder, elem_ty, buffer, vec_data_i64(&elem_indices), 1)
+        let elem_ptr = wl_build_gep(self.builder, elem_ty, buffer, list_data_i64(&elem_indices), 1)
         // #697: element drops are member drops — always sentinel-guarded (#605
         // blanks a moved-out slot; the guard is what makes that skip real).
         self.member_drop_depth = self.member_drop_depth + 1
@@ -5852,20 +5852,20 @@ impl Codegen:
         wl_build_cond_br(self.builder, more, loop_bb, done_bb)
         let loop_end_bb = wl_get_insert_block(self.builder)
 
-        let phi_vals: Vec[i64] = Vec.new()
+        let phi_vals: List[i64] = List.new()
         phi_vals.push(zero)
         phi_vals.push(next_idx)
-        let phi_bbs: Vec[i64] = Vec.new()
+        let phi_bbs: List[i64] = List.new()
         phi_bbs.push(entry_bb)
         phi_bbs.push(loop_end_bb)
-        wl_add_incoming(idx_phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+        wl_add_incoming(idx_phi, list_data_i64(&phi_vals), list_data_i64(&phi_bbs), 2)
 
         wl_position_at_end(self.builder, done_bb)
 
     // #1557: a collection element of struct type drops through the type's
     // named drop fn (ensure_structural_drop_fn declares it before emitting
     // its body). Inlined, a type recursive through its own collection
-    // (`N { next: Vec[N] }`) expanded N -> Vec[N] -> N without end and
+    // (`N { next: List[N] }`) expanded N -> List[N] -> N without end and
     // overflowed the compiler's stack.
     mut fn mir_emit_element_drop(ptr: i64, ty: i64, sema_ty: i32):
         if sema_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(sema_ty as TypeId)) == TypeKind.TY_STRUCT:
@@ -5876,7 +5876,7 @@ impl Codegen:
         self.mir_emit_drop_ptr_for_sema_type(ptr, ty, sema_ty)
 
     // #747: free a str's buffer via the ownership-checked runtime helper and
-    // blank the place. Mirrors the Vec pattern including drop-origin tagging.
+    // blank the place. Mirrors the List pattern including drop-origin tagging.
     // D111: a copied value is one more holder of every str it carries. A Copy
     // type with drop glue (a str, or a tuple, array, struct or enum holding
     // one) is dropped in the source and in the copy, so the copy retains what
@@ -5892,9 +5892,9 @@ impl Codegen:
             return
         if tk == TypeKind.TY_STR:
             let retain_fn = self.ensure_with_str_retain_fn()
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(ptr)
-            let _ = wl_build_call(self.builder, wl_global_get_value_type(retain_fn), retain_fn, vec_data_i64(&args), 1)
+            let _ = wl_build_call(self.builder, wl_global_get_value_type(retain_fn), retain_fn, list_data_i64(&args), 1)
             return
         if tk == TypeKind.TY_TUPLE:
             for i in 0..self.sema.get_type_d1(resolved as TypeId):
@@ -5908,10 +5908,10 @@ impl Codegen:
             let elem_sema = self.sema.get_type_d0(resolved as TypeId)
             let elem_llvm = wl_get_element_type(ty)
             for i in 0..self.sema.get_type_d1(resolved as TypeId):
-                let gep_indices: Vec[i64] = Vec.new()
+                let gep_indices: List[i64] = List.new()
                 gep_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
                 gep_indices.push(wl_const_int(wl_i32_type(self.context), i, 0))
-                self.mir_emit_copy_glue_ptr(wl_build_gep(self.builder, ty, ptr, vec_data_i64(&gep_indices), 2), elem_llvm, elem_sema)
+                self.mir_emit_copy_glue_ptr(wl_build_gep(self.builder, ty, ptr, list_data_i64(&gep_indices), 2), elem_llvm, elem_sema)
             return
         if tk == TypeKind.TY_STRUCT and wl_get_type_kind(ty) == wl_struct_type_kind():
             let struct_idx = self.find_struct_index_by_type(ty)
@@ -5967,18 +5967,18 @@ impl Codegen:
         let retain_fn = wl_get_named_function(self.llmod, "with_str_retain")
         if retain_fn != 0:
             return retain_fn
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
-        wl_add_function(self.llmod, "with_str_retain", wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0))
+        wl_add_function(self.llmod, "with_str_retain", wl_function_type(wl_void_type(self.context), list_data_i64(&params), 1, 0))
 
     fn ensure_with_str_free_fn() -> i64:
         var free_fn = wl_get_named_function(self.llmod, "with_str_free")
         if free_fn != 0:
             return free_fn
         let void_ty = wl_void_type(self.context)
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
-        let fn_ty = wl_function_type(void_ty, vec_data_i64(&params), 1, 0)
+        let fn_ty = wl_function_type(void_ty, list_data_i64(&params), 1, 0)
         wl_add_function(self.llmod, "with_str_free", fn_ty)
 
     fn ensure_with_str_free_drop_origin_fn() -> i64:
@@ -5986,11 +5986,11 @@ impl Codegen:
         if free_fn != 0:
             return free_fn
         let void_ty = wl_void_type(self.context)
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         params.push(wl_ptr_type(self.context))
         params.push(wl_i64_type(self.context))
-        let fn_ty = wl_function_type(void_ty, vec_data_i64(&params), 3, 0)
+        let fn_ty = wl_function_type(void_ty, list_data_i64(&params), 3, 0)
         wl_add_function(self.llmod, "with_str_free_drop_origin", fn_ty)
 
     fn mir_emit_str_free_ptr(ptr: i64) -> Unit:
@@ -6000,20 +6000,20 @@ impl Codegen:
             let free_fn = self.ensure_with_str_free_drop_origin_fn()
             if free_fn == 0:
                 return
-            let args_tagged: Vec[i64] = Vec.new()
+            let args_tagged: List[i64] = List.new()
             args_tagged.push(ptr)
             args_tagged.push(self.current_drop_origin_ptr)
             args_tagged.push(self.current_drop_origin_len)
-            let _tagged = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&args_tagged), 3)
+            let _tagged = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(&args_tagged), 3)
             return
         let free_fn = self.ensure_with_str_free_fn()
         if free_fn == 0:
             return
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(ptr)
-        let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&args), 1)
+        let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(&args), 1)
 
-    // #606: free a Vec's heap buffer via the runtime helper.
+    // #606: free a List's heap buffer via the runtime helper.
     // `push` inline: when len < cap, store the element at buffer[len] and
     // bump len; otherwise the runtime grows and pushes. The common case is
     // three loads, a compare, a store, and a store, with the buffer and the
@@ -6021,15 +6021,15 @@ impl Codegen:
     // byte by byte and hid the header from every optimization (bench grow:
     // 8x C on a push loop, and the reason nbody's length was never a
     // constant).
-    mut fn mir_emit_vec_push(recv_ptr: i64, elem: i64, elem_ty: i64):
+    mut fn mir_emit_list_push(recv_ptr: i64, elem: i64, elem_ty: i64):
         let i64_ty = wl_i64_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
         let void_ty = wl_void_type(self.context)
         let elem_alloca = self.create_entry_alloca(elem_ty)
         wl_build_store(self.builder, elem, elem_alloca)
-        let len_ptr = self.mir_vec_header_word_ptr(recv_ptr, 8)
+        let len_ptr = self.mir_list_header_word_ptr(recv_ptr, 8)
         let len = wl_build_load(self.builder, i64_ty, len_ptr)
-        let cap = wl_build_load(self.builder, i64_ty, self.mir_vec_header_word_ptr(recv_ptr, 16))
+        let cap = wl_build_load(self.builder, i64_ty, self.mir_list_header_word_ptr(recv_ptr, 16))
         let fits = wl_build_icmp(self.builder, wl_int_slt(), len, cap)
         let fast_bb = wl_append_bb(self.context, self.current_function, "vec.push.fast")
         let slow_bb = wl_append_bb(self.context, self.current_function, "vec.push.slow")
@@ -6037,45 +6037,45 @@ impl Codegen:
         wl_build_cond_br(self.builder, fits, fast_bb, slow_bb)
         wl_position_at_end(self.builder, fast_bb)
         let buffer = wl_build_load(self.builder, ptr_ty, recv_ptr)
-        let indices: Vec[i64] = Vec.new()
+        let indices: List[i64] = List.new()
         indices.push(len)
-        let slot = wl_build_gep(self.builder, elem_ty, buffer, vec_data_i64(&indices), 1)
+        let slot = wl_build_gep(self.builder, elem_ty, buffer, list_data_i64(&indices), 1)
         wl_build_store(self.builder, elem, slot)
         wl_build_store(self.builder, wl_build_add(self.builder, len, wl_const_int(i64_ty, 1, 0)), len_ptr)
         wl_build_br(self.builder, done_bb)
         wl_position_at_end(self.builder, slow_bb)
-        let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
-        let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
-        let args: Vec[i64] = Vec.new()
+        let push_fn = self.ensure_list_runtime_fn("with_vec_push", void_ty, 2)
+        let push_ty = self.get_list_fn_type("with_vec_push", void_ty, 2)
+        let args: List[i64] = List.new()
         args.push(recv_ptr)
         args.push(elem_alloca)
-        let _ = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&args), 2)
+        let _ = wl_build_call(self.builder, push_ty, push_fn, list_data_i64(&args), 2)
         wl_build_br(self.builder, done_bb)
         wl_position_at_end(self.builder, done_bb)
 
     // The header word at `offset`, loaded inline ({ptr, len, cap, elem_size}).
-    fn mir_vec_header_word_ptr(ptr: i64, offset: i64) -> i64:
-        let indices: Vec[i64] = Vec.new()
+    fn mir_list_header_word_ptr(ptr: i64, offset: i64) -> i64:
+        let indices: List[i64] = List.new()
         indices.push(wl_const_int(wl_i64_type(self.context), offset, 0))
-        wl_build_gep(self.builder, wl_i8_type(self.context), ptr, vec_data_i64(&indices), 1)
+        wl_build_gep(self.builder, wl_i8_type(self.context), ptr, list_data_i64(&indices), 1)
 
     // Free the buffer by value and blank the pointer word. The header's
-    // address never reaches a call, so an aggregate that holds the Vec stays
+    // address never reaches a call, so an aggregate that holds the List stays
     // promotable (see with_vec_free_buffer in the runtime).
-    fn mir_emit_vec_free_ptr(ptr: i64) -> Unit:
+    fn mir_emit_list_free_ptr(ptr: i64) -> Unit:
         if ptr == 0:
             return
         let i64_ty = wl_i64_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
         let void_ty = wl_void_type(self.context)
         let buffer = wl_build_load(self.builder, ptr_ty, ptr)
-        let cap = wl_build_load(self.builder, i64_ty, self.mir_vec_header_word_ptr(ptr, 16))
-        let elem_size = wl_build_load(self.builder, i64_ty, self.mir_vec_header_word_ptr(ptr, 24))
-        let params: Vec[i64] = Vec.new()
+        let cap = wl_build_load(self.builder, i64_ty, self.mir_list_header_word_ptr(ptr, 16))
+        let elem_size = wl_build_load(self.builder, i64_ty, self.mir_list_header_word_ptr(ptr, 24))
+        let params: List[i64] = List.new()
         params.push(ptr_ty)
         params.push(i64_ty)
         params.push(i64_ty)
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(buffer)
         args.push(cap)
         args.push(elem_size)
@@ -6087,29 +6087,29 @@ impl Codegen:
             args.push(self.current_drop_origin_ptr)
             args.push(self.current_drop_origin_len)
         var free_fn = wl_get_named_function(self.llmod, name)
-        let free_ty = wl_function_type(void_ty, vec_data_i64(&params), params.len() as i32, 0)
+        let free_ty = wl_function_type(void_ty, list_data_i64(&params), params.len() as i32, 0)
         if free_fn == 0:
             free_fn = wl_add_function(self.llmod, name, free_ty)
-        let _ = wl_build_call(self.builder, free_ty, free_fn, vec_data_i64(&args), args.len() as i32)
-        // Blank the header as the runtime did: a freed Vec reads as empty.
+        let _ = wl_build_call(self.builder, free_ty, free_fn, list_data_i64(&args), args.len() as i32)
+        // Blank the header as the runtime did: a freed List reads as empty.
         wl_build_store(self.builder, wl_const_null(ptr_ty), ptr)
-        wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), self.mir_vec_header_word_ptr(ptr, 8))
-        wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), self.mir_vec_header_word_ptr(ptr, 16))
+        wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), self.mir_list_header_word_ptr(ptr, 8))
+        wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), self.mir_list_header_word_ptr(ptr, 16))
 
-    // #691/D18 (§2.5.1, supersedes the A5 narrow form): drop a Vec value at
-    // scope exit. Every Vec frees its buffer — ownership is a property of the
+    // #691/D18 (§2.5.1, supersedes the A5 narrow form): drop a List value at
+    // scope exit. Every List frees its buffer — ownership is a property of the
     // handle, not its contents; elements are dropped first only when the
     // element type needs it. The null guard inside the free path makes a
     // blanked (moved-from) header a no-op.
-    mut fn mir_emit_drop_vec_ptr(ptr: i64, sema_ty: i32) -> bool:
-        if not self.mir_sema_type_is_std_vec(sema_ty):
+    mut fn mir_emit_drop_list_ptr(ptr: i64, sema_ty: i32) -> bool:
+        if not self.mir_sema_type_is_std_list(sema_ty):
             return false
-        let elem_sema = self.mir_vec_elem_sema_type_from_sema_type(sema_ty)
+        let elem_sema = self.mir_list_elem_sema_type_from_sema_type(sema_ty)
         if with_getenv_str("WITH_TRACE_VECDROP").len() > 0:
             with_eprint(f"[vecdrop] sema_ty={sema_ty} elem_sema={elem_sema} needs_drop={if elem_sema > 0: self.sema.type_needs_drop_frozen(elem_sema) else: -1}")
         if elem_sema > 0 and self.sema.type_needs_drop_frozen(elem_sema) != 0:
-            self.mir_emit_vec_element_drops_ptr(ptr, sema_ty)
-        self.mir_emit_vec_free_ptr(ptr)
+            self.mir_emit_list_element_drops_ptr(ptr, sema_ty)
+        self.mir_emit_list_free_ptr(ptr)
         true
 
     // HashMap[K, V] and HashSet[T] are opaque { ptr } values in LLVM. Generic
@@ -6167,17 +6167,17 @@ impl Codegen:
         let existing = wl_get_named_function(self.llmod, name)
         if existing != 0:
             return existing
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         params.push(wl_i64_type(self.context))
-        let fn_ty = wl_function_type(ret_ty, vec_data_i64(&params), 2, 0)
+        let fn_ty = wl_function_type(ret_ty, list_data_i64(&params), 2, 0)
         wl_add_function(self.llmod, name, fn_ty)
 
     fn hashmap_slot_runtime_fn_type(ret_ty: i64) -> i64:
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         params.push(wl_i64_type(self.context))
-        wl_function_type(ret_ty, vec_data_i64(&params), 2, 0)
+        wl_function_type(ret_ty, list_data_i64(&params), 2, 0)
 
     mut fn mir_emit_hash_collection_element_drops(handle: i64, sema_ty: i32, collection_kind: i32) -> Unit:
         let key_sema = self.mir_hash_collection_arg_sema_type(sema_ty, 0)
@@ -6195,10 +6195,10 @@ impl Codegen:
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
         let cap_fn = self.ensure_hm_fn("with_hashmap_capacity", i64_ty)
-        let cap_ty = wl_function_type(i64_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
-        let cap_args: Vec[i64] = Vec.new()
+        let cap_ty = wl_function_type(i64_ty, list_data_i64(&self.make_ptr_list()), 1, 0)
+        let cap_args: List[i64] = List.new()
         cap_args.push(handle)
-        let cap = wl_build_call(self.builder, cap_ty, cap_fn, vec_data_i64(&cap_args), 1)
+        let cap = wl_build_call(self.builder, cap_ty, cap_fn, list_data_i64(&cap_args), 1)
         let zero = wl_const_int(i64_ty, 0, 0)
         let has_slots = wl_build_icmp(self.builder, wl_int_sgt(), cap, zero)
         let entry_bb = wl_get_insert_block(self.builder)
@@ -6212,10 +6212,10 @@ impl Codegen:
         let idx_phi = wl_build_phi(self.builder, i64_ty)
         let occupied_fn = self.ensure_hashmap_slot_runtime_fn("with_hashmap_slot_occupied", i32_ty)
         let occupied_ty = self.hashmap_slot_runtime_fn_type(i32_ty)
-        let occupied_args: Vec[i64] = Vec.new()
+        let occupied_args: List[i64] = List.new()
         occupied_args.push(handle)
         occupied_args.push(idx_phi)
-        let occupied = wl_build_call(self.builder, occupied_ty, occupied_fn, vec_data_i64(&occupied_args), 2)
+        let occupied = wl_build_call(self.builder, occupied_ty, occupied_fn, list_data_i64(&occupied_args), 2)
         let is_occupied = wl_build_icmp(self.builder, wl_int_ne(), occupied, wl_const_int(i32_ty, 0, 0))
         wl_build_cond_br(self.builder, is_occupied, occupied_bb, advance_bb)
 
@@ -6223,20 +6223,20 @@ impl Codegen:
         if drop_key:
             let key_fn = self.ensure_hashmap_slot_runtime_fn("with_hashmap_key_ptr_at", ptr_ty)
             let key_fn_ty = self.hashmap_slot_runtime_fn_type(ptr_ty)
-            let key_args: Vec[i64] = Vec.new()
+            let key_args: List[i64] = List.new()
             key_args.push(handle)
             key_args.push(idx_phi)
-            let key_ptr = wl_build_call(self.builder, key_fn_ty, key_fn, vec_data_i64(&key_args), 2)
+            let key_ptr = wl_build_call(self.builder, key_fn_ty, key_fn, list_data_i64(&key_args), 2)
             self.member_drop_depth = self.member_drop_depth + 1
             self.mir_emit_element_drop(key_ptr, key_ty, key_sema)
             self.member_drop_depth = self.member_drop_depth - 1
         if drop_value:
             let value_fn = self.ensure_hashmap_slot_runtime_fn("with_hashmap_value_ptr_at", ptr_ty)
             let value_fn_ty = self.hashmap_slot_runtime_fn_type(ptr_ty)
-            let value_args: Vec[i64] = Vec.new()
+            let value_args: List[i64] = List.new()
             value_args.push(handle)
             value_args.push(idx_phi)
-            let value_ptr = wl_build_call(self.builder, value_fn_ty, value_fn, vec_data_i64(&value_args), 2)
+            let value_ptr = wl_build_call(self.builder, value_fn_ty, value_fn, list_data_i64(&value_args), 2)
             self.member_drop_depth = self.member_drop_depth + 1
             self.mir_emit_element_drop(value_ptr, value_ty, value_sema)
             self.member_drop_depth = self.member_drop_depth - 1
@@ -6248,13 +6248,13 @@ impl Codegen:
         wl_build_cond_br(self.builder, more, loop_bb, done_bb)
         let advance_end_bb = wl_get_insert_block(self.builder)
 
-        let phi_vals: Vec[i64] = Vec.new()
+        let phi_vals: List[i64] = List.new()
         phi_vals.push(zero)
         phi_vals.push(next_idx)
-        let phi_bbs: Vec[i64] = Vec.new()
+        let phi_bbs: List[i64] = List.new()
         phi_bbs.push(entry_bb)
         phi_bbs.push(advance_end_bb)
-        wl_add_incoming(idx_phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+        wl_add_incoming(idx_phi, list_data_i64(&phi_vals), list_data_i64(&phi_bbs), 2)
         wl_position_at_end(self.builder, done_bb)
 
     mut fn mir_emit_drop_hash_collection_ptr(ptr: i64, ty: i64, sema_ty: i32) -> bool:
@@ -6267,10 +6267,10 @@ impl Codegen:
         let handle = wl_build_load(self.builder, wl_ptr_type(self.context), handle_ptr)
         self.mir_emit_hash_collection_element_drops(handle, sema_ty, collection_kind)
         let free_fn = self.ensure_hm_fn("with_hashmap_free", wl_void_type(self.context))
-        let free_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&self.make_ptr_vec()), 1, 0)
-        let free_args: Vec[i64] = Vec.new()
+        let free_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&self.make_ptr_list()), 1, 0)
+        let free_args: List[i64] = List.new()
         free_args.push(handle)
-        let _ = wl_build_call(self.builder, free_ty, free_fn, vec_data_i64(&free_args), 1)
+        let _ = wl_build_call(self.builder, free_ty, free_fn, list_data_i64(&free_args), 1)
         true
 
     fn mir_slotmap_elem_sema_type_from_sema_type(sema_ty: i32) -> i32:
@@ -6301,17 +6301,17 @@ impl Codegen:
         let existing = wl_get_named_function(self.llmod, name)
         if existing != 0:
             return existing
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         params.push(wl_i64_type(self.context))
-        let fn_ty = wl_function_type(ret_ty, vec_data_i64(&params), 2, 0)
+        let fn_ty = wl_function_type(ret_ty, list_data_i64(&params), 2, 0)
         wl_add_function(self.llmod, name, fn_ty)
 
     fn slotmap_slot_runtime_fn_type(ret_ty: i64) -> i64:
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         params.push(wl_i64_type(self.context))
-        wl_function_type(ret_ty, vec_data_i64(&params), 2, 0)
+        wl_function_type(ret_ty, list_data_i64(&params), 2, 0)
 
     mut fn mir_emit_slotmap_element_drops(handle: i64, elem_sema: i32) -> Unit:
         if elem_sema <= 0 or self.sema.type_needs_drop_frozen(elem_sema) == 0:
@@ -6323,10 +6323,10 @@ impl Codegen:
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
         let cap_fn = self.ensure_hm_fn("with_slotmap_capacity", i64_ty)
-        let cap_ty = wl_function_type(i64_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
-        let cap_args: Vec[i64] = Vec.new()
+        let cap_ty = wl_function_type(i64_ty, list_data_i64(&self.make_ptr_list()), 1, 0)
+        let cap_args: List[i64] = List.new()
         cap_args.push(handle)
-        let cap = wl_build_call(self.builder, cap_ty, cap_fn, vec_data_i64(&cap_args), 1)
+        let cap = wl_build_call(self.builder, cap_ty, cap_fn, list_data_i64(&cap_args), 1)
         let zero = wl_const_int(i64_ty, 0, 0)
         let has_slots = wl_build_icmp(self.builder, wl_int_sgt(), cap, zero)
         let entry_bb = wl_get_insert_block(self.builder)
@@ -6340,20 +6340,20 @@ impl Codegen:
         let idx_phi = wl_build_phi(self.builder, i64_ty)
         let occupied_fn = self.ensure_slotmap_slot_runtime_fn("with_slotmap_slot_occupied", i32_ty)
         let occupied_ty = self.slotmap_slot_runtime_fn_type(i32_ty)
-        let occupied_args: Vec[i64] = Vec.new()
+        let occupied_args: List[i64] = List.new()
         occupied_args.push(handle)
         occupied_args.push(idx_phi)
-        let occupied = wl_build_call(self.builder, occupied_ty, occupied_fn, vec_data_i64(&occupied_args), 2)
+        let occupied = wl_build_call(self.builder, occupied_ty, occupied_fn, list_data_i64(&occupied_args), 2)
         let is_occupied = wl_build_icmp(self.builder, wl_int_ne(), occupied, wl_const_int(i32_ty, 0, 0))
         wl_build_cond_br(self.builder, is_occupied, occupied_bb, advance_bb)
 
         wl_position_at_end(self.builder, occupied_bb)
         let value_fn = self.ensure_slotmap_slot_runtime_fn("with_slotmap_value_ptr_at", ptr_ty)
         let value_ty = self.slotmap_slot_runtime_fn_type(ptr_ty)
-        let value_args: Vec[i64] = Vec.new()
+        let value_args: List[i64] = List.new()
         value_args.push(handle)
         value_args.push(idx_phi)
-        let value_ptr = wl_build_call(self.builder, value_ty, value_fn, vec_data_i64(&value_args), 2)
+        let value_ptr = wl_build_call(self.builder, value_ty, value_fn, list_data_i64(&value_args), 2)
         self.member_drop_depth = self.member_drop_depth + 1
         self.mir_emit_element_drop(value_ptr, elem_ty, elem_sema)
         self.member_drop_depth = self.member_drop_depth - 1
@@ -6364,13 +6364,13 @@ impl Codegen:
         let more = wl_build_icmp(self.builder, wl_int_slt(), next_idx, cap)
         wl_build_cond_br(self.builder, more, loop_bb, done_bb)
         let advance_end_bb = wl_get_insert_block(self.builder)
-        let phi_vals: Vec[i64] = Vec.new()
+        let phi_vals: List[i64] = List.new()
         phi_vals.push(zero)
         phi_vals.push(next_idx)
-        let phi_bbs: Vec[i64] = Vec.new()
+        let phi_bbs: List[i64] = List.new()
         phi_bbs.push(entry_bb)
         phi_bbs.push(advance_end_bb)
-        wl_add_incoming(idx_phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+        wl_add_incoming(idx_phi, list_data_i64(&phi_vals), list_data_i64(&phi_bbs), 2)
         wl_position_at_end(self.builder, done_bb)
 
     mut fn mir_emit_drop_slotmap_ptr(ptr: i64, ty: i64, sema_ty: i32) -> bool:
@@ -6381,10 +6381,10 @@ impl Codegen:
         let handle = wl_build_load(self.builder, wl_ptr_type(self.context), handle_ptr)
         self.mir_emit_slotmap_element_drops(handle, elem_sema)
         let free_fn = self.ensure_hm_fn("with_slotmap_free", wl_void_type(self.context))
-        let free_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&self.make_ptr_vec()), 1, 0)
-        let free_args: Vec[i64] = Vec.new()
+        let free_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&self.make_ptr_list()), 1, 0)
+        let free_args: List[i64] = List.new()
         free_args.push(handle)
-        let _ = wl_build_call(self.builder, free_ty, free_fn, vec_data_i64(&free_args), 1)
+        let _ = wl_build_call(self.builder, free_ty, free_fn, list_data_i64(&free_args), 1)
         true
 
     mut fn mir_emit_drop_ptr_for_sema_type(ptr: i64, ty: i64, sema_ty: i32) -> Unit:
@@ -6424,11 +6424,11 @@ impl Codegen:
         if tk == TypeKind.TY_FN:
             self.mir_emit_closure_drop_ptr(ptr)
             return
-        // #606 (A5 narrow): a std Vec[T] with a Drop element drops each element then
+        // #606 (A5 narrow): a std List[T] with a Drop element drops each element then
         // frees the buffer. POD-element Vecs return false here and fall through.
         if tk == TypeKind.TY_GENERIC_INST and self.mir_emit_boxed_dyn_drop_ptr(ptr, ty, sema_ty):
             return
-        if tk == TypeKind.TY_GENERIC_INST and self.mir_emit_drop_vec_ptr(ptr, drop_sema_ty):
+        if tk == TypeKind.TY_GENERIC_INST and self.mir_emit_drop_list_ptr(ptr, drop_sema_ty):
             return
         if tk == TypeKind.TY_GENERIC_INST and self.mir_emit_drop_hash_collection_ptr(ptr, ty, drop_sema_ty):
             return
@@ -6466,19 +6466,19 @@ impl Codegen:
         // #606: an enum (or generic enum like Option/Result) with no explicit Drop
         // impl drops the active variant's payloads. Skipped when an explicit drop
         // exists — that drop owns cleanup (no per-payload consumed tracking yet).
-        // Recursive enums (V { L(Vec[V]) }) must go through a NAMED per-type
+        // Recursive enums (V { L(List[V]) }) must go through a NAMED per-type
         // fn: the inline payload walk re-enters this emitter for the same type
         // and never terminates. Declaration-before-body breaks the cycle,
         // exactly like ensure_structural_drop_fn.
         if not has_drop and enum_variants > 0:
             let enum_drop_fn = self.ensure_enum_drop_fn(resolved, ty)
             if enum_drop_fn != 0:
-                let edf_args: Vec[i64] = Vec.new()
+                let edf_args: List[i64] = List.new()
                 edf_args.push(ptr)
-                let edf_params: Vec[i64] = Vec.new()
+                let edf_params: List[i64] = List.new()
                 edf_params.push(wl_ptr_type(self.context))
-                let edf_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&edf_params), 1, 0)
-                let _ = wl_build_call(self.builder, edf_ty, enum_drop_fn, vec_data_i64(&edf_args), 1)
+                let edf_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&edf_params), 1, 0)
+                let _ = wl_build_call(self.builder, edf_ty, enum_drop_fn, list_data_i64(&edf_args), 1)
             else:
                 self.mir_emit_drop_enum_ptr(ptr, ty, resolved)
 
@@ -6507,13 +6507,13 @@ impl Codegen:
         let fn_name = if endpoint_kind == 1: "with_channel_release_sender" else: "with_channel_release_receiver"
         var release_fn = wl_get_named_function(self.llmod, fn_name)
         if release_fn == 0:
-            let params: Vec[i64] = Vec.new()
+            let params: List[i64] = List.new()
             params.push(wl_i64_type(self.context))
-            let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+            let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 1, 0)
             release_fn = wl_add_function(self.llmod, fn_name, fn_ty)
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(handle)
-        let _ = wl_build_call(self.builder, wl_global_get_value_type(release_fn), release_fn, vec_data_i64(&args), 1)
+        let _ = wl_build_call(self.builder, wl_global_get_value_type(release_fn), release_fn, list_data_i64(&args), 1)
         true
 
     mut fn ensure_channel_drop_fn_for_type(sema_ty: i32, llvm_ty: i64) -> i64:
@@ -6525,9 +6525,9 @@ impl Codegen:
             return existing
 
         let ptr_ty = wl_ptr_type(self.context)
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(ptr_ty)
-        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+        let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 1, 0)
         let drop_fn = wl_add_function(self.llmod, fn_name, fn_ty)
 
         let saved_fn: i64 = self.current_function
@@ -6563,7 +6563,7 @@ impl Codegen:
     // Outline an enum's variant-switched payload drop into a cached per-type
     // function `__drop_enum_<sema_ty>(ptr)`. Same contract as
     // ensure_structural_drop_fn below: declared before its body is built, so
-    // a self-referential payload (V { L(Vec[V]) }) finds the declaration and
+    // a self-referential payload (V { L(List[V]) }) finds the declaration and
     // emits a call instead of recursing the emitter forever; body unguarded,
     // member depth resets, synthetic per-type drop origin.
     mut fn ensure_enum_drop_fn(sema_ty: i32, llvm_ty: i64) -> i64:
@@ -6577,9 +6577,9 @@ impl Codegen:
             return existing
 
         let ptr_ty = wl_ptr_type(self.context)
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(ptr_ty)
-        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+        let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 1, 0)
         let drop_fn = wl_add_function(self.llmod, fn_name, fn_ty)
         wl_set_linkage(drop_fn, wl_internal_linkage())
 
@@ -6625,7 +6625,7 @@ impl Codegen:
     // function `__drop_struct_<sema_ty>(ptr)` instead of inlining the whole
     // drop tree at every scope-exit site. Turns O(drop-sites × tree-size)
     // generated IR into O(types + sites) — the wide flip made every
-    // Vec-bearing aggregate need drop, so inlining exploded compile memory
+    // List-bearing aggregate need drop, so inlining exploded compile memory
     // past 32 GiB. The body runs UNGUARDED (the reset-on-move null guard is
     // applied at the call site, per-local); recursion through nested types
     // terminates because the function is declared before its body is built,
@@ -6645,9 +6645,9 @@ impl Codegen:
         if existing != 0:
             return existing
 
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(llvm_ty)
-        let flags: Vec[i32] = Vec.new()
+        let flags: List[i32] = List.new()
         flags.push(4)
         let abi_index = self.compute_fn_abi(wl_void_type(self.context), params, flags, FN_ABI_WITH, 0)
         let fn_ty = self.fn_abis[abi_index].llvm_ty
@@ -6799,10 +6799,10 @@ impl Codegen:
             rc_skip_bb = wl_append_bb(self.context, self.current_function, "refcount.drop.skip")
             wl_build_cond_br(self.builder, live, live_bb, rc_skip_bb)
             wl_position_at_end(self.builder, live_bb)
-        let inner_fields: Vec[i64] = Vec.new()
+        let inner_fields: List[i64] = List.new()
         inner_fields.push(i64_ty)
         inner_fields.push(ptr_ty)
-        let inner_ty = wl_struct_type(self.context, vec_data_i64(&inner_fields), 2, 0)
+        let inner_ty = wl_struct_type(self.context, list_data_i64(&inner_fields), 2, 0)
         let strong_ptr = wl_build_struct_gep(self.builder, inner_ty, heap_ptr, 0)
         let one = wl_const_int(i64_ty, 1, 0)
         var is_last: i64 = 0
@@ -6852,12 +6852,12 @@ impl Codegen:
         let done_bb = wl_append_bb(self.context, self.current_function, "drop.dyn.done")
         wl_build_cond_br(self.builder, has_drop, call_bb, done_bb)
         wl_position_at_end(self.builder, call_bb)
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(ptr_ty)
-        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
-        let args: Vec[i64] = Vec.new()
+        let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 1, 0)
+        let args: List[i64] = List.new()
         args.push(data_ptr)
-        let _ = wl_build_call(self.builder, fn_ty, drop_fn, vec_data_i64(&args), 1)
+        let _ = wl_build_call(self.builder, fn_ty, drop_fn, list_data_i64(&args), 1)
         wl_build_br(self.builder, done_bb)
         wl_position_at_end(self.builder, done_bb)
 
@@ -6983,12 +6983,12 @@ impl Codegen:
         let ms_sym = self.intern.intern("llvm.memset.p0.i64")
         let ms_func = self.ensure_llvm_memset_declared()
         let ms_ft = self.fn_fn_types.get(ms_sym).unwrap() as i64
-        let ms_args: Vec[i64] = Vec.new()
+        let ms_args: List[i64] = List.new()
         ms_args.push(ptr)
         ms_args.push(wl_const_int(wl_i8_type(self.context), 0, 0))
         ms_args.push(wl_const_int(wl_i64_type(self.context), size_bytes, 0))
         ms_args.push(wl_const_int(wl_i1_type(self.context), 0, 0))
-        let _ = wl_build_call(self.builder, ms_ft, ms_func, vec_data_i64(&ms_args), 4)
+        let _ = wl_build_call(self.builder, ms_ft, ms_func, list_data_i64(&ms_args), 4)
 
     // True if rvalue `rval_id` is `RK_USE` of a `CK_ZERO_SIZED` constant (the
     // reset-on-move / default zero value).
@@ -7062,20 +7062,20 @@ impl Codegen:
                         let ms_sym = self.intern.intern("llvm.memset.p0.i64")
                         let ms_func = self.ensure_llvm_memset_declared()
                         let ms_ft = self.fn_fn_types.get(ms_sym).unwrap() as i64
-                        let ms_args: Vec[i64] = Vec.new()
+                        let ms_args: List[i64] = List.new()
                         ms_args.push(dst_ptr)
                         ms_args.push(af_fill)
                         ms_args.push(af_len)
                         ms_args.push(af_vol)
-                        wl_build_call(self.builder, ms_ft, ms_func, vec_data_i64(&ms_args), 4)
+                        wl_build_call(self.builder, ms_ft, ms_func, list_data_i64(&ms_args), 4)
                         return true
                     else:
                         let af_coerced = self.coerce_value_to_type(af_val, af_elem_ty)
                         for afi in 0..af_count:
-                            let af_indices: Vec[i64] = Vec.new()
+                            let af_indices: List[i64] = List.new()
                             af_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
                             af_indices.push(wl_const_int(wl_i32_type(self.context), afi as i64, 0))
-                            let af_gep = wl_build_gep(self.builder, af_arr_ty, dst_ptr, vec_data_i64(&af_indices), 2)
+                            let af_gep = wl_build_gep(self.builder, af_arr_ty, dst_ptr, list_data_i64(&af_indices), 2)
                             wl_build_store(self.builder, af_coerced, af_gep)
                         return true
             if d1 >= 0 and d1 < body.rval_kinds.len() as i32 and body.rval_kinds[d1] == RvalueKind.RK_USE:
@@ -7102,12 +7102,12 @@ impl Codegen:
                                 // `[v; N > 64]` fill copied into its binding, #1049).
                                 let mc_len = wl_const_int(wl_i64_type(self.context), wl_abi_size_of(wl_get_module_data_layout(self.llmod), use_arr_ty), 0)
                                 let mc_vol = wl_const_int(wl_i1_type(self.context), 0, 0)
-                                let mc_args: Vec[i64] = Vec.new()
+                                let mc_args: List[i64] = List.new()
                                 mc_args.push(dst_ptr)
                                 mc_args.push(src_ptr)
                                 mc_args.push(mc_len)
                                 mc_args.push(mc_vol)
-                                wl_build_call(self.builder, mc_ft, mc_func, vec_data_i64(&mc_args), 4)
+                                wl_build_call(self.builder, mc_ft, mc_func, list_data_i64(&mc_args), 4)
                                 return true
             let value = self.mir_eval_rvalue(body, d1, dst_ty, dst_sema_ty)
             if dst_ptr == 0 and not has_projections and not self.mir_local_is_memory(dst_local):
@@ -7530,8 +7530,8 @@ impl Codegen:
     // Evaluate a contiguous MIR call-argument range under the concrete signature
     // captured in that MIR body. Every user call path uses this function for
     // non-receiver arguments; branch-local template guesses are forbidden.
-    mut fn mir_eval_call_arg_range(body: &MirBody, args_id: i32, mir_offset: i32, count: i32, param_offset: i32) -> Vec[i64]:
-        let values: Vec[i64] = Vec.new()
+    mut fn mir_eval_call_arg_range(body: &MirBody, args_id: i32, mir_offset: i32, count: i32, param_offset: i32) -> List[i64]:
+        let values: List[i64] = List.new()
         let start = body.call_arg_starts[args_id]
         for i in 0..count:
             let operand = body.call_arg_operands[(start + mir_offset + i)]
@@ -7623,28 +7623,28 @@ impl Codegen:
             return str_val
         // #761: observing form — pass the `&str` view (#1810). The copy is
         // lent from storage that stays readable after the call (§16.3c, D47).
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(str_ty)
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(self.str_view_arg(str_val))
         self.call_internal_runtime_fn("with_cstr_lend", params, args, 1, wl_ptr_type(self.context))
 
-    fn free_call_temp_ptrs(ptrs: &Vec[i64]):
+    fn free_call_temp_ptrs(ptrs: &List[i64]):
         if ptrs.len() == 0:
             return
         var free_fn = wl_get_named_function(self.llmod, "with_cstr_release")
         if free_fn == 0:
-            let fp: Vec[i64] = Vec.new()
+            let fp: List[i64] = List.new()
             fp.push(wl_ptr_type(self.context))
-            let fft = wl_function_type(wl_void_type(self.context), vec_data_i64(&fp), 1, 0)
+            let fft = wl_function_type(wl_void_type(self.context), list_data_i64(&fp), 1, 0)
             free_fn = wl_add_function(self.llmod, "with_cstr_release", fft)
         if free_fn == 0:
             return
         let free_ty = wl_global_get_value_type(free_fn)
         for i in 0..ptrs.len() as i32:
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(ptrs[i])
-            wl_build_call(self.builder, free_ty, free_fn, vec_data_i64(&args), 1)
+            wl_build_call(self.builder, free_ty, free_fn, list_data_i64(&args), 1)
 
     mut fn mir_eval_call_operand_info(body: &MirBody, operand_id: i32, expected_ty: i64, expected_sema_ty: i32, lends_c_strings: i32, call_context: &str, arg_index: i32) -> CallArgValue:
         var eval_expected_ty = expected_ty
@@ -7715,7 +7715,7 @@ impl Codegen:
         let od = body.operand_d0[recv_op]
         // If operand is a place (Copy/Move), get its address directly. This must
         // happen before the reference shortcut below; field places like
-        // `self.xs` may have reference-like sema during projection, but Vec
+        // `self.xs` may have reference-like sema during projection, but List
         // intrinsics need the field address, not an evaluated pointer-shaped value.
         if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
             let ptr = self.mir_place_ptr(body, od, false, 0)
@@ -7770,7 +7770,7 @@ impl Codegen:
                 return llvm_ty
         self.type_fallback()
 
-    mut fn mir_intrinsic_recv_vec_value(body: &MirBody, args_id: i32) -> i64:
+    mut fn mir_intrinsic_recv_list_value(body: &MirBody, args_id: i32) -> i64:
         let arg_start = body.call_arg_starts[args_id]
         let recv_op = body.call_arg_operands[arg_start]
         let recv = self.mir_intrinsic_arg(body, args_id, 0)
@@ -7805,7 +7805,7 @@ impl Codegen:
         let raw = self.mir_intrinsic_arg(body, args_id, idx)
         self.mir_intrinsic_value_as(body, args_id, idx, raw, target_ty)
 
-    // The `T` of a `VecSlot[T]` / `VecRange[T]` receiver: the element a
+    // The `T` of a `ListSlot[T]` / `ListRange[T]` receiver: the element a
     // `set` writes, whatever narrower type its value argument had.
     mut fn mir_recv_elem_sema_type(body: &MirBody, args_id: i32) -> i32:
         let recv_sema = self.mir_operand_sema_type(body, body.call_arg_operands[body.call_arg_starts[args_id]])
@@ -7834,7 +7834,7 @@ impl Codegen:
 
     // Integer widening takes its signedness from the operand's Sema type, as
     // a call argument's does (#1017): the LLVM-level coercer has no type to
-    // ask and sign-extends, so a u8 200 pushed into a Vec[i16] read -56.
+    // ask and sign-extends, so a u8 200 pushed into a List[i16] read -56.
     mut fn mir_operand_value_as(body: &MirBody, op_id: i32, raw: i64, target_ty: i64) -> i64:
         if target_ty == 0 or wl_type_of(raw) == target_ty:
             return raw
@@ -8002,8 +8002,8 @@ impl Codegen:
             return wl_build_trunc(self.builder, raw64, i32_ty)
         raw64
 
-    mut fn mir_vec_elem_size(body: &MirBody, dest_place: i32) -> i64:
-        // Determine Vec element size from dest place sema type (TypeKind.TY_GENERIC_INST).
+    mut fn mir_list_elem_size(body: &MirBody, dest_place: i32) -> i64:
+        // Determine List element size from dest place sema type (TypeKind.TY_GENERIC_INST).
         let sema_ty = self.mir_intrinsic_dest_sema_type(body, dest_place)
         if sema_ty > 0:
             let resolved = self.mir_resolve_alias_at(sema_ty)
@@ -8014,7 +8014,7 @@ impl Codegen:
                     let te_start = self.mir_type_d1_at(resolved)
                     let elem_tid = self.mir_type_extra_at(te_start)
                     if elem_tid > 0:
-                        let elem_llvm = self.mir_vec_storage_elem_type(elem_tid)
+                        let elem_llvm = self.mir_list_storage_elem_type(elem_tid)
                         if elem_llvm != 0:
                             return self.abi_size_of(elem_llvm)
         8 // default for pointer-sized elements when sema data is unavailable
@@ -8107,7 +8107,7 @@ impl Codegen:
         var has_dynamic_len = tk == TypeKind.TY_SLICE or tk == TypeKind.TY_STR
         if not has_dynamic_len and tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.sema_sym_to_codegen_sym(self.mir_type_d0_from_snapshot(bounded_ty))
-            has_dynamic_len = base_sym == self.sym_vec
+            has_dynamic_len = base_sym == self.sym_list
         if not has_dynamic_len:
             return 0
         if wl_get_type_kind(llvm_ty) != wl_struct_type_kind() or wl_count_struct_elem_types(llvm_ty) < 2:
@@ -8184,9 +8184,9 @@ impl Codegen:
         let ok_bb = wl_append_bb(self.context, self.current_function, "str.slice.boundary.ok")
         wl_build_cond_br(self.builder, inside, byte_bb, ok_bb)
         wl_position_at_end(self.builder, byte_bb)
-        let indices: Vec[i64] = Vec.new()
+        let indices: List[i64] = List.new()
         indices.push(off_val)
-        let byte_ptr = wl_build_gep(self.builder, i8_ty, data_ptr, vec_data_i64(&indices), 1)
+        let byte_ptr = wl_build_gep(self.builder, i8_ty, data_ptr, list_data_i64(&indices), 1)
         let byte = wl_build_load(self.builder, i8_ty, byte_ptr)
         let high_bits = wl_build_and(self.builder, byte, wl_const_int(i8_ty, 192, 0))
         let continues = wl_build_icmp(self.builder, wl_int_eq(), high_bits, wl_const_int(i8_ty, 128, 0))
@@ -8262,7 +8262,7 @@ impl Codegen:
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.sema_sym_to_codegen_sym(self.mir_type_d0_at(resolved))
             let arg_count = self.mir_type_d2_at(resolved)
-            if base_sym == self.sym_vec and arg_count > 0:
+            if base_sym == self.sym_list and arg_count > 0:
                 let te_start = self.mir_type_d1_at(resolved)
                 return self.mir_type_extra_at(te_start)
         0
@@ -8690,9 +8690,9 @@ impl Codegen:
             return 0
 
         var mangled: str = with_str_clone_ref(self.intern.resolve(base_sym))
-        let pending_syms: Vec[i32] = Vec.new()
-        let pending_types: Vec[i64] = Vec.new()
-        let pending_sema_types: Vec[i32] = Vec.new()
+        let pending_syms: List[i32] = List.new()
+        let pending_types: List[i64] = List.new()
+        let pending_sema_types: List[i32] = List.new()
         var tp_pos = self.type_decl_tp_start(owner_decl)
         for ti in 0..tp_count:
             let tp_sym = self.pool.get_extra(tp_pos)
@@ -8744,7 +8744,7 @@ impl Codegen:
         let specs_start = if mi_kind == NodeKind.NK_MULTI_INDEX: self.pool.get_data1(mi_node) else: 0
         let specs_count = if mi_kind == NodeKind.NK_INDEX: 2 else: self.pool.get_data2(mi_node)
         let ctx: i64 = self.context
-        let spec_fields: Vec[i64] = Vec.new()
+        let spec_fields: List[i64] = List.new()
         spec_fields.push(wl_i32_type(ctx))
         spec_fields.push(wl_i64_type(ctx))
         spec_fields.push(wl_i64_type(ctx))
@@ -8752,7 +8752,7 @@ impl Codegen:
         spec_fields.push(wl_i1_type(ctx))
         spec_fields.push(wl_i1_type(ctx))
         spec_fields.push(wl_i1_type(ctx))
-        let spec_ty = wl_struct_type(ctx, vec_data_i64(&spec_fields), 7, 0)
+        let spec_ty = wl_struct_type(ctx, list_data_i64(&spec_fields), 7, 0)
         let arr_ty = wl_array_type(spec_ty, specs_count as i64)
         let arr_ptr = self.create_entry_alloca(arr_ty)
         let zero_i32 = wl_const_int(wl_i32_type(ctx), 0, 0)
@@ -8772,10 +8772,10 @@ impl Codegen:
                 let d2 = self.pool.get_data2(spec_node)
                 kind = d2 / INDEX_KIND_SHIFT
                 step_node = d2 - kind * INDEX_KIND_SHIFT
-            let elem_indices: Vec[i64] = Vec.new()
+            let elem_indices: List[i64] = List.new()
             elem_indices.push(zero_i32)
             elem_indices.push(wl_const_int(wl_i32_type(ctx), si as i64, 0))
-            let elem_ptr = wl_build_gep(self.builder, arr_ty, arr_ptr, vec_data_i64(&elem_indices), 2)
+            let elem_ptr = wl_build_gep(self.builder, arr_ty, arr_ptr, list_data_i64(&elem_indices), 2)
             wl_build_store(self.builder, wl_const_int(wl_i32_type(ctx), kind as i64, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 0))
             let arg_base = 1 + si * 3
             let start_arg = self.mir_intrinsic_arg(body, args_id, arg_base)
@@ -8791,14 +8791,14 @@ impl Codegen:
             wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), if d1 != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 5))
             wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), if step_node != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 6))
 
-        let data_indices: Vec[i64] = Vec.new()
+        let data_indices: List[i64] = List.new()
         data_indices.push(zero_i32)
         data_indices.push(zero_i32)
-        let data_ptr = if specs_count > 0: wl_build_gep(self.builder, arr_ty, arr_ptr, vec_data_i64(&data_indices), 2) else: wl_const_null(wl_ptr_type(ctx))
-        let slice_fields: Vec[i64] = Vec.new()
+        let data_ptr = if specs_count > 0: wl_build_gep(self.builder, arr_ty, arr_ptr, list_data_i64(&data_indices), 2) else: wl_const_null(wl_ptr_type(ctx))
+        let slice_fields: List[i64] = List.new()
         slice_fields.push(wl_ptr_type(ctx))
         slice_fields.push(i64_ty)
-        let slice_ty = wl_struct_type(ctx, vec_data_i64(&slice_fields), 2, 0)
+        let slice_ty = wl_struct_type(ctx, list_data_i64(&slice_fields), 2, 0)
         var slice_val = wl_get_undef(slice_ty)
         slice_val = wl_build_insert_value(self.builder, slice_val, data_ptr, 0)
         slice_val = wl_build_insert_value(self.builder, slice_val, wl_const_int(i64_ty, specs_count as i64, 0), 1)
@@ -8836,7 +8836,7 @@ impl Codegen:
             self.had_error = 1
             return self.mir_multi_index_failure_value(body, dest_place)
 
-        let call_args: Vec[i64] = Vec.new()
+        let call_args: List[i64] = List.new()
         if self.is_ref_param(fn_sym, 0):
             // #D6: receiver marshals through the one canonical policy.
             call_args.push(self.marshal_ref_addr(body, base_op, base_val))
@@ -9080,11 +9080,11 @@ impl Codegen:
         let fn_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), slot_ptr)
 
         let param_count = wl_count_param_types(fn_ty)
-        let param_types: Vec[i64] = Vec.new()
+        let param_types: List[i64] = List.new()
         for pi in 0..param_count:
             param_types.push(wl_i32_type(self.context))
         if param_count > 0:
-            wl_get_param_types(fn_ty, vec_data_i64(&param_types))
+            wl_get_param_types(fn_ty, list_data_i64(&param_types))
 
         // D6: dyn_trait_method_fn_type applies the native win64 ABI, so an
         // aggregate return (>8B) becomes an sret parameter — matching the vtable
@@ -9096,7 +9096,7 @@ impl Codegen:
         let is_void_ret = ret_ty == wl_void_type(self.context)
         let has_sret = is_void_ret and param_count == arg_count + 1
 
-        let call_args: Vec[i64] = Vec.new()
+        let call_args: List[i64] = List.new()
         var sret_dst: i64 = 0
         if has_sret:
             if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
@@ -9121,7 +9121,7 @@ impl Codegen:
             call_args.push(val)
             ai = ai + 1
 
-        let result = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&call_args), call_args.len() as i32)
+        let result = wl_build_call(self.builder, fn_ty, fn_ptr, list_data_i64(&call_args), call_args.len() as i32)
         if not has_sret and ret_ty != wl_void_type(self.context):
             if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
                 return self.mir_emit_dyn_call_error("error: dyn trait call has no destination for non-void return", next_bb)
@@ -9139,8 +9139,8 @@ impl Codegen:
         wl_build_br(self.builder, self.mir_bb_values[next_bb])
         true
 
-    mut fn mir_vec_elem_type(body: &MirBody, recv_op_id: i32) -> i64:
-        // Infer Vec element LLVM type from the receiver's sema type (using snapshot).
+    mut fn mir_list_elem_type(body: &MirBody, recv_op_id: i32) -> i64:
+        // Infer List element LLVM type from the receiver's sema type (using snapshot).
         let sema_ty = self.mir_operand_sema_type(body, recv_op_id)
         if sema_ty > 0:
             let resolved = self.mir_unwrap_ref_like_sema_type(sema_ty)
@@ -9246,7 +9246,7 @@ impl Codegen:
             let arg1 = self.ast_static_type_expr(self.pool.get_data1(node))
             if arg1 == 0:
                 return 0
-            let args: Vec[i32] = Vec.new()
+            let args: List[i32] = List.new()
             args.push(arg1)
             var arg_count = 1
             if self.pool.get_data2(node) != 0:
@@ -9355,10 +9355,10 @@ impl Codegen:
     // the module declares is a compiler bug reported here, not a call LLVM
     // makes with whatever bits arrive. The free channel builtins called
     // with_channel_send(ptr, i64) against `(i64, *const u8)` for months.
-    mut fn call_runtime_checked(name: &str, ret_ty: i64, param_tys: &Vec[i64], args: &Vec[i64]) -> i64:
+    mut fn call_runtime_checked(name: &str, ret_ty: i64, param_tys: &List[i64], args: &List[i64]) -> i64:
         var f = wl_get_named_function(self.llmod, name)
         if f == 0:
-            let ft = wl_function_type(ret_ty, vec_data_i64(param_tys), param_tys.len() as i32, 0)
+            let ft = wl_function_type(ret_ty, list_data_i64(param_tys), param_tys.len() as i32, 0)
             f = wl_add_function(self.llmod, name, ft)
         let ft = wl_global_get_value_type(f)
         let count = wl_count_param_types(ft)
@@ -9371,7 +9371,7 @@ impl Codegen:
             with_eprint(f"error: BUG: call of runtime `{name}` does not match its declaration (params={count}, args={args.len()}) in {self.intern.resolve(self.current_function_name_sym)}")
             self.had_error = 1
             return wl_get_undef(if ret_ty == wl_void_type(self.context): wl_i32_type(self.context) else: ret_ty)
-        wl_build_call(self.builder, ft, f, vec_data_i64(args), args.len() as i32)
+        wl_build_call(self.builder, ft, f, list_data_i64(args), args.len() as i32)
 
     mut fn mir_emit_free_channel_builtin(body: &MirBody, builtin: CallBuiltin, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
         let i64_ty = wl_i64_type(self.context)
@@ -9382,28 +9382,28 @@ impl Codegen:
         var result: i64 = 0
         if builtin == CallBuiltin.Channel:
             let cap = if argc >= 1: self.coerce_int(self.mir_intrinsic_arg(body, args_id, 0), i32_ty) else: wl_const_int(i32_ty, 0, 0)
-            let ps: Vec[i64] = [i32_ty, i32_ty, ptr_ty]
-            let args: Vec[i64] = [cap, wl_const_int(i32_ty, 8, 0), wl_const_null(ptr_ty)]
+            let ps: List[i64] = [i32_ty, i32_ty, ptr_ty]
+            let args: List[i64] = [cap, wl_const_int(i32_ty, 8, 0), wl_const_null(ptr_ty)]
             result = self.call_runtime_checked("with_channel_create", i64_ty, &ps, &args)
         else if builtin == CallBuiltin.Send:
             let handle = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 0), i64_ty)
             let slot = self.create_entry_alloca(i64_ty)
             wl_build_store(self.builder, self.coerce_int(self.mir_intrinsic_arg(body, args_id, 1), i64_ty), slot)
-            let ps: Vec[i64] = [i64_ty, ptr_ty]
-            let args: Vec[i64] = [handle, slot]
+            let ps: List[i64] = [i64_ty, ptr_ty]
+            let args: List[i64] = [handle, slot]
             self.call_runtime_checked("with_channel_send", void_ty, &ps, &args)
         else if builtin == CallBuiltin.Recv:
             let handle = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 0), i64_ty)
             let slot = self.create_entry_alloca(i64_ty)
             wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), slot)
-            let ps: Vec[i64] = [i64_ty, ptr_ty]
-            let args: Vec[i64] = [handle, slot]
+            let ps: List[i64] = [i64_ty, ptr_ty]
+            let args: List[i64] = [handle, slot]
             self.call_runtime_checked("with_channel_recv", i32_ty, &ps, &args)
             result = self.coerce_int(wl_build_load(self.builder, i64_ty, slot), i32_ty)
         else:
             let handle = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 0), i64_ty)
-            let ps: Vec[i64] = [i64_ty]
-            let args: Vec[i64] = [handle]
+            let ps: List[i64] = [i64_ty]
+            let args: List[i64] = [handle]
             self.call_runtime_checked("with_channel_close", void_ty, &ps, &args)
         self.mir_finish_intrinsic_call(body, dest_place, next_bb, result)
         true
@@ -9418,15 +9418,15 @@ impl Codegen:
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values[next_bb])
 
-    fn mir_build_vecrange_value(data_i64: i64, offset_i64: i64, len_i64: i64, range_ty: i64) -> i64:
+    fn mir_build_listrange_value(data_i64: i64, offset_i64: i64, len_i64: i64, range_ty: i64) -> i64:
         let i64_ty = wl_i64_type(self.context)
         var ty = range_ty
         if ty == 0 or wl_get_type_kind(ty) != wl_struct_type_kind() or wl_count_struct_elem_types(ty) < 3:
-            let fields: Vec[i64] = Vec.new()
+            let fields: List[i64] = List.new()
             fields.push(i64_ty)
             fields.push(i64_ty)
             fields.push(i64_ty)
-            ty = wl_struct_type(self.context, vec_data_i64(&fields), 3, 0)
+            ty = wl_struct_type(self.context, list_data_i64(&fields), 3, 0)
         let alloca = self.create_entry_alloca(ty)
         let f0 = wl_build_struct_gep(self.builder, ty, alloca, 0)
         wl_build_store(self.builder, self.coerce_int(data_i64, wl_struct_get_type_at(ty, 0)), f0)
@@ -9473,12 +9473,12 @@ impl Codegen:
                 recv_len = self.coerce_int(wl_build_load(self.builder, wl_struct_get_type_at(slice_ty, 1), lp), i64_ty)
         else if recv_kind == TypeKind.TY_GENERIC_INST:
             let base_sym = self.sema_sym_to_codegen_sym(self.mir_type_d0_from_snapshot(recv_resolved))
-            if base_sym == self.sym_vec:
-                let vec_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
-                let raw_ptr3 = wl_build_extract_value(self.builder, vec_recv, 0)
+            if base_sym == self.sym_list:
+                let list_recv = self.mir_intrinsic_recv_list_value(body, args_id)
+                let raw_ptr3 = wl_build_extract_value(self.builder, list_recv, 0)
                 data_i64 = wl_build_ptr_to_int(self.builder, raw_ptr3, i64_ty)
-                recv_len = self.coerce_int(wl_build_extract_value(self.builder, vec_recv, 1), i64_ty)
-            else if base_sym == self.sym_vecrange:
+                recv_len = self.coerce_int(wl_build_extract_value(self.builder, list_recv, 1), i64_ty)
+            else if base_sym == self.sym_listrange:
                 let range_ty = self.mir_intrinsic_recv_storage_type(body, args_id, recv_ptr)
                 let dp2 = wl_build_struct_gep(self.builder, range_ty, recv_ptr, 0)
                 data_i64 = self.coerce_int(wl_build_load(self.builder, wl_struct_get_type_at(range_ty, 0), dp2), i64_ty)
@@ -9506,17 +9506,17 @@ impl Codegen:
         if tuple_ty != 0 and wl_get_type_kind(tuple_ty) == wl_struct_type_kind() and self.tuple_elem_count(tuple_ty) >= 2:
             range_ty_out = self.tuple_elem_type(tuple_ty, 0)
         else:
-            let rf: Vec[i64] = Vec.new()
+            let rf: List[i64] = List.new()
             rf.push(i64_ty)
             rf.push(i64_ty)
             rf.push(i64_ty)
-            range_ty_out = wl_struct_type(self.context, vec_data_i64(&rf), 3, 0)
-            let tf: Vec[i64] = Vec.new()
+            range_ty_out = wl_struct_type(self.context, list_data_i64(&rf), 3, 0)
+            let tf: List[i64] = List.new()
             tf.push(range_ty_out)
             tf.push(range_ty_out)
             tuple_ty = self.tuple_type_from_elems(&tf)
-        let left = self.mir_build_vecrange_value(data_i64, base_offset, idx, range_ty_out)
-        let right = self.mir_build_vecrange_value(data_i64, right_offset, right_len, range_ty_out)
+        let left = self.mir_build_listrange_value(data_i64, base_offset, idx, range_ty_out)
+        let right = self.mir_build_listrange_value(data_i64, right_offset, right_len, range_ty_out)
         let tuple_alloca = self.create_entry_alloca(tuple_ty)
         let f0 = self.tuple_elem_ptr(tuple_ty, tuple_alloca, 0)
         wl_build_store(self.builder, left, f0)
@@ -9529,17 +9529,17 @@ impl Codegen:
         var alloc_fn = wl_get_named_function(self.llmod, "with_alloc_aligned")
         if alloc_fn != 0:
             return alloc_fn
-        let params: Vec[i64] = [wl_i64_type(self.context), wl_i64_type(self.context)]
-        let fn_ty = wl_function_type(wl_ptr_type(self.context), vec_data_i64(&params), 2, 0)
+        let params: List[i64] = [wl_i64_type(self.context), wl_i64_type(self.context)]
+        let fn_ty = wl_function_type(wl_ptr_type(self.context), list_data_i64(&params), 2, 0)
         wl_add_function(self.llmod, "with_alloc_aligned", fn_ty)
 
     fn ensure_box_free_fn() -> i64:
         var free_fn = wl_get_named_function(self.llmod, "with_free")
         if free_fn != 0:
             return free_fn
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
-        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+        let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 1, 0)
         wl_add_function(self.llmod, "with_free", fn_ty)
 
     mut fn mir_emit_box_new_call(body: &MirBody, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
@@ -9562,10 +9562,10 @@ impl Codegen:
             self.had_error = 1
             return false
         let alloc_fn = self.ensure_box_alloc_aligned_fn()
-        let alloc_args: Vec[i64] = Vec.new()
+        let alloc_args: List[i64] = List.new()
         alloc_args.push(wl_const_int(wl_i64_type(self.context), self.abi_size_of(value_ty), 0))
         alloc_args.push(wl_const_int(wl_i64_type(self.context), self.sema.type_layout_align_of_frozen(value_sema), 0))
-        let heap_ptr = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 2)
+        let heap_ptr = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, list_data_i64(&alloc_args), 2)
         wl_build_store(self.builder, value, heap_ptr)
 
         var result = heap_ptr
@@ -9611,13 +9611,13 @@ impl Codegen:
         let free_fn = self.ensure_box_free_fn()
         if free_fn == 0:
             return false
-        let free_args: Vec[i64] = Vec.new()
+        let free_args: List[i64] = List.new()
         free_args.push(box_ptr)
-        let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&free_args), 1)
+        let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(&free_args), 1)
         self.mir_finish_intrinsic_call(body, dest_place, next_bb, payload)
         true
 
-    mut fn mir_emit_vec_core_intrinsic_call(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    mut fn mir_emit_list_core_intrinsic_call(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
         let i64_ty = wl_i64_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
@@ -9626,8 +9626,8 @@ impl Codegen:
         var result: i64 = 0
         if intrinsic == MirIntrinsic.SPLIT_AT or intrinsic == MirIntrinsic.SPLIT_AT_MUT:
             return self.mir_emit_split_at_call(body, args_id, dest_place, next_bb)
-        if intrinsic == MirIntrinsic.VEC_NEW:
-            var vec_elem_ty = wl_i64_type(self.context)
+        if intrinsic == MirIntrinsic.LIST_NEW:
+            var list_elem_ty = wl_i64_type(self.context)
             let dest_sema_new = self.mir_intrinsic_dest_sema_type(body, dest_place)
             if dest_sema_new > 0:
                 let resolved_new = self.mir_resolve_alias_at(dest_sema_new)
@@ -9637,20 +9637,20 @@ impl Codegen:
                         let te_start_new = self.mir_type_d1_at(resolved_new)
                         let elem_tid_new = self.mir_type_extra_at(te_start_new)
                         if elem_tid_new > 0:
-                            let elem_llvm_new = self.mir_vec_storage_elem_type(elem_tid_new)
+                            let elem_llvm_new = self.mir_list_storage_elem_type(elem_tid_new)
                             if elem_llvm_new != 0:
-                                vec_elem_ty = elem_llvm_new
-            let elem_size = self.abi_size_of(vec_elem_ty)
-            let vec_ty = self.get_or_create_vec_type(0, vec_elem_ty)
-            let alloca = self.create_entry_alloca(vec_ty)
-            wl_build_store(self.builder, self.build_default_value(vec_ty), alloca)
-            let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
-            let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
-            let args: Vec[i64] = Vec.new()
+                                list_elem_ty = elem_llvm_new
+            let elem_size = self.abi_size_of(list_elem_ty)
+            let list_ty = self.get_or_create_list_type(0, list_elem_ty)
+            let alloca = self.create_entry_alloca(list_ty)
+            wl_build_store(self.builder, self.build_default_value(list_ty), alloca)
+            let new_fn = self.ensure_list_runtime_fn("with_vec_new_out", void_ty, 2)
+            let new_ty = self.get_list_fn_type("with_vec_new_out", void_ty, 2)
+            let args: List[i64] = List.new()
             args.push(alloca)
             args.push(wl_const_int(i64_ty, elem_size, 0))
-            let _ = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&args), 2)
-            result = wl_build_load(self.builder, vec_ty, alloca)
+            let _ = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(&args), 2)
+            result = wl_build_load(self.builder, list_ty, alloca)
 
         else if intrinsic == MirIntrinsic.FIXED_STRING_NEW:
             let fs_dest_ty = self.mir_dest_llvm_type(body, dest_place)
@@ -9708,10 +9708,10 @@ impl Codegen:
             wl_build_cond_br(self.builder, fits, ok_bb, done_bb)
             wl_position_at_end(self.builder, ok_bb)
             let fs_buf_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 0)
-            let elem_indices: Vec[i64] = Vec.new()
+            let elem_indices: List[i64] = List.new()
             elem_indices.push(wl_const_int(i32_ty, 0, 0))
             elem_indices.push(fs_len)
-            let byte_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, vec_data_i64(&elem_indices), 2)
+            let byte_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, list_data_i64(&elem_indices), 2)
             let byte_val = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 1), wl_i8_type(self.context))
             let _ = wl_build_store(self.builder, byte_val, byte_ptr)
             let _ = wl_build_store(self.builder, wl_build_add(self.builder, fs_len, wl_const_int(i64_ty, 1, 0)), fs_len_ptr)
@@ -9751,16 +9751,16 @@ impl Codegen:
             let more = wl_build_icmp(self.builder, wl_int_ult(), idx, text_len)
             wl_build_cond_br(self.builder, more, body_bb, copied_bb)
             wl_position_at_end(self.builder, body_bb)
-            let src_indices: Vec[i64] = Vec.new()
+            let src_indices: List[i64] = List.new()
             src_indices.push(idx)
-            let src_byte_ptr = wl_build_gep(self.builder, wl_i8_type(self.context), text_ptr, vec_data_i64(&src_indices), 1)
+            let src_byte_ptr = wl_build_gep(self.builder, wl_i8_type(self.context), text_ptr, list_data_i64(&src_indices), 1)
             let src_byte = wl_build_load(self.builder, wl_i8_type(self.context), src_byte_ptr)
             let dst_index = wl_build_add(self.builder, fs_start_len, idx)
             let fs_buf_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 0)
-            let dst_indices: Vec[i64] = Vec.new()
+            let dst_indices: List[i64] = List.new()
             dst_indices.push(wl_const_int(i32_ty, 0, 0))
             dst_indices.push(dst_index)
-            let dst_byte_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, vec_data_i64(&dst_indices), 2)
+            let dst_byte_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, list_data_i64(&dst_indices), 2)
             let _ = wl_build_store(self.builder, src_byte, dst_byte_ptr)
             let _ = wl_build_store(self.builder, wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0)), idx_ptr)
             wl_build_br(self.builder, loop_bb)
@@ -9780,10 +9780,10 @@ impl Codegen:
             let fs_len_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 1)
             let fs_len = wl_build_load(self.builder, i64_ty, fs_len_ptr)
             let fs_buf_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 0)
-            let view_indices: Vec[i64] = Vec.new()
+            let view_indices: List[i64] = List.new()
             view_indices.push(wl_const_int(i32_ty, 0, 0))
             view_indices.push(wl_const_int(i64_ty, 0, 0))
-            let data_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, vec_data_i64(&view_indices), 2)
+            let data_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, list_data_i64(&view_indices), 2)
             result = self.build_str_value(data_ptr, fs_len)
 
         else if intrinsic == MirIntrinsic.FIXED_STRING_EQUALS:
@@ -9817,14 +9817,14 @@ impl Codegen:
             wl_build_cond_br(self.builder, more, body_bb, done_bb)
             wl_position_at_end(self.builder, body_bb)
             let fs_buf_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 0)
-            let fs_indices: Vec[i64] = Vec.new()
+            let fs_indices: List[i64] = List.new()
             fs_indices.push(wl_const_int(i32_ty, 0, 0))
             fs_indices.push(idx)
-            let fs_byte_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, vec_data_i64(&fs_indices), 2)
+            let fs_byte_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, list_data_i64(&fs_indices), 2)
             let fs_byte = wl_build_load(self.builder, wl_i8_type(self.context), fs_byte_ptr)
-            let text_indices: Vec[i64] = Vec.new()
+            let text_indices: List[i64] = List.new()
             text_indices.push(idx)
-            let text_byte_ptr = wl_build_gep(self.builder, wl_i8_type(self.context), text_ptr, vec_data_i64(&text_indices), 1)
+            let text_byte_ptr = wl_build_gep(self.builder, wl_i8_type(self.context), text_ptr, list_data_i64(&text_indices), 1)
             let text_byte = wl_build_load(self.builder, wl_i8_type(self.context), text_byte_ptr)
             let bytes_same = wl_build_icmp(self.builder, wl_int_eq(), fs_byte, text_byte)
             let eq_next_bb = wl_append_bb(self.context, self.current_function, "fixed.eq.next")
@@ -9838,7 +9838,7 @@ impl Codegen:
             wl_position_at_end(self.builder, done_bb)
             result = wl_build_load(self.builder, wl_i1_type(self.context), out_ptr)
 
-        else if intrinsic == MirIntrinsic.VEC_WITH_CAPACITY:
+        else if intrinsic == MirIntrinsic.LIST_WITH_CAPACITY:
             let wc_cap = self.mir_intrinsic_arg(body, args_id, 0)
             let wc_cap64 = self.coerce_int_ext(wc_cap, i64_ty, false)
             var wc_elem_ty = i64_ty
@@ -9855,80 +9855,80 @@ impl Codegen:
                             if wc_ll != 0:
                                 wc_elem_ty = wc_ll
             let wc_esz = self.abi_size_of(wc_elem_ty)
-            let wc_vty = self.get_or_create_vec_type(0, wc_elem_ty)
+            let wc_vty = self.get_or_create_list_type(0, wc_elem_ty)
             let wc_al = self.create_entry_alloca(wc_vty)
             wl_build_store(self.builder, self.build_default_value(wc_vty), wc_al)
-            let wc_fn = self.ensure_vec_runtime_fn("with_vec_new_with_capacity_out", void_ty, 3)
-            let wc_ft = self.get_vec_fn_type("with_vec_new_with_capacity_out", void_ty, 3)
-            let wc_args: Vec[i64] = Vec.new()
+            let wc_fn = self.ensure_list_runtime_fn("with_vec_new_with_capacity_out", void_ty, 3)
+            let wc_ft = self.get_list_fn_type("with_vec_new_with_capacity_out", void_ty, 3)
+            let wc_args: List[i64] = List.new()
             wc_args.push(wc_al)
             wc_args.push(wl_const_int(i64_ty, wc_esz, 0))
             wc_args.push(wc_cap64)
-            let _ = wl_build_call(self.builder, wc_ft, wc_fn, vec_data_i64(&wc_args), 3)
+            let _ = wl_build_call(self.builder, wc_ft, wc_fn, list_data_i64(&wc_args), 3)
             result = wl_build_load(self.builder, wc_vty, wc_al)
 
-        else if intrinsic == MirIntrinsic.VEC_PUSH:
+        else if intrinsic == MirIntrinsic.LIST_PUSH:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let elem_raw = self.mir_intrinsic_arg(body, args_id, 1)
-            // Coerce element to match Vec's element type: a #1847 dyn target
+            // Coerce element to match List's element type: a #1847 dyn target
             // takes the fat pointer first; a narrower integer widens by its
             // operand's signedness (§4.2.6, mir_intrinsic_value_as).
             var elem = elem_raw
             let push_arg_start = body.call_arg_starts[args_id]
             let push_recv_op = body.call_arg_operands[push_arg_start]
-            let push_elem_ty = self.mir_vec_elem_type(body, push_recv_op)
+            let push_elem_ty = self.mir_list_elem_type(body, push_recv_op)
             if push_elem_ty != 0 and wl_type_of(elem_raw) != push_elem_ty:
-                let push_vec_ty = self.mir_unwrap_ref_like_sema_type(self.mir_operand_sema_type(body, push_recv_op))
-                let push_elem_sema = if push_vec_ty > 0 and self.mir_type_kind_at(push_vec_ty) == TypeKind.TY_GENERIC_INST and self.mir_type_d2_at(push_vec_ty) > 0: self.mir_type_extra_at(self.mir_type_d1_at(push_vec_ty)) else: 0
+                let push_list_ty = self.mir_unwrap_ref_like_sema_type(self.mir_operand_sema_type(body, push_recv_op))
+                let push_elem_sema = if push_list_ty > 0 and self.mir_type_kind_at(push_list_ty) == TypeKind.TY_GENERIC_INST and self.mir_type_d2_at(push_list_ty) > 0: self.mir_type_extra_at(self.mir_type_d1_at(push_list_ty)) else: 0
                 let push_elem_op = body.call_arg_operands[(push_arg_start + 1)]
                 let dyn_elem = self.mir_coerce_operand_to_dyn_trait_target(body, push_elem_op, elem_raw, push_elem_ty, push_elem_sema)
                 elem = self.mir_intrinsic_value_as(body, args_id, 1, dyn_elem, push_elem_ty)
-            self.mir_emit_vec_push(recv_ptr, elem, wl_type_of(elem))
+            self.mir_emit_list_push(recv_ptr, elem, wl_type_of(elem))
 
-        else if intrinsic == MirIntrinsic.VEC_GET:
+        else if intrinsic == MirIntrinsic.LIST_GET:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let idx = self.mir_intrinsic_arg(body, args_id, 1)
             let idx64 = self.coerce_int(idx, i64_ty)
             var elem_ty = self.mir_dest_llvm_type(body, dest_place)
             if elem_ty == 0:
                 let recv_op = body.call_arg_operands[arg_start]
-                elem_ty = self.mir_vec_elem_type(body, recv_op)
+                elem_ty = self.mir_list_elem_type(body, recv_op)
             if elem_ty == 0:
                 elem_ty = i64_ty
-            let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
-            let get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
-            let args: Vec[i64] = Vec.new()
+            let get_fn = self.ensure_list_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+            let get_ty = self.get_list_fn_type("with_vec_get_ptr", ptr_ty, 2)
+            let args: List[i64] = List.new()
             args.push(recv_ptr)
             args.push(idx64)
-            let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&args), 2)
+            let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, list_data_i64(&args), 2)
             result = wl_build_load(self.builder, elem_ty, raw_ptr)
 
-        else if intrinsic == MirIntrinsic.VEC_GET_REF:
+        else if intrinsic == MirIntrinsic.LIST_GET_REF:
             let gr_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let gr_idx = self.mir_intrinsic_arg(body, args_id, 1)
             let gr_idx64 = self.coerce_int(gr_idx, i64_ty)
-            let gr_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
-            let gr_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
-            let gr_args: Vec[i64] = Vec.new()
+            let gr_fn = self.ensure_list_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+            let gr_ty = self.get_list_fn_type("with_vec_get_ptr", ptr_ty, 2)
+            let gr_args: List[i64] = List.new()
             gr_args.push(gr_recv_ptr)
             gr_args.push(gr_idx64)
-            result = self.mir_ref_from_slot_ptr(wl_build_call(self.builder, gr_ty, gr_fn, vec_data_i64(&gr_args), 2), self.mir_intrinsic_dest_sema_type(body, dest_place))
+            result = self.mir_ref_from_slot_ptr(wl_build_call(self.builder, gr_ty, gr_fn, list_data_i64(&gr_args), 2), self.mir_intrinsic_dest_sema_type(body, dest_place))
 
-        else if intrinsic == MirIntrinsic.VEC_LEN:
+        else if intrinsic == MirIntrinsic.LIST_LEN:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            result = self.mir_vec_len_inline(recv_ptr)
+            result = self.mir_list_len_inline(recv_ptr)
 
-        else if intrinsic == MirIntrinsic.VEC_IS_EMPTY:
+        else if intrinsic == MirIntrinsic.LIST_IS_EMPTY:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let raw_len = self.mir_vec_len_inline(recv_ptr)
+            let raw_len = self.mir_list_len_inline(recv_ptr)
             result = wl_build_icmp(self.builder, wl_int_eq(), raw_len, wl_const_int(i64_ty, 0, 0))
 
-        else if intrinsic == MirIntrinsic.VEC_LEN32 or intrinsic == MirIntrinsic.VEC_LEN64 or intrinsic == MirIntrinsic.VEC_ULEN32:
+        else if intrinsic == MirIntrinsic.LIST_LEN32 or intrinsic == MirIntrinsic.LIST_LEN64 or intrinsic == MirIntrinsic.LIST_ULEN32:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let raw_len = self.mir_vec_len_inline(recv_ptr)
+            let raw_len = self.mir_list_len_inline(recv_ptr)
             result = self.mir_convert_len_method_result(raw_len, intrinsic)
 
-        else if intrinsic == MirIntrinsic.VEC_SET:
+        else if intrinsic == MirIntrinsic.LIST_SET:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let idx = self.mir_intrinsic_arg(body, args_id, 1)
             let val = self.mir_intrinsic_arg(body, args_id, 2)
@@ -9936,20 +9936,20 @@ impl Codegen:
             let val32 = self.coerce_int(val, i32_ty)
             let set_fn_name = "with_vec_set_i32"
             var set_fn = wl_get_named_function(self.llmod, set_fn_name)
-            let param_types: Vec[i64] = Vec.new()
+            let param_types: List[i64] = List.new()
             param_types.push(ptr_ty)
             param_types.push(i64_ty)
             param_types.push(i32_ty)
-            let set_ty = wl_function_type(void_ty, vec_data_i64(&param_types), 3, 0)
+            let set_ty = wl_function_type(void_ty, list_data_i64(&param_types), 3, 0)
             if set_fn == 0:
                 set_fn = wl_add_function(self.llmod, set_fn_name, set_ty)
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(recv_ptr)
             args.push(idx64)
             args.push(val32)
-            result = wl_build_call(self.builder, set_ty, set_fn, vec_data_i64(&args), 3)
+            result = wl_build_call(self.builder, set_ty, set_fn, list_data_i64(&args), 3)
 
-        else if intrinsic == MirIntrinsic.VEC_REMOVE:
+        else if intrinsic == MirIntrinsic.LIST_REMOVE:
             // #606: materialize element[idx] as the result (moved into the caller's
             // binding so it drops exactly once), THEN compact the vector. The compaction
             // shifts the tail down over the removed slot, so the removed element lives
@@ -9957,44 +9957,44 @@ impl Codegen:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let idx = self.mir_intrinsic_arg(body, args_id, 1)
             let idx64 = self.coerce_int(idx, i64_ty)
-            let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
-            let get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
-            let get_args: Vec[i64] = Vec.new()
+            let get_fn = self.ensure_list_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+            let get_ty = self.get_list_fn_type("with_vec_get_ptr", ptr_ty, 2)
+            let get_args: List[i64] = List.new()
             get_args.push(recv_ptr)
             get_args.push(idx64)
-            let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&get_args), 2)
+            let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, list_data_i64(&get_args), 2)
             let recv_op = body.call_arg_operands[arg_start]
-            let elem_ty = self.mir_vec_elem_type(body, recv_op)
+            let elem_ty = self.mir_list_elem_type(body, recv_op)
             if elem_ty != 0:
                 result = wl_build_load(self.builder, elem_ty, raw_ptr)
             else:
                 result = wl_build_load(self.builder, i64_ty, raw_ptr)
-            let remove_fn = self.ensure_vec_runtime_fn("with_vec_remove", void_ty, 2)
-            let remove_ty = self.get_vec_fn_type("with_vec_remove", void_ty, 2)
-            let rm_args: Vec[i64] = Vec.new()
+            let remove_fn = self.ensure_list_runtime_fn("with_vec_remove", void_ty, 2)
+            let remove_ty = self.get_list_fn_type("with_vec_remove", void_ty, 2)
+            let rm_args: List[i64] = List.new()
             rm_args.push(recv_ptr)
             rm_args.push(idx64)
-            let _ = wl_build_call(self.builder, remove_ty, remove_fn, vec_data_i64(&rm_args), 2)
+            let _ = wl_build_call(self.builder, remove_ty, remove_fn, list_data_i64(&rm_args), 2)
 
-        else if intrinsic == MirIntrinsic.VEC_CLEAR:
+        else if intrinsic == MirIntrinsic.LIST_CLEAR:
             // #606: drop each live element before resetting len. No-op for POD elements
             // (mir_emit_vec_element_drops_ptr gates on element-needs-drop internally).
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let clear_recv_op = body.call_arg_operands[arg_start]
             let clear_recv_sema = self.mir_operand_sema_type(body, clear_recv_op)
-            self.mir_emit_vec_element_drops_ptr(recv_ptr, clear_recv_sema)
-            let clear_fn = self.ensure_vec_runtime_fn("with_vec_clear", void_ty, 1)
-            let clear_ty = self.get_vec_fn_type("with_vec_clear", void_ty, 1)
-            let args: Vec[i64] = Vec.new()
+            self.mir_emit_list_element_drops_ptr(recv_ptr, clear_recv_sema)
+            let clear_fn = self.ensure_list_runtime_fn("with_vec_clear", void_ty, 1)
+            let clear_ty = self.get_list_fn_type("with_vec_clear", void_ty, 1)
+            let args: List[i64] = List.new()
             args.push(recv_ptr)
-            result = wl_build_call(self.builder, clear_ty, clear_fn, vec_data_i64(&args), 1)
+            result = wl_build_call(self.builder, clear_ty, clear_fn, list_data_i64(&args), 1)
 
-        else if intrinsic == MirIntrinsic.VEC_POP:
+        else if intrinsic == MirIntrinsic.LIST_POP:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+            let recv = self.mir_intrinsic_recv_list_value(body, args_id)
             let len = wl_build_extract_value(self.builder, recv, 1)
             let recv_op = body.call_arg_operands[arg_start]
-            var elem_ty = self.mir_vec_elem_type(body, recv_op)
+            var elem_ty = self.mir_list_elem_type(body, recv_op)
             if elem_ty == 0:
                 elem_ty = i64_ty
             var opt_ty = self.mir_dest_llvm_type(body, dest_place)
@@ -10008,19 +10008,19 @@ impl Codegen:
 
             wl_position_at_end(self.builder, some_bb)
             let last_idx = wl_build_sub(self.builder, len, wl_const_int(i64_ty, 1, 0))
-            let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
-            let get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
-            let get_args: Vec[i64] = Vec.new()
+            let get_fn = self.ensure_list_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+            let get_ty = self.get_list_fn_type("with_vec_get_ptr", ptr_ty, 2)
+            let get_args: List[i64] = List.new()
             get_args.push(recv_ptr)
             get_args.push(last_idx)
-            let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&get_args), 2)
+            let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, list_data_i64(&get_args), 2)
             let popped = wl_build_load(self.builder, elem_ty, raw_ptr)
-            let remove_fn = self.ensure_vec_runtime_fn("with_vec_remove", void_ty, 2)
-            let remove_ty = self.get_vec_fn_type("with_vec_remove", void_ty, 2)
-            let rm_args: Vec[i64] = Vec.new()
+            let remove_fn = self.ensure_list_runtime_fn("with_vec_remove", void_ty, 2)
+            let remove_ty = self.get_list_fn_type("with_vec_remove", void_ty, 2)
+            let rm_args: List[i64] = List.new()
             rm_args.push(recv_ptr)
             rm_args.push(last_idx)
-            let _ = wl_build_call(self.builder, remove_ty, remove_fn, vec_data_i64(&rm_args), 2)
+            let _ = wl_build_call(self.builder, remove_ty, remove_fn, list_data_i64(&rm_args), 2)
             let some_val = self.build_option_some(popped, opt_ty)
             wl_build_br(self.builder, merge_bb)
             let some_end = wl_get_insert_block(self.builder)
@@ -10032,13 +10032,13 @@ impl Codegen:
 
             wl_position_at_end(self.builder, merge_bb)
             let pop_phi = wl_build_phi(self.builder, opt_ty)
-            let pop_vals: Vec[i64] = Vec.new()
-            let pop_bbs: Vec[i64] = Vec.new()
+            let pop_vals: List[i64] = List.new()
+            let pop_bbs: List[i64] = List.new()
             pop_vals.push(some_val)
             pop_vals.push(none_val)
             pop_bbs.push(some_end)
             pop_bbs.push(none_end)
-            wl_add_incoming(pop_phi, vec_data_i64(&pop_vals), vec_data_i64(&pop_bbs), 2)
+            wl_add_incoming(pop_phi, list_data_i64(&pop_vals), list_data_i64(&pop_bbs), 2)
             result = pop_phi
 
         else:
@@ -10125,13 +10125,13 @@ impl Codegen:
                     wl_build_store(self.builder, val, map_val_alloca)
                     map_val_alloca
             let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
-            let params: Vec[i64] = Vec.new()
+            let params: List[i64] = List.new()
             params.push(ptr_ty)
             params.push(ptr_ty)
             params.push(ptr_ty)
             params.push(i64_ty)
-            let fn_ty = wl_function_type(void_ty, vec_data_i64(&params), 4, 0)
-            let args: Vec[i64] = Vec.new()
+            let fn_ty = wl_function_type(void_ty, list_data_i64(&params), 4, 0)
+            let args: List[i64] = List.new()
             args.push(map_ptr)
             args.push(key_alloca)
             args.push(val_alloca)
@@ -10154,16 +10154,16 @@ impl Codegen:
             wl_build_store(self.builder, key, key_alloca)
             let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
             let fn_val = self.ensure_hm_fn("with_hashmap_get_ptr", ptr_ty)
-            let get_params: Vec[i64] = Vec.new()
+            let get_params: List[i64] = List.new()
             get_params.push(ptr_ty)
             get_params.push(ptr_ty)
             get_params.push(i64_ty)
-            let fn_ty = wl_function_type(ptr_ty, vec_data_i64(&get_params), 3, 0)
-            let get_args: Vec[i64] = Vec.new()
+            let fn_ty = wl_function_type(ptr_ty, list_data_i64(&get_params), 3, 0)
+            let get_args: List[i64] = List.new()
             get_args.push(map_ptr)
             get_args.push(key_alloca)
             get_args.push(is_str_val)
-            let value_ptr = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&get_args), 3)
+            let value_ptr = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&get_args), 3)
             // D22: Option[&V] uses the same nullable-pointer niche representation
             // as SlotMap.get: null is None, and a live value address is Some(&V)
             // (a `&str` view's Option is tagged, #1810). Any contextual Copy
@@ -10181,33 +10181,33 @@ impl Codegen:
             wl_build_store(self.builder, key, key_alloca)
             let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
             let fn_val = self.ensure_hm_fn("with_hashmap_contains", wl_i32_type(self.context))
-            let params: Vec[i64] = Vec.new()
+            let params: List[i64] = List.new()
             params.push(ptr_ty)
             params.push(ptr_ty)
             params.push(i64_ty)
-            let fn_ty = wl_function_type(wl_i32_type(self.context), vec_data_i64(&params), 3, 0)
-            let args: Vec[i64] = Vec.new()
+            let fn_ty = wl_function_type(wl_i32_type(self.context), list_data_i64(&params), 3, 0)
+            let args: List[i64] = List.new()
             args.push(map_ptr)
             args.push(key_alloca)
             args.push(is_str_val)
-            let raw = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 3)
+            let raw = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 3)
             result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(wl_i32_type(self.context), 0, 0))
 
         else if intrinsic == MirIntrinsic.MAP_LEN:
             let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
             let fn_val = self.ensure_hm_fn("with_hashmap_len", i64_ty)
-            let fn_ty = wl_function_type(i64_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
-            let args: Vec[i64] = Vec.new()
+            let fn_ty = wl_function_type(i64_ty, list_data_i64(&self.make_ptr_list()), 1, 0)
+            let args: List[i64] = List.new()
             args.push(map_ptr)
-            result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
+            result = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 1)
 
         else if intrinsic == MirIntrinsic.MAP_CAPACITY:
             let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
             let fn_val = self.ensure_hm_fn("with_hashmap_capacity", i64_ty)
-            let fn_ty = wl_function_type(i64_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
-            let args: Vec[i64] = Vec.new()
+            let fn_ty = wl_function_type(i64_ty, list_data_i64(&self.make_ptr_list()), 1, 0)
+            let args: List[i64] = List.new()
             args.push(map_ptr)
-            result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
+            result = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 1)
 
         else if intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED or intrinsic == MirIntrinsic.MAP_KEY_AT or intrinsic == MirIntrinsic.MAP_VALUE_AT:
             // D44: the slot is read where it lives. A view destination gets
@@ -10215,19 +10215,19 @@ impl Codegen:
             // through it. Nothing non-Copy is duplicated (§2.3).
             let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
             let slot = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 1), i64_ty)
-            let slot_args: Vec[i64] = Vec.new()
+            let slot_args: List[i64] = List.new()
             slot_args.push(map_ptr)
             slot_args.push(slot)
             if intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED:
                 let occupied_fn = self.ensure_hashmap_slot_runtime_fn("with_hashmap_slot_occupied", i32_ty)
-                let occupied = wl_build_call(self.builder, self.hashmap_slot_runtime_fn_type(i32_ty), occupied_fn, vec_data_i64(&slot_args), 2)
+                let occupied = wl_build_call(self.builder, self.hashmap_slot_runtime_fn_type(i32_ty), occupied_fn, list_data_i64(&slot_args), 2)
                 // std.collections reads it as `slot_live(i) -> bool`.
                 let occupied_dest = self.mir_dest_llvm_type(body, dest_place)
                 result = if occupied_dest != 0 and wl_get_type_kind(occupied_dest) == wl_integer_type_kind() and wl_get_int_type_width(occupied_dest) == 1: wl_build_icmp(self.builder, wl_int_ne(), occupied, wl_const_int(i32_ty, 0, 0)) else: occupied
             else:
                 let at_name = if intrinsic == MirIntrinsic.MAP_KEY_AT: "with_hashmap_key_ptr_at" else: "with_hashmap_value_ptr_at"
                 let at_fn = self.ensure_hashmap_slot_runtime_fn(at_name, ptr_ty)
-                let slot_ptr = wl_build_call(self.builder, self.hashmap_slot_runtime_fn_type(ptr_ty), at_fn, vec_data_i64(&slot_args), 2)
+                let slot_ptr = wl_build_call(self.builder, self.hashmap_slot_runtime_fn_type(ptr_ty), at_fn, list_data_i64(&slot_args), 2)
                 // D100: no unchecked helpers. A slot that holds no entry
                 // (removed, or past the end) has no key to view: the runtime
                 // returns null, and reading through it was undefined.
@@ -10250,12 +10250,12 @@ impl Codegen:
             let entry_ty = self.mir_dest_llvm_type(body, dest_place)
             let entry = self.create_entry_alloca(entry_ty)
             var take_fn = wl_get_named_function(self.llmod, "with_hashmap_take_at")
-            let take_params: Vec[i64] = [ptr_ty, i64_ty, ptr_ty, ptr_ty]
-            let take_ty = wl_function_type(i32_ty, vec_data_i64(&take_params), 4, 0)
+            let take_params: List[i64] = [ptr_ty, i64_ty, ptr_ty, ptr_ty]
+            let take_ty = wl_function_type(i32_ty, list_data_i64(&take_params), 4, 0)
             if take_fn == 0:
                 take_fn = wl_add_function(self.llmod, "with_hashmap_take_at", take_ty)
-            let take_args: Vec[i64] = [map_ptr, slot, wl_build_struct_gep(self.builder, entry_ty, entry, 0), wl_build_struct_gep(self.builder, entry_ty, entry, 1)]
-            let taken = wl_build_call(self.builder, take_ty, take_fn, vec_data_i64(&take_args), 4)
+            let take_args: List[i64] = [map_ptr, slot, wl_build_struct_gep(self.builder, entry_ty, entry, 0), wl_build_struct_gep(self.builder, entry_ty, entry, 1)]
+            let taken = wl_build_call(self.builder, take_ty, take_fn, list_data_i64(&take_args), 4)
             // D100: a dead slot wrote nothing; the entry would be an owned
             // (K, V) made of uninitialized bytes.
             let none_taken = wl_build_icmp(self.builder, wl_int_eq(), taken, wl_const_int(i32_ty, 0, 0))
@@ -10270,10 +10270,10 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.MAP_ULEN32:
             let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
             let fn_val = self.ensure_hm_fn("with_hashmap_len", i64_ty)
-            let fn_ty = wl_function_type(i64_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
-            let args: Vec[i64] = Vec.new()
+            let fn_ty = wl_function_type(i64_ty, list_data_i64(&self.make_ptr_list()), 1, 0)
+            let args: List[i64] = List.new()
             args.push(map_ptr)
-            let raw_len = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
+            let raw_len = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 1)
             result = self.mir_convert_len_method_result(raw_len, intrinsic)
 
         else if intrinsic == MirIntrinsic.MAP_REMOVE:
@@ -10297,13 +10297,13 @@ impl Codegen:
                 stored_key_alloca = self.create_entry_alloca(rm_key_llvm)
                 wl_build_store(self.builder, self.build_default_value(rm_key_llvm), stored_key_alloca)
             let fn_val = self.ensure_hm_fn(if rm_key_llvm != 0: "with_hashmap_remove_entry" else: "with_hashmap_remove", wl_i32_type(self.context))
-            let params: Vec[i64] = Vec.new()
+            let params: List[i64] = List.new()
             params.push(ptr_ty)
             params.push(ptr_ty)
             params.push(ptr_ty)
             params.push(if rm_key_llvm != 0: ptr_ty else: i64_ty)
-            let fn_ty = wl_function_type(wl_i32_type(self.context), vec_data_i64(&params), 4, 0)
-            let args: Vec[i64] = Vec.new()
+            let fn_ty = wl_function_type(wl_i32_type(self.context), list_data_i64(&params), 4, 0)
+            let args: List[i64] = List.new()
             args.push(map_ptr)
             args.push(key_alloca)
             if rm_key_llvm != 0: args.push(stored_key_alloca)
@@ -10314,7 +10314,7 @@ impl Codegen:
                 let out_alloca = self.create_entry_alloca(val_ty)
                 args.push(out_alloca)
                 if rm_key_llvm == 0: args.push(is_str_val)
-                let found = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
+                let found = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 4)
                 if rm_key_llvm != 0:
                     // The stored key drops; the probe is the caller's (D110).
                     self.mir_emit_drop_ptr_for_sema_type(stored_key_alloca, rm_key_llvm, rm_key_sema)
@@ -10330,7 +10330,7 @@ impl Codegen:
             else:
                 args.push(wl_const_null(ptr_ty))
                 if rm_key_llvm == 0: args.push(is_str_val)
-                let raw = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
+                let raw = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 4)
                 if rm_key_llvm != 0:
                     self.mir_emit_drop_ptr_for_sema_type(stored_key_alloca, rm_key_llvm, rm_key_sema)
                 result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(wl_i32_type(self.context), 0, 0))
@@ -10347,10 +10347,10 @@ impl Codegen:
             let clear_collection_kind = self.mir_hash_collection_kind(clear_recv_sema)
             self.mir_emit_hash_collection_element_drops(map_ptr, clear_recv_sema, clear_collection_kind)
             let fn_val = self.ensure_hm_fn("with_hashmap_clear", void_ty)
-            let fn_ty = wl_function_type(void_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
-            let args: Vec[i64] = Vec.new()
+            let fn_ty = wl_function_type(void_ty, list_data_i64(&self.make_ptr_list()), 1, 0)
+            let args: List[i64] = List.new()
             args.push(map_ptr)
-            result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
+            result = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 1)
 
         else if intrinsic == MirIntrinsic.SLOTMAP_NEW:
             var sm_elem_ty = i64_ty
@@ -10366,12 +10366,12 @@ impl Codegen:
                         sm_elem_ty = sm_elem_llvm
                         sm_ty = self.get_or_create_slotmap_type(sm_dest_sema, sm_elem_ty)
             let sm_new_fn = self.ensure_c_fn("with_slotmap_new", ptr_ty, 1)
-            let sm_params: Vec[i64] = Vec.new()
+            let sm_params: List[i64] = List.new()
             sm_params.push(i64_ty)
-            let sm_fn_ty = wl_function_type(ptr_ty, vec_data_i64(&sm_params), 1, 0)
-            let sm_args: Vec[i64] = Vec.new()
+            let sm_fn_ty = wl_function_type(ptr_ty, list_data_i64(&sm_params), 1, 0)
+            let sm_args: List[i64] = List.new()
             sm_args.push(wl_const_int(i64_ty, self.abi_size_of(sm_elem_ty), 0))
-            let sm_handle = wl_build_call(self.builder, sm_fn_ty, sm_new_fn, vec_data_i64(&sm_args), 1)
+            let sm_handle = wl_build_call(self.builder, sm_fn_ty, sm_new_fn, list_data_i64(&sm_args), 1)
             if sm_ty == 0:
                 sm_ty = self.get_or_create_slotmap_type(0, sm_elem_ty)
             result = wl_build_insert_value(self.builder, self.build_default_value(sm_ty), sm_handle, 0)
@@ -10385,22 +10385,22 @@ impl Codegen:
             wl_build_store(self.builder, sm_val, sm_val_alloca)
             var sm_h_ty = self.mir_sema_type_to_llvm(self.mir_intrinsic_dest_sema_type(body, dest_place))
             if sm_h_ty == 0:
-                let sm_h_fields: Vec[i64] = Vec.new()
+                let sm_h_fields: List[i64] = List.new()
                 sm_h_fields.push(i32_ty)
                 sm_h_fields.push(i32_ty)
-                sm_h_ty = wl_struct_type(self.context, vec_data_i64(&sm_h_fields), 2, 0)
+                sm_h_ty = wl_struct_type(self.context, list_data_i64(&sm_h_fields), 2, 0)
             let sm_out = self.create_entry_alloca(sm_h_ty)
             let sm_insert_fn = self.ensure_c_fn("with_slotmap_insert_out", void_ty, 3)
-            let sm_insert_params: Vec[i64] = Vec.new()
+            let sm_insert_params: List[i64] = List.new()
             sm_insert_params.push(ptr_ty)
             sm_insert_params.push(ptr_ty)
             sm_insert_params.push(ptr_ty)
-            let sm_insert_ty = wl_function_type(void_ty, vec_data_i64(&sm_insert_params), 3, 0)
-            let sm_insert_args: Vec[i64] = Vec.new()
+            let sm_insert_ty = wl_function_type(void_ty, list_data_i64(&sm_insert_params), 3, 0)
+            let sm_insert_args: List[i64] = List.new()
             sm_insert_args.push(sm_map)
             sm_insert_args.push(sm_val_alloca)
             sm_insert_args.push(sm_out)
-            wl_build_call(self.builder, sm_insert_ty, sm_insert_fn, vec_data_i64(&sm_insert_args), 3)
+            wl_build_call(self.builder, sm_insert_ty, sm_insert_fn, list_data_i64(&sm_insert_args), 3)
             result = wl_build_load(self.builder, sm_h_ty, sm_out)
 
         else if intrinsic == MirIntrinsic.SLOTMAP_GET:
@@ -10409,16 +10409,16 @@ impl Codegen:
             let sm_idx = wl_build_extract_value(self.builder, sm_h, 0)
             let sm_gen = wl_build_extract_value(self.builder, sm_h, 1)
             let sm_get_fn = self.ensure_c_fn("with_slotmap_get_ptr", ptr_ty, 3)
-            let sm_get_params: Vec[i64] = Vec.new()
+            let sm_get_params: List[i64] = List.new()
             sm_get_params.push(ptr_ty)
             sm_get_params.push(i32_ty)
             sm_get_params.push(i32_ty)
-            let sm_get_ty = wl_function_type(ptr_ty, vec_data_i64(&sm_get_params), 3, 0)
-            let sm_get_args: Vec[i64] = Vec.new()
+            let sm_get_ty = wl_function_type(ptr_ty, list_data_i64(&sm_get_params), 3, 0)
+            let sm_get_args: List[i64] = List.new()
             sm_get_args.push(sm_map)
             sm_get_args.push(sm_idx)
             sm_get_args.push(sm_gen)
-            let sm_ptr = wl_build_call(self.builder, sm_get_ty, sm_get_fn, vec_data_i64(&sm_get_args), 3)
+            let sm_ptr = wl_build_call(self.builder, sm_get_ty, sm_get_fn, list_data_i64(&sm_get_args), 3)
             result = self.mir_option_ref_from_slot_ptr(sm_ptr, self.mir_intrinsic_dest_sema_type(body, dest_place))
 
         else if intrinsic == MirIntrinsic.SLOTMAP_SLOT:
@@ -10428,11 +10428,11 @@ impl Codegen:
             let sm_gen = wl_build_extract_value(self.builder, sm_h, 1)
             var sms_ty = self.mir_sema_type_to_llvm(self.mir_intrinsic_dest_sema_type(body, dest_place))
             if sms_ty == 0:
-                let sms_fields: Vec[i64] = Vec.new()
+                let sms_fields: List[i64] = List.new()
                 sms_fields.push(i64_ty)
                 sms_fields.push(i32_ty)
                 sms_fields.push(i32_ty)
-                sms_ty = wl_struct_type(self.context, vec_data_i64(&sms_fields), 3, 0)
+                sms_ty = wl_struct_type(self.context, list_data_i64(&sms_fields), 3, 0)
             let sms_map_i64 = wl_build_ptr_to_int(self.builder, sm_map, i64_ty)
             let sms_0 = wl_build_insert_value(self.builder, self.build_default_value(sms_ty), sms_map_i64, 0)
             let sms_1 = wl_build_insert_value(self.builder, sms_0, sm_idx, 1)
@@ -10444,37 +10444,37 @@ impl Codegen:
             let sm_idx = wl_build_extract_value(self.builder, sm_h, 0)
             let sm_gen = wl_build_extract_value(self.builder, sm_h, 1)
             let sm_contains_fn = self.ensure_c_fn("with_slotmap_contains", i32_ty, 3)
-            let sm_contains_params: Vec[i64] = Vec.new()
+            let sm_contains_params: List[i64] = List.new()
             sm_contains_params.push(ptr_ty)
             sm_contains_params.push(i32_ty)
             sm_contains_params.push(i32_ty)
-            let sm_contains_ty = wl_function_type(i32_ty, vec_data_i64(&sm_contains_params), 3, 0)
-            let sm_contains_args: Vec[i64] = Vec.new()
+            let sm_contains_ty = wl_function_type(i32_ty, list_data_i64(&sm_contains_params), 3, 0)
+            let sm_contains_args: List[i64] = List.new()
             sm_contains_args.push(sm_map)
             sm_contains_args.push(sm_idx)
             sm_contains_args.push(sm_gen)
-            let sm_raw = wl_build_call(self.builder, sm_contains_ty, sm_contains_fn, vec_data_i64(&sm_contains_args), 3)
+            let sm_raw = wl_build_call(self.builder, sm_contains_ty, sm_contains_fn, list_data_i64(&sm_contains_args), 3)
             result = wl_build_icmp(self.builder, wl_int_ne(), sm_raw, wl_const_int(i32_ty, 0, 0))
 
         else if intrinsic == MirIntrinsic.SLOTMAP_LEN:
             let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
             let sm_len_fn = self.ensure_c_fn("with_slotmap_len", i64_ty, 1)
-            let sm_len_params: Vec[i64] = Vec.new()
+            let sm_len_params: List[i64] = List.new()
             sm_len_params.push(ptr_ty)
-            let sm_len_ty = wl_function_type(i64_ty, vec_data_i64(&sm_len_params), 1, 0)
-            let sm_len_args: Vec[i64] = Vec.new()
+            let sm_len_ty = wl_function_type(i64_ty, list_data_i64(&sm_len_params), 1, 0)
+            let sm_len_args: List[i64] = List.new()
             sm_len_args.push(sm_map)
-            result = wl_build_call(self.builder, sm_len_ty, sm_len_fn, vec_data_i64(&sm_len_args), 1)
+            result = wl_build_call(self.builder, sm_len_ty, sm_len_fn, list_data_i64(&sm_len_args), 1)
 
         else if intrinsic == MirIntrinsic.SLOTMAP_LEN32 or intrinsic == MirIntrinsic.SLOTMAP_LEN64 or intrinsic == MirIntrinsic.SLOTMAP_ULEN32:
             let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
             let sm_len_fn = self.ensure_c_fn("with_slotmap_len", i64_ty, 1)
-            let sm_len_params: Vec[i64] = Vec.new()
+            let sm_len_params: List[i64] = List.new()
             sm_len_params.push(ptr_ty)
-            let sm_len_ty = wl_function_type(i64_ty, vec_data_i64(&sm_len_params), 1, 0)
-            let sm_len_args: Vec[i64] = Vec.new()
+            let sm_len_ty = wl_function_type(i64_ty, list_data_i64(&sm_len_params), 1, 0)
+            let sm_len_args: List[i64] = List.new()
             sm_len_args.push(sm_map)
-            let raw_len = wl_build_call(self.builder, sm_len_ty, sm_len_fn, vec_data_i64(&sm_len_args), 1)
+            let raw_len = wl_build_call(self.builder, sm_len_ty, sm_len_fn, list_data_i64(&sm_len_args), 1)
             result = self.mir_convert_len_method_result(raw_len, intrinsic)
 
         else if intrinsic == MirIntrinsic.SLOTMAP_REMOVE or intrinsic == MirIntrinsic.SLOTMAP_REPLACE:
@@ -10487,38 +10487,38 @@ impl Codegen:
             var sm_found: i64 = 0
             if intrinsic == MirIntrinsic.SLOTMAP_REMOVE:
                 let sm_remove_fn = self.ensure_c_fn("with_slotmap_remove", i32_ty, 4)
-                let sm_remove_params: Vec[i64] = Vec.new()
+                let sm_remove_params: List[i64] = List.new()
                 sm_remove_params.push(ptr_ty)
                 sm_remove_params.push(i32_ty)
                 sm_remove_params.push(i32_ty)
                 sm_remove_params.push(ptr_ty)
-                let sm_remove_ty = wl_function_type(i32_ty, vec_data_i64(&sm_remove_params), 4, 0)
-                let sm_remove_args: Vec[i64] = Vec.new()
+                let sm_remove_ty = wl_function_type(i32_ty, list_data_i64(&sm_remove_params), 4, 0)
+                let sm_remove_args: List[i64] = List.new()
                 sm_remove_args.push(sm_map)
                 sm_remove_args.push(sm_idx)
                 sm_remove_args.push(sm_gen)
                 sm_remove_args.push(sm_out)
-                sm_found = wl_build_call(self.builder, sm_remove_ty, sm_remove_fn, vec_data_i64(&sm_remove_args), 4)
+                sm_found = wl_build_call(self.builder, sm_remove_ty, sm_remove_fn, list_data_i64(&sm_remove_args), 4)
             else:
                 let sm_val_raw = self.mir_intrinsic_arg(body, args_id, 2)
                 let sm_val = self.mir_intrinsic_value_as(body, args_id, 2, sm_val_raw, sm_elem_ty)
                 let sm_val_alloca = self.create_entry_alloca(sm_elem_ty)
                 wl_build_store(self.builder, sm_val, sm_val_alloca)
                 let sm_replace_fn = self.ensure_c_fn("with_slotmap_replace", i32_ty, 5)
-                let sm_replace_params: Vec[i64] = Vec.new()
+                let sm_replace_params: List[i64] = List.new()
                 sm_replace_params.push(ptr_ty)
                 sm_replace_params.push(i32_ty)
                 sm_replace_params.push(i32_ty)
                 sm_replace_params.push(ptr_ty)
                 sm_replace_params.push(ptr_ty)
-                let sm_replace_ty = wl_function_type(i32_ty, vec_data_i64(&sm_replace_params), 5, 0)
-                let sm_replace_args: Vec[i64] = Vec.new()
+                let sm_replace_ty = wl_function_type(i32_ty, list_data_i64(&sm_replace_params), 5, 0)
+                let sm_replace_args: List[i64] = List.new()
                 sm_replace_args.push(sm_map)
                 sm_replace_args.push(sm_idx)
                 sm_replace_args.push(sm_gen)
                 sm_replace_args.push(sm_val_alloca)
                 sm_replace_args.push(sm_out)
-                sm_found = wl_build_call(self.builder, sm_replace_ty, sm_replace_fn, vec_data_i64(&sm_replace_args), 5)
+                sm_found = wl_build_call(self.builder, sm_replace_ty, sm_replace_fn, list_data_i64(&sm_replace_args), 5)
             let sm_val = wl_build_load(self.builder, sm_elem_ty, sm_out)
             let sm_opt_ty = self.get_or_create_option_type(0, sm_elem_ty)
             let sm_is_found = wl_build_icmp(self.builder, wl_int_ne(), sm_found, wl_const_int(i32_ty, 0, 0))
@@ -10535,21 +10535,21 @@ impl Codegen:
             let sm_i2 = wl_build_extract_value(self.builder, sm_h2, 0)
             let sm_g2 = wl_build_extract_value(self.builder, sm_h2, 1)
             let sm_valid_fn = self.ensure_c_fn("with_slotmap_contains", i32_ty, 3)
-            let sm_valid_params: Vec[i64] = Vec.new()
+            let sm_valid_params: List[i64] = List.new()
             sm_valid_params.push(ptr_ty)
             sm_valid_params.push(i32_ty)
             sm_valid_params.push(i32_ty)
-            let sm_valid_ty = wl_function_type(i32_ty, vec_data_i64(&sm_valid_params), 3, 0)
-            let sm_va: Vec[i64] = Vec.new()
+            let sm_valid_ty = wl_function_type(i32_ty, list_data_i64(&sm_valid_params), 3, 0)
+            let sm_va: List[i64] = List.new()
             sm_va.push(sm_map)
             sm_va.push(sm_i1)
             sm_va.push(sm_g1)
-            let sm_v1 = wl_build_call(self.builder, sm_valid_ty, sm_valid_fn, vec_data_i64(&sm_va), 3)
-            let sm_vb: Vec[i64] = Vec.new()
+            let sm_v1 = wl_build_call(self.builder, sm_valid_ty, sm_valid_fn, list_data_i64(&sm_va), 3)
+            let sm_vb: List[i64] = List.new()
             sm_vb.push(sm_map)
             sm_vb.push(sm_i2)
             sm_vb.push(sm_g2)
-            let sm_v2 = wl_build_call(self.builder, sm_valid_ty, sm_valid_fn, vec_data_i64(&sm_vb), 3)
+            let sm_v2 = wl_build_call(self.builder, sm_valid_ty, sm_valid_fn, list_data_i64(&sm_vb), 3)
             let sm_same_i = wl_build_icmp(self.builder, wl_int_eq(), sm_i1, sm_i2)
             let sm_same_g = wl_build_icmp(self.builder, wl_int_eq(), sm_g1, sm_g2)
             let sm_same = wl_build_and(self.builder, sm_same_i, sm_same_g)
@@ -10562,11 +10562,11 @@ impl Codegen:
             wl_position_at_end(self.builder, sm_panic_bb)
             self.emit_runtime_panic("SlotMap.get_disjoint requires distinct valid handles")
             wl_position_at_end(self.builder, sm_ok_bb)
-            let sm_slot_fields: Vec[i64] = Vec.new()
+            let sm_slot_fields: List[i64] = List.new()
             sm_slot_fields.push(i64_ty)
             sm_slot_fields.push(i32_ty)
             sm_slot_fields.push(i32_ty)
-            let sm_slot_ty = wl_struct_type(self.context, vec_data_i64(&sm_slot_fields), 3, 0)
+            let sm_slot_ty = wl_struct_type(self.context, list_data_i64(&sm_slot_fields), 3, 0)
             let sm_map_i64 = wl_build_ptr_to_int(self.builder, sm_map, i64_ty)
             let sm_s0a = wl_build_insert_value(self.builder, self.build_default_value(sm_slot_ty), sm_map_i64, 0)
             let sm_s0b = wl_build_insert_value(self.builder, sm_s0a, sm_i1, 1)
@@ -10576,7 +10576,7 @@ impl Codegen:
             let sm_s1 = wl_build_insert_value(self.builder, sm_s1b, sm_g2, 2)
             var sm_tuple_ty = self.mir_sema_type_to_llvm(self.mir_intrinsic_dest_sema_type(body, dest_place))
             if sm_tuple_ty == 0:
-                let sm_tuple_fields: Vec[i64] = Vec.new()
+                let sm_tuple_fields: List[i64] = List.new()
                 sm_tuple_fields.push(sm_slot_ty)
                 sm_tuple_fields.push(sm_slot_ty)
                 sm_tuple_ty = self.tuple_type_from_elems(&sm_tuple_fields)
@@ -10585,11 +10585,11 @@ impl Codegen:
 
         else if intrinsic == MirIntrinsic.SLOTMAPSLOT_GET:
             let sms_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let sms_fields: Vec[i64] = Vec.new()
+            let sms_fields: List[i64] = List.new()
             sms_fields.push(i64_ty)
             sms_fields.push(i32_ty)
             sms_fields.push(i32_ty)
-            let sms_ty = wl_struct_type(self.context, vec_data_i64(&sms_fields), 3, 0)
+            let sms_ty = wl_struct_type(self.context, list_data_i64(&sms_fields), 3, 0)
             let sms_map_p = wl_build_struct_gep(self.builder, sms_ty, sms_ptr, 0)
             let sms_map_i = wl_build_load(self.builder, i64_ty, sms_map_p)
             let sms_map = wl_build_int_to_ptr(self.builder, sms_map_i, ptr_ty)
@@ -10598,16 +10598,16 @@ impl Codegen:
             let sms_gen_p = wl_build_struct_gep(self.builder, sms_ty, sms_ptr, 2)
             let sms_gen = wl_build_load(self.builder, i32_ty, sms_gen_p)
             let sms_get_fn = self.ensure_c_fn("with_slotmap_get_ptr", ptr_ty, 3)
-            let sms_get_params: Vec[i64] = Vec.new()
+            let sms_get_params: List[i64] = List.new()
             sms_get_params.push(ptr_ty)
             sms_get_params.push(i32_ty)
             sms_get_params.push(i32_ty)
-            let sms_get_ty = wl_function_type(ptr_ty, vec_data_i64(&sms_get_params), 3, 0)
-            let sms_get_args: Vec[i64] = Vec.new()
+            let sms_get_ty = wl_function_type(ptr_ty, list_data_i64(&sms_get_params), 3, 0)
+            let sms_get_args: List[i64] = List.new()
             sms_get_args.push(sms_map)
             sms_get_args.push(sms_idx)
             sms_get_args.push(sms_gen)
-            let sms_val_ptr = wl_build_call(self.builder, sms_get_ty, sms_get_fn, vec_data_i64(&sms_get_args), 3)
+            let sms_val_ptr = wl_build_call(self.builder, sms_get_ty, sms_get_fn, list_data_i64(&sms_get_args), 3)
             let sms_is_null = wl_build_icmp(self.builder, wl_int_eq(), sms_val_ptr, wl_const_null(ptr_ty))
             let sms_panic_bb = wl_append_bb(self.context, self.current_function, "slotmap.slot.get.panic")
             let sms_ok_bb = wl_append_bb(self.context, self.current_function, "slotmap.slot.get.ok")
@@ -10620,11 +10620,11 @@ impl Codegen:
 
         else if intrinsic == MirIntrinsic.SLOTMAPSLOT_SET:
             let sms_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let sms_fields: Vec[i64] = Vec.new()
+            let sms_fields: List[i64] = List.new()
             sms_fields.push(i64_ty)
             sms_fields.push(i32_ty)
             sms_fields.push(i32_ty)
-            let sms_ty = wl_struct_type(self.context, vec_data_i64(&sms_fields), 3, 0)
+            let sms_ty = wl_struct_type(self.context, list_data_i64(&sms_fields), 3, 0)
             let sms_map_p = wl_build_struct_gep(self.builder, sms_ty, sms_ptr, 0)
             let sms_map_i = wl_build_load(self.builder, i64_ty, sms_map_p)
             let sms_map = wl_build_int_to_ptr(self.builder, sms_map_i, ptr_ty)
@@ -10643,16 +10643,16 @@ impl Codegen:
             // slot must destroy that owner before the runtime copies the new
             // value into the same bytes; a raw overwrite leaks Drop payloads.
             let sms_get_fn = self.ensure_c_fn("with_slotmap_get_ptr", ptr_ty, 3)
-            let sms_get_params: Vec[i64] = Vec.new()
+            let sms_get_params: List[i64] = List.new()
             sms_get_params.push(ptr_ty)
             sms_get_params.push(i32_ty)
             sms_get_params.push(i32_ty)
-            let sms_get_ty = wl_function_type(ptr_ty, vec_data_i64(&sms_get_params), 3, 0)
-            let sms_get_args: Vec[i64] = Vec.new()
+            let sms_get_ty = wl_function_type(ptr_ty, list_data_i64(&sms_get_params), 3, 0)
+            let sms_get_args: List[i64] = List.new()
             sms_get_args.push(sms_map)
             sms_get_args.push(sms_idx)
             sms_get_args.push(sms_gen)
-            let sms_old_ptr = wl_build_call(self.builder, sms_get_ty, sms_get_fn, vec_data_i64(&sms_get_args), 3)
+            let sms_old_ptr = wl_build_call(self.builder, sms_get_ty, sms_get_fn, list_data_i64(&sms_get_args), 3)
             let sms_old_is_null = wl_build_icmp(self.builder, wl_int_eq(), sms_old_ptr, wl_const_null(ptr_ty))
             let sms_set_panic = wl_append_bb(self.context, self.current_function, "slotmap.slot.set.panic")
             let sms_replace_bb = wl_append_bb(self.context, self.current_function, "slotmap.slot.set.replace")
@@ -10664,18 +10664,18 @@ impl Codegen:
                 self.mir_emit_drop_ptr_for_sema_type(sms_old_ptr, sms_elem_ty, sms_elem_sema)
                 self.member_drop_depth = self.member_drop_depth - 1
             let sms_set_fn = self.ensure_c_fn("with_slotmap_set", i32_ty, 4)
-            let sms_set_params: Vec[i64] = Vec.new()
+            let sms_set_params: List[i64] = List.new()
             sms_set_params.push(ptr_ty)
             sms_set_params.push(i32_ty)
             sms_set_params.push(i32_ty)
             sms_set_params.push(ptr_ty)
-            let sms_set_ty = wl_function_type(i32_ty, vec_data_i64(&sms_set_params), 4, 0)
-            let sms_set_args: Vec[i64] = Vec.new()
+            let sms_set_ty = wl_function_type(i32_ty, list_data_i64(&sms_set_params), 4, 0)
+            let sms_set_args: List[i64] = List.new()
             sms_set_args.push(sms_map)
             sms_set_args.push(sms_idx)
             sms_set_args.push(sms_gen)
             sms_set_args.push(sms_val_alloca)
-            let sms_ok = wl_build_call(self.builder, sms_set_ty, sms_set_fn, vec_data_i64(&sms_set_args), 4)
+            let sms_ok = wl_build_call(self.builder, sms_set_ty, sms_set_fn, list_data_i64(&sms_set_args), 4)
             let sms_bad = wl_build_icmp(self.builder, wl_int_eq(), sms_ok, wl_const_int(i32_ty, 0, 0))
             wl_build_cond_br(self.builder, sms_bad, sms_set_panic, sms_set_ok)
             wl_position_at_end(self.builder, sms_set_panic)
@@ -10692,10 +10692,10 @@ impl Codegen:
             if me_key_ty == 0:
                 me_key_ty = wl_type_of(me_key_raw)
             let me_key = self.mir_intrinsic_value_as(body, args_id, 1, me_key_raw, me_key_ty)
-            let me_fields: Vec[i64] = Vec.new()
+            let me_fields: List[i64] = List.new()
             me_fields.push(ptr_ty)
             me_fields.push(me_key_ty)
-            let me_struct_ty = wl_struct_type(self.context, vec_data_i64(&me_fields), 2, 0)
+            let me_struct_ty = wl_struct_type(self.context, list_data_i64(&me_fields), 2, 0)
             let me_alloca = self.create_entry_alloca(me_struct_ty)
             let me_f0 = wl_build_struct_gep(self.builder, me_struct_ty, me_alloca, 0)
             wl_build_store(self.builder, me_map_ptr, me_f0)
@@ -10725,10 +10725,10 @@ impl Codegen:
                         let oi_vt = self.mir_sema_type_to_llvm(oi_val_tid)
                         if oi_vt != 0:
                             oi_val_ty = oi_vt
-            let oi_entry_fields: Vec[i64] = Vec.new()
+            let oi_entry_fields: List[i64] = List.new()
             oi_entry_fields.push(ptr_ty)
             oi_entry_fields.push(oi_key_ty)
-            let oi_entry_ty = wl_struct_type(self.context, vec_data_i64(&oi_entry_fields), 2, 0)
+            let oi_entry_ty = wl_struct_type(self.context, list_data_i64(&oi_entry_fields), 2, 0)
             let oi_mp = wl_build_struct_gep(self.builder, oi_entry_ty, oi_ptr, 0)
             let oi_map_ptr = wl_build_load(self.builder, ptr_ty, oi_mp)
             let oi_kp = wl_build_struct_gep(self.builder, oi_entry_ty, oi_ptr, 1)
@@ -10738,16 +10738,16 @@ impl Codegen:
             wl_build_store(self.builder, oi_key, oi_key_alloca)
             // contains?
             let oi_contains_fn = self.ensure_hm_fn("with_hashmap_contains", wl_i32_type(self.context))
-            let oi_c_params: Vec[i64] = Vec.new()
+            let oi_c_params: List[i64] = List.new()
             oi_c_params.push(ptr_ty)
             oi_c_params.push(ptr_ty)
             oi_c_params.push(i64_ty)
-            let oi_c_fn_ty = wl_function_type(wl_i32_type(self.context), vec_data_i64(&oi_c_params), 3, 0)
-            let oi_c_args: Vec[i64] = Vec.new()
+            let oi_c_fn_ty = wl_function_type(wl_i32_type(self.context), list_data_i64(&oi_c_params), 3, 0)
+            let oi_c_args: List[i64] = List.new()
             oi_c_args.push(oi_map_ptr)
             oi_c_args.push(oi_key_alloca)
             oi_c_args.push(oi_is_str)
-            let oi_found = wl_build_call(self.builder, oi_c_fn_ty, oi_contains_fn, vec_data_i64(&oi_c_args), 3)
+            let oi_found = wl_build_call(self.builder, oi_c_fn_ty, oi_contains_fn, list_data_i64(&oi_c_args), 3)
             let oi_cond = wl_build_icmp(self.builder, wl_int_eq(), oi_found, wl_const_int(wl_i32_type(self.context), 0, 0))
             let oi_insert_bb = wl_append_bb(self.context, self.current_function, "entry.insert")
             let oi_get_bb = wl_append_bb(self.context, self.current_function, "entry.get")
@@ -10757,35 +10757,35 @@ impl Codegen:
             let oi_val_alloca = self.create_entry_alloca(oi_val_ty)
             wl_build_store(self.builder, self.mir_intrinsic_value_as(body, args_id, 1, oi_default, oi_val_ty), oi_val_alloca)
             let oi_ins_fn = self.ensure_hm_fn("with_hashmap_insert", void_ty)
-            let oi_i_params: Vec[i64] = Vec.new()
+            let oi_i_params: List[i64] = List.new()
             oi_i_params.push(ptr_ty)
             oi_i_params.push(ptr_ty)
             oi_i_params.push(ptr_ty)
             oi_i_params.push(i64_ty)
-            let oi_i_fn_ty = wl_function_type(void_ty, vec_data_i64(&oi_i_params), 4, 0)
-            let oi_i_args: Vec[i64] = Vec.new()
+            let oi_i_fn_ty = wl_function_type(void_ty, list_data_i64(&oi_i_params), 4, 0)
+            let oi_i_args: List[i64] = List.new()
             oi_i_args.push(oi_map_ptr)
             oi_i_args.push(oi_key_alloca)
             oi_i_args.push(oi_val_alloca)
             oi_i_args.push(oi_is_str)
-            let _ = wl_build_call(self.builder, oi_i_fn_ty, oi_ins_fn, vec_data_i64(&oi_i_args), 4)
+            let _ = wl_build_call(self.builder, oi_i_fn_ty, oi_ins_fn, list_data_i64(&oi_i_args), 4)
             wl_build_br(self.builder, oi_get_bb)
             // get value
             wl_position_at_end(self.builder, oi_get_bb)
             let oi_out_alloca = self.create_entry_alloca(oi_val_ty)
             let oi_get_fn = self.ensure_hm_fn("with_hashmap_get", wl_i32_type(self.context))
-            let oi_g_params: Vec[i64] = Vec.new()
+            let oi_g_params: List[i64] = List.new()
             oi_g_params.push(ptr_ty)
             oi_g_params.push(ptr_ty)
             oi_g_params.push(ptr_ty)
             oi_g_params.push(i64_ty)
-            let oi_g_fn_ty = wl_function_type(wl_i32_type(self.context), vec_data_i64(&oi_g_params), 4, 0)
-            let oi_g_args: Vec[i64] = Vec.new()
+            let oi_g_fn_ty = wl_function_type(wl_i32_type(self.context), list_data_i64(&oi_g_params), 4, 0)
+            let oi_g_args: List[i64] = List.new()
             oi_g_args.push(oi_map_ptr)
             oi_g_args.push(oi_key_alloca)
             oi_g_args.push(oi_out_alloca)
             oi_g_args.push(oi_is_str)
-            let _ = wl_build_call(self.builder, oi_g_fn_ty, oi_get_fn, vec_data_i64(&oi_g_args), 4)
+            let _ = wl_build_call(self.builder, oi_g_fn_ty, oi_get_fn, list_data_i64(&oi_g_args), 4)
             result = wl_build_load(self.builder, oi_val_ty, oi_out_alloca)
 
         else if intrinsic == MirIntrinsic.ENTRY_GET:
@@ -10814,10 +10814,10 @@ impl Codegen:
                 let eg_dt = self.mir_sema_type_to_llvm(self.mir_resolve_alias_at(eg_dest_sema))
                 if eg_dt != 0:
                     eg_val_ty = eg_dt
-            let eg_entry_fields: Vec[i64] = Vec.new()
+            let eg_entry_fields: List[i64] = List.new()
             eg_entry_fields.push(ptr_ty)
             eg_entry_fields.push(eg_key_ty)
-            let eg_entry_ty = wl_struct_type(self.context, vec_data_i64(&eg_entry_fields), 2, 0)
+            let eg_entry_ty = wl_struct_type(self.context, list_data_i64(&eg_entry_fields), 2, 0)
             let eg_mp = wl_build_struct_gep(self.builder, eg_entry_ty, eg_ptr, 0)
             let eg_map_ptr = wl_build_load(self.builder, ptr_ty, eg_mp)
             let eg_kp = wl_build_struct_gep(self.builder, eg_entry_ty, eg_ptr, 1)
@@ -10827,18 +10827,18 @@ impl Codegen:
             wl_build_store(self.builder, eg_key, eg_key_alloca)
             let eg_out_alloca = self.create_entry_alloca(eg_val_ty)
             let eg_get_fn = self.ensure_hm_fn("with_hashmap_get", wl_i32_type(self.context))
-            let eg_g_params: Vec[i64] = Vec.new()
+            let eg_g_params: List[i64] = List.new()
             eg_g_params.push(ptr_ty)
             eg_g_params.push(ptr_ty)
             eg_g_params.push(ptr_ty)
             eg_g_params.push(i64_ty)
-            let eg_g_fn_ty = wl_function_type(wl_i32_type(self.context), vec_data_i64(&eg_g_params), 4, 0)
-            let eg_g_args: Vec[i64] = Vec.new()
+            let eg_g_fn_ty = wl_function_type(wl_i32_type(self.context), list_data_i64(&eg_g_params), 4, 0)
+            let eg_g_args: List[i64] = List.new()
             eg_g_args.push(eg_map_ptr)
             eg_g_args.push(eg_key_alloca)
             eg_g_args.push(eg_out_alloca)
             eg_g_args.push(eg_is_str)
-            let _ = wl_build_call(self.builder, eg_g_fn_ty, eg_get_fn, vec_data_i64(&eg_g_args), 4)
+            let _ = wl_build_call(self.builder, eg_g_fn_ty, eg_get_fn, list_data_i64(&eg_g_args), 4)
             result = wl_build_load(self.builder, eg_val_ty, eg_out_alloca)
 
         else if intrinsic == MirIntrinsic.ENTRY_SET:
@@ -10862,10 +10862,10 @@ impl Codegen:
                     if es_val_tid > 0:
                         es_val_ty = self.mir_sema_type_to_llvm(es_val_tid)
             let es_val = self.mir_intrinsic_value_as(body, args_id, 1, es_val_raw, es_val_ty)
-            let es_entry_fields: Vec[i64] = Vec.new()
+            let es_entry_fields: List[i64] = List.new()
             es_entry_fields.push(ptr_ty)
             es_entry_fields.push(es_key_ty)
-            let es_entry_ty = wl_struct_type(self.context, vec_data_i64(&es_entry_fields), 2, 0)
+            let es_entry_ty = wl_struct_type(self.context, list_data_i64(&es_entry_fields), 2, 0)
             let es_mp = wl_build_struct_gep(self.builder, es_entry_ty, es_ptr, 0)
             let es_map_ptr = wl_build_load(self.builder, ptr_ty, es_mp)
             let es_kp = wl_build_struct_gep(self.builder, es_entry_ty, es_ptr, 1)
@@ -10876,25 +10876,25 @@ impl Codegen:
             let es_val_alloca = self.create_entry_alloca(wl_type_of(es_val))
             wl_build_store(self.builder, es_val, es_val_alloca)
             let es_ins_fn = self.ensure_hm_fn("with_hashmap_insert", void_ty)
-            let es_i_params: Vec[i64] = Vec.new()
+            let es_i_params: List[i64] = List.new()
             es_i_params.push(ptr_ty)
             es_i_params.push(ptr_ty)
             es_i_params.push(ptr_ty)
             es_i_params.push(i64_ty)
-            let es_i_fn_ty = wl_function_type(void_ty, vec_data_i64(&es_i_params), 4, 0)
-            let es_i_args: Vec[i64] = Vec.new()
+            let es_i_fn_ty = wl_function_type(void_ty, list_data_i64(&es_i_params), 4, 0)
+            let es_i_args: List[i64] = List.new()
             es_i_args.push(es_map_ptr)
             es_i_args.push(es_key_alloca)
             es_i_args.push(es_val_alloca)
             es_i_args.push(es_is_str)
-            result = wl_build_call(self.builder, es_i_fn_ty, es_ins_fn, vec_data_i64(&es_i_args), 4)
+            result = wl_build_call(self.builder, es_i_fn_ty, es_ins_fn, list_data_i64(&es_i_args), 4)
 
         else:
             return false
         self.mir_finish_intrinsic_call(body, dest_place, next_bb, result)
         true
 
-    mut fn mir_emit_scalar_vec_intrinsic_call(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    mut fn mir_emit_scalar_list_intrinsic_call(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
         let i64_ty = wl_i64_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
@@ -11076,10 +11076,10 @@ impl Codegen:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let index = self.mir_intrinsic_arg(body, args_id, 1)
             let index64 = self.coerce_int(index, i64_ty)
-            let param_types: Vec[i64] = Vec.new()
+            let param_types: List[i64] = List.new()
             param_types.push(self.str_llvm_type())
             param_types.push(i64_ty)
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(self.str_view_arg(recv))
             args.push(index64)
             result = self.call_internal_runtime_fn("with_str_byte_at_ref", param_types, args, 2, i32_ty)
@@ -11098,11 +11098,11 @@ impl Codegen:
             let start64 = self.coerce_int(start, i64_ty)
             let end64 = self.coerce_int(end, i64_ty)
             let str_ty = self.resolve_named_type(self.intern.intern("str"))
-            let param_types: Vec[i64] = Vec.new()
+            let param_types: List[i64] = List.new()
             param_types.push(self.str_llvm_type())
             param_types.push(i64_ty)
             param_types.push(i64_ty)
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(self.str_view_arg(recv))
             args.push(start64)
             args.push(end64)
@@ -11111,10 +11111,10 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.STR_CONTAINS:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let needle = self.mir_intrinsic_arg_str_value(body, args_id, 1)
-            let param_types: Vec[i64] = Vec.new()
+            let param_types: List[i64] = List.new()
             param_types.push(self.str_llvm_type())
             param_types.push(self.str_llvm_type())
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(self.str_view_arg(recv))
             args.push(self.str_view_arg(needle))
             let raw = self.call_internal_runtime_fn("with_str_contains_ref", param_types, args, 2, i32_ty)
@@ -11123,10 +11123,10 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.STR_CONTAINS_CHAR:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let ch = self.mir_intrinsic_arg(body, args_id, 1)
-            let param_types: Vec[i64] = Vec.new()
+            let param_types: List[i64] = List.new()
             param_types.push(self.str_llvm_type())
             param_types.push(i32_ty)
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(self.str_view_arg(recv))
             args.push(ch)
             let raw = self.call_internal_runtime_fn("with_str_contains_char_ref", param_types, args, 2, i32_ty)
@@ -11135,10 +11135,10 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.STR_STARTS_WITH:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let prefix = self.mir_intrinsic_arg_str_value(body, args_id, 1)
-            let param_types: Vec[i64] = Vec.new()
+            let param_types: List[i64] = List.new()
             param_types.push(self.str_llvm_type())
             param_types.push(self.str_llvm_type())
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(self.str_view_arg(recv))
             args.push(self.str_view_arg(prefix))
             let raw = self.call_internal_runtime_fn("with_str_starts_with_ref", param_types, args, 2, i32_ty)
@@ -11147,10 +11147,10 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.STR_ENDS_WITH:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let suffix = self.mir_intrinsic_arg_str_value(body, args_id, 1)
-            let param_types: Vec[i64] = Vec.new()
+            let param_types: List[i64] = List.new()
             param_types.push(self.str_llvm_type())
             param_types.push(self.str_llvm_type())
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(self.str_view_arg(recv))
             args.push(self.str_view_arg(suffix))
             let raw = self.call_internal_runtime_fn("with_str_ends_with_ref", param_types, args, 2, i32_ty)
@@ -11159,17 +11159,17 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.STR_FIND:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let needle = self.mir_intrinsic_arg_str_value(body, args_id, 1)
-            let param_types: Vec[i64] = Vec.new()
+            let param_types: List[i64] = List.new()
             param_types.push(self.str_llvm_type())
             param_types.push(self.str_llvm_type())
-            let args: Vec[i64] = Vec.new()
+            let args: List[i64] = List.new()
             args.push(self.str_view_arg(recv))
             args.push(self.str_view_arg(needle))
             result = self.call_internal_runtime_fn("with_str_index_of_ref", param_types, args, 2, i64_ty)
 
         else if intrinsic == MirIntrinsic.VECITER_NEXT:
-            // VecIter[T].next() — advance iterator, return Option[T]
-            // VecIter = { data_ptr: i64, len: i64, idx: i64 }
+            // ListIter[T].next() — advance iterator, return Option[T]
+            // ListIter = { data_ptr: i64, len: i64, idx: i64 }
             let iter_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let recv_op = body.call_arg_operands[arg_start]
             // Determine element type from the destination type.
@@ -11192,14 +11192,14 @@ impl Codegen:
                     elem_ty = self.mir_sema_type_to_llvm(resolved_dest)
             // Fall back to receiver's generic type argument.
             if elem_ty == 0:
-                elem_ty = self.mir_vec_elem_type(body, recv_op)
+                elem_ty = self.mir_list_elem_type(body, recv_op)
             if elem_ty == 0:
                 elem_ty = i32_ty
-            let iter_fields: Vec[i64] = Vec.new()
+            let iter_fields: List[i64] = List.new()
             iter_fields.push(i64_ty)
             iter_fields.push(i64_ty)
             iter_fields.push(i64_ty)
-            let iter_struct_ty = wl_struct_type(self.context, vec_data_i64(&iter_fields), 3, 0)
+            let iter_struct_ty = wl_struct_type(self.context, list_data_i64(&iter_fields), 3, 0)
             let data_ptr_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 0)
             let data_ptr = wl_build_load(self.builder, i64_ty, data_ptr_ptr)
             let len_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 1)
@@ -11214,9 +11214,9 @@ impl Codegen:
             wl_build_cond_br(self.builder, cond, some_bb, none_bb)
             wl_position_at_end(self.builder, some_bb)
             let typed_ptr = wl_build_int_to_ptr(self.builder, data_ptr, ptr_ty)
-            let gep_indices: Vec[i64] = Vec.new()
+            let gep_indices: List[i64] = List.new()
             gep_indices.push(idx)
-            let elem_ptr = wl_build_gep(self.builder, elem_ty, typed_ptr, vec_data_i64(&gep_indices), 1)
+            let elem_ptr = wl_build_gep(self.builder, elem_ty, typed_ptr, list_data_i64(&gep_indices), 1)
             let val = wl_build_load(self.builder, elem_ty, elem_ptr)
             let next_idx = wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0))
             wl_build_store(self.builder, next_idx, idx_ptr)
@@ -11229,24 +11229,24 @@ impl Codegen:
             let none_bb_end = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb)
             let phi = wl_build_phi(self.builder, opt_type)
-            let phi_vals: Vec[i64] = Vec.new()
-            let phi_bbs: Vec[i64] = Vec.new()
+            let phi_vals: List[i64] = List.new()
+            let phi_bbs: List[i64] = List.new()
             phi_vals.push(some_val)
             phi_vals.push(none_val)
             phi_bbs.push(some_bb_end)
             phi_bbs.push(none_bb_end)
-            wl_add_incoming(phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+            wl_add_incoming(phi, list_data_i64(&phi_vals), list_data_i64(&phi_bbs), 2)
             result = phi
 
-        else if intrinsic == MirIntrinsic.VEC_ITER:
-            // Vec.iter() — create VecIter[T] from Vec
-            // VecIter = { data_ptr: i64, len: i64, idx: i64 }
-            let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
-            let iter_fields: Vec[i64] = Vec.new()
+        else if intrinsic == MirIntrinsic.LIST_ITER:
+            // List.iter() — create ListIter[T] from List
+            // ListIter = { data_ptr: i64, len: i64, idx: i64 }
+            let recv = self.mir_intrinsic_recv_list_value(body, args_id)
+            let iter_fields: List[i64] = List.new()
             iter_fields.push(i64_ty)
             iter_fields.push(i64_ty)
             iter_fields.push(i64_ty)
-            let iter_struct_ty = wl_struct_type(self.context, vec_data_i64(&iter_fields), 3, 0)
+            let iter_struct_ty = wl_struct_type(self.context, list_data_i64(&iter_fields), 3, 0)
             let iter_alloca = self.create_entry_alloca(iter_struct_ty)
             let data_raw = wl_build_extract_value(self.builder, recv, 0)
             let data_i64 = wl_build_ptr_to_int(self.builder, data_raw, i64_ty)
@@ -11259,14 +11259,14 @@ impl Codegen:
             wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), f2)
             result = wl_build_load(self.builder, iter_struct_ty, iter_alloca)
 
-        else if intrinsic == MirIntrinsic.VEC_ITER_REF:
-            // Vec.iter_ref() — create VecIterRef[T] from Vec (same layout as VecIter)
-            let iref_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
-            let iref_fields: Vec[i64] = Vec.new()
+        else if intrinsic == MirIntrinsic.LIST_ITER_REF:
+            // List.iter_ref() — create ListIterRef[T] from List (same layout as ListIter)
+            let iref_recv = self.mir_intrinsic_recv_list_value(body, args_id)
+            let iref_fields: List[i64] = List.new()
             iref_fields.push(i64_ty)
             iref_fields.push(i64_ty)
             iref_fields.push(i64_ty)
-            let iref_struct_ty = wl_struct_type(self.context, vec_data_i64(&iref_fields), 3, 0)
+            let iref_struct_ty = wl_struct_type(self.context, list_data_i64(&iref_fields), 3, 0)
             let iref_alloca = self.create_entry_alloca(iref_struct_ty)
             let iref_data_raw = wl_build_extract_value(self.builder, iref_recv, 0)
             let iref_data_i64 = wl_build_ptr_to_int(self.builder, iref_data_raw, i64_ty)
@@ -11280,13 +11280,13 @@ impl Codegen:
             result = wl_build_load(self.builder, iref_struct_ty, iref_alloca)
 
         else if intrinsic == MirIntrinsic.VECITERREF_NEXT:
-            // VecIterRef[T].next() — advance iterator, return Option[&T] (nullable pointer)
+            // ListIterRef[T].next() — advance iterator, return Option[&T] (nullable pointer)
             let irn_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let irn_fields: Vec[i64] = Vec.new()
+            let irn_fields: List[i64] = List.new()
             irn_fields.push(i64_ty)
             irn_fields.push(i64_ty)
             irn_fields.push(i64_ty)
-            let irn_struct_ty = wl_struct_type(self.context, vec_data_i64(&irn_fields), 3, 0)
+            let irn_struct_ty = wl_struct_type(self.context, list_data_i64(&irn_fields), 3, 0)
             let irn_dp_ptr = wl_build_struct_gep(self.builder, irn_struct_ty, irn_ptr, 0)
             let irn_dp = wl_build_load(self.builder, i64_ty, irn_dp_ptr)
             let irn_len_ptr = wl_build_struct_gep(self.builder, irn_struct_ty, irn_ptr, 1)
@@ -11300,13 +11300,13 @@ impl Codegen:
             wl_build_cond_br(self.builder, irn_cond, irn_some_bb, irn_none_bb)
             wl_position_at_end(self.builder, irn_some_bb)
             let irn_recv_op = body.call_arg_operands[arg_start]
-            var irn_elem_ty = self.mir_vec_elem_type(body, irn_recv_op)
+            var irn_elem_ty = self.mir_list_elem_type(body, irn_recv_op)
             if irn_elem_ty == 0:
                 irn_elem_ty = i32_ty
             let irn_typed_ptr = wl_build_int_to_ptr(self.builder, irn_dp, ptr_ty)
-            let irn_gep: Vec[i64] = Vec.new()
+            let irn_gep: List[i64] = List.new()
             irn_gep.push(irn_idx)
-            let irn_elem_ptr = wl_build_gep(self.builder, irn_elem_ty, irn_typed_ptr, vec_data_i64(&irn_gep), 1)
+            let irn_elem_ptr = wl_build_gep(self.builder, irn_elem_ty, irn_typed_ptr, list_data_i64(&irn_gep), 1)
             let irn_next_idx = wl_build_add(self.builder, irn_idx, wl_const_int(i64_ty, 1, 0))
             wl_build_store(self.builder, irn_next_idx, irn_idx_ptr)
             wl_build_br(self.builder, irn_merge_bb)
@@ -11317,24 +11317,24 @@ impl Codegen:
             let irn_none_bb_end = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, irn_merge_bb)
             let irn_phi = wl_build_phi(self.builder, ptr_ty)
-            let irn_phi_vals: Vec[i64] = Vec.new()
-            let irn_phi_bbs: Vec[i64] = Vec.new()
+            let irn_phi_vals: List[i64] = List.new()
+            let irn_phi_bbs: List[i64] = List.new()
             irn_phi_vals.push(irn_elem_ptr)
             irn_phi_vals.push(irn_null)
             irn_phi_bbs.push(irn_some_bb_end)
             irn_phi_bbs.push(irn_none_bb_end)
-            wl_add_incoming(irn_phi, vec_data_i64(&irn_phi_vals), vec_data_i64(&irn_phi_bbs), 2)
+            wl_add_incoming(irn_phi, list_data_i64(&irn_phi_vals), list_data_i64(&irn_phi_bbs), 2)
             result = self.mir_option_ref_from_slot_ptr(irn_phi, self.mir_intrinsic_dest_sema_type(body, dest_place))
 
-        else if intrinsic == MirIntrinsic.VEC_SLOT:
-            // Vec.slot(index) — create VecSlot[T] from Vec
-            // VecSlot = { data_ptr: i64, index: i64 }
-            let vs_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+        else if intrinsic == MirIntrinsic.LIST_SLOT:
+            // List.slot(index) — create ListSlot[T] from List
+            // ListSlot = { data_ptr: i64, index: i64 }
+            let vs_recv = self.mir_intrinsic_recv_list_value(body, args_id)
             let vs_index = self.mir_intrinsic_arg(body, args_id, 1)
-            let slot_fields: Vec[i64] = Vec.new()
+            let slot_fields: List[i64] = List.new()
             slot_fields.push(i64_ty)
             slot_fields.push(i64_ty)
-            let slot_struct_ty = wl_struct_type(self.context, vec_data_i64(&slot_fields), 2, 0)
+            let slot_struct_ty = wl_struct_type(self.context, list_data_i64(&slot_fields), 2, 0)
             let slot_alloca = self.create_entry_alloca(slot_struct_ty)
             let vs_data_raw = wl_build_extract_value(self.builder, vs_recv, 0)
             let vs_data_i64 = wl_build_ptr_to_int(self.builder, vs_data_raw, i64_ty)
@@ -11344,10 +11344,10 @@ impl Codegen:
             wl_build_store(self.builder, vs_index, sf1)
             result = wl_build_load(self.builder, slot_struct_ty, slot_alloca)
 
-        else if intrinsic == MirIntrinsic.VEC_GET_DISJOINT:
-            // Vec.get_disjoint(i, j) — return (VecSlot[T], VecSlot[T])
+        else if intrinsic == MirIntrinsic.LIST_GET_DISJOINT:
+            // List.get_disjoint(i, j) — return (ListSlot[T], ListSlot[T])
             // Panics if indices out of bounds or equal
-            let gd_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+            let gd_recv = self.mir_intrinsic_recv_list_value(body, args_id)
             let gd_i = self.mir_intrinsic_arg(body, args_id, 1)
             let gd_j = self.mir_intrinsic_arg(body, args_id, 2)
             let gd_i64 = self.coerce_int(gd_i, i64_ty)
@@ -11366,14 +11366,14 @@ impl Codegen:
             let gd_ok_bb = wl_append_bb(self.context, self.current_function, "gd.ok")
             wl_build_cond_br(self.builder, gd_fail, gd_panic_bb, gd_ok_bb)
             wl_position_at_end(self.builder, gd_panic_bb)
-            self.emit_runtime_panic("Vec.get_disjoint requires distinct in-bounds indices")
+            self.emit_runtime_panic("List.get_disjoint requires distinct in-bounds indices")
             wl_position_at_end(self.builder, gd_ok_bb)
             let gd_data_raw = wl_build_extract_value(self.builder, gd_recv, 0)
             let gd_data_i64 = wl_build_ptr_to_int(self.builder, gd_data_raw, i64_ty)
-            let gd_slot_fields: Vec[i64] = Vec.new()
+            let gd_slot_fields: List[i64] = List.new()
             gd_slot_fields.push(i64_ty)
             gd_slot_fields.push(i64_ty)
-            let gd_slot_ty = wl_struct_type(self.context, vec_data_i64(&gd_slot_fields), 2, 0)
+            let gd_slot_ty = wl_struct_type(self.context, list_data_i64(&gd_slot_fields), 2, 0)
             let gd_sa = self.create_entry_alloca(gd_slot_ty)
             let gd_sa0 = wl_build_struct_gep(self.builder, gd_slot_ty, gd_sa, 0)
             wl_build_store(self.builder, gd_data_i64, gd_sa0)
@@ -11386,7 +11386,7 @@ impl Codegen:
             let gd_sb1 = wl_build_struct_gep(self.builder, gd_slot_ty, gd_sb, 1)
             wl_build_store(self.builder, gd_j64, gd_sb1)
             let gd_slot_b = wl_build_load(self.builder, gd_slot_ty, gd_sb)
-            let gd_tup_fields: Vec[i64] = Vec.new()
+            let gd_tup_fields: List[i64] = List.new()
             gd_tup_fields.push(gd_slot_ty)
             gd_tup_fields.push(gd_slot_ty)
             let gd_tup_ty = self.tuple_type_from_elems(&gd_tup_fields)
@@ -11397,9 +11397,9 @@ impl Codegen:
             wl_build_store(self.builder, gd_slot_b, gd_tf1)
             result = wl_build_load(self.builder, gd_tup_ty, gd_tup)
 
-        else if intrinsic == MirIntrinsic.VEC_RANGE:
-            // Vec.range(start..end) — create VecRange[T] = { data_ptr: i64, offset: i64, len: i64 }
-            let vr_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+        else if intrinsic == MirIntrinsic.LIST_RANGE:
+            // List.range(start..end) — create ListRange[T] = { data_ptr: i64, offset: i64, len: i64 }
+            let vr_recv = self.mir_intrinsic_recv_list_value(body, args_id)
             let vr_range = self.mir_intrinsic_arg(body, args_id, 1)
             let vr_range_ty = wl_type_of(vr_range)
             let vr_range_alloca = self.create_entry_alloca(vr_range_ty)
@@ -11411,9 +11411,9 @@ impl Codegen:
             let vr_end_ptr = wl_build_struct_gep(self.builder, vr_range_ty, vr_range_alloca, 1)
             let vr_end_raw = wl_build_load(self.builder, vr_elem_ty, vr_end_ptr)
             let vr_end = self.coerce_int(vr_end_raw, i64_ty)
-            let vr_vec_len = wl_build_extract_value(self.builder, vr_recv, 1)
+            let vr_list_len = wl_build_extract_value(self.builder, vr_recv, 1)
             let vr_bad_start = wl_build_icmp(self.builder, wl_int_slt(), vr_start, wl_const_int(i64_ty, 0, 0))
-            let vr_bad_end = wl_build_icmp(self.builder, wl_int_sgt(), vr_end, vr_vec_len)
+            let vr_bad_end = wl_build_icmp(self.builder, wl_int_sgt(), vr_end, vr_list_len)
             let vr_bad_order = wl_build_icmp(self.builder, wl_int_sgt(), vr_start, vr_end)
             let vr_bad1 = wl_build_or(self.builder, vr_bad_start, vr_bad_end)
             let vr_bad2 = wl_build_or(self.builder, vr_bad1, vr_bad_order)
@@ -11421,16 +11421,16 @@ impl Codegen:
             let vr_ok_bb = wl_append_bb(self.context, self.current_function, "vr.ok")
             wl_build_cond_br(self.builder, vr_bad2, vr_panic_bb, vr_ok_bb)
             wl_position_at_end(self.builder, vr_panic_bb)
-            self.emit_runtime_panic("Vec.range index out of bounds")
+            self.emit_runtime_panic("List.range index out of bounds")
             wl_position_at_end(self.builder, vr_ok_bb)
             let vr_range_len = wl_build_sub(self.builder, vr_end, vr_start)
             let vr_data_raw = wl_build_extract_value(self.builder, vr_recv, 0)
             let vr_data_i64 = wl_build_ptr_to_int(self.builder, vr_data_raw, i64_ty)
-            let vr_fields: Vec[i64] = Vec.new()
+            let vr_fields: List[i64] = List.new()
             vr_fields.push(i64_ty)
             vr_fields.push(i64_ty)
             vr_fields.push(i64_ty)
-            let vr_struct_ty = wl_struct_type(self.context, vec_data_i64(&vr_fields), 3, 0)
+            let vr_struct_ty = wl_struct_type(self.context, list_data_i64(&vr_fields), 3, 0)
             let vr_alloca = self.create_entry_alloca(vr_struct_ty)
             let vr_f0 = wl_build_struct_gep(self.builder, vr_struct_ty, vr_alloca, 0)
             wl_build_store(self.builder, vr_data_i64, vr_f0)
@@ -11441,7 +11441,7 @@ impl Codegen:
             result = wl_build_load(self.builder, vr_struct_ty, vr_alloca)
 
         else if intrinsic == MirIntrinsic.VECRANGE_GET:
-            // VecRange[T].get(i) — load element at data_ptr[offset + i]
+            // ListRange[T].get(i) — load element at data_ptr[offset + i]
             let vrg_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let vrg_idx = self.mir_intrinsic_arg(body, args_id, 1)
             let vrg_idx64 = self.coerce_int(vrg_idx, i64_ty)
@@ -11451,11 +11451,11 @@ impl Codegen:
                 vrg_elem_ty = self.mir_sema_type_to_llvm(self.mir_resolve_alias_at(vrg_dest_sema))
             if vrg_elem_ty == 0:
                 vrg_elem_ty = i32_ty
-            let vrg_fields: Vec[i64] = Vec.new()
+            let vrg_fields: List[i64] = List.new()
             vrg_fields.push(i64_ty)
             vrg_fields.push(i64_ty)
             vrg_fields.push(i64_ty)
-            let vrg_struct_ty = wl_struct_type(self.context, vec_data_i64(&vrg_fields), 3, 0)
+            let vrg_struct_ty = wl_struct_type(self.context, list_data_i64(&vrg_fields), 3, 0)
             let vrg_dp = wl_build_struct_gep(self.builder, vrg_struct_ty, vrg_ptr, 0)
             let vrg_data = wl_build_load(self.builder, i64_ty, vrg_dp)
             let vrg_off_ptr = wl_build_struct_gep(self.builder, vrg_struct_ty, vrg_ptr, 1)
@@ -11469,28 +11469,28 @@ impl Codegen:
             let vrg_ok_bb = wl_append_bb(self.context, self.current_function, "vrg.ok")
             wl_build_cond_br(self.builder, vrg_bad, vrg_panic_bb, vrg_ok_bb)
             wl_position_at_end(self.builder, vrg_panic_bb)
-            self.emit_runtime_panic("VecRange.get index out of bounds")
+            self.emit_runtime_panic("ListRange.get index out of bounds")
             wl_position_at_end(self.builder, vrg_ok_bb)
             let vrg_abs = wl_build_add(self.builder, vrg_off, vrg_idx64)
             let vrg_typed_ptr = wl_build_int_to_ptr(self.builder, vrg_data, ptr_ty)
-            let vrg_gep: Vec[i64] = Vec.new()
+            let vrg_gep: List[i64] = List.new()
             vrg_gep.push(vrg_abs)
-            let vrg_elem_ptr = wl_build_gep(self.builder, vrg_elem_ty, vrg_typed_ptr, vec_data_i64(&vrg_gep), 1)
+            let vrg_elem_ptr = wl_build_gep(self.builder, vrg_elem_ty, vrg_typed_ptr, list_data_i64(&vrg_gep), 1)
             result = wl_build_load(self.builder, vrg_elem_ty, vrg_elem_ptr)
 
         else if intrinsic == MirIntrinsic.VECRANGE_SET:
-            // VecRange[T].set(i, value) — store value at data_ptr[offset + i]
+            // ListRange[T].set(i, value) — store value at data_ptr[offset + i]
             let vrs_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let vrs_idx = self.mir_intrinsic_arg(body, args_id, 1)
-            let vrs_want = self.mir_recv_elem_llvm_type(body, args_id, "VecRange.set")
+            let vrs_want = self.mir_recv_elem_llvm_type(body, args_id, "ListRange.set")
             let vrs_val = self.mir_intrinsic_arg_as(body, args_id, 2, vrs_want)
             let vrs_idx64 = self.coerce_int(vrs_idx, i64_ty)
             let vrs_elem_ty = wl_type_of(vrs_val)
-            let vrs_fields: Vec[i64] = Vec.new()
+            let vrs_fields: List[i64] = List.new()
             vrs_fields.push(i64_ty)
             vrs_fields.push(i64_ty)
             vrs_fields.push(i64_ty)
-            let vrs_struct_ty = wl_struct_type(self.context, vec_data_i64(&vrs_fields), 3, 0)
+            let vrs_struct_ty = wl_struct_type(self.context, list_data_i64(&vrs_fields), 3, 0)
             let vrs_dp = wl_build_struct_gep(self.builder, vrs_struct_ty, vrs_ptr, 0)
             let vrs_data = wl_build_load(self.builder, i64_ty, vrs_dp)
             let vrs_off_ptr = wl_build_struct_gep(self.builder, vrs_struct_ty, vrs_ptr, 1)
@@ -11504,27 +11504,27 @@ impl Codegen:
             let vrs_ok_bb = wl_append_bb(self.context, self.current_function, "vrs.ok")
             wl_build_cond_br(self.builder, vrs_bad, vrs_panic_bb, vrs_ok_bb)
             wl_position_at_end(self.builder, vrs_panic_bb)
-            self.emit_runtime_panic("VecRange.set index out of bounds")
+            self.emit_runtime_panic("ListRange.set index out of bounds")
             wl_position_at_end(self.builder, vrs_ok_bb)
             let vrs_abs = wl_build_add(self.builder, vrs_off, vrs_idx64)
             let vrs_typed_ptr = wl_build_int_to_ptr(self.builder, vrs_data, ptr_ty)
-            let vrs_gep: Vec[i64] = Vec.new()
+            let vrs_gep: List[i64] = List.new()
             vrs_gep.push(vrs_abs)
-            let vrs_elem_ptr = wl_build_gep(self.builder, vrs_elem_ty, vrs_typed_ptr, vec_data_i64(&vrs_gep), 1)
+            let vrs_elem_ptr = wl_build_gep(self.builder, vrs_elem_ty, vrs_typed_ptr, list_data_i64(&vrs_gep), 1)
             wl_build_store(self.builder, vrs_val, vrs_elem_ptr)
 
         else if intrinsic == MirIntrinsic.VECRANGE_LEN:
-            // VecRange[T].len() — return len field (field 2 of {i64,i64,i64})
+            // ListRange[T].len() — return len field (field 2 of {i64,i64,i64})
             let vrl_recv = self.mir_intrinsic_arg(body, args_id, 0)
             if wl_get_type_kind(wl_type_of(vrl_recv)) == wl_struct_type_kind():
                 result = wl_build_extract_value(self.builder, vrl_recv, 2)
             else:
                 let vrl_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-                let vrl_fields: Vec[i64] = Vec.new()
+                let vrl_fields: List[i64] = List.new()
                 vrl_fields.push(i64_ty)
                 vrl_fields.push(i64_ty)
                 vrl_fields.push(i64_ty)
-                let vrl_struct_ty = wl_struct_type(self.context, vec_data_i64(&vrl_fields), 3, 0)
+                let vrl_struct_ty = wl_struct_type(self.context, list_data_i64(&vrl_fields), 3, 0)
                 let vrl_len_ptr = wl_build_struct_gep(self.builder, vrl_struct_ty, vrl_ptr, 2)
                 result = wl_build_load(self.builder, i64_ty, vrl_len_ptr)
 
@@ -11535,24 +11535,24 @@ impl Codegen:
                 raw_len = wl_build_extract_value(self.builder, vrl_recv, 2)
             else:
                 let vrl_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-                let vrl_fields: Vec[i64] = Vec.new()
+                let vrl_fields: List[i64] = List.new()
                 vrl_fields.push(i64_ty)
                 vrl_fields.push(i64_ty)
                 vrl_fields.push(i64_ty)
-                let vrl_struct_ty = wl_struct_type(self.context, vec_data_i64(&vrl_fields), 3, 0)
+                let vrl_struct_ty = wl_struct_type(self.context, list_data_i64(&vrl_fields), 3, 0)
                 let vrl_len_ptr = wl_build_struct_gep(self.builder, vrl_struct_ty, vrl_ptr, 2)
                 raw_len = wl_build_load(self.builder, i64_ty, vrl_len_ptr)
             result = self.mir_convert_len_method_result(raw_len, intrinsic)
 
-        else if intrinsic == MirIntrinsic.VEC_ITER_PLACE:
-            // Vec.iter_place() — create VecIterPlace[T] from Vec
-            // VecIterPlace = { data_ptr: i64, len: i64, idx: i64 }
-            let vip_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
-            let vip_fields: Vec[i64] = Vec.new()
+        else if intrinsic == MirIntrinsic.LIST_ITER_PLACE:
+            // List.iter_place() — create ListIterPlace[T] from List
+            // ListIterPlace = { data_ptr: i64, len: i64, idx: i64 }
+            let vip_recv = self.mir_intrinsic_recv_list_value(body, args_id)
+            let vip_fields: List[i64] = List.new()
             vip_fields.push(i64_ty)
             vip_fields.push(i64_ty)
             vip_fields.push(i64_ty)
-            let vip_struct_ty = wl_struct_type(self.context, vec_data_i64(&vip_fields), 3, 0)
+            let vip_struct_ty = wl_struct_type(self.context, list_data_i64(&vip_fields), 3, 0)
             let vip_alloca = self.create_entry_alloca(vip_struct_ty)
             let vip_data_raw = wl_build_extract_value(self.builder, vip_recv, 0)
             let vip_data_i64 = wl_build_ptr_to_int(self.builder, vip_data_raw, i64_ty)
@@ -11566,15 +11566,15 @@ impl Codegen:
             result = wl_build_load(self.builder, vip_struct_ty, vip_alloca)
 
         else if intrinsic == MirIntrinsic.VECITERPLACE_NEXT:
-            // VecIterPlace[T].next() — advance iterator, return Option[VecSlot[T]]
-            // VecIterPlace = { data_ptr: i64, len: i64, idx: i64 }
-            // VecSlot = { data_ptr: i64, index: i64 }
+            // ListIterPlace[T].next() — advance iterator, return Option[ListSlot[T]]
+            // ListIterPlace = { data_ptr: i64, len: i64, idx: i64 }
+            // ListSlot = { data_ptr: i64, index: i64 }
             let ipn_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let ipn_fields: Vec[i64] = Vec.new()
+            let ipn_fields: List[i64] = List.new()
             ipn_fields.push(i64_ty)
             ipn_fields.push(i64_ty)
             ipn_fields.push(i64_ty)
-            let ipn_struct_ty = wl_struct_type(self.context, vec_data_i64(&ipn_fields), 3, 0)
+            let ipn_struct_ty = wl_struct_type(self.context, list_data_i64(&ipn_fields), 3, 0)
             let ipn_dp_ptr = wl_build_struct_gep(self.builder, ipn_struct_ty, ipn_ptr, 0)
             let ipn_data = wl_build_load(self.builder, i64_ty, ipn_dp_ptr)
             let ipn_len_ptr = wl_build_struct_gep(self.builder, ipn_struct_ty, ipn_ptr, 1)
@@ -11582,10 +11582,10 @@ impl Codegen:
             let ipn_idx_ptr = wl_build_struct_gep(self.builder, ipn_struct_ty, ipn_ptr, 2)
             let ipn_idx = wl_build_load(self.builder, i64_ty, ipn_idx_ptr)
             let ipn_cond = wl_build_icmp(self.builder, wl_int_slt(), ipn_idx, ipn_len)
-            let ipn_slot_fields: Vec[i64] = Vec.new()
+            let ipn_slot_fields: List[i64] = List.new()
             ipn_slot_fields.push(i64_ty)
             ipn_slot_fields.push(i64_ty)
-            let ipn_slot_ty = wl_struct_type(self.context, vec_data_i64(&ipn_slot_fields), 2, 0)
+            let ipn_slot_ty = wl_struct_type(self.context, list_data_i64(&ipn_slot_fields), 2, 0)
             let ipn_opt_type = self.get_or_create_option_type(0, ipn_slot_ty)
             let ipn_some_bb = wl_append_bb(self.context, self.current_function, "iterplace.some")
             let ipn_none_bb = wl_append_bb(self.context, self.current_function, "iterplace.none")
@@ -11609,18 +11609,18 @@ impl Codegen:
             let ipn_none_end = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, ipn_merge_bb)
             let ipn_phi = wl_build_phi(self.builder, ipn_opt_type)
-            let ipn_phi_vals: Vec[i64] = Vec.new()
-            let ipn_phi_bbs: Vec[i64] = Vec.new()
+            let ipn_phi_vals: List[i64] = List.new()
+            let ipn_phi_bbs: List[i64] = List.new()
             ipn_phi_vals.push(ipn_some_val)
             ipn_phi_vals.push(ipn_none_val)
             ipn_phi_bbs.push(ipn_some_end)
             ipn_phi_bbs.push(ipn_none_end)
-            wl_add_incoming(ipn_phi, vec_data_i64(&ipn_phi_vals), vec_data_i64(&ipn_phi_bbs), 2)
+            wl_add_incoming(ipn_phi, list_data_i64(&ipn_phi_vals), list_data_i64(&ipn_phi_bbs), 2)
             result = ipn_phi
 
         else if intrinsic == MirIntrinsic.VECSLOT_GET:
-            // VecSlot[T].get() — load element from data_ptr[index]
-            // VecSlot = { data_ptr: i64, index: i64 }
+            // ListSlot[T].get() — load element from data_ptr[index]
+            // ListSlot = { data_ptr: i64, index: i64 }
             let sg_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let sg_dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
             var sg_elem_ty: i64 = 0
@@ -11628,41 +11628,41 @@ impl Codegen:
                 sg_elem_ty = self.mir_sema_type_to_llvm(self.mir_resolve_alias_at(sg_dest_sema))
             if sg_elem_ty == 0:
                 sg_elem_ty = i32_ty
-            let sg_fields: Vec[i64] = Vec.new()
+            let sg_fields: List[i64] = List.new()
             sg_fields.push(i64_ty)
             sg_fields.push(i64_ty)
-            let sg_struct_ty = wl_struct_type(self.context, vec_data_i64(&sg_fields), 2, 0)
+            let sg_struct_ty = wl_struct_type(self.context, list_data_i64(&sg_fields), 2, 0)
             let sg_dp = wl_build_struct_gep(self.builder, sg_struct_ty, sg_ptr, 0)
             let sg_data = wl_build_load(self.builder, i64_ty, sg_dp)
             let sg_ip = wl_build_struct_gep(self.builder, sg_struct_ty, sg_ptr, 1)
             let sg_idx = wl_build_load(self.builder, i64_ty, sg_ip)
             let sg_typed_ptr = wl_build_int_to_ptr(self.builder, sg_data, ptr_ty)
-            let sg_gep_indices: Vec[i64] = Vec.new()
+            let sg_gep_indices: List[i64] = List.new()
             sg_gep_indices.push(sg_idx)
-            let sg_elem_ptr = wl_build_gep(self.builder, sg_elem_ty, sg_typed_ptr, vec_data_i64(&sg_gep_indices), 1)
+            let sg_elem_ptr = wl_build_gep(self.builder, sg_elem_ty, sg_typed_ptr, list_data_i64(&sg_gep_indices), 1)
             result = wl_build_load(self.builder, sg_elem_ty, sg_elem_ptr)
 
         else if intrinsic == MirIntrinsic.VECSLOT_SET:
-            // VecSlot[T].set(value) replaces an initialized element. Drop the
+            // ListSlot[T].set(value) replaces an initialized element. Drop the
             // old owner before storing the consumed replacement; a raw store
             // duplicates/leaks non-Copy resources held by T.
             let ss_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let ss_elem_sema = self.mir_recv_elem_sema_type(body, args_id)
-            let ss_want = self.mir_recv_elem_llvm_type(body, args_id, "VecSlot.set")
+            let ss_want = self.mir_recv_elem_llvm_type(body, args_id, "ListSlot.set")
             let ss_val = self.mir_intrinsic_arg_as(body, args_id, 1, ss_want)
             let ss_elem_ty = wl_type_of(ss_val)
-            let ss_fields: Vec[i64] = Vec.new()
+            let ss_fields: List[i64] = List.new()
             ss_fields.push(i64_ty)
             ss_fields.push(i64_ty)
-            let ss_struct_ty = wl_struct_type(self.context, vec_data_i64(&ss_fields), 2, 0)
+            let ss_struct_ty = wl_struct_type(self.context, list_data_i64(&ss_fields), 2, 0)
             let ss_dp = wl_build_struct_gep(self.builder, ss_struct_ty, ss_ptr, 0)
             let ss_data = wl_build_load(self.builder, i64_ty, ss_dp)
             let ss_ip = wl_build_struct_gep(self.builder, ss_struct_ty, ss_ptr, 1)
             let ss_idx = wl_build_load(self.builder, i64_ty, ss_ip)
             let ss_typed_ptr = wl_build_int_to_ptr(self.builder, ss_data, ptr_ty)
-            let ss_gep_indices: Vec[i64] = Vec.new()
+            let ss_gep_indices: List[i64] = List.new()
             ss_gep_indices.push(ss_idx)
-            let ss_elem_ptr = wl_build_gep(self.builder, ss_elem_ty, ss_typed_ptr, vec_data_i64(&ss_gep_indices), 1)
+            let ss_elem_ptr = wl_build_gep(self.builder, ss_elem_ty, ss_typed_ptr, list_data_i64(&ss_gep_indices), 1)
             if ss_elem_sema > 0 and self.sema.type_needs_drop_frozen(ss_elem_sema) != 0:
                 self.member_drop_depth = self.member_drop_depth + 1
                 self.mir_emit_drop_ptr_for_sema_type(ss_elem_ptr, ss_elem_ty, ss_elem_sema)
@@ -11806,8 +11806,8 @@ impl Codegen:
                 // Determine return type and collect input values.
                 // Extras: [output_count, out_type_0.., input_count, in_expr_0..]
                 var asm_ret_ty = wl_void_type(self.context)
-                let asm_input_vals: Vec[i64] = Vec.new()
-                let asm_param_tys: Vec[i64] = Vec.new()
+                let asm_input_vals: List[i64] = List.new()
+                let asm_param_tys: List[i64] = List.new()
                 if asm_extra_start > 0:
                     let asm_out_count = self.pool.get_extra(asm_extra_start)
                     let asm_in_base = asm_extra_start + 1 + asm_out_count
@@ -11831,16 +11831,16 @@ impl Codegen:
                         // {T0, T1, ...}, which is identical to the With tuple type
                         // (Codegen lowers tuples to the same struct), so the call
                         // result stores directly into the tuple destination.
-                        let asm_out_tys: Vec[i64] = Vec.new()
+                        let asm_out_tys: List[i64] = List.new()
                         for asm_oi in 0..asm_out_count:
                             var asm_ot = self.body_type_node_llvm(self.pool.get_extra(asm_extra_start + 1 + asm_oi))
                             if asm_ot == 0:
                                 asm_ot = wl_i64_type(self.context)
                             asm_out_tys.push(asm_ot)
-                        asm_ret_ty = wl_struct_type(self.context, vec_data_i64(&asm_out_tys), asm_out_count, 0)
-                let asm_fn_ty = wl_function_type(asm_ret_ty, vec_data_i64(&asm_param_tys), asm_param_tys.len() as i32, 0)
+                        asm_ret_ty = wl_struct_type(self.context, list_data_i64(&asm_out_tys), asm_out_count, 0)
+                let asm_fn_ty = wl_function_type(asm_ret_ty, list_data_i64(&asm_param_tys), asm_param_tys.len() as i32, 0)
                 let asm_val = wl_get_inline_asm(asm_fn_ty, asm_tmpl, asm_constr, if asm_is_volatile: 1 else: 0, 0)
-                let asm_call_result = wl_build_call(self.builder, asm_fn_ty, asm_val, vec_data_i64(&asm_input_vals), asm_input_vals.len() as i32)
+                let asm_call_result = wl_build_call(self.builder, asm_fn_ty, asm_val, list_data_i64(&asm_input_vals), asm_input_vals.len() as i32)
                 if asm_has_output:
                     result = asm_call_result
             // Store the output (if any) into the destination place and branch.
@@ -11895,24 +11895,24 @@ impl Codegen:
             let await_fn_name = if intrinsic == MirIntrinsic.FIBER_CLEANUP_AWAIT: "with_fiber_cleanup_await" else: "with_fiber_await"
             var await_fn = wl_get_named_function(self.llmod, await_fn_name)
             if await_fn == 0:
-                let ap: Vec[i64] = Vec.new()
+                let ap: List[i64] = List.new()
                 ap.push(wl_i32_type(self.context))
-                let aft = wl_function_type(wl_void_type(self.context), vec_data_i64(&ap), 1, 0)
+                let aft = wl_function_type(wl_void_type(self.context), list_data_i64(&ap), 1, 0)
                 await_fn = wl_add_function(self.llmod, await_fn_name, aft)
             let await_ft = wl_global_get_value_type(await_fn)
-            let aa: Vec[i64] = Vec.new()
+            let aa: List[i64] = List.new()
             aa.push(fid)
-            wl_build_call(self.builder, await_ft, await_fn, vec_data_i64(&aa), 1)
+            wl_build_call(self.builder, await_ft, await_fn, list_data_i64(&aa), 1)
             var await_after_cancel_bb: i64 = 0
             if intrinsic == MirIntrinsic.FIBER_AWAIT:
                 var ic_fn = wl_get_named_function(self.llmod, "with_runtime_current_cancel_requested")
                 if ic_fn == 0:
-                    let icp: Vec[i64] = Vec.new()
-                    let icft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&icp), 0, 0)
+                    let icp: List[i64] = List.new()
+                    let icft = wl_function_type(wl_i32_type(self.context), list_data_i64(&icp), 0, 0)
                     ic_fn = wl_add_function(self.llmod, "with_runtime_current_cancel_requested", icft)
                 let icft2 = wl_global_get_value_type(ic_fn)
-                let ic_args: Vec[i64] = Vec.new()
-                let is_cancelled = wl_build_call(self.builder, icft2, ic_fn, vec_data_i64(&ic_args), 0)
+                let ic_args: List[i64] = List.new()
+                let is_cancelled = wl_build_call(self.builder, icft2, ic_fn, list_data_i64(&ic_args), 0)
                 let is_cancelled_bool = wl_build_icmp(self.builder, wl_int_ne(), is_cancelled, wl_const_int(wl_i32_type(self.context), 0, 0))
                 let await_load_bb = wl_append_bb(self.context, self.current_function, "await.load_result")
                 await_after_cancel_bb = wl_append_bb(self.context, self.current_function, "await.after_cancel")
@@ -11961,14 +11961,14 @@ impl Codegen:
             if not scoped_task_await and await_frees_buf:
                 var free_fn = wl_get_named_function(self.llmod, "with_free")
                 if free_fn == 0:
-                    let fp: Vec[i64] = Vec.new()
+                    let fp: List[i64] = List.new()
                     fp.push(wl_ptr_type(self.context))
-                    let fft = wl_function_type(wl_void_type(self.context), vec_data_i64(&fp), 1, 0)
+                    let fft = wl_function_type(wl_void_type(self.context), list_data_i64(&fp), 1, 0)
                     free_fn = wl_add_function(self.llmod, "with_free", fft)
                 let free_ft = wl_global_get_value_type(free_fn)
-                let fa: Vec[i64] = Vec.new()
+                let fa: List[i64] = List.new()
                 fa.push(rbuf)
-                wl_build_call(self.builder, free_ft, free_fn, vec_data_i64(&fa), 1)
+                wl_build_call(self.builder, free_ft, free_fn, list_data_i64(&fa), 1)
             if await_after_cancel_bb != 0:
                 wl_build_br(self.builder, await_after_cancel_bb)
                 wl_position_at_end(self.builder, await_after_cancel_bb)
@@ -11992,10 +11992,10 @@ impl Codegen:
                 wl_build_store(self.builder, task_op, task_alloca)
                 let fid_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 0)
                 let fid = wl_build_load(self.builder, i32_ty, fid_ptr)
-                let indices: Vec[i64] = Vec.new()
+                let indices: List[i64] = List.new()
                 indices.push(wl_const_int(i32_ty, 0, 0))
                 indices.push(wl_const_int(i32_ty, ti as i64, 0))
-                let slot = wl_build_gep(self.builder, arr_ty, ids_alloca, vec_data_i64(&indices), 2)
+                let slot = wl_build_gep(self.builder, arr_ty, ids_alloca, list_data_i64(&indices), 2)
                 wl_build_store(self.builder, fid, slot)
 
             // Allocate winner_index on stack
@@ -12005,24 +12005,24 @@ impl Codegen:
             let select_fn_name = "with_fiber_select_mode"
             var select_fn = wl_get_named_function(self.llmod, select_fn_name)
             if select_fn == 0:
-                let sp: Vec[i64] = Vec.new()
+                let sp: List[i64] = List.new()
                 sp.push(ptr_ty)    // ids
                 sp.push(i32_ty)    // count
                 sp.push(i32_ty)    // biased
                 sp.push(ptr_ty)    // result_index
-                let sel_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&sp), 4, 0)
+                let sel_ft = wl_function_type(wl_void_type(self.context), list_data_i64(&sp), 4, 0)
                 select_fn = wl_add_function(self.llmod, select_fn_name, sel_ft)
             let sel_ft2 = wl_global_get_value_type(select_fn)
-            let sa: Vec[i64] = Vec.new()
-            let zero_idx: Vec[i64] = Vec.new()
+            let sa: List[i64] = List.new()
+            let zero_idx: List[i64] = List.new()
             zero_idx.push(wl_const_int(i32_ty, 0, 0))
             zero_idx.push(wl_const_int(i32_ty, 0, 0))
-            let ids_ptr = wl_build_gep(self.builder, arr_ty, ids_alloca, vec_data_i64(&zero_idx), 2)
+            let ids_ptr = wl_build_gep(self.builder, arr_ty, ids_alloca, list_data_i64(&zero_idx), 2)
             sa.push(ids_ptr)
             sa.push(wl_const_int(i32_ty, arg_count as i64, 0))
             sa.push(wl_const_int(i32_ty, if intrinsic == MirIntrinsic.FIBER_SELECT_BIASED: 1 else: 0, 0))
             sa.push(winner_alloca)
-            wl_build_call(self.builder, sel_ft2, select_fn, vec_data_i64(&sa), 4)
+            wl_build_call(self.builder, sel_ft2, select_fn, list_data_i64(&sa), 4)
 
             // Load winner index and store to dest
             let winner_idx = wl_build_load(self.builder, i32_ty, winner_alloca)
@@ -12052,14 +12052,14 @@ impl Codegen:
             let cancel_fn_name = "with_fiber_cancel"
             var cancel_fn = wl_get_named_function(self.llmod, cancel_fn_name)
             if cancel_fn == 0:
-                let cp: Vec[i64] = Vec.new()
+                let cp: List[i64] = List.new()
                 cp.push(wl_i32_type(self.context))
-                let cft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&cp), 1, 0)
+                let cft = wl_function_type(wl_i32_type(self.context), list_data_i64(&cp), 1, 0)
                 cancel_fn = wl_add_function(self.llmod, cancel_fn_name, cft)
             let cft = wl_global_get_value_type(cancel_fn)
-            let ca: Vec[i64] = Vec.new()
+            let ca: List[i64] = List.new()
             ca.push(fid)
-            result = wl_build_call(self.builder, cft, cancel_fn, vec_data_i64(&ca), 1)
+            result = wl_build_call(self.builder, cft, cancel_fn, list_data_i64(&ca), 1)
 
             if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                 wl_build_br(self.builder, self.mir_bb_values[next_bb])
@@ -12081,16 +12081,16 @@ impl Codegen:
             let detach_fn_name = if intrinsic == MirIntrinsic.FIBER_DETACH: "with_fiber_detach" else: "with_fiber_detach_cancel"
             var detach_fn = wl_get_named_function(self.llmod, detach_fn_name)
             if detach_fn == 0:
-                let dp: Vec[i64] = Vec.new()
+                let dp: List[i64] = List.new()
                 dp.push(wl_i32_type(self.context))
                 dp.push(wl_ptr_type(self.context))
-                let dft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&dp), 2, 0)
+                let dft = wl_function_type(wl_i32_type(self.context), list_data_i64(&dp), 2, 0)
                 detach_fn = wl_add_function(self.llmod, detach_fn_name, dft)
             let dft2 = wl_global_get_value_type(detach_fn)
-            let da: Vec[i64] = Vec.new()
+            let da: List[i64] = List.new()
             da.push(fid)
             da.push(rbuf)
-            result = wl_build_call(self.builder, dft2, detach_fn, vec_data_i64(&da), 2)
+            result = wl_build_call(self.builder, dft2, detach_fn, list_data_i64(&da), 2)
 
             if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                 wl_build_br(self.builder, self.mir_bb_values[next_bb])
@@ -12109,11 +12109,11 @@ impl Codegen:
             return true
         if self.mir_emit_collection_literal_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
             return true
-        if self.mir_emit_vec_core_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
+        if self.mir_emit_list_core_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
             return true
         if self.mir_emit_map_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
             return true
-        if self.mir_emit_scalar_vec_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
+        if self.mir_emit_scalar_list_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
             return true
         if self.mir_emit_atomic_fiber_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
             return true
@@ -12135,18 +12135,18 @@ impl Codegen:
 
     // Ordinary insert and literals transfer the same owners. A duplicate keeps
     // the stored key, drops the unused incoming key, and replaces the value.
-    mut fn mir_emit_owned_map_insert(insert_fn: i64, insert_ty: i64, args: &Vec[i64], key_sema: i32, value_sema: i32, key_llvm: i64, value_llvm: i64):
+    mut fn mir_emit_owned_map_insert(insert_fn: i64, insert_ty: i64, args: &List[i64], key_sema: i32, value_sema: i32, key_llvm: i64, value_llvm: i64):
         let drop_key = key_sema > 0 and self.sema.type_needs_drop_frozen(key_sema) != 0
         let drop_value = value_sema > 0 and self.sema.type_needs_drop_frozen(value_sema) != 0
         if not drop_key and not drop_value:
-            wl_build_call(self.builder, insert_ty, insert_fn, vec_data_i64(args), 4)
+            wl_build_call(self.builder, insert_ty, insert_fn, list_data_i64(args), 4)
             return
         let ptr_ty = wl_ptr_type(self.context)
         let get_fn = self.ensure_hm_fn("with_hashmap_get_ptr", ptr_ty)
-        let get_params: Vec[i64] = [ptr_ty, ptr_ty, wl_i64_type(self.context)]
-        let get_ty = wl_function_type(ptr_ty, vec_data_i64(get_params), 3, 0)
-        let get_args: Vec[i64] = [args[0], args[1], args[3]]
-        let old_value = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(get_args), 3)
+        let get_params: List[i64] = [ptr_ty, ptr_ty, wl_i64_type(self.context)]
+        let get_ty = wl_function_type(ptr_ty, list_data_i64(get_params), 3, 0)
+        let get_args: List[i64] = [args[0], args[1], args[3]]
+        let old_value = wl_build_call(self.builder, get_ty, get_fn, list_data_i64(get_args), 3)
         let duplicate = wl_build_icmp(self.builder, wl_int_ne(), old_value, wl_const_null(ptr_ty))
         let replace_bb = wl_append_bb(self.context, self.current_function, "map.insert.replace")
         let new_bb = wl_append_bb(self.context, self.current_function, "map.insert.new")
@@ -12168,7 +12168,7 @@ impl Codegen:
             self.member_drop_depth = self.member_drop_depth - 1
         wl_build_br(self.builder, done_bb)
         wl_position_at_end(self.builder, new_bb)
-        wl_build_call(self.builder, insert_ty, insert_fn, vec_data_i64(args), 4)
+        wl_build_call(self.builder, insert_ty, insert_fn, list_data_i64(args), 4)
         wl_build_br(self.builder, done_bb)
         wl_position_at_end(self.builder, done_bb)
 
@@ -12183,31 +12183,31 @@ impl Codegen:
         let (base_sym, first_tid, second_tid) = self.mir_collection_literal_target(body, dest_place)
         var result: i64 = 0
 
-        if intrinsic == MirIntrinsic.COLLECTION_LITERAL and base_sym == self.sym_vec:
+        if intrinsic == MirIntrinsic.COLLECTION_LITERAL and base_sym == self.sym_list:
             let elem_ty0 = self.sema_type_to_llvm(first_tid)
             let elem_ty = if elem_ty0 != 0: elem_ty0 else: i64_ty
-            let vec_ty0 = self.mir_dest_llvm_type(body, dest_place)
-            let vec_ty = if vec_ty0 != 0: vec_ty0 else: self.get_or_create_vec_type(0, elem_ty)
-            let out_ptr = self.create_entry_alloca(vec_ty)
-            wl_build_store(self.builder, self.build_default_value(vec_ty), out_ptr)
-            let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
-            let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
-            let new_args: Vec[i64] = Vec.new()
+            let list_ty0 = self.mir_dest_llvm_type(body, dest_place)
+            let list_ty = if list_ty0 != 0: list_ty0 else: self.get_or_create_list_type(0, elem_ty)
+            let out_ptr = self.create_entry_alloca(list_ty)
+            wl_build_store(self.builder, self.build_default_value(list_ty), out_ptr)
+            let new_fn = self.ensure_list_runtime_fn("with_vec_new_out", void_ty, 2)
+            let new_ty = self.get_list_fn_type("with_vec_new_out", void_ty, 2)
+            let new_args: List[i64] = List.new()
             new_args.push(out_ptr)
             new_args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
-            wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args), 2)
-            let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
-            let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
+            wl_build_call(self.builder, new_ty, new_fn, list_data_i64(&new_args), 2)
+            let push_fn = self.ensure_list_runtime_fn("with_vec_push", void_ty, 2)
+            let push_ty = self.get_list_fn_type("with_vec_push", void_ty, 2)
             for i in 0..arg_count:
                 let raw = self.mir_intrinsic_arg(body, args_id, i)
                 let elem = self.mir_intrinsic_value_as(body, args_id, i, raw, elem_ty)
                 let elem_alloca = self.create_entry_alloca(elem_ty)
                 wl_build_store(self.builder, elem, elem_alloca)
-                let push_args: Vec[i64] = Vec.new()
+                let push_args: List[i64] = List.new()
                 push_args.push(out_ptr)
                 push_args.push(elem_alloca)
-                wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&push_args), 2)
-            result = wl_build_load(self.builder, vec_ty, out_ptr)
+                wl_build_call(self.builder, push_ty, push_fn, list_data_i64(&push_args), 2)
+            result = wl_build_load(self.builder, list_ty, out_ptr)
 
         else if (intrinsic == MirIntrinsic.COLLECTION_LITERAL and base_sym == self.sym_hashset) or (intrinsic == MirIntrinsic.MAP_LITERAL and base_sym == self.sym_hashmap):
             let key_ty0 = self.sema_type_to_llvm(first_tid)
@@ -12220,12 +12220,12 @@ impl Codegen:
             let val_size = self.abi_size_of(val_ty)
             let handle = self.mir_emit_hashmap_new(first_tid, key_ty, key_size, val_size)
             let map_value = wl_build_insert_value(self.builder, self.build_default_value(map_ty), handle, 0)
-            let insert_params: Vec[i64] = Vec.new()
+            let insert_params: List[i64] = List.new()
             insert_params.push(ptr_ty)
             insert_params.push(ptr_ty)
             insert_params.push(ptr_ty)
             insert_params.push(i64_ty)
-            let insert_ty = wl_function_type(void_ty, vec_data_i64(&insert_params), 4, 0)
+            let insert_ty = wl_function_type(void_ty, list_data_i64(&insert_params), 4, 0)
             var insert_fn = wl_get_named_function(self.llmod, "with_hashmap_insert")
             if insert_fn == 0:
                 insert_fn = wl_add_function(self.llmod, "with_hashmap_insert", insert_ty)
@@ -12241,7 +12241,7 @@ impl Codegen:
                 let val_alloca = self.create_entry_alloca(val_ty)
                 wl_build_store(self.builder, key, key_alloca)
                 wl_build_store(self.builder, val, val_alloca)
-                let insert_args: Vec[i64] = Vec.new()
+                let insert_args: List[i64] = List.new()
                 insert_args.push(handle)
                 insert_args.push(key_alloca)
                 insert_args.push(val_alloca)
@@ -12273,18 +12273,18 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.STR_TO_UPPER:
             let r2 = self.mir_intrinsic_recv_str_value(body, args_id)
             let t2 = wl_type_of(r2)
-            let p2: Vec[i64] = Vec.new()
+            let p2: List[i64] = List.new()
             p2.push(self.str_llvm_type())
-            let a2: Vec[i64] = Vec.new()
+            let a2: List[i64] = List.new()
             a2.push(self.str_view_arg(r2))
             result = self.call_internal_runtime_fn("with_str_to_upper_ref", p2, a2, 1, t2)
 
         else if intrinsic == MirIntrinsic.STR_TO_LOWER:
             let r3 = self.mir_intrinsic_recv_str_value(body, args_id)
             let t3 = wl_type_of(r3)
-            let p3: Vec[i64] = Vec.new()
+            let p3: List[i64] = List.new()
             p3.push(self.str_llvm_type())
-            let a3: Vec[i64] = Vec.new()
+            let a3: List[i64] = List.new()
             a3.push(self.str_view_arg(r3))
             result = self.call_internal_runtime_fn("with_str_to_lower_ref", p3, a3, 1, t3)
 
@@ -12293,11 +12293,11 @@ impl Codegen:
             let t4 = wl_type_of(r4)
             let s4a = self.mir_intrinsic_arg_str_value(body, args_id, 1)
             let s4b = self.mir_intrinsic_arg_str_value(body, args_id, 2)
-            let p4: Vec[i64] = Vec.new()
+            let p4: List[i64] = List.new()
             p4.push(self.str_llvm_type())
             p4.push(self.str_llvm_type())
             p4.push(self.str_llvm_type())
-            let a4: Vec[i64] = Vec.new()
+            let a4: List[i64] = List.new()
             a4.push(self.str_view_arg(r4))
             a4.push(self.str_view_arg(s4a))
             a4.push(self.str_view_arg(s4b))
@@ -12307,13 +12307,13 @@ impl Codegen:
             let r6 = self.mir_intrinsic_recv_str_value(body, args_id)
             let t6 = wl_type_of(r6)
             let d6 = self.mir_intrinsic_arg_str_value(body, args_id, 1)
-            let vt6 = self.get_or_create_vec_type(0, t6)
+            let vt6 = self.get_or_create_list_type(0, t6)
             let out6 = self.create_entry_alloca(vt6)
-            let p6: Vec[i64] = Vec.new()
+            let p6: List[i64] = List.new()
             p6.push(wl_ptr_type(self.context))
             p6.push(self.str_llvm_type())
             p6.push(self.str_llvm_type())
-            let a6: Vec[i64] = Vec.new()
+            let a6: List[i64] = List.new()
             a6.push(out6)
             a6.push(self.str_view_arg(r6))
             a6.push(self.str_view_arg(d6))
@@ -12323,10 +12323,10 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.STR_INDEX_OF:
             let r5 = self.mir_intrinsic_recv_str_value(body, args_id)
             let n5 = self.mir_intrinsic_arg_str_value(body, args_id, 1)
-            let p5: Vec[i64] = Vec.new()
+            let p5: List[i64] = List.new()
             p5.push(self.str_llvm_type())
             p5.push(self.str_llvm_type())
-            let a5: Vec[i64] = Vec.new()
+            let a5: List[i64] = List.new()
             a5.push(self.str_view_arg(r5))
             a5.push(self.str_view_arg(n5))
             result = self.call_internal_runtime_fn("with_str_index_of_ref", p5, a5, 2, i64_ty)
@@ -12340,16 +12340,16 @@ impl Codegen:
             wl_build_store(self.builder, k7, ka7)
             let is7 = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(k7)): 1 else: 0, 0)
             let f7 = self.ensure_hm_fn(if intrinsic == MirIntrinsic.MAP_INCREMENT: "with_hashmap_increment" else: "with_hashmap_decrement", wl_void_type(self.context))
-            let p7: Vec[i64] = Vec.new()
+            let p7: List[i64] = List.new()
             p7.push(wl_ptr_type(self.context))
             p7.push(wl_ptr_type(self.context))
             p7.push(i64_ty)
-            let ft7 = wl_function_type(wl_void_type(self.context), vec_data_i64(&p7), 3, 0)
-            let a7: Vec[i64] = Vec.new()
+            let ft7 = wl_function_type(wl_void_type(self.context), list_data_i64(&p7), 3, 0)
+            let a7: List[i64] = List.new()
             a7.push(mp7)
             a7.push(ka7)
             a7.push(is7)
-            let _ = wl_build_call(self.builder, ft7, f7, vec_data_i64(&a7), 3)
+            let _ = wl_build_call(self.builder, ft7, f7, list_data_i64(&a7), 3)
             result = 0
 
         else if intrinsic == MirIntrinsic.MAP_UPDATE:
@@ -12370,18 +12370,18 @@ impl Codegen:
             let upd_val_alloca = self.create_entry_alloca(upd_val_ty)
             let upd_is_str = wl_const_int(i64_ty, if self.is_str_type(upd_key_ty): 1 else: 0, 0)
             let upd_get_fn = self.ensure_hm_fn("with_hashmap_get", wl_i32_type(self.context))
-            let upd_hm_params: Vec[i64] = Vec.new()
+            let upd_hm_params: List[i64] = List.new()
             upd_hm_params.push(wl_ptr_type(self.context))
             upd_hm_params.push(wl_ptr_type(self.context))
             upd_hm_params.push(wl_ptr_type(self.context))
             upd_hm_params.push(i64_ty)
-            let upd_get_ty = wl_function_type(wl_i32_type(self.context), vec_data_i64(&upd_hm_params), 4, 0)
-            let upd_get_args: Vec[i64] = Vec.new()
+            let upd_get_ty = wl_function_type(wl_i32_type(self.context), list_data_i64(&upd_hm_params), 4, 0)
+            let upd_get_args: List[i64] = List.new()
             upd_get_args.push(upd_map_ptr)
             upd_get_args.push(upd_key_alloca)
             upd_get_args.push(upd_val_alloca)
             upd_get_args.push(upd_is_str)
-            let upd_found = wl_build_call(self.builder, upd_get_ty, upd_get_fn, vec_data_i64(&upd_get_args), 4)
+            let upd_found = wl_build_call(self.builder, upd_get_ty, upd_get_fn, list_data_i64(&upd_get_args), 4)
             let upd_missing = wl_build_icmp(self.builder, wl_int_eq(), upd_found, wl_const_int(wl_i32_type(self.context), 0, 0))
             let upd_default_bb = wl_append_bb(self.context, self.current_function, "map.update.default")
             let upd_call_bb = wl_append_bb(self.context, self.current_function, "map.update.call")
@@ -12401,33 +12401,33 @@ impl Codegen:
                 upd_is_fat = 1
             var upd_call_ty: i64 = 0
             if upd_is_fat != 0:
-                let upd_call_params: Vec[i64] = Vec.new()
+                let upd_call_params: List[i64] = List.new()
                 upd_call_params.push(wl_ptr_type(self.context))
                 upd_call_params.push(upd_val_ty)
-                upd_call_ty = wl_function_type(upd_val_ty, vec_data_i64(&upd_call_params), 2, 0)
+                upd_call_ty = wl_function_type(upd_val_ty, list_data_i64(&upd_call_params), 2, 0)
             else:
                 upd_call_ty = wl_global_get_value_type(upd_fn_ptr)
             if upd_call_ty == 0:
-                let upd_fallback_params: Vec[i64] = Vec.new()
+                let upd_fallback_params: List[i64] = List.new()
                 upd_fallback_params.push(upd_val_ty)
-                upd_call_ty = wl_function_type(upd_val_ty, vec_data_i64(&upd_fallback_params), 1, 0)
+                upd_call_ty = wl_function_type(upd_val_ty, list_data_i64(&upd_fallback_params), 1, 0)
             let upd_current = wl_build_load(self.builder, upd_val_ty, upd_val_alloca)
-            let upd_call_args: Vec[i64] = Vec.new()
+            let upd_call_args: List[i64] = List.new()
             if upd_is_fat != 0:
                 upd_call_args.push(upd_ctx_ptr)
             upd_call_args.push(upd_current)
-            let upd_updated_raw = wl_build_call(self.builder, upd_call_ty, upd_fn_ptr, vec_data_i64(&upd_call_args), upd_call_args.len() as i32)
+            let upd_updated_raw = wl_build_call(self.builder, upd_call_ty, upd_fn_ptr, list_data_i64(&upd_call_args), upd_call_args.len() as i32)
             let upd_updated = if wl_type_of(upd_updated_raw) != upd_val_ty: self.coerce_value_to_type(upd_updated_raw, upd_val_ty) else: upd_updated_raw
             wl_build_store(self.builder, upd_updated, upd_val_alloca)
             // D110: update observes its key; an absent key goes in as the map's copy.
             let upd_insert_fn = self.ensure_hm_fn("with_hashmap_put_copy_key", wl_void_type(self.context))
-            let upd_insert_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&upd_hm_params), 4, 0)
-            let upd_insert_args: Vec[i64] = Vec.new()
+            let upd_insert_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&upd_hm_params), 4, 0)
+            let upd_insert_args: List[i64] = List.new()
             upd_insert_args.push(upd_map_ptr)
             upd_insert_args.push(upd_key_alloca)
             upd_insert_args.push(upd_val_alloca)
             upd_insert_args.push(upd_is_str)
-            let _ = wl_build_call(self.builder, upd_insert_ty, upd_insert_fn, vec_data_i64(&upd_insert_args), 4)
+            let _ = wl_build_call(self.builder, upd_insert_ty, upd_insert_fn, list_data_i64(&upd_insert_args), 4)
             result = 0
 
         else if intrinsic == MirIntrinsic.STR_REPEAT:
@@ -12435,10 +12435,10 @@ impl Codegen:
             let sr_n = self.mir_intrinsic_arg(body, args_id, 1)
             let sr_n64 = self.coerce_int(sr_n, i64_ty)
             let sr_ty = wl_type_of(sr_recv)
-            let sr_params: Vec[i64] = Vec.new()
+            let sr_params: List[i64] = List.new()
             sr_params.push(self.str_llvm_type())
             sr_params.push(i64_ty)
-            let sr_args: Vec[i64] = Vec.new()
+            let sr_args: List[i64] = List.new()
             sr_args.push(self.str_view_arg(sr_recv))
             sr_args.push(sr_n64)
             result = self.call_internal_runtime_fn("with_str_repeat_ref", sr_params, sr_args, 2, sr_ty)
@@ -12485,9 +12485,9 @@ impl Codegen:
             // modulo the width as comptime_rotate_bits takes it. The shift
             // pair `(x << n) | (x >> (W - n))` shifts by W when n is 0 or W,
             // which is poison, and a branch on it is UB.
-            let rot_overloads: Vec[i64] = Vec.new()
+            let rot_overloads: List[i64] = List.new()
             rot_overloads.push(rot_ty)
-            let rot_args: Vec[i64] = Vec.new()
+            let rot_args: List[i64] = List.new()
             rot_args.push(rot_val)
             rot_args.push(rot_val)
             rot_args.push(self.coerce_value_to_type(rot_amt, rot_ty))
@@ -12507,19 +12507,19 @@ impl Codegen:
                 let sb_fv = self.fn_values.get(sb_sym)
                 let sb_ft = self.fn_fn_types.get(sb_sym)
                 if sb_fv.is_some() and sb_ft.is_some():
-                    let sb_args: Vec[i64] = Vec.new()
+                    let sb_args: List[i64] = List.new()
                     sb_args.push(sb_val)
-                    result = wl_build_call(self.builder, sb_ft.unwrap() as i64, sb_fv.unwrap() as i64, vec_data_i64(&sb_args), 1)
+                    result = wl_build_call(self.builder, sb_ft.unwrap() as i64, sb_fv.unwrap() as i64, list_data_i64(&sb_args), 1)
                 else:
-                    let sb_pts: Vec[i64] = Vec.new()
+                    let sb_pts: List[i64] = List.new()
                     sb_pts.push(sb_ty)
-                    let sb_fnt = wl_function_type(sb_ty, vec_data_i64(&sb_pts), 1, 0)
+                    let sb_fnt = wl_function_type(sb_ty, list_data_i64(&sb_pts), 1, 0)
                     let sb_func = wl_add_function(self.llmod, sb_fn_name, sb_fnt)
                     self.fn_values.insert(sb_sym, sb_func)
                     self.fn_fn_types.insert(sb_sym, sb_fnt)
-                    let sb_args: Vec[i64] = Vec.new()
+                    let sb_args: List[i64] = List.new()
                     sb_args.push(sb_val)
-                    result = wl_build_call(self.builder, sb_fnt, sb_func, vec_data_i64(&sb_args), 1)
+                    result = wl_build_call(self.builder, sb_fnt, sb_func, list_data_i64(&sb_args), 1)
 
         else if intrinsic == MirIntrinsic.POPCOUNT:
             let pc_val = self.mir_intrinsic_arg(body, args_id, 0)
@@ -12531,20 +12531,20 @@ impl Codegen:
             let pc_fv = self.fn_values.get(pc_sym)
             let pc_ft = self.fn_fn_types.get(pc_sym)
             if pc_fv.is_some() and pc_ft.is_some():
-                let pc_args: Vec[i64] = Vec.new()
+                let pc_args: List[i64] = List.new()
                 pc_args.push(pc_val)
-                let pc_raw = wl_build_call(self.builder, pc_ft.unwrap() as i64, pc_fv.unwrap() as i64, vec_data_i64(&pc_args), 1)
+                let pc_raw = wl_build_call(self.builder, pc_ft.unwrap() as i64, pc_fv.unwrap() as i64, list_data_i64(&pc_args), 1)
                 result = if pc_width < 32: wl_build_zext(self.builder, pc_raw, pc_i32_ty) else if pc_width > 32: wl_build_trunc(self.builder, pc_raw, pc_i32_ty) else: pc_raw
             else:
-                let pc_pts: Vec[i64] = Vec.new()
+                let pc_pts: List[i64] = List.new()
                 pc_pts.push(pc_ty)
-                let pc_fnt = wl_function_type(pc_ty, vec_data_i64(&pc_pts), 1, 0)
+                let pc_fnt = wl_function_type(pc_ty, list_data_i64(&pc_pts), 1, 0)
                 let pc_func = wl_add_function(self.llmod, pc_fn_name, pc_fnt)
                 self.fn_values.insert(pc_sym, pc_func)
                 self.fn_fn_types.insert(pc_sym, pc_fnt)
-                let pc_args: Vec[i64] = Vec.new()
+                let pc_args: List[i64] = List.new()
                 pc_args.push(pc_val)
-                let pc_raw = wl_build_call(self.builder, pc_fnt, pc_func, vec_data_i64(&pc_args), 1)
+                let pc_raw = wl_build_call(self.builder, pc_fnt, pc_func, list_data_i64(&pc_args), 1)
                 result = if pc_width < 32: wl_build_zext(self.builder, pc_raw, pc_i32_ty) else if pc_width > 32: wl_build_trunc(self.builder, pc_raw, pc_i32_ty) else: pc_raw
 
         else if intrinsic == MirIntrinsic.CLZ or intrinsic == MirIntrinsic.CTZ:
@@ -12560,23 +12560,23 @@ impl Codegen:
             let ct_i1_ty = wl_i1_type(self.context)
             let ct_false = wl_const_int(ct_i1_ty, 0, 0)
             if ct_fv.is_some() and ct_ft.is_some():
-                let ct_args: Vec[i64] = Vec.new()
+                let ct_args: List[i64] = List.new()
                 ct_args.push(ct_val)
                 ct_args.push(ct_false)
-                let ct_raw = wl_build_call(self.builder, ct_ft.unwrap() as i64, ct_fv.unwrap() as i64, vec_data_i64(&ct_args), 2)
+                let ct_raw = wl_build_call(self.builder, ct_ft.unwrap() as i64, ct_fv.unwrap() as i64, list_data_i64(&ct_args), 2)
                 result = if ct_width < 32: wl_build_zext(self.builder, ct_raw, ct_i32_ty) else if ct_width > 32: wl_build_trunc(self.builder, ct_raw, ct_i32_ty) else: ct_raw
             else:
-                let ct_pts: Vec[i64] = Vec.new()
+                let ct_pts: List[i64] = List.new()
                 ct_pts.push(ct_ty)
                 ct_pts.push(ct_i1_ty)
-                let ct_fnt = wl_function_type(ct_ty, vec_data_i64(&ct_pts), 2, 0)
+                let ct_fnt = wl_function_type(ct_ty, list_data_i64(&ct_pts), 2, 0)
                 let ct_func = wl_add_function(self.llmod, ct_fn_name, ct_fnt)
                 self.fn_values.insert(ct_sym, ct_func)
                 self.fn_fn_types.insert(ct_sym, ct_fnt)
-                let ct_args: Vec[i64] = Vec.new()
+                let ct_args: List[i64] = List.new()
                 ct_args.push(ct_val)
                 ct_args.push(ct_false)
-                let ct_raw = wl_build_call(self.builder, ct_fnt, ct_func, vec_data_i64(&ct_args), 2)
+                let ct_raw = wl_build_call(self.builder, ct_fnt, ct_func, list_data_i64(&ct_args), 2)
                 result = if ct_width < 32: wl_build_zext(self.builder, ct_raw, ct_i32_ty) else if ct_width > 32: wl_build_trunc(self.builder, ct_raw, ct_i32_ty) else: ct_raw
 
         else if intrinsic == MirIntrinsic.BITREVERSE:
@@ -12588,19 +12588,19 @@ impl Codegen:
             let br_fv = self.fn_values.get(br_sym)
             let br_ft = self.fn_fn_types.get(br_sym)
             if br_fv.is_some() and br_ft.is_some():
-                let br_args: Vec[i64] = Vec.new()
+                let br_args: List[i64] = List.new()
                 br_args.push(br_val)
-                result = wl_build_call(self.builder, br_ft.unwrap() as i64, br_fv.unwrap() as i64, vec_data_i64(&br_args), 1)
+                result = wl_build_call(self.builder, br_ft.unwrap() as i64, br_fv.unwrap() as i64, list_data_i64(&br_args), 1)
             else:
-                let br_pts: Vec[i64] = Vec.new()
+                let br_pts: List[i64] = List.new()
                 br_pts.push(br_ty)
-                let br_fnt = wl_function_type(br_ty, vec_data_i64(&br_pts), 1, 0)
+                let br_fnt = wl_function_type(br_ty, list_data_i64(&br_pts), 1, 0)
                 let br_func = wl_add_function(self.llmod, br_fn_name, br_fnt)
                 self.fn_values.insert(br_sym, br_func)
                 self.fn_fn_types.insert(br_sym, br_fnt)
-                let br_args: Vec[i64] = Vec.new()
+                let br_args: List[i64] = List.new()
                 br_args.push(br_val)
-                result = wl_build_call(self.builder, br_fnt, br_func, vec_data_i64(&br_args), 1)
+                result = wl_build_call(self.builder, br_fnt, br_func, list_data_i64(&br_args), 1)
 
         else if intrinsic == MirIntrinsic.MATH_FN:
             // One arm for every MathBuiltins row. The row names an LLVM
@@ -12618,7 +12618,7 @@ impl Codegen:
                 mf_fn_name = if mf_is_f32: mf_llvm ++ ".f32" else: mf_llvm ++ ".f64"
             else if mf_is_f32:
                 mf_fn_name = mf_fn_name ++ "f"
-            let mf_args: Vec[i64] = Vec.new()
+            let mf_args: List[i64] = List.new()
             mf_args.push(mf_a)
             if mf_arity == 2:
                 mf_args.push(self.mir_intrinsic_arg(body, args_id, 1))
@@ -12626,17 +12626,17 @@ impl Codegen:
             let mf_fv = self.fn_values.get(mf_sym)
             let mf_ft = self.fn_fn_types.get(mf_sym)
             if mf_fv.is_some() and mf_ft.is_some():
-                result = wl_build_call(self.builder, mf_ft.unwrap() as i64, mf_fv.unwrap() as i64, vec_data_i64(&mf_args), mf_arity)
+                result = wl_build_call(self.builder, mf_ft.unwrap() as i64, mf_fv.unwrap() as i64, list_data_i64(&mf_args), mf_arity)
             else:
-                let mf_pts: Vec[i64] = Vec.new()
+                let mf_pts: List[i64] = List.new()
                 mf_pts.push(mf_ty)
                 if mf_arity == 2:
                     mf_pts.push(mf_ty)
-                let mf_fnt = wl_function_type(mf_ty, vec_data_i64(&mf_pts), mf_arity, 0)
+                let mf_fnt = wl_function_type(mf_ty, list_data_i64(&mf_pts), mf_arity, 0)
                 let mf_func = wl_add_function(self.llmod, mf_fn_name, mf_fnt)
                 self.fn_values.insert(mf_sym, mf_func)
                 self.fn_fn_types.insert(mf_sym, mf_fnt)
-                result = wl_build_call(self.builder, mf_fnt, mf_func, vec_data_i64(&mf_args), mf_arity)
+                result = wl_build_call(self.builder, mf_fnt, mf_func, list_data_i64(&mf_args), mf_arity)
 
         else if intrinsic == MirIntrinsic.MIN or intrinsic == MirIntrinsic.MAX:
             let mm_a = self.mir_intrinsic_arg(body, args_id, 0)
@@ -12652,22 +12652,22 @@ impl Codegen:
                 let mm_fv = self.fn_values.get(mm_sym)
                 let mm_ft = self.fn_fn_types.get(mm_sym)
                 if mm_fv.is_some() and mm_ft.is_some():
-                    let mm_args: Vec[i64] = Vec.new()
+                    let mm_args: List[i64] = List.new()
                     mm_args.push(mm_a)
                     mm_args.push(mm_b)
-                    result = wl_build_call(self.builder, mm_ft.unwrap() as i64, mm_fv.unwrap() as i64, vec_data_i64(&mm_args), 2)
+                    result = wl_build_call(self.builder, mm_ft.unwrap() as i64, mm_fv.unwrap() as i64, list_data_i64(&mm_args), 2)
                 else:
-                    let mm_pts: Vec[i64] = Vec.new()
+                    let mm_pts: List[i64] = List.new()
                     mm_pts.push(mm_ty)
                     mm_pts.push(mm_ty)
-                    let mm_fnt = wl_function_type(mm_ty, vec_data_i64(&mm_pts), 2, 0)
+                    let mm_fnt = wl_function_type(mm_ty, list_data_i64(&mm_pts), 2, 0)
                     let mm_func = wl_add_function(self.llmod, mm_fn_name, mm_fnt)
                     self.fn_values.insert(mm_sym, mm_func)
                     self.fn_fn_types.insert(mm_sym, mm_fnt)
-                    let mm_args: Vec[i64] = Vec.new()
+                    let mm_args: List[i64] = List.new()
                     mm_args.push(mm_a)
                     mm_args.push(mm_b)
-                    result = wl_build_call(self.builder, mm_fnt, mm_func, vec_data_i64(&mm_args), 2)
+                    result = wl_build_call(self.builder, mm_fnt, mm_func, list_data_i64(&mm_args), 2)
             else:
                 // Integer min/max: icmp + select. Use unsigned comparison for
                 // unsigned operands so e.g. u32.min(1) is 1, not the value whose
@@ -12694,19 +12694,19 @@ impl Codegen:
                 let abs_fv = self.fn_values.get(abs_sym)
                 let abs_ft = self.fn_fn_types.get(abs_sym)
                 if abs_fv.is_some() and abs_ft.is_some():
-                    let abs_args: Vec[i64] = Vec.new()
+                    let abs_args: List[i64] = List.new()
                     abs_args.push(abs_val)
-                    result = wl_build_call(self.builder, abs_ft.unwrap() as i64, abs_fv.unwrap() as i64, vec_data_i64(&abs_args), 1)
+                    result = wl_build_call(self.builder, abs_ft.unwrap() as i64, abs_fv.unwrap() as i64, list_data_i64(&abs_args), 1)
                 else:
-                    let abs_pts: Vec[i64] = Vec.new()
+                    let abs_pts: List[i64] = List.new()
                     abs_pts.push(abs_ty)
-                    let abs_fnt = wl_function_type(abs_ty, vec_data_i64(&abs_pts), 1, 0)
+                    let abs_fnt = wl_function_type(abs_ty, list_data_i64(&abs_pts), 1, 0)
                     let abs_func = wl_add_function(self.llmod, abs_fn_name, abs_fnt)
                     self.fn_values.insert(abs_sym, abs_func)
                     self.fn_fn_types.insert(abs_sym, abs_fnt)
-                    let abs_args: Vec[i64] = Vec.new()
+                    let abs_args: List[i64] = List.new()
                     abs_args.push(abs_val)
-                    result = wl_build_call(self.builder, abs_fnt, abs_func, vec_data_i64(&abs_args), 1)
+                    result = wl_build_call(self.builder, abs_fnt, abs_func, list_data_i64(&abs_args), 1)
             else:
                 // Integer abs. For unsigned operands abs is the identity (§17.6a);
                 // negating would produce a wrong value (#511). For signed: negate
@@ -12732,25 +12732,25 @@ impl Codegen:
             let fma_fv = self.fn_values.get(fma_sym)
             let fma_ft = self.fn_fn_types.get(fma_sym)
             if fma_fv.is_some() and fma_ft.is_some():
-                let fma_args: Vec[i64] = Vec.new()
+                let fma_args: List[i64] = List.new()
                 fma_args.push(fma_a)
                 fma_args.push(fma_b)
                 fma_args.push(fma_c)
-                result = wl_build_call(self.builder, fma_ft.unwrap() as i64, fma_fv.unwrap() as i64, vec_data_i64(&fma_args), 3)
+                result = wl_build_call(self.builder, fma_ft.unwrap() as i64, fma_fv.unwrap() as i64, list_data_i64(&fma_args), 3)
             else:
-                let fma_pts: Vec[i64] = Vec.new()
+                let fma_pts: List[i64] = List.new()
                 fma_pts.push(fma_ty)
                 fma_pts.push(fma_ty)
                 fma_pts.push(fma_ty)
-                let fma_fnt = wl_function_type(fma_ty, vec_data_i64(&fma_pts), 3, 0)
+                let fma_fnt = wl_function_type(fma_ty, list_data_i64(&fma_pts), 3, 0)
                 let fma_func = wl_add_function(self.llmod, fma_fn_name, fma_fnt)
                 self.fn_values.insert(fma_sym, fma_func)
                 self.fn_fn_types.insert(fma_sym, fma_fnt)
-                let fma_args: Vec[i64] = Vec.new()
+                let fma_args: List[i64] = List.new()
                 fma_args.push(fma_a)
                 fma_args.push(fma_b)
                 fma_args.push(fma_c)
-                result = wl_build_call(self.builder, fma_fnt, fma_func, vec_data_i64(&fma_args), 3)
+                result = wl_build_call(self.builder, fma_fnt, fma_func, list_data_i64(&fma_args), 3)
 
         else:
             return false
@@ -12765,14 +12765,14 @@ impl Codegen:
         if intrinsic == MirIntrinsic.OPT_FILTER:
             result = self.mir_emit_opt_filter(body, args_id)
 
-        else if intrinsic == MirIntrinsic.VEC_MAP:
-            result = self.mir_emit_vec_map(body, args_id)
-        else if intrinsic == MirIntrinsic.VEC_FILTER:
-            result = self.mir_emit_vec_filter(body, args_id)
-        else if intrinsic == MirIntrinsic.VEC_FOLD:
-            result = self.mir_emit_vec_fold(body, args_id)
-        else if intrinsic == MirIntrinsic.VEC_CONTAINS:
-            result = self.mir_emit_vec_contains(body, args_id)
+        else if intrinsic == MirIntrinsic.LIST_MAP:
+            result = self.mir_emit_list_map(body, args_id)
+        else if intrinsic == MirIntrinsic.LIST_FILTER:
+            result = self.mir_emit_list_filter(body, args_id)
+        else if intrinsic == MirIntrinsic.LIST_FOLD:
+            result = self.mir_emit_list_fold(body, args_id)
+        else if intrinsic == MirIntrinsic.LIST_CONTAINS:
+            result = self.mir_emit_list_contains(body, args_id)
         else if intrinsic == MirIntrinsic.ITER_MAP or intrinsic == MirIntrinsic.ITER_FILTER or intrinsic == MirIntrinsic.ITER_FILTER_MAP or intrinsic == MirIntrinsic.ITER_TAKE or intrinsic == MirIntrinsic.ITER_DROP or intrinsic == MirIntrinsic.ITER_TAKE_WHILE or intrinsic == MirIntrinsic.ITER_DROP_WHILE or intrinsic == MirIntrinsic.ITER_ZIP or intrinsic == MirIntrinsic.ITER_ENUMERATE or intrinsic == MirIntrinsic.ITER_CHAIN or intrinsic == MirIntrinsic.ITER_ZIP_WITH or intrinsic == MirIntrinsic.ITER_STEP_BY or intrinsic == MirIntrinsic.ITER_FLAT_MAP:
             result = self.mir_emit_iter_adapter(body, args_id, dest_place, intrinsic)
         else if intrinsic == MirIntrinsic.MAPITER_NEXT or intrinsic == MirIntrinsic.FILTERITER_NEXT or intrinsic == MirIntrinsic.FILTERMAPITER_NEXT or intrinsic == MirIntrinsic.TAKEITER_NEXT or intrinsic == MirIntrinsic.DROPITER_NEXT or intrinsic == MirIntrinsic.TAKEWHILEITER_NEXT or intrinsic == MirIntrinsic.DROPWHILEITER_NEXT or intrinsic == MirIntrinsic.ZIPITER_NEXT or intrinsic == MirIntrinsic.ENUMERATEITER_NEXT or intrinsic == MirIntrinsic.CHAINITER_NEXT or intrinsic == MirIntrinsic.ZIPWITHITER_NEXT or intrinsic == MirIntrinsic.STEPBYITER_NEXT or intrinsic == MirIntrinsic.FLATMAPITER_NEXT:
@@ -12811,8 +12811,8 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.ITER_UNZIP:
             result = self.mir_emit_iter_unzip(body, args_id, dest_place)
 
-        else if intrinsic == MirIntrinsic.VEC_JOIN:
-            let vj_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+        else if intrinsic == MirIntrinsic.LIST_JOIN:
+            let vj_recv = self.mir_intrinsic_recv_list_value(body, args_id)
             let vj_sep = self.mir_intrinsic_arg(body, args_id, 1)
             let vj_str_ty = self.str_llvm_type()
             let vj_alloca = self.create_entry_alloca(wl_type_of(vj_recv))
@@ -12820,10 +12820,10 @@ impl Codegen:
             // `with_vec_str_join(parts: *mut u8, sep: &str) -> str`: the
             // separator is a `&str` view (#1810) and both it and the str
             // result cross as the FnAbi descriptor says for this target.
-            let vj_params: Vec[i64] = Vec.new()
+            let vj_params: List[i64] = List.new()
             vj_params.push(wl_ptr_type(self.context))
             vj_params.push(vj_str_ty)
-            let vj_args: Vec[i64] = Vec.new()
+            let vj_args: List[i64] = List.new()
             vj_args.push(vj_alloca)
             vj_args.push(self.str_view_arg(vj_sep))
             result = self.call_internal_runtime_fn("with_vec_str_join", vj_params, vj_args, 2, vj_str_ty)
@@ -12978,16 +12978,16 @@ impl Codegen:
             let cs_fn_name = "with_channel_send"
             var cs_fn = wl_get_named_function(self.llmod, cs_fn_name)
             if cs_fn == 0:
-                let csp: Vec[i64] = Vec.new()
+                let csp: List[i64] = List.new()
                 csp.push(wl_i64_type(self.context))   // handle
                 csp.push(wl_ptr_type(self.context))    // value_ptr
-                let csft = wl_function_type(wl_void_type(self.context), vec_data_i64(&csp), 2, 0)
+                let csft = wl_function_type(wl_void_type(self.context), list_data_i64(&csp), 2, 0)
                 cs_fn = wl_add_function(self.llmod, cs_fn_name, csft)
             let csft2 = wl_global_get_value_type(cs_fn)
-            let csa: Vec[i64] = Vec.new()
+            let csa: List[i64] = List.new()
             csa.push(send_handle)
             csa.push(send_slot)
-            wl_build_call(self.builder, csft2, cs_fn, vec_data_i64(&csa), 2)
+            wl_build_call(self.builder, csft2, cs_fn, list_data_i64(&csa), 2)
             result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
         else if intrinsic == MirIntrinsic.CHAN_CREATE:
@@ -13018,22 +13018,22 @@ impl Codegen:
             let ccr_fn_name = "with_channel_create"
             var ccr_fn = wl_get_named_function(self.llmod, ccr_fn_name)
             if ccr_fn == 0:
-                let ccrp: Vec[i64] = Vec.new()
+                let ccrp: List[i64] = List.new()
                 ccrp.push(wl_i32_type(self.context))   // capacity
                 ccrp.push(wl_i32_type(self.context))   // elem_size
                 ccrp.push(ptr_ty)                       // drop_fn
-                let ccrft = wl_function_type(wl_i64_type(self.context), vec_data_i64(&ccrp), 3, 0)
+                let ccrft = wl_function_type(wl_i64_type(self.context), list_data_i64(&ccrp), 3, 0)
                 ccr_fn = wl_add_function(self.llmod, ccr_fn_name, ccrft)
             let ccrft2 = wl_global_get_value_type(ccr_fn)
-            let ccra: Vec[i64] = Vec.new()
+            let ccra: List[i64] = List.new()
             ccra.push(create_cap)
             ccra.push(wl_const_int(wl_i32_type(self.context), chan_elem_size, 0))
             ccra.push(chan_drop_fn)
-            let chan_handle = wl_build_call(self.builder, ccrft2, ccr_fn, vec_data_i64(&ccra), 3)
+            let chan_handle = wl_build_call(self.builder, ccrft2, ccr_fn, list_data_i64(&ccra), 3)
             // Wrap in Channel { handle } struct
-            let chan_struct_fields: Vec[i64] = Vec.new()
+            let chan_struct_fields: List[i64] = List.new()
             chan_struct_fields.push(wl_i64_type(self.context))
-            let chan_struct_ty = wl_struct_type(self.context, vec_data_i64(&chan_struct_fields), 1, 0)
+            let chan_struct_ty = wl_struct_type(self.context, list_data_i64(&chan_struct_fields), 1, 0)
             let empty_chan = self.build_default_value(chan_struct_ty)
             result = wl_build_insert_value(self.builder, empty_chan, chan_handle, 0)
 
@@ -13068,16 +13068,16 @@ impl Codegen:
             let cr_fn_name = "with_channel_recv"
             var cr_fn = wl_get_named_function(self.llmod, cr_fn_name)
             if cr_fn == 0:
-                let crp: Vec[i64] = Vec.new()
+                let crp: List[i64] = List.new()
                 crp.push(wl_i64_type(self.context))   // handle
                 crp.push(wl_ptr_type(self.context))    // out_ptr
-                let crft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&crp), 2, 0)
+                let crft = wl_function_type(wl_i32_type(self.context), list_data_i64(&crp), 2, 0)
                 cr_fn = wl_add_function(self.llmod, cr_fn_name, crft)
             let crft2 = wl_global_get_value_type(cr_fn)
-            let cra: Vec[i64] = Vec.new()
+            let cra: List[i64] = List.new()
             cra.push(recv_handle)
             cra.push(recv_payload_ptr)
-            let recv_status = wl_build_call(self.builder, crft2, cr_fn, vec_data_i64(&cra), 2)
+            let recv_status = wl_build_call(self.builder, crft2, cr_fn, list_data_i64(&cra), 2)
             if wl_get_type_kind(recv_opt_ty) == wl_struct_type_kind():
                 var recv_some_disc = self.option_tag(true)
                 var recv_none_disc = self.option_tag(false)
@@ -13099,14 +13099,14 @@ impl Codegen:
             let cc_fn_name = "with_channel_close"
             var cc_fn = wl_get_named_function(self.llmod, cc_fn_name)
             if cc_fn == 0:
-                let ccp: Vec[i64] = Vec.new()
+                let ccp: List[i64] = List.new()
                 ccp.push(wl_i64_type(self.context))
-                let ccft = wl_function_type(wl_void_type(self.context), vec_data_i64(&ccp), 1, 0)
+                let ccft = wl_function_type(wl_void_type(self.context), list_data_i64(&ccp), 1, 0)
                 cc_fn = wl_add_function(self.llmod, cc_fn_name, ccft)
             let ccft2 = wl_global_get_value_type(cc_fn)
-            let cca: Vec[i64] = Vec.new()
+            let cca: List[i64] = List.new()
             cca.push(close_handle)
-            wl_build_call(self.builder, ccft2, cc_fn, vec_data_i64(&cca), 1)
+            wl_build_call(self.builder, ccft2, cc_fn, list_data_i64(&cca), 1)
             result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
         else if intrinsic == MirIntrinsic.SCOPE_CREATE:
@@ -13123,14 +13123,14 @@ impl Codegen:
             let sa_handle = self.mir_intrinsic_arg(body, args_id, 0)
             var sa_fn = wl_get_named_function(self.llmod, "with_scope_await_all")
             if sa_fn == 0:
-                let sap: Vec[i64] = Vec.new()
+                let sap: List[i64] = List.new()
                 sap.push(wl_i64_type(self.context))
-                let saft = wl_function_type(wl_void_type(self.context), vec_data_i64(&sap), 1, 0)
+                let saft = wl_function_type(wl_void_type(self.context), list_data_i64(&sap), 1, 0)
                 sa_fn = wl_add_function(self.llmod, "with_scope_await_all", saft)
             let saft2 = wl_global_get_value_type(sa_fn)
-            let saa: Vec[i64] = Vec.new()
+            let saa: List[i64] = List.new()
             saa.push(sa_handle)
-            wl_build_call(self.builder, saft2, sa_fn, vec_data_i64(&saa), 1)
+            wl_build_call(self.builder, saft2, sa_fn, list_data_i64(&saa), 1)
             result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
         else if intrinsic == MirIntrinsic.SCOPE_DESTROY:
@@ -13138,14 +13138,14 @@ impl Codegen:
             let sd_handle = self.mir_intrinsic_arg(body, args_id, 0)
             var sd_fn = wl_get_named_function(self.llmod, "with_scope_destroy")
             if sd_fn == 0:
-                let sdp: Vec[i64] = Vec.new()
+                let sdp: List[i64] = List.new()
                 sdp.push(wl_i64_type(self.context))
-                let sdft = wl_function_type(wl_void_type(self.context), vec_data_i64(&sdp), 1, 0)
+                let sdft = wl_function_type(wl_void_type(self.context), list_data_i64(&sdp), 1, 0)
                 sd_fn = wl_add_function(self.llmod, "with_scope_destroy", sdft)
             let sdft2 = wl_global_get_value_type(sd_fn)
-            let sda: Vec[i64] = Vec.new()
+            let sda: List[i64] = List.new()
             sda.push(sd_handle)
-            wl_build_call(self.builder, sdft2, sd_fn, vec_data_i64(&sda), 1)
+            wl_build_call(self.builder, sdft2, sd_fn, list_data_i64(&sda), 1)
             result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
         else if intrinsic == MirIntrinsic.THREAD_SCOPE_CREATE:
@@ -13160,28 +13160,28 @@ impl Codegen:
             let tsj_handle = self.mir_intrinsic_arg(body, args_id, 0)
             var tsj_fn = wl_get_named_function(self.llmod, "with_thread_scope_join_all")
             if tsj_fn == 0:
-                let tsjp: Vec[i64] = Vec.new()
+                let tsjp: List[i64] = List.new()
                 tsjp.push(wl_i64_type(self.context))
-                let tsjft = wl_function_type(wl_void_type(self.context), vec_data_i64(&tsjp), 1, 0)
+                let tsjft = wl_function_type(wl_void_type(self.context), list_data_i64(&tsjp), 1, 0)
                 tsj_fn = wl_add_function(self.llmod, "with_thread_scope_join_all", tsjft)
             let tsjft2 = wl_global_get_value_type(tsj_fn)
-            let tsja: Vec[i64] = Vec.new()
+            let tsja: List[i64] = List.new()
             tsja.push(tsj_handle)
-            wl_build_call(self.builder, tsjft2, tsj_fn, vec_data_i64(&tsja), 1)
+            wl_build_call(self.builder, tsjft2, tsj_fn, list_data_i64(&tsja), 1)
             result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
         else if intrinsic == MirIntrinsic.THREAD_SCOPE_DESTROY:
             let tsd_handle = self.mir_intrinsic_arg(body, args_id, 0)
             var tsd_fn = wl_get_named_function(self.llmod, "with_thread_scope_destroy")
             if tsd_fn == 0:
-                let tsdp: Vec[i64] = Vec.new()
+                let tsdp: List[i64] = List.new()
                 tsdp.push(wl_i64_type(self.context))
-                let tsdft = wl_function_type(wl_void_type(self.context), vec_data_i64(&tsdp), 1, 0)
+                let tsdft = wl_function_type(wl_void_type(self.context), list_data_i64(&tsdp), 1, 0)
                 tsd_fn = wl_add_function(self.llmod, "with_thread_scope_destroy", tsdft)
             let tsdft2 = wl_global_get_value_type(tsd_fn)
-            let tsda: Vec[i64] = Vec.new()
+            let tsda: List[i64] = List.new()
             tsda.push(tsd_handle)
-            wl_build_call(self.builder, tsdft2, tsd_fn, vec_data_i64(&tsda), 1)
+            wl_build_call(self.builder, tsdft2, tsd_fn, list_data_i64(&tsda), 1)
             result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
         else if intrinsic == MirIntrinsic.FIBER_IS_CANCELLED:
@@ -13204,14 +13204,14 @@ impl Codegen:
             let done_fid = self.mir_intrinsic_arg(body, args_id, 0)
             var done_fn = wl_get_named_function(self.llmod, "with_runtime_fiber_is_completed")
             if done_fn == 0:
-                let done_params: Vec[i64] = Vec.new()
+                let done_params: List[i64] = List.new()
                 done_params.push(wl_i32_type(self.context))
-                let done_ft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&done_params), 1, 0)
+                let done_ft = wl_function_type(wl_i32_type(self.context), list_data_i64(&done_params), 1, 0)
                 done_fn = wl_add_function(self.llmod, "with_runtime_fiber_is_completed", done_ft)
             let done_ft2 = wl_global_get_value_type(done_fn)
-            let done_args: Vec[i64] = Vec.new()
+            let done_args: List[i64] = List.new()
             done_args.push(done_fid)
-            let done_raw = wl_build_call(self.builder, done_ft2, done_fn, vec_data_i64(&done_args), 1)
+            let done_raw = wl_build_call(self.builder, done_ft2, done_fn, list_data_i64(&done_args), 1)
             let done_dest = self.mir_intrinsic_dest_sema_type(body, dest_place)
             result = if done_dest == self.sema.ty_bool as i32:
                 wl_build_icmp(self.builder, wl_int_ne(), done_raw, wl_const_int(wl_i32_type(self.context), 0, 0))
@@ -13222,14 +13222,14 @@ impl Codegen:
             let wcr_fid = self.mir_intrinsic_arg(body, args_id, 0)
             var wcr_fn = wl_get_named_function(self.llmod, "with_fiber_was_cancelled_return")
             if wcr_fn == 0:
-                let wcrp: Vec[i64] = Vec.new()
+                let wcrp: List[i64] = List.new()
                 wcrp.push(wl_i32_type(self.context))
-                let wcrft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&wcrp), 1, 0)
+                let wcrft = wl_function_type(wl_i32_type(self.context), list_data_i64(&wcrp), 1, 0)
                 wcr_fn = wl_add_function(self.llmod, "with_fiber_was_cancelled_return", wcrft)
             let wcrft2 = wl_global_get_value_type(wcr_fn)
-            let wcra: Vec[i64] = Vec.new()
+            let wcra: List[i64] = List.new()
             wcra.push(wcr_fid)
-            let wcr_raw = wl_build_call(self.builder, wcrft2, wcr_fn, vec_data_i64(&wcra), 1)
+            let wcr_raw = wl_build_call(self.builder, wcrft2, wcr_fn, list_data_i64(&wcra), 1)
             let wcr_dest = self.mir_intrinsic_dest_sema_type(body, dest_place)
             result = if wcr_dest == self.sema.ty_bool as i32:
                 wl_build_icmp(self.builder, wl_int_ne(), wcr_raw, wl_const_int(wl_i32_type(self.context), 0, 0))
@@ -13323,12 +13323,12 @@ impl Codegen:
         wl_position_at_end(self.builder, cannot_bb)
         self.emit_runtime_panic("cannot clone this `move` closure: a capture is not Clone")
         wl_position_at_end(self.builder, can_bb)
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(ptr_ty)
-        let clone_ft = wl_function_type(ptr_ty, vec_data_i64(&params), 1, 0)
-        let args: Vec[i64] = Vec.new()
+        let clone_ft = wl_function_type(ptr_ty, list_data_i64(&params), 1, 0)
+        let args: List[i64] = List.new()
         args.push(cell)
-        let new_cell = wl_build_call(self.builder, clone_ft, clone_fn, vec_data_i64(&args), 1)
+        let new_cell = wl_build_call(self.builder, clone_ft, clone_fn, list_data_i64(&args), 1)
         let tagged = wl_build_or(self.builder, wl_build_ptr_to_int(self.builder, new_cell, i64_ty), wl_const_int(i64_ty, self.closure_ctx_tag_owned(), 0))
         wl_build_store(self.builder, wl_build_int_to_ptr(self.builder, tagged, ptr_ty), ctx_slot)
         wl_build_br(self.builder, done_bb)
@@ -13338,7 +13338,7 @@ impl Codegen:
     // The per-closure clone fn of an owned cell: a new cell with the same
     // header, every Copy capture copied and every str capture cloned. Null
     // (no clone fn) when a capture is any other type.
-    mut fn gen_closure_env_clone_fn(cell_ty: i64, cap_struct_type: i64, cap_sema_types: &Vec[i32], cap_llvm_types: &Vec[i64]) -> i64:
+    mut fn gen_closure_env_clone_fn(cell_ty: i64, cap_struct_type: i64, cap_sema_types: &List[i32], cap_llvm_types: &List[i64]) -> i64:
         let ptr_ty = wl_ptr_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let i64_ty = wl_i64_type(self.context)
@@ -13349,9 +13349,9 @@ impl Codegen:
             if self.sema.is_copy_frozen(cap_sema_ty as TypeId) == 0 and self.sema.get_type_kind(self.sema.resolve_alias(cap_sema_ty as TypeId)) != TypeKind.TY_STR:
                 return 0
         let fn_name = f"__closure_env_clone_{self.closure_counter}"
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(ptr_ty)
-        let fn_ty = wl_function_type(ptr_ty, vec_data_i64(&params), 1, 0)
+        let fn_ty = wl_function_type(ptr_ty, list_data_i64(&params), 1, 0)
         let clone_fn = wl_add_function(self.llmod, fn_name, fn_ty)
         wl_set_linkage(clone_fn, wl_internal_linkage())
         let saved_fn: i64 = self.current_function
@@ -13369,8 +13369,8 @@ impl Codegen:
         // #2042: the copy is at the cell's model alignment, as the original.
         let alloc_fn = self.ensure_box_alloc_aligned_fn()
         let cell_size = self.abi_size_of(cell_ty)
-        let alloc_args: Vec[i64] = [wl_const_int(i64_ty, cell_size, 0), wl_const_int(i64_ty, self.declared_align_of(cell_ty), 0)]
-        let new_cell = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 2)
+        let alloc_args: List[i64] = [wl_const_int(i64_ty, cell_size, 0), wl_const_int(i64_ty, self.declared_align_of(cell_ty), 0)]
+        let new_cell = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, list_data_i64(&alloc_args), 2)
         self.emit_llvm_memcpy(new_cell, old_cell, cell_size)
         let old_env = self.tuple_elem_ptr(cell_ty, old_cell, 2)
         let new_env = self.tuple_elem_ptr(cell_ty, new_cell, 2)
@@ -13424,10 +13424,10 @@ impl Codegen:
             is_fat = 1
         var fn_ty: i64 = 0
         if is_fat != 0:
-            let fp: Vec[i64] = Vec.new()
+            let fp: List[i64] = List.new()
             fp.push(ptr_ty)
             fp.push(self.closure_abi_param_ty(elem_ty))
-            fn_ty = wl_function_type(i1_ty, vec_data_i64(&fp), 2, 0)
+            fn_ty = wl_function_type(i1_ty, list_data_i64(&fp), 2, 0)
         else:
             fn_ty = wl_global_get_value_type(fn_ptr)
         let filt_then = wl_append_bb(self.context, self.current_function, "of.some")
@@ -13437,12 +13437,12 @@ impl Codegen:
         wl_build_cond_br(self.builder, is_some, filt_then, filt_else)
         wl_position_at_end(self.builder, filt_then)
         let payload = self.option_payload_value(recv, elem_ty)
-        let filt_args: Vec[i64] = Vec.new()
+        let filt_args: List[i64] = List.new()
         if is_fat != 0:
             filt_args.push(ctx_ptr)
         filt_args.push(self.closure_abi_arg(elem_ty, payload))
         let filt_arg_count = if is_fat != 0: 2 else: 1
-        let pred_result = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&filt_args), filt_arg_count)
+        let pred_result = wl_build_call(self.builder, fn_ty, fn_ptr, list_data_i64(&filt_args), filt_arg_count)
         var filt_bool = pred_result
         if wl_type_of(pred_result) != wl_i1_type(self.context):
             filt_bool = wl_build_icmp(self.builder, wl_int_ne(), pred_result, wl_const_int(wl_type_of(pred_result), 0, 0))
@@ -13456,13 +13456,13 @@ impl Codegen:
         let else_end = wl_get_insert_block(self.builder)
         wl_position_at_end(self.builder, filt_merge)
         let filt_phi = wl_build_phi(self.builder, obj_ty)
-        let phi_vals: Vec[i64] = Vec.new()
-        let phi_bbs: Vec[i64] = Vec.new()
+        let phi_vals: List[i64] = List.new()
+        let phi_bbs: List[i64] = List.new()
         phi_vals.push(recv)
         phi_bbs.push(check_end)
         phi_vals.push(filt_none)
         phi_bbs.push(else_end)
-        wl_add_incoming(filt_phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+        wl_add_incoming(filt_phi, list_data_i64(&phi_vals), list_data_i64(&phi_bbs), 2)
         filt_phi
 
     fn mir_generic_base_name(sema_ty: i32) -> str:
@@ -13523,9 +13523,9 @@ impl Codegen:
 
     fn mir_iter_elem_tid(iter_sema: i32) -> i32:
         let name = self.mir_generic_base_name(iter_sema)
-        if name == "VecIter":
+        if name == "ListIter":
             return self.mir_generic_arg_tid(iter_sema, 0)
-        if name == "VecIterRef":
+        if name == "ListIterRef":
             let elem_tid = self.mir_generic_arg_tid(iter_sema, 0)
             return self.sema.find_exact_type(TypeKind.TY_REF, elem_tid, 0, 0) as i32
         if name == "MappedIter":
@@ -13540,7 +13540,7 @@ impl Codegen:
             let left = self.mir_generic_arg_tid(iter_sema, 2)
             let right = self.mir_generic_arg_tid(iter_sema, 3)
             if left != 0 and right != 0:
-                let elems: Vec[i32] = Vec.new()
+                let elems: List[i32] = List.new()
                 elems.push(left)
                 elems.push(right)
                 return self.sema.find_tuple_type(elems, 2) as i32
@@ -13548,7 +13548,7 @@ impl Codegen:
         if name == "EnumerateIter":
             let elem = self.mir_generic_arg_tid(iter_sema, 1)
             if elem != 0:
-                let elems2: Vec[i32] = Vec.new()
+                let elems2: List[i32] = List.new()
                 elems2.push(self.sema.ty_i64 as i32)
                 elems2.push(elem)
                 return self.sema.find_tuple_type(elems2, 2) as i32
@@ -13565,7 +13565,7 @@ impl Codegen:
             return wl_build_icmp(self.builder, wl_int_ne(), opt_val, wl_const_null(opt_ty))
         self.option_tag_is_some(self.option_tag_value(opt_val))
 
-    mut fn mir_call_fn_value(fn_val: i64, ret_ty: i64, args: &Vec[i64], arg_count: i32) -> i64:
+    mut fn mir_call_fn_value(fn_val: i64, ret_ty: i64, args: &List[i64], arg_count: i32) -> i64:
         let ptr_ty = wl_ptr_type(self.context)
         let cty = wl_type_of(fn_val)
         var fn_ptr = fn_val
@@ -13576,8 +13576,8 @@ impl Codegen:
             ctx_ptr = wl_build_extract_value(self.builder, fn_val, 1)
             is_fat = 1
         var fn_ty: i64 = 0
-        let call_args: Vec[i64] = Vec.new()
-        let param_tys: Vec[i64] = Vec.new()
+        let call_args: List[i64] = List.new()
+        let param_tys: List[i64] = List.new()
         if is_fat != 0:
             call_args.push(ctx_ptr)
             param_tys.push(ptr_ty)
@@ -13587,19 +13587,19 @@ impl Codegen:
             call_args.push(self.closure_abi_arg(avt, av))
             param_tys.push(self.closure_abi_param_ty(avt))
         if is_fat != 0:
-            fn_ty = wl_function_type(ret_ty, vec_data_i64(&param_tys), arg_count + 1, 0)
+            fn_ty = wl_function_type(ret_ty, list_data_i64(&param_tys), arg_count + 1, 0)
         else:
             fn_ty = wl_global_get_value_type(fn_ptr)
-        wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&call_args), arg_count + is_fat)
+        wl_build_call(self.builder, fn_ty, fn_ptr, list_data_i64(&call_args), arg_count + is_fat)
 
-    mut fn mir_emit_veciter_next_from_ptr(iter_ptr: i64, elem_ty: i64) -> i64:
+    mut fn mir_emit_listiter_next_from_ptr(iter_ptr: i64, elem_ty: i64) -> i64:
         let i64_ty = wl_i64_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
-        let iter_fields: Vec[i64] = Vec.new()
+        let iter_fields: List[i64] = List.new()
         iter_fields.push(i64_ty)
         iter_fields.push(i64_ty)
         iter_fields.push(i64_ty)
-        let iter_struct_ty = wl_struct_type(self.context, vec_data_i64(&iter_fields), 3, 0)
+        let iter_struct_ty = wl_struct_type(self.context, list_data_i64(&iter_fields), 3, 0)
         let data_ptr_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 0)
         let data_ptr = wl_build_load(self.builder, i64_ty, data_ptr_ptr)
         let len_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 1)
@@ -13614,9 +13614,9 @@ impl Codegen:
         wl_build_cond_br(self.builder, cond, some_bb, none_bb)
         wl_position_at_end(self.builder, some_bb)
         let typed_ptr = wl_build_int_to_ptr(self.builder, data_ptr, ptr_ty)
-        let gep_indices: Vec[i64] = Vec.new()
+        let gep_indices: List[i64] = List.new()
         gep_indices.push(idx)
-        let elem_ptr = wl_build_gep(self.builder, elem_ty, typed_ptr, vec_data_i64(&gep_indices), 1)
+        let elem_ptr = wl_build_gep(self.builder, elem_ty, typed_ptr, list_data_i64(&gep_indices), 1)
         let val = wl_build_load(self.builder, elem_ty, elem_ptr)
         wl_build_store(self.builder, wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0)), idx_ptr)
         let some_val = self.build_option_some(val, opt_type)
@@ -13628,23 +13628,23 @@ impl Codegen:
         let none_end = wl_get_insert_block(self.builder)
         wl_position_at_end(self.builder, merge_bb)
         let phi = wl_build_phi(self.builder, opt_type)
-        let vals: Vec[i64] = Vec.new()
-        let bbs: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
+        let bbs: List[i64] = List.new()
         vals.push(some_val)
         vals.push(none_val)
         bbs.push(some_end)
         bbs.push(none_end)
-        wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+        wl_add_incoming(phi, list_data_i64(&vals), list_data_i64(&bbs), 2)
         phi
 
-    fn mir_emit_veciterref_next_from_ptr(iter_ptr: i64, elem_ty: i64) -> i64:
+    fn mir_emit_listiterref_next_from_ptr(iter_ptr: i64, elem_ty: i64) -> i64:
         let i64_ty = wl_i64_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
-        let iter_fields: Vec[i64] = Vec.new()
+        let iter_fields: List[i64] = List.new()
         iter_fields.push(i64_ty)
         iter_fields.push(i64_ty)
         iter_fields.push(i64_ty)
-        let iter_struct_ty = wl_struct_type(self.context, vec_data_i64(&iter_fields), 3, 0)
+        let iter_struct_ty = wl_struct_type(self.context, list_data_i64(&iter_fields), 3, 0)
         let data_ptr_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 0)
         let data_ptr = wl_build_load(self.builder, i64_ty, data_ptr_ptr)
         let len_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 1)
@@ -13658,9 +13658,9 @@ impl Codegen:
         wl_build_cond_br(self.builder, cond, some_bb, none_bb)
         wl_position_at_end(self.builder, some_bb)
         let typed_ptr = wl_build_int_to_ptr(self.builder, data_ptr, ptr_ty)
-        let gep_indices: Vec[i64] = Vec.new()
+        let gep_indices: List[i64] = List.new()
         gep_indices.push(idx)
-        let elem_ptr = wl_build_gep(self.builder, elem_ty, typed_ptr, vec_data_i64(&gep_indices), 1)
+        let elem_ptr = wl_build_gep(self.builder, elem_ty, typed_ptr, list_data_i64(&gep_indices), 1)
         wl_build_store(self.builder, wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0)), idx_ptr)
         wl_build_br(self.builder, merge_bb)
         let some_end = wl_get_insert_block(self.builder)
@@ -13670,13 +13670,13 @@ impl Codegen:
         let none_end = wl_get_insert_block(self.builder)
         wl_position_at_end(self.builder, merge_bb)
         let phi = wl_build_phi(self.builder, ptr_ty)
-        let vals: Vec[i64] = Vec.new()
-        let bbs: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
+        let bbs: List[i64] = List.new()
         vals.push(elem_ptr)
         vals.push(null_ptr)
         bbs.push(some_end)
         bbs.push(none_end)
-        wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+        wl_add_incoming(phi, list_data_i64(&vals), list_data_i64(&bbs), 2)
         phi
 
     mut fn mir_emit_iter_next_from_ptr(iter_ptr: i64, iter_sema: i32, elem_tid: i32) -> i64:
@@ -13684,13 +13684,13 @@ impl Codegen:
         let elem_ty0 = self.mir_sema_type_to_llvm(elem_tid)
         let elem_ty = if elem_ty0 != 0: elem_ty0 else: self.type_fallback()
         let opt_type = self.get_or_create_option_type(0, elem_ty)
-        if name == "VecIter":
-            return self.mir_emit_veciter_next_from_ptr(iter_ptr, elem_ty)
-        if name == "VecIterRef":
+        if name == "ListIter":
+            return self.mir_emit_listiter_next_from_ptr(iter_ptr, elem_ty)
+        if name == "ListIterRef":
             let raw_elem_tid = self.mir_generic_arg_tid(iter_sema, 0)
             let raw_elem_ty0 = self.mir_sema_type_to_llvm(raw_elem_tid)
             let raw_elem_ty = if raw_elem_ty0 != 0: raw_elem_ty0 else: self.type_fallback()
-            return self.option_ref_from_slot_ptr(self.mir_emit_veciterref_next_from_ptr(iter_ptr, raw_elem_ty), opt_type, elem_ty)
+            return self.option_ref_from_slot_ptr(self.mir_emit_listiterref_next_from_ptr(iter_ptr, raw_elem_ty), opt_type, elem_ty)
         let iter_ty = self.mir_sema_type_to_llvm(iter_sema)
         if iter_ty == 0:
             with_eprint("error: iterator codegen missing LLVM type for iterator '" ++ name ++ "'")
@@ -13713,7 +13713,7 @@ impl Codegen:
             wl_build_cond_br(self.builder, cond, some_bb, none_bb)
             wl_position_at_end(self.builder, some_bb)
             let payload = self.option_payload_value(next, in_ty)
-            let call_args: Vec[i64] = Vec.new()
+            let call_args: List[i64] = List.new()
             call_args.push(payload)
             let mapped = self.mir_call_fn_value(fn_val, elem_ty, call_args, 1)
             self.mir_iter_cancel_exit(none_bb)
@@ -13726,13 +13726,13 @@ impl Codegen:
             let none_end = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb)
             let phi = wl_build_phi(self.builder, opt_type)
-            let vals: Vec[i64] = Vec.new()
-            let bbs: Vec[i64] = Vec.new()
+            let vals: List[i64] = List.new()
+            let bbs: List[i64] = List.new()
             vals.push(some_val)
             vals.push(none_val)
             bbs.push(some_end)
             bbs.push(none_end)
-            wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+            wl_add_incoming(phi, list_data_i64(&vals), list_data_i64(&bbs), 2)
             return phi
         if name == "FilterIter":
             let upstream_tid2 = self.mir_generic_arg_tid(iter_sema, 0)
@@ -13752,7 +13752,7 @@ impl Codegen:
             wl_build_cond_br(self.builder, cond2, test_bb, none_bb2)
             wl_position_at_end(self.builder, test_bb)
             let payload2 = self.option_payload_value(next2, elem_ty)
-            let pred_args: Vec[i64] = Vec.new()
+            let pred_args: List[i64] = List.new()
             pred_args.push(payload2)
             let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
             self.mir_iter_cancel_exit(none_bb2)
@@ -13770,13 +13770,13 @@ impl Codegen:
             let none_end2 = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb2)
             let phi2 = wl_build_phi(self.builder, opt_type)
-            let vals2: Vec[i64] = Vec.new()
-            let bbs2: Vec[i64] = Vec.new()
+            let vals2: List[i64] = List.new()
+            let bbs2: List[i64] = List.new()
             vals2.push(some_val2)
             vals2.push(none_val2)
             bbs2.push(some_end2)
             bbs2.push(none_end2)
-            wl_add_incoming(phi2, vec_data_i64(&vals2), vec_data_i64(&bbs2), 2)
+            wl_add_incoming(phi2, list_data_i64(&vals2), list_data_i64(&bbs2), 2)
             return phi2
         if name == "TakeIter":
             let upstream_tid3 = self.mir_generic_arg_tid(iter_sema, 0)
@@ -13808,13 +13808,13 @@ impl Codegen:
             let none_end3 = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb3)
             let phi3 = wl_build_phi(self.builder, opt_type)
-            let vals3: Vec[i64] = Vec.new()
-            let bbs3: Vec[i64] = Vec.new()
+            let vals3: List[i64] = List.new()
+            let bbs3: List[i64] = List.new()
             vals3.push(next3)
             vals3.push(none3)
             bbs3.push(dec_end3)
             bbs3.push(none_end3)
-            wl_add_incoming(phi3, vec_data_i64(&vals3), vec_data_i64(&bbs3), 2)
+            wl_add_incoming(phi3, list_data_i64(&vals3), list_data_i64(&bbs3), 2)
             return phi3
         if name == "FilterMapIter":
             let upstream_tid_fm = self.mir_generic_arg_tid(iter_sema, 0)
@@ -13836,7 +13836,7 @@ impl Codegen:
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next_fm), map_bb_fm, none_bb_fm)
             wl_position_at_end(self.builder, map_bb_fm)
             let payload_fm = self.option_payload_value(next_fm, in_ty_fm)
-            let call_args_fm: Vec[i64] = Vec.new()
+            let call_args_fm: List[i64] = List.new()
             call_args_fm.push(payload_fm)
             let mapped_fm = self.mir_call_fn_value(fn_val_fm, opt_type, call_args_fm, 1)
             self.mir_iter_cancel_exit(none_bb_fm)
@@ -13850,13 +13850,13 @@ impl Codegen:
             let none_end_fm = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb_fm)
             let phi_fm = wl_build_phi(self.builder, opt_type)
-            let vals_fm: Vec[i64] = Vec.new()
-            let bbs_fm: Vec[i64] = Vec.new()
+            let vals_fm: List[i64] = List.new()
+            let bbs_fm: List[i64] = List.new()
             vals_fm.push(mapped_fm)
             vals_fm.push(none_val_fm)
             bbs_fm.push(some_end_fm)
             bbs_fm.push(none_end_fm)
-            wl_add_incoming(phi_fm, vec_data_i64(&vals_fm), vec_data_i64(&bbs_fm), 2)
+            wl_add_incoming(phi_fm, list_data_i64(&vals_fm), list_data_i64(&bbs_fm), 2)
             return phi_fm
         if name == "DropIter":
             let upstream_tid_drop = self.mir_generic_arg_tid(iter_sema, 0)
@@ -13889,13 +13889,13 @@ impl Codegen:
             let none_end_drop = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb_drop)
             let phi_drop = wl_build_phi(self.builder, opt_type)
-            let vals_drop: Vec[i64] = Vec.new()
-            let bbs_drop: Vec[i64] = Vec.new()
+            let vals_drop: List[i64] = List.new()
+            let bbs_drop: List[i64] = List.new()
             vals_drop.push(next_drop)
             vals_drop.push(none_val_drop)
             bbs_drop.push(next_end_drop)
             bbs_drop.push(none_end_drop)
-            wl_add_incoming(phi_drop, vec_data_i64(&vals_drop), vec_data_i64(&bbs_drop), 2)
+            wl_add_incoming(phi_drop, list_data_i64(&vals_drop), list_data_i64(&bbs_drop), 2)
             return phi_drop
         if name == "TakeWhileIter":
             let upstream_tid_tw = self.mir_generic_arg_tid(iter_sema, 0)
@@ -13916,7 +13916,7 @@ impl Codegen:
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next_tw), pred_bb_tw, none_bb_tw)
             wl_position_at_end(self.builder, pred_bb_tw)
             let payload_tw = self.option_payload_value(next_tw, elem_ty)
-            let pred_args_tw: Vec[i64] = Vec.new()
+            let pred_args_tw: List[i64] = List.new()
             pred_args_tw.push(payload_tw)
             let pred_raw_tw = self.mir_call_fn_value(pred_val_tw, wl_i1_type(self.context), pred_args_tw, 1)
             self.mir_iter_cancel_exit(none_bb_tw)
@@ -13935,13 +13935,13 @@ impl Codegen:
             let none_end_tw = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb_tw)
             let phi_tw = wl_build_phi(self.builder, opt_type)
-            let vals_tw: Vec[i64] = Vec.new()
-            let bbs_tw: Vec[i64] = Vec.new()
+            let vals_tw: List[i64] = List.new()
+            let bbs_tw: List[i64] = List.new()
             vals_tw.push(some_val_tw)
             vals_tw.push(none_val_tw)
             bbs_tw.push(some_end_tw)
             bbs_tw.push(none_end_tw)
-            wl_add_incoming(phi_tw, vec_data_i64(&vals_tw), vec_data_i64(&bbs_tw), 2)
+            wl_add_incoming(phi_tw, list_data_i64(&vals_tw), list_data_i64(&bbs_tw), 2)
             return phi_tw
         if name == "DropWhileIter":
             let upstream_tid_dw = self.mir_generic_arg_tid(iter_sema, 0)
@@ -13965,7 +13965,7 @@ impl Codegen:
             let check_bb_dw = wl_append_bb(self.context, self.current_function, "dropwhile.check")
             wl_build_cond_br(self.builder, dropping_dw, check_bb_dw, some_bb_dw)
             wl_position_at_end(self.builder, check_bb_dw)
-            let pred_args_dw: Vec[i64] = Vec.new()
+            let pred_args_dw: List[i64] = List.new()
             pred_args_dw.push(payload_dw)
             let pred_raw_dw = self.mir_call_fn_value(pred_val_dw, wl_i1_type(self.context), pred_args_dw, 1)
             self.mir_iter_cancel_exit(none_bb_dw)
@@ -13987,13 +13987,13 @@ impl Codegen:
             let none_end_dw = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb_dw)
             let phi_dw = wl_build_phi(self.builder, opt_type)
-            let vals_dw: Vec[i64] = Vec.new()
-            let bbs_dw: Vec[i64] = Vec.new()
+            let vals_dw: List[i64] = List.new()
+            let bbs_dw: List[i64] = List.new()
             vals_dw.push(some_val_dw)
             vals_dw.push(none_val_dw)
             bbs_dw.push(some_end_dw)
             bbs_dw.push(none_end_dw)
-            wl_add_incoming(phi_dw, vec_data_i64(&vals_dw), vec_data_i64(&bbs_dw), 2)
+            wl_add_incoming(phi_dw, list_data_i64(&vals_dw), list_data_i64(&bbs_dw), 2)
             return phi_dw
         if name == "ZipIter":
             let left_tid = self.mir_generic_arg_tid(iter_sema, 0)
@@ -14036,13 +14036,13 @@ impl Codegen:
             let none_end4 = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb4)
             let phi4 = wl_build_phi(self.builder, opt_type)
-            let vals4: Vec[i64] = Vec.new()
-            let bbs4: Vec[i64] = Vec.new()
+            let vals4: List[i64] = List.new()
+            let bbs4: List[i64] = List.new()
             vals4.push(some_val4)
             vals4.push(none_val4)
             bbs4.push(some_end4)
             bbs4.push(none_end4)
-            wl_add_incoming(phi4, vec_data_i64(&vals4), vec_data_i64(&bbs4), 2)
+            wl_add_incoming(phi4, list_data_i64(&vals4), list_data_i64(&bbs4), 2)
             return phi4
         if name == "EnumerateIter":
             let upstream_tid_en = self.mir_generic_arg_tid(iter_sema, 0)
@@ -14076,13 +14076,13 @@ impl Codegen:
             let none_end_en = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb_en)
             let phi_en = wl_build_phi(self.builder, opt_type)
-            let vals_en: Vec[i64] = Vec.new()
-            let bbs_en: Vec[i64] = Vec.new()
+            let vals_en: List[i64] = List.new()
+            let bbs_en: List[i64] = List.new()
             vals_en.push(some_val_en)
             vals_en.push(none_val_en)
             bbs_en.push(some_end_en)
             bbs_en.push(none_end_en)
-            wl_add_incoming(phi_en, vec_data_i64(&vals_en), vec_data_i64(&bbs_en), 2)
+            wl_add_incoming(phi_en, list_data_i64(&vals_en), list_data_i64(&bbs_en), 2)
             return phi_en
         if name == "ChainIter":
             let left_tid_ch = self.mir_generic_arg_tid(iter_sema, 0)
@@ -14110,13 +14110,13 @@ impl Codegen:
             let right_end_ch = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb_ch)
             let phi_ch = wl_build_phi(self.builder, opt_type)
-            let vals_ch: Vec[i64] = Vec.new()
-            let bbs_ch: Vec[i64] = Vec.new()
+            let vals_ch: List[i64] = List.new()
+            let bbs_ch: List[i64] = List.new()
             vals_ch.push(left_next_ch)
             vals_ch.push(right_next_ch)
             bbs_ch.push(left_some_end_ch)
             bbs_ch.push(right_end_ch)
-            wl_add_incoming(phi_ch, vec_data_i64(&vals_ch), vec_data_i64(&bbs_ch), 2)
+            wl_add_incoming(phi_ch, list_data_i64(&vals_ch), list_data_i64(&bbs_ch), 2)
             return phi_ch
         if name == "ZipWithIter":
             let left_tid_zw = self.mir_generic_arg_tid(iter_sema, 0)
@@ -14144,7 +14144,7 @@ impl Codegen:
             wl_position_at_end(self.builder, some_bb_zw)
             let lv_zw = self.option_payload_value(ln_zw, left_ty_zw)
             let rv_zw = self.option_payload_value(rn_zw, right_ty_zw)
-            let call_args_zw: Vec[i64] = Vec.new()
+            let call_args_zw: List[i64] = List.new()
             call_args_zw.push(lv_zw)
             call_args_zw.push(rv_zw)
             let mapped_zw = self.mir_call_fn_value(fn_val_zw, elem_ty, call_args_zw, 2)
@@ -14158,13 +14158,13 @@ impl Codegen:
             let none_end_zw = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb_zw)
             let phi_zw = wl_build_phi(self.builder, opt_type)
-            let vals_zw: Vec[i64] = Vec.new()
-            let bbs_zw: Vec[i64] = Vec.new()
+            let vals_zw: List[i64] = List.new()
+            let bbs_zw: List[i64] = List.new()
             vals_zw.push(some_val_zw)
             vals_zw.push(none_val_zw)
             bbs_zw.push(some_end_zw)
             bbs_zw.push(none_end_zw)
-            wl_add_incoming(phi_zw, vec_data_i64(&vals_zw), vec_data_i64(&bbs_zw), 2)
+            wl_add_incoming(phi_zw, list_data_i64(&vals_zw), list_data_i64(&bbs_zw), 2)
             return phi_zw
         if name == "StepByIter":
             let upstream_tid_sb = self.mir_generic_arg_tid(iter_sema, 0)
@@ -14206,13 +14206,13 @@ impl Codegen:
             let none_end_sb = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb_sb)
             let phi_sb = wl_build_phi(self.builder, opt_type)
-            let vals_sb: Vec[i64] = Vec.new()
-            let bbs_sb: Vec[i64] = Vec.new()
+            let vals_sb: List[i64] = List.new()
+            let bbs_sb: List[i64] = List.new()
             vals_sb.push(next_sb)
             vals_sb.push(none_val_sb)
             bbs_sb.push(next_end_sb)
             bbs_sb.push(none_end_sb)
-            wl_add_incoming(phi_sb, vec_data_i64(&vals_sb), vec_data_i64(&bbs_sb), 2)
+            wl_add_incoming(phi_sb, list_data_i64(&vals_sb), list_data_i64(&bbs_sb), 2)
             return phi_sb
         if name == "FlatMapIter":
             let outer_tid = self.mir_generic_arg_tid(iter_sema, 0)
@@ -14255,12 +14255,12 @@ impl Codegen:
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(outer_next), produce_bb5, none_bb5)
             wl_position_at_end(self.builder, produce_bb5)
             let outer_payload = self.option_payload_value(outer_next, in_ty)
-            let fm_args: Vec[i64] = Vec.new()
+            let fm_args: List[i64] = List.new()
             fm_args.push(outer_payload)
             let produced = self.mir_call_fn_value(fn_val5, collection_ty, fm_args, 1)
             self.mir_iter_cancel_exit(none_bb5)
             let collection_name = self.mir_generic_base_name(collection_tid)
-            if collection_name == "Vec":
+            if collection_name == "List":
                 let current_ty = wl_struct_get_type_at(iter_ty, 2)
                 let data_raw = wl_build_extract_value(self.builder, produced, 0)
                 let len_raw = wl_build_extract_value(self.builder, produced, 1)
@@ -14281,13 +14281,13 @@ impl Codegen:
             let none_end5 = wl_get_insert_block(self.builder)
             wl_position_at_end(self.builder, merge_bb5)
             let phi5 = wl_build_phi(self.builder, opt_type)
-            let vals5: Vec[i64] = Vec.new()
-            let bbs5: Vec[i64] = Vec.new()
+            let vals5: List[i64] = List.new()
+            let bbs5: List[i64] = List.new()
             vals5.push(inner_next)
             vals5.push(none_val5)
             bbs5.push(inner_some_end)
             bbs5.push(none_end5)
-            wl_add_incoming(phi5, vec_data_i64(&vals5), vec_data_i64(&bbs5), 2)
+            wl_add_incoming(phi5, list_data_i64(&vals5), list_data_i64(&bbs5), 2)
             return phi5
         with_eprint("error: iterator codegen does not support iterator type '" ++ name ++ "'")
         self.had_error = 1
@@ -14361,7 +14361,7 @@ impl Codegen:
         wl_position_at_end(self.builder, body_bb)
         let elem = self.option_payload_value(next, elem_ty)
         let cur = wl_build_load(self.builder, acc_ty, acc_ptr)
-        let call_args: Vec[i64] = Vec.new()
+        let call_args: List[i64] = List.new()
         call_args.push(cur)
         call_args.push(elem)
         let updated = self.mir_call_fn_value(fn_val, acc_ty, call_args, 2)
@@ -14395,15 +14395,15 @@ impl Codegen:
             dest_arg_count = self.mir_type_d2_at(dest_resolved)
 
         if dest_sema == self.sema.ty_str as i32 or dest_resolved == self.sema.ty_str as i32:
-            let vec_ty = self.get_or_create_vec_type(0, elem_ty)
-            let out_ptr = self.create_entry_alloca(vec_ty)
-            wl_build_store(self.builder, self.build_default_value(vec_ty), out_ptr)
-            let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
-            let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
-            let new_args: Vec[i64] = Vec.new()
+            let list_ty = self.get_or_create_list_type(0, elem_ty)
+            let out_ptr = self.create_entry_alloca(list_ty)
+            wl_build_store(self.builder, self.build_default_value(list_ty), out_ptr)
+            let new_fn = self.ensure_list_runtime_fn("with_vec_new_out", void_ty, 2)
+            let new_ty = self.get_list_fn_type("with_vec_new_out", void_ty, 2)
+            let new_args: List[i64] = List.new()
             new_args.push(out_ptr)
             new_args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
-            let _ = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args), 2)
+            let _ = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(&new_args), 2)
             let tmp = self.create_entry_alloca(elem_ty)
             let loop_bb = wl_append_bb(self.context, self.current_function, "itercollectstr.loop")
             let push_bb = wl_append_bb(self.context, self.current_function, "itercollectstr.push")
@@ -14415,28 +14415,28 @@ impl Codegen:
             wl_position_at_end(self.builder, push_bb)
             let elem = self.option_payload_value(next, elem_ty)
             wl_build_store(self.builder, elem, tmp)
-            let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
-            let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
-            let push_args: Vec[i64] = Vec.new()
+            let push_fn = self.ensure_list_runtime_fn("with_vec_push", void_ty, 2)
+            let push_ty = self.get_list_fn_type("with_vec_push", void_ty, 2)
+            let push_args: List[i64] = List.new()
             push_args.push(out_ptr)
             push_args.push(tmp)
-            let _p = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&push_args), 2)
+            let _p = wl_build_call(self.builder, push_ty, push_fn, list_data_i64(&push_args), 2)
             wl_build_br(self.builder, loop_bb)
             wl_position_at_end(self.builder, end_bb)
             let str_ty = self.mir_sema_type_to_llvm(self.sema.ty_str as i32)
             let str_sym = self.intern.intern("with_str_from_vec_u8")
             var str_fn = wl_get_named_function(self.llmod, "with_str_from_vec_u8")
             if str_fn == 0:
-                let str_params: Vec[i64] = Vec.new()
+                let str_params: List[i64] = List.new()
                 str_params.push(ptr_ty)
                 str_fn = self.ensure_internal_runtime_fn("with_str_from_vec_u8", str_params, 1, str_ty)
             let str_call_ty: i64 = self.fn_fn_types.get(str_sym).unwrap()
-            let str_args: Vec[i64] = Vec.new()
+            let str_args: List[i64] = List.new()
             str_args.push(out_ptr)
             let collected = self.build_call_fn_value(str_sym, str_fn, str_call_ty, -1, 0, str_args, 1, "collect_str", 0)
-            // The str is a copy of the bytes; the staging Vec is this
+            // The str is a copy of the bytes; the staging List is this
             // lowering's own and dies here.
-            self.mir_emit_vec_free_ptr(out_ptr)
+            self.mir_emit_list_free_ptr(out_ptr)
             return collected
 
         if dest_base_sym == self.sym_hashset or dest_base_sym == self.sym_hashmap:
@@ -14469,12 +14469,12 @@ impl Codegen:
             let handle = self.mir_emit_hashmap_new(if key_tid != 0: key_tid else: elem_tid, key_ty, key_size, val_size)
             let map_init = wl_build_insert_value(self.builder, self.build_default_value(map_ty), handle, 0)
             wl_build_store(self.builder, map_init, out_ptr)
-            let insert_params: Vec[i64] = Vec.new()
+            let insert_params: List[i64] = List.new()
             insert_params.push(ptr_ty)
             insert_params.push(ptr_ty)
             insert_params.push(ptr_ty)
             insert_params.push(i64_ty)
-            let insert_ty = wl_function_type(void_ty, vec_data_i64(&insert_params), 4, 0)
+            let insert_ty = wl_function_type(void_ty, list_data_i64(&insert_params), 4, 0)
             var insert_fn = wl_get_named_function(self.llmod, "with_hashmap_insert")
             if insert_fn == 0:
                 insert_fn = wl_add_function(self.llmod, "with_hashmap_insert", insert_ty)
@@ -14499,7 +14499,7 @@ impl Codegen:
             wl_build_store(self.builder, key_val, key_alloca)
             wl_build_store(self.builder, val_val, val_alloca)
             let is_str_key = wl_const_int(i64_ty, if self.is_str_type(key_ty): 1 else: 0, 0)
-            let insert_args: Vec[i64] = Vec.new()
+            let insert_args: List[i64] = List.new()
             insert_args.push(handle)
             insert_args.push(key_alloca)
             insert_args.push(val_alloca)
@@ -14520,24 +14520,24 @@ impl Codegen:
                 let key_ty0_b = self.mir_sema_type_to_llvm(key_tid_b)
                 if key_ty0_b != 0:
                     key_ty_b = key_ty0_b
-            let vec_ty = self.get_or_create_vec_type(0, elem_ty)
-            let out_ptr = self.create_entry_alloca(vec_ty)
-            wl_build_store(self.builder, self.build_default_value(vec_ty), out_ptr)
-            let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
-            let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
-            let new_args: Vec[i64] = Vec.new()
+            let list_ty = self.get_or_create_list_type(0, elem_ty)
+            let out_ptr = self.create_entry_alloca(list_ty)
+            wl_build_store(self.builder, self.build_default_value(list_ty), out_ptr)
+            let new_fn = self.ensure_list_runtime_fn("with_vec_new_out", void_ty, 2)
+            let new_ty = self.get_list_fn_type("with_vec_new_out", void_ty, 2)
+            let new_args: List[i64] = List.new()
             new_args.push(out_ptr)
             new_args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
-            let _ = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args), 2)
+            let _ = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(&new_args), 2)
             let tmp = self.create_entry_alloca(elem_ty)
             let idx_ptr_b = self.create_entry_alloca(i64_ty)
             let j_ptr_b = self.create_entry_alloca(i64_ty)
-            let len_fn_b = self.ensure_vec_runtime_fn("with_vec_len", i64_ty, 1)
-            let len_ty_b = self.get_vec_fn_type("with_vec_len", i64_ty, 1)
-            let get_fn_b = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
-            let get_ty_b = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
-            let push_fn_b = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
-            let push_ty_b = self.get_vec_fn_type("with_vec_push", void_ty, 2)
+            let len_fn_b = self.ensure_list_runtime_fn("with_vec_len", i64_ty, 1)
+            let len_ty_b = self.get_list_fn_type("with_vec_len", i64_ty, 1)
+            let get_fn_b = self.ensure_list_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+            let get_ty_b = self.get_list_fn_type("with_vec_get_ptr", ptr_ty, 2)
+            let push_fn_b = self.ensure_list_runtime_fn("with_vec_push", void_ty, 2)
+            let push_ty_b = self.get_list_fn_type("with_vec_push", void_ty, 2)
             let loop_bb_b = wl_append_bb(self.context, self.current_function, "itercollectbtree.loop")
             let item_bb_b = wl_append_bb(self.context, self.current_function, "itercollectbtree.item")
             let scan_bb_b = wl_append_bb(self.context, self.current_function, "itercollectbtree.scan")
@@ -14564,18 +14564,18 @@ impl Codegen:
             wl_build_br(self.builder, scan_bb_b)
 
             wl_position_at_end(self.builder, scan_bb_b)
-            let len_args_b: Vec[i64] = Vec.new()
+            let len_args_b: List[i64] = List.new()
             len_args_b.push(out_ptr)
-            let len_b = wl_build_call(self.builder, len_ty_b, len_fn_b, vec_data_i64(&len_args_b), 1)
+            let len_b = wl_build_call(self.builder, len_ty_b, len_fn_b, list_data_i64(&len_args_b), 1)
             let idx_b = wl_build_load(self.builder, i64_ty, idx_ptr_b)
             let in_range_b = wl_build_icmp(self.builder, wl_int_slt(), idx_b, len_b)
             wl_build_cond_br(self.builder, in_range_b, check_bb_b, append_bb_b)
 
             wl_position_at_end(self.builder, check_bb_b)
-            let get_args_b: Vec[i64] = Vec.new()
+            let get_args_b: List[i64] = List.new()
             get_args_b.push(out_ptr)
             get_args_b.push(idx_b)
-            let entry_ptr_b = wl_build_call(self.builder, get_ty_b, get_fn_b, vec_data_i64(&get_args_b), 2)
+            let entry_ptr_b = wl_build_call(self.builder, get_ty_b, get_fn_b, list_data_i64(&get_args_b), 2)
             let entry_b = wl_build_load(self.builder, elem_ty, entry_ptr_b)
             var existing_key_b = entry_b
             if dest_base_sym == self.sym_btreemap:
@@ -14604,10 +14604,10 @@ impl Codegen:
 
             wl_position_at_end(self.builder, append_bb_b)
             wl_build_store(self.builder, elem_b, tmp)
-            let push_args_b: Vec[i64] = Vec.new()
+            let push_args_b: List[i64] = List.new()
             push_args_b.push(out_ptr)
             push_args_b.push(tmp)
-            let _p = wl_build_call(self.builder, push_ty_b, push_fn_b, vec_data_i64(&push_args_b), 2)
+            let _p = wl_build_call(self.builder, push_ty_b, push_fn_b, list_data_i64(&push_args_b), 2)
             wl_build_store(self.builder, len_b, j_ptr_b)
             wl_build_br(self.builder, swap_check_bb_b)
 
@@ -14619,14 +14619,14 @@ impl Codegen:
 
             wl_position_at_end(self.builder, swap_body_bb_b)
             let left_idx_b = wl_build_sub(self.builder, j_b, wl_const_int(i64_ty, 1, 0))
-            let left_args_b: Vec[i64] = Vec.new()
+            let left_args_b: List[i64] = List.new()
             left_args_b.push(out_ptr)
             left_args_b.push(left_idx_b)
-            let left_ptr_b = wl_build_call(self.builder, get_ty_b, get_fn_b, vec_data_i64(&left_args_b), 2)
-            let right_args_b: Vec[i64] = Vec.new()
+            let left_ptr_b = wl_build_call(self.builder, get_ty_b, get_fn_b, list_data_i64(&left_args_b), 2)
+            let right_args_b: List[i64] = List.new()
             right_args_b.push(out_ptr)
             right_args_b.push(j_b)
-            let right_ptr_b = wl_build_call(self.builder, get_ty_b, get_fn_b, vec_data_i64(&right_args_b), 2)
+            let right_ptr_b = wl_build_call(self.builder, get_ty_b, get_fn_b, list_data_i64(&right_args_b), 2)
             let left_val_b = wl_build_load(self.builder, elem_ty, left_ptr_b)
             let right_val_b = wl_build_load(self.builder, elem_ty, right_ptr_b)
             wl_build_store(self.builder, right_val_b, left_ptr_b)
@@ -14635,22 +14635,22 @@ impl Codegen:
             wl_build_br(self.builder, swap_check_bb_b)
 
             wl_position_at_end(self.builder, end_bb_b)
-            let vec_value = wl_build_load(self.builder, vec_ty, out_ptr)
+            let list_value = wl_build_load(self.builder, list_ty, out_ptr)
             let dest_ty = self.mir_dest_llvm_type(body, dest_place)
             var result = self.build_default_value(dest_ty)
-            result = wl_build_insert_value(self.builder, result, vec_value, 0)
+            result = wl_build_insert_value(self.builder, result, list_value, 0)
             return result
 
-        let vec_ty0 = self.mir_sema_type_to_llvm(dest_sema)
-        let vec_ty = if vec_ty0 != 0: vec_ty0 else: self.get_or_create_vec_type(0, elem_ty)
-        let out_ptr = self.create_entry_alloca(vec_ty)
-        wl_build_store(self.builder, self.build_default_value(vec_ty), out_ptr)
-        let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
-        let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
-        let new_args: Vec[i64] = Vec.new()
+        let list_ty0 = self.mir_sema_type_to_llvm(dest_sema)
+        let list_ty = if list_ty0 != 0: list_ty0 else: self.get_or_create_list_type(0, elem_ty)
+        let out_ptr = self.create_entry_alloca(list_ty)
+        wl_build_store(self.builder, self.build_default_value(list_ty), out_ptr)
+        let new_fn = self.ensure_list_runtime_fn("with_vec_new_out", void_ty, 2)
+        let new_ty = self.get_list_fn_type("with_vec_new_out", void_ty, 2)
+        let new_args: List[i64] = List.new()
         new_args.push(out_ptr)
         new_args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
-        let _ = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args), 2)
+        let _ = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(&new_args), 2)
         let tmp = self.create_entry_alloca(elem_ty)
         let loop_bb = wl_append_bb(self.context, self.current_function, "itercollect.loop")
         let push_bb = wl_append_bb(self.context, self.current_function, "itercollect.push")
@@ -14662,15 +14662,15 @@ impl Codegen:
         wl_position_at_end(self.builder, push_bb)
         let elem = self.option_payload_value(next, elem_ty)
         wl_build_store(self.builder, elem, tmp)
-        let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
-        let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
-        let push_args: Vec[i64] = Vec.new()
+        let push_fn = self.ensure_list_runtime_fn("with_vec_push", void_ty, 2)
+        let push_ty = self.get_list_fn_type("with_vec_push", void_ty, 2)
+        let push_args: List[i64] = List.new()
         push_args.push(out_ptr)
         push_args.push(tmp)
-        let _p = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&push_args), 2)
+        let _p = wl_build_call(self.builder, push_ty, push_fn, list_data_i64(&push_args), 2)
         wl_build_br(self.builder, loop_bb)
         wl_position_at_end(self.builder, end_bb)
-        wl_build_load(self.builder, vec_ty, out_ptr)
+        wl_build_load(self.builder, list_ty, out_ptr)
 
     mut fn mir_emit_iter_count(body: &MirBody, args_id: i32, dest_place: i32) -> i64:
         let i64_ty = wl_i64_type(self.context)
@@ -14827,13 +14827,13 @@ impl Codegen:
         let none_end = wl_get_insert_block(self.builder)
         wl_position_at_end(self.builder, merge_bb)
         let phi = wl_build_phi(self.builder, opt_ty)
-        let vals: Vec[i64] = Vec.new()
-        let bbs: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
+        let bbs: List[i64] = List.new()
         vals.push(some_val)
         vals.push(none_val)
         bbs.push(some_end)
         bbs.push(none_end)
-        wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+        wl_add_incoming(phi, list_data_i64(&vals), list_data_i64(&bbs), 2)
         phi
 
     mut fn mir_emit_iter_minmax_by(body: &MirBody, args_id: i32, dest_place: i32, want_max: bool) -> i64:
@@ -14870,7 +14870,7 @@ impl Codegen:
         wl_build_br(self.builder, loop_bb)
         wl_position_at_end(self.builder, compare_bb)
         let cur = wl_build_load(self.builder, elem_ty, acc_ptr)
-        let cmp_args: Vec[i64] = Vec.new()
+        let cmp_args: List[i64] = List.new()
         cmp_args.push(cur)
         cmp_args.push(elem)
         let cmp_raw = self.mir_call_fn_value(fn_val, wl_i32_type(self.context), cmp_args, 2)
@@ -14904,13 +14904,13 @@ impl Codegen:
         let none_end = wl_get_insert_block(self.builder)
         wl_position_at_end(self.builder, merge_bb)
         let phi = wl_build_phi(self.builder, opt_ty)
-        let vals: Vec[i64] = Vec.new()
-        let bbs: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
+        let bbs: List[i64] = List.new()
         vals.push(some_val)
         vals.push(none_val)
         bbs.push(some_end)
         bbs.push(none_end)
-        wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+        wl_add_incoming(phi, list_data_i64(&vals), list_data_i64(&bbs), 2)
         phi
 
     mut fn mir_emit_iter_find(body: &MirBody, args_id: i32, dest_place: i32) -> i64:
@@ -14935,7 +14935,7 @@ impl Codegen:
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), test_bb, none_bb)
         wl_position_at_end(self.builder, test_bb)
         let elem = self.option_payload_value(next, elem_ty)
-        let pred_args: Vec[i64] = Vec.new()
+        let pred_args: List[i64] = List.new()
         pred_args.push(elem)
         let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
         self.mir_iter_cancel_exit(none_bb)
@@ -14953,13 +14953,13 @@ impl Codegen:
         let none_end = wl_get_insert_block(self.builder)
         wl_position_at_end(self.builder, merge_bb)
         let phi = wl_build_phi(self.builder, opt_ty)
-        let vals: Vec[i64] = Vec.new()
-        let bbs: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
+        let bbs: List[i64] = List.new()
         vals.push(some_val)
         vals.push(none_val)
         bbs.push(found_end)
         bbs.push(none_end)
-        wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+        wl_add_incoming(phi, list_data_i64(&vals), list_data_i64(&bbs), 2)
         phi
 
     mut fn mir_emit_iter_position(body: &MirBody, args_id: i32, dest_place: i32) -> i64:
@@ -14988,7 +14988,7 @@ impl Codegen:
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), test_bb, none_bb)
         wl_position_at_end(self.builder, test_bb)
         let elem = self.option_payload_value(next, elem_ty)
-        let pred_args: Vec[i64] = Vec.new()
+        let pred_args: List[i64] = List.new()
         pred_args.push(elem)
         let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
         self.mir_iter_cancel_exit(none_bb)
@@ -15010,13 +15010,13 @@ impl Codegen:
         let none_end = wl_get_insert_block(self.builder)
         wl_position_at_end(self.builder, merge_bb)
         let phi = wl_build_phi(self.builder, opt_ty)
-        let vals: Vec[i64] = Vec.new()
-        let bbs: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
+        let bbs: List[i64] = List.new()
         vals.push(some_val)
         vals.push(none_val)
         bbs.push(found_end)
         bbs.push(none_end)
-        wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+        wl_add_incoming(phi, list_data_i64(&vals), list_data_i64(&bbs), 2)
         phi
 
     mut fn mir_emit_iter_bool_predicate(body: &MirBody, args_id: i32, intrinsic: MirIntrinsic) -> i64:
@@ -15043,7 +15043,7 @@ impl Codegen:
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), test_bb, end_bb)
         wl_position_at_end(self.builder, test_bb)
         let elem = self.option_payload_value(next, elem_ty)
-        let pred_args: Vec[i64] = Vec.new()
+        let pred_args: List[i64] = List.new()
         pred_args.push(elem)
         let pred_raw = self.mir_call_fn_value(pred_val, i1_ty, pred_args, 1)
         self.mir_iter_cancel_exit(end_bb)
@@ -15079,7 +15079,7 @@ impl Codegen:
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), body_bb, end_bb)
         wl_position_at_end(self.builder, body_bb)
         let elem = self.option_payload_value(next, elem_ty)
-        let call_args: Vec[i64] = Vec.new()
+        let call_args: List[i64] = List.new()
         call_args.push(elem)
         let _ = self.mir_call_fn_value(fn_val, wl_void_type(self.context), call_args, 1)
         self.mir_iter_cancel_exit(end_bb)
@@ -15109,16 +15109,16 @@ impl Codegen:
         wl_build_store(self.builder, self.build_default_value(tuple_ty), out_ptr)
         let left_ptr = self.tuple_elem_ptr(tuple_ty, out_ptr, 0)
         let right_ptr = self.tuple_elem_ptr(tuple_ty, out_ptr, 1)
-        let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
-        let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
-        let left_new_args: Vec[i64] = Vec.new()
+        let new_fn = self.ensure_list_runtime_fn("with_vec_new_out", void_ty, 2)
+        let new_ty = self.get_list_fn_type("with_vec_new_out", void_ty, 2)
+        let left_new_args: List[i64] = List.new()
         left_new_args.push(left_ptr)
         left_new_args.push(wl_const_int(i64_ty, self.abi_size_of(left_elem_ty), 0))
-        let _ln = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&left_new_args), 2)
-        let right_new_args: Vec[i64] = Vec.new()
+        let _ln = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(&left_new_args), 2)
+        let right_new_args: List[i64] = List.new()
         right_new_args.push(right_ptr)
         right_new_args.push(wl_const_int(i64_ty, self.abi_size_of(right_elem_ty), 0))
-        let _rn = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&right_new_args), 2)
+        let _rn = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(&right_new_args), 2)
         let left_tmp = self.create_entry_alloca(left_elem_ty)
         let right_tmp = self.create_entry_alloca(right_elem_ty)
         let loop_bb = wl_append_bb(self.context, self.current_function, "iterunzip.loop")
@@ -15132,16 +15132,16 @@ impl Codegen:
         let elem = self.option_payload_value(next, elem_ty)
         wl_build_store(self.builder, self.tuple_elem_extract(elem, 0), left_tmp)
         wl_build_store(self.builder, self.tuple_elem_extract(elem, 1), right_tmp)
-        let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
-        let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
-        let left_push_args: Vec[i64] = Vec.new()
+        let push_fn = self.ensure_list_runtime_fn("with_vec_push", void_ty, 2)
+        let push_ty = self.get_list_fn_type("with_vec_push", void_ty, 2)
+        let left_push_args: List[i64] = List.new()
         left_push_args.push(left_ptr)
         left_push_args.push(left_tmp)
-        let _lp = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&left_push_args), 2)
-        let right_push_args: Vec[i64] = Vec.new()
+        let _lp = wl_build_call(self.builder, push_ty, push_fn, list_data_i64(&left_push_args), 2)
+        let right_push_args: List[i64] = List.new()
         right_push_args.push(right_ptr)
         right_push_args.push(right_tmp)
-        let _rp = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&right_push_args), 2)
+        let _rp = wl_build_call(self.builder, push_ty, push_fn, list_data_i64(&right_push_args), 2)
         wl_build_br(self.builder, loop_bb)
         wl_position_at_end(self.builder, end_bb)
         wl_build_load(self.builder, tuple_ty, out_ptr)
@@ -15178,7 +15178,7 @@ impl Codegen:
         wl_build_br(self.builder, loop_bb)
         wl_position_at_end(self.builder, combine_bb)
         let cur = wl_build_load(self.builder, elem_ty, acc_ptr)
-        let call_args: Vec[i64] = Vec.new()
+        let call_args: List[i64] = List.new()
         call_args.push(cur)
         call_args.push(elem)
         let updated = self.mir_call_fn_value(fn_val, elem_ty, call_args, 2)
@@ -15203,13 +15203,13 @@ impl Codegen:
         let none_end = wl_get_insert_block(self.builder)
         wl_position_at_end(self.builder, merge_bb)
         let phi = wl_build_phi(self.builder, opt_ty)
-        let vals: Vec[i64] = Vec.new()
-        let bbs: Vec[i64] = Vec.new()
+        let vals: List[i64] = List.new()
+        let bbs: List[i64] = List.new()
         vals.push(some_val)
         vals.push(none_val)
         bbs.push(some_end)
         bbs.push(none_end)
-        wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+        wl_add_incoming(phi, list_data_i64(&vals), list_data_i64(&bbs), 2)
         phi
 
     mut fn mir_emit_iter_partition(body: &MirBody, args_id: i32, dest_place: i32) -> i64:
@@ -15229,16 +15229,16 @@ impl Codegen:
         wl_build_store(self.builder, self.build_default_value(tuple_ty), out_ptr)
         let left_ptr = self.tuple_elem_ptr(tuple_ty, out_ptr, 0)
         let right_ptr = self.tuple_elem_ptr(tuple_ty, out_ptr, 1)
-        let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
-        let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
-        let left_new_args: Vec[i64] = Vec.new()
+        let new_fn = self.ensure_list_runtime_fn("with_vec_new_out", void_ty, 2)
+        let new_ty = self.get_list_fn_type("with_vec_new_out", void_ty, 2)
+        let left_new_args: List[i64] = List.new()
         left_new_args.push(left_ptr)
         left_new_args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
-        let _ln = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&left_new_args), 2)
-        let right_new_args: Vec[i64] = Vec.new()
+        let _ln = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(&left_new_args), 2)
+        let right_new_args: List[i64] = List.new()
         right_new_args.push(right_ptr)
         right_new_args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
-        let _rn = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&right_new_args), 2)
+        let _rn = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(&right_new_args), 2)
         let tmp = self.create_entry_alloca(elem_ty)
         let loop_bb = wl_append_bb(self.context, self.current_function, "iterpart.loop")
         let pred_bb = wl_append_bb(self.context, self.current_function, "iterpart.pred")
@@ -15252,7 +15252,7 @@ impl Codegen:
         wl_position_at_end(self.builder, pred_bb)
         let elem = self.option_payload_value(next, elem_ty)
         wl_build_store(self.builder, elem, tmp)
-        let pred_args: Vec[i64] = Vec.new()
+        let pred_args: List[i64] = List.new()
         pred_args.push(elem)
         let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
         self.mir_iter_cancel_exit(end_bb)
@@ -15260,19 +15260,19 @@ impl Codegen:
         if wl_type_of(pred_raw) != wl_i1_type(self.context):
             pred_bool = wl_build_icmp(self.builder, wl_int_ne(), pred_raw, wl_const_int(wl_type_of(pred_raw), 0, 0))
         wl_build_cond_br(self.builder, pred_bool, left_bb, right_bb)
-        let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
-        let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
+        let push_fn = self.ensure_list_runtime_fn("with_vec_push", void_ty, 2)
+        let push_ty = self.get_list_fn_type("with_vec_push", void_ty, 2)
         wl_position_at_end(self.builder, left_bb)
-        let la: Vec[i64] = Vec.new()
+        let la: List[i64] = List.new()
         la.push(left_ptr)
         la.push(tmp)
-        let _lp = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&la), 2)
+        let _lp = wl_build_call(self.builder, push_ty, push_fn, list_data_i64(&la), 2)
         wl_build_br(self.builder, loop_bb)
         wl_position_at_end(self.builder, right_bb)
-        let ra: Vec[i64] = Vec.new()
+        let ra: List[i64] = List.new()
         ra.push(right_ptr)
         ra.push(tmp)
-        let _rp = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&ra), 2)
+        let _rp = wl_build_call(self.builder, push_ty, push_fn, list_data_i64(&ra), 2)
         wl_build_br(self.builder, loop_bb)
         wl_position_at_end(self.builder, end_bb)
         wl_build_load(self.builder, tuple_ty, out_ptr)
@@ -15314,12 +15314,12 @@ impl Codegen:
         let wc = wl_build_call(self.builder, wl_global_get_value_type(wc_fn), wc_fn, 0, 0)
         wl_build_icmp(self.builder, wl_int_ne(), wc, wl_const_int(wl_i32_type(self.context), 0, 0))
 
-    mut fn mir_emit_vec_map(body: &MirBody, args_id: i32) -> i64:
+    mut fn mir_emit_list_map(body: &MirBody, args_id: i32) -> i64:
         let i64_ty = wl_i64_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
         let void_ty = wl_void_type(self.context)
-        let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+        let recv = self.mir_intrinsic_recv_list_value(body, args_id)
         let fn_val = self.mir_intrinsic_arg(body, args_id, 1)
         let cty = wl_type_of(fn_val)
         var fn_ptr = fn_val
@@ -15329,9 +15329,9 @@ impl Codegen:
             fn_ptr = wl_build_extract_value(self.builder, fn_val, 0)
             ctx_ptr = wl_build_extract_value(self.builder, fn_val, 1)
             is_fat = 1
-        // Input element type (from the receiver Vec) and output element type (the
+        // Input element type (from the receiver List) and output element type (the
         // closure's return type). Previously both were hardcoded to i32, so mapping
-        // a Vec of any non-i32-sized element (structs, str, …) loaded the wrong
+        // a List of any non-i32-sized element (structs, str, …) loaded the wrong
         // bytes and produced garbage (#306).
         let map_arg_start = body.call_arg_starts[args_id]
         let map_recv_op = body.call_arg_operands[map_arg_start]
@@ -15357,24 +15357,24 @@ impl Codegen:
         if is_fat != 0:
             // Fat pointer closure: fn_ptr is extract_value, not a global.
             // Build fn_ty from closure calling convention: fn(ptr, elem) -> ret
-            let fp: Vec[i64] = Vec.new()
+            let fp: List[i64] = List.new()
             fp.push(ptr_ty)
             fp.push(self.closure_abi_param_ty(elem_ty))
-            fn_ty = wl_function_type(out_elem_ty, vec_data_i64(&fp), 2, 0)
+            fn_ty = wl_function_type(out_elem_ty, list_data_i64(&fp), 2, 0)
             ret_ty = out_elem_ty
         else:
             fn_ty = wl_global_get_value_type(fn_ptr)
             ret_ty = wl_get_return_type(fn_ty)
         let len = wl_build_extract_value(self.builder, recv, 1)
-        let rvt = self.get_or_create_vec_type(0, ret_ty)
+        let rvt = self.get_or_create_list_type(0, ret_ty)
         let ra = self.create_entry_alloca(rvt)
         wl_build_store(self.builder, self.build_default_value(rvt), ra)
-        let nf = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
-        let nt = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
-        let na: Vec[i64] = Vec.new()
+        let nf = self.ensure_list_runtime_fn("with_vec_new_out", void_ty, 2)
+        let nt = self.get_list_fn_type("with_vec_new_out", void_ty, 2)
+        let na: List[i64] = List.new()
         na.push(ra)
         na.push(wl_const_int(i64_ty, self.abi_size_of(ret_ty), 0))
-        let _ = wl_build_call(self.builder, nt, nf, vec_data_i64(&na), 2)
+        let _ = wl_build_call(self.builder, nt, nf, list_data_i64(&na), 2)
         let sa = self.create_entry_alloca(wl_type_of(recv))
         wl_build_store(self.builder, recv, sa)
         let ctr = self.create_entry_alloca(i64_ty)
@@ -15389,26 +15389,26 @@ impl Codegen:
         let cv = wl_build_load(self.builder, i64_ty, ctr)
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_slt(), cv, len), bb, eb)
         wl_position_at_end(self.builder, bb)
-        let gf = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
-        let gt = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
-        let ga: Vec[i64] = Vec.new()
+        let gf = self.ensure_list_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+        let gt = self.get_list_fn_type("with_vec_get_ptr", ptr_ty, 2)
+        let ga: List[i64] = List.new()
         ga.push(sa)
         ga.push(wl_build_load(self.builder, i64_ty, ctr))
-        let ep = wl_build_call(self.builder, gt, gf, vec_data_i64(&ga), 2)
+        let ep = wl_build_call(self.builder, gt, gf, list_data_i64(&ga), 2)
         let el = wl_build_load(self.builder, elem_ty, ep)
-        let ca: Vec[i64] = Vec.new()
+        let ca: List[i64] = List.new()
         if is_fat != 0: ca.push(ctx_ptr)
         ca.push(self.closure_abi_arg(elem_ty, el))
         let cc = if is_fat != 0: 2 else: 1
-        let rv = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&ca), cc)
+        let rv = wl_build_call(self.builder, fn_ty, fn_ptr, list_data_i64(&ca), cc)
         self.mir_iter_cancel_exit(eb)
         wl_build_store(self.builder, rv, tmp)
-        let pf = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
-        let pt = self.get_vec_fn_type("with_vec_push", void_ty, 2)
-        let pa: Vec[i64] = Vec.new()
+        let pf = self.ensure_list_runtime_fn("with_vec_push", void_ty, 2)
+        let pt = self.get_list_fn_type("with_vec_push", void_ty, 2)
+        let pa: List[i64] = List.new()
         pa.push(ra)
         pa.push(tmp)
-        let _ = wl_build_call(self.builder, pt, pf, vec_data_i64(&pa), 2)
+        let _ = wl_build_call(self.builder, pt, pf, list_data_i64(&pa), 2)
         wl_build_br(self.builder, ib)
         wl_position_at_end(self.builder, ib)
         wl_build_store(self.builder, wl_build_add(self.builder, wl_build_load(self.builder, i64_ty, ctr), wl_const_int(i64_ty, 1, 0)), ctr)
@@ -15416,12 +15416,12 @@ impl Codegen:
         wl_position_at_end(self.builder, eb)
         wl_build_load(self.builder, rvt, ra)
 
-    mut fn mir_emit_vec_filter(body: &MirBody, args_id: i32) -> i64:
+    mut fn mir_emit_list_filter(body: &MirBody, args_id: i32) -> i64:
         let i64_ty = wl_i64_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
         let void_ty = wl_void_type(self.context)
-        let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+        let recv = self.mir_intrinsic_recv_list_value(body, args_id)
         let fn_val = self.mir_intrinsic_arg(body, args_id, 1)
         let cty = wl_type_of(fn_val)
         var fn_ptr = fn_val
@@ -15435,7 +15435,7 @@ impl Codegen:
         var pred_ret_ty = i32_ty
         let arg_start_for_pred = body.call_arg_starts[args_id]
         let filter_recv_op = body.call_arg_operands[arg_start_for_pred]
-        let filter_elem_ty = self.mir_vec_elem_type(body, filter_recv_op)
+        let filter_elem_ty = self.mir_list_elem_type(body, filter_recv_op)
         if filter_elem_ty != 0:
             elem_ty = filter_elem_ty
         let pred_op = body.call_arg_operands[(arg_start_for_pred + 1)]
@@ -15449,22 +15449,22 @@ impl Codegen:
                     pred_ret_ty = pred_ret_llvm
         var fn_ty: i64 = 0
         if is_fat != 0:
-            let fp: Vec[i64] = Vec.new()
+            let fp: List[i64] = List.new()
             fp.push(ptr_ty)
             fp.push(self.closure_abi_param_ty(elem_ty))
-            fn_ty = wl_function_type(pred_ret_ty, vec_data_i64(&fp), 2, 0)
+            fn_ty = wl_function_type(pred_ret_ty, list_data_i64(&fp), 2, 0)
         else:
             fn_ty = wl_global_get_value_type(fn_ptr)
         let len = wl_build_extract_value(self.builder, recv, 1)
-        let vt = self.get_or_create_vec_type(0, elem_ty)
+        let vt = self.get_or_create_list_type(0, elem_ty)
         let ra = self.create_entry_alloca(vt)
         wl_build_store(self.builder, self.build_default_value(vt), ra)
-        let nf = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
-        let nt = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
-        let na: Vec[i64] = Vec.new()
+        let nf = self.ensure_list_runtime_fn("with_vec_new_out", void_ty, 2)
+        let nt = self.get_list_fn_type("with_vec_new_out", void_ty, 2)
+        let na: List[i64] = List.new()
         na.push(ra)
         na.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
-        let _ = wl_build_call(self.builder, nt, nf, vec_data_i64(&na), 2)
+        let _ = wl_build_call(self.builder, nt, nf, list_data_i64(&na), 2)
         let sa = self.create_entry_alloca(wl_type_of(recv))
         wl_build_store(self.builder, recv, sa)
         let ctr = self.create_entry_alloca(i64_ty)
@@ -15480,28 +15480,28 @@ impl Codegen:
         let cv = wl_build_load(self.builder, i64_ty, ctr)
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_slt(), cv, len), bb, eb)
         wl_position_at_end(self.builder, bb)
-        let gf = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
-        let gt = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
-        let ga: Vec[i64] = Vec.new()
+        let gf = self.ensure_list_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+        let gt = self.get_list_fn_type("with_vec_get_ptr", ptr_ty, 2)
+        let ga: List[i64] = List.new()
         ga.push(sa)
         ga.push(wl_build_load(self.builder, i64_ty, ctr))
-        let ep = wl_build_call(self.builder, gt, gf, vec_data_i64(&ga), 2)
+        let ep = wl_build_call(self.builder, gt, gf, list_data_i64(&ga), 2)
         let el = wl_build_load(self.builder, elem_ty, ep)
-        let ca: Vec[i64] = Vec.new()
+        let ca: List[i64] = List.new()
         if is_fat != 0: ca.push(ctx_ptr)
         ca.push(self.closure_abi_arg(elem_ty, el))
         let cc = if is_fat != 0: 2 else: 1
-        let pred = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&ca), cc)
+        let pred = wl_build_call(self.builder, fn_ty, fn_ptr, list_data_i64(&ca), cc)
         self.mir_iter_cancel_exit(eb)
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_ne(), pred, wl_const_int(wl_type_of(pred), 0, 0)), pb, ib)
         wl_position_at_end(self.builder, pb)
         wl_build_store(self.builder, el, tmp)
-        let pf = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
-        let pt = self.get_vec_fn_type("with_vec_push", void_ty, 2)
-        let pa: Vec[i64] = Vec.new()
+        let pf = self.ensure_list_runtime_fn("with_vec_push", void_ty, 2)
+        let pt = self.get_list_fn_type("with_vec_push", void_ty, 2)
+        let pa: List[i64] = List.new()
         pa.push(ra)
         pa.push(tmp)
-        let _ = wl_build_call(self.builder, pt, pf, vec_data_i64(&pa), 2)
+        let _ = wl_build_call(self.builder, pt, pf, list_data_i64(&pa), 2)
         wl_build_br(self.builder, ib)
         wl_position_at_end(self.builder, ib)
         wl_build_store(self.builder, wl_build_add(self.builder, wl_build_load(self.builder, i64_ty, ctr), wl_const_int(i64_ty, 1, 0)), ctr)
@@ -15509,15 +15509,15 @@ impl Codegen:
         wl_position_at_end(self.builder, eb)
         wl_build_load(self.builder, vt, ra)
 
-    mut fn mir_emit_vec_contains(body: &MirBody, args_id: i32) -> i64:
+    mut fn mir_emit_list_contains(body: &MirBody, args_id: i32) -> i64:
         let i64_ty = wl_i64_type(self.context)
         let i1_ty = wl_i1_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
-        let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+        let recv = self.mir_intrinsic_recv_list_value(body, args_id)
         let needle_raw = self.mir_intrinsic_arg(body, args_id, 1)
         let arg_start = body.call_arg_starts[args_id]
         let recv_op = body.call_arg_operands[arg_start]
-        var elem_ty = self.mir_vec_elem_type(body, recv_op)
+        var elem_ty = self.mir_list_elem_type(body, recv_op)
         if elem_ty == 0:
             elem_ty = wl_type_of(needle_raw)
         if elem_ty == 0:
@@ -15540,14 +15540,14 @@ impl Codegen:
         let cv = wl_build_load(self.builder, i64_ty, ctr)
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_slt(), cv, len), bb, eb)
         wl_position_at_end(self.builder, bb)
-        let gf = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
-        let gt = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
-        let ga: Vec[i64] = Vec.new()
+        let gf = self.ensure_list_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+        let gt = self.get_list_fn_type("with_vec_get_ptr", ptr_ty, 2)
+        let ga: List[i64] = List.new()
         ga.push(sa)
         ga.push(wl_build_load(self.builder, i64_ty, ctr))
-        let ep = wl_build_call(self.builder, gt, gf, vec_data_i64(&ga), 2)
+        let ep = wl_build_call(self.builder, gt, gf, list_data_i64(&ga), 2)
         // #2137: an element equals the needle as its With type says.
-        let elem_sema = self.mir_vec_elem_sema_type_from_sema_type(self.mir_operand_sema_type(body, recv_op))
+        let elem_sema = self.mir_list_elem_sema_type_from_sema_type(self.mir_operand_sema_type(body, recv_op))
         var eq: i64 = 0
         if elem_sema > 0 and wl_type_of(needle) == elem_ty:
             let needle_slot = self.create_entry_alloca(elem_ty)
@@ -15565,11 +15565,11 @@ impl Codegen:
         wl_position_at_end(self.builder, eb)
         wl_build_load(self.builder, i1_ty, found)
 
-    mut fn mir_emit_vec_fold(body: &MirBody, args_id: i32) -> i64:
+    mut fn mir_emit_list_fold(body: &MirBody, args_id: i32) -> i64:
         let i64_ty = wl_i64_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
-        let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+        let recv = self.mir_intrinsic_recv_list_value(body, args_id)
         let init = self.mir_intrinsic_arg(body, args_id, 1)
         let fn_val = self.mir_intrinsic_arg(body, args_id, 2)
         let cty = wl_type_of(fn_val)
@@ -15585,15 +15585,15 @@ impl Codegen:
         var elem_ty = i32_ty
         let fold_arg_start = body.call_arg_starts[args_id]
         let fold_recv_op = body.call_arg_operands[fold_arg_start]
-        let fold_elem_ty = self.mir_vec_elem_type(body, fold_recv_op)
+        let fold_elem_ty = self.mir_list_elem_type(body, fold_recv_op)
         if fold_elem_ty != 0:
             elem_ty = fold_elem_ty
         if is_fat != 0:
-            let fp: Vec[i64] = Vec.new()
+            let fp: List[i64] = List.new()
             fp.push(ptr_ty)
             fp.push(self.closure_abi_param_ty(at))
             fp.push(self.closure_abi_param_ty(elem_ty))
-            fn_ty = wl_function_type(at, vec_data_i64(&fp), 3, 0)
+            fn_ty = wl_function_type(at, list_data_i64(&fp), 3, 0)
         else:
             fn_ty = wl_global_get_value_type(fn_ptr)
         let len = wl_build_extract_value(self.builder, recv, 1)
@@ -15612,20 +15612,20 @@ impl Codegen:
         let cv = wl_build_load(self.builder, i64_ty, ctr)
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_slt(), cv, len), bb, eb)
         wl_position_at_end(self.builder, bb)
-        let gf = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
-        let gt = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
-        let ga: Vec[i64] = Vec.new()
+        let gf = self.ensure_list_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+        let gt = self.get_list_fn_type("with_vec_get_ptr", ptr_ty, 2)
+        let ga: List[i64] = List.new()
         ga.push(sa)
         ga.push(wl_build_load(self.builder, i64_ty, ctr))
-        let ep = wl_build_call(self.builder, gt, gf, vec_data_i64(&ga), 2)
+        let ep = wl_build_call(self.builder, gt, gf, list_data_i64(&ga), 2)
         let el = wl_build_load(self.builder, elem_ty, ep)
         let ca_val = wl_build_load(self.builder, at, aa)
-        let ca: Vec[i64] = Vec.new()
+        let ca: List[i64] = List.new()
         if is_fat != 0: ca.push(ctx_ptr)
         ca.push(self.closure_abi_arg(at, ca_val))
         ca.push(self.closure_abi_arg(elem_ty, el))
         let cc = if is_fat != 0: 3 else: 2
-        let nv = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&ca), cc)
+        let nv = wl_build_call(self.builder, fn_ty, fn_ptr, list_data_i64(&ca), cc)
         self.mir_iter_cancel_exit_blanking(eb, aa, at)
         wl_build_store(self.builder, nv, aa)
         wl_build_br(self.builder, ib)
@@ -15653,18 +15653,18 @@ impl Codegen:
         let gc_rbuf = wl_build_load(self.builder, wl_ptr_type(self.context), gc_rbuf_ptr)
         var gc_track_fn = wl_get_named_function(self.llmod, "with_scope_track")
         if gc_track_fn == 0:
-            let gtp: Vec[i64] = Vec.new()
+            let gtp: List[i64] = List.new()
             gtp.push(wl_i64_type(self.context))
             gtp.push(wl_i32_type(self.context))
             gtp.push(wl_ptr_type(self.context))
-            let gtft = wl_function_type(wl_void_type(self.context), vec_data_i64(&gtp), 3, 0)
+            let gtft = wl_function_type(wl_void_type(self.context), list_data_i64(&gtp), 3, 0)
             gc_track_fn = wl_add_function(self.llmod, "with_scope_track", gtft)
         let gtft2 = wl_global_get_value_type(gc_track_fn)
-        let gta: Vec[i64] = Vec.new()
+        let gta: List[i64] = List.new()
         gta.push(gc_recv_val)
         gta.push(gc_fid)
         gta.push(gc_rbuf)
-        wl_build_call(self.builder, gtft2, gc_track_fn, vec_data_i64(&gta), 3)
+        wl_build_call(self.builder, gtft2, gc_track_fn, list_data_i64(&gta), 3)
         if dest_place >= 0 and gc_arg_val != 0:
             var gc_dst_ty: i64 = 0
             if dest_place < body.place_locals.len() as i32:
@@ -15719,7 +15719,7 @@ impl Codegen:
         wl_get_undef(self.get_dyn_fat_ptr_type())
 
     mut fn mir_emit_call_term(body: &MirBody, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
-        // Check for intrinsic-tagged calls (Vec/HashMap/Option builtins).
+        // Check for intrinsic-tagged calls (List/HashMap/Option builtins).
         // These have meaningless ConstKind.CK_FN syms — dispatch by intrinsic kind instead.
         let mir_intrinsic = body.call_intrinsic(args_id)
         if self.debug_mir_codegen_enabled():
@@ -15751,9 +15751,9 @@ impl Codegen:
                     if gc0_gf.is_some():
                         let gc0_mir_count = body.call_arg_counts[args_id]
                         let gc0_arg_vals = self.mir_eval_call_arg_range(body, args_id, 0, gc0_mir_count, 0)
-                        let gc0_arg_tys: Vec[i64] = Vec.new()
-                        let gc0_arg_nodes: Vec[i32] = Vec.new()
-                        let gc0_arg_sema_tys: Vec[i32] = Vec.new()
+                        let gc0_arg_tys: List[i64] = List.new()
+                        let gc0_arg_nodes: List[i32] = List.new()
+                        let gc0_arg_sema_tys: List[i32] = List.new()
                         let gc0_result = self.monomorphize_generic_call_core(gc0_callee_sym, gc0_gf.unwrap(), 0, gc0_mir_count, 0, body.call_sig_index(args_id), body.call_mono_sym(args_id), gc0_arg_vals, gc0_arg_tys, gc0_arg_nodes, gc0_arg_sema_tys)
                         if dest_place >= 0 and gc0_result != 0:
                             let gc0_ret_ty = wl_type_of(gc0_result)
@@ -15802,7 +15802,7 @@ impl Codegen:
                             let owner_sym = self.ensure_generic_method_owner_sym(recv_sema)
                             let decl = self.lookup_generic_struct_method_decl(gc_callee_sym)
                             if owner_sym != 0 and decl.is_some() and decl.unwrap() > 0:
-                                let no_args: Vec[i64] = Vec.new()
+                                let no_args: List[i64] = List.new()
                                 let recv_ptr = self.marshal_ref_addr(body, recv_op, recv_val)
                                 try_result = self.monomorphize_struct_method_core(owner_sym, "branch", decl.unwrap(), recv_val, recv_ptr, 0, wl_type_of(recv_val), 0, 0, gc_node, body.call_sig_index(args_id), body.call_mono_sym(args_id), no_args)
                         else if gc_callee_sym == try_from_break_sym:
@@ -15954,10 +15954,10 @@ impl Codegen:
                         let gc_mir_start = body.call_arg_starts[args_id]
                         let gc_mir_count = body.call_arg_counts[args_id]
                         let gc_as = self.pool.get_data1(gc_node)
-                        let gc_arg_vals: Vec[i64] = Vec.new()
-                        let gc_arg_tys: Vec[i64] = Vec.new()
-                        let gc_arg_nodes: Vec[i32] = Vec.new()
-                        let gc_arg_sema_tys: Vec[i32] = Vec.new()
+                        let gc_arg_vals: List[i64] = List.new()
+                        let gc_arg_tys: List[i64] = List.new()
+                        let gc_arg_nodes: List[i32] = List.new()
+                        let gc_arg_sema_tys: List[i32] = List.new()
                         let gc_ast_count = self.pool.get_data2(gc_node)
                         // #D6: hoist the owner lookup so the ref-ABI classification is
                         // queried PER PARAMETER (not just param 0) — every IndirectPlace
@@ -16191,26 +16191,26 @@ impl Codegen:
                         // Call with_channel_create(capacity, elem_size, drop_fn)
                         var chan_create_fn = wl_get_named_function(self.llmod, "with_channel_create")
                         if chan_create_fn == 0:
-                            let ccp: Vec[i64] = Vec.new()
+                            let ccp: List[i64] = List.new()
                             ccp.push(wl_i32_type(self.context))
                             ccp.push(wl_i32_type(self.context))
                             ccp.push(wl_ptr_type(self.context))
-                            let ccft = wl_function_type(wl_i64_type(self.context), vec_data_i64(&ccp), 3, 0)
+                            let ccft = wl_function_type(wl_i64_type(self.context), list_data_i64(&ccp), 3, 0)
                             chan_create_fn = wl_add_function(self.llmod, "with_channel_create", ccft)
                         let ccft2 = wl_global_get_value_type(chan_create_fn)
-                        let cca: Vec[i64] = Vec.new()
+                        let cca: List[i64] = List.new()
                         cca.push(chan_cap_val)
                         cca.push(wl_const_int(wl_i32_type(self.context), chan_elem_size, 0))
                         cca.push(chan_drop_fn)
-                        let chan_handle = wl_build_call(self.builder, ccft2, chan_create_fn, vec_data_i64(&cca), 3)
+                        let chan_handle = wl_build_call(self.builder, ccft2, chan_create_fn, list_data_i64(&cca), 3)
                         // Construct tuple (Sender{handle}, Receiver{handle})
                         // Sender = { i64 }, Receiver = { i64 }
                         // Tuple = { {i64}, {i64} }
-                        let chan_inner_fields: Vec[i64] = Vec.new()
+                        let chan_inner_fields: List[i64] = List.new()
                         chan_inner_fields.push(wl_i64_type(self.context))
-                        let chan_sender_ty = wl_struct_type(self.context, vec_data_i64(&chan_inner_fields), 1, 0)
+                        let chan_sender_ty = wl_struct_type(self.context, list_data_i64(&chan_inner_fields), 1, 0)
                         let chan_receiver_ty = chan_sender_ty  // same layout
-                        let chan_tuple_fields: Vec[i64] = Vec.new()
+                        let chan_tuple_fields: List[i64] = List.new()
                         chan_tuple_fields.push(chan_sender_ty)
                         chan_tuple_fields.push(chan_receiver_ty)
                         let chan_tuple_ty = self.tuple_type_from_elems(&chan_tuple_fields)
@@ -16310,9 +16310,9 @@ impl Codegen:
                             let gc_static_mir_start = body.call_arg_starts[args_id]
                             let gc_static_mir_count = body.call_arg_counts[args_id]
                             let gc_static_call_args_start = self.pool.get_data1(gc_node)
-                            let gc_static_args: Vec[i64] = Vec.new()
-                            let gc_static_arg_tys: Vec[i64] = Vec.new()
-                            let gc_static_arg_nodes: Vec[i32] = Vec.new()
+                            let gc_static_args: List[i64] = List.new()
+                            let gc_static_arg_tys: List[i64] = List.new()
+                            let gc_static_arg_nodes: List[i32] = List.new()
                             for gc_static_ai in 0..gc_static_mir_count:
                                 let gc_static_arg_node = self.pool.get_extra(gc_static_call_args_start + gc_static_ai)
                                 let gc_static_op = body.call_arg_operands[(gc_static_mir_start + gc_static_ai)]
@@ -16369,7 +16369,7 @@ impl Codegen:
                         let gc_recv_op = body.call_arg_operands[gc_mir_start]
                         gc_recv_type = self.mir_operand_sema_type(body, gc_recv_op)
                     // Unwrap reference/pointer to get the underlying type for dispatch.
-                    // When the receiver is &mut Vec[T], we need to dispatch on Vec[T].
+                    // When the receiver is &mut List[T], we need to dispatch on List[T].
                     var gc_recv_type_unwrapped = gc_recv_type
                     if gc_recv_type_unwrapped > 0:
                         let gc_recv_tk = self.mir_type_kind_at(self.mir_resolve_alias_at(gc_recv_type_unwrapped))
@@ -16432,7 +16432,7 @@ impl Codegen:
                             if gc_direct_fv.is_some() and gc_direct_ft.is_some():
                                 let gc_direct_fn_value: i64 = gc_direct_fv.unwrap()
                                 let gc_direct_fn_type: i64 = gc_direct_ft.unwrap()
-                                let gc_call_args: Vec[i64] = Vec.new()
+                                let gc_call_args: List[i64] = List.new()
                                 let gc_is_ref = self.is_ref_param(gc_fn_sym_early, 0)
                                 if gc_is_ref:
                                     gc_call_args.push(self.marshal_ref_addr(body, gc_recv_op, gc_recv_val))
@@ -16465,7 +16465,7 @@ impl Codegen:
                                 let gc_direct_fn_type: i64 = gc_direct_ft2.unwrap()
                                 let gc_direct_call_args_start = self.pool.get_data1(gc_node)
                                 let gc_direct_method_arg_count = gc_mir_count - 1
-                                let gc_direct_args: Vec[i64] = Vec.new()
+                                let gc_direct_args: List[i64] = List.new()
                                 let gc_direct_is_ref = self.is_ref_param(gc_direct_fn_sym, 0)
                                 if gc_direct_is_ref:
                                     // #D6: receiver marshals through the one canonical policy.
@@ -16539,7 +16539,7 @@ impl Codegen:
                         if gc_vc_is_enum:
                             let gc_vc_mir_start = body.call_arg_starts[args_id]
                             let gc_vc_mir_count = body.call_arg_counts[args_id]
-                            let gc_vc_args: Vec[i64] = Vec.new()
+                            let gc_vc_args: List[i64] = List.new()
                             for gc_vc_i in 0..gc_vc_mir_count:
                                 let gc_vc_op = body.call_arg_operands[(gc_vc_mir_start + gc_vc_i)]
                                 gc_vc_args.push(self.mir_eval_operand(body, gc_vc_op, 0))
@@ -16714,29 +16714,29 @@ impl Codegen:
 
                         var spawn_fn = wl_get_named_function(self.llmod, "with_thread_spawn")
                         if spawn_fn == 0:
-                            let spawn_params: Vec[i64] = Vec.new()
+                            let spawn_params: List[i64] = List.new()
                             spawn_params.push(wl_ptr_type(self.context))
                             spawn_params.push(wl_ptr_type(self.context))
-                            let spawn_ft = wl_function_type(wl_i64_type(self.context), vec_data_i64(&spawn_params), 2, 0)
+                            let spawn_ft = wl_function_type(wl_i64_type(self.context), list_data_i64(&spawn_params), 2, 0)
                             spawn_fn = wl_add_function(self.llmod, "with_thread_spawn", spawn_ft)
                         let spawn_ft2 = wl_global_get_value_type(spawn_fn)
-                        let spawn_args: Vec[i64] = Vec.new()
+                        let spawn_args: List[i64] = List.new()
                         spawn_args.push(spawn_fn_ptr)
                         spawn_args.push(spawn_ctx_ptr)
-                        let thread_handle = wl_build_call(self.builder, spawn_ft2, spawn_fn, vec_data_i64(&spawn_args), 2)
+                        let thread_handle = wl_build_call(self.builder, spawn_ft2, spawn_fn, list_data_i64(&spawn_args), 2)
 
                         var track_fn = wl_get_named_function(self.llmod, "with_thread_scope_track")
                         if track_fn == 0:
-                            let track_params: Vec[i64] = Vec.new()
+                            let track_params: List[i64] = List.new()
                             track_params.push(wl_i64_type(self.context))
                             track_params.push(wl_i64_type(self.context))
-                            let track_ft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&track_params), 2, 0)
+                            let track_ft = wl_function_type(wl_i32_type(self.context), list_data_i64(&track_params), 2, 0)
                             track_fn = wl_add_function(self.llmod, "with_thread_scope_track", track_ft)
                         let track_ft2 = wl_global_get_value_type(track_fn)
-                        let track_args: Vec[i64] = Vec.new()
+                        let track_args: List[i64] = List.new()
                         track_args.push(spawn_scope_val)
                         track_args.push(thread_handle)
-                        let thread_index = wl_build_call(self.builder, track_ft2, track_fn, vec_data_i64(&track_args), 2)
+                        let thread_index = wl_build_call(self.builder, track_ft2, track_fn, list_data_i64(&track_args), 2)
 
                         if dest_place >= 0:
                             var sjh_ty: i64 = 0
@@ -16745,11 +16745,11 @@ impl Codegen:
                                 if sjh_local >= 0 and sjh_local < body.local_type_ids.len() as i32:
                                     sjh_ty = self.mir_sema_type_to_llvm(body.local_type_ids[sjh_local])
                             if sjh_ty == 0:
-                                let sjh_fields: Vec[i64] = Vec.new()
+                                let sjh_fields: List[i64] = List.new()
                                 sjh_fields.push(wl_i64_type(self.context))
                                 sjh_fields.push(wl_i32_type(self.context))
                                 sjh_fields.push(wl_i64_type(self.context))
-                                sjh_ty = wl_struct_type(self.context, vec_data_i64(&sjh_fields), 3, 0)
+                                sjh_ty = wl_struct_type(self.context, list_data_i64(&sjh_fields), 3, 0)
                             var sjh_val = wl_get_undef(sjh_ty)
                             sjh_val = wl_build_insert_value(self.builder, sjh_val, spawn_scope_val, 0)
                             sjh_val = wl_build_insert_value(self.builder, sjh_val, thread_index, 1)
@@ -16785,18 +16785,18 @@ impl Codegen:
                             let join_handle = wl_build_load(self.builder, wl_i64_type(self.context), join_handle_ptr)
                             var join_fn = wl_get_named_function(self.llmod, "with_thread_scope_join")
                             if join_fn == 0:
-                                let join_params: Vec[i64] = Vec.new()
+                                let join_params: List[i64] = List.new()
                                 join_params.push(wl_i64_type(self.context))
                                 join_params.push(wl_i32_type(self.context))
                                 join_params.push(wl_i64_type(self.context))
-                                let join_ft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&join_params), 3, 0)
+                                let join_ft = wl_function_type(wl_i32_type(self.context), list_data_i64(&join_params), 3, 0)
                                 join_fn = wl_add_function(self.llmod, "with_thread_scope_join", join_ft)
                             let join_ft2 = wl_global_get_value_type(join_fn)
-                            let join_args: Vec[i64] = Vec.new()
+                            let join_args: List[i64] = List.new()
                             join_args.push(join_scope)
                             join_args.push(join_index)
                             join_args.push(join_handle)
-                            let join_result = wl_build_call(self.builder, join_ft2, join_fn, vec_data_i64(&join_args), 3)
+                            let join_result = wl_build_call(self.builder, join_ft2, join_fn, list_data_i64(&join_args), 3)
                             if dest_place >= 0:
                                 let join_dst_ptr = self.mir_place_ptr(body, dest_place, false, wl_i32_type(self.context))
                                 if join_dst_ptr != 0:
@@ -16968,8 +16968,8 @@ impl Codegen:
                 with_eprint(f"error: call to unprototyped '{self.sema.pool_resolve(callee_raw_fn_sym)}' has {arg_count} argument(s) but Sema recorded {c_promoted.len()} promoted type(s): {call_context}")
                 self.had_error = 1
                 return false
-            let promoted_sources: Vec[i64] = Vec.new()
-            let promoted_places: Vec[i32] = Vec.new()
+            let promoted_sources: List[i64] = List.new()
+            let promoted_places: List[i32] = List.new()
             for pi in 0..c_promoted.len() as i32:
                 promoted_sources.push(self.sema_type_to_llvm(c_promoted[pi]))
                 promoted_places.push(0)
@@ -16982,9 +16982,9 @@ impl Codegen:
         let abi: FnAbi = self.fn_abis[call_abi]
         call_ft = abi.llvm_ty
         let param_count = wl_count_param_types(call_ft)
-        let param_types: Vec[i64] = Vec.new()
+        let param_types: List[i64] = List.new()
         for pi in 0..param_count: param_types.push(0)
-        if param_count > 0: wl_get_param_types(call_ft, vec_data_i64(&param_types))
+        if param_count > 0: wl_get_param_types(call_ft, list_data_i64(&param_types))
         let abi_has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let abi_sret_ty = abi.ret.source_ty
         let abi_byval_types = self.fn_abi_byval_attr_types(call_abi)
@@ -16999,8 +16999,8 @@ impl Codegen:
         // Keying on the convention passed the str header's address to a
         // translated inline function (#1589).
         let lends_c_strings = if abi.convention == FN_ABI_C or (callee_raw_fn_sym != 0 and self.sema.ci_syms.contains(callee_raw_fn_sym)): 1 else: 0
-        let args: Vec[i64] = Vec.new()
-        let call_temp_cleanups: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
+        let call_temp_cleanups: List[i64] = List.new()
         if is_indirect:
             args.push(ctx_ptr_val)
 
@@ -17138,7 +17138,7 @@ impl Codegen:
             self.free_call_temp_ptrs(call_temp_cleanups)
             return spawn_result
 
-        let call_val = wl_build_call(self.builder, call_ft, actual_callee, vec_data_i64(&args), actual_arg_count)
+        let call_val = wl_build_call(self.builder, call_ft, actual_callee, list_data_i64(&args), actual_arg_count)
         self.apply_c_abi_call_attrs(call_val, abi_has_sret, abi_sret_ty, abi_byval_types, arg_count, if is_indirect: 1 else: 0)
         // Guaranteed mutual @[tailrec] edges are emitted as musttail.
         if self.mir_emit_mutual_tail_call != 0 and call_val != 0 and call_temp_cleanups.len() == 0:
@@ -17488,8 +17488,8 @@ impl Codegen:
         let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
         let fresh_local_sema_types: HashMap[i32, i32] = HashMap.new()
         let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
-        let fresh_defer_stack: Vec[i32] = Vec.new()
-        let fresh_errdefer_stack: Vec[i32] = Vec.new()
+        let fresh_defer_stack: List[i32] = List.new()
+        let fresh_errdefer_stack: List[i32] = List.new()
         let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
         let fresh_trait_local_concrete_types: HashMap[i32, i32] = HashMap.new()
         let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
@@ -17527,8 +17527,8 @@ impl Codegen:
         let fresh_mir_local_types: HashMap[i32, i64] = HashMap.new()
         let fresh_mir_indirect_value_local_types: HashMap[i32, i64] = HashMap.new()
         let fresh_mir_ref_capture_local_types: HashMap[i32, i64] = HashMap.new()
-        let fresh_mir_bbs: Vec[i64] = Vec.new()
-        let fresh_mir_default_unreachable_bbs: Vec[i64] = Vec.new()
+        let fresh_mir_bbs: List[i64] = List.new()
+        let fresh_mir_default_unreachable_bbs: List[i64] = List.new()
         self.mir_local_ptrs = fresh_mir_locals
         self.mir_local_values = fresh_mir_values
         self.mir_memory_locals = fresh_mir_memory_locals
@@ -17559,14 +17559,14 @@ impl Codegen:
             has_ast_params = 1
         else:
             param_count = body.n_params
-        var fn_byval_types: Vec[i64] = Vec.new()
+        var fn_byval_types: List[i64] = List.new()
         let fn_byval_types_opt = self.fn_abi_symbol_byval_types(name_sym)
         if fn_byval_types_opt.is_some():
-            fn_byval_types = vec_copy_i64(fn_byval_types_opt.unwrap())
-        var fn_direct_types: Vec[i64] = Vec.new()
+            fn_byval_types = list_copy_i64(fn_byval_types_opt.unwrap())
+        var fn_direct_types: List[i64] = List.new()
         let fn_direct_types_opt = self.fn_abi_direct_param_types(name_sym)
         if fn_direct_types_opt.is_some():
-            fn_direct_types = vec_copy_i64(fn_direct_types_opt.unwrap())
+            fn_direct_types = list_copy_i64(fn_direct_types_opt.unwrap())
 
         // The method owner Sema recorded for this function (#2043).
         let method_owner_sym = self.fn_method_owner_cg_sym(name_sym)
@@ -17925,15 +17925,15 @@ impl Codegen:
         let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
         let fresh_local_sema_types: HashMap[i32, i32] = HashMap.new()
         let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
-        let fresh_defer_stack: Vec[i32] = Vec.new()
-        let fresh_errdefer_stack: Vec[i32] = Vec.new()
+        let fresh_defer_stack: List[i32] = List.new()
+        let fresh_errdefer_stack: List[i32] = List.new()
         let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
         let fresh_trait_local_concrete_types: HashMap[i32, i32] = HashMap.new()
         let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
-        let fresh_scope_syms: Vec[i32] = Vec.new()
-        let fresh_scope_allocas: Vec[i64] = Vec.new()
-        let fresh_scope_types: Vec[i64] = Vec.new()
-        let fresh_tail_allocas: Vec[i64] = Vec.new()
+        let fresh_scope_syms: List[i32] = List.new()
+        let fresh_scope_allocas: List[i64] = List.new()
+        let fresh_scope_types: List[i64] = List.new()
+        let fresh_tail_allocas: List[i64] = List.new()
         self.local_allocas = fresh_local_allocas
         self.local_types = fresh_local_types
         self.local_muts = fresh_local_muts
@@ -17973,8 +17973,8 @@ impl Codegen:
         let fresh_mir_local_types: HashMap[i32, i64] = HashMap.new()
         let fresh_mir_indirect_value_local_types: HashMap[i32, i64] = HashMap.new()
         let fresh_mir_ref_capture_local_types: HashMap[i32, i64] = HashMap.new()
-        let fresh_mir_bbs: Vec[i64] = Vec.new()
-        let fresh_mir_default_unreachable_bbs: Vec[i64] = Vec.new()
+        let fresh_mir_bbs: List[i64] = List.new()
+        let fresh_mir_default_unreachable_bbs: List[i64] = List.new()
         self.mir_local_ptrs = fresh_mir_locals
         self.mir_local_values = fresh_mir_values
         self.mir_memory_locals = fresh_mir_memory_locals
@@ -18002,14 +18002,14 @@ impl Codegen:
             param_count = self.pool.fn_meta_param_count(meta)
         else:
             param_count = body.n_params
-        var fn_byval_types: Vec[i64] = Vec.new()
+        var fn_byval_types: List[i64] = List.new()
         let fn_byval_types_opt = self.fn_abi_symbol_byval_types(mono_sym)
         if fn_byval_types_opt.is_some():
-            fn_byval_types = vec_copy_i64(fn_byval_types_opt.unwrap())
-        var fn_direct_types: Vec[i64] = Vec.new()
+            fn_byval_types = list_copy_i64(fn_byval_types_opt.unwrap())
+        var fn_direct_types: List[i64] = List.new()
         let fn_direct_types_opt = self.fn_abi_direct_param_types(mono_sym)
         if fn_direct_types_opt.is_some():
-            fn_direct_types = vec_copy_i64(fn_direct_types_opt.unwrap())
+            fn_direct_types = list_copy_i64(fn_direct_types_opt.unwrap())
 
         // The method owner Sema recorded for this function (#2043).
         let method_owner_sym = self.fn_method_owner_cg_sym(mono_sym)
@@ -18347,7 +18347,7 @@ impl Codegen:
                 return i
         self.find_field_index_from_ast(type_sym, field_sym)
 
-    fn find_binding_type(syms: &Vec[i32], tys: &Vec[i64], sym: i32) -> i64:
+    fn find_binding_type(syms: &List[i32], tys: &List[i64], sym: i32) -> i64:
         let want = self.codegen_symbol_text(sym)
         for i in 0..syms.len() as i32:
             let stored = syms[i]
@@ -18367,7 +18367,7 @@ impl Codegen:
         let a_text = self.codegen_symbol_text(a)
         a_text.len() > 0 and a_text == self.codegen_symbol_text(b)
 
-    fn codegen_binding_index(syms: &Vec[i32], sym: i32) -> i32:
+    fn codegen_binding_index(syms: &List[i32], sym: i32) -> i32:
         for i in 0..syms.len() as i32:
             if self.codegen_symbols_match(syms[i], sym):
                 return i
@@ -18438,7 +18438,7 @@ impl Codegen:
                 return Some(decl as i32)
         None
 
-    mut fn infer_static_generic_struct_mono_sym(owner_sym: i32, decl: i32, owner_expr_node: i32, arg_tys: &Vec[i64], arg_nodes: &Vec[i32], call_sema_ty: i32) -> i32:
+    mut fn infer_static_generic_struct_mono_sym(owner_sym: i32, decl: i32, owner_expr_node: i32, arg_tys: &List[i64], arg_nodes: &List[i32], call_sema_ty: i32) -> i32:
         let owner_decl_opt = self.generic_structs.get(owner_sym)
         if not owner_decl_opt.is_some():
             return 0
@@ -18447,16 +18447,16 @@ impl Codegen:
         if tp_count <= 0:
             return owner_sym
 
-        let tp_syms: Vec[i32] = Vec.new()
+        let tp_syms: List[i32] = List.new()
         var tp_pos = self.type_decl_tp_start(owner_decl)
         for ti in 0..tp_count:
             tp_syms.push(self.pool.get_extra(tp_pos))
             let bound_count = self.pool.get_extra(tp_pos + 1)
             tp_pos = tp_pos + 2 + bound_count
 
-        let bind_syms: Vec[i32] = Vec.new()
-        let bind_tys: Vec[i64] = Vec.new()
-        let bind_sema_tys: Vec[i32] = Vec.new()
+        let bind_syms: List[i32] = List.new()
+        let bind_tys: List[i64] = List.new()
+        let bind_sema_tys: List[i32] = List.new()
 
         if call_sema_ty > 0:
             let call_resolved = self.sema.resolve_alias(call_sema_ty)
@@ -18586,7 +18586,7 @@ impl Codegen:
 
         // #1647 (D65): the owner is the instance Sema created for the bound
         // arguments, laid out from Sema's record.
-        let inst_args: Vec[i32] = Vec.new()
+        let inst_args: List[i32] = List.new()
         for ti in 0..tp_syms.len() as i32:
             var arg_sema = 0
             for bi in 0..bind_syms.len() as i32:
@@ -18675,7 +18675,7 @@ impl Codegen:
             return "array"
         f"unknown#{tk}"
 
-    mut fn monomorphize_generic_call_core(_fn_sym: i32, _fn_node: i32, args_start: i32, arg_count: i32, call_node: i32, concrete_sig: i32, concrete_sym: i32, arg_vals: &Vec[i64], _arg_tys: &Vec[i64], _arg_nodes: &Vec[i32], _arg_sema_tys: &Vec[i32]) -> i64:
+    mut fn monomorphize_generic_call_core(_fn_sym: i32, _fn_node: i32, args_start: i32, arg_count: i32, call_node: i32, concrete_sig: i32, concrete_sym: i32, arg_vals: &List[i64], _arg_tys: &List[i64], _arg_nodes: &List[i32], _arg_sema_tys: &List[i32]) -> i64:
         let concrete = self.ensure_concrete_mir_function(call_node, concrete_sig, concrete_sym, 0, "generic function call")
         if concrete.sym == 0:
             return wl_get_undef(wl_i32_type(self.context))
@@ -18702,7 +18702,7 @@ impl Codegen:
 
     // ── While loop ────────────────────────────────────────────────────
 
-    mut fn build_variant_payload_val(payload_ty: i64, args: &Vec[i64], arg_count: i32) -> i64:
+    mut fn build_variant_payload_val(payload_ty: i64, args: &List[i64], arg_count: i32) -> i64:
         if arg_count <= 0:
             return wl_get_undef(wl_i32_type(self.context))
         if payload_ty == 0:
@@ -18721,7 +18721,7 @@ impl Codegen:
             return payload
         self.coerce_value_to_type(args[0], payload_ty)
 
-    mut fn gen_enum_variant_call_val(enum_owner_sym: i32, variant_sym: i32, args: &Vec[i64], arg_count: i32) -> i64:
+    mut fn gen_enum_variant_call_val(enum_owner_sym: i32, variant_sym: i32, args: &List[i64], arg_count: i32) -> i64:
         let variant_name = self.intern.resolve(variant_sym)
         for ei in 0..self.enum_llvm_types.len() as i32:
             let enum_ty: i64 = self.enum_llvm_types[ei]
@@ -18793,10 +18793,10 @@ impl Codegen:
 
     fn closure_pair_llvm_type() -> i64:
         let ptr_ty = wl_ptr_type(self.context)
-        let fat_types: Vec[i64] = Vec.new()
+        let fat_types: List[i64] = List.new()
         fat_types.push(ptr_ty)
         fat_types.push(ptr_ty)
-        wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
+        wl_struct_type(self.context, list_data_i64(&fat_types), 2, 0)
 
     // The owned cell: {drop_fn, clone_fn, env}.
     // #2042: a closure's (or async block's) environment, its captures placed
@@ -18805,9 +18805,9 @@ impl Codegen:
     // a by-place capture as a pointer. The literal struct of their LLVM types
     // put an `@[align(32)]` capture at LLVM's offset (its i8-padded body
     // reports 8). Accesses go through tuple_elem_ptr.
-    mut fn closure_env_llvm_type(cap_types: &Vec[i64], cap_sema_types: &Vec[i32], by_place: &Vec[i32]) -> i64:
+    mut fn closure_env_llvm_type(cap_types: &List[i64], cap_sema_types: &List[i32], by_place: &List[i32]) -> i64:
         let ptr_bytes = self.abi_size_of(wl_ptr_type(self.context))
-        let offsets: Vec[i64] = Vec.new()
+        let offsets: List[i64] = List.new()
         var at: i64 = 0
         var align: i64 = 1
         for ci in 0..cap_types.len() as i32:
@@ -18826,11 +18826,11 @@ impl Codegen:
     mut fn closure_cell_llvm_type(cap_struct_type: i64) -> i64:
         let ptr_ty = wl_ptr_type(self.context)
         let ptr_bytes = self.abi_size_of(ptr_ty)
-        let cell_types: Vec[i64] = [ptr_ty, ptr_ty, cap_struct_type]
+        let cell_types: List[i64] = [ptr_ty, ptr_ty, cap_struct_type]
         let env_align = self.declared_align_of(cap_struct_type)
         let align = if env_align > ptr_bytes: env_align else: ptr_bytes
         let env_off = closure_align_up(2 * ptr_bytes, env_align)
-        let offsets: Vec[i64] = [0, ptr_bytes, env_off]
+        let offsets: List[i64] = [0, ptr_bytes, env_off]
         let size = closure_align_up(env_off + self.abi_size_of(cap_struct_type), align)
         self.tuple_type_from_layout(&cell_types, &offsets, size, align)
 
@@ -18852,12 +18852,12 @@ impl Codegen:
         wl_position_at_end(self.builder, live_bb)
         let cell = wl_build_int_to_ptr(self.builder, wl_build_sub(self.builder, bits, wl_const_int(i64_ty, self.closure_ctx_tag_owned(), 0)), ptr_ty)
         let drop_fn = wl_build_load(self.builder, ptr_ty, cell)
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(ptr_ty)
-        let drop_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
-        let args: Vec[i64] = Vec.new()
+        let drop_ft = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 1, 0)
+        let args: List[i64] = List.new()
         args.push(cell)
-        let _ = wl_build_call(self.builder, drop_ft, drop_fn, vec_data_i64(&args), 1)
+        let _ = wl_build_call(self.builder, drop_ft, drop_fn, list_data_i64(&args), 1)
         wl_build_store(self.builder, wl_const_null(ptr_ty), ctx_slot)
         wl_build_br(self.builder, done_bb)
         wl_position_at_end(self.builder, done_bb)
@@ -18865,13 +18865,13 @@ impl Codegen:
     // The per-closure drop fn of an owned cell: drops every capture that
     // needs it (guarded — a consuming body blanks the slot it moved out of),
     // then frees the cell.
-    mut fn gen_closure_env_drop_fn(cell_ty: i64, cap_struct_type: i64, cap_sema_types: &Vec[i32], cap_llvm_types: &Vec[i64]) -> i64:
+    mut fn gen_closure_env_drop_fn(cell_ty: i64, cap_struct_type: i64, cap_sema_types: &List[i32], cap_llvm_types: &List[i64]) -> i64:
         let ptr_ty = wl_ptr_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let fn_name = f"__closure_env_drop_{self.closure_counter}"
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(ptr_ty)
-        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+        let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 1, 0)
         let drop_fn = wl_add_function(self.llmod, fn_name, fn_ty)
         wl_set_linkage(drop_fn, wl_internal_linkage())
 
@@ -18974,7 +18974,7 @@ impl Codegen:
 
         // Capture identity and types belong to this concrete MIR body.
         let capture_count = closure_body.anonymous_capture_count
-        let captures: Vec[i32] = Vec.new()
+        let captures: List[i32] = List.new()
         for ci in 0..capture_count:
             captures.push(closure_body.local_names[ci + 1])
         if is_extern_closure and capture_count > 0:
@@ -18984,7 +18984,7 @@ impl Codegen:
         // §12.4 / #1481: every non-move closure captures a non-Copy value by
         // place (a pointer to the outer slot), let-bound or direct argument;
         // only `move ||` copies the bytes into the environment.
-        let capture_ref_modes: Vec[i32] = Vec.new()
+        let capture_ref_modes: List[i32] = List.new()
         for ci in 0..capture_count:
             // §12.4: "Captures are by place regardless of whether the type
             // is Copy" — a Copy capture is a pointer to the outer slot too;
@@ -18999,7 +18999,7 @@ impl Codegen:
             capture_ref_modes.push(by_ref)
 
         // Build capture struct type from captured variable types
-        let cap_types: Vec[i64] = Vec.new()
+        let cap_types: List[i64] = List.new()
         for ci in 0..capture_count:
             let sym = captures[ci]
             if capture_ref_modes[ci] != 0:
@@ -19009,7 +19009,7 @@ impl Codegen:
                 if capture_ty == 0: sema_phase_bug(f"BUG: closure capture lacks LLVM type: node={node} capture={ci}")
                 cap_types.push(capture_ty)
         // Collect original types for ref capture (needed inside closure body)
-        let cap_orig_types: Vec[i64] = Vec.new()
+        let cap_orig_types: List[i64] = List.new()
         for ci in 0..capture_count:
             let sym = captures[ci]
             let capture_ty = self.sema_type_to_llvm(closure_body.local_type_ids[ci + 1])
@@ -19017,7 +19017,7 @@ impl Codegen:
             cap_orig_types.push(capture_ty)
         var cap_struct_type: i64 = 0
         if capture_count > 0:
-            let env_sema_types: Vec[i32] = Vec.new()
+            let env_sema_types: List[i32] = List.new()
             for ci in 0..capture_count:
                 env_sema_types.push(closure_body.local_type_ids[ci + 1])
             cap_struct_type = self.closure_env_llvm_type(&cap_types, &env_sema_types, &capture_ref_modes)
@@ -19025,9 +19025,9 @@ impl Codegen:
         // Build parameter types: context ptr first, then user params. Keep the
         // semantic types in lockstep with the LLVM signature so closure-local MIR
         // can recover pointee types for reference parameters.
-        let closure_param_sema_types: Vec[i32] = Vec.new()
-        let param_types: Vec[i64] = Vec.new()
-        let closure_places: Vec[i32] = Vec.new()
+        let closure_param_sema_types: List[i32] = List.new()
+        let param_types: List[i64] = List.new()
+        let closure_places: List[i32] = List.new()
         for i in 0..param_count:
             let p_sema_ty = closure_body.local_type_ids[capture_count + i + 1]
             closure_param_sema_types.push(p_sema_ty)
@@ -19090,7 +19090,7 @@ impl Codegen:
         // (a consuming body blanks the slot it moved out of, so the cell's
         // drop fn never drops it again).
         let owned_env = not is_extern_closure and capture_count > 0 and self.mode_decide(MODE_SITE_CLOSURE_OWNED_ENV, self.sema.closure_env_owned(node), self.pool.is_move_closure(node) == 1, self.current_function_name_sym, node)
-        let cap_sema_types: Vec[i32] = Vec.new()
+        let cap_sema_types: List[i32] = List.new()
         for ci in 0..capture_count:
             cap_sema_types.push(closure_body.local_type_ids[ci + 1])
         var env_all_copy = true
@@ -19183,8 +19183,8 @@ impl Codegen:
         let fresh_cl_mir_local_types: HashMap[i32, i64] = HashMap.new()
         let fresh_cl_mir_indirect_value_local_types: HashMap[i32, i64] = HashMap.new()
         let fresh_cl_mir_ref_capture_local_types: HashMap[i32, i64] = HashMap.new()
-        let fresh_cl_mir_bbs: Vec[i64] = Vec.new()
-        let fresh_cl_mir_unreachable: Vec[i64] = Vec.new()
+        let fresh_cl_mir_bbs: List[i64] = List.new()
+        let fresh_cl_mir_unreachable: List[i64] = List.new()
         self.mir_local_ptrs = fresh_cl_mir_locals
         self.mir_local_values = fresh_cl_mir_values
         self.mir_memory_locals = fresh_cl_mir_memory_locals
@@ -19369,8 +19369,8 @@ impl Codegen:
                 let env_clone_fn = self.gen_closure_env_clone_fn(cell_ty, cap_struct_type, cap_sema_types, cap_orig_types)
                 // #2042: the cell at its model alignment (its environment's).
                 let alloc_fn = self.ensure_box_alloc_aligned_fn()
-                let alloc_args: Vec[i64] = [wl_const_int(i64_ty, self.abi_size_of(cell_ty), 0), wl_const_int(i64_ty, self.declared_align_of(cell_ty), 0)]
-                let cell = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 2)
+                let alloc_args: List[i64] = [wl_const_int(i64_ty, self.abi_size_of(cell_ty), 0), wl_const_int(i64_ty, self.declared_align_of(cell_ty), 0)]
+                let cell = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, list_data_i64(&alloc_args), 2)
                 wl_build_store(self.builder, env_drop_fn, self.tuple_elem_ptr(cell_ty, cell, 0))
                 wl_build_store(self.builder, if env_clone_fn != 0: env_clone_fn else: wl_const_null(ptr_ty), self.tuple_elem_ptr(cell_ty, cell, 1))
                 self.emit_llvm_memcpy(self.tuple_elem_ptr(cell_ty, cell, 2), cap_alloca, env_size)
@@ -19381,10 +19381,10 @@ impl Codegen:
             return closure_fn
 
         // Build fat pointer {fn_ptr, ctx_ptr}
-        let fat_types: Vec[i64] = Vec.new()
+        let fat_types: List[i64] = List.new()
         fat_types.push(ptr_ty)
         fat_types.push(ptr_ty)
-        let fat_ty = wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
+        let fat_ty = wl_struct_type(self.context, list_data_i64(&fat_types), 2, 0)
         var fat_val = wl_get_undef(fat_ty)
         fat_val = wl_build_insert_value(self.builder, fat_val, closure_fn, 0)
         fat_val = wl_build_insert_value(self.builder, fat_val, ctx_ptr, 1)
@@ -19400,77 +19400,77 @@ impl Codegen:
 
         // void with_runtime_init(void)
         if wl_get_named_function(self.llmod, "with_runtime_init") == 0:
-            let no_params: Vec[i64] = Vec.new()
-            let ft = wl_function_type(void_ty, vec_data_i64(&no_params), 0, 0)
+            let no_params: List[i64] = List.new()
+            let ft = wl_function_type(void_ty, list_data_i64(&no_params), 0, 0)
             wl_add_function(self.llmod, "with_runtime_init", ft)
 
         // void with_runtime_run(void)
         if wl_get_named_function(self.llmod, "with_runtime_run") == 0:
-            let no_params: Vec[i64] = Vec.new()
-            let ft = wl_function_type(void_ty, vec_data_i64(&no_params), 0, 0)
+            let no_params: List[i64] = List.new()
+            let ft = wl_function_type(void_ty, list_data_i64(&no_params), 0, 0)
             wl_add_function(self.llmod, "with_runtime_run", ft)
 
         // void with_runtime_shutdown(void)
         if wl_get_named_function(self.llmod, "with_runtime_shutdown") == 0:
-            let no_params: Vec[i64] = Vec.new()
-            let ft = wl_function_type(void_ty, vec_data_i64(&no_params), 0, 0)
+            let no_params: List[i64] = List.new()
+            let ft = wl_function_type(void_ty, list_data_i64(&no_params), 0, 0)
             wl_add_function(self.llmod, "with_runtime_shutdown", ft)
 
         // i32 with_fiber_spawn(entry: ptr, arg: ptr, result_buf: ptr, result_size: i32, stack_size: i32)
         if wl_get_named_function(self.llmod, "with_fiber_spawn") == 0:
-            let params: Vec[i64] = Vec.new()
+            let params: List[i64] = List.new()
             params.push(ptr_ty)
             params.push(ptr_ty)
             params.push(ptr_ty)
             params.push(i32_ty)
             params.push(i32_ty)
-            let ft = wl_function_type(i32_ty, vec_data_i64(&params), 5, 0)
+            let ft = wl_function_type(i32_ty, list_data_i64(&params), 5, 0)
             wl_add_function(self.llmod, "with_fiber_spawn", ft)
 
         // void with_fiber_await(fiber_id: i32)
         if wl_get_named_function(self.llmod, "with_fiber_await") == 0:
-            let params: Vec[i64] = Vec.new()
+            let params: List[i64] = List.new()
             params.push(i32_ty)
-            let ft = wl_function_type(void_ty, vec_data_i64(&params), 1, 0)
+            let ft = wl_function_type(void_ty, list_data_i64(&params), 1, 0)
             wl_add_function(self.llmod, "with_fiber_await", ft)
 
         // i32 with_fiber_cancel(task_id: i32) -> i32
         if wl_get_named_function(self.llmod, "with_fiber_cancel") == 0:
-            let params: Vec[i64] = Vec.new()
+            let params: List[i64] = List.new()
             params.push(i32_ty)
-            let ft = wl_function_type(i32_ty, vec_data_i64(&params), 1, 0)
+            let ft = wl_function_type(i32_ty, list_data_i64(&params), 1, 0)
             wl_add_function(self.llmod, "with_fiber_cancel", ft)
 
         // void with_fiber_set_result(value: i64)
         if wl_get_named_function(self.llmod, "with_fiber_set_result") == 0:
-            let params: Vec[i64] = Vec.new()
+            let params: List[i64] = List.new()
             params.push(i64_ty)
-            let ft = wl_function_type(void_ty, vec_data_i64(&params), 1, 0)
+            let ft = wl_function_type(void_ty, list_data_i64(&params), 1, 0)
             wl_add_function(self.llmod, "with_fiber_set_result", ft)
 
         // void with_fiber_yield(void)
         if wl_get_named_function(self.llmod, "with_fiber_yield") == 0:
-            let no_params: Vec[i64] = Vec.new()
-            let ft = wl_function_type(void_ty, vec_data_i64(&no_params), 0, 0)
+            let no_params: List[i64] = List.new()
+            let ft = wl_function_type(void_ty, list_data_i64(&no_params), 0, 0)
             wl_add_function(self.llmod, "with_fiber_yield", ft)
 
         // void with_fiber_select(ids: ptr, count: i32, result_out: ptr)
         if wl_get_named_function(self.llmod, "with_fiber_select") == 0:
-            let params: Vec[i64] = Vec.new()
+            let params: List[i64] = List.new()
             params.push(ptr_ty)
             params.push(i32_ty)
             params.push(ptr_ty)
-            let ft = wl_function_type(void_ty, vec_data_i64(&params), 3, 0)
+            let ft = wl_function_type(void_ty, list_data_i64(&params), 3, 0)
             wl_add_function(self.llmod, "with_fiber_select", ft)
 
         // void with_fiber_select_mode(ids: ptr, count: i32, biased: i32, result_out: ptr)
         if wl_get_named_function(self.llmod, "with_fiber_select_mode") == 0:
-            let params: Vec[i64] = Vec.new()
+            let params: List[i64] = List.new()
             params.push(ptr_ty)
             params.push(i32_ty)
             params.push(i32_ty)
             params.push(ptr_ty)
-            let ft = wl_function_type(void_ty, vec_data_i64(&params), 4, 0)
+            let ft = wl_function_type(void_ty, list_data_i64(&params), 4, 0)
             wl_add_function(self.llmod, "with_fiber_select_mode", ft)
 
         self.uses_async = true
@@ -19480,9 +19480,9 @@ impl Codegen:
         if existing != 0: return existing
         let ptr_ty = wl_ptr_type(self.context)
         let i64_ty = wl_i64_type(self.context)
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(i64_ty)
-        let ft = wl_function_type(ptr_ty, vec_data_i64(&params), 1, 0)
+        let ft = wl_function_type(ptr_ty, list_data_i64(&params), 1, 0)
         wl_add_function(self.llmod, "malloc", ft)
 
     fn pack_result_to_i64(val: i64, val_ty: i64) -> i64:
@@ -19543,8 +19543,8 @@ impl Codegen:
         self.async_fn_ret_types.insert(name_sym, ret_ty)
         let cc_name = self.fn_callconv_name(meta)
 
-        let param_types: Vec[i64] = Vec.new()
-        let param_flags: Vec[i32] = Vec.new()
+        let param_types: List[i64] = List.new()
+        let param_flags: List[i32] = List.new()
         for pi in 0..param_count:
             param_types.push(self.abi_param_source_type(sig_idx, pi))
             param_flags.push(self.sig_abi_param_flags(sig_idx, pi))
@@ -19569,7 +19569,7 @@ impl Codegen:
             return
 
         // Keep only the metadata the current async spawn path still consumes.
-        let args_struct_type = wl_struct_type(self.context, vec_data_i64(&param_types), param_count, 0)
+        let args_struct_type = wl_struct_type(self.context, list_data_i64(&param_types), param_count, 0)
         self.async_fn_args_struct_types.insert(name_sym, args_struct_type)
 
     // ── Async expressions ─────────────────────────────────────────────
@@ -19739,10 +19739,10 @@ impl Codegen:
             if ptr_value == 0:
                 with_eprint("error: failed to create string literal byte storage")
                 return wl_const_null(wl_ptr_type(self.context))
-            let fields: Vec[i64] = Vec.new()
+            let fields: List[i64] = List.new()
             fields.push(ptr_value)
             fields.push(wl_const_int(wl_i64_type(self.context), text.len(), 1))
-            let init = wl_const_named_struct(str_type, vec_data_i64(&fields), 2)
+            let init = wl_const_named_struct(str_type, list_data_i64(&fields), 2)
             str_global = wl_add_global(self.llmod, str_type, name)
             wl_set_initializer(str_global, init)
             wl_set_global_constant(str_global, 1)
@@ -19766,10 +19766,10 @@ impl Codegen:
             if ptr_value == 0:
                 with_eprint("error: failed to create C-string byte storage")
                 return wl_const_null(wl_ptr_type(self.context))
-            let fields: Vec[i64] = Vec.new()
+            let fields: List[i64] = List.new()
             fields.push(ptr_value)
             fields.push(wl_const_int(wl_i64_type(self.context), text.len(), 1))
-            let init = wl_const_named_struct(cstr_type, vec_data_i64(&fields), 2)
+            let init = wl_const_named_struct(cstr_type, list_data_i64(&fields), 2)
             cstr_global = wl_add_global(self.llmod, cstr_type, name)
             wl_set_initializer(cstr_global, init)
             wl_set_global_constant(cstr_global, 1)
@@ -19884,16 +19884,16 @@ impl Codegen:
         if fn_val == 0:
             // Declare with_str_from_cstr if not already in the module
             let ptr_ty = wl_ptr_type(self.context)
-            var param_types: Vec[i64] = Vec.new()
+            var param_types: List[i64] = List.new()
             param_types.push(ptr_ty)
-            let fn_ty = wl_function_type(str_type, vec_data_i64(&param_types), 1, 0)
+            let fn_ty = wl_function_type(str_type, list_data_i64(&param_types), 1, 0)
             fn_val = wl_add_function(self.llmod, "with_str_from_cstr", fn_ty)
         if fn_val == 0:
             return self.build_str_value(ptr_val, wl_const_int(wl_i64_type(self.context), 0, 0))
         let fn_type = wl_global_get_value_type(fn_val)
-        var args: Vec[i64] = Vec.new()
+        var args: List[i64] = List.new()
         args.push(ptr_val)
-        wl_build_call(self.builder, fn_type, fn_val, vec_data_i64(&args), 1)
+        wl_build_call(self.builder, fn_type, fn_val, list_data_i64(&args), 1)
 
     fn ensure_c_fn(name: &str, ret_ty: i64, param_count: i32) -> i64:
         let existing = wl_get_named_function(self.llmod, name)
@@ -19911,7 +19911,7 @@ impl Codegen:
         let i64_ty = wl_i64_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         if name == "with_slotmap_new":
             params.push(i64_ty)
         else if name == "with_slotmap_insert_out":
@@ -19940,7 +19940,7 @@ impl Codegen:
                 params.push(i64_ty)
         if params.len() as i32 != param_count:
             sema_phase_bug(f"BUG: runtime helper '{name}' declared with {param_count} parameters; its prototype has {params.len()}")
-        wl_function_type(ret_ty, vec_data_i64(&params), params.len() as i32, 0)
+        wl_function_type(ret_ty, list_data_i64(&params), params.len() as i32, 0)
 
     mut fn emit_runtime_panic(msg: &str) -> Unit:
         self.emit_runtime_panic_value(self.gen_string_literal_raw(msg), self.gen_string_literal_raw(""))
@@ -19965,11 +19965,11 @@ impl Codegen:
         let str_ty = self.str_llvm_type()
         let saved_fn: i64 = self.current_function
         self.current_function = wl_get_insert_function(self.builder)
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(str_ty)
         params.push(str_ty)
         params.push(wl_i32_type(self.context))
-        let args: Vec[i64] = Vec.new()
+        let args: List[i64] = List.new()
         args.push(self.str_view_arg(msg))
         args.push(self.str_view_arg(loc))
         args.push(wl_const_int(wl_i32_type(self.context), 0, 0))
@@ -19977,16 +19977,16 @@ impl Codegen:
         let _unreachable = wl_build_unreachable(self.builder)
         self.current_function = saved_fn
 
-    // ── VecIter.next() codegen intrinsic ──────────────────────────────
-    // VecIter[T] = { data_ptr: i64, len: i64, idx: i64 }
+    // ── ListIter.next() codegen intrinsic ──────────────────────────────
+    // ListIter[T] = { data_ptr: i64, len: i64, idx: i64 }
     // next() returns Option[T]: checks idx < len, loads T from data_ptr, increments idx.
 
-    fn ensure_vec_runtime_fn(name: &str, ret_ty: i64, param_count: i32) -> i64:
+    fn ensure_list_runtime_fn(name: &str, ret_ty: i64, param_count: i32) -> i64:
         let existing = wl_get_named_function(self.llmod, name)
         if existing != 0: return existing
-        let fn_ty = self.get_vec_fn_type(name, ret_ty, param_count)
+        let fn_ty = self.get_list_fn_type(name, ret_ty, param_count)
         let function = wl_add_function(self.llmod, name, fn_ty)
-        // The runtime reads and rewrites the caller's Vec header through this
+        // The runtime reads and rewrites the caller's List header through this
         // pointer and never retains it. Told so (`captures(none)`), LLVM can
         // prove a store through the buffer cannot alias the header, and keeps
         // the header's length and data pointer in registers across a loop of
@@ -19994,11 +19994,11 @@ impl Codegen:
         wl_add_param_attr(self.context, function, 0, "captures")
         function
 
-    fn get_vec_fn_type(name: &str, ret_ty: i64, param_count: i32) -> i64:
+    fn get_list_fn_type(name: &str, ret_ty: i64, param_count: i32) -> i64:
         let ptr_ty = wl_ptr_type(self.context)
         let i64_ty = wl_i64_type(self.context)
-        let params: Vec[i64] = Vec.new()
-        // First param is always ptr (to Vec struct)
+        let params: List[i64] = List.new()
+        // First param is always ptr (to List struct)
         params.push(ptr_ty)
         var i = 1
         while i < param_count:
@@ -20007,7 +20007,7 @@ impl Codegen:
             else:
                 params.push(i64_ty)
             i = i + 1
-        wl_function_type(ret_ty, vec_data_i64(&params), param_count, 0)
+        wl_function_type(ret_ty, list_data_i64(&params), param_count, 0)
 
     // ── HashMap method dispatch ───────────────────────────────────────
 
@@ -20022,7 +20022,7 @@ impl Codegen:
         let ptr_ty = wl_ptr_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let i64_ty = wl_i64_type(self.context)
-        let params: Vec[i64] = Vec.new()
+        let params: List[i64] = List.new()
         params.push(ptr_ty)
         var real_ret = ret_ty
         if name == "with_hashmap_insert":
@@ -20048,11 +20048,11 @@ impl Codegen:
             real_ret = i32_ty
         if real_ret != ret_ty:
             sema_phase_bug(f"BUG: runtime helper '{name}' declared with a return type other than its prototype's")
-        let fn_ty = wl_function_type(real_ret, vec_data_i64(&params), params.len() as i32, 0)
+        let fn_ty = wl_function_type(real_ret, list_data_i64(&params), params.len() as i32, 0)
         wl_add_function(self.llmod, name, fn_ty)
 
-    fn make_ptr_vec() -> Vec[i64]:
-        let v: Vec[i64] = Vec.new()
+    fn make_ptr_list() -> List[i64]:
+        let v: List[i64] = List.new()
         v.push(wl_ptr_type(self.context))
         v
 
@@ -20076,9 +20076,9 @@ impl Codegen:
             wl_build_store(self.builder, key_ptr, spill)
             key_ptr = spill
         let hash_fn = self.mir_map_key_hash_fn(key_sema, key_ty)
-        let params: Vec[i64] = [wl_ptr_type(self.context)]
-        let args: Vec[i64] = [key_ptr]
-        wl_build_call(self.builder, wl_function_type(wl_i64_type(self.context), vec_data_i64(&params), 1, 0), hash_fn, vec_data_i64(&args), 1)
+        let params: List[i64] = [wl_ptr_type(self.context)]
+        let args: List[i64] = [key_ptr]
+        wl_build_call(self.builder, wl_function_type(wl_i64_type(self.context), list_data_i64(&params), 1, 0), hash_fn, list_data_i64(&args), 1)
 
     mut fn gen_transmute(node: i32, body: &MirBody, args_id: i32) -> i64:
         // transmute[T](value) — reinterpret bits as type T
@@ -20123,8 +20123,8 @@ impl Codegen:
     // against the instance substitution. Without this frame a frozen resolve
     // of a bare type-param ident misses and downstream consumers see 0.
     mut fn set_mono_type_bindings(fn_sym: i32):
-        let fresh_syms: Vec[i32] = Vec.new()
-        let fresh_tys: Vec[i64] = Vec.new()
+        let fresh_syms: List[i32] = List.new()
+        let fresh_tys: List[i64] = List.new()
         self.type_binding_syms = fresh_syms
         self.type_binding_types = fresh_tys
         self.type_bindings_len = 0
@@ -20271,7 +20271,7 @@ impl Codegen:
 
     // ── Async function spawn codegen ──────────────────────────────────
 
-    mut fn emit_async_fn_spawn_task_value(fn_sym: i32, callee: i64, call_ft: i64, args: &Vec[i64], task_ty: i64) -> i64:
+    mut fn emit_async_fn_spawn_task_value(fn_sym: i32, callee: i64, call_ft: i64, args: &List[i64], task_ty: i64) -> i64:
         let ctx = self.context
         let ptr_ty = wl_ptr_type(ctx)
         let i32_ty = wl_i32_type(ctx)
@@ -20284,34 +20284,34 @@ impl Codegen:
         if actual_ret_opt.is_some():
             ret_ty = actual_ret_opt.unwrap() as i64
 
-        let arg_types: Vec[i64] = Vec.new()
+        let arg_types: List[i64] = List.new()
         for ai in 0..arg_count:
             arg_types.push(wl_type_of(args[ai]))
         let args_struct_ty = if arg_count > 0:
-            wl_struct_type(ctx, vec_data_i64(&arg_types), arg_count, 0)
+            wl_struct_type(ctx, list_data_i64(&arg_types), arg_count, 0)
         else:
             wl_struct_type(ctx, 0, 0, 0)
 
         let args_size = if arg_count > 0: wl_abi_size_of(wl_get_module_data_layout(self.llmod), args_struct_ty) else: 8
         var alloc_fn = wl_get_named_function(self.llmod, "with_alloc")
         if alloc_fn == 0:
-            let alloc_params: Vec[i64] = Vec.new()
+            let alloc_params: List[i64] = List.new()
             alloc_params.push(i64_ty)
-            let alloc_ft = wl_function_type(ptr_ty, vec_data_i64(&alloc_params), 1, 0)
+            let alloc_ft = wl_function_type(ptr_ty, list_data_i64(&alloc_params), 1, 0)
             alloc_fn = wl_add_function(self.llmod, "with_alloc", alloc_ft)
         let alloc_ft = wl_global_get_value_type(alloc_fn)
-        let alloc_args: Vec[i64] = Vec.new()
+        let alloc_args: List[i64] = List.new()
         alloc_args.push(wl_const_int(i64_ty, args_size, 0))
-        let env_ptr = wl_build_call(self.builder, alloc_ft, alloc_fn, vec_data_i64(&alloc_args), 1)
+        let env_ptr = wl_build_call(self.builder, alloc_ft, alloc_fn, list_data_i64(&alloc_args), 1)
 
         for ai in 0..arg_count:
             let field_ptr = wl_build_struct_gep(self.builder, args_struct_ty, env_ptr, ai)
             wl_build_store(self.builder, args[ai], field_ptr)
 
         let result_size = if ret_ty != void_ty: wl_abi_size_of(wl_get_module_data_layout(self.llmod), ret_ty) else: 0
-        let rbuf_alloc_args: Vec[i64] = Vec.new()
+        let rbuf_alloc_args: List[i64] = List.new()
         rbuf_alloc_args.push(wl_const_int(i64_ty, if result_size > 0: result_size else: 1, 0))
-        let result_buf = wl_build_call(self.builder, alloc_ft, alloc_fn, vec_data_i64(&rbuf_alloc_args), 1)
+        let result_buf = wl_build_call(self.builder, alloc_ft, alloc_fn, list_data_i64(&rbuf_alloc_args), 1)
 
         var trampoline = 0 as i64
         if self.async_trampolines.contains(fn_sym):
@@ -20322,16 +20322,16 @@ impl Codegen:
 
         var spawn_fn = wl_get_named_function(self.llmod, "with_fiber_spawn")
         if spawn_fn == 0:
-            let spawn_params: Vec[i64] = Vec.new()
+            let spawn_params: List[i64] = List.new()
             spawn_params.push(ptr_ty)
             spawn_params.push(ptr_ty)
             spawn_params.push(ptr_ty)
             spawn_params.push(i32_ty)
             spawn_params.push(i32_ty)
-            let spawn_ft = wl_function_type(i32_ty, vec_data_i64(&spawn_params), 5, 0)
+            let spawn_ft = wl_function_type(i32_ty, list_data_i64(&spawn_params), 5, 0)
             spawn_fn = wl_add_function(self.llmod, "with_fiber_spawn", spawn_ft)
         let spawn_ft = wl_global_get_value_type(spawn_fn)
-        let spawn_args: Vec[i64] = Vec.new()
+        let spawn_args: List[i64] = List.new()
         spawn_args.push(trampoline)
         spawn_args.push(env_ptr)
         spawn_args.push(result_buf)
@@ -20340,14 +20340,14 @@ impl Codegen:
         if self.sema.fn_stack_sizes.contains(fn_sym):
             spawn_stack_size = self.sema.fn_stack_sizes.get(fn_sym).unwrap()
         spawn_args.push(wl_const_int(i32_ty, spawn_stack_size as i64, 0))
-        let fiber_id = wl_build_call(self.builder, spawn_ft, spawn_fn, vec_data_i64(&spawn_args), 5)
+        let fiber_id = wl_build_call(self.builder, spawn_ft, spawn_fn, list_data_i64(&spawn_args), 5)
 
         var task_value = wl_get_undef(task_ty)
         task_value = wl_build_insert_value(self.builder, task_value, fiber_id, 0)
         task_value = wl_build_insert_value(self.builder, task_value, result_buf, 1)
         task_value
 
-    mut fn emit_async_fn_spawn(fn_sym: i32, callee: i64, call_ft: i64, args: &Vec[i64], dest_place: i32, body: &MirBody, next_bb: i32) -> bool:
+    mut fn emit_async_fn_spawn(fn_sym: i32, callee: i64, call_ft: i64, args: &List[i64], dest_place: i32, body: &MirBody, next_bb: i32) -> bool:
         let ctx = self.context
         let ptr_ty = wl_ptr_type(ctx)
         let i32_ty = wl_i32_type(ctx)
@@ -20362,11 +20362,11 @@ impl Codegen:
             ret_ty = actual_ret_opt.unwrap() as i64
 
         // 1. Build args struct type: { arg0_ty, arg1_ty, ... }
-        let arg_types: Vec[i64] = Vec.new()
+        let arg_types: List[i64] = List.new()
         for ai in 0..arg_count:
             arg_types.push(wl_type_of(args[ai]))
         let args_struct_ty = if arg_count > 0:
-            wl_struct_type(ctx, vec_data_i64(&arg_types), arg_count, 0)
+            wl_struct_type(ctx, list_data_i64(&arg_types), arg_count, 0)
         else:
             wl_struct_type(ctx, 0, 0, 0)
 
@@ -20375,14 +20375,14 @@ impl Codegen:
         let alloc_fn_name = "with_alloc"
         var alloc_fn = wl_get_named_function(self.llmod, alloc_fn_name)
         if alloc_fn == 0:
-            let alloc_params: Vec[i64] = Vec.new()
+            let alloc_params: List[i64] = List.new()
             alloc_params.push(i64_ty)
-            let alloc_ft = wl_function_type(ptr_ty, vec_data_i64(&alloc_params), 1, 0)
+            let alloc_ft = wl_function_type(ptr_ty, list_data_i64(&alloc_params), 1, 0)
             alloc_fn = wl_add_function(self.llmod, alloc_fn_name, alloc_ft)
         let alloc_ft = wl_global_get_value_type(alloc_fn)
-        let alloc_args: Vec[i64] = Vec.new()
+        let alloc_args: List[i64] = List.new()
         alloc_args.push(wl_const_int(i64_ty, args_size, 0))
-        let env_ptr = wl_build_call(self.builder, alloc_ft, alloc_fn, vec_data_i64(&alloc_args), 1)
+        let env_ptr = wl_build_call(self.builder, alloc_ft, alloc_fn, list_data_i64(&alloc_args), 1)
 
         // 3. Store args into heap struct
         for ai in 0..arg_count:
@@ -20391,9 +20391,9 @@ impl Codegen:
 
         // 4. Heap-allocate result buffer
         let result_size = if ret_ty != void_ty: wl_abi_size_of(wl_get_module_data_layout(self.llmod),ret_ty) else: 0
-        let rbuf_alloc_args: Vec[i64] = Vec.new()
+        let rbuf_alloc_args: List[i64] = List.new()
         rbuf_alloc_args.push(wl_const_int(i64_ty, if result_size > 0: result_size else: 1, 0))
-        let result_buf = wl_build_call(self.builder, alloc_ft, alloc_fn, vec_data_i64(&rbuf_alloc_args), 1)
+        let result_buf = wl_build_call(self.builder, alloc_ft, alloc_fn, list_data_i64(&rbuf_alloc_args), 1)
 
         // 5. Get or generate trampoline
         var trampoline = 0 as i64
@@ -20407,16 +20407,16 @@ impl Codegen:
         let spawn_fn_name = "with_fiber_spawn"
         var spawn_fn = wl_get_named_function(self.llmod, spawn_fn_name)
         if spawn_fn == 0:
-            let spawn_params: Vec[i64] = Vec.new()
+            let spawn_params: List[i64] = List.new()
             spawn_params.push(ptr_ty)   // entry fn
             spawn_params.push(ptr_ty)   // arg
             spawn_params.push(ptr_ty)   // result_buf
             spawn_params.push(i32_ty)   // result_size
             spawn_params.push(i32_ty)   // stack_size
-            let spawn_ft = wl_function_type(i32_ty, vec_data_i64(&spawn_params), 5, 0)
+            let spawn_ft = wl_function_type(i32_ty, list_data_i64(&spawn_params), 5, 0)
             spawn_fn = wl_add_function(self.llmod, spawn_fn_name, spawn_ft)
         let spawn_ft = wl_global_get_value_type(spawn_fn)
-        let spawn_args: Vec[i64] = Vec.new()
+        let spawn_args: List[i64] = List.new()
         spawn_args.push(trampoline)
         spawn_args.push(env_ptr)
         spawn_args.push(result_buf)
@@ -20426,16 +20426,16 @@ impl Codegen:
         if self.sema.fn_stack_sizes.contains(fn_sym):
             spawn_stack_size = self.sema.fn_stack_sizes.get(fn_sym).unwrap()
         spawn_args.push(wl_const_int(i32_ty, spawn_stack_size as i64, 0))
-        let fiber_id = wl_build_call(self.builder, spawn_ft, spawn_fn, vec_data_i64(&spawn_args), 5)
+        let fiber_id = wl_build_call(self.builder, spawn_ft, spawn_fn, list_data_i64(&spawn_args), 5)
 
         // 7. Construct Task { fiber_id, result_buf }
         if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
             let dst_local = body.place_locals[dest_place]
             // Task = { i32, ptr }
-            let task_fields: Vec[i64] = Vec.new()
+            let task_fields: List[i64] = List.new()
             task_fields.push(i32_ty)
             task_fields.push(ptr_ty)
-            let task_ty = wl_struct_type(ctx, vec_data_i64(&task_fields), 2, 0)
+            let task_ty = wl_struct_type(ctx, list_data_i64(&task_fields), 2, 0)
             let task_alloca = self.create_entry_alloca(task_ty)
             let fid_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 0)
             wl_build_store(self.builder, fiber_id, fid_ptr)
@@ -20448,7 +20448,7 @@ impl Codegen:
             wl_build_br(self.builder, self.mir_bb_values[next_bb])
         true
 
-    fn generate_async_trampoline(fn_sym: i32, callee: i64, call_ft: i64, args_struct_ty: i64, arg_types: &Vec[i64]) -> i64:
+    fn generate_async_trampoline(fn_sym: i32, callee: i64, call_ft: i64, args_struct_ty: i64, arg_types: &List[i64]) -> i64:
         let ctx = self.context
         let ptr_ty = wl_ptr_type(ctx)
         let void_ty = wl_void_type(ctx)
@@ -20462,10 +20462,10 @@ impl Codegen:
         let param_count = arg_types.len() as i32
 
         // Trampoline signature: Unit(i8* env, i8* result_buf)
-        let tramp_params: Vec[i64] = Vec.new()
+        let tramp_params: List[i64] = List.new()
         tramp_params.push(ptr_ty)
         tramp_params.push(ptr_ty)
-        let tramp_ft = wl_function_type(void_ty, vec_data_i64(&tramp_params), 2, 0)
+        let tramp_ft = wl_function_type(void_ty, list_data_i64(&tramp_params), 2, 0)
         let fn_name = self.intern.resolve(fn_sym)
         let tramp_name = "__async_tramp_" ++ fn_name
         let tramp_fn = wl_add_function(self.llmod, tramp_name, tramp_ft)
@@ -20481,7 +20481,7 @@ impl Codegen:
         let rbuf_arg = wl_get_param(tramp_fn, 1)
 
         // Unpack args from env struct
-        let call_args: Vec[i64] = Vec.new()
+        let call_args: List[i64] = List.new()
         for pi in 0..param_count:
             let field_ptr = wl_build_struct_gep(self.builder, args_struct_ty, env_arg, pi)
             let param_ty = arg_types[pi]
@@ -20492,17 +20492,17 @@ impl Codegen:
         let free_fn_name = "with_free"
         var free_fn = wl_get_named_function(self.llmod, free_fn_name)
         if free_fn == 0:
-            let free_params: Vec[i64] = Vec.new()
+            let free_params: List[i64] = List.new()
             free_params.push(ptr_ty)
-            let free_ft = wl_function_type(void_ty, vec_data_i64(&free_params), 1, 0)
+            let free_ft = wl_function_type(void_ty, list_data_i64(&free_params), 1, 0)
             free_fn = wl_add_function(self.llmod, free_fn_name, free_ft)
         let free_ft = wl_global_get_value_type(free_fn)
-        let free_args: Vec[i64] = Vec.new()
+        let free_args: List[i64] = List.new()
         free_args.push(env_arg)
-        wl_build_call(self.builder, free_ft, free_fn, vec_data_i64(&free_args), 1)
+        wl_build_call(self.builder, free_ft, free_fn, list_data_i64(&free_args), 1)
 
         // Call the actual async function
-        let result = wl_build_call(self.builder, call_ft, callee, vec_data_i64(&call_args), param_count)
+        let result = wl_build_call(self.builder, call_ft, callee, list_data_i64(&call_args), param_count)
 
         // Write guard: check cancel_requested before storing result.
         // If cancelled, skip the write — buffer may be freed by parent's unwind.
@@ -20541,22 +20541,22 @@ impl Codegen:
 
         // Capture locals were established in the concrete lowering context.
         let capture_count = ab_body.anonymous_capture_count
-        let captures: Vec[i32] = Vec.new()
+        let captures: List[i32] = List.new()
         for ci in 0..capture_count:
             captures.push(ab_body.local_names[ci + 1])
 
         // 2. Build capture struct type
-        let cap_types: Vec[i64] = Vec.new()
+        let cap_types: List[i64] = List.new()
         for ci in 0..capture_count:
             let ty = self.sema_type_to_llvm(ab_body.local_type_ids[ci + 1])
             if ty == 0: sema_phase_bug(f"BUG: async capture lacks LLVM type: node={node} capture={ci}")
             cap_types.push(ty)
         var cap_struct_type: i64 = 0
         if capture_count > 0:
-            let env_sema_types: Vec[i32] = Vec.new()
+            let env_sema_types: List[i32] = List.new()
             for ci in 0..capture_count:
                 env_sema_types.push(ab_body.local_type_ids[ci + 1])
-            cap_struct_type = self.closure_env_llvm_type(&cap_types, &env_sema_types, &Vec.new())
+            cap_struct_type = self.closure_env_llvm_type(&cap_types, &env_sema_types, &List.new())
 
         let ret_sema_ty_id = ab_body.local_type_ids[0]
         let ret_ty = self.sema_type_to_llvm(ret_sema_ty_id)
@@ -20565,10 +20565,10 @@ impl Codegen:
         // 3. Create anonymous trampoline: Unit(ptr env, ptr result_buf)
         self.async_block_counter = self.async_block_counter + 1
         let tramp_name = "__async_block_" ++ int_to_string(self.async_block_counter)
-        let tramp_params: Vec[i64] = Vec.new()
+        let tramp_params: List[i64] = List.new()
         tramp_params.push(ptr_ty)  // env
         tramp_params.push(ptr_ty)  // result_buf
-        let tramp_ft = wl_function_type(void_ty, vec_data_i64(&tramp_params), 2, 0)
+        let tramp_ft = wl_function_type(void_ty, list_data_i64(&tramp_params), 2, 0)
         let tramp_fn = wl_add_function(self.llmod, tramp_name, tramp_ft)
 
         // 4. Save codegen state
@@ -20616,15 +20616,15 @@ impl Codegen:
         // Free env struct
         var free_fn = wl_get_named_function(self.llmod, "with_free")
         if free_fn == 0:
-            let fp: Vec[i64] = Vec.new()
+            let fp: List[i64] = List.new()
             fp.push(ptr_ty)
-            let fft = wl_function_type(void_ty, vec_data_i64(&fp), 1, 0)
+            let fft = wl_function_type(void_ty, list_data_i64(&fp), 1, 0)
             free_fn = wl_add_function(self.llmod, "with_free", fft)
         if capture_count > 0:
             let free_ft = wl_global_get_value_type(free_fn)
-            let free_args: Vec[i64] = Vec.new()
+            let free_args: List[i64] = List.new()
             free_args.push(env_arg)
-            wl_build_call(self.builder, free_ft, free_fn, vec_data_i64(&free_args), 1)
+            wl_build_call(self.builder, free_ft, free_fn, list_data_i64(&free_args), 1)
 
         // Set rbuf flag so TK_RETURN stores result into result_buf
         self.async_block_rbuf = rbuf_arg
@@ -20653,7 +20653,7 @@ impl Codegen:
         self.mir_scan_memory_locals(ab_body)
 
         // Create LLVM BBs for MIR blocks
-        self.mir_bb_values = Vec.new()
+        self.mir_bb_values = List.new()
         let bb_count = ab_body.block_count()
         for bi in 0..bb_count:
             let bb = wl_append_bb(ctx, tramp_fn, "bb")
@@ -20698,8 +20698,8 @@ impl Codegen:
             let cap_size = self.abi_size_of(cap_struct_type)
             // #2042: the environment at its model alignment.
             let alloc_fn = self.ensure_box_alloc_aligned_fn()
-            let alloc_args: Vec[i64] = [wl_const_int(i64_ty, cap_size, 0), wl_const_int(i64_ty, self.declared_align_of(cap_struct_type), 0)]
-            env_ptr = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 2)
+            let alloc_args: List[i64] = [wl_const_int(i64_ty, cap_size, 0), wl_const_int(i64_ty, self.declared_align_of(cap_struct_type), 0)]
+            env_ptr = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, list_data_i64(&alloc_args), 2)
             // Store captures into heap struct
             for ci in 0..capture_count:
                 let sym = captures[ci]
@@ -20714,40 +20714,40 @@ impl Codegen:
         let result_size = self.abi_size_of(ret_ty)
         var alloc_fn2 = wl_get_named_function(self.llmod, "with_alloc")
         if alloc_fn2 == 0:
-            let ap2: Vec[i64] = Vec.new()
+            let ap2: List[i64] = List.new()
             ap2.push(i64_ty)
-            let aft2 = wl_function_type(ptr_ty, vec_data_i64(&ap2), 1, 0)
+            let aft2 = wl_function_type(ptr_ty, list_data_i64(&ap2), 1, 0)
             alloc_fn2 = wl_add_function(self.llmod, "with_alloc", aft2)
         let alloc_ft2 = wl_global_get_value_type(alloc_fn2)
-        let rbuf_args: Vec[i64] = Vec.new()
+        let rbuf_args: List[i64] = List.new()
         rbuf_args.push(wl_const_int(i64_ty, if result_size > 0: result_size else: 1, 0))
-        let result_buf = wl_build_call(self.builder, alloc_ft2, alloc_fn2, vec_data_i64(&rbuf_args), 1)
+        let result_buf = wl_build_call(self.builder, alloc_ft2, alloc_fn2, list_data_i64(&rbuf_args), 1)
 
         // 10. Call with_fiber_spawn(trampoline, env, result_buf, result_size, 0)
         var spawn_fn = wl_get_named_function(self.llmod, "with_fiber_spawn")
         if spawn_fn == 0:
-            let sp: Vec[i64] = Vec.new()
+            let sp: List[i64] = List.new()
             sp.push(ptr_ty)
             sp.push(ptr_ty)
             sp.push(ptr_ty)
             sp.push(i32_ty)
             sp.push(i32_ty)
-            let sft = wl_function_type(i32_ty, vec_data_i64(&sp), 5, 0)
+            let sft = wl_function_type(i32_ty, list_data_i64(&sp), 5, 0)
             spawn_fn = wl_add_function(self.llmod, "with_fiber_spawn", sft)
         let spawn_ft = wl_global_get_value_type(spawn_fn)
-        let spawn_args: Vec[i64] = Vec.new()
+        let spawn_args: List[i64] = List.new()
         spawn_args.push(tramp_fn)
         spawn_args.push(env_ptr)
         spawn_args.push(result_buf)
         spawn_args.push(wl_const_int(i32_ty, result_size, 0))
         spawn_args.push(wl_const_int(i32_ty, 0, 0))
-        let fiber_id = wl_build_call(self.builder, spawn_ft, spawn_fn, vec_data_i64(&spawn_args), 5)
+        let fiber_id = wl_build_call(self.builder, spawn_ft, spawn_fn, list_data_i64(&spawn_args), 5)
 
         // 11. Construct Task { fiber_id, result_buf }
-        let task_fields: Vec[i64] = Vec.new()
+        let task_fields: List[i64] = List.new()
         task_fields.push(i32_ty)
         task_fields.push(ptr_ty)
-        let task_ty = wl_struct_type(ctx, vec_data_i64(&task_fields), 2, 0)
+        let task_ty = wl_struct_type(ctx, list_data_i64(&task_fields), 2, 0)
         var task_val = wl_get_undef(task_ty)
         task_val = wl_build_insert_value(self.builder, task_val, fiber_id, 0)
         task_val = wl_build_insert_value(self.builder, task_val, result_buf, 1)

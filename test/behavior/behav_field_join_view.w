@@ -20,7 +20,7 @@ use std.process
 type S { s: str, n: i32 }
 type Outer { inner: S, t: str }
 type P { p: str, q: str }
-type V { v: Vec[i32], w: Vec[i32] }
+type V { v: List[i32], w: List[i32] }
 
 impl P:
     mut fn show(c: bool):
@@ -64,9 +64,9 @@ fn main:
     let typed: &str = if c: x.s else: y.s
     print(f"<{blocked}> {(if c: x.s else: y.s).len()} {if c: typed else: mixed}")
 
-    var a: Vec[i32] = Vec.new()
+    var a: List[i32] = List.new()
     a.push(1)
-    var b: Vec[i32] = Vec.new()
+    var b: List[i32] = List.new()
     b.push(2)
     b.push(3)
     let vs = V { v: a, w: b }

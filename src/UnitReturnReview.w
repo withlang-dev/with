@@ -4,10 +4,10 @@
 use Lexer
 use Token
 
-pub fn explicit_unit_returns(text: &str) -> Vec[str]:
+pub fn explicit_unit_returns(text: &str) -> List[str]:
     var lexer = Lexer.init(text.slice(0, text.len()), 0)
     let tokens = lexer.tokenize()
-    var found: Vec[str] = Vec.new()
+    var found: List[str] = List.new()
     for ti in 0..tokens.len() - 1:
         if tokens.get_tag(ti) != TokenKind.TK_KW_FN or tokens.get_tag(ti + 1) != TokenKind.TK_IDENT: continue
         var depth = 0
@@ -28,12 +28,12 @@ pub fn explicit_unit_returns(text: &str) -> Vec[str]:
             index = index + 1
     found
 
-pub fn added_unit_returns(before: &str, after: &str) -> Vec[str]:
+pub fn added_unit_returns(before: &str, after: &str) -> List[str]:
     let old = explicit_unit_returns(before)
     let current = explicit_unit_returns(after)
-    var used: Vec[bool] = Vec.new()
+    var used: List[bool] = List.new()
     for _ in 0..old.len(): used.push(false)
-    var added: Vec[str] = Vec.new()
+    var added: List[str] = List.new()
     for item in current:
         var matched = false
         for i in 0..old.len():

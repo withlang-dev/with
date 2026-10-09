@@ -5,8 +5,8 @@
 // visible to the enclosing return check.
 type ForwardViewFactory { marker: i32 }
 
-fn ForwardViewFactory.borrow(values: &Vec[i32]) -> &Vec[i32]: values
+fn ForwardViewFactory.borrow(values: &List[i32]) -> &List[i32]: values
 
-fn bad() -> &Vec[i32]:
-    let values: Vec[i32] = Vec.new()
+fn bad() -> &List[i32]:
+    let values: List[i32] = List.new()
     ForwardViewFactory.borrow(&values)

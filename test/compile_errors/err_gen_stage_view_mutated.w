@@ -5,13 +5,13 @@
 // cannot be written by a stage's closure nor before the chain is consumed.
 use std.generators.{map, collect}
 
-gen fn over(xs: &Vec[i64]) -> &i64:
+gen fn over(xs: &List[i64]) -> &i64:
     for x in xs:
         yield x
 
 fn main:
-    var v: Vec[i64] = [4, 5, 6]
+    var v: List[i64] = [4, 5, 6]
     let staged = over(&v) |> map(it * 3)
     v.push(7)
-    let all = staged |> collect[Vec]()
+    let all = staged |> collect[List]()
     print(all.len())

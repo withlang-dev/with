@@ -13,7 +13,7 @@ type Pair[T] { left: T, right: T }
 enum Maybe[T]:
     Just(T)
     Nothing
-type Cell[K, V] { key: K, values: Vec[V] }
+type Cell[K, V] { key: K, values: List[V] }
 
 enum Chain:
     Cons(i32, Box[Chain])
@@ -37,7 +37,7 @@ fn main:
     check(f"{nested:?}", "Pair { left: Pair { left: 1, right: 2 }, right: Pair { left: 3, right: 4 } }")
     let just: Maybe[Pair[str]] = Maybe.Just(Pair { left: "x", right: "y" })
     check(f"{just:?}", r#"Just(Pair { left: "x", right: "y" })"#)
-    let cell_values: Vec[Maybe[i32]] = Vec.new()
+    let cell_values: List[Maybe[i32]] = List.new()
     cell_values.push(Maybe.Just(1))
     cell_values.push(Maybe.Just(2))
     let cell = Cell { key: "k", values: cell_values }

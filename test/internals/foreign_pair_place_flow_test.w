@@ -5,9 +5,9 @@ fn step(action: i32, place: i32, source: i32, op: i32, guard: i32, can_fail: boo
     ForeignPairStep { action, place, source, contract: ForeignPairBlock { action: op, ty: 17, origin: 3, guard, can_fail, preserves_on_failure: true, invokes: op == FOREIGN_PAIR_DESTROY } }
 
 fn main:
-    let starts: Vec[i32] = Vec.new()
-    let counts: Vec[i32] = Vec.new()
-    let steps: Vec[ForeignPairStep] = Vec.new()
+    let starts: List[i32] = List.new()
+    let counts: List[i32] = List.new()
+    let steps: List[ForeignPairStep] = List.new()
     // bb0: construct a and borrow it as r, then set its callback.
     starts.push(0)
     counts.push(3)
@@ -31,7 +31,7 @@ fn main:
     starts.push(7)
     counts.push(1)
     steps.push(step(FOREIGN_STEP_APPLY, 1, -1, FOREIGN_PAIR_RESET, -1, false))
-    let edges: Vec[ForeignPairEdge] = Vec.new()
+    let edges: List[ForeignPairEdge] = List.new()
     edges.push(ForeignPairEdge { from: 0, to: 1, guard: 10, succeeded: true })
     edges.push(ForeignPairEdge { from: 0, to: 2, guard: 10, succeeded: false })
     edges.push(ForeignPairEdge { from: 1, to: 3, guard: 11, succeeded: true })

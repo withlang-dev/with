@@ -30,11 +30,11 @@ c facade dbf:
 
 type StatementCache = ephemeral {
     db: &Database,
-    ids: Vec[i32],
-    stmts: Vec[Statement],
+    ids: List[i32],
+    stmts: List[Statement],
 }
 
-fn StatementCache.over(db: &Database) -> StatementCache: StatementCache { db: db, ids: Vec.new(), stmts: Vec.new() }
+fn StatementCache.over(db: &Database) -> StatementCache: StatementCache { db: db, ids: List.new(), stmts: List.new() }
 
 impl StatementCache:
     // Prepared once per id; a repeat is served from the cache. The explicit

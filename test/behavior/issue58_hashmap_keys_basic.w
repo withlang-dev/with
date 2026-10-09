@@ -10,6 +10,6 @@ fn main:
     m.insert(2, "b")
     m.insert(1, "updated")
 
-    let ks = m.keys() |> map(it.clone()) |> collect[Vec]()
+    let ks = m.keys() |> map(it.clone()) |> collect[List]()
     assert(ks == [1, 2])
     print("ok")

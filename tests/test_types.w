@@ -1,6 +1,6 @@
 // test_types.w — Comprehensive type, cast, and coercion tests.
 // Covers all primitive types from §4.1, casts from §4.2.6, struct
-// field storage, Vec element storage, and cross-type arithmetic.
+// field storage, List element storage, and cross-type arithmetic.
 
 extern fn with_eprintln(s: str) -> void
 extern fn int_to_string(n: i32) -> str
@@ -178,7 +178,7 @@ fn test_struct_field_storage:
 fn test_struct_in_loop:
     with_eprintln("  struct fields in loops...")
     // f32 struct in loop with computed value
-    var results: Vec[i32] = Vec.new()
+    var results: List[i32] = List.new()
     for i in 0..5:
         let fi = i as f32
         let s = S_f32 { val: fi * 10.0 + 1.0 }
@@ -189,20 +189,20 @@ fn test_struct_in_loop:
     assert_eq_i32(results.get(3), 31, "loop f32 struct i=3")
     assert_eq_i32(results.get(4), 41, "loop f32 struct i=4")
 
-// ── Vec push/get with struct types ─────────────────────────────────
+// ── List push/get with struct types ─────────────────────────────────
 
 type Position = { x: f32, y: f32 }
 
-fn test_vec_struct:
-    with_eprintln("  Vec[struct] push/get...")
-    var pos: Vec[Position] = Vec.new()
+fn test_list_struct:
+    with_eprintln("  List[struct] push/get...")
+    var pos: List[Position] = List.new()
     pos.push(Position { x: 1.5, y: 2.5 })
     pos.push(Position { x: 3.0, y: 4.0 })
     assert_eq_i32(pos[0].x as i32, 1, "vec struct [0].x")
     assert_eq_i32(pos[0].y as i32, 2, "vec struct [0].y")
     assert_eq_i32(pos[1].x as i32, 3, "vec struct [1].x")
     // Push in loop with computed values
-    var pos2: Vec[Position] = Vec.new()
+    var pos2: List[Position] = List.new()
     for i in 0..5:
         let fi = i as f32
         pos2.push(Position { x: fi + 0.5, y: fi * 2.0 })
@@ -210,34 +210,34 @@ fn test_vec_struct:
     assert_eq_i32(pos2[1].x as i32, 1, "vec loop [1].x (1.5→1)")
     assert_eq_i32(pos2[4].x as i32, 4, "vec loop [4].x (4.5→4)")
     assert_eq_i32(pos2[4].y as i32, 8, "vec loop [4].y (8.0→8)")
-    // Vec index assignment
+    // List index assignment
     pos2[0] = Position { x: 99.0, y: 88.0 }
     assert_eq_i32(pos2[0].x as i32, 99, "vec set [0].x")
 
-// ── Vec with all numeric types ─────────────────────────────────────
+// ── List with all numeric types ─────────────────────────────────────
 
-fn test_vec_numeric_types:
-    with_eprintln("  Vec numeric types...")
-    var vi32: Vec[i32] = Vec.new()
+fn test_list_numeric_types:
+    with_eprintln("  List numeric types...")
+    var vi32: List[i32] = List.new()
     vi32.push(42)
-    assert_eq_i32(vi32.get(0), 42, "Vec[i32]")
+    assert_eq_i32(vi32.get(0), 42, "List[i32]")
 
-    var vu8: Vec[u8] = Vec.new()
+    var vu8: List[u8] = List.new()
     vu8.push(200u8)
-    assert_eq_i32(vu8.get(0) as i32, 200, "Vec[u8] via get")
-    assert_eq_i32(vu8[0] as i32, 200, "Vec[u8] via index")
+    assert_eq_i32(vu8.get(0) as i32, 200, "List[u8] via get")
+    assert_eq_i32(vu8[0] as i32, 200, "List[u8] via index")
 
-    var vf32: Vec[f32] = Vec.new()
+    var vf32: List[f32] = List.new()
     vf32.push(3.25)
-    assert_eq_i32(vf32[0] as i32, 3, "Vec[f32]")
+    assert_eq_i32(vf32[0] as i32, 3, "List[f32]")
 
-    var vf64: Vec[f64] = Vec.new()
+    var vf64: List[f64] = List.new()
     vf64.push(1000.5)
-    assert_eq_i64(vf64[0] as i64, 1000i64, "Vec[f64]")
+    assert_eq_i64(vf64[0] as i64, 1000i64, "List[f64]")
 
-    var vi64: Vec[i64] = Vec.new()
+    var vi64: List[i64] = List.new()
     vi64.push(999999i64)
-    assert_eq_i64(vi64.get(0), 999999i64, "Vec[i64]")
+    assert_eq_i64(vi64.get(0), 999999i64, "List[i64]")
 
 // ── f32/f64 arithmetic ─────────────────────────────────────────────
 
@@ -284,10 +284,10 @@ fn test_typed_float_literal_precision:
     assert_eq_i64(scale_f32(p.x), 12345600585i64, "struct f32 field keeps precision")
     assert_eq_i64(scale_f32(p.y), 99999i64, "struct f32 field rem+mul keeps precision")
 
-    var pos_precise: Vec[Position] = Vec.new()
+    var pos_precise: List[Position] = List.new()
     pos_precise.push(Position { x: 99.0f32 * 0.1f32, y: 0.0f32 })
     let zero = 0
-    assert_eq_i64(scale_f32(pos_precise[zero].x), 9900000i64, "Vec[struct] push from typed expr keeps precision")
+    assert_eq_i64(scale_f32(pos_precise[zero].x), 9900000i64, "List[struct] push from typed expr keeps precision")
 
     var loop_sum: f64 = 0.0
     for i in 0..1000:
@@ -356,8 +356,8 @@ fn main:
     test_int_float_casts()
     test_struct_field_storage()
     test_struct_in_loop()
-    test_vec_struct()
-    test_vec_numeric_types()
+    test_list_struct()
+    test_list_numeric_types()
     test_float_arithmetic()
     test_typed_float_literal_precision()
     test_bool()

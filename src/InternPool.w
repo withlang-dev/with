@@ -1,7 +1,7 @@
 // Wave 1 foundations: unified intern pool.
 //
 // InternPool is a thin handle wrapping a heap-allocated state block.
-// Copies of InternPool share the same underlying data — Vec growth
+// Copies of InternPool share the same underlying data — List growth
 // in one copy is visible to all. This is critical because Sema stores
 // InternPool by value and passes self by value on every method call.
 
@@ -37,13 +37,13 @@ type ValueId = i32
 let INTERN_PAGE_SIZE: i64 = 1048576  // 1MB per page
 
 type InternStringArena {
-    pages: Vec[*mut u8],
+    pages: List[*mut u8],
     offset: i64,
 }
 
 fn InternStringArena.new() -> InternStringArena:
     let first = with_alloc(INTERN_PAGE_SIZE)
-    var arena = InternStringArena { pages: Vec.new(), offset: 0 }
+    var arena = InternStringArena { pages: List.new(), offset: 0 }
     arena.pages.push(first)
     arena
 
@@ -71,12 +71,12 @@ impl InternStringArena:
 // ── InternPool ────────────────────────────────────────────────────
 
 type InternPoolState {
-    symbol_texts: Vec[str],
+    symbol_texts: List[str],
     symbol_map: HashMap[str, i32],
     strings: InternStringArena,
-    type_keys: Vec[TypeKey],
+    type_keys: List[TypeKey],
     type_map: HashMap[str, i32],
-    value_keys: Vec[ValueKey],
+    value_keys: List[ValueKey],
     value_map: HashMap[str, i32],
 }
 
@@ -93,12 +93,12 @@ fn InternPool.init -> InternPool:
     intern_debug_init("InternPool.init:start")
     let ptr = with_alloc(256) as *mut InternPoolState
     unsafe *ptr = InternPoolState {
-        symbol_texts: Vec.new(),
+        symbol_texts: List.new(),
         symbol_map: intern_new_map_str_i32(),
         strings: InternStringArena.new(),
-        type_keys: Vec.new(),
+        type_keys: List.new(),
         type_map: intern_new_map_str_i32(),
-        value_keys: Vec.new(),
+        value_keys: List.new(),
         value_map: intern_new_map_str_i32(),
     }
     intern_debug_init("InternPool.init:assembled")

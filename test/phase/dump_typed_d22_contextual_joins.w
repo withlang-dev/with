@@ -7,16 +7,16 @@
 //! expect-check-stdout: bind owned_last: i32
 //! expect-check-stdout: bind owned_first: i32
 //! expect-check-stdout: bind five_views: &i32
-//! expect-check-stdout: bind sequence: Vec[i32]
-//! expect-check-stdout: bind pinned_sequence: Vec[i32]
+//! expect-check-stdout: bind sequence: List[i32]
+//! expect-check-stdout: bind pinned_sequence: List[i32]
 //! expect-check-stdout: bind some_first: Option[i32]
 //! expect-check-stdout: bind none_first: Option[i32]
 //! expect-check-stdout: bind chained_some_first: Option[i32]
 //! expect-check-stdout: bind chained_none_first: Option[i32]
 //! expect-check-stdout: bind matched_some_first: Option[i32]
 //! expect-check-stdout: bind matched_none_first: Option[i32]
-//! expect-check-stdout: bind sequence_some_first: Vec[Option[i32]]
-//! expect-check-stdout: bind sequence_none_first: Vec[Option[i32]]
+//! expect-check-stdout: bind sequence_some_first: List[Option[i32]]
+//! expect-check-stdout: bind sequence_none_first: List[Option[i32]]
 //! expect-check-stdout: final=&i32 expected=<inferred> expected-anchor=0 arms=2 owned-anchors=0 materialized=0 views=2 diverging=0
 //! expect-check-stdout: final=i32 expected=<inferred> expected-anchor=0 arms=2 owned-anchors=1 materialized=1 views=0 diverging=0
 //! expect-check-stdout: final=i32 expected=i32 expected-anchor=1 arms=2 owned-anchors=0 materialized=2 views=0 diverging=0
@@ -58,7 +58,7 @@ fn main:
         _ => left_view
 
     let sequence = [left_view, 125]
-    let pinned_sequence: Vec[i32] = [left_view, right_view]
+    let pinned_sequence: List[i32] = [left_view, right_view]
 
     // Context-dependent variant shorthand is completed only after an
     // independent arm establishes the enum instantiation. Arm order is not

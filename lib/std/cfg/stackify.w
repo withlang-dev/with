@@ -66,12 +66,12 @@ pub type StackifyBlock {
 
 pub type StackifyGraph {
     pub entry: i32,
-    pub blocks: Vec[StackifyBlock],
-    pub block_params: Vec[i32],
-    pub succs: Vec[i32],
-    pub targets: Vec[StackifyTarget],
-    pub target_args: Vec[i32],
-    pub return_values: Vec[i32],
+    pub blocks: List[StackifyBlock],
+    pub block_params: List[i32],
+    pub succs: List[i32],
+    pub targets: List[StackifyTarget],
+    pub target_args: List[i32],
+    pub return_values: List[i32],
 }
 
 pub type StackifyNode {
@@ -95,10 +95,10 @@ pub type StackifyNode {
 pub type StackifyTree {
     pub roots_start: i32,
     pub roots_count: i32,
-    pub nodes: Vec[StackifyNode],
-    pub children: Vec[i32],
-    pub values: Vec[i32],
-    pub labels: Vec[i32],
+    pub nodes: List[StackifyNode],
+    pub children: List[i32],
+    pub values: List[i32],
+    pub labels: List[i32],
 }
 
 pub type StackifyResult {
@@ -108,17 +108,17 @@ pub type StackifyResult {
 }
 
 type StackifyPreds {
-    starts: Vec[i32],
-    counts: Vec[i32],
-    data: Vec[i32],
+    starts: List[i32],
+    counts: List[i32],
+    data: List[i32],
 }
 
 type StackifyAnalysis {
-    rpo: Vec[i32],
-    rpo_pos: Vec[i32],
-    idom: Vec[i32],
-    merge_nodes: Vec[i32],
-    loop_headers: Vec[i32],
+    rpo: List[i32],
+    rpo_pos: List[i32],
+    idom: List[i32],
+    merge_nodes: List[i32],
+    loop_headers: List[i32],
     ok: bool,
     message: str,
 }
@@ -140,14 +140,14 @@ type StackifyContext {
     graph: StackifyGraph,
     analysis: StackifyAnalysis,
     tree: StackifyTree,
-    ctrl_stack: Vec[StackifyCtrlEntry],
-    process_stack: Vec[StackifyProcessEntry],
-    result_starts: Vec[i32],
-    result_counts: Vec[i32],
-    result_items: Vec[i32],
-    merge_starts: Vec[i32],
-    merge_counts: Vec[i32],
-    merge_items: Vec[i32],
+    ctrl_stack: List[StackifyCtrlEntry],
+    process_stack: List[StackifyProcessEntry],
+    result_starts: List[i32],
+    result_counts: List[i32],
+    result_items: List[i32],
+    merge_starts: List[i32],
+    merge_counts: List[i32],
+    merge_items: List[i32],
     ok: bool,
     message: str,
 }
@@ -175,12 +175,12 @@ fn stackify_empty_block(desc: str) -> StackifyBlock:
 pub fn StackifyGraph.new(entry: i32) -> StackifyGraph:
     StackifyGraph {
         entry,
-        blocks: Vec.new(),
-        block_params: Vec.new(),
-        succs: Vec.new(),
-        targets: Vec.new(),
-        target_args: Vec.new(),
-        return_values: Vec.new(),
+        blocks: List.new(),
+        block_params: List.new(),
+        succs: List.new(),
+        targets: List.new(),
+        target_args: List.new(),
+        return_values: List.new(),
     }
 
 impl StackifyGraph:
@@ -197,7 +197,7 @@ impl StackifyGraph:
         self.block_params.push(value)
         self.blocks[block].params_count = self.blocks[block].params_count + 1
 
-    mut fn add_target(block: i32, args: &Vec[i32]) -> i32:
+    mut fn add_target(block: i32, args: &List[i32]) -> i32:
         let start = self.target_args.len() as i32
         var i: i64 = 0
         while i < args.len():
@@ -211,10 +211,10 @@ impl StackifyGraph:
         })
         id
 
-    pub mut fn add_branch_target(block: i32, args: &Vec[i32]) -> i32:
+    pub mut fn add_branch_target(block: i32, args: &List[i32]) -> i32:
         self.add_target(block, args)
 
-    mut fn set_succs(block: i32, block_succs: &Vec[i32]):
+    mut fn set_succs(block: i32, block_succs: &List[i32]):
         self.blocks[block].succs_start = self.succs.len() as i32
         self.blocks[block].succs_count = block_succs.len() as i32
         var i: i64 = 0
@@ -222,18 +222,18 @@ impl StackifyGraph:
             self.succs.push(block_succs[i])
             i = i + 1
 
-    pub mut fn set_br(block: i32, target_block: i32, args: &Vec[i32]):
+    pub mut fn set_br(block: i32, target_block: i32, args: &List[i32]):
         if block < 0 or block >= self.blocks.len() as i32:
             return
         let target = self.add_target(target_block, args)
         self.blocks[block].term_kind = StackifyTermKind.Br
         self.blocks[block].targets_start = target
         self.blocks[block].targets_count = 1
-        let block_succs: Vec[i32] = Vec.new()
+        let block_succs: List[i32] = List.new()
         block_succs.push(target_block)
         self.set_succs(block, block_succs)
 
-    pub mut fn set_cond_br(block: i32, cond: i32, true_block: i32, true_args: &Vec[i32], false_block: i32, false_args: &Vec[i32]):
+    pub mut fn set_cond_br(block: i32, cond: i32, true_block: i32, true_args: &List[i32], false_block: i32, false_args: &List[i32]):
         if block < 0 or block >= self.blocks.len() as i32:
             return
         let first_target = self.targets.len() as i32
@@ -243,28 +243,28 @@ impl StackifyGraph:
         self.blocks[block].cond_value = cond
         self.blocks[block].targets_start = first_target
         self.blocks[block].targets_count = 2
-        let block_succs: Vec[i32] = Vec.new()
+        let block_succs: List[i32] = List.new()
         block_succs.push(true_block)
         block_succs.push(false_block)
         self.set_succs(block, block_succs)
 
-    pub mut fn set_select(block: i32, selector: i32, target_blocks: &Vec[i32], default_block: i32):
+    pub mut fn set_select(block: i32, selector: i32, target_blocks: &List[i32], default_block: i32):
         if block < 0 or block >= self.blocks.len() as i32:
             return
         let first_target = self.targets.len() as i32
         var i: i64 = 0
         while i < target_blocks.len():
-            let empty: Vec[i32] = Vec.new()
+            let empty: List[i32] = List.new()
             let _ = self.add_target(target_blocks[i], empty)
             i = i + 1
-        let default_empty: Vec[i32] = Vec.new()
+        let default_empty: List[i32] = List.new()
         let default_target = self.add_target(default_block, default_empty)
         self.blocks[block].term_kind = StackifyTermKind.Select
         self.blocks[block].selector_value = selector
         self.blocks[block].targets_start = first_target
         self.blocks[block].targets_count = target_blocks.len() as i32
         self.blocks[block].default_target = default_target
-        let block_succs: Vec[i32] = Vec.new()
+        let block_succs: List[i32] = List.new()
         var si: i64 = 0
         while si < target_blocks.len():
             block_succs.push(target_blocks[si])
@@ -280,7 +280,7 @@ impl StackifyGraph:
         self.blocks[block].targets_start = targets_start
         self.blocks[block].targets_count = targets_count
         self.blocks[block].default_target = default_target
-        let block_succs: Vec[i32] = Vec.new()
+        let block_succs: List[i32] = List.new()
         var i = 0
         while i < targets_count:
             if targets_start + i >= 0 and targets_start + i < self.targets.len() as i32:
@@ -290,7 +290,7 @@ impl StackifyGraph:
             block_succs.push(self.targets[default_target].block)
         self.set_succs(block, block_succs)
 
-    pub mut fn set_return(block: i32, values: &Vec[i32]):
+    pub mut fn set_return(block: i32, values: &List[i32]):
         if block < 0 or block >= self.blocks.len() as i32:
             return
         self.blocks[block].term_kind = StackifyTermKind.Return
@@ -300,24 +300,24 @@ impl StackifyGraph:
         while i < values.len():
             self.return_values.push(values[i])
             i = i + 1
-        let no_succs: Vec[i32] = Vec.new()
+        let no_succs: List[i32] = List.new()
         self.set_succs(block, no_succs)
 
     pub mut fn set_unreachable(block: i32):
         if block < 0 or block >= self.blocks.len() as i32:
             return
         self.blocks[block].term_kind = StackifyTermKind.Unreachable
-        let no_succs: Vec[i32] = Vec.new()
+        let no_succs: List[i32] = List.new()
         self.set_succs(block, no_succs)
 
 fn stackify_tree_empty -> StackifyTree:
     StackifyTree {
         roots_start: 0,
         roots_count: 0,
-        nodes: Vec.new(),
-        children: Vec.new(),
-        values: Vec.new(),
-        labels: Vec.new(),
+        nodes: List.new(),
+        children: List.new(),
+        values: List.new(),
+        labels: List.new(),
     }
 
 fn stackify_result_error(msg: str) -> StackifyResult:
@@ -334,8 +334,8 @@ fn stackify_result_ok(tree: StackifyTree) -> StackifyResult:
         tree,
     }
 
-fn stackify_bool_vec(count: i32, value: i32) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
+fn stackify_bool_list(count: i32, value: i32) -> List[i32]:
+    let out: List[i32] = List.new()
     var i = 0
     while i < count:
         out.push(value)
@@ -376,11 +376,11 @@ fn stackify_validate_graph(graph: &StackifyGraph) -> str:
 
 // Accumulator state for the iterative post-order DFS used by
 // stackify_compute_analysis. Bundled into a struct so the traversal is
-// a method on StackifyDfsState rather than a free fn with `&mut Vec`
+// a method on StackifyDfsState rather than a free fn with `&mut List`
 // output parameters.
 type StackifyDfsState {
-    visited: Vec[i32],
-    out: Vec[i32],
+    visited: List[i32],
+    out: List[i32],
 }
 
 impl StackifyDfsState:
@@ -389,8 +389,8 @@ impl StackifyDfsState:
             return
         if self.visited[start] != 0:
             return
-        let stack_block: Vec[i32] = Vec.new()
-        let stack_idx: Vec[i32] = Vec.new()
+        let stack_block: List[i32] = List.new()
+        let stack_idx: List[i32] = List.new()
         self.visited[start] = 1
         stack_block.push(start)
         stack_idx.push(0)
@@ -414,8 +414,8 @@ impl StackifyDfsState:
 
 fn stackify_compute_preds(graph: &StackifyGraph) -> StackifyPreds:
     let n = graph.blocks.len() as i32
-    let starts = stackify_bool_vec(n, 0)
-    let counts = stackify_bool_vec(n, 0)
+    let starts = stackify_bool_list(n, 0)
+    let counts = stackify_bool_list(n, 0)
     var b = 0
     while b < n:
         let blk = graph.blocks[b]
@@ -432,7 +432,7 @@ fn stackify_compute_preds(graph: &StackifyGraph) -> StackifyPreds:
         total = total + counts[i]
         counts[i] = 0
         i = i + 1
-    let pred_data = stackify_bool_vec(total, 0)
+    let pred_data = stackify_bool_list(total, 0)
     var b2 = 0
     while b2 < n:
         let blk = graph.blocks[b2]
@@ -452,7 +452,7 @@ fn stackify_pred_count(preds: &StackifyPreds, block: i32) -> i32:
 fn stackify_pred_get(preds: &StackifyPreds, block: i32, idx: i32) -> i32:
     preds.data[(preds.starts[block] + idx)]
 
-fn stackify_domtree_merge(idom: &Vec[i32], rpo_pos: &Vec[i32], a: i32, b: i32) -> i32:
+fn stackify_domtree_merge(idom: &List[i32], rpo_pos: &List[i32], a: i32, b: i32) -> i32:
     var n1 = a
     var n2 = b
     while n1 != n2:
@@ -467,9 +467,9 @@ fn stackify_domtree_merge(idom: &Vec[i32], rpo_pos: &Vec[i32], a: i32, b: i32) -
                 n2 = idom[n2]
     n1
 
-fn stackify_compute_idom(graph: &StackifyGraph, post_ord: &Vec[i32], rpo_pos: &Vec[i32], preds: &StackifyPreds) -> Vec[i32]:
+fn stackify_compute_idom(graph: &StackifyGraph, post_ord: &List[i32], rpo_pos: &List[i32], preds: &StackifyPreds) -> List[i32]:
     let n = graph.blocks.len() as i32
-    var idom = stackify_bool_vec(n, stackify_invalid())
+    var idom = stackify_bool_list(n, stackify_invalid())
     idom[graph.entry] = graph.entry
     var changed = true
     while changed:
@@ -503,7 +503,7 @@ fn stackify_compute_idom(graph: &StackifyGraph, post_ord: &Vec[i32], rpo_pos: &V
     idom[graph.entry] = stackify_invalid()
     idom
 
-fn stackify_dominates(idom: &Vec[i32], a: i32, b: i32) -> bool:
+fn stackify_dominates(idom: &List[i32], a: i32, b: i32) -> bool:
     var cur = b
     while true:
         if a == cur:
@@ -517,19 +517,19 @@ fn stackify_compute_analysis(graph: &StackifyGraph) -> StackifyAnalysis:
     let err = stackify_validate_graph(graph)
     if err.len() > 0:
         return StackifyAnalysis {
-            rpo: Vec.new(),
-            rpo_pos: Vec.new(),
-            idom: Vec.new(),
-            merge_nodes: Vec.new(),
-            loop_headers: Vec.new(),
+            rpo: List.new(),
+            rpo_pos: List.new(),
+            idom: List.new(),
+            merge_nodes: List.new(),
+            loop_headers: List.new(),
             ok: false,
             message: err,
         }
     let n = graph.blocks.len() as i32
-    var dfs = StackifyDfsState { visited: stackify_bool_vec(n, 0), out: Vec.new() }
+    var dfs = StackifyDfsState { visited: stackify_bool_list(n, 0), out: List.new() }
     dfs.dfs_post(graph, graph.entry)
     let post_ord = dfs.out
-    var rpo_pos = stackify_bool_vec(n, stackify_invalid())
+    var rpo_pos = stackify_bool_list(n, stackify_invalid())
     var ri = post_ord.len() as i32 - 1
     while ri >= 0:
         let block: i32 = post_ord[ri]
@@ -537,14 +537,14 @@ fn stackify_compute_analysis(graph: &StackifyGraph) -> StackifyAnalysis:
         ri = ri - 1
     let preds = stackify_compute_preds(graph)
     let idom = stackify_compute_idom(graph, post_ord, rpo_pos, preds)
-    let rpo: Vec[i32] = Vec.new()
+    let rpo: List[i32] = List.new()
     var pi = post_ord.len() as i32 - 1
     while pi >= 0:
         rpo.push(post_ord[pi])
         pi = pi - 1
-    var loop_headers = stackify_bool_vec(n, 0)
-    var branched_once = stackify_bool_vec(n, 0)
-    var merge_nodes = stackify_bool_vec(n, 0)
+    var loop_headers = stackify_bool_list(n, 0)
+    var branched_once = stackify_bool_list(n, 0)
+    var merge_nodes = stackify_bool_list(n, 0)
     var bi = 0
     while bi < rpo.len() as i32:
         let block: i32 = rpo[bi]
@@ -633,7 +633,7 @@ impl StackifyContext:
             i = i + 1
         child_start
 
-    mut fn tree_add_child_vec(children: &Vec[i32]) -> i32:
+    mut fn tree_add_child_list(children: &List[i32]) -> i32:
         let child_start = self.tree.children.len() as i32
         var i: i64 = 0
         while i < children.len():
@@ -641,7 +641,7 @@ impl StackifyContext:
             i = i + 1
         child_start
 
-    mut fn tree_add_values_from_vec(values: &Vec[i32]) -> i32:
+    mut fn tree_add_values_from_list(values: &List[i32]) -> i32:
         let start = self.tree.values.len() as i32
         var i: i64 = 0
         while i < values.len():
@@ -794,7 +794,7 @@ impl StackifyContext:
         select_node.default_label = targets_count
         let select_id = self.tree_add_node(move select_node)
 
-        var body: Vec[i32] = Vec.new()
+        var body: List[i32] = List.new()
         body.push(select_id)
         var extra = targets_count + 1
         var idx = 0
@@ -807,8 +807,8 @@ impl StackifyContext:
                 self.ok = false
                 self.message = "stackify: select target is not on the control stack"
                 return
-            let outer: Vec[i32] = Vec.new()
-            let child_start = self.tree_add_child_vec(body)
+            let outer: List[i32] = List.new()
+            let child_start = self.tree_add_child_list(body)
             var block_node = stackify_empty_node(StackifyNodeKind.Block)
             block_node.block = stackify_invalid()
             block_node.first_child_start = child_start
@@ -925,13 +925,13 @@ impl StackifyContext:
             self.push_process(StackifyProcessKind.DoSelect, block, 0, 0, 0)
             return
         if term_kind == StackifyTermKind.Return:
-            let vals: Vec[i32] = Vec.new()
+            let vals: List[i32] = List.new()
             var i = 0
             while i < return_values_count:
                 vals.push(self.graph.return_values[(return_values_start + i)])
                 i = i + 1
             var ret = stackify_empty_node(StackifyNodeKind.Return)
-            ret.values_start = self.tree_add_values_from_vec(vals)
+            ret.values_start = self.tree_add_values_from_list(vals)
             ret.values_count = return_values_count
             let id = self.tree_add_node(move ret)
             self.result_push(id)
@@ -945,14 +945,14 @@ fn stackify_context_new(graph: StackifyGraph, analysis: StackifyAnalysis) -> Sta
         graph,
         analysis,
         tree: stackify_tree_empty(),
-        ctrl_stack: Vec.new(),
-        process_stack: Vec.new(),
-        result_starts: Vec.new(),
-        result_counts: Vec.new(),
-        result_items: Vec.new(),
-        merge_starts: Vec.new(),
-        merge_counts: Vec.new(),
-        merge_items: Vec.new(),
+        ctrl_stack: List.new(),
+        process_stack: List.new(),
+        result_starts: List.new(),
+        result_counts: List.new(),
+        result_items: List.new(),
+        merge_starts: List.new(),
+        merge_counts: List.new(),
+        merge_items: List.new(),
         ok: true,
         message: "",
     }

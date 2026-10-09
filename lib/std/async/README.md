@@ -3,11 +3,11 @@
 Collection await combinators for `Task[...]` values.
 
 ## Public API
-- `await_all[T](tasks: impl IntoIter[Task[T]]) -> Vec[T]`
-- `await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[Vec[T], E]`
+- `await_all[T](tasks: impl IntoIter[Task[T]]) -> List[T]`
+- `await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[List[T], E]`
 - `await_first[T](tasks: impl IntoIter[Task[T]]) -> T`
-- `await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, Vec[E]]`
-- `await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Vec[Result[T, E]]`
+- `await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, List[E]]`
+- `await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> List[Result[T, E]]`
 - `with_concurrency[T](tasks: impl IntoIter[Task[T]], n: i32) -> impl IntoIter[Task[T]]`
 
 ## Guarantees
@@ -15,7 +15,7 @@ Collection await combinators for `Task[...]` values.
   `await_all` and `await_settled` return results in input order.
 - Empty input:
   `await_first([])` panics with message `await_first: empty input`.
-  `await_any([])` returns `Err(Vec.new())`.
+  `await_any([])` returns `Err(List.new())`.
 - Error aggregation:
   `await_any` returns all errors in input order when all tasks fail.
 
@@ -30,5 +30,5 @@ Collection await combinators for `Task[...]` values.
   target's cancellation state into the cleanup path.
 
 ## Iterator consumption
-- Inputs are consumed exactly once and materialized into an internal `Vec` before awaiting.
+- Inputs are consumed exactly once and materialized into an internal `List` before awaiting.
 - This is eager consumption (not streaming); memory is `O(n)` in number of tasks.

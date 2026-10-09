@@ -5,7 +5,7 @@
 // value flow into a field, so the call runs any callable value of its type
 // in this compilation — `grow` among them, which reallocates `G` while `r`
 // views its first element.
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 type H:
     f: fn() -> Unit

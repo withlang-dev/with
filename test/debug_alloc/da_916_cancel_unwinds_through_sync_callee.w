@@ -15,7 +15,7 @@ extern fn with_runtime_run_one_step()
 var resumed: Atomic[i32]
 var batch_drops: Atomic[i32]
 
-type Batch { values: Vec[i32] }
+type Batch { values: List[i32] }
 impl Drop for Batch:
     move fn drop():
         batch_drops.fetch_add(1, .SeqCst)
@@ -28,26 +28,26 @@ async fn wait_forever(value: i32) -> i32:
     value
 
 // Sync fns that suspend: they await each task.
-fn eat(tasks: Vec[Task[i32]]) -> Batch:
+fn eat(tasks: List[Task[i32]]) -> Batch:
     let pending = tasks
     defer:
         while pending.len() > 0: pending.remove(0).join_cleanup()
-    let values: Vec[i32] = Vec.new()
+    let values: List[i32] = List.new()
     while pending.len() > 0:
         values.push(pending.remove(0).await)
     Batch { values }
 
-fn eat_all[T](tasks: Vec[Task[T]]) -> Vec[T]:
+fn eat_all[T](tasks: List[Task[T]]) -> List[T]:
     let pending = tasks
     defer:
         while pending.len() > 0: pending.remove(0).join_cleanup()
-    let values: Vec[T] = Vec.new()
+    let values: List[T] = List.new()
     while pending.len() > 0:
         values.push(pending.remove(0).await)
     values
 
 async fn parent -> i32:
-    let tasks: Vec[Task[i32]] = Vec.new()
+    let tasks: List[Task[i32]] = List.new()
     tasks.push(wait_forever(1))
     tasks.push(wait_forever(2))
     let batch = eat(tasks)
@@ -55,7 +55,7 @@ async fn parent -> i32:
     batch.values.len() as i32
 
 async fn generic_parent -> i32:
-    let tasks: Vec[Task[i32]] = Vec.new()
+    let tasks: List[Task[i32]] = List.new()
     tasks.push(wait_forever(1))
     tasks.push(wait_forever(2))
     let values = tasks |> eat_all

@@ -8,12 +8,12 @@
 // address ("Both operands to a binary operator are not of the same type").
 fn main:
     let s = "hello world"
-    var cuts: Vec[i64] = Vec.new()
+    var cuts: List[i64] = List.new()
     cuts.push(2)
     cuts.push(4)
     let at = cuts[0]
     print(s[at..at + 3])
-    let v: Vec[i32] = [1, 2, 3, 4, 5]
+    let v: List[i32] = [1, 2, 3, 4, 5]
     let tail = v[at..cuts[1]]
     print(f"{tail[0]} {tail[1]}")
     let a = [7, 8, 9, 10]

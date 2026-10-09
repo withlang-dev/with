@@ -10,7 +10,7 @@
 
 // #1443: a generic method whose receiver is `&Self` called through a
 // reference to the receiver — a `Box` bound from a `&Enum` match subject, a
-// `&Box` parameter, `&&Box`, a `for` view over `Vec[Box[T]]`. The autoderef
+// `&Box` parameter, `&&Box`, a `for` view over `List[Box[T]]`. The autoderef
 // walk reaches the place behind the reference, and the call must pass that
 // place's address. It passed the Box value (a `ptr`, like `&Box`), so the
 // callee read the list node as the box: the sum returned the head (1) and
@@ -87,7 +87,7 @@ fn main:
     print(f"field={child_of(&n)}")
     let bw = Box.new(Wrap { inner: 1i64, tag: 33 })
     print(f"box-deref={bw.tag_of()} {via_box(&bw)}")
-    var v: Vec[Box[i64]] = Vec.new()
+    var v: List[Box[i64]] = List.new()
     v.push(Box.new(3))
     v.push(Box.new(4))
     var t: i64 = 0

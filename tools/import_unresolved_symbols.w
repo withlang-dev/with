@@ -55,13 +55,13 @@ fn quoted_after(line: &str, prefix: &str) -> str:
     if close < 0: return ""
     rest.slice(0, close)
 
-fn vec_contains(v: &Vec[str], s: &str) -> bool:
+fn list_contains(v: &List[str], s: &str) -> bool:
     for i in 0..v.len():
         if v[i] == s: return true
     false
 
-fn source_files(dir: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn source_files(dir: &str) -> List[str]:
+    var out: List[str] = List.new()
     for entry in list_files_text(dir).split("\n"):
         if entry.len() == 0 or entry == dir: continue
         if entry.ends_with(".w"): out.push(entry.clone())
@@ -112,7 +112,7 @@ fn header_insert_offset(text: &str) -> i64:
 let argv = args()
 var apply = false
 var log_path = ""
-var roots: Vec[str] = Vec.new()
+var roots: List[str] = List.new()
 var ai = 1
 while ai < argv.len():
     let a = argv[ai]
@@ -128,9 +128,9 @@ if log_path.len() == 0:
 if roots.len() == 0: roots.push("src")
 
 // Top-level declaration index: name, file, whether already `pub`.
-var decl_names: Vec[str] = Vec.new()
-var decl_paths: Vec[str] = Vec.new()
-var decl_pub: Vec[bool] = Vec.new()
+var decl_names: List[str] = List.new()
+var decl_paths: List[str] = List.new()
+var decl_pub: List[bool] = List.new()
 for root in roots:
     for path in source_files(root):
         for line in (read_file(path) ?? "").split("\n"):
@@ -141,12 +141,12 @@ for root in roots:
                 decl_pub.push(line.starts_with("pub "))
 
 // (file, use-line) imports and (owner, name) publications, deduplicated.
-var import_files: Vec[str] = Vec.new()
-var import_lines: Vec[str] = Vec.new()
-var pub_owners: Vec[str] = Vec.new()
-var pub_names: Vec[str] = Vec.new()
-var reports: Vec[str] = Vec.new()
-var seen_keys: Vec[str] = Vec.new()
+var import_files: List[str] = List.new()
+var import_lines: List[str] = List.new()
+var pub_owners: List[str] = List.new()
+var pub_names: List[str] = List.new()
+var reports: List[str] = List.new()
+var seen_keys: List[str] = List.new()
 
 let log_lines = (read_file(log_path) ?? "").split("\n")
 var li = 0
@@ -166,7 +166,7 @@ while li < log_lines.len() as i32:
     if line.contains("requires an explicit import (§18.1); add: use "):
         let use_line = "use " ++ line.split("; add: use ")[1].trim()
         let key = "use\t" ++ file ++ "\t" ++ use_line
-        if not vec_contains(&seen_keys, key):
+        if not list_contains(&seen_keys, key):
             seen_keys.push(key)
             import_files.push(file.clone())
             import_lines.push(use_line)
@@ -190,25 +190,25 @@ while li < log_lines.len() as i32:
     if owners != 1 or owner == file:
         let why = if owners == 0: "no top-level owner" else: if owners > 1: "several owners" else: "declared in the referencing module"
         let rep = f"{file}:{parts[1]}: '{name}': {why}"
-        if not vec_contains(&reports, rep): reports.push(rep)
+        if not list_contains(&reports, rep): reports.push(rep)
         continue
     let use_line = "use " ++ module_name(owner)
     let ukey = "use\t" ++ file ++ "\t" ++ use_line
-    if not vec_contains(&seen_keys, ukey):
+    if not list_contains(&seen_keys, ukey):
         seen_keys.push(ukey)
         import_files.push(file.clone())
         import_lines.push(use_line)
     let pkey = "pub\t" ++ owner ++ "\t" ++ name
-    if not owner_pub and not vec_contains(&seen_keys, pkey):
+    if not owner_pub and not list_contains(&seen_keys, pkey):
         seen_keys.push(pkey)
         pub_owners.push(owner.clone())
         pub_names.push(name.clone())
 
 // Publish first (the owner may also gain an import below; both rewrite it).
 var published = 0
-var touched: Vec[str] = Vec.new()
+var touched: List[str] = List.new()
 for p in pub_owners:
-    if not vec_contains(&touched, p): touched.push(p.clone())
+    if not list_contains(&touched, p): touched.push(p.clone())
 for owner in touched:
     let text = read_file(owner) ?? ""
     var out = ""
@@ -229,17 +229,17 @@ for owner in touched:
             exit_code(1)
 
 var imported = 0
-var files: Vec[str] = Vec.new()
+var files: List[str] = List.new()
 for f in import_files:
-    if not vec_contains(&files, f): files.push(f.clone())
+    if not list_contains(&files, f): files.push(f.clone())
 for file in files:
     let text = read_file(file) ?? ""
-    var present: Vec[str] = Vec.new()
+    var present: List[str] = List.new()
     for line in text.split("\n"):
         if line.starts_with("use "): present.push(line.trim().clone())
     var added = ""
     for k in 0..import_files.len():
-        if import_files[k] == file and not vec_contains(&present, import_lines[k]):
+        if import_files[k] == file and not list_contains(&present, import_lines[k]):
             added = added ++ import_lines[k] ++ "\n"
             present.push(import_lines[k].clone())
             imported = imported + 1

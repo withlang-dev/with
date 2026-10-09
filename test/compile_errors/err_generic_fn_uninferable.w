@@ -5,8 +5,8 @@
 // bare "unknown type" errors.
 
 use std.builtins.print_i32
-fn make[T]() -> Vec[T]:
-    Vec.new()
+fn make[T]() -> List[T]:
+    List.new()
 
 fn main:
     let x = make()

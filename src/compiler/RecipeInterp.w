@@ -93,7 +93,7 @@ fn py_fstring_expr_end(field: &str) -> i32:
 
 // An f-string as tokens: `fstr[`, then its literal parts as strings and each
 // replacement field as `f{` expression-tokens `f}`, then `]fstr`.
-fn py_lex_fstring(body: &str, line: i32, out0: Vec[PyTok]) -> Vec[PyTok]:
+fn py_lex_fstring(body: &str, line: i32, out0: List[PyTok]) -> List[PyTok]:
     var out = out0
     out.push(py_tok(PT_OP, "fstr[", line))
     var literal = StringBuilder.new()
@@ -131,9 +131,9 @@ fn py_lex_fstring(body: &str, line: i32, out0: Vec[PyTok]) -> Vec[PyTok]:
     out.push(py_tok(PT_OP, "]fstr", line))
     out
 
-fn py_lex(src: &str) -> Vec[PyTok]:
-    var out: Vec[PyTok] = Vec.new()
-    var indents: Vec[i32] = Vec.new()
+fn py_lex(src: &str) -> List[PyTok]:
+    var out: List[PyTok] = List.new()
+    var indents: List[i32] = List.new()
     indents.push(0)
     let n = src.len() as i32
     var i = 0
@@ -307,9 +307,9 @@ let N_CONTINUE = 41
 let N_RAISE = 42
 let N_CLASS = 43      // s: kids
 
-pub type PyNode { kind: i32, a: i32, b: i32, c: i32, s: str, kids: Vec[i32], line: i32 }
+pub type PyNode { kind: i32, a: i32, b: i32, c: i32, s: str, kids: List[i32], line: i32 }
 
-type PyParser { toks: Vec[PyTok], at: i32, nodes: Vec[PyNode], err: str }
+type PyParser { toks: List[PyTok], at: i32, nodes: List[PyNode], err: str }
 
 impl PyParser:
     fn kind() -> i32: self.toks[self.at].kind
@@ -337,11 +337,11 @@ impl PyParser:
     mut fn expect_op(op: &str):
         if not self.accept_op(op): self.fail("expected '" ++ op ++ "'")
 
-    mut fn mk(kind: i32, a: i32, b: i32, c: i32, s: &str, kids: Vec[i32], line: i32) -> i32:
+    mut fn mk(kind: i32, a: i32, b: i32, c: i32, s: &str, kids: List[i32], line: i32) -> i32:
         self.nodes.push(PyNode { kind, a, b, c, s: s.to_owned(), kids, line })
         self.nodes.len() as i32 - 1
 
-    mut fn leaf(kind: i32, s: &str) -> i32: self.mk(kind, -1, -1, -1, s, Vec.new(), self.line())
+    mut fn leaf(kind: i32, s: &str) -> i32: self.mk(kind, -1, -1, -1, s, List.new(), self.line())
 
     // ── Expressions ──
 
@@ -358,7 +358,7 @@ impl PyParser:
             self.fail("expected 'else' in a conditional expression")
             return value
         let other = self.expression()
-        self.mk(N_COND, cond, value, other, "", Vec.new(), line)
+        self.mk(N_COND, cond, value, other, "", List.new(), line)
 
     mut fn or_test() -> i32:
         var left = self.and_test()
@@ -366,7 +366,7 @@ impl PyParser:
             let line = self.line()
             self.advance()
             let right = self.and_test()
-            left = self.mk(N_OR, left, right, -1, "", Vec.new(), line)
+            left = self.mk(N_OR, left, right, -1, "", List.new(), line)
         left
 
     mut fn and_test() -> i32:
@@ -375,7 +375,7 @@ impl PyParser:
             let line = self.line()
             self.advance()
             let right = self.not_test()
-            left = self.mk(N_AND, left, right, -1, "", Vec.new(), line)
+            left = self.mk(N_AND, left, right, -1, "", List.new(), line)
         left
 
     mut fn not_test() -> i32:
@@ -383,7 +383,7 @@ impl PyParser:
             let line = self.line()
             self.advance()
             let inner = self.not_test()
-            return self.mk(N_NOT, inner, -1, -1, "", Vec.new(), line)
+            return self.mk(N_NOT, inner, -1, -1, "", List.new(), line)
         self.comparison()
 
     mut fn comparison() -> i32:
@@ -406,7 +406,7 @@ impl PyParser:
                 op = if self.accept_word("not"): "!=" else: "=="
             else: break
             let right = self.arith()
-            left = self.mk(N_CMP, left, right, -1, op, Vec.new(), line)
+            left = self.mk(N_CMP, left, right, -1, op, List.new(), line)
         left
 
     mut fn arith() -> i32:
@@ -416,7 +416,7 @@ impl PyParser:
             let op = self.text()
             self.advance()
             let right = self.term()
-            left = self.mk(N_BIN, left, right, -1, op, Vec.new(), line)
+            left = self.mk(N_BIN, left, right, -1, op, List.new(), line)
         left
 
     mut fn term() -> i32:
@@ -426,7 +426,7 @@ impl PyParser:
             let op = self.text()
             self.advance()
             let right = self.unary()
-            left = self.mk(N_BIN, left, right, -1, op, Vec.new(), line)
+            left = self.mk(N_BIN, left, right, -1, op, List.new(), line)
         left
 
     mut fn unary() -> i32:
@@ -434,7 +434,7 @@ impl PyParser:
             let line = self.line()
             self.advance()
             let inner = self.unary()
-            return self.mk(N_NEG, inner, -1, -1, "", Vec.new(), line)
+            return self.mk(N_NEG, inner, -1, -1, "", List.new(), line)
         if self.is_op("+"):
             self.advance()
             return self.unary()
@@ -442,7 +442,7 @@ impl PyParser:
 
     // The names a `for` binds: `x` or `k, v` (parentheses allowed).
     mut fn for_targets() -> i32:
-        var names: Vec[i32] = Vec.new()
+        var names: List[i32] = List.new()
         let line = self.line()
         let paren = self.accept_op("(")
         while self.kind() == PT_NAME and not self.is_word("in"):
@@ -466,12 +466,12 @@ impl PyParser:
             // A nested comprehension is outside the subset.
             while not self.is_op(")") and not self.is_op("]") and not self.is_op("}") and self.kind() != PT_EOF: self.advance()
             return self.leaf(N_UNSUPPORTED, "nested comprehension")
-        let kids: Vec[i32] = Vec.new()
+        let kids: List[i32] = List.new()
         kids.push(targets)
         self.mk(N_COMP, elt, iter, cond, "", kids, line)
 
-    mut fn call_args() -> Vec[i32]:
-        var args: Vec[i32] = Vec.new()
+    mut fn call_args() -> List[i32]:
+        var args: List[i32] = List.new()
         while not self.is_op(")") and self.kind() != PT_EOF and self.err.len() == 0:
             if self.is_op("*") or self.is_op("**"):
                 self.advance()
@@ -483,7 +483,7 @@ impl PyParser:
                 self.advance()
                 self.advance()
                 let value = self.expression()
-                args.push(self.mk(N_KW, value, -1, -1, name, Vec.new(), line))
+                args.push(self.mk(N_KW, value, -1, -1, name, List.new(), line))
             else:
                 let value = self.expression()
                 if self.is_word("for"): args.push(self.comprehension(value))
@@ -502,7 +502,7 @@ impl PyParser:
                     self.fail("expected an attribute name")
                     break
                 self.advance()
-                node = self.mk(N_ATTR, node, -1, -1, name, Vec.new(), line)
+                node = self.mk(N_ATTR, node, -1, -1, name, List.new(), line)
             else if self.accept_op("("):
                 let args = self.call_args()
                 node = self.mk(N_CALL, node, -1, -1, "", args, line)
@@ -520,7 +520,7 @@ impl PyParser:
                     node = self.leaf(N_UNSUPPORTED, "slice")
                     continue
                 self.expect_op("]")
-                node = self.mk(N_SUB, node, index, -1, "", Vec.new(), line)
+                node = self.mk(N_SUB, node, index, -1, "", List.new(), line)
             else: break
         node
 
@@ -530,15 +530,15 @@ impl PyParser:
         if k == PT_NAME:
             let name = self.text()
             self.advance()
-            if name == "True" or name == "False" or name == "None": return self.mk(N_CONST, -1, -1, -1, name, Vec.new(), line)
-            return self.mk(N_NAME, -1, -1, -1, name, Vec.new(), line)
+            if name == "True" or name == "False" or name == "None": return self.mk(N_CONST, -1, -1, -1, name, List.new(), line)
+            return self.mk(N_NAME, -1, -1, -1, name, List.new(), line)
         if k == PT_NUM:
             let text = self.text()
             self.advance()
-            return self.mk(N_NUM, -1, -1, -1, text, Vec.new(), line)
+            return self.mk(N_NUM, -1, -1, -1, text, List.new(), line)
         if k == PT_STR or self.is_op("fstr["):
             // Adjacent literals are one string.
-            var parts: Vec[i32] = Vec.new()
+            var parts: List[i32] = List.new()
             while self.kind() == PT_STR or self.is_op("fstr["):
                 if self.kind() == PT_STR:
                     parts.push(self.leaf(N_STR, self.text()))
@@ -557,7 +557,7 @@ impl PyParser:
             if parts.len() == 1 and self.nodes[parts[0]].kind == N_STR: return parts[0]
             return self.mk(N_FSTR, -1, -1, -1, "", parts, line)
         if self.accept_op("("):
-            var items: Vec[i32] = Vec.new()
+            var items: List[i32] = List.new()
             if self.accept_op(")"): return self.mk(N_LIST, -1, -1, -1, "", items, line)
             let first = self.expression()
             if self.is_word("for"):
@@ -572,7 +572,7 @@ impl PyParser:
             self.expect_op(")")
             return self.mk(N_LIST, -1, -1, -1, "", items, line)
         if self.accept_op("["):
-            var items: Vec[i32] = Vec.new()
+            var items: List[i32] = List.new()
             if self.accept_op("]"): return self.mk(N_LIST, -1, -1, -1, "", items, line)
             let first = self.expression()
             if self.is_word("for"):
@@ -586,7 +586,7 @@ impl PyParser:
             self.expect_op("]")
             return self.mk(N_LIST, -1, -1, -1, "", items, line)
         if self.accept_op("{"):
-            var items: Vec[i32] = Vec.new()
+            var items: List[i32] = List.new()
             var is_dict = true
             while not self.is_op("}") and self.kind() != PT_EOF and self.err.len() == 0:
                 if self.is_op("**"):
@@ -594,7 +594,7 @@ impl PyParser:
                     let spread_line = self.line()
                     self.advance()
                     let inner = self.expression()
-                    let spread = self.mk(N_SPREAD, inner, -1, -1, "", Vec.new(), spread_line)
+                    let spread = self.mk(N_SPREAD, inner, -1, -1, "", List.new(), spread_line)
                     items.push(spread)
                     items.push(spread)
                 else:
@@ -611,7 +611,7 @@ impl PyParser:
                             var cond = -1
                             if self.accept_word("if"): cond = self.or_test()
                             self.expect_op("}")
-                            let kids: Vec[i32] = Vec.new()
+                            let kids: List[i32] = List.new()
                             kids.push(targets)
                             kids.push(iter)
                             kids.push(value)
@@ -639,7 +639,7 @@ impl PyParser:
         let line = self.line()
         let first = self.expression()
         if not self.is_op(","): return first
-        var items: Vec[i32] = Vec.new()
+        var items: List[i32] = List.new()
         items.push(first)
         while self.accept_op(","):
             if self.kind() == PT_NEWLINE or self.is_op("="): break
@@ -665,8 +665,8 @@ impl PyParser:
             self.advance()
 
     // The statements after a `:` — an indented block, or the rest of the line.
-    mut fn block() -> Vec[i32]:
-        var stmts: Vec[i32] = Vec.new()
+    mut fn block() -> List[i32]:
+        var stmts: List[i32] = List.new()
         if self.kind() != PT_NEWLINE:
             let s = self.statement()
             if s >= 0: stmts.push(s)
@@ -691,7 +691,7 @@ impl PyParser:
             let body = self.block()
             let tail = self.orelse()
             let nested = self.mk(N_IF, cond, tail, -1, "", body, line)
-            let kids: Vec[i32] = Vec.new()
+            let kids: List[i32] = List.new()
             kids.push(nested)
             return self.mk(N_BLOCK, -1, -1, -1, "", kids, line)
         if self.accept_word("else"):
@@ -707,7 +707,7 @@ impl PyParser:
         self.advance()
         let name = self.text()
         self.advance()
-        var params: Vec[i32] = Vec.new()
+        var params: List[i32] = List.new()
         self.expect_op("(")
         while not self.is_op(")") and self.kind() != PT_EOF and self.err.len() == 0:
             if self.is_op("*") or self.is_op("**"): self.advance()
@@ -718,8 +718,8 @@ impl PyParser:
                 let _ = self.expression()
             if self.accept_op("="):
                 let default = self.expression()
-                params.push(self.mk(N_KW, default, -1, -1, pname, Vec.new(), pline))
-            else: params.push(self.mk(N_NAME, -1, -1, -1, pname, Vec.new(), pline))
+                params.push(self.mk(N_KW, default, -1, -1, pname, List.new(), pline))
+            else: params.push(self.mk(N_NAME, -1, -1, -1, pname, List.new(), pline))
             if not self.accept_op(","): break
         self.expect_op(")")
         if self.accept_op("->"):
@@ -740,7 +740,7 @@ impl PyParser:
         let plist = self.mk(N_LIST, -1, -1, -1, "", params, line)
         let why = if unreadable == 1: self.err.clone() else: ""
         if unreadable == 1: self.err = ""
-        let node = self.mk(N_DEF, plist, if is_property: 1 else: 0, unreadable, name, if unreadable == 1: Vec.new() else: body, line)
+        let node = self.mk(N_DEF, plist, if is_property: 1 else: 0, unreadable, name, if unreadable == 1: List.new() else: body, line)
         if unreadable == 1: self.nodes[node].s = name ++ "\n" ++ why
         node
 
@@ -806,7 +806,7 @@ impl PyParser:
             let body = self.block()
             if is_while:
                 let unsupported = self.leaf(N_UNSUPPORTED, "while")
-                return self.mk(N_EXPR, unsupported, -1, -1, "", Vec.new(), line)
+                return self.mk(N_EXPR, unsupported, -1, -1, "", List.new(), line)
             return self.mk(N_BLOCK, -1, -1, -1, "", body, line)
         if self.is_word("import") or self.is_word("from") or self.is_word("assert") or self.is_word("global") or self.is_word("nonlocal"):
             self.skip_line()
@@ -814,35 +814,35 @@ impl PyParser:
         var node = -1
         if self.accept_word("return"):
             let value = if self.kind() == PT_NEWLINE or self.kind() == PT_EOF: -1 else: self.expression_list()
-            node = self.mk(N_RETURN, value, -1, -1, "", Vec.new(), line)
-        else if self.accept_word("pass"): node = self.mk(N_PASS, -1, -1, -1, "", Vec.new(), line)
-        else if self.accept_word("break"): node = self.mk(N_BREAK, -1, -1, -1, "", Vec.new(), line)
-        else if self.accept_word("continue"): node = self.mk(N_CONTINUE, -1, -1, -1, "", Vec.new(), line)
+            node = self.mk(N_RETURN, value, -1, -1, "", List.new(), line)
+        else if self.accept_word("pass"): node = self.mk(N_PASS, -1, -1, -1, "", List.new(), line)
+        else if self.accept_word("break"): node = self.mk(N_BREAK, -1, -1, -1, "", List.new(), line)
+        else if self.accept_word("continue"): node = self.mk(N_CONTINUE, -1, -1, -1, "", List.new(), line)
         else if self.accept_word("raise"):
             while self.kind() != PT_NEWLINE and self.kind() != PT_EOF: self.advance()
-            node = self.mk(N_RAISE, -1, -1, -1, "", Vec.new(), line)
+            node = self.mk(N_RAISE, -1, -1, -1, "", List.new(), line)
         else if self.accept_word("del"):
             let target = self.expression_list()
-            node = self.mk(N_DEL, target, -1, -1, "", Vec.new(), line)
+            node = self.mk(N_DEL, target, -1, -1, "", List.new(), line)
         else:
             let target = self.expression_list()
             if self.accept_op("="):
                 var value = self.expression_list()
                 // `a = b = c` assigns the last value to the first target.
                 while self.accept_op("="): value = self.expression_list()
-                node = self.mk(N_ASSIGN, target, value, -1, "", Vec.new(), line)
+                node = self.mk(N_ASSIGN, target, value, -1, "", List.new(), line)
             else if self.is_op("+=") or self.is_op("-=") or self.is_op("*=") or self.is_op("|="):
                 let op = self.text().slice(0, 1).to_owned()
                 self.advance()
                 let value = self.expression_list()
-                node = self.mk(N_AUG, target, value, -1, op, Vec.new(), line)
+                node = self.mk(N_AUG, target, value, -1, op, List.new(), line)
             else if self.accept_op(":"):
                 // An annotation, with or without a value.
                 let _ = self.expression()
                 if self.accept_op("="):
                     let value = self.expression_list()
-                    node = self.mk(N_ASSIGN, target, value, -1, "", Vec.new(), line)
-            else: node = self.mk(N_EXPR, target, -1, -1, "", Vec.new(), line)
+                    node = self.mk(N_ASSIGN, target, value, -1, "", List.new(), line)
+            else: node = self.mk(N_EXPR, target, -1, -1, "", List.new(), line)
         if self.accept_op(";"): return node
         if self.kind() == PT_NEWLINE: self.advance()
         else if self.kind() != PT_EOF and self.kind() != PT_DEDENT: self.fail("unexpected '" ++ self.text() ++ "'")
@@ -850,11 +850,11 @@ impl PyParser:
 
 // The recipe as a tree: the nodes, the top-level statements, and what could
 // not be read ("" when all of it was).
-pub type PyModule { nodes: Vec[PyNode], top: Vec[i32], problem: str }
+pub type PyModule { nodes: List[PyNode], top: List[i32], problem: str }
 
 pub fn py_parse(src: &str) -> PyModule:
-    var p = PyParser { toks: py_lex(src), at: 0, nodes: Vec.new(), err: "" }
-    var top: Vec[i32] = Vec.new()
+    var p = PyParser { toks: py_lex(src), at: 0, nodes: List.new(), err: "" }
+    var top: List[i32] = List.new()
     while p.kind() != PT_EOF and p.err.len() == 0:
         if p.kind() == PT_INDENT or p.kind() == PT_DEDENT:
             p.advance()
@@ -890,29 +890,29 @@ fn pv_bool(b: bool): pv(V_BOOL, if b: 1 else: 0, "")
 fn pv_str(s: &str): pv(V_STR, 0, s)
 fn pv_sink(): pv(V_SINK, 0, "")
 
-type PyObj { cls: str, names: Vec[str], vals: Vec[PyVal] }
+type PyObj { cls: str, names: List[str], vals: List[PyVal] }
 
 // A list, a dict's keys or values, a frame's names or values: each held in
 // an arena and named by its index, since a Python list is shared by
 // everything that holds it.
-type PyList { items: Vec[PyVal] }
-type PyNames { items: Vec[str] }
+type PyList { items: List[PyVal] }
+type PyNames { items: List[str] }
 
 // What a recipe is evaluated against: the platform and compiler of the
 // binary (its conaninfo, or this toolchain for a package built here), the
 // package's version and directory, and its options as `name=value` when the
 // binary states them (`options_known`); otherwise the recipe's defaults are
 // taken and its `config_options` and `configure` run over them.
-pub type RecipeEnv { os: str, arch: str, compiler: str, compiler_version: str, build_type: str, version: str, package_folder: str, source_folder: str, options: Vec[str], options_known: bool }
+pub type RecipeEnv { os: str, arch: str, compiler: str, compiler_version: str, build_type: str, version: str, package_folder: str, source_folder: str, options: List[str], options_known: bool }
 
 // One `cpp_info`: the package's own, or a component's.
-pub type RecipeComponent { name: str, libs: Vec[str], system_libs: Vec[str], frameworks: Vec[str], libdirs: Vec[str], includedirs: Vec[str], defines: Vec[str], exelinkflags: Vec[str], requires: Vec[str] }
+pub type RecipeComponent { name: str, libs: List[str], system_libs: List[str], frameworks: List[str], libdirs: List[str], includedirs: List[str], defines: List[str], exelinkflags: List[str], requires: List[str] }
 
 // What `package_info` said: the package's own cpp_info, its components in
 // the order the recipe names them, and every decision that could not be made
 // (`notes`). `ok` is false when the recipe or the method could not be read
 // at all (`problem`).
-pub type RecipePackageInfo { ok: bool, problem: str, notes: Vec[str], root: RecipeComponent, components: Vec[RecipeComponent] }
+pub type RecipePackageInfo { ok: bool, problem: str, notes: List[str], root: RecipeComponent, components: List[RecipeComponent] }
 
 let PY_NORMAL = 0
 let PY_RETURN = 1
@@ -921,7 +921,7 @@ let PY_CONTINUE = 3
 
 let PY_STEP_LIMIT = 400000
 
-type PyInterp { nodes: Vec[PyNode], lists: Vec[PyList], dkeys: Vec[PyList], dvals: Vec[PyList], objs: Vec[PyObj], recv: Vec[PyVal], frame_names: Vec[PyNames], frame_vals: Vec[PyList], method_names: Vec[str], method_nodes: Vec[i32], attr_names: Vec[str], attr_vals: Vec[PyVal], func_names: Vec[str], func_nodes: Vec[i32], self_obj: i32, env: RecipeEnv, notes: Vec[str], ret: PyVal, steps: i32, depth: i32, problem: str, reqs: Vec[str], tool_reqs: Vec[str], toolchains: Vec[i32] }
+type PyInterp { nodes: List[PyNode], lists: List[PyList], dkeys: List[PyList], dvals: List[PyList], objs: List[PyObj], recv: List[PyVal], frame_names: List[PyNames], frame_vals: List[PyList], method_names: List[str], method_nodes: List[i32], attr_names: List[str], attr_vals: List[PyVal], func_names: List[str], func_nodes: List[i32], self_obj: i32, env: RecipeEnv, notes: List[str], ret: PyVal, steps: i32, depth: i32, problem: str, reqs: List[str], tool_reqs: List[str], toolchains: List[i32] }
 
 // Numeric order of two versions, component by component; a missing
 // component is 0, and a component that is not a number orders as text.
@@ -966,22 +966,22 @@ fn py_option_text(v: &PyVal) -> str:
 impl PyInterp:
     // ── Arenas ──
 
-    mut fn new_list(items: Vec[PyVal]) -> PyVal:
+    mut fn new_list(items: List[PyVal]) -> PyVal:
         self.lists.push(PyList { items })
         pv(V_LIST, self.lists.len() as i64 - 1, "")
 
-    mut fn new_str_list(items: &Vec[str]) -> PyVal:
-        var out: Vec[PyVal] = Vec.new()
+    mut fn new_str_list(items: &List[str]) -> PyVal:
+        var out: List[PyVal] = List.new()
         for s in items: out.push(pv_str(s))
         self.new_list(move out)
 
     mut fn new_dict() -> PyVal:
-        self.dkeys.push(PyList { items: Vec.new() })
-        self.dvals.push(PyList { items: Vec.new() })
+        self.dkeys.push(PyList { items: List.new() })
+        self.dvals.push(PyList { items: List.new() })
         pv(V_DICT, self.dkeys.len() as i64 - 1, "")
 
     mut fn new_obj(cls: &str) -> i32:
-        self.objs.push(PyObj { cls: cls.to_owned(), names: Vec.new(), vals: Vec.new() })
+        self.objs.push(PyObj { cls: cls.to_owned(), names: List.new(), vals: List.new() })
         self.objs.len() as i32 - 1
 
     fn obj_find(obj: i32, name: &str) -> i32:
@@ -1000,8 +1000,8 @@ impl PyInterp:
     mut fn obj_remove(obj: i32, name: &str):
         let at = self.obj_find(obj, name)
         if at < 0: return
-        var names: Vec[str] = Vec.new()
-        var vals: Vec[PyVal] = Vec.new()
+        var names: List[str] = List.new()
+        var vals: List[PyVal] = List.new()
         for i in 0..self.objs[obj].names.len() as i32:
             if i == at: continue
             names.push(self.objs[obj].names[i].clone())
@@ -1136,7 +1136,7 @@ impl PyInterp:
             self.obj_set(obj, name, pv(V_OBJ, comps as i64, ""))
             return pv(V_OBJ, comps as i64, "")
         if name == "libs" or name == "system_libs" or name == "frameworks" or name == "defines" or name == "cflags" or name == "cxxflags" or name == "sharedlinkflags" or name == "exelinkflags" or name == "requires" or name == "objects" or name == "libdirs" or name == "includedirs" or name == "bindirs" or name == "resdirs" or name == "srcdirs" or name == "builddirs" or name == "frameworkdirs":
-            var items: Vec[PyVal] = Vec.new()
+            var items: List[PyVal] = List.new()
             if name == "libdirs": items.push(pv_str("lib"))
             if name == "includedirs": items.push(pv_str("include"))
             if name == "bindirs": items.push(pv_str("bin"))
@@ -1160,7 +1160,7 @@ impl PyInterp:
         for i in 0..self.method_names.len() as i32:
             if self.method_names[i] != name: continue
             let node: i32 = self.method_nodes[i]
-            if self.nodes[node].b == 1: return self.call_def(node, Vec.new(), line)
+            if self.nodes[node].b == 1: return self.call_def(node, List.new(), line)
             return pv(V_FUNC, node as i64, name)
         for i in 0..self.attr_names.len() as i32:
             if self.attr_names[i] == name: return pv_copy(&self.attr_vals[i])
@@ -1231,7 +1231,7 @@ impl PyInterp:
             cur = pv_copy(&self.objs[cur.n as i32].vals[at])
         self.plain(&cur)
 
-    mut fn call_method(receiver: &PyVal, name: &str, args: &Vec[PyVal], line: i32) -> PyVal:
+    mut fn call_method(receiver: &PyVal, name: &str, args: &List[PyVal], line: i32) -> PyVal:
         let arg0 = if args.len() > 0: pv_copy(&args[0]) else: pv_unknown()
         if receiver.k == V_LIST:
             let id = receiver.n as i32
@@ -1242,12 +1242,12 @@ impl PyInterp:
                 if arg0.k != V_LIST:
                     self.note(line, "a list is extended by something that could not be evaluated")
                     return pv_none()
-                var items: Vec[PyVal] = Vec.new()
+                var items: List[PyVal] = List.new()
                 for i in 0..self.lists[arg0.n as i32].items.len() as i32: items.push(pv_copy(&self.lists[arg0.n as i32].items[i]))
                 for item in items: self.lists[id].items.push(pv_copy(item))
                 return pv_none()
             if name == "insert" and args.len() > 1:
-                var items: Vec[PyVal] = Vec.new()
+                var items: List[PyVal] = List.new()
                 let n = self.lists[id].items.len() as i32
                 let at = if arg0.k == V_INT and arg0.n >= 0 and arg0.n as i32 <= n: arg0.n as i32 else: n
                 for i in 0..n:
@@ -1257,7 +1257,7 @@ impl PyInterp:
                 self.lists[id].items = items
                 return pv_none()
             if name == "remove":
-                var items: Vec[PyVal] = Vec.new()
+                var items: List[PyVal] = List.new()
                 var removed = false
                 for i in 0..self.lists[id].items.len() as i32:
                     if not removed and self.equal(&arg0, &self.lists[id].items[i]) == 1:
@@ -1267,7 +1267,7 @@ impl PyInterp:
                 self.lists[id].items = items
                 return pv_none()
             if name == "copy":
-                var items: Vec[PyVal] = Vec.new()
+                var items: List[PyVal] = List.new()
                 for i in 0..self.lists[id].items.len() as i32: items.push(pv_copy(&self.lists[id].items[i]))
                 return self.new_list(move items)
             return pv_unknown()
@@ -1280,7 +1280,7 @@ impl PyInterp:
             if name == "strip" and args.len() == 0: return pv_str(s.trim())
             if name == "replace" and args.len() > 1 and arg0.k == V_STR and args[1].k == V_STR: return pv_str(s.replace(arg0.s, args[1].s))
             if name == "split" and arg0.k == V_STR:
-                var items: Vec[PyVal] = Vec.new()
+                var items: List[PyVal] = List.new()
                 for part in s.split(arg0.s): items.push(pv_str(part))
                 return self.new_list(move items)
             if name == "format":
@@ -1330,12 +1330,12 @@ impl PyInterp:
                     if self.equal(&arg0, &self.dkeys[id].items[i]) == 1: return pv_copy(&self.dvals[id].items[i])
                 return if args.len() > 1: pv_copy(&args[1]) else: pv_none()
             if name == "keys" or name == "values" or name == "items":
-                var items: Vec[PyVal] = Vec.new()
+                var items: List[PyVal] = List.new()
                 for i in 0..self.dkeys[id].items.len() as i32:
                     if name == "keys": items.push(pv_copy(&self.dkeys[id].items[i]))
                     else if name == "values": items.push(pv_copy(&self.dvals[id].items[i]))
                     else:
-                        var pair: Vec[PyVal] = Vec.new()
+                        var pair: List[PyVal] = List.new()
                         pair.push(pv_copy(&self.dkeys[id].items[i]))
                         pair.push(pv_copy(&self.dvals[id].items[i]))
                         items.push(self.new_list(move pair))
@@ -1373,7 +1373,7 @@ impl PyInterp:
         pv_unknown()
 
     // A function the recipe imports, by the name it calls it under.
-    mut fn call_named(name: &str, args: &Vec[PyVal], line: i32) -> PyVal:
+    mut fn call_named(name: &str, args: &List[PyVal], line: i32) -> PyVal:
         let arg0 = if args.len() > 0: self.plain(&args[0]) else: pv_unknown()
         let os = self.env.os.clone()
         if name == "is_apple_os": return pv_bool(os == "Macos" or os == "iOS" or os == "watchOS" or os == "tvOS" or os == "visionOS")
@@ -1399,9 +1399,9 @@ impl PyInterp:
             if arg0.k == V_DICT: return pv(V_INT, self.dkeys[arg0.n as i32].items.len() as i64, "")
             return pv_unknown()
         if name == "list" or name == "tuple" or name == "sorted" or name == "set":
-            if args.len() == 0: return self.new_list(Vec.new())
+            if args.len() == 0: return self.new_list(List.new())
             if arg0.k != V_LIST: return pv_unknown()
-            return self.call_method(&arg0, "copy", &Vec.new(), line)
+            return self.call_method(&arg0, "copy", &List.new(), line)
         if name == "any" or name == "all":
             if arg0.k != V_LIST: return pv_unknown()
             var unknown = false
@@ -1430,7 +1430,7 @@ impl PyInterp:
             // directories, by the names a linker is given.
             let folder = self.env.package_folder.clone()
             if folder.len() == 0: return pv_unknown()
-            var names: Vec[str] = Vec.new()
+            var names: List[str] = List.new()
             for dir in ["lib"]:
                 let base = folder ++ "/" ++ dir ++ "/"
                 for path in runtime_list_files(folder ++ "/" ++ dir).split("\n"):
@@ -1461,15 +1461,15 @@ impl PyInterp:
         if name == "PkgConfig" or name == "VirtualBuildEnv" or name == "VirtualRunEnv" or name == "Environment": return pv_sink()
         pv_unknown()
 
-    mut fn call_def(node: i32, args: Vec[PyVal], line: i32) -> PyVal:
+    mut fn call_def(node: i32, args: List[PyVal], line: i32) -> PyVal:
         if self.nodes[node].c == 1:
             self.note(line, "the recipe's '" ++ self.nodes[node].s.split("\n")[0] ++ "' could not be read (" ++ self.nodes[node].s.split("\n")[1] ++ ")")
             return pv_unknown()
         if self.depth > 40:
             self.note(line, "the recipe recurses too deeply")
             return pv_unknown()
-        var names: Vec[str] = Vec.new()
-        var vals: Vec[PyVal] = Vec.new()
+        var names: List[str] = List.new()
+        var vals: List[PyVal] = List.new()
         let params = self.nodes[node].a
         var next = 0
         for pi in 0..self.nodes[params].kids.len() as i32:
@@ -1500,7 +1500,7 @@ impl PyInterp:
     mut fn call(node: i32) -> PyVal:
         let line = self.nodes[node].line
         let callee = self.eval(self.nodes[node].a)
-        var args: Vec[PyVal] = Vec.new()
+        var args: List[PyVal] = List.new()
         for i in 0..self.nodes[node].kids.len() as i32:
             let arg: i32 = self.nodes[node].kids[i]
             // A keyword argument is passed by position after the others;
@@ -1540,7 +1540,7 @@ impl PyInterp:
                 out = out ++ part.s
             return pv_str(out)
         if kind == N_LIST:
-            var items: Vec[PyVal] = Vec.new()
+            var items: List[PyVal] = List.new()
             for i in 0..self.nodes[node].kids.len() as i32: items.push(self.eval(self.nodes[node].kids[i]))
             return self.new_list(move items)
         if kind == N_DICT:
@@ -1568,7 +1568,7 @@ impl PyInterp:
             let iter = self.eval(self.nodes[node].kids[1])
             if iter.k != V_LIST: return pv_unknown()
             let dict = self.new_dict()
-            var source: Vec[PyVal] = Vec.new()
+            var source: List[PyVal] = List.new()
             for i in 0..self.lists[iter.n as i32].items.len() as i32: source.push(pv_copy(&self.lists[iter.n as i32].items[i]))
             for item in source:
                 self.bind_targets(self.nodes[node].kids[0], item)
@@ -1634,7 +1634,7 @@ impl PyInterp:
             let op = self.nodes[node].s.clone()
             if op == "+":
                 if left.k == V_LIST and right.k == V_LIST:
-                    var items: Vec[PyVal] = Vec.new()
+                    var items: List[PyVal] = List.new()
                     for i in 0..self.lists[left.n as i32].items.len() as i32: items.push(pv_copy(&self.lists[left.n as i32].items[i]))
                     for i in 0..self.lists[right.n as i32].items.len() as i32: items.push(pv_copy(&self.lists[right.n as i32].items[i]))
                     return self.new_list(move items)
@@ -1646,8 +1646,8 @@ impl PyInterp:
         if kind == N_COMP:
             let iter = self.eval(self.nodes[node].b)
             if iter.k != V_LIST: return pv_unknown()
-            var items: Vec[PyVal] = Vec.new()
-            var source: Vec[PyVal] = Vec.new()
+            var items: List[PyVal] = List.new()
+            var source: List[PyVal] = List.new()
             for i in 0..self.lists[iter.n as i32].items.len() as i32: source.push(pv_copy(&self.lists[iter.n as i32].items[i]))
             for item in source:
                 self.bind_targets(self.nodes[node].kids[0], item)
@@ -1759,7 +1759,7 @@ impl PyInterp:
             if iter.k != V_LIST:
                 if iter.k != V_SINK: self.note(line, "a 'for' runs over something that could not be evaluated; its body was not run")
                 return PY_NORMAL
-            var source: Vec[PyVal] = Vec.new()
+            var source: List[PyVal] = List.new()
             for i in 0..self.lists[iter.n as i32].items.len() as i32: source.push(pv_copy(&self.lists[iter.n as i32].items[i]))
             for item in source:
                 self.bind_targets(self.nodes[node].a, item)
@@ -1782,16 +1782,16 @@ impl PyInterp:
             return PY_NORMAL
         PY_NORMAL
 
-fn py_one(value: PyVal) -> Vec[PyVal]:
-    var out: Vec[PyVal] = Vec.new()
+fn py_one(value: PyVal) -> List[PyVal]:
+    var out: List[PyVal] = List.new()
     out.push(value)
     out
 
 // ── The recipe ───────────────────────────────────────────────────────
 
-fn recipe_empty_component(name: &str): RecipeComponent { name: name.to_owned(), libs: Vec.new(), system_libs: Vec.new(), frameworks: Vec.new(), libdirs: Vec.new(), includedirs: Vec.new(), defines: Vec.new(), exelinkflags: Vec.new(), requires: Vec.new() }
+fn recipe_empty_component(name: &str): RecipeComponent { name: name.to_owned(), libs: List.new(), system_libs: List.new(), frameworks: List.new(), libdirs: List.new(), includedirs: List.new(), defines: List.new(), exelinkflags: List.new(), requires: List.new() }
 
-fn recipe_failed(problem: &str): RecipePackageInfo { ok: false, problem: problem.to_owned(), notes: Vec.new(), root: recipe_empty_component(""), components: Vec.new() }
+fn recipe_failed(problem: &str): RecipePackageInfo { ok: false, problem: problem.to_owned(), notes: List.new(), root: recipe_empty_component(""), components: List.new() }
 
 impl PyInterp:
     mut fn setting(value: &str) -> PyVal:
@@ -1800,8 +1800,8 @@ impl PyInterp:
         pv(V_OBJ, obj as i64, "")
 
     // A cpp_info list attribute as text; an entry that is not text is noted.
-    mut fn component_strings(obj: i32, name: &str, component: &str) -> Vec[str]:
-        var out: Vec[str] = Vec.new()
+    mut fn component_strings(obj: i32, name: &str, component: &str) -> List[str]:
+        var out: List[str] = List.new()
         let list = self.cppinfo_attr(obj, name)
         if list.k != V_LIST: return out
         for i in 0..self.lists[list.n as i32].items.len() as i32:
@@ -1817,7 +1817,7 @@ impl PyInterp:
     mut fn run_method(name: &str) -> bool:
         for i in 0..self.method_names.len() as i32:
             if self.method_names[i] != name: continue
-            let _ = self.call_def(self.method_nodes[i], Vec.new(), self.nodes[self.method_nodes[i]].line)
+            let _ = self.call_def(self.method_nodes[i], List.new(), self.nodes[self.method_nodes[i]].line)
             return true
         false
 
@@ -1834,23 +1834,23 @@ fn recipe_class(tree: &PyModule) -> i32:
 
 fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
     var tree = py_parse(recipe)
-    var ip = PyInterp { nodes: Vec.new(), lists: Vec.new(), dkeys: Vec.new(), dvals: Vec.new(), objs: Vec.new(), recv: Vec.new(), frame_names: Vec.new(), frame_vals: Vec.new(), method_names: Vec.new(), method_nodes: Vec.new(), attr_names: Vec.new(), attr_vals: Vec.new(), func_names: Vec.new(), func_nodes: Vec.new(), self_obj: 0, env: RecipeEnv { os: env.os.clone(), arch: env.arch.clone(), compiler: env.compiler.clone(), compiler_version: env.compiler_version.clone(), build_type: env.build_type.clone(), version: env.version.clone(), package_folder: env.package_folder.clone(), source_folder: env.source_folder.clone(), options: Vec.new(), options_known: env.options_known }, notes: Vec.new(), ret: pv_none(), steps: 0, depth: 0, problem: "", reqs: Vec.new(), tool_reqs: Vec.new(), toolchains: Vec.new() }
+    var ip = PyInterp { nodes: List.new(), lists: List.new(), dkeys: List.new(), dvals: List.new(), objs: List.new(), recv: List.new(), frame_names: List.new(), frame_vals: List.new(), method_names: List.new(), method_nodes: List.new(), attr_names: List.new(), attr_vals: List.new(), func_names: List.new(), func_nodes: List.new(), self_obj: 0, env: RecipeEnv { os: env.os.clone(), arch: env.arch.clone(), compiler: env.compiler.clone(), compiler_version: env.compiler_version.clone(), build_type: env.build_type.clone(), version: env.version.clone(), package_folder: env.package_folder.clone(), source_folder: env.source_folder.clone(), options: List.new(), options_known: env.options_known }, notes: List.new(), ret: pv_none(), steps: 0, depth: 0, problem: "", reqs: List.new(), tool_reqs: List.new(), toolchains: List.new() }
     if tree.problem.len() > 0: return (ip, "the recipe could not be read: " ++ tree.problem)
     let cls_node = recipe_class(&tree)
     if cls_node < 0: return (ip, "the recipe defines no class")
-    ip.frame_names.push(PyNames { items: Vec.new() })
-    ip.frame_vals.push(PyList { items: Vec.new() })
+    ip.frame_names.push(PyNames { items: List.new() })
+    ip.frame_vals.push(PyList { items: List.new() })
     for t in tree.top:
         if tree.nodes[t].kind == N_DEF:
             ip.func_names.push(tree.nodes[t].s.split("\n")[0].to_owned())
             ip.func_nodes.push(t)
-    var class_body: Vec[i32] = Vec.new()
+    var class_body: List[i32] = List.new()
     for k in tree.nodes[cls_node].kids:
         if tree.nodes[k].kind == N_DEF:
             ip.method_names.push(tree.nodes[k].s.split("\n")[0].to_owned())
             ip.method_nodes.push(k)
         else: class_body.push(k)
-    var top_assigns: Vec[i32] = Vec.new()
+    var top_assigns: List[i32] = List.new()
     for t in tree.top:
         if tree.nodes[t].kind == N_ASSIGN: top_assigns.push(t)
     ip.nodes = move tree.nodes
@@ -1859,8 +1859,8 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
     // The class body is statements too (`default_options = {…}` then
     // `default_options["fPIC"] = True`): run in order, and what they bind
     // is what `self.<name>` finds.
-    ip.frame_names.push(PyNames { items: Vec.new() })
-    ip.frame_vals.push(PyList { items: Vec.new() })
+    ip.frame_names.push(PyNames { items: List.new() })
+    ip.frame_vals.push(PyList { items: List.new() })
     for k in class_body:
         let _ = ip.exec(k)
     let class_frame: i32 = ip.frame_names.len() as i32 - 1
@@ -1917,8 +1917,8 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
 
 // The options a package built here is made with, as conaninfo spells them:
 // the recipe's defaults after its `config_options` and `configure`.
-pub fn recipe_built_options(recipe: &str, env: &RecipeEnv) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+pub fn recipe_built_options(recipe: &str, env: &RecipeEnv) -> List[str]:
+    var out: List[str] = List.new()
     let (ip, problem) = recipe_interp(recipe, env)
     if problem.len() > 0: return out
     let self_obj: i32 = ip.self_obj
@@ -1933,18 +1933,18 @@ pub fn recipe_package_info(recipe: &str, env: &RecipeEnv) -> RecipePackageInfo:
     let (ip0, problem) = recipe_interp(recipe, env)
     if problem.len() > 0: return recipe_failed(problem)
     var ip = ip0
-    ip.notes = Vec.new()
+    ip.notes = List.new()
     if not ip.run_method("package_info"): return recipe_failed("the recipe defines no package_info")
     if ip.problem.len() > 0: return recipe_failed(ip.problem)
     let self_obj: i32 = ip.self_obj
     let cpp_info = ip.objs[self_obj].vals[ip.obj_find(self_obj, "cpp_info")].n as i32
     let root = ip.component(cpp_info, "")
-    var components: Vec[RecipeComponent] = Vec.new()
+    var components: List[RecipeComponent] = List.new()
     let comps_at = ip.obj_find(cpp_info, "components")
     if comps_at >= 0:
         let comps = ip.objs[cpp_info].vals[comps_at].n as i32
-        var names: Vec[str] = Vec.new()
-        var ids: Vec[i32] = Vec.new()
+        var names: List[str] = List.new()
+        var ids: List[i32] = List.new()
         for i in 0..ip.objs[comps].names.len() as i32:
             names.push(ip.objs[comps].names[i].clone())
             ids.push(ip.objs[comps].vals[i].n as i32)
@@ -1954,13 +1954,13 @@ pub fn recipe_package_info(recipe: &str, env: &RecipeEnv) -> RecipePackageInfo:
 // What `requirements` and `build_requirements` ask for: the packages the
 // library needs, and the tools its build runs, as the recipe writes them
 // (`zlib/[>=1.2.11 <2]`).
-pub type RecipeRequirements { ok: bool, problem: str, notes: Vec[str], requires: Vec[str], tool_requires: Vec[str] }
+pub type RecipeRequirements { ok: bool, problem: str, notes: List[str], requires: List[str], tool_requires: List[str] }
 
 pub fn recipe_requirements(recipe: &str, env: &RecipeEnv) -> RecipeRequirements:
     let (ip0, problem) = recipe_interp(recipe, env)
-    if problem.len() > 0: return RecipeRequirements { ok: false, problem, notes: Vec.new(), requires: Vec.new(), tool_requires: Vec.new() }
+    if problem.len() > 0: return RecipeRequirements { ok: false, problem, notes: List.new(), requires: List.new(), tool_requires: List.new() }
     var ip = ip0
-    ip.notes = Vec.new()
+    ip.notes = List.new()
     // The class may state its requirements as an attribute instead.
     let stated = ip.self_attr("requires", 0)
     if stated.k == V_STR: ip.reqs.push(stated.s.clone())
@@ -1970,21 +1970,21 @@ pub fn recipe_requirements(recipe: &str, env: &RecipeEnv) -> RecipeRequirements:
             if reference.k == V_STR: ip.reqs.push(reference.s.clone())
     let _r = ip.run_method("requirements")
     let _b = ip.run_method("build_requirements")
-    if ip.problem.len() > 0: return RecipeRequirements { ok: false, problem: move ip.problem, notes: Vec.new(), requires: Vec.new(), tool_requires: Vec.new() }
+    if ip.problem.len() > 0: return RecipeRequirements { ok: false, problem: move ip.problem, notes: List.new(), requires: List.new(), tool_requires: List.new() }
     RecipeRequirements { ok: true, problem: "", notes: move ip.notes, requires: move ip.reqs, tool_requires: move ip.tool_reqs }
 
 // The variables `generate` sets on its CMakeToolchain, as CMake spells
 // their values; `unknown` names each one whose value could not be evaluated.
-pub type RecipeCMake { ok: bool, problem: str, notes: Vec[str], names: Vec[str], values: Vec[str], unknown: Vec[str] }
+pub type RecipeCMake { ok: bool, problem: str, notes: List[str], names: List[str], values: List[str], unknown: List[str] }
 
 pub fn recipe_cmake_variables(recipe: &str, env: &RecipeEnv) -> RecipeCMake:
-    var out = RecipeCMake { ok: false, problem: "", notes: Vec.new(), names: Vec.new(), values: Vec.new(), unknown: Vec.new() }
+    var out = RecipeCMake { ok: false, problem: "", notes: List.new(), names: List.new(), values: List.new(), unknown: List.new() }
     let (ip0, problem) = recipe_interp(recipe, env)
     if problem.len() > 0:
         out.problem = problem
         return out
     var ip = ip0
-    ip.notes = Vec.new()
+    ip.notes = List.new()
     let _g = ip.run_method("generate")
     if ip.problem.len() > 0:
         out.problem = move ip.problem

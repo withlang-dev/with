@@ -14,9 +14,9 @@ use std.crypto.sha256
 // embedding, the exclusions, the stage/cross/release wiring and the lanes
 // all iterate it, so a corpus is present everywhere it must be by
 // construction. Adding a library is one line here plus its declaration
-// module under build/; nothing else names it. Indexed, not a Vec: a Corpus
+// module under build/; nothing else names it. Indexed, not a List: a Corpus
 // is ephemeral (its hooks take references), and the seed's comptime
-// evaluator iterates a Vec of ephemeral records as strings.
+// evaluator iterates a List of ephemeral records as strings.
 pub fn corpus_count() -> i32: 4
 
 pub fn corpus_at(index: i32) -> Corpus:
@@ -49,8 +49,8 @@ pub fn corpus_bundle_plan(ctx: &BuildCtx, corpus: &Corpus) -> WoBundle:
     wo_bundle_plan(ctx, corpus.name, corpus.corpus_rel, corpus.corpus_dir ++ "/bundle.w")
 
 /// One host bundle plan per corpus, in registry order.
-pub fn corpora_bundle_plans(ctx: &BuildCtx) -> Vec[WoBundle]:
-    var plans: Vec[WoBundle] = Vec.new()
+pub fn corpora_bundle_plans(ctx: &BuildCtx) -> List[WoBundle]:
+    var plans: List[WoBundle] = List.new()
     for i in 0..corpus_count():
         let corpus = corpus_at(i)
         plans.push(corpus_bundle_plan(ctx, corpus))
@@ -163,8 +163,8 @@ pub fn run_corpus_bundle_root_check_action(ctx: ActionCtx) -> i32:
     if fs.write_text(ctx.output(), "ok\n") != 0: return corpus_fail(ctx, "cannot write " ++ ctx.output())
     0
 
-fn corpus_w_names(ctx: &ActionCtx, dir: &str) -> Vec[str]:
-    var names: Vec[str] = Vec.new()
+fn corpus_w_names(ctx: &ActionCtx, dir: &str) -> List[str]:
+    var names: List[str] = List.new()
     for path in ctx.fs().list_files(dir):
         if path.ends_with(".w") and not path.slice(dir.len() + 1, path.len()).contains("/"): names.push(corpus_basename(path))
     corpus_sorted(names)
@@ -182,7 +182,7 @@ fn corpus_w_names(ctx: &ActionCtx, dir: &str) -> Vec[str]:
 
 /// The sources that make up `with migrate`; their hash names a migrator
 /// generation.
-fn corpus_migrator_sources() -> Vec[str]:
+fn corpus_migrator_sources() -> List[str]:
     ["src/CImport.w", "src/CiMigrate.w", "src/CiIR.w", "src/CiPrint.w", "src/Migrate.w", "src/compiler/ClangBridge.w", "src/compiler/ClangDriver.w"]
 
 fn corpus_sha256_text(text: &str) -> str:
@@ -237,9 +237,9 @@ pub fn run_corpus_integrity_action(ctx: ActionCtx) -> i32:
 /// How the checked-in corpus differs from a fresh migration: one line per
 /// module that differs, is missing or is extra. The migration is against
 /// the C model (build/corpus.w, #2060), so it means the same on every host.
-fn corpus_drift_lines(ctx: &ActionCtx, corpus: &Corpus) -> Vec[str]:
+fn corpus_drift_lines(ctx: &ActionCtx, corpus: &Corpus) -> List[str]:
     let fs = ctx.fs()
-    var lines: Vec[str] = Vec.new()
+    var lines: List[str] = List.new()
     let generated = corpus_scratch(ctx) ++ "/generated"
     if corpus_generate(ctx, corpus, generated) != 0:
         lines.push("  the fresh migration failed; see the log above")

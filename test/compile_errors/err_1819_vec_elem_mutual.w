@@ -3,7 +3,7 @@
 // #1819 (§9.1c: globals are places; §21.1 rule 1): mutually recursive callees, one of which writes G.
 // A call writes every global its callee writes.
 
-var G: Vec[str] = Vec.new()
+var G: List[str] = List.new()
 
 fn ping(n: i32):
     if n > 0: pong(n - 1)

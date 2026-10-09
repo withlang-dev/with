@@ -6,10 +6,10 @@
 // free an uninitialized temp. Both orders: the temp in the not-taken `then`,
 // and the temp in the not-taken `else`.
 use std.builtins.print_i32
-type Big { a: Vec[str], b: Vec[str] }
+type Big { a: List[str], b: List[str] }
 
-fn cl(v: &Vec[str]) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+fn cl(v: &List[str]) -> List[str]:
+    var out: List[str] = List.new()
     for i in 0..v.len() as i32:
         out.push(v[i as i64] ++ "")
     out
@@ -21,10 +21,10 @@ fn consume(b: Big) -> i32:
     b.a.len() as i32
 
 fn main:
-    let seed: Vec[str] = Vec.new()
+    let seed: List[str] = List.new()
     seed.push("x")
     var big = Big { a: cl(&seed), b: cl(&seed) }
-    var results: Vec[i32] = Vec.new()
+    var results: List[i32] = List.new()
     let none: Option[i32] = None
     let some: Option[i32] = Some(1)
 

@@ -28,13 +28,13 @@ fn fail(msg: &str) -> Never:
 
 type Decl { path: str, name: str, start: i64, kind: str }
 
-fn facts(root: &str, query: &str) -> Vec[str]:
+fn facts(root: &str, query: &str) -> List[str]:
     let out_path = "out/tmp/pub_lint_" ++ query.replace(":", "_").replace("=", "_").replace(",", "_") ++ ".txt"
     let compiler = if env("WITH").len() > 0: env("WITH") else: "with".to_owned()
-    let argv: Vec[str] = [compiler, "analyze", root.to_owned(), query.to_owned()]
+    let argv: List[str] = [compiler, "analyze", root.to_owned(), query.to_owned()]
     let finished = run_to_files(&argv, out_path, out_path ++ ".stderr", 900000)
     if finished.code != 0: fail("`with analyze " ++ root ++ " " ++ query ++ "` exited " ++ f"{finished.code}; see " ++ out_path ++ ".stderr")
-    var rows: Vec[str] = Vec.new()
+    var rows: List[str] = List.new()
     for l in read_file(out_path).unwrap_or("").split("\n"):
         if l.starts_with("fact\t"): rows.push(l.to_owned())
     rows
@@ -60,7 +60,7 @@ let apply = argv.len() > 2 and argv[2] == "--apply"
 let _ = mkdir_p("out/tmp")
 
 // Declarations of the root's package, with their module and start byte.
-var decls: Vec[Decl] = Vec.new()
+var decls: List[Decl] = List.new()
 for row in facts(root, "select:stage=ast,kind=declaration"):
     let path = column(row, 18)
     if package_of(path) != "<program>" or path.starts_with("<c_import"): continue
@@ -91,7 +91,7 @@ for row in facts(root, "select:kind=method-resolution"):
     if package_of(column(row, 18)) != "<program>": used_outside.insert(column(row, 19), 1)
 
 var reported = 0
-var edits: HashMap[str, Vec[i64]] = HashMap.new()
+var edits: HashMap[str, List[i64]] = HashMap.new()
 for d in decls:
     let text = read_file(d.path).unwrap_or("")
     if text.len() == 0 or d.start < 0 or d.start + 4 > text.len(): continue
@@ -100,9 +100,9 @@ for d in decls:
     reported = reported + 1
     print(d.path ++ f":{d.start}: pub " ++ d.name ++ " is used by nothing outside its package (D100: pub is what another package needs)")
     if apply:
-        var starts: Vec[i64] = match edits.get(d.path):
+        var starts: List[i64] = match edits.get(d.path):
             Some(v) => v.clone()
-            None => Vec.new()
+            None => List.new()
         starts.push(d.start)
         edits.insert(d.path.clone(), move starts)
 if apply:

@@ -12,7 +12,7 @@ gen fn labels(count: i32) -> &str:
         buf = f"item-{i}"
         yield &buf
 
-gen fn nonempty(lines: &Vec[str]) -> &str:
+gen fn nonempty(lines: &List[str]) -> &str:
     for line in lines:
         if line.len() > 0:
             yield line
@@ -34,7 +34,7 @@ fn main:
     for s in labels(3):
         out = out ++ (if out.len() > 0: " " else: "") ++ s
     print(out)
-    let lines: Vec[str] = ["alpha", "", "gamma"]
+    let lines: List[str] = ["alpha", "", "gamma"]
     var joined = ""
     for line in nonempty(&lines):
         joined = joined ++ (if joined.len() > 0: " " else: "") ++ line

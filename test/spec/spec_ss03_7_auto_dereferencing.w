@@ -54,8 +54,8 @@ fn test_auto_deref_generic_wrapper:
     assert(wrapped.name == "Edsger")
     assert(wrapped.label() == "Edsger")
 
-fn test_auto_deref_vec_method_through_references:
-    var values = Vec.new()
+fn test_auto_deref_list_method_through_references:
+    var values = List.new()
     values.push(10)
     values.push(20)
     let r = &values
