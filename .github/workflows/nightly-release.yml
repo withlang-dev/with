@@ -63,9 +63,9 @@ jobs:
         include:
           - arch: x86_64
             runner: windows-latest
-            seed_version: nightly-20261005-local-1-3207aacb2c74
+            seed_version: nightly-20261009-local-1-2638c97adaf8
             seed_asset: with-windows-x86_64.exe
-            seed_sha256: 699bba4b9276cdc26bad8525796df9adb52a67a46b84400c3655c4351f50320d
+            seed_sha256: dc6314d6b68207a4b28d16221b6aa79e5d47c33f407eb57b7e3ce0bb06882188
             mesa_arch: x64
             mesa_sha256: 418f1938dc48d401538cf6440d3c718e2f456ef2023e44133105263f483e903f
           - arch: aarch64
@@ -233,9 +233,9 @@ jobs:
             runner: ubuntu-latest
             sdk_host_tag: linux-x86_64
             seed_repo: withlang-dev/with
-            seed_version: nightly-20261005-local-1-3207aacb2c74
+            seed_version: nightly-20261009-local-1-2638c97adaf8
             seed_asset: with-linux-x86_64
-            seed_sha256: d9b731adf6334d4366068f21fee5dcab9d8e9ec2bf817f4277c811f62ba61a86
+            seed_sha256: 3886cc6f7a81f38043a6e0d1b56e5303218414222053e18e5d080cee7a430995
             sdk_version: nightly-sdk-20261004-c4ddb7ddbef2
             sdk_asset: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
             sdk_sha256: 89751749724afcd2cd26f4022201797d310dc77c74f4b49689a0d2768db74785
@@ -452,9 +452,9 @@ jobs:
             runner: macos-latest
             sdk_host_tag: darwin-arm64
             seed_repo: withlang-dev/with
-            seed_version: nightly-20261005-local-1-3207aacb2c74
+            seed_version: nightly-20261009-local-1-2638c97adaf8
             seed_asset: with-darwin-aarch64
-            seed_sha256: ceec31159b5436da3d3cb752c85f0ecd2837bb27fe5f06e0e7038d9a1718e03f
+            seed_sha256: 86ee98b5650c798c74349398c223144a3bdd6b6f733ae7643b4ff7d3d96e5770
             sdk_version: nightly-sdk-20261004-8b0595267bb0
             sdk_asset: with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz
             sdk_sha256: d3abcdfd6f6ccc8094929e4053a15c28c45d1672108d5755460cd51607bd9406
@@ -651,9 +651,9 @@ jobs:
       # predated that fix; a compiler bootstrapped from it self-perpetuates the
       # miscompile and crashes (0xC0000005) compiling any regex literal at comptime.
       # build and :fixpoint never compile a regex, so that poison shipped green.
-      WITH_SEED_VERSION: nightly-20261005-local-1-3207aacb2c74
+      WITH_SEED_VERSION: nightly-20261009-local-1-2638c97adaf8
       WITH_SEED_ASSET: with-windows-x86_64.exe
-      WITH_SEED_SHA256: 699bba4b9276cdc26bad8525796df9adb52a67a46b84400c3655c4351f50320d
+      WITH_SEED_SHA256: dc6314d6b68207a4b28d16221b6aa79e5d47c33f407eb57b7e3ce0bb06882188
       # The windows-gnu SDK of sdk.lock (#1915): its own C runtime, so the
       # job reads no Visual Studio and no Windows SDK. The archive digest is
       # pinned here; the release republishes the verified archive as is.

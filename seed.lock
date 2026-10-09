@@ -8,9 +8,12 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20261005-local-1-3207aacb2c74
-with-darwin-aarch64=ceec31159b5436da3d3cb752c85f0ecd2837bb27fe5f06e0e7038d9a1718e03f
-# darwin-aarch64, linux-x86_64 and windows-x86_64 are cut from main 3207aacb
+version=nightly-20261009-local-1-2638c97adaf8
+with-darwin-aarch64=86ee98b5650c798c74349398c223144a3bdd6b6f733ae7643b4ff7d3d96e5770
+# darwin-aarch64, linux-x86_64 and windows-x86_64 are cut from main 2638c97a
+# (2026-10-09), each on its own host from a stage2 == stage3 fixpoint: the
+# first seeds that accept `List` (D118 step a), which the renamed tree needs.
+# Before them, darwin-aarch64, linux-x86_64 and windows-x86_64 were cut from main 3207aacb
 # (2026-10-05), each on its own host from a stage2 == stage3 fixpoint: the
 # first seeds whose std.libc has the libc constants (D90) and `Target` (D91)
 # that a re-migrated corpus names, and whose `==` compares by type (#2137).
@@ -30,7 +33,7 @@ with-darwin-aarch64=ceec31159b5436da3d3cb752c85f0ecd2837bb27fe5f06e0e7038d9a1718
 # libc++ and lld: a fresh clone in a bare ubuntu:24.04 (git, curl, bubblewrap)
 # runs :deps and build with no LLVM_PREFIX to a stage2 == stage3 fixpoint over
 # all 16 units, and its release compiler is this binary byte for byte.
-with-linux-x86_64=d9b731adf6334d4366068f21fee5dcab9d8e9ec2bf817f4277c811f62ba61a86
+with-linux-x86_64=3886cc6f7a81f38043a6e0d1b56e5303218414222053e18e5d080cee7a430995
 with-linux-aarch64.version=nightly-20261003-local-2-b78ceca2d3c5
 with-linux-aarch64=c5b434ce739a0ef2a8beddf09abd30f1f501aa2b9227b07a0b16bdf65f8f2898
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
@@ -43,6 +46,6 @@ with-linux-aarch64=c5b434ce739a0ef2a8beddf09abd30f1f501aa2b9227b07a0b16bdf65f8f2
 # v0.15.2.1: cross-built from ea377276 (v0.15.2.1 + the #1089 embed-slot
 # fix), an intermediate seed the native windows-aarch64 lane bootstraps and
 # verifies.
-with-windows-x86_64.exe=699bba4b9276cdc26bad8525796df9adb52a67a46b84400c3655c4351f50320d
+with-windows-x86_64.exe=dc6314d6b68207a4b28d16221b6aa79e5d47c33f407eb57b7e3ce0bb06882188
 with-windows-aarch64.exe.version=v0.15.2.1
 with-windows-aarch64.exe=bb3b17c64ad057ddc852a5ee6a61a4e4a224780447013699d490e6f726893c73
