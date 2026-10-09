@@ -532,7 +532,7 @@ pub type TrieValue = *mut c_void
 
 pub var test_array: [c_int; 10000] = [0 as c_int; 10000]
 
-pub var test_strings: [[c_char; 10]; 10000] = [[0 as c_char; 10] as [c_char; 10]; 10000]
+pub var test_strings: [c_char; 10000, 10] = [0 as c_char; 10000, 10]
 
 pub var bin_key: [u8; 7] = [97, 98, 99, 0, 1, 2, 255]
 

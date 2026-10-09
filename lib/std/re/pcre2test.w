@@ -22097,7 +22097,7 @@ fn display_properties(__param_wantscripts: c_int) {
 
     var __local_seencount: c_int = ((0 as c_int))
 
-    var __local_found: [[c_short; 6]; 256]
+    var __local_found: [c_short; 256, 6]
 
     var __local_fc: c_int = ((0 as c_int))
 
