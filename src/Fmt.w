@@ -216,7 +216,7 @@ fn flatten_nested_arrays_once(source: &str) -> str:
             k += 1
         if outer_close < 0 or semi + 1 >= inner_close or inner_close + 2 >= outer_close:
             continue
-        let flat = "[" ++ token_span(source, &tokens, i + 2, semi - 1) ++ "; " ++ token_span(source, &tokens, inner_close + 2, outer_close - 1) ++ ", " ++ token_span(source, &tokens, semi + 1, inner_close - 1) ++ "]"
+        let flat = "[" ++ token_span(source, tokens, i + 2, semi - 1) ++ "; " ++ token_span(source, tokens, inner_close + 2, outer_close - 1) ++ ", " ++ token_span(source, tokens, semi + 1, inner_close - 1) ++ "]"
         return source.slice(0, tokens.get_start(i)) ++ flat ++ source.slice(tokens.get_end(outer_close), source.len())
     source
 
