@@ -735,6 +735,13 @@ The result has no `Drop`, cannot outlive the named origin, and cannot be
 consumed or destroyed. A nullable borrowed return is `Option` of the borrowed
 value.
 
+**A borrow through a borrow** is a borrow of the same origin (D122). When
+`param N` is itself a borrowed value, `returns borrow T from param N` borrows
+from that value's origin: libxml2's root, its first child and that child's
+next sibling are all one `Node` type borrowed from the `Document`, and an
+operation that invalidates the document's views invalidates every node taken
+from it.
+
 **Borrowed record views.** The same clause applies to any imported record
 type, with a resource parameter or a foreign-state domain (§16.2b.7) as the
 origin:
@@ -888,6 +895,23 @@ resource SqliteString wraps *mut c_char
 It exposes a borrowed `CStr` view; the foreign allocator/deallocator pairing
 stays intact, and With never substitutes its allocator except through an
 explicit copying conversion. The same applies to any foreign-owned buffer.
+
+**Text.** `text param P` states that a pointer parameter of any C character
+type (`const char *`, `const unsigned char *` such as libxml2's `xmlChar *`)
+is input text: C reads it only up to its NUL and does not keep the pointer.
+The parameter then accepts a `str`, passed as a `const char *` parameter's is
+(§16.3c). The fact is proved from the function's body (§16.2b.15: both
+halves, the read stops at the NUL and the pointer is not stored) or stated by
+the registry. Without it a `const char *` keeps §16.3c's rule and any other
+character pointer stays raw, since a `const unsigned char *` is as often a
+fixed-size binary input that a short `str` would let C read past.
+
+`text return, owned, freed by F` states that the returned character pointer
+is new text the caller owns, released with `F` (`xmlNodeGetContent`'s result,
+freed by `xmlFree`). The caller receives a `str`: the compiler copies the
+text and calls `F` on the pointer, on every path. Encoding stays evidence:
+a return proved or declared UTF-8 presents as `str`; any other presents as
+owned bytes (unknown encoding is bytes, §16.2b.2).
 
 **Nullability.** `NULL` is information. Machine-readable nullability is used
 directly. Otherwise `nullable -> Option`, `nonnull -> direct value`, and
