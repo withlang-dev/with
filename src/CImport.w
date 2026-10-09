@@ -11865,8 +11865,13 @@ impl CiStmtPool:
                     let pure_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
                     if pure_ty != 0:
                         let pure_cond = exprs.bool_expr_from_value_ir(session, cond_cursor, cond.value_expr, types)
-                        let pure_then = exprs.coerce_value_expr_for_target(session, pure_ty, then_cursor, then_v.value_expr, types)
-                        let pure_else = exprs.coerce_value_expr_for_target(session, pure_ty, else_cursor, else_v.value_expr, types)
+                        // A `null` arm has no type of its own, and an `if`
+                        // arm never takes the other arm's: it is spelled
+                        // with its type, as C's `NULL` already is.
+                        var pure_then = exprs.coerce_value_expr_for_target(session, pure_ty, then_cursor, then_v.value_expr, types)
+                        if pure_then != 0 and exprs.kind(pure_then) == CiExprKind.CIE_NULL_PTR: pure_then = exprs.cast(pure_ty, pure_then)
+                        var pure_else = exprs.coerce_value_expr_for_target(session, pure_ty, else_cursor, else_v.value_expr, types)
+                        if pure_else != 0 and exprs.kind(pure_else) == CiExprKind.CIE_NULL_PTR: pure_else = exprs.cast(pure_ty, pure_else)
                         if pure_cond != 0 and pure_then != 0 and pure_else != 0:
                             return CiValueExprIR { value_expr: exprs.add(CiExprKind.CIE_TERNARY, pure_cond as i32, pure_then as i32, pure_else as i32, 0 as CiTypeId) }
                 let result_name = ci_expr_temp_name(session, cursor, "ternary")

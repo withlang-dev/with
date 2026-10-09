@@ -5276,12 +5276,13 @@ fn bs_check_migrate_libc_ctype(ctx: &ActionCtx, compiler_path: &str, case_dir: &
 // A ternary inside a call argument inside an initializer-list element
 // (STC's `{_i_new_n(T, n), 0, n}` expands to `malloc((size_t)(1 ? n : -1))`)
 // is a pure expression: it lowers to `if` there, never to a hoisted temp
-// the initializer cannot take.
+// the initializer cannot take. A `0` arm of a pointer ternary is spelled
+// with its type (`pick`): `null` has none of its own.
 fn bs_check_migrate_ternary_in_initializer_call(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "ternary_in_initializer_call.c")
     let out_w = bs_join(case_dir, "ternary_in_initializer_call.w")
-    let c_text = "#include <stdlib.h>\n#include <stddef.h>\ntypedef struct { int* data; size_t size; ptrdiff_t cap; } V;\nV make(ptrdiff_t c) { V out = {(int*)malloc((size_t)(1 ? c : -1) * sizeof(int)), 0, c}; return out; }\n"
+    let c_text = "#include <stdlib.h>\n#include <stddef.h>\ntypedef struct { int* data; size_t size; ptrdiff_t cap; } V;\nV make(ptrdiff_t c) { V out = {(int*)malloc((size_t)(1 ? c : -1) * sizeof(int)), 0, c}; return out; }\nint* pick(int give, int* p) { return give ? p : 0; }\n"
     var rc = bs_write_fixture(ctx, src, c_text, "ternary in an initializer call")
     if rc != 0: return rc
     let migrate = ["migrate", bs_abs(root, src), "--no-c-export", "-o", bs_abs(root, out_w)]
