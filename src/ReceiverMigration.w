@@ -33,7 +33,7 @@ fn col_of(text: &str, offset: i32):
         j = j - 1
     offset - (j + 1)
 
-fn slice(text: &str, a: i32, b: i32): text.slice(a as i64, b as i64)
+fn slice(text: &str, a: isize, b: isize): text.slice(a, b)
 
 fn trim(s: &str):
     let m = s.len() as i32
@@ -161,7 +161,7 @@ impl RelocationFacts:
         var count = 0
         var skipped = 0
 
-        var i = 0
+        var i: i32 = 0
         while i < n:
             // Blank lines emit a NEWLINE token at column 0 — skip them; they are not
             // decls and must not reset an open impl group.

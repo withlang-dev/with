@@ -1,5 +1,5 @@
 extern fn with_arg_count() -> i32
-extern fn with_arg_at(idx: i32) -> str
+extern fn with_arg_at(idx: isize) -> str
 extern fn with_fs_read_file(path: &str) -> str
 extern fn with_fs_list_files(path: &str) -> str
 extern fn with_fs_write_file(path: &str, data: &str) -> i32

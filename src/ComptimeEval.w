@@ -59,7 +59,7 @@ extern fn with_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path:
 extern fn with_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> i32
 extern fn with_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32
 extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
-extern fn with_arg_at(idx: i32) -> str
+extern fn with_arg_at(idx: isize) -> str
 @[effect(fn_ptr: escape_value, ctx: escape_value)]
 extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
 extern fn with_thread_join(handle: i64) -> i32
@@ -850,7 +850,7 @@ fn comptime_pax_parse_decimal(text: &str, start: i32, end: i32) -> i32:
     value
 
 fn comptime_pax_value(text: &str, key: &str) -> str:
-    var pos = 0
+    var pos: i32 = 0
     while pos < text.len() as i32:
         var space = pos
         while space < text.len() as i32 and text[space] != 32:
@@ -2947,7 +2947,7 @@ impl ComptimeEvaluator:
                 return 0
             let args: List[i32] = List.new()
             args.push(arg1)
-            var arg_count = 1
+            var arg_count: i32 = 1
             if self.ast.get_data2(node) != 0:
                 let arg2 = self.static_type_expr(self.ast.get_data2(node))
                 if arg2 == 0:
@@ -3626,7 +3626,7 @@ impl ComptimeEvaluator:
             return self.fail(node, "method receiver type is unavailable in comptime")
 
         var fn_sym = self.sema.lookup_generic_method_fn(owner, method)
-        var concrete_sig = -1
+        var concrete_sig: i32 = -1
         var type_args = ComptimeGenericResolvedArgs { ok: 1, tp_syms: List.new(), tp_tys: List.new() }
         if fn_sym != 0:
             let ret_ty = self.sema.check_generic_method_call(owner, resolved_recv as i32, fn_sym, 0, recv_node, arg_types, extra_start, arg_count, node)
@@ -3776,8 +3776,8 @@ impl ComptimeEvaluator:
         let lhs = self.ast.get_data0(node)
         let rhs = self.ast.get_data1(node)
         var callee = rhs
-        var args_start = -1
-        var arg_count = 0
+        var args_start: i32 = -1
+        var arg_count: i32 = 0
         if self.ast.kind(rhs) == NodeKind.NK_CALL:
             callee = self.ast.get_data0(rhs)
             args_start = self.ast.get_data1(rhs)
@@ -6994,7 +6994,7 @@ impl ComptimeEvaluator:
         self.fail(node, "comparison requires comptime scalar values")
 
     mut fn eval_binary_membership(node: i32, lhs: &ComptimeValue, rhs: &ComptimeValue, negate: i32) -> ComptimeControl:
-        var matched = 0
+        var matched: i32 = 0
         if rhs.kind == ComptimeValueKind.CV_ARRAY or rhs.kind == ComptimeValueKind.CV_TUPLE or rhs.kind == ComptimeValueKind.CV_LIST:
             for i in 0..rhs.extra_count:
                 let item = self.extra_value_at((rhs.extra_start + i) as i64)
@@ -8090,7 +8090,7 @@ impl ComptimeEvaluator:
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0 or self.ast.fn_meta_tp_count(meta) == 0:
             return ComptimeGenericResolvedArgs { ok: 1, tp_syms: List.new(), tp_tys: List.new() }
-        var concrete_sig = -1
+        var concrete_sig: i32 = -1
         let recorded = self.sema.resolved_call_sigs.get(node)
         if recorded.is_some():
             concrete_sig = recorded.unwrap()

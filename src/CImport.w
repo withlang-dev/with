@@ -883,7 +883,7 @@ pub fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx
     g_macro_type_names = ci_collect_macro_type_names(session)
     g_macro_type_aliases = ci_collect_macro_type_aliases(session)
 
-    var i = 0
+    var i: i32 = 0
     while i < count:
         let kind = with_cimport_decl_kind(session, i)
         if kind == CK_FUNCTION:
@@ -1187,7 +1187,7 @@ fn ci_missing_pointer_opaque_add(session: i64, count: i32, names: &str, translat
 
 fn ci_collect_missing_pointer_opaques(session: i64, count: i32) -> str:
     var names = ""
-    var i = 0
+    var i: i32 = 0
     while i < count:
         let kind = with_cimport_decl_kind(session, i)
         if kind == CK_STRUCT or kind == CK_UNION:
@@ -1437,7 +1437,7 @@ pub fn ci_collect_demoted_types(session: i64, count: i32) -> str:
     // bitfields) and `_SCOPE_TABLE_AMD64`, so they are demoted by the same
     // rules — skipping them emitted bitfields as whole-word fields (#1396).
     var demoted = ""
-    var i = 0
+    var i: i32 = 0
     while i < count:
         let kind = with_cimport_decl_kind(session, i)
         if kind == CK_STRUCT or kind == CK_UNION:
@@ -1478,7 +1478,7 @@ fn ci_is_directly_demoted(session: i64, idx: i32, count: i32) -> bool:
     if with_ci_record_requires_cxx_semantics(session, decl_cursor): return true
     // Bitfield in any field
     if with_cimport_is_cxx(session) and not ci_record_layout_matches(session, idx, field_count): return true
-    var fi = 0
+    var fi: i32 = 0
     while fi < field_count:
         if with_cimport_struct_field_is_bitfield(session, idx, fi) != 0:
             return true
@@ -1521,7 +1521,7 @@ fn ci_has_demoted_field(session: i64, idx: i32, demoted: &str) -> bool:
         return false
     let decl_cursor = ci_find_decl_cursor_for_idx(session, idx)
     let field_count = with_cimport_struct_field_count(session, idx)
-    var fi = 0
+    var fi: i32 = 0
     while fi < field_count:
         let field_cursor = ci_decl_field_cursor(session, decl_cursor, fi)
         let anon_decl = ci_field_cursor_anon_record_decl(session, field_cursor)
@@ -2139,7 +2139,7 @@ pub fn ci_detect_member_functions(session: i64, count: i32, known_structs: &str)
         else:
             si = si + 1
 
-    var i = 0
+    var i: i32 = 0
     while i < count:
         let kind = with_cimport_decl_kind(session, i)
         if kind == CK_FUNCTION:
@@ -2303,7 +2303,7 @@ fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: &str, method_n
     let ret = ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx))
 
     // Check for unsupported types — skip wrapper if so
-    var pi = 0
+    var pi: i32 = 0
     while pi < param_count:
         let pt = with_cimport_fn_param_type_translated(session, idx, pi)
         if ci_starts_with(pt, "__UNSUPPORTED:"):
@@ -2363,7 +2363,7 @@ fn ci_emit_constructor_wrapper(session: i64, idx: i32, struct_name: &str, method
     let param_count = with_cimport_fn_param_count(session, idx)
     let ret = ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx))
     // Check for unsupported types
-    var pi = 0
+    var pi: i32 = 0
     while pi < param_count:
         let pt = with_cimport_fn_param_type_translated(session, idx, pi)
         if ci_starts_with(pt, "__UNSUPPORTED:"):
@@ -2502,7 +2502,7 @@ pub fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs
     // Naming: Parent_anon_N for unnamed fields, Parent_fieldname for named fields.
     var anon_decls = ""
     var anon_idx = 0
-    var afi = 0
+    var afi: i32 = 0
     while afi < field_count:
         let field_cursor = ci_decl_field_cursor(session, decl_cursor, afi)
         let anon_decl = ci_field_cursor_anon_record_decl(session, field_cursor)
@@ -2524,7 +2524,7 @@ pub fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs
     let pack_cap = if is_really_packed or is_union: 0 else: ci_record_pack_cap(session, idx, field_count)
     var field_str = ""
     var anon_idx2 = 0
-    var fi = 0
+    var fi: i32 = 0
     while fi < field_count:
         if field_str.len() > 0:
             field_str = field_str ++ ", "
@@ -2619,7 +2619,7 @@ fn ci_record_layout_matches(session: i64, idx: i32, field_count: i32):
 fn ci_record_has_field_below_natural(session: i64, idx: i32, field_count: i32) -> bool:
     if with_cimport_struct_is_packed(session, idx) != 0 or with_cimport_decl_kind(session, idx) == CK_UNION:
         return false
-    var fi = 0
+    var fi: i32 = 0
     while fi < field_count:
         let align_n = ci_compute_field_alignment(session, idx, fi, field_count)
         if align_n > 0 and align_n < with_cimport_struct_field_align(session, idx, fi) and with_cimport_struct_field_size(session, idx, fi) != 0:
@@ -2644,7 +2644,7 @@ fn ci_record_pack_cap(session: i64, idx: i32, field_count: i32) -> i64:
         return 0
     var off: i64 = 0
     var max_align: i64 = 1
-    var fi = 0
+    var fi: i32 = 0
     while fi < field_count:
         if with_cimport_struct_field_is_bitfield(session, idx, fi) != 0:
             return 0
@@ -2714,7 +2714,7 @@ fn ci_compute_field_alignment(session: i64, idx: i32, fi: i32, field_count: i32)
 
 fn ci_head_field_alignment(session: i64, idx: i32, field_count: i32, parent_align: i64) -> i64:
     var max_field_align: i64 = 0
-    var fi = 0
+    var fi: i32 = 0
     while fi < field_count:
         let fa = with_cimport_struct_field_align(session, idx, fi)
         if fa > max_field_align:
@@ -2748,7 +2748,7 @@ fn ci_build_struct_fields(session: i64, idx: i32, field_count: i32, known_struct
         return ci_build_one_field(session, idx, 0, known_structs)
     // Build fields iteratively using a helper to avoid mutable var in loop
     var result = ci_build_one_field(session, idx, 0, known_structs)
-    var fi = 1
+    var fi: i32 = 1
     while fi < field_count:
         result = result ++ ", " ++ ci_build_one_field(session, idx, fi, known_structs)
         fi = fi + 1
@@ -3022,7 +3022,7 @@ pub fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
         // Check for bitfields or unsupported field types → demote to opaque
         var anon_has_bitfield = false
         var anon_has_unsupported = false
-        var afi = 0
+        var afi: i32 = 0
         while afi < anon_field_count:
             if with_cimport_typedef_anon_field_is_bitfield(session, idx, afi) != 0:
                 anon_has_bitfield = true
@@ -3179,7 +3179,7 @@ fn ci_offsetof_text_args(expr: &str) -> List[str]:
     let t = ci_trim(ci_strip_parens(expr))
     var fn_name = ""
     var args = ""
-    var call_paren = 0
+    var call_paren: i32 = 0
     while call_paren < t.len() as i32 and t[call_paren] != '(':
         call_paren = call_paren + 1
     if call_paren > 0 and call_paren < t.len() as i32:
@@ -3467,7 +3467,7 @@ fn ci_macro_token_end(text: &str, start: i32):
 
 fn ci_macro_substitute_arguments(session: i64, index: i32, body: &str, args: &List[str]):
     var output = ""
-    var pos = 0
+    var pos: i32 = 0
     while pos < body.len():
         let end = ci_macro_token_end(body, pos)
         let token = body.slice(pos, end)
@@ -3487,11 +3487,11 @@ fn ci_macro_substitute_arguments(session: i64, index: i32, body: &str, args: &Li
 fn ci_expand_private_macro_body(session: i64, indices: &HashMap[str, i32], body: &str, params: &str, disabled: &str, depth: i32) -> str:
     if depth > 16: return ""
     var output = ""
-    var pos = 0
+    var pos: i32 = 0
     while pos < body.len():
         var end = ci_macro_token_end(body, pos)
         let token = body.slice(pos, end)
-        var index = -1
+        var index: i32 = -1
         if ci_is_ident_start(body[pos]) and not params.contains("|" ++ token ++ "|") and not disabled.contains("|" ++ token ++ "|"):
             let found = indices.get(token)
             if found.is_some():
@@ -3560,7 +3560,7 @@ fn ci_macro_expands_empty(session: i64, indices: &HashMap[str, i32], index: i32,
     let name = with_cimport_macro_name(session, index)
     if disabled.contains("|" ++ name ++ "|"): return false
     let body = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, index)))
-    var pos = 0
+    var pos: i32 = 0
     while pos < body.len():
         if ci_is_space(body[pos]):
             pos += 1
@@ -3655,7 +3655,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                     let param_count = with_cimport_macro_param_count(session, fn_index)
                     // Detect variadic macros (... params or __VA_ARGS__ in body)
                     var is_variadic_macro = ci_str_contains(value, "__VA_ARGS__")
-                    var vpi = 0
+                    var vpi: i32 = 0
                     while vpi < param_count:
                         let vpname = with_cimport_macro_param_name(session, fn_index, vpi)
                         if vpname == "..." or vpname == "__VA_ARGS__":
@@ -4256,7 +4256,7 @@ fn ci_parse_add_expr(s: &str, params: &str, known: &str) -> str:
     // Find rightmost + or - at depth 0, but not after another operator (unary)
     var best_pos = -1
     var depth = 0
-    var i = 0
+    var i: i32 = 0
     while i < s.len() as i32:
         let c = s[i]
         if c == 40: depth = depth + 1
@@ -4282,7 +4282,7 @@ fn ci_parse_mul_expr(s: &str, params: &str, known: &str) -> str:
     // Find rightmost * / % at depth 0
     var best_pos = -1
     var depth = 0
-    var i = 0
+    var i: i32 = 0
     while i < s.len() as i32:
         let c = s[i]
         if c == 40: depth = depth + 1
@@ -4596,7 +4596,7 @@ fn ci_scan_ident(s: &str) -> i32:
 // Translate postfix chain: .field, ->field, [expr]
 fn ci_translate_postfix(base: &str, rest: &str, params: &str, known: &str) -> str:
     var result = with_str_clone_ref(base)
-    var pos = 0
+    var pos: i32 = 0
     let slen = rest.len() as i32
     while pos < slen:
         let c = rest[pos]
@@ -4645,7 +4645,7 @@ fn ci_translation_is_bool_valued(expr: &str) -> bool:
         return false
     var depth = 0
     var in_string = false
-    var i = 0
+    var i: i32 = 0
     while i < t.len() as i32:
         let c = t[i]
         if in_string:
@@ -4788,7 +4788,7 @@ fn ci_find_matching_bracket(s: &str, start: i32) -> i32:
 // Find the opening paren of a function call: ident(...)
 // Returns position of '(' or -1.
 fn ci_find_call_paren(s: &str) -> i32:
-    var i = 0
+    var i: i32 = 0
     // Skip identifier chars
     while i < s.len() as i32:
         let c = s[i]
@@ -5460,7 +5460,7 @@ fn ci_find_binary_op_ext(s: &str) -> i32:
     var best_prec = 100
     var best_len = 0
     var paren_depth = 0
-    var idx = 0
+    var idx: i32 = 0
     let slen = s.len() as i32
     while idx < slen:
         let c = s[idx]
@@ -6035,7 +6035,7 @@ fn ci_lookup_known(name: &str, known: &str) -> str:
     // entry — the dominant translate cost on the emitted compiler C
     // (with_str_slice + mmap churn under ci_trans_stmt_via_ir).
     let key = name ++ "="
-    var pos = 0
+    var pos: i32 = 0
     while pos < known.len() as i32:
         if ci_str_matches_at(known, pos, key):
             let val_start = pos + key.len() as i32
@@ -6072,7 +6072,7 @@ fn ci_find_binary_op(s: &str) -> i32:
     var best_prec = 100
     var best_len = 0
     var paren_depth = 0
-    var idx = 0
+    var idx: i32 = 0
     let slen = s.len() as i32
     while idx < slen:
         let c = s[idx]
@@ -7389,7 +7389,7 @@ impl CiStmtPool:
                 let one_idx = exprs.add_string("1")
                 let one = exprs.int_lit(one_idx, 0 as CiTypeId)
                 let operand_ty = exprs.get_type(operand.value_expr)
-                var operand_is_ptr = 0
+                var operand_is_ptr: i32 = 0
                 if ci_cursor_type_is_pointerish(session, operand_cursor) or ((operand_ty as i32) != 0 and types.kind(operand_ty) == CiTypeKind.CT_POINTER):
                     operand_is_ptr = 1
                 let delta_op = ci_incdec_binop(op, with_ci_type_is_unsigned(session, cursor), operand_is_ptr)
@@ -7846,7 +7846,7 @@ impl CiExprPool:
             start = 1
         let end = text.len() as i32 - 1
         let items_start = self.extra_len()
-        var item_count = 0
+        var item_count: i32 = 0
         var i = start
         while i < end:
             var value: i32 = text[i]
@@ -8074,7 +8074,7 @@ fn ci_record_type_field_count(session: i64, ty: i32) -> i32:
     let decl = ci_record_decl_cursor_for_type(session, ty)
     if decl < 0:
         return 0
-    var count = 0
+    var count: i32 = 0
     while ci_decl_field_cursor(session, decl, count) >= 0:
         count = count + 1
     count
@@ -8191,7 +8191,7 @@ fn ci_record_field_cache_store(key: &str, name: &str, ty: &str) -> Unit:
 // bounded by the record nesting C allows (no record contains itself).
 fn ci_record_zero_invalid_field(session: i64, ty_text: &str, ty: i32) -> str:
     let count = ci_init_list_record_field_count(session, ty_text, ty)
-    var fi = 0
+    var fi: i32 = 0
     while fi < count:
         let fname = ci_init_list_record_field_name(session, ty_text, ty, fi)
         let ftext = ci_init_list_record_field_type(session, ty_text, ty, fi)
@@ -8429,7 +8429,7 @@ impl CiExprPool:
         let decl_cursor = ci_find_decl_cursor_for_idx(session, decl_idx)
         let record_is_union = with_cimport_decl_kind(session, decl_idx) == CK_UNION
         var slot_exprs: List[i32] = List.new()
-        var si = 0
+        var si: i32 = 0
         while si < field_count:
             slot_exprs.push(0)
             si = si + 1
@@ -8443,8 +8443,8 @@ impl CiExprPool:
             // otherwise mistake for a `.member =` designator, misrouting the
             // positional value and failing the whole record init.
             let designator = if ci_init_child_has_designator(session, child) != 0: ci_init_child_designator_name(session, child) else: ""
-            var slot = -1
-            var arm_idx = -1
+            var slot: i32 = -1
+            var arm_idx: i32 = -1
             if designator.len() == 0:
                 if ci_init_child_has_designator(session, child) != 0:
                     if g_ci_bail_message.len() == 0:
@@ -8454,7 +8454,7 @@ impl CiExprPool:
                 slot = next_positional
                 next_positional = next_positional + 1
             else:
-                var fi2 = 0
+                var fi2: i32 = 0
                 while fi2 < field_count and slot < 0:
                     if with_cimport_struct_field_is_anonymous_record(session, decl_idx, fi2) == 0:
                         if with_cimport_struct_field_name(session, decl_idx, fi2) == designator:
@@ -8533,7 +8533,7 @@ impl CiExprPool:
             return 0 as CiExprId
         let nc = with_ci_num_children(session, anon_decl)
         var seen = 0
-        var arm_cursor = -1
+        var arm_cursor: i32 = -1
         var i = 0
         while i < nc and arm_cursor < 0:
             let child = with_ci_child(session, anon_decl, i)
@@ -8600,7 +8600,7 @@ impl CiExprPool:
                         return 0 as CiExprId
                     var field_names: List[i32] = List.new()
                     var field_values: List[i32] = List.new()
-                    var fi = 0
+                    var fi: i32 = 0
                     while fi < elem_field_count:
                         let field_name = ci_init_list_record_field_name(session, elem_ty_str, elem_cxtype, fi)
                         let field_type = ci_init_list_record_field_type(session, elem_ty_str, elem_cxtype, fi)
@@ -9482,7 +9482,7 @@ impl CiExprPool:
             let one_idx = self.add_string("1")
             let one = self.int_lit(one_idx, 0 as CiTypeId)
             let child_ty = self.get_type(child_id)
-            var child_is_ptr = 0
+            var child_is_ptr: i32 = 0
             if ci_cursor_type_is_pointerish(session, child_cursor) or ((child_ty as i32) != 0 and types.kind(child_ty) == CiTypeKind.CT_POINTER):
                 child_is_ptr = 1
             let delta_op = ci_incdec_binop(op, with_ci_type_is_unsigned(session, cursor), child_is_ptr)
@@ -9992,7 +9992,7 @@ fn ci_record_index_ensure(session: i64):
     var by_struct: HashMap[str, i32] = HashMap.new()
     var by_typedef: HashMap[str, i32] = HashMap.new()
     let count = with_cimport_decl_count(session)
-    var i = 0
+    var i: i32 = 0
     while i < count:
         let kind = with_cimport_decl_kind(session, i)
         if kind == CK_STRUCT or kind == CK_UNION:
@@ -10060,7 +10060,7 @@ fn ci_record_all_fields_defaulted(session: i64, ty_name: &str) -> bool:
     if tidx >= 0 and with_cimport_typedef_anon_is_union(session, tidx) == 0:
         let n = with_cimport_typedef_anon_record_field_count(session, tidx)
         if n == 0: return false
-        var fi = 0
+        var fi: i32 = 0
         while fi < n:
             if ci_default_for_type(with_cimport_typedef_anon_field_type(session, tidx, fi)).len() == 0:
                 return false
@@ -10506,7 +10506,7 @@ impl CiTypePool:
         if record_name.len() == 0:
             return 0 as CiTypeId
         let count = ci_type_field_count(session, record_name)
-        var i = 0
+        var i: i32 = 0
         while i < count:
             let c_field = ci_type_field_name(session, record_name, i)
             if c_field == field or ci_escape_reserved(c_field) == field:
@@ -11595,7 +11595,7 @@ impl CiStmtPool:
                 return self.lower_value_expr_ir(session, inner, exprs, types, scope)
 
         if kind == CXK_IMPLICIT_CAST:
-            var inner_cursor = -1
+            var inner_cursor: i32 = -1
             if nc == 1:
                 inner_cursor = with_ci_child(session, cursor, 0)
             else if nc > 0:
@@ -11844,7 +11844,7 @@ impl CiStmtPool:
                     let one_idx = exprs.add_string("1")
                     let one = exprs.int_lit(one_idx, 0 as CiTypeId)
                     let operand_ty = exprs.get_type(operand.value_expr)
-                    var operand_is_ptr = 0
+                    var operand_is_ptr: i32 = 0
                     if ci_cursor_type_is_pointerish(session, operand_cursor) or ((operand_ty as i32) != 0 and types.kind(operand_ty) == CiTypeKind.CT_POINTER):
                         operand_is_ptr = 1
                     let delta_op = ci_incdec_binop(op, with_ci_type_is_unsigned(session, cursor), operand_is_ptr)
@@ -12638,7 +12638,7 @@ impl CiStmtPool:
         let subject_id = prepared_subject.value_expr
 
         var arm_records: List[i32] = List.new()
-        var arm_count = 0
+        var arm_count: i32 = 0
         var default_body_id: CiStmtId = 0 as CiStmtId
         var has_default_body = false
         var i = 0
@@ -13900,7 +13900,7 @@ fn ci_fn_definition_cursor(session: i64, decl_idx: i32) -> i32:
     let root = with_ci_root_cursor(session)
     let n = with_ci_num_children(session, root)
     let target_name = with_cimport_decl_name(session, decl_idx)
-    var found_cursor = -1
+    var found_cursor: i32 = -1
     var i = 0
     while i < n:
         let child = with_ci_child(session, root, i)
@@ -13959,7 +13959,7 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
 
     // Find the CompoundStmt child (the function body)
     let nc = with_ci_num_children(session, found_cursor)
-    var body_cursor = -1
+    var body_cursor: i32 = -1
     var i = 0
     while i < nc:
         let child = with_ci_child(session, found_cursor, i)
@@ -13992,7 +13992,7 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
     var param_rebinds = ""
     let fn_nc = with_ci_num_children(session, found_cursor)
     var cpi = 0
-    var param_index = 0
+    var param_index: i32 = 0
     while cpi < fn_nc:
         let child = with_ci_child(session, found_cursor, cpi)
         if with_ci_cursor_kind(session, child) == 10:  // CXCursor_ParmDecl
@@ -14767,7 +14767,7 @@ fn ci_is_concatenated_string(s: &str) -> bool:
 // `"a" "b"` concatenation (safe to join) from `"a" MACRO(x) "b"` (must expand).
 fn ci_concat_is_pure_literals(s: &str) -> bool:
     let t = ci_trim(s)
-    var i = 0
+    var i: i32 = 0
     let slen = t.len() as i32
     var saw = false
     while i < slen:
@@ -15183,7 +15183,7 @@ fn ci_resolve_pp_conditionals(src: &str) -> str:
                 if c < 0:
                     return ""
                 let par = if depth == 0: true else: top_eff
-                var v = 0
+                var v: i32 = 0
                 if par and c == 1: v = v + 1
                 if c == 1: v = v + 2
                 if par: v = v + 4
@@ -15194,7 +15194,7 @@ fn ci_resolve_pp_conditionals(src: &str) -> str:
                 let c = ci_pp_eval_if_expr(t.slice(5, t.len()))
                 if c < 0:
                     return ""
-                var v = 0
+                var v: i32 = 0
                 if top_par and not top_taken and c == 1: v = v + 1
                 if top_taken or c == 1: v = v + 2
                 if top_par: v = v + 4
@@ -15202,7 +15202,7 @@ fn ci_resolve_pp_conditionals(src: &str) -> str:
             else if ci_starts_with(t, "#else"):
                 if depth == 0:
                     return ""
-                var v = 2
+                var v: i32 = 2
                 if top_par and not top_taken: v = v + 1
                 if top_par: v = v + 4
                 stack = stack.slice(0, (depth - 1) as i64) ++ ci_pp_digit(v)
@@ -15358,7 +15358,7 @@ fn ci_is_stringify_macro(session: i64, name: &str, depth: i32) -> bool:
     if macro_session == 0:
         return false
     let count = with_cimport_macro_count(macro_session)
-    var i = 0
+    var i: i32 = 0
     while i < count:
         if with_cimport_macro_is_fn_like(macro_session, i) != 0:
             if with_cimport_macro_name(macro_session, i) == name:
@@ -15479,7 +15479,7 @@ fn ci_string_text_mentions_null_escape(s: &str) -> bool:
     false
 
 fn ci_first_string_literal_token(s: &str) -> str:
-    var pos = 0
+    var pos: i32 = 0
     let slen = s.len() as i32
     while pos < slen:
         if s[pos] == 34:
@@ -15621,7 +15621,7 @@ fn ci_expand_string_macro_sequence_depth(session: i64, s: &str, depth: i32) -> s
     if ci_is_string_literal(cleaned):
         return ci_concat_strings(cleaned)
     var segments = ""
-    var pos = 0
+    var pos: i32 = 0
     let slen = cleaned.len() as i32
     var found_any = false
     while pos < slen:
@@ -15963,7 +15963,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
             expand_i = expand_i + 1
         var rendered_parts: List[str] = List.new()
         rendered_parts.push("[")
-        var i = 0
+        var i: i32 = 0
         while i < expanded_items.len() as i32:
             let item = ci_translate_c_initializer_for_cursor_type(session, expanded_items[i], elem_ty, elem_cxtype, ci_init_list_item_cursor(session, init_cursor, i, expanded_items.len()))
             if item.len() == 0:
@@ -15981,7 +15981,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
         var field_parts: List[str] = List.new()
         field_parts.push(with_str_clone_ref(ty))
         field_parts.push(" { ")
-        var i = 0
+        var i: i32 = 0
         while i < items.len() as i32:
             if i >= field_count:
                 return ""
@@ -16212,7 +16212,7 @@ fn ci_macro_arg_for_initializer_param(session: i64, var_cursor: i32, param_name:
         return ""
     let macro_session = if g_migrate_macro_session != 0: g_migrate_macro_session else: session
     let count = with_cimport_macro_count(macro_session)
-    var macro_idx = -1
+    var macro_idx: i32 = -1
     var i = 0
     while i < count:
         if with_cimport_macro_is_fn_like(macro_session, i) != 0 and with_cimport_macro_name(macro_session, i) == macro_name:
@@ -16223,7 +16223,7 @@ fn ci_macro_arg_for_initializer_param(session: i64, var_cursor: i32, param_name:
         return ""
     let param_count = with_cimport_macro_param_count(macro_session, macro_idx)
     var param_idx = -1
-    var pi = 0
+    var pi: i32 = 0
     while pi < param_count:
         if with_cimport_macro_param_name(macro_session, macro_idx, pi) == param:
             param_idx = pi

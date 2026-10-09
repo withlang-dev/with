@@ -241,7 +241,7 @@ pub fn facade_profile_apply(pool: AstPool, intern: InternPool, ci: &List[i32], f
         if not received: continue
         if facade_render_is_resource_op(p, intern, names[k]): continue
         let candidates: List[i32] = List.new()
-        var rule_of = 0
+        var rule_of: i32 = 0
         for ri in 0..rule_count:
             let rule = p.get_extra(rule_start + ri)
             let rx = p.get_data1(rule as NodeId)

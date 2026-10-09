@@ -54,7 +54,7 @@ type UatStep {
     verb: i32,
     a: str,       // the verb's first operand: a command line, a path, a name, text
     b: str,       // its second: a fixture, a destination, a value, an int as text
-    line: i32,    // 1-based, for the report
+    line: isize,  // 1-based, for the report
 }
 
 type UatScenario {
@@ -115,7 +115,7 @@ fn uat_indented_block(lines: &List[str], at: i32) -> (str, i32):
     // A block ends where the file does; trailing blank lines are not content.
     (uat_trim_trailing_line_endings(out) ++ "\n", i)
 
-fn uat_step(verb: i32, a: str, b: str, line: i32) -> UatStep: UatStep { verb, a, b, line }
+fn uat_step(verb: i32, a: str, b: str, line: isize) -> UatStep: UatStep { verb, a, b, line }
 
 // A decimal integer with an optional sign; (false, 0) otherwise.
 fn uat_parse_int(text: &str) -> (bool, i64):
@@ -144,7 +144,7 @@ fn uat_sort_strings(items: List[str]) -> List[str]:
             j = j - 1
     sorted
 
-fn uat_error(sc: UatScenario, line: i32, message: &str) -> UatScenario:
+fn uat_error(sc: UatScenario, line: isize, message: &str) -> UatScenario:
     var out = sc
     out.problem = f"{out.path}:{line}: {message}"
     out
@@ -162,7 +162,7 @@ fn uat_parse(path: &str, text: &str) -> UatScenario:
     var lines: List[str] = List.new()
     for raw in text.split("\n"):
         lines.push(uat_trim_trailing_line_endings(raw).clone())
-    var i = 0
+    var i: i32 = 0
     var header_done = false
     while i < lines.len() as i32:
         let lineno = i + 1
@@ -385,7 +385,7 @@ type UatOutcome {
     verdict: str,     // "pass", "skip", "FAIL"
     detail: str,      // the failed step's line, or the skip reason
     stderr_path: str,
-    steps: i32,
+    steps: isize,
     human: List[str],
 }
 
@@ -405,7 +405,7 @@ fn uat_write_text(path: &str, text: &str) -> i32:
 
 fn uat_read_text(path: &str) -> str: with_fs_read_file(path)
 
-fn uat_fail(steps: i32, step: &UatStep, what: &str, stderr_path: &str, human: List[str]) -> UatOutcome:
+fn uat_fail(steps: isize, step: &UatStep, what: &str, stderr_path: &str, human: List[str]) -> UatOutcome:
     UatOutcome { verdict: "FAIL", detail: f"step {steps} (line {step.line}): {what}", stderr_path: stderr_path.clone(), steps, human }
 
 // The toolchain a `run:` line's leading `with` names: WITH_UAT_WITH, else

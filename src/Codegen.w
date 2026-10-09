@@ -1451,7 +1451,7 @@ impl Codegen:
         else:
             wl_add_module_flag_int(self.llmod, "Dwarf Version", 5)
 
-        let is_opt = 0
+        let is_opt: i32 = 0
         self.di_compile_unit = wl_di_create_compile_unit(
             self.di_builder, self.di_file, "with", is_opt, 5, wl_dwarf_lang_with())
 
@@ -2995,7 +2995,7 @@ impl Codegen:
                     return wl_const_int(i1_ty, 1, 0)
                 return wl_const_int(i1_ty, 0, 0)
             var result = wl_const_int(i1_ty, 1, 0)
-            var fi = 0
+            var fi: i32 = 0
             while fi < field_count:
                 let lf = self.tuple_elem_extract(lhs, fi)
                 let rf = self.tuple_elem_extract(rhs, fi)
@@ -3015,7 +3015,7 @@ impl Codegen:
                 return wl_const_int(i1_ty, 0, 0)
             let elem_ty = wl_get_element_type(lhs_ty)
             var result = wl_const_int(i1_ty, 1, 0)
-            var ai = 0
+            var ai: i32 = 0
             while ai < elem_count:
                 let lf = wl_build_extract_value(self.builder, lhs, ai)
                 let rf = wl_build_extract_value(self.builder, rhs, ai)
@@ -5105,7 +5105,7 @@ impl Codegen:
         let body: List[i64] = List.new()
         let positions: List[i32] = List.new()
         var at: i64 = 0
-        var packed = 0
+        var packed: i32 = 0
         for i in 0..n:
             let elem = elem_tys[i]
             let off = offsets[i]

@@ -203,7 +203,7 @@ fn flatten_nested_arrays_once(source: &str) -> str:
             continue
         // The outer `; d_out]`.
         depth = 0
-        var outer_close = -1
+        var outer_close: i32 = -1
         var k = inner_close + 2
         while k < n:
             let t = tokens.get_tag(k)
@@ -228,9 +228,9 @@ pub fn format_source_styled(input: &str, style: i32) -> str:
     var out = ""
     var at_line_start = true
     var blank_lines = 0
-    var prev_tag = 0
+    var prev_tag: i32 = 0
     var prev_was_newline = false
-    var line_indent = 0
+    var line_indent: i32 = 0
     var block_kw_active = false
     var close_stack: List[i32] = List.new()
     var suppress_stack: List[i32] = List.new()
@@ -242,7 +242,7 @@ pub fn format_source_styled(input: &str, style: i32) -> str:
     // bound annotation, never a block introducer.
     var group_depth = 0
 
-    var i = 0
+    var i: i32 = 0
     while i < count:
         let tag = tokens.get_tag(i)
         let start = tokens.get_start(i)

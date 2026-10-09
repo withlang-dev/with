@@ -37,17 +37,17 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = s
     0
 
-@[weak] pub fn with_cimport_decl_kind(s: i64, i: i32) -> i32:
+@[weak] pub fn with_cimport_decl_kind(s: i64, i: isize) -> i32:
     let _ = s
     let _ = i
     0
 
-@[weak] pub fn with_cimport_decl_name(s: i64, i: i32) -> str:
+@[weak] pub fn with_cimport_decl_name(s: i64, i: isize) -> str:
     let _ = s
     let _ = i
     empty_str()
 
-@[weak] pub fn with_cimport_decl_cursor(s: i64, i: i32) -> i32:
+@[weak] pub fn with_cimport_decl_cursor(s: i64, i: isize) -> i32:
     let _ = s
     let _ = i
     -1
@@ -185,7 +185,7 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = c
     0
 
-@[weak] pub fn with_ci_child(s: i64, c: i32, i: i32) -> i32:
+@[weak] pub fn with_ci_child(s: i64, c: i32, i: isize) -> i32:
     let _ = s
     let _ = c
     let _ = i
@@ -401,12 +401,12 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = s
     0
 
-@[weak] pub fn with_cimport_macro_name(s: i64, i: i32) -> str:
+@[weak] pub fn with_cimport_macro_name(s: i64, i: isize) -> str:
     let _ = s
     let _ = i
     empty_str()
 
-@[weak] pub fn with_cimport_macro_value(s: i64, i: i32) -> str:
+@[weak] pub fn with_cimport_macro_value(s: i64, i: isize) -> str:
     let _ = s
     let _ = i
     empty_str()
@@ -421,7 +421,7 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = i
     0
 
-@[weak] pub fn with_cimport_macro_is_fn_like(s: i64, i: i32) -> i32:
+@[weak] pub fn with_cimport_macro_is_fn_like(s: i64, i: isize) -> i32:
     let _ = s
     let _ = i
     0
@@ -450,7 +450,7 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = i
     str_int()
 
-@[weak] pub fn with_cimport_fn_param_type_translated(s: i64, i: i32, p: i32) -> str:
+@[weak] pub fn with_cimport_fn_param_type_translated(s: i64, i: isize, p: isize) -> str:
     let _ = s
     let _ = i
     let _ = p
@@ -461,7 +461,7 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = i
     str_void()
 
-@[weak] pub fn with_cimport_struct_field_type_translated(s: i64, i: i32, f: i32) -> str:
+@[weak] pub fn with_cimport_struct_field_type_translated(s: i64, i: isize, f: isize) -> str:
     let _ = s
     let _ = i
     let _ = f
@@ -482,7 +482,7 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = i
     str_i32()
 
-@[weak] pub fn with_cimport_struct_field_is_anonymous_record(s: i64, i: i32, f: i32) -> i32:
+@[weak] pub fn with_cimport_struct_field_is_anonymous_record(s: i64, i: isize, f: isize) -> i32:
     let _ = s
     let _ = i
     let _ = f

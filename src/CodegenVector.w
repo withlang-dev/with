@@ -125,7 +125,7 @@ impl Codegen:
             if op == BinaryOp.OP_MUL: return wl_build_fmul(self.builder, l, r)
             if op == BinaryOp.OP_DIV: return wl_build_fdiv(self.builder, l, r)
             if op == BinaryOp.OP_MOD: return wl_build_frem(self.builder, l, r)
-            var pred = -1
+            var pred: i32 = -1
             if op == BinaryOp.OP_EQ: pred = wl_real_oeq()
             if op == BinaryOp.OP_NEQ: pred = wl_real_une()
             if op == BinaryOp.OP_LT: pred = wl_real_olt()
@@ -137,7 +137,7 @@ impl Codegen:
             return self.cg_vector_unsupported("float vector operator")
         let unsigned = self.cg_lane_is_unsigned(lane)
         let width = wl_get_int_type_width(elem_ty)
-        var ipred = -1
+        var ipred: i32 = -1
         if op == BinaryOp.OP_EQ: ipred = wl_int_eq()
         if op == BinaryOp.OP_NEQ: ipred = wl_int_ne()
         if op == BinaryOp.OP_LT: ipred = if unsigned: wl_int_ult() else: wl_int_slt()

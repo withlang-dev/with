@@ -1983,7 +1983,7 @@ unsafe fn collect_field(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i3
     clang_disposeString(type_str)
     CXChildVisit_Continue
 
-unsafe fn ensure_fields_cached(s: *mut CImportSession, idx: i32):
+unsafe fn ensure_fields_cached(s: *mut CImportSession, idx: isize):
     if idx < 0 or idx >= (*s).decl_count: return
     if (*s).caches as i64 == 0:
         let size = (*s).decl_count as i64 * sizeof[DeclCache]()
@@ -2266,7 +2266,7 @@ pub fn with_cimport_set_resource_dir(path: &str) -> Unit:
 
 // Every declaration parse and macro probe uses the same language and target.
 unsafe fn cimport_build_args(args: *mut *const u8, cxx: bool):
-    var n = 0
+    var n: i32 = 0
     // A named C model replaces the host's sysroot and library directories.
     let sysroot = if cimport_has_c_model(): 0 as *const u8 else: get_sdk_path()
     if sysroot as i64 != 0:
@@ -2528,7 +2528,7 @@ pub fn with_cimport_decl_count(session: i64) -> i32:
         if s as i64 == 0: return 0
         (*s).decl_count
 
-pub fn with_cimport_decl_kind(session: i64, idx: i32) -> i32:
+pub fn with_cimport_decl_kind(session: i64, idx: isize) -> i32:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
@@ -2576,7 +2576,7 @@ pub fn with_ci_record_requires_cxx_semantics(session: i64, cursor_idx: i32) -> b
         let _ = clang_visitChildren(cursor, collect_cxx_record_semantics as *const u8, &raw mut unsupported as *mut bool as *mut u8)
         unsupported
 
-pub fn with_cimport_decl_name(session: i64, idx: i32) -> str:
+pub fn with_cimport_decl_name(session: i64, idx: isize) -> str:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
@@ -2622,7 +2622,7 @@ pub fn with_cimport_decl_is_unused_anon_record(session: i64, idx: i32) -> i32:
         if clang_Cursor_isAnonymous(cursor) == 0: return 0
         if session_file_scope_anon_record_name(s, cursor) as i64 != 0: 0 else: 1
 
-pub fn with_cimport_decl_cursor(session: i64, idx: i32) -> i32:
+pub fn with_cimport_decl_cursor(session: i64, idx: isize) -> i32:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return -1
@@ -2784,7 +2784,7 @@ pub fn with_cimport_fn_is_noreturn(session: i64, idx: i32) -> i32:
 
 // ── Translated type functions ───────────────────────────────
 
-pub fn with_cimport_fn_param_type_translated(session: i64, idx: i32, param: i32) -> str:
+pub fn with_cimport_fn_param_type_translated(session: i64, idx: isize, param: isize) -> str:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
@@ -3001,7 +3001,7 @@ pub fn with_cimport_struct_align(session: i64, idx: i32) -> i64:
         let ty = clang_getCursorType(cursor)
         clang_Type_getAlignOf(ty)
 
-pub fn with_cimport_struct_field_type_translated(session: i64, idx: i32, field: i32) -> str:
+pub fn with_cimport_struct_field_type_translated(session: i64, idx: isize, field: isize) -> str:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0: return ""
@@ -3759,13 +3759,13 @@ pub fn with_cimport_macro_count(session: i64) -> i32:
         if ms as i64 == 0: return 0
         (*ms).count
 
-pub fn with_cimport_macro_name(session: i64, idx: i32) -> str:
+pub fn with_cimport_macro_name(session: i64, idx: isize) -> str:
     unsafe:
         let ms = session as *mut MacroSession
         if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return ""
         make_str(*(((*ms).names as i64 + idx as i64 * 8) as *const *const u8))
 
-pub fn with_cimport_macro_value(session: i64, idx: i32) -> str:
+pub fn with_cimport_macro_value(session: i64, idx: isize) -> str:
     unsafe:
         let ms = session as *mut MacroSession
         if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return ""
@@ -3791,7 +3791,7 @@ pub fn with_cimport_macro_is_system(session: i64, idx: i32) -> i32: macro_origin
 // actual input file. Main-file macros belong to that driver, not the corpus.
 pub fn cimport_macro_is_from_input(session: i64, idx: i32) -> i32: macro_origin_flags(session, idx) & 2
 
-pub fn with_cimport_macro_is_fn_like(session: i64, idx: i32) -> i32:
+pub fn with_cimport_macro_is_fn_like(session: i64, idx: isize) -> i32:
     unsafe:
         let ms = session as *mut MacroSession
         if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return 0
@@ -3863,7 +3863,7 @@ pub fn with_cimport_var_is_threadlocal(session: i64, idx: i32) -> i32:
 
 // ── Anonymous struct/union in struct fields ──────────────────
 
-pub fn with_cimport_struct_field_is_anonymous_record(session: i64, idx: i32, field: i32) -> i32:
+pub fn with_cimport_struct_field_is_anonymous_record(session: i64, idx: isize, field: isize) -> i32:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0: return 0
@@ -4092,7 +4092,7 @@ pub fn with_ci_num_children(session: i64, cursor_idx: i32) -> i32:
         if cursor_idx >= (*s).children_cache_cap: return 0
         *(((*s).child_counts as i64 + cursor_idx as i64 * 4) as *const i32)
 
-pub fn with_ci_child(session: i64, cursor_idx: i32, child_index: i32) -> i32:
+pub fn with_ci_child(session: i64, cursor_idx: i32, child_index: isize) -> i32:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1

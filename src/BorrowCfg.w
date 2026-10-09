@@ -193,7 +193,7 @@ fn build_block(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     if stmt_count == 0 and tail == 0:
         return graph.add_node(CfgNodeKind.Expr, start, end)
 
-    var prev = -1
+    var prev: i32 = -1
     var first = -1
     for i in 0..stmt_count:
         let stmt_node = pool.get_extra(extra_start + i)

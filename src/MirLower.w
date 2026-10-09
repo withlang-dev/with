@@ -1124,7 +1124,7 @@ impl MirBuilder:
 
     // The same, for the entries queued before index `limit`.
     mut fn emit_payload_resets_before(base_local: i32, limit: i32):
-        var i = 0
+        var i: i32 = 0
         var end = limit
         while i < end:
             let place: i32 = self.pending_payload_reset_places[i]
@@ -1247,9 +1247,9 @@ impl MirBuilder:
             self.stmt_temp_locals.pop()
             self.stmt_temp_drop_depths.pop()
         self.stmt_temp_starts.pop()
-        var reset_start = 0
-        var reset_field_start = 0
-        var reset_temp_start = 0
+        var reset_start: i32 = 0
+        var reset_field_start: i32 = 0
+        var reset_temp_start: i32 = 0
         if self.stmt_reset_starts.len() > 0:
             reset_start = self.stmt_reset_starts[(self.stmt_reset_starts.len() as i32 - 1)]
             reset_field_start = self.stmt_reset_field_starts[(self.stmt_reset_field_starts.len() as i32 - 1)]
@@ -2383,7 +2383,7 @@ impl MirBuilder:
             // whole expression to void when sema metadata is missing.
             let m_arms_start = self.ast.get_data1(node)
             let m_arms_count = self.ast.get_data2(node)
-            var match_ty = 0
+            var match_ty: i32 = 0
             if m_arms_count > 0:
                 for mi in 0..m_arms_count:
                     let arm_node = self.ast.get_extra(m_arms_start + mi)
@@ -2525,7 +2525,7 @@ impl MirBuilder:
         var current_ty = self.body.local_type_ids[local_id] as i32
         let proj_start: i32 = self.body.place_proj_starts[place_id]
         let proj_count = self.body.place_proj_counts[place_id]
-        var active_variant_idx = -1
+        var active_variant_idx: i32 = -1
 
         for pi in 0..proj_count:
             let proj_kind = self.body.proj_kinds[(proj_start + pi)]
@@ -3239,7 +3239,7 @@ impl MirBuilder:
         if regex_node == 0:
             return
         let capture_count = if self.sema.regex_capture_counts.contains(regex_node): self.sema.regex_capture_counts.get(regex_node).unwrap() else: 0
-        var i = 0
+        var i: i32 = 0
         while i <= capture_count:
             let sym = self.sema.pool_lookup_symbol("$" ++ i.to_string())
             if sym != 0:
@@ -3780,7 +3780,7 @@ impl MirBuilder:
                 let lowered_op = self.lower_expr(expr_node)
                 var expr_op = self.observe_interpolant(lowered_op, self.ast.get_start(expr_node))
                 var resolved_ty = if self.expr_type(expr_node) > 0: self.sema.resolve_alias(self.expr_type(expr_node)) else: 0
-                var borrowed_str_ref_op = -1
+                var borrowed_str_ref_op: i32 = -1
                 // A view interpolant formats its POINTEE — formatting observes
                 // (D22 transparency); reference bits must never reach the
                 // formatter (#728: stage2's own MIR dump printed sym garbage).
@@ -4016,7 +4016,7 @@ impl MirBuilder:
             let is_mut = flags % 2
             // Prefer an explicit type annotation. Otherwise infer from the
             // unwrapped initializer expression instead of the raw comptime wrapper.
-            var gty = 0
+            var gty: i32 = 0
             let type_extra_packed = flags / 16
             if type_extra_packed > 0:
                 let type_node = self.ast.get_extra(type_extra_packed - 1)
@@ -4648,7 +4648,7 @@ impl MirBuilder:
             if field_sym == 0:
                 continue
             let operand_id: i32 = self.body.agg_field_operands[(start + i)]
-            var field_ty = 0
+            var field_ty: i32 = 0
             let aggregate_ty = if aggregate_place < self.body.place_sema_types.len(): self.body.place_sema_types[aggregate_place] else: 0
             if aggregate_ty != 0:
                 field_ty = self.struct_field_type(aggregate_ty, field_sym)
@@ -5231,7 +5231,7 @@ impl MirBuilder:
         // later `x == "..."` compared "" (same class as the =~ subject fix;
         // the helper reads named places in place, rvalues still materialize).
         let lhs_place = self.lower_regex_subject_place(lhs_expr)
-        var acc = 0
+        var acc: i32 = 0
         var has_acc = 0
         for i in 0..elem_count:
             let elem_node = self.ast.get_extra(extra_start + i)
@@ -5262,7 +5262,7 @@ impl MirBuilder:
         let lhs_place = self.materialize_operand(lhs_op, lhs_ty, self.ast.get_start(lhs_expr))
         let rhs_op = self.lower_expr(rhs_expr)
         let rhs_place = self.materialize_operand(rhs_op, array_ty, self.ast.get_start(rhs_expr))
-        var acc = 0
+        var acc: i32 = 0
         var has_acc = 0
         for i in 0..elem_count:
             let lhs_copy = self.body.new_operand(OperandKind.OK_COPY, lhs_place)
@@ -5924,7 +5924,7 @@ impl MirBuilder:
 
     mut fn lower_user_deref_result_place(place: i32, current_ty: i32, deref_info: &SemaDerefInfo, node: i32) -> i32:
         let result_ref_ty = if deref_info.target_ty != 0: self.sema.find_exact_type(TypeKind.TY_REF, deref_info.target_ty, 0, 0) as i32 else: deref_info.result_ref_ty
-        var recv_ref_ty = 0
+        var recv_ref_ty: i32 = 0
         if self.sema.generic_fn_node_for_symbol(deref_info.deref_fn) == 0:
             let sig_idx = self.sema.get_sig(deref_info.deref_fn)
             if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 0:
@@ -6402,7 +6402,7 @@ impl MirBuilder:
         let target_base = self.literal_target_base_sym(target_ty)
         if target_base != self.sema.syms.list and target_base != self.sema.syms.hashset and self.is_btreeset_base_sym(target_base) == 0:
             return -1
-        var elem_ty = 0
+        var elem_ty: i32 = 0
         let resolved = self.sema.resolve_alias(target_ty)
         if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) > 0:
             elem_ty = self.sema.get_generic_inst_arg(resolved as i32, 0)
@@ -6495,8 +6495,8 @@ impl MirBuilder:
         let pair_count = self.ast.get_data1(node)
         let target_ty = self.expr_type(node)
         let resolved = self.sema.resolve_alias(target_ty)
-        var key_ty = 0
-        var val_ty = 0
+        var key_ty: i32 = 0
+        var val_ty: i32 = 0
         if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) == 2:
             key_ty = self.sema.get_generic_inst_arg(resolved as i32, 0)
             val_ty = self.sema.get_generic_inst_arg(resolved as i32, 1)
@@ -6549,7 +6549,7 @@ impl MirBuilder:
             self.lower_expr(start_node)
         else:
             self.int_const_operand(0, self.sema.ty_i64)
-        var end_op = 0
+        var end_op: i32 = 0
         if end_node != 0:
             end_op = self.lower_expr(end_node)
         else:
@@ -6817,7 +6817,7 @@ impl MirBuilder:
         if target == 0:
             return 0
         let kind = self.ast.kind(target)
-        var base = 0
+        var base: i32 = 0
         if kind == NodeKind.NK_UNARY and self.ast.get_data0(target) == UnaryOp.UOP_DEREF:
             base = self.ast.get_data1(target)
         else if kind == NodeKind.NK_INDEX:
@@ -6995,7 +6995,7 @@ impl MirBuilder:
             self.expected_type = bind_ty
             // #1244: `let s: &T = place` is a borrow (Sema recorded the
             // auto-ref); take the place's address like a call argument.
-            var rhs_op = -1
+            var rhs_op: i32 = -1
             if self.sema.auto_ref_binding_values.contains(rhs_expr):
                 rhs_op = self.lower_auto_ref_call_arg(rhs_expr, bind_ty)
             if rhs_op < 0:
@@ -7560,9 +7560,9 @@ impl MirBuilder:
         if want_result != 0: result else: self.unit_operand()
 
     mut fn lower_if(cond_expr: i32, then_expr: i32, else_expr_opt: i32, node: i32, want_result: i32) -> i32:
-        var cond_op = 0
-        var regex_capture_node = 0
-        var regex_captures_opt_place = -1
+        var cond_op: i32 = 0
+        var regex_capture_node: i32 = 0
+        var regex_captures_opt_place: i32 = -1
         let cond_frame = self.push_stmt_temp_frame()
         if self.ast.kind(cond_expr) == NodeKind.NK_MATCH_OP:
             let lhs = self.ast.get_data0(cond_expr)
@@ -7794,7 +7794,7 @@ impl MirBuilder:
         let break_bb = self.new_block()
         let loop_ty = if self.sema.typed_expr_types.contains(node): self.sema.typed_expr_types.get(node).unwrap() else: self.sema.ty_void as i32
         let has_result = loop_ty != 0 and loop_ty != self.sema.ty_void and loop_ty != self.sema.ty_never
-        var result_place = -1
+        var result_place: i32 = -1
         if has_result:
             let result_tmp = self.new_temp(loop_ty)
             result_place = self.place_for_local(result_tmp)
@@ -7845,9 +7845,9 @@ impl MirBuilder:
         self.push_control_target(self.ast.get_data2(node), ControlTargetKind.CT_LOOP, cond_bb, exit_bb, -1)
 
         self.switch_to(cond_bb)
-        var cond_op = 0
-        var regex_capture_node = 0
-        var regex_captures_opt_place = -1
+        var cond_op: i32 = 0
+        var regex_capture_node: i32 = 0
+        var regex_captures_opt_place: i32 = -1
         let cond_frame = self.push_stmt_temp_frame()
         if self.ast.kind(cond_expr) == NodeKind.NK_MATCH_OP:
             let lhs = self.ast.get_data0(cond_expr)
@@ -8083,10 +8083,10 @@ impl MirBuilder:
         // that; the template sym alone names no lowered function.
         let next_sym = self.pool.intern("next")
         let recorded_mono = self.sema.iter_next_mono_syms.get(for_node)
-        var recorded_mono_sym = 0
+        var recorded_mono_sym: i32 = 0
         if recorded_mono.is_some(): recorded_mono_sym = recorded_mono.unwrap()
         let recorded_sig = self.sema.iter_next_sigs.get(for_node)
-        var recorded_sig_idx = -1
+        var recorded_sig_idx: i32 = -1
         if recorded_sig.is_some(): recorded_sig_idx = recorded_sig.unwrap()
         // §13.5 (#1837): over a collection Sema resolved an implicit `.iter()`
         // for (for_iter_*), the loop steps the iterator that call returns —
@@ -8109,7 +8109,7 @@ impl MirBuilder:
         let resolved_iter = self.sema.resolve_alias(stepped_ty)
         let owner_sym = self.sema.method_owner_symbol_for_type(resolved_iter as i32)
         let sema_next_sym = self.sema.pool_lookup_symbol("next")
-        var next_ret_ty = 0
+        var next_ret_ty: i32 = 0
         if recorded_sig_idx >= 0:
             next_ret_ty = self.sema.sig_return_type(recorded_sig_idx)
         if next_ret_ty == 0 and owner_sym != 0 and sema_next_sym > 0:
@@ -8198,7 +8198,7 @@ impl MirBuilder:
         let iter_sig: i32 = self.sema.for_iter_sigs.get(key_node).unwrap()
         let iter_mono: i32 = self.sema.for_iter_monos.get(key_node) ?? 0
         let iterator_ty: i32 = self.sema.for_iter_types.get(key_node).unwrap()
-        var recv_op = -1
+        var recv_op: i32 = -1
         if self.callee_has_move_self(iter_fn):
             recv_op = self.body.new_operand(OperandKind.OK_MOVE, self.lower_expr_place(iterable))
             self.consume_moved_operand(recv_op)
@@ -8607,7 +8607,7 @@ impl MirBuilder:
             let val_expr = self.ast.get_extra(comp_start + 1)
             let target_ty = self.expr_type(comp_node)
             let resolved = self.sema.resolve_alias(target_ty)
-            var key_ty = 0
+            var key_ty: i32 = 0
             var val_ty = out_elem_ty
             if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) == 2:
                 key_ty = self.sema.get_generic_inst_arg(resolved as i32, 0)
@@ -8904,7 +8904,7 @@ impl MirBuilder:
         let iter_ty = self.expr_type(iter_expr)
         let elem_ty = self.clause_element_type(comp_node, clause_index)
         let ivk = self.ast.kind(iter_expr)
-        var list_place = 0
+        var list_place: i32 = 0
         if ivk == NodeKind.NK_IDENT or ivk == NodeKind.NK_FIELD_ACCESS or ivk == NodeKind.NK_INDEX:
             list_place = self.lower_expr_place(iter_expr)
         else:
@@ -8971,10 +8971,10 @@ impl MirBuilder:
         // the clause's iterable expression node — dispatch exactly that.
         let next_sym = self.pool.intern("next")
         let recorded_mono = self.sema.iter_next_mono_syms.get(iter_expr)
-        var recorded_mono_sym = 0
+        var recorded_mono_sym: i32 = 0
         if recorded_mono.is_some(): recorded_mono_sym = recorded_mono.unwrap()
         let recorded_sig = self.sema.iter_next_sigs.get(iter_expr)
-        var recorded_sig_idx = -1
+        var recorded_sig_idx: i32 = -1
         if recorded_sig.is_some(): recorded_sig_idx = recorded_sig.unwrap()
         // §13.5 (#1837): over a collection Sema resolved an implicit `.iter()`
         // for, the clause steps the iterator that call returns.
@@ -8995,7 +8995,7 @@ impl MirBuilder:
         let resolved_iter = self.sema.resolve_alias(stepped_ty)
         let owner_sym = self.sema.method_owner_symbol_for_type(resolved_iter as i32)
         let sema_next_sym = self.sema.pool_lookup_symbol("next")
-        var next_ret_ty = 0
+        var next_ret_ty: i32 = 0
         if recorded_sig_idx >= 0:
             next_ret_ty = self.sema.sig_return_type(recorded_sig_idx)
         if next_ret_ty == 0 and owner_sym != 0 and sema_next_sym > 0:
@@ -9158,7 +9158,7 @@ impl MirBuilder:
             self.mark_unsupported()
             return self.unit_operand()
         let out_base = self.literal_target_base_sym(out_ty)
-        var elem_ty = 0
+        var elem_ty: i32 = 0
         let out_resolved = self.sema.resolve_alias(out_ty)
         if self.sema.get_type_kind(out_resolved) == TypeKind.TY_GENERIC_INST:
             if self.sema.get_generic_inst_arg_count(out_resolved as i32) > 0:
@@ -9383,7 +9383,7 @@ impl MirBuilder:
         // elements into a temp, and the binding was empty after the loop. Only
         // an rvalue materializes a temp, which the statement frame drops.
         let ivk = self.ast.kind(iter_expr)
-        var held_place = 0
+        var held_place: i32 = 0
         if ivk == NodeKind.NK_IDENT or ivk == NodeKind.NK_FIELD_ACCESS or ivk == NodeKind.NK_INDEX:
             held_place = self.lower_expr_place(iter_expr)
         else:
@@ -9510,7 +9510,7 @@ impl MirBuilder:
         let elem_ty = self.loop_element_type(for_node)
 
         let ivk = self.ast.kind(iter_expr)
-        var list_place = 0
+        var list_place: i32 = 0
         if ivk == NodeKind.NK_IDENT or ivk == NodeKind.NK_FIELD_ACCESS or ivk == NodeKind.NK_INDEX:
             list_place = self.lower_expr_place(iter_expr)
         else:
@@ -9636,7 +9636,7 @@ impl MirBuilder:
     mut fn lower_for_btreemap(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
         let map_ty = self.expr_type(iter_expr)
         let mvk = self.ast.kind(iter_expr)
-        var map_place = 0
+        var map_place: i32 = 0
         if mvk == NodeKind.NK_IDENT or mvk == NodeKind.NK_FIELD_ACCESS or mvk == NodeKind.NK_INDEX:
             map_place = self.lower_expr_place(iter_expr)
         else:
@@ -9668,7 +9668,7 @@ impl MirBuilder:
         let elem_ty = self.loop_element_type(for_node)
 
         let mvk = self.ast.kind(iter_expr)
-        var map_place = 0
+        var map_place: i32 = 0
         if mvk == NodeKind.NK_IDENT or mvk == NodeKind.NK_FIELD_ACCESS or mvk == NodeKind.NK_INDEX:
             map_place = self.lower_expr_place(iter_expr)
         else:
@@ -9907,7 +9907,7 @@ impl MirBuilder:
         // only borrows (VEC_GET_REF), so the receiver keeps sole ownership. Non-place
         // receivers (e.g. a call result) get a genuine owning temp as before.
         let vk = self.ast.kind(list_expr)
-        var list_place = 0
+        var list_place: i32 = 0
         if vk == NodeKind.NK_IDENT or vk == NodeKind.NK_FIELD_ACCESS or vk == NodeKind.NK_INDEX:
             list_place = self.lower_expr_place(list_expr)
         else:
@@ -10944,7 +10944,7 @@ impl MirBuilder:
         let seq_ty = self.sema.resolve_alias(self.place_local_type(shape_place) as TypeId) as i32
         let seq_kind = self.sema.get_type_kind(seq_ty)
         let seq_dyn = self.slice_pattern_dyn_kind(seq_ty)
-        var elem_ty = 0
+        var elem_ty: i32 = 0
         if seq_kind == TypeKind.TY_ARRAY or seq_kind == TypeKind.TY_SLICE:
             elem_ty = self.sema.get_type_d0(seq_ty)
         else if seq_dyn == 2 and self.sema.get_generic_inst_arg_count(seq_ty) == 1:
@@ -10957,7 +10957,7 @@ impl MirBuilder:
         let base = self.slice_pattern_dyn_base(shape_place, seq_ty, span)
         let arr_len = if seq_kind == TypeKind.TY_ARRAY: self.sema.get_type_d1(seq_ty) else: 0
         let rest_sym = if has_rest != 0: self.ast.get_data2(pat_node) else: 0
-        var len_place = -1
+        var len_place: i32 = -1
         if seq_dyn != 0 and (tail > 0 or rest_sym != 0):
             len_place = self.slice_pattern_dyn_len(base, seq_ty, span)
         for i in 0..head + tail:
@@ -11594,7 +11594,7 @@ impl MirBuilder:
 
         let result_ty = self.expr_type(node)
         let result_is_void = if want_result == 0 or result_ty == 0 or result_ty == self.sema.ty_void as i32: 1 else: 0
-        var result_place = -1
+        var result_place: i32 = -1
         if result_is_void == 0:
             let result_local = self.new_temp(result_ty)
             result_place = self.place_for_local(result_local)
@@ -11734,7 +11734,7 @@ impl MirBuilder:
 
     mut fn record_call_contract(args_id: i32, node: i32, fallback_sig: i32):
         var sig_idx = fallback_sig
-        var mono_sym = 0
+        var mono_sym: i32 = 0
         let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
         let recorded_mono = self.sema.resolved_call_mono_syms.get(node)
         if recorded_sig.is_some():
@@ -12141,7 +12141,7 @@ impl MirBuilder:
         self.sema.generic_fn_node_for_symbol(sema_sym)
 
     fn callee_has_move_self(fn_sym: i32) -> bool:
-        var fn_node = 0
+        var fn_node: i32 = 0
         if self.sema.fn_decl_nodes.contains(fn_sym):
             fn_node = self.sema.fn_decl_nodes.get(fn_sym).unwrap()
         else:
@@ -12158,7 +12158,7 @@ impl MirBuilder:
     // the caller's place; the caller must pass it as OK_COPY of the place, never
     // OK_MOVE + consume.
     fn callee_has_mut_self(fn_sym: i32) -> bool:
-        var fn_node = 0
+        var fn_node: i32 = 0
         if self.sema.fn_decl_nodes.contains(fn_sym):
             fn_node = self.sema.fn_decl_nodes.get(fn_sym).unwrap()
         else:
@@ -12279,7 +12279,7 @@ impl MirBuilder:
 
     mut fn lower_call_arg(arg_node: i32, sig_idx: i32, callable_fn_tid: i32, arg_i: i32, callee_sym: i32 = 0) -> i32:
         let saved_expected = self.expected_type
-        var expected_ty = 0
+        var expected_ty: i32 = 0
         if sig_idx >= 0 and arg_i >= 0 and arg_i < self.sema.sig_get_param_count(sig_idx):
             expected_ty = self.sema.sig_param_type(sig_idx, arg_i)
             if expected_ty != 0 and expected_ty != self.sema.ty_void:
@@ -12385,7 +12385,7 @@ impl MirBuilder:
 
     mut fn lower_method_arg_with_expected(recv_type: i32, method_sym: i32, arg_node: i32, arg_index: i32) -> i32:
         let saved_expected = self.expected_type
-        var expected_ty = 0
+        var expected_ty: i32 = 0
         if recv_type != 0:
             let resolved_recv = self.sema.auto_deref_ref_ptr_type(recv_type as TypeId) as i32
             expected_ty = self.sema.method_expected_arg_type(resolved_recv, method_sym, arg_index)
@@ -13079,7 +13079,7 @@ impl MirBuilder:
                 // (Sema: dyn_consuming_calls); any other call observes the
                 // fat pointer in place. Moving it made the caller skip the
                 // Box[dyn T]'s drop: the value and its cell leaked.
-                var dyn_recv_op = -1
+                var dyn_recv_op: i32 = -1
                 if self.sema.dyn_consuming_calls.contains(node):
                     dyn_recv_op = self.lower_expr(self_expr)
                     self.consume_moved_operand(dyn_recv_op)
@@ -13243,7 +13243,7 @@ impl MirBuilder:
         // the caller's place (via the same autoderef discipline the GENERIC_CALL
         // path uses) instead of OK_MOVE + consume. Consuming receivers (`move
         // self` and legacy unflagged `self: T`) keep the plain-arg move path.
-        var recv_op = -1
+        var recv_op: i32 = -1
         if not is_static_call:
             if self.has_contextual_copy_adjustment(self_expr) != 0:
                 recv_op = self.lower_contextual_copy_adjustment(self_expr)
@@ -13343,7 +13343,7 @@ impl MirBuilder:
         // the receiver is a type ident — skip it. For instance methods, include it.
         let is_static = intrinsic == MirIntrinsic.LIST_NEW or intrinsic == MirIntrinsic.FIXED_STRING_NEW or intrinsic == MirIntrinsic.LIST_WITH_CAPACITY or intrinsic == MirIntrinsic.MAP_NEW or intrinsic == MirIntrinsic.SLOTMAP_NEW
         let call_args: List[i32] = List.new()
-        var recv_type_for_args = 0
+        var recv_type_for_args: i32 = 0
         if not is_static:
             let recv_ty = self.expr_type(self_expr)
             recv_type_for_args = self.autoderef_result_type_for_method(recv_ty, method_sym)
@@ -13357,7 +13357,7 @@ impl MirBuilder:
                 let recv_kind = self.sema.get_type_kind(recv_resolved)
                 let raw_pointer_option_receiver = recv_kind == TypeKind.TY_PTR and (intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_EXPECT or intrinsic == MirIntrinsic.OPT_IS_SOME or intrinsic == MirIntrinsic.OPT_IS_NONE or intrinsic == MirIntrinsic.OPT_FILTER)
                 let borrowed_payload_eliminator = recv_kind == TypeKind.TY_REF and self.sema.get_type_d1(recv_resolved) == 0 and (intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_EXPECT)
-                var recv_op = 0
+                var recv_op: i32 = 0
                 let recv_owner = self.sema.method_owner_symbol_for_type(recv_type_for_args)
                 if self.has_contextual_copy_adjustment(self_expr) != 0:
                     recv_op = self.lower_contextual_copy_adjustment(self_expr)
@@ -13651,7 +13651,7 @@ impl MirBuilder:
             self.mark_unsupported()
             return self.unit_operand()
 
-        var recv_place = 0
+        var recv_place: i32 = 0
         if accessor_kind == 2:
             let saved_expected = self.expected_type
             self.expected_type = enum_ty
@@ -14544,7 +14544,7 @@ impl MirBuilder:
             return self.unit_operand()
 
         let recv_place = self.lower_owned_receiver_place(self_expr, recv_type)
-        var mapper_op = 0
+        var mapper_op: i32 = 0
         var wrapper_ty = recv_elem_ty
         if lowering == MethodLowering.ListTraverse:
             mapper_op = self.lower_method_arg_with_expected(recv_type, self.sema.syms.traverse, self.ast.get_extra(arg_start), 0)
@@ -14678,7 +14678,7 @@ impl MirBuilder:
             return self.unit_operand()
 
         let value_place = if explicit_owner: self.lower_expr_place(self_expr) else: self.lower_owned_receiver_place(self_expr, value_ty)
-        var mapper_op = 0
+        var mapper_op: i32 = 0
         if not explicit_owner:
             mapper_op = self.lower_expr(self.ast.get_extra(arg_start))
             mapper_op = self.mapper_callee_operand(mapper_op)
@@ -14816,14 +14816,14 @@ impl MirBuilder:
             return self.unit_operand()
 
         let value_place = self.lower_owned_receiver_place(self_expr, value_ty)
-        var mapper_op = 0
-        var context_message_op = 0
-        var context_fn_op = 0
+        var mapper_op: i32 = 0
+        var context_message_op: i32 = 0
+        var context_fn_op: i32 = 0
         // `context(message)` owns its message on both paths: the Err arm
         // moves it into the ContextError, the Ok arm drops it. Held in the
         // call's own local, it was a statement temp the flush dropped after
         // the Err arm had moved it (a DOUBLE FREE of the message).
-        var context_message_local = -1
+        var context_message_local: i32 = -1
         if lowering == MethodLowering.ResContext:
             context_message_op = self.lower_expr(self.ast.get_extra(arg_start))
             let message_ty = self.operand_type(context_message_op)
@@ -15558,7 +15558,7 @@ impl MirBuilder:
     // name/receiver. User-Deref dispatch opts out at its creation site.
     mut fn require_generic_call_contract(args_id: i32, callee_sym: i32, method_sym: i32, self_expr: i32, has_recorded_sig: bool, site: &str, node: i32 = 0):
         let mach_name = self.generic_call_symbol_text(if method_sym != 0: method_sym else: callee_sym)
-        var recv_ty = 0
+        var recv_ty: i32 = 0
         if self_expr != 0 and self.sema.typed_expr_types.contains(self_expr):
             recv_ty = self.sema.typed_expr_types.get(self_expr).unwrap()
         let recv_kind = if recv_ty != 0: self.sema.get_type_kind(self.sema.resolve_alias(recv_ty as TypeId)) else: -1
@@ -15646,7 +15646,7 @@ impl MirBuilder:
         let method_name = self.pool.resolve_symbol(member_sym)
         let arg_count = self.ast.optional_chain_arg_count(extra_start)
         let arg_start = self.ast.optional_chain_arg_start(extra_start)
-        var raw_op = 0
+        var raw_op: i32 = 0
 
         // Sema's table for a builtin method on the chain's payload (#2043).
         let intrinsic = self.sema.builtin_method_intrinsic_of_sym(payload_ty, self.sema_symbol_for_ast_symbol(member_sym))
@@ -15932,7 +15932,7 @@ impl MirBuilder:
         // into a temporary reset it, and the next chain on the same Option
         // read `Some(<blank>)`. A chain that is not observing has a
         // temporary base (a named base that gives a field up is refused).
-        var base_place = 0
+        var base_place: i32 = 0
         if self.sema.optional_chain_observing_nodes.contains(node):
             base_place = self.lower_expr_place(base_expr)
         else:
@@ -16185,7 +16185,7 @@ impl MirBuilder:
         if kind == NodeKind.NK_CAST:
             // Read pre-resolved cast type from sema sidecar (avoids add_type on
             // shallow-copied Sema — see resolve_type_expr aliasing bug).
-            var cast_tid = 0
+            var cast_tid: i32 = 0
             if self.sema.typed_expr_types.contains(node):
                 cast_tid = self.sema.typed_expr_types.get(node).unwrap() as i32
             else:
@@ -16508,7 +16508,7 @@ impl MirBuilder:
             // D65 phase 5 (#1647): Sema's record of what the callee resolved
             // to decides the lowering; MIR never re-derives it from the name.
             let callee_kind = self.sema.call_callee_kind(node)
-            var generic_builtin_sym = 0
+            var generic_builtin_sym: i32 = 0
             if callee_kind == CallCalleeKind.TypeLevelBuiltin:
                 let gb_base = self.ast.get_data0(callee)
                 if self.ast.kind(gb_base) != NodeKind.NK_IDENT:
@@ -16598,7 +16598,7 @@ impl MirBuilder:
                     for vci in 0..vc_args_count:
                         let vc_arg = if vc_has_resolved != 0: self.sema.get_resolved_call_arg(node, vci) else: self.ast.get_extra(vc_args_start + vci)
                         let saved_expected = self.expected_type
-                        var vc_payload_ty = 0
+                        var vc_payload_ty: i32 = 0
                         if vci < vc_payload_tys.len():
                             vc_payload_ty = vc_payload_tys[vci]
                             if vc_payload_ty != 0:
@@ -16796,7 +16796,7 @@ impl MirBuilder:
                 let f_val_node = self.ast.get_extra(sl_fields_start + i * 2 + 1)
                 let saved_expected = self.expected_type
                 var resolved_name = f_name_sym
-                var f_ty = 0
+                var f_ty: i32 = 0
                 if f_name_sym == 0:
                     let info = self.sema.struct_field_info_by_index(sl_struct_ty, i)
                     resolved_name = (info % 4294967296) as i32
@@ -16805,7 +16805,7 @@ impl MirBuilder:
                     f_ty = self.struct_field_type(sl_struct_ty, f_name_sym)
                 if f_ty != 0:
                     self.expected_type = f_ty
-                var f_op = 0
+                var f_op: i32 = 0
                 var f_ref_done = 0
                 if f_ty != 0:
                     let f_ty_res = self.sema.resolve_alias(f_ty as TypeId)
@@ -17078,7 +17078,7 @@ impl MirBuilder:
             for vsi in 0..vs_arg_count:
                 let vs_arg = self.ast.get_extra(vs_args_start + vsi)
                 let saved_expected = self.expected_type
-                var vs_payload_ty = 0
+                var vs_payload_ty: i32 = 0
                 if vsi < vs_payload_tys.len():
                     vs_payload_ty = vs_payload_tys[vsi]
                     if vs_payload_ty != 0:
@@ -17089,7 +17089,7 @@ impl MirBuilder:
                 // them stored a `&i32` view where `Option[i32]` demanded the
                 // value (read back as 0) and would store a value where a
                 // reference was expected.
-                var vs_arg_op = -1
+                var vs_arg_op: i32 = -1
                 if vs_payload_ty != 0:
                     vs_arg_op = self.lower_auto_ref_call_arg(vs_arg, vs_payload_ty)
                     if vs_arg_op < 0:
@@ -17717,7 +17717,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
         let param_locals: List[i32] = List.new()
         for i in 0..param_count:
             let p_name = builder.ast.fn_param_name(param_start, i)
-            var p_ty = 0
+            var p_ty: i32 = 0
             if sig_idx >= 0:
                 p_ty = builder.sema.sig_param_type(sig_idx, i)
             else:
@@ -18000,7 +18000,7 @@ impl MirBody:
         if fn_sym == 0 or self.n_params == 0:
             return
         let bb_count = self.block_count()
-        var bb = 0
+        var bb: i32 = 0
         while bb < bb_count:
             if bb < 0 or bb >= self.bb_term_kinds.len() or self.bb_term_kinds[bb] != TermKind.TK_CALL:
                 bb = bb + 1
@@ -18417,7 +18417,7 @@ pub fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> Mi
     // Lower the dynamic specialization queue to a fixpoint. Rechecking a body
     // can discover nested calls, and preregistration can expose concrete
     // generic Drop implementations that have no source call node of their own.
-    var specialization = 0
+    var specialization: i32 = 0
     var specializations_stable = false
     while not specializations_stable:
         while specialization < sema.concrete_specialization_nodes.len():

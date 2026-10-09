@@ -275,7 +275,7 @@ impl Codegen:
         let ptr_ty = wl_ptr_type(self.context)
         let param_types: List[i64] = List.new()
         param_types.push(ptr_ty)
-        var pi = 1
+        var pi: i32 = 1
         while pi < param_count:
             let p_type_node = self.pool.fn_param_type(param_start, pi)
             if codegen_type_node_mentions_self(self.pool, self.sym_Self, p_type_node) != 0:
@@ -409,7 +409,7 @@ impl Codegen:
         if has_sret:
             wrapper_param_types.push(ptr_ty)
         wrapper_param_types.push(ptr_ty)
-        var pi = 1
+        var pi: i32 = 1
         while pi < orig_param_count:
             let pval = wl_get_param(method_fn, pi)
             wrapper_param_types.push(wl_type_of(pval))
@@ -1039,7 +1039,7 @@ impl Codegen:
             let row = self.sema.dyn_impl_method_row(concrete_sema_ty, trait_text, method_text)
             var fv: i64 = 0
             var ft: i64 = 0
-            var wrapper_fn_sym = 0
+            var wrapper_fn_sym: i32 = 0
             if row >= 0:
                 let cmf = self.ensure_concrete_mir_function(0, self.sema.dyn_impl_row_sig(row), self.sema.dyn_impl_row_mono_sym(row), 0, "dyn trait method " ++ type_name ++ "." ++ method_text)
                 fv = cmf.value

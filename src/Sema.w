@@ -3933,7 +3933,7 @@ impl Sema:
         if paren <= 0:
             return
         let fn_name = text.slice(0, paren as i64)
-        var idx = 0
+        var idx: i32 = 0
         var got = 0
         var j = paren + 1
         while j < n:
@@ -4223,7 +4223,7 @@ impl Sema:
         if self.scope_lookup(sym) >= 0:
             return sym
         let head: i32 = self.displaced_fn_index.get(sym).unwrap()
-        var chosen = 0
+        var chosen: i32 = 0
         // #1882: a c_import's displaced definition carries its importer's
         // path, but it is the importer's IMPORT (tier 3), not its own
         // declaration (tier 2): the module's own `fn twice` outranks the
@@ -5102,8 +5102,8 @@ impl Sema:
     fn lookup_named_type_filtered(sym: i32, gated: i32) -> i32:
         let named_tid = if self.named_types.contains(sym): self.named_types.get(sym).unwrap() else: 0
         var global_tid = 0
-        var saw_recorded = 0
-        var saw_named_tid = 0
+        var saw_recorded: i32 = 0
+        var saw_named_tid: i32 = 0
         // The scoped tier first (#1967): `Self` and a generic type parameter
         // are inserted into named_types directly, with no module candidate,
         // and are lexically closer than any module's declaration — a visible
@@ -6952,7 +6952,7 @@ impl Sema:
 
     mut fn emit_pending_generic_binding_error(sym: i32):
         let binding_name: str = with_str_clone_ref(self.pool_resolve(sym))
-        var node = 0
+        var node: i32 = 0
         if self.pending_generic_binding_decl.contains(sym):
             node = self.pending_generic_binding_decl.get(sym).unwrap()
         else if self.pending_generic_binding_call.contains(sym):
@@ -7806,7 +7806,7 @@ impl Sema:
         let trace_move = runtime_getenv("WITH_TRACE_MOVE").len() > 0
         if trace_move:
             with_eprint(f"[trace-move] continue back-edge: frame={frame_idx} bindings={boundary}")
-        var i = 0
+        var i: i32 = 0
         while i < boundary:
             let entry_state = if off >= 0 and (off + i) < self.loop_entry_flat.len() as i32: self.loop_entry_flat[(off + i)] else: VarState.LIVE
             let cur_state = if i < self.bind_states.len() as i32: self.bind_states[i] else: VarState.LIVE
@@ -7837,7 +7837,7 @@ impl Sema:
         if trace_move:
             with_eprint(f"[trace-move] loop finalize: body_diverges={body_diverges} bindings={entry_count}")
         if body_diverges == 0:
-            var i = 0
+            var i: i32 = 0
             while i < entry_count:
                 // Scoped to needs-drop values (like the conditional-move feature): a
                 // moved-out POD List is a non-destructive copy today (#607), and the
@@ -8235,7 +8235,7 @@ impl Sema:
                     break
             if result == 0:
                 let variant_count = self.type_reflection_variant_count(resolved as i32)
-                var vidx = 0
+                var vidx: i32 = 0
                 while vidx < variant_count and result == 0:
                     let payload_count = self.type_reflection_variant_payload_count(resolved as i32, vidx)
                     for pi in 0..payload_count:
@@ -8464,7 +8464,7 @@ impl Sema:
                 if self.type_owns_user_drop(fty) != 0:
                     result = 1
                     break
-            var vidx = 0
+            var vidx: i32 = 0
             while vidx < self.type_reflection_variant_count(resolved as i32) and result == 0:
                 for pi in 0..self.type_reflection_variant_payload_count(resolved as i32, vidx):
                     let pty = self.type_reflection_variant_payload_type(resolved as i32, vidx, pi)
@@ -8510,7 +8510,7 @@ impl Sema:
                     break
             if result == 0:
                 let variant_count = self.type_reflection_variant_count(resolved as i32)
-                var vidx = 0
+                var vidx: i32 = 0
                 while vidx < variant_count and result == 0:
                     let payload_count = self.type_reflection_variant_payload_count(resolved as i32, vidx)
                     for pi in 0..payload_count:
@@ -9198,7 +9198,7 @@ impl Sema:
             changed = 0
             guard = guard + 1
             var i = 0
-            var edge_index = 0
+            var edge_index: i32 = 0
             while i + 3 < n:
                 let caller_sig: i32 = self.effect_flow_edges[i]
                 let caller_pi: i32 = self.effect_flow_edges[(i + 1)]

@@ -309,7 +309,7 @@ pub fn analysis_parse_i32(text: &str) -> i32:
 
 fn analysis_escape(text: &str) -> str:
     let parts: List[str] = List.new()
-    var start = 0
+    var start: i32 = 0
     for i in 0..text.len() as i32:
         let c = text[i] as i32
         var replacement = ""
@@ -379,8 +379,8 @@ fn analysis_term_matches(fact: &AnalysisFact, term: &str) -> bool:
 pub fn analysis_fact_matches(fact: &AnalysisFact, query: &str) -> bool:
     if query.len() == 0 or query == "all":
         return true
-    var start = 0
-    var i = 0
+    var start: i32 = 0
+    var i: i32 = 0
     let n = query.len() as i32
     while i <= n:
         if i == n or query[i] as i32 == 44:

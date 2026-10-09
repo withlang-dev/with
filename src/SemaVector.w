@@ -358,8 +358,8 @@ impl Sema:
         // other operand or from the context; two scalars with no vector
         // context have no one meaning and are refused.
         var vec_ty = if self.has_expected_type != 0 and self.is_vector_type(self.expected_expr_type as i32): self.expected_expr_type as i32 else: 0
-        var a_ty = 0
-        var b_ty = 0
+        var a_ty: i32 = 0
+        var b_ty: i32 = 0
         if vec_ty == 0 and not self.expr_is_untyped_literal_arith(a_node):
             let a_exact = self.check_expr_value_context(a_node) as i32
             a_ty = self.vector_value_type(a_node, a_exact)

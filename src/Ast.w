@@ -1452,7 +1452,7 @@ impl AstPool:
         false
 
     fn has_type_derives() -> bool:
-        var meta = 0
+        var meta: i32 = 0
         while meta < self.state.type_meta.len() as i32:
             if self.type_meta_derive_count(meta) > 0:
                 return true
@@ -1779,7 +1779,7 @@ impl AstPool:
                     ast_pool_phase_bug("BUG: trait impl method range contains a non-function declaration")
                 let method_name = intern.resolve(self.get_data0(method_node))
 
-                var trait_method = -1
+                var trait_method: i32 = -1
                 for trait_mi in 0..self.trait_method_count(trait_node):
                     let bare_sym = self.trait_method_field(trait_node, trait_mi, TRAIT_METHOD_NAME)
                     let expected = intern.resolve(self.get_data0(impl_node)) ++ "." ++ intern.resolve(bare_sym)

@@ -1139,7 +1139,7 @@ pub fn mir_mark_last_use_holds(body: MirBody) -> MirBody:
                 else if out.term_kind(bb) == TermKind.TK_CALL: suspend_call_operands(&out, out.term_data1(bb))
                 else: List.new()
                 var reads = 0
-                var held_op = -1
+                var held_op: i32 = -1
                 for oi in 0..operands.len():
                     if suspend_place_root_local(&out, out.operand_d0[operands[oi]]) == local:
                         reads = reads + 1

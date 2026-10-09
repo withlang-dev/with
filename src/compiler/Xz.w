@@ -226,7 +226,7 @@ impl XzLzma:
             if self.bit(P_IS_MATCH + (self.state << 4) + pos_state) == 0:
                 self.literal()
                 continue
-            var len = 0
+            var len: i32 = 0
             if self.bit(P_IS_REP + self.state) == 0:
                 self.rep3 = self.rep2
                 self.rep2 = self.rep1

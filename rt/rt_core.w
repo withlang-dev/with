@@ -3203,7 +3203,7 @@ pub fn with_parse_float_ref(s: &str) -> f64:
 pub fn with_arg_count() -> i32:
     saved_argc
 
-pub fn with_arg_at(idx: i32) -> str:
+pub fn with_arg_at(idx: isize) -> str:
     if idx < 0 or idx >= saved_argc or saved_argv_raw == 0:
         return make_str("" as *const u8, 0)
     let s = unsafe *((saved_argv_raw + idx as i64 * 8) as *const *const u8)

@@ -913,7 +913,7 @@ fn ci_capture_macro_values(session: i64):
     g_migrate_macro_last_values = HashMap.new()
     g_migrate_macro_miss_names = HashMap.new()
     let count = with_cimport_macro_count(session)
-    var i = 0
+    var i: i32 = 0
     while i < count:
         if with_cimport_macro_is_fn_like(session, i) == 0:
             let name = with_cimport_macro_name(session, i)
@@ -944,7 +944,7 @@ pub fn ci_collect_macro_type_names(session: i64) -> str:
 pub fn ci_collect_macro_type_aliases(session: i64) -> str:
     let count = with_cimport_decl_count(session)
     var aliases = ""
-    var i = 0
+    var i: i32 = 0
     while i < count:
         if with_cimport_decl_kind(session, i) == CK_TYPEDEF:
             let name = with_cimport_decl_name(session, i)
@@ -1066,7 +1066,7 @@ impl CiProject:
 
         let module_id = self.ensure_module(input_path)
         let count = with_cimport_decl_count(session)
-        var i = 0
+        var i: i32 = 0
         while i < count:
             if with_cimport_decl_kind(session, i) == CK_VAR:
                 let name = with_cimport_decl_name(session, i)
@@ -1294,7 +1294,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     // Translate declarations (skip system header noise).
     // Use declaration source location to filter: only emit declarations
     // that originate from the user's file or from PCRE2 headers.
-    var i = 0
+    var i: i32 = 0
     while i < count:
         let decl_name = with_cimport_decl_name(session, i)
         if ci_migrate_decl_is_filtered(session, i, decl_name):
@@ -2115,7 +2115,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
     // Build parameter list — use cursor API for real param names
     // (the old decl API returns "" for many PCRE2 functions)
     var cursor_param_names = ""
-    var fn_body_cursor = -1
+    var fn_body_cursor: i32 = -1
     let fn_cursor = ci_find_fn_cursor(session, name)
     if fn_cursor >= 0:
         // Find the CompoundStmt body for param mutation detection
@@ -2358,7 +2358,7 @@ fn ci_migrate_project_fn_owner_path(project_active: bool, project: &CiProject, n
 
 fn ci_migrate_collect_unsafe_extern_fns(session: i64, count: i32, primary_path: &str, project_active: bool, project: &CiProject):
     ci_migrate_reset_unsafe_extern_fns()
-    var i = 0
+    var i: i32 = 0
     while i < count:
         if with_cimport_decl_kind(session, i) != CK_FUNCTION:
             i = i + 1
@@ -2419,7 +2419,7 @@ fn ci_migrate_var_priority(session: i64, idx: i32, primary_path: &str) -> i32:
 fn ci_migrate_find_best_var_decl(session: i64, count: i32, name: &str, primary_path: &str) -> i32:
     var best = -1
     var best_priority = -1
-    var i = 0
+    var i: i32 = 0
     while i < count:
         if with_cimport_decl_kind(session, i) == CK_VAR and with_cimport_decl_name(session, i) == name:
             let priority = ci_migrate_var_priority(session, i, primary_path)
@@ -2573,7 +2573,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
 
 fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: &str, project_active: bool, project: &CiProject) -> str:
     var output = StringBuilder.new()
-    var i = 0
+    var i: i32 = 0
     while i < count:
         if with_cimport_decl_kind(session, i) == CK_VAR:
             let name = with_cimport_decl_name(session, i)

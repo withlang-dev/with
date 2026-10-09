@@ -634,7 +634,7 @@ impl Zcu:
     mut fn inject_toolchain_facades_frontend(pool: AstPool) -> AstPool:
         var out = self.project_owned_annotations_frontend(pool)
         var claimed = frontend_new_list_str()
-        var owner = -1
+        var owner: i32 = -1
         for i in 0..out.decl_count():
             let decl = out.get_decl(i)
             let kind = out.kind(decl)
@@ -1775,7 +1775,7 @@ impl Zcu:
                 merged_pool = self.parse_imported_file_frontend(fpath, merged_pool)
             else if fpath.len() == 0:
                 self.emit_missing_import_frontend(merged_pool, first)
-        var pi = 1
+        var pi: i32 = 1
         while pi < merged_pool.decl_count():
             let decl = merged_pool.get_decl(pi)
             if merged_pool.kind(decl) == NodeKind.NK_USE_DECL:

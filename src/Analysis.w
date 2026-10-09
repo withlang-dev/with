@@ -492,7 +492,7 @@ fn analysis_collect_ast_node_tree(report: &AnalysisReport, sema: &Sema, node: i3
     let d2 = sema.ast.get_data2(node)
     let typed = sema.typed_expr_types.get(node)
     let resolved = sema.comp_resolved.get(node)
-    var symbol = 0
+    var symbol: i32 = 0
     if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED:
         symbol = d0
     else if kind == NodeKind.NK_FIELD_ACCESS:
@@ -1024,7 +1024,7 @@ fn analysis_audit_effects(report: &AnalysisReport, sema: &Sema):
         else if mode == ReceiverMode.Mut and (required & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
             report.fail(f"sig {si}: mut receiver requires move")
     var at = 0
-    var edge_index = 0
+    var edge_index: i32 = 0
     while at + 3 < sema.effect_flow_edges.len() as i32:
         let caller_sig = sema.effect_flow_edges[at]
         let caller_pi = sema.effect_flow_edges[(at + 1)]

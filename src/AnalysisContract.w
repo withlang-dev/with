@@ -266,7 +266,7 @@ fn contract_collect_resource(report: &AnalysisReport, sema: &Sema, ri: i32, sour
             continue
         for k in 0..parents.len() as i32:
             let pi = parents[k]
-            var clause = 0
+            var clause: i32 = 0
             for bi in 0..r.borrows.len() as i32:
                 if r.borrows_owner[bi] == o and r.borrows[bi] == pi: clause = r.borrows_nodes[bi]
             let prov = if clause != 0: contract_clause_at(sema, &site, clause) else: "default:unknown independence is dependency (§16.2b.6)"
@@ -520,7 +520,7 @@ fn contract_collect_domain(report: &AnalysisReport, sema: &Sema, di: i32, source
     // A domain's block is the facade it was declared in; find that block's
     // declaration through a resource or item of the same facade, else the
     // main file.
-    var decl = -1
+    var decl: i32 = -1
     for ri in 0..sema.facade_resources.len() as i32:
         if sema.facade_resources[ri].facade == d.facade: decl = sema.facade_resources[ri].decl
     for ci in 0..sema.foreign_contracts.len() as i32:

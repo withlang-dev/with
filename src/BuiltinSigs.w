@@ -157,7 +157,7 @@ fn builtin_param_type_span(params: &str, index: i32) -> (i32, i32):
 // (taken as one of the receiver's type parameters `T`, `K`, `V`), `t` taken.
 pub fn builtin_param_modes(params: &str) -> str:
     var modes = ""
-    var index = 0
+    var index: i32 = 0
     while true:
         let (start, end) = builtin_param_type_span(params, index)
         if start < 0:

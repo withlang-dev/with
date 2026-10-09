@@ -273,6 +273,16 @@ impl Sema:
             diag.add_help(help)
         self.diags.emit(move diag)
 
+    // An error that also points at a second place: where the fact it rests
+    // on came from.
+    mut fn emit_error_with_label(msg: &str, node: i32, label_node: i32, label: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
+        if self.suppress_errors != 0:
+            return
+        var diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
+        diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
+        diag.add_label(self.diagnostic_node_span(label_node), label)
+        self.diags.emit(move diag)
+
     mut fn emit_warning(msg: &str, node: i32, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         var diag = Diagnostic.warn(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
@@ -515,8 +525,8 @@ impl Sema:
                     out.push_str(fn_name)
                     out.push_str("(")
                     let meta = self.ast.find_fn_meta(decl)
-                    var param_start = 0
-                    var meta_param_count = 0
+                    var param_start: i32 = 0
+                    var meta_param_count: i32 = 0
                     if meta >= 0:
                         param_start = self.ast.fn_meta_param_start(meta)
                         meta_param_count = self.ast.fn_meta_param_count(meta)
@@ -553,8 +563,8 @@ impl Sema:
                     out.push_str(ext_name)
                     out.push_str("(")
                     let meta = self.ast.find_fn_meta(decl)
-                    var param_start = 0
-                    var meta_param_count = 0
+                    var param_start: i32 = 0
+                    var meta_param_count: i32 = 0
                     if meta >= 0:
                         param_start = self.ast.fn_meta_param_start(meta)
                         meta_param_count = self.ast.fn_meta_param_count(meta)
@@ -693,8 +703,8 @@ impl Sema:
                     with_write(fn_name)
                     with_write("(")
                     let meta = self.ast.find_fn_meta(decl)
-                    var param_start = 0
-                    var meta_param_count = 0
+                    var param_start: i32 = 0
+                    var meta_param_count: i32 = 0
                     if meta >= 0:
                         param_start = self.ast.fn_meta_param_start(meta)
                         meta_param_count = self.ast.fn_meta_param_count(meta)
@@ -729,8 +739,8 @@ impl Sema:
                     with_write(ext_name)
                     with_write("(")
                     let meta = self.ast.find_fn_meta(decl)
-                    var param_start = 0
-                    var meta_param_count = 0
+                    var param_start: i32 = 0
+                    var meta_param_count: i32 = 0
                     if meta >= 0:
                         param_start = self.ast.fn_meta_param_start(meta)
                         meta_param_count = self.ast.fn_meta_param_count(meta)

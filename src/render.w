@@ -195,7 +195,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         var out = StringBuilder.new()
         out.push_str(prefix ++ "extern fn " ++ name ++ "(")
         let meta = pool.find_fn_meta(node)
-        var param_count = 0
+        var param_count: i32 = 0
         if meta >= 0:
             let param_start = pool.fn_meta_param_start(meta)
             param_count = pool.fn_meta_param_count(meta)

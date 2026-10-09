@@ -111,7 +111,7 @@ fn resolution_sema_answer(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, b
             let argc = body.call_arg_counts[call_id]
             let resolved = sema.has_resolved_call_args(node) != 0
             let count = if resolved: sema.get_resolved_call_arg_count(node) else: sema.ast.get_data2(node)
-            var first_callable = 0
+            var first_callable: i32 = 0
             for ai in 0..count:
                 let arg = if resolved: sema.get_resolved_call_arg(node, ai) else: sema.ast.get_extra(sema.ast.get_data1(node) + ai)
                 if arg <= 0 or arg >= sema.ast.node_count(): continue

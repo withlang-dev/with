@@ -132,8 +132,8 @@ fn link_stage_argv_append(argv: &str, arg: &str) -> str:
 fn link_stage_is_digit(ch: i32) -> bool:
     ch >= 48 and ch <= 57
 
-fn link_stage_read_u32_le(data: &str, offset: i32) -> i64:
-    if offset < 0 or offset + 3 >= data.len() as i32:
+fn link_stage_read_u32_le(data: &str, offset: isize) -> i64:
+    if offset < 0 or offset + 3 >= data.len():
         return -1
     (data[offset] as i64) |
         ((data[(offset + 1)] as i64) << 8) |

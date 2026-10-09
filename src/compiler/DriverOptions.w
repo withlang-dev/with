@@ -1,6 +1,6 @@
 // Structured CLI option values for compiler-driver commands.
 
-extern fn with_arg_at(idx: i32) -> str
+extern fn with_arg_at(idx: isize) -> str
 extern fn with_getenv_str(name: &str) -> str
 extern fn with_str_len(s: &str) -> i64
 extern fn with_str_byte_at_ref(s: &str, index: i64) -> i32

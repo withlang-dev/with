@@ -195,8 +195,8 @@ impl Sema:
             if self.ast.kind(decl) != NodeKind.NK_C_FACADE or facade_error_sym(self.ast, decl as i32) == 0:
                 continue
             let err: str = self.pool_resolve(facade_error_sym(self.ast, decl as i32))
-            var first = 0
-            var first_ret = 0
+            var first: i32 = 0
+            var first_ret: i32 = 0
             var readers: List[i32] = List.new()
             for ri in 0..self.facade_resources.len() as i32:
                 if self.facade_resources[ri].decl != di or self.facade_resources[ri].ok_consts.len() == 0:
@@ -228,8 +228,8 @@ impl Sema:
         let cn = self.facade_ok_text(ri)
         var statuses = 0
         var shapes = ""
-        var first = 0
-        var first_ret = 0
+        var first: i32 = 0
+        var first_ret: i32 = 0
         for pi in 0..self.facade_resources[ri].producers.len() as i32:
             let p = self.facade_resources[ri].producers[pi]
             let pn: str = self.pool_resolve(p)
@@ -1229,7 +1229,7 @@ impl Sema:
                 let shown = self.facade_param_display(fn_sym, sig, pi)
                 self.emit_error(f"fn '{fname}': consumes {shown}: not a pointer, there is nothing to transfer (§16.2b.5, §16.2b.13)", clause)
                 return c
-            var by = -1
+            var by: i32 = -1
             let by_ref = self.ast.get_extra(ops + 1)
             if by_ref != 0:
                 by = self.facade_resolve_param(by_ref, fn_sym, sig)
@@ -3839,7 +3839,7 @@ impl Sema:
                     shift = self.sig_get_param_count(self.get_sig(self.facade_resources[ri].preinit))
                 let slot = self.facade_owner_skip(ri, owner)
                 let raw_mask = self.facade_touch_params_mask(f, ci, if owner == FACADE_DEP_INIT: 1 else: 0)
-                var mask = 0
+                var mask: i32 = 0
                 // #1977: the C parameter each presented one came from — the
                 // projection below, kept so a presented bit names its source
                 // (facade_effect_source_param) instead of reading as the C
@@ -4645,7 +4645,7 @@ impl Sema:
             // One userdata per item: a consumed-with-destroy userdata, a
             // retained one and a paired one are the same parameter.
             let ud = self.facade_contract_userdata_param(ci)
-            var second = -1
+            var second: i32 = -1
             for k in 0..self.foreign_contracts[ci].consumes.len() as i32:
                 if self.foreign_contracts[ci].consumes_destroyed_by[k] >= 0 and self.foreign_contracts[ci].consumes[k] != ud: second = self.foreign_contracts[ci].consumes[k]
             for k in 0..self.foreign_contracts[ci].retains.len() as i32:
@@ -4680,7 +4680,7 @@ impl Sema:
             // is not modeled nullable; nor is any other parameter here.
             let paired_cb = self.facade_contract_callback_param(ci)
             var nullable = 0
-            var bad = -1
+            var bad: i32 = -1
             for k in 0..self.foreign_contracts[ci].nullable_params.len() as i32:
                 let npi = self.foreign_contracts[ci].nullable_params[k]
                 if npi == paired_cb and paired_cb >= 0 and ud >= 0 and not self.facade_contract_userdata_retained(ci) and not self.facade_contract_userdata_consumed(ci): nullable = 1
@@ -4856,7 +4856,7 @@ impl Sema:
         let k: i32 = self.facade_pair_setter_case.get(node).unwrap()
         let kind: i32 = self.foreign_contracts[ci].variadic_case_kinds[k]
         let case_sym: i32 = self.foreign_contracts[ci].variadic_case_syms[k]
-        var slot = -1
+        var slot: i32 = -1
         for si in 0..self.foreign_contracts[ci].variadic_slots.len() as i32:
             let s = &self.foreign_contracts[ci].variadic_slots[si]
             if kind == FACADE_VARIADIC_CALLBACK and s.case_index == k: slot = si
@@ -4867,7 +4867,7 @@ impl Sema:
         if count == 0:
             return
         let last = self.resolve_alias(self.sig_param_type(sig, count - 1) as TypeId)
-        var u_tid = 0
+        var u_tid: i32 = 0
         if kind == FACADE_VARIADIC_USERDATA:
             if self.get_type_kind(last) == TypeKind.TY_REF: u_tid = self.resolve_alias(self.get_type_d0(last) as TypeId) as i32
         else:

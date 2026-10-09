@@ -189,7 +189,7 @@ impl PairsBody:
         "this value"
 
     fn resource_name(sema: &Sema, key: i32) -> str:
-        var ri = -1
+        var ri: i32 = -1
         if key >= 0 and key < self.width():
             ri = self.key_resource[key]
             if ri < 0 and self.is_ref(key) and self.ref_origin[key] >= 0: ri = self.key_resource[self.ref_origin[key]]

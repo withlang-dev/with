@@ -61,7 +61,7 @@ use std.string.StringBuilder
 
 extern fn with_arg_count() -> i32
 extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_arg_at(idx: i32) -> str
+extern fn with_arg_at(idx: isize) -> str
 extern fn with_fs_write_file(path: &str, data: &str) -> i32
 extern fn with_fs_mkdir_p(path: &str) -> i32
 extern fn with_fs_read_file(path: &str) -> str
@@ -632,7 +632,7 @@ fn cli_leading_use_len(code: &str) -> i32:
     var lexer = Lexer.init(code, 0)
     let tokens = lexer.tokenize()
     var end = 0
-    var i = 0
+    var i: i32 = 0
     while i < tokens.len():
         let tag = tokens.get_tag(i)
         if tag == TokenKind.TK_NEWLINE:
@@ -1608,7 +1608,7 @@ fn run_reduce_command(argc: i32) -> i32:
     var changed = true
     while changed:
         changed = false
-        var i = 0
+        var i: i32 = 0
         while i < lines.len() as i32:
             let candidate = reduce_join_lines(&lines, i)
             if with_fs_write_file(candidate_path, candidate) != 0:
@@ -4169,9 +4169,9 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
     let only_on_prefix = "//! only-on: "
     let known_issue_prefix = "//! known-issue: "
     var unknown_line = ""
-    var unknown_line_no = 0
+    var unknown_line_no: i32 = 0
     var start = 0
-    var i = 0
+    var i: i32 = 0
     while i <= text_len:
         var ch = 10
         if i < text_len:
@@ -4858,7 +4858,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
                 return 0
             print_test_summary(target, 0, 1, run_quiet)
             return 1
-        var passed = 0
+        var passed: i32 = 0
         let failed_tests: List[str] = List.new()
         var run_quiet = quiet
         if verbose:
@@ -5592,7 +5592,7 @@ fn run_fmt_command(argc: i32) -> i32:
         return 1
     let prefer_brace = cli_has_flag(argc, "--prefer-brace")
     let prefer_colon = cli_has_flag(argc, "--prefer-colon")
-    var fmt_style = 0
+    var fmt_style: i32 = 0
     if prefer_brace: fmt_style = 2
     if prefer_colon: fmt_style = 1
     var files: List[str] = List.new()

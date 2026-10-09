@@ -136,8 +136,8 @@ fn py_lex(src: &str) -> List[PyTok]:
     var indents: List[i32] = List.new()
     indents.push(0)
     let n = src.len() as i32
-    var i = 0
-    var line = 1
+    var i: i32 = 0
+    var line: i32 = 1
     var depth = 0
     var at_line_start = true
     while i < n:
@@ -460,7 +460,7 @@ impl PyParser:
         let targets = self.for_targets()
         if not self.accept_word("in"): self.fail("expected 'in' in a comprehension")
         let iter = self.or_test()
-        var cond = -1
+        var cond: i32 = -1
         if self.accept_word("if"): cond = self.or_test()
         if self.is_word("for") or self.is_word("if"):
             // A nested comprehension is outside the subset.
@@ -608,7 +608,7 @@ impl PyParser:
                             let targets = self.for_targets()
                             if not self.accept_word("in"): self.fail("expected 'in' in a comprehension")
                             let iter = self.or_test()
-                            var cond = -1
+                            var cond: i32 = -1
                             if self.accept_word("if"): cond = self.or_test()
                             self.expect_op("}")
                             let kids: List[i32] = List.new()
@@ -728,7 +728,7 @@ impl PyParser:
         let header_ok = self.err.len() == 0
         let body_at: i32 = self.at
         let body = self.block()
-        var unreadable = 0
+        var unreadable: i32 = 0
         if self.err.len() > 0 and header_ok:
             // Resynchronize after the body and keep going.
             unreadable = 1

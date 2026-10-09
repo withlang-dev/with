@@ -250,7 +250,7 @@ impl CodegenUnitPipeline:
 
 pub fn codegen_unit_extra_objects(obj_path: &str, unit_count: i32) -> List[str]:
     let extras: List[str] = List.new()
-    var k = 1
+    var k: i32 = 1
     while k < unit_count:
         extras.push(codegen_unit_object_path(obj_path, k))
         k = k + 1

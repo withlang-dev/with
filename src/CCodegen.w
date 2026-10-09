@@ -1164,7 +1164,7 @@ impl CCodegen:
             return 0
         let name = cc_intern_resolve(self.intern, self.ast.get_data0(decl))
         let what = if dk == NodeKind.NK_EXTERN_VAR: "extern var" else: "global"
-        var type_node = 0
+        var type_node: i32 = 0
         if dk == NodeKind.NK_EXTERN_VAR:
             type_node = self.ast.get_data1(decl)
         else:
@@ -1813,8 +1813,8 @@ impl CCodegen:
         let count = body.place_proj_counts[place_id]
         // A payload enum's downcast names its variant; the field after it is
         // that variant's payload field `pd` (MirCore's projection typing).
-        var downcast_enum_tid = 0
-        var downcast_variant = -1
+        var downcast_enum_tid: i32 = 0
+        var downcast_variant: i32 = -1
         for i in 0..count:
             let pk = body.proj_kinds[(start + i)]
             let pd = body.proj_d0[(start + i)]
@@ -1915,8 +1915,8 @@ impl CCodegen:
         let count = body.place_proj_counts[place_id]
         // A payload enum's downcast names its variant; the field after it is
         // that variant's payload field `pd` (MirCore's projection typing).
-        var downcast_enum_tid = 0
-        var downcast_variant = -1
+        var downcast_enum_tid: i32 = 0
+        var downcast_variant: i32 = -1
         for i in 0..count:
             let pk = body.proj_kinds[(start + i)]
             let pd = body.proj_d0[(start + i)]
@@ -2016,8 +2016,8 @@ impl CCodegen:
         let count = body.place_proj_counts[place_id]
         // A payload enum's downcast names its variant; the field after it is
         // that variant's payload field `pd` (MirCore's projection typing).
-        var downcast_enum_tid = 0
-        var downcast_variant = -1
+        var downcast_enum_tid: i32 = 0
+        var downcast_variant: i32 = -1
         for i in 0..count:
             let pk = body.proj_kinds[(start + i)]
             let pd = body.proj_d0[(start + i)]
@@ -2567,7 +2567,7 @@ impl CCodegen:
         let recv_text = self.operand_text(body, recv_operand)
         if recv_text.len() == 0:
             return 0
-        var out = 0
+        var out: i32 = 0
         for bb in 0..body.block_count():
             if body.term_kind(bb) != TermKind.TK_CALL:
                 continue
@@ -2593,7 +2593,7 @@ impl CCodegen:
     mut fn list_local_element_tid(body: &MirBody, local_id: i32) -> i32:
         if local_id < 0:
             return 0
-        var out = 0
+        var out: i32 = 0
         for bb in 0..body.block_count():
             let start = body.bb_stmt_starts[bb]
             let count = body.bb_stmt_counts[bb]
@@ -2747,7 +2747,7 @@ impl CCodegen:
                 return 0
             return value
         self.local_call_ret_cache.insert(cache_key, -1)
-        var out = 0
+        var out: i32 = 0
         for bb in 0..body.block_count():
             if body.term_kind(bb) != TermKind.TK_CALL:
                 continue
@@ -2786,7 +2786,7 @@ impl CCodegen:
                 return 0
             return value
         self.local_copied_payload_cache.insert(cache_key, -1)
-        var out = 0
+        var out: i32 = 0
         for bb in 0..body.block_count():
             let start = body.bb_stmt_starts[bb]
             let count = body.bb_stmt_counts[bb]
@@ -2860,7 +2860,7 @@ impl CCodegen:
         self.local_downcast_option_cache.insert(cache_key, -1)
         if self.local_declared_non_option_payload_enum(body, local_id):
             return 0
-        var out = 0
+        var out: i32 = 0
         for bb in 0..body.block_count():
             let start = body.bb_stmt_starts[bb]
             let count = body.bb_stmt_counts[bb]
@@ -3263,8 +3263,8 @@ impl CCodegen:
         let count = body.place_proj_counts[place_id]
         // A payload enum's downcast names its variant; the field after it is
         // that variant's payload field `pd` (MirCore's projection typing).
-        var downcast_enum_tid = 0
-        var downcast_variant = -1
+        var downcast_enum_tid: i32 = 0
+        var downcast_variant: i32 = -1
         for i in 0..count:
             let pk = body.proj_kinds[(start + i)]
             let pd = body.proj_d0[(start + i)]
@@ -3620,7 +3620,7 @@ impl CCodegen:
             let field_sym: i32 = self.sema.type_extra[(start + fi * 3)]
             let field_name = cc_intern_resolve(self.intern, field_sym)
             let field_tid = self.effective_field_tid(resolved, field_sym, self.sema.type_extra[(start + fi * 3 + 1)])
-            var value = 0
+            var value: i32 = 0
             for li in 0..lit_count:
                 let lit_name = self.ast.get_extra(lit_start + li * 2)
                 if (lit_name == 0 and li == fi) or (lit_name != 0 and cc_intern_resolve(self.intern, lit_name) == field_name):
@@ -4029,7 +4029,7 @@ impl CCodegen:
                     body.agg_field_name_syms[(start + i)]
                 else:
                     0
-                var agg_field_tid = 0
+                var agg_field_tid: i32 = 0
                 if dst_tk == TypeKind.TY_STRUCT and name_sym != 0:
                     let field_name = cc_intern_resolve(self.intern, name_sym)
                     if field_name.len() > 0 and self.struct_field_tid(dst_resolved as i32, name_sym) != 0:
@@ -4649,7 +4649,7 @@ impl CCodegen:
         let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
         let first_arg_tid = self.call_first_arg_resolved_tid(body, args_id)
         let first_owner = self.type_owner_text(first_arg_tid)
-        var match_sym = 0
+        var match_sym: i32 = 0
         var match_score = -1
         for i in 0..self.mir_mod.body_fn_syms.len() as i32:
             let cand: i32 = self.mir_mod.body_fn_syms[i]
@@ -4945,7 +4945,7 @@ impl CCodegen:
         let cache_hit = self.local_usage_hint_cache_lookup(body.fn_sym, local_id)
         if cache_hit != -1234567:
             return cache_hit
-        var hint_tid = 0
+        var hint_tid: i32 = 0
 
         // Prefer concrete typed use-sites where this local flows into a known call parameter.
         for bb in 0..body.block_count():
@@ -4953,7 +4953,7 @@ impl CCodegen:
                 continue
             let callee_operand = body.term_data0(bb)
             let args_id = body.term_data1(bb)
-            var sig_idx = -1
+            var sig_idx: i32 = -1
             let fn_sym = self.call_callee_fn_sym(body, callee_operand)
             if fn_sym != 0:
                 sig_idx = self.sig_index_for_sym(fn_sym)
@@ -5069,7 +5069,7 @@ impl CCodegen:
             return 0
         self.direct_infer_push(args_id, dest_place)
         let local_scan = self.infer_direct_call_sym_scan(body, args_id, dest_place, 1)
-        var result = 0
+        var result: i32 = 0
         if local_scan == -2 or local_scan > 0:
             result = local_scan
         else:
@@ -5256,7 +5256,7 @@ impl CCodegen:
             return 0
         self.method_infer_push(method_sym, args_id, dest_place)
         let local_scan = self.infer_qualified_method_sym_scan(body, method_sym, args_id, dest_place, 1)
-        var result = 0
+        var result: i32 = 0
         if local_scan == -2 or local_scan > 0:
             result = local_scan
         else:
@@ -6180,7 +6180,7 @@ impl CCodegen:
                 0
             else:
                 1
-        var recv_hint = 0
+        var recv_hint: i32 = 0
 
         for bb in 0..body.block_count():
             let tk = body.term_kind(bb)
@@ -8542,7 +8542,7 @@ impl CCodegen:
         if hinted != -1234567:
             return hinted
 
-        var inferred = 0
+        var inferred: i32 = 0
         for bi in 0..self.mir_mod.bodies.len() as i32:
             if self.check_interrupted() != 0:
                 return 0
@@ -8557,7 +8557,7 @@ impl CCodegen:
                     let args_id = body.term_data1(bb)
                     let dest_place = body.term_data2(bb)
 
-                    var sig_idx = -1
+                    var sig_idx: i32 = -1
                     if callee_operand >= 0 and callee_operand < body.operand_kinds.len() as i32:
                         if body.operand_kinds[callee_operand] == OperandKind.OK_CONSTANT:
                             let const_id = body.operand_d0[callee_operand]
@@ -8599,7 +8599,7 @@ impl CCodegen:
                     let rval_id = body.stmt_d1[stmt_id]
 
                     if self.field_place_matches(body, dst_place, resolved_struct, field_sym) != 0:
-                        var rv_tid = 0
+                        var rv_tid: i32 = 0
                         if rval_id >= 0 and rval_id < body.rval_kinds.len() as i32:
                             let rk = body.rval_kinds[rval_id]
                             let rd0 = body.rval_d0[rval_id]
@@ -10088,7 +10088,7 @@ impl CCodegen:
                 return 0
             return value
         self.local_ref_target_cache.insert(cache_key, -1)
-        var out = 0
+        var out: i32 = 0
         for bb in 0..body.block_count():
             let start = body.bb_stmt_starts[bb]
             let count = body.bb_stmt_counts[bb]
@@ -10103,7 +10103,7 @@ impl CCodegen:
                 if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
                     continue
                 let rk = body.rval_kinds[rval_id]
-                var src_place = -1
+                var src_place: i32 = -1
                 if rk == RvalueKind.RK_REF:
                     // A `&str` view is the str's {ptr, len}, not a pointer
                     // to the place it was read from (#1810).
@@ -10724,7 +10724,7 @@ impl CCodegen:
                 needs_override = 1
             if needs_override == 0:
                 continue
-            var ret_tid = 0
+            var ret_tid: i32 = 0
             if call_kind == CcBuiltin.MAP_GET:
                 ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
             else if intrinsic_kind != CcBuiltin.NONE:

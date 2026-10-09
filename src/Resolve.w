@@ -214,7 +214,7 @@ pub fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root
     state.root_source_dir = with_str_clone_ref(root_dir)
     let root_module = state.reserve_module(root_path, root_dir, root_file_id)
 
-    var work = 0
+    var work: i32 = 0
     while work < state.module_paths.len() as i32:
         if state.module_processed[work] != 0:
             work = work + 1

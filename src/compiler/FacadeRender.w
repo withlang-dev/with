@@ -201,7 +201,7 @@ fn facade_render_item_rename_of(pool: AstPool, intern: InternPool, item: i32) ->
 // clause names, on the resource itself or on the one parent it holds — or
 // "" when the resource states none (Sema refuses a clause that is neither).
 fn facade_render_message_call(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32) -> str:
-    var named = 0
+    var named: i32 = 0
     let extra_start = pool.get_data1(resource as NodeId)
     for k in 0..pool.get_data2(resource as NodeId):
         let clause = pool.get_extra(extra_start + 1 + k)
@@ -1043,13 +1043,13 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &List[i32], ite
     let out_refs: List[i32] = List.new()   // parallel to producers; 0 for a direct return
     // The `borrows` and `independent` clauses are read by
     // facade_render_item_deps, the one dependency derivation.
-    var drop_fn = 0
-    var init_fn = 0
-    var preinit_fn = 0
+    var drop_fn: i32 = 0
+    var init_fn: i32 = 0
+    var preinit_fn: i32 = 0
     // `ok C1, C2, …` (§16.2b.4): every listed status is success.
     let ok_syms: List[i32] = List.new()
     var movable = false
-    var abandon_fn = 0
+    var abandon_fn: i32 = 0
     let destroyers: List[i32] = List.new()
     for k in 0..clause_count:
         let clause = pool.get_extra(extra_start + 1 + k)
@@ -1262,8 +1262,8 @@ fn facade_render_item_deps(pool: AstPool, intern: InternPool, ci: &List[i32], it
     let borrow_owners: List[i32] = List.new()
     var last_producer = -2
     var independent = false
-    var init_fn = 0
-    var preinit_fn = 0
+    var init_fn: i32 = 0
+    var preinit_fn: i32 = 0
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(extra_start + 1 + k)
         let kind = pool.get_data0(clause as NodeId)
@@ -1292,7 +1292,7 @@ fn facade_render_parent_field(pool: AstPool, intern: InternPool, ci: &List[i32],
     let deps = facade_render_item_deps(pool, intern, ci, item)
     if not deps.ok:
         return ""
-    var found = -1
+    var found: i32 = -1
     for si in 0..deps.slot_res.len() as i32:
         if intern.resolve(pool.get_data0(deps.slot_res[si] as NodeId)) == parent:
             if found >= 0:

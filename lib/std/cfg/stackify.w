@@ -425,7 +425,7 @@ fn stackify_compute_preds(graph: &StackifyGraph) -> StackifyPreds:
             counts[succ] = counts[succ] + 1
             si = si + 1
         b = b + 1
-    var total = 0
+    var total: i32 = 0
     var i = 0
     while i < n:
         starts[i] = total
@@ -480,7 +480,7 @@ fn stackify_compute_idom(graph: &StackifyGraph, post_ord: &List[i32], rpo_pos: &
             if node != graph.entry:
                 let rponum = rpo_pos[node]
                 var parent = stackify_invalid()
-                var pi = 0
+                var pi: i32 = 0
                 let pc = stackify_pred_count(preds, node)
                 while pi < pc:
                     let pred = stackify_pred_get(preds, node, pi)
@@ -490,7 +490,7 @@ fn stackify_compute_idom(graph: &StackifyGraph, post_ord: &List[i32], rpo_pos: &
                         pi = pc
                     pi = pi + 1
                 if parent != stackify_invalid():
-                    var pi2 = 0
+                    var pi2: i32 = 0
                     while pi2 < pc:
                         let pred = stackify_pred_get(preds, node, pi2)
                         if pred != parent and idom[pred] != stackify_invalid():

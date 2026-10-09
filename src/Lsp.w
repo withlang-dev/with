@@ -32,7 +32,7 @@ extern fn with_fs_read_file(path: &str) -> str
 // ── JSON-RPC framing ─────────────────────────────────────────
 
 fn lsp_read_message() -> str:
-    var content_length = 0
+    var content_length: i32 = 0
     while true:
         let line = with_read_line_stdin()
         if line.len() == 0 or line == "\r":
@@ -852,7 +852,7 @@ impl LspState:
         let intern = if use_cache: &self.documents[idx].cached_intern else: &comp.zcu.pool
 
         var hover = ""
-        var decl_start = 0
+        var decl_start: i32 = 0
         for di in 0..pool.decl_count():
             let decl = pool.get_decl(di)
             let kind = pool.kind(decl)
@@ -1232,7 +1232,7 @@ impl LspState:
             let decl = pool.get_decl(di)
             let kind = pool.kind(decl)
             var label = ""
-            var ck = 0
+            var ck: i32 = 0
             if kind == NodeKind.NK_FN_DECL:
                 label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
                 ck = 3
@@ -1518,8 +1518,8 @@ impl LspState:
 
         // Walk backward to find the opening ( and count commas for active param
         var paren_depth = 0
-        var comma_count = 0
-        var fn_name_tok = -1
+        var comma_count: i32 = 0
+        var fn_name_tok: i32 = -1
         var ti = cursor_tok
         while ti >= 0:
             let tag = tokens.get_tag(ti)
@@ -1734,7 +1734,7 @@ impl LspState:
             let decl = pool.get_decl(di)
             let kind = pool.kind(decl)
             var label = ""
-            var sk = 0
+            var sk: i32 = 0
             if kind == NodeKind.NK_FN_DECL:
                 label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
                 sk = 12
