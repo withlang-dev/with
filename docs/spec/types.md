@@ -717,7 +717,9 @@ let pool = connect("postgres://localhost/mydb", PoolConfig {
 ### 4.3a Fixed-Size Arrays
 
 Fixed-size arrays have a compile-time-known length and are
-stack-allocated value types:
+stack-allocated value types. A fixed array is With's fixed-size value — a
+`float3`, a matrix, a hash state, a struct field whose bytes C reads — and
+a `List` is the growable sequence (D119):
 
 ```
 let a: [i32; 4] = [1, 2, 3, 4]
@@ -923,9 +925,11 @@ let none: List[i32] = []                // empty sequence (type from context)
    form `[value; N]` follows the same rule: a `List` of N elements unless a
    fixed array is demanded (D113).
 
-   A literal that is never grown or retained needn't touch the heap: the
-   compiler may place it on the stack, or in static data when its elements
-   are constants. The program cannot tell the difference.
+   A literal that is never pushed, grown, moved out, stored or retained
+   does not touch the heap: it is placed on the stack, or in static data
+   when its elements are constants. This is a guaranteed lowering, not an
+   optimization the compiler may skip (D119). The program cannot tell the
+   difference.
 
    Duplicate constants in a set literal warn: `["a", "a"]` demanded as a
    set is almost always a typo. A `List` keeps every element: `let v =

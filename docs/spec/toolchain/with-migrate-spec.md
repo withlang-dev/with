@@ -344,6 +344,37 @@ requires types to be defined before use (except through pointers).
 
 ---
 
+## Arrays (D119)
+
+A C array becomes what a With programmer writes for it, decided by what
+the C program can do with it:
+
+- **A local or file-scope array becomes a `List`.** An initialized table
+  `int t[4] = {1, 2, 3, 4}` is `let t = [1, 2, 3, 4]`; an uninitialized
+  buffer `char buf[256]` is a 256-element zero fill, never a capacity (a
+  capacity is length 0, and `buf[10]` would panic). C cannot assign such
+  an array or pass it by value — it decays to a pointer — so nothing it
+  does needs the elements inline. The length is carried, so
+  `sizeof(t) / sizeof(t[0])` becomes `t.len()`. A two-dimensional local
+  `int a[4][4]` is `List[[i32; 4]]`: its rows are inline values and the
+  whole is contiguous.
+- **A struct or union field stays `[T; N]`** (`[[T; N]; M]` when nested).
+  Migrated C treats structs as bytes — `memcpy(&a, &b, sizeof a)`,
+  `memset(&s, 0, sizeof s)`, `fwrite(&rec, sizeof rec, 1, f)` — and struct
+  assignment copies the array inline. A `List` field would copy a header
+  and share a buffer.
+- **An array whose address goes to C** (`fread(buf, 1, sizeof buf, f)`)
+  passes the list's data pointer and its length, not the list.
+- Elements are typed by the array's element type (§4.3c), never cast one
+  by one, and a fixed array is spelled `[T; N]`.
+
+The first rule depends on the guaranteed no-heap lowering of §4.3c: the
+migrator emits a `List` for local and file-scope arrays only once that
+lowering holds, and each corpus is benchmarked against its C before and
+after the switch. Until then they stay `[T; N]`.
+
+---
+
 ## Multi-File Translation
 
 A C project has multiple `.c` files that share headers.
