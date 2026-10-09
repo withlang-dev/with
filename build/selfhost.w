@@ -1976,7 +1976,7 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
     rc = bs_write_fixture(ctx, bs_join(scheduler_dir, "with.toml"), "[package]\nname = \"runtimeworkers\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_worker_count = 2\nfiber_pool_size = 8\n", "runtime worker manifest")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(scheduler_dir, "src/main.w"),
-        "use std.sync\nuse std.task.Task\n\n" ++
+        "use std.sync\nuse std.task.Task\nuse std.time\n\n" ++
         "extern fn with_fiber_yield() -> Unit\n" ++
         "extern fn with_runtime_run_one_step() -> Unit\n" ++
         "extern fn with_fiber_is_cancelled() -> i32\n" ++
@@ -2016,9 +2016,12 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
         "    let b = busy(2)\n" ++
         "    let c = busy(3)\n" ++
         "    let d = busy(4)\n" ++
+        "    // A deadline, not a spin count: under a loaded machine the OS may\n" ++
+        "    // not run the second worker within any fixed number of spins.\n" ++
+        "    let deadline = now_ns() + 30000000000\n" ++
+        "    while with_runtime_fiber_running_worker(fiber_of(victim)) != 1 and now_ns() < deadline:\n" ++
+        "        continue\n" ++
         "    var guard = 0\n" ++
-        "    while with_runtime_fiber_running_worker(fiber_of(victim)) != 1 and guard < 2000000:\n" ++
-        "        guard = guard + 1\n" ++
         "    let running_worker = with_runtime_fiber_running_worker(fiber_of(victim))\n" ++
         "    assert(running_worker == 1)\n" ++
         "    let before_cancel = with_fiber_cross_thread_cancels()\n" ++
