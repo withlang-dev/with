@@ -2057,7 +2057,7 @@ impl MirBuilder:
         let resolved = self.sema.resolve_alias(list_ty) as i32
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
-        if self.sema.std_generic_of(resolved) != StdGeneric.Sequence:
+        if self.sema.std_generic_of(resolved) != StdGeneric.List:
             return 0
         resolved
 
@@ -2190,7 +2190,7 @@ impl MirBuilder:
         if tk == TypeKind.TY_REF:
             return self.indexed_element_type(self.sema.get_type_d0(resolved))
         if tk == TypeKind.TY_GENERIC_INST:
-            if self.sema.std_generic_of(resolved) == StdGeneric.Sequence and self.sema.get_generic_inst_arg_count(resolved) > 0:
+            if self.sema.std_generic_of(resolved) == StdGeneric.List and self.sema.get_generic_inst_arg_count(resolved) > 0:
                 return self.sema.get_generic_inst_arg(resolved, 0)
         0
 
@@ -7992,7 +7992,7 @@ impl MirBuilder:
             if ref_inner_ty != 0:
                 let ref_inner_resolved = self.sema.resolve_alias(ref_inner_ty)
                 let rin_std = self.sema.std_generic_of(ref_inner_resolved as i32)
-                if rin_std == StdGeneric.Sequence:
+                if rin_std == StdGeneric.List:
                     return self.lower_for_iter_ref(for_node, pat_or_sym, ref_inner, body_expr)
                 // #1187: `for (k, v) in &m` walks m's table in place.
                 if rin_std == StdGeneric.HashMap:
@@ -8011,7 +8011,7 @@ impl MirBuilder:
             if self.sema.get_type_kind(range_resolved) == TypeKind.TY_REF:
                 let ref_pointee = self.sema.resolve_alias(self.sema.get_type_d0(range_resolved))
                 let rp_std = self.sema.std_generic_of(ref_pointee as i32)
-                if rp_std == StdGeneric.Sequence:
+                if rp_std == StdGeneric.List:
                     return self.lower_for_iter_ref(for_node, pat_or_sym, iter_expr, body_expr)
                 // #1187: a `&HashMap` binding (a borrowed parameter)
                 // traverses like the map it views.
@@ -8036,7 +8036,7 @@ impl MirBuilder:
             if tk == TypeKind.TY_GENERIC_INST:
                 let iter_std = self.sema.std_generic_of(resolved as i32)
                 if iter_std != StdGeneric.None:
-                    if iter_std == StdGeneric.Sequence:
+                    if iter_std == StdGeneric.List:
                         // §13 implicit iteration borrows the collection. An
                         // element with drop glue (Drop-class, or a str under
                         // D111) iterates as a &T view, as Sema binds it
@@ -8064,7 +8064,7 @@ impl MirBuilder:
                 let iter_intrinsic = self.sema.method_intrinsic_in_body(self.body.instance_sym, iter_expr)
                 if iter_intrinsic == MirIntrinsic.LIST_ITER:
                     let recv_resolved = self.sema.resolve_alias(self.expr_type(recv))
-                    if self.sema.std_generic_of(recv_resolved as i32) == StdGeneric.Sequence:
+                    if self.sema.std_generic_of(recv_resolved as i32) == StdGeneric.List:
                         // .iter() ≡ the implicit form (§13): same
                         // borrow split as the bare-List dispatch.
                         self.body.note_elided_call_node(iter_expr)
@@ -8072,9 +8072,9 @@ impl MirBuilder:
                         if self.sema.type_needs_drop_frozen(it_elem) != 0:
                             return self.lower_for_iter_ref(for_node, pat_or_sym, recv, body_expr)
                         return self.lower_for_list(for_node, pat_or_sym, recv, body_expr)
-                if iter_intrinsic == MirIntrinsic.LIST_ITER_REF and self.sema.std_generic_of(self.expr_type(recv)) == StdGeneric.Sequence:
+                if iter_intrinsic == MirIntrinsic.LIST_ITER_REF and self.sema.std_generic_of(self.expr_type(recv)) == StdGeneric.List:
                     return self.lower_for_iter_ref(for_node, pat_or_sym, recv, body_expr)
-                if iter_intrinsic == MirIntrinsic.LIST_ITER_PLACE and self.sema.std_generic_of(self.expr_type(recv)) == StdGeneric.Sequence:
+                if iter_intrinsic == MirIntrinsic.LIST_ITER_PLACE and self.sema.std_generic_of(self.expr_type(recv)) == StdGeneric.List:
                     return self.lower_for_iter_place(for_node, pat_or_sym, recv, body_expr)
 
         // Generic iterator protocol: resolve next() on the iterator type.
@@ -9128,7 +9128,7 @@ impl MirBuilder:
             if tk == TypeKind.TY_SLICE or tk == TypeKind.TY_ARRAY:
                 self.lower_comprehension_slice(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr)
                 return
-            if tk == TypeKind.TY_GENERIC_INST and self.sema.std_generic_of(resolved as i32) == StdGeneric.Sequence:
+            if tk == TypeKind.TY_GENERIC_INST and self.sema.std_generic_of(resolved as i32) == StdGeneric.List:
                 self.lower_comprehension_list(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr)
                 return
 
@@ -9145,7 +9145,7 @@ impl MirBuilder:
                     if recv_ty != 0:
                         let recv_resolved = self.sema.resolve_alias(recv_ty)
                         if self.sema.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
-                            if self.sema.std_generic_of(recv_resolved as i32) == StdGeneric.Sequence:
+                            if self.sema.std_generic_of(recv_resolved as i32) == StdGeneric.List:
                                 self.body.note_elided_call_node(iter_expr)
                                 self.lower_comprehension_list(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, recv)
                                 return

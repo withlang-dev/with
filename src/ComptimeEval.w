@@ -7592,7 +7592,7 @@ impl ComptimeEvaluator:
         for elem in elems.into_iter():
             self.push_extra_value(elem)
         let type_id = self.node_type_or(node, 0)
-        if type_id != 0 and self.sema.std_generic_of(type_id) == StdGeneric.Sequence:
+        if type_id != 0 and self.sema.std_generic_of(type_id) == StdGeneric.List:
             return comptime_control_value(comptime_value_list(type_id, start, count))
         comptime_control_value(comptime_value_array(type_id, start, count))
 

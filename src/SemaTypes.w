@@ -458,9 +458,7 @@ impl Copy for MethodLowering
 // the instance's declaration — never by a later stage reading its name.
 pub enum StdGeneric: i32:
     None = 0
-    // `List` (D118). Spelled `Sequence` while the step-(a) seed drives the
-    // build: its `List` alias misses a member name after a dot (#2296).
-    Sequence
+    List
     HashMap
     HashSet
     BTreeMap

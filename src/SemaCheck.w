@@ -14667,7 +14667,7 @@ impl Sema:
         let have = if recv_ty != 0: self.resolve_alias(recv_ty as TypeId) as i32 else: 0
         var elem = if have == 0: 0
             else if self.get_type_kind(have as TypeId) == TypeKind.TY_ARRAY: self.get_type_d0(have as TypeId)
-            else if self.std_generic_of(have) == StdGeneric.Sequence: self.get_generic_inst_arg(have, 0)
+            else if self.std_generic_of(have) == StdGeneric.List: self.get_generic_inst_arg(have, 0)
             else: 0
         if elem == 0 and first_arg_ty != 0: elem = self.auto_deref_ref_ptr_type(self.resolve_alias(first_arg_ty as TypeId)) as i32
         if elem == 0:
@@ -31524,7 +31524,7 @@ impl Sema:
             // `Iterable.iter`, declared `-> ListIter[T]`), it is what is made.
             let wanted = if self.has_expected_type != 0 and self.expected_expr_type != 0: self.resolve_alias(self.expected_expr_type) as i32 else: 0
             let wants_by_value = wanted != 0 and self.get_type_kind(wanted as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(wanted) == self.syms.listiter
-            if not wants_by_value and list_ty != 0 and self.std_generic_of(list_ty) == StdGeneric.Sequence and not self.copy_is_bits(self.get_generic_inst_arg(list_ty, 0)):
+            if not wants_by_value and list_ty != 0 and self.std_generic_of(list_ty) == StdGeneric.List and not self.copy_is_bits(self.get_generic_inst_arg(list_ty, 0)):
                 field = self.syms.iter_ref
         let ret = self.check_method_call_parts_inner(expr, field, extra_start, arg_count, node, known_recv_ty)
         // §15.3: `next()` advances the iterator, so it needs a place. The
@@ -31734,7 +31734,7 @@ impl Sema:
     fn std_generic_of_base(base: i32, tid: i32) -> StdGeneric:
         if base == 0:
             return StdGeneric.None
-        if base == self.syms.list: return StdGeneric.Sequence
+        if base == self.syms.list: return StdGeneric.List
         if base == self.syms.hashmap: return StdGeneric.HashMap
         if base == self.syms.hashset: return StdGeneric.HashSet
         if base == self.syms.option: return StdGeneric.Option
