@@ -14,7 +14,7 @@ use std.collections.engine_slot.Slot
 use std.collections.engine_slot.slot_compare
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut u8)
 extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 
 /// Values kept in ascending `Ord` order (D41: `cmp` backs the `<`/`>` the
@@ -42,7 +42,7 @@ impl[T: Ord] SortedList[T]:
         unsafe { sortedarray_get(self.array, index as c_uint) } as *mut Slot[T]
 
     /// Inserts `value` at its sorted position, after any equal values.
-    pub mut fn insert(value: T) -> Unit:
+    pub mut fn insert(value: T):
         let slot = unsafe { with_alloc(sizeof[Slot[T]]() as i64) } as *mut Slot[T]
         unsafe { *slot = Slot { compare: self.comparator(), value: value } }
         assert(unsafe { sortedarray_insert(self.array, slot as *mut c_void) } != 0)
@@ -74,7 +74,7 @@ impl[T: Ord] SortedList[T]:
     pub fn contains(value: &T) -> bool: self.index_of(value).is_some()
 
     /// Drops every value and empties the collection.
-    pub mut fn clear() -> Unit:
+    pub mut fn clear():
         for index in 0..self.len():
             var slot = unsafe { self.slot_at(index) }
             let value: T = unsafe { move slot.value }
