@@ -432,51 +432,6 @@ impl[T] Vec[T]:
     // `iter()` yields views (#2145), so the pairs hold `&T`.
     fn enumerate(): self.iter() |> enumerate()
 
-impl[T] Vec[T]:
-    /// Exchanges elements `i` and `j` in place. Their bytes move between the
-    /// two slots; nothing is copied or dropped (§2.3: transport is not
-    /// duplication). Panics when either index is out of range.
-    pub mut fn swap(i: i64, j: i64):
-        if i < 0 or j < 0 or i >= self.len or j >= self.len:
-            panic(f"Vec.swap: index out of range (len {self.len}, {i} and {j})")
-        if i == j: return
-        let a = self.ptr as i64 + i * self.elem_size
-        let b = self.ptr as i64 + j * self.elem_size
-        var k = 0
-        while k < self.elem_size:
-            let pa = (a + k) as *mut u8
-            let pb = (b + k) as *mut u8
-            let byte = unsafe *pa
-            unsafe *pa = unsafe *pb
-            unsafe *pb = byte
-            k = k + 1
-
-impl[T: Ord] Vec[T]:
-    /// Sorts the elements in ascending order, in place: heapsort, O(n log n),
-    /// no allocation; elements move by `swap`, never by copy. Not stable.
-    pub mut fn sort():
-        let n = self.len()
-        var start = n / 2
-        while start > 0:
-            start = start - 1
-            self.sift_down(start, n)
-        var end = n
-        while end > 1:
-            end = end - 1
-            self.swap(0, end)
-            self.sift_down(0, end)
-
-    // Restores the max-heap below `root` within the first `end` elements.
-    mut fn sift_down(root: i64, end: i64):
-        var parent = root
-        while true:
-            var child = 2 * parent + 1
-            if child >= end: return
-            if child + 1 < end and self[child] < self[child + 1]: child = child + 1
-            if not (self[parent] < self[child]): return
-            self.swap(parent, child)
-            parent = child
-
 /// Consuming iterator over Vec[T] (§13, D33). Obtain via `vec.into_iter()`:
 /// the Vec moves into the iterator and each `.next()` moves one element out.
 /// Dropping the iterator early (break, `?`, return) releases the un-yielded
