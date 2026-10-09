@@ -1325,6 +1325,12 @@ pub fn run_cli_selfhost_fmt_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_fmt_case(ctx, compiler_path, output_dir, "fmt-default-preserve", "", "fn add(a: i32) -> i32: a + 1\n", "fn add(a: i32) -> i32: a + 1")
     if rc != 0: return rc
+    // A `;` inside brackets is part of `[T; N]`, never a statement split.
+    rc = bs_fmt_case(ctx, compiler_path, output_dir, "fmt-array-semicolon", "", "fn f(m: [f32; 4]) -> f32: m[0]\n", "fn f(m: [f32; 4]) -> f32: m[0]")
+    if rc != 0: return rc
+    // D119: nested arrays are written in index order; an index is not one.
+    rc = bs_fmt_case(ctx, compiler_path, output_dir, "fmt-array-flatten", "", "fn f(c: [[[u8; 3]; 16]; 16], r: List[[i32; 3]]): c[[1; 2][0]]\n", "fn f(c: [u8; 16, 16, 3], r: List[[i32; 3]]): c[[1; 2][0]]")
+    if rc != 0: return rc
     rc = bs_fmt_case(ctx, compiler_path, output_dir, "fmt-brace-idempotent", "--prefer-brace", "fn add(a: i32, b: i32) -> i32 {a + b}\n", "fn add(a: i32, b: i32) -> i32 {a + b}")
     if rc != 0: return rc
     print("CLI-SELFHOST-FMT OK")
@@ -4518,7 +4524,7 @@ fn bs_check_migrate_d119_arrays(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     let out_text = ctx.fs().read_text(out_w)
     rc = bs_assert_contains(ctx, out_text, "let table: [c_uint; 4] = [1, 2, 3, ", "D119 arrays: [T; N] with bare literals")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let grid: [[c_int; 2]; 2] = [[1, 2], [3, 4]]", "D119 arrays: nested")
+    rc = bs_assert_contains(ctx, out_text, "let grid: [c_int; 2, 2] = [[1, 2], [3, 4]]", "D119 arrays: nested")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "table.len()", "D119 arrays: sizeof ratio is len()")
     if rc != 0: return rc

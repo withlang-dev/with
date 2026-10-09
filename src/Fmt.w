@@ -157,7 +157,71 @@ fn emit_indent(indent: i32) -> str:
 // ── Core formatter ──────────────────────────────────────────────
 
 // style: 0=preserve, 1=prefer-colon, 2=prefer-brace
-pub fn format_source_styled(source: &str, style: i32) -> str:
+// D119: a nested array is written with its dimensions in index order:
+// `[[E; d_in]; d_out]` becomes `[E; d_out, d_in]`, the same type (or the
+// same fill), until none is left (`[[[T; 4]; 3]; 2]` → `[T; 2, 3, 4]`). An
+// outer `[` that indexes (after a name, `]` or `)`) is not an array.
+fn flatten_nested_arrays(source: &str) -> str:
+    var text: str = source
+    for _ in 0..16:
+        let next = flatten_nested_arrays_once(text)
+        if next == text: return text
+        text = next
+    text
+
+// The source text from token `a` through token `b`.
+fn token_span(source: &str, tokens: &TokenList, a: i32, b: i32) -> str:
+    source.slice(tokens.get_start(a), tokens.get_end(b))
+
+fn flatten_nested_arrays_once(source: &str) -> str:
+    var lexer = Lexer.init(source, 0)
+    let tokens = lexer.tokenize_with_comments()
+    let n = tokens.len()
+    for i in 0..n - 1:
+        if tokens.get_tag(i) != TokenKind.TK_L_BRACKET or tokens.get_tag(i + 1) != TokenKind.TK_L_BRACKET:
+            continue
+        if i > 0:
+            let before = tokens.get_tag(i - 1)
+            if before == TokenKind.TK_IDENT or before == TokenKind.TK_R_BRACKET or before == TokenKind.TK_R_PAREN:
+                continue
+        // The inner `[E; d_in]`: its top-level `;` and its `]`.
+        var depth = 0
+        var semi = -1
+        var inner_close = -1
+        var j = i + 2
+        while j < n:
+            let t = tokens.get_tag(j)
+            if t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_L_PAREN: depth += 1
+            else if t == TokenKind.TK_R_BRACKET or t == TokenKind.TK_R_PAREN:
+                if depth == 0:
+                    inner_close = j
+                    break
+                depth -= 1
+            else if t == TokenKind.TK_SEMICOLON and depth == 0 and semi < 0: semi = j
+            j += 1
+        if semi < 0 or inner_close < 0 or inner_close + 1 >= n or tokens.get_tag(inner_close + 1) != TokenKind.TK_SEMICOLON:
+            continue
+        // The outer `; d_out]`.
+        depth = 0
+        var outer_close = -1
+        var k = inner_close + 2
+        while k < n:
+            let t = tokens.get_tag(k)
+            if t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_L_PAREN: depth += 1
+            else if t == TokenKind.TK_R_BRACKET or t == TokenKind.TK_R_PAREN:
+                if depth == 0:
+                    outer_close = k
+                    break
+                depth -= 1
+            k += 1
+        if outer_close < 0 or semi + 1 >= inner_close or inner_close + 2 >= outer_close:
+            continue
+        let flat = "[" ++ token_span(source, &tokens, i + 2, semi - 1) ++ "; " ++ token_span(source, &tokens, inner_close + 2, outer_close - 1) ++ ", " ++ token_span(source, &tokens, semi + 1, inner_close - 1) ++ "]"
+        return source.slice(0, tokens.get_start(i)) ++ flat ++ source.slice(tokens.get_end(outer_close), source.len())
+    source
+
+pub fn format_source_styled(input: &str, style: i32) -> str:
+    let source = flatten_nested_arrays(input)
     var lexer = Lexer.init(source, 0)
     let tokens = lexer.tokenize_with_comments()
     let count = tokens.len()
@@ -187,7 +251,9 @@ pub fn format_source_styled(source: &str, style: i32) -> str:
         if tag == TokenKind.TK_EOF:
             break
 
-        if tag == TokenKind.TK_NEWLINE or tag == TokenKind.TK_SEMICOLON:
+        // A `;` inside […] or (…) is part of what it is in (`[T; N]`), not a
+        // statement separator.
+        if tag == TokenKind.TK_NEWLINE or (tag == TokenKind.TK_SEMICOLON and group_depth == 0):
             if not at_line_start:
                 while inline_close_count > 0:
                     out = out ++ "}"
@@ -388,10 +454,10 @@ fn needs_space_before(cur: i32, prev: i32) -> bool:
     if cur == TokenKind.TK_DOT or prev == TokenKind.TK_DOT: return false
     if cur == TokenKind.TK_QUESTION_DOT or prev == TokenKind.TK_QUESTION_DOT: return false
     if cur == TokenKind.TK_DOT_IDENT: return false
-    // No space before comma
-    if cur == TokenKind.TK_COMMA: return false
-    // Space after comma
-    if prev == TokenKind.TK_COMMA: return true
+    // No space before comma or a bracketed `;` (`[T; N]`)
+    if cur == TokenKind.TK_COMMA or cur == TokenKind.TK_SEMICOLON: return false
+    // Space after comma or `;`
+    if prev == TokenKind.TK_COMMA or prev == TokenKind.TK_SEMICOLON: return true
     // No space before colon, space after colon
     if cur == TokenKind.TK_COLON: return false
     if prev == TokenKind.TK_COLON: return true

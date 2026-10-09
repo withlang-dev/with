@@ -2783,13 +2783,15 @@ pub fn ci_default_for_type(ty: &str) -> str:
     // But NOT struct types — those need struct-literal defaults, not integer 0.
     // Check: if the type resolves to a primitive int alias, use 0.
     // Otherwise leave empty (no default) for struct/union/opaque types.
-    // Array types [T; N] → emit [0 as T; N]
+    // Array types [T; N] → emit [0 as T; N]; a row of an array type joins
+    // its fill's dimensions (D119): [T; 2, 3] → [0 as T; 2, 3].
     if ty.len() > 0 and ty[0] == 91:
         let elem = ci_array_text_elem(ty)
         let count = ci_array_text_count(ty)
         if elem.len() > 0 and count.len() > 0:
             let elem_default = ci_default_for_type(elem)
             if elem_default.len() > 0:
+                if elem[0] == '[': return ci_array_text(elem_default, count)
                 return "[" ++ elem_default ++ " as " ++ elem ++ "; " ++ count ++ "]"
         return ""
     // Unknown types (struct/union/opaque) — no safe default

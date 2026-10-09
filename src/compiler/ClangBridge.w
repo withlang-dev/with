@@ -651,6 +651,32 @@ unsafe fn buf_append_str(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
         i = i + 1
     *((buf as i64 + *pos) as *mut u8) = 0
 
+/// buf_append_str for the bytes `s[from..to]`.
+unsafe fn buf_append_range(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8, from: i64, to: i64):
+    var i = from
+    while i < to and *pos < cap - 1:
+        *((buf as i64 + *pos) as *mut u8) = *((s as i64 + i) as *const u8)
+        *pos = *pos + 1
+        i = i + 1
+    *((buf as i64 + *pos) as *mut u8) = 0
+
+/// D119: the index of the top-level `;` of a fixed array type text
+/// `[T; dims]`, or -1 (a slice, the old `[N]T`, any other type).
+unsafe fn array_text_semicolon(s: *const u8) -> i64:
+    if s as i64 == 0 or *s != '[': return -1
+    let len = c_strlen(s)
+    var depth = 0
+    var i: i64 = 1
+    while i < len:
+        let ch = *((s as i64 + i) as *const u8)
+        if ch == '[' or ch == '(': depth = depth + 1
+        else if ch == ']' or ch == ')':
+            if depth == 0: return -1
+            depth = depth - 1
+        else if ch == ';' and depth == 0: return i
+        i = i + 1
+    -1
+
 /// buf_append_str for a file path: `\` is appended as `/` (the path boundary).
 unsafe fn buf_append_path(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
     if s as i64 == 0: return
@@ -1116,13 +1142,24 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             return elem_str
         var buf: [2048]u8 = [0 as u8; 2048]
         var pos: i64 = 0
-        // D119: `[T; N]`.
-        buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "[\0" as *const u8)
-        buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, elem_str as *const u8)
-        buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "; \0" as *const u8)
-        buf_append_i64(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, size)
-        buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "]\0" as *const u8)
-        return session_strdup(s, &buf as *const [2048]u8 as *const u8)
+        // D119: `[T; N]`; an array element joins the dimensions in index
+        // order, so C's `T a[2][3]` is `[T; 2, 3]`.
+        let out = &raw mut buf as *mut [u8; 2048] as *mut u8
+        let elem_semi = array_text_semicolon(elem_str as *const u8)
+        buf_append_str(out, &raw mut pos, 2048, "[\0" as *const u8)
+        if elem_semi > 0:
+            buf_append_range(out, &raw mut pos, 2048, elem_str as *const u8, 1, elem_semi)
+        else:
+            buf_append_str(out, &raw mut pos, 2048, elem_str as *const u8)
+        buf_append_str(out, &raw mut pos, 2048, "; \0" as *const u8)
+        buf_append_i64(out, &raw mut pos, 2048, size)
+        if elem_semi > 0:
+            // `, ` then the element's own dimensions, its `]` closing ours.
+            buf_append_str(out, &raw mut pos, 2048, ",\0" as *const u8)
+            buf_append_range(out, &raw mut pos, 2048, elem_str as *const u8, elem_semi + 1, c_strlen(elem_str as *const u8))
+        else:
+            buf_append_str(out, &raw mut pos, 2048, "]\0" as *const u8)
+        return session_strdup(s, &buf as *const [u8; 2048] as *const u8)
 
     if kind == CXType_IncompleteArray:
         let elem = clang_getArrayElementType(canonical)

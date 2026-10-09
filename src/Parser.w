@@ -6503,6 +6503,27 @@ impl Parser:
             self.pool.add_extra(specs[i])
         self.pool.add_node(NodeKind.NK_MULTI_INDEX, self.pool.get_start(base), self.prev_end(), base, extra_start, count)
 
+    // Desugar [value; N] to NodeKind.NK_ARRAY_LIT with N copies of value
+    // when N is an integer literal. Any other count (§4.3a: a `const`, or an
+    // expression of them) is kept as the literal's d2 with the value held
+    // once; Sema evaluates it (array_fill_count) and MirLower and the
+    // comptime evaluator read the count from Sema (#1478: it used to fall
+    // back to ONE copy silently, and a typed binding then read uninitialized
+    // tail elements).
+    mut fn array_fill_node(start: i32, value: i32, count_expr: NodeId) -> NodeId:
+        var fill_count = -1
+        if self.pool.kind(count_expr) == NodeKind.NK_INT_LIT:
+            let fast = self.pool.int_literal_fast_i64(count_expr)
+            if fast.ok != 0 and fast.value >= 0:
+                fill_count = fast.value as i32
+        let extra_start = self.pool.extra_len()
+        if fill_count < 0:
+            self.pool.add_extra(value)
+            return self.pool.add_node(NodeKind.NK_ARRAY_LIT, start, self.prev_end(), extra_start, 1, count_expr as i32)
+        for fi in 0..fill_count:
+            self.pool.add_extra(value)
+        self.pool.add_node(NodeKind.NK_ARRAY_LIT, start, self.prev_end(), extra_start, fill_count, 0)
+
     mut fn parse_index_expr() -> NodeId:
         self.parse_precedence(6)
 
@@ -8525,31 +8546,22 @@ impl Parser:
                     self.pool.add_extra(values[mi])
                 return self.pool.add_node(NodeKind.NK_MAP_LIT, start, self.prev_end(), map_extra_start, pair_count, 0)
 
-            // Array fill: [value; N]
+            // Array fill: [value; N], and D119's `[value; 2, 3]`, which is
+            // `[[value; 3]; 2]`: the fills nest from the last dimension out.
             if self.peek() == TokenKind.TK_SEMICOLON:
                 self.advance()  // consume ;
-                let count_expr = self.parse_expr()
+                let counts: List[i32] = [self.parse_expr() as i32]
+                while self.peek() == TokenKind.TK_COMMA:
+                    self.advance()
+                    self.skip_newlines()
+                    counts.push(self.parse_expr() as i32)
                 self.expect(TokenKind.TK_R_BRACKET)
-                // Desugar [value; N] to NodeKind.NK_ARRAY_LIT with N copies of value
-                // when N is an integer literal. Any other count (§4.3a: a
-                // `const`, or an expression of them) is kept as the literal's
-                // d2 with the value held once; Sema evaluates it
-                // (array_fill_count) and MirLower and the comptime evaluator
-                // read the count from Sema (#1478: it used to fall back to
-                // ONE copy silently, and a typed binding then read
-                // uninitialized tail elements).
-                var fill_count = -1
-                if self.pool.kind(count_expr) == NodeKind.NK_INT_LIT:
-                    let fast = self.pool.int_literal_fast_i64(count_expr)
-                    if fast.ok != 0 and fast.value >= 0:
-                        fill_count = fast.value as i32
-                let extra_start = self.pool.extra_len()
-                if fill_count < 0:
-                    self.pool.add_extra(first as i32)
-                    return self.pool.add_node(NodeKind.NK_ARRAY_LIT, start, self.prev_end(), extra_start, 1, count_expr as i32)
-                for fi in 0..fill_count:
-                    self.pool.add_extra(first as i32)
-                return self.pool.add_node(NodeKind.NK_ARRAY_LIT, start, self.prev_end(), extra_start, fill_count, 0)
+                var value = first as i32
+                var d = counts.len() - 1
+                while d >= 0:
+                    value = self.array_fill_node(start, value, counts[d] as NodeId) as i32
+                    d -= 1
+                return value as NodeId
 
             // Comprehension: [expr for pattern in iter ... if filter]
             if self.peek() == TokenKind.TK_KW_FOR:
@@ -9110,22 +9122,35 @@ impl Parser:
             if self.peek() == TokenKind.TK_SEMICOLON:
                 self.advance()  // consume ;
                 self.skip_newlines()
-                // §4.3a: N is an integer literal or a constant expression
-                // (a `const`). A non-literal length is the node's d2; Sema
-                // evaluates it (#2121).
-                if self.peek() != TokenKind.TK_INT_LIT:
-                    let len_expr = self.parse_expr()
+                // §4.3a: each dimension is an integer literal or a constant
+                // expression (a `const`); a non-literal length is the node's
+                // d2, which Sema evaluates (#2121). D119: `[T; 2, 3]` lists
+                // the dimensions in index order and is `[[T; 3]; 2]`: the
+                // nodes nest from the last dimension out.
+                let sizes: List[i32] = []
+                let len_exprs: List[i32] = []
+                while true:
+                    if self.peek() == TokenKind.TK_INT_LIT:
+                        let ss = self.current_start()
+                        let se = self.current_end()
+                        sizes.push(parse_int(self.source.slice(ss as i64, se as i64)))
+                        len_exprs.push(0)
+                        self.advance()
+                    else:
+                        sizes.push(0)
+                        len_exprs.push(self.parse_expr())
                     self.skip_newlines()
-                    self.expect(TokenKind.TK_R_BRACKET)
-                    return self.pool.add_node(NodeKind.NK_TYPE_ARRAY, start, self.prev_end(), elem, 0, len_expr)
-                let ss = self.current_start()
-                let se = self.current_end()
-                let size_text = self.source.slice(ss as i64, se as i64)
-                let size = parse_int(size_text)
-                self.advance()
-                self.skip_newlines()
+                    if self.peek() != TokenKind.TK_COMMA:
+                        break
+                    self.advance()
+                    self.skip_newlines()
                 self.expect(TokenKind.TK_R_BRACKET)
-                return self.pool.add_node(NodeKind.NK_TYPE_ARRAY, start, self.prev_end(), elem, size, 0)
+                var node = elem
+                var d = sizes.len() - 1
+                while d >= 0:
+                    node = self.pool.add_node(NodeKind.NK_TYPE_ARRAY, start, self.prev_end(), node, sizes[d], len_exprs[d])
+                    d -= 1
+                return node
             // [T] → slice type
             self.skip_newlines()
             self.expect(TokenKind.TK_R_BRACKET)

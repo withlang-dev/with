@@ -1475,8 +1475,15 @@ impl Sema:
         if tk == TypeKind.TY_ENUM:
             return self.safe_symbol_text(self.get_type_d0(resolved))
         if tk == TypeKind.TY_ARRAY:
-            let size = self.get_type_d1(resolved)
-            return f"[{size}]" ++ self.type_name(self.get_type_d0(resolved))
+            // D119: `[T; 2, 3]`, the dimensions in index order, however the
+            // nested type was written.
+            var dims = f"{self.get_type_d1(resolved)}"
+            var elem = self.get_type_d0(resolved)
+            while self.get_type_kind(self.resolve_alias(elem as TypeId)) == TypeKind.TY_ARRAY:
+                let inner = self.resolve_alias(elem as TypeId)
+                dims = dims ++ f", {self.get_type_d1(inner)}"
+                elem = self.get_type_d0(inner)
+            return "[" ++ self.type_name(elem) ++ "; " ++ dims ++ "]"
         if tk == TypeKind.TY_SLICE:
             let mut_text = if self.get_type_d1(resolved) != 0: "mut " else: ""
             return "[]" ++ mut_text ++ self.type_name(self.get_type_d0(resolved))

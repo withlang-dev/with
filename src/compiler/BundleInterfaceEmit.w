@@ -296,8 +296,14 @@ impl BundleEmitter:
             self.note_named_type(name_sym)
             return name
         if tk == TypeKind.TY_ARRAY:
-            let size = sema.get_type_d1(resolved)
-            return f"[{size}]" ++ self.spell(sema, sema.get_type_d0(resolved))
+            // D119: `[T; 2, 3]`, the dimensions in index order.
+            var dims = f"{sema.get_type_d1(resolved)}"
+            var elem = sema.get_type_d0(resolved)
+            while sema.get_type_kind(sema.resolve_alias(elem as TypeId)) == TypeKind.TY_ARRAY:
+                let inner = sema.resolve_alias(elem as TypeId)
+                dims = dims ++ f", {sema.get_type_d1(inner)}"
+                elem = sema.get_type_d0(inner)
+            return "[" ++ self.spell(sema, elem) ++ "; " ++ dims ++ "]"
         if tk == TypeKind.TY_SLICE:
             let mut_text = if sema.get_type_d1(resolved) != 0: "mut " else: ""
             return "[]" ++ mut_text ++ self.spell(sema, sema.get_type_d0(resolved))

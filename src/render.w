@@ -1105,6 +1105,12 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: NodeId) -> str:
 
     f"<pat:{kind}>"
 
+// One dimension of an array type node: its literal length, or the constant
+// expression written for it (§4.3a).
+fn render_array_dim(pool: AstPool, intern: InternPool, node: NodeId) -> str:
+    let len_expr = pool.get_data2(node)
+    if len_expr != 0: render_expr(pool, intern, len_expr as NodeId, 0) else: f"{pool.get_data1(node)}"
+
 pub fn render_type_expr(pool: AstPool, intern: InternPool, node: NodeId) -> str:
     if node == 0:
         return "_"
@@ -1181,9 +1187,13 @@ pub fn render_type_expr(pool: AstPool, intern: InternPool, node: NodeId) -> str:
         return "?" ++ render_type_expr(pool, intern, (inner) as NodeId)
 
     if kind == NodeKind.NK_TYPE_ARRAY:
-        let elem = pool.get_data0(node)
-        let size = pool.get_data1(node)
-        return f"[{size}]{render_type_expr(pool, intern, (elem) as NodeId)}"
+        // D119: `[T; 2, 3]`, the dimensions in index order.
+        var dims = render_array_dim(pool, intern, node)
+        var elem = pool.get_data0(node) as NodeId
+        while pool.kind(elem) == NodeKind.NK_TYPE_ARRAY:
+            dims = dims ++ ", " ++ render_array_dim(pool, intern, elem)
+            elem = pool.get_data0(elem) as NodeId
+        return "[" ++ render_type_expr(pool, intern, elem) ++ "; " ++ dims ++ "]"
 
     if kind == NodeKind.NK_TYPE_SLICE:
         let elem = pool.get_data0(node)
