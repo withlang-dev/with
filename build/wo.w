@@ -86,7 +86,7 @@ fn wo_abs(root: &str, path: &str) -> str:
         return wo_owned_text(path)
     root ++ "/" ++ path
 
-fn wo_arg_value(args: &Vec[str], prefix: &str) -> str:
+pub fn wo_arg_value(args: &Vec[str], prefix: &str) -> str:
     for i in 0..args.len() as i32:
         let arg = args[i]
         if arg.starts_with(prefix):

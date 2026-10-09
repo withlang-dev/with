@@ -31,6 +31,7 @@ pub fn tommyds_corpus() -> Corpus:
         harness: ["check_"], drift_harness: "check_.w", drift_harness_arg: "",
         module_floor: 14, defines: Vec.new(), excludes: Vec.new(), declared_externs: Vec.new(),
         promote_after: Vec.new(), test_lane: "tommyds-test",
+        fresh_test_lanes: ["tommyds-test-fresh"], extra_generated_dirs: Vec.new(),
         prepare_reference: corpus_no_prepare, stage: tommy_stage,
         migrate: corpus_migrate_directory, finish_generated: corpus_no_finish,
         verify_generated: corpus_no_verify, lanes: tommy_lanes,
@@ -53,20 +54,32 @@ fn tommy_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) 
 // corpus by the release binary against the embedded bundle, then run. It
 // asserts internally and exits non-zero on any failure.
 pub fn run_tommy_test_action(ctx: ActionCtx) -> i32:
+    let output = ctx.output()
+    if corpus_reset_dir(ctx, output) != 0: return 1
+    tommy_compile_and_run(ctx, ["build", "-O1", "lib/std/tommyds/check_.w"], ".")
+
+// D112: upstream's check program on a fresh migration, for the migrator
+// gate: the fresh modules in a scratch lib/std/tommyds, compiled from
+// source (`--bundle-corpus`) rather than from the bundle the compiler embeds.
+pub fn run_tommy_test_fresh_action(ctx: ActionCtx) -> i32:
+    let output = ctx.output()
+    if corpus_reset_dir(ctx, output) != 0: return 1
+    let tree = output ++ "/tree"
+    if corpus_reset_dir(ctx, tree ++ "/lib/std/tommyds") != 0: return 1
+    if corpus_copy_w_files(ctx, ctx.inputs()[1], tree ++ "/lib/std/tommyds") != 0: return 1
+    tommy_compile_and_run(ctx, ["build", "-O1", "lib/std/tommyds/check_.w", "--bundle-corpus", "std/tommyds"], tree)
+
+fn tommy_compile_and_run(ctx: &ActionCtx, build_args: Vec[str], cwd: &str) -> i32:
     let fs = ctx.fs()
     let compiler = corpus_abs(ctx, ctx.inputs()[0])
     let output = ctx.output()
-    if corpus_reset_dir(ctx, output) != 0: return 1
     let binary = output ++ "/tommycheck"
-    // Build-layer code runs on the seed: argv is pushed (#1122).
     var compile_args: Vec[str] = Vec.new()
     compile_args.push(compiler.clone())
-    compile_args.push("build")
-    compile_args.push("-O1")
-    compile_args.push("lib/std/tommyds/check_.w")
+    for arg in build_args: compile_args.push(arg.clone())
     compile_args.push("-o")
     compile_args.push(corpus_abs(ctx, binary))
-    let compiled = ctx.process_runner().run_capture(compile_args, corpus_abs(ctx, binary ++ ".compile.stdout"), corpus_abs(ctx, binary ++ ".compile.stderr"), 600000)
+    let compiled = ctx.process_runner().run_capture_cwd(compile_args, corpus_abs(ctx, binary ++ ".compile.stdout"), corpus_abs(ctx, binary ++ ".compile.stderr"), 600000, corpus_abs(ctx, cwd))
     if compiled.rc != 0: return corpus_fail(ctx, f"compile tommycheck exited {compiled.rc}\n" ++ fs.read_text(binary ++ ".compile.stderr"))
     // #2230: name what runs before it runs — the compiler and the binary.
     if corpus_provenance(ctx, output, ctx.inputs()[0]) != 0: return 1
@@ -83,4 +96,7 @@ fn tommy_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &s
     var tests = target_new(.Action, "tommyds-test", "").output("out/corpus/tommyds-test")
     tests.action = run_tommy_test_action
     tests = tests.input(release_compiler.clone()).input("lib/std/tommyds/check_.w").dep("build")
-    out.add_target(tests)
+    var fresh = target_new(.Action, "tommyds-test-fresh", "").output("out/corpus/tommyds-test-fresh")
+    fresh.action = run_tommy_test_fresh_action
+    fresh = fresh.input(release_compiler.clone()).input("out/tommyds_migrated").dep("build").dep("tommyds-migrate")
+    out.add_target(tests).add_target(fresh)

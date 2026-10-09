@@ -25,6 +25,7 @@ pub fn zlib_corpus() -> Corpus:
         harness: ["example", "minigzip"], drift_harness: "example.w", drift_harness_arg: "out/wo-drift/zlib/example.gz",
         module_floor: 21, defines: Vec.new(), excludes: Vec.new(), declared_externs: Vec.new(),
         promote_after: ["zlib-test"], test_lane: "",
+        fresh_test_lanes: ["zlib-test"], extra_generated_dirs: Vec.new(),
         prepare_reference: corpus_no_prepare, stage: zlib_stage,
         migrate: zlib_migrate, finish_generated: corpus_no_finish,
         verify_generated: corpus_no_verify, lanes: zlib_lanes,

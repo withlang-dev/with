@@ -121,6 +121,13 @@ jobs:
       - name: Green battery (build :test)
         run: src/main build :test
 
+      # D112: which corpora a re-promotion with today's migrator would
+      # change, and by how much. Informational: it never fails the run.
+      - name: Corpus drift report
+        if: always()
+        continue-on-error: true
+        run: src/main build :corpus-drift-report
+
       # A stage timeout keeps its compiler captures. Preserve those profiles
       # as well as test captures so a build failure identifies its last phase.
       - name: Upload compiler and test captures on failure

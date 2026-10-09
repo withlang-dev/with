@@ -582,6 +582,7 @@ pub fn pcre2_corpus() -> Corpus:
         excludes: ["pcre2demo.c", "pcre2grep.c", "pcre2posix_test.c", "pcre2_jit_test.c", "pcre2_dftables.c", "pcre2_fuzzsupport.c"],
         declared_externs: Vec.new(),
         promote_after: ["pcre2-test"], test_lane: "",
+        fresh_test_lanes: ["pcre2-test"], extra_generated_dirs: Vec.new(),
         prepare_reference: pcre2_prepare, stage: pcre2_stage,
         migrate: corpus_migrate_directory, finish_generated: pcre2_finish,
         verify_generated: pcre2_verify, lanes: pcre2_lanes,

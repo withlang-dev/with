@@ -2,6 +2,7 @@ module build.c_algorithms
 
 use std.build
 use build.corpus
+use build.wo
 
 // fragglet/c-algorithms, ISC (its COPYING ships beside the migration).
 // Phase 1 of docs/proposals/stdlib_sourcing_plan.md. The generic pipeline
@@ -54,6 +55,7 @@ pub fn c_algorithms_corpus() -> Corpus:
         // rb-tree.h declares rb_tree_subtree_height; rb-tree.c never defines it.
         declared_externs: ["rb_tree_subtree_height"],
         promote_after: ["c-algorithms-promote-tests"], test_lane: "c-algorithms-test",
+        fresh_test_lanes: ["c-algorithms-test-fresh"], extra_generated_dirs: [CALG_TESTS_DIR],
         prepare_reference: corpus_no_prepare, stage: calg_stage,
         migrate: corpus_migrate_directory, finish_generated: corpus_no_finish,
         verify_generated: corpus_no_verify, lanes: calg_lanes,
@@ -160,8 +162,15 @@ pub fn run_calg_test_action(ctx: ActionCtx) -> i32:
         let program_root = output ++ "/" ++ name
         let module_dir = program_root ++ "/" ++ calg_tests_package_dir()
         if fs.mkdir_all(module_dir) != 0: return 1
-        if corpus_copy_w_files(ctx, CALG_TESTS_DIR ++ "/engine", module_dir) != 0: return 1
-        if corpus_copy_w_files(ctx, CALG_TESTS_DIR ++ "/programs/" ++ name, module_dir) != 0: return 1
+        // D112: `fresh=<dir>` runs a fresh migration (each program whole
+        // under <dir>/tests/<name>) for the migrator gate; otherwise the
+        // promoted programs and their shared engine.
+        let fresh = wo_arg_value(ctx.args(), "fresh=")
+        if fresh.len() > 0:
+            if corpus_copy_w_files(ctx, fresh ++ "/tests/" ++ name, module_dir) != 0: return 1
+        else:
+            if corpus_copy_w_files(ctx, CALG_TESTS_DIR ++ "/engine", module_dir) != 0: return 1
+            if corpus_copy_w_files(ctx, CALG_TESTS_DIR ++ "/programs/" ++ name, module_dir) != 0: return 1
         let binary = output ++ "/test-" ++ name
         // The program's directory is the project root so its lib/ root holds
         // the package; the release binary's embedded std supplies std.libc.
@@ -212,4 +221,10 @@ fn calg_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &st
     tests.action = run_calg_test_action
     tests = tests.input(release_compiler.clone()).dep("build")
     tests = calg_with_test_inputs(move tests, ctx)
-    graph.add_target(tests)
+    graph = graph.add_target(tests)
+    // D112: the same programs from a fresh migration, for the migrator gate.
+    var fresh = target_new(.Action, "c-algorithms-test-fresh", "").output("out/corpus/c-algorithms-test-fresh")
+    fresh.action = run_calg_test_action
+    fresh = fresh.input(release_compiler.clone()).input("out/c_algorithms_tests_migrated").arg("fresh=out/c_algorithms_tests_migrated")
+    fresh = fresh.dep("build").dep("c-algorithms-migrate-tests")
+    graph.add_target(fresh)

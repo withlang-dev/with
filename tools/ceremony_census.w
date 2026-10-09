@@ -50,17 +50,27 @@ fn area_of(path: &str):
 fn counted(path: &str) -> bool:
     path.ends_with(".w") and (path == "build.w" or path.starts_with("src/") or path.starts_with("lib/") or path.starts_with("tools/") or path.starts_with("build/") or path.starts_with("examples/"))
 
+// D112: a directory holding a corpus.stamp is a migrated corpus, generated
+// code that carries its migrator generation's idioms; it is never counted
+// as written With.
+fn under_any(path: &str, dirs: &Vec[str]) -> bool:
+    for dir in dirs:
+        if path.starts_with(dir): return true
+    false
+
 fn tracked_files() -> Vec[str]:
-    var argv: Vec[str] = Vec.new()
-    argv.push("git")
-    argv.push("ls-files")
-    let done = run_to_files_in(".", &argv, "out/ceremony-ls.txt", "out/ceremony-ls.err")
+    let argv = ["git", "ls-files"]
+    let done = run_to_files_in(".", argv, "out/ceremony-ls.txt", "out/ceremony-ls.err")
     if done.code != 0:
         eprint("ceremony-census: git ls-files failed")
         exit_code(2)
+    let listing = (read_file("out/ceremony-ls.txt") ?? "").split("\n")
+    var generated: Vec[str] = Vec.new()
+    for path in listing:
+        if path.ends_with("/corpus.stamp"): generated.push(path.slice(0, path.len() - "corpus.stamp".len()))
     var files: Vec[str] = Vec.new()
-    for path in (read_file("out/ceremony-ls.txt") ?? "").split("\n"):
-        if counted(path): files.push(path.clone())
+    for path in listing:
+        if counted(path) and not under_any(path, generated): files.push(path)
     files
 
 type Census { counts: BTreeMap[str, i64] }

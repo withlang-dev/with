@@ -1004,7 +1004,7 @@ fn gate_fixed_targets() -> Vec[str]:
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
     var fixed: Vec[str] = Vec.new()
-    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-drift-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-integrity-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
     fixed
 
 fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
@@ -4706,6 +4706,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     // The corpora lane (docs/proposals/stdlib_sourcing_plan.md): every migrated
     // container corpus runs its upstream test programs under With.
     tests = corpora_test_deps(move tests)
+    // D112: a migrator change is gated on every corpus migrated afresh and
+    // tested; nothing is promoted.
+    tests = tests.dep("corpus-migrator-gate")
     tests = tests.dep("spec-inventory-check")
     tests = tests.dep("libc-surface-check")
     tests = tests.dep("runtime-domain-audit")
@@ -4934,7 +4937,9 @@ pub fn build(ctx: BuildCtx) -> Build:
         let corpus = corpus_at(ci)
         out = corpus_pipeline(move out, ctx, corpus, release_compiler_bin("with"))
     out = out.add_target(corpora_drift_group(ctx))
-    out = out.add_target(corpora_drift_check_group())
+    out = out.add_target(corpora_integrity_group())
+    out = out.add_target(corpora_migrator_gate_group())
+    out = out.add_target(corpora_drift_report_group())
 
     var prune = target_new(.Action, "prune", "").output("out/.build-state/prune.always")
     prune.action = run_prune_action

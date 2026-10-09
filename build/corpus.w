@@ -61,6 +61,12 @@ pub type Corpus ephemeral {
     promote_after: Vec[str],
     // the lane `:test` runs ("" = none)
     test_lane: str,
+    // D112: the lanes that run upstream's tests on a fresh migration; with
+    // `<stem>-check-generated` they are this corpus's migrator gate
+    fresh_test_lanes: Vec[str],
+    // D112: generated directories beside corpus_dir that promotion writes
+    // and the corpus stamp covers (c-algorithms' migrated test programs)
+    extra_generated_dirs: Vec[str],
     // ── hooks ────────────────────────────────────────────────────
     // adjust the extracted reference tree (pcre2 generates config.h)
     prepare_reference: fn(&ActionCtx, &Corpus, &str) -> i32,
