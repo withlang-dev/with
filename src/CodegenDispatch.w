@@ -1948,9 +1948,21 @@ impl Codegen:
             return value
         if hold == MIR_HOLD_TAKE:
             wl_build_store(self.builder, self.build_default_value(place_ty), src_ptr)
+        else if self.mir_place_is_str_view_read(body, place, sema_ty):
+            // #2307: a str read through a view owns its bytes: shared when the
+            // view starts an owned buffer, copied otherwise.
+            return self.gen_str_own_view(value)
         else:
             self.mir_emit_copy_glue_ptr(src_ptr, place_ty, sema_ty)
         value
+
+    // A `str` place read through a dereference: the bytes are a view's
+    // (`view.*` with `view: &str`), not a `str` place's own buffer.
+    fn mir_place_is_str_view_read(body: &MirBody, place: i32, sema_ty: i32) -> bool:
+        if sema_ty != self.sema.ty_str as i32 or place < 0 or place >= body.place_proj_counts.len():
+            return false
+        let count = body.place_proj_counts[place]
+        count > 0 and body.proj_kinds[(body.place_proj_starts[place] + count - 1)] == ProjKind.PK_DEREF
 
     mut fn mir_eval_operand_raw(body: &MirBody, operand_id: i32, expected_ty: i64) -> i64:
         let fallback_ty = if expected_ty != 0: expected_ty else: wl_i32_type(self.context)
@@ -4574,6 +4586,16 @@ impl Codegen:
         let args: List[i64] = List.new()
         args.push(s)
         self.build_call_fn_value(ft_sym, func, ft, -1, 0, args, 1, "with_str_clone_ref", 0)
+
+    // `s` is a `&str` view; the result is a str that owns its bytes (#2307).
+    mut fn gen_str_own_view(s: i64) -> i64:
+        let str_ty = self.str_llvm_type()
+        let pts: List[i64] = [str_ty]
+        let func = self.ensure_fmt_buf_fn("with_str_own_view", pts, 1, str_ty)
+        let ft_sym = self.intern.intern("with_str_own_view")
+        let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
+        let args: List[i64] = [s]
+        self.build_call_fn_value(ft_sym, func, ft, -1, 0, args, 1, "with_str_own_view", 0)
 
     // `is_unsigned` as for gen_fmt_with_spec: Sema's signedness of the
     // value's type, from the FMT_BUF_WRITE_FMT intrinsic (#1922).

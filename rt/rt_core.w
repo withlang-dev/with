@@ -3407,6 +3407,19 @@ pub fn with_str_retain(s: *const u8):
     if p as i64 != 0 and rt_payload_start_is_owned(p) != 0:
         unsafe { (*str_holders(p)).fetch_add(1, .AcqRel) }
 
+// #2307: a str made from a `&str` view. A view that starts an owned payload
+// shares it, as a copy of the str would (a prefix of an immutable buffer is
+// still that buffer). Any other view (an interior slice, a view of a
+// literal, of a List[u8], of C memory) holds no buffer, so the str copies its
+// bytes: a retain is a no-op there and left the str sharing bytes it did not
+// hold, which dangled once their owner was freed.
+pub fn with_str_own_view(s: &str) -> str:
+    let p = unsafe *(s as *const str as *const *const u8)
+    if p as i64 != 0 and rt_payload_start_is_owned(p) != 0:
+        unsafe { (*str_holders(p)).fetch_add(1, .AcqRel) }
+        return make_str(p, s.len())
+    with_str_clone_ref(s)
+
 // Whether `p` names a buffer this str alone holds, so it may be written in
 // place (the `s = s ++ x` append).
 fn str_is_unique(p: *const u8) -> bool:
