@@ -1,6 +1,6 @@
 # `std.mssql`: Microsoft SQL Server from the standard library, written clean-room
 
-**Status:** plan, 2026-10-09. Licensing ruled (Eric, below); one question
+**Status:** plan, 2026-10-09; the protocol design is `tds.md`. Licensing ruled (Eric, below); one question
 is open. **Why:** a customer needs With programs to talk to Microsoft SQL
 Server with no setup, the way `std.http` talks to a web server.
 
@@ -70,6 +70,7 @@ Microsoft publishes its own SQL Server drivers under permissive licenses
 - `dotnet/SqlClient` (Microsoft.Data.SqlClient): MIT.
 - `microsoft/go-mssqldb`: BSD-3-Clause.
 - `tediousjs/tedious` (Node): MIT.
+- `tiberius-rs/tiberius` (Rust): Apache-2.0 (not Microsoft's, but permissive).
 
 They are the protocol's reference implementations from the vendor, with
 the decade of corner cases the sourcing rule values. Reading them, or
