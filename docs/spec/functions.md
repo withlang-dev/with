@@ -890,9 +890,15 @@ For fixed-size arrays, the compiler performs compile-time length matching:
 elements between the matched ends. If the subject is owned — a temporary,
 or a place moved with `move` — the pattern takes it apart by value: each
 binding is an owned element, and `rest` is the owned remainder (`[T; N-k]`
-for a fixed array, `Vec[T]` for a `Vec`). If the subject is a place, the
-pattern observes it: elements bind as views and `rest` is a `[]T` view of
-it. Its length is `rest.len()`.
+for a fixed array, `Vec[T]` for a `Vec`). A `Vec` remainder shares the
+subject's buffer without copying, so taking it is O(1), as taking a view of
+a place is. If the subject is a place, the pattern observes it: elements
+bind as views and `rest` is a `[]T` view of it. Its length is `rest.len()`.
+
+A shared remainder keeps the whole original buffer alive: a three-element
+`rest` taken from a million-element `Vec` holds the million-element
+allocation until it is dropped. Growing the remainder reallocates, and
+`shrink_to_fit()` releases the prefix.
 
 **`let` destructuring:**
 

@@ -77,7 +77,7 @@ generated code and `rt/rt_core.w`:
 | Type | Layout | Size |
 |---|---|---|
 | `str` | `{ ptr: *const u8, len: i64 }` | 16 |
-| `Vec[T]` | `{ ptr: *mut u8, len: i64, cap: i64, elem_size: i64 }` | 32 |
+| `Vec[T]` | `{ ptr: *mut u8, len: i64, cap: i64, start: i64 }`: `ptr` is the first live element, `start` the elements before it in the allocation (D115); the element size is static, never stored | 32 |
 | `HashMap[K, V]` / `HashSet[T]` | handle: one pointer to a 64-byte runtime header (`keys, vals, occupied, cap, len, key_size, val_size, is_str_key`) | 8 |
 | `SlotMap[T]` | handle: one pointer to a 56-byte runtime header (`values, next, generations, len, cap, elem_size, free_head: u32, free_tail: u32`) | 8 |
 | `Handle[T]` | `{ index: u32, generation: u32 }` | 8 |

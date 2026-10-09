@@ -50,3 +50,60 @@ length is `rest.len()`."
 **What would reopen it.** A case where observing a place subject forces
 ceremony the by-value rule avoided (a `Drop` array that must be consumed
 element-wise without `move`).
+
+## Amendment 1 (2026-10-09): an owned `Vec` remainder is O(1)
+
+**Context.** The first implementation took the head of an owned `Vec` with
+`remove(0)`, shifting the tail per match, so the canonical recursion
+`[h, ..t] => h + sum(t)` was O(n²) where Scala's is O(n). Scala's O(1) comes
+from sharing the tail, not from links; With shares the buffer.
+
+**Ruling (Eric, verbatim).** "Bless it, with one question attached. … The
+question is about the cost, because I think there is a cheaper encoding. A
+Vec today is {ptr, len, cap, elem_size}. Why is elem_size stored in every
+Vec at runtime? The element type is known statically at every use, and the
+compiler monomorphizes. If the only reason is that the runtime helpers are
+type-erased, they can take the element size as an argument instead, since
+every call site knows it. Then the offset takes elem_size's slot, and Vec
+stays 32 bytes. … A static fact stored in every value is the
+representation-level version of the ceremony you've been removing all day."
+
+"One trade-off to state in the ruling so nobody discovers it later: a small
+rest keeps the whole original buffer alive. … It's acceptable, since it's
+the price of O(1), and the agent's design already handles the common case,
+because growing an offset Vec reallocates. But the doc should say so, and
+shrink_to_fit should release the prefix."
+
+"So: "Blessed, provided the offset replaces elem_size rather than adding a
+field, if nothing needs elem_size at runtime. If something does, tell me
+what, and the 40 bytes stands.""
+
+**Blessed words (§9.7).** "A `Vec` remainder shares the subject's buffer
+without copying, so taking it is O(1), as taking a view of a place is."
+
+**The condition, checked.** Nothing needs `elem_size` at runtime. Its readers
+are the type-erased `with_vec_*` helpers in `rt/rt_core.w` (new, push, get,
+grow, remove, set, free, the byte check in `append_bytes`), codegen's inline
+drop glue (header word 3, passed to the sized free), the C backend's header
+initialization, and one debug-allocator print; every call site has the
+static element type. Nothing reinterprets a `Vec` as another element type.
+So the offset replaces `elem_size`: `{ptr, len, cap, start}`, 32 bytes,
+`ptr` the first live element and `start` the elements before it. Taking a
+head advances `ptr` and `start` and lowers `len` and `cap`; free and grow
+read `start` to find the allocation. A zeroed header (#633: `elem_size = 0`,
+"happens to work") becomes a valid empty Vec.
+
+**Derived, not ruled.**
+- The trade-off is stated in §9.7: a small remainder keeps the original
+  buffer alive; growing reallocates; `shrink_to_fit()` releases the prefix
+  (a new `Vec` method, non-compliant until it lands).
+- #2289 is fixed by the same mechanism: a failed guard moves head elements
+  back by moving the offset back, and tail elements back into the capacity
+  they left; the guard refusal goes.
+- A fixed array's remainder `[T; N-k]` is an inline value and moves N-k
+  elements; N is a compile-time constant and the length is part of the
+  type, so there is no recursion to protect.
+- Bootstrap: codegen and the runtime agree on word 3 within one compiler
+  generation, so the change is two-step: first every helper takes the element
+  size as an argument while the field still holds it (a seed is cut), then
+  word 3 becomes `start`.
