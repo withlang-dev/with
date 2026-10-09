@@ -22,14 +22,14 @@ extern fn str_from_byte(b: i32) -> str
 
 // ── Tokens ───────────────────────────────────────────────────────────
 
-let PT_NAME = 1
-let PT_NUM = 2
-let PT_STR = 3
-let PT_OP = 4
-let PT_NEWLINE = 5
-let PT_INDENT = 6
-let PT_DEDENT = 7
-let PT_EOF = 8
+const PT_NAME = 1
+const PT_NUM = 2
+const PT_STR = 3
+const PT_OP = 4
+const PT_NEWLINE = 5
+const PT_INDENT = 6
+const PT_DEDENT = 7
+const PT_EOF = 8
 
 type PyTok { kind: i32, text: str, line: i32 }
 
@@ -269,43 +269,43 @@ fn py_lex_string_body(src: &str, at: i32) -> (str, i32, i32):
 
 // ── Syntax tree ──────────────────────────────────────────────────────
 
-let N_NAME = 1        // s
-let N_STR = 2         // s
-let N_FSTR = 3        // kids: parts
-let N_NUM = 4         // s
-let N_CONST = 5       // s: True, False, None
-let N_LIST = 6        // kids (tuples too)
-let N_DICT = 7        // kids: key, value, key, value
-let N_ATTR = 8        // a.s
-let N_CALL = 9        // a(kids)
-let N_KW = 10         // s=a, a keyword argument
-let N_SUB = 11        // a[b]
-let N_BIN = 12        // a s b
-let N_NOT = 13        // not a
-let N_NEG = 14        // -a
-let N_AND = 15        // a and b
-let N_OR = 16         // a or b
-let N_CMP = 17        // a s b
-let N_COND = 18       // b if a else c
-let N_COMP = 19       // [a for kids(names) in b if c]
-let N_UNSUPPORTED = 20 // an expression this subset does not read: Unknown
-let N_SPREAD = 21      // **a, inside a dict literal
-let N_DICTCOMP = 22    // {a: kids[2] for kids[0] in kids[1] if c}
+const N_NAME = 1        // s
+const N_STR = 2         // s
+const N_FSTR = 3        // kids: parts
+const N_NUM = 4         // s
+const N_CONST = 5       // s: True, False, None
+const N_LIST = 6        // kids (tuples too)
+const N_DICT = 7        // kids: key, value, key, value
+const N_ATTR = 8        // a.s
+const N_CALL = 9        // a(kids)
+const N_KW = 10         // s=a, a keyword argument
+const N_SUB = 11        // a[b]
+const N_BIN = 12        // a s b
+const N_NOT = 13        // not a
+const N_NEG = 14        // -a
+const N_AND = 15        // a and b
+const N_OR = 16         // a or b
+const N_CMP = 17        // a s b
+const N_COND = 18       // b if a else c
+const N_COMP = 19       // [a for kids(names) in b if c]
+const N_UNSUPPORTED = 20 // an expression this subset does not read: Unknown
+const N_SPREAD = 21      // **a, inside a dict literal
+const N_DICTCOMP = 22    // {a: kids[2] for kids[0] in kids[1] if c}
 
-let N_EXPR = 30       // a
-let N_ASSIGN = 31     // a = b
-let N_AUG = 32        // a s= b
-let N_IF = 33         // a: kids; orelse in the node b (an N_BLOCK) or -1
-let N_FOR = 34        // for a(targets list) in b: kids
-let N_RETURN = 35     // a or -1
-let N_PASS = 36
-let N_DEL = 37        // a
-let N_DEF = 38        // s(params in a: an N_LIST of N_NAME/N_KW): kids; b = 1 for a property
-let N_BLOCK = 39      // kids
-let N_BREAK = 40
-let N_CONTINUE = 41
-let N_RAISE = 42
-let N_CLASS = 43      // s: kids
+const N_EXPR = 30       // a
+const N_ASSIGN = 31     // a = b
+const N_AUG = 32        // a s= b
+const N_IF = 33         // a: kids; orelse in the node b (an N_BLOCK) or -1
+const N_FOR = 34        // for a(targets list) in b: kids
+const N_RETURN = 35     // a or -1
+const N_PASS = 36
+const N_DEL = 37        // a
+const N_DEF = 38        // s(params in a: an N_LIST of N_NAME/N_KW): kids; b = 1 for a property
+const N_BLOCK = 39      // kids
+const N_BREAK = 40
+const N_CONTINUE = 41
+const N_RAISE = 42
+const N_CLASS = 43      // s: kids
 
 pub type PyNode { kind: i32, a: i32, b: i32, c: i32, s: str, kids: List[i32], line: i32 }
 
@@ -865,20 +865,20 @@ pub fn py_parse(src: &str) -> PyModule:
 
 // ── Values ───────────────────────────────────────────────────────────
 
-let V_UNKNOWN = 0
-let V_NONE = 1
-let V_BOOL = 2        // n
-let V_INT = 3         // n
-let V_STR = 4         // s
-let V_LIST = 5        // n: list arena index
-let V_DICT = 6        // n: dict arena index
-let V_OBJ = 7         // n: object arena index
-let V_FUNC = 8        // n: N_DEF node
-let V_BOUND = 9       // s: method name; n: receiver arena index
-let V_SINK = 10       // something whose contents nothing here reads
-let V_VER = 11        // s: a version, compared by component
-let V_OPT = 12        // s: an option's value, as Conan spells it
-let V_NAMED = 13      // s: a name from outside the recipe (`os.path.join`)
+const V_UNKNOWN = 0
+const V_NONE = 1
+const V_BOOL = 2        // n
+const V_INT = 3         // n
+const V_STR = 4         // s
+const V_LIST = 5        // n: list arena index
+const V_DICT = 6        // n: dict arena index
+const V_OBJ = 7         // n: object arena index
+const V_FUNC = 8        // n: N_DEF node
+const V_BOUND = 9       // s: method name; n: receiver arena index
+const V_SINK = 10       // something whose contents nothing here reads
+const V_VER = 11        // s: a version, compared by component
+const V_OPT = 12        // s: an option's value, as Conan spells it
+const V_NAMED = 13      // s: a name from outside the recipe (`os.path.join`)
 
 pub type PyVal { k: i32, n: i64, s: str }
 
@@ -914,12 +914,12 @@ pub type RecipeComponent { name: str, libs: List[str], system_libs: List[str], f
 // at all (`problem`).
 pub type RecipePackageInfo { ok: bool, problem: str, notes: List[str], root: RecipeComponent, components: List[RecipeComponent] }
 
-let PY_NORMAL = 0
-let PY_RETURN = 1
-let PY_BREAK = 2
-let PY_CONTINUE = 3
+const PY_NORMAL = 0
+const PY_RETURN = 1
+const PY_BREAK = 2
+const PY_CONTINUE = 3
 
-let PY_STEP_LIMIT = 400000
+const PY_STEP_LIMIT = 400000
 
 type PyInterp { nodes: List[PyNode], lists: List[PyList], dkeys: List[PyList], dvals: List[PyList], objs: List[PyObj], recv: List[PyVal], frame_names: List[PyNames], frame_vals: List[PyList], method_names: List[str], method_nodes: List[i32], attr_names: List[str], attr_vals: List[PyVal], func_names: List[str], func_nodes: List[i32], self_obj: i32, env: RecipeEnv, notes: List[str], ret: PyVal, steps: i32, depth: i32, problem: str, reqs: List[str], tool_reqs: List[str], toolchains: List[i32] }
 

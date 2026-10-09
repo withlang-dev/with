@@ -1376,7 +1376,7 @@ pub fn ci_ir_roundtrip_test -> i32:
     with_eprint("ci-roundtrip: FAIL (" ++ i32_to_string(fails) ++ " case(s))\n")
     1
 
-let _ci_print_eof_guard = 0
+const _ci_print_eof_guard = 0
 
 // D119: the bare text of an array initializer item that is a decimal integer
 // literal C converted to the element type, when the element type holds it

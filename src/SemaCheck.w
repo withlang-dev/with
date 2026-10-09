@@ -14654,14 +14654,6 @@ impl Sema:
         // The latest such `let` of that name in this function.
         self.fn_literal_lets.get((self.current_fn_sig_idx as i64) * 4294967296 + sym as i64) ?? 0
 
-    // An unsuffixed integer literal, negated or grouped or not (`0`, `-1`).
-    fn is_bare_int_literal(expr: i32) -> bool:
-        if expr <= 0: return false
-        let kind = self.ast.kind(expr)
-        if kind == NodeKind.NK_GROUPED: return self.is_bare_int_literal(self.ast.get_data0(expr))
-        if kind == NodeKind.NK_UNARY and self.ast.get_data0(expr) == UnaryOp.UOP_NEGATE: return self.is_bare_int_literal(self.ast.get_data1(expr))
-        kind == NodeKind.NK_INT_LIT and self.ast.literal_suffix(expr as NodeId) == 0
-
     // A use of `expr` that needs the type `demanded`: a parameter, a typed
     // place, a return. The collections a list builds are demanded (`List`,
     // `HashSet`, `BTreeSet`, a fixed array); a slice views the List and
@@ -14672,19 +14664,12 @@ impl Sema:
             return
         let want = self.auto_deref_ref_ptr_type(self.resolve_alias(demanded as TypeId)) as i32
         let kind = self.get_type_kind(want as TypeId)
-        // D114 prototype: an unsuffixed integer literal's binding takes the
-        // integer type its uses demand, as a bracket literal takes its
-        // collection; `isize` when nothing demands one.
-        let int_let = self.is_bare_int_literal(self.ast.get_data1(let_node))
-        if int_let != (kind == TypeKind.TY_INT):
-            return
-        if not int_let:
-            if kind == TypeKind.TY_GENERIC_INST:
-                let base = self.canonical_symbol_by_text(self.get_generic_inst_base(want))
-                if base != self.syms.list and base != self.syms.hashset and base != self.syms.btreeset:
-                    return
-            else if kind != TypeKind.TY_ARRAY:
+        if kind == TypeKind.TY_GENERIC_INST:
+            let base = self.canonical_symbol_by_text(self.get_generic_inst_base(want))
+            if base != self.syms.list and base != self.syms.hashset and base != self.syms.btreeset:
                 return
+        else if kind != TypeKind.TY_ARRAY:
+            return
         self.literal_demands.push(let_node)
         self.literal_demands.push(want)
         self.literal_demands.push(use_node)
@@ -14802,12 +14787,6 @@ impl Sema:
                 found.push(0)
                 found.push(use_node)
                 found.push(0)
-            else if found[at + 1] != want and found[at + 2] == 0 and self.get_type_kind(want as TypeId) == TypeKind.TY_INT and self.get_type_kind(found[at + 1] as TypeId) == TypeKind.TY_INT and (self.int_narrowing_requires_cast(want as TypeId, found[at + 1] as TypeId) == 0 or self.int_narrowing_requires_cast(found[at + 1] as TypeId, want as TypeId) == 0):
-                // Integer demands one of which widens into the other: the
-                // narrower meets both (`i32` passes where `i64` is wanted).
-                if self.int_narrowing_requires_cast(found[at + 1] as TypeId, want as TypeId) == 0:
-                    found[at + 1] = want
-                    found[at + 3] = use_node
             else if found[at + 1] != want and found[at + 2] == 0:
                 found[at + 2] = want
                 found[at + 4] = use_node
@@ -14903,7 +14882,7 @@ impl Sema:
 
         // D93: no annotation, an element-form literal, and uses that
         // demanded a collection: the binding has that type.
-        let use_typed = ann_extra < 0 and value != 0 and (self.ast.kind(value) == NodeKind.NK_ARRAY_LIT or self.is_bare_int_literal(value))
+        let use_typed = ann_extra < 0 and value != 0 and self.ast.kind(value) == NodeKind.NK_ARRAY_LIT
         if use_typed and self.literal_watermark == 0:
             self.literal_watermark = self.type_kinds.len() as i32
         if use_typed and self.literal_decisions.len() > 0:

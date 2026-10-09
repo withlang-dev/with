@@ -1077,4 +1077,4 @@ impl CiProject:
             return ""
         with_str_clone_ref(self.module_paths[owner_module])
 
-let _ci_ir_eof_guard = 0
+const _ci_ir_eof_guard = 0

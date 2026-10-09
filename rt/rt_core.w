@@ -3519,14 +3519,14 @@ pub fn with_vec_pop_i32(v: *mut u8) -> i32:
 // Header: values, next, generations, len, cap, elem_size (six words),
 // followed by the u32 FIFO head and tail. Each next entry is either a free
 // slot index, SM_FREE_END, or SM_OCCUPIED. Retired slots are not enqueued.
-let SM_OFF_NEXT = 8
-let SM_OFF_GENS = 16
-let SM_OFF_LEN = 24
-let SM_OFF_CAP = 32
-let SM_OFF_ESZ = 40
-let SM_OFF_HEAD = 48
-let SM_OFF_TAIL = 52
-let SM_SIZE = 56
+const SM_OFF_NEXT = 8
+const SM_OFF_GENS = 16
+const SM_OFF_LEN = 24
+const SM_OFF_CAP = 32
+const SM_OFF_ESZ = 40
+const SM_OFF_HEAD = 48
+const SM_OFF_TAIL = 52
+const SM_SIZE = 56
 let SM_OCCUPIED: u32 = 4294967294
 let SM_FREE_END: u32 = 4294967295
 let SM_MAX_GENERATION: u32 = 4294967295

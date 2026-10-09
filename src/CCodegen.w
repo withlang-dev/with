@@ -55,8 +55,8 @@ fn cc_lbrace -> str:
 fn cc_rbrace -> str:
     str_from_byte(125)
 
-let CC_PSEUDO_TID_LIST = 1900001
-let CC_PSEUDO_TID_FMT_BUF = 1900002
+const CC_PSEUDO_TID_LIST = 1900001
+const CC_PSEUDO_TID_FMT_BUF = 1900002
 
 enum CcPlaceKind: i32:
     UNKNOWN

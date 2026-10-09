@@ -314,7 +314,7 @@ fn backend_dump_struct_extras(pool: AstPool, intern: InternPool):
         if ok == 1 and (name == "Codegen" or name == "ContextError"):
             runtime_eprint(f"[sd] OK {name} d={decl as i32} es={es} fc={fc}")
 
-let _backend_eof_guard = 0
+const _backend_eof_guard = 0
 
 // The failure line with codegen's reason, when it gave one (#2199: the
 // detail was recorded and never printed).

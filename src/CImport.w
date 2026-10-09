@@ -1054,10 +1054,10 @@ fn ci_build_include_text(header_spec: &str) -> str:
 // its spelling, once per pointer field, return type and record: decls x uses,
 // which is what c_import of a windows.h-sized header spent its minutes on.
 // One pass records, per name, which kinds of declaration carry it.
-let CI_NAME_TYPE = 2             // struct/union/enum/typedef, raw or escaped
-let CI_NAME_TYPEDEF = 4          // a typedef, raw spelling
-let CI_NAME_STRUCT_DEF = 8       // a struct with a body, raw spelling
-let CI_NAME_UNION_DEF = 16       // a union with a body, raw spelling
+const CI_NAME_TYPE = 2             // struct/union/enum/typedef, raw or escaped
+const CI_NAME_TYPEDEF = 4          // a typedef, raw spelling
+const CI_NAME_STRUCT_DEF = 8       // a struct with a body, raw spelling
+const CI_NAME_UNION_DEF = 16       // a union with a body, raw spelling
 
 var g_ci_decl_name_flags: HashMap[str, i32] = HashMap.new()
 var g_ci_decl_name_index_session: i64 = 0

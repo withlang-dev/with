@@ -3,4 +3,4 @@
 
 use compiler.ConanClient
 
-let _conan_client_facade_eof_guard = 0
+const _conan_client_facade_eof_guard = 0

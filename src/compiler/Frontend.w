@@ -59,11 +59,11 @@ fn frontend_owned_text(text: &str) -> str:
 // comment, blank), a named declaration, an impl (named by its target), a
 // function (its bare method name answers too), or one the classifier
 // cannot name — always parsed.
-let INTERFACE_LINE_SKIP = 0
-let INTERFACE_LINE_DECL = 1
-let INTERFACE_LINE_IMPL = 2
-let INTERFACE_LINE_FN = 3
-let INTERFACE_LINE_ALWAYS = 4
+const INTERFACE_LINE_SKIP = 0
+const INTERFACE_LINE_DECL = 1
+const INTERFACE_LINE_IMPL = 2
+const INTERFACE_LINE_FN = 3
+const INTERFACE_LINE_ALWAYS = 4
 
 fn interface_line_kind(line: &str) -> i32:
     if line.len() == 0 or line.starts_with("//") or line.starts_with("use ") or line.starts_with("module "):
@@ -2982,9 +2982,9 @@ fn frontend_fn_decl_is_generic(pool: AstPool, decl: i32) -> bool:
     let meta = pool.find_fn_meta(decl as NodeId)
     meta >= 0 and pool.fn_meta_tp_count(meta) > 0
 
-let FRONTEND_FN_KEEP = 0
-let FRONTEND_FN_DROP = 1
-let FRONTEND_FN_DISPLACE = 2
+const FRONTEND_FN_KEEP = 0
+const FRONTEND_FN_DROP = 1
+const FRONTEND_FN_DISPLACE = 2
 
 // The flat merge's verdict for one fn decl of a lower-precedence tier. A
 // same-name decl of higher precedence takes the short name. When that decl

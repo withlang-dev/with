@@ -71,24 +71,24 @@ type XzLzma {
 }
 
 // Probability array layout (offsets into probs).
-let P_IS_MATCH = 0
-let P_IS_REP = 192
-let P_IS_REP_G0 = 204
-let P_IS_REP_G1 = 216
-let P_IS_REP_G2 = 228
-let P_IS_REP0_LONG = 240
-let P_POS_SLOT = 432
-let P_SPEC_POS = 688
-let P_ALIGN = 802
-let P_LEN = 818
-let P_REP_LEN = 1332
-let P_LITERAL = 1846
+const P_IS_MATCH = 0
+const P_IS_REP = 192
+const P_IS_REP_G0 = 204
+const P_IS_REP_G1 = 216
+const P_IS_REP_G2 = 228
+const P_IS_REP0_LONG = 240
+const P_POS_SLOT = 432
+const P_SPEC_POS = 688
+const P_ALIGN = 802
+const P_LEN = 818
+const P_REP_LEN = 1332
+const P_LITERAL = 1846
 // A length coder: choice, choice2, low[16][8], mid[16][8], high[256].
-let LEN_CHOICE = 0
-let LEN_CHOICE2 = 1
-let LEN_LOW = 2
-let LEN_MID = 130
-let LEN_HIGH = 258
+const LEN_CHOICE = 0
+const LEN_CHOICE2 = 1
+const LEN_LOW = 2
+const LEN_MID = 130
+const LEN_HIGH = 258
 
 impl XzLzma:
     mut fn fail(message: &str):
