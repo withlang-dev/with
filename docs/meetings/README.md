@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D113 — Brackets make a Vec, unless a fixed array type is demanded (supersedes D93's array default)](2026-10-08-D113-brackets-make-a-vec.md)
 - [D111 — Copy-or-move is decided by identity; `str` is a value (immutable shared buffer, atomic count)](2026-10-08-D111-copy-or-move-is-decided-by-identity.md)
 - [D110 — A parameter's mode is what the callee does with it; builtin modes come from declared signatures](2026-10-08-D110-a-parameters-mode-is-what-the-callee-does.md)
 - [D109 — `offsetof[T](field)` is a built-in beside `sizeof`; a migrated `offsetof(T, f)` is spelled, never folded (delegated)](2026-10-07-D109-offsetof-builtin.md)

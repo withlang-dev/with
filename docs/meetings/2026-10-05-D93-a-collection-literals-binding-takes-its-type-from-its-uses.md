@@ -1,5 +1,9 @@
 # D93 — A collection literal's binding takes its type from its uses
 
+**Superseded in part by D113 (2026-10-08):** brackets make a `Vec` unless a
+fixed array type is demanded; uses no longer choose between a fixed array and
+a `Vec`. They still give an empty literal its element type.
+
 **Laws:** 2 (docs/mission.md).
 
 **Date:** 2026-10-05. **Status:** BDFL ruling; the words are Eric's (his
