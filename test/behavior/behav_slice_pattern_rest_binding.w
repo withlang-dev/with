@@ -1,14 +1,14 @@
 //! expect-stdout: ok
 
 fn main:
-    let arr = [1, 2, 3]
+    let arr: [i32; 3] = [1, 2, 3]
     match arr:
         [first, ..rest] =>
             assert(first == 1)
             assert(rest == 2)
         _ => assert(false)
 
-    let arr2 = [1, 2, 3, 4]
+    let arr2: [i32; 4] = [1, 2, 3, 4]
     match arr2:
         [first, ..mid, last] =>
             assert(first == 1)

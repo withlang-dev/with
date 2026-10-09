@@ -74,5 +74,7 @@ fn main:
     many.push(1)
     many.push(2)
     print(f"{kind(b)} {kind(a)} {kind(many)}")
-    let [first, .., last] = &[6, 0, 1]
+    // Brackets make a Vec (D113); the borrowed array is demanded.
+    let six: [i32; 3] = [6, 0, 1]
+    let [first, .., last] = &six
     print(f"{first} {last}")

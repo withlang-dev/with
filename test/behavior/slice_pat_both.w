@@ -3,7 +3,7 @@
 
 use std.builtins.int_to_string
 fn main:
-    let arr = [10, 20, 30, 40, 50]
+    let arr: [i32; 5] = [10, 20, 30, 40, 50]
     // [first, ..middle, last] — extract both ends
     match arr:
         [first, ..middle, last] => print("first=" ++ int_to_string(first) ++ " last=" ++ int_to_string(last))

@@ -14621,6 +14621,9 @@ impl Sema:
     // binding has no annotation and an element-form literal for its
     // initializer; 0 otherwise.
     fn literal_binding_let(expr: i32) -> i32:
+        // `&xs` demands of `xs` what its parameter demands of the reference.
+        if expr > 0 and self.ast.kind(expr) == NodeKind.NK_UNARY and self.ast.get_data0(expr) == UnaryOp.UOP_REF:
+            return self.literal_binding_let(self.ast.get_data1(expr))
         if expr <= 0 or self.ast.kind(expr) != NodeKind.NK_IDENT:
             return 0
         let sym = self.ast.get_data0(expr)
@@ -14632,17 +14635,20 @@ impl Sema:
         0
 
     // A use of `expr` that needs the type `demanded`: a parameter, a typed
-    // place, a return. Only `Vec`, `HashSet` and `BTreeSet` are demanded: a
-    // slice is met by the fixed array and demands nothing.
+    // place, a return. The collections a list builds are demanded (`Vec`,
+    // `HashSet`, `BTreeSet`, a fixed array); a slice views the Vec and
+    // demands nothing (D113).
     mut fn note_literal_demand(expr: i32, demanded: i32, use_node: i32):
         let let_node = self.literal_binding_let(expr)
         if let_node == 0 or demanded == 0:
             return
         let want = self.auto_deref_ref_ptr_type(self.resolve_alias(demanded as TypeId)) as i32
-        if self.get_type_kind(want as TypeId) != TypeKind.TY_GENERIC_INST:
-            return
-        let base = self.canonical_symbol_by_text(self.get_generic_inst_base(want))
-        if base != self.syms.vec and base != self.syms.hashset and base != self.syms.btreeset:
+        let kind = self.get_type_kind(want as TypeId)
+        if kind == TypeKind.TY_GENERIC_INST:
+            let base = self.canonical_symbol_by_text(self.get_generic_inst_base(want))
+            if base != self.syms.vec and base != self.syms.hashset and base != self.syms.btreeset:
+                return
+        else if kind != TypeKind.TY_ARRAY:
             return
         self.literal_demands.push(let_node)
         self.literal_demands.push(want)
@@ -14656,7 +14662,10 @@ impl Sema:
         if let_node == 0:
             return
         let have = if recv_ty != 0: self.resolve_alias(recv_ty as TypeId) as i32 else: 0
-        var elem = if have != 0 and self.get_type_kind(have as TypeId) == TypeKind.TY_ARRAY: self.get_type_d0(have as TypeId) else: 0
+        var elem = if have == 0: 0
+            else if self.get_type_kind(have as TypeId) == TypeKind.TY_ARRAY: self.get_type_d0(have as TypeId)
+            else if self.std_generic_of(have) == StdGeneric.Vec: self.get_generic_inst_arg(have, 0)
+            else: 0
         if elem == 0 and first_arg_ty != 0: elem = self.auto_deref_ref_ptr_type(self.resolve_alias(first_arg_ty as TypeId)) as i32
         if elem == 0:
             return
@@ -14739,7 +14748,7 @@ impl Sema:
     // the use that demanded its type, the use that demanded another (or 0),
     // then each of the two types as a length and its encoding (the second
     // has length 0 when there is none). A binding whose demanded type cannot
-    // be carried is left out, and stays the array it is without its uses.
+    // be carried is left out, and stays the Vec it is without its uses.
     pub fn literal_decisions_from_demands() -> Vec[i32]:
         // (let, type, second type or 0, use, second use), in this check's ids.
         var found: Vec[i32] = Vec.new()
@@ -19333,7 +19342,7 @@ impl Sema:
                 // #1229: a slice expectation types the ELEMENTS, never the
                 // literal. A literal typed as `[]T` reached MIR as an
                 // `aggregate` into a slice-typed temp and the callee received
-                // `{ptr = 5, len = 6}`. The literal is its `[T; N]` array; a
+                // `{ptr = 5, len = 6}`. The literal is a Vec (D113); a
                 // call site slices it (note_slice_coerce_call_arg) and every
                 // other slice context reports the mismatch.
                 expected_elem = self.get_type_d0(expected)
@@ -19351,9 +19360,16 @@ impl Sema:
         // `items: Vec[T]`) selects the collection; the elements decide T.
         if target_ty == 0 and expected_elem == 0 and self.collection_literal_hints.contains(node):
             target_base = self.collection_literal_hints.get(node).unwrap()
+        // D113 (§4.3c rule 1): brackets make a Vec, unless the demanded type
+        // is another collection built from a list (a fixed array, a set). A
+        // slice demand views the Vec.
+        if target_ty == 0 and target_base == 0:
+            target_base = self.syms.vec
         if elem_count == 0:
             if target_ty == 0 and expected_elem != 0:
-                target_ty = self.ensure_exact_type(TypeKind.TY_ARRAY, expected_elem as TypeId, 0, 0) as i32
+                let empty_args: Vec[i32] = Vec.new()
+                empty_args.push(expected_elem)
+                target_ty = self.ensure_generic_inst_type(target_base, empty_args, 1) as i32
             if target_ty != 0:
                 self.typed_expr_types.insert(node, target_ty)
                 return target_ty
@@ -19417,16 +19433,15 @@ impl Sema:
                 return 0
         let result: TypeId = if target_ty != 0:
             target_ty as TypeId
-        else if target_base != 0:
+        else:
             let hinted_args: Vec[i32] = Vec.new()
             hinted_args.push(elem_type)
             self.ensure_generic_inst_type(target_base, hinted_args, 1)
-        else:
-            // Array types have no side-table payload: reuse the canonical type
-            // so frozen MIR lowering sees the same pointee identity as a
-            // spelled `&[N]T` parameter.
-            self.ensure_exact_type(TypeKind.TY_ARRAY, elem_type, array_len, 0)
         self.typed_expr_types.insert(node, result as i32)
+        // D113: a duplicate constant in a literal built as a set is almost
+        // always a typo; a Vec keeps every element (`["a", "a"]` has two).
+        if target_base == self.syms.hashset or target_base == self.syms.btreeset:
+            self.warn_duplicate_set_constants(extra_start, elem_count)
         if target_base == self.syms.btreeset:
             let ord_trait = self.pool_lookup_symbol("Ord")
             if ord_trait != 0 and elem_type != 0 and self.type_implements_trait(elem_type, ord_trait) == 0:
@@ -19437,6 +19452,24 @@ impl Sema:
                 if self.record_btree_insert_contract(self.syms.btreeset, result as i32, self.ast.get_extra(extra_start + i)) == 0:
                     return 0
         result as i32
+
+    // A string or integer literal element equal, by spelling, to an earlier
+    // one. (Spelling, not value: `1` and `0x1` are not caught.)
+    mut fn warn_duplicate_set_constants(extra_start: i32, elem_count: i32):
+        for i in 1..elem_count:
+            let elem = self.ast.get_extra(extra_start + i)
+            let kind = self.ast.kind(elem)
+            if kind != NodeKind.NK_STRING_LIT and kind != NodeKind.NK_INT_LIT: continue
+            for j in 0..i:
+                let earlier = self.ast.get_extra(extra_start + j)
+                if self.ast.kind(earlier) == kind and self.same_source_spelling(elem, earlier):
+                    self.emit_warning("duplicate element in a set literal; a set keeps one, so the second is almost always a typo (D113)", elem)
+                    break
+
+    fn same_source_spelling(a: i32, b: i32) -> bool:
+        let text_a = self.source_text_view_for_file_id(self.ast.file(a as NodeId) as i32)
+        let text_b = self.source_text_view_for_file_id(self.ast.file(b as NodeId) as i32)
+        text_a.slice(self.ast.get_start(a), self.ast.get_end(a)) == text_b.slice(self.ast.get_start(b), self.ast.get_end(b))
 
     mut fn check_map_literal(node: i32) -> i32:
         let extra_start = self.ast.get_data0(node)

@@ -5,8 +5,8 @@
 
 use std.builtins.int_to_string
 fn main:
-    let arr = [1, 2, 3]
-    // Exhaustive: exact element count match for [3]i32
+    let arr: [i32; 3] = [1, 2, 3]
+    // Exhaustive: exact element count match for [i32; 3]
     let r1 = match arr:
         [a, b, c] => "three: " ++ int_to_string(a + b + c)
     print(r1)

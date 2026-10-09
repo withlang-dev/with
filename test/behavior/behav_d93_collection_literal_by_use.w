@@ -11,8 +11,8 @@
 // D93 (§4.3c rule 1): a binding with no annotation whose initializer is an
 // element-form literal takes its type from its uses in its own function — a
 // parameter, a typed place, a return, or a method exactly one collection
-// has — and the demand settles the element type too. A slice demand is met
-// by the fixed array, and with no demand the literal is a fixed array.
+// has — and the demand settles the element type too. A slice demand views
+// the Vec, and with no demand the literal is a Vec (D113).
 use std.collections.HashSet
 
 fn total(xs: &Vec[i32]): xs.iter() |> sum()
@@ -38,19 +38,19 @@ fn main:
     grown.push(4)
     print(f"{archive(xs)} {grown.len()}")
     // Another collection, by its parameter.
-    let names = ["a", "b", "a"]
+    let names = ["a", "b"]
     print(distinct(names))
     // The demand settles the element type.
     let wide = [1, 3000000000]
     print(widest(wide))
-    // A slice demand is met by the fixed array; nothing is demanded.
+    // A slice demand views the Vec; nothing is demanded.
     let pair = [4, 5]
     print(first_two(pair))
     // A typed place.
     let ys = [7, 8, 9]
     let kept: Vec[i32] = ys
     print(kept.len())
-    // A return (in `made`), and no demand at all: a fixed array.
+    // A return (in `made`), and no demand at all: a Vec.
     let plain = [1, 2, 3]
     print(f"{total(made())} {plain.len()}")
     // The empty literal takes its element type from the method's argument.
