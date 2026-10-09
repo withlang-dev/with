@@ -408,16 +408,7 @@ fn multmodp(__param_a: c_ulong, __param_b: c_ulong) -> c_ulong {
 
         (__local_m = __local_m >> (1 as c_uint))
 
-        var __ci_expr_ternary_0: c_ulong = 0
-
-        if (((__local_b as c_ulong) & (1 as c_ulong)) != 0) {
-            (__ci_expr_ternary_0 = ((((((__local_b as c_ulong) >> (1 as c_uint)) as c_ulong) ^ (3988292384 as c_ulong)) as c_ulong)))
-        } else {
-            (__ci_expr_ternary_0 = ((((__local_b as c_ulong) >> (1 as c_uint)) as c_ulong)))
-        }
-
-        (__local_b = __ci_expr_ternary_0)
-
+        (__local_b = (((if ((__local_b as c_ulong) & (1 as c_ulong)) != 0: (((((__local_b as c_ulong) >> (1 as c_uint)) as c_ulong) ^ (3988292384 as c_ulong)) as c_ulong) else: (((__local_b as c_ulong) >> (1 as c_uint)) as c_ulong)) as c_ulong)))
 
     }
 

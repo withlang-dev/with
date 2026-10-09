@@ -44,33 +44,25 @@ pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_cod
 
     var __local_data: *mut pcre2_serialized_data
 
-    var __local_memctl: *const pcre2_memctl = with 0 as __ci_expr_seq_16 {
-        var __ci_expr_ternary_0: *mut pcre2_memctl = null
-        if ((if __param_gcontext != null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = (((&raw const (*__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
-        } else {
-            (__ci_expr_ternary_0 = (((&raw const (*(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
-        }
-        (__ci_expr_ternary_0 as *const pcre2_memctl)
-    }
-
-    var __ci_expr_logic_2: c_int
+    var __local_memctl: *const pcre2_memctl = (((if (if __param_gcontext != null: 1 else: 0) != 0: ((&raw const (*__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl) else: ((&raw const (*(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)) as *const pcre2_memctl))
 
     var __ci_expr_logic_1: c_int
 
+    var __ci_expr_logic_0: c_int
+
     if ((if __param_codes == null: 1 else: 0) != 0) {
+        (__ci_expr_logic_0 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_0 = (if (if __param_serialized_bytes == null: 1 else: 0) != 0: 1 else: 0))
+    }
+
+    if (__ci_expr_logic_0 != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if __param_serialized_bytes == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (if __param_serialized_size == null: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_1 != 0) {
-        (__ci_expr_logic_2 = (if true: 1 else: 0))
-    } else {
-        (__ci_expr_logic_2 = (if (if __param_serialized_size == null: 1 else: 0) != 0: 1 else: 0))
-    }
-
-    if (__ci_expr_logic_2 != 0) {
         return -51
     }
 
@@ -171,15 +163,7 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
     var __local_number_of_codes = __param_number_of_codes
     var __local_data: *const pcre2_serialized_data = ((__param_bytes as *const pcre2_serialized_data))
 
-    var __local_memctl: *const pcre2_memctl = with 0 as __ci_expr_seq_10 {
-        var __ci_expr_ternary_0: *mut pcre2_memctl = null
-        if ((if __param_gcontext != null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = (((&raw const (*__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
-        } else {
-            (__ci_expr_ternary_0 = (((&raw const (*(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
-        }
-        (__ci_expr_ternary_0 as *const pcre2_memctl)
-    }
+    var __local_memctl: *const pcre2_memctl = (((if (if __param_gcontext != null: 1 else: 0) != 0: ((&raw const (*__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl) else: ((&raw const (*(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)) as *const pcre2_memctl))
 
     var __local_src_bytes: *const u8
 
@@ -192,15 +176,15 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
     var __local_j: c_int
 
 
-    var __ci_expr_logic_1: c_int
+    var __ci_expr_logic_0: c_int
 
     if ((if __local_data == null: 1 else: 0) != 0) {
-        (__ci_expr_logic_1 = (if true: 1 else: 0))
+        (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if __param_codes == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if __param_codes == null: 1 else: 0) != 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if (__ci_expr_logic_0 != 0) {
         return -51
     }
 
@@ -278,23 +262,23 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
         with_memcpy(((((__local_dst_re as *mut u8) + (sizeof[pcre2_memctl]() as usize)) as *mut c_void) as *mut u8), (((__local_src_bytes + (sizeof[pcre2_memctl]() as usize)) as *const c_void) as *const u8), ((((__local_blocksize as c_ulong) -% (sizeof[pcre2_memctl]() as c_ulong)) as c_ulong) as i64))
 
-        var __ci_expr_logic_3: c_int
-
         var __ci_expr_logic_2: c_int
 
+        var __ci_expr_logic_1: c_int
+
         if ((if (*__local_dst_re).magic_number != 1346589253: 1 else: 0) != 0) {
+            (__ci_expr_logic_1 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_1 = (if (if (*__local_dst_re).name_entry_size > ((128 + 2) + 1): 1 else: 0) != 0: 1 else: 0))
+        }
+
+        if (__ci_expr_logic_1 != 0) {
             (__ci_expr_logic_2 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_2 = (if (if (*__local_dst_re).name_entry_size > ((128 + 2) + 1): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (if (*__local_dst_re).name_count > 10000: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_2 != 0) {
-            (__ci_expr_logic_3 = (if true: 1 else: 0))
-        } else {
-            (__ci_expr_logic_3 = (if (if (*__local_dst_re).name_count > 10000: 1 else: 0) != 0: 1 else: 0))
-        }
-
-        if (__ci_expr_logic_3 != 0) {
             (*__local_memctl).free.unwrap()((__local_dst_re as *mut c_void), (*__local_memctl).memory_data)
 
             return -62

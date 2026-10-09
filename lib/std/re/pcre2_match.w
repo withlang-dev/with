@@ -133,13 +133,15 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     var __ci_expr_logic_1: c_int = 0
 
-    var __ci_expr_ternary_3: c_int = 0
+    var __ci_expr_logic_2: c_int = 0
 
     var __ci_expr_logic_4: c_int = 0
 
+    var __ci_expr_logic_3: c_int = 0
+
     var __ci_expr_logic_6: c_int = 0
 
-    var __ci_expr_logic_5: c_int = 0
+    var __ci_expr_logic_7: c_int = 0
 
     var __ci_expr_logic_8: c_int = 0
 
@@ -155,109 +157,81 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     var __ci_expr_logic_14: c_int = 0
 
-    var __ci_expr_logic_15: c_int = 0
+    var __ci_expr_logic_16: c_int = 0
 
-    var __ci_expr_ternary_16: *const u8 = null
+    var __ci_expr_logic_15: c_int = 0
 
     var __ci_expr_logic_17: c_int = 0
 
-    var __ci_expr_ternary_18: c_uint = 0
+    var __ci_expr_logic_19: c_int = 0
 
-    var __ci_expr_ternary_19: c_uint = 0
-
-    var __ci_expr_ternary_20: c_uint = 0
-
-    var __ci_expr_logic_22: c_int = 0
-
-    var __ci_expr_logic_21: c_int = 0
-
-    var __ci_expr_logic_23: c_int = 0
+    var __ci_expr_logic_18: c_int = 0
 
     var __ci_expr_logic_25: c_int = 0
 
-    var __ci_expr_logic_24: c_int = 0
-
-    var __ci_expr_logic_31: c_int = 0
+    var __ci_expr_logic_26: c_int = 0
 
     var __ci_expr_logic_32: c_int = 0
 
+    var __ci_expr_logic_33: c_int = 0
+
+    var __ci_expr_logic_35: c_int = 0
+
+    var __ci_expr_logic_36: c_int = 0
+
+    var __ci_expr_logic_37: c_int = 0
+
     var __ci_expr_logic_38: c_int = 0
+
+    var __ci_expr_ternary_40: *const u8 = null
 
     var __ci_expr_logic_39: c_int = 0
 
     var __ci_expr_logic_41: c_int = 0
 
-    var __ci_expr_logic_42: c_int = 0
+    var __ci_expr_logic_47: c_int = 0
 
-    var __ci_expr_logic_43: c_int = 0
+    var __ci_expr_logic_48: c_int = 0
 
-    var __ci_expr_ternary_44: *const u8 = null
-
-    var __ci_expr_ternary_45: *const u8 = null
-
-    var __ci_expr_logic_46: c_int = 0
-
-    var __ci_expr_ternary_47: *const u8 = null
-
-    var __ci_expr_ternary_48: *const u8 = null
-
-    var __ci_expr_ternary_49: *const u8 = null
-
-    var __ci_expr_ternary_51: *const u8 = null
-
-    var __ci_expr_logic_50: c_int = 0
-
-    var __ci_expr_logic_52: c_int = 0
+    var __ci_expr_logic_54: c_int = 0
 
     var __ci_expr_logic_58: c_int = 0
 
+    var __ci_expr_logic_57: c_int = 0
+
+    var __ci_expr_logic_56: c_int = 0
+
     var __ci_expr_logic_59: c_int = 0
 
-    var __ci_expr_logic_65: c_int = 0
+    var __ci_expr_logic_60: c_int = 0
 
-    var __ci_expr_logic_69: c_int = 0
+    var __ci_expr_logic_62: c_int = 0
 
-    var __ci_expr_logic_68: c_int = 0
+    var __ci_expr_logic_63: c_int = 0
 
-    var __ci_expr_logic_67: c_int = 0
+    var __ci_expr_logic_64: c_int = 0
 
     var __ci_expr_logic_70: c_int = 0
 
-    var __ci_expr_ternary_71: c_int = 0
+    var __ci_expr_logic_71: c_int = 0
 
-    var __ci_expr_logic_72: c_int = 0
-
-    var __ci_expr_logic_74: c_int = 0
+    var __ci_expr_logic_78: c_int = 0
 
     var __ci_expr_logic_75: c_int = 0
 
-    var __ci_expr_logic_76: c_int = 0
+    var __ci_expr_logic_74: c_int = 0
+
+    var __ci_expr_logic_73: c_int = 0
+
+    var __ci_expr_logic_72: c_int = 0
+
+    var __ci_expr_logic_81: c_int = 0
+
+    var __ci_expr_logic_79: c_int = 0
 
     var __ci_expr_logic_82: c_int = 0
 
     var __ci_expr_logic_83: c_int = 0
-
-    var __ci_expr_logic_90: c_int = 0
-
-    var __ci_expr_logic_87: c_int = 0
-
-    var __ci_expr_logic_86: c_int = 0
-
-    var __ci_expr_logic_85: c_int = 0
-
-    var __ci_expr_logic_84: c_int = 0
-
-    var __ci_expr_logic_93: c_int = 0
-
-    var __ci_expr_logic_91: c_int = 0
-
-    var __ci_expr_logic_94: c_int = 0
-
-    var __ci_expr_ternary_95: c_int = 0
-
-    var __ci_expr_ternary_96: *const u8 = null
-
-    var __ci_expr_logic_97: c_int = 0
 
     goto '__ci_bb_0
 
@@ -397,27 +371,12 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
         (__local_utf__goto_7005_6 = (((if (((*__local_re__goto_6969_24).overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) as c_int)))
         (__local_allow_invalid__goto_7009_6 = (((if (((*__local_re__goto_6969_24).overall_options as c_uint) & (67108864 as c_uint)) != 0: 1 else: 0) as c_int)))
         (__local_ucp__goto_7008_6 = (((if (((*__local_re__goto_6969_24).overall_options as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) as c_int)))
-        (__ci_expr_ternary_3 = 0)
-        if ((if ((__local_options as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
-            (__ci_expr_ternary_3 = ((2 as c_int)))
-        } else {
-            var __ci_expr_ternary_2: c_int = 0
-
-            if ((if ((__local_options as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0) {
-                (__ci_expr_ternary_2 = ((1 as c_int)))
-            } else {
-                (__ci_expr_ternary_2 = ((0 as c_int)))
-            }
-
-            (__ci_expr_ternary_3 = __ci_expr_ternary_2)
-
-        }
-        ((*__local_mb__goto_7024_14).partial = ((__ci_expr_ternary_3 as c_ushort)))
-        (__ci_expr_logic_4 = 0)
+        ((*__local_mb__goto_7024_14).partial = (((if (if ((__local_options as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((__local_options as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_ushort)))
+        (__ci_expr_logic_2 = 0)
         if ((if (*__local_mb__goto_7024_14).partial != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (if (((((*__local_re__goto_6969_24).overall_options as c_uint) | (__local_options as c_uint)) as c_uint) & (536870912 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (if (((((*__local_re__goto_6969_24).overall_options as c_uint) | (__local_options as c_uint)) as c_uint) & (536870912 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_4 != 0) {
+        if (__ci_expr_logic_2 != 0) {
             goto '__ci_bb_17
         } else {
             goto '__ci_bb_18
@@ -430,15 +389,15 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_18 {
-        (__ci_expr_logic_6 = 0)
-        (__ci_expr_logic_5 = 0)
+        (__ci_expr_logic_4 = 0)
+        (__ci_expr_logic_3 = 0)
         if ((if __local_mcontext != null: 1 else: 0) != 0) {
-            (__ci_expr_logic_5 = (if (if (*__local_mcontext).offset_limit != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_3 = (if (if (*__local_mcontext).offset_limit != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_5 != 0) {
-            (__ci_expr_logic_6 = (if (if (((*__local_re__goto_6969_24).overall_options as c_uint) & (8388608 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_3 != 0) {
+            (__ci_expr_logic_4 = (if (if (((*__local_re__goto_6969_24).overall_options as c_uint) & (8388608 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_6 != 0) {
+        if (__ci_expr_logic_4 != 0) {
             goto '__ci_bb_19
         } else {
             goto '__ci_bb_20
@@ -468,20 +427,20 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
         ((*__param_match_data).subject = ((null as *const u8)))
         ((*__param_match_data).startchar = ((0 as c_ulong)))
         ((*__local_mb__goto_7024_14).check_subject = __local_subject)
-        (__ci_expr_logic_8 = 0)
+        (__ci_expr_logic_6 = 0)
         if (__local_utf__goto_7005_6 != 0) {
-            var __ci_expr_logic_7: c_int
+            var __ci_expr_logic_5: c_int
 
             if ((if ((__local_options as c_uint) & (1073741824 as c_uint)) == 0: 1 else: 0) != 0) {
-                (__ci_expr_logic_7 = (if true: 1 else: 0))
+                (__ci_expr_logic_5 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_7 = (if __local_allow_invalid__goto_7009_6 != 0: 1 else: 0))
+                (__ci_expr_logic_5 = (if __local_allow_invalid__goto_7009_6 != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_8 = (if __ci_expr_logic_7 != 0: 1 else: 0))
+            (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_8 != 0) {
+        if (__ci_expr_logic_6 != 0) {
             goto '__ci_bb_23
         } else {
             goto '__ci_bb_24
@@ -510,11 +469,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_26 {
-        (__ci_expr_logic_10 = 0)
+        (__ci_expr_logic_8 = 0)
         if ((if __local_start_match__goto_6993_12 < __local_end_subject__goto_6991_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_10 = (if (if ((((*__local_start_match__goto_6993_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_8 = (if (if ((((*__local_start_match__goto_6993_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_10 != 0) {
+        if (__ci_expr_logic_8 != 0) {
             goto '__ci_bb_31
         } else {
             goto '__ci_bb_32
@@ -531,11 +490,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_28 {
-        (__ci_expr_logic_9 = 0)
+        (__ci_expr_logic_7 = 0)
         if ((if __local_start_match__goto_6993_12 < __local_end_subject__goto_6991_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_9 = (if (if ((((*__local_start_match__goto_6993_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_7 = (if (if ((((*__local_start_match__goto_6993_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_9 != 0) {
+        if (__ci_expr_logic_7 != 0) {
             goto '__ci_bb_29
         } else {
             goto '__ci_bb_30
@@ -584,11 +543,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_37 {
-        (__ci_expr_logic_11 = 0)
+        (__ci_expr_logic_9 = 0)
         if ((if __local_i__goto_7306_18 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_11 = (if (if (*__local_mb__goto_7024_14).check_subject > __local_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_9 = (if (if (*__local_mb__goto_7024_14).check_subject > __local_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_11 != 0) {
+        if (__ci_expr_logic_9 != 0) {
             goto '__ci_bb_38
         } else {
             goto '__ci_bb_40
@@ -610,11 +569,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_41 {
-        (__ci_expr_logic_12 = 0)
+        (__ci_expr_logic_10 = 0)
         if ((if (*__local_mb__goto_7024_14).check_subject > __local_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_12 = (if (if (((*((*__local_mb__goto_7024_14).check_subject)) as c_int) & (192 as c_int)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_10 = (if (if (((*((*__local_mb__goto_7024_14).check_subject)) as c_int) & (192 as c_int)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_12 != 0) {
+        if (__ci_expr_logic_10 != 0) {
             goto '__ci_bb_42
         } else {
             goto '__ci_bb_43
@@ -658,11 +617,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     '__ci_bb_49 {
         ((*__param_match_data).startchar = ((*__param_match_data).startchar +% ((((((*__local_mb__goto_7024_14).check_subject as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if not (__local_allow_invalid__goto_7009_6 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_13 = (if true: 1 else: 0))
+            (__ci_expr_logic_11 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_13 = (if (if __local_rc__goto_6967_5 > 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_11 = (if (if __local_rc__goto_6967_5 > 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_13 != 0) {
+        if (__ci_expr_logic_11 != 0) {
             goto '__ci_bb_50
         } else {
             goto '__ci_bb_51
@@ -698,11 +657,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_55 {
-        (__ci_expr_logic_14 = 0)
+        (__ci_expr_logic_12 = 0)
         if ((if (*__local_mb__goto_7024_14).check_subject < __local_start_match__goto_6993_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_14 = (if (if ((((*((*__local_mb__goto_7024_14).check_subject)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_12 = (if (if ((((*((*__local_mb__goto_7024_14).check_subject)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_14 != 0) {
+        if (__ci_expr_logic_12 != 0) {
             goto '__ci_bb_56
         } else {
             goto '__ci_bb_57
@@ -732,19 +691,13 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     '__ci_bb_60 {
         (__local_anchored__goto_6972_6 = (((if (((((*__local_re__goto_6969_24).overall_options as c_uint) | (__local_options as c_uint)) as c_uint) & (2147483648 as c_uint)) != 0: 1 else: 0) as c_int)))
-        (__ci_expr_logic_15 = 0)
+        (__ci_expr_logic_13 = 0)
         if ((if not (__local_anchored__goto_6972_6 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_15 = (if (if (((*__local_re__goto_6969_24).overall_options as c_uint) & (256 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_13 = (if (if (((*__local_re__goto_6969_24).overall_options as c_uint) & (256 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_firstline__goto_6973_6 = __ci_expr_logic_15)
+        (__local_firstline__goto_6973_6 = __ci_expr_logic_13)
         (__local_startline__goto_6976_6 = (((if (((*__local_re__goto_6969_24).flags as c_uint) & (512 as c_uint)) != 0: 1 else: 0) as c_int)))
-        (__ci_expr_ternary_16 = null)
-        if ((if (*__local_mcontext).offset_limit == (~(0 as c_ulong)): 1 else: 0) != 0) {
-            (__ci_expr_ternary_16 = __local_true_end_subject__goto_6992_12)
-        } else {
-            (__ci_expr_ternary_16 = __local_subject + ((*__local_mcontext).offset_limit as usize))
-        }
-        (__local_bumpalong_limit__goto_6990_12 = __ci_expr_ternary_16)
+        (__local_bumpalong_limit__goto_6990_12 = (if (if (*__local_mcontext).offset_limit == (~(0 as c_ulong)): 1 else: 0) != 0: __local_true_end_subject__goto_6992_12 else: (__local_subject + ((*__local_mcontext).offset_limit as usize))))
         ((*__local_mb__goto_7024_14).cb = ((&raw mut __local_cb__goto_7022_21 as *mut pcre2_callout_block_8)))
         (__local_cb__goto_7022_21.version = ((2 as c_uint)))
         (__local_cb__goto_7022_21.subject = __local_subject)
@@ -759,11 +712,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
         ((*__local_mb__goto_7024_14).hasthen = (((if (((*__local_re__goto_6969_24).flags as c_uint) & (4096 as c_uint)) != 0: 1 else: 0) as c_int)))
         ((*__local_mb__goto_7024_14).hasbsk = (((if (((*__local_re__goto_6969_24).flags as c_uint) & (16777216 as c_uint)) != 0: 1 else: 0) as c_int)))
         if ((if (*__local_re__goto_6969_24).max_lookbehind > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_17 = (if true: 1 else: 0))
+            (__ci_expr_logic_14 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_17 = (if (if (((*__local_re__goto_6969_24).flags as c_uint) & (8192 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_14 = (if (if (((*__local_re__goto_6969_24).flags as c_uint) & (8192 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        ((*__local_mb__goto_7024_14).allowemptypartial = __ci_expr_logic_17)
+        ((*__local_mb__goto_7024_14).allowemptypartial = __ci_expr_logic_14)
         ((*__local_mb__goto_7024_14).allowlookaroundbsk = (((if (((*__local_re__goto_6969_24).extra_options as c_uint) & (64 as c_uint)) != 0: 1 else: 0) as c_int)))
         ((*__local_mb__goto_7024_14).poptions = (*__local_re__goto_6969_24).overall_options)
         ((*__local_mb__goto_7024_14).ignore_skip_arg = ((0 as c_uint)))
@@ -788,27 +741,9 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     '__ci_bb_62 {
         (__local_frame_size__goto_7016_12 = (((((((((((offsetof[heapframe](ovector) as usize) as c_ulong) +% ((((((*__local_re__goto_6969_24).top_bracket as c_int) * 2) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong)) as c_ulong) +% ((offsetof[heapframe_align](frame) as usize) as c_ulong)) as c_ulong) -% (1 as c_ulong)) as c_ulong) & ((~(((offsetof[heapframe_align](frame) as usize) as c_ulong) -% (1 as c_ulong))) as c_ulong)) as c_ulong)))
-        (__ci_expr_ternary_18 = 0)
-        if ((if (*__local_mcontext).heap_limit < (*__local_re__goto_6969_24).limit_heap: 1 else: 0) != 0) {
-            (__ci_expr_ternary_18 = (*__local_mcontext).heap_limit)
-        } else {
-            (__ci_expr_ternary_18 = (*__local_re__goto_6969_24).limit_heap)
-        }
-        ((*__local_mb__goto_7024_14).heap_limit = __ci_expr_ternary_18)
-        (__ci_expr_ternary_19 = 0)
-        if ((if (*__local_mcontext).match_limit < (*__local_re__goto_6969_24).limit_match: 1 else: 0) != 0) {
-            (__ci_expr_ternary_19 = (*__local_mcontext).match_limit)
-        } else {
-            (__ci_expr_ternary_19 = (*__local_re__goto_6969_24).limit_match)
-        }
-        ((*__local_mb__goto_7024_14).match_limit = __ci_expr_ternary_19)
-        (__ci_expr_ternary_20 = 0)
-        if ((if (*__local_mcontext).depth_limit < (*__local_re__goto_6969_24).limit_depth: 1 else: 0) != 0) {
-            (__ci_expr_ternary_20 = (*__local_mcontext).depth_limit)
-        } else {
-            (__ci_expr_ternary_20 = (*__local_re__goto_6969_24).limit_depth)
-        }
-        ((*__local_mb__goto_7024_14).match_limit_depth = __ci_expr_ternary_20)
+        ((*__local_mb__goto_7024_14).heap_limit = (((if (if (*__local_mcontext).heap_limit < (*__local_re__goto_6969_24).limit_heap: 1 else: 0) != 0: (*__local_mcontext).heap_limit else: (*__local_re__goto_6969_24).limit_heap) as c_uint)))
+        ((*__local_mb__goto_7024_14).match_limit = (((if (if (*__local_mcontext).match_limit < (*__local_re__goto_6969_24).limit_match: 1 else: 0) != 0: (*__local_mcontext).match_limit else: (*__local_re__goto_6969_24).limit_match) as c_uint)))
+        ((*__local_mb__goto_7024_14).match_limit_depth = (((if (if (*__local_mcontext).depth_limit < (*__local_re__goto_6969_24).limit_depth: 1 else: 0) != 0: (*__local_mcontext).depth_limit else: (*__local_re__goto_6969_24).limit_depth) as c_uint)))
         (__local_heapframes_size__goto_7017_12 = ((((__local_frame_size__goto_7016_12 as c_ulong) *% (10 as c_ulong)) as c_ulong)))
         if ((if __local_heapframes_size__goto_7017_12 < 20480: 1 else: 0) != 0) {
             goto '__ci_bb_78
@@ -998,11 +933,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_89 {
-        (__ci_expr_logic_23 = 0)
+        (__ci_expr_logic_17 = 0)
         if ((if not (__local_startline__goto_6976_6 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_23 = (if (if (((*__local_re__goto_6969_24).flags as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_17 = (if (if (((*__local_re__goto_6969_24).flags as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_23 != 0) {
+        if (__ci_expr_logic_17 != 0) {
             goto '__ci_bb_95
         } else {
             goto '__ci_bb_96
@@ -1019,15 +954,15 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     '__ci_bb_91 {
         (__local_first_cu2__goto_6984_13 = ((((*__local_mb__goto_7024_14).fcc[__local_first_cu__goto_6983_13]) as u8)))
-        (__ci_expr_logic_22 = 0)
-        (__ci_expr_logic_21 = 0)
+        (__ci_expr_logic_16 = 0)
+        (__ci_expr_logic_15 = 0)
         if ((if __local_first_cu__goto_6983_13 > 127: 1 else: 0) != 0) {
-            (__ci_expr_logic_21 = (if __local_ucp__goto_7008_6 != 0: 1 else: 0))
+            (__ci_expr_logic_15 = (if __local_ucp__goto_7008_6 != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_21 != 0) {
-            (__ci_expr_logic_22 = (if (if not (__local_utf__goto_7005_6 != 0): 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_15 != 0) {
+            (__ci_expr_logic_16 = (if (if not (__local_utf__goto_7005_6 != 0): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_22 != 0) {
+        if (__ci_expr_logic_16 != 0) {
             goto '__ci_bb_93
         } else {
             goto '__ci_bb_94
@@ -1073,15 +1008,15 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     '__ci_bb_99 {
         (__local_req_cu2__goto_6986_13 = ((((*__local_mb__goto_7024_14).fcc[__local_req_cu__goto_6985_13]) as u8)))
-        (__ci_expr_logic_25 = 0)
-        (__ci_expr_logic_24 = 0)
+        (__ci_expr_logic_19 = 0)
+        (__ci_expr_logic_18 = 0)
         if ((if __local_req_cu__goto_6985_13 > 127: 1 else: 0) != 0) {
-            (__ci_expr_logic_24 = (if __local_ucp__goto_7008_6 != 0: 1 else: 0))
+            (__ci_expr_logic_18 = (if __local_ucp__goto_7008_6 != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_24 != 0) {
-            (__ci_expr_logic_25 = (if (if not (__local_utf__goto_7005_6 != 0): 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_18 != 0) {
+            (__ci_expr_logic_19 = (if (if not (__local_utf__goto_7005_6 != 0): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_25 != 0) {
+        if (__ci_expr_logic_19 != 0) {
             goto '__ci_bb_101
         } else {
             goto '__ci_bb_102
@@ -1177,49 +1112,49 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_115 {
-        (__ci_expr_logic_31 = 0)
+        (__ci_expr_logic_25 = 0)
         if ((if __local_t__goto_7625_18 < __local_end_subject__goto_6991_12: 1 else: 0) != 0) {
-            var __ci_expr_ternary_30: c_int = 0
+            var __ci_expr_ternary_24: c_int = 0
 
             if ((if (*__local_mb__goto_7024_14).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_26: c_int = 0
+                var __ci_expr_logic_20: c_int = 0
 
                 if ((if __local_t__goto_7625_18 < (*__local_mb__goto_7024_14).end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_26 = (if _pcre2_is_newline_8(__local_t__goto_7625_18, (*__local_mb__goto_7024_14).nltype, (*__local_mb__goto_7024_14).end_subject, ((&raw const (*__local_mb__goto_7024_14).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_7005_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_20 = (if _pcre2_is_newline_8(__local_t__goto_7625_18, (*__local_mb__goto_7024_14).nltype, (*__local_mb__goto_7024_14).end_subject, ((&raw const (*__local_mb__goto_7024_14).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_7005_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_30 = __ci_expr_logic_26)
+                (__ci_expr_ternary_24 = __ci_expr_logic_20)
 
             } else {
-                var __ci_expr_logic_29: c_int = 0
+                var __ci_expr_logic_23: c_int = 0
 
-                var __ci_expr_logic_27: c_int = 0
+                var __ci_expr_logic_21: c_int = 0
 
                 if ((if __local_t__goto_7625_18 <= ((*__local_mb__goto_7024_14).end_subject - ((*__local_mb__goto_7024_14).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_27 = (if (if (*__local_t__goto_7625_18) == (*__local_mb__goto_7024_14).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_21 = (if (if (*__local_t__goto_7625_18) == (*__local_mb__goto_7024_14).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_27 != 0) {
-                    var __ci_expr_logic_28: c_int
+                if (__ci_expr_logic_21 != 0) {
+                    var __ci_expr_logic_22: c_int
 
                     if ((if (*__local_mb__goto_7024_14).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_28 = (if true: 1 else: 0))
+                        (__ci_expr_logic_22 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_28 = (if (if (*(__local_t__goto_7625_18 + ((1 as isize) as usize))) == (*__local_mb__goto_7024_14).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_22 = (if (if (*(__local_t__goto_7625_18 + ((1 as isize) as usize))) == (*__local_mb__goto_7024_14).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_29 = (if __ci_expr_logic_28 != 0: 1 else: 0))
+                    (__ci_expr_logic_23 = (if __ci_expr_logic_22 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_30 = __ci_expr_logic_29)
+                (__ci_expr_ternary_24 = __ci_expr_logic_23)
 
             }
 
-            (__ci_expr_logic_31 = (if (if not (__ci_expr_ternary_30 != 0): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_25 = (if (if not (__ci_expr_ternary_24 != 0): 1 else: 0) != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_31 != 0) {
+        if (__ci_expr_logic_25 != 0) {
             goto '__ci_bb_116
         } else {
             goto '__ci_bb_117
@@ -1236,11 +1171,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_118 {
-        (__ci_expr_logic_32 = 0)
+        (__ci_expr_logic_26 = 0)
         if ((if __local_t__goto_7625_18 < __local_end_subject__goto_6991_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_32 = (if (if ((((*__local_t__goto_7625_18) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_26 = (if (if ((((*__local_t__goto_7625_18) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_32 != 0) {
+        if (__ci_expr_logic_26 != 0) {
             goto '__ci_bb_119
         } else {
             goto '__ci_bb_120
@@ -1257,49 +1192,49 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_121 {
-        (__ci_expr_logic_38 = 0)
+        (__ci_expr_logic_32 = 0)
         if ((if __local_t__goto_7625_18 < __local_end_subject__goto_6991_12: 1 else: 0) != 0) {
-            var __ci_expr_ternary_37: c_int = 0
+            var __ci_expr_ternary_31: c_int = 0
 
             if ((if (*__local_mb__goto_7024_14).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_33: c_int = 0
+                var __ci_expr_logic_27: c_int = 0
 
                 if ((if __local_t__goto_7625_18 < (*__local_mb__goto_7024_14).end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_33 = (if _pcre2_is_newline_8(__local_t__goto_7625_18, (*__local_mb__goto_7024_14).nltype, (*__local_mb__goto_7024_14).end_subject, ((&raw const (*__local_mb__goto_7024_14).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_7005_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_27 = (if _pcre2_is_newline_8(__local_t__goto_7625_18, (*__local_mb__goto_7024_14).nltype, (*__local_mb__goto_7024_14).end_subject, ((&raw const (*__local_mb__goto_7024_14).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_7005_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_37 = __ci_expr_logic_33)
+                (__ci_expr_ternary_31 = __ci_expr_logic_27)
 
             } else {
-                var __ci_expr_logic_36: c_int = 0
+                var __ci_expr_logic_30: c_int = 0
 
-                var __ci_expr_logic_34: c_int = 0
+                var __ci_expr_logic_28: c_int = 0
 
                 if ((if __local_t__goto_7625_18 <= ((*__local_mb__goto_7024_14).end_subject - ((*__local_mb__goto_7024_14).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_34 = (if (if (*__local_t__goto_7625_18) == (*__local_mb__goto_7024_14).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_28 = (if (if (*__local_t__goto_7625_18) == (*__local_mb__goto_7024_14).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_34 != 0) {
-                    var __ci_expr_logic_35: c_int
+                if (__ci_expr_logic_28 != 0) {
+                    var __ci_expr_logic_29: c_int
 
                     if ((if (*__local_mb__goto_7024_14).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_35 = (if true: 1 else: 0))
+                        (__ci_expr_logic_29 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_35 = (if (if (*(__local_t__goto_7625_18 + ((1 as isize) as usize))) == (*__local_mb__goto_7024_14).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_29 = (if (if (*(__local_t__goto_7625_18 + ((1 as isize) as usize))) == (*__local_mb__goto_7024_14).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_36 = (if __ci_expr_logic_35 != 0: 1 else: 0))
+                    (__ci_expr_logic_30 = (if __ci_expr_logic_29 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_37 = __ci_expr_logic_36)
+                (__ci_expr_ternary_31 = __ci_expr_logic_30)
 
             }
 
-            (__ci_expr_logic_38 = (if (if not (__ci_expr_ternary_37 != 0): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_32 = (if (if not (__ci_expr_ternary_31 != 0): 1 else: 0) != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_38 != 0) {
+        if (__ci_expr_logic_32 != 0) {
             goto '__ci_bb_122
         } else {
             goto '__ci_bb_123
@@ -1317,11 +1252,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     '__ci_bb_124 {
         if (__local_has_first_cu__goto_6974_6 != 0) {
-            (__ci_expr_logic_39 = (if true: 1 else: 0))
+            (__ci_expr_logic_33 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_39 = (if (if __local_start_bits__goto_6968_16 != null: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_33 = (if (if __local_start_bits__goto_6968_16 != null: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_39 != 0) {
+        if (__ci_expr_logic_33 != 0) {
             goto '__ci_bb_127
         } else {
             goto '__ci_bb_128
@@ -1360,25 +1295,25 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     '__ci_bb_129 {
         (__local_c__goto_7652_23 = (((*__local_start_match__goto_6993_12) as u8)))
-        (__ci_expr_logic_41 = 0)
+        (__ci_expr_logic_35 = 0)
         if (__local_has_first_cu__goto_6974_6 != 0) {
-            var __ci_expr_logic_40: c_int
+            var __ci_expr_logic_34: c_int
 
             if ((if __local_c__goto_7652_23 == __local_first_cu__goto_6983_13: 1 else: 0) != 0) {
-                (__ci_expr_logic_40 = (if true: 1 else: 0))
+                (__ci_expr_logic_34 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_40 = (if (if __local_c__goto_7652_23 == __local_first_cu2__goto_6984_13: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_34 = (if (if __local_c__goto_7652_23 == __local_first_cu2__goto_6984_13: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_41 = (if __ci_expr_logic_40 != 0: 1 else: 0))
+            (__ci_expr_logic_35 = (if __ci_expr_logic_34 != 0: 1 else: 0))
 
         }
-        (__local_ok__goto_7649_14 = __ci_expr_logic_41)
-        (__ci_expr_logic_42 = 0)
+        (__local_ok__goto_7649_14 = __ci_expr_logic_35)
+        (__ci_expr_logic_36 = 0)
         if ((if not (__local_ok__goto_7649_14 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_42 = (if (if __local_start_bits__goto_6968_16 != null: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_36 = (if (if __local_start_bits__goto_6968_16 != null: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_42 != 0) {
+        if (__ci_expr_logic_36 != 0) {
             goto '__ci_bb_131
         } else {
             goto '__ci_bb_132
@@ -1436,11 +1371,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
         (__local_pp2__goto_7696_22 = null)
         (__local_searchlength__goto_7697_22 = ((((((__local_end_subject__goto_6991_12 as usize) -% (__local_start_match__goto_6993_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if __local_memchr_found_first_cu__goto_6979_12 == null: 1 else: 0) != 0) {
-            (__ci_expr_logic_43 = (if true: 1 else: 0))
+            (__ci_expr_logic_37 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_43 = (if (if __local_start_match__goto_6993_12 > __local_memchr_found_first_cu__goto_6979_12: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_37 = (if (if __local_start_match__goto_6993_12 > __local_memchr_found_first_cu__goto_6979_12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_43 != 0) {
+        if (__ci_expr_logic_37 != 0) {
             goto '__ci_bb_141
         } else {
             goto '__ci_bb_142
@@ -1457,11 +1392,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_140 {
-        (__ci_expr_logic_52 = 0)
+        (__ci_expr_logic_41 = 0)
         if ((if (*__local_mb__goto_7024_14).partial == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_52 = (if (if __local_start_match__goto_6993_12 >= (*__local_mb__goto_7024_14).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_41 = (if (if __local_start_match__goto_6993_12 >= (*__local_mb__goto_7024_14).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_52 != 0) {
+        if (__ci_expr_logic_41 != 0) {
             goto '__ci_bb_152
         } else {
             goto '__ci_bb_153
@@ -1470,34 +1405,22 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     '__ci_bb_141 {
         (__local_pp1__goto_7695_22 = ((memchr(((__local_start_match__goto_6993_12 as *const c_void) as *mut c_void), (__local_first_cu__goto_6983_13 as c_int), (__local_searchlength__goto_7697_22 as i64)) as *const u8)))
-        (__ci_expr_ternary_44 = null)
-        if ((if __local_pp1__goto_7695_22 == null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_44 = __local_end_subject__goto_6991_12)
-        } else {
-            (__ci_expr_ternary_44 = __local_pp1__goto_7695_22)
-        }
-        (__local_memchr_found_first_cu__goto_6979_12 = __ci_expr_ternary_44)
+        (__local_memchr_found_first_cu__goto_6979_12 = (if (if __local_pp1__goto_7695_22 == null: 1 else: 0) != 0: __local_end_subject__goto_6991_12 else: __local_pp1__goto_7695_22))
         goto '__ci_bb_143
     }
 
     '__ci_bb_142 {
-        (__ci_expr_ternary_45 = null)
-        if ((if __local_memchr_found_first_cu__goto_6979_12 == __local_end_subject__goto_6991_12: 1 else: 0) != 0) {
-            (__ci_expr_ternary_45 = null)
-        } else {
-            (__ci_expr_ternary_45 = __local_memchr_found_first_cu__goto_6979_12)
-        }
-        (__local_pp1__goto_7695_22 = __ci_expr_ternary_45)
+        (__local_pp1__goto_7695_22 = (if (if __local_memchr_found_first_cu__goto_6979_12 == __local_end_subject__goto_6991_12: 1 else: 0) != 0: (null as *const u8) else: __local_memchr_found_first_cu__goto_6979_12))
         goto '__ci_bb_143
     }
 
     '__ci_bb_143 {
         if ((if __local_memchr_found_first_cu2__goto_6980_12 == null: 1 else: 0) != 0) {
-            (__ci_expr_logic_46 = (if true: 1 else: 0))
+            (__ci_expr_logic_38 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_46 = (if (if __local_start_match__goto_6993_12 > __local_memchr_found_first_cu2__goto_6980_12: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_38 = (if (if __local_start_match__goto_6993_12 > __local_memchr_found_first_cu2__goto_6980_12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_46 != 0) {
+        if (__ci_expr_logic_38 != 0) {
             goto '__ci_bb_144
         } else {
             goto '__ci_bb_145
@@ -1506,24 +1429,12 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     '__ci_bb_144 {
         (__local_pp2__goto_7696_22 = ((memchr(((__local_start_match__goto_6993_12 as *const c_void) as *mut c_void), (__local_first_cu2__goto_6984_13 as c_int), (__local_searchlength__goto_7697_22 as i64)) as *const u8)))
-        (__ci_expr_ternary_47 = null)
-        if ((if __local_pp2__goto_7696_22 == null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_47 = __local_end_subject__goto_6991_12)
-        } else {
-            (__ci_expr_ternary_47 = __local_pp2__goto_7696_22)
-        }
-        (__local_memchr_found_first_cu2__goto_6980_12 = __ci_expr_ternary_47)
+        (__local_memchr_found_first_cu2__goto_6980_12 = (if (if __local_pp2__goto_7696_22 == null: 1 else: 0) != 0: __local_end_subject__goto_6991_12 else: __local_pp2__goto_7696_22))
         goto '__ci_bb_146
     }
 
     '__ci_bb_145 {
-        (__ci_expr_ternary_48 = null)
-        if ((if __local_memchr_found_first_cu2__goto_6980_12 == __local_end_subject__goto_6991_12: 1 else: 0) != 0) {
-            (__ci_expr_ternary_48 = null)
-        } else {
-            (__ci_expr_ternary_48 = __local_memchr_found_first_cu2__goto_6980_12)
-        }
-        (__local_pp2__goto_7696_22 = __ci_expr_ternary_48)
+        (__local_pp2__goto_7696_22 = (if (if __local_memchr_found_first_cu2__goto_6980_12 == __local_end_subject__goto_6991_12: 1 else: 0) != 0: (null as *const u8) else: __local_memchr_found_first_cu2__goto_6980_12))
         goto '__ci_bb_146
     }
 
@@ -1536,29 +1447,23 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_147 {
-        (__ci_expr_ternary_49 = null)
-        if ((if __local_pp2__goto_7696_22 == null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_49 = __local_end_subject__goto_6991_12)
-        } else {
-            (__ci_expr_ternary_49 = __local_pp2__goto_7696_22)
-        }
-        (__local_start_match__goto_6993_12 = __ci_expr_ternary_49)
+        (__local_start_match__goto_6993_12 = (if (if __local_pp2__goto_7696_22 == null: 1 else: 0) != 0: __local_end_subject__goto_6991_12 else: __local_pp2__goto_7696_22))
         goto '__ci_bb_149
     }
 
     '__ci_bb_148 {
-        (__ci_expr_ternary_51 = null)
+        (__ci_expr_ternary_40 = null)
         if ((if __local_pp2__goto_7696_22 == null: 1 else: 0) != 0) {
-            (__ci_expr_logic_50 = (if true: 1 else: 0))
+            (__ci_expr_logic_39 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_50 = (if (if __local_pp1__goto_7695_22 < __local_pp2__goto_7696_22: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_39 = (if (if __local_pp1__goto_7695_22 < __local_pp2__goto_7696_22: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_50 != 0) {
-            (__ci_expr_ternary_51 = __local_pp1__goto_7695_22)
+        if (__ci_expr_logic_39 != 0) {
+            (__ci_expr_ternary_40 = __local_pp1__goto_7695_22)
         } else {
-            (__ci_expr_ternary_51 = __local_pp2__goto_7696_22)
+            (__ci_expr_ternary_40 = __local_pp2__goto_7696_22)
         }
-        (__local_start_match__goto_6993_12 = __ci_expr_ternary_51)
+        (__local_start_match__goto_6993_12 = __ci_expr_ternary_40)
         goto '__ci_bb_149
     }
 
@@ -1625,28 +1530,28 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_161 {
-        (__ci_expr_logic_69 = 0)
-        (__ci_expr_logic_68 = 0)
-        (__ci_expr_logic_67 = 0)
+        (__ci_expr_logic_58 = 0)
+        (__ci_expr_logic_57 = 0)
+        (__ci_expr_logic_56 = 0)
         if ((if (__local_start_match__goto_6993_12[-1]) == 13: 1 else: 0) != 0) {
-            var __ci_expr_logic_66: c_int
+            var __ci_expr_logic_55: c_int
 
             if ((if (*__local_mb__goto_7024_14).nltype == 1: 1 else: 0) != 0) {
-                (__ci_expr_logic_66 = (if true: 1 else: 0))
+                (__ci_expr_logic_55 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_66 = (if (if (*__local_mb__goto_7024_14).nltype == 2: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_55 = (if (if (*__local_mb__goto_7024_14).nltype == 2: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_67 = (if __ci_expr_logic_66 != 0: 1 else: 0))
+            (__ci_expr_logic_56 = (if __ci_expr_logic_55 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_67 != 0) {
-            (__ci_expr_logic_68 = (if (if __local_start_match__goto_6993_12 < __local_end_subject__goto_6991_12: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_56 != 0) {
+            (__ci_expr_logic_57 = (if (if __local_start_match__goto_6993_12 < __local_end_subject__goto_6991_12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_68 != 0) {
-            (__ci_expr_logic_69 = (if (if (*__local_start_match__goto_6993_12) == 10: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_57 != 0) {
+            (__ci_expr_logic_58 = (if (if (*__local_start_match__goto_6993_12) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_69 != 0) {
+        if (__ci_expr_logic_58 != 0) {
             goto '__ci_bb_171
         } else {
             goto '__ci_bb_172
@@ -1654,49 +1559,49 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_162 {
-        (__ci_expr_logic_58 = 0)
+        (__ci_expr_logic_47 = 0)
         if ((if __local_start_match__goto_6993_12 < __local_end_subject__goto_6991_12: 1 else: 0) != 0) {
-            var __ci_expr_ternary_57: c_int = 0
+            var __ci_expr_ternary_46: c_int = 0
 
             if ((if (*__local_mb__goto_7024_14).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_53: c_int = 0
+                var __ci_expr_logic_42: c_int = 0
 
                 if ((if __local_start_match__goto_6993_12 > (*__local_mb__goto_7024_14).start_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_53 = (if _pcre2_was_newline_8(__local_start_match__goto_6993_12, (*__local_mb__goto_7024_14).nltype, (*__local_mb__goto_7024_14).start_subject, ((&raw const (*__local_mb__goto_7024_14).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_7005_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_42 = (if _pcre2_was_newline_8(__local_start_match__goto_6993_12, (*__local_mb__goto_7024_14).nltype, (*__local_mb__goto_7024_14).start_subject, ((&raw const (*__local_mb__goto_7024_14).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_7005_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_57 = __ci_expr_logic_53)
+                (__ci_expr_ternary_46 = __ci_expr_logic_42)
 
             } else {
-                var __ci_expr_logic_56: c_int = 0
+                var __ci_expr_logic_45: c_int = 0
 
-                var __ci_expr_logic_54: c_int = 0
+                var __ci_expr_logic_43: c_int = 0
 
                 if ((if __local_start_match__goto_6993_12 >= ((*__local_mb__goto_7024_14).start_subject + ((*__local_mb__goto_7024_14).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_54 = (if (if (*(__local_start_match__goto_6993_12 - ((*__local_mb__goto_7024_14).nllen as usize))) == (*__local_mb__goto_7024_14).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_43 = (if (if (*(__local_start_match__goto_6993_12 - ((*__local_mb__goto_7024_14).nllen as usize))) == (*__local_mb__goto_7024_14).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_54 != 0) {
-                    var __ci_expr_logic_55: c_int
+                if (__ci_expr_logic_43 != 0) {
+                    var __ci_expr_logic_44: c_int
 
                     if ((if (*__local_mb__goto_7024_14).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_55 = (if true: 1 else: 0))
+                        (__ci_expr_logic_44 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_55 = (if (if (*((__local_start_match__goto_6993_12 - ((*__local_mb__goto_7024_14).nllen as usize)) + ((1 as isize) as usize))) == (*__local_mb__goto_7024_14).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_44 = (if (if (*((__local_start_match__goto_6993_12 - ((*__local_mb__goto_7024_14).nllen as usize)) + ((1 as isize) as usize))) == (*__local_mb__goto_7024_14).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_56 = (if __ci_expr_logic_55 != 0: 1 else: 0))
+                    (__ci_expr_logic_45 = (if __ci_expr_logic_44 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_57 = __ci_expr_logic_56)
+                (__ci_expr_ternary_46 = __ci_expr_logic_45)
 
             }
 
-            (__ci_expr_logic_58 = (if (if not (__ci_expr_ternary_57 != 0): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_47 = (if (if not (__ci_expr_ternary_46 != 0): 1 else: 0) != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_58 != 0) {
+        if (__ci_expr_logic_47 != 0) {
             goto '__ci_bb_163
         } else {
             goto '__ci_bb_164
@@ -1713,11 +1618,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_165 {
-        (__ci_expr_logic_59 = 0)
+        (__ci_expr_logic_48 = 0)
         if ((if __local_start_match__goto_6993_12 < __local_end_subject__goto_6991_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_59 = (if (if ((((*__local_start_match__goto_6993_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_48 = (if (if ((((*__local_start_match__goto_6993_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_59 != 0) {
+        if (__ci_expr_logic_48 != 0) {
             goto '__ci_bb_166
         } else {
             goto '__ci_bb_167
@@ -1734,49 +1639,49 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_168 {
-        (__ci_expr_logic_65 = 0)
+        (__ci_expr_logic_54 = 0)
         if ((if __local_start_match__goto_6993_12 < __local_end_subject__goto_6991_12: 1 else: 0) != 0) {
-            var __ci_expr_ternary_64: c_int = 0
+            var __ci_expr_ternary_53: c_int = 0
 
             if ((if (*__local_mb__goto_7024_14).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_60: c_int = 0
+                var __ci_expr_logic_49: c_int = 0
 
                 if ((if __local_start_match__goto_6993_12 > (*__local_mb__goto_7024_14).start_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_60 = (if _pcre2_was_newline_8(__local_start_match__goto_6993_12, (*__local_mb__goto_7024_14).nltype, (*__local_mb__goto_7024_14).start_subject, ((&raw const (*__local_mb__goto_7024_14).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_7005_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_49 = (if _pcre2_was_newline_8(__local_start_match__goto_6993_12, (*__local_mb__goto_7024_14).nltype, (*__local_mb__goto_7024_14).start_subject, ((&raw const (*__local_mb__goto_7024_14).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_7005_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_64 = __ci_expr_logic_60)
+                (__ci_expr_ternary_53 = __ci_expr_logic_49)
 
             } else {
-                var __ci_expr_logic_63: c_int = 0
+                var __ci_expr_logic_52: c_int = 0
 
-                var __ci_expr_logic_61: c_int = 0
+                var __ci_expr_logic_50: c_int = 0
 
                 if ((if __local_start_match__goto_6993_12 >= ((*__local_mb__goto_7024_14).start_subject + ((*__local_mb__goto_7024_14).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_61 = (if (if (*(__local_start_match__goto_6993_12 - ((*__local_mb__goto_7024_14).nllen as usize))) == (*__local_mb__goto_7024_14).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_50 = (if (if (*(__local_start_match__goto_6993_12 - ((*__local_mb__goto_7024_14).nllen as usize))) == (*__local_mb__goto_7024_14).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_61 != 0) {
-                    var __ci_expr_logic_62: c_int
+                if (__ci_expr_logic_50 != 0) {
+                    var __ci_expr_logic_51: c_int
 
                     if ((if (*__local_mb__goto_7024_14).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_62 = (if true: 1 else: 0))
+                        (__ci_expr_logic_51 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_62 = (if (if (*((__local_start_match__goto_6993_12 - ((*__local_mb__goto_7024_14).nllen as usize)) + ((1 as isize) as usize))) == (*__local_mb__goto_7024_14).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_51 = (if (if (*((__local_start_match__goto_6993_12 - ((*__local_mb__goto_7024_14).nllen as usize)) + ((1 as isize) as usize))) == (*__local_mb__goto_7024_14).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_63 = (if __ci_expr_logic_62 != 0: 1 else: 0))
+                    (__ci_expr_logic_52 = (if __ci_expr_logic_51 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_64 = __ci_expr_logic_63)
+                (__ci_expr_ternary_53 = __ci_expr_logic_52)
 
             }
 
-            (__ci_expr_logic_65 = (if (if not (__ci_expr_ternary_64 != 0): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_54 = (if (if not (__ci_expr_ternary_53 != 0): 1 else: 0) != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_65 != 0) {
+        if (__ci_expr_logic_54 != 0) {
             goto '__ci_bb_169
         } else {
             goto '__ci_bb_170
@@ -1827,11 +1732,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_177 {
-        (__ci_expr_logic_70 = 0)
+        (__ci_expr_logic_59 = 0)
         if ((if (*__local_mb__goto_7024_14).partial == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_70 = (if (if __local_start_match__goto_6993_12 >= (*__local_mb__goto_7024_14).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_59 = (if (if __local_start_match__goto_6993_12 >= (*__local_mb__goto_7024_14).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_70 != 0) {
+        if (__ci_expr_logic_59 != 0) {
             goto '__ci_bb_180
         } else {
             goto '__ci_bb_181
@@ -1874,18 +1779,12 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_185 {
-        (__ci_expr_ternary_71 = 0)
-        if (__local_has_first_cu__goto_6974_6 != 0) {
-            (__ci_expr_ternary_71 = ((1 as c_int)))
-        } else {
-            (__ci_expr_ternary_71 = ((0 as c_int)))
-        }
-        (__local_p__goto_7839_18 = __local_start_match__goto_6993_12 + ((__ci_expr_ternary_71 as isize) as usize))
-        (__ci_expr_logic_72 = 0)
+        (__local_p__goto_7839_18 = __local_start_match__goto_6993_12 + (((if __local_has_first_cu__goto_6974_6 != 0: (1 as c_int) else: (0 as c_int)) as isize) as usize))
+        (__ci_expr_logic_60 = 0)
         if (__local_has_req_cu__goto_6975_6 != 0) {
-            (__ci_expr_logic_72 = (if (if __local_p__goto_7839_18 > __local_req_cu_ptr__goto_6994_12: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_60 = (if (if __local_p__goto_7839_18 > __local_req_cu_ptr__goto_6994_12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_72 != 0) {
+        if (__ci_expr_logic_60 != 0) {
             goto '__ci_bb_186
         } else {
             goto '__ci_bb_187
@@ -1895,18 +1794,18 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     '__ci_bb_186 {
         (__local_check_length__goto_7877_20 = ((((((__local_end_subject__goto_6991_12 as usize) -% (__local_start_match__goto_6993_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if __local_check_length__goto_7877_20 < 5000: 1 else: 0) != 0) {
-            (__ci_expr_logic_74 = (if true: 1 else: 0))
+            (__ci_expr_logic_62 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_73: c_int = 0
+            var __ci_expr_logic_61: c_int = 0
 
             if ((if not (__local_anchored__goto_6972_6 != 0): 1 else: 0) != 0) {
-                (__ci_expr_logic_73 = (if (if __local_check_length__goto_7877_20 < 5000000: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_61 = (if (if __local_check_length__goto_7877_20 < 5000000: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_74 = (if __ci_expr_logic_73 != 0: 1 else: 0))
+            (__ci_expr_logic_62 = (if __ci_expr_logic_61 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_74 != 0) {
+        if (__ci_expr_logic_62 != 0) {
             goto '__ci_bb_188
         } else {
             goto '__ci_bb_189
@@ -2012,11 +1911,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
         ((*__local_mb__goto_7024_14).end_offset_top = ((0 as c_ulong)))
         ((*__local_mb__goto_7024_14).skip_arg_count = ((0 as c_uint)))
         (__local_rc__goto_6967_5 = ((match_(__local_start_match__goto_6993_12, (*__local_mb__goto_7024_14).start_code, (*__local_re__goto_6969_24).top_bracket, __local_frame_size__goto_7016_12, __param_match_data, __local_mb__goto_7024_14) as c_int)))
-        (__ci_expr_logic_75 = 0)
+        (__ci_expr_logic_63 = 0)
         if ((*__local_mb__goto_7024_14).hitend != 0) {
-            (__ci_expr_logic_75 = (if (if __local_start_partial__goto_6995_12 == null: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_63 = (if (if __local_start_partial__goto_6995_12 == null: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_75 != 0) {
+        if (__ci_expr_logic_63 != 0) {
             goto '__ci_bb_203
         } else {
             goto '__ci_bb_204
@@ -2043,49 +1942,49 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     '__ci_bb_206 {
         (__local_rc__goto_6967_5 = ((0 as c_int)))
-        (__ci_expr_logic_82 = 0)
+        (__ci_expr_logic_70 = 0)
         if (__local_firstline__goto_6973_6 != 0) {
-            var __ci_expr_ternary_81: c_int = 0
+            var __ci_expr_ternary_69: c_int = 0
 
             if ((if (*__local_mb__goto_7024_14).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_77: c_int = 0
+                var __ci_expr_logic_65: c_int = 0
 
                 if ((if __local_start_match__goto_6993_12 < (*__local_mb__goto_7024_14).end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_77 = (if _pcre2_is_newline_8(__local_start_match__goto_6993_12, (*__local_mb__goto_7024_14).nltype, (*__local_mb__goto_7024_14).end_subject, ((&raw const (*__local_mb__goto_7024_14).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_7005_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_65 = (if _pcre2_is_newline_8(__local_start_match__goto_6993_12, (*__local_mb__goto_7024_14).nltype, (*__local_mb__goto_7024_14).end_subject, ((&raw const (*__local_mb__goto_7024_14).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_7005_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_81 = __ci_expr_logic_77)
+                (__ci_expr_ternary_69 = __ci_expr_logic_65)
 
             } else {
-                var __ci_expr_logic_80: c_int = 0
+                var __ci_expr_logic_68: c_int = 0
 
-                var __ci_expr_logic_78: c_int = 0
+                var __ci_expr_logic_66: c_int = 0
 
                 if ((if __local_start_match__goto_6993_12 <= ((*__local_mb__goto_7024_14).end_subject - ((*__local_mb__goto_7024_14).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_78 = (if (if (*__local_start_match__goto_6993_12) == (*__local_mb__goto_7024_14).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_66 = (if (if (*__local_start_match__goto_6993_12) == (*__local_mb__goto_7024_14).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_78 != 0) {
-                    var __ci_expr_logic_79: c_int
+                if (__ci_expr_logic_66 != 0) {
+                    var __ci_expr_logic_67: c_int
 
                     if ((if (*__local_mb__goto_7024_14).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_79 = (if true: 1 else: 0))
+                        (__ci_expr_logic_67 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_79 = (if (if (*(__local_start_match__goto_6993_12 + ((1 as isize) as usize))) == (*__local_mb__goto_7024_14).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_67 = (if (if (*(__local_start_match__goto_6993_12 + ((1 as isize) as usize))) == (*__local_mb__goto_7024_14).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_80 = (if __ci_expr_logic_79 != 0: 1 else: 0))
+                    (__ci_expr_logic_68 = (if __ci_expr_logic_67 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_81 = __ci_expr_logic_80)
+                (__ci_expr_ternary_69 = __ci_expr_logic_68)
 
             }
 
-            (__ci_expr_logic_82 = (if __ci_expr_ternary_81 != 0: 1 else: 0))
+            (__ci_expr_logic_70 = (if __ci_expr_ternary_69 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_82 != 0) {
+        if (__ci_expr_logic_70 != 0) {
             goto '__ci_bb_225
         } else {
             goto '__ci_bb_226
@@ -2134,11 +2033,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_214 {
-        (__ci_expr_logic_76 = 0)
+        (__ci_expr_logic_64 = 0)
         if ((if __local_new_start_match__goto_7606_14 < __local_end_subject__goto_6991_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_76 = (if (if ((((*__local_new_start_match__goto_7606_14) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_64 = (if (if ((((*__local_new_start_match__goto_7606_14) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_76 != 0) {
+        if (__ci_expr_logic_64 != 0) {
             goto '__ci_bb_215
         } else {
             goto '__ci_bb_216
@@ -2160,24 +2059,24 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_218 {
-        (__ci_expr_logic_93 = 0)
-        (__ci_expr_logic_91 = 0)
+        (__ci_expr_logic_81 = 0)
+        (__ci_expr_logic_79 = 0)
         if (__local_utf__goto_7005_6 != 0) {
-            (__ci_expr_logic_91 = (if (if __local_end_subject__goto_6991_12 != __local_true_end_subject__goto_6992_12: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_79 = (if (if __local_end_subject__goto_6991_12 != __local_true_end_subject__goto_6992_12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_91 != 0) {
-            var __ci_expr_logic_92: c_int
+        if (__ci_expr_logic_79 != 0) {
+            var __ci_expr_logic_80: c_int
 
             if ((if __local_rc__goto_6967_5 == 0: 1 else: 0) != 0) {
-                (__ci_expr_logic_92 = (if true: 1 else: 0))
+                (__ci_expr_logic_80 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_92 = (if (if __local_rc__goto_6967_5 == -2: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_80 = (if (if __local_rc__goto_6967_5 == -2: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_93 = (if __ci_expr_logic_92 != 0: 1 else: 0))
+            (__ci_expr_logic_81 = (if __ci_expr_logic_80 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_93 != 0) {
+        if (__ci_expr_logic_81 != 0) {
             goto '__ci_bb_231
         } else {
             goto '__ci_bb_232
@@ -2235,11 +2134,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     '__ci_bb_226 {
         (__local_start_match__goto_6993_12 = __local_new_start_match__goto_7606_14)
         if (__local_anchored__goto_6972_6 != 0) {
-            (__ci_expr_logic_83 = (if true: 1 else: 0))
+            (__ci_expr_logic_71 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_83 = (if (if __local_start_match__goto_6993_12 > __local_end_subject__goto_6991_12: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_71 = (if (if __local_start_match__goto_6993_12 > __local_end_subject__goto_6991_12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_83 != 0) {
+        if (__ci_expr_logic_71 != 0) {
             goto '__ci_bb_227
         } else {
             goto '__ci_bb_228
@@ -2251,44 +2150,44 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_228 {
-        (__ci_expr_logic_90 = 0)
-        (__ci_expr_logic_87 = 0)
-        (__ci_expr_logic_86 = 0)
-        (__ci_expr_logic_85 = 0)
-        (__ci_expr_logic_84 = 0)
+        (__ci_expr_logic_78 = 0)
+        (__ci_expr_logic_75 = 0)
+        (__ci_expr_logic_74 = 0)
+        (__ci_expr_logic_73 = 0)
+        (__ci_expr_logic_72 = 0)
         if ((if __local_start_match__goto_6993_12 > (__local_subject + (__param_start_offset as usize)): 1 else: 0) != 0) {
-            (__ci_expr_logic_84 = (if (if (__local_start_match__goto_6993_12[-1]) == 13: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_72 = (if (if (__local_start_match__goto_6993_12[-1]) == 13: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_84 != 0) {
-            (__ci_expr_logic_85 = (if (if __local_start_match__goto_6993_12 < __local_end_subject__goto_6991_12: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_72 != 0) {
+            (__ci_expr_logic_73 = (if (if __local_start_match__goto_6993_12 < __local_end_subject__goto_6991_12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_85 != 0) {
-            (__ci_expr_logic_86 = (if (if (*__local_start_match__goto_6993_12) == 10: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_73 != 0) {
+            (__ci_expr_logic_74 = (if (if (*__local_start_match__goto_6993_12) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_86 != 0) {
-            (__ci_expr_logic_87 = (if (if (((*__local_re__goto_6969_24).flags as c_uint) & (2048 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_74 != 0) {
+            (__ci_expr_logic_75 = (if (if (((*__local_re__goto_6969_24).flags as c_uint) & (2048 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_87 != 0) {
-            var __ci_expr_logic_89: c_int
+        if (__ci_expr_logic_75 != 0) {
+            var __ci_expr_logic_77: c_int
 
-            var __ci_expr_logic_88: c_int
+            var __ci_expr_logic_76: c_int
 
             if ((if (*__local_mb__goto_7024_14).nltype == 1: 1 else: 0) != 0) {
-                (__ci_expr_logic_88 = (if true: 1 else: 0))
+                (__ci_expr_logic_76 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_88 = (if (if (*__local_mb__goto_7024_14).nltype == 2: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_76 = (if (if (*__local_mb__goto_7024_14).nltype == 2: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_88 != 0) {
-                (__ci_expr_logic_89 = (if true: 1 else: 0))
+            if (__ci_expr_logic_76 != 0) {
+                (__ci_expr_logic_77 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_89 = (if (if (*__local_mb__goto_7024_14).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_77 = (if (if (*__local_mb__goto_7024_14).nllen == 2: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_90 = (if __ci_expr_logic_89 != 0: 1 else: 0))
+            (__ci_expr_logic_78 = (if __ci_expr_logic_77 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_90 != 0) {
+        if (__ci_expr_logic_78 != 0) {
             goto '__ci_bb_229
         } else {
             goto '__ci_bb_230
@@ -2339,11 +2238,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_237 {
-        (__ci_expr_logic_94 = 0)
+        (__ci_expr_logic_82 = 0)
         if ((if __local_start_match__goto_6993_12 < __local_true_end_subject__goto_6992_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_94 = (if (if ((((*__local_start_match__goto_6993_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_82 = (if (if ((((*__local_start_match__goto_6993_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_94 != 0) {
+        if (__ci_expr_logic_82 != 0) {
             goto '__ci_bb_238
         } else {
             goto '__ci_bb_239
@@ -2422,24 +2321,12 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_249 {
-        (__ci_expr_ternary_95 = 0)
-        if ((if (((*__local_mb__goto_7024_14).end_offset_top as c_int)) >= (2 * ((*__param_match_data).oveccount as c_int)): 1 else: 0) != 0) {
-            (__ci_expr_ternary_95 = ((0 as c_int)))
-        } else {
-            (__ci_expr_ternary_95 = ((((((*__local_mb__goto_7024_14).end_offset_top as c_int) / 2) + 1) as c_int)))
-        }
-        ((*__param_match_data).rc = __ci_expr_ternary_95)
+        ((*__param_match_data).rc = (((if (if (((*__local_mb__goto_7024_14).end_offset_top as c_int)) >= (2 * ((*__param_match_data).oveccount as c_int)): 1 else: 0) != 0: (0 as c_int) else: (((((*__local_mb__goto_7024_14).end_offset_top as c_int) / 2) + 1) as c_int)) as c_int)))
         ((*__param_match_data).subject_length = __local_length)
         ((*__param_match_data).start_offset = __param_start_offset)
         ((*__param_match_data).startchar = ((((((__local_start_match__goto_6993_12 as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         ((*__param_match_data).leftchar = (((((((*__local_mb__goto_7024_14).start_used_ptr as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
-        (__ci_expr_ternary_96 = null)
-        if ((if (*__local_mb__goto_7024_14).last_used_ptr > (*__local_mb__goto_7024_14).end_match_ptr: 1 else: 0) != 0) {
-            (__ci_expr_ternary_96 = (*__local_mb__goto_7024_14).last_used_ptr)
-        } else {
-            (__ci_expr_ternary_96 = (*__local_mb__goto_7024_14).end_match_ptr)
-        }
-        ((*__param_match_data).rightchar = ((((((__ci_expr_ternary_96 as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
+        ((*__param_match_data).rightchar = (((((((if (if (*__local_mb__goto_7024_14).last_used_ptr > (*__local_mb__goto_7024_14).end_match_ptr: 1 else: 0) != 0: (*__local_mb__goto_7024_14).last_used_ptr else: (*__local_mb__goto_7024_14).end_match_ptr) as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if ((__local_options as c_uint) & (16384 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_251
         } else {
@@ -2449,11 +2336,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     '__ci_bb_250 {
         ((*__param_match_data).mark = (*__local_mb__goto_7024_14).nomatch_mark)
-        (__ci_expr_logic_97 = 0)
+        (__ci_expr_logic_83 = 0)
         if ((if __local_rc__goto_6967_5 != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_97 = (if (if __local_rc__goto_6967_5 != -2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_83 = (if (if __local_rc__goto_6967_5 != -2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_97 != 0) {
+        if (__ci_expr_logic_83 != 0) {
             goto '__ci_bb_259
         } else {
             goto '__ci_bb_260
@@ -2564,16 +2451,7 @@ unsafe fn do_callout(__param_F: *mut heapframe, __param_mb: *mut match_block_8, 
 
     var __local_cb: *mut pcre2_callout_block_8
 
-    var __ci_expr_ternary_0: c_uint = 0
-
-    if ((if (*((*__param_F).ecode)) == OP_CALLOUT: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = ((_pcre2_OP_lengths_8[OP_CALLOUT] as c_uint)))
-    } else {
-        (__ci_expr_ternary_0 = ((((((((*__param_F).ecode[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) as c_int) | (((*__param_F).ecode[((1 + (2 * 2)) + 1)]) as c_int)) as c_uint)))
-    }
-
-    ((*__param_lengthptr) = ((__ci_expr_ternary_0 as c_ulong)))
-
+    ((*__param_lengthptr) = (((if (if (*((*__param_F).ecode)) == OP_CALLOUT: 1 else: 0) != 0: (_pcre2_OP_lengths_8[OP_CALLOUT] as c_uint) else: (((((((*__param_F).ecode[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) as c_int) | (((*__param_F).ecode[((1 + (2 * 2)) + 1)]) as c_int)) as c_uint)) as c_ulong)))
 
     if ((if (*__param_mb).callout == null: 1 else: 0) != 0) {
         return 0
@@ -2847,70 +2725,34 @@ unsafe fn match_ref(__param_offset: c_ulong, __param_caseless: c_int, __param_ca
                 }
 
                 if (__ci_expr_logic_10 != 0) {
-                    var __ci_expr_ternary_12: c_uint = 0
+                    (__local_c = (((if (if __local_c == 304: 1 else: 0) != 0: (105 as c_uint) else: ((if (if __local_c == 73: 1 else: 0) != 0: (305 as c_uint) else: __local_c) as c_uint)) as c_uint)))
 
-                    if ((if __local_c == 304: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_12 = ((105 as c_uint)))
-                    } else {
-                        var __ci_expr_ternary_11: c_uint = 0
-
-                        if ((if __local_c == 73: 1 else: 0) != 0) {
-                            (__ci_expr_ternary_11 = ((305 as c_uint)))
-                        } else {
-                            (__ci_expr_ternary_11 = __local_c)
-                        }
-
-                        (__ci_expr_ternary_12 = __ci_expr_ternary_11)
-
-                    }
-
-                    (__local_c = __ci_expr_ternary_12)
-
-
-                    var __ci_expr_ternary_14: c_uint = 0
-
-                    if ((if __local_d == 304: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_14 = ((105 as c_uint)))
-                    } else {
-                        var __ci_expr_ternary_13: c_uint = 0
-
-                        if ((if __local_d == 73: 1 else: 0) != 0) {
-                            (__ci_expr_ternary_13 = ((305 as c_uint)))
-                        } else {
-                            (__ci_expr_ternary_13 = __local_d)
-                        }
-
-                        (__ci_expr_ternary_14 = __ci_expr_ternary_13)
-
-                    }
-
-                    (__local_d = __ci_expr_ternary_14)
-
+                    (__local_d = (((if (if __local_d == 304: 1 else: 0) != 0: (105 as c_uint) else: ((if (if __local_d == 73: 1 else: 0) != 0: (305 as c_uint) else: __local_d) as c_uint)) as c_uint)))
 
                     if ((if __local_c != __local_d: 1 else: 0) != 0) {
                         return -1
                     }
 
                 } else {
-                    var __ci_expr_logic_15: c_int = 0
+                    var __ci_expr_logic_11: c_int = 0
 
                     if ((if __local_c != __local_d: 1 else: 0) != 0) {
                         (__local_ur = (&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_d as c_int) / 128)] as c_int) * 128) + ((__local_d as c_int) % 128))] as c_uint) as usize))
 
-                        (__ci_expr_logic_15 = (if (if __local_c != ((((__local_d as c_int) + (*__local_ur).other_case) as c_uint)): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_11 = (if (if __local_c != ((((__local_d as c_int) + (*__local_ur).other_case) as c_uint)): 1 else: 0) != 0: 1 else: 0))
 
                     }
 
-                    if (__ci_expr_logic_15 != 0) {
+                    if (__ci_expr_logic_11 != 0) {
                         var __local_pp: *const c_uint = ((&_pcre2_ucd_caseless_sets_8[0] as *const c_uint) + (((*__local_ur).caseset as c_uint) as usize))
 
-                        var __ci_expr_logic_16: c_int = 0
+                        var __ci_expr_logic_12: c_int = 0
 
                         if (__local_caseless_restrict != 0) {
-                            (__ci_expr_logic_16 = (if (if (*__local_pp) < 128: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_12 = (if (if (*__local_pp) < 128: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_16 != 0) {
+                        if (__ci_expr_logic_12 != 0) {
                             return -1
                         }
 
@@ -2920,11 +2762,11 @@ unsafe fn match_ref(__param_offset: c_ulong, __param_caseless: c_int, __param_ca
                                 return -1
                             }
 
-                            var __ci_expr_old_17: *const c_uint = __local_pp
+                            var __ci_expr_old_13: *const c_uint = __local_pp
 
                             (__local_pp = __local_pp + 1)
 
-                            if ((if __local_c == (*__ci_expr_old_17): 1 else: 0) != 0) {
+                            if ((if __local_c == (*__ci_expr_old_13): 1 else: 0) != 0) {
                                 break
                             }
 
@@ -2976,15 +2818,15 @@ unsafe fn match_ref(__param_offset: c_ulong, __param_caseless: c_int, __param_ca
                     return 1
                 }
 
-                var __ci_expr_old_18: *const u8 = __local_p
+                var __ci_expr_old_14: *const u8 = __local_p
 
                 (__local_p = __local_p + 1)
 
-                var __ci_expr_old_19: *const u8 = __local_eptr
+                var __ci_expr_old_15: *const u8 = __local_eptr
 
                 (__local_eptr = __local_eptr + 1)
 
-                if ((if (*__ci_expr_old_18) != (*__ci_expr_old_19): 1 else: 0) != 0) {
+                if ((if (*__ci_expr_old_14) != (*__ci_expr_old_15): 1 else: 0) != 0) {
                     return -1
                 }
 
@@ -2995,15 +2837,15 @@ unsafe fn match_ref(__param_offset: c_ulong, __param_caseless: c_int, __param_ca
             }
 
         } else {
-            var __ci_expr_logic_20: c_int
+            var __ci_expr_logic_16: c_int
 
             if ((if (((((((*__param_mb).end_subject as usize) -% (__local_eptr as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)) < __local_length: 1 else: 0) != 0) {
-                (__ci_expr_logic_20 = (if true: 1 else: 0))
+                (__ci_expr_logic_16 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_20 = (if (if with_memcmp(((__local_p as *const c_void) as *const u8), ((__local_eptr as *const c_void) as *const u8), ((((__local_length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_16 = (if (if with_memcmp(((__local_p as *const c_void) as *const u8), ((__local_eptr as *const c_void) as *const u8), ((((__local_length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_20 != 0) {
+            if (__ci_expr_logic_16 != 0) {
                 return -1
             }
 
@@ -3086,16 +2928,7 @@ unsafe fn recurse_update_offsets(__param_F: *mut heapframe, __param_P: *mut heap
 
     ((*__param_F).ecode = __local_ecode)
 
-    var __ci_expr_ternary_0: c_ulong = 0
-
-    if ((if __local_offset <= (*__param_P).offset_top: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = (*__param_P).offset_top)
-    } else {
-        (__ci_expr_ternary_0 = ((((__local_offset as c_ulong) -% (2 as c_ulong)) as c_ulong)))
-    }
-
-    ((*__param_F).offset_top = __ci_expr_ternary_0)
-
+    ((*__param_F).offset_top = (((if (if __local_offset <= (*__param_P).offset_top: 1 else: 0) != 0: (*__param_P).offset_top else: (((__local_offset as c_ulong) -% (2 as c_ulong)) as c_ulong)) as c_ulong)))
 
 }
 
@@ -3395,11 +3228,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_logic_5: c_int = 0
 
-    var __ci_expr_ternary_6: c_int = 0
-
-    var __ci_expr_ternary_11: c_int = 0
-
-    var __ci_expr_logic_15: c_int = 0
+    var __ci_expr_ternary_10: c_int = 0
 
     var __ci_expr_logic_14: c_int = 0
 
@@ -3407,33 +3236,37 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_logic_12: c_int = 0
 
+    var __ci_expr_logic_11: c_int = 0
+
+    var __ci_expr_logic_16: c_int = 0
+
     var __ci_expr_logic_17: c_int = 0
 
-    var __ci_expr_logic_18: c_int = 0
+    var __ci_expr_logic_19: c_int = 0
 
-    var __ci_expr_logic_20: c_int = 0
+    var __ci_expr_logic_21: c_int = 0
 
-    var __ci_expr_logic_22: c_int = 0
+    var __ci_expr_old_22: *const u8 = null
 
     var __ci_expr_old_23: *const u8 = null
 
-    var __ci_expr_old_24: *const u8 = null
+    var __ci_expr_logic_25: c_int = 0
 
-    var __ci_expr_logic_26: c_int = 0
+    var __ci_expr_old_26: *const u8 = null
 
-    var __ci_expr_old_27: *const u8 = null
+    var __ci_expr_logic_28: c_int = 0
 
-    var __ci_expr_logic_29: c_int = 0
+    var __ci_expr_old_29: *const u8 = null
 
     var __ci_expr_old_30: *const u8 = null
 
-    var __ci_expr_old_31: *const u8 = null
+    var __ci_expr_logic_31: c_int = 0
 
     var __ci_expr_logic_32: c_int = 0
 
-    var __ci_expr_logic_33: c_int = 0
+    var __ci_expr_logic_34: c_int = 0
 
-    var __ci_expr_logic_35: c_int = 0
+    var __ci_expr_old_35: *const u8 = null
 
     var __ci_expr_old_36: *const u8 = null
 
@@ -3445,111 +3278,109 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_old_40: *const u8 = null
 
-    var __ci_expr_old_41: *const u8 = null
+    var __ci_expr_logic_42: c_int = 0
 
-    var __ci_expr_logic_43: c_int = 0
+    var __ci_expr_old_43: *const u8 = null
 
-    var __ci_expr_old_44: *const u8 = null
+    var __ci_expr_logic_44: c_int = 0
 
-    var __ci_expr_ternary_45: c_int = 0
-
-    var __ci_expr_logic_46: c_int = 0
+    var __ci_expr_logic_45: c_int = 0
 
     var __ci_expr_logic_47: c_int = 0
 
+    var __ci_expr_logic_46: c_int = 0
+
     var __ci_expr_logic_49: c_int = 0
 
-    var __ci_expr_logic_48: c_int = 0
+    var __ci_expr_old_50: c_uint = 0
 
     var __ci_expr_logic_51: c_int = 0
 
-    var __ci_expr_old_52: c_uint = 0
-
     var __ci_expr_logic_53: c_int = 0
+
+    var __ci_expr_logic_52: c_int = 0
 
     var __ci_expr_logic_55: c_int = 0
 
-    var __ci_expr_logic_54: c_int = 0
-
-    var __ci_expr_logic_57: c_int = 0
+    var __ci_expr_logic_56: c_int = 0
 
     var __ci_expr_logic_58: c_int = 0
 
+    var __ci_expr_logic_57: c_int = 0
+
     var __ci_expr_logic_60: c_int = 0
 
-    var __ci_expr_logic_59: c_int = 0
+    var __ci_expr_old_61: *const u8 = null
+
+    var __ci_expr_logic_63: c_int = 0
 
     var __ci_expr_logic_62: c_int = 0
 
-    var __ci_expr_old_63: *const u8 = null
-
     var __ci_expr_logic_65: c_int = 0
 
-    var __ci_expr_logic_64: c_int = 0
+    var __ci_expr_logic_66: c_int = 0
 
-    var __ci_expr_logic_67: c_int = 0
+    var __ci_expr_old_67: c_uint = 0
 
-    var __ci_expr_logic_68: c_int = 0
+    var __ci_expr_logic_69: c_int = 0
 
-    var __ci_expr_old_69: c_uint = 0
-
-    var __ci_expr_logic_71: c_int = 0
+    var __ci_expr_logic_70: c_int = 0
 
     var __ci_expr_logic_72: c_int = 0
 
-    var __ci_expr_logic_74: c_int = 0
+    var __ci_expr_logic_73: c_int = 0
 
     var __ci_expr_logic_75: c_int = 0
 
-    var __ci_expr_logic_77: c_int = 0
+    var __ci_expr_old_76: *const u8 = null
 
-    var __ci_expr_old_78: *const u8 = null
+    var __ci_expr_old_77: c_uint = 0
 
-    var __ci_expr_old_79: c_uint = 0
+    var __ci_expr_logic_79: c_int = 0
 
-    var __ci_expr_logic_81: c_int = 0
+    var __ci_expr_old_80: *const u8 = null
 
-    var __ci_expr_old_82: *const u8 = null
+    var __ci_expr_logic_82: c_int = 0
 
-    var __ci_expr_logic_84: c_int = 0
+    var __ci_expr_old_83: *const u8 = null
 
-    var __ci_expr_old_85: *const u8 = null
+    var __ci_expr_old_84: *const u8 = null
 
-    var __ci_expr_ternary_86: c_int = 0
+    var __ci_expr_logic_85: c_int = 0
 
-    var __ci_expr_old_87: *const u8 = null
+    var __ci_expr_old_86: *const u8 = null
 
     var __ci_expr_logic_88: c_int = 0
 
-    var __ci_expr_old_89: *const u8 = null
-
-    var __ci_expr_logic_91: c_int = 0
+    var __ci_expr_logic_87: c_int = 0
 
     var __ci_expr_logic_90: c_int = 0
 
+    var __ci_expr_old_91: *const u8 = null
+
+    var __ci_expr_old_92: *const u8 = null
+
     var __ci_expr_logic_93: c_int = 0
 
-    var __ci_expr_old_94: *const u8 = null
-
-    var __ci_expr_old_95: *const u8 = null
+    var __ci_expr_logic_95: c_int = 0
 
     var __ci_expr_logic_96: c_int = 0
 
-    var __ci_expr_logic_98: c_int = 0
+    var __ci_expr_old_97: c_uint = 0
 
     var __ci_expr_logic_99: c_int = 0
 
-    var __ci_expr_old_100: c_uint = 0
+    var __ci_expr_old_100: *const u8 = null
+
+    var __ci_expr_old_101: *const u8 = null
 
     var __ci_expr_logic_102: c_int = 0
 
-    var __ci_expr_old_103: *const u8 = null
-
-    var __ci_expr_old_104: *const u8 = null
+    var __ci_expr_old_103: c_uint = 0
 
     var __ci_expr_logic_105: c_int = 0
 
-    var __ci_expr_old_106: c_uint = 0
+    var __ci_expr_logic_106: c_int = 0
 
     var __ci_expr_logic_108: c_int = 0
 
@@ -3561,57 +3392,57 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_logic_114: c_int = 0
 
-    var __ci_expr_logic_115: c_int = 0
+    var __ci_expr_old_115: *const u8 = null
 
-    var __ci_expr_logic_117: c_int = 0
+    var __ci_expr_old_116: *const u8 = null
 
-    var __ci_expr_old_118: *const u8 = null
+    var __ci_expr_logic_118: c_int = 0
 
     var __ci_expr_old_119: *const u8 = null
 
-    var __ci_expr_logic_121: c_int = 0
+    var __ci_expr_old_120: c_uint = 0
 
-    var __ci_expr_old_122: *const u8 = null
+    var __ci_expr_logic_122: c_int = 0
 
-    var __ci_expr_old_123: c_uint = 0
+    var __ci_expr_old_123: *const u8 = null
 
-    var __ci_expr_logic_125: c_int = 0
+    var __ci_expr_old_124: *const u8 = null
 
-    var __ci_expr_old_126: *const u8 = null
+    var __ci_expr_old_125: c_uint = 0
 
-    var __ci_expr_old_127: *const u8 = null
+    var __ci_expr_logic_127: c_int = 0
 
-    var __ci_expr_old_128: c_uint = 0
+    var __ci_expr_old_128: *const u8 = null
 
     var __ci_expr_logic_130: c_int = 0
 
-    var __ci_expr_old_131: *const u8 = null
+    var __ci_expr_logic_132: c_int = 0
 
-    var __ci_expr_logic_133: c_int = 0
+    var __ci_expr_old_133: *const u8 = null
 
     var __ci_expr_logic_135: c_int = 0
 
     var __ci_expr_old_136: *const u8 = null
 
-    var __ci_expr_logic_138: c_int = 0
+    var __ci_expr_old_137: *const u8 = null
 
-    var __ci_expr_old_139: *const u8 = null
+    var __ci_expr_logic_139: c_int = 0
 
     var __ci_expr_old_140: *const u8 = null
 
-    var __ci_expr_logic_142: c_int = 0
+    var __ci_expr_old_141: c_uint = 0
 
-    var __ci_expr_old_143: *const u8 = null
+    var __ci_expr_logic_143: c_int = 0
 
-    var __ci_expr_old_144: c_uint = 0
+    var __ci_expr_old_144: *const u8 = null
 
-    var __ci_expr_logic_146: c_int = 0
+    var __ci_expr_old_145: *const u8 = null
 
-    var __ci_expr_old_147: *const u8 = null
+    var __ci_expr_old_146: c_uint = 0
 
-    var __ci_expr_old_148: *const u8 = null
+    var __ci_expr_logic_148: c_int = 0
 
-    var __ci_expr_old_149: c_uint = 0
+    var __ci_expr_old_149: *const u8 = null
 
     var __ci_expr_logic_151: c_int = 0
 
@@ -3625,251 +3456,251 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_old_158: *const u8 = null
 
-    var __ci_expr_logic_160: c_int = 0
+    var __ci_expr_logic_159: c_int = 0
 
-    var __ci_expr_old_161: *const u8 = null
+    var __ci_expr_old_160: *const u8 = null
 
-    var __ci_expr_logic_162: c_int = 0
+    var __ci_expr_old_161: c_uint = 0
 
-    var __ci_expr_old_163: *const u8 = null
+    var __ci_expr_logic_163: c_int = 0
 
-    var __ci_expr_old_164: c_uint = 0
+    var __ci_expr_old_164: *const u8 = null
 
-    var __ci_expr_logic_166: c_int = 0
+    var __ci_expr_logic_165: c_int = 0
 
-    var __ci_expr_old_167: *const u8 = null
+    var __ci_expr_old_166: *const u8 = null
 
     var __ci_expr_logic_168: c_int = 0
 
-    var __ci_expr_old_169: *const u8 = null
+    var __ci_expr_logic_169: c_int = 0
 
-    var __ci_expr_logic_171: c_int = 0
+    var __ci_expr_old_170: *const u8 = null
 
-    var __ci_expr_logic_172: c_int = 0
+    var __ci_expr_old_171: *const u8 = null
 
-    var __ci_expr_old_173: *const u8 = null
+    var __ci_expr_logic_173: c_int = 0
 
     var __ci_expr_old_174: *const u8 = null
 
-    var __ci_expr_logic_176: c_int = 0
+    var __ci_expr_logic_175: c_int = 0
 
-    var __ci_expr_old_177: *const u8 = null
+    var __ci_expr_old_176: *const u8 = null
 
-    var __ci_expr_logic_178: c_int = 0
+    var __ci_expr_old_177: c_uint = 0
 
-    var __ci_expr_old_179: *const u8 = null
+    var __ci_expr_logic_179: c_int = 0
 
-    var __ci_expr_old_180: c_uint = 0
+    var __ci_expr_old_180: *const u8 = null
 
-    var __ci_expr_logic_182: c_int = 0
+    var __ci_expr_logic_181: c_int = 0
 
-    var __ci_expr_old_183: *const u8 = null
+    var __ci_expr_old_182: *const u8 = null
 
     var __ci_expr_logic_184: c_int = 0
 
-    var __ci_expr_old_185: *const u8 = null
+    var __ci_expr_logic_185: c_int = 0
 
-    var __ci_expr_logic_187: c_int = 0
+    var __ci_expr_old_186: *const u8 = null
 
     var __ci_expr_logic_188: c_int = 0
 
     var __ci_expr_old_189: *const u8 = null
 
-    var __ci_expr_logic_191: c_int = 0
+    var __ci_expr_logic_190: c_int = 0
 
-    var __ci_expr_old_192: *const u8 = null
+    var __ci_expr_old_191: *const u8 = null
 
-    var __ci_expr_logic_193: c_int = 0
+    var __ci_expr_logic_192: c_int = 0
 
-    var __ci_expr_old_194: *const u8 = null
+    var __ci_expr_logic_194: c_int = 0
 
-    var __ci_expr_logic_195: c_int = 0
+    var __ci_expr_old_195: *const u8 = null
 
-    var __ci_expr_logic_197: c_int = 0
+    var __ci_expr_logic_196: c_int = 0
 
-    var __ci_expr_old_198: *const u8 = null
+    var __ci_expr_old_197: *const u8 = null
 
-    var __ci_expr_logic_199: c_int = 0
+    var __ci_expr_logic_198: c_int = 0
 
-    var __ci_expr_old_200: *const u8 = null
+    var __ci_expr_logic_200: c_int = 0
 
-    var __ci_expr_logic_201: c_int = 0
+    var __ci_expr_old_201: *const u8 = null
 
-    var __ci_expr_logic_203: c_int = 0
+    var __ci_expr_logic_202: c_int = 0
 
-    var __ci_expr_old_204: *const u8 = null
+    var __ci_expr_old_203: *const u8 = null
 
-    var __ci_expr_logic_205: c_int = 0
+    var __ci_expr_logic_204: c_int = 0
 
-    var __ci_expr_old_206: *const u8 = null
+    var __ci_expr_logic_206: c_int = 0
 
-    var __ci_expr_logic_207: c_int = 0
+    var __ci_expr_old_207: *const u8 = null
 
-    var __ci_expr_logic_209: c_int = 0
+    var __ci_expr_logic_208: c_int = 0
 
-    var __ci_expr_old_210: *const u8 = null
+    var __ci_expr_old_209: *const u8 = null
 
-    var __ci_expr_logic_211: c_int = 0
+    var __ci_expr_logic_210: c_int = 0
 
-    var __ci_expr_old_212: *const u8 = null
+    var __ci_expr_logic_212: c_int = 0
 
-    var __ci_expr_logic_213: c_int = 0
+    var __ci_expr_old_213: *const u8 = null
 
-    var __ci_expr_logic_215: c_int = 0
+    var __ci_expr_logic_214: c_int = 0
 
-    var __ci_expr_old_216: *const u8 = null
+    var __ci_expr_old_215: *const u8 = null
 
-    var __ci_expr_logic_217: c_int = 0
+    var __ci_expr_logic_216: c_int = 0
 
-    var __ci_expr_old_218: *const u8 = null
+    var __ci_expr_logic_218: c_int = 0
 
-    var __ci_expr_logic_219: c_int = 0
+    var __ci_expr_old_219: *const u8 = null
 
-    var __ci_expr_logic_221: c_int = 0
+    var __ci_expr_logic_220: c_int = 0
 
-    var __ci_expr_old_222: *const u8 = null
+    var __ci_expr_old_221: *const u8 = null
 
-    var __ci_expr_logic_223: c_int = 0
+    var __ci_expr_logic_222: c_int = 0
 
-    var __ci_expr_old_224: *const u8 = null
+    var __ci_expr_logic_224: c_int = 0
 
-    var __ci_expr_logic_225: c_int = 0
+    var __ci_expr_old_225: *const u8 = null
 
-    var __ci_expr_logic_227: c_int = 0
+    var __ci_expr_logic_226: c_int = 0
 
-    var __ci_expr_old_228: *const u8 = null
+    var __ci_expr_old_227: *const u8 = null
 
     var __ci_expr_logic_229: c_int = 0
 
-    var __ci_expr_old_230: *const u8 = null
+    var __ci_expr_logic_231: c_int = 0
 
-    var __ci_expr_logic_232: c_int = 0
+    var __ci_expr_old_232: *const u8 = null
 
-    var __ci_expr_logic_234: c_int = 0
+    var __ci_expr_logic_233: c_int = 0
 
-    var __ci_expr_old_235: *const u8 = null
+    var __ci_expr_old_234: *const u8 = null
 
     var __ci_expr_logic_236: c_int = 0
 
     var __ci_expr_old_237: *const u8 = null
 
-    var __ci_expr_logic_239: c_int = 0
+    var __ci_expr_logic_238: c_int = 0
 
-    var __ci_expr_old_240: *const u8 = null
+    var __ci_expr_old_239: *const u8 = null
 
     var __ci_expr_logic_241: c_int = 0
 
     var __ci_expr_old_242: *const u8 = null
 
-    var __ci_expr_logic_244: c_int = 0
+    var __ci_expr_logic_243: c_int = 0
 
-    var __ci_expr_old_245: *const u8 = null
+    var __ci_expr_old_244: *const u8 = null
 
     var __ci_expr_logic_246: c_int = 0
 
     var __ci_expr_old_247: *const u8 = null
 
-    var __ci_expr_logic_249: c_int = 0
+    var __ci_expr_logic_248: c_int = 0
 
-    var __ci_expr_old_250: *const u8 = null
+    var __ci_expr_old_249: *const u8 = null
 
     var __ci_expr_logic_251: c_int = 0
 
     var __ci_expr_old_252: *const u8 = null
 
-    var __ci_expr_logic_254: c_int = 0
+    var __ci_expr_logic_253: c_int = 0
 
-    var __ci_expr_old_255: *const u8 = null
+    var __ci_expr_old_254: *const u8 = null
 
     var __ci_expr_logic_256: c_int = 0
 
-    var __ci_expr_old_257: *const u8 = null
+    var __ci_expr_logic_255: c_int = 0
 
-    var __ci_expr_logic_259: c_int = 0
+    var __ci_expr_logic_257: c_int = 0
 
     var __ci_expr_logic_258: c_int = 0
 
-    var __ci_expr_logic_260: c_int = 0
-
     var __ci_expr_logic_261: c_int = 0
 
-    var __ci_expr_logic_264: c_int = 0
+    var __ci_expr_logic_260: c_int = 0
 
-    var __ci_expr_logic_263: c_int = 0
+    var __ci_expr_logic_259: c_int = 0
 
-    var __ci_expr_logic_262: c_int = 0
-
-    var __ci_expr_old_265: *const c_uint = null
-
-    var __ci_expr_logic_270: c_int = 0
-
-    var __ci_expr_logic_269: c_int = 0
+    var __ci_expr_old_262: *const c_uint = null
 
     var __ci_expr_logic_267: c_int = 0
 
     var __ci_expr_logic_266: c_int = 0
 
-    var __ci_expr_logic_272: c_int = 0
+    var __ci_expr_logic_264: c_int = 0
 
-    var __ci_expr_old_273: *const u8 = null
+    var __ci_expr_logic_263: c_int = 0
+
+    var __ci_expr_logic_269: c_int = 0
+
+    var __ci_expr_old_270: *const u8 = null
+
+    var __ci_expr_logic_271: c_int = 0
+
+    var __ci_expr_old_272: *const u8 = null
 
     var __ci_expr_logic_274: c_int = 0
 
     var __ci_expr_old_275: *const u8 = null
 
+    var __ci_expr_old_276: *const u8 = null
+
     var __ci_expr_logic_277: c_int = 0
 
-    var __ci_expr_ternary_278: c_int = 0
+    var __ci_expr_old_278: *const u8 = null
 
     var __ci_expr_old_279: *const u8 = null
-
-    var __ci_expr_old_280: *const u8 = null
 
     var __ci_expr_logic_281: c_int = 0
 
     var __ci_expr_old_282: *const u8 = null
 
-    var __ci_expr_old_283: *const u8 = null
+    var __ci_expr_logic_283: c_int = 0
+
+    var __ci_expr_old_284: *const u8 = null
+
+    var __ci_expr_logic_286: c_int = 0
 
     var __ci_expr_logic_285: c_int = 0
 
-    var __ci_expr_old_286: *const u8 = null
+    var __ci_expr_logic_288: c_int = 0
 
-    var __ci_expr_logic_287: c_int = 0
-
-    var __ci_expr_old_288: *const u8 = null
+    var __ci_expr_old_289: *const u8 = null
 
     var __ci_expr_logic_290: c_int = 0
 
-    var __ci_expr_logic_289: c_int = 0
+    var __ci_expr_old_291: *const u8 = null
 
-    var __ci_expr_logic_292: c_int = 0
+    var __ci_expr_logic_293: c_int = 0
 
-    var __ci_expr_old_293: *const u8 = null
+    var __ci_expr_old_294: *const u8 = null
 
-    var __ci_expr_logic_294: c_int = 0
+    var __ci_expr_logic_295: c_int = 0
 
-    var __ci_expr_old_295: *const u8 = null
+    var __ci_expr_old_296: *const u8 = null
 
-    var __ci_expr_logic_297: c_int = 0
+    var __ci_expr_logic_298: c_int = 0
 
-    var __ci_expr_old_298: *const u8 = null
+    var __ci_expr_old_299: *const u8 = null
 
-    var __ci_expr_logic_299: c_int = 0
+    var __ci_expr_logic_300: c_int = 0
 
-    var __ci_expr_old_300: *const u8 = null
+    var __ci_expr_old_301: *const u8 = null
 
-    var __ci_expr_logic_302: c_int = 0
+    var __ci_expr_logic_303: c_int = 0
 
-    var __ci_expr_old_303: *const u8 = null
+    var __ci_expr_old_304: *const u8 = null
 
-    var __ci_expr_logic_304: c_int = 0
+    var __ci_expr_logic_305: c_int = 0
 
-    var __ci_expr_old_305: *const u8 = null
+    var __ci_expr_old_306: *const u8 = null
 
     var __ci_expr_logic_307: c_int = 0
-
-    var __ci_expr_old_308: *const u8 = null
 
     var __ci_expr_logic_309: c_int = 0
 
@@ -3877,9 +3708,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_logic_311: c_int = 0
 
-    var __ci_expr_logic_313: c_int = 0
+    var __ci_expr_old_312: *const u8 = null
 
-    var __ci_expr_old_314: *const u8 = null
+    var __ci_expr_logic_313: c_int = 0
 
     var __ci_expr_logic_315: c_int = 0
 
@@ -3887,105 +3718,105 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_logic_317: c_int = 0
 
-    var __ci_expr_logic_319: c_int = 0
+    var __ci_expr_old_318: *const u8 = null
 
-    var __ci_expr_old_320: *const u8 = null
+    var __ci_expr_logic_320: c_int = 0
 
-    var __ci_expr_logic_321: c_int = 0
+    var __ci_expr_old_321: *const u8 = null
 
-    var __ci_expr_old_322: *const u8 = null
+    var __ci_expr_logic_322: c_int = 0
 
-    var __ci_expr_logic_324: c_int = 0
-
-    var __ci_expr_old_325: *const u8 = null
+    var __ci_expr_old_323: *const u8 = null
 
     var __ci_expr_logic_326: c_int = 0
 
-    var __ci_expr_old_327: *const u8 = null
+    var __ci_expr_logic_325: c_int = 0
 
-    var __ci_expr_logic_330: c_int = 0
-
-    var __ci_expr_logic_329: c_int = 0
+    var __ci_expr_logic_324: c_int = 0
 
     var __ci_expr_logic_328: c_int = 0
 
-    var __ci_expr_logic_332: c_int = 0
+    var __ci_expr_old_329: *const u8 = null
 
-    var __ci_expr_old_333: *const u8 = null
+    var __ci_expr_logic_330: c_int = 0
+
+    var __ci_expr_old_331: *const u8 = null
+
+    var __ci_expr_old_332: *const c_uint = null
 
     var __ci_expr_logic_334: c_int = 0
 
     var __ci_expr_old_335: *const u8 = null
 
-    var __ci_expr_old_336: *const c_uint = null
+    var __ci_expr_logic_336: c_int = 0
 
-    var __ci_expr_logic_338: c_int = 0
-
-    var __ci_expr_old_339: *const u8 = null
-
-    var __ci_expr_logic_340: c_int = 0
-
-    var __ci_expr_old_341: *const u8 = null
-
-    var __ci_expr_logic_346: c_int = 0
-
-    var __ci_expr_logic_345: c_int = 0
-
-    var __ci_expr_logic_343: c_int = 0
+    var __ci_expr_old_337: *const u8 = null
 
     var __ci_expr_logic_342: c_int = 0
 
-    var __ci_expr_logic_348: c_int = 0
+    var __ci_expr_logic_341: c_int = 0
 
-    var __ci_expr_old_349: *const u8 = null
+    var __ci_expr_logic_339: c_int = 0
 
-    var __ci_expr_logic_350: c_int = 0
+    var __ci_expr_logic_338: c_int = 0
 
-    var __ci_expr_old_351: *const u8 = null
+    var __ci_expr_logic_344: c_int = 0
 
-    var __ci_expr_logic_353: c_int = 0
+    var __ci_expr_old_345: *const u8 = null
 
-    var __ci_expr_old_354: *const u8 = null
+    var __ci_expr_logic_346: c_int = 0
 
-    var __ci_expr_logic_355: c_int = 0
+    var __ci_expr_old_347: *const u8 = null
 
-    var __ci_expr_old_356: *const u8 = null
+    var __ci_expr_logic_349: c_int = 0
 
-    var __ci_expr_logic_358: c_int = 0
+    var __ci_expr_old_350: *const u8 = null
 
-    var __ci_expr_old_359: *const u8 = null
+    var __ci_expr_logic_351: c_int = 0
 
-    var __ci_expr_logic_360: c_int = 0
+    var __ci_expr_old_352: *const u8 = null
 
-    var __ci_expr_old_361: *const u8 = null
+    var __ci_expr_logic_354: c_int = 0
 
-    var __ci_expr_logic_363: c_int = 0
+    var __ci_expr_old_355: *const u8 = null
 
-    var __ci_expr_logic_365: c_int = 0
+    var __ci_expr_logic_356: c_int = 0
 
-    var __ci_expr_ternary_370: c_int = 0
+    var __ci_expr_old_357: *const u8 = null
 
-    var __ci_expr_logic_374: c_int = 0
+    var __ci_expr_logic_359: c_int = 0
 
-    var __ci_expr_logic_373: c_int = 0
+    var __ci_expr_logic_361: c_int = 0
 
-    var __ci_expr_logic_372: c_int = 0
+    var __ci_expr_ternary_366: c_int = 0
+
+    var __ci_expr_logic_370: c_int = 0
+
+    var __ci_expr_logic_369: c_int = 0
+
+    var __ci_expr_logic_368: c_int = 0
+
+    var __ci_expr_logic_367: c_int = 0
 
     var __ci_expr_logic_371: c_int = 0
 
-    var __ci_expr_logic_375: c_int = 0
+    var __ci_expr_logic_373: c_int = 0
 
-    var __ci_expr_logic_377: c_int = 0
+    var __ci_expr_logic_374: c_int = 0
 
-    var __ci_expr_logic_378: c_int = 0
+    var __ci_expr_logic_376: c_int = 0
 
-    var __ci_expr_logic_380: c_int = 0
+    var __ci_expr_old_377: *const u8 = null
 
-    var __ci_expr_old_381: *const u8 = null
+    var __ci_expr_old_378: *const u8 = null
+
+    var __ci_expr_logic_379: c_int = 0
+
+    var __ci_expr_logic_381: c_int = 0
 
     var __ci_expr_old_382: *const u8 = null
 
-    var __ci_expr_logic_383: c_int = 0
+    var __ci_expr_old_383: *const u8 = null
 
     var __ci_expr_logic_385: c_int = 0
 
@@ -4011,13 +3842,13 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_old_399: *const u8 = null
 
-    var __ci_expr_logic_401: c_int = 0
+    var __ci_expr_logic_400: c_int = 0
 
-    var __ci_expr_old_402: *const u8 = null
+    var __ci_expr_logic_402: c_int = 0
 
-    var __ci_expr_old_403: *const u8 = null
+    var __ci_expr_logic_403: c_int = 0
 
-    var __ci_expr_logic_404: c_int = 0
+    var __ci_expr_logic_405: c_int = 0
 
     var __ci_expr_logic_406: c_int = 0
 
@@ -4027,7 +3858,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_logic_410: c_int = 0
 
-    var __ci_expr_logic_411: c_int = 0
+    var __ci_expr_logic_412: c_int = 0
 
     var __ci_expr_logic_413: c_int = 0
 
@@ -4037,33 +3868,33 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_logic_417: c_int = 0
 
-    var __ci_expr_logic_418: c_int = 0
+    var __ci_expr_logic_419: c_int = 0
 
-    var __ci_expr_logic_420: c_int = 0
+    var __ci_expr_ternary_424: c_int = 0
 
-    var __ci_expr_logic_421: c_int = 0
+    var __ci_expr_logic_428: c_int = 0
 
-    var __ci_expr_logic_423: c_int = 0
+    var __ci_expr_logic_427: c_int = 0
 
-    var __ci_expr_ternary_428: c_int = 0
+    var __ci_expr_logic_426: c_int = 0
 
-    var __ci_expr_logic_432: c_int = 0
-
-    var __ci_expr_logic_431: c_int = 0
+    var __ci_expr_logic_425: c_int = 0
 
     var __ci_expr_logic_430: c_int = 0
 
-    var __ci_expr_logic_429: c_int = 0
+    var __ci_expr_logic_432: c_int = 0
 
-    var __ci_expr_logic_434: c_int = 0
+    var __ci_expr_old_433: *const u8 = null
 
-    var __ci_expr_logic_436: c_int = 0
+    var __ci_expr_switch_434: c_int = 0
 
-    var __ci_expr_old_437: *const u8 = null
+    var __ci_expr_logic_435: c_int = 0
 
-    var __ci_expr_switch_438: c_int = 0
+    var __ci_expr_logic_437: c_int = 0
 
-    var __ci_expr_logic_439: c_int = 0
+    var __ci_expr_old_438: *const u8 = null
+
+    var __ci_expr_switch_439: c_int = 0
 
     var __ci_expr_logic_441: c_int = 0
 
@@ -4085,207 +3916,209 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_logic_453: c_int = 0
 
-    var __ci_expr_old_454: *const u8 = null
+    var __ci_expr_logic_454: c_int = 0
 
-    var __ci_expr_switch_455: c_int = 0
+    var __ci_expr_logic_456: c_int = 0
 
     var __ci_expr_logic_457: c_int = 0
 
-    var __ci_expr_logic_458: c_int = 0
+    var __ci_expr_logic_459: c_int = 0
 
     var __ci_expr_logic_460: c_int = 0
 
-    var __ci_expr_logic_461: c_int = 0
+    var __ci_expr_logic_462: c_int = 0
 
     var __ci_expr_logic_463: c_int = 0
 
-    var __ci_expr_logic_464: c_int = 0
+    var __ci_expr_logic_465: c_int = 0
 
     var __ci_expr_logic_466: c_int = 0
 
-    var __ci_expr_logic_467: c_int = 0
+    var __ci_expr_logic_468: c_int = 0
 
     var __ci_expr_logic_469: c_int = 0
 
-    var __ci_expr_logic_470: c_int = 0
+    var __ci_expr_old_470: c_uint = 0
 
     var __ci_expr_logic_472: c_int = 0
 
-    var __ci_expr_logic_473: c_int = 0
+    var __ci_expr_old_473: *const u8 = null
 
-    var __ci_expr_old_474: c_uint = 0
+    var __ci_expr_logic_474: c_int = 0
+
+    var __ci_expr_old_475: *const u8 = null
+
+    var __ci_expr_logic_477: c_int = 0
 
     var __ci_expr_logic_476: c_int = 0
 
-    var __ci_expr_old_477: *const u8 = null
-
-    var __ci_expr_logic_478: c_int = 0
-
-    var __ci_expr_old_479: *const u8 = null
-
-    var __ci_expr_logic_481: c_int = 0
+    var __ci_expr_old_478: c_uint = 0
 
     var __ci_expr_logic_480: c_int = 0
 
-    var __ci_expr_old_482: c_uint = 0
+    var __ci_expr_old_481: *const u8 = null
 
-    var __ci_expr_logic_484: c_int = 0
+    var __ci_expr_logic_482: c_int = 0
 
-    var __ci_expr_old_485: *const u8 = null
+    var __ci_expr_old_483: *const u8 = null
+
+    var __ci_expr_old_484: c_uint = 0
 
     var __ci_expr_logic_486: c_int = 0
 
     var __ci_expr_old_487: *const u8 = null
 
-    var __ci_expr_old_488: c_uint = 0
+    var __ci_expr_logic_488: c_int = 0
 
-    var __ci_expr_logic_490: c_int = 0
+    var __ci_expr_old_489: *const u8 = null
 
-    var __ci_expr_old_491: *const u8 = null
+    var __ci_expr_old_490: c_uint = 0
 
     var __ci_expr_logic_492: c_int = 0
 
     var __ci_expr_old_493: *const u8 = null
 
-    var __ci_expr_old_494: c_uint = 0
+    var __ci_expr_logic_494: c_int = 0
 
-    var __ci_expr_logic_496: c_int = 0
+    var __ci_expr_old_495: *const u8 = null
 
-    var __ci_expr_old_497: *const u8 = null
+    var __ci_expr_old_496: c_uint = 0
 
     var __ci_expr_logic_498: c_int = 0
 
     var __ci_expr_old_499: *const u8 = null
 
-    var __ci_expr_old_500: c_uint = 0
+    var __ci_expr_logic_500: c_int = 0
+
+    var __ci_expr_old_501: *const u8 = null
 
     var __ci_expr_logic_502: c_int = 0
 
-    var __ci_expr_old_503: *const u8 = null
+    var __ci_expr_old_503: c_uint = 0
 
-    var __ci_expr_logic_504: c_int = 0
+    var __ci_expr_logic_505: c_int = 0
 
-    var __ci_expr_old_505: *const u8 = null
+    var __ci_expr_old_506: *const u8 = null
 
-    var __ci_expr_logic_506: c_int = 0
+    var __ci_expr_logic_507: c_int = 0
 
-    var __ci_expr_old_507: c_uint = 0
+    var __ci_expr_old_508: *const u8 = null
 
     var __ci_expr_logic_509: c_int = 0
 
-    var __ci_expr_old_510: *const u8 = null
+    var __ci_expr_old_510: c_uint = 0
 
-    var __ci_expr_logic_511: c_int = 0
+    var __ci_expr_logic_512: c_int = 0
 
-    var __ci_expr_old_512: *const u8 = null
+    var __ci_expr_old_513: *const u8 = null
 
-    var __ci_expr_logic_513: c_int = 0
+    var __ci_expr_logic_514: c_int = 0
 
-    var __ci_expr_old_514: c_uint = 0
+    var __ci_expr_old_515: *const u8 = null
 
-    var __ci_expr_logic_516: c_int = 0
-
-    var __ci_expr_old_517: *const u8 = null
+    var __ci_expr_old_516: c_uint = 0
 
     var __ci_expr_logic_518: c_int = 0
 
     var __ci_expr_old_519: *const u8 = null
 
-    var __ci_expr_old_520: c_uint = 0
+    var __ci_expr_logic_520: c_int = 0
 
-    var __ci_expr_logic_522: c_int = 0
-
-    var __ci_expr_old_523: *const u8 = null
+    var __ci_expr_old_521: *const u8 = null
 
     var __ci_expr_logic_524: c_int = 0
 
-    var __ci_expr_old_525: *const u8 = null
+    var __ci_expr_logic_523: c_int = 0
 
-    var __ci_expr_logic_528: c_int = 0
+    var __ci_expr_logic_522: c_int = 0
+
+    var __ci_expr_old_525: c_uint = 0
 
     var __ci_expr_logic_527: c_int = 0
 
-    var __ci_expr_logic_526: c_int = 0
+    var __ci_expr_old_528: *const u8 = null
 
-    var __ci_expr_old_529: c_uint = 0
+    var __ci_expr_logic_529: c_int = 0
 
-    var __ci_expr_logic_531: c_int = 0
+    var __ci_expr_old_530: *const u8 = null
 
-    var __ci_expr_old_532: *const u8 = null
+    var __ci_expr_old_531: *const c_uint = null
 
-    var __ci_expr_logic_533: c_int = 0
+    var __ci_expr_old_532: c_uint = 0
 
-    var __ci_expr_old_534: *const u8 = null
+    var __ci_expr_logic_534: c_int = 0
 
-    var __ci_expr_old_535: *const c_uint = null
+    var __ci_expr_old_535: *const u8 = null
 
-    var __ci_expr_old_536: c_uint = 0
+    var __ci_expr_logic_536: c_int = 0
 
-    var __ci_expr_logic_538: c_int = 0
-
-    var __ci_expr_old_539: *const u8 = null
-
-    var __ci_expr_logic_540: c_int = 0
-
-    var __ci_expr_old_541: *const u8 = null
-
-    var __ci_expr_logic_546: c_int = 0
-
-    var __ci_expr_logic_545: c_int = 0
-
-    var __ci_expr_logic_543: c_int = 0
+    var __ci_expr_old_537: *const u8 = null
 
     var __ci_expr_logic_542: c_int = 0
 
-    var __ci_expr_old_547: c_uint = 0
+    var __ci_expr_logic_541: c_int = 0
 
-    var __ci_expr_logic_549: c_int = 0
+    var __ci_expr_logic_539: c_int = 0
 
-    var __ci_expr_old_550: *const u8 = null
+    var __ci_expr_logic_538: c_int = 0
+
+    var __ci_expr_old_543: c_uint = 0
+
+    var __ci_expr_logic_545: c_int = 0
+
+    var __ci_expr_old_546: *const u8 = null
+
+    var __ci_expr_logic_547: c_int = 0
+
+    var __ci_expr_old_548: *const u8 = null
+
+    var __ci_expr_old_549: c_uint = 0
 
     var __ci_expr_logic_551: c_int = 0
 
     var __ci_expr_old_552: *const u8 = null
 
-    var __ci_expr_old_553: c_uint = 0
+    var __ci_expr_logic_553: c_int = 0
 
-    var __ci_expr_logic_555: c_int = 0
+    var __ci_expr_old_554: *const u8 = null
 
-    var __ci_expr_old_556: *const u8 = null
+    var __ci_expr_old_555: c_uint = 0
 
     var __ci_expr_logic_557: c_int = 0
 
     var __ci_expr_old_558: *const u8 = null
 
-    var __ci_expr_old_559: c_uint = 0
+    var __ci_expr_logic_559: c_int = 0
 
-    var __ci_expr_logic_561: c_int = 0
+    var __ci_expr_old_560: *const u8 = null
 
-    var __ci_expr_old_562: *const u8 = null
+    var __ci_expr_logic_562: c_int = 0
 
-    var __ci_expr_logic_563: c_int = 0
+    var __ci_expr_old_563: c_uint = 0
 
-    var __ci_expr_old_564: *const u8 = null
+    var __ci_expr_logic_565: c_int = 0
 
-    var __ci_expr_logic_566: c_int = 0
+    var __ci_expr_logic_571: c_int = 0
 
-    var __ci_expr_old_567: c_uint = 0
+    var __ci_expr_old_572: *const u8 = null
 
-    var __ci_expr_logic_569: c_int = 0
+    var __ci_expr_old_573: *const u8 = null
+
+    var __ci_expr_logic_577: c_int = 0
+
+    var __ci_expr_logic_576: c_int = 0
 
     var __ci_expr_logic_575: c_int = 0
 
-    var __ci_expr_old_576: *const u8 = null
+    var __ci_expr_logic_574: c_int = 0
 
-    var __ci_expr_old_577: *const u8 = null
-
-    var __ci_expr_logic_581: c_int = 0
-
-    var __ci_expr_logic_580: c_int = 0
+    var __ci_expr_logic_578: c_int = 0
 
     var __ci_expr_logic_579: c_int = 0
 
-    var __ci_expr_logic_578: c_int = 0
+    var __ci_expr_logic_580: c_int = 0
+
+    var __ci_expr_logic_581: c_int = 0
 
     var __ci_expr_logic_582: c_int = 0
 
@@ -4293,29 +4126,29 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_logic_584: c_int = 0
 
-    var __ci_expr_logic_585: c_int = 0
-
-    var __ci_expr_logic_586: c_int = 0
+    var __ci_expr_old_585: c_uint = 0
 
     var __ci_expr_logic_587: c_int = 0
 
-    var __ci_expr_logic_588: c_int = 0
+    var __ci_expr_logic_593: c_int = 0
 
-    var __ci_expr_old_589: c_uint = 0
+    var __ci_expr_old_594: *const u8 = null
 
-    var __ci_expr_logic_591: c_int = 0
+    var __ci_expr_logic_598: c_int = 0
 
     var __ci_expr_logic_597: c_int = 0
 
-    var __ci_expr_old_598: *const u8 = null
+    var __ci_expr_logic_596: c_int = 0
 
-    var __ci_expr_logic_602: c_int = 0
+    var __ci_expr_logic_595: c_int = 0
 
-    var __ci_expr_logic_601: c_int = 0
+    var __ci_expr_logic_599: c_int = 0
 
     var __ci_expr_logic_600: c_int = 0
 
-    var __ci_expr_logic_599: c_int = 0
+    var __ci_expr_logic_601: c_int = 0
+
+    var __ci_expr_logic_602: c_int = 0
 
     var __ci_expr_logic_603: c_int = 0
 
@@ -4323,29 +4156,27 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_logic_605: c_int = 0
 
-    var __ci_expr_logic_606: c_int = 0
-
     var __ci_expr_logic_607: c_int = 0
 
     var __ci_expr_logic_608: c_int = 0
 
-    var __ci_expr_logic_609: c_int = 0
+    var __ci_expr_logic_610: c_int = 0
 
-    var __ci_expr_logic_611: c_int = 0
+    var __ci_expr_logic_609: c_int = 0
 
     var __ci_expr_logic_612: c_int = 0
 
-    var __ci_expr_logic_614: c_int = 0
-
     var __ci_expr_logic_613: c_int = 0
+
+    var __ci_expr_logic_615: c_int = 0
 
     var __ci_expr_logic_616: c_int = 0
 
-    var __ci_expr_logic_617: c_int = 0
+    var __ci_expr_logic_618: c_int = 0
 
     var __ci_expr_logic_619: c_int = 0
 
-    var __ci_expr_logic_620: c_int = 0
+    var __ci_expr_logic_621: c_int = 0
 
     var __ci_expr_logic_622: c_int = 0
 
@@ -4361,133 +4192,131 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_logic_630: c_int = 0
 
-    var __ci_expr_logic_631: c_int = 0
+    var __ci_expr_logic_632: c_int = 0
 
     var __ci_expr_logic_633: c_int = 0
 
-    var __ci_expr_logic_634: c_int = 0
-
     var __ci_expr_logic_636: c_int = 0
 
-    var __ci_expr_logic_637: c_int = 0
+    var __ci_expr_logic_635: c_int = 0
 
-    var __ci_expr_logic_640: c_int = 0
+    var __ci_expr_logic_634: c_int = 0
+
+    var __ci_expr_logic_638: c_int = 0
 
     var __ci_expr_logic_639: c_int = 0
 
-    var __ci_expr_logic_638: c_int = 0
+    var __ci_expr_old_640: *const c_uint = null
 
     var __ci_expr_logic_642: c_int = 0
 
     var __ci_expr_logic_643: c_int = 0
 
-    var __ci_expr_old_644: *const c_uint = null
-
-    var __ci_expr_logic_646: c_int = 0
+    var __ci_expr_logic_648: c_int = 0
 
     var __ci_expr_logic_647: c_int = 0
 
-    var __ci_expr_logic_652: c_int = 0
+    var __ci_expr_logic_645: c_int = 0
+
+    var __ci_expr_logic_644: c_int = 0
+
+    var __ci_expr_logic_650: c_int = 0
 
     var __ci_expr_logic_651: c_int = 0
 
-    var __ci_expr_logic_649: c_int = 0
-
-    var __ci_expr_logic_648: c_int = 0
+    var __ci_expr_logic_653: c_int = 0
 
     var __ci_expr_logic_654: c_int = 0
 
-    var __ci_expr_logic_655: c_int = 0
+    var __ci_expr_logic_656: c_int = 0
 
-    var __ci_expr_logic_657: c_int = 0
+    var __ci_expr_old_657: *const u8 = null
 
     var __ci_expr_logic_658: c_int = 0
 
-    var __ci_expr_logic_660: c_int = 0
+    var __ci_expr_old_659: *const u8 = null
 
-    var __ci_expr_old_661: *const u8 = null
+    var __ci_expr_logic_661: c_int = 0
 
-    var __ci_expr_logic_662: c_int = 0
+    var __ci_expr_logic_663: c_int = 0
 
-    var __ci_expr_old_663: *const u8 = null
+    var __ci_expr_ternary_668: c_int = 0
 
-    var __ci_expr_logic_665: c_int = 0
+    var __ci_expr_logic_672: c_int = 0
 
-    var __ci_expr_logic_667: c_int = 0
+    var __ci_expr_logic_671: c_int = 0
 
-    var __ci_expr_ternary_672: c_int = 0
+    var __ci_expr_logic_670: c_int = 0
 
-    var __ci_expr_logic_676: c_int = 0
-
-    var __ci_expr_logic_675: c_int = 0
-
-    var __ci_expr_logic_674: c_int = 0
+    var __ci_expr_logic_669: c_int = 0
 
     var __ci_expr_logic_673: c_int = 0
 
-    var __ci_expr_logic_677: c_int = 0
+    var __ci_expr_logic_675: c_int = 0
 
-    var __ci_expr_logic_679: c_int = 0
+    var __ci_expr_logic_676: c_int = 0
+
+    var __ci_expr_logic_678: c_int = 0
 
     var __ci_expr_logic_680: c_int = 0
 
     var __ci_expr_logic_682: c_int = 0
 
-    var __ci_expr_logic_684: c_int = 0
+    var __ci_expr_logic_688: c_int = 0
 
-    var __ci_expr_logic_686: c_int = 0
+    var __ci_expr_logic_690: c_int = 0
 
     var __ci_expr_logic_692: c_int = 0
 
     var __ci_expr_logic_694: c_int = 0
 
-    var __ci_expr_logic_696: c_int = 0
+    var __ci_expr_logic_695: c_int = 0
+
+    var __ci_expr_logic_697: c_int = 0
 
     var __ci_expr_logic_698: c_int = 0
 
-    var __ci_expr_logic_699: c_int = 0
+    var __ci_expr_logic_700: c_int = 0
 
     var __ci_expr_logic_701: c_int = 0
 
-    var __ci_expr_logic_702: c_int = 0
+    var __ci_expr_logic_703: c_int = 0
 
     var __ci_expr_logic_704: c_int = 0
 
-    var __ci_expr_logic_705: c_int = 0
+    var __ci_expr_logic_706: c_int = 0
 
     var __ci_expr_logic_707: c_int = 0
 
-    var __ci_expr_logic_708: c_int = 0
+    var __ci_expr_logic_709: c_int = 0
 
     var __ci_expr_logic_710: c_int = 0
 
-    var __ci_expr_logic_711: c_int = 0
-
     var __ci_expr_logic_713: c_int = 0
 
-    var __ci_expr_logic_714: c_int = 0
+    var __ci_expr_logic_712: c_int = 0
 
-    var __ci_expr_logic_717: c_int = 0
-
-    var __ci_expr_logic_716: c_int = 0
+    var __ci_expr_logic_711: c_int = 0
 
     var __ci_expr_logic_715: c_int = 0
 
-    var __ci_expr_logic_719: c_int = 0
+    var __ci_expr_ternary_720: c_int = 0
 
-    var __ci_expr_ternary_724: c_int = 0
+    var __ci_expr_logic_724: c_int = 0
 
-    var __ci_expr_logic_728: c_int = 0
+    var __ci_expr_logic_723: c_int = 0
 
-    var __ci_expr_logic_727: c_int = 0
+    var __ci_expr_logic_722: c_int = 0
+
+    var __ci_expr_logic_721: c_int = 0
 
     var __ci_expr_logic_726: c_int = 0
 
-    var __ci_expr_logic_725: c_int = 0
-
-    var __ci_expr_logic_730: c_int = 0
+    var __ci_expr_logic_728: c_int = 0
 
     var __ci_expr_logic_732: c_int = 0
+
+    var __ci_expr_logic_734: c_int = 0
 
     var __ci_expr_logic_736: c_int = 0
 
@@ -4497,199 +4326,181 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     var __ci_expr_logic_742: c_int = 0
 
-    var __ci_expr_logic_744: c_int = 0
+    var __ci_expr_logic_743: c_int = 0
+
+    var __ci_expr_logic_745: c_int = 0
 
     var __ci_expr_logic_746: c_int = 0
 
-    var __ci_expr_logic_747: c_int = 0
+    var __ci_expr_logic_748: c_int = 0
 
     var __ci_expr_logic_749: c_int = 0
 
-    var __ci_expr_logic_750: c_int = 0
+    var __ci_expr_logic_751: c_int = 0
 
     var __ci_expr_logic_752: c_int = 0
 
-    var __ci_expr_logic_753: c_int = 0
+    var __ci_expr_logic_754: c_int = 0
 
     var __ci_expr_logic_755: c_int = 0
 
-    var __ci_expr_logic_756: c_int = 0
+    var __ci_expr_logic_757: c_int = 0
 
     var __ci_expr_logic_758: c_int = 0
 
-    var __ci_expr_logic_759: c_int = 0
-
     var __ci_expr_logic_761: c_int = 0
 
-    var __ci_expr_logic_762: c_int = 0
+    var __ci_expr_logic_760: c_int = 0
 
-    var __ci_expr_logic_765: c_int = 0
+    var __ci_expr_logic_759: c_int = 0
 
-    var __ci_expr_logic_764: c_int = 0
+    var __ci_expr_old_762: c_int = 0
 
     var __ci_expr_logic_763: c_int = 0
 
-    var __ci_expr_ternary_766: c_int = 0
+    var __ci_expr_old_764: *const u8 = null
 
-    var __ci_expr_ternary_767: c_int = 0
+    var __ci_expr_logic_766: c_int = 0
 
-    var __ci_expr_old_768: c_int = 0
+    var __ci_expr_logic_767: c_int = 0
 
-    var __ci_expr_logic_769: c_int = 0
+    var __ci_expr_logic_768: c_int = 0
 
-    var __ci_expr_ternary_770: c_int = 0
+    var __ci_expr_logic_770: c_int = 0
 
-    var __ci_expr_ternary_771: c_int = 0
+    var __ci_expr_old_771: c_uint = 0
 
-    var __ci_expr_old_772: *const u8 = null
-
-    var __ci_expr_logic_774: c_int = 0
+    var __ci_expr_logic_773: c_int = 0
 
     var __ci_expr_logic_775: c_int = 0
+
+    var __ci_expr_logic_774: c_int = 0
 
     var __ci_expr_logic_776: c_int = 0
 
     var __ci_expr_logic_778: c_int = 0
 
-    var __ci_expr_old_779: c_uint = 0
+    var __ci_expr_logic_779: c_int = 0
 
-    var __ci_expr_logic_781: c_int = 0
-
-    var __ci_expr_logic_783: c_int = 0
+    var __ci_expr_logic_780: c_int = 0
 
     var __ci_expr_logic_782: c_int = 0
 
     var __ci_expr_logic_784: c_int = 0
 
+    var __ci_expr_logic_783: c_int = 0
+
     var __ci_expr_logic_786: c_int = 0
+
+    var __ci_expr_logic_785: c_int = 0
+
+    var __ci_expr_logic_789: c_int = 0
 
     var __ci_expr_logic_787: c_int = 0
 
-    var __ci_expr_logic_788: c_int = 0
-
     var __ci_expr_logic_790: c_int = 0
 
-    var __ci_expr_ternary_791: c_uint = 0
-
-    var __ci_expr_logic_793: c_int = 0
+    var __ci_expr_logic_791: c_int = 0
 
     var __ci_expr_logic_792: c_int = 0
 
-    var __ci_expr_logic_795: c_int = 0
+    var __ci_expr_logic_793: c_int = 0
 
     var __ci_expr_logic_794: c_int = 0
 
-    var __ci_expr_logic_798: c_int = 0
+    var __ci_expr_logic_795: c_int = 0
 
-    var __ci_expr_logic_796: c_int = 0
+    var __ci_expr_old_796: c_int = 0
+
+    var __ci_expr_logic_797: c_int = 0
+
+    var __ci_expr_old_798: c_int = 0
 
     var __ci_expr_logic_799: c_int = 0
 
     var __ci_expr_logic_800: c_int = 0
 
-    var __ci_expr_logic_801: c_int = 0
+    var __ci_expr_old_801: c_uint = 0
 
     var __ci_expr_logic_802: c_int = 0
 
     var __ci_expr_logic_803: c_int = 0
 
-    var __ci_expr_logic_804: c_int = 0
-
-    var __ci_expr_old_805: c_int = 0
-
     var __ci_expr_logic_806: c_int = 0
 
-    var __ci_expr_old_807: c_int = 0
+    var __ci_expr_logic_805: c_int = 0
+
+    var __ci_expr_logic_804: c_int = 0
+
+    var __ci_expr_logic_807: c_int = 0
 
     var __ci_expr_logic_808: c_int = 0
 
     var __ci_expr_logic_809: c_int = 0
 
-    var __ci_expr_ternary_810: c_ulong = 0
+    var __ci_expr_logic_810: c_int = 0
 
-    var __ci_expr_ternary_812: c_int = 0
+    var __ci_expr_logic_812: c_int = 0
 
-    var __ci_expr_old_813: c_uint = 0
-
-    var __ci_expr_logic_814: c_int = 0
-
-    var __ci_expr_logic_815: c_int = 0
-
-    var __ci_expr_logic_818: c_int = 0
-
-    var __ci_expr_logic_817: c_int = 0
-
-    var __ci_expr_logic_816: c_int = 0
-
-    var __ci_expr_logic_819: c_int = 0
+    var __ci_expr_logic_813: c_int = 0
 
     var __ci_expr_logic_820: c_int = 0
 
-    var __ci_expr_logic_821: c_int = 0
+    var __ci_expr_logic_824: c_int = 0
+
+    var __ci_expr_logic_823: c_int = 0
 
     var __ci_expr_logic_822: c_int = 0
 
-    var __ci_expr_logic_824: c_int = 0
+    var __ci_expr_logic_821: c_int = 0
 
     var __ci_expr_logic_825: c_int = 0
 
-    var __ci_expr_logic_832: c_int = 0
-
-    var __ci_expr_logic_836: c_int = 0
-
-    var __ci_expr_logic_835: c_int = 0
-
-    var __ci_expr_logic_834: c_int = 0
-
     var __ci_expr_logic_833: c_int = 0
 
-    var __ci_expr_logic_837: c_int = 0
+    var __ci_expr_ternary_838: c_int = 0
+
+    var __ci_expr_logic_842: c_int = 0
+
+    var __ci_expr_logic_841: c_int = 0
+
+    var __ci_expr_logic_840: c_int = 0
+
+    var __ci_expr_logic_839: c_int = 0
+
+    var __ci_expr_logic_844: c_int = 0
 
     var __ci_expr_logic_845: c_int = 0
 
-    var __ci_expr_ternary_850: c_int = 0
+    var __ci_expr_logic_848: c_int = 0
 
-    var __ci_expr_logic_854: c_int = 0
+    var __ci_expr_logic_847: c_int = 0
 
-    var __ci_expr_logic_853: c_int = 0
+    var __ci_expr_logic_846: c_int = 0
 
-    var __ci_expr_logic_852: c_int = 0
+    var __ci_expr_logic_849: c_int = 0
 
     var __ci_expr_logic_851: c_int = 0
 
+    var __ci_expr_logic_852: c_int = 0
+
+    var __ci_expr_logic_853: c_int = 0
+
     var __ci_expr_logic_856: c_int = 0
+
+    var __ci_expr_logic_855: c_int = 0
+
+    var __ci_expr_logic_854: c_int = 0
 
     var __ci_expr_logic_857: c_int = 0
 
-    var __ci_expr_logic_860: c_int = 0
+    var __ci_expr_ternary_860: c_int = 0
 
     var __ci_expr_logic_859: c_int = 0
 
-    var __ci_expr_logic_858: c_int = 0
+    var __ci_expr_old_858: *const u8 = null
 
     var __ci_expr_logic_861: c_int = 0
-
-    var __ci_expr_logic_863: c_int = 0
-
-    var __ci_expr_logic_864: c_int = 0
-
-    var __ci_expr_logic_865: c_int = 0
-
-    var __ci_expr_logic_868: c_int = 0
-
-    var __ci_expr_logic_867: c_int = 0
-
-    var __ci_expr_logic_866: c_int = 0
-
-    var __ci_expr_logic_869: c_int = 0
-
-    var __ci_expr_ternary_872: c_int = 0
-
-    var __ci_expr_logic_871: c_int = 0
-
-    var __ci_expr_old_870: *const u8 = null
-
-    var __ci_expr_logic_873: c_int = 0
 
     goto '__ci_bb_0
 
@@ -5270,13 +5081,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_93 {
         ((*__param_match_data).ovector[0] = (((((((*__local_F__goto_692_12).start_match as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         ((*__param_match_data).ovector[1] = (((((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
-        (__ci_expr_ternary_6 = 0)
-        if ((if ((__param_top_bracket as c_int) + 1) > (*__param_match_data).oveccount: 1 else: 0) != 0) {
-            (__ci_expr_ternary_6 = (((*__param_match_data).oveccount as c_int)))
-        } else {
-            (__ci_expr_ternary_6 = ((((__param_top_bracket as c_int) + 1) as c_int)))
-        }
-        (__local_i__goto_713_10 = (((2 * __ci_expr_ternary_6) as c_uint)))
+        (__local_i__goto_713_10 = (((2 * (if (if ((__param_top_bracket as c_int) + 1) > (*__param_match_data).oveccount: 1 else: 0) != 0: ((*__param_match_data).oveccount as c_int) else: (((__param_top_bracket as c_int) + 1) as c_int))) as c_uint)))
         with_memcpy(((((&(*__param_match_data).ovector[0] as *mut c_ulong) + ((2 as isize) as usize)) as *mut c_void) as *mut u8), ((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *const u8), ((((((__local_i__goto_713_10 as c_uint) -% (2 as c_uint)) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
         goto '__ci_bb_94
     }
@@ -5300,42 +5105,42 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_97 {
-        (__ci_expr_ternary_11 = 0)
+        (__ci_expr_ternary_10 = 0)
         if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_7: c_int = 0
+            var __ci_expr_logic_6: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                (__ci_expr_logic_7 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
+                (__ci_expr_logic_6 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
             }
 
-            (__ci_expr_ternary_11 = __ci_expr_logic_7)
+            (__ci_expr_ternary_10 = __ci_expr_logic_6)
 
         } else {
-            var __ci_expr_logic_10: c_int = 0
+            var __ci_expr_logic_9: c_int = 0
 
-            var __ci_expr_logic_8: c_int = 0
+            var __ci_expr_logic_7: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                (__ci_expr_logic_8 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_7 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_8 != 0) {
-                var __ci_expr_logic_9: c_int
+            if (__ci_expr_logic_7 != 0) {
+                var __ci_expr_logic_8: c_int
 
                 if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_9 = (if true: 1 else: 0))
+                    (__ci_expr_logic_8 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_9 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_8 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_logic_10 = (if __ci_expr_logic_9 != 0: 1 else: 0))
+                (__ci_expr_logic_9 = (if __ci_expr_logic_8 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_ternary_11 = __ci_expr_logic_10)
+            (__ci_expr_ternary_10 = __ci_expr_logic_9)
 
         }
-        if (__ci_expr_ternary_11 != 0) {
+        if (__ci_expr_ternary_10 != 0) {
             goto '__ci_bb_98
         } else {
             goto '__ci_bb_99
@@ -5347,23 +5152,23 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_99 {
-        (__ci_expr_logic_15 = 0)
         (__ci_expr_logic_14 = 0)
         (__ci_expr_logic_13 = 0)
         (__ci_expr_logic_12 = 0)
+        (__ci_expr_logic_11 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_12 = (if (if (*__local_F__goto_692_12).eptr == ((*__param_mb).end_subject - ((1 as isize) as usize)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_11 = (if (if (*__local_F__goto_692_12).eptr == ((*__param_mb).end_subject - ((1 as isize) as usize)): 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_11 != 0) {
+            (__ci_expr_logic_12 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_12 != 0) {
-            (__ci_expr_logic_13 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_13 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_13 != 0) {
-            (__ci_expr_logic_14 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_14 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_14 != 0) {
-            (__ci_expr_logic_15 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
-        }
-        if (__ci_expr_logic_15 != 0) {
             goto '__ci_bb_103
         } else {
             goto '__ci_bb_104
@@ -5418,20 +5223,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_110 {
-        (__ci_expr_logic_17 = 0)
+        (__ci_expr_logic_16 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_16: c_int
+            var __ci_expr_logic_15: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_16 = (if true: 1 else: 0))
+                (__ci_expr_logic_15 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_16 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_15 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_17 = (if __ci_expr_logic_16 != 0: 1 else: 0))
+            (__ci_expr_logic_16 = (if __ci_expr_logic_15 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_17 != 0) {
+        if (__ci_expr_logic_16 != 0) {
             goto '__ci_bb_113
         } else {
             goto '__ci_bb_114
@@ -5486,11 +5291,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_122 {
-        (__ci_expr_logic_18 = 0)
+        (__ci_expr_logic_17 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_18 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_17 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_18 != 0) {
+        if (__ci_expr_logic_17 != 0) {
             goto '__ci_bb_123
         } else {
             goto '__ci_bb_124
@@ -5525,20 +5330,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_128 {
-        (__ci_expr_logic_20 = 0)
+        (__ci_expr_logic_19 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_19: c_int
+            var __ci_expr_logic_18: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_19 = (if true: 1 else: 0))
+                (__ci_expr_logic_18 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_19 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_18 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_20 = (if __ci_expr_logic_19 != 0: 1 else: 0))
+            (__ci_expr_logic_19 = (if __ci_expr_logic_18 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_20 != 0) {
+        if (__ci_expr_logic_19 != 0) {
             goto '__ci_bb_131
         } else {
             goto '__ci_bb_132
@@ -5737,20 +5542,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_163 {
-        (__ci_expr_logic_22 = 0)
+        (__ci_expr_logic_21 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_21: c_int
+            var __ci_expr_logic_20: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_21 = (if true: 1 else: 0))
+                (__ci_expr_logic_20 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_21 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_20 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_22 = (if __ci_expr_logic_21 != 0: 1 else: 0))
+            (__ci_expr_logic_21 = (if __ci_expr_logic_20 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_22 != 0) {
+        if (__ci_expr_logic_21 != 0) {
             goto '__ci_bb_166
         } else {
             goto '__ci_bb_167
@@ -5804,11 +5609,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_174 {
-        (__ci_expr_old_23 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_22 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        (__ci_expr_old_24 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_23 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        if ((if (*__ci_expr_old_23) != (*__ci_expr_old_24): 1 else: 0) != 0) {
+        if ((if (*__ci_expr_old_22) != (*__ci_expr_old_23): 1 else: 0) != 0) {
             goto '__ci_bb_177
         } else {
             goto '__ci_bb_178
@@ -5842,9 +5647,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_183 {
-        (__ci_expr_old_27 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_26 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        if ((if ((*__local_F__goto_692_12).ecode[1]) != (*__ci_expr_old_27): 1 else: 0) != 0) {
+        if ((if ((*__local_F__goto_692_12).ecode[1]) != (*__ci_expr_old_26): 1 else: 0) != 0) {
             goto '__ci_bb_194
         } else {
             goto '__ci_bb_195
@@ -5852,20 +5657,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_184 {
-        (__ci_expr_logic_26 = 0)
+        (__ci_expr_logic_25 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_25: c_int
+            var __ci_expr_logic_24: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_25 = (if true: 1 else: 0))
+                (__ci_expr_logic_24 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_25 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_24 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_26 = (if __ci_expr_logic_25 != 0: 1 else: 0))
+            (__ci_expr_logic_25 = (if __ci_expr_logic_24 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_26 != 0) {
+        if (__ci_expr_logic_25 != 0) {
             goto '__ci_bb_187
         } else {
             goto '__ci_bb_188
@@ -5945,20 +5750,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_202 {
-        (__ci_expr_logic_29 = 0)
+        (__ci_expr_logic_28 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_28: c_int
+            var __ci_expr_logic_27: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_28 = (if true: 1 else: 0))
+                (__ci_expr_logic_27 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_28 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_27 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_29 = (if __ci_expr_logic_28 != 0: 1 else: 0))
+            (__ci_expr_logic_28 = (if __ci_expr_logic_27 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_29 != 0) {
+        if (__ci_expr_logic_28 != 0) {
             goto '__ci_bb_205
         } else {
             goto '__ci_bb_206
@@ -6122,9 +5927,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_230 {
-        (__ci_expr_old_30 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_29 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_dc__goto_1184_18 = (((*__ci_expr_old_30) as c_uint)))
+        (__local_dc__goto_1184_18 = (((*__ci_expr_old_29) as c_uint)))
         if ((if __local_dc__goto_1184_18 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_237
         } else {
@@ -6161,11 +5966,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_238 {
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + ((*__local_F__goto_692_12).length as usize))
-        (__ci_expr_logic_32 = 0)
+        (__ci_expr_logic_31 = 0)
         if ((if __local_dc__goto_1184_18 != __local_fc__goto_714_10: 1 else: 0) != 0) {
-            (__ci_expr_logic_32 = (if (if __local_dc__goto_1184_18 != ((((__local_fc__goto_714_10 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).other_case) as c_uint)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_31 = (if (if __local_dc__goto_1184_18 != ((((__local_fc__goto_714_10 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).other_case) as c_uint)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_32 != 0) {
+        if (__ci_expr_logic_31 != 0) {
             goto '__ci_bb_251
         } else {
             goto '__ci_bb_252
@@ -6173,9 +5978,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_239 {
-        (__ci_expr_old_31 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_30 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_dc__goto_1184_18 = ((((((((__local_dc__goto_1184_18 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_31) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_dc__goto_1184_18 = ((((((((__local_dc__goto_1184_18 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_30) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_241
     }
 
@@ -6287,11 +6092,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_260 {
-        (__ci_expr_logic_33 = 0)
+        (__ci_expr_logic_32 = 0)
         if ((if __local_cc__goto_1196_16 != __local_fc__goto_714_10: 1 else: 0) != 0) {
-            (__ci_expr_logic_33 = (if (if __local_cc__goto_1196_16 != ((((__local_fc__goto_714_10 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).other_case) as c_uint)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_32 = (if (if __local_cc__goto_1196_16 != ((((__local_fc__goto_714_10 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).other_case) as c_uint)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_33 != 0) {
+        if (__ci_expr_logic_32 != 0) {
             goto '__ci_bb_267
         } else {
             goto '__ci_bb_268
@@ -6366,20 +6171,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_280 {
-        (__ci_expr_logic_35 = 0)
+        (__ci_expr_logic_34 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_34: c_int
+            var __ci_expr_logic_33: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_34 = (if true: 1 else: 0))
+                (__ci_expr_logic_33 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_34 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_33 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_35 = (if __ci_expr_logic_34 != 0: 1 else: 0))
+            (__ci_expr_logic_34 = (if __ci_expr_logic_33 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_35 != 0) {
+        if (__ci_expr_logic_34 != 0) {
             goto '__ci_bb_283
         } else {
             goto '__ci_bb_284
@@ -6426,9 +6231,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_290 {
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        (__ci_expr_old_36 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_35 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        (__local_ch__goto_1237_16 = (((*__ci_expr_old_36) as c_uint)))
+        (__local_ch__goto_1237_16 = (((*__ci_expr_old_35) as c_uint)))
         if ((if __local_ch__goto_1237_16 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_293
         } else {
@@ -6457,9 +6262,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_294 {
-        (__ci_expr_old_38 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_37 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_38) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_37) as c_uint)))
         if ((if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_307
         } else {
@@ -6468,9 +6273,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_295 {
-        (__ci_expr_old_37 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_36 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        (__local_ch__goto_1237_16 = ((((((((__local_ch__goto_1237_16 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_37) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_ch__goto_1237_16 = ((((((((__local_ch__goto_1237_16 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_36) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_297
     }
 
@@ -6555,9 +6360,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_309 {
-        (__ci_expr_old_39 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_38 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_39) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_38) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_311
     }
 
@@ -6690,9 +6495,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_337 {
-        (__ci_expr_old_40 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_39 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_40) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_39) as c_uint)))
         (__local_ch__goto_1259_16 = ((((*__local_F__goto_692_12).ecode[1]) as c_uint)))
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + ((2 as isize) as usize))
         if ((if __local_ch__goto_1259_16 == __local_fc__goto_714_10: 1 else: 0) != 0) {
@@ -6704,22 +6509,22 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_338 {
         (__local_ch__goto_1284_16 = ((((*__local_F__goto_692_12).ecode[1]) as c_uint)))
-        (__ci_expr_old_41 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_40 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_41) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_40) as c_uint)))
         if ((if __local_ch__goto_1284_16 == __local_fc__goto_714_10: 1 else: 0) != 0) {
-            (__ci_expr_logic_43 = (if true: 1 else: 0))
+            (__ci_expr_logic_42 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_42: c_int = 0
+            var __ci_expr_logic_41: c_int = 0
 
             if ((if (*__local_F__goto_692_12).op == OP_NOTI: 1 else: 0) != 0) {
-                (__ci_expr_logic_42 = (if (if ((*__param_mb).fcc[__local_ch__goto_1284_16]) == __local_fc__goto_714_10: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_41 = (if (if ((*__param_mb).fcc[__local_ch__goto_1284_16]) == __local_fc__goto_714_10: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_43 = (if __ci_expr_logic_42 != 0: 1 else: 0))
+            (__ci_expr_logic_42 = (if __ci_expr_logic_41 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_43 != 0) {
+        if (__ci_expr_logic_42 != 0) {
             goto '__ci_bb_356
         } else {
             goto '__ci_bb_357
@@ -6872,15 +6677,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_369 {
-        (__ci_expr_old_44 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_43 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        (__ci_expr_ternary_45 = 0)
-        if ((if (*__local_F__goto_692_12).op < OP_STARI: 1 else: 0) != 0) {
-            (__ci_expr_ternary_45 = OP_STAR)
-        } else {
-            (__ci_expr_ternary_45 = OP_STARI)
-        }
-        (__local_fc__goto_714_10 = (((((*__ci_expr_old_44) as c_int) - __ci_expr_ternary_45) as c_uint)))
+        (__local_fc__goto_714_10 = (((((*__ci_expr_old_43) as c_int) - (if (if (*__local_F__goto_692_12).op < OP_STARI: 1 else: 0) != 0: OP_STAR else: OP_STARI)) as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((rep_min[__local_fc__goto_714_10] as c_uint)))
         ((*__local_F__goto_692_12).temp_32[1] = ((rep_max[__local_fc__goto_714_10] as c_uint)))
         (__local_reptype__goto_716_10 = ((rep_typ[__local_fc__goto_714_10] as c_uint)))
@@ -6899,9 +6698,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_371 {
-        (__ci_expr_old_63 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_61 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        ((*__local_F__goto_692_12).temp_32[2] = (((*__ci_expr_old_63) as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[2] = (((*__ci_expr_old_61) as c_uint)))
         goto '__ci_bb_372
     }
 
@@ -7001,14 +6800,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_387 {
-        (__ci_expr_logic_46 = 0)
+        (__ci_expr_logic_44 = 0)
         if ((if (*__local_F__goto_692_12).op >= OP_STARI: 1 else: 0) != 0) {
             (__local_othercase__goto_1405_18 = ((((__local_fc__goto_714_10 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).other_case) as c_uint)))
 
-            (__ci_expr_logic_46 = (if (if __local_othercase__goto_1405_18 != __local_fc__goto_714_10: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_44 = (if (if __local_othercase__goto_1405_18 != __local_fc__goto_714_10: 1 else: 0) != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_46 != 0) {
+        if (__ci_expr_logic_44 != 0) {
             goto '__ci_bb_389
         } else {
             goto '__ci_bb_390
@@ -7044,11 +6843,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_393 {
-        (__ci_expr_logic_47 = 0)
+        (__ci_expr_logic_45 = 0)
         if ((if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__local_F__goto_692_12).length as usize)): 1 else: 0) != 0) {
-            (__ci_expr_logic_47 = (if (if with_memcmp((((*__local_F__goto_692_12).eptr as *const c_void) as *const u8), (((*__local_F__goto_692_12).temp_sptr[1] as *const c_void) as *const u8), (((((*__local_F__goto_692_12).length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_45 = (if (if with_memcmp((((*__local_F__goto_692_12).eptr as *const c_void) as *const u8), (((*__local_F__goto_692_12).temp_sptr[1] as *const c_void) as *const u8), (((((*__local_F__goto_692_12).length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_47 != 0) {
+        if (__ci_expr_logic_45 != 0) {
             goto '__ci_bb_396
         } else {
             goto '__ci_bb_397
@@ -7074,15 +6873,15 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_397 {
-        (__ci_expr_logic_49 = 0)
-        (__ci_expr_logic_48 = 0)
+        (__ci_expr_logic_47 = 0)
+        (__ci_expr_logic_46 = 0)
         if ((if (*__local_F__goto_692_12).temp_size > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_48 = (if (if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__local_F__goto_692_12).temp_size as usize)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_46 = (if (if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__local_F__goto_692_12).temp_size as usize)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_48 != 0) {
-            (__ci_expr_logic_49 = (if (if with_memcmp((((*__local_F__goto_692_12).eptr as *const c_void) as *const u8), ((&(*__local_F__goto_692_12).occu[0] as *mut u8) as *const u8), (((((*__local_F__goto_692_12).temp_size as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_46 != 0) {
+            (__ci_expr_logic_47 = (if (if with_memcmp((((*__local_F__goto_692_12).eptr as *const c_void) as *const u8), ((&(*__local_F__goto_692_12).occu[0] as *mut u8) as *const u8), (((((*__local_F__goto_692_12).temp_size as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_49 != 0) {
+        if (__ci_expr_logic_47 != 0) {
             goto '__ci_bb_399
         } else {
             goto '__ci_bb_400
@@ -7135,20 +6934,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_407 {
-        (__ci_expr_logic_51 = 0)
+        (__ci_expr_logic_49 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_50: c_int
+            var __ci_expr_logic_48: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_50 = (if true: 1 else: 0))
+                (__ci_expr_logic_48 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_50 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_48 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_51 = (if __ci_expr_logic_50 != 0: 1 else: 0))
+            (__ci_expr_logic_49 = (if __ci_expr_logic_48 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_51 != 0) {
+        if (__ci_expr_logic_49 != 0) {
             goto '__ci_bb_410
         } else {
             goto '__ci_bb_411
@@ -7262,9 +7061,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_431 {
-        (__ci_expr_old_52 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_50 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_52 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_50 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_435
         } else {
             goto '__ci_bb_436
@@ -7281,11 +7080,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_436 {
-        (__ci_expr_logic_53 = 0)
+        (__ci_expr_logic_51 = 0)
         if ((if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__local_F__goto_692_12).length as usize)): 1 else: 0) != 0) {
-            (__ci_expr_logic_53 = (if (if with_memcmp((((*__local_F__goto_692_12).eptr as *const c_void) as *const u8), (((*__local_F__goto_692_12).temp_sptr[1] as *const c_void) as *const u8), (((((*__local_F__goto_692_12).length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_51 = (if (if with_memcmp((((*__local_F__goto_692_12).eptr as *const c_void) as *const u8), (((*__local_F__goto_692_12).temp_sptr[1] as *const c_void) as *const u8), (((((*__local_F__goto_692_12).length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_53 != 0) {
+        if (__ci_expr_logic_51 != 0) {
             goto '__ci_bb_440
         } else {
             goto '__ci_bb_441
@@ -7303,15 +7102,15 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_441 {
-        (__ci_expr_logic_55 = 0)
-        (__ci_expr_logic_54 = 0)
+        (__ci_expr_logic_53 = 0)
+        (__ci_expr_logic_52 = 0)
         if ((if (*__local_F__goto_692_12).temp_size > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_54 = (if (if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__local_F__goto_692_12).temp_size as usize)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_52 = (if (if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__local_F__goto_692_12).temp_size as usize)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_54 != 0) {
-            (__ci_expr_logic_55 = (if (if with_memcmp((((*__local_F__goto_692_12).eptr as *const c_void) as *const u8), ((&(*__local_F__goto_692_12).occu[0] as *mut u8) as *const u8), (((((*__local_F__goto_692_12).temp_size as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_52 != 0) {
+            (__ci_expr_logic_53 = (if (if with_memcmp((((*__local_F__goto_692_12).eptr as *const c_void) as *const u8), ((&(*__local_F__goto_692_12).occu[0] as *mut u8) as *const u8), (((((*__local_F__goto_692_12).temp_size as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_55 != 0) {
+        if (__ci_expr_logic_53 != 0) {
             goto '__ci_bb_443
         } else {
             goto '__ci_bb_444
@@ -7364,20 +7163,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_451 {
-        (__ci_expr_logic_57 = 0)
+        (__ci_expr_logic_55 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_56: c_int
+            var __ci_expr_logic_54: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_56 = (if true: 1 else: 0))
+                (__ci_expr_logic_54 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_56 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_54 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_57 = (if __ci_expr_logic_56 != 0: 1 else: 0))
+            (__ci_expr_logic_55 = (if __ci_expr_logic_54 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_57 != 0) {
+        if (__ci_expr_logic_55 != 0) {
             goto '__ci_bb_454
         } else {
             goto '__ci_bb_455
@@ -7431,11 +7230,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_462 {
-        (__ci_expr_logic_58 = 0)
+        (__ci_expr_logic_56 = 0)
         if ((if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__local_F__goto_692_12).length as usize)): 1 else: 0) != 0) {
-            (__ci_expr_logic_58 = (if (if with_memcmp((((*__local_F__goto_692_12).eptr as *const c_void) as *const u8), (((*__local_F__goto_692_12).temp_sptr[1] as *const c_void) as *const u8), (((((*__local_F__goto_692_12).length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_56 = (if (if with_memcmp((((*__local_F__goto_692_12).eptr as *const c_void) as *const u8), (((*__local_F__goto_692_12).temp_sptr[1] as *const c_void) as *const u8), (((((*__local_F__goto_692_12).length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_58 != 0) {
+        if (__ci_expr_logic_56 != 0) {
             goto '__ci_bb_465
         } else {
             goto '__ci_bb_466
@@ -7461,15 +7260,15 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_466 {
-        (__ci_expr_logic_60 = 0)
-        (__ci_expr_logic_59 = 0)
+        (__ci_expr_logic_58 = 0)
+        (__ci_expr_logic_57 = 0)
         if ((if (*__local_F__goto_692_12).temp_size > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_59 = (if (if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__local_F__goto_692_12).temp_size as usize)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_57 = (if (if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__local_F__goto_692_12).temp_size as usize)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_59 != 0) {
-            (__ci_expr_logic_60 = (if (if with_memcmp((((*__local_F__goto_692_12).eptr as *const c_void) as *const u8), ((&(*__local_F__goto_692_12).occu[0] as *mut u8) as *const u8), (((((*__local_F__goto_692_12).temp_size as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_57 != 0) {
+            (__ci_expr_logic_58 = (if (if with_memcmp((((*__local_F__goto_692_12).eptr as *const c_void) as *const u8), ((&(*__local_F__goto_692_12).occu[0] as *mut u8) as *const u8), (((((*__local_F__goto_692_12).temp_size as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_60 != 0) {
+        if (__ci_expr_logic_58 != 0) {
             goto '__ci_bb_468
         } else {
             goto '__ci_bb_469
@@ -7522,20 +7321,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_476 {
-        (__ci_expr_logic_62 = 0)
+        (__ci_expr_logic_60 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_61: c_int
+            var __ci_expr_logic_59: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_61 = (if true: 1 else: 0))
+                (__ci_expr_logic_59 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_61 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_59 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_62 = (if __ci_expr_logic_61 != 0: 1 else: 0))
+            (__ci_expr_logic_60 = (if __ci_expr_logic_59 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_62 != 0) {
+        if (__ci_expr_logic_60 != 0) {
             goto '__ci_bb_479
         } else {
             goto '__ci_bb_480
@@ -7669,15 +7468,15 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_503 {
-        (__ci_expr_logic_65 = 0)
-        (__ci_expr_logic_64 = 0)
+        (__ci_expr_logic_63 = 0)
+        (__ci_expr_logic_62 = 0)
         if (__local_ucp__goto_727_6 != 0) {
-            (__ci_expr_logic_64 = (if (if not (__local_utf__goto_726_6 != 0): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_62 = (if (if not (__local_utf__goto_726_6 != 0): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_64 != 0) {
-            (__ci_expr_logic_65 = (if (if (*__local_F__goto_692_12).temp_32[2] > 127: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_62 != 0) {
+            (__ci_expr_logic_63 = (if (if (*__local_F__goto_692_12).temp_32[2] > 127: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_65 != 0) {
+        if (__ci_expr_logic_63 != 0) {
             goto '__ci_bb_506
         } else {
             goto '__ci_bb_507
@@ -7743,11 +7542,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_514 {
         (__local_cc__goto_1520_18 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_68 = 0)
+        (__ci_expr_logic_66 = 0)
         if ((if (*__local_F__goto_692_12).temp_32[2] != __local_cc__goto_1520_18: 1 else: 0) != 0) {
-            (__ci_expr_logic_68 = (if (if (*__local_F__goto_692_12).temp_32[3] != __local_cc__goto_1520_18: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_66 = (if (if (*__local_F__goto_692_12).temp_32[3] != __local_cc__goto_1520_18: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_68 != 0) {
+        if (__ci_expr_logic_66 != 0) {
             goto '__ci_bb_525
         } else {
             goto '__ci_bb_526
@@ -7755,20 +7554,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_515 {
-        (__ci_expr_logic_67 = 0)
+        (__ci_expr_logic_65 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_66: c_int
+            var __ci_expr_logic_64: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_66 = (if true: 1 else: 0))
+                (__ci_expr_logic_64 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_66 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_64 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_67 = (if __ci_expr_logic_66 != 0: 1 else: 0))
+            (__ci_expr_logic_65 = (if __ci_expr_logic_64 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_67 != 0) {
+        if (__ci_expr_logic_65 != 0) {
             goto '__ci_bb_518
         } else {
             goto '__ci_bb_519
@@ -7896,9 +7695,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_544 {
-        (__ci_expr_old_69 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_67 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_69 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_67 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_548
         } else {
             goto '__ci_bb_549
@@ -7933,11 +7732,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_554 {
         (__local_cc__goto_1536_20 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_72 = 0)
+        (__ci_expr_logic_70 = 0)
         if ((if (*__local_F__goto_692_12).temp_32[2] != __local_cc__goto_1536_20: 1 else: 0) != 0) {
-            (__ci_expr_logic_72 = (if (if (*__local_F__goto_692_12).temp_32[3] != __local_cc__goto_1536_20: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_70 = (if (if (*__local_F__goto_692_12).temp_32[3] != __local_cc__goto_1536_20: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_72 != 0) {
+        if (__ci_expr_logic_70 != 0) {
             goto '__ci_bb_565
         } else {
             goto '__ci_bb_566
@@ -7945,20 +7744,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_555 {
-        (__ci_expr_logic_71 = 0)
+        (__ci_expr_logic_69 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_70: c_int
+            var __ci_expr_logic_68: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_70 = (if true: 1 else: 0))
+                (__ci_expr_logic_68 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_70 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_68 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_71 = (if __ci_expr_logic_70 != 0: 1 else: 0))
+            (__ci_expr_logic_69 = (if __ci_expr_logic_68 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_71 != 0) {
+        if (__ci_expr_logic_69 != 0) {
             goto '__ci_bb_558
         } else {
             goto '__ci_bb_559
@@ -8052,11 +7851,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_575 {
         (__local_cc__goto_1557_20 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_75 = 0)
+        (__ci_expr_logic_73 = 0)
         if ((if (*__local_F__goto_692_12).temp_32[2] != __local_cc__goto_1557_20: 1 else: 0) != 0) {
-            (__ci_expr_logic_75 = (if (if (*__local_F__goto_692_12).temp_32[3] != __local_cc__goto_1557_20: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_73 = (if (if (*__local_F__goto_692_12).temp_32[3] != __local_cc__goto_1557_20: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_75 != 0) {
+        if (__ci_expr_logic_73 != 0) {
             goto '__ci_bb_583
         } else {
             goto '__ci_bb_584
@@ -8064,20 +7863,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_576 {
-        (__ci_expr_logic_74 = 0)
+        (__ci_expr_logic_72 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_73: c_int
+            var __ci_expr_logic_71: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_73 = (if true: 1 else: 0))
+                (__ci_expr_logic_71 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_73 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_71 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_74 = (if __ci_expr_logic_73 != 0: 1 else: 0))
+            (__ci_expr_logic_72 = (if __ci_expr_logic_71 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_74 != 0) {
+        if (__ci_expr_logic_72 != 0) {
             goto '__ci_bb_579
         } else {
             goto '__ci_bb_580
@@ -8236,9 +8035,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_607 {
-        (__ci_expr_old_78 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_76 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        if ((if (*__local_F__goto_692_12).temp_32[2] != (*__ci_expr_old_78): 1 else: 0) != 0) {
+        if ((if (*__local_F__goto_692_12).temp_32[2] != (*__ci_expr_old_76): 1 else: 0) != 0) {
             goto '__ci_bb_618
         } else {
             goto '__ci_bb_619
@@ -8246,20 +8045,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_608 {
-        (__ci_expr_logic_77 = 0)
+        (__ci_expr_logic_75 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_76: c_int
+            var __ci_expr_logic_74: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_76 = (if true: 1 else: 0))
+                (__ci_expr_logic_74 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_76 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_74 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_77 = (if __ci_expr_logic_76 != 0: 1 else: 0))
+            (__ci_expr_logic_75 = (if __ci_expr_logic_74 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_77 != 0) {
+        if (__ci_expr_logic_75 != 0) {
             goto '__ci_bb_611
         } else {
             goto '__ci_bb_612
@@ -8386,9 +8185,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_637 {
-        (__ci_expr_old_79 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_77 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_79 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_77 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_641
         } else {
             goto '__ci_bb_642
@@ -8422,9 +8221,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_647 {
-        (__ci_expr_old_82 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_80 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        if ((if (*__local_F__goto_692_12).temp_32[2] != (*__ci_expr_old_82): 1 else: 0) != 0) {
+        if ((if (*__local_F__goto_692_12).temp_32[2] != (*__ci_expr_old_80): 1 else: 0) != 0) {
             goto '__ci_bb_658
         } else {
             goto '__ci_bb_659
@@ -8432,20 +8231,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_648 {
-        (__ci_expr_logic_81 = 0)
+        (__ci_expr_logic_79 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_80: c_int
+            var __ci_expr_logic_78: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_80 = (if true: 1 else: 0))
+                (__ci_expr_logic_78 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_80 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_78 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_81 = (if __ci_expr_logic_80 != 0: 1 else: 0))
+            (__ci_expr_logic_79 = (if __ci_expr_logic_78 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_81 != 0) {
+        if (__ci_expr_logic_79 != 0) {
             goto '__ci_bb_651
         } else {
             goto '__ci_bb_652
@@ -8545,20 +8344,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_669 {
-        (__ci_expr_logic_84 = 0)
+        (__ci_expr_logic_82 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_83: c_int
+            var __ci_expr_logic_81: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_83 = (if true: 1 else: 0))
+                (__ci_expr_logic_81 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_83 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_81 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_84 = (if __ci_expr_logic_83 != 0: 1 else: 0))
+            (__ci_expr_logic_82 = (if __ci_expr_logic_81 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_84 != 0) {
+        if (__ci_expr_logic_82 != 0) {
             goto '__ci_bb_672
         } else {
             goto '__ci_bb_673
@@ -8691,14 +8490,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_696 {
-        (__ci_expr_old_87 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_84 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        ((*__local_F__goto_692_12).temp_32[2] = (((*__ci_expr_old_87) as c_uint)))
-        (__ci_expr_logic_88 = 0)
+        ((*__local_F__goto_692_12).temp_32[2] = (((*__ci_expr_old_84) as c_uint)))
+        (__ci_expr_logic_85 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_88 = (if (if (*__local_F__goto_692_12).temp_32[2] >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_85 = (if (if (*__local_F__goto_692_12).temp_32[2] >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_88 != 0) {
+        if (__ci_expr_logic_85 != 0) {
             goto '__ci_bb_704
         } else {
             goto '__ci_bb_705
@@ -8754,15 +8553,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_703 {
-        (__ci_expr_old_85 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_83 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        (__ci_expr_ternary_86 = 0)
-        if ((if (*__local_F__goto_692_12).op >= OP_NOTSTARI: 1 else: 0) != 0) {
-            (__ci_expr_ternary_86 = OP_NOTSTARI)
-        } else {
-            (__ci_expr_ternary_86 = OP_NOTSTAR)
-        }
-        (__local_fc__goto_714_10 = (((((*__ci_expr_old_85) as c_int) - __ci_expr_ternary_86) as c_uint)))
+        (__local_fc__goto_714_10 = (((((*__ci_expr_old_83) as c_int) - (if (if (*__local_F__goto_692_12).op >= OP_NOTSTARI: 1 else: 0) != 0: OP_NOTSTARI else: OP_NOTSTAR)) as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((rep_min[__local_fc__goto_714_10] as c_uint)))
         ((*__local_F__goto_692_12).temp_32[1] = ((rep_max[__local_fc__goto_714_10] as c_uint)))
         (__local_reptype__goto_716_10 = ((rep_typ[__local_fc__goto_714_10] as c_uint)))
@@ -8786,9 +8579,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_706 {
-        (__ci_expr_old_89 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_86 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        ((*__local_F__goto_692_12).temp_32[2] = (((((((((*__local_F__goto_692_12).temp_32[2] as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_89) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[2] = (((((((((*__local_F__goto_692_12).temp_32[2] as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_86) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_708
     }
 
@@ -8857,16 +8650,16 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_718 {
-        (__ci_expr_logic_91 = 0)
+        (__ci_expr_logic_88 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_90 = (if true: 1 else: 0))
+            (__ci_expr_logic_87 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_90 = (if __local_ucp__goto_727_6 != 0: 1 else: 0))
+            (__ci_expr_logic_87 = (if __local_ucp__goto_727_6 != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_90 != 0) {
-            (__ci_expr_logic_91 = (if (if (*__local_F__goto_692_12).temp_32[2] > 127: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_87 != 0) {
+            (__ci_expr_logic_88 = (if (if (*__local_F__goto_692_12).temp_32[2] > 127: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_91 != 0) {
+        if (__ci_expr_logic_88 != 0) {
             goto '__ci_bb_721
         } else {
             goto '__ci_bb_722
@@ -8951,9 +8744,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_732 {
-        (__ci_expr_old_94 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_91 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_d__goto_1755_18 = (((*__ci_expr_old_94) as c_uint)))
+        (__local_d__goto_1755_18 = (((*__ci_expr_old_91) as c_uint)))
         if ((if __local_d__goto_1755_18 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_743
         } else {
@@ -8962,20 +8755,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_733 {
-        (__ci_expr_logic_93 = 0)
+        (__ci_expr_logic_90 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_92: c_int
+            var __ci_expr_logic_89: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_92 = (if true: 1 else: 0))
+                (__ci_expr_logic_89 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_92 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_89 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_93 = (if __ci_expr_logic_92 != 0: 1 else: 0))
+            (__ci_expr_logic_90 = (if __ci_expr_logic_89 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_93 != 0) {
+        if (__ci_expr_logic_90 != 0) {
             goto '__ci_bb_736
         } else {
             goto '__ci_bb_737
@@ -9030,11 +8823,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_744 {
         if ((if (*__local_F__goto_692_12).temp_32[2] == __local_d__goto_1755_18: 1 else: 0) != 0) {
-            (__ci_expr_logic_96 = (if true: 1 else: 0))
+            (__ci_expr_logic_93 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_96 = (if (if (*__local_F__goto_692_12).temp_32[3] == __local_d__goto_1755_18: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_93 = (if (if (*__local_F__goto_692_12).temp_32[3] == __local_d__goto_1755_18: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_96 != 0) {
+        if (__ci_expr_logic_93 != 0) {
             goto '__ci_bb_757
         } else {
             goto '__ci_bb_758
@@ -9042,9 +8835,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_745 {
-        (__ci_expr_old_95 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_92 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_d__goto_1755_18 = ((((((((__local_d__goto_1755_18 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_95) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_d__goto_1755_18 = ((((((((__local_d__goto_1755_18 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_92) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_747
     }
 
@@ -9156,11 +8949,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_767 {
         if ((if (*__local_F__goto_692_12).temp_32[2] == (*((*__local_F__goto_692_12).eptr)): 1 else: 0) != 0) {
-            (__ci_expr_logic_99 = (if true: 1 else: 0))
+            (__ci_expr_logic_96 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_99 = (if (if (*__local_F__goto_692_12).temp_32[3] == (*((*__local_F__goto_692_12).eptr)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_96 = (if (if (*__local_F__goto_692_12).temp_32[3] == (*((*__local_F__goto_692_12).eptr)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_99 != 0) {
+        if (__ci_expr_logic_96 != 0) {
             goto '__ci_bb_778
         } else {
             goto '__ci_bb_779
@@ -9168,20 +8961,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_768 {
-        (__ci_expr_logic_98 = 0)
+        (__ci_expr_logic_95 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_97: c_int
+            var __ci_expr_logic_94: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_97 = (if true: 1 else: 0))
+                (__ci_expr_logic_94 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_97 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_94 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_98 = (if __ci_expr_logic_97 != 0: 1 else: 0))
+            (__ci_expr_logic_95 = (if __ci_expr_logic_94 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_98 != 0) {
+        if (__ci_expr_logic_95 != 0) {
             goto '__ci_bb_771
         } else {
             goto '__ci_bb_772
@@ -9324,9 +9117,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_800 {
-        (__ci_expr_old_100 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_97 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_100 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_97 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_804
         } else {
             goto '__ci_bb_805
@@ -9360,9 +9153,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_810 {
-        (__ci_expr_old_103 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_100 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_d__goto_1791_20 = (((*__ci_expr_old_103) as c_uint)))
+        (__local_d__goto_1791_20 = (((*__ci_expr_old_100) as c_uint)))
         if ((if __local_d__goto_1791_20 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_821
         } else {
@@ -9371,20 +9164,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_811 {
-        (__ci_expr_logic_102 = 0)
+        (__ci_expr_logic_99 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_101: c_int
+            var __ci_expr_logic_98: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_101 = (if true: 1 else: 0))
+                (__ci_expr_logic_98 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_101 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_98 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_102 = (if __ci_expr_logic_101 != 0: 1 else: 0))
+            (__ci_expr_logic_99 = (if __ci_expr_logic_98 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_102 != 0) {
+        if (__ci_expr_logic_99 != 0) {
             goto '__ci_bb_814
         } else {
             goto '__ci_bb_815
@@ -9439,11 +9232,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_822 {
         if ((if (*__local_F__goto_692_12).temp_32[2] == __local_d__goto_1791_20: 1 else: 0) != 0) {
-            (__ci_expr_logic_105 = (if true: 1 else: 0))
+            (__ci_expr_logic_102 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_105 = (if (if (*__local_F__goto_692_12).temp_32[3] == __local_d__goto_1791_20: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_102 = (if (if (*__local_F__goto_692_12).temp_32[3] == __local_d__goto_1791_20: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_105 != 0) {
+        if (__ci_expr_logic_102 != 0) {
             goto '__ci_bb_835
         } else {
             goto '__ci_bb_836
@@ -9451,9 +9244,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_823 {
-        (__ci_expr_old_104 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_101 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_d__goto_1791_20 = ((((((((__local_d__goto_1791_20 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_104) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_d__goto_1791_20 = ((((((((__local_d__goto_1791_20 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_101) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_825
     }
 
@@ -9577,9 +9370,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_849 {
-        (__ci_expr_old_106 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_103 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_106 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_103 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_853
         } else {
             goto '__ci_bb_854
@@ -9614,11 +9407,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_859 {
         if ((if (*__local_F__goto_692_12).temp_32[2] == (*((*__local_F__goto_692_12).eptr)): 1 else: 0) != 0) {
-            (__ci_expr_logic_109 = (if true: 1 else: 0))
+            (__ci_expr_logic_106 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_109 = (if (if (*__local_F__goto_692_12).temp_32[3] == (*((*__local_F__goto_692_12).eptr)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_106 = (if (if (*__local_F__goto_692_12).temp_32[3] == (*((*__local_F__goto_692_12).eptr)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_109 != 0) {
+        if (__ci_expr_logic_106 != 0) {
             goto '__ci_bb_870
         } else {
             goto '__ci_bb_871
@@ -9626,20 +9419,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_860 {
-        (__ci_expr_logic_108 = 0)
+        (__ci_expr_logic_105 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_107: c_int
+            var __ci_expr_logic_104: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_107 = (if true: 1 else: 0))
+                (__ci_expr_logic_104 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_107 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_104 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_108 = (if __ci_expr_logic_107 != 0: 1 else: 0))
+            (__ci_expr_logic_105 = (if __ci_expr_logic_104 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_108 != 0) {
+        if (__ci_expr_logic_105 != 0) {
             goto '__ci_bb_863
         } else {
             goto '__ci_bb_864
@@ -9756,20 +9549,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_884 {
-        (__ci_expr_logic_111 = 0)
+        (__ci_expr_logic_108 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_110: c_int
+            var __ci_expr_logic_107: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_110 = (if true: 1 else: 0))
+                (__ci_expr_logic_107 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_110 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_107 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_111 = (if __ci_expr_logic_110 != 0: 1 else: 0))
+            (__ci_expr_logic_108 = (if __ci_expr_logic_107 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_111 != 0) {
+        if (__ci_expr_logic_108 != 0) {
             goto '__ci_bb_887
         } else {
             goto '__ci_bb_888
@@ -9819,11 +9612,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_892 {
         if ((if (*__local_F__goto_692_12).temp_32[2] == __local_d__goto_1837_20: 1 else: 0) != 0) {
-            (__ci_expr_logic_112 = (if true: 1 else: 0))
+            (__ci_expr_logic_109 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_112 = (if (if (*__local_F__goto_692_12).temp_32[3] == __local_d__goto_1837_20: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_109 = (if (if (*__local_F__goto_692_12).temp_32[3] == __local_d__goto_1837_20: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_112 != 0) {
+        if (__ci_expr_logic_109 != 0) {
             goto '__ci_bb_905
         } else {
             goto '__ci_bb_906
@@ -10037,11 +9830,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_932 {
         if ((if (*__local_F__goto_692_12).temp_32[2] == (*((*__local_F__goto_692_12).eptr)): 1 else: 0) != 0) {
-            (__ci_expr_logic_115 = (if true: 1 else: 0))
+            (__ci_expr_logic_112 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_115 = (if (if (*__local_F__goto_692_12).temp_32[3] == (*((*__local_F__goto_692_12).eptr)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_112 = (if (if (*__local_F__goto_692_12).temp_32[3] == (*((*__local_F__goto_692_12).eptr)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_115 != 0) {
+        if (__ci_expr_logic_112 != 0) {
             goto '__ci_bb_940
         } else {
             goto '__ci_bb_941
@@ -10049,20 +9842,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_933 {
-        (__ci_expr_logic_114 = 0)
+        (__ci_expr_logic_111 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_113: c_int
+            var __ci_expr_logic_110: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_113 = (if true: 1 else: 0))
+                (__ci_expr_logic_110 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_113 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_110 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_114 = (if __ci_expr_logic_113 != 0: 1 else: 0))
+            (__ci_expr_logic_111 = (if __ci_expr_logic_110 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_114 != 0) {
+        if (__ci_expr_logic_111 != 0) {
             goto '__ci_bb_936
         } else {
             goto '__ci_bb_937
@@ -10235,9 +10028,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_967 {
-        (__ci_expr_old_118 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_115 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_d__goto_1897_18 = (((*__ci_expr_old_118) as c_uint)))
+        (__local_d__goto_1897_18 = (((*__ci_expr_old_115) as c_uint)))
         if ((if __local_d__goto_1897_18 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_978
         } else {
@@ -10246,20 +10039,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_968 {
-        (__ci_expr_logic_117 = 0)
+        (__ci_expr_logic_114 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_116: c_int
+            var __ci_expr_logic_113: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_116 = (if true: 1 else: 0))
+                (__ci_expr_logic_113 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_116 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_113 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_117 = (if __ci_expr_logic_116 != 0: 1 else: 0))
+            (__ci_expr_logic_114 = (if __ci_expr_logic_113 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_117 != 0) {
+        if (__ci_expr_logic_114 != 0) {
             goto '__ci_bb_971
         } else {
             goto '__ci_bb_972
@@ -10321,9 +10114,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_980 {
-        (__ci_expr_old_119 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_116 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_d__goto_1897_18 = ((((((((__local_d__goto_1897_18 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_119) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_d__goto_1897_18 = ((((((((__local_d__goto_1897_18 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_116) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_982
     }
 
@@ -10434,9 +10227,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1002 {
-        (__ci_expr_old_122 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_119 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        if ((if (*__local_F__goto_692_12).temp_32[2] == (*__ci_expr_old_122): 1 else: 0) != 0) {
+        if ((if (*__local_F__goto_692_12).temp_32[2] == (*__ci_expr_old_119): 1 else: 0) != 0) {
             goto '__ci_bb_1013
         } else {
             goto '__ci_bb_1014
@@ -10444,20 +10237,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1003 {
-        (__ci_expr_logic_121 = 0)
+        (__ci_expr_logic_118 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_120: c_int
+            var __ci_expr_logic_117: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_120 = (if true: 1 else: 0))
+                (__ci_expr_logic_117 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_120 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_117 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_121 = (if __ci_expr_logic_120 != 0: 1 else: 0))
+            (__ci_expr_logic_118 = (if __ci_expr_logic_117 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_121 != 0) {
+        if (__ci_expr_logic_118 != 0) {
             goto '__ci_bb_1006
         } else {
             goto '__ci_bb_1007
@@ -10599,9 +10392,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1035 {
-        (__ci_expr_old_123 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_120 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_123 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_120 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_1039
         } else {
             goto '__ci_bb_1040
@@ -10635,9 +10428,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1045 {
-        (__ci_expr_old_126 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_123 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_d__goto_1931_20 = (((*__ci_expr_old_126) as c_uint)))
+        (__local_d__goto_1931_20 = (((*__ci_expr_old_123) as c_uint)))
         if ((if __local_d__goto_1931_20 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_1056
         } else {
@@ -10646,20 +10439,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1046 {
-        (__ci_expr_logic_125 = 0)
+        (__ci_expr_logic_122 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_124: c_int
+            var __ci_expr_logic_121: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_124 = (if true: 1 else: 0))
+                (__ci_expr_logic_121 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_124 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_121 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_125 = (if __ci_expr_logic_124 != 0: 1 else: 0))
+            (__ci_expr_logic_122 = (if __ci_expr_logic_121 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_125 != 0) {
+        if (__ci_expr_logic_122 != 0) {
             goto '__ci_bb_1049
         } else {
             goto '__ci_bb_1050
@@ -10721,9 +10514,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1058 {
-        (__ci_expr_old_127 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_124 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_d__goto_1931_20 = ((((((((__local_d__goto_1931_20 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_127) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_d__goto_1931_20 = ((((((((__local_d__goto_1931_20 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_124) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1060
     }
 
@@ -10847,9 +10640,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1084 {
-        (__ci_expr_old_128 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_125 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_128 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_125 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_1088
         } else {
             goto '__ci_bb_1089
@@ -10883,9 +10676,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1094 {
-        (__ci_expr_old_131 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_128 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        if ((if (*__local_F__goto_692_12).temp_32[2] == (*__ci_expr_old_131): 1 else: 0) != 0) {
+        if ((if (*__local_F__goto_692_12).temp_32[2] == (*__ci_expr_old_128): 1 else: 0) != 0) {
             goto '__ci_bb_1105
         } else {
             goto '__ci_bb_1106
@@ -10893,20 +10686,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1095 {
-        (__ci_expr_logic_130 = 0)
+        (__ci_expr_logic_127 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_129: c_int
+            var __ci_expr_logic_126: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_129 = (if true: 1 else: 0))
+                (__ci_expr_logic_126 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_129 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_126 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_130 = (if __ci_expr_logic_129 != 0: 1 else: 0))
+            (__ci_expr_logic_127 = (if __ci_expr_logic_126 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_130 != 0) {
+        if (__ci_expr_logic_127 != 0) {
             goto '__ci_bb_1098
         } else {
             goto '__ci_bb_1099
@@ -11022,20 +10815,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1119 {
-        (__ci_expr_logic_133 = 0)
+        (__ci_expr_logic_130 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_132: c_int
+            var __ci_expr_logic_129: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_132 = (if true: 1 else: 0))
+                (__ci_expr_logic_129 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_132 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_129 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_133 = (if __ci_expr_logic_132 != 0: 1 else: 0))
+            (__ci_expr_logic_130 = (if __ci_expr_logic_129 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_133 != 0) {
+        if (__ci_expr_logic_130 != 0) {
             goto '__ci_bb_1122
         } else {
             goto '__ci_bb_1123
@@ -11305,20 +11098,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1168 {
-        (__ci_expr_logic_135 = 0)
+        (__ci_expr_logic_132 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_134: c_int
+            var __ci_expr_logic_131: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_134 = (if true: 1 else: 0))
+                (__ci_expr_logic_131 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_134 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_131 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_135 = (if __ci_expr_logic_134 != 0: 1 else: 0))
+            (__ci_expr_logic_132 = (if __ci_expr_logic_131 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_135 != 0) {
+        if (__ci_expr_logic_132 != 0) {
             goto '__ci_bb_1171
         } else {
             goto '__ci_bb_1172
@@ -11466,9 +11259,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1197 {
-        (__ci_expr_old_136 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_133 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        (__local_fc__goto_714_10 = (((((*__ci_expr_old_136) as c_int) - OP_CRSTAR) as c_uint)))
+        (__local_fc__goto_714_10 = (((((*__ci_expr_old_133) as c_int) - OP_CRSTAR) as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((rep_min[__local_fc__goto_714_10] as c_uint)))
         ((*__local_F__goto_692_12).temp_32[1] = ((rep_max[__local_fc__goto_714_10] as c_uint)))
         (__local_reptype__goto_716_10 = ((rep_typ[__local_fc__goto_714_10] as c_uint)))
@@ -11638,9 +11431,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1221 {
-        (__ci_expr_old_139 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_136 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_139) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_136) as c_uint)))
         if ((if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_1232
         } else {
@@ -11649,20 +11442,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1222 {
-        (__ci_expr_logic_138 = 0)
+        (__ci_expr_logic_135 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_137: c_int
+            var __ci_expr_logic_134: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_137 = (if true: 1 else: 0))
+                (__ci_expr_logic_134 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_137 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_134 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_138 = (if __ci_expr_logic_137 != 0: 1 else: 0))
+            (__ci_expr_logic_135 = (if __ci_expr_logic_134 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_138 != 0) {
+        if (__ci_expr_logic_135 != 0) {
             goto '__ci_bb_1225
         } else {
             goto '__ci_bb_1226
@@ -11724,9 +11517,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1234 {
-        (__ci_expr_old_140 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_137 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_140) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_137) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1236
     }
 
@@ -11870,9 +11663,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1264 {
-        (__ci_expr_old_143 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_140 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_143) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_140) as c_uint)))
         if ((if (((((*__local_F__goto_692_12).temp_sptr[1][((__local_fc__goto_714_10 as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_fc__goto_714_10 as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_1275
         } else {
@@ -11881,20 +11674,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1265 {
-        (__ci_expr_logic_142 = 0)
+        (__ci_expr_logic_139 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_141: c_int
+            var __ci_expr_logic_138: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_141 = (if true: 1 else: 0))
+                (__ci_expr_logic_138 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_141 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_138 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_142 = (if __ci_expr_logic_141 != 0: 1 else: 0))
+            (__ci_expr_logic_139 = (if __ci_expr_logic_138 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_142 != 0) {
+        if (__ci_expr_logic_139 != 0) {
             goto '__ci_bb_1268
         } else {
             goto '__ci_bb_1269
@@ -12032,9 +11825,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1297 {
-        (__ci_expr_old_144 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_141 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_144 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_141 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_1301
         } else {
             goto '__ci_bb_1302
@@ -12068,9 +11861,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1307 {
-        (__ci_expr_old_147 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_144 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_147) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_144) as c_uint)))
         if ((if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_1318
         } else {
@@ -12079,20 +11872,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1308 {
-        (__ci_expr_logic_146 = 0)
+        (__ci_expr_logic_143 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_145: c_int
+            var __ci_expr_logic_142: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_145 = (if true: 1 else: 0))
+                (__ci_expr_logic_142 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_145 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_142 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_146 = (if __ci_expr_logic_145 != 0: 1 else: 0))
+            (__ci_expr_logic_143 = (if __ci_expr_logic_142 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_146 != 0) {
+        if (__ci_expr_logic_143 != 0) {
             goto '__ci_bb_1311
         } else {
             goto '__ci_bb_1312
@@ -12154,9 +11947,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1320 {
-        (__ci_expr_old_148 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_145 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_148) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_145) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1322
     }
 
@@ -12313,9 +12106,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1354 {
-        (__ci_expr_old_149 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_146 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_149 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_146 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_1358
         } else {
             goto '__ci_bb_1359
@@ -12349,9 +12142,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1364 {
-        (__ci_expr_old_152 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_149 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_152) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_149) as c_uint)))
         if ((if (((((*__local_F__goto_692_12).temp_sptr[1][((__local_fc__goto_714_10 as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_fc__goto_714_10 as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_1375
         } else {
@@ -12360,20 +12153,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1365 {
-        (__ci_expr_logic_151 = 0)
+        (__ci_expr_logic_148 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_150: c_int
+            var __ci_expr_logic_147: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_150 = (if true: 1 else: 0))
+                (__ci_expr_logic_147 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_150 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_147 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_151 = (if __ci_expr_logic_150 != 0: 1 else: 0))
+            (__ci_expr_logic_148 = (if __ci_expr_logic_147 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_151 != 0) {
+        if (__ci_expr_logic_148 != 0) {
             goto '__ci_bb_1368
         } else {
             goto '__ci_bb_1369
@@ -12489,20 +12282,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1389 {
-        (__ci_expr_logic_154 = 0)
+        (__ci_expr_logic_151 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_153: c_int
+            var __ci_expr_logic_150: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_153 = (if true: 1 else: 0))
+                (__ci_expr_logic_150 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_153 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_150 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_154 = (if __ci_expr_logic_153 != 0: 1 else: 0))
+            (__ci_expr_logic_151 = (if __ci_expr_logic_150 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_154 != 0) {
+        if (__ci_expr_logic_151 != 0) {
             goto '__ci_bb_1392
         } else {
             goto '__ci_bb_1393
@@ -12720,9 +12513,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1428 {
-        (__ci_expr_old_155 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_152 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr - 1)
-        if ((if __ci_expr_old_155 <= (*__local_F__goto_692_12).temp_sptr[0]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_152 <= (*__local_F__goto_692_12).temp_sptr[0]: 1 else: 0) != 0) {
             goto '__ci_bb_1432
         } else {
             goto '__ci_bb_1433
@@ -12802,20 +12595,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1443 {
-        (__ci_expr_logic_157 = 0)
+        (__ci_expr_logic_154 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_156: c_int
+            var __ci_expr_logic_153: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_156 = (if true: 1 else: 0))
+                (__ci_expr_logic_153 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_156 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_153 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_157 = (if __ci_expr_logic_156 != 0: 1 else: 0))
+            (__ci_expr_logic_154 = (if __ci_expr_logic_153 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_157 != 0) {
+        if (__ci_expr_logic_154 != 0) {
             goto '__ci_bb_1446
         } else {
             goto '__ci_bb_1447
@@ -12953,9 +12746,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1475 {
-        (__ci_expr_old_158 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_155 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        (__local_fc__goto_714_10 = (((((*__ci_expr_old_158) as c_int) - OP_CRSTAR) as c_uint)))
+        (__local_fc__goto_714_10 = (((((*__ci_expr_old_155) as c_int) - OP_CRSTAR) as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((rep_min[__local_fc__goto_714_10] as c_uint)))
         ((*__local_F__goto_692_12).temp_32[1] = ((rep_max[__local_fc__goto_714_10] as c_uint)))
         (__local_reptype__goto_716_10 = ((rep_typ[__local_fc__goto_714_10] as c_uint)))
@@ -13111,14 +12904,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1496 {
-        (__ci_expr_old_161 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_158 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_161) as c_uint)))
-        (__ci_expr_logic_162 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_158) as c_uint)))
+        (__ci_expr_logic_159 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_162 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_159 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_162 != 0) {
+        if (__ci_expr_logic_159 != 0) {
             goto '__ci_bb_1507
         } else {
             goto '__ci_bb_1508
@@ -13126,20 +12919,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1497 {
-        (__ci_expr_logic_160 = 0)
+        (__ci_expr_logic_157 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_159: c_int
+            var __ci_expr_logic_156: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_159 = (if true: 1 else: 0))
+                (__ci_expr_logic_156 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_159 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_156 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_160 = (if __ci_expr_logic_159 != 0: 1 else: 0))
+            (__ci_expr_logic_157 = (if __ci_expr_logic_156 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_160 != 0) {
+        if (__ci_expr_logic_157 != 0) {
             goto '__ci_bb_1500
         } else {
             goto '__ci_bb_1501
@@ -13201,9 +12994,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1509 {
-        (__ci_expr_old_163 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_160 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_163) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_160) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1511
     }
 
@@ -13349,9 +13142,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1540 {
-        (__ci_expr_old_164 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_161 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_164 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_161 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_1544
         } else {
             goto '__ci_bb_1545
@@ -13385,14 +13178,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1550 {
-        (__ci_expr_old_167 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_164 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_167) as c_uint)))
-        (__ci_expr_logic_168 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_164) as c_uint)))
+        (__ci_expr_logic_165 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_168 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_165 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_168 != 0) {
+        if (__ci_expr_logic_165 != 0) {
             goto '__ci_bb_1561
         } else {
             goto '__ci_bb_1562
@@ -13400,20 +13193,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1551 {
-        (__ci_expr_logic_166 = 0)
+        (__ci_expr_logic_163 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_165: c_int
+            var __ci_expr_logic_162: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_165 = (if true: 1 else: 0))
+                (__ci_expr_logic_162 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_165 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_162 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_166 = (if __ci_expr_logic_165 != 0: 1 else: 0))
+            (__ci_expr_logic_163 = (if __ci_expr_logic_162 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_166 != 0) {
+        if (__ci_expr_logic_163 != 0) {
             goto '__ci_bb_1554
         } else {
             goto '__ci_bb_1555
@@ -13475,9 +13268,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1563 {
-        (__ci_expr_old_169 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_166 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_169) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_166) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1565
     }
 
@@ -13594,11 +13387,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_1585 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_172 = 0)
+        (__ci_expr_logic_169 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_172 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_169 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_172 != 0) {
+        if (__ci_expr_logic_169 != 0) {
             goto '__ci_bb_1593
         } else {
             goto '__ci_bb_1594
@@ -13606,20 +13399,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1586 {
-        (__ci_expr_logic_171 = 0)
+        (__ci_expr_logic_168 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_170: c_int
+            var __ci_expr_logic_167: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_170 = (if true: 1 else: 0))
+                (__ci_expr_logic_167 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_170 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_167 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_171 = (if __ci_expr_logic_170 != 0: 1 else: 0))
+            (__ci_expr_logic_168 = (if __ci_expr_logic_167 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_171 != 0) {
+        if (__ci_expr_logic_168 != 0) {
             goto '__ci_bb_1589
         } else {
             goto '__ci_bb_1590
@@ -13809,9 +13602,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1620 {
-        (__ci_expr_old_173 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_170 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr - 1)
-        if ((if __ci_expr_old_173 <= (*__local_F__goto_692_12).temp_sptr[0]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_170 <= (*__local_F__goto_692_12).temp_sptr[0]: 1 else: 0) != 0) {
             goto '__ci_bb_1624
         } else {
             goto '__ci_bb_1625
@@ -13886,9 +13679,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1640 {
-        (__ci_expr_old_174 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_171 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        (__local_fc__goto_714_10 = (((((*__ci_expr_old_174) as c_int) - OP_CRSTAR) as c_uint)))
+        (__local_fc__goto_714_10 = (((((*__ci_expr_old_171) as c_int) - OP_CRSTAR) as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((rep_min[__local_fc__goto_714_10] as c_uint)))
         ((*__local_F__goto_692_12).temp_32[1] = ((rep_max[__local_fc__goto_714_10] as c_uint)))
         (__local_reptype__goto_716_10 = ((rep_typ[__local_fc__goto_714_10] as c_uint)))
@@ -14044,14 +13837,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1661 {
-        (__ci_expr_old_177 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_174 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_177) as c_uint)))
-        (__ci_expr_logic_178 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_174) as c_uint)))
+        (__ci_expr_logic_175 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_178 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_175 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_178 != 0) {
+        if (__ci_expr_logic_175 != 0) {
             goto '__ci_bb_1672
         } else {
             goto '__ci_bb_1673
@@ -14059,20 +13852,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1662 {
-        (__ci_expr_logic_176 = 0)
+        (__ci_expr_logic_173 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_175: c_int
+            var __ci_expr_logic_172: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_175 = (if true: 1 else: 0))
+                (__ci_expr_logic_172 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_175 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_172 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_176 = (if __ci_expr_logic_175 != 0: 1 else: 0))
+            (__ci_expr_logic_173 = (if __ci_expr_logic_172 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_176 != 0) {
+        if (__ci_expr_logic_173 != 0) {
             goto '__ci_bb_1665
         } else {
             goto '__ci_bb_1666
@@ -14134,9 +13927,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1674 {
-        (__ci_expr_old_179 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_176 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_179) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_176) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1676
     }
 
@@ -14282,9 +14075,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1705 {
-        (__ci_expr_old_180 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_177 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_180 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_177 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_1709
         } else {
             goto '__ci_bb_1710
@@ -14318,14 +14111,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1715 {
-        (__ci_expr_old_183 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_180 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_183) as c_uint)))
-        (__ci_expr_logic_184 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_180) as c_uint)))
+        (__ci_expr_logic_181 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_184 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_181 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_184 != 0) {
+        if (__ci_expr_logic_181 != 0) {
             goto '__ci_bb_1726
         } else {
             goto '__ci_bb_1727
@@ -14333,20 +14126,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1716 {
-        (__ci_expr_logic_182 = 0)
+        (__ci_expr_logic_179 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_181: c_int
+            var __ci_expr_logic_178: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_181 = (if true: 1 else: 0))
+                (__ci_expr_logic_178 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_181 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_178 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_182 = (if __ci_expr_logic_181 != 0: 1 else: 0))
+            (__ci_expr_logic_179 = (if __ci_expr_logic_178 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_182 != 0) {
+        if (__ci_expr_logic_179 != 0) {
             goto '__ci_bb_1719
         } else {
             goto '__ci_bb_1720
@@ -14408,9 +14201,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1728 {
-        (__ci_expr_old_185 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_182 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_185) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_182) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1730
     }
 
@@ -14527,11 +14320,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_1750 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_188 = 0)
+        (__ci_expr_logic_185 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_188 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_185 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_188 != 0) {
+        if (__ci_expr_logic_185 != 0) {
             goto '__ci_bb_1758
         } else {
             goto '__ci_bb_1759
@@ -14539,20 +14332,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1751 {
-        (__ci_expr_logic_187 = 0)
+        (__ci_expr_logic_184 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_186: c_int
+            var __ci_expr_logic_183: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_186 = (if true: 1 else: 0))
+                (__ci_expr_logic_183 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_186 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_183 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_187 = (if __ci_expr_logic_186 != 0: 1 else: 0))
+            (__ci_expr_logic_184 = (if __ci_expr_logic_183 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_187 != 0) {
+        if (__ci_expr_logic_184 != 0) {
             goto '__ci_bb_1754
         } else {
             goto '__ci_bb_1755
@@ -14742,9 +14535,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1785 {
-        (__ci_expr_old_189 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_186 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr - 1)
-        if ((if __ci_expr_old_189 <= (*__local_F__goto_692_12).temp_sptr[0]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_186 <= (*__local_F__goto_692_12).temp_sptr[0]: 1 else: 0) != 0) {
             goto '__ci_bb_1789
         } else {
             goto '__ci_bb_1790
@@ -14811,14 +14604,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1804 {
-        (__ci_expr_old_192 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_189 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_192) as c_uint)))
-        (__ci_expr_logic_193 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_189) as c_uint)))
+        (__ci_expr_logic_190 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_193 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_190 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_193 != 0) {
+        if (__ci_expr_logic_190 != 0) {
             goto '__ci_bb_1815
         } else {
             goto '__ci_bb_1816
@@ -14826,20 +14619,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1805 {
-        (__ci_expr_logic_191 = 0)
+        (__ci_expr_logic_188 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_190: c_int
+            var __ci_expr_logic_187: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_190 = (if true: 1 else: 0))
+                (__ci_expr_logic_187 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_190 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_187 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_191 = (if __ci_expr_logic_190 != 0: 1 else: 0))
+            (__ci_expr_logic_188 = (if __ci_expr_logic_187 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_191 != 0) {
+        if (__ci_expr_logic_188 != 0) {
             goto '__ci_bb_1808
         } else {
             goto '__ci_bb_1809
@@ -14893,11 +14686,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1816 {
-        (__ci_expr_logic_195 = 0)
+        (__ci_expr_logic_192 = 0)
         if ((if __local_fc__goto_714_10 <= 255: 1 else: 0) != 0) {
-            (__ci_expr_logic_195 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_192 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_195 != 0) {
+        if (__ci_expr_logic_192 != 0) {
             goto '__ci_bb_1829
         } else {
             goto '__ci_bb_1830
@@ -14905,9 +14698,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1817 {
-        (__ci_expr_old_194 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_191 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_194) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_191) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1819
     }
 
@@ -15002,14 +14795,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1836 {
-        (__ci_expr_old_198 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_195 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_198) as c_uint)))
-        (__ci_expr_logic_199 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_195) as c_uint)))
+        (__ci_expr_logic_196 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_199 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_196 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_199 != 0) {
+        if (__ci_expr_logic_196 != 0) {
             goto '__ci_bb_1847
         } else {
             goto '__ci_bb_1848
@@ -15017,20 +14810,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1837 {
-        (__ci_expr_logic_197 = 0)
+        (__ci_expr_logic_194 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_196: c_int
+            var __ci_expr_logic_193: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_196 = (if true: 1 else: 0))
+                (__ci_expr_logic_193 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_196 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_193 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_197 = (if __ci_expr_logic_196 != 0: 1 else: 0))
+            (__ci_expr_logic_194 = (if __ci_expr_logic_193 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_197 != 0) {
+        if (__ci_expr_logic_194 != 0) {
             goto '__ci_bb_1840
         } else {
             goto '__ci_bb_1841
@@ -15085,11 +14878,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_1848 {
         if ((if not ((if __local_fc__goto_714_10 <= 255: 1 else: 0) != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_201 = (if true: 1 else: 0))
+            (__ci_expr_logic_198 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_201 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_198 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_201 != 0) {
+        if (__ci_expr_logic_198 != 0) {
             goto '__ci_bb_1861
         } else {
             goto '__ci_bb_1862
@@ -15097,9 +14890,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1849 {
-        (__ci_expr_old_200 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_197 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_200) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_197) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1851
     }
 
@@ -15194,14 +14987,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1868 {
-        (__ci_expr_old_204 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_201 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_204) as c_uint)))
-        (__ci_expr_logic_205 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_201) as c_uint)))
+        (__ci_expr_logic_202 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_205 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_202 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_205 != 0) {
+        if (__ci_expr_logic_202 != 0) {
             goto '__ci_bb_1879
         } else {
             goto '__ci_bb_1880
@@ -15209,20 +15002,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1869 {
-        (__ci_expr_logic_203 = 0)
+        (__ci_expr_logic_200 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_202: c_int
+            var __ci_expr_logic_199: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_202 = (if true: 1 else: 0))
+                (__ci_expr_logic_199 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_202 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_199 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_203 = (if __ci_expr_logic_202 != 0: 1 else: 0))
+            (__ci_expr_logic_200 = (if __ci_expr_logic_199 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_203 != 0) {
+        if (__ci_expr_logic_200 != 0) {
             goto '__ci_bb_1872
         } else {
             goto '__ci_bb_1873
@@ -15276,11 +15069,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1880 {
-        (__ci_expr_logic_207 = 0)
+        (__ci_expr_logic_204 = 0)
         if ((if __local_fc__goto_714_10 <= 255: 1 else: 0) != 0) {
-            (__ci_expr_logic_207 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_204 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_207 != 0) {
+        if (__ci_expr_logic_204 != 0) {
             goto '__ci_bb_1893
         } else {
             goto '__ci_bb_1894
@@ -15288,9 +15081,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1881 {
-        (__ci_expr_old_206 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_203 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_206) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_203) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1883
     }
 
@@ -15385,14 +15178,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1900 {
-        (__ci_expr_old_210 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_207 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_210) as c_uint)))
-        (__ci_expr_logic_211 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_207) as c_uint)))
+        (__ci_expr_logic_208 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_211 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_208 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_211 != 0) {
+        if (__ci_expr_logic_208 != 0) {
             goto '__ci_bb_1911
         } else {
             goto '__ci_bb_1912
@@ -15400,20 +15193,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1901 {
-        (__ci_expr_logic_209 = 0)
+        (__ci_expr_logic_206 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_208: c_int
+            var __ci_expr_logic_205: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_208 = (if true: 1 else: 0))
+                (__ci_expr_logic_205 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_208 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_205 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_209 = (if __ci_expr_logic_208 != 0: 1 else: 0))
+            (__ci_expr_logic_206 = (if __ci_expr_logic_205 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_209 != 0) {
+        if (__ci_expr_logic_206 != 0) {
             goto '__ci_bb_1904
         } else {
             goto '__ci_bb_1905
@@ -15468,11 +15261,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_1912 {
         if ((if not ((if __local_fc__goto_714_10 <= 255: 1 else: 0) != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_213 = (if true: 1 else: 0))
+            (__ci_expr_logic_210 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_213 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_210 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_213 != 0) {
+        if (__ci_expr_logic_210 != 0) {
             goto '__ci_bb_1925
         } else {
             goto '__ci_bb_1926
@@ -15480,9 +15273,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1913 {
-        (__ci_expr_old_212 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_209 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_212) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_209) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1915
     }
 
@@ -15577,14 +15370,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1932 {
-        (__ci_expr_old_216 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_213 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_216) as c_uint)))
-        (__ci_expr_logic_217 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_213) as c_uint)))
+        (__ci_expr_logic_214 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_217 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_214 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_217 != 0) {
+        if (__ci_expr_logic_214 != 0) {
             goto '__ci_bb_1943
         } else {
             goto '__ci_bb_1944
@@ -15592,20 +15385,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1933 {
-        (__ci_expr_logic_215 = 0)
+        (__ci_expr_logic_212 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_214: c_int
+            var __ci_expr_logic_211: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_214 = (if true: 1 else: 0))
+                (__ci_expr_logic_211 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_214 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_211 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_215 = (if __ci_expr_logic_214 != 0: 1 else: 0))
+            (__ci_expr_logic_212 = (if __ci_expr_logic_211 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_215 != 0) {
+        if (__ci_expr_logic_212 != 0) {
             goto '__ci_bb_1936
         } else {
             goto '__ci_bb_1937
@@ -15659,11 +15452,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1944 {
-        (__ci_expr_logic_219 = 0)
+        (__ci_expr_logic_216 = 0)
         if ((if __local_fc__goto_714_10 <= 255: 1 else: 0) != 0) {
-            (__ci_expr_logic_219 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_216 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_219 != 0) {
+        if (__ci_expr_logic_216 != 0) {
             goto '__ci_bb_1957
         } else {
             goto '__ci_bb_1958
@@ -15671,9 +15464,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1945 {
-        (__ci_expr_old_218 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_215 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_218) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_215) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1947
     }
 
@@ -15768,14 +15561,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1964 {
-        (__ci_expr_old_222 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_219 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_222) as c_uint)))
-        (__ci_expr_logic_223 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_219) as c_uint)))
+        (__ci_expr_logic_220 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_223 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_220 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_223 != 0) {
+        if (__ci_expr_logic_220 != 0) {
             goto '__ci_bb_1975
         } else {
             goto '__ci_bb_1976
@@ -15783,20 +15576,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1965 {
-        (__ci_expr_logic_221 = 0)
+        (__ci_expr_logic_218 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_220: c_int
+            var __ci_expr_logic_217: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_220 = (if true: 1 else: 0))
+                (__ci_expr_logic_217 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_220 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_217 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_221 = (if __ci_expr_logic_220 != 0: 1 else: 0))
+            (__ci_expr_logic_218 = (if __ci_expr_logic_217 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_221 != 0) {
+        if (__ci_expr_logic_218 != 0) {
             goto '__ci_bb_1968
         } else {
             goto '__ci_bb_1969
@@ -15851,11 +15644,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_1976 {
         if ((if not ((if __local_fc__goto_714_10 <= 255: 1 else: 0) != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_225 = (if true: 1 else: 0))
+            (__ci_expr_logic_222 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_225 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_222 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_225 != 0) {
+        if (__ci_expr_logic_222 != 0) {
             goto '__ci_bb_1989
         } else {
             goto '__ci_bb_1990
@@ -15863,9 +15656,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1977 {
-        (__ci_expr_old_224 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_221 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_224) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_221) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_1979
     }
 
@@ -15960,14 +15753,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1996 {
-        (__ci_expr_old_228 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_225 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_228) as c_uint)))
-        (__ci_expr_logic_229 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_225) as c_uint)))
+        (__ci_expr_logic_226 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_229 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_226 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_229 != 0) {
+        if (__ci_expr_logic_226 != 0) {
             goto '__ci_bb_2007
         } else {
             goto '__ci_bb_2008
@@ -15975,20 +15768,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1997 {
-        (__ci_expr_logic_227 = 0)
+        (__ci_expr_logic_224 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_226: c_int
+            var __ci_expr_logic_223: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_226 = (if true: 1 else: 0))
+                (__ci_expr_logic_223 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_226 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_223 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_227 = (if __ci_expr_logic_226 != 0: 1 else: 0))
+            (__ci_expr_logic_224 = (if __ci_expr_logic_223 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_227 != 0) {
+        if (__ci_expr_logic_224 != 0) {
             goto '__ci_bb_2000
         } else {
             goto '__ci_bb_2001
@@ -16046,9 +15839,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2009 {
-        (__ci_expr_old_230 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_227 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_230) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_227) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2011
     }
 
@@ -16163,20 +15956,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2031 {
-        (__ci_expr_logic_232 = 0)
+        (__ci_expr_logic_229 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_231: c_int
+            var __ci_expr_logic_228: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_231 = (if true: 1 else: 0))
+                (__ci_expr_logic_228 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_231 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_228 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_232 = (if __ci_expr_logic_231 != 0: 1 else: 0))
+            (__ci_expr_logic_229 = (if __ci_expr_logic_228 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_232 != 0) {
+        if (__ci_expr_logic_229 != 0) {
             goto '__ci_bb_2034
         } else {
             goto '__ci_bb_2035
@@ -16311,14 +16104,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2055 {
-        (__ci_expr_old_235 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_232 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_235) as c_uint)))
-        (__ci_expr_logic_236 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_232) as c_uint)))
+        (__ci_expr_logic_233 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_236 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_233 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_236 != 0) {
+        if (__ci_expr_logic_233 != 0) {
             goto '__ci_bb_2066
         } else {
             goto '__ci_bb_2067
@@ -16326,20 +16119,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2056 {
-        (__ci_expr_logic_234 = 0)
+        (__ci_expr_logic_231 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_233: c_int
+            var __ci_expr_logic_230: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_233 = (if true: 1 else: 0))
+                (__ci_expr_logic_230 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_233 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_230 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_234 = (if __ci_expr_logic_233 != 0: 1 else: 0))
+            (__ci_expr_logic_231 = (if __ci_expr_logic_230 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_234 != 0) {
+        if (__ci_expr_logic_231 != 0) {
             goto '__ci_bb_2059
         } else {
             goto '__ci_bb_2060
@@ -16397,9 +16190,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2068 {
-        (__ci_expr_old_237 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_234 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_237) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_234) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2070
     }
 
@@ -16650,14 +16443,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2107 {
-        (__ci_expr_old_240 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_237 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_240) as c_uint)))
-        (__ci_expr_logic_241 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_237) as c_uint)))
+        (__ci_expr_logic_238 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_241 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_238 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_241 != 0) {
+        if (__ci_expr_logic_238 != 0) {
             goto '__ci_bb_2118
         } else {
             goto '__ci_bb_2119
@@ -16665,20 +16458,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2108 {
-        (__ci_expr_logic_239 = 0)
+        (__ci_expr_logic_236 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_238: c_int
+            var __ci_expr_logic_235: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_238 = (if true: 1 else: 0))
+                (__ci_expr_logic_235 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_238 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_235 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_239 = (if __ci_expr_logic_238 != 0: 1 else: 0))
+            (__ci_expr_logic_236 = (if __ci_expr_logic_235 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_239 != 0) {
+        if (__ci_expr_logic_236 != 0) {
             goto '__ci_bb_2111
         } else {
             goto '__ci_bb_2112
@@ -16736,9 +16529,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2120 {
-        (__ci_expr_old_242 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_239 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_242) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_239) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2122
     }
 
@@ -16989,14 +16782,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2159 {
-        (__ci_expr_old_245 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_242 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_245) as c_uint)))
-        (__ci_expr_logic_246 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_242) as c_uint)))
+        (__ci_expr_logic_243 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_246 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_243 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_246 != 0) {
+        if (__ci_expr_logic_243 != 0) {
             goto '__ci_bb_2170
         } else {
             goto '__ci_bb_2171
@@ -17004,20 +16797,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2160 {
-        (__ci_expr_logic_244 = 0)
+        (__ci_expr_logic_241 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_243: c_int
+            var __ci_expr_logic_240: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_243 = (if true: 1 else: 0))
+                (__ci_expr_logic_240 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_243 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_240 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_244 = (if __ci_expr_logic_243 != 0: 1 else: 0))
+            (__ci_expr_logic_241 = (if __ci_expr_logic_240 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_244 != 0) {
+        if (__ci_expr_logic_241 != 0) {
             goto '__ci_bb_2163
         } else {
             goto '__ci_bb_2164
@@ -17075,9 +16868,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2172 {
-        (__ci_expr_old_247 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_244 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_247) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_244) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2174
     }
 
@@ -17232,14 +17025,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2199 {
-        (__ci_expr_old_250 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_247 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_250) as c_uint)))
-        (__ci_expr_logic_251 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_247) as c_uint)))
+        (__ci_expr_logic_248 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_251 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_248 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_251 != 0) {
+        if (__ci_expr_logic_248 != 0) {
             goto '__ci_bb_2210
         } else {
             goto '__ci_bb_2211
@@ -17247,20 +17040,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2200 {
-        (__ci_expr_logic_249 = 0)
+        (__ci_expr_logic_246 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_248: c_int
+            var __ci_expr_logic_245: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_248 = (if true: 1 else: 0))
+                (__ci_expr_logic_245 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_248 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_245 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_249 = (if __ci_expr_logic_248 != 0: 1 else: 0))
+            (__ci_expr_logic_246 = (if __ci_expr_logic_245 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_249 != 0) {
+        if (__ci_expr_logic_246 != 0) {
             goto '__ci_bb_2203
         } else {
             goto '__ci_bb_2204
@@ -17318,9 +17111,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2212 {
-        (__ci_expr_old_252 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_249 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_252) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_249) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2214
     }
 
@@ -17475,14 +17268,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2239 {
-        (__ci_expr_old_255 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_252 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_255) as c_uint)))
-        (__ci_expr_logic_256 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_252) as c_uint)))
+        (__ci_expr_logic_253 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_256 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_253 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_256 != 0) {
+        if (__ci_expr_logic_253 != 0) {
             goto '__ci_bb_2250
         } else {
             goto '__ci_bb_2251
@@ -17490,20 +17283,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2240 {
-        (__ci_expr_logic_254 = 0)
+        (__ci_expr_logic_251 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_253: c_int
+            var __ci_expr_logic_250: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_253 = (if true: 1 else: 0))
+                (__ci_expr_logic_250 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_253 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_250 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_254 = (if __ci_expr_logic_253 != 0: 1 else: 0))
+            (__ci_expr_logic_251 = (if __ci_expr_logic_250 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_254 != 0) {
+        if (__ci_expr_logic_251 != 0) {
             goto '__ci_bb_2243
         } else {
             goto '__ci_bb_2244
@@ -17563,9 +17356,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2252 {
-        (__ci_expr_old_257 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_254 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_257) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_254) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2254
     }
 
@@ -17649,16 +17442,16 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_2266 {
         (__local_chartype__goto_2756_16 = (((*__local_prop__goto_2757_25).chartype as c_uint)))
         if ((if __local_chartype__goto_2756_16 == 9: 1 else: 0) != 0) {
-            (__ci_expr_logic_258 = (if true: 1 else: 0))
+            (__ci_expr_logic_255 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_258 = (if (if __local_chartype__goto_2756_16 == 5: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_255 = (if (if __local_chartype__goto_2756_16 == 5: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_258 != 0) {
-            (__ci_expr_logic_259 = (if true: 1 else: 0))
+        if (__ci_expr_logic_255 != 0) {
+            (__ci_expr_logic_256 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_259 = (if (if __local_chartype__goto_2756_16 == 8: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_256 = (if (if __local_chartype__goto_2756_16 == 8: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_259 == __local_notmatch__goto_2758_12: 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_256 == __local_notmatch__goto_2758_12: 1 else: 0) != 0) {
             goto '__ci_bb_2267
         } else {
             goto '__ci_bb_2268
@@ -17743,11 +17536,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_2290 {
         if ((if ((*__local_F__goto_692_12).ecode[2]) == (*__local_prop__goto_2757_25).script: 1 else: 0) != 0) {
-            (__ci_expr_logic_260 = (if true: 1 else: 0))
+            (__ci_expr_logic_257 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_260 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_2757_25).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[((((*__local_F__goto_692_12).ecode[2]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << (((((*__local_F__goto_692_12).ecode[2]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_257 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_2757_25).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[((((*__local_F__goto_692_12).ecode[2]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << (((((*__local_F__goto_692_12).ecode[2]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_ok__goto_2787_16 = __ci_expr_logic_260)
+        (__local_ok__goto_2787_16 = __ci_expr_logic_257)
         if ((if __local_ok__goto_2787_16 == __local_notmatch__goto_2758_12: 1 else: 0) != 0) {
             goto '__ci_bb_2291
         } else {
@@ -17771,11 +17564,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_2296 {
         (__local_chartype__goto_2756_16 = (((*__local_prop__goto_2757_25).chartype as c_uint)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_2756_16] == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_261 = (if true: 1 else: 0))
+            (__ci_expr_logic_258 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_261 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_2756_16] == 3: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_258 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_2756_16] == 3: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_261 == __local_notmatch__goto_2758_12: 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_258 == __local_notmatch__goto_2758_12: 1 else: 0) != 0) {
             goto '__ci_bb_2297
         } else {
             goto '__ci_bb_2298
@@ -18056,21 +17849,21 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_2342 {
         (__local_chartype__goto_2756_16 = (((*__local_prop__goto_2757_25).chartype as c_uint)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_2756_16] == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_262 = (if true: 1 else: 0))
+            (__ci_expr_logic_259 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_262 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_2756_16] == 3: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_259 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_2756_16] == 3: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_262 != 0) {
-            (__ci_expr_logic_263 = (if true: 1 else: 0))
+        if (__ci_expr_logic_259 != 0) {
+            (__ci_expr_logic_260 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_263 = (if (if __local_chartype__goto_2756_16 == 12: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_260 = (if (if __local_chartype__goto_2756_16 == 12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_263 != 0) {
-            (__ci_expr_logic_264 = (if true: 1 else: 0))
+        if (__ci_expr_logic_260 != 0) {
+            (__ci_expr_logic_261 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_264 = (if (if __local_chartype__goto_2756_16 == 16: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_261 = (if (if __local_chartype__goto_2756_16 == 16: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_264 == __local_notmatch__goto_2758_12: 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_261 == __local_notmatch__goto_2758_12: 1 else: 0) != 0) {
             goto '__ci_bb_2343
         } else {
             goto '__ci_bb_2344
@@ -18124,9 +17917,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2354 {
-        (__ci_expr_old_265 = __local_cp__goto_2755_23)
+        (__ci_expr_old_262 = __local_cp__goto_2755_23)
         (__local_cp__goto_2755_23 = __local_cp__goto_2755_23 + 1)
-        if ((if __local_fc__goto_714_10 == (*__ci_expr_old_265): 1 else: 0) != 0) {
+        if ((if __local_fc__goto_714_10 == (*__ci_expr_old_262): 1 else: 0) != 0) {
             goto '__ci_bb_2361
         } else {
             goto '__ci_bb_2362
@@ -18173,33 +17966,33 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_2369 {
         if ((if __local_fc__goto_714_10 == 36: 1 else: 0) != 0) {
+            (__ci_expr_logic_263 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_263 = (if (if __local_fc__goto_714_10 == 64: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_263 != 0) {
+            (__ci_expr_logic_264 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_264 = (if (if __local_fc__goto_714_10 == 96: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_264 != 0) {
             (__ci_expr_logic_266 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_266 = (if (if __local_fc__goto_714_10 == 64: 1 else: 0) != 0: 1 else: 0))
+            var __ci_expr_logic_265: c_int = 0
+
+            if ((if __local_fc__goto_714_10 >= 160: 1 else: 0) != 0) {
+                (__ci_expr_logic_265 = (if (if __local_fc__goto_714_10 <= 55295: 1 else: 0) != 0: 1 else: 0))
+            }
+
+            (__ci_expr_logic_266 = (if __ci_expr_logic_265 != 0: 1 else: 0))
+
         }
         if (__ci_expr_logic_266 != 0) {
             (__ci_expr_logic_267 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_267 = (if (if __local_fc__goto_714_10 == 96: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_267 = (if (if __local_fc__goto_714_10 >= 57344: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_267 != 0) {
-            (__ci_expr_logic_269 = (if true: 1 else: 0))
-        } else {
-            var __ci_expr_logic_268: c_int = 0
-
-            if ((if __local_fc__goto_714_10 >= 160: 1 else: 0) != 0) {
-                (__ci_expr_logic_268 = (if (if __local_fc__goto_714_10 <= 55295: 1 else: 0) != 0: 1 else: 0))
-            }
-
-            (__ci_expr_logic_269 = (if __ci_expr_logic_268 != 0: 1 else: 0))
-
-        }
-        if (__ci_expr_logic_269 != 0) {
-            (__ci_expr_logic_270 = (if true: 1 else: 0))
-        } else {
-            (__ci_expr_logic_270 = (if (if __local_fc__goto_714_10 >= 57344: 1 else: 0) != 0: 1 else: 0))
-        }
-        if ((if __ci_expr_logic_270 == __local_notmatch__goto_2758_12: 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_267 == __local_notmatch__goto_2758_12: 1 else: 0) != 0) {
             goto '__ci_bb_2370
         } else {
             goto '__ci_bb_2371
@@ -18391,14 +18184,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2405 {
-        (__ci_expr_old_273 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_270 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_273) as c_uint)))
-        (__ci_expr_logic_274 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_270) as c_uint)))
+        (__ci_expr_logic_271 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_274 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_271 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_274 != 0) {
+        if (__ci_expr_logic_271 != 0) {
             goto '__ci_bb_2417
         } else {
             goto '__ci_bb_2418
@@ -18410,20 +18203,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2407 {
-        (__ci_expr_logic_272 = 0)
+        (__ci_expr_logic_269 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_271: c_int
+            var __ci_expr_logic_268: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_271 = (if true: 1 else: 0))
+                (__ci_expr_logic_268 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_271 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_268 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_272 = (if __ci_expr_logic_271 != 0: 1 else: 0))
+            (__ci_expr_logic_269 = (if __ci_expr_logic_268 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_272 != 0) {
+        if (__ci_expr_logic_269 != 0) {
             goto '__ci_bb_2410
         } else {
             goto '__ci_bb_2411
@@ -18482,9 +18275,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2419 {
-        (__ci_expr_old_275 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_272 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_275) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_272) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2421
     }
 
@@ -18582,20 +18375,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2436 {
-        (__ci_expr_logic_277 = 0)
+        (__ci_expr_logic_274 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_276: c_int
+            var __ci_expr_logic_273: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_276 = (if true: 1 else: 0))
+                (__ci_expr_logic_273 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_276 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_273 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_277 = (if __ci_expr_logic_276 != 0: 1 else: 0))
+            (__ci_expr_logic_274 = (if __ci_expr_logic_273 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_277 != 0) {
+        if (__ci_expr_logic_274 != 0) {
             goto '__ci_bb_2439
         } else {
             goto '__ci_bb_2440
@@ -18643,15 +18436,15 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2444 {
-        (__ci_expr_old_280 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_276 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        ((*__local_F__goto_692_12).temp_32[2] = (((*__ci_expr_old_280) as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[2] = (((*__ci_expr_old_276) as c_uint)))
         if ((if (*__local_F__goto_692_12).temp_32[2] == 16: 1 else: 0) != 0) {
-            (__ci_expr_logic_281 = (if true: 1 else: 0))
+            (__ci_expr_logic_277 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_281 = (if (if (*__local_F__goto_692_12).temp_32[2] == 15: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_277 = (if (if (*__local_F__goto_692_12).temp_32[2] == 15: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_281 != 0) {
+        if (__ci_expr_logic_277 != 0) {
             goto '__ci_bb_2451
         } else {
             goto '__ci_bb_2452
@@ -18661,13 +18454,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_2445 {
         ((*__local_F__goto_692_12).temp_32[0] = ((0 as c_uint)))
         ((*__local_F__goto_692_12).temp_32[1] = ((((((((*__local_F__goto_692_12).ecode[1]) as c_int) << (8 as c_uint)) as c_int) | (((*__local_F__goto_692_12).ecode[(1 + 1)]) as c_int)) as c_uint)))
-        (__ci_expr_ternary_278 = 0)
-        if ((if (*((*__local_F__goto_692_12).ecode)) == OP_TYPEMINUPTO: 1 else: 0) != 0) {
-            (__ci_expr_ternary_278 = REPTYPE_MIN)
-        } else {
-            (__ci_expr_ternary_278 = REPTYPE_MAX)
-        }
-        (__local_reptype__goto_716_10 = ((__ci_expr_ternary_278 as c_uint)))
+        (__local_reptype__goto_716_10 = (((if (if (*((*__local_F__goto_692_12).ecode)) == OP_TYPEMINUPTO: 1 else: 0) != 0: REPTYPE_MIN else: REPTYPE_MAX) as c_uint)))
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + (((1 + 2) as isize) as usize))
         goto '__ci_bb_2444
     }
@@ -18705,9 +18492,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2450 {
-        (__ci_expr_old_279 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_275 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        (__local_fc__goto_714_10 = (((((*__ci_expr_old_279) as c_int) - OP_TYPESTAR) as c_uint)))
+        (__local_fc__goto_714_10 = (((((*__ci_expr_old_275) as c_int) - OP_TYPESTAR) as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((rep_min[__local_fc__goto_714_10] as c_uint)))
         ((*__local_F__goto_692_12).temp_32[1] = ((rep_max[__local_fc__goto_714_10] as c_uint)))
         (__local_reptype__goto_716_10 = ((rep_typ[__local_fc__goto_714_10] as c_uint)))
@@ -18715,12 +18502,12 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2451 {
-        (__ci_expr_old_282 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_278 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        (__local_proptype__goto_710_5 = (((*__ci_expr_old_282) as c_int)))
-        (__ci_expr_old_283 = (*__local_F__goto_692_12).ecode)
+        (__local_proptype__goto_710_5 = (((*__ci_expr_old_278) as c_int)))
+        (__ci_expr_old_279 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        ((*__local_F__goto_692_12).temp_32[3] = (((*__ci_expr_old_283) as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[3] = (((*__ci_expr_old_279) as c_uint)))
         goto '__ci_bb_2453
     }
 
@@ -18817,14 +18604,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2467 {
-        (__ci_expr_old_286 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_282 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_286) as c_uint)))
-        (__ci_expr_logic_287 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_282) as c_uint)))
+        (__ci_expr_logic_283 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_287 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_283 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_287 != 0) {
+        if (__ci_expr_logic_283 != 0) {
             goto '__ci_bb_2478
         } else {
             goto '__ci_bb_2479
@@ -18832,20 +18619,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2468 {
-        (__ci_expr_logic_285 = 0)
+        (__ci_expr_logic_281 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_284: c_int
+            var __ci_expr_logic_280: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_284 = (if true: 1 else: 0))
+                (__ci_expr_logic_280 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_284 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_280 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_285 = (if __ci_expr_logic_284 != 0: 1 else: 0))
+            (__ci_expr_logic_281 = (if __ci_expr_logic_280 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_285 != 0) {
+        if (__ci_expr_logic_281 != 0) {
             goto '__ci_bb_2471
         } else {
             goto '__ci_bb_2472
@@ -18901,16 +18688,16 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_2479 {
         (__local_chartype__goto_3000_17 = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).chartype as c_int)))
         if ((if __local_chartype__goto_3000_17 == ucp_Lu: 1 else: 0) != 0) {
-            (__ci_expr_logic_289 = (if true: 1 else: 0))
+            (__ci_expr_logic_285 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_289 = (if (if __local_chartype__goto_3000_17 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_285 = (if (if __local_chartype__goto_3000_17 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_289 != 0) {
-            (__ci_expr_logic_290 = (if true: 1 else: 0))
+        if (__ci_expr_logic_285 != 0) {
+            (__ci_expr_logic_286 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_290 = (if (if __local_chartype__goto_3000_17 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_286 = (if (if __local_chartype__goto_3000_17 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_290 == __local_notmatch__goto_2994_14: 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_286 == __local_notmatch__goto_2994_14: 1 else: 0) != 0) {
             goto '__ci_bb_2492
         } else {
             goto '__ci_bb_2493
@@ -18918,9 +18705,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2480 {
-        (__ci_expr_old_288 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_284 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_288) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_284) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2482
     }
 
@@ -19036,14 +18823,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2503 {
-        (__ci_expr_old_293 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_289 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_293) as c_uint)))
-        (__ci_expr_logic_294 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_289) as c_uint)))
+        (__ci_expr_logic_290 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_294 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_290 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_294 != 0) {
+        if (__ci_expr_logic_290 != 0) {
             goto '__ci_bb_2514
         } else {
             goto '__ci_bb_2515
@@ -19051,20 +18838,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2504 {
-        (__ci_expr_logic_292 = 0)
+        (__ci_expr_logic_288 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_291: c_int
+            var __ci_expr_logic_287: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_291 = (if true: 1 else: 0))
+                (__ci_expr_logic_287 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_291 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_287 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_292 = (if __ci_expr_logic_291 != 0: 1 else: 0))
+            (__ci_expr_logic_288 = (if __ci_expr_logic_287 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_292 != 0) {
+        if (__ci_expr_logic_288 != 0) {
             goto '__ci_bb_2507
         } else {
             goto '__ci_bb_2508
@@ -19126,9 +18913,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2516 {
-        (__ci_expr_old_295 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_291 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_295) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_291) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2518
     }
 
@@ -19244,14 +19031,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2539 {
-        (__ci_expr_old_298 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_294 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_298) as c_uint)))
-        (__ci_expr_logic_299 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_294) as c_uint)))
+        (__ci_expr_logic_295 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_299 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_295 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_299 != 0) {
+        if (__ci_expr_logic_295 != 0) {
             goto '__ci_bb_2550
         } else {
             goto '__ci_bb_2551
@@ -19259,20 +19046,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2540 {
-        (__ci_expr_logic_297 = 0)
+        (__ci_expr_logic_293 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_296: c_int
+            var __ci_expr_logic_292: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_296 = (if true: 1 else: 0))
+                (__ci_expr_logic_292 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_296 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_292 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_297 = (if __ci_expr_logic_296 != 0: 1 else: 0))
+            (__ci_expr_logic_293 = (if __ci_expr_logic_292 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_297 != 0) {
+        if (__ci_expr_logic_293 != 0) {
             goto '__ci_bb_2543
         } else {
             goto '__ci_bb_2544
@@ -19334,9 +19121,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2552 {
-        (__ci_expr_old_300 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_296 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_300) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_296) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2554
     }
 
@@ -19452,14 +19239,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2575 {
-        (__ci_expr_old_303 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_299 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_303) as c_uint)))
-        (__ci_expr_logic_304 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_299) as c_uint)))
+        (__ci_expr_logic_300 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_304 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_300 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_304 != 0) {
+        if (__ci_expr_logic_300 != 0) {
             goto '__ci_bb_2586
         } else {
             goto '__ci_bb_2587
@@ -19467,20 +19254,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2576 {
-        (__ci_expr_logic_302 = 0)
+        (__ci_expr_logic_298 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_301: c_int
+            var __ci_expr_logic_297: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_301 = (if true: 1 else: 0))
+                (__ci_expr_logic_297 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_301 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_297 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_302 = (if __ci_expr_logic_301 != 0: 1 else: 0))
+            (__ci_expr_logic_298 = (if __ci_expr_logic_297 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_302 != 0) {
+        if (__ci_expr_logic_298 != 0) {
             goto '__ci_bb_2579
         } else {
             goto '__ci_bb_2580
@@ -19542,9 +19329,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2588 {
-        (__ci_expr_old_305 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_301 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_305) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_301) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2590
     }
 
@@ -19660,14 +19447,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2611 {
-        (__ci_expr_old_308 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_304 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_308) as c_uint)))
-        (__ci_expr_logic_309 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_304) as c_uint)))
+        (__ci_expr_logic_305 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_309 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_305 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_309 != 0) {
+        if (__ci_expr_logic_305 != 0) {
             goto '__ci_bb_2622
         } else {
             goto '__ci_bb_2623
@@ -19675,20 +19462,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2612 {
-        (__ci_expr_logic_307 = 0)
+        (__ci_expr_logic_303 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_306: c_int
+            var __ci_expr_logic_302: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_306 = (if true: 1 else: 0))
+                (__ci_expr_logic_302 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_306 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_302 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_307 = (if __ci_expr_logic_306 != 0: 1 else: 0))
+            (__ci_expr_logic_303 = (if __ci_expr_logic_302 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_307 != 0) {
+        if (__ci_expr_logic_303 != 0) {
             goto '__ci_bb_2615
         } else {
             goto '__ci_bb_2616
@@ -19744,11 +19531,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_2623 {
         (__local_prop__goto_3061_31 = (&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize))
         if ((if (*__local_prop__goto_3061_31).script == (*__local_F__goto_692_12).temp_32[3]: 1 else: 0) != 0) {
-            (__ci_expr_logic_311 = (if true: 1 else: 0))
+            (__ci_expr_logic_307 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_311 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_3061_31).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((*__local_F__goto_692_12).temp_32[3] as c_uint) / (32 as c_uint))]) as c_uint) & (((1 as c_uint) << ((((*__local_F__goto_692_12).temp_32[3] as c_uint) % (32 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_307 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_3061_31).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((*__local_F__goto_692_12).temp_32[3] as c_uint) / (32 as c_uint))]) as c_uint) & (((1 as c_uint) << ((((*__local_F__goto_692_12).temp_32[3] as c_uint) % (32 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_ok__goto_3060_18 = __ci_expr_logic_311)
+        (__local_ok__goto_3060_18 = __ci_expr_logic_307)
         if ((if __local_ok__goto_3060_18 == __local_notmatch__goto_2994_14: 1 else: 0) != 0) {
             goto '__ci_bb_2636
         } else {
@@ -19757,9 +19544,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2624 {
-        (__ci_expr_old_310 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_306 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_310) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_306) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2626
     }
 
@@ -19875,14 +19662,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2647 {
-        (__ci_expr_old_314 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_310 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_314) as c_uint)))
-        (__ci_expr_logic_315 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_310) as c_uint)))
+        (__ci_expr_logic_311 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_315 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_311 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_315 != 0) {
+        if (__ci_expr_logic_311 != 0) {
             goto '__ci_bb_2658
         } else {
             goto '__ci_bb_2659
@@ -19890,20 +19677,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2648 {
-        (__ci_expr_logic_313 = 0)
+        (__ci_expr_logic_309 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_312: c_int
+            var __ci_expr_logic_308: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_312 = (if true: 1 else: 0))
+                (__ci_expr_logic_308 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_312 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_308 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_313 = (if __ci_expr_logic_312 != 0: 1 else: 0))
+            (__ci_expr_logic_309 = (if __ci_expr_logic_308 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_313 != 0) {
+        if (__ci_expr_logic_309 != 0) {
             goto '__ci_bb_2651
         } else {
             goto '__ci_bb_2652
@@ -19959,11 +19746,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_2659 {
         (__local_category__goto_3079_17 = ((_pcre2_ucp_gentype_8[((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).chartype] as c_int)))
         if ((if __local_category__goto_3079_17 == ucp_L: 1 else: 0) != 0) {
-            (__ci_expr_logic_317 = (if true: 1 else: 0))
+            (__ci_expr_logic_313 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_317 = (if (if __local_category__goto_3079_17 == ucp_N: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_313 = (if (if __local_category__goto_3079_17 == ucp_N: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_317 == __local_notmatch__goto_2994_14: 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_313 == __local_notmatch__goto_2994_14: 1 else: 0) != 0) {
             goto '__ci_bb_2672
         } else {
             goto '__ci_bb_2673
@@ -19971,9 +19758,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2660 {
-        (__ci_expr_old_316 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_312 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_316) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_312) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2662
     }
 
@@ -20089,14 +19876,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2683 {
-        (__ci_expr_old_320 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_316 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_320) as c_uint)))
-        (__ci_expr_logic_321 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_316) as c_uint)))
+        (__ci_expr_logic_317 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_321 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_317 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_321 != 0) {
+        if (__ci_expr_logic_317 != 0) {
             goto '__ci_bb_2694
         } else {
             goto '__ci_bb_2695
@@ -20104,20 +19891,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2684 {
-        (__ci_expr_logic_319 = 0)
+        (__ci_expr_logic_315 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_318: c_int
+            var __ci_expr_logic_314: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_318 = (if true: 1 else: 0))
+                (__ci_expr_logic_314 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_318 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_314 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_319 = (if __ci_expr_logic_318 != 0: 1 else: 0))
+            (__ci_expr_logic_315 = (if __ci_expr_logic_314 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_319 != 0) {
+        if (__ci_expr_logic_315 != 0) {
             goto '__ci_bb_2687
         } else {
             goto '__ci_bb_2688
@@ -20175,9 +19962,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2696 {
-        (__ci_expr_old_322 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_318 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_322) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_318) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2698
     }
 
@@ -20534,14 +20321,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2753 {
-        (__ci_expr_old_325 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_321 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_325) as c_uint)))
-        (__ci_expr_logic_326 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_321) as c_uint)))
+        (__ci_expr_logic_322 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_326 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_322 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_326 != 0) {
+        if (__ci_expr_logic_322 != 0) {
             goto '__ci_bb_2764
         } else {
             goto '__ci_bb_2765
@@ -20549,20 +20336,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2754 {
-        (__ci_expr_logic_324 = 0)
+        (__ci_expr_logic_320 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_323: c_int
+            var __ci_expr_logic_319: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_323 = (if true: 1 else: 0))
+                (__ci_expr_logic_319 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_323 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_319 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_324 = (if __ci_expr_logic_323 != 0: 1 else: 0))
+            (__ci_expr_logic_320 = (if __ci_expr_logic_319 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_324 != 0) {
+        if (__ci_expr_logic_320 != 0) {
             goto '__ci_bb_2757
         } else {
             goto '__ci_bb_2758
@@ -20619,21 +20406,21 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
         (__local_chartype__goto_3124_17 = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).chartype as c_int)))
         (__local_category__goto_3124_27 = ((_pcre2_ucp_gentype_8[__local_chartype__goto_3124_17] as c_int)))
         if ((if __local_category__goto_3124_27 == ucp_L: 1 else: 0) != 0) {
-            (__ci_expr_logic_328 = (if true: 1 else: 0))
+            (__ci_expr_logic_324 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_328 = (if (if __local_category__goto_3124_27 == ucp_N: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_324 = (if (if __local_category__goto_3124_27 == ucp_N: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_328 != 0) {
-            (__ci_expr_logic_329 = (if true: 1 else: 0))
+        if (__ci_expr_logic_324 != 0) {
+            (__ci_expr_logic_325 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_329 = (if (if __local_chartype__goto_3124_17 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_325 = (if (if __local_chartype__goto_3124_17 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_329 != 0) {
-            (__ci_expr_logic_330 = (if true: 1 else: 0))
+        if (__ci_expr_logic_325 != 0) {
+            (__ci_expr_logic_326 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_330 = (if (if __local_chartype__goto_3124_17 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_326 = (if (if __local_chartype__goto_3124_17 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_330 == __local_notmatch__goto_2994_14: 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_326 == __local_notmatch__goto_2994_14: 1 else: 0) != 0) {
             goto '__ci_bb_2778
         } else {
             goto '__ci_bb_2779
@@ -20641,9 +20428,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2766 {
-        (__ci_expr_old_327 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_323 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_327) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_323) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2768
     }
 
@@ -20759,14 +20546,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2789 {
-        (__ci_expr_old_333 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_329 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_333) as c_uint)))
-        (__ci_expr_logic_334 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_329) as c_uint)))
+        (__ci_expr_logic_330 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_334 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_330 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_334 != 0) {
+        if (__ci_expr_logic_330 != 0) {
             goto '__ci_bb_2800
         } else {
             goto '__ci_bb_2801
@@ -20774,20 +20561,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2790 {
-        (__ci_expr_logic_332 = 0)
+        (__ci_expr_logic_328 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_331: c_int
+            var __ci_expr_logic_327: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_331 = (if true: 1 else: 0))
+                (__ci_expr_logic_327 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_331 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_327 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_332 = (if __ci_expr_logic_331 != 0: 1 else: 0))
+            (__ci_expr_logic_328 = (if __ci_expr_logic_327 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_332 != 0) {
+        if (__ci_expr_logic_328 != 0) {
             goto '__ci_bb_2793
         } else {
             goto '__ci_bb_2794
@@ -20846,9 +20633,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2802 {
-        (__ci_expr_old_335 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_331 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_335) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_331) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2804
     }
 
@@ -20945,9 +20732,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2819 {
-        (__ci_expr_old_336 = __local_cp__goto_3142_29)
+        (__ci_expr_old_332 = __local_cp__goto_3142_29)
         (__local_cp__goto_3142_29 = __local_cp__goto_3142_29 + 1)
-        if ((if __local_fc__goto_714_10 == (*__ci_expr_old_336): 1 else: 0) != 0) {
+        if ((if __local_fc__goto_714_10 == (*__ci_expr_old_332): 1 else: 0) != 0) {
             goto '__ci_bb_2825
         } else {
             goto '__ci_bb_2826
@@ -21027,14 +20814,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2838 {
-        (__ci_expr_old_339 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_335 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_339) as c_uint)))
-        (__ci_expr_logic_340 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_335) as c_uint)))
+        (__ci_expr_logic_336 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_340 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_336 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_340 != 0) {
+        if (__ci_expr_logic_336 != 0) {
             goto '__ci_bb_2849
         } else {
             goto '__ci_bb_2850
@@ -21042,20 +20829,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2839 {
-        (__ci_expr_logic_338 = 0)
+        (__ci_expr_logic_334 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_337: c_int
+            var __ci_expr_logic_333: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_337 = (if true: 1 else: 0))
+                (__ci_expr_logic_333 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_337 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_333 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_338 = (if __ci_expr_logic_337 != 0: 1 else: 0))
+            (__ci_expr_logic_334 = (if __ci_expr_logic_333 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_338 != 0) {
+        if (__ci_expr_logic_334 != 0) {
             goto '__ci_bb_2842
         } else {
             goto '__ci_bb_2843
@@ -21110,33 +20897,33 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_2850 {
         if ((if __local_fc__goto_714_10 == 36: 1 else: 0) != 0) {
-            (__ci_expr_logic_342 = (if true: 1 else: 0))
+            (__ci_expr_logic_338 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_342 = (if (if __local_fc__goto_714_10 == 64: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_338 = (if (if __local_fc__goto_714_10 == 64: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_342 != 0) {
-            (__ci_expr_logic_343 = (if true: 1 else: 0))
+        if (__ci_expr_logic_338 != 0) {
+            (__ci_expr_logic_339 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_343 = (if (if __local_fc__goto_714_10 == 96: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_339 = (if (if __local_fc__goto_714_10 == 96: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_343 != 0) {
-            (__ci_expr_logic_345 = (if true: 1 else: 0))
+        if (__ci_expr_logic_339 != 0) {
+            (__ci_expr_logic_341 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_344: c_int = 0
+            var __ci_expr_logic_340: c_int = 0
 
             if ((if __local_fc__goto_714_10 >= 160: 1 else: 0) != 0) {
-                (__ci_expr_logic_344 = (if (if __local_fc__goto_714_10 <= 55295: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_340 = (if (if __local_fc__goto_714_10 <= 55295: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_345 = (if __ci_expr_logic_344 != 0: 1 else: 0))
+            (__ci_expr_logic_341 = (if __ci_expr_logic_340 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_345 != 0) {
-            (__ci_expr_logic_346 = (if true: 1 else: 0))
+        if (__ci_expr_logic_341 != 0) {
+            (__ci_expr_logic_342 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_346 = (if (if __local_fc__goto_714_10 >= 57344: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_342 = (if (if __local_fc__goto_714_10 >= 57344: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_346 == __local_notmatch__goto_2994_14: 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_342 == __local_notmatch__goto_2994_14: 1 else: 0) != 0) {
             goto '__ci_bb_2863
         } else {
             goto '__ci_bb_2864
@@ -21144,9 +20931,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2851 {
-        (__ci_expr_old_341 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_337 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_341) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_337) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2853
     }
 
@@ -21262,14 +21049,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2874 {
-        (__ci_expr_old_349 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_345 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_349) as c_uint)))
-        (__ci_expr_logic_350 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_345) as c_uint)))
+        (__ci_expr_logic_346 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_350 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_346 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_350 != 0) {
+        if (__ci_expr_logic_346 != 0) {
             goto '__ci_bb_2885
         } else {
             goto '__ci_bb_2886
@@ -21277,20 +21064,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2875 {
-        (__ci_expr_logic_348 = 0)
+        (__ci_expr_logic_344 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_347: c_int
+            var __ci_expr_logic_343: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                (__ci_expr_logic_343 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_347 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_343 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_348 = (if __ci_expr_logic_347 != 0: 1 else: 0))
+            (__ci_expr_logic_344 = (if __ci_expr_logic_343 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_348 != 0) {
+        if (__ci_expr_logic_344 != 0) {
             goto '__ci_bb_2878
         } else {
             goto '__ci_bb_2879
@@ -21352,9 +21139,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2887 {
-        (__ci_expr_old_351 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_347 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_351) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_347) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2889
     }
 
@@ -21470,14 +21257,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2910 {
-        (__ci_expr_old_354 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_350 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_354) as c_uint)))
-        (__ci_expr_logic_355 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_350) as c_uint)))
+        (__ci_expr_logic_351 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_355 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_351 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_355 != 0) {
+        if (__ci_expr_logic_351 != 0) {
             goto '__ci_bb_2921
         } else {
             goto '__ci_bb_2922
@@ -21485,20 +21272,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2911 {
-        (__ci_expr_logic_353 = 0)
+        (__ci_expr_logic_349 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_352: c_int
+            var __ci_expr_logic_348: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                (__ci_expr_logic_348 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_352 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_348 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_353 = (if __ci_expr_logic_352 != 0: 1 else: 0))
+            (__ci_expr_logic_349 = (if __ci_expr_logic_348 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_353 != 0) {
+        if (__ci_expr_logic_349 != 0) {
             goto '__ci_bb_2914
         } else {
             goto '__ci_bb_2915
@@ -21562,9 +21349,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2923 {
-        (__ci_expr_old_356 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_352 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_356) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_352) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2925
     }
 
@@ -21808,14 +21595,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2964 {
-        (__ci_expr_old_359 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_355 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_359) as c_uint)))
-        (__ci_expr_logic_360 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_355) as c_uint)))
+        (__ci_expr_logic_356 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_360 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_356 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_360 != 0) {
+        if (__ci_expr_logic_356 != 0) {
             goto '__ci_bb_2976
         } else {
             goto '__ci_bb_2977
@@ -21827,20 +21614,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2966 {
-        (__ci_expr_logic_358 = 0)
+        (__ci_expr_logic_354 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_357: c_int
+            var __ci_expr_logic_353: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_357 = (if true: 1 else: 0))
+                (__ci_expr_logic_353 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_357 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_353 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_358 = (if __ci_expr_logic_357 != 0: 1 else: 0))
+            (__ci_expr_logic_354 = (if __ci_expr_logic_353 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_358 != 0) {
+        if (__ci_expr_logic_354 != 0) {
             goto '__ci_bb_2969
         } else {
             goto '__ci_bb_2970
@@ -21899,9 +21686,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2978 {
-        (__ci_expr_old_361 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_357 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_361) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_357) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_2980
     }
 
@@ -21998,20 +21785,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_2995 {
-        (__ci_expr_logic_363 = 0)
+        (__ci_expr_logic_359 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_362: c_int
+            var __ci_expr_logic_358: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_362 = (if true: 1 else: 0))
+                (__ci_expr_logic_358 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_362 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_358 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_363 = (if __ci_expr_logic_362 != 0: 1 else: 0))
+            (__ci_expr_logic_359 = (if __ci_expr_logic_358 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_363 != 0) {
+        if (__ci_expr_logic_359 != 0) {
             goto '__ci_bb_2998
         } else {
             goto '__ci_bb_2999
@@ -22110,42 +21897,42 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3013 {
-        (__ci_expr_ternary_370 = 0)
+        (__ci_expr_ternary_366 = 0)
         if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_366: c_int = 0
+            var __ci_expr_logic_362: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                (__ci_expr_logic_366 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
+                (__ci_expr_logic_362 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
             }
 
-            (__ci_expr_ternary_370 = __ci_expr_logic_366)
+            (__ci_expr_ternary_366 = __ci_expr_logic_362)
 
         } else {
-            var __ci_expr_logic_369: c_int = 0
+            var __ci_expr_logic_365: c_int = 0
 
-            var __ci_expr_logic_367: c_int = 0
+            var __ci_expr_logic_363: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                (__ci_expr_logic_367 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_363 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_367 != 0) {
-                var __ci_expr_logic_368: c_int
+            if (__ci_expr_logic_363 != 0) {
+                var __ci_expr_logic_364: c_int
 
                 if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_368 = (if true: 1 else: 0))
+                    (__ci_expr_logic_364 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_368 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_364 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_logic_369 = (if __ci_expr_logic_368 != 0: 1 else: 0))
+                (__ci_expr_logic_365 = (if __ci_expr_logic_364 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_ternary_370 = __ci_expr_logic_369)
+            (__ci_expr_ternary_366 = __ci_expr_logic_365)
 
         }
-        if (__ci_expr_ternary_370 != 0) {
+        if (__ci_expr_ternary_366 != 0) {
             goto '__ci_bb_3024
         } else {
             goto '__ci_bb_3025
@@ -22153,20 +21940,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3014 {
-        (__ci_expr_logic_365 = 0)
+        (__ci_expr_logic_361 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_364: c_int
+            var __ci_expr_logic_360: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_364 = (if true: 1 else: 0))
+                (__ci_expr_logic_360 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_364 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_360 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_365 = (if __ci_expr_logic_364 != 0: 1 else: 0))
+            (__ci_expr_logic_361 = (if __ci_expr_logic_360 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_365 != 0) {
+        if (__ci_expr_logic_361 != 0) {
             goto '__ci_bb_3017
         } else {
             goto '__ci_bb_3018
@@ -22216,23 +22003,23 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3025 {
-        (__ci_expr_logic_374 = 0)
-        (__ci_expr_logic_373 = 0)
-        (__ci_expr_logic_372 = 0)
-        (__ci_expr_logic_371 = 0)
+        (__ci_expr_logic_370 = 0)
+        (__ci_expr_logic_369 = 0)
+        (__ci_expr_logic_368 = 0)
+        (__ci_expr_logic_367 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_371 = (if (if ((*__local_F__goto_692_12).eptr + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_367 = (if (if ((*__local_F__goto_692_12).eptr + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_371 != 0) {
-            (__ci_expr_logic_372 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_367 != 0) {
+            (__ci_expr_logic_368 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_372 != 0) {
-            (__ci_expr_logic_373 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_368 != 0) {
+            (__ci_expr_logic_369 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_373 != 0) {
-            (__ci_expr_logic_374 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_369 != 0) {
+            (__ci_expr_logic_370 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_374 != 0) {
+        if (__ci_expr_logic_370 != 0) {
             goto '__ci_bb_3029
         } else {
             goto '__ci_bb_3030
@@ -22267,11 +22054,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3033 {
-        (__ci_expr_logic_375 = 0)
+        (__ci_expr_logic_371 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_375 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_371 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_375 != 0) {
+        if (__ci_expr_logic_371 != 0) {
             goto '__ci_bb_3034
         } else {
             goto '__ci_bb_3035
@@ -22327,20 +22114,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3043 {
-        (__ci_expr_logic_377 = 0)
+        (__ci_expr_logic_373 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_376: c_int
+            var __ci_expr_logic_372: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_376 = (if true: 1 else: 0))
+                (__ci_expr_logic_372 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_376 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_372 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_377 = (if __ci_expr_logic_376 != 0: 1 else: 0))
+            (__ci_expr_logic_373 = (if __ci_expr_logic_372 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_377 != 0) {
+        if (__ci_expr_logic_373 != 0) {
             goto '__ci_bb_3046
         } else {
             goto '__ci_bb_3047
@@ -22386,11 +22173,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3053 {
-        (__ci_expr_logic_378 = 0)
+        (__ci_expr_logic_374 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_378 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_374 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_378 != 0) {
+        if (__ci_expr_logic_374 != 0) {
             goto '__ci_bb_3054
         } else {
             goto '__ci_bb_3055
@@ -22463,9 +22250,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3068 {
-        (__ci_expr_old_381 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_377 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_381) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_377) as c_uint)))
         if ((if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_3079
         } else {
@@ -22474,20 +22261,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3069 {
-        (__ci_expr_logic_380 = 0)
+        (__ci_expr_logic_376 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_379: c_int
+            var __ci_expr_logic_375: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_379 = (if true: 1 else: 0))
+                (__ci_expr_logic_375 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_379 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_375 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_380 = (if __ci_expr_logic_379 != 0: 1 else: 0))
+            (__ci_expr_logic_376 = (if __ci_expr_logic_375 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_380 != 0) {
+        if (__ci_expr_logic_376 != 0) {
             goto '__ci_bb_3072
         } else {
             goto '__ci_bb_3073
@@ -22545,9 +22332,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3081 {
-        (__ci_expr_old_382 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_378 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_382) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_378) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_3083
     }
 
@@ -22637,11 +22424,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3099 {
-        (__ci_expr_logic_383 = 0)
+        (__ci_expr_logic_379 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_383 = (if (if (*((*__local_F__goto_692_12).eptr)) == 10: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_379 = (if (if (*((*__local_F__goto_692_12).eptr)) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_383 != 0) {
+        if (__ci_expr_logic_379 != 0) {
             goto '__ci_bb_3100
         } else {
             goto '__ci_bb_3101
@@ -22765,9 +22552,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3121 {
-        (__ci_expr_old_386 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_382 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_386) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_382) as c_uint)))
         if ((if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_3132
         } else {
@@ -22776,20 +22563,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3122 {
-        (__ci_expr_logic_385 = 0)
+        (__ci_expr_logic_381 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_384: c_int
+            var __ci_expr_logic_380: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_384 = (if true: 1 else: 0))
+                (__ci_expr_logic_380 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_384 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_380 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_385 = (if __ci_expr_logic_384 != 0: 1 else: 0))
+            (__ci_expr_logic_381 = (if __ci_expr_logic_380 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_385 != 0) {
+        if (__ci_expr_logic_381 != 0) {
             goto '__ci_bb_3125
         } else {
             goto '__ci_bb_3126
@@ -22847,9 +22634,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3134 {
-        (__ci_expr_old_387 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_383 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_387) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_383) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_3136
     }
 
@@ -23121,9 +22908,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3177 {
-        (__ci_expr_old_390 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_386 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_390) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_386) as c_uint)))
         if ((if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_3188
         } else {
@@ -23132,20 +22919,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3178 {
-        (__ci_expr_logic_389 = 0)
+        (__ci_expr_logic_385 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_388: c_int
+            var __ci_expr_logic_384: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_388 = (if true: 1 else: 0))
+                (__ci_expr_logic_384 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_388 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_384 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_389 = (if __ci_expr_logic_388 != 0: 1 else: 0))
+            (__ci_expr_logic_385 = (if __ci_expr_logic_384 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_389 != 0) {
+        if (__ci_expr_logic_385 != 0) {
             goto '__ci_bb_3181
         } else {
             goto '__ci_bb_3182
@@ -23203,9 +22990,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3190 {
-        (__ci_expr_old_391 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_387 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_391) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_387) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_3192
     }
 
@@ -23477,9 +23264,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3233 {
-        (__ci_expr_old_394 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_390 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_394) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_390) as c_uint)))
         if ((if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_3244
         } else {
@@ -23488,20 +23275,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3234 {
-        (__ci_expr_logic_393 = 0)
+        (__ci_expr_logic_389 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_392: c_int
+            var __ci_expr_logic_388: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_392 = (if true: 1 else: 0))
+                (__ci_expr_logic_388 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_392 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_388 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_393 = (if __ci_expr_logic_392 != 0: 1 else: 0))
+            (__ci_expr_logic_389 = (if __ci_expr_logic_388 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_393 != 0) {
+        if (__ci_expr_logic_389 != 0) {
             goto '__ci_bb_3237
         } else {
             goto '__ci_bb_3238
@@ -23559,9 +23346,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3246 {
-        (__ci_expr_old_395 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_391 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_395) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_391) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_3248
     }
 
@@ -23737,9 +23524,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3277 {
-        (__ci_expr_old_398 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_394 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_398) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_394) as c_uint)))
         if ((if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_3288
         } else {
@@ -23748,20 +23535,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3278 {
-        (__ci_expr_logic_397 = 0)
+        (__ci_expr_logic_393 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_396: c_int
+            var __ci_expr_logic_392: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_396 = (if true: 1 else: 0))
+                (__ci_expr_logic_392 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_396 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_392 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_397 = (if __ci_expr_logic_396 != 0: 1 else: 0))
+            (__ci_expr_logic_393 = (if __ci_expr_logic_392 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_397 != 0) {
+        if (__ci_expr_logic_393 != 0) {
             goto '__ci_bb_3281
         } else {
             goto '__ci_bb_3282
@@ -23819,9 +23606,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3290 {
-        (__ci_expr_old_399 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_395 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_399) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_395) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_3292
     }
 
@@ -23997,9 +23784,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3321 {
-        (__ci_expr_old_402 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_398 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_402) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_398) as c_uint)))
         if ((if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_3332
         } else {
@@ -24008,20 +23795,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3322 {
-        (__ci_expr_logic_401 = 0)
+        (__ci_expr_logic_397 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_400: c_int
+            var __ci_expr_logic_396: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_400 = (if true: 1 else: 0))
+                (__ci_expr_logic_396 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_400 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_396 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_401 = (if __ci_expr_logic_400 != 0: 1 else: 0))
+            (__ci_expr_logic_397 = (if __ci_expr_logic_396 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_401 != 0) {
+        if (__ci_expr_logic_397 != 0) {
             goto '__ci_bb_3325
         } else {
             goto '__ci_bb_3326
@@ -24075,11 +23862,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3333 {
-        (__ci_expr_logic_404 = 0)
+        (__ci_expr_logic_400 = 0)
         if ((if __local_fc__goto_714_10 < 128: 1 else: 0) != 0) {
-            (__ci_expr_logic_404 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_400 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_404 != 0) {
+        if (__ci_expr_logic_400 != 0) {
             goto '__ci_bb_3346
         } else {
             goto '__ci_bb_3347
@@ -24087,9 +23874,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3334 {
-        (__ci_expr_old_403 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_399 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_403) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_399) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_3336
     }
 
@@ -24207,11 +23994,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_3357 {
         (__local_cc__goto_3420_20 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
         if ((if __local_cc__goto_3420_20 >= 128: 1 else: 0) != 0) {
-            (__ci_expr_logic_407 = (if true: 1 else: 0))
+            (__ci_expr_logic_403 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_407 = (if (if ((((*__param_mb).ctypes[__local_cc__goto_3420_20]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_403 = (if (if ((((*__param_mb).ctypes[__local_cc__goto_3420_20]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_407 != 0) {
+        if (__ci_expr_logic_403 != 0) {
             goto '__ci_bb_3368
         } else {
             goto '__ci_bb_3369
@@ -24219,20 +24006,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3358 {
-        (__ci_expr_logic_406 = 0)
+        (__ci_expr_logic_402 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_405: c_int
+            var __ci_expr_logic_401: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_405 = (if true: 1 else: 0))
+                (__ci_expr_logic_401 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_405 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_401 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_406 = (if __ci_expr_logic_405 != 0: 1 else: 0))
+            (__ci_expr_logic_402 = (if __ci_expr_logic_401 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_406 != 0) {
+        if (__ci_expr_logic_402 != 0) {
             goto '__ci_bb_3361
         } else {
             goto '__ci_bb_3362
@@ -24327,11 +24114,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_3379 {
         (__local_cc__goto_3437_20 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_410 = 0)
+        (__ci_expr_logic_406 = 0)
         if ((if __local_cc__goto_3437_20 < 128: 1 else: 0) != 0) {
-            (__ci_expr_logic_410 = (if (if ((((*__param_mb).ctypes[__local_cc__goto_3437_20]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_406 = (if (if ((((*__param_mb).ctypes[__local_cc__goto_3437_20]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_410 != 0) {
+        if (__ci_expr_logic_406 != 0) {
             goto '__ci_bb_3390
         } else {
             goto '__ci_bb_3391
@@ -24339,20 +24126,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3380 {
-        (__ci_expr_logic_409 = 0)
+        (__ci_expr_logic_405 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_408: c_int
+            var __ci_expr_logic_404: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_408 = (if true: 1 else: 0))
+                (__ci_expr_logic_404 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_408 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_404 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_409 = (if __ci_expr_logic_408 != 0: 1 else: 0))
+            (__ci_expr_logic_405 = (if __ci_expr_logic_404 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_409 != 0) {
+        if (__ci_expr_logic_405 != 0) {
             goto '__ci_bb_3383
         } else {
             goto '__ci_bb_3384
@@ -24412,11 +24199,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3395 {
-        (__ci_expr_logic_411 = 0)
+        (__ci_expr_logic_407 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_411 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_407 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_411 != 0) {
+        if (__ci_expr_logic_407 != 0) {
             goto '__ci_bb_3396
         } else {
             goto '__ci_bb_3397
@@ -24469,11 +24256,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_3404 {
         (__local_cc__goto_3454_20 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
         if ((if __local_cc__goto_3454_20 >= 128: 1 else: 0) != 0) {
-            (__ci_expr_logic_414 = (if true: 1 else: 0))
+            (__ci_expr_logic_410 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_414 = (if (if ((((*__param_mb).ctypes[__local_cc__goto_3454_20]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_410 = (if (if ((((*__param_mb).ctypes[__local_cc__goto_3454_20]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_414 != 0) {
+        if (__ci_expr_logic_410 != 0) {
             goto '__ci_bb_3415
         } else {
             goto '__ci_bb_3416
@@ -24481,20 +24268,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3405 {
-        (__ci_expr_logic_413 = 0)
+        (__ci_expr_logic_409 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_412: c_int
+            var __ci_expr_logic_408: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_412 = (if true: 1 else: 0))
+                (__ci_expr_logic_408 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_412 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_408 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_413 = (if __ci_expr_logic_412 != 0: 1 else: 0))
+            (__ci_expr_logic_409 = (if __ci_expr_logic_408 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_413 != 0) {
+        if (__ci_expr_logic_409 != 0) {
             goto '__ci_bb_3408
         } else {
             goto '__ci_bb_3409
@@ -24589,11 +24376,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_3426 {
         (__local_cc__goto_3471_20 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_417 = 0)
+        (__ci_expr_logic_413 = 0)
         if ((if __local_cc__goto_3471_20 < 128: 1 else: 0) != 0) {
-            (__ci_expr_logic_417 = (if (if ((((*__param_mb).ctypes[__local_cc__goto_3471_20]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_413 = (if (if ((((*__param_mb).ctypes[__local_cc__goto_3471_20]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_417 != 0) {
+        if (__ci_expr_logic_413 != 0) {
             goto '__ci_bb_3437
         } else {
             goto '__ci_bb_3438
@@ -24601,20 +24388,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3427 {
-        (__ci_expr_logic_416 = 0)
+        (__ci_expr_logic_412 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_415: c_int
+            var __ci_expr_logic_411: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_415 = (if true: 1 else: 0))
+                (__ci_expr_logic_411 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_415 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_411 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_416 = (if __ci_expr_logic_415 != 0: 1 else: 0))
+            (__ci_expr_logic_412 = (if __ci_expr_logic_411 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_416 != 0) {
+        if (__ci_expr_logic_412 != 0) {
             goto '__ci_bb_3430
         } else {
             goto '__ci_bb_3431
@@ -24674,11 +24461,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3442 {
-        (__ci_expr_logic_418 = 0)
+        (__ci_expr_logic_414 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_418 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_414 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_418 != 0) {
+        if (__ci_expr_logic_414 != 0) {
             goto '__ci_bb_3443
         } else {
             goto '__ci_bb_3444
@@ -24731,11 +24518,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_3451 {
         (__local_cc__goto_3488_20 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
         if ((if __local_cc__goto_3488_20 >= 128: 1 else: 0) != 0) {
-            (__ci_expr_logic_421 = (if true: 1 else: 0))
+            (__ci_expr_logic_417 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_421 = (if (if ((((*__param_mb).ctypes[__local_cc__goto_3488_20]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_417 = (if (if ((((*__param_mb).ctypes[__local_cc__goto_3488_20]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_421 != 0) {
+        if (__ci_expr_logic_417 != 0) {
             goto '__ci_bb_3462
         } else {
             goto '__ci_bb_3463
@@ -24743,20 +24530,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3452 {
-        (__ci_expr_logic_420 = 0)
+        (__ci_expr_logic_416 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_419: c_int
+            var __ci_expr_logic_415: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_419 = (if true: 1 else: 0))
+                (__ci_expr_logic_415 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_419 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_415 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_420 = (if __ci_expr_logic_419 != 0: 1 else: 0))
+            (__ci_expr_logic_416 = (if __ci_expr_logic_415 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_420 != 0) {
+        if (__ci_expr_logic_416 != 0) {
             goto '__ci_bb_3455
         } else {
             goto '__ci_bb_3456
@@ -24986,42 +24773,42 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3492 {
-        (__ci_expr_ternary_428 = 0)
+        (__ci_expr_ternary_424 = 0)
         if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_424: c_int = 0
+            var __ci_expr_logic_420: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                (__ci_expr_logic_424 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
+                (__ci_expr_logic_420 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
             }
 
-            (__ci_expr_ternary_428 = __ci_expr_logic_424)
+            (__ci_expr_ternary_424 = __ci_expr_logic_420)
 
         } else {
-            var __ci_expr_logic_427: c_int = 0
+            var __ci_expr_logic_423: c_int = 0
 
-            var __ci_expr_logic_425: c_int = 0
+            var __ci_expr_logic_421: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                (__ci_expr_logic_425 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_421 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_425 != 0) {
-                var __ci_expr_logic_426: c_int
+            if (__ci_expr_logic_421 != 0) {
+                var __ci_expr_logic_422: c_int
 
                 if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_426 = (if true: 1 else: 0))
+                    (__ci_expr_logic_422 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_426 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_422 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_logic_427 = (if __ci_expr_logic_426 != 0: 1 else: 0))
+                (__ci_expr_logic_423 = (if __ci_expr_logic_422 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_ternary_428 = __ci_expr_logic_427)
+            (__ci_expr_ternary_424 = __ci_expr_logic_423)
 
         }
-        if (__ci_expr_ternary_428 != 0) {
+        if (__ci_expr_ternary_424 != 0) {
             goto '__ci_bb_3503
         } else {
             goto '__ci_bb_3504
@@ -25029,20 +24816,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3493 {
-        (__ci_expr_logic_423 = 0)
+        (__ci_expr_logic_419 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_422: c_int
+            var __ci_expr_logic_418: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_422 = (if true: 1 else: 0))
+                (__ci_expr_logic_418 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_422 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_418 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_423 = (if __ci_expr_logic_422 != 0: 1 else: 0))
+            (__ci_expr_logic_419 = (if __ci_expr_logic_418 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_423 != 0) {
+        if (__ci_expr_logic_419 != 0) {
             goto '__ci_bb_3496
         } else {
             goto '__ci_bb_3497
@@ -25092,23 +24879,23 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3504 {
-        (__ci_expr_logic_432 = 0)
-        (__ci_expr_logic_431 = 0)
-        (__ci_expr_logic_430 = 0)
-        (__ci_expr_logic_429 = 0)
+        (__ci_expr_logic_428 = 0)
+        (__ci_expr_logic_427 = 0)
+        (__ci_expr_logic_426 = 0)
+        (__ci_expr_logic_425 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_429 = (if (if ((*__local_F__goto_692_12).eptr + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_425 = (if (if ((*__local_F__goto_692_12).eptr + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_429 != 0) {
-            (__ci_expr_logic_430 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_425 != 0) {
+            (__ci_expr_logic_426 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_430 != 0) {
-            (__ci_expr_logic_431 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_426 != 0) {
+            (__ci_expr_logic_427 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_431 != 0) {
-            (__ci_expr_logic_432 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_427 != 0) {
+            (__ci_expr_logic_428 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_432 != 0) {
+        if (__ci_expr_logic_428 != 0) {
             goto '__ci_bb_3508
         } else {
             goto '__ci_bb_3509
@@ -25160,20 +24947,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3515 {
-        (__ci_expr_logic_434 = 0)
+        (__ci_expr_logic_430 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_433: c_int
+            var __ci_expr_logic_429: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_433 = (if true: 1 else: 0))
+                (__ci_expr_logic_429 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_433 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_429 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_434 = (if __ci_expr_logic_433 != 0: 1 else: 0))
+            (__ci_expr_logic_430 = (if __ci_expr_logic_429 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_434 != 0) {
+        if (__ci_expr_logic_430 != 0) {
             goto '__ci_bb_3518
         } else {
             goto '__ci_bb_3519
@@ -25253,27 +25040,27 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3531 {
-        (__ci_expr_old_437 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_433 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__ci_expr_switch_438 = (*__ci_expr_old_437))
+        (__ci_expr_switch_434 = (*__ci_expr_old_433))
         goto '__ci_bb_3542
     }
 
     '__ci_bb_3532 {
-        (__ci_expr_logic_436 = 0)
+        (__ci_expr_logic_432 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_435: c_int
+            var __ci_expr_logic_431: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_435 = (if true: 1 else: 0))
+                (__ci_expr_logic_431 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_435 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_431 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_436 = (if __ci_expr_logic_435 != 0: 1 else: 0))
+            (__ci_expr_logic_432 = (if __ci_expr_logic_431 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_436 != 0) {
+        if (__ci_expr_logic_432 != 0) {
             goto '__ci_bb_3535
         } else {
             goto '__ci_bb_3536
@@ -25319,7 +25106,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3542 {
-        if (__ci_expr_switch_438 == 13) {
+        if (__ci_expr_switch_434 == 13) {
             goto '__ci_bb_3548
         } else {
             goto '__ci_bb_3558
@@ -25340,11 +25127,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3548 {
-        (__ci_expr_logic_439 = 0)
+        (__ci_expr_logic_435 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_439 = (if (if (*((*__local_F__goto_692_12).eptr)) == 10: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_435 = (if (if (*((*__local_F__goto_692_12).eptr)) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_439 != 0) {
+        if (__ci_expr_logic_435 != 0) {
             goto '__ci_bb_3549
         } else {
             goto '__ci_bb_3550
@@ -25386,7 +25173,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3558 {
-        if (__ci_expr_switch_438 == 10) {
+        if (__ci_expr_switch_434 == 10) {
             goto '__ci_bb_3551
         } else {
             goto '__ci_bb_3559
@@ -25394,7 +25181,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3559 {
-        if (__ci_expr_switch_438 == 11) {
+        if (__ci_expr_switch_434 == 11) {
             goto '__ci_bb_3552
         } else {
             goto '__ci_bb_3560
@@ -25402,7 +25189,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3560 {
-        if (__ci_expr_switch_438 == 12) {
+        if (__ci_expr_switch_434 == 12) {
             goto '__ci_bb_3552
         } else {
             goto '__ci_bb_3561
@@ -25410,7 +25197,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3561 {
-        if (__ci_expr_switch_438 == 133) {
+        if (__ci_expr_switch_434 == 133) {
             goto '__ci_bb_3552
         } else {
             goto '__ci_bb_3544
@@ -25452,27 +25239,27 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3568 {
-        (__ci_expr_old_442 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_438 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__ci_expr_switch_443 = (*__ci_expr_old_442))
+        (__ci_expr_switch_439 = (*__ci_expr_old_438))
         goto '__ci_bb_3579
     }
 
     '__ci_bb_3569 {
-        (__ci_expr_logic_441 = 0)
+        (__ci_expr_logic_437 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_440: c_int
+            var __ci_expr_logic_436: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_440 = (if true: 1 else: 0))
+                (__ci_expr_logic_436 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_440 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_436 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_441 = (if __ci_expr_logic_440 != 0: 1 else: 0))
+            (__ci_expr_logic_437 = (if __ci_expr_logic_436 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_441 != 0) {
+        if (__ci_expr_logic_437 != 0) {
             goto '__ci_bb_3572
         } else {
             goto '__ci_bb_3573
@@ -25518,7 +25305,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3579 {
-        if (__ci_expr_switch_443 == 9) {
+        if (__ci_expr_switch_439 == 9) {
             goto '__ci_bb_3582
         } else {
             goto '__ci_bb_3586
@@ -25543,7 +25330,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3586 {
-        if (__ci_expr_switch_443 == 32) {
+        if (__ci_expr_switch_439 == 32) {
             goto '__ci_bb_3582
         } else {
             goto '__ci_bb_3587
@@ -25551,7 +25338,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3587 {
-        if (__ci_expr_switch_443 == 160) {
+        if (__ci_expr_switch_439 == 160) {
             goto '__ci_bb_3582
         } else {
             goto '__ci_bb_3581
@@ -25593,27 +25380,27 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3594 {
-        (__ci_expr_old_446 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_442 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__ci_expr_switch_447 = (*__ci_expr_old_446))
+        (__ci_expr_switch_443 = (*__ci_expr_old_442))
         goto '__ci_bb_3605
     }
 
     '__ci_bb_3595 {
-        (__ci_expr_logic_445 = 0)
+        (__ci_expr_logic_441 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_444: c_int
+            var __ci_expr_logic_440: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_444 = (if true: 1 else: 0))
+                (__ci_expr_logic_440 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_444 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_440 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_445 = (if __ci_expr_logic_444 != 0: 1 else: 0))
+            (__ci_expr_logic_441 = (if __ci_expr_logic_440 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_445 != 0) {
+        if (__ci_expr_logic_441 != 0) {
             goto '__ci_bb_3598
         } else {
             goto '__ci_bb_3599
@@ -25659,7 +25446,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3605 {
-        if (__ci_expr_switch_447 == 9) {
+        if (__ci_expr_switch_443 == 9) {
             goto '__ci_bb_3611
         } else {
             goto '__ci_bb_3612
@@ -25684,7 +25471,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3612 {
-        if (__ci_expr_switch_447 == 32) {
+        if (__ci_expr_switch_443 == 32) {
             goto '__ci_bb_3611
         } else {
             goto '__ci_bb_3613
@@ -25692,7 +25479,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3613 {
-        if (__ci_expr_switch_447 == 160) {
+        if (__ci_expr_switch_443 == 160) {
             goto '__ci_bb_3611
         } else {
             goto '__ci_bb_3607
@@ -25734,27 +25521,27 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3620 {
-        (__ci_expr_old_450 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_446 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__ci_expr_switch_451 = (*__ci_expr_old_450))
+        (__ci_expr_switch_447 = (*__ci_expr_old_446))
         goto '__ci_bb_3631
     }
 
     '__ci_bb_3621 {
-        (__ci_expr_logic_449 = 0)
+        (__ci_expr_logic_445 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_448: c_int
+            var __ci_expr_logic_444: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_448 = (if true: 1 else: 0))
+                (__ci_expr_logic_444 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_448 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_444 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_449 = (if __ci_expr_logic_448 != 0: 1 else: 0))
+            (__ci_expr_logic_445 = (if __ci_expr_logic_444 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_449 != 0) {
+        if (__ci_expr_logic_445 != 0) {
             goto '__ci_bb_3624
         } else {
             goto '__ci_bb_3625
@@ -25800,7 +25587,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3631 {
-        if (__ci_expr_switch_451 == 10) {
+        if (__ci_expr_switch_447 == 10) {
             goto '__ci_bb_3633
         } else {
             goto '__ci_bb_3638
@@ -25825,7 +25612,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3638 {
-        if (__ci_expr_switch_451 == 11) {
+        if (__ci_expr_switch_447 == 11) {
             goto '__ci_bb_3633
         } else {
             goto '__ci_bb_3639
@@ -25833,7 +25620,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3639 {
-        if (__ci_expr_switch_451 == 12) {
+        if (__ci_expr_switch_447 == 12) {
             goto '__ci_bb_3633
         } else {
             goto '__ci_bb_3640
@@ -25841,7 +25628,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3640 {
-        if (__ci_expr_switch_451 == 13) {
+        if (__ci_expr_switch_447 == 13) {
             goto '__ci_bb_3633
         } else {
             goto '__ci_bb_3641
@@ -25849,7 +25636,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3641 {
-        if (__ci_expr_switch_451 == 133) {
+        if (__ci_expr_switch_447 == 133) {
             goto '__ci_bb_3633
         } else {
             goto '__ci_bb_3637
@@ -25891,27 +25678,27 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3648 {
-        (__ci_expr_old_454 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_450 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__ci_expr_switch_455 = (*__ci_expr_old_454))
+        (__ci_expr_switch_451 = (*__ci_expr_old_450))
         goto '__ci_bb_3659
     }
 
     '__ci_bb_3649 {
-        (__ci_expr_logic_453 = 0)
+        (__ci_expr_logic_449 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_452: c_int
+            var __ci_expr_logic_448: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_452 = (if true: 1 else: 0))
+                (__ci_expr_logic_448 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_452 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_448 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_453 = (if __ci_expr_logic_452 != 0: 1 else: 0))
+            (__ci_expr_logic_449 = (if __ci_expr_logic_448 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_453 != 0) {
+        if (__ci_expr_logic_449 != 0) {
             goto '__ci_bb_3652
         } else {
             goto '__ci_bb_3653
@@ -25957,7 +25744,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3659 {
-        if (__ci_expr_switch_455 == 10) {
+        if (__ci_expr_switch_451 == 10) {
             goto '__ci_bb_3665
         } else {
             goto '__ci_bb_3666
@@ -25982,7 +25769,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3666 {
-        if (__ci_expr_switch_455 == 11) {
+        if (__ci_expr_switch_451 == 11) {
             goto '__ci_bb_3665
         } else {
             goto '__ci_bb_3667
@@ -25990,7 +25777,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3667 {
-        if (__ci_expr_switch_455 == 12) {
+        if (__ci_expr_switch_451 == 12) {
             goto '__ci_bb_3665
         } else {
             goto '__ci_bb_3668
@@ -25998,7 +25785,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3668 {
-        if (__ci_expr_switch_455 == 13) {
+        if (__ci_expr_switch_451 == 13) {
             goto '__ci_bb_3665
         } else {
             goto '__ci_bb_3669
@@ -26006,7 +25793,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3669 {
-        if (__ci_expr_switch_455 == 133) {
+        if (__ci_expr_switch_451 == 133) {
             goto '__ci_bb_3665
         } else {
             goto '__ci_bb_3661
@@ -26048,11 +25835,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3676 {
-        (__ci_expr_logic_458 = 0)
+        (__ci_expr_logic_454 = 0)
         if (1 != 0) {
-            (__ci_expr_logic_458 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_454 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_458 != 0) {
+        if (__ci_expr_logic_454 != 0) {
             goto '__ci_bb_3687
         } else {
             goto '__ci_bb_3688
@@ -26060,20 +25847,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3677 {
-        (__ci_expr_logic_457 = 0)
+        (__ci_expr_logic_453 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_456: c_int
+            var __ci_expr_logic_452: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_456 = (if true: 1 else: 0))
+                (__ci_expr_logic_452 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_456 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_452 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_457 = (if __ci_expr_logic_456 != 0: 1 else: 0))
+            (__ci_expr_logic_453 = (if __ci_expr_logic_452 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_457 != 0) {
+        if (__ci_expr_logic_453 != 0) {
             goto '__ci_bb_3680
         } else {
             goto '__ci_bb_3681
@@ -26168,11 +25955,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_3698 {
         if ((if not (1 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_461 = (if true: 1 else: 0))
+            (__ci_expr_logic_457 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_461 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_457 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_461 != 0) {
+        if (__ci_expr_logic_457 != 0) {
             goto '__ci_bb_3709
         } else {
             goto '__ci_bb_3710
@@ -26180,20 +25967,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3699 {
-        (__ci_expr_logic_460 = 0)
+        (__ci_expr_logic_456 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_459: c_int
+            var __ci_expr_logic_455: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_459 = (if true: 1 else: 0))
+                (__ci_expr_logic_455 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_459 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_455 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_460 = (if __ci_expr_logic_459 != 0: 1 else: 0))
+            (__ci_expr_logic_456 = (if __ci_expr_logic_455 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_460 != 0) {
+        if (__ci_expr_logic_456 != 0) {
             goto '__ci_bb_3702
         } else {
             goto '__ci_bb_3703
@@ -26287,11 +26074,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3720 {
-        (__ci_expr_logic_464 = 0)
+        (__ci_expr_logic_460 = 0)
         if (1 != 0) {
-            (__ci_expr_logic_464 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_460 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_464 != 0) {
+        if (__ci_expr_logic_460 != 0) {
             goto '__ci_bb_3731
         } else {
             goto '__ci_bb_3732
@@ -26299,20 +26086,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3721 {
-        (__ci_expr_logic_463 = 0)
+        (__ci_expr_logic_459 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_462: c_int
+            var __ci_expr_logic_458: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_462 = (if true: 1 else: 0))
+                (__ci_expr_logic_458 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_462 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_458 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_463 = (if __ci_expr_logic_462 != 0: 1 else: 0))
+            (__ci_expr_logic_459 = (if __ci_expr_logic_458 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_463 != 0) {
+        if (__ci_expr_logic_459 != 0) {
             goto '__ci_bb_3724
         } else {
             goto '__ci_bb_3725
@@ -26407,11 +26194,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_3742 {
         if ((if not (1 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_467 = (if true: 1 else: 0))
+            (__ci_expr_logic_463 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_467 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_463 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_467 != 0) {
+        if (__ci_expr_logic_463 != 0) {
             goto '__ci_bb_3753
         } else {
             goto '__ci_bb_3754
@@ -26419,20 +26206,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3743 {
-        (__ci_expr_logic_466 = 0)
+        (__ci_expr_logic_462 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_465: c_int
+            var __ci_expr_logic_461: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_465 = (if true: 1 else: 0))
+                (__ci_expr_logic_461 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_465 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_461 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_466 = (if __ci_expr_logic_465 != 0: 1 else: 0))
+            (__ci_expr_logic_462 = (if __ci_expr_logic_461 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_466 != 0) {
+        if (__ci_expr_logic_462 != 0) {
             goto '__ci_bb_3746
         } else {
             goto '__ci_bb_3747
@@ -26526,11 +26313,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3764 {
-        (__ci_expr_logic_470 = 0)
+        (__ci_expr_logic_466 = 0)
         if (1 != 0) {
-            (__ci_expr_logic_470 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_466 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_470 != 0) {
+        if (__ci_expr_logic_466 != 0) {
             goto '__ci_bb_3775
         } else {
             goto '__ci_bb_3776
@@ -26538,20 +26325,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3765 {
-        (__ci_expr_logic_469 = 0)
+        (__ci_expr_logic_465 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_468: c_int
+            var __ci_expr_logic_464: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_468 = (if true: 1 else: 0))
+                (__ci_expr_logic_464 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_468 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_464 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_469 = (if __ci_expr_logic_468 != 0: 1 else: 0))
+            (__ci_expr_logic_465 = (if __ci_expr_logic_464 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_469 != 0) {
+        if (__ci_expr_logic_465 != 0) {
             goto '__ci_bb_3768
         } else {
             goto '__ci_bb_3769
@@ -26646,11 +26433,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_3786 {
         if ((if not (1 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_473 = (if true: 1 else: 0))
+            (__ci_expr_logic_469 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_473 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_469 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_473 != 0) {
+        if (__ci_expr_logic_469 != 0) {
             goto '__ci_bb_3797
         } else {
             goto '__ci_bb_3798
@@ -26658,20 +26445,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3787 {
-        (__ci_expr_logic_472 = 0)
+        (__ci_expr_logic_468 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_471: c_int
+            var __ci_expr_logic_467: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_471 = (if true: 1 else: 0))
+                (__ci_expr_logic_467 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_471 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_467 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_472 = (if __ci_expr_logic_471 != 0: 1 else: 0))
+            (__ci_expr_logic_468 = (if __ci_expr_logic_467 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_472 != 0) {
+        if (__ci_expr_logic_468 != 0) {
             goto '__ci_bb_3790
         } else {
             goto '__ci_bb_3791
@@ -26946,9 +26733,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3838 {
-        (__ci_expr_old_474 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_470 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_474 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_470 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_3842
         } else {
             goto '__ci_bb_3843
@@ -26982,14 +26769,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3848 {
-        (__ci_expr_old_477 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_473 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_477) as c_uint)))
-        (__ci_expr_logic_478 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_473) as c_uint)))
+        (__ci_expr_logic_474 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_478 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_474 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_478 != 0) {
+        if (__ci_expr_logic_474 != 0) {
             goto '__ci_bb_3859
         } else {
             goto '__ci_bb_3860
@@ -26997,20 +26784,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3849 {
-        (__ci_expr_logic_476 = 0)
+        (__ci_expr_logic_472 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_475: c_int
+            var __ci_expr_logic_471: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_475 = (if true: 1 else: 0))
+                (__ci_expr_logic_471 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_475 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_471 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_476 = (if __ci_expr_logic_475 != 0: 1 else: 0))
+            (__ci_expr_logic_472 = (if __ci_expr_logic_471 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_476 != 0) {
+        if (__ci_expr_logic_472 != 0) {
             goto '__ci_bb_3852
         } else {
             goto '__ci_bb_3853
@@ -27066,16 +26853,16 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_3860 {
         (__local_chartype__goto_3784_17 = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).chartype as c_int)))
         if ((if __local_chartype__goto_3784_17 == ucp_Lu: 1 else: 0) != 0) {
-            (__ci_expr_logic_480 = (if true: 1 else: 0))
+            (__ci_expr_logic_476 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_480 = (if (if __local_chartype__goto_3784_17 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_476 = (if (if __local_chartype__goto_3784_17 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_480 != 0) {
-            (__ci_expr_logic_481 = (if true: 1 else: 0))
+        if (__ci_expr_logic_476 != 0) {
+            (__ci_expr_logic_477 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_481 = (if (if __local_chartype__goto_3784_17 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_477 = (if (if __local_chartype__goto_3784_17 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_481 == (if (*__local_F__goto_692_12).temp_32[2] == 15: 1 else: 0): 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_477 == (if (*__local_F__goto_692_12).temp_32[2] == 15: 1 else: 0): 1 else: 0) != 0) {
             goto '__ci_bb_3873
         } else {
             goto '__ci_bb_3874
@@ -27083,9 +26870,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3861 {
-        (__ci_expr_old_479 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_475 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_479) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_475) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_3863
     }
 
@@ -27213,9 +27000,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3888 {
-        (__ci_expr_old_482 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_478 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_482 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_478 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_3892
         } else {
             goto '__ci_bb_3893
@@ -27249,14 +27036,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3898 {
-        (__ci_expr_old_485 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_481 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_485) as c_uint)))
-        (__ci_expr_logic_486 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_481) as c_uint)))
+        (__ci_expr_logic_482 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_486 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_482 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_486 != 0) {
+        if (__ci_expr_logic_482 != 0) {
             goto '__ci_bb_3909
         } else {
             goto '__ci_bb_3910
@@ -27264,20 +27051,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3899 {
-        (__ci_expr_logic_484 = 0)
+        (__ci_expr_logic_480 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_483: c_int
+            var __ci_expr_logic_479: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_483 = (if true: 1 else: 0))
+                (__ci_expr_logic_479 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_483 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_479 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_484 = (if __ci_expr_logic_483 != 0: 1 else: 0))
+            (__ci_expr_logic_480 = (if __ci_expr_logic_479 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_484 != 0) {
+        if (__ci_expr_logic_480 != 0) {
             goto '__ci_bb_3902
         } else {
             goto '__ci_bb_3903
@@ -27339,9 +27126,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3911 {
-        (__ci_expr_old_487 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_483 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_487) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_483) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_3913
     }
 
@@ -27469,9 +27256,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3938 {
-        (__ci_expr_old_488 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_484 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_488 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_484 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_3942
         } else {
             goto '__ci_bb_3943
@@ -27505,14 +27292,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3948 {
-        (__ci_expr_old_491 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_487 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_491) as c_uint)))
-        (__ci_expr_logic_492 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_487) as c_uint)))
+        (__ci_expr_logic_488 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_492 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_488 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_492 != 0) {
+        if (__ci_expr_logic_488 != 0) {
             goto '__ci_bb_3959
         } else {
             goto '__ci_bb_3960
@@ -27520,20 +27307,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3949 {
-        (__ci_expr_logic_490 = 0)
+        (__ci_expr_logic_486 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_489: c_int
+            var __ci_expr_logic_485: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_489 = (if true: 1 else: 0))
+                (__ci_expr_logic_485 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_489 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_485 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_490 = (if __ci_expr_logic_489 != 0: 1 else: 0))
+            (__ci_expr_logic_486 = (if __ci_expr_logic_485 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_490 != 0) {
+        if (__ci_expr_logic_486 != 0) {
             goto '__ci_bb_3952
         } else {
             goto '__ci_bb_3953
@@ -27595,9 +27382,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3961 {
-        (__ci_expr_old_493 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_489 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_493) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_489) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_3963
     }
 
@@ -27725,9 +27512,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3988 {
-        (__ci_expr_old_494 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_490 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_494 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_490 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_3992
         } else {
             goto '__ci_bb_3993
@@ -27761,14 +27548,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3998 {
-        (__ci_expr_old_497 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_493 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_497) as c_uint)))
-        (__ci_expr_logic_498 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_493) as c_uint)))
+        (__ci_expr_logic_494 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_498 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_494 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_498 != 0) {
+        if (__ci_expr_logic_494 != 0) {
             goto '__ci_bb_4009
         } else {
             goto '__ci_bb_4010
@@ -27776,20 +27563,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3999 {
-        (__ci_expr_logic_496 = 0)
+        (__ci_expr_logic_492 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_495: c_int
+            var __ci_expr_logic_491: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_495 = (if true: 1 else: 0))
+                (__ci_expr_logic_491 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_495 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_491 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_496 = (if __ci_expr_logic_495 != 0: 1 else: 0))
+            (__ci_expr_logic_492 = (if __ci_expr_logic_491 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_496 != 0) {
+        if (__ci_expr_logic_492 != 0) {
             goto '__ci_bb_4002
         } else {
             goto '__ci_bb_4003
@@ -27851,9 +27638,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4011 {
-        (__ci_expr_old_499 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_495 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_499) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_495) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_4013
     }
 
@@ -27981,9 +27768,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4038 {
-        (__ci_expr_old_500 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_496 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_500 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_496 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_4042
         } else {
             goto '__ci_bb_4043
@@ -28017,14 +27804,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4048 {
-        (__ci_expr_old_503 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_499 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_503) as c_uint)))
-        (__ci_expr_logic_504 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_499) as c_uint)))
+        (__ci_expr_logic_500 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_504 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_500 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_504 != 0) {
+        if (__ci_expr_logic_500 != 0) {
             goto '__ci_bb_4059
         } else {
             goto '__ci_bb_4060
@@ -28032,20 +27819,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4049 {
-        (__ci_expr_logic_502 = 0)
+        (__ci_expr_logic_498 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_501: c_int
+            var __ci_expr_logic_497: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_501 = (if true: 1 else: 0))
+                (__ci_expr_logic_497 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_501 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_497 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_502 = (if __ci_expr_logic_501 != 0: 1 else: 0))
+            (__ci_expr_logic_498 = (if __ci_expr_logic_497 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_502 != 0) {
+        if (__ci_expr_logic_498 != 0) {
             goto '__ci_bb_4052
         } else {
             goto '__ci_bb_4053
@@ -28101,11 +27888,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_4060 {
         (__local_prop__goto_3857_31 = (&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize))
         if ((if (*__local_prop__goto_3857_31).script == (*__local_F__goto_692_12).temp_32[3]: 1 else: 0) != 0) {
-            (__ci_expr_logic_506 = (if true: 1 else: 0))
+            (__ci_expr_logic_502 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_506 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_3857_31).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((*__local_F__goto_692_12).temp_32[3] as c_uint) / (32 as c_uint))]) as c_uint) & (((1 as c_uint) << ((((*__local_F__goto_692_12).temp_32[3] as c_uint) % (32 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_502 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_3857_31).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((*__local_F__goto_692_12).temp_32[3] as c_uint) / (32 as c_uint))]) as c_uint) & (((1 as c_uint) << ((((*__local_F__goto_692_12).temp_32[3] as c_uint) % (32 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_ok__goto_3856_18 = __ci_expr_logic_506)
+        (__local_ok__goto_3856_18 = __ci_expr_logic_502)
         if ((if __local_ok__goto_3856_18 == (if (*__local_F__goto_692_12).temp_32[2] == 15: 1 else: 0): 1 else: 0) != 0) {
             goto '__ci_bb_4073
         } else {
@@ -28114,9 +27901,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4061 {
-        (__ci_expr_old_505 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_501 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_505) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_501) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_4063
     }
 
@@ -28244,9 +28031,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4088 {
-        (__ci_expr_old_507 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_503 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_507 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_503 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_4092
         } else {
             goto '__ci_bb_4093
@@ -28280,14 +28067,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4098 {
-        (__ci_expr_old_510 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_506 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_510) as c_uint)))
-        (__ci_expr_logic_511 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_506) as c_uint)))
+        (__ci_expr_logic_507 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_511 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_507 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_511 != 0) {
+        if (__ci_expr_logic_507 != 0) {
             goto '__ci_bb_4109
         } else {
             goto '__ci_bb_4110
@@ -28295,20 +28082,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4099 {
-        (__ci_expr_logic_509 = 0)
+        (__ci_expr_logic_505 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_508: c_int
+            var __ci_expr_logic_504: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_508 = (if true: 1 else: 0))
+                (__ci_expr_logic_504 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_508 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_504 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_509 = (if __ci_expr_logic_508 != 0: 1 else: 0))
+            (__ci_expr_logic_505 = (if __ci_expr_logic_504 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_509 != 0) {
+        if (__ci_expr_logic_505 != 0) {
             goto '__ci_bb_4102
         } else {
             goto '__ci_bb_4103
@@ -28364,11 +28151,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_4110 {
         (__local_category__goto_3878_17 = ((_pcre2_ucp_gentype_8[((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).chartype] as c_int)))
         if ((if __local_category__goto_3878_17 == ucp_L: 1 else: 0) != 0) {
-            (__ci_expr_logic_513 = (if true: 1 else: 0))
+            (__ci_expr_logic_509 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_513 = (if (if __local_category__goto_3878_17 == ucp_N: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_509 = (if (if __local_category__goto_3878_17 == ucp_N: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_513 == (if (*__local_F__goto_692_12).temp_32[2] == 15: 1 else: 0): 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_509 == (if (*__local_F__goto_692_12).temp_32[2] == 15: 1 else: 0): 1 else: 0) != 0) {
             goto '__ci_bb_4123
         } else {
             goto '__ci_bb_4124
@@ -28376,9 +28163,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4111 {
-        (__ci_expr_old_512 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_508 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_512) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_508) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_4113
     }
 
@@ -28506,9 +28293,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4138 {
-        (__ci_expr_old_514 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_510 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_514 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_510 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_4142
         } else {
             goto '__ci_bb_4143
@@ -28542,14 +28329,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4148 {
-        (__ci_expr_old_517 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_513 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_517) as c_uint)))
-        (__ci_expr_logic_518 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_513) as c_uint)))
+        (__ci_expr_logic_514 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_518 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_514 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_518 != 0) {
+        if (__ci_expr_logic_514 != 0) {
             goto '__ci_bb_4159
         } else {
             goto '__ci_bb_4160
@@ -28557,20 +28344,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4149 {
-        (__ci_expr_logic_516 = 0)
+        (__ci_expr_logic_512 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_515: c_int
+            var __ci_expr_logic_511: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_515 = (if true: 1 else: 0))
+                (__ci_expr_logic_511 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_515 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_511 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_516 = (if __ci_expr_logic_515 != 0: 1 else: 0))
+            (__ci_expr_logic_512 = (if __ci_expr_logic_511 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_516 != 0) {
+        if (__ci_expr_logic_512 != 0) {
             goto '__ci_bb_4152
         } else {
             goto '__ci_bb_4153
@@ -28628,9 +28415,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4161 {
-        (__ci_expr_old_519 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_515 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_519) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_515) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_4163
     }
 
@@ -28999,9 +28786,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4222 {
-        (__ci_expr_old_520 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_516 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_520 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_516 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_4226
         } else {
             goto '__ci_bb_4227
@@ -29035,14 +28822,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4232 {
-        (__ci_expr_old_523 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_519 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_523) as c_uint)))
-        (__ci_expr_logic_524 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_519) as c_uint)))
+        (__ci_expr_logic_520 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_524 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_520 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_524 != 0) {
+        if (__ci_expr_logic_520 != 0) {
             goto '__ci_bb_4243
         } else {
             goto '__ci_bb_4244
@@ -29050,20 +28837,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4233 {
-        (__ci_expr_logic_522 = 0)
+        (__ci_expr_logic_518 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_521: c_int
+            var __ci_expr_logic_517: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_521 = (if true: 1 else: 0))
+                (__ci_expr_logic_517 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_521 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_517 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_522 = (if __ci_expr_logic_521 != 0: 1 else: 0))
+            (__ci_expr_logic_518 = (if __ci_expr_logic_517 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_522 != 0) {
+        if (__ci_expr_logic_518 != 0) {
             goto '__ci_bb_4236
         } else {
             goto '__ci_bb_4237
@@ -29120,21 +28907,21 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
         (__local_chartype__goto_3929_17 = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).chartype as c_int)))
         (__local_category__goto_3929_27 = ((_pcre2_ucp_gentype_8[__local_chartype__goto_3929_17] as c_int)))
         if ((if __local_category__goto_3929_27 == ucp_L: 1 else: 0) != 0) {
-            (__ci_expr_logic_526 = (if true: 1 else: 0))
+            (__ci_expr_logic_522 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_526 = (if (if __local_category__goto_3929_27 == ucp_N: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_522 = (if (if __local_category__goto_3929_27 == ucp_N: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_526 != 0) {
-            (__ci_expr_logic_527 = (if true: 1 else: 0))
+        if (__ci_expr_logic_522 != 0) {
+            (__ci_expr_logic_523 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_527 = (if (if __local_chartype__goto_3929_17 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_523 = (if (if __local_chartype__goto_3929_17 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_527 != 0) {
-            (__ci_expr_logic_528 = (if true: 1 else: 0))
+        if (__ci_expr_logic_523 != 0) {
+            (__ci_expr_logic_524 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_528 = (if (if __local_chartype__goto_3929_17 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_524 = (if (if __local_chartype__goto_3929_17 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_528 == (if (*__local_F__goto_692_12).temp_32[2] == 15: 1 else: 0): 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_524 == (if (*__local_F__goto_692_12).temp_32[2] == 15: 1 else: 0): 1 else: 0) != 0) {
             goto '__ci_bb_4257
         } else {
             goto '__ci_bb_4258
@@ -29142,9 +28929,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4245 {
-        (__ci_expr_old_525 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_521 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_525) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_521) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_4247
     }
 
@@ -29272,9 +29059,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4272 {
-        (__ci_expr_old_529 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_525 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_529 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_525 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_4276
         } else {
             goto '__ci_bb_4277
@@ -29308,14 +29095,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4282 {
-        (__ci_expr_old_532 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_528 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_532) as c_uint)))
-        (__ci_expr_logic_533 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_528) as c_uint)))
+        (__ci_expr_logic_529 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_533 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_529 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_533 != 0) {
+        if (__ci_expr_logic_529 != 0) {
             goto '__ci_bb_4293
         } else {
             goto '__ci_bb_4294
@@ -29323,20 +29110,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4283 {
-        (__ci_expr_logic_531 = 0)
+        (__ci_expr_logic_527 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_530: c_int
+            var __ci_expr_logic_526: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_530 = (if true: 1 else: 0))
+                (__ci_expr_logic_526 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_530 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_526 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_531 = (if __ci_expr_logic_530 != 0: 1 else: 0))
+            (__ci_expr_logic_527 = (if __ci_expr_logic_526 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_531 != 0) {
+        if (__ci_expr_logic_527 != 0) {
             goto '__ci_bb_4286
         } else {
             goto '__ci_bb_4287
@@ -29395,9 +29182,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4295 {
-        (__ci_expr_old_534 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_530 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_534) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_530) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_4297
     }
 
@@ -29494,9 +29281,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4312 {
-        (__ci_expr_old_535 = __local_cp__goto_3952_29)
+        (__ci_expr_old_531 = __local_cp__goto_3952_29)
         (__local_cp__goto_3952_29 = __local_cp__goto_3952_29 + 1)
-        if ((if __local_fc__goto_714_10 == (*__ci_expr_old_535): 1 else: 0) != 0) {
+        if ((if __local_fc__goto_714_10 == (*__ci_expr_old_531): 1 else: 0) != 0) {
             goto '__ci_bb_4318
         } else {
             goto '__ci_bb_4319
@@ -29588,9 +29375,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4335 {
-        (__ci_expr_old_536 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_532 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_536 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_532 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_4339
         } else {
             goto '__ci_bb_4340
@@ -29624,14 +29411,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4345 {
-        (__ci_expr_old_539 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_535 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_539) as c_uint)))
-        (__ci_expr_logic_540 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_535) as c_uint)))
+        (__ci_expr_logic_536 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_540 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_536 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_540 != 0) {
+        if (__ci_expr_logic_536 != 0) {
             goto '__ci_bb_4356
         } else {
             goto '__ci_bb_4357
@@ -29639,20 +29426,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4346 {
-        (__ci_expr_logic_538 = 0)
+        (__ci_expr_logic_534 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_537: c_int
+            var __ci_expr_logic_533: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_537 = (if true: 1 else: 0))
+                (__ci_expr_logic_533 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_537 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_533 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_538 = (if __ci_expr_logic_537 != 0: 1 else: 0))
+            (__ci_expr_logic_534 = (if __ci_expr_logic_533 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_538 != 0) {
+        if (__ci_expr_logic_534 != 0) {
             goto '__ci_bb_4349
         } else {
             goto '__ci_bb_4350
@@ -29707,33 +29494,33 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_4357 {
         if ((if __local_fc__goto_714_10 == 36: 1 else: 0) != 0) {
-            (__ci_expr_logic_542 = (if true: 1 else: 0))
+            (__ci_expr_logic_538 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_542 = (if (if __local_fc__goto_714_10 == 64: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_538 = (if (if __local_fc__goto_714_10 == 64: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_542 != 0) {
-            (__ci_expr_logic_543 = (if true: 1 else: 0))
+        if (__ci_expr_logic_538 != 0) {
+            (__ci_expr_logic_539 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_543 = (if (if __local_fc__goto_714_10 == 96: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_539 = (if (if __local_fc__goto_714_10 == 96: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_543 != 0) {
-            (__ci_expr_logic_545 = (if true: 1 else: 0))
+        if (__ci_expr_logic_539 != 0) {
+            (__ci_expr_logic_541 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_544: c_int = 0
+            var __ci_expr_logic_540: c_int = 0
 
             if ((if __local_fc__goto_714_10 >= 160: 1 else: 0) != 0) {
-                (__ci_expr_logic_544 = (if (if __local_fc__goto_714_10 <= 55295: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_540 = (if (if __local_fc__goto_714_10 <= 55295: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_545 = (if __ci_expr_logic_544 != 0: 1 else: 0))
+            (__ci_expr_logic_541 = (if __ci_expr_logic_540 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_545 != 0) {
-            (__ci_expr_logic_546 = (if true: 1 else: 0))
+        if (__ci_expr_logic_541 != 0) {
+            (__ci_expr_logic_542 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_546 = (if (if __local_fc__goto_714_10 >= 57344: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_542 = (if (if __local_fc__goto_714_10 >= 57344: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_546 == (if (*__local_F__goto_692_12).temp_32[2] == 15: 1 else: 0): 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_542 == (if (*__local_F__goto_692_12).temp_32[2] == 15: 1 else: 0): 1 else: 0) != 0) {
             goto '__ci_bb_4370
         } else {
             goto '__ci_bb_4371
@@ -29741,9 +29528,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4358 {
-        (__ci_expr_old_541 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_537 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_541) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_537) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_4360
     }
 
@@ -29871,9 +29658,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4385 {
-        (__ci_expr_old_547 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_543 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_547 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_543 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_4389
         } else {
             goto '__ci_bb_4390
@@ -29907,14 +29694,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4395 {
-        (__ci_expr_old_550 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_546 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_550) as c_uint)))
-        (__ci_expr_logic_551 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_546) as c_uint)))
+        (__ci_expr_logic_547 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_551 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_547 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_551 != 0) {
+        if (__ci_expr_logic_547 != 0) {
             goto '__ci_bb_4406
         } else {
             goto '__ci_bb_4407
@@ -29922,20 +29709,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4396 {
-        (__ci_expr_logic_549 = 0)
+        (__ci_expr_logic_545 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_548: c_int
+            var __ci_expr_logic_544: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_548 = (if true: 1 else: 0))
+                (__ci_expr_logic_544 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_548 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_544 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_549 = (if __ci_expr_logic_548 != 0: 1 else: 0))
+            (__ci_expr_logic_545 = (if __ci_expr_logic_544 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_549 != 0) {
+        if (__ci_expr_logic_545 != 0) {
             goto '__ci_bb_4399
         } else {
             goto '__ci_bb_4400
@@ -29997,9 +29784,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4408 {
-        (__ci_expr_old_552 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_548 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_552) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_548) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_4410
     }
 
@@ -30127,9 +29914,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4435 {
-        (__ci_expr_old_553 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_549 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_553 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_549 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_4439
         } else {
             goto '__ci_bb_4440
@@ -30163,14 +29950,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4445 {
-        (__ci_expr_old_556 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_552 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_556) as c_uint)))
-        (__ci_expr_logic_557 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_552) as c_uint)))
+        (__ci_expr_logic_553 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_557 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_553 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_557 != 0) {
+        if (__ci_expr_logic_553 != 0) {
             goto '__ci_bb_4456
         } else {
             goto '__ci_bb_4457
@@ -30178,20 +29965,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4446 {
-        (__ci_expr_logic_555 = 0)
+        (__ci_expr_logic_551 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_554: c_int
+            var __ci_expr_logic_550: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_554 = (if true: 1 else: 0))
+                (__ci_expr_logic_550 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_554 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_550 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_555 = (if __ci_expr_logic_554 != 0: 1 else: 0))
+            (__ci_expr_logic_551 = (if __ci_expr_logic_550 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_555 != 0) {
+        if (__ci_expr_logic_551 != 0) {
             goto '__ci_bb_4449
         } else {
             goto '__ci_bb_4450
@@ -30255,9 +30042,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4458 {
-        (__ci_expr_old_558 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_554 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_558) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_554) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_4460
     }
 
@@ -30509,9 +30296,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4503 {
-        (__ci_expr_old_559 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_555 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_559 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_555 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_4507
         } else {
             goto '__ci_bb_4508
@@ -30545,14 +30332,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4513 {
-        (__ci_expr_old_562 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_558 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_562) as c_uint)))
-        (__ci_expr_logic_563 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_558) as c_uint)))
+        (__ci_expr_logic_559 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_563 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_559 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_563 != 0) {
+        if (__ci_expr_logic_559 != 0) {
             goto '__ci_bb_4525
         } else {
             goto '__ci_bb_4526
@@ -30564,20 +30351,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4515 {
-        (__ci_expr_logic_561 = 0)
+        (__ci_expr_logic_557 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_560: c_int
+            var __ci_expr_logic_556: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_560 = (if true: 1 else: 0))
+                (__ci_expr_logic_556 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_560 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_556 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_561 = (if __ci_expr_logic_560 != 0: 1 else: 0))
+            (__ci_expr_logic_557 = (if __ci_expr_logic_556 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_561 != 0) {
+        if (__ci_expr_logic_557 != 0) {
             goto '__ci_bb_4518
         } else {
             goto '__ci_bb_4519
@@ -30636,9 +30423,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4527 {
-        (__ci_expr_old_564 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_560 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_564) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_560) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_4529
     }
 
@@ -30735,20 +30522,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4544 {
-        (__ci_expr_logic_566 = 0)
+        (__ci_expr_logic_562 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_565: c_int
+            var __ci_expr_logic_561: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_565 = (if true: 1 else: 0))
+                (__ci_expr_logic_561 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_565 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_561 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_566 = (if __ci_expr_logic_565 != 0: 1 else: 0))
+            (__ci_expr_logic_562 = (if __ci_expr_logic_561 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_566 != 0) {
+        if (__ci_expr_logic_562 != 0) {
             goto '__ci_bb_4547
         } else {
             goto '__ci_bb_4548
@@ -30839,9 +30626,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4563 {
-        (__ci_expr_old_567 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_563 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_567 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_563 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_4567
         } else {
             goto '__ci_bb_4568
@@ -30875,49 +30662,49 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4573 {
-        (__ci_expr_logic_575 = 0)
+        (__ci_expr_logic_571 = 0)
         if ((if (*__local_F__goto_692_12).temp_32[2] == 12: 1 else: 0) != 0) {
-            var __ci_expr_ternary_574: c_int = 0
+            var __ci_expr_ternary_570: c_int = 0
 
             if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_570: c_int = 0
+                var __ci_expr_logic_566: c_int = 0
 
                 if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_570 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_566 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_574 = __ci_expr_logic_570)
+                (__ci_expr_ternary_570 = __ci_expr_logic_566)
 
             } else {
-                var __ci_expr_logic_573: c_int = 0
+                var __ci_expr_logic_569: c_int = 0
 
-                var __ci_expr_logic_571: c_int = 0
+                var __ci_expr_logic_567: c_int = 0
 
                 if ((if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_571 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_567 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_571 != 0) {
-                    var __ci_expr_logic_572: c_int
+                if (__ci_expr_logic_567 != 0) {
+                    var __ci_expr_logic_568: c_int
 
                     if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_572 = (if true: 1 else: 0))
+                        (__ci_expr_logic_568 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_572 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_568 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_573 = (if __ci_expr_logic_572 != 0: 1 else: 0))
+                    (__ci_expr_logic_569 = (if __ci_expr_logic_568 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_574 = __ci_expr_logic_573)
+                (__ci_expr_ternary_570 = __ci_expr_logic_569)
 
             }
 
-            (__ci_expr_logic_575 = (if __ci_expr_ternary_574 != 0: 1 else: 0))
+            (__ci_expr_logic_571 = (if __ci_expr_ternary_570 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_575 != 0) {
+        if (__ci_expr_logic_571 != 0) {
             goto '__ci_bb_4584
         } else {
             goto '__ci_bb_4585
@@ -30925,20 +30712,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4574 {
-        (__ci_expr_logic_569 = 0)
+        (__ci_expr_logic_565 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_568: c_int
+            var __ci_expr_logic_564: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_568 = (if true: 1 else: 0))
+                (__ci_expr_logic_564 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_568 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_564 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_569 = (if __ci_expr_logic_568 != 0: 1 else: 0))
+            (__ci_expr_logic_565 = (if __ci_expr_logic_564 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_569 != 0) {
+        if (__ci_expr_logic_565 != 0) {
             goto '__ci_bb_4577
         } else {
             goto '__ci_bb_4578
@@ -30988,9 +30775,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4585 {
-        (__ci_expr_old_576 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_572 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_576) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_572) as c_uint)))
         if ((if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_4589
         } else {
@@ -31016,9 +30803,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4591 {
-        (__ci_expr_old_577 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_573 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_577) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_573) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_4593
     }
 
@@ -31099,23 +30886,23 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4605 {
-        (__ci_expr_logic_581 = 0)
-        (__ci_expr_logic_580 = 0)
-        (__ci_expr_logic_579 = 0)
-        (__ci_expr_logic_578 = 0)
+        (__ci_expr_logic_577 = 0)
+        (__ci_expr_logic_576 = 0)
+        (__ci_expr_logic_575 = 0)
+        (__ci_expr_logic_574 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_578 = (if (if (*__local_F__goto_692_12).eptr >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_574 = (if (if (*__local_F__goto_692_12).eptr >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_578 != 0) {
-            (__ci_expr_logic_579 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_574 != 0) {
+            (__ci_expr_logic_575 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_579 != 0) {
-            (__ci_expr_logic_580 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_575 != 0) {
+            (__ci_expr_logic_576 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_580 != 0) {
-            (__ci_expr_logic_581 = (if (if __local_fc__goto_714_10 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_576 != 0) {
+            (__ci_expr_logic_577 = (if (if __local_fc__goto_714_10 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_581 != 0) {
+        if (__ci_expr_logic_577 != 0) {
             goto '__ci_bb_4606
         } else {
             goto '__ci_bb_4607
@@ -31173,11 +30960,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4618 {
-        (__ci_expr_logic_582 = 0)
+        (__ci_expr_logic_578 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_582 = (if (if (*((*__local_F__goto_692_12).eptr)) == 10: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_578 = (if (if (*((*__local_F__goto_692_12).eptr)) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_582 != 0) {
+        if (__ci_expr_logic_578 != 0) {
             goto '__ci_bb_4619
         } else {
             goto '__ci_bb_4620
@@ -31767,11 +31554,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4714 {
-        (__ci_expr_logic_583 = 0)
+        (__ci_expr_logic_579 = 0)
         if ((if __local_fc__goto_714_10 < 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_583 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_579 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_583 != 0) {
+        if (__ci_expr_logic_579 != 0) {
             goto '__ci_bb_4715
         } else {
             goto '__ci_bb_4716
@@ -31793,11 +31580,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_4720 {
         if ((if __local_fc__goto_714_10 >= 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_584 = (if true: 1 else: 0))
+            (__ci_expr_logic_580 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_584 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_580 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_584 != 0) {
+        if (__ci_expr_logic_580 != 0) {
             goto '__ci_bb_4721
         } else {
             goto '__ci_bb_4722
@@ -31818,11 +31605,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4726 {
-        (__ci_expr_logic_585 = 0)
+        (__ci_expr_logic_581 = 0)
         if ((if __local_fc__goto_714_10 < 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_585 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_581 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_585 != 0) {
+        if (__ci_expr_logic_581 != 0) {
             goto '__ci_bb_4727
         } else {
             goto '__ci_bb_4728
@@ -31844,11 +31631,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_4732 {
         if ((if __local_fc__goto_714_10 >= 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_586 = (if true: 1 else: 0))
+            (__ci_expr_logic_582 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_586 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_582 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_586 != 0) {
+        if (__ci_expr_logic_582 != 0) {
             goto '__ci_bb_4733
         } else {
             goto '__ci_bb_4734
@@ -31869,11 +31656,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4738 {
-        (__ci_expr_logic_587 = 0)
+        (__ci_expr_logic_583 = 0)
         if ((if __local_fc__goto_714_10 < 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_587 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_583 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_587 != 0) {
+        if (__ci_expr_logic_583 != 0) {
             goto '__ci_bb_4739
         } else {
             goto '__ci_bb_4740
@@ -31895,11 +31682,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_4744 {
         if ((if __local_fc__goto_714_10 >= 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_588 = (if true: 1 else: 0))
+            (__ci_expr_logic_584 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_588 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_584 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_588 != 0) {
+        if (__ci_expr_logic_584 != 0) {
             goto '__ci_bb_4745
         } else {
             goto '__ci_bb_4746
@@ -32086,9 +31873,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4776 {
-        (__ci_expr_old_589 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_585 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_589 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_585 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_4780
         } else {
             goto '__ci_bb_4781
@@ -32122,49 +31909,49 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4786 {
-        (__ci_expr_logic_597 = 0)
+        (__ci_expr_logic_593 = 0)
         if ((if (*__local_F__goto_692_12).temp_32[2] == 12: 1 else: 0) != 0) {
-            var __ci_expr_ternary_596: c_int = 0
+            var __ci_expr_ternary_592: c_int = 0
 
             if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_592: c_int = 0
+                var __ci_expr_logic_588: c_int = 0
 
                 if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_592 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_588 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_596 = __ci_expr_logic_592)
+                (__ci_expr_ternary_592 = __ci_expr_logic_588)
 
             } else {
-                var __ci_expr_logic_595: c_int = 0
+                var __ci_expr_logic_591: c_int = 0
 
-                var __ci_expr_logic_593: c_int = 0
+                var __ci_expr_logic_589: c_int = 0
 
                 if ((if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_593 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_589 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_593 != 0) {
-                    var __ci_expr_logic_594: c_int
+                if (__ci_expr_logic_589 != 0) {
+                    var __ci_expr_logic_590: c_int
 
                     if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_594 = (if true: 1 else: 0))
+                        (__ci_expr_logic_590 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_594 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_590 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_595 = (if __ci_expr_logic_594 != 0: 1 else: 0))
+                    (__ci_expr_logic_591 = (if __ci_expr_logic_590 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_596 = __ci_expr_logic_595)
+                (__ci_expr_ternary_592 = __ci_expr_logic_591)
 
             }
 
-            (__ci_expr_logic_597 = (if __ci_expr_ternary_596 != 0: 1 else: 0))
+            (__ci_expr_logic_593 = (if __ci_expr_ternary_592 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_597 != 0) {
+        if (__ci_expr_logic_593 != 0) {
             goto '__ci_bb_4797
         } else {
             goto '__ci_bb_4798
@@ -32172,20 +31959,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4787 {
-        (__ci_expr_logic_591 = 0)
+        (__ci_expr_logic_587 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_590: c_int
+            var __ci_expr_logic_586: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_590 = (if true: 1 else: 0))
+                (__ci_expr_logic_586 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_590 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_586 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_591 = (if __ci_expr_logic_590 != 0: 1 else: 0))
+            (__ci_expr_logic_587 = (if __ci_expr_logic_586 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_591 != 0) {
+        if (__ci_expr_logic_587 != 0) {
             goto '__ci_bb_4790
         } else {
             goto '__ci_bb_4791
@@ -32235,9 +32022,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4798 {
-        (__ci_expr_old_598 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_594 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_598) as c_uint)))
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_594) as c_uint)))
         goto '__ci_bb_4802
     }
 
@@ -32259,23 +32046,23 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4804 {
-        (__ci_expr_logic_602 = 0)
-        (__ci_expr_logic_601 = 0)
-        (__ci_expr_logic_600 = 0)
-        (__ci_expr_logic_599 = 0)
+        (__ci_expr_logic_598 = 0)
+        (__ci_expr_logic_597 = 0)
+        (__ci_expr_logic_596 = 0)
+        (__ci_expr_logic_595 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_599 = (if (if (*__local_F__goto_692_12).eptr >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_595 = (if (if (*__local_F__goto_692_12).eptr >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_599 != 0) {
-            (__ci_expr_logic_600 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_595 != 0) {
+            (__ci_expr_logic_596 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_600 != 0) {
-            (__ci_expr_logic_601 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_596 != 0) {
+            (__ci_expr_logic_597 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_601 != 0) {
-            (__ci_expr_logic_602 = (if (if __local_fc__goto_714_10 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_597 != 0) {
+            (__ci_expr_logic_598 = (if (if __local_fc__goto_714_10 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_602 != 0) {
+        if (__ci_expr_logic_598 != 0) {
             goto '__ci_bb_4805
         } else {
             goto '__ci_bb_4806
@@ -32333,11 +32120,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4817 {
-        (__ci_expr_logic_603 = 0)
+        (__ci_expr_logic_599 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_603 = (if (if (*((*__local_F__goto_692_12).eptr)) == 10: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_599 = (if (if (*((*__local_F__goto_692_12).eptr)) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_603 != 0) {
+        if (__ci_expr_logic_599 != 0) {
             goto '__ci_bb_4818
         } else {
             goto '__ci_bb_4819
@@ -32623,11 +32410,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4875 {
-        (__ci_expr_logic_604 = 0)
+        (__ci_expr_logic_600 = 0)
         if (1 != 0) {
-            (__ci_expr_logic_604 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_600 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_604 != 0) {
+        if (__ci_expr_logic_600 != 0) {
             goto '__ci_bb_4876
         } else {
             goto '__ci_bb_4877
@@ -32649,11 +32436,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_4881 {
         if ((if not (1 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_605 = (if true: 1 else: 0))
+            (__ci_expr_logic_601 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_605 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_601 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_605 != 0) {
+        if (__ci_expr_logic_601 != 0) {
             goto '__ci_bb_4882
         } else {
             goto '__ci_bb_4883
@@ -32674,11 +32461,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4887 {
-        (__ci_expr_logic_606 = 0)
+        (__ci_expr_logic_602 = 0)
         if (1 != 0) {
-            (__ci_expr_logic_606 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_602 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_606 != 0) {
+        if (__ci_expr_logic_602 != 0) {
             goto '__ci_bb_4888
         } else {
             goto '__ci_bb_4889
@@ -32700,11 +32487,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_4893 {
         if ((if not (1 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_607 = (if true: 1 else: 0))
+            (__ci_expr_logic_603 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_607 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_603 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_607 != 0) {
+        if (__ci_expr_logic_603 != 0) {
             goto '__ci_bb_4894
         } else {
             goto '__ci_bb_4895
@@ -32725,11 +32512,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4899 {
-        (__ci_expr_logic_608 = 0)
+        (__ci_expr_logic_604 = 0)
         if (1 != 0) {
-            (__ci_expr_logic_608 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_604 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_608 != 0) {
+        if (__ci_expr_logic_604 != 0) {
             goto '__ci_bb_4900
         } else {
             goto '__ci_bb_4901
@@ -32751,11 +32538,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_4905 {
         if ((if not (1 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_609 = (if true: 1 else: 0))
+            (__ci_expr_logic_605 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_609 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_605 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_609 != 0) {
+        if (__ci_expr_logic_605 != 0) {
             goto '__ci_bb_4906
         } else {
             goto '__ci_bb_4907
@@ -32969,11 +32756,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_4939 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_612 = 0)
+        (__ci_expr_logic_608 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_612 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_608 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_612 != 0) {
+        if (__ci_expr_logic_608 != 0) {
             goto '__ci_bb_4947
         } else {
             goto '__ci_bb_4948
@@ -32981,20 +32768,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4940 {
-        (__ci_expr_logic_611 = 0)
+        (__ci_expr_logic_607 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_610: c_int
+            var __ci_expr_logic_606: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_610 = (if true: 1 else: 0))
+                (__ci_expr_logic_606 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_610 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_606 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_611 = (if __ci_expr_logic_610 != 0: 1 else: 0))
+            (__ci_expr_logic_607 = (if __ci_expr_logic_606 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_611 != 0) {
+        if (__ci_expr_logic_607 != 0) {
             goto '__ci_bb_4943
         } else {
             goto '__ci_bb_4944
@@ -33045,16 +32832,16 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_4948 {
         (__local_chartype__goto_4380_17 = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).chartype as c_int)))
         if ((if __local_chartype__goto_4380_17 == ucp_Lu: 1 else: 0) != 0) {
-            (__ci_expr_logic_613 = (if true: 1 else: 0))
+            (__ci_expr_logic_609 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_613 = (if (if __local_chartype__goto_4380_17 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_609 = (if (if __local_chartype__goto_4380_17 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_613 != 0) {
-            (__ci_expr_logic_614 = (if true: 1 else: 0))
+        if (__ci_expr_logic_609 != 0) {
+            (__ci_expr_logic_610 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_614 = (if (if __local_chartype__goto_4380_17 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_610 = (if (if __local_chartype__goto_4380_17 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_614 == __local_notmatch__goto_4374_14: 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_610 == __local_notmatch__goto_4374_14: 1 else: 0) != 0) {
             goto '__ci_bb_4961
         } else {
             goto '__ci_bb_4962
@@ -33177,11 +32964,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_4969 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_617 = 0)
+        (__ci_expr_logic_613 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_617 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_613 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_617 != 0) {
+        if (__ci_expr_logic_613 != 0) {
             goto '__ci_bb_4977
         } else {
             goto '__ci_bb_4978
@@ -33189,20 +32976,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_4970 {
-        (__ci_expr_logic_616 = 0)
+        (__ci_expr_logic_612 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_615: c_int
+            var __ci_expr_logic_611: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_615 = (if true: 1 else: 0))
+                (__ci_expr_logic_611 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_615 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_611 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_616 = (if __ci_expr_logic_615 != 0: 1 else: 0))
+            (__ci_expr_logic_612 = (if __ci_expr_logic_611 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_616 != 0) {
+        if (__ci_expr_logic_612 != 0) {
             goto '__ci_bb_4973
         } else {
             goto '__ci_bb_4974
@@ -33374,11 +33161,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_4999 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_620 = 0)
+        (__ci_expr_logic_616 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_620 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_616 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_620 != 0) {
+        if (__ci_expr_logic_616 != 0) {
             goto '__ci_bb_5007
         } else {
             goto '__ci_bb_5008
@@ -33386,20 +33173,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5000 {
-        (__ci_expr_logic_619 = 0)
+        (__ci_expr_logic_615 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_618: c_int
+            var __ci_expr_logic_614: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_618 = (if true: 1 else: 0))
+                (__ci_expr_logic_614 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_618 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_614 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_619 = (if __ci_expr_logic_618 != 0: 1 else: 0))
+            (__ci_expr_logic_615 = (if __ci_expr_logic_614 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_619 != 0) {
+        if (__ci_expr_logic_615 != 0) {
             goto '__ci_bb_5003
         } else {
             goto '__ci_bb_5004
@@ -33571,11 +33358,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5029 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_623 = 0)
+        (__ci_expr_logic_619 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_623 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_619 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_623 != 0) {
+        if (__ci_expr_logic_619 != 0) {
             goto '__ci_bb_5037
         } else {
             goto '__ci_bb_5038
@@ -33583,20 +33370,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5030 {
-        (__ci_expr_logic_622 = 0)
+        (__ci_expr_logic_618 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_621: c_int
+            var __ci_expr_logic_617: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_621 = (if true: 1 else: 0))
+                (__ci_expr_logic_617 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_621 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_617 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_622 = (if __ci_expr_logic_621 != 0: 1 else: 0))
+            (__ci_expr_logic_618 = (if __ci_expr_logic_617 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_622 != 0) {
+        if (__ci_expr_logic_618 != 0) {
             goto '__ci_bb_5033
         } else {
             goto '__ci_bb_5034
@@ -33768,11 +33555,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5059 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_626 = 0)
+        (__ci_expr_logic_622 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_626 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_622 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_626 != 0) {
+        if (__ci_expr_logic_622 != 0) {
             goto '__ci_bb_5067
         } else {
             goto '__ci_bb_5068
@@ -33780,20 +33567,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5060 {
-        (__ci_expr_logic_625 = 0)
+        (__ci_expr_logic_621 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_624: c_int
+            var __ci_expr_logic_620: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_624 = (if true: 1 else: 0))
+                (__ci_expr_logic_620 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_624 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_620 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_625 = (if __ci_expr_logic_624 != 0: 1 else: 0))
+            (__ci_expr_logic_621 = (if __ci_expr_logic_620 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_625 != 0) {
+        if (__ci_expr_logic_621 != 0) {
             goto '__ci_bb_5063
         } else {
             goto '__ci_bb_5064
@@ -33844,11 +33631,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_5068 {
         (__local_prop__goto_4446_31 = (&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize))
         if ((if (*__local_prop__goto_4446_31).script == (*__local_F__goto_692_12).temp_32[3]: 1 else: 0) != 0) {
-            (__ci_expr_logic_627 = (if true: 1 else: 0))
+            (__ci_expr_logic_623 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_627 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_4446_31).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((*__local_F__goto_692_12).temp_32[3] as c_uint) / (32 as c_uint))]) as c_uint) & (((1 as c_uint) << ((((*__local_F__goto_692_12).temp_32[3] as c_uint) % (32 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_623 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_4446_31).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((*__local_F__goto_692_12).temp_32[3] as c_uint) / (32 as c_uint))]) as c_uint) & (((1 as c_uint) << ((((*__local_F__goto_692_12).temp_32[3] as c_uint) % (32 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_ok__goto_4445_18 = __ci_expr_logic_627)
+        (__local_ok__goto_4445_18 = __ci_expr_logic_623)
         if ((if __local_ok__goto_4445_18 == __local_notmatch__goto_4374_14: 1 else: 0) != 0) {
             goto '__ci_bb_5081
         } else {
@@ -33972,11 +33759,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5089 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_630 = 0)
+        (__ci_expr_logic_626 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_630 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_626 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_630 != 0) {
+        if (__ci_expr_logic_626 != 0) {
             goto '__ci_bb_5097
         } else {
             goto '__ci_bb_5098
@@ -33984,20 +33771,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5090 {
-        (__ci_expr_logic_629 = 0)
+        (__ci_expr_logic_625 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_628: c_int
+            var __ci_expr_logic_624: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_628 = (if true: 1 else: 0))
+                (__ci_expr_logic_624 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_628 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_624 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_629 = (if __ci_expr_logic_628 != 0: 1 else: 0))
+            (__ci_expr_logic_625 = (if __ci_expr_logic_624 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_629 != 0) {
+        if (__ci_expr_logic_625 != 0) {
             goto '__ci_bb_5093
         } else {
             goto '__ci_bb_5094
@@ -34048,11 +33835,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_5098 {
         (__local_category__goto_4465_17 = ((_pcre2_ucp_gentype_8[((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).chartype] as c_int)))
         if ((if __local_category__goto_4465_17 == ucp_L: 1 else: 0) != 0) {
-            (__ci_expr_logic_631 = (if true: 1 else: 0))
+            (__ci_expr_logic_627 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_631 = (if (if __local_category__goto_4465_17 == ucp_N: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_627 = (if (if __local_category__goto_4465_17 == ucp_N: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_631 == __local_notmatch__goto_4374_14: 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_627 == __local_notmatch__goto_4374_14: 1 else: 0) != 0) {
             goto '__ci_bb_5111
         } else {
             goto '__ci_bb_5112
@@ -34175,11 +33962,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5119 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_634 = 0)
+        (__ci_expr_logic_630 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_634 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_630 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_634 != 0) {
+        if (__ci_expr_logic_630 != 0) {
             goto '__ci_bb_5127
         } else {
             goto '__ci_bb_5128
@@ -34187,20 +33974,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5120 {
-        (__ci_expr_logic_633 = 0)
+        (__ci_expr_logic_629 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_632: c_int
+            var __ci_expr_logic_628: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_632 = (if true: 1 else: 0))
+                (__ci_expr_logic_628 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_632 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_628 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_633 = (if __ci_expr_logic_632 != 0: 1 else: 0))
+            (__ci_expr_logic_629 = (if __ci_expr_logic_628 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_633 != 0) {
+        if (__ci_expr_logic_629 != 0) {
             goto '__ci_bb_5123
         } else {
             goto '__ci_bb_5124
@@ -34608,11 +34395,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5181 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_637 = 0)
+        (__ci_expr_logic_633 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_637 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_633 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_637 != 0) {
+        if (__ci_expr_logic_633 != 0) {
             goto '__ci_bb_5189
         } else {
             goto '__ci_bb_5190
@@ -34620,20 +34407,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5182 {
-        (__ci_expr_logic_636 = 0)
+        (__ci_expr_logic_632 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_635: c_int
+            var __ci_expr_logic_631: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_635 = (if true: 1 else: 0))
+                (__ci_expr_logic_631 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_635 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_631 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_636 = (if __ci_expr_logic_635 != 0: 1 else: 0))
+            (__ci_expr_logic_632 = (if __ci_expr_logic_631 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_636 != 0) {
+        if (__ci_expr_logic_632 != 0) {
             goto '__ci_bb_5185
         } else {
             goto '__ci_bb_5186
@@ -34685,21 +34472,21 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
         (__local_chartype__goto_4515_17 = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).chartype as c_int)))
         (__local_category__goto_4515_27 = ((_pcre2_ucp_gentype_8[__local_chartype__goto_4515_17] as c_int)))
         if ((if __local_category__goto_4515_27 == ucp_L: 1 else: 0) != 0) {
-            (__ci_expr_logic_638 = (if true: 1 else: 0))
+            (__ci_expr_logic_634 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_638 = (if (if __local_category__goto_4515_27 == ucp_N: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_634 = (if (if __local_category__goto_4515_27 == ucp_N: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_638 != 0) {
-            (__ci_expr_logic_639 = (if true: 1 else: 0))
+        if (__ci_expr_logic_634 != 0) {
+            (__ci_expr_logic_635 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_639 = (if (if __local_chartype__goto_4515_17 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_635 = (if (if __local_chartype__goto_4515_17 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_639 != 0) {
-            (__ci_expr_logic_640 = (if true: 1 else: 0))
+        if (__ci_expr_logic_635 != 0) {
+            (__ci_expr_logic_636 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_640 = (if (if __local_chartype__goto_4515_17 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_636 = (if (if __local_chartype__goto_4515_17 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_640 == __local_notmatch__goto_4374_14: 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_636 == __local_notmatch__goto_4374_14: 1 else: 0) != 0) {
             goto '__ci_bb_5203
         } else {
             goto '__ci_bb_5204
@@ -34822,11 +34609,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5211 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_643 = 0)
+        (__ci_expr_logic_639 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_643 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_639 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_643 != 0) {
+        if (__ci_expr_logic_639 != 0) {
             goto '__ci_bb_5219
         } else {
             goto '__ci_bb_5220
@@ -34834,20 +34621,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5212 {
-        (__ci_expr_logic_642 = 0)
+        (__ci_expr_logic_638 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_641: c_int
+            var __ci_expr_logic_637: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_641 = (if true: 1 else: 0))
+                (__ci_expr_logic_637 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_641 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_637 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_642 = (if __ci_expr_logic_641 != 0: 1 else: 0))
+            (__ci_expr_logic_638 = (if __ci_expr_logic_637 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_642 != 0) {
+        if (__ci_expr_logic_638 != 0) {
             goto '__ci_bb_5215
         } else {
             goto '__ci_bb_5216
@@ -35000,9 +34787,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5238 {
-        (__ci_expr_old_644 = __local_cp__goto_4537_29)
+        (__ci_expr_old_640 = __local_cp__goto_4537_29)
         (__local_cp__goto_4537_29 = __local_cp__goto_4537_29 + 1)
-        if ((if __local_fc__goto_714_10 == (*__ci_expr_old_644): 1 else: 0) != 0) {
+        if ((if __local_fc__goto_714_10 == (*__ci_expr_old_640): 1 else: 0) != 0) {
             goto '__ci_bb_5243
         } else {
             goto '__ci_bb_5244
@@ -35078,11 +34865,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5254 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_647 = 0)
+        (__ci_expr_logic_643 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_647 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_643 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_647 != 0) {
+        if (__ci_expr_logic_643 != 0) {
             goto '__ci_bb_5262
         } else {
             goto '__ci_bb_5263
@@ -35090,20 +34877,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5255 {
-        (__ci_expr_logic_646 = 0)
+        (__ci_expr_logic_642 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_645: c_int
+            var __ci_expr_logic_641: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_645 = (if true: 1 else: 0))
+                (__ci_expr_logic_641 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_645 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_641 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_646 = (if __ci_expr_logic_645 != 0: 1 else: 0))
+            (__ci_expr_logic_642 = (if __ci_expr_logic_641 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_646 != 0) {
+        if (__ci_expr_logic_642 != 0) {
             goto '__ci_bb_5258
         } else {
             goto '__ci_bb_5259
@@ -35153,33 +34940,33 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5263 {
         if ((if __local_fc__goto_714_10 == 36: 1 else: 0) != 0) {
-            (__ci_expr_logic_648 = (if true: 1 else: 0))
+            (__ci_expr_logic_644 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_648 = (if (if __local_fc__goto_714_10 == 64: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_644 = (if (if __local_fc__goto_714_10 == 64: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_648 != 0) {
-            (__ci_expr_logic_649 = (if true: 1 else: 0))
+        if (__ci_expr_logic_644 != 0) {
+            (__ci_expr_logic_645 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_649 = (if (if __local_fc__goto_714_10 == 96: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_645 = (if (if __local_fc__goto_714_10 == 96: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_649 != 0) {
-            (__ci_expr_logic_651 = (if true: 1 else: 0))
+        if (__ci_expr_logic_645 != 0) {
+            (__ci_expr_logic_647 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_650: c_int = 0
+            var __ci_expr_logic_646: c_int = 0
 
             if ((if __local_fc__goto_714_10 >= 160: 1 else: 0) != 0) {
-                (__ci_expr_logic_650 = (if (if __local_fc__goto_714_10 <= 55295: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_646 = (if (if __local_fc__goto_714_10 <= 55295: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_651 = (if __ci_expr_logic_650 != 0: 1 else: 0))
+            (__ci_expr_logic_647 = (if __ci_expr_logic_646 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_651 != 0) {
-            (__ci_expr_logic_652 = (if true: 1 else: 0))
+        if (__ci_expr_logic_647 != 0) {
+            (__ci_expr_logic_648 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_652 = (if (if __local_fc__goto_714_10 >= 57344: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_648 = (if (if __local_fc__goto_714_10 >= 57344: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_652 == __local_notmatch__goto_4374_14: 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_648 == __local_notmatch__goto_4374_14: 1 else: 0) != 0) {
             goto '__ci_bb_5276
         } else {
             goto '__ci_bb_5277
@@ -35302,11 +35089,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5284 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_655 = 0)
+        (__ci_expr_logic_651 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_655 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_651 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_655 != 0) {
+        if (__ci_expr_logic_651 != 0) {
             goto '__ci_bb_5292
         } else {
             goto '__ci_bb_5293
@@ -35314,20 +35101,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5285 {
-        (__ci_expr_logic_654 = 0)
+        (__ci_expr_logic_650 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_653: c_int
+            var __ci_expr_logic_649: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_653 = (if true: 1 else: 0))
+                (__ci_expr_logic_649 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_653 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_649 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_654 = (if __ci_expr_logic_653 != 0: 1 else: 0))
+            (__ci_expr_logic_650 = (if __ci_expr_logic_649 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_654 != 0) {
+        if (__ci_expr_logic_650 != 0) {
             goto '__ci_bb_5288
         } else {
             goto '__ci_bb_5289
@@ -35499,11 +35286,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5314 {
         (__local_fc__goto_714_10 = (((*((*__local_F__goto_692_12).eptr)) as c_uint)))
-        (__ci_expr_logic_658 = 0)
+        (__ci_expr_logic_654 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_658 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_654 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_658 != 0) {
+        if (__ci_expr_logic_654 != 0) {
             goto '__ci_bb_5322
         } else {
             goto '__ci_bb_5323
@@ -35511,20 +35298,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5315 {
-        (__ci_expr_logic_657 = 0)
+        (__ci_expr_logic_653 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_656: c_int
+            var __ci_expr_logic_652: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_656 = (if true: 1 else: 0))
+                (__ci_expr_logic_652 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_656 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_652 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_657 = (if __ci_expr_logic_656 != 0: 1 else: 0))
+            (__ci_expr_logic_653 = (if __ci_expr_logic_652 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_657 != 0) {
+        if (__ci_expr_logic_653 != 0) {
             goto '__ci_bb_5318
         } else {
             goto '__ci_bb_5319
@@ -35933,14 +35720,14 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5384 {
-        (__ci_expr_old_661 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_657 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = (((*__ci_expr_old_661) as c_uint)))
-        (__ci_expr_logic_662 = 0)
+        (__local_fc__goto_714_10 = (((*__ci_expr_old_657) as c_uint)))
+        (__ci_expr_logic_658 = 0)
         if (__local_utf__goto_726_6 != 0) {
-            (__ci_expr_logic_662 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_658 = (if (if __local_fc__goto_714_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_662 != 0) {
+        if (__ci_expr_logic_658 != 0) {
             goto '__ci_bb_5393
         } else {
             goto '__ci_bb_5394
@@ -35952,20 +35739,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5386 {
-        (__ci_expr_logic_660 = 0)
+        (__ci_expr_logic_656 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_659: c_int
+            var __ci_expr_logic_655: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_659 = (if true: 1 else: 0))
+                (__ci_expr_logic_655 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_659 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_655 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_660 = (if __ci_expr_logic_659 != 0: 1 else: 0))
+            (__ci_expr_logic_656 = (if __ci_expr_logic_655 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_660 != 0) {
+        if (__ci_expr_logic_656 != 0) {
             goto '__ci_bb_5389
         } else {
             goto '__ci_bb_5390
@@ -36019,9 +35806,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5395 {
-        (__ci_expr_old_663 = (*__local_F__goto_692_12).eptr)
+        (__ci_expr_old_659 = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr + 1)
-        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_663) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
+        (__local_fc__goto_714_10 = ((((((((__local_fc__goto_714_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((*__ci_expr_old_659) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_5397
     }
 
@@ -36118,20 +35905,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5412 {
-        (__ci_expr_logic_665 = 0)
+        (__ci_expr_logic_661 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_664: c_int
+            var __ci_expr_logic_660: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_664 = (if true: 1 else: 0))
+                (__ci_expr_logic_660 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_664 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_660 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_665 = (if __ci_expr_logic_664 != 0: 1 else: 0))
+            (__ci_expr_logic_661 = (if __ci_expr_logic_660 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_665 != 0) {
+        if (__ci_expr_logic_661 != 0) {
             goto '__ci_bb_5415
         } else {
             goto '__ci_bb_5416
@@ -36587,42 +36374,42 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5495 {
-        (__ci_expr_ternary_672 = 0)
+        (__ci_expr_ternary_668 = 0)
         if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_668: c_int = 0
+            var __ci_expr_logic_664: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                (__ci_expr_logic_668 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
+                (__ci_expr_logic_664 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
             }
 
-            (__ci_expr_ternary_672 = __ci_expr_logic_668)
+            (__ci_expr_ternary_668 = __ci_expr_logic_664)
 
         } else {
-            var __ci_expr_logic_671: c_int = 0
+            var __ci_expr_logic_667: c_int = 0
 
-            var __ci_expr_logic_669: c_int = 0
+            var __ci_expr_logic_665: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                (__ci_expr_logic_669 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_665 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_669 != 0) {
-                var __ci_expr_logic_670: c_int
+            if (__ci_expr_logic_665 != 0) {
+                var __ci_expr_logic_666: c_int
 
                 if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_670 = (if true: 1 else: 0))
+                    (__ci_expr_logic_666 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_670 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_666 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_logic_671 = (if __ci_expr_logic_670 != 0: 1 else: 0))
+                (__ci_expr_logic_667 = (if __ci_expr_logic_666 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_ternary_672 = __ci_expr_logic_671)
+            (__ci_expr_ternary_668 = __ci_expr_logic_667)
 
         }
-        if (__ci_expr_ternary_672 != 0) {
+        if (__ci_expr_ternary_668 != 0) {
             goto '__ci_bb_5503
         } else {
             goto '__ci_bb_5504
@@ -36630,20 +36417,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5496 {
-        (__ci_expr_logic_667 = 0)
+        (__ci_expr_logic_663 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_666: c_int
+            var __ci_expr_logic_662: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_666 = (if true: 1 else: 0))
+                (__ci_expr_logic_662 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_666 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_662 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_667 = (if __ci_expr_logic_666 != 0: 1 else: 0))
+            (__ci_expr_logic_663 = (if __ci_expr_logic_662 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_667 != 0) {
+        if (__ci_expr_logic_663 != 0) {
             goto '__ci_bb_5499
         } else {
             goto '__ci_bb_5500
@@ -36688,23 +36475,23 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5504 {
-        (__ci_expr_logic_676 = 0)
-        (__ci_expr_logic_675 = 0)
-        (__ci_expr_logic_674 = 0)
-        (__ci_expr_logic_673 = 0)
+        (__ci_expr_logic_672 = 0)
+        (__ci_expr_logic_671 = 0)
+        (__ci_expr_logic_670 = 0)
+        (__ci_expr_logic_669 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_673 = (if (if ((*__local_F__goto_692_12).eptr + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_669 = (if (if ((*__local_F__goto_692_12).eptr + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_673 != 0) {
-            (__ci_expr_logic_674 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_669 != 0) {
+            (__ci_expr_logic_670 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_674 != 0) {
-            (__ci_expr_logic_675 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_670 != 0) {
+            (__ci_expr_logic_671 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_675 != 0) {
-            (__ci_expr_logic_676 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_671 != 0) {
+            (__ci_expr_logic_672 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_676 != 0) {
+        if (__ci_expr_logic_672 != 0) {
             goto '__ci_bb_5505
         } else {
             goto '__ci_bb_5506
@@ -36734,11 +36521,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5509 {
-        (__ci_expr_logic_677 = 0)
+        (__ci_expr_logic_673 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_677 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_673 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_677 != 0) {
+        if (__ci_expr_logic_673 != 0) {
             goto '__ci_bb_5510
         } else {
             goto '__ci_bb_5511
@@ -36811,20 +36598,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5522 {
-        (__ci_expr_logic_679 = 0)
+        (__ci_expr_logic_675 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_678: c_int
+            var __ci_expr_logic_674: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_678 = (if true: 1 else: 0))
+                (__ci_expr_logic_674 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_678 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_674 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_679 = (if __ci_expr_logic_678 != 0: 1 else: 0))
+            (__ci_expr_logic_675 = (if __ci_expr_logic_674 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_679 != 0) {
+        if (__ci_expr_logic_675 != 0) {
             goto '__ci_bb_5525
         } else {
             goto '__ci_bb_5526
@@ -36865,11 +36652,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5529 {
-        (__ci_expr_logic_680 = 0)
+        (__ci_expr_logic_676 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_680 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_676 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_680 != 0) {
+        if (__ci_expr_logic_676 != 0) {
             goto '__ci_bb_5530
         } else {
             goto '__ci_bb_5531
@@ -36886,20 +36673,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5532 {
-        (__ci_expr_logic_682 = 0)
+        (__ci_expr_logic_678 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_681: c_int
+            var __ci_expr_logic_677: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_681 = (if true: 1 else: 0))
+                (__ci_expr_logic_677 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_681 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_677 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_682 = (if __ci_expr_logic_681 != 0: 1 else: 0))
+            (__ci_expr_logic_678 = (if __ci_expr_logic_677 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_682 != 0) {
+        if (__ci_expr_logic_678 != 0) {
             goto '__ci_bb_5535
         } else {
             goto '__ci_bb_5536
@@ -36963,20 +36750,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5543 {
-        (__ci_expr_logic_684 = 0)
+        (__ci_expr_logic_680 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_683: c_int
+            var __ci_expr_logic_679: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_683 = (if true: 1 else: 0))
+                (__ci_expr_logic_679 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_683 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_679 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_684 = (if __ci_expr_logic_683 != 0: 1 else: 0))
+            (__ci_expr_logic_680 = (if __ci_expr_logic_679 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_684 != 0) {
+        if (__ci_expr_logic_680 != 0) {
             goto '__ci_bb_5546
         } else {
             goto '__ci_bb_5547
@@ -37061,20 +36848,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5557 {
-        (__ci_expr_logic_686 = 0)
+        (__ci_expr_logic_682 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_685: c_int
+            var __ci_expr_logic_681: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_685 = (if true: 1 else: 0))
+                (__ci_expr_logic_681 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_685 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_681 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_686 = (if __ci_expr_logic_685 != 0: 1 else: 0))
+            (__ci_expr_logic_682 = (if __ci_expr_logic_681 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_686 != 0) {
+        if (__ci_expr_logic_682 != 0) {
             goto '__ci_bb_5560
         } else {
             goto '__ci_bb_5561
@@ -37210,45 +36997,45 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5579 {
-        (__ci_expr_logic_692 = 0)
+        (__ci_expr_logic_688 = 0)
         if ((if __local_fc__goto_714_10 != 10: 1 else: 0) != 0) {
-            var __ci_expr_logic_691: c_int
+            var __ci_expr_logic_687: c_int
 
             if ((if (*__param_mb).bsr_convention == 2: 1 else: 0) != 0) {
-                (__ci_expr_logic_691 = (if true: 1 else: 0))
+                (__ci_expr_logic_687 = (if true: 1 else: 0))
             } else {
-                var __ci_expr_logic_690: c_int = 0
+                var __ci_expr_logic_686: c_int = 0
 
-                var __ci_expr_logic_689: c_int = 0
+                var __ci_expr_logic_685: c_int = 0
 
-                var __ci_expr_logic_688: c_int = 0
+                var __ci_expr_logic_684: c_int = 0
 
-                var __ci_expr_logic_687: c_int = 0
+                var __ci_expr_logic_683: c_int = 0
 
                 if ((if __local_fc__goto_714_10 != 11: 1 else: 0) != 0) {
-                    (__ci_expr_logic_687 = (if (if __local_fc__goto_714_10 != 12: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_683 = (if (if __local_fc__goto_714_10 != 12: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_687 != 0) {
-                    (__ci_expr_logic_688 = (if (if __local_fc__goto_714_10 != 133: 1 else: 0) != 0: 1 else: 0))
+                if (__ci_expr_logic_683 != 0) {
+                    (__ci_expr_logic_684 = (if (if __local_fc__goto_714_10 != 133: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_688 != 0) {
-                    (__ci_expr_logic_689 = (if (if __local_fc__goto_714_10 != 8232: 1 else: 0) != 0: 1 else: 0))
+                if (__ci_expr_logic_684 != 0) {
+                    (__ci_expr_logic_685 = (if (if __local_fc__goto_714_10 != 8232: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_689 != 0) {
-                    (__ci_expr_logic_690 = (if (if __local_fc__goto_714_10 != 8233: 1 else: 0) != 0: 1 else: 0))
+                if (__ci_expr_logic_685 != 0) {
+                    (__ci_expr_logic_686 = (if (if __local_fc__goto_714_10 != 8233: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_logic_691 = (if __ci_expr_logic_690 != 0: 1 else: 0))
+                (__ci_expr_logic_687 = (if __ci_expr_logic_686 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_logic_692 = (if __ci_expr_logic_691 != 0: 1 else: 0))
+            (__ci_expr_logic_688 = (if __ci_expr_logic_687 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_692 != 0) {
+        if (__ci_expr_logic_688 != 0) {
             goto '__ci_bb_5585
         } else {
             goto '__ci_bb_5586
@@ -37334,20 +37121,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5594 {
-        (__ci_expr_logic_694 = 0)
+        (__ci_expr_logic_690 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_693: c_int
+            var __ci_expr_logic_689: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_693 = (if true: 1 else: 0))
+                (__ci_expr_logic_689 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_693 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_689 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_694 = (if __ci_expr_logic_693 != 0: 1 else: 0))
+            (__ci_expr_logic_690 = (if __ci_expr_logic_689 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_694 != 0) {
+        if (__ci_expr_logic_690 != 0) {
             goto '__ci_bb_5597
         } else {
             goto '__ci_bb_5598
@@ -37693,20 +37480,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5646 {
-        (__ci_expr_logic_696 = 0)
+        (__ci_expr_logic_692 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_695: c_int
+            var __ci_expr_logic_691: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_695 = (if true: 1 else: 0))
+                (__ci_expr_logic_691 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_695 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_691 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_696 = (if __ci_expr_logic_695 != 0: 1 else: 0))
+            (__ci_expr_logic_692 = (if __ci_expr_logic_691 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_696 != 0) {
+        if (__ci_expr_logic_692 != 0) {
             goto '__ci_bb_5649
         } else {
             goto '__ci_bb_5650
@@ -37956,20 +37743,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5686 {
-        (__ci_expr_logic_698 = 0)
+        (__ci_expr_logic_694 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_697: c_int
+            var __ci_expr_logic_693: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_697 = (if true: 1 else: 0))
+                (__ci_expr_logic_693 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_697 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_693 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_698 = (if __ci_expr_logic_697 != 0: 1 else: 0))
+            (__ci_expr_logic_694 = (if __ci_expr_logic_693 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_698 != 0) {
+        if (__ci_expr_logic_694 != 0) {
             goto '__ci_bb_5689
         } else {
             goto '__ci_bb_5690
@@ -38018,11 +37805,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5694 {
-        (__ci_expr_logic_699 = 0)
+        (__ci_expr_logic_695 = 0)
         if ((if __local_fc__goto_714_10 < 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_699 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_695 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_699 != 0) {
+        if (__ci_expr_logic_695 != 0) {
             goto '__ci_bb_5707
         } else {
             goto '__ci_bb_5708
@@ -38153,20 +37940,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5716 {
-        (__ci_expr_logic_701 = 0)
+        (__ci_expr_logic_697 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_700: c_int
+            var __ci_expr_logic_696: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_700 = (if true: 1 else: 0))
+                (__ci_expr_logic_696 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_700 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_696 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_701 = (if __ci_expr_logic_700 != 0: 1 else: 0))
+            (__ci_expr_logic_697 = (if __ci_expr_logic_696 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_701 != 0) {
+        if (__ci_expr_logic_697 != 0) {
             goto '__ci_bb_5719
         } else {
             goto '__ci_bb_5720
@@ -38216,11 +38003,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5724 {
         if ((if __local_fc__goto_714_10 >= 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_702 = (if true: 1 else: 0))
+            (__ci_expr_logic_698 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_702 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_698 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_702 != 0) {
+        if (__ci_expr_logic_698 != 0) {
             goto '__ci_bb_5737
         } else {
             goto '__ci_bb_5738
@@ -38351,20 +38138,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5746 {
-        (__ci_expr_logic_704 = 0)
+        (__ci_expr_logic_700 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_703: c_int
+            var __ci_expr_logic_699: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_703 = (if true: 1 else: 0))
+                (__ci_expr_logic_699 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_703 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_699 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_704 = (if __ci_expr_logic_703 != 0: 1 else: 0))
+            (__ci_expr_logic_700 = (if __ci_expr_logic_699 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_704 != 0) {
+        if (__ci_expr_logic_700 != 0) {
             goto '__ci_bb_5749
         } else {
             goto '__ci_bb_5750
@@ -38413,11 +38200,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5754 {
-        (__ci_expr_logic_705 = 0)
+        (__ci_expr_logic_701 = 0)
         if ((if __local_fc__goto_714_10 < 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_705 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_701 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_705 != 0) {
+        if (__ci_expr_logic_701 != 0) {
             goto '__ci_bb_5767
         } else {
             goto '__ci_bb_5768
@@ -38548,20 +38335,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5776 {
-        (__ci_expr_logic_707 = 0)
+        (__ci_expr_logic_703 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_706: c_int
+            var __ci_expr_logic_702: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_706 = (if true: 1 else: 0))
+                (__ci_expr_logic_702 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_706 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_702 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_707 = (if __ci_expr_logic_706 != 0: 1 else: 0))
+            (__ci_expr_logic_703 = (if __ci_expr_logic_702 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_707 != 0) {
+        if (__ci_expr_logic_703 != 0) {
             goto '__ci_bb_5779
         } else {
             goto '__ci_bb_5780
@@ -38611,11 +38398,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5784 {
         if ((if __local_fc__goto_714_10 >= 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_708 = (if true: 1 else: 0))
+            (__ci_expr_logic_704 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_708 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_704 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_708 != 0) {
+        if (__ci_expr_logic_704 != 0) {
             goto '__ci_bb_5797
         } else {
             goto '__ci_bb_5798
@@ -38746,20 +38533,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5806 {
-        (__ci_expr_logic_710 = 0)
+        (__ci_expr_logic_706 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_709: c_int
+            var __ci_expr_logic_705: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_709 = (if true: 1 else: 0))
+                (__ci_expr_logic_705 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_709 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_705 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_710 = (if __ci_expr_logic_709 != 0: 1 else: 0))
+            (__ci_expr_logic_706 = (if __ci_expr_logic_705 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_710 != 0) {
+        if (__ci_expr_logic_706 != 0) {
             goto '__ci_bb_5809
         } else {
             goto '__ci_bb_5810
@@ -38808,11 +38595,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5814 {
-        (__ci_expr_logic_711 = 0)
+        (__ci_expr_logic_707 = 0)
         if ((if __local_fc__goto_714_10 < 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_711 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_707 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_711 != 0) {
+        if (__ci_expr_logic_707 != 0) {
             goto '__ci_bb_5827
         } else {
             goto '__ci_bb_5828
@@ -38943,20 +38730,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5836 {
-        (__ci_expr_logic_713 = 0)
+        (__ci_expr_logic_709 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_712: c_int
+            var __ci_expr_logic_708: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_712 = (if true: 1 else: 0))
+                (__ci_expr_logic_708 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_712 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_708 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_713 = (if __ci_expr_logic_712 != 0: 1 else: 0))
+            (__ci_expr_logic_709 = (if __ci_expr_logic_708 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_713 != 0) {
+        if (__ci_expr_logic_709 != 0) {
             goto '__ci_bb_5839
         } else {
             goto '__ci_bb_5840
@@ -39006,11 +38793,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5844 {
         if ((if __local_fc__goto_714_10 >= 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_714 = (if true: 1 else: 0))
+            (__ci_expr_logic_710 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_714 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_710 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_714 != 0) {
+        if (__ci_expr_logic_710 != 0) {
             goto '__ci_bb_5857
         } else {
             goto '__ci_bb_5858
@@ -39310,19 +39097,19 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5895 {
-        (__ci_expr_logic_717 = 0)
-        (__ci_expr_logic_716 = 0)
-        (__ci_expr_logic_715 = 0)
+        (__ci_expr_logic_713 = 0)
+        (__ci_expr_logic_712 = 0)
+        (__ci_expr_logic_711 = 0)
         if ((if (*__local_F__goto_692_12).temp_32[2] == 17: 1 else: 0) != 0) {
-            (__ci_expr_logic_715 = (if (if (*__local_F__goto_692_12).eptr > (*__local_F__goto_692_12).temp_sptr[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_711 = (if (if (*__local_F__goto_692_12).eptr > (*__local_F__goto_692_12).temp_sptr[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_715 != 0) {
-            (__ci_expr_logic_716 = (if (if (*((*__local_F__goto_692_12).eptr)) == 10: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_711 != 0) {
+            (__ci_expr_logic_712 = (if (if (*((*__local_F__goto_692_12).eptr)) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_716 != 0) {
-            (__ci_expr_logic_717 = (if (if (*((*__local_F__goto_692_12).eptr - ((1 as isize) as usize))) == 13: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_712 != 0) {
+            (__ci_expr_logic_713 = (if (if (*((*__local_F__goto_692_12).eptr - ((1 as isize) as usize))) == 13: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_717 != 0) {
+        if (__ci_expr_logic_713 != 0) {
             goto '__ci_bb_5896
         } else {
             goto '__ci_bb_5897
@@ -39389,42 +39176,42 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5906 {
-        (__ci_expr_ternary_724 = 0)
+        (__ci_expr_ternary_720 = 0)
         if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_720: c_int = 0
+            var __ci_expr_logic_716: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                (__ci_expr_logic_720 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
+                (__ci_expr_logic_716 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
             }
 
-            (__ci_expr_ternary_724 = __ci_expr_logic_720)
+            (__ci_expr_ternary_720 = __ci_expr_logic_716)
 
         } else {
-            var __ci_expr_logic_723: c_int = 0
+            var __ci_expr_logic_719: c_int = 0
 
-            var __ci_expr_logic_721: c_int = 0
+            var __ci_expr_logic_717: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                (__ci_expr_logic_721 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_717 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_721 != 0) {
-                var __ci_expr_logic_722: c_int
+            if (__ci_expr_logic_717 != 0) {
+                var __ci_expr_logic_718: c_int
 
                 if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_722 = (if true: 1 else: 0))
+                    (__ci_expr_logic_718 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_722 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_718 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_logic_723 = (if __ci_expr_logic_722 != 0: 1 else: 0))
+                (__ci_expr_logic_719 = (if __ci_expr_logic_718 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_ternary_724 = __ci_expr_logic_723)
+            (__ci_expr_ternary_720 = __ci_expr_logic_719)
 
         }
-        if (__ci_expr_ternary_724 != 0) {
+        if (__ci_expr_ternary_720 != 0) {
             goto '__ci_bb_5914
         } else {
             goto '__ci_bb_5915
@@ -39432,20 +39219,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5907 {
-        (__ci_expr_logic_719 = 0)
+        (__ci_expr_logic_715 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_718: c_int
+            var __ci_expr_logic_714: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_718 = (if true: 1 else: 0))
+                (__ci_expr_logic_714 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_718 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_714 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_719 = (if __ci_expr_logic_718 != 0: 1 else: 0))
+            (__ci_expr_logic_715 = (if __ci_expr_logic_714 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_719 != 0) {
+        if (__ci_expr_logic_715 != 0) {
             goto '__ci_bb_5910
         } else {
             goto '__ci_bb_5911
@@ -39490,23 +39277,23 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5915 {
-        (__ci_expr_logic_728 = 0)
-        (__ci_expr_logic_727 = 0)
-        (__ci_expr_logic_726 = 0)
-        (__ci_expr_logic_725 = 0)
+        (__ci_expr_logic_724 = 0)
+        (__ci_expr_logic_723 = 0)
+        (__ci_expr_logic_722 = 0)
+        (__ci_expr_logic_721 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_725 = (if (if ((*__local_F__goto_692_12).eptr + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_721 = (if (if ((*__local_F__goto_692_12).eptr + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_725 != 0) {
-            (__ci_expr_logic_726 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_721 != 0) {
+            (__ci_expr_logic_722 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_726 != 0) {
-            (__ci_expr_logic_727 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_722 != 0) {
+            (__ci_expr_logic_723 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_727 != 0) {
-            (__ci_expr_logic_728 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_723 != 0) {
+            (__ci_expr_logic_724 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_728 != 0) {
+        if (__ci_expr_logic_724 != 0) {
             goto '__ci_bb_5916
         } else {
             goto '__ci_bb_5917
@@ -39559,20 +39346,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5924 {
-        (__ci_expr_logic_730 = 0)
+        (__ci_expr_logic_726 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_729: c_int
+            var __ci_expr_logic_725: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_729 = (if true: 1 else: 0))
+                (__ci_expr_logic_725 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_729 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_725 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_730 = (if __ci_expr_logic_729 != 0: 1 else: 0))
+            (__ci_expr_logic_726 = (if __ci_expr_logic_725 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_730 != 0) {
+        if (__ci_expr_logic_726 != 0) {
             goto '__ci_bb_5927
         } else {
             goto '__ci_bb_5928
@@ -39656,20 +39443,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5938 {
-        (__ci_expr_logic_732 = 0)
+        (__ci_expr_logic_728 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_731: c_int
+            var __ci_expr_logic_727: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_731 = (if true: 1 else: 0))
+                (__ci_expr_logic_727 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_731 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_727 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_732 = (if __ci_expr_logic_731 != 0: 1 else: 0))
+            (__ci_expr_logic_728 = (if __ci_expr_logic_727 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_732 != 0) {
+        if (__ci_expr_logic_728 != 0) {
             goto '__ci_bb_5941
         } else {
             goto '__ci_bb_5942
@@ -39719,33 +39506,33 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5946 {
-        (__ci_expr_logic_736 = 0)
+        (__ci_expr_logic_732 = 0)
         if ((if __local_fc__goto_714_10 != 10: 1 else: 0) != 0) {
-            var __ci_expr_logic_735: c_int
+            var __ci_expr_logic_731: c_int
 
             if ((if (*__param_mb).bsr_convention == 2: 1 else: 0) != 0) {
-                (__ci_expr_logic_735 = (if true: 1 else: 0))
+                (__ci_expr_logic_731 = (if true: 1 else: 0))
             } else {
-                var __ci_expr_logic_734: c_int = 0
+                var __ci_expr_logic_730: c_int = 0
 
-                var __ci_expr_logic_733: c_int = 0
+                var __ci_expr_logic_729: c_int = 0
 
                 if ((if __local_fc__goto_714_10 != 11: 1 else: 0) != 0) {
-                    (__ci_expr_logic_733 = (if (if __local_fc__goto_714_10 != 12: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_729 = (if (if __local_fc__goto_714_10 != 12: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_733 != 0) {
-                    (__ci_expr_logic_734 = (if (if __local_fc__goto_714_10 != 133: 1 else: 0) != 0: 1 else: 0))
+                if (__ci_expr_logic_729 != 0) {
+                    (__ci_expr_logic_730 = (if (if __local_fc__goto_714_10 != 133: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_logic_735 = (if __ci_expr_logic_734 != 0: 1 else: 0))
+                (__ci_expr_logic_731 = (if __ci_expr_logic_730 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_logic_736 = (if __ci_expr_logic_735 != 0: 1 else: 0))
+            (__ci_expr_logic_732 = (if __ci_expr_logic_731 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_736 != 0) {
+        if (__ci_expr_logic_732 != 0) {
             goto '__ci_bb_5952
         } else {
             goto '__ci_bb_5953
@@ -39825,20 +39612,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5961 {
-        (__ci_expr_logic_738 = 0)
+        (__ci_expr_logic_734 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_737: c_int
+            var __ci_expr_logic_733: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_737 = (if true: 1 else: 0))
+                (__ci_expr_logic_733 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_737 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_733 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_738 = (if __ci_expr_logic_737 != 0: 1 else: 0))
+            (__ci_expr_logic_734 = (if __ci_expr_logic_733 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_738 != 0) {
+        if (__ci_expr_logic_734 != 0) {
             goto '__ci_bb_5964
         } else {
             goto '__ci_bb_5965
@@ -39958,20 +39745,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5982 {
-        (__ci_expr_logic_740 = 0)
+        (__ci_expr_logic_736 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_739: c_int
+            var __ci_expr_logic_735: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_739 = (if true: 1 else: 0))
+                (__ci_expr_logic_735 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_739 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_735 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_740 = (if __ci_expr_logic_739 != 0: 1 else: 0))
+            (__ci_expr_logic_736 = (if __ci_expr_logic_735 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_740 != 0) {
+        if (__ci_expr_logic_736 != 0) {
             goto '__ci_bb_5985
         } else {
             goto '__ci_bb_5986
@@ -40091,20 +39878,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6003 {
-        (__ci_expr_logic_742 = 0)
+        (__ci_expr_logic_738 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_741: c_int
+            var __ci_expr_logic_737: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_741 = (if true: 1 else: 0))
+                (__ci_expr_logic_737 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_741 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_737 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_742 = (if __ci_expr_logic_741 != 0: 1 else: 0))
+            (__ci_expr_logic_738 = (if __ci_expr_logic_737 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_742 != 0) {
+        if (__ci_expr_logic_738 != 0) {
             goto '__ci_bb_6006
         } else {
             goto '__ci_bb_6007
@@ -40240,20 +40027,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6026 {
-        (__ci_expr_logic_744 = 0)
+        (__ci_expr_logic_740 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_743: c_int
+            var __ci_expr_logic_739: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_743 = (if true: 1 else: 0))
+                (__ci_expr_logic_739 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_743 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_739 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_744 = (if __ci_expr_logic_743 != 0: 1 else: 0))
+            (__ci_expr_logic_740 = (if __ci_expr_logic_739 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_744 != 0) {
+        if (__ci_expr_logic_740 != 0) {
             goto '__ci_bb_6029
         } else {
             goto '__ci_bb_6030
@@ -40385,11 +40172,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6048 {
-        (__ci_expr_logic_747 = 0)
+        (__ci_expr_logic_743 = 0)
         if (1 != 0) {
-            (__ci_expr_logic_747 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_743 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (8 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_747 != 0) {
+        if (__ci_expr_logic_743 != 0) {
             goto '__ci_bb_6056
         } else {
             goto '__ci_bb_6057
@@ -40397,20 +40184,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6049 {
-        (__ci_expr_logic_746 = 0)
+        (__ci_expr_logic_742 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_745: c_int
+            var __ci_expr_logic_741: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_745 = (if true: 1 else: 0))
+                (__ci_expr_logic_741 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_745 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_741 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_746 = (if __ci_expr_logic_745 != 0: 1 else: 0))
+            (__ci_expr_logic_742 = (if __ci_expr_logic_741 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_746 != 0) {
+        if (__ci_expr_logic_742 != 0) {
             goto '__ci_bb_6052
         } else {
             goto '__ci_bb_6053
@@ -40495,11 +40282,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6064 {
         if ((if not (1 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_750 = (if true: 1 else: 0))
+            (__ci_expr_logic_746 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_750 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_746 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (8 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_750 != 0) {
+        if (__ci_expr_logic_746 != 0) {
             goto '__ci_bb_6072
         } else {
             goto '__ci_bb_6073
@@ -40507,20 +40294,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6065 {
-        (__ci_expr_logic_749 = 0)
+        (__ci_expr_logic_745 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_748: c_int
+            var __ci_expr_logic_744: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_748 = (if true: 1 else: 0))
+                (__ci_expr_logic_744 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_748 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_744 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_749 = (if __ci_expr_logic_748 != 0: 1 else: 0))
+            (__ci_expr_logic_745 = (if __ci_expr_logic_744 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_749 != 0) {
+        if (__ci_expr_logic_745 != 0) {
             goto '__ci_bb_6068
         } else {
             goto '__ci_bb_6069
@@ -40604,11 +40391,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6080 {
-        (__ci_expr_logic_753 = 0)
+        (__ci_expr_logic_749 = 0)
         if (1 != 0) {
-            (__ci_expr_logic_753 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_749 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (1 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_753 != 0) {
+        if (__ci_expr_logic_749 != 0) {
             goto '__ci_bb_6088
         } else {
             goto '__ci_bb_6089
@@ -40616,20 +40403,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6081 {
-        (__ci_expr_logic_752 = 0)
+        (__ci_expr_logic_748 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_751: c_int
+            var __ci_expr_logic_747: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_751 = (if true: 1 else: 0))
+                (__ci_expr_logic_747 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_751 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_747 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_752 = (if __ci_expr_logic_751 != 0: 1 else: 0))
+            (__ci_expr_logic_748 = (if __ci_expr_logic_747 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_752 != 0) {
+        if (__ci_expr_logic_748 != 0) {
             goto '__ci_bb_6084
         } else {
             goto '__ci_bb_6085
@@ -40714,11 +40501,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6096 {
         if ((if not (1 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_756 = (if true: 1 else: 0))
+            (__ci_expr_logic_752 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_756 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_752 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_756 != 0) {
+        if (__ci_expr_logic_752 != 0) {
             goto '__ci_bb_6104
         } else {
             goto '__ci_bb_6105
@@ -40726,20 +40513,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6097 {
-        (__ci_expr_logic_755 = 0)
+        (__ci_expr_logic_751 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_754: c_int
+            var __ci_expr_logic_750: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_754 = (if true: 1 else: 0))
+                (__ci_expr_logic_750 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_754 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_750 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_755 = (if __ci_expr_logic_754 != 0: 1 else: 0))
+            (__ci_expr_logic_751 = (if __ci_expr_logic_750 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_755 != 0) {
+        if (__ci_expr_logic_751 != 0) {
             goto '__ci_bb_6100
         } else {
             goto '__ci_bb_6101
@@ -40823,11 +40610,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6112 {
-        (__ci_expr_logic_759 = 0)
+        (__ci_expr_logic_755 = 0)
         if (1 != 0) {
-            (__ci_expr_logic_759 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_755 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_759 != 0) {
+        if (__ci_expr_logic_755 != 0) {
             goto '__ci_bb_6120
         } else {
             goto '__ci_bb_6121
@@ -40835,20 +40622,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6113 {
-        (__ci_expr_logic_758 = 0)
+        (__ci_expr_logic_754 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_757: c_int
+            var __ci_expr_logic_753: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_757 = (if true: 1 else: 0))
+                (__ci_expr_logic_753 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_757 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_753 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_758 = (if __ci_expr_logic_757 != 0: 1 else: 0))
+            (__ci_expr_logic_754 = (if __ci_expr_logic_753 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_758 != 0) {
+        if (__ci_expr_logic_754 != 0) {
             goto '__ci_bb_6116
         } else {
             goto '__ci_bb_6117
@@ -40933,11 +40720,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6128 {
         if ((if not (1 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_762 = (if true: 1 else: 0))
+            (__ci_expr_logic_758 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_762 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_758 = (if (if ((((*__param_mb).ctypes[(*((*__local_F__goto_692_12).eptr))]) as c_int) & (16 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_762 != 0) {
+        if (__ci_expr_logic_758 != 0) {
             goto '__ci_bb_6136
         } else {
             goto '__ci_bb_6137
@@ -40945,20 +40732,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6129 {
-        (__ci_expr_logic_761 = 0)
+        (__ci_expr_logic_757 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_760: c_int
+            var __ci_expr_logic_756: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_760 = (if true: 1 else: 0))
+                (__ci_expr_logic_756 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_760 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_756 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_761 = (if __ci_expr_logic_760 != 0: 1 else: 0))
+            (__ci_expr_logic_757 = (if __ci_expr_logic_756 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_761 != 0) {
+        if (__ci_expr_logic_757 != 0) {
             goto '__ci_bb_6132
         } else {
             goto '__ci_bb_6133
@@ -41199,19 +40986,19 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6168 {
         ((*__local_F__goto_692_12).eptr = (*__local_F__goto_692_12).eptr - 1)
-        (__ci_expr_logic_765 = 0)
-        (__ci_expr_logic_764 = 0)
-        (__ci_expr_logic_763 = 0)
+        (__ci_expr_logic_761 = 0)
+        (__ci_expr_logic_760 = 0)
+        (__ci_expr_logic_759 = 0)
         if ((if (*__local_F__goto_692_12).temp_32[2] == 17: 1 else: 0) != 0) {
-            (__ci_expr_logic_763 = (if (if (*__local_F__goto_692_12).eptr > (*__local_F__goto_692_12).temp_sptr[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_759 = (if (if (*__local_F__goto_692_12).eptr > (*__local_F__goto_692_12).temp_sptr[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_763 != 0) {
-            (__ci_expr_logic_764 = (if (if (*((*__local_F__goto_692_12).eptr)) == 10: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_759 != 0) {
+            (__ci_expr_logic_760 = (if (if (*((*__local_F__goto_692_12).eptr)) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_764 != 0) {
-            (__ci_expr_logic_765 = (if (if ((*__local_F__goto_692_12).eptr[-1]) == 13: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_760 != 0) {
+            (__ci_expr_logic_761 = (if (if ((*__local_F__goto_692_12).eptr[-1]) == 13: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_765 != 0) {
+        if (__ci_expr_logic_761 != 0) {
             goto '__ci_bb_6172
         } else {
             goto '__ci_bb_6173
@@ -41234,29 +41021,17 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6174 {
         ((*__local_F__goto_692_12).temp_32[2] = (((if (*__local_F__goto_692_12).op == OP_DNREFI: 1 else: 0) as c_uint)))
-        (__ci_expr_ternary_766 = 0)
-        if ((if (*__local_F__goto_692_12).op == OP_DNREFI: 1 else: 0) != 0) {
-            (__ci_expr_ternary_766 = ((((*__local_F__goto_692_12).ecode[(1 + (2 * 2))]) as c_int)))
-        } else {
-            (__ci_expr_ternary_766 = ((0 as c_int)))
-        }
-        ((*__local_F__goto_692_12).temp_32[3] = ((__ci_expr_ternary_766 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[3] = (((if (if (*__local_F__goto_692_12).op == OP_DNREFI: 1 else: 0) != 0: (((*__local_F__goto_692_12).ecode[(1 + (2 * 2))]) as c_int) else: (0 as c_int)) as c_uint)))
         (__local_count__goto_5251_11 = (((((((((*__local_F__goto_692_12).ecode[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | (((*__local_F__goto_692_12).ecode[((1 + 2) + 1)]) as c_int)) as c_uint) as c_int)))
         (__local_slot__goto_5252_18 = (*__param_mb).name_table + (((((((((*__local_F__goto_692_12).ecode[1]) as c_int) << (8 as c_uint)) as c_int) | (((*__local_F__goto_692_12).ecode[(1 + 1)]) as c_int)) as c_uint) *% (((*__param_mb).name_entry_size as c_int) as c_uint)) as usize))
-        (__ci_expr_ternary_767 = 0)
-        if ((if (*__local_F__goto_692_12).op == OP_DNREFI: 1 else: 0) != 0) {
-            (__ci_expr_ternary_767 = ((1 as c_int)))
-        } else {
-            (__ci_expr_ternary_767 = ((0 as c_int)))
-        }
-        ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + ((((1 + (2 * 2)) + __ci_expr_ternary_767) as isize) as usize))
+        ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + ((((1 + (2 * 2)) + (if (if (*__local_F__goto_692_12).op == OP_DNREFI: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int))) as isize) as usize))
         goto '__ci_bb_6175
     }
 
     '__ci_bb_6175 {
-        (__ci_expr_old_768 = __local_count__goto_5251_11)
+        (__ci_expr_old_762 = __local_count__goto_5251_11)
         (__local_count__goto_5251_11 = __local_count__goto_5251_11 - 1)
-        if ((if __ci_expr_old_768 > 0: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_762 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_6176
         } else {
             goto '__ci_bb_6177
@@ -41265,11 +41040,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6176 {
         ((*__local_F__goto_692_12).temp_size = (((((((((((__local_slot__goto_5252_18[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_slot__goto_5252_18[(0 + 1)]) as c_int)) as c_uint) << (1 as c_uint)) as c_uint) -% (2 as c_uint)) as c_ulong)))
-        (__ci_expr_logic_769 = 0)
+        (__ci_expr_logic_763 = 0)
         if ((if (*__local_F__goto_692_12).temp_size < (*__local_F__goto_692_12).offset_top: 1 else: 0) != 0) {
-            (__ci_expr_logic_769 = (if (if (*__local_F__goto_692_12).ovector[(*__local_F__goto_692_12).temp_size] != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_763 = (if (if (*__local_F__goto_692_12).ovector[(*__local_F__goto_692_12).temp_size] != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_769 != 0) {
+        if (__ci_expr_logic_763 != 0) {
             goto '__ci_bb_6178
         } else {
             goto '__ci_bb_6179
@@ -41295,21 +41070,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6181 {
         ((*__local_F__goto_692_12).temp_32[2] = (((if (*__local_F__goto_692_12).op == OP_REFI: 1 else: 0) as c_uint)))
-        (__ci_expr_ternary_770 = 0)
-        if ((if (*__local_F__goto_692_12).op == OP_REFI: 1 else: 0) != 0) {
-            (__ci_expr_ternary_770 = ((((*__local_F__goto_692_12).ecode[(1 + 2)]) as c_int)))
-        } else {
-            (__ci_expr_ternary_770 = ((0 as c_int)))
-        }
-        ((*__local_F__goto_692_12).temp_32[3] = ((__ci_expr_ternary_770 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[3] = (((if (if (*__local_F__goto_692_12).op == OP_REFI: 1 else: 0) != 0: (((*__local_F__goto_692_12).ecode[(1 + 2)]) as c_int) else: (0 as c_int)) as c_uint)))
         ((*__local_F__goto_692_12).temp_size = ((((((((((((*__local_F__goto_692_12).ecode[1]) as c_int) << (8 as c_uint)) as c_int) | (((*__local_F__goto_692_12).ecode[(1 + 1)]) as c_int)) as c_uint) << (1 as c_uint)) as c_uint) -% (2 as c_uint)) as c_ulong)))
-        (__ci_expr_ternary_771 = 0)
-        if ((if (*__local_F__goto_692_12).op == OP_REFI: 1 else: 0) != 0) {
-            (__ci_expr_ternary_771 = ((1 as c_int)))
-        } else {
-            (__ci_expr_ternary_771 = ((0 as c_int)))
-        }
-        ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + ((((1 + 2) + __ci_expr_ternary_771) as isize) as usize))
+        ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + ((((1 + 2) + (if (if (*__local_F__goto_692_12).op == OP_REFI: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int))) as isize) as usize))
         goto '__ci_bb_6180
     }
 
@@ -41322,11 +41085,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6183 {
-        (__ci_expr_logic_775 = 0)
+        (__ci_expr_logic_767 = 0)
         if ((if (*__local_F__goto_692_12).temp_size < (*__local_F__goto_692_12).offset_top: 1 else: 0) != 0) {
-            (__ci_expr_logic_775 = (if (if (*__local_F__goto_692_12).ovector[(*__local_F__goto_692_12).temp_size] != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_767 = (if (if (*__local_F__goto_692_12).ovector[(*__local_F__goto_692_12).temp_size] != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_775 != 0) {
+        if (__ci_expr_logic_767 != 0) {
             goto '__ci_bb_6215
         } else {
             goto '__ci_bb_6216
@@ -41334,9 +41097,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6184 {
-        (__ci_expr_old_772 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_old_764 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        (__local_fc__goto_714_10 = (((((*__ci_expr_old_772) as c_int) - OP_CRSTAR) as c_uint)))
+        (__local_fc__goto_714_10 = (((((*__ci_expr_old_764) as c_int) - OP_CRSTAR) as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((rep_min[__local_fc__goto_714_10] as c_uint)))
         ((*__local_F__goto_692_12).temp_32[1] = ((rep_max[__local_fc__goto_714_10] as c_uint)))
         (__local_reptype__goto_716_10 = ((rep_typ[__local_fc__goto_714_10] as c_uint)))
@@ -41424,20 +41187,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6198 {
-        (__ci_expr_logic_774 = 0)
+        (__ci_expr_logic_766 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_773: c_int
+            var __ci_expr_logic_765: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_773 = (if true: 1 else: 0))
+                (__ci_expr_logic_765 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_773 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_765 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_774 = (if __ci_expr_logic_773 != 0: 1 else: 0))
+            (__ci_expr_logic_766 = (if __ci_expr_logic_765 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_774 != 0) {
+        if (__ci_expr_logic_766 != 0) {
             goto '__ci_bb_6201
         } else {
             goto '__ci_bb_6202
@@ -41548,11 +41311,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6216 {
         if ((if (*__local_F__goto_692_12).temp_32[0] == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_776 = (if true: 1 else: 0))
+            (__ci_expr_logic_768 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_776 = (if (if (((*__param_mb).poptions as c_uint) & (512 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_768 = (if (if (((*__param_mb).poptions as c_uint) & (512 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_776 != 0) {
+        if (__ci_expr_logic_768 != 0) {
             goto '__ci_bb_6220
         } else {
             goto '__ci_bb_6221
@@ -41661,20 +41424,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6235 {
-        (__ci_expr_logic_778 = 0)
+        (__ci_expr_logic_770 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_777: c_int
+            var __ci_expr_logic_769: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_777 = (if true: 1 else: 0))
+                (__ci_expr_logic_769 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_777 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_769 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_778 = (if __ci_expr_logic_777 != 0: 1 else: 0))
+            (__ci_expr_logic_770 = (if __ci_expr_logic_769 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_778 != 0) {
+        if (__ci_expr_logic_770 != 0) {
             goto '__ci_bb_6238
         } else {
             goto '__ci_bb_6239
@@ -41786,9 +41549,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6259 {
-        (__ci_expr_old_779 = (*__local_F__goto_692_12).temp_32[0])
+        (__ci_expr_old_771 = (*__local_F__goto_692_12).temp_32[0])
         ((*__local_F__goto_692_12).temp_32[0] = ((*__local_F__goto_692_12).temp_32[0] +% 1))
-        if ((if __ci_expr_old_779 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_771 >= (*__local_F__goto_692_12).temp_32[1]: 1 else: 0) != 0) {
             goto '__ci_bb_6263
         } else {
             goto '__ci_bb_6264
@@ -41869,20 +41632,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6277 {
-        (__ci_expr_logic_781 = 0)
+        (__ci_expr_logic_773 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_780: c_int
+            var __ci_expr_logic_772: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_780 = (if true: 1 else: 0))
+                (__ci_expr_logic_772 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_780 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_772 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_781 = (if __ci_expr_logic_780 != 0: 1 else: 0))
+            (__ci_expr_logic_773 = (if __ci_expr_logic_772 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_781 != 0) {
+        if (__ci_expr_logic_773 != 0) {
             goto '__ci_bb_6280
         } else {
             goto '__ci_bb_6281
@@ -41958,15 +41721,15 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6291 {
-        (__ci_expr_logic_783 = 0)
-        (__ci_expr_logic_782 = 0)
+        (__ci_expr_logic_775 = 0)
+        (__ci_expr_logic_774 = 0)
         if ((if __local_rrc__goto_708_5 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_782 = (if (if (*__param_mb).partial != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_774 = (if (if (*__param_mb).partial != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_782 != 0) {
-            (__ci_expr_logic_783 = (if (if (*__param_mb).end_subject > (*__param_mb).start_used_ptr: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_774 != 0) {
+            (__ci_expr_logic_775 = (if (if (*__param_mb).end_subject > (*__param_mb).start_used_ptr: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_783 != 0) {
+        if (__ci_expr_logic_775 != 0) {
             goto '__ci_bb_6293
         } else {
             goto '__ci_bb_6294
@@ -42330,11 +42093,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
         ((*__local_F__goto_692_12).temp_32[2] = ((1 as c_uint)))
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + ((1 as isize) as usize))
         if ((if (*((*__local_F__goto_692_12).ecode)) == OP_CBRAPOS: 1 else: 0) != 0) {
-            (__ci_expr_logic_784 = (if true: 1 else: 0))
+            (__ci_expr_logic_776 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_784 = (if (if (*((*__local_F__goto_692_12).ecode)) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_776 = (if (if (*((*__local_F__goto_692_12).ecode)) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_784 != 0) {
+        if (__ci_expr_logic_776 != 0) {
             goto '__ci_bb_6370
         } else {
             goto '__ci_bb_6371
@@ -42392,11 +42155,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6380 {
         if ((*__local_F__goto_692_12).temp_32[1] != 0) {
-            (__ci_expr_logic_787 = (if true: 1 else: 0))
+            (__ci_expr_logic_779 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_787 = (if (*__local_F__goto_692_12).temp_32[2] != 0: 1 else: 0))
+            (__ci_expr_logic_779 = (if (*__local_F__goto_692_12).temp_32[2] != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_787 != 0) {
+        if (__ci_expr_logic_779 != 0) {
             goto '__ci_bb_6403
         } else {
             goto '__ci_bb_6404
@@ -42474,20 +42237,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6392 {
         (__local_next_ecode__goto_5565_20 = (*__local_F__goto_692_12).ecode + ((((((((*__local_F__goto_692_12).ecode[1]) as c_int) << (8 as c_uint)) as c_int) | (((*__local_F__goto_692_12).ecode[(1 + 1)]) as c_int)) as c_uint) as usize))
-        (__ci_expr_logic_786 = 0)
+        (__ci_expr_logic_778 = 0)
         if ((if (*__param_mb).verb_ecode_ptr < __local_next_ecode__goto_5565_20: 1 else: 0) != 0) {
-            var __ci_expr_logic_785: c_int
+            var __ci_expr_logic_777: c_int
 
             if ((if (*((*__local_F__goto_692_12).ecode)) == OP_ALT: 1 else: 0) != 0) {
-                (__ci_expr_logic_785 = (if true: 1 else: 0))
+                (__ci_expr_logic_777 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_785 = (if (if (*__local_next_ecode__goto_5565_20) == OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_777 = (if (if (*__local_next_ecode__goto_5565_20) == OP_ALT: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_786 = (if __ci_expr_logic_785 != 0: 1 else: 0))
+            (__ci_expr_logic_778 = (if __ci_expr_logic_777 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_786 != 0) {
+        if (__ci_expr_logic_778 != 0) {
             goto '__ci_bb_6394
         } else {
             goto '__ci_bb_6395
@@ -42553,11 +42316,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6408 {
         if ((*__param_mb).hasthen != 0) {
-            (__ci_expr_logic_788 = (if true: 1 else: 0))
+            (__ci_expr_logic_780 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_788 = (if (if (*__local_F__goto_692_12).rdepth == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_780 = (if (if (*__local_F__goto_692_12).rdepth == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_788 != 0) {
+        if (__ci_expr_logic_780 != 0) {
             goto '__ci_bb_6409
         } else {
             goto '__ci_bb_6410
@@ -42698,20 +42461,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6437 {
         (__local_next_ecode__goto_5659_20 = (*__local_F__goto_692_12).ecode + ((((((((*__local_F__goto_692_12).ecode[1]) as c_int) << (8 as c_uint)) as c_int) | (((*__local_F__goto_692_12).ecode[(1 + 1)]) as c_int)) as c_uint) as usize))
-        (__ci_expr_logic_790 = 0)
+        (__ci_expr_logic_782 = 0)
         if ((if (*__param_mb).verb_ecode_ptr < __local_next_ecode__goto_5659_20: 1 else: 0) != 0) {
-            var __ci_expr_logic_789: c_int
+            var __ci_expr_logic_781: c_int
 
             if ((if (*((*__local_F__goto_692_12).ecode)) == OP_ALT: 1 else: 0) != 0) {
-                (__ci_expr_logic_789 = (if true: 1 else: 0))
+                (__ci_expr_logic_781 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_789 = (if (if (*__local_next_ecode__goto_5659_20) == OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_781 = (if (if (*__local_next_ecode__goto_5659_20) == OP_ALT: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_790 = (if __ci_expr_logic_789 != 0: 1 else: 0))
+            (__ci_expr_logic_782 = (if __ci_expr_logic_781 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_790 != 0) {
+        if (__ci_expr_logic_782 != 0) {
             goto '__ci_bb_6439
         } else {
             goto '__ci_bb_6440
@@ -42768,13 +42531,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6451 {
         (__local_bracode__goto_704_12 = (*__param_mb).start_code + ((((((((*__local_F__goto_692_12).ecode[1]) as c_int) << (8 as c_uint)) as c_int) | (((*__local_F__goto_692_12).ecode[(1 + 1)]) as c_int)) as c_uint) as usize))
-        (__ci_expr_ternary_791 = 0)
-        if ((if __local_bracode__goto_704_12 == (*__param_mb).start_code: 1 else: 0) != 0) {
-            (__ci_expr_ternary_791 = ((0 as c_uint)))
-        } else {
-            (__ci_expr_ternary_791 = (((((((__local_bracode__goto_704_12[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | ((__local_bracode__goto_704_12[((1 + 2) + 1)]) as c_int)) as c_uint)))
-        }
-        (__local_number__goto_715_10 = __ci_expr_ternary_791)
+        (__local_number__goto_715_10 = (((if (if __local_bracode__goto_704_12 == (*__param_mb).start_code: 1 else: 0) != 0: (0 as c_uint) else: ((((((__local_bracode__goto_704_12[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | ((__local_bracode__goto_704_12[((1 + 2) + 1)]) as c_int)) as c_uint)) as c_uint)))
         if ((if (*__local_F__goto_692_12).current_recurse != 4294967295: 1 else: 0) != 0) {
             goto '__ci_bb_6452
         } else {
@@ -42817,15 +42574,15 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6457 {
-        (__ci_expr_logic_793 = 0)
-        (__ci_expr_logic_792 = 0)
+        (__ci_expr_logic_784 = 0)
+        (__ci_expr_logic_783 = 0)
         if ((if (*__local_F__goto_692_12).eptr == (*__local_P__goto_694_12).eptr: 1 else: 0) != 0) {
-            (__ci_expr_logic_792 = (if (if (*__param_mb).last_used_ptr == (*__local_P__goto_694_12).recurse_last_used: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_783 = (if (if (*__param_mb).last_used_ptr == (*__local_P__goto_694_12).recurse_last_used: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_792 != 0) {
-            (__ci_expr_logic_793 = (if (if (((*__param_mb).moptions as c_uint) & (262144 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_783 != 0) {
+            (__ci_expr_logic_784 = (if (if (((*__param_mb).moptions as c_uint) & (262144 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_793 != 0) {
+        if (__ci_expr_logic_784 != 0) {
             goto '__ci_bb_6459
         } else {
             goto '__ci_bb_6460
@@ -42874,15 +42631,15 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6467 {
         (__local_next_ecode__goto_5721_18 = (*__local_F__goto_692_12).temp_sptr[0] + ((((((((*__local_F__goto_692_12).temp_sptr[0][1]) as c_int) << (8 as c_uint)) as c_int) | (((*__local_F__goto_692_12).temp_sptr[0][(1 + 1)]) as c_int)) as c_uint) as usize))
-        (__ci_expr_logic_795 = 0)
-        (__ci_expr_logic_794 = 0)
+        (__ci_expr_logic_786 = 0)
+        (__ci_expr_logic_785 = 0)
         if ((if __local_rrc__goto_708_5 >= -997: 1 else: 0) != 0) {
-            (__ci_expr_logic_794 = (if (if __local_rrc__goto_708_5 <= -993: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_785 = (if (if __local_rrc__goto_708_5 <= -993: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_794 != 0) {
-            (__ci_expr_logic_795 = (if (if (*__param_mb).verb_current_recurse == (((*__local_F__goto_692_12).temp_32[0] as c_uint) ^ (262144 as c_uint)): 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_785 != 0) {
+            (__ci_expr_logic_786 = (if (if (*__param_mb).verb_current_recurse == (((*__local_F__goto_692_12).temp_32[0] as c_uint) ^ (262144 as c_uint)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_795 != 0) {
+        if (__ci_expr_logic_786 != 0) {
             goto '__ci_bb_6469
         } else {
             goto '__ci_bb_6470
@@ -42894,24 +42651,24 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6469 {
-        (__ci_expr_logic_798 = 0)
-        (__ci_expr_logic_796 = 0)
+        (__ci_expr_logic_789 = 0)
+        (__ci_expr_logic_787 = 0)
         if ((if __local_rrc__goto_708_5 == -993: 1 else: 0) != 0) {
-            (__ci_expr_logic_796 = (if (if (*__param_mb).verb_ecode_ptr < __local_next_ecode__goto_5721_18: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_787 = (if (if (*__param_mb).verb_ecode_ptr < __local_next_ecode__goto_5721_18: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_796 != 0) {
-            var __ci_expr_logic_797: c_int
+        if (__ci_expr_logic_787 != 0) {
+            var __ci_expr_logic_788: c_int
 
             if ((if (*((*__local_F__goto_692_12).temp_sptr[0] as *const u8)) == OP_ALT: 1 else: 0) != 0) {
-                (__ci_expr_logic_797 = (if true: 1 else: 0))
+                (__ci_expr_logic_788 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_797 = (if (if (*__local_next_ecode__goto_5721_18) == OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_788 = (if (if (*__local_next_ecode__goto_5721_18) == OP_ALT: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_798 = (if __ci_expr_logic_797 != 0: 1 else: 0))
+            (__ci_expr_logic_789 = (if __ci_expr_logic_788 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_798 != 0) {
+        if (__ci_expr_logic_789 != 0) {
             goto '__ci_bb_6471
         } else {
             goto '__ci_bb_6472
@@ -43031,11 +42788,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6497 {
-        (__ci_expr_logic_799 = 0)
+        (__ci_expr_logic_790 = 0)
         if ((if __local_rrc__goto_708_5 != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_799 = (if (if __local_rrc__goto_708_5 != -993: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_790 = (if (if __local_rrc__goto_708_5 != -993: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_799 != 0) {
+        if (__ci_expr_logic_790 != 0) {
             goto '__ci_bb_6498
         } else {
             goto '__ci_bb_6499
@@ -43279,11 +43036,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
         (__local_extra_size__goto_5857_16 = (__local_extra_size__goto_5857_16 +% 3))
         (__local_offset__goto_705_12 = (((((((((((__local_ecode__goto_5856_18[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_ecode__goto_5856_18[(1 + 1)]) as c_int)) as c_uint) << (1 as c_uint)) as c_uint) -% (2 as c_uint)) as c_ulong)))
         (__local_ecode__goto_5856_18 = __local_ecode__goto_5856_18 + (((1 + 2) as isize) as usize))
-        (__ci_expr_logic_800 = 0)
+        (__ci_expr_logic_791 = 0)
         if ((if __local_offset__goto_705_12 < (*__local_F__goto_692_12).offset_top: 1 else: 0) != 0) {
-            (__ci_expr_logic_800 = (if (if (*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_791 = (if (if (*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_800 != 0) {
+        if (__ci_expr_logic_791 != 0) {
             goto '__ci_bb_6551
         } else {
             goto '__ci_bb_6552
@@ -43337,11 +43094,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6560 {
         (__local_offset__goto_705_12 = (((((((((((__local_slot__goto_5859_18[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_slot__goto_5859_18[(0 + 1)]) as c_int)) as c_uint) << (1 as c_uint)) as c_uint) -% (2 as c_uint)) as c_ulong)))
-        (__ci_expr_logic_801 = 0)
+        (__ci_expr_logic_792 = 0)
         if ((if __local_offset__goto_705_12 < (*__local_F__goto_692_12).offset_top: 1 else: 0) != 0) {
-            (__ci_expr_logic_801 = (if (if (*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_792 = (if (if (*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_801 != 0) {
+        if (__ci_expr_logic_792 != 0) {
             goto '__ci_bb_6562
         } else {
             goto '__ci_bb_6563
@@ -43478,11 +43235,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6583 {
-        (__ci_expr_logic_802 = 0)
+        (__ci_expr_logic_793 = 0)
         if ((if __local_rrc__goto_708_5 != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_802 = (if (if __local_rrc__goto_708_5 != -993: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_793 = (if (if __local_rrc__goto_708_5 != -993: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_802 != 0) {
+        if (__ci_expr_logic_793 != 0) {
             goto '__ci_bb_6584
         } else {
             goto '__ci_bb_6585
@@ -43603,11 +43360,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_6610 {
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + (((1 + 2) as isize) as usize))
         if ((if (*((*__local_F__goto_692_12).ecode)) == OP_CALLOUT: 1 else: 0) != 0) {
-            (__ci_expr_logic_803 = (if true: 1 else: 0))
+            (__ci_expr_logic_794 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_803 = (if (if (*((*__local_F__goto_692_12).ecode)) == OP_CALLOUT_STR: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_794 = (if (if (*((*__local_F__goto_692_12).ecode)) == OP_CALLOUT_STR: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_803 != 0) {
+        if (__ci_expr_logic_794 != 0) {
             goto '__ci_bb_6611
         } else {
             goto '__ci_bb_6612
@@ -43669,13 +43426,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6624 {
-        (__ci_expr_ternary_810 = 0)
-        if (__local_condition__goto_719_6 != 0) {
-            (__ci_expr_ternary_810 = ((_pcre2_OP_lengths_8[(*((*__local_F__goto_692_12).ecode))] as c_ulong)))
-        } else {
-            (__ci_expr_ternary_810 = (*__local_F__goto_692_12).length)
-        }
-        ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + (__ci_expr_ternary_810 as usize))
+        ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + ((if __local_condition__goto_719_6 != 0: (_pcre2_OP_lengths_8[(*((*__local_F__goto_692_12).ecode))] as c_ulong) else: (*__local_F__goto_692_12).length) as usize))
         if ((if (*__local_F__goto_692_12).op == OP_SCOND: 1 else: 0) != 0) {
             goto '__ci_bb_6683
         } else {
@@ -43694,11 +43445,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_6626 {
         (__local_number__goto_715_10 = ((((((((*__local_F__goto_692_12).ecode[1]) as c_int) << (8 as c_uint)) as c_int) | (((*__local_F__goto_692_12).ecode[(1 + 1)]) as c_int)) as c_uint)))
         if ((if __local_number__goto_715_10 == 65535: 1 else: 0) != 0) {
-            (__ci_expr_logic_804 = (if true: 1 else: 0))
+            (__ci_expr_logic_795 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_804 = (if (if __local_number__goto_715_10 == (*__local_F__goto_692_12).current_recurse: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_795 = (if (if __local_number__goto_715_10 == (*__local_F__goto_692_12).current_recurse: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_condition__goto_719_6 = __ci_expr_logic_804)
+        (__local_condition__goto_719_6 = __ci_expr_logic_795)
         goto '__ci_bb_6627
     }
 
@@ -43725,9 +43476,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6631 {
-        (__ci_expr_old_805 = __local_count__goto_6041_13)
+        (__ci_expr_old_796 = __local_count__goto_6041_13)
         (__local_count__goto_6041_13 = __local_count__goto_6041_13 - 1)
-        if ((if __ci_expr_old_805 > 0: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_796 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_6632
         } else {
             goto '__ci_bb_6633
@@ -43759,11 +43510,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6636 {
         (__local_offset__goto_705_12 = ((((((((((((*__local_F__goto_692_12).ecode[1]) as c_int) << (8 as c_uint)) as c_int) | (((*__local_F__goto_692_12).ecode[(1 + 1)]) as c_int)) as c_uint) << (1 as c_uint)) as c_uint) -% (2 as c_uint)) as c_ulong)))
-        (__ci_expr_logic_806 = 0)
+        (__ci_expr_logic_797 = 0)
         if ((if __local_offset__goto_705_12 < (*__local_F__goto_692_12).offset_top: 1 else: 0) != 0) {
-            (__ci_expr_logic_806 = (if (if (*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_797 = (if (if (*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_condition__goto_719_6 = __ci_expr_logic_806)
+        (__local_condition__goto_719_6 = __ci_expr_logic_797)
         goto '__ci_bb_6624
     }
 
@@ -43774,9 +43525,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6638 {
-        (__ci_expr_old_807 = __local_count__goto_6060_13)
+        (__ci_expr_old_798 = __local_count__goto_6060_13)
         (__local_count__goto_6060_13 = __local_count__goto_6060_13 - 1)
-        if ((if __ci_expr_old_807 > 0: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_798 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_6639
         } else {
             goto '__ci_bb_6640
@@ -43785,11 +43536,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6639 {
         (__local_offset__goto_705_12 = (((((((((((__local_slot__goto_6061_20[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_slot__goto_6061_20[(0 + 1)]) as c_int)) as c_uint) << (1 as c_uint)) as c_uint) -% (2 as c_uint)) as c_ulong)))
-        (__ci_expr_logic_808 = 0)
+        (__ci_expr_logic_799 = 0)
         if ((if __local_offset__goto_705_12 < (*__local_F__goto_692_12).offset_top: 1 else: 0) != 0) {
-            (__ci_expr_logic_808 = (if (if (*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_799 = (if (if (*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_condition__goto_719_6 = __ci_expr_logic_808)
+        (__local_condition__goto_719_6 = __ci_expr_logic_799)
         if (__local_condition__goto_719_6 != 0) {
             goto '__ci_bb_6641
         } else {
@@ -43821,11 +43572,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6645 {
         if ((if (*((*__local_F__goto_692_12).ecode)) == OP_ASSERT: 1 else: 0) != 0) {
-            (__ci_expr_logic_809 = (if true: 1 else: 0))
+            (__ci_expr_logic_800 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_809 = (if (if (*((*__local_F__goto_692_12).ecode)) == OP_ASSERTBACK: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_800 = (if (if (*((*__local_F__goto_692_12).ecode)) == OP_ASSERTBACK: 1 else: 0) != 0: 1 else: 0))
         }
-        ((*__local_F__goto_692_12).temp_32[0] = ((__ci_expr_logic_809 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[0] = ((__ci_expr_logic_800 as c_uint)))
         ((*__local_F__goto_692_12).temp_sptr[0] = (*__local_F__goto_692_12).ecode)
         goto '__ci_bb_6646
     }
@@ -44208,22 +43959,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6716 {
         (__local_diff__goto_6252_17 = (((((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_long)))
-        (__ci_expr_ternary_812 = 0)
-        if ((if __local_diff__goto_6252_17 > 65535: 1 else: 0) != 0) {
-            (__ci_expr_ternary_812 = ((65535 as c_int)))
-        } else {
-            var __ci_expr_ternary_811: c_int = 0
-
-            if ((if __local_diff__goto_6252_17 > 0: 1 else: 0) != 0) {
-                (__ci_expr_ternary_811 = ((__local_diff__goto_6252_17 as c_int)))
-            } else {
-                (__ci_expr_ternary_811 = ((0 as c_int)))
-            }
-
-            (__ci_expr_ternary_812 = __ci_expr_ternary_811)
-
-        }
-        (__local_available__goto_6253_16 = ((__ci_expr_ternary_812 as c_uint)))
+        (__local_available__goto_6253_16 = (((if (if __local_diff__goto_6252_17 > 65535: 1 else: 0) != 0: (65535 as c_int) else: ((if (if __local_diff__goto_6252_17 > 0: 1 else: 0) != 0: (__local_diff__goto_6252_17 as c_int) else: (0 as c_int)) as c_int)) as c_uint)))
         if ((if (*__local_F__goto_692_12).temp_32[0] > __local_available__goto_6253_16: 1 else: 0) != 0) {
             goto '__ci_bb_6732
         } else {
@@ -44374,9 +44110,9 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6748 {
-        (__ci_expr_old_813 = (*__local_F__goto_692_12).temp_32[1])
+        (__ci_expr_old_801 = (*__local_F__goto_692_12).temp_32[1])
         ((*__local_F__goto_692_12).temp_32[1] = ((*__local_F__goto_692_12).temp_32[1] -% 1))
-        if ((if __ci_expr_old_813 <= (*__local_F__goto_692_12).temp_32[0]: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_801 <= (*__local_F__goto_692_12).temp_32[0]: 1 else: 0) != 0) {
             goto '__ci_bb_6752
         } else {
             goto '__ci_bb_6753
@@ -44415,11 +44151,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6759 {
-        (__ci_expr_logic_814 = 0)
+        (__ci_expr_logic_802 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_814 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_802 = (if (if ((((*((*__local_F__goto_692_12).eptr)) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_814 != 0) {
+        if (__ci_expr_logic_802 != 0) {
             goto '__ci_bb_6760
         } else {
             goto '__ci_bb_6761
@@ -44491,11 +44227,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6771 {
         (__local_branch_end__goto_702_12 = ((null as *const u8)))
-        (__ci_expr_logic_815 = 0)
+        (__ci_expr_logic_803 = 0)
         if ((if (*__local_bracode__goto_704_12) != OP_BRA: 1 else: 0) != 0) {
-            (__ci_expr_logic_815 = (if (if (*__local_bracode__goto_704_12) != OP_COND: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_803 = (if (if (*__local_bracode__goto_704_12) != OP_COND: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_815 != 0) {
+        if (__ci_expr_logic_803 != 0) {
             goto '__ci_bb_6772
         } else {
             goto '__ci_bb_6773
@@ -44523,20 +44259,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6775 {
-        (__ci_expr_logic_818 = 0)
-        (__ci_expr_logic_817 = 0)
+        (__ci_expr_logic_806 = 0)
+        (__ci_expr_logic_805 = 0)
         if ((if (*__local_bracode__goto_704_12) == OP_ASSERTBACK: 1 else: 0) != 0) {
-            (__ci_expr_logic_816 = (if true: 1 else: 0))
+            (__ci_expr_logic_804 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_816 = (if (if (*__local_bracode__goto_704_12) == OP_ASSERTBACK_NOT: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_804 = (if (if (*__local_bracode__goto_704_12) == OP_ASSERTBACK_NOT: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_816 != 0) {
-            (__ci_expr_logic_817 = (if (if (__local_branch_start__goto_703_12[(1 + 2)]) == OP_VREVERSE: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_804 != 0) {
+            (__ci_expr_logic_805 = (if (if (__local_branch_start__goto_703_12[(1 + 2)]) == OP_VREVERSE: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_817 != 0) {
-            (__ci_expr_logic_818 = (if (if (*__local_F__goto_692_12).eptr != (*__local_P__goto_694_12).eptr: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_805 != 0) {
+            (__ci_expr_logic_806 = (if (if (*__local_F__goto_692_12).eptr != (*__local_P__goto_694_12).eptr: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_818 != 0) {
+        if (__ci_expr_logic_806 != 0) {
             goto '__ci_bb_6777
         } else {
             goto '__ci_bb_6778
@@ -44587,11 +44323,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6787 {
         if ((if (*__local_F__goto_692_12).current_recurse != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_819 = (if true: 1 else: 0))
+            (__ci_expr_logic_807 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_819 = (if (if ((*__local_F__goto_692_12).ecode[(1 + 2)]) != OP_END: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_807 = (if (if ((*__local_F__goto_692_12).ecode[(1 + 2)]) != OP_END: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_819 != 0) {
+        if (__ci_expr_logic_807 != 0) {
             goto '__ci_bb_6788
         } else {
             goto '__ci_bb_6789
@@ -44665,11 +44401,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6799 {
-        (__ci_expr_logic_820 = 0)
+        (__ci_expr_logic_808 = 0)
         if ((if (__local_branch_start__goto_703_12[(1 + 2)]) == OP_VREVERSE: 1 else: 0) != 0) {
-            (__ci_expr_logic_820 = (if (if (*__local_F__goto_692_12).eptr != (*__local_P__goto_694_12).eptr: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_808 = (if (if (*__local_F__goto_692_12).eptr != (*__local_P__goto_694_12).eptr: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_820 != 0) {
+        if (__ci_expr_logic_808 != 0) {
             goto '__ci_bb_6800
         } else {
             goto '__ci_bb_6801
@@ -44708,11 +44444,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6808 {
-        (__ci_expr_logic_821 = 0)
+        (__ci_expr_logic_809 = 0)
         if ((if (__local_branch_start__goto_703_12[(1 + 2)]) == OP_VREVERSE: 1 else: 0) != 0) {
-            (__ci_expr_logic_821 = (if (if (*__local_F__goto_692_12).eptr != (*__local_P__goto_694_12).eptr: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_809 = (if (if (*__local_F__goto_692_12).eptr != (*__local_P__goto_694_12).eptr: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_821 != 0) {
+        if (__ci_expr_logic_809 != 0) {
             goto '__ci_bb_6809
         } else {
             goto '__ci_bb_6810
@@ -44786,11 +44522,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6824 {
-        (__ci_expr_logic_822 = 0)
+        (__ci_expr_logic_810 = 0)
         if ((if (__local_branch_start__goto_703_12[(1 + 2)]) == OP_VREVERSE: 1 else: 0) != 0) {
-            (__ci_expr_logic_822 = (if (if (*__local_F__goto_692_12).eptr != (*__local_P__goto_694_12).eptr: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_810 = (if (if (*__local_F__goto_692_12).eptr != (*__local_P__goto_694_12).eptr: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_822 != 0) {
+        if (__ci_expr_logic_810 != 0) {
             goto '__ci_bb_6825
         } else {
             goto '__ci_bb_6826
@@ -45060,20 +44796,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6872 {
-        (__ci_expr_logic_824 = 0)
+        (__ci_expr_logic_812 = 0)
         if ((if (*__local_F__goto_692_12).op != OP_KET: 1 else: 0) != 0) {
-            var __ci_expr_logic_823: c_int
+            var __ci_expr_logic_811: c_int
 
             if ((if __local_P__goto_694_12 == null: 1 else: 0) != 0) {
-                (__ci_expr_logic_823 = (if true: 1 else: 0))
+                (__ci_expr_logic_811 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_823 = (if (if (*__local_F__goto_692_12).eptr != (*__local_P__goto_694_12).eptr: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_811 = (if (if (*__local_F__goto_692_12).eptr != (*__local_P__goto_694_12).eptr: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_824 = (if __ci_expr_logic_823 != 0: 1 else: 0))
+            (__ci_expr_logic_812 = (if __ci_expr_logic_811 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_824 != 0) {
+        if (__ci_expr_logic_812 != 0) {
             goto '__ci_bb_6876
         } else {
             goto '__ci_bb_6877
@@ -45187,11 +44923,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_6898 {
         if ((if (*__local_F__goto_692_12).eptr != (*__param_mb).start_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_825 = (if true: 1 else: 0))
+            (__ci_expr_logic_813 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_825 = (if (if (((*__param_mb).moptions as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_813 = (if (if (((*__param_mb).moptions as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_825 != 0) {
+        if (__ci_expr_logic_813 != 0) {
             goto '__ci_bb_6899
         } else {
             goto '__ci_bb_6900
@@ -45268,57 +45004,57 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6918 {
-        (__ci_expr_logic_832 = 0)
+        (__ci_expr_logic_820 = 0)
         if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).true_end_subject: 1 else: 0) != 0) {
-            var __ci_expr_logic_831: c_int
+            var __ci_expr_logic_819: c_int
 
-            var __ci_expr_ternary_830: c_int = 0
+            var __ci_expr_ternary_818: c_int = 0
 
             if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_826: c_int = 0
+                var __ci_expr_logic_814: c_int = 0
 
                 if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_826 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_814 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_830 = __ci_expr_logic_826)
+                (__ci_expr_ternary_818 = __ci_expr_logic_814)
 
             } else {
-                var __ci_expr_logic_829: c_int = 0
+                var __ci_expr_logic_817: c_int = 0
 
-                var __ci_expr_logic_827: c_int = 0
+                var __ci_expr_logic_815: c_int = 0
 
                 if ((if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_827 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_815 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_827 != 0) {
-                    var __ci_expr_logic_828: c_int
+                if (__ci_expr_logic_815 != 0) {
+                    var __ci_expr_logic_816: c_int
 
                     if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_828 = (if true: 1 else: 0))
+                        (__ci_expr_logic_816 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_828 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_816 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_829 = (if __ci_expr_logic_828 != 0: 1 else: 0))
+                    (__ci_expr_logic_817 = (if __ci_expr_logic_816 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_830 = __ci_expr_logic_829)
+                (__ci_expr_ternary_818 = __ci_expr_logic_817)
 
             }
 
-            if ((if not (__ci_expr_ternary_830 != 0): 1 else: 0) != 0) {
-                (__ci_expr_logic_831 = (if true: 1 else: 0))
+            if ((if not (__ci_expr_ternary_818 != 0): 1 else: 0) != 0) {
+                (__ci_expr_logic_819 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_831 = (if (if (*__local_F__goto_692_12).eptr != ((*__param_mb).true_end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_819 = (if (if (*__local_F__goto_692_12).eptr != ((*__param_mb).true_end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_832 = (if __ci_expr_logic_831 != 0: 1 else: 0))
+            (__ci_expr_logic_820 = (if __ci_expr_logic_819 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_832 != 0) {
+        if (__ci_expr_logic_820 != 0) {
             goto '__ci_bb_6930
         } else {
             goto '__ci_bb_6931
@@ -45377,23 +45113,23 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6930 {
-        (__ci_expr_logic_836 = 0)
-        (__ci_expr_logic_835 = 0)
-        (__ci_expr_logic_834 = 0)
-        (__ci_expr_logic_833 = 0)
+        (__ci_expr_logic_824 = 0)
+        (__ci_expr_logic_823 = 0)
+        (__ci_expr_logic_822 = 0)
+        (__ci_expr_logic_821 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_833 = (if (if ((*__local_F__goto_692_12).eptr + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_821 = (if (if ((*__local_F__goto_692_12).eptr + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_833 != 0) {
-            (__ci_expr_logic_834 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_821 != 0) {
+            (__ci_expr_logic_822 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_834 != 0) {
-            (__ci_expr_logic_835 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_822 != 0) {
+            (__ci_expr_logic_823 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_835 != 0) {
-            (__ci_expr_logic_836 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_823 != 0) {
+            (__ci_expr_logic_824 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_836 != 0) {
+        if (__ci_expr_logic_824 != 0) {
             goto '__ci_bb_6932
         } else {
             goto '__ci_bb_6933
@@ -45457,11 +45193,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6943 {
-        (__ci_expr_logic_837 = 0)
+        (__ci_expr_logic_825 = 0)
         if ((if (((*__param_mb).moptions as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_837 = (if (if (*__local_F__goto_692_12).eptr == (*__param_mb).start_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_825 = (if (if (*__local_F__goto_692_12).eptr == (*__param_mb).start_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_837 != 0) {
+        if (__ci_expr_logic_825 != 0) {
             goto '__ci_bb_6944
         } else {
             goto '__ci_bb_6945
@@ -45473,64 +45209,64 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6945 {
-        (__ci_expr_logic_845 = 0)
+        (__ci_expr_logic_833 = 0)
         if ((if (*__local_F__goto_692_12).eptr != (*__param_mb).start_subject: 1 else: 0) != 0) {
-            var __ci_expr_logic_844: c_int
+            var __ci_expr_logic_832: c_int
 
-            var __ci_expr_logic_838: c_int = 0
+            var __ci_expr_logic_826: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr == (*__param_mb).end_subject: 1 else: 0) != 0) {
-                (__ci_expr_logic_838 = (if (if (((*__param_mb).poptions as c_uint) & (2097152 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_826 = (if (if (((*__param_mb).poptions as c_uint) & (2097152 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_838 != 0) {
-                (__ci_expr_logic_844 = (if true: 1 else: 0))
+            if (__ci_expr_logic_826 != 0) {
+                (__ci_expr_logic_832 = (if true: 1 else: 0))
             } else {
-                var __ci_expr_ternary_843: c_int = 0
+                var __ci_expr_ternary_831: c_int = 0
 
                 if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                    var __ci_expr_logic_839: c_int = 0
+                    var __ci_expr_logic_827: c_int = 0
 
                     if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_subject: 1 else: 0) != 0) {
-                        (__ci_expr_logic_839 = (if _pcre2_was_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).start_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
+                        (__ci_expr_logic_827 = (if _pcre2_was_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).start_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_ternary_843 = __ci_expr_logic_839)
+                    (__ci_expr_ternary_831 = __ci_expr_logic_827)
 
                 } else {
-                    var __ci_expr_logic_842: c_int = 0
+                    var __ci_expr_logic_830: c_int = 0
 
-                    var __ci_expr_logic_840: c_int = 0
+                    var __ci_expr_logic_828: c_int = 0
 
                     if ((if (*__local_F__goto_692_12).eptr >= ((*__param_mb).start_subject + ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                        (__ci_expr_logic_840 = (if (if (*((*__local_F__goto_692_12).eptr - ((*__param_mb).nllen as usize))) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_828 = (if (if (*((*__local_F__goto_692_12).eptr - ((*__param_mb).nllen as usize))) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_840 != 0) {
-                        var __ci_expr_logic_841: c_int
+                    if (__ci_expr_logic_828 != 0) {
+                        var __ci_expr_logic_829: c_int
 
                         if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                            (__ci_expr_logic_841 = (if true: 1 else: 0))
+                            (__ci_expr_logic_829 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_841 = (if (if (*(((*__local_F__goto_692_12).eptr - ((*__param_mb).nllen as usize)) + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_829 = (if (if (*(((*__local_F__goto_692_12).eptr - ((*__param_mb).nllen as usize)) + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        (__ci_expr_logic_842 = (if __ci_expr_logic_841 != 0: 1 else: 0))
+                        (__ci_expr_logic_830 = (if __ci_expr_logic_829 != 0: 1 else: 0))
 
                     }
 
-                    (__ci_expr_ternary_843 = __ci_expr_logic_842)
+                    (__ci_expr_ternary_831 = __ci_expr_logic_830)
 
                 }
 
-                (__ci_expr_logic_844 = (if (if not (__ci_expr_ternary_843 != 0): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_832 = (if (if not (__ci_expr_ternary_831 != 0): 1 else: 0) != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_logic_845 = (if __ci_expr_logic_844 != 0: 1 else: 0))
+            (__ci_expr_logic_833 = (if __ci_expr_logic_832 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_845 != 0) {
+        if (__ci_expr_logic_833 != 0) {
             goto '__ci_bb_6949
         } else {
             goto '__ci_bb_6950
@@ -45565,42 +45301,42 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6955 {
-        (__ci_expr_ternary_850 = 0)
+        (__ci_expr_ternary_838 = 0)
         if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_846: c_int = 0
+            var __ci_expr_logic_834: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                (__ci_expr_logic_846 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
+                (__ci_expr_logic_834 = (if _pcre2_is_newline_8((*__local_F__goto_692_12).eptr, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_726_6) != 0: 1 else: 0))
             }
 
-            (__ci_expr_ternary_850 = __ci_expr_logic_846)
+            (__ci_expr_ternary_838 = __ci_expr_logic_834)
 
         } else {
-            var __ci_expr_logic_849: c_int = 0
+            var __ci_expr_logic_837: c_int = 0
 
-            var __ci_expr_logic_847: c_int = 0
+            var __ci_expr_logic_835: c_int = 0
 
             if ((if (*__local_F__goto_692_12).eptr <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                (__ci_expr_logic_847 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_835 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_847 != 0) {
-                var __ci_expr_logic_848: c_int
+            if (__ci_expr_logic_835 != 0) {
+                var __ci_expr_logic_836: c_int
 
                 if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_848 = (if true: 1 else: 0))
+                    (__ci_expr_logic_836 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_848 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_836 = (if (if (*((*__local_F__goto_692_12).eptr + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_logic_849 = (if __ci_expr_logic_848 != 0: 1 else: 0))
+                (__ci_expr_logic_837 = (if __ci_expr_logic_836 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_ternary_850 = __ci_expr_logic_849)
+            (__ci_expr_ternary_838 = __ci_expr_logic_837)
 
         }
-        if ((if not (__ci_expr_ternary_850 != 0): 1 else: 0) != 0) {
+        if ((if not (__ci_expr_ternary_838 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_6958
         } else {
             goto '__ci_bb_6959
@@ -45621,23 +45357,23 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6958 {
-        (__ci_expr_logic_854 = 0)
-        (__ci_expr_logic_853 = 0)
-        (__ci_expr_logic_852 = 0)
-        (__ci_expr_logic_851 = 0)
+        (__ci_expr_logic_842 = 0)
+        (__ci_expr_logic_841 = 0)
+        (__ci_expr_logic_840 = 0)
+        (__ci_expr_logic_839 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_851 = (if (if ((*__local_F__goto_692_12).eptr + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_839 = (if (if ((*__local_F__goto_692_12).eptr + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_851 != 0) {
-            (__ci_expr_logic_852 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_839 != 0) {
+            (__ci_expr_logic_840 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_852 != 0) {
-            (__ci_expr_logic_853 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_840 != 0) {
+            (__ci_expr_logic_841 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_853 != 0) {
-            (__ci_expr_logic_854 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_841 != 0) {
+            (__ci_expr_logic_842 = (if (if (*((*__local_F__goto_692_12).eptr)) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_854 != 0) {
+        if (__ci_expr_logic_842 != 0) {
             goto '__ci_bb_6960
         } else {
             goto '__ci_bb_6961
@@ -45688,20 +45424,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6972 {
-        (__ci_expr_logic_856 = 0)
+        (__ci_expr_logic_844 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_855: c_int
+            var __ci_expr_logic_843: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_855 = (if true: 1 else: 0))
+                (__ci_expr_logic_843 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_855 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_843 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_856 = (if __ci_expr_logic_855 != 0: 1 else: 0))
+            (__ci_expr_logic_844 = (if __ci_expr_logic_843 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_856 != 0) {
+        if (__ci_expr_logic_844 != 0) {
             goto '__ci_bb_6975
         } else {
             goto '__ci_bb_6976
@@ -45922,11 +45658,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_7011 {
         if ((if (*__local_F__goto_692_12).op == OP_UCP_WORD_BOUNDARY: 1 else: 0) != 0) {
-            (__ci_expr_logic_857 = (if true: 1 else: 0))
+            (__ci_expr_logic_845 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_857 = (if (if (*__local_F__goto_692_12).op == OP_NOT_UCP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_845 = (if (if (*__local_F__goto_692_12).op == OP_NOT_UCP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_857 != 0) {
+        if (__ci_expr_logic_845 != 0) {
             goto '__ci_bb_7012
         } else {
             goto '__ci_bb_7013
@@ -45937,30 +45673,30 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
         (__local_chartype__goto_6712_13 = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).chartype as c_int)))
         (__local_category__goto_6713_13 = ((_pcre2_ucp_gentype_8[__local_chartype__goto_6712_13] as c_int)))
         if ((if __local_category__goto_6713_13 == ucp_L: 1 else: 0) != 0) {
-            (__ci_expr_logic_858 = (if true: 1 else: 0))
+            (__ci_expr_logic_846 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_858 = (if (if __local_category__goto_6713_13 == ucp_N: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_846 = (if (if __local_category__goto_6713_13 == ucp_N: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_858 != 0) {
-            (__ci_expr_logic_859 = (if true: 1 else: 0))
+        if (__ci_expr_logic_846 != 0) {
+            (__ci_expr_logic_847 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_859 = (if (if __local_chartype__goto_6712_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_847 = (if (if __local_chartype__goto_6712_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_859 != 0) {
-            (__ci_expr_logic_860 = (if true: 1 else: 0))
+        if (__ci_expr_logic_847 != 0) {
+            (__ci_expr_logic_848 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_860 = (if (if __local_chartype__goto_6712_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_848 = (if (if __local_chartype__goto_6712_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_prev_is_word__goto_721_6 = __ci_expr_logic_860)
+        (__local_prev_is_word__goto_721_6 = __ci_expr_logic_848)
         goto '__ci_bb_7014
     }
 
     '__ci_bb_7013 {
-        (__ci_expr_logic_861 = 0)
+        (__ci_expr_logic_849 = 0)
         if ((if __local_fc__goto_714_10 <= 255: 1 else: 0) != 0) {
-            (__ci_expr_logic_861 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_849 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_prev_is_word__goto_721_6 = __ci_expr_logic_861)
+        (__local_prev_is_word__goto_721_6 = __ci_expr_logic_849)
         goto '__ci_bb_7014
     }
 
@@ -45982,20 +45718,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_7017 {
-        (__ci_expr_ternary_872 = 0)
-        (__ci_expr_old_870 = (*__local_F__goto_692_12).ecode)
+        (__ci_expr_ternary_860 = 0)
+        (__ci_expr_old_858 = (*__local_F__goto_692_12).ecode)
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
-        if ((if (*__ci_expr_old_870) == OP_WORD_BOUNDARY: 1 else: 0) != 0) {
-            (__ci_expr_logic_871 = (if true: 1 else: 0))
+        if ((if (*__ci_expr_old_858) == OP_WORD_BOUNDARY: 1 else: 0) != 0) {
+            (__ci_expr_logic_859 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_871 = (if (if (*__local_F__goto_692_12).op == OP_UCP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_859 = (if (if (*__local_F__goto_692_12).op == OP_UCP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_871 != 0) {
-            (__ci_expr_ternary_872 = (((if __local_cur_is_word__goto_720_6 == __local_prev_is_word__goto_721_6: 1 else: 0) as c_int)))
+        if (__ci_expr_logic_859 != 0) {
+            (__ci_expr_ternary_860 = (((if __local_cur_is_word__goto_720_6 == __local_prev_is_word__goto_721_6: 1 else: 0) as c_int)))
         } else {
-            (__ci_expr_ternary_872 = (((if __local_cur_is_word__goto_720_6 != __local_prev_is_word__goto_721_6: 1 else: 0) as c_int)))
+            (__ci_expr_ternary_860 = (((if __local_cur_is_word__goto_720_6 != __local_prev_is_word__goto_721_6: 1 else: 0) as c_int)))
         }
-        if (__ci_expr_ternary_872 != 0) {
+        if (__ci_expr_ternary_860 != 0) {
             goto '__ci_bb_7050
         } else {
             goto '__ci_bb_7051
@@ -46003,20 +45739,20 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_7018 {
-        (__ci_expr_logic_863 = 0)
+        (__ci_expr_logic_851 = 0)
         if ((if (*__param_mb).partial != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_862: c_int
+            var __ci_expr_logic_850: c_int
 
             if ((if (*__local_F__goto_692_12).eptr > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                (__ci_expr_logic_862 = (if true: 1 else: 0))
+                (__ci_expr_logic_850 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_862 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                (__ci_expr_logic_850 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_863 = (if __ci_expr_logic_862 != 0: 1 else: 0))
+            (__ci_expr_logic_851 = (if __ci_expr_logic_850 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_863 != 0) {
+        if (__ci_expr_logic_851 != 0) {
             goto '__ci_bb_7021
         } else {
             goto '__ci_bb_7022
@@ -46075,11 +45811,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_7028 {
-        (__ci_expr_logic_864 = 0)
+        (__ci_expr_logic_852 = 0)
         if ((if __local_nextptr__goto_6731_18 < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_864 = (if (if ((((*__local_nextptr__goto_6731_18) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_852 = (if (if ((((*__local_nextptr__goto_6731_18) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_864 != 0) {
+        if (__ci_expr_logic_852 != 0) {
             goto '__ci_bb_7029
         } else {
             goto '__ci_bb_7030
@@ -46184,11 +45920,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_7046 {
         if ((if (*__local_F__goto_692_12).op == OP_UCP_WORD_BOUNDARY: 1 else: 0) != 0) {
-            (__ci_expr_logic_865 = (if true: 1 else: 0))
+            (__ci_expr_logic_853 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_865 = (if (if (*__local_F__goto_692_12).op == OP_NOT_UCP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_853 = (if (if (*__local_F__goto_692_12).op == OP_NOT_UCP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_865 != 0) {
+        if (__ci_expr_logic_853 != 0) {
             goto '__ci_bb_7047
         } else {
             goto '__ci_bb_7048
@@ -46199,30 +45935,30 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
         (__local_chartype__goto_6745_13 = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_fc__goto_714_10 as c_int) / 128)] as c_int) * 128) + ((__local_fc__goto_714_10 as c_int) % 128))] as c_uint) as usize)).chartype as c_int)))
         (__local_category__goto_6746_13 = ((_pcre2_ucp_gentype_8[__local_chartype__goto_6745_13] as c_int)))
         if ((if __local_category__goto_6746_13 == ucp_L: 1 else: 0) != 0) {
-            (__ci_expr_logic_866 = (if true: 1 else: 0))
+            (__ci_expr_logic_854 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_866 = (if (if __local_category__goto_6746_13 == ucp_N: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_854 = (if (if __local_category__goto_6746_13 == ucp_N: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_866 != 0) {
-            (__ci_expr_logic_867 = (if true: 1 else: 0))
+        if (__ci_expr_logic_854 != 0) {
+            (__ci_expr_logic_855 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_867 = (if (if __local_chartype__goto_6745_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_855 = (if (if __local_chartype__goto_6745_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_867 != 0) {
-            (__ci_expr_logic_868 = (if true: 1 else: 0))
+        if (__ci_expr_logic_855 != 0) {
+            (__ci_expr_logic_856 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_868 = (if (if __local_chartype__goto_6745_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_856 = (if (if __local_chartype__goto_6745_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_cur_is_word__goto_720_6 = __ci_expr_logic_868)
+        (__local_cur_is_word__goto_720_6 = __ci_expr_logic_856)
         goto '__ci_bb_7049
     }
 
     '__ci_bb_7048 {
-        (__ci_expr_logic_869 = 0)
+        (__ci_expr_logic_857 = 0)
         if ((if __local_fc__goto_714_10 <= 255: 1 else: 0) != 0) {
-            (__ci_expr_logic_869 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_857 = (if (if ((((*__param_mb).ctypes[__local_fc__goto_714_10]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_cur_is_word__goto_720_6 = __ci_expr_logic_869)
+        (__local_cur_is_word__goto_720_6 = __ci_expr_logic_857)
         goto '__ci_bb_7049
     }
 
@@ -46264,11 +46000,11 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_7058 {
-        (__ci_expr_logic_873 = 0)
+        (__ci_expr_logic_861 = 0)
         if ((if __local_rrc__goto_708_5 == -994: 1 else: 0) != 0) {
-            (__ci_expr_logic_873 = (if (if _pcre2_strcmp_8(((*__local_F__goto_692_12).ecode + ((2 as isize) as usize)), (*__param_mb).verb_skip_ptr) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_861 = (if (if _pcre2_strcmp_8(((*__local_F__goto_692_12).ecode + ((2 as isize) as usize)), (*__param_mb).verb_skip_ptr) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_873 != 0) {
+        if (__ci_expr_logic_861 != 0) {
             goto '__ci_bb_7060
         } else {
             goto '__ci_bb_7061

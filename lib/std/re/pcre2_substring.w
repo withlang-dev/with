@@ -326,16 +326,7 @@ pub unsafe fn pcre2_substring_length_bynumber_8(__param_match_data: *mut pcre2_r
 
 
     if ((if __param_sizeptr != null: 1 else: 0) != 0) {
-        var __ci_expr_ternary_2: c_ulong = 0
-
-        if ((if __local_left > __local_right: 1 else: 0) != 0) {
-            (__ci_expr_ternary_2 = ((0 as c_ulong)))
-        } else {
-            (__ci_expr_ternary_2 = ((((__local_right as c_ulong) -% (__local_left as c_ulong)) as c_ulong)))
-        }
-
-        ((*__param_sizeptr) = __ci_expr_ternary_2)
-
+        ((*__param_sizeptr) = (((if (if __local_left > __local_right: 1 else: 0) != 0: (0 as c_ulong) else: (((__local_right as c_ulong) -% (__local_left as c_ulong)) as c_ulong)) as c_ulong)))
     }
 
     return 0
@@ -391,16 +382,7 @@ pub unsafe fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_c
             }
 
             if ((if __param_firstptr == null: 1 else: 0) != 0) {
-                var __ci_expr_ternary_0: c_int = 0
-
-                if ((if __local_first == __local_last: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_0 = ((((((((__local_entry[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_entry[(0 + 1)]) as c_int)) as c_uint) as c_int)))
-                } else {
-                    (__ci_expr_ternary_0 = ((-50 as c_int)))
-                }
-
-                return __ci_expr_ternary_0
-
+                return (if (if __local_first == __local_last: 1 else: 0) != 0: (((((((__local_entry[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_entry[(0 + 1)]) as c_int)) as c_uint) as c_int) else: (-50 as c_int))
             }
 
             ((*__param_firstptr) = __local_first)
@@ -522,44 +504,35 @@ pub unsafe fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_mat
     (__local_i = ((0 as c_int)))
 
     while ((if __local_i < __local_count2: 1 else: 0) != 0) {
-        var __ci_expr_ternary_0: c_ulong = 0
-
-        if ((if (__local_ovector[(__local_i + 1)]) > (__local_ovector[__local_i]): 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = (((((__local_ovector[(__local_i + 1)]) as c_ulong) -% ((__local_ovector[__local_i]) as c_ulong)) as c_ulong)))
-        } else {
-            (__ci_expr_ternary_0 = ((0 as c_ulong)))
-        }
-
-        (__local_size = __ci_expr_ternary_0)
-
+        (__local_size = (((if (if (__local_ovector[(__local_i + 1)]) > (__local_ovector[__local_i]): 1 else: 0) != 0: ((((__local_ovector[(__local_i + 1)]) as c_ulong) -% ((__local_ovector[__local_i]) as c_ulong)) as c_ulong) else: (0 as c_ulong)) as c_ulong)))
 
         if ((if __local_size != 0: 1 else: 0) != 0) {
             with_memcpy(((__local_sp as *mut c_void) as *mut u8), ((((*__param_match_data).subject + ((__local_ovector[__local_i]) as usize)) as *const c_void) as *const u8), ((((__local_size as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64))
         }
 
-        var __ci_expr_old_1: *mut *mut u8 = __local_listp
+        var __ci_expr_old_0: *mut *mut u8 = __local_listp
 
         (__local_listp = __local_listp + 1)
 
-        ((*__ci_expr_old_1) = __local_sp)
+        ((*__ci_expr_old_0) = __local_sp)
 
 
         if ((if __local_lensp != null: 1 else: 0) != 0) {
-            var __ci_expr_old_2: *mut c_ulong = __local_lensp
+            var __ci_expr_old_1: *mut c_ulong = __local_lensp
 
             (__local_lensp = __local_lensp + 1)
 
-            ((*__ci_expr_old_2) = __local_size)
+            ((*__ci_expr_old_1) = __local_size)
 
         }
 
         (__local_sp = __local_sp + (__local_size as usize))
 
-        var __ci_expr_old_3: *mut u8 = __local_sp
+        var __ci_expr_old_2: *mut u8 = __local_sp
 
         (__local_sp = __local_sp + 1)
 
-        ((*__ci_expr_old_3) = ((0 as u8)))
+        ((*__ci_expr_old_2) = ((0 as u8)))
 
 
 

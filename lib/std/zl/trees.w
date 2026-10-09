@@ -73,16 +73,7 @@ pub unsafe fn _tr_tally(__param_s: *mut internal_state, __param_dist: c_uint, __
 
         ((*__param_s).dyn_ltree[(((_length_code[__param_lc] as c_int) + 256) + 1)].fc.freq = ((*__param_s).dyn_ltree[(((_length_code[__param_lc] as c_int) + 256) + 1)].fc.freq +% 1))
 
-        var __ci_expr_ternary_3: c_int = 0
-
-        if ((if __local_dist < 256: 1 else: 0) != 0) {
-            (__ci_expr_ternary_3 = ((_dist_code[__local_dist] as c_int)))
-        } else {
-            (__ci_expr_ternary_3 = ((_dist_code[((256 as c_uint) +% (((__local_dist as c_uint) >> (7 as c_uint)) as c_uint))] as c_int)))
-        }
-
-        ((*__param_s).dyn_dtree[__ci_expr_ternary_3].fc.freq = ((*__param_s).dyn_dtree[__ci_expr_ternary_3].fc.freq +% 1))
-
+        ((*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as c_int) else: (_dist_code[((256 as c_uint) +% (((__local_dist as c_uint) >> (7 as c_uint)) as c_uint))] as c_int))].fc.freq = ((*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as c_int) else: (_dist_code[((256 as c_uint) +% (((__local_dist as c_uint) >> (7 as c_uint)) as c_uint))] as c_int))].fc.freq +% 1))
 
     }
 
@@ -978,27 +969,18 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
         ((__local_tree[__local_node]).fc.freq = (((((__local_tree[__local_n]).fc.freq as c_int) + ((__local_tree[__local_m]).fc.freq as c_int)) as c_ushort)))
 
-        var __ci_expr_ternary_2: c_int = 0
-
-        if ((if (*__param_s).depth[__local_n] >= (*__param_s).depth[__local_m]: 1 else: 0) != 0) {
-            (__ci_expr_ternary_2 = (((*__param_s).depth[__local_n] as c_int)))
-        } else {
-            (__ci_expr_ternary_2 = (((*__param_s).depth[__local_m] as c_int)))
-        }
-
-        ((*__param_s).depth[__local_node] = (((__ci_expr_ternary_2 + 1) as u8)))
-
+        ((*__param_s).depth[__local_node] = ((((if (if (*__param_s).depth[__local_n] >= (*__param_s).depth[__local_m]: 1 else: 0) != 0: ((*__param_s).depth[__local_n] as c_int) else: ((*__param_s).depth[__local_m] as c_int)) + 1) as u8)))
 
         ((__local_tree[__local_m]).dl.dad = ((__local_node as c_ushort)))
 
         ((__local_tree[__local_n]).dl.dad = (__local_tree[__local_m]).dl.dad)
 
 
-        var __ci_expr_old_3: c_int = __local_node
+        var __ci_expr_old_2: c_int = __local_node
 
         (__local_node = __local_node + 1)
 
-        ((*__param_s).heap[1] = __ci_expr_old_3)
+        ((*__param_s).heap[1] = __ci_expr_old_2)
 
 
         pqdownheap(__param_s, __local_tree, (1 as c_int))
@@ -1926,16 +1908,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
                 (__local_dist = (__local_dist -% 1))
 
-                var __ci_expr_ternary_9: c_int = 0
-
-                if ((if __local_dist < 256: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_9 = ((_dist_code[__local_dist] as c_int)))
-                } else {
-                    (__ci_expr_ternary_9 = ((_dist_code[((256 as c_uint) +% (((__local_dist as c_uint) >> (7 as c_uint)) as c_uint))] as c_int)))
-                }
-
-                (__local_code = ((__ci_expr_ternary_9 as c_uint)))
-
+                (__local_code = (((if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as c_int) else: (_dist_code[((256 as c_uint) +% (((__local_dist as c_uint) >> (7 as c_uint)) as c_uint))] as c_int)) as c_uint)))
 
 
                 var __local_len_3: c_int = (((__param_dtree[__local_code]).dl.len as c_int))
@@ -1945,20 +1918,20 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
                     ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_3 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
+                    var __ci_expr_old_9: c_ulong = (*__param_s).pending
+
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                    (((*__param_s).pending_buf[__ci_expr_old_9]) = (((((*__param_s).bi_buf as c_int) & (255 as c_int)) as u8)))
+
+
+
+
                     var __ci_expr_old_10: c_ulong = (*__param_s).pending
 
                     ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                    (((*__param_s).pending_buf[__ci_expr_old_10]) = (((((*__param_s).bi_buf as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                    var __ci_expr_old_11: c_ulong = (*__param_s).pending
-
-                    ((*__param_s).pending = ((*__param_s).pending +% 1))
-
-                    (((*__param_s).pending_buf[__ci_expr_old_11]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                    (((*__param_s).pending_buf[__ci_expr_old_10]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
 
@@ -1990,20 +1963,20 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
                         ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_4 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
+                        var __ci_expr_old_11: c_ulong = (*__param_s).pending
+
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                        (((*__param_s).pending_buf[__ci_expr_old_11]) = (((((*__param_s).bi_buf as c_int) & (255 as c_int)) as u8)))
+
+
+
+
                         var __ci_expr_old_12: c_ulong = (*__param_s).pending
 
                         ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                        (((*__param_s).pending_buf[__ci_expr_old_12]) = (((((*__param_s).bi_buf as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                        var __ci_expr_old_13: c_ulong = (*__param_s).pending
-
-                        ((*__param_s).pending = ((*__param_s).pending +% 1))
-
-                        (((*__param_s).pending_buf[__ci_expr_old_13]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                        (((*__param_s).pending_buf[__ci_expr_old_12]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
 
@@ -2041,20 +2014,20 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
         ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_5 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
+        var __ci_expr_old_13: c_ulong = (*__param_s).pending
+
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+        (((*__param_s).pending_buf[__ci_expr_old_13]) = (((((*__param_s).bi_buf as c_int) & (255 as c_int)) as u8)))
+
+
+
+
         var __ci_expr_old_14: c_ulong = (*__param_s).pending
 
         ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-        (((*__param_s).pending_buf[__ci_expr_old_14]) = (((((*__param_s).bi_buf as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-        var __ci_expr_old_15: c_ulong = (*__param_s).pending
-
-        ((*__param_s).pending = ((*__param_s).pending +% 1))
-
-        (((*__param_s).pending_buf[__ci_expr_old_15]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+        (((*__param_s).pending_buf[__ci_expr_old_14]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
 

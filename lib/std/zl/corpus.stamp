@@ -1,5 +1,5 @@
 # D112: written by promotion, never by hand. The migrator generation that
 # produced these modules (a hash of the migrator's sources) and a hash of
 # the modules; the integrity check compares the second.
-migrated_by 45e6dca7e8622abbb18f83f283ba8388e5a508e8fa354f30d7129ec9021f047e
-modules 2ea025dde23584feb987d7593d1a47ae246373ba2bba0954a96482571b2ddf15
+migrated_by 479863ad8647fc988f977702ea1555b3578b0f73f9197543b1917acdd0b44dd1
+modules b9ab68593f4d02801491db8bd68b9c2be95dae2ac1dcf4a42d153d5ffa5246f9

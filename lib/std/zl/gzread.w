@@ -130,16 +130,7 @@ pub unsafe fn gzfread(__param_buf: *mut c_void, __param_size: c_ulong, __param_n
     }
 
 
-    var __ci_expr_ternary_3: c_ulong = 0
-
-    if (__local_len != 0) {
-        (__ci_expr_ternary_3 = ((((gz_read(__local_state, __param_buf, __local_len) as c_ulong) / (__param_size as c_ulong)) as c_ulong)))
-    } else {
-        (__ci_expr_ternary_3 = ((0 as c_ulong)))
-    }
-
-    return __ci_expr_ternary_3
-
+    return (if __local_len != 0: (((gz_read(__local_state, __param_buf, __local_len) as c_ulong) / (__param_size as c_ulong)) as c_ulong) else: (0 as c_ulong))
 
 }
 
@@ -237,16 +228,7 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
 
             }
 
-            var __ci_expr_ternary_7: c_uint = 0
-
-            if ((if (*(&raw const __local_state.x as *const gzFile_s)).have > __local_left: 1 else: 0) != 0) {
-                (__ci_expr_ternary_7 = __local_left)
-            } else {
-                (__ci_expr_ternary_7 = (*(&raw const __local_state.x as *const gzFile_s)).have)
-            }
-
-            (__local_n = __ci_expr_ternary_7)
-
+            (__local_n = (((if (if (*(&raw const __local_state.x as *const gzFile_s)).have > __local_left: 1 else: 0) != 0: __local_left else: (*(&raw const __local_state.x as *const gzFile_s)).have) as c_uint)))
 
             (__local_eol = (((memchr((((*(&raw const __local_state.x as *const gzFile_s)).next as *const c_void) as *mut c_void), (10 as c_int), ((__local_n as c_ulong) as i64)) as *const u8) as *mut u8)))
 
@@ -336,16 +318,7 @@ pub unsafe fn gzgetc(__param_file: *mut gzFile_s) -> c_int {
 
     }
 
-    var __ci_expr_ternary_3: c_int = 0
-
-    if ((if gz_read(__local_state, (&__local_buf[0] as *mut u8), (1 as c_ulong)) < 1: 1 else: 0) != 0) {
-        (__ci_expr_ternary_3 = ((-1 as c_int)))
-    } else {
-        (__ci_expr_ternary_3 = ((__local_buf[0] as c_int)))
-    }
-
-    return __ci_expr_ternary_3
-
+    return (if (if gz_read(__local_state, (&__local_buf[0] as *mut u8), (1 as c_ulong)) < 1: 1 else: 0) != 0: (-1 as c_int) else: (__local_buf[0] as c_int))
 
 }
 
@@ -518,16 +491,7 @@ pub unsafe fn gzclose_r(__param_file: *mut gzFile_s) -> c_int {
 
     }
 
-    var __ci_expr_ternary_0: c_int = 0
-
-    if ((if __local_state.err == -5: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = ((-5 as c_int)))
-    } else {
-        (__ci_expr_ternary_0 = ((0 as c_int)))
-    }
-
-    (__local_err = __ci_expr_ternary_0)
-
+    (__local_err = (((if (if __local_state.err == -5: 1 else: 0) != 0: (-5 as c_int) else: (0 as c_int)) as c_int)))
 
     gz_error(__local_state, (0 as c_int), (null as *const i8))
 
@@ -537,16 +501,7 @@ pub unsafe fn gzclose_r(__param_file: *mut gzFile_s) -> c_int {
 
     with_free(((__local_state as *mut c_void) as *mut u8))
 
-    var __ci_expr_ternary_1: c_int = 0
-
-    if (__local_ret != 0) {
-        (__ci_expr_ternary_1 = ((-1 as c_int)))
-    } else {
-        (__ci_expr_ternary_1 = __local_err)
-    }
-
-    return __ci_expr_ternary_1
-
+    return (if __local_ret != 0: (-1 as c_int) else: __local_err)
 
 }
 
@@ -912,16 +867,7 @@ unsafe fn gz_decomp(__param_state: *mut gz_state) -> c_int {
 
             }
 
-            var __ci_expr_ternary_3: *mut c_char = null
-
-            if ((if __local_strm.msg == null: 1 else: 0) != 0) {
-                (__ci_expr_ternary_3 = (("compressed data error" as *mut c_char)))
-            } else {
-                (__ci_expr_ternary_3 = ((__local_strm.msg as *mut c_char)))
-            }
-
-            gz_error(__param_state, (-3 as c_int), (__ci_expr_ternary_3 as *const i8))
-
+            gz_error(__param_state, (-3 as c_int), ((if (if __local_strm.msg == null: 1 else: 0) != 0: ("compressed data error" as *mut c_char) else: (__local_strm.msg as *mut c_char)) as *const i8))
 
             break
 
@@ -951,16 +897,7 @@ unsafe fn gz_decomp(__param_state: *mut gz_state) -> c_int {
 
     }
 
-    var __ci_expr_ternary_4: c_int = 0
-
-    if ((if __local_ret != 0: 1 else: 0) != 0) {
-        (__ci_expr_ternary_4 = ((-1 as c_int)))
-    } else {
-        (__ci_expr_ternary_4 = ((0 as c_int)))
-    }
-
-    return __ci_expr_ternary_4
-
+    return (if (if __local_ret != 0: 1 else: 0) != 0: (-1 as c_int) else: (0 as c_int))
 
 }
 

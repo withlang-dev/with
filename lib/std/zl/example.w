@@ -900,16 +900,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     test_compress(__local_compr, __local_comprLen, __local_uncompr, __local_uncomprLen)
 
-    var __ci_expr_ternary_1: *mut c_char = null
-
-    if ((if __param_argc > 1: 1 else: 0) != 0) {
-        (__ci_expr_ternary_1 = (((__param_argv[1]) as *mut c_char)))
-    } else {
-        (__ci_expr_ternary_1 = (("foo.gz" as *mut c_char)))
-    }
-
-    test_gzio((__ci_expr_ternary_1 as *const i8), __local_uncompr, __local_uncomprLen)
-
+    test_gzio(((if (if __param_argc > 1: 1 else: 0) != 0: ((__param_argv[1]) as *mut c_char) else: ("foo.gz" as *mut c_char)) as *const i8), __local_uncompr, __local_uncomprLen)
 
     test_deflate(__local_compr, __local_comprLen)
 

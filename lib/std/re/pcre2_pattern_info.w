@@ -161,49 +161,13 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
                 ((*(__param_where_ as *mut c_uint)) = (*__local_re).extra_options)
             },
             6 => {
-                var __ci_expr_ternary_1: c_int = 0
-
-                if ((if (((*__local_re).flags as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_1 = ((1 as c_int)))
-                } else {
-                    var __ci_expr_ternary_0: c_int = 0
-
-                    if ((if (((*__local_re).flags as c_uint) & (512 as c_uint)) != 0: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_0 = ((2 as c_int)))
-                    } else {
-                        (__ci_expr_ternary_0 = ((0 as c_int)))
-                    }
-
-                    (__ci_expr_ternary_1 = __ci_expr_ternary_0)
-
-                }
-
-                ((*(__param_where_ as *mut c_uint)) = ((__ci_expr_ternary_1 as c_uint)))
-
+                ((*(__param_where_ as *mut c_uint)) = (((if (if (((*__local_re).flags as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0: (1 as c_int) else: ((if (if (((*__local_re).flags as c_uint) & (512 as c_uint)) != 0: 1 else: 0) != 0: (2 as c_int) else: (0 as c_int)) as c_int)) as c_uint)))
             },
             5 => {
-                var __ci_expr_ternary_2: c_uint = 0
-
-                if ((if (((*__local_re).flags as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_2 = (*__local_re).first_codeunit)
-                } else {
-                    (__ci_expr_ternary_2 = ((0 as c_uint)))
-                }
-
-                ((*(__param_where_ as *mut c_uint)) = __ci_expr_ternary_2)
-
+                ((*(__param_where_ as *mut c_uint)) = (((if (if (((*__local_re).flags as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0: (*__local_re).first_codeunit else: (0 as c_uint)) as c_uint)))
             },
             7 => {
-                var __ci_expr_ternary_3: *const u8 = null
-
-                if ((if (((*__local_re).flags as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_3 = ((&raw const (*__local_re).start_bitmap[0] as *const u8)))
-                } else {
-                    (__ci_expr_ternary_3 = ((null as *const u8)))
-                }
-
-                ((*(__param_where_ as *mut *const u8)) = __ci_expr_ternary_3)
-
+                ((*(__param_where_ as *mut *const u8)) = (if (if (((*__local_re).flags as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0: (&raw const (*__local_re).start_bitmap[0] as *const u8) else: (null as *const u8)))
             },
             24 => {
                 ((*(__param_where_ as *mut c_ulong)) = (((((offsetof[heapframe](ovector) as usize) as c_ulong) +% ((((((*__local_re).top_bracket as c_int) * 2) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong)) as c_ulong)))
@@ -229,28 +193,10 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
                 ((*(__param_where_ as *mut c_ulong)) = ((0 as c_ulong)))
             },
             12 => {
-                var __ci_expr_ternary_4: c_int = 0
-
-                if ((if (((*__local_re).flags as c_uint) & (128 as c_uint)) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_4 = ((1 as c_int)))
-                } else {
-                    (__ci_expr_ternary_4 = ((0 as c_int)))
-                }
-
-                ((*(__param_where_ as *mut c_uint)) = ((__ci_expr_ternary_4 as c_uint)))
-
+                ((*(__param_where_ as *mut c_uint)) = (((if (if (((*__local_re).flags as c_uint) & (128 as c_uint)) != 0: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_uint)))
             },
             11 => {
-                var __ci_expr_ternary_5: c_uint = 0
-
-                if ((if (((*__local_re).flags as c_uint) & (128 as c_uint)) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_5 = (*__local_re).last_codeunit)
-                } else {
-                    (__ci_expr_ternary_5 = ((0 as c_uint)))
-                }
-
-                ((*(__param_where_ as *mut c_uint)) = __ci_expr_ternary_5)
-
+                ((*(__param_where_ as *mut c_uint)) = (((if (if (((*__local_re).flags as c_uint) & (128 as c_uint)) != 0: 1 else: 0) != 0: (*__local_re).last_codeunit else: (0 as c_uint)) as c_uint)))
             },
             13 => {
                 ((*(__param_where_ as *mut c_uint)) = (((if (((*__local_re).flags as c_uint) & (8192 as c_uint)) != 0: 1 else: 0) as c_uint)))

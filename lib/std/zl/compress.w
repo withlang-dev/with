@@ -105,47 +105,20 @@ pub unsafe fn compress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong, 
 
     loop {
         if ((if (*(&raw const __local_stream as *const z_stream_s)).avail_out == 0: 1 else: 0) != 0) {
-            var __ci_expr_ternary_4: c_uint = 0
-
-            if ((if __local_left > ((4294967295 as c_ulong)): 1 else: 0) != 0) {
-                (__ci_expr_ternary_4 = ((4294967295 as c_uint)))
-            } else {
-                (__ci_expr_ternary_4 = ((__local_left as c_uint)))
-            }
-
-            (__local_stream.avail_out = __ci_expr_ternary_4)
-
+            (__local_stream.avail_out = (((if (if __local_left > ((4294967295 as c_ulong)): 1 else: 0) != 0: (4294967295 as c_uint) else: (__local_left as c_uint)) as c_uint)))
 
             (__local_left = (__local_left -% (*(&raw const __local_stream as *const z_stream_s)).avail_out))
 
         }
 
         if ((if (*(&raw const __local_stream as *const z_stream_s)).avail_in == 0: 1 else: 0) != 0) {
-            var __ci_expr_ternary_5: c_uint = 0
-
-            if ((if __local_sourceLen > ((4294967295 as c_ulong)): 1 else: 0) != 0) {
-                (__ci_expr_ternary_5 = ((4294967295 as c_uint)))
-            } else {
-                (__ci_expr_ternary_5 = ((__local_sourceLen as c_uint)))
-            }
-
-            (__local_stream.avail_in = __ci_expr_ternary_5)
-
+            (__local_stream.avail_in = (((if (if __local_sourceLen > ((4294967295 as c_ulong)): 1 else: 0) != 0: (4294967295 as c_uint) else: (__local_sourceLen as c_uint)) as c_uint)))
 
             (__local_sourceLen = (__local_sourceLen -% (*(&raw const __local_stream as *const z_stream_s)).avail_in))
 
         }
 
-        var __ci_expr_ternary_6: c_int = 0
-
-        if (__local_sourceLen != 0) {
-            (__ci_expr_ternary_6 = ((0 as c_int)))
-        } else {
-            (__ci_expr_ternary_6 = ((4 as c_int)))
-        }
-
-        (__local_err = ((deflate((&raw mut __local_stream as *mut z_stream_s), __ci_expr_ternary_6) as c_int)))
-
+        (__local_err = ((deflate((&raw mut __local_stream as *mut z_stream_s), ((if __local_sourceLen != 0: (0 as c_int) else: (4 as c_int)) as c_int)) as c_int)))
 
         if not (((if __local_err == 0: 1 else: 0) != 0)) {
             break
@@ -156,47 +129,20 @@ pub unsafe fn compress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong, 
 
     deflateEnd((&raw mut __local_stream as *mut z_stream_s))
 
-    var __ci_expr_ternary_7: c_int = 0
-
-    if ((if __local_err == 1: 1 else: 0) != 0) {
-        (__ci_expr_ternary_7 = ((0 as c_int)))
-    } else {
-        (__ci_expr_ternary_7 = __local_err)
-    }
-
-    return __ci_expr_ternary_7
-
+    return (if (if __local_err == 1: 1 else: 0) != 0: (0 as c_int) else: __local_err)
 
 }
 
 pub fn compressBound(__param_sourceLen: c_ulong) -> c_ulong {
     var __local_bound: c_ulong = ((compressBound_z(__param_sourceLen) as c_ulong))
 
-    var __ci_expr_ternary_0: c_ulong = 0
-
-    if ((if __local_bound != __local_bound: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = ((-1 as c_ulong)))
-    } else {
-        (__ci_expr_ternary_0 = __local_bound)
-    }
-
-    return __ci_expr_ternary_0
-
+    return (if (if __local_bound != __local_bound: 1 else: 0) != 0: (-1 as c_ulong) else: __local_bound)
 
 }
 
 pub fn compressBound_z(__param_sourceLen: c_ulong) -> c_ulong {
     var __local_bound: c_ulong = ((((((((((__param_sourceLen as c_ulong) +% (((__param_sourceLen as c_ulong) >> (12 as c_uint)) as c_ulong)) as c_ulong) +% (((__param_sourceLen as c_ulong) >> (14 as c_uint)) as c_ulong)) as c_ulong) +% (((__param_sourceLen as c_ulong) >> (25 as c_uint)) as c_ulong)) as c_ulong) +% (13 as c_ulong)) as c_ulong))
 
-    var __ci_expr_ternary_0: c_ulong = 0
-
-    if ((if __local_bound < __param_sourceLen: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = ((-1 as c_ulong)))
-    } else {
-        (__ci_expr_ternary_0 = __local_bound)
-    }
-
-    return __ci_expr_ternary_0
-
+    return (if (if __local_bound < __param_sourceLen: 1 else: 0) != 0: (-1 as c_ulong) else: __local_bound)
 
 }

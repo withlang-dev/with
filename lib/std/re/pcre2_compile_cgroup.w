@@ -253,16 +253,7 @@ pub unsafe fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __pa
 
         (__local_groupnumber = (((((((__local_slot[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_slot[(0 + 1)]) as c_int)) as c_uint)))
 
-        var __ci_expr_ternary_1: c_uint = 0
-
-        if ((if __local_groupnumber < 32: 1 else: 0) != 0) {
-            (__ci_expr_ternary_1 = ((((1 as c_uint) << (__local_groupnumber as c_uint)) as c_uint)))
-        } else {
-            (__ci_expr_ternary_1 = ((1 as c_uint)))
-        }
-
-        ((*__param_cb).backref_map = ((*__param_cb).backref_map as c_uint) | (__ci_expr_ternary_1 as c_uint))
-
+        ((*__param_cb).backref_map = ((*__param_cb).backref_map as c_uint) | ((if (if __local_groupnumber < 32: 1 else: 0) != 0: (((1 as c_uint) << (__local_groupnumber as c_uint)) as c_uint) else: (1 as c_uint)) as c_uint))
 
         if ((if __local_groupnumber > (*__param_cb).top_backref: 1 else: 0) != 0) {
             ((*__param_cb).top_backref = __local_groupnumber)
@@ -277,15 +268,15 @@ pub unsafe fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __pa
 
         (__local_slot = __local_slot + ((((*__param_cb).name_entry_size as c_uint) as usize) as c_int))
 
-        var __ci_expr_logic_2: c_int
+        var __ci_expr_logic_1: c_int
 
         if ((if _pcre2_strncmp_8(__param_name, ((__local_slot + ((2 as isize) as usize)) as *const u8), (__param_length as c_ulong)) != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_2 = (if true: 1 else: 0))
+            (__ci_expr_logic_1 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_2 = (if (if ((__local_slot + ((2 as isize) as usize))[__param_length]) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if (if ((__local_slot + ((2 as isize) as usize))[__param_length]) != 0: 1 else: 0) != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_2 != 0) {
+        if (__ci_expr_logic_1 != 0) {
             break
         }
 

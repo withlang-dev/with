@@ -108,16 +108,7 @@ pub unsafe fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: 
 
     ((__param_buffer[__local_i]) = ((0 as u8)))
 
-    var __ci_expr_ternary_2: c_int = 0
-
-    if (__local_rc != 0) {
-        (__ci_expr_ternary_2 = __local_rc)
-    } else {
-        (__ci_expr_ternary_2 = ((__local_i as c_int)))
-    }
-
-    return __ci_expr_ternary_2
-
+    return (if __local_rc != 0: __local_rc else: (__local_i as c_int))
 
 }
 

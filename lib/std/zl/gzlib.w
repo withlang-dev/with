@@ -142,16 +142,7 @@ pub unsafe fn gzeof(__param_file: *mut gzFile_s) -> c_int {
     }
 
 
-    var __ci_expr_ternary_1: c_int = 0
-
-    if ((if __local_state.mode == 7247: 1 else: 0) != 0) {
-        (__ci_expr_ternary_1 = __local_state.past)
-    } else {
-        (__ci_expr_ternary_1 = ((0 as c_int)))
-    }
-
-    return __ci_expr_ternary_1
-
+    return (if (if __local_state.mode == 7247: 1 else: 0) != 0: __local_state.past else: (0 as c_int))
 
 }
 
@@ -179,25 +170,7 @@ pub unsafe fn gzerror(__param_file: *mut gzFile_s, __param_errnum: *mut c_int) -
         ((*__param_errnum) = __local_state.err)
     }
 
-    var __ci_expr_ternary_2: *mut c_char = null
-
-    if ((if __local_state.err == -4: 1 else: 0) != 0) {
-        (__ci_expr_ternary_2 = (("out of memory" as *mut c_char)))
-    } else {
-        var __ci_expr_ternary_1: *mut c_char = null
-
-        if ((if __local_state.msg == null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_1 = (("" as *mut c_char)))
-        } else {
-            (__ci_expr_ternary_1 = ((__local_state.msg as *mut c_char)))
-        }
-
-        (__ci_expr_ternary_2 = ((__ci_expr_ternary_1 as *mut c_char)))
-
-    }
-
-    return ((__ci_expr_ternary_2 as *const i8))
-
+    return (((if (if __local_state.err == -4: 1 else: 0) != 0: ("out of memory" as *mut c_char) else: ((if (if __local_state.msg == null: 1 else: 0) != 0: ("" as *mut c_char) else: (__local_state.msg as *mut c_char)) as *mut c_char)) as *const i8))
 
 }
 
@@ -242,16 +215,7 @@ pub unsafe fn gzseek(__param_file: *mut gzFile_s, __param_offset: c_longlong, __
 
     (__local_ret = ((gzseek64(__param_file, __param_offset, __param_whence) as c_longlong)))
 
-    var __ci_expr_ternary_0: c_longlong = 0
-
-    if ((if __local_ret == __local_ret: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = __local_ret)
-    } else {
-        (__ci_expr_ternary_0 = ((-1 as c_longlong)))
-    }
-
-    return __ci_expr_ternary_0
-
+    return (if (if __local_ret == __local_ret: 1 else: 0) != 0: __local_ret else: (-1 as c_longlong))
 
 }
 
@@ -260,16 +224,7 @@ pub unsafe fn gztell(__param_file: *mut gzFile_s) -> c_longlong {
 
     (__local_ret = ((gztell64(__param_file) as c_longlong)))
 
-    var __ci_expr_ternary_0: c_longlong = 0
-
-    if ((if __local_ret == __local_ret: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = __local_ret)
-    } else {
-        (__ci_expr_ternary_0 = ((-1 as c_longlong)))
-    }
-
-    return __ci_expr_ternary_0
-
+    return (if (if __local_ret == __local_ret: 1 else: 0) != 0: __local_ret else: (-1 as c_longlong))
 
 }
 
@@ -278,16 +233,7 @@ pub unsafe fn gzoffset(__param_file: *mut gzFile_s) -> c_longlong {
 
     (__local_ret = ((gzoffset64(__param_file) as c_longlong)))
 
-    var __ci_expr_ternary_0: c_longlong = 0
-
-    if ((if __local_ret == __local_ret: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = __local_ret)
-    } else {
-        (__ci_expr_ternary_0 = ((-1 as c_longlong)))
-    }
-
-    return __ci_expr_ternary_0
-
+    return (if (if __local_ret == __local_ret: 1 else: 0) != 0: __local_ret else: (-1 as c_longlong))
 
 }
 
@@ -346,34 +292,25 @@ pub unsafe fn gzseek64(__param_file: *mut gzFile_s, __param_offset: c_longlong, 
     if ((if __param_whence == libc.SEEK_SET: 1 else: 0) != 0) {
         (__local_offset = __local_offset - (*(&raw const __local_state.x as *const gzFile_s)).pos)
     } else {
-        var __ci_expr_ternary_3: c_longlong = 0
-
-        if (__local_state.past != 0) {
-            (__ci_expr_ternary_3 = ((0 as c_longlong)))
-        } else {
-            (__ci_expr_ternary_3 = __local_state.skip)
-        }
-
-        (__local_offset = __local_offset + __ci_expr_ternary_3)
-
+        (__local_offset = __local_offset + (if __local_state.past != 0: (0 as c_longlong) else: __local_state.skip))
 
         (__local_state.skip = ((0 as c_longlong)))
 
     }
 
-    var __ci_expr_logic_5: c_int = 0
-
     var __ci_expr_logic_4: c_int = 0
 
+    var __ci_expr_logic_3: c_int = 0
+
     if ((if __local_state.mode == 7247: 1 else: 0) != 0) {
-        (__ci_expr_logic_4 = (if (if __local_state.how == 1: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_3 = (if (if __local_state.how == 1: 1 else: 0) != 0: 1 else: 0))
+    }
+
+    if (__ci_expr_logic_3 != 0) {
+        (__ci_expr_logic_4 = (if (if ((*(&raw const __local_state.x as *const gzFile_s)).pos + __local_offset) >= 0: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_4 != 0) {
-        (__ci_expr_logic_5 = (if (if ((*(&raw const __local_state.x as *const gzFile_s)).pos + __local_offset) >= 0: 1 else: 0) != 0: 1 else: 0))
-    }
-
-    if (__ci_expr_logic_5 != 0) {
         (__local_ret = ((lseek(__local_state.fd, ((__local_offset - ((*(&raw const __local_state.x as *const gzFile_s)).have as c_longlong)) as c_longlong), (libc.SEEK_CUR as c_int)) as c_longlong)))
 
         if ((if __local_ret == -1: 1 else: 0) != 0) {
@@ -417,29 +354,29 @@ pub unsafe fn gzseek64(__param_file: *mut gzFile_s, __param_offset: c_longlong, 
     }
 
     if ((if __local_state.mode == 7247: 1 else: 0) != 0) {
-        var __ci_expr_ternary_8: c_uint = 0
+        var __ci_expr_ternary_7: c_uint = 0
 
-        var __ci_expr_logic_7: c_int
+        var __ci_expr_logic_6: c_int
 
-        var __ci_expr_logic_6: c_int = 0
+        var __ci_expr_logic_5: c_int = 0
 
         if ((if 4 == (sizeof[c_longlong]() as usize): 1 else: 0) != 0) {
-            (__ci_expr_logic_6 = (if (if (*(&raw const __local_state.x as *const gzFile_s)).have > gz_intmax(): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_5 = (if (if (*(&raw const __local_state.x as *const gzFile_s)).have > gz_intmax(): 1 else: 0) != 0: 1 else: 0))
+        }
+
+        if (__ci_expr_logic_5 != 0) {
+            (__ci_expr_logic_6 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_6 = (if (if (((*(&raw const __local_state.x as *const gzFile_s)).have as c_longlong)) > __local_offset: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_6 != 0) {
-            (__ci_expr_logic_7 = (if true: 1 else: 0))
+            (__ci_expr_ternary_7 = ((__local_offset as c_uint)))
         } else {
-            (__ci_expr_logic_7 = (if (if (((*(&raw const __local_state.x as *const gzFile_s)).have as c_longlong)) > __local_offset: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_ternary_7 = (*(&raw const __local_state.x as *const gzFile_s)).have)
         }
 
-        if (__ci_expr_logic_7 != 0) {
-            (__ci_expr_ternary_8 = ((__local_offset as c_uint)))
-        } else {
-            (__ci_expr_ternary_8 = (*(&raw const __local_state.x as *const gzFile_s)).have)
-        }
-
-        (__local_n = __ci_expr_ternary_8)
+        (__local_n = __ci_expr_ternary_7)
 
 
         (__local_state.x.have = ((*(&raw const __local_state.x as *const gzFile_s)).have -% __local_n))
@@ -478,16 +415,7 @@ pub unsafe fn gztell64(__param_file: *mut gzFile_s) -> c_longlong {
     }
 
 
-    var __ci_expr_ternary_1: c_longlong = 0
-
-    if (__local_state.past != 0) {
-        (__ci_expr_ternary_1 = ((0 as c_longlong)))
-    } else {
-        (__ci_expr_ternary_1 = __local_state.skip)
-    }
-
-    return ((*(&raw const __local_state.x as *const gzFile_s)).pos + __ci_expr_ternary_1)
-
+    return ((*(&raw const __local_state.x as *const gzFile_s)).pos + (if __local_state.past != 0: (0 as c_longlong) else: __local_state.skip))
 
 }
 
@@ -767,33 +695,7 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
     snprintf(__local_state.path, (((__local_len as c_ulong) +% (1 as c_ulong)) as c_ulong), c"%s".ptr, (__param_path as *const c_char))
 
 
-    var __ci_expr_ternary_5: c_int = 0
-
-    if ((if __local_state.mode == 7247: 1 else: 0) != 0) {
-        (__ci_expr_ternary_5 = ((libc.O_RDONLY as c_int)))
-    } else {
-        var __ci_expr_ternary_3: c_int = 0
-
-        if (__local_exclusive != 0) {
-            (__ci_expr_ternary_3 = ((libc.O_EXCL as c_int)))
-        } else {
-            (__ci_expr_ternary_3 = ((0 as c_int)))
-        }
-
-        var __ci_expr_ternary_4: c_int = 0
-
-        if ((if __local_state.mode == 31153: 1 else: 0) != 0) {
-            (__ci_expr_ternary_4 = ((libc.O_TRUNC as c_int)))
-        } else {
-            (__ci_expr_ternary_4 = ((libc.O_APPEND as c_int)))
-        }
-
-        (__ci_expr_ternary_5 = ((((((((libc.O_WRONLY as c_int) | (libc.O_CREAT as c_int)) as c_int) | (__ci_expr_ternary_3 as c_int)) as c_int) | (__ci_expr_ternary_4 as c_int)) as c_int)))
-
-    }
-
-    (__local_oflag = (__local_oflag as c_int) | (__ci_expr_ternary_5 as c_int))
-
+    (__local_oflag = (__local_oflag as c_int) | ((if (if __local_state.mode == 7247: 1 else: 0) != 0: (libc.O_RDONLY as c_int) else: (((((((libc.O_WRONLY as c_int) | (libc.O_CREAT as c_int)) as c_int) | ((if __local_exclusive != 0: (libc.O_EXCL as c_int) else: (0 as c_int)) as c_int)) as c_int) | ((if (if __local_state.mode == 31153: 1 else: 0) != 0: (libc.O_TRUNC as c_int) else: (libc.O_APPEND as c_int)) as c_int)) as c_int)) as c_int))
 
     if ((if __param_fd == -1: 1 else: 0) != 0) {
         (__local_state.fd = ((open(((__param_path as *const c_char) as *const i8), __local_oflag, 438) as c_int)))

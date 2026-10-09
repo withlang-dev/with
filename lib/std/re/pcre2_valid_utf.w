@@ -327,16 +327,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ul
         if ((if __local_ab > 3: 1 else: 0) != 0) {
             ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (__local_ab as c_ulong)) as c_ulong)))
 
-            var __ci_expr_ternary_8: c_int = 0
-
-            if ((if __local_ab == 4: 1 else: 0) != 0) {
-                (__ci_expr_ternary_8 = ((-13 as c_int)))
-            } else {
-                (__ci_expr_ternary_8 = ((-14 as c_int)))
-            }
-
-            return __ci_expr_ternary_8
-
+            return (if (if __local_ab == 4: 1 else: 0) != 0: (-13 as c_int) else: (-14 as c_int))
 
         }
 

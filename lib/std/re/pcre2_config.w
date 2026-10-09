@@ -142,42 +142,16 @@ pub unsafe fn pcre2_config_8(__param_what: c_uint, __param_where_: *mut c_void) 
             10 => {
                 var __local_v: *const c_char = ((_pcre2_unicode_version_8 as *const c_char))
 
-                var __ci_expr_ternary_1: c_ulong = 0
-
-                if ((if __param_where_ == null: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_1 = ((strlen(__local_v) as c_ulong)))
-                } else {
-                    (__ci_expr_ternary_1 = ((_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v) as c_ulong)))
-                }
-
-                return ((((1 as c_ulong) +% (__ci_expr_ternary_1 as c_ulong)) as c_int))
-
+                return ((((1 as c_ulong) +% ((if (if __param_where_ == null: 1 else: 0) != 0: (strlen(__local_v) as c_ulong) else: (_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v) as c_ulong)) as c_ulong)) as c_int))
 
             },
             9 => {
                 ((*(__param_where_ as *mut c_uint)) = ((1 as c_uint)))
             },
             11 => {
-                var __local_v_1: *const c_char = with 0 as __ci_expr_seq_43 {
-                    var __ci_expr_ternary_2: *mut c_char = null
-                    if ((if 0 == 0: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_2 = (("10.47 2025-10-21" as *mut c_char)))
-                    } else {
-                        (__ci_expr_ternary_2 = (("10.47PCRE2_PRERELEASE 2025-10-21" as *mut c_char)))
-                    }
-                    (__ci_expr_ternary_2 as *const c_char)
-                }
+                var __local_v_1: *const c_char = (((if (if 0 == 0: 1 else: 0) != 0: ("10.47 2025-10-21" as *mut c_char) else: ("10.47PCRE2_PRERELEASE 2025-10-21" as *mut c_char)) as *const c_char))
 
-                var __ci_expr_ternary_3: c_ulong = 0
-
-                if ((if __param_where_ == null: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_3 = ((strlen(__local_v_1) as c_ulong)))
-                } else {
-                    (__ci_expr_ternary_3 = ((_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v_1) as c_ulong)))
-                }
-
-                return ((((1 as c_ulong) +% (__ci_expr_ternary_3 as c_ulong)) as c_int))
-
+                return ((((1 as c_ulong) +% ((if (if __param_where_ == null: 1 else: 0) != 0: (strlen(__local_v_1) as c_ulong) else: (_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v_1) as c_ulong)) as c_ulong)) as c_int))
 
             },
             _ => {

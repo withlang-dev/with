@@ -131,16 +131,7 @@ pub fn zError(__param_err: c_int) -> *const i8 {
 
 pub unsafe fn zcalloc(__param_opaque_: *mut c_void, __param_items: c_uint, __param_size: c_uint) -> *mut c_void {
 
-    var __ci_expr_ternary_0: *mut c_void = null
-
-    if ((if (sizeof[c_uint]() as usize) > 2: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = ((with_alloc(((((__param_items as c_uint) *% (__param_size as c_uint)) as c_ulong) as i64)) as *mut c_void)))
-    } else {
-        (__ci_expr_ternary_0 = ((with_alloc_zeroed(((__param_items as c_ulong) as i64), ((__param_size as c_ulong) as i64)) as *mut c_void)))
-    }
-
-    return __ci_expr_ternary_0
-
+    return (((if (if (sizeof[c_uint]() as usize) > 2: 1 else: 0) != 0: (with_alloc(((((__param_items as c_uint) *% (__param_size as c_uint)) as c_ulong) as i64)) as *mut c_void) else: (with_alloc_zeroed(((__param_items as c_ulong) as i64), ((__param_size as c_ulong) as i64)) as *mut c_void)) as *mut c_void))
 
 }
 

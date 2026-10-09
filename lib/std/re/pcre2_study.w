@@ -73,8 +73,6 @@ pub unsafe fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
 
     var __ci_expr_logic_5: c_int = 0
 
-    var __ci_expr_ternary_6: c_int = 0
-
     goto '__ci_bb_0
 
     '__ci_bb_0 {
@@ -546,13 +544,7 @@ pub unsafe fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     }
 
     '__ci_bb_71 {
-        (__ci_expr_ternary_6 = 0)
-        if ((if __local_min__goto_2056_7 > libc.UINT16_MAX: 1 else: 0) != 0) {
-            (__ci_expr_ternary_6 = ((libc.UINT16_MAX as c_int)))
-        } else {
-            (__ci_expr_ternary_6 = __local_min__goto_2056_7)
-        }
-        ((*__param_re).minlength = ((__ci_expr_ternary_6 as c_ushort)))
+        ((*__param_re).minlength = (((if (if __local_min__goto_2056_7 > libc.UINT16_MAX: 1 else: 0) != 0: (libc.UINT16_MAX as c_int) else: __local_min__goto_2056_7) as c_ushort)))
         goto '__ci_bb_61
     }
 
@@ -3762,51 +3754,37 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
 
     var __local_d__goto_1845_19: c_int = 0
 
-    var __ci_expr_ternary_0: c_int = 0
-
-    var __ci_expr_logic_3: c_int = 0
-
     var __ci_expr_logic_2: c_int = 0
 
     var __ci_expr_logic_1: c_int = 0
 
-    var __ci_expr_old_4: *const c_uint = null
+    var __ci_expr_logic_0: c_int = 0
 
-    var __ci_expr_logic_6: c_int = 0
+    var __ci_expr_old_3: *const c_uint = null
 
     var __ci_expr_logic_5: c_int = 0
 
+    var __ci_expr_logic_4: c_int = 0
+
+    var __ci_expr_logic_6: c_int = 0
+
     var __ci_expr_logic_7: c_int = 0
 
-    var __ci_expr_ternary_8: *const u8 = null
+    var __ci_expr_old_8: *const u8 = null
 
-    var __ci_expr_logic_9: c_int = 0
+    var __ci_expr_switch_9: c_int = 0
 
-    var __ci_expr_ternary_10: c_int = 0
+    var __ci_expr_old_10: *const u8 = null
 
-    var __ci_expr_ternary_11: c_int = 0
+    var __ci_expr_old_11: *const u8 = null
 
     var __ci_expr_old_12: *const u8 = null
-
-    var __ci_expr_switch_13: c_int = 0
-
-    var __ci_expr_old_14: *const u8 = null
-
-    var __ci_expr_old_15: *const u8 = null
-
-    var __ci_expr_old_16: *const u8 = null
 
     goto '__ci_bb_0
 
     '__ci_bb_0 {
         (__local_yield___goto_1097_5 = SSB_DONE)
-        (__ci_expr_ternary_0 = 0)
-        if (__param_utf != 0) {
-            (__ci_expr_ternary_0 = ((16 as c_int)))
-        } else {
-            (__ci_expr_ternary_0 = ((32 as c_int)))
-        }
-        (__local_table_limit__goto_1100_5 = __ci_expr_ternary_0)
+        (__local_table_limit__goto_1100_5 = (((if __param_utf != 0: (16 as c_int) else: (32 as c_int)) as c_int)))
         ((*__param_depthptr) = (*__param_depthptr) + 1)
         if ((if (*__param_depthptr) > 1000: 1 else: 0) != 0) {
             goto '__ci_bb_1
@@ -3827,21 +3805,21 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
         (__local_try_next__goto_1110_8 = ((1 as c_int)))
         (__local_tcode__goto_1111_14 = (__local_code + ((1 as isize) as usize)) + ((2 as isize) as usize))
         if ((if (*__local_code) == OP_CBRA: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_0 = (if (if (*__local_code) == OP_SCBRA: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_0 != 0) {
             (__ci_expr_logic_1 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_1 = (if (if (*__local_code) == OP_SCBRA: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if (if (*__local_code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_1 != 0) {
             (__ci_expr_logic_2 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_2 = (if (if (*__local_code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (if (*__local_code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_2 != 0) {
-            (__ci_expr_logic_3 = (if true: 1 else: 0))
-        } else {
-            (__ci_expr_logic_3 = (if (if (*__local_code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0))
-        }
-        if (__ci_expr_logic_3 != 0) {
             goto '__ci_bb_6
         } else {
             goto '__ci_bb_7
@@ -3930,9 +3908,9 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     }
 
     '__ci_bb_19 {
-        (__ci_expr_old_4 = __local_p__goto_1225_25)
+        (__ci_expr_old_3 = __local_p__goto_1225_25)
         (__local_p__goto_1225_25 = __local_p__goto_1225_25 + 1)
-        (__local_c__goto_1096_10 = (*__ci_expr_old_4))
+        (__local_c__goto_1096_10 = (*__ci_expr_old_3))
         if ((if __local_c__goto_1096_10 < 4294967295: 1 else: 0) != 0) {
             goto '__ci_bb_20
         } else {
@@ -4472,16 +4450,16 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
         (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + 1)
         (__local_rc__goto_1118_9 = ((set_start_bits(__param_re, __local_tcode__goto_1111_14, __param_utf, __param_ucp, __param_depthptr) as c_int)))
         if ((if __local_rc__goto_1118_9 == SSB_FAIL: 1 else: 0) != 0) {
+            (__ci_expr_logic_4 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_4 = (if (if __local_rc__goto_1118_9 == SSB_UNKNOWN: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_4 != 0) {
             (__ci_expr_logic_5 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_5 = (if (if __local_rc__goto_1118_9 == SSB_UNKNOWN: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_5 = (if (if __local_rc__goto_1118_9 == SSB_TOODEEP: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_5 != 0) {
-            (__ci_expr_logic_6 = (if true: 1 else: 0))
-        } else {
-            (__ci_expr_logic_6 = (if (if __local_rc__goto_1118_9 == SSB_TOODEEP: 1 else: 0) != 0: 1 else: 0))
-        }
-        if (__ci_expr_logic_6 != 0) {
             goto '__ci_bb_103
         } else {
             goto '__ci_bb_104
@@ -4878,11 +4856,11 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     '__ci_bb_166 {
         (__local_xclassflags__goto_1122_17 = (((__local_tcode__goto_1111_14[(1 + 2)]) as u8)))
         if ((if ((__local_xclassflags__goto_1122_17 as c_int) & (4 as c_int)) != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_7 = (if true: 1 else: 0))
+            (__ci_expr_logic_6 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_7 = (if (if ((__local_xclassflags__goto_1122_17 as c_int) & (((2 as c_int) | (1 as c_int)) as c_int)) == 1: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_6 = (if (if ((__local_xclassflags__goto_1122_17 as c_int) & (((2 as c_int) | (1 as c_int)) as c_int)) == 1: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_7 != 0) {
+        if (__ci_expr_logic_6 != 0) {
             goto '__ci_bb_167
         } else {
             goto '__ci_bb_168
@@ -4894,18 +4872,12 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     }
 
     '__ci_bb_168 {
-        (__ci_expr_ternary_8 = null)
-        if ((if ((__local_xclassflags__goto_1122_17 as c_int) & (2 as c_int)) == 0: 1 else: 0) != 0) {
-            (__ci_expr_ternary_8 = ((null as *const u8)))
-        } else {
-            (__ci_expr_ternary_8 = ((__local_tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
-        }
-        (__local_classmap__goto_1120_20 = __ci_expr_ternary_8)
-        (__ci_expr_logic_9 = 0)
+        (__local_classmap__goto_1120_20 = (if (if ((__local_xclassflags__goto_1122_17 as c_int) & (2 as c_int)) == 0: 1 else: 0) != 0: (null as *const u8) else: (((__local_tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))))
+        (__ci_expr_logic_7 = 0)
         if (__param_utf != 0) {
-            (__ci_expr_logic_9 = (if (if ((__local_xclassflags__goto_1122_17 as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_7 = (if (if ((__local_xclassflags__goto_1122_17 as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_9 != 0) {
+        if (__ci_expr_logic_7 != 0) {
             goto '__ci_bb_169
         } else {
             goto '__ci_bb_170
@@ -4913,21 +4885,9 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     }
 
     '__ci_bb_169 {
-        (__ci_expr_ternary_10 = 0)
-        if ((if __local_classmap__goto_1120_20 == null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_10 = ((0 as c_int)))
-        } else {
-            (__ci_expr_ternary_10 = ((32 as c_int)))
-        }
-        (__local_p__goto_1750_20 = (((__local_tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize)) + ((__ci_expr_ternary_10 as isize) as usize))
+        (__local_p__goto_1750_20 = (((__local_tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize)) + (((if (if __local_classmap__goto_1120_20 == null: 1 else: 0) != 0: (0 as c_int) else: (32 as c_int)) as isize) as usize))
         (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + (((((((__local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_tcode__goto_1111_14[(1 + 1)]) as c_int)) as c_uint) as usize))
-        (__ci_expr_ternary_11 = 0)
-        if ((if (sizeof[u8]() as usize) == 1: 1 else: 0) != 0) {
-            (__ci_expr_ternary_11 = ((16 as c_int)))
-        } else {
-            (__ci_expr_ternary_11 = ((4096 as c_int)))
-        }
-        if ((if (*__local_p__goto_1750_20) >= __ci_expr_ternary_11: 1 else: 0) != 0) {
+        if ((if (*__local_p__goto_1750_20) >= (if (if (sizeof[u8]() as usize) == 1: 1 else: 0) != 0: (16 as c_int) else: (4096 as c_int)): 1 else: 0) != 0) {
             goto '__ci_bb_171
         } else {
             goto '__ci_bb_172
@@ -4960,9 +4920,9 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     }
 
     '__ci_bb_175 {
-        (__ci_expr_old_12 = __local_p__goto_1750_20)
+        (__ci_expr_old_8 = __local_p__goto_1750_20)
         (__local_p__goto_1750_20 = __local_p__goto_1750_20 + 1)
-        (__ci_expr_switch_13 = (*__ci_expr_old_12))
+        (__ci_expr_switch_9 = (*__ci_expr_old_8))
         goto '__ci_bb_178
     }
 
@@ -4971,7 +4931,7 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     }
 
     '__ci_bb_178 {
-        if (__ci_expr_switch_13 == 1) {
+        if (__ci_expr_switch_9 == 1) {
             goto '__ci_bb_180
         } else {
             goto '__ci_bb_200
@@ -4983,9 +4943,9 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     }
 
     '__ci_bb_180 {
-        (__ci_expr_old_14 = __local_p__goto_1750_20)
+        (__ci_expr_old_10 = __local_p__goto_1750_20)
         (__local_p__goto_1750_20 = __local_p__goto_1750_20 + 1)
-        (__local_b__goto_1749_21 = (((*__ci_expr_old_14) as u8)))
+        (__local_b__goto_1749_21 = (((*__ci_expr_old_10) as u8)))
         goto '__ci_bb_181
     }
 
@@ -5008,9 +4968,9 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     }
 
     '__ci_bb_184 {
-        (__ci_expr_old_15 = __local_p__goto_1750_20)
+        (__ci_expr_old_11 = __local_p__goto_1750_20)
         (__local_p__goto_1750_20 = __local_p__goto_1750_20 + 1)
-        (__local_b__goto_1749_21 = (((*__ci_expr_old_15) as u8)))
+        (__local_b__goto_1749_21 = (((*__ci_expr_old_11) as u8)))
         goto '__ci_bb_185
     }
 
@@ -5028,9 +4988,9 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     }
 
     '__ci_bb_187 {
-        (__ci_expr_old_16 = __local_p__goto_1750_20)
+        (__ci_expr_old_12 = __local_p__goto_1750_20)
         (__local_p__goto_1750_20 = __local_p__goto_1750_20 + 1)
-        (__local_e__goto_1749_24 = (((*__ci_expr_old_16) as u8)))
+        (__local_e__goto_1749_24 = (((*__ci_expr_old_12) as u8)))
         goto '__ci_bb_188
     }
 
@@ -5098,7 +5058,7 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     }
 
     '__ci_bb_200 {
-        if (__ci_expr_switch_13 == 2) {
+        if (__ci_expr_switch_9 == 2) {
             goto '__ci_bb_184
         } else {
             goto '__ci_bb_201
@@ -5106,7 +5066,7 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     }
 
     '__ci_bb_201 {
-        if (__ci_expr_switch_13 == 0) {
+        if (__ci_expr_switch_9 == 0) {
             goto '__ci_bb_195
         } else {
             goto '__ci_bb_196

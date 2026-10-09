@@ -475,15 +475,7 @@ pub unsafe fn pcre2_set_recursion_memory_management_8(__param_mcontext: *mut pcr
 pub unsafe fn _pcre2_memctl_malloc_8(__param_size: c_ulong, __param_memctl: *mut pcre2_memctl) -> *mut c_void {
     var __local_newmemctl: *mut pcre2_memctl
 
-    var __local_yield_: *mut c_void = with 0 as __ci_expr_seq_10 {
-        var __ci_expr_ternary_0: *mut c_void = null
-        if ((if __param_memctl == null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = ((with_alloc((__param_size as i64)) as *mut c_void)))
-        } else {
-            (__ci_expr_ternary_0 = (*__param_memctl).malloc.unwrap()(__param_size, (*__param_memctl).memory_data))
-        }
-        __ci_expr_ternary_0
-    }
+    var __local_yield_: *mut c_void = (if (if __param_memctl == null: 1 else: 0) != 0: (with_alloc((__param_size as i64)) as *mut c_void) else: (*__param_memctl).malloc.unwrap()(__param_size, (*__param_memctl).memory_data))
 
     if ((if __local_yield_ == null: 1 else: 0) != 0) {
         return null

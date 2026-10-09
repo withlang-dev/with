@@ -171,25 +171,9 @@ pub unsafe fn tommy_tree_memory_usage(__param_tree: *mut tommy_tree_struct) -> c
 }
 
 unsafe fn tommy_tree_delta(__param_root: *mut tommy_node_struct) -> c_longlong {
-    var __local_left_height: c_longlong = with 0 as __ci_expr_seq_9 {
-        var __ci_expr_ternary_0: c_ulonglong = 0
-        if ((*__param_root).prev != null) {
-            (__ci_expr_ternary_0 = (*(*__param_root).prev).index)
-        } else {
-            (__ci_expr_ternary_0 = ((0 as c_ulonglong)))
-        }
-        (__ci_expr_ternary_0 as c_longlong)
-    }
+    var __local_left_height: c_longlong = (((if (*__param_root).prev != null: (*(*__param_root).prev).index else: (0 as c_ulonglong)) as c_longlong))
 
-    var __local_right_height: c_longlong = with 0 as __ci_expr_seq_18 {
-        var __ci_expr_ternary_1: c_ulonglong = 0
-        if ((*__param_root).next != null) {
-            (__ci_expr_ternary_1 = (*(*__param_root).next).index)
-        } else {
-            (__ci_expr_ternary_1 = ((0 as c_ulonglong)))
-        }
-        (__ci_expr_ternary_1 as c_longlong)
-    }
+    var __local_right_height: c_longlong = (((if (*__param_root).next != null: (*(*__param_root).next).index else: (0 as c_ulonglong)) as c_longlong))
 
     return (__local_left_height - __local_right_height)
 

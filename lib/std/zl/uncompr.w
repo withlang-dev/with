@@ -137,32 +137,14 @@ pub unsafe fn uncompress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong
 
     loop {
         if ((if (*(&raw const __local_stream as *const z_stream_s)).avail_out == 0: 1 else: 0) != 0) {
-            var __ci_expr_ternary_6: c_uint = 0
-
-            if ((if __local_left > ((4294967295 as c_ulong)): 1 else: 0) != 0) {
-                (__ci_expr_ternary_6 = ((4294967295 as c_uint)))
-            } else {
-                (__ci_expr_ternary_6 = ((__local_left as c_uint)))
-            }
-
-            (__local_stream.avail_out = __ci_expr_ternary_6)
-
+            (__local_stream.avail_out = (((if (if __local_left > ((4294967295 as c_ulong)): 1 else: 0) != 0: (4294967295 as c_uint) else: (__local_left as c_uint)) as c_uint)))
 
             (__local_left = (__local_left -% (*(&raw const __local_stream as *const z_stream_s)).avail_out))
 
         }
 
         if ((if (*(&raw const __local_stream as *const z_stream_s)).avail_in == 0: 1 else: 0) != 0) {
-            var __ci_expr_ternary_7: c_uint = 0
-
-            if ((if __local_len > ((4294967295 as c_ulong)): 1 else: 0) != 0) {
-                (__ci_expr_ternary_7 = ((4294967295 as c_uint)))
-            } else {
-                (__ci_expr_ternary_7 = ((__local_len as c_uint)))
-            }
-
-            (__local_stream.avail_in = __ci_expr_ternary_7)
-
+            (__local_stream.avail_in = (((if (if __local_len > ((4294967295 as c_ulong)): 1 else: 0) != 0: (4294967295 as c_uint) else: (__local_len as c_uint)) as c_uint)))
 
             (__local_len = (__local_len -% (*(&raw const __local_stream as *const z_stream_s)).avail_in))
 
@@ -185,39 +167,39 @@ pub unsafe fn uncompress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong
 
     inflateEnd((&raw mut __local_stream as *mut z_stream_s))
 
-    var __ci_expr_ternary_11: c_int = 0
+    var __ci_expr_ternary_9: c_int = 0
 
     if ((if __local_err == 1: 1 else: 0) != 0) {
-        (__ci_expr_ternary_11 = ((0 as c_int)))
+        (__ci_expr_ternary_9 = ((0 as c_int)))
     } else {
-        var __ci_expr_ternary_10: c_int = 0
+        var __ci_expr_ternary_8: c_int = 0
 
         if ((if __local_err == 2: 1 else: 0) != 0) {
-            (__ci_expr_ternary_10 = ((-3 as c_int)))
+            (__ci_expr_ternary_8 = ((-3 as c_int)))
         } else {
-            var __ci_expr_ternary_9: c_int = 0
+            var __ci_expr_ternary_7: c_int = 0
 
-            var __ci_expr_logic_8: c_int = 0
+            var __ci_expr_logic_6: c_int = 0
 
             if ((if __local_err == -5: 1 else: 0) != 0) {
-                (__ci_expr_logic_8 = (if (if __local_len == 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_6 = (if (if __local_len == 0: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_8 != 0) {
-                (__ci_expr_ternary_9 = ((-3 as c_int)))
+            if (__ci_expr_logic_6 != 0) {
+                (__ci_expr_ternary_7 = ((-3 as c_int)))
             } else {
-                (__ci_expr_ternary_9 = __local_err)
+                (__ci_expr_ternary_7 = __local_err)
             }
 
-            (__ci_expr_ternary_10 = __ci_expr_ternary_9)
+            (__ci_expr_ternary_8 = __ci_expr_ternary_7)
 
         }
 
-        (__ci_expr_ternary_11 = __ci_expr_ternary_10)
+        (__ci_expr_ternary_9 = __ci_expr_ternary_8)
 
     }
 
-    return __ci_expr_ternary_11
+    return __ci_expr_ternary_9
 
 
 }

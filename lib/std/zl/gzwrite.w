@@ -193,16 +193,7 @@ pub unsafe fn gzfwrite(__param_buf: *const c_void, __param_size: c_ulong, __para
     }
 
 
-    var __ci_expr_ternary_3: c_ulong = 0
-
-    if (__local_len != 0) {
-        (__ci_expr_ternary_3 = ((((gz_write(__local_state, __param_buf, __local_len) as c_ulong) / (__param_size as c_ulong)) as c_ulong)))
-    } else {
-        (__ci_expr_ternary_3 = ((0 as c_ulong)))
-    }
-
-    return __ci_expr_ternary_3
-
+    return (if __local_len != 0: (((gz_write(__local_state, __param_buf, __local_len) as c_ulong) / (__param_size as c_ulong)) as c_ulong) else: (0 as c_ulong))
 
 }
 
@@ -724,29 +715,20 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
 
             ((*__param_state).again = ((0 as c_int)))
 
-            var __ci_expr_ternary_1: c_uint = 0
-
-            if ((if __local_strm.avail_in > __local_max: 1 else: 0) != 0) {
-                (__ci_expr_ternary_1 = __local_max)
-            } else {
-                (__ci_expr_ternary_1 = __local_strm.avail_in)
-            }
-
-            (__local_put = __ci_expr_ternary_1)
-
+            (__local_put = (((if (if __local_strm.avail_in > __local_max: 1 else: 0) != 0: __local_max else: __local_strm.avail_in) as c_uint)))
 
             (__local_writ = ((write((*__param_state).fd, (__local_strm.next_in as *const c_void), (__local_put as c_ulong)) as c_int)))
 
             if ((if __local_writ < 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_2: c_int
+                var __ci_expr_logic_1: c_int
 
                 if ((if (*(errno_ptr())) == libc.EAGAIN: 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if true: 1 else: 0))
+                    (__ci_expr_logic_1 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_2 = (if (if (*(errno_ptr())) == libc.EWOULDBLOCK: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_1 = (if (if (*(errno_ptr())) == libc.EWOULDBLOCK: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_2 != 0) {
+                if (__ci_expr_logic_1 != 0) {
                     ((*__param_state).again = ((1 as c_int)))
                 }
 
@@ -768,13 +750,13 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
     }
 
     if ((*__param_state).reset != 0) {
-        var __ci_expr_logic_3: c_int = 0
+        var __ci_expr_logic_2: c_int = 0
 
         if ((if __local_strm.avail_in == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_3 = (if (if __param_flush == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (if __param_flush == 0: 1 else: 0) != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_3 != 0) {
+        if (__ci_expr_logic_2 != 0) {
             return 0
         }
 
@@ -788,59 +770,50 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
     (__local_ret = ((0 as c_int)))
 
     loop {
-        var __ci_expr_logic_6: c_int
+        var __ci_expr_logic_5: c_int
 
         if ((if __local_strm.avail_out == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_6 = (if true: 1 else: 0))
+            (__ci_expr_logic_5 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_5: c_int = 0
+            var __ci_expr_logic_4: c_int = 0
 
             if ((if __param_flush != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_4: c_int
+                var __ci_expr_logic_3: c_int
 
                 if ((if __param_flush != 4: 1 else: 0) != 0) {
-                    (__ci_expr_logic_4 = (if true: 1 else: 0))
+                    (__ci_expr_logic_3 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_4 = (if (if __local_ret == 1: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_3 = (if (if __local_ret == 1: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_logic_5 = (if __ci_expr_logic_4 != 0: 1 else: 0))
+                (__ci_expr_logic_4 = (if __ci_expr_logic_3 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
+            (__ci_expr_logic_5 = (if __ci_expr_logic_4 != 0: 1 else: 0))
 
         }
 
-        if (__ci_expr_logic_6 != 0) {
+        if (__ci_expr_logic_5 != 0) {
             while ((if __local_strm.next_out > (*(&raw const (*__param_state).x as *const gzFile_s)).next: 1 else: 0) != 0) {
                 ((*(errno_ptr())) = ((0 as c_int)))
 
                 ((*__param_state).again = ((0 as c_int)))
 
-                var __ci_expr_ternary_7: c_uint = 0
-
-                if ((if ((((__local_strm.next_out as usize) -% ((*(&raw const (*__param_state).x as *const gzFile_s)).next as usize)) as c_long) / (sizeof[u8]() as c_long)) > ((__local_max as c_int)): 1 else: 0) != 0) {
-                    (__ci_expr_ternary_7 = __local_max)
-                } else {
-                    (__ci_expr_ternary_7 = ((((((__local_strm.next_out as usize) -% ((*(&raw const (*__param_state).x as *const gzFile_s)).next as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
-                }
-
-                (__local_put = __ci_expr_ternary_7)
-
+                (__local_put = (((if (if ((((__local_strm.next_out as usize) -% ((*(&raw const (*__param_state).x as *const gzFile_s)).next as usize)) as c_long) / (sizeof[u8]() as c_long)) > ((__local_max as c_int)): 1 else: 0) != 0: __local_max else: (((((__local_strm.next_out as usize) -% ((*(&raw const (*__param_state).x as *const gzFile_s)).next as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)) as c_uint)))
 
                 (__local_writ = ((write((*__param_state).fd, ((*(&raw const (*__param_state).x as *const gzFile_s)).next as *const c_void), (__local_put as c_ulong)) as c_int)))
 
                 if ((if __local_writ < 0: 1 else: 0) != 0) {
-                    var __ci_expr_logic_8: c_int
+                    var __ci_expr_logic_6: c_int
 
                     if ((if (*(errno_ptr())) == libc.EAGAIN: 1 else: 0) != 0) {
-                        (__ci_expr_logic_8 = (if true: 1 else: 0))
+                        (__ci_expr_logic_6 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_8 = (if (if (*(errno_ptr())) == libc.EWOULDBLOCK: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_6 = (if (if (*(errno_ptr())) == libc.EWOULDBLOCK: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_8 != 0) {
+                    if (__ci_expr_logic_6 != 0) {
                         ((*__param_state).again = ((1 as c_int)))
                     }
 
@@ -1041,28 +1014,19 @@ unsafe fn gz_write(__param_state: *mut gz_state, __param_buf: *const c_void, __p
             }
 
             if ((if gz_comp(__param_state, (0 as c_int)) == -1: 1 else: 0) != 0) {
-                var __ci_expr_ternary_2: c_ulong = 0
-
-                if ((*__param_state).again != 0) {
-                    (__ci_expr_ternary_2 = ((((__local_put as c_ulong) -% (__local_len as c_ulong)) as c_ulong)))
-                } else {
-                    (__ci_expr_ternary_2 = ((0 as c_ulong)))
-                }
-
-                return __ci_expr_ternary_2
-
+                return (if (*__param_state).again != 0: (((__local_put as c_ulong) -% (__local_len as c_ulong)) as c_ulong) else: (0 as c_ulong))
             }
 
         }
 
     } else {
-        var __ci_expr_logic_3: c_int = 0
+        var __ci_expr_logic_2: c_int = 0
 
         if ((*(&raw const (*__param_state).strm as *const z_stream_s)).avail_in != 0) {
-            (__ci_expr_logic_3 = (if (if gz_comp(__param_state, (0 as c_int)) == -1: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (if gz_comp(__param_state, (0 as c_int)) == -1: 1 else: 0) != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_3 != 0) {
+        if (__ci_expr_logic_2 != 0) {
             return 0
         }
 
@@ -1087,16 +1051,7 @@ unsafe fn gz_write(__param_state: *mut gz_state, __param_buf: *const c_void, __p
             (__local_len = (__local_len -% __local_n))
 
             if ((if __local_ret == -1: 1 else: 0) != 0) {
-                var __ci_expr_ternary_4: c_ulong = 0
-
-                if ((*__param_state).again != 0) {
-                    (__ci_expr_ternary_4 = ((((__local_put as c_ulong) -% (__local_len as c_ulong)) as c_ulong)))
-                } else {
-                    (__ci_expr_ternary_4 = ((0 as c_ulong)))
-                }
-
-                return __ci_expr_ternary_4
-
+                return (if (*__param_state).again != 0: (((__local_put as c_ulong) -% (__local_len as c_ulong)) as c_ulong) else: (0 as c_ulong))
             }
 
             if not ((__local_len != 0)) {

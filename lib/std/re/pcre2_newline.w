@@ -137,16 +137,7 @@ pub unsafe fn _pcre2_is_newline_8(__param_ptr: *const u8, __param_type_: c_uint,
 
             },
             133 => {
-                var __ci_expr_ternary_4: c_int = 0
-
-                if (__param_utf != 0) {
-                    (__ci_expr_ternary_4 = ((2 as c_int)))
-                } else {
-                    (__ci_expr_ternary_4 = ((1 as c_int)))
-                }
-
-                ((*__param_lenptr) = ((__ci_expr_ternary_4 as c_uint)))
-
+                ((*__param_lenptr) = (((if __param_utf != 0: (2 as c_int) else: (1 as c_int)) as c_uint)))
 
                 return 1
 
@@ -286,16 +277,7 @@ pub unsafe fn _pcre2_was_newline_8(__param_ptr: *const u8, __param_type_: c_uint
 
             },
             133 => {
-                var __ci_expr_ternary_4: c_int = 0
-
-                if (__param_utf != 0) {
-                    (__ci_expr_ternary_4 = ((2 as c_int)))
-                } else {
-                    (__ci_expr_ternary_4 = ((1 as c_int)))
-                }
-
-                ((*__param_lenptr) = ((__ci_expr_ternary_4 as c_uint)))
-
+                ((*__param_lenptr) = (((if __param_utf != 0: (2 as c_int) else: (1 as c_int)) as c_uint)))
 
                 return 1
 

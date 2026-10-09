@@ -303,15 +303,15 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
 
     var __ci_expr_logic_1: c_int = 0
 
-    var __ci_expr_ternary_2: c_uint = 0
+    var __ci_expr_old_2: *mut u8 = null
 
-    var __ci_expr_old_3: *mut u8 = null
+    var __ci_expr_logic_3: c_int = 0
+
+    var __ci_expr_logic_5: c_int = 0
 
     var __ci_expr_logic_4: c_int = 0
 
-    var __ci_expr_logic_6: c_int = 0
-
-    var __ci_expr_logic_5: c_int = 0
+    var __ci_expr_old_6: *mut u8 = null
 
     var __ci_expr_old_7: *mut u8 = null
 
@@ -319,35 +319,33 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
 
     var __ci_expr_old_9: *mut u8 = null
 
-    var __ci_expr_old_10: *mut u8 = null
+    var __ci_expr_logic_10: c_int = 0
 
-    var __ci_expr_logic_11: c_int = 0
+    var __ci_expr_old_11: *mut u8 = null
 
-    var __ci_expr_old_12: *mut u8 = null
+    var __ci_expr_logic_12: c_int = 0
 
     var __ci_expr_logic_13: c_int = 0
 
-    var __ci_expr_logic_14: c_int = 0
+    var __ci_expr_old_14: *mut u8 = null
 
     var __ci_expr_old_15: *mut u8 = null
 
-    var __ci_expr_old_16: *mut u8 = null
+    var __ci_expr_old_16: *const u8 = null
 
-    var __ci_expr_old_17: *const u8 = null
+    var __ci_expr_logic_17: c_int = 0
 
-    var __ci_expr_logic_18: c_int = 0
+    var __ci_expr_old_18: *mut u8 = null
 
-    var __ci_expr_old_19: *mut u8 = null
+    var __ci_expr_logic_20: c_int = 0
 
     var __ci_expr_logic_21: c_int = 0
 
     var __ci_expr_logic_22: c_int = 0
 
-    var __ci_expr_logic_23: c_int = 0
+    var __ci_expr_old_23: *mut u8 = null
 
     var __ci_expr_old_24: *mut u8 = null
-
-    var __ci_expr_old_25: *mut u8 = null
 
     goto '__ci_bb_0
 
@@ -459,13 +457,7 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     '__ci_bb_13 {
         (__local_posix__goto_154_12 = __local_posix__goto_154_12 + ((__local_clength__goto_179_7 as isize) as usize))
         (__local_plength = (__local_plength -% (__local_clength__goto_179_7 as c_ulong)))
-        (__ci_expr_ternary_2 = 0)
-        if (__local_nextisliteral__goto_164_6 != 0) {
-            (__ci_expr_ternary_2 = ((0 as c_uint)))
-        } else {
-            (__ci_expr_ternary_2 = __local_c__goto_178_12)
-        }
-        (__local_sc__goto_178_15 = __ci_expr_ternary_2)
+        (__local_sc__goto_178_15 = (((if __local_nextisliteral__goto_164_6 != 0: (0 as c_uint) else: __local_c__goto_178_12) as c_uint)))
         (__local_nextisliteral__goto_164_6 = ((0 as c_int)))
         if ((if __local_posix_state__goto_161_10 >= 3: 1 else: 0) != 0) {
             goto '__ci_bb_26
@@ -604,9 +596,9 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_37 {
-        (__ci_expr_old_3 = __local_p__goto_155_14)
+        (__ci_expr_old_2 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
-        ((*__ci_expr_old_3) = (((*__local_s__goto_208_7) as u8)))
+        ((*__ci_expr_old_2) = (((*__local_s__goto_208_7) as u8)))
         goto '__ci_bb_34
     }
 
@@ -627,11 +619,11 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_40 {
-        (__ci_expr_logic_4 = 0)
+        (__ci_expr_logic_3 = 0)
         if ((if __local_c__goto_178_12 >= 97: 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (if __local_c__goto_178_12 <= 122: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_3 = (if (if __local_c__goto_178_12 <= 122: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_4 != 0) {
+        if (__ci_expr_logic_3 != 0) {
             goto '__ci_bb_41
         } else {
             goto '__ci_bb_42
@@ -644,15 +636,15 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
 
     '__ci_bb_42 {
         (__local_posix_state__goto_161_10 = ((3 as c_uint)))
-        (__ci_expr_logic_6 = 0)
         (__ci_expr_logic_5 = 0)
+        (__ci_expr_logic_4 = 0)
         if ((if __local_c__goto_178_12 == 58: 1 else: 0) != 0) {
-            (__ci_expr_logic_5 = (if (if __local_plength > 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_4 = (if (if __local_plength > 0: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_4 != 0) {
+            (__ci_expr_logic_5 = (if (if (*__local_posix__goto_154_12) == 93: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_5 != 0) {
-            (__ci_expr_logic_6 = (if (if (*__local_posix__goto_154_12) == 93: 1 else: 0) != 0: 1 else: 0))
-        }
-        if (__ci_expr_logic_6 != 0) {
             goto '__ci_bb_43
         } else {
             goto '__ci_bb_44
@@ -700,9 +692,9 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_50 {
-        (__ci_expr_old_7 = __local_p__goto_155_14)
+        (__ci_expr_old_6 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
-        ((*__ci_expr_old_7) = (((*__local_s__goto_224_11) as u8)))
+        ((*__ci_expr_old_6) = (((*__local_s__goto_224_11) as u8)))
         goto '__ci_bb_47
     }
 
@@ -799,9 +791,9 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_66 {
-        (__ci_expr_old_8 = __local_p__goto_155_14)
+        (__ci_expr_old_7 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
-        ((*__ci_expr_old_8) = (((*__local_s__goto_241_32) as u8)))
+        ((*__ci_expr_old_7) = (((*__local_s__goto_241_32) as u8)))
         goto '__ci_bb_63
     }
 
@@ -867,9 +859,9 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_77 {
-        (__ci_expr_old_9 = __local_p__goto_155_14)
+        (__ci_expr_old_8 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
-        ((*__ci_expr_old_9) = (((*__local_s__goto_253_5) as u8)))
+        ((*__ci_expr_old_8) = (((*__local_s__goto_253_5) as u8)))
         goto '__ci_bb_74
     }
 
@@ -893,11 +885,11 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_81 {
-        (__ci_expr_logic_11 = 0)
+        (__ci_expr_logic_10 = 0)
         if ((if __local_plength > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_11 = (if (if (*__local_posix__goto_154_12) == 93: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_10 = (if (if (*__local_posix__goto_154_12) == 93: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_11 != 0) {
+        if (__ci_expr_logic_10 != 0) {
             goto '__ci_bb_88
         } else {
             goto '__ci_bb_89
@@ -934,9 +926,9 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_87 {
-        (__ci_expr_old_10 = __local_p__goto_155_14)
+        (__ci_expr_old_9 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
-        ((*__ci_expr_old_10) = (((*__local_s__goto_291_9) as u8)))
+        ((*__ci_expr_old_9) = (((*__local_s__goto_291_9) as u8)))
         goto '__ci_bb_84
     }
 
@@ -981,9 +973,9 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_95 {
-        (__ci_expr_old_12 = __local_p__goto_155_14)
+        (__ci_expr_old_11 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
-        ((*__ci_expr_old_12) = (((*__local_s__goto_297_9) as u8)))
+        ((*__ci_expr_old_11) = (((*__local_s__goto_297_9) as u8)))
         goto '__ci_bb_92
     }
 
@@ -1013,11 +1005,11 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_100 {
-        (__ci_expr_logic_13 = 0)
+        (__ci_expr_logic_12 = 0)
         if ((if (*__local_posix__goto_154_12) < 255: 1 else: 0) != 0) {
-            (__ci_expr_logic_13 = (if (if strchr(posix_meta_escapes, ((*__local_posix__goto_154_12) as c_int)) != null: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_12 = (if (if strchr(posix_meta_escapes, ((*__local_posix__goto_154_12) as c_int)) != null: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_13 != 0) {
+        if (__ci_expr_logic_12 != 0) {
             goto '__ci_bb_102
         } else {
             goto '__ci_bb_103
@@ -1029,11 +1021,11 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_102 {
-        (__ci_expr_logic_14 = 0)
+        (__ci_expr_logic_13 = 0)
         if ((if (*__local_posix__goto_154_12) >= 48: 1 else: 0) != 0) {
-            (__ci_expr_logic_14 = (if (if (*__local_posix__goto_154_12) <= 57: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_13 = (if (if (*__local_posix__goto_154_12) <= 57: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_14 != 0) {
+        if (__ci_expr_logic_13 != 0) {
             goto '__ci_bb_105
         } else {
             goto '__ci_bb_106
@@ -1092,9 +1084,9 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_112 {
-        (__ci_expr_old_15 = __local_p__goto_155_14)
+        (__ci_expr_old_14 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
-        ((*__ci_expr_old_15) = (((*__local_s__goto_308_51) as u8)))
+        ((*__ci_expr_old_14) = (((*__local_s__goto_308_51) as u8)))
         goto '__ci_bb_109
     }
 
@@ -1103,23 +1095,23 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_114 {
-        (__ci_expr_old_16 = __local_p__goto_155_14)
+        (__ci_expr_old_15 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
-        (__ci_expr_old_17 = __local_posix__goto_154_12)
+        (__ci_expr_old_16 = __local_posix__goto_154_12)
         (__local_posix__goto_154_12 = __local_posix__goto_154_12 + 1)
-        ((*__ci_expr_old_16) = (((*__ci_expr_old_17) as u8)))
-        (__local_lastspecial__goto_162_10 = (((*__ci_expr_old_16) as c_uint)))
+        ((*__ci_expr_old_15) = (((*__ci_expr_old_16) as u8)))
+        (__local_lastspecial__goto_162_10 = (((*__ci_expr_old_15) as c_uint)))
         (__local_plength = (__local_plength -% 1))
         goto '__ci_bb_104
     }
 
     '__ci_bb_115 {
         if ((if not (__local_extended__goto_163_6 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_18 = (if true: 1 else: 0))
+            (__ci_expr_logic_17 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_18 = (if (if __local_bracount__goto_160_10 == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_17 = (if (if __local_bracount__goto_160_10 == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_18 != 0) {
+        if (__ci_expr_logic_17 != 0) {
             goto '__ci_bb_116
         } else {
             goto '__ci_bb_117
@@ -1180,9 +1172,9 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_126 {
-        (__ci_expr_old_19 = __local_p__goto_155_14)
+        (__ci_expr_old_18 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
-        ((*__ci_expr_old_19) = ((__local_c__goto_178_12 as u8)))
+        ((*__ci_expr_old_18) = ((__local_c__goto_178_12 as u8)))
         goto '__ci_bb_70
     }
 
@@ -1195,20 +1187,20 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_128 {
-        (__ci_expr_logic_21 = 0)
+        (__ci_expr_logic_20 = 0)
         if ((if not (__local_extended__goto_163_6 != 0): 1 else: 0) != 0) {
-            var __ci_expr_logic_20: c_int
+            var __ci_expr_logic_19: c_int
 
             if ((if __local_posix_state__goto_161_10 < 2: 1 else: 0) != 0) {
-                (__ci_expr_logic_20 = (if true: 1 else: 0))
+                (__ci_expr_logic_19 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_20 = (if (if __local_lastspecial__goto_162_10 == 40: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_19 = (if (if __local_lastspecial__goto_162_10 == 40: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_21 = (if __ci_expr_logic_20 != 0: 1 else: 0))
+            (__ci_expr_logic_20 = (if __ci_expr_logic_19 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_21 != 0) {
+        if (__ci_expr_logic_20 != 0) {
             goto '__ci_bb_130
         } else {
             goto '__ci_bb_131
@@ -1241,11 +1233,11 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
 
     '__ci_bb_134 {
         if ((if __local_posix_state__goto_161_10 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_22 = (if true: 1 else: 0))
+            (__ci_expr_logic_21 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_22 = (if (if __local_lastspecial__goto_162_10 == 40: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_21 = (if (if __local_lastspecial__goto_162_10 == 40: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_22 != 0) {
+        if (__ci_expr_logic_21 != 0) {
             goto '__ci_bb_135
         } else {
             goto '__ci_bb_136
@@ -1262,11 +1254,11 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_137 {
-        (__ci_expr_logic_23 = 0)
+        (__ci_expr_logic_22 = 0)
         if ((if __local_c__goto_178_12 < 255: 1 else: 0) != 0) {
-            (__ci_expr_logic_23 = (if (if strchr(pcre2_escaped_literals, (__local_c__goto_178_12 as c_int)) != null: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_22 = (if (if strchr(pcre2_escaped_literals, (__local_c__goto_178_12 as c_int)) != null: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_23 != 0) {
+        if (__ci_expr_logic_22 != 0) {
             goto '__ci_bb_138
         } else {
             goto '__ci_bb_139
@@ -1316,9 +1308,9 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_145 {
-        (__ci_expr_old_24 = __local_p__goto_155_14)
+        (__ci_expr_old_23 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
-        ((*__ci_expr_old_24) = (((*__local_s__goto_367_7) as u8)))
+        ((*__ci_expr_old_23) = (((*__local_s__goto_367_7) as u8)))
         goto '__ci_bb_142
     }
 
@@ -1436,9 +1428,9 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     '__ci_bb_161 {
         (__local_convlength__goto_158_12 = (__local_convlength__goto_158_12 +% (((((__local_p__goto_155_14 as usize) -% (__local_pp__goto_156_14 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         ((*__param_bufflenptr) = __local_convlength__goto_158_12)
-        (__ci_expr_old_25 = __local_p__goto_155_14)
+        (__ci_expr_old_24 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
-        ((*__ci_expr_old_25) = ((0 as u8)))
+        ((*__ci_expr_old_24) = ((0 as u8)))
         return 0
     }
 

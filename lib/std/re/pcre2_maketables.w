@@ -31,15 +31,7 @@ use std.re.pcre2_xclass
 use std.libc
 
 pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *const u8 {
-    var __local_yield_: *mut u8 = with 0 as __ci_expr_seq_9 {
-        var __ci_expr_ternary_0: *mut c_void = null
-        if ((if __param_gcontext != null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).malloc.unwrap()((1088 as c_ulong), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data))
-        } else {
-            (__ci_expr_ternary_0 = ((with_alloc(((1088 as c_ulong) as i64)) as *mut c_void)))
-        }
-        (__ci_expr_ternary_0 as *mut u8)
-    }
+    var __local_yield_: *mut u8 = (((if (if __param_gcontext != null: 1 else: 0) != 0: (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).malloc.unwrap()((1088 as c_ulong), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data) else: (with_alloc(((1088 as c_ulong) as i64)) as *mut c_void)) as *mut u8))
 
     var __local_i: c_int
 
@@ -56,19 +48,11 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
     while ((if __local_i < 256: 1 else: 0) != 0) {
         var __local_c: c_int = ((tolower(__local_i) as c_int))
 
-        var __ci_expr_old_1: *mut u8 = __local_p
+        var __ci_expr_old_0: *mut u8 = __local_p
 
         (__local_p = __local_p + 1)
 
-        var __ci_expr_ternary_2: c_int = 0
-
-        if ((if __local_c < 256: 1 else: 0) != 0) {
-            (__ci_expr_ternary_2 = __local_c)
-        } else {
-            (__ci_expr_ternary_2 = __local_i)
-        }
-
-        ((*__ci_expr_old_1) = ((__ci_expr_ternary_2 as u8)))
+        ((*__ci_expr_old_0) = (((if (if __local_c < 256: 1 else: 0) != 0: __local_c else: __local_i) as u8)))
 
 
 
@@ -80,29 +64,13 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
     (__local_i = ((0 as c_int)))
 
     while ((if __local_i < 256: 1 else: 0) != 0) {
-        var __local_c_1: c_int = with 0 as __ci_expr_seq_60 {
-            var __ci_expr_ternary_3: c_int = 0
-            if (islower(__local_i) != 0) {
-                (__ci_expr_ternary_3 = ((toupper(__local_i) as c_int)))
-            } else {
-                (__ci_expr_ternary_3 = ((tolower(__local_i) as c_int)))
-            }
-            __ci_expr_ternary_3
-        }
+        var __local_c_1: c_int = (((if islower(__local_i) != 0: (toupper(__local_i) as c_int) else: (tolower(__local_i) as c_int)) as c_int))
 
-        var __ci_expr_old_4: *mut u8 = __local_p
+        var __ci_expr_old_1: *mut u8 = __local_p
 
         (__local_p = __local_p + 1)
 
-        var __ci_expr_ternary_5: c_int = 0
-
-        if ((if __local_c_1 < 256: 1 else: 0) != 0) {
-            (__ci_expr_ternary_5 = __local_c_1)
-        } else {
-            (__ci_expr_ternary_5 = __local_i)
-        }
-
-        ((*__ci_expr_old_4) = ((__ci_expr_ternary_5 as u8)))
+        ((*__ci_expr_old_1) = (((if (if __local_c_1 < 256: 1 else: 0) != 0: __local_c_1 else: __local_i) as u8)))
 
 
 
@@ -189,24 +157,24 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
             (__local_x = __local_x + 8)
         }
 
-        var __ci_expr_logic_6: c_int
+        var __ci_expr_logic_2: c_int
 
         if (isalnum(__local_i) != 0) {
-            (__ci_expr_logic_6 = (if true: 1 else: 0))
+            (__ci_expr_logic_2 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_6 = (if (if __local_i == 95: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (if __local_i == 95: 1 else: 0) != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_6 != 0) {
+        if (__ci_expr_logic_2 != 0) {
             (__local_x = __local_x + 16)
         }
 
 
-        var __ci_expr_old_7: *mut u8 = __local_p
+        var __ci_expr_old_3: *mut u8 = __local_p
 
         (__local_p = __local_p + 1)
 
-        ((*__ci_expr_old_7) = ((__local_x as u8)))
+        ((*__ci_expr_old_3) = ((__local_x as u8)))
 
 
 

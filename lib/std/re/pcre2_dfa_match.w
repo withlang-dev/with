@@ -165,65 +165,53 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
 
     var __ci_expr_logic_36: c_int = 0
 
-    var __ci_expr_ternary_37: *const u8 = null
+    var __ci_expr_logic_37: c_int = 0
 
-    var __ci_expr_ternary_38: *const u8 = null
+    var __ci_expr_ternary_39: *const u8 = null
 
-    var __ci_expr_logic_39: c_int = 0
+    var __ci_expr_logic_38: c_int = 0
 
-    var __ci_expr_ternary_40: *const u8 = null
+    var __ci_expr_logic_40: c_int = 0
 
-    var __ci_expr_ternary_41: *const u8 = null
+    var __ci_expr_logic_46: c_int = 0
 
-    var __ci_expr_ternary_42: *const u8 = null
+    var __ci_expr_logic_47: c_int = 0
 
-    var __ci_expr_ternary_44: *const u8 = null
+    var __ci_expr_logic_53: c_int = 0
 
-    var __ci_expr_logic_43: c_int = 0
+    var __ci_expr_logic_57: c_int = 0
 
-    var __ci_expr_logic_45: c_int = 0
+    var __ci_expr_logic_56: c_int = 0
 
-    var __ci_expr_logic_51: c_int = 0
-
-    var __ci_expr_logic_52: c_int = 0
+    var __ci_expr_logic_55: c_int = 0
 
     var __ci_expr_logic_58: c_int = 0
 
-    var __ci_expr_logic_62: c_int = 0
+    var __ci_expr_logic_59: c_int = 0
 
     var __ci_expr_logic_61: c_int = 0
 
-    var __ci_expr_logic_60: c_int = 0
+    var __ci_expr_logic_62: c_int = 0
 
     var __ci_expr_logic_63: c_int = 0
 
-    var __ci_expr_ternary_64: c_int = 0
+    var __ci_expr_logic_64: c_int = 0
 
     var __ci_expr_logic_65: c_int = 0
 
-    var __ci_expr_logic_67: c_int = 0
-
-    var __ci_expr_logic_68: c_int = 0
-
-    var __ci_expr_logic_69: c_int = 0
-
-    var __ci_expr_logic_70: c_int = 0
-
-    var __ci_expr_logic_71: c_int = 0
+    var __ci_expr_logic_66: c_int = 0
 
     var __ci_expr_logic_72: c_int = 0
 
-    var __ci_expr_logic_78: c_int = 0
+    var __ci_expr_logic_73: c_int = 0
 
     var __ci_expr_logic_79: c_int = 0
 
-    var __ci_expr_logic_85: c_int = 0
+    var __ci_expr_logic_76: c_int = 0
 
-    var __ci_expr_logic_82: c_int = 0
+    var __ci_expr_logic_75: c_int = 0
 
-    var __ci_expr_logic_81: c_int = 0
-
-    var __ci_expr_logic_80: c_int = 0
+    var __ci_expr_logic_74: c_int = 0
 
     goto '__ci_bb_0
 
@@ -1287,11 +1275,11 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_126 {
-        (__ci_expr_logic_45 = 0)
+        (__ci_expr_logic_40 = 0)
         if ((if (((*__local_mb__goto_3377_18).moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_45 = (if (if __local_start_match__goto_3351_12 >= (*__local_mb__goto_3377_18).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_40 = (if (if __local_start_match__goto_3351_12 >= (*__local_mb__goto_3377_18).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_45 != 0) {
+        if (__ci_expr_logic_40 != 0) {
             goto '__ci_bb_138
         } else {
             goto '__ci_bb_139
@@ -1300,34 +1288,22 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
 
     '__ci_bb_127 {
         (__local_pp1__goto_3787_22 = ((memchr(((__local_start_match__goto_3351_12 as *const c_void) as *mut c_void), (__local_first_cu__goto_3365_13 as c_int), (__local_searchlength__goto_3789_22 as i64)) as *const u8)))
-        (__ci_expr_ternary_37 = null)
-        if ((if __local_pp1__goto_3787_22 == null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_37 = __local_end_subject__goto_3352_12)
-        } else {
-            (__ci_expr_ternary_37 = __local_pp1__goto_3787_22)
-        }
-        (__local_memchr_found_first_cu__goto_3361_12 = __ci_expr_ternary_37)
+        (__local_memchr_found_first_cu__goto_3361_12 = (if (if __local_pp1__goto_3787_22 == null: 1 else: 0) != 0: __local_end_subject__goto_3352_12 else: __local_pp1__goto_3787_22))
         goto '__ci_bb_129
     }
 
     '__ci_bb_128 {
-        (__ci_expr_ternary_38 = null)
-        if ((if __local_memchr_found_first_cu__goto_3361_12 == __local_end_subject__goto_3352_12: 1 else: 0) != 0) {
-            (__ci_expr_ternary_38 = null)
-        } else {
-            (__ci_expr_ternary_38 = __local_memchr_found_first_cu__goto_3361_12)
-        }
-        (__local_pp1__goto_3787_22 = __ci_expr_ternary_38)
+        (__local_pp1__goto_3787_22 = (if (if __local_memchr_found_first_cu__goto_3361_12 == __local_end_subject__goto_3352_12: 1 else: 0) != 0: (null as *const u8) else: __local_memchr_found_first_cu__goto_3361_12))
         goto '__ci_bb_129
     }
 
     '__ci_bb_129 {
         if ((if __local_memchr_found_first_cu2__goto_3362_12 == null: 1 else: 0) != 0) {
-            (__ci_expr_logic_39 = (if true: 1 else: 0))
+            (__ci_expr_logic_37 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_39 = (if (if __local_start_match__goto_3351_12 > __local_memchr_found_first_cu2__goto_3362_12: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_37 = (if (if __local_start_match__goto_3351_12 > __local_memchr_found_first_cu2__goto_3362_12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_39 != 0) {
+        if (__ci_expr_logic_37 != 0) {
             goto '__ci_bb_130
         } else {
             goto '__ci_bb_131
@@ -1336,24 +1312,12 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
 
     '__ci_bb_130 {
         (__local_pp2__goto_3788_22 = ((memchr(((__local_start_match__goto_3351_12 as *const c_void) as *mut c_void), (__local_first_cu2__goto_3366_13 as c_int), (__local_searchlength__goto_3789_22 as i64)) as *const u8)))
-        (__ci_expr_ternary_40 = null)
-        if ((if __local_pp2__goto_3788_22 == null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_40 = __local_end_subject__goto_3352_12)
-        } else {
-            (__ci_expr_ternary_40 = __local_pp2__goto_3788_22)
-        }
-        (__local_memchr_found_first_cu2__goto_3362_12 = __ci_expr_ternary_40)
+        (__local_memchr_found_first_cu2__goto_3362_12 = (if (if __local_pp2__goto_3788_22 == null: 1 else: 0) != 0: __local_end_subject__goto_3352_12 else: __local_pp2__goto_3788_22))
         goto '__ci_bb_132
     }
 
     '__ci_bb_131 {
-        (__ci_expr_ternary_41 = null)
-        if ((if __local_memchr_found_first_cu2__goto_3362_12 == __local_end_subject__goto_3352_12: 1 else: 0) != 0) {
-            (__ci_expr_ternary_41 = null)
-        } else {
-            (__ci_expr_ternary_41 = __local_memchr_found_first_cu2__goto_3362_12)
-        }
-        (__local_pp2__goto_3788_22 = __ci_expr_ternary_41)
+        (__local_pp2__goto_3788_22 = (if (if __local_memchr_found_first_cu2__goto_3362_12 == __local_end_subject__goto_3352_12: 1 else: 0) != 0: (null as *const u8) else: __local_memchr_found_first_cu2__goto_3362_12))
         goto '__ci_bb_132
     }
 
@@ -1366,29 +1330,23 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_133 {
-        (__ci_expr_ternary_42 = null)
-        if ((if __local_pp2__goto_3788_22 == null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_42 = __local_end_subject__goto_3352_12)
-        } else {
-            (__ci_expr_ternary_42 = __local_pp2__goto_3788_22)
-        }
-        (__local_start_match__goto_3351_12 = __ci_expr_ternary_42)
+        (__local_start_match__goto_3351_12 = (if (if __local_pp2__goto_3788_22 == null: 1 else: 0) != 0: __local_end_subject__goto_3352_12 else: __local_pp2__goto_3788_22))
         goto '__ci_bb_135
     }
 
     '__ci_bb_134 {
-        (__ci_expr_ternary_44 = null)
+        (__ci_expr_ternary_39 = null)
         if ((if __local_pp2__goto_3788_22 == null: 1 else: 0) != 0) {
-            (__ci_expr_logic_43 = (if true: 1 else: 0))
+            (__ci_expr_logic_38 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_43 = (if (if __local_pp1__goto_3787_22 < __local_pp2__goto_3788_22: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_38 = (if (if __local_pp1__goto_3787_22 < __local_pp2__goto_3788_22: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_43 != 0) {
-            (__ci_expr_ternary_44 = __local_pp1__goto_3787_22)
+        if (__ci_expr_logic_38 != 0) {
+            (__ci_expr_ternary_39 = __local_pp1__goto_3787_22)
         } else {
-            (__ci_expr_ternary_44 = __local_pp2__goto_3788_22)
+            (__ci_expr_ternary_39 = __local_pp2__goto_3788_22)
         }
-        (__local_start_match__goto_3351_12 = __ci_expr_ternary_44)
+        (__local_start_match__goto_3351_12 = __ci_expr_ternary_39)
         goto '__ci_bb_135
     }
 
@@ -1454,28 +1412,28 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_147 {
-        (__ci_expr_logic_62 = 0)
-        (__ci_expr_logic_61 = 0)
-        (__ci_expr_logic_60 = 0)
+        (__ci_expr_logic_57 = 0)
+        (__ci_expr_logic_56 = 0)
+        (__ci_expr_logic_55 = 0)
         if ((if (__local_start_match__goto_3351_12[-1]) == 13: 1 else: 0) != 0) {
-            var __ci_expr_logic_59: c_int
+            var __ci_expr_logic_54: c_int
 
             if ((if (*__local_mb__goto_3377_18).nltype == 1: 1 else: 0) != 0) {
-                (__ci_expr_logic_59 = (if true: 1 else: 0))
+                (__ci_expr_logic_54 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_59 = (if (if (*__local_mb__goto_3377_18).nltype == 2: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_54 = (if (if (*__local_mb__goto_3377_18).nltype == 2: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_60 = (if __ci_expr_logic_59 != 0: 1 else: 0))
+            (__ci_expr_logic_55 = (if __ci_expr_logic_54 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_60 != 0) {
-            (__ci_expr_logic_61 = (if (if __local_start_match__goto_3351_12 < __local_end_subject__goto_3352_12: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_55 != 0) {
+            (__ci_expr_logic_56 = (if (if __local_start_match__goto_3351_12 < __local_end_subject__goto_3352_12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_61 != 0) {
-            (__ci_expr_logic_62 = (if (if (*__local_start_match__goto_3351_12) == 10: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_56 != 0) {
+            (__ci_expr_logic_57 = (if (if (*__local_start_match__goto_3351_12) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_62 != 0) {
+        if (__ci_expr_logic_57 != 0) {
             goto '__ci_bb_157
         } else {
             goto '__ci_bb_158
@@ -1483,49 +1441,49 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_148 {
-        (__ci_expr_logic_51 = 0)
+        (__ci_expr_logic_46 = 0)
         if ((if __local_start_match__goto_3351_12 < __local_end_subject__goto_3352_12: 1 else: 0) != 0) {
-            var __ci_expr_ternary_50: c_int = 0
+            var __ci_expr_ternary_45: c_int = 0
 
             if ((if (*__local_mb__goto_3377_18).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_46: c_int = 0
+                var __ci_expr_logic_41: c_int = 0
 
                 if ((if __local_start_match__goto_3351_12 > (*__local_mb__goto_3377_18).start_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_46 = (if _pcre2_was_newline_8(__local_start_match__goto_3351_12, (*__local_mb__goto_3377_18).nltype, (*__local_mb__goto_3377_18).start_subject, ((&raw const (*__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_41 = (if _pcre2_was_newline_8(__local_start_match__goto_3351_12, (*__local_mb__goto_3377_18).nltype, (*__local_mb__goto_3377_18).start_subject, ((&raw const (*__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_50 = __ci_expr_logic_46)
+                (__ci_expr_ternary_45 = __ci_expr_logic_41)
 
             } else {
-                var __ci_expr_logic_49: c_int = 0
+                var __ci_expr_logic_44: c_int = 0
 
-                var __ci_expr_logic_47: c_int = 0
+                var __ci_expr_logic_42: c_int = 0
 
                 if ((if __local_start_match__goto_3351_12 >= ((*__local_mb__goto_3377_18).start_subject + ((*__local_mb__goto_3377_18).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_47 = (if (if (*(__local_start_match__goto_3351_12 - ((*__local_mb__goto_3377_18).nllen as usize))) == (*__local_mb__goto_3377_18).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_42 = (if (if (*(__local_start_match__goto_3351_12 - ((*__local_mb__goto_3377_18).nllen as usize))) == (*__local_mb__goto_3377_18).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_47 != 0) {
-                    var __ci_expr_logic_48: c_int
+                if (__ci_expr_logic_42 != 0) {
+                    var __ci_expr_logic_43: c_int
 
                     if ((if (*__local_mb__goto_3377_18).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_48 = (if true: 1 else: 0))
+                        (__ci_expr_logic_43 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_48 = (if (if (*((__local_start_match__goto_3351_12 - ((*__local_mb__goto_3377_18).nllen as usize)) + ((1 as isize) as usize))) == (*__local_mb__goto_3377_18).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_43 = (if (if (*((__local_start_match__goto_3351_12 - ((*__local_mb__goto_3377_18).nllen as usize)) + ((1 as isize) as usize))) == (*__local_mb__goto_3377_18).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_49 = (if __ci_expr_logic_48 != 0: 1 else: 0))
+                    (__ci_expr_logic_44 = (if __ci_expr_logic_43 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_50 = __ci_expr_logic_49)
+                (__ci_expr_ternary_45 = __ci_expr_logic_44)
 
             }
 
-            (__ci_expr_logic_51 = (if (if not (__ci_expr_ternary_50 != 0): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_46 = (if (if not (__ci_expr_ternary_45 != 0): 1 else: 0) != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_51 != 0) {
+        if (__ci_expr_logic_46 != 0) {
             goto '__ci_bb_149
         } else {
             goto '__ci_bb_150
@@ -1542,11 +1500,11 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_151 {
-        (__ci_expr_logic_52 = 0)
+        (__ci_expr_logic_47 = 0)
         if ((if __local_start_match__goto_3351_12 < __local_end_subject__goto_3352_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_52 = (if (if ((((*__local_start_match__goto_3351_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_47 = (if (if ((((*__local_start_match__goto_3351_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_52 != 0) {
+        if (__ci_expr_logic_47 != 0) {
             goto '__ci_bb_152
         } else {
             goto '__ci_bb_153
@@ -1563,49 +1521,49 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_154 {
-        (__ci_expr_logic_58 = 0)
+        (__ci_expr_logic_53 = 0)
         if ((if __local_start_match__goto_3351_12 < __local_end_subject__goto_3352_12: 1 else: 0) != 0) {
-            var __ci_expr_ternary_57: c_int = 0
+            var __ci_expr_ternary_52: c_int = 0
 
             if ((if (*__local_mb__goto_3377_18).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_53: c_int = 0
+                var __ci_expr_logic_48: c_int = 0
 
                 if ((if __local_start_match__goto_3351_12 > (*__local_mb__goto_3377_18).start_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_53 = (if _pcre2_was_newline_8(__local_start_match__goto_3351_12, (*__local_mb__goto_3377_18).nltype, (*__local_mb__goto_3377_18).start_subject, ((&raw const (*__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_48 = (if _pcre2_was_newline_8(__local_start_match__goto_3351_12, (*__local_mb__goto_3377_18).nltype, (*__local_mb__goto_3377_18).start_subject, ((&raw const (*__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_57 = __ci_expr_logic_53)
+                (__ci_expr_ternary_52 = __ci_expr_logic_48)
 
             } else {
-                var __ci_expr_logic_56: c_int = 0
+                var __ci_expr_logic_51: c_int = 0
 
-                var __ci_expr_logic_54: c_int = 0
+                var __ci_expr_logic_49: c_int = 0
 
                 if ((if __local_start_match__goto_3351_12 >= ((*__local_mb__goto_3377_18).start_subject + ((*__local_mb__goto_3377_18).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_54 = (if (if (*(__local_start_match__goto_3351_12 - ((*__local_mb__goto_3377_18).nllen as usize))) == (*__local_mb__goto_3377_18).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_49 = (if (if (*(__local_start_match__goto_3351_12 - ((*__local_mb__goto_3377_18).nllen as usize))) == (*__local_mb__goto_3377_18).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_54 != 0) {
-                    var __ci_expr_logic_55: c_int
+                if (__ci_expr_logic_49 != 0) {
+                    var __ci_expr_logic_50: c_int
 
                     if ((if (*__local_mb__goto_3377_18).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_55 = (if true: 1 else: 0))
+                        (__ci_expr_logic_50 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_55 = (if (if (*((__local_start_match__goto_3351_12 - ((*__local_mb__goto_3377_18).nllen as usize)) + ((1 as isize) as usize))) == (*__local_mb__goto_3377_18).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_50 = (if (if (*((__local_start_match__goto_3351_12 - ((*__local_mb__goto_3377_18).nllen as usize)) + ((1 as isize) as usize))) == (*__local_mb__goto_3377_18).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_56 = (if __ci_expr_logic_55 != 0: 1 else: 0))
+                    (__ci_expr_logic_51 = (if __ci_expr_logic_50 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_57 = __ci_expr_logic_56)
+                (__ci_expr_ternary_52 = __ci_expr_logic_51)
 
             }
 
-            (__ci_expr_logic_58 = (if (if not (__ci_expr_ternary_57 != 0): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_53 = (if (if not (__ci_expr_ternary_52 != 0): 1 else: 0) != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_58 != 0) {
+        if (__ci_expr_logic_53 != 0) {
             goto '__ci_bb_155
         } else {
             goto '__ci_bb_156
@@ -1656,11 +1614,11 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_163 {
-        (__ci_expr_logic_63 = 0)
+        (__ci_expr_logic_58 = 0)
         if ((if (((*__local_mb__goto_3377_18).moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_63 = (if (if __local_start_match__goto_3351_12 >= (*__local_mb__goto_3377_18).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_58 = (if (if __local_start_match__goto_3351_12 >= (*__local_mb__goto_3377_18).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_63 != 0) {
+        if (__ci_expr_logic_58 != 0) {
             goto '__ci_bb_166
         } else {
             goto '__ci_bb_167
@@ -1701,18 +1659,12 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_171 {
-        (__ci_expr_ternary_64 = 0)
-        if (__local_has_first_cu__goto_3357_6 != 0) {
-            (__ci_expr_ternary_64 = ((1 as c_int)))
-        } else {
-            (__ci_expr_ternary_64 = ((0 as c_int)))
-        }
-        (__local_p__goto_3926_18 = __local_start_match__goto_3351_12 + ((__ci_expr_ternary_64 as isize) as usize))
-        (__ci_expr_logic_65 = 0)
+        (__local_p__goto_3926_18 = __local_start_match__goto_3351_12 + (((if __local_has_first_cu__goto_3357_6 != 0: (1 as c_int) else: (0 as c_int)) as isize) as usize))
+        (__ci_expr_logic_59 = 0)
         if (__local_has_req_cu__goto_3358_6 != 0) {
-            (__ci_expr_logic_65 = (if (if __local_p__goto_3926_18 > __local_req_cu_ptr__goto_3354_12: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_59 = (if (if __local_p__goto_3926_18 > __local_req_cu_ptr__goto_3354_12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_65 != 0) {
+        if (__ci_expr_logic_59 != 0) {
             goto '__ci_bb_173
         } else {
             goto '__ci_bb_174
@@ -1730,18 +1682,18 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     '__ci_bb_173 {
         (__local_check_length__goto_3960_20 = ((((((__local_end_subject__goto_3352_12 as usize) -% (__local_start_match__goto_3351_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if __local_check_length__goto_3960_20 < 5000: 1 else: 0) != 0) {
-            (__ci_expr_logic_67 = (if true: 1 else: 0))
+            (__ci_expr_logic_61 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_66: c_int = 0
+            var __ci_expr_logic_60: c_int = 0
 
             if ((if not (__local_anchored__goto_3356_11 != 0): 1 else: 0) != 0) {
-                (__ci_expr_logic_66 = (if (if __local_check_length__goto_3960_20 < 5000000: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_60 = (if (if __local_check_length__goto_3960_20 < 5000000: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_67 = (if __ci_expr_logic_66 != 0: 1 else: 0))
+            (__ci_expr_logic_61 = (if __ci_expr_logic_60 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_67 != 0) {
+        if (__ci_expr_logic_61 != 0) {
             goto '__ci_bb_175
         } else {
             goto '__ci_bb_176
@@ -1841,11 +1793,11 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
         ((*__local_mb__goto_3377_18).recursive = ((null as *mut dfa_recursion_info)))
         (__local_rc__goto_3344_5 = ((internal_dfa_match(__local_mb__goto_3377_18, (*__local_mb__goto_3377_18).start_code, __local_start_match__goto_3351_12, __param_start_offset, (&(*__param_match_data).ovector[0] as *mut c_ulong), ((((*__param_match_data).oveccount as c_uint) *% (2 as c_uint)) as c_uint), __param_workspace, (__param_wscount as c_int), (0 as c_uint), (&__local_base_recursion_workspace__goto_3384_5[0] as *mut c_int)) as c_int)))
         if ((if __local_rc__goto_3344_5 != -1: 1 else: 0) != 0) {
-            (__ci_expr_logic_68 = (if true: 1 else: 0))
+            (__ci_expr_logic_62 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_68 = (if __local_anchored__goto_3356_11 != 0: 1 else: 0))
+            (__ci_expr_logic_62 = (if __local_anchored__goto_3356_11 != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_68 != 0) {
+        if (__ci_expr_logic_62 != 0) {
             goto '__ci_bb_190
         } else {
             goto '__ci_bb_191
@@ -1861,49 +1813,49 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_191 {
-        (__ci_expr_logic_78 = 0)
+        (__ci_expr_logic_72 = 0)
         if (__local_firstline__goto_3356_32 != 0) {
-            var __ci_expr_ternary_77: c_int = 0
+            var __ci_expr_ternary_71: c_int = 0
 
             if ((if (*__local_mb__goto_3377_18).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_73: c_int = 0
+                var __ci_expr_logic_67: c_int = 0
 
                 if ((if __local_start_match__goto_3351_12 < (*__local_mb__goto_3377_18).end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_73 = (if _pcre2_is_newline_8(__local_start_match__goto_3351_12, (*__local_mb__goto_3377_18).nltype, (*__local_mb__goto_3377_18).end_subject, ((&raw const (*__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_67 = (if _pcre2_is_newline_8(__local_start_match__goto_3351_12, (*__local_mb__goto_3377_18).nltype, (*__local_mb__goto_3377_18).end_subject, ((&raw const (*__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_77 = __ci_expr_logic_73)
+                (__ci_expr_ternary_71 = __ci_expr_logic_67)
 
             } else {
-                var __ci_expr_logic_76: c_int = 0
+                var __ci_expr_logic_70: c_int = 0
 
-                var __ci_expr_logic_74: c_int = 0
+                var __ci_expr_logic_68: c_int = 0
 
                 if ((if __local_start_match__goto_3351_12 <= ((*__local_mb__goto_3377_18).end_subject - ((*__local_mb__goto_3377_18).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_74 = (if (if (*__local_start_match__goto_3351_12) == (*__local_mb__goto_3377_18).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_68 = (if (if (*__local_start_match__goto_3351_12) == (*__local_mb__goto_3377_18).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_74 != 0) {
-                    var __ci_expr_logic_75: c_int
+                if (__ci_expr_logic_68 != 0) {
+                    var __ci_expr_logic_69: c_int
 
                     if ((if (*__local_mb__goto_3377_18).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_75 = (if true: 1 else: 0))
+                        (__ci_expr_logic_69 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_75 = (if (if (*(__local_start_match__goto_3351_12 + ((1 as isize) as usize))) == (*__local_mb__goto_3377_18).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_69 = (if (if (*(__local_start_match__goto_3351_12 + ((1 as isize) as usize))) == (*__local_mb__goto_3377_18).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_76 = (if __ci_expr_logic_75 != 0: 1 else: 0))
+                    (__ci_expr_logic_70 = (if __ci_expr_logic_69 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_77 = __ci_expr_logic_76)
+                (__ci_expr_ternary_71 = __ci_expr_logic_70)
 
             }
 
-            (__ci_expr_logic_78 = (if __ci_expr_ternary_77 != 0: 1 else: 0))
+            (__ci_expr_logic_72 = (if __ci_expr_ternary_71 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_78 != 0) {
+        if (__ci_expr_logic_72 != 0) {
             goto '__ci_bb_208
         } else {
             goto '__ci_bb_209
@@ -1915,11 +1867,11 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_193 {
-        (__ci_expr_logic_69 = 0)
+        (__ci_expr_logic_63 = 0)
         if ((if __local_rc__goto_3344_5 == -2: 1 else: 0) != 0) {
-            (__ci_expr_logic_69 = (if (if (*__param_match_data).oveccount > 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_63 = (if (if (*__param_match_data).oveccount > 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_69 != 0) {
+        if (__ci_expr_logic_63 != 0) {
             goto '__ci_bb_194
         } else {
             goto '__ci_bb_195
@@ -1934,11 +1886,11 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
 
     '__ci_bb_195 {
         if ((if __local_rc__goto_3344_5 >= 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_70 = (if true: 1 else: 0))
+            (__ci_expr_logic_64 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_70 = (if (if __local_rc__goto_3344_5 == -2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_64 = (if (if __local_rc__goto_3344_5 == -2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_70 != 0) {
+        if (__ci_expr_logic_64 != 0) {
             goto '__ci_bb_196
         } else {
             goto '__ci_bb_197
@@ -1955,11 +1907,11 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_197 {
-        (__ci_expr_logic_71 = 0)
+        (__ci_expr_logic_65 = 0)
         if ((if __local_rc__goto_3344_5 >= 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_71 = (if (if ((__local_options as c_uint) & (16384 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_65 = (if (if ((__local_options as c_uint) & (16384 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_71 != 0) {
+        if (__ci_expr_logic_65 != 0) {
             goto '__ci_bb_198
         } else {
             goto '__ci_bb_199
@@ -1976,11 +1928,11 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
 
     '__ci_bb_199 {
         if ((if __local_rc__goto_3344_5 >= 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_72 = (if true: 1 else: 0))
+            (__ci_expr_logic_66 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_72 = (if (if __local_rc__goto_3344_5 == -2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_66 = (if (if __local_rc__goto_3344_5 == -2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_72 != 0) {
+        if (__ci_expr_logic_66 != 0) {
             goto '__ci_bb_206
         } else {
             goto '__ci_bb_207
@@ -2055,11 +2007,11 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_212 {
-        (__ci_expr_logic_79 = 0)
+        (__ci_expr_logic_73 = 0)
         if ((if __local_start_match__goto_3351_12 < __local_end_subject__goto_3352_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_79 = (if (if ((((*__local_start_match__goto_3351_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_73 = (if (if ((((*__local_start_match__goto_3351_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_79 != 0) {
+        if (__ci_expr_logic_73 != 0) {
             goto '__ci_bb_213
         } else {
             goto '__ci_bb_214
@@ -2080,40 +2032,40 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_216 {
-        (__ci_expr_logic_85 = 0)
-        (__ci_expr_logic_82 = 0)
-        (__ci_expr_logic_81 = 0)
-        (__ci_expr_logic_80 = 0)
+        (__ci_expr_logic_79 = 0)
+        (__ci_expr_logic_76 = 0)
+        (__ci_expr_logic_75 = 0)
+        (__ci_expr_logic_74 = 0)
         if ((if (*(__local_start_match__goto_3351_12 - ((1 as isize) as usize))) == 13: 1 else: 0) != 0) {
-            (__ci_expr_logic_80 = (if (if __local_start_match__goto_3351_12 < __local_end_subject__goto_3352_12: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_74 = (if (if __local_start_match__goto_3351_12 < __local_end_subject__goto_3352_12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_80 != 0) {
-            (__ci_expr_logic_81 = (if (if (*__local_start_match__goto_3351_12) == 10: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_74 != 0) {
+            (__ci_expr_logic_75 = (if (if (*__local_start_match__goto_3351_12) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_81 != 0) {
-            (__ci_expr_logic_82 = (if (if (((*__local_re__goto_3346_24).flags as c_uint) & (2048 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_75 != 0) {
+            (__ci_expr_logic_76 = (if (if (((*__local_re__goto_3346_24).flags as c_uint) & (2048 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_82 != 0) {
-            var __ci_expr_logic_84: c_int
+        if (__ci_expr_logic_76 != 0) {
+            var __ci_expr_logic_78: c_int
 
-            var __ci_expr_logic_83: c_int
+            var __ci_expr_logic_77: c_int
 
             if ((if (*__local_mb__goto_3377_18).nltype == 1: 1 else: 0) != 0) {
-                (__ci_expr_logic_83 = (if true: 1 else: 0))
+                (__ci_expr_logic_77 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_83 = (if (if (*__local_mb__goto_3377_18).nltype == 2: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_77 = (if (if (*__local_mb__goto_3377_18).nltype == 2: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_83 != 0) {
-                (__ci_expr_logic_84 = (if true: 1 else: 0))
+            if (__ci_expr_logic_77 != 0) {
+                (__ci_expr_logic_78 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_84 = (if (if (*__local_mb__goto_3377_18).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_78 = (if (if (*__local_mb__goto_3377_18).nllen == 2: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_85 = (if __ci_expr_logic_84 != 0: 1 else: 0))
+            (__ci_expr_logic_79 = (if __ci_expr_logic_78 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_85 != 0) {
+        if (__ci_expr_logic_79 != 0) {
             goto '__ci_bb_217
         } else {
             goto '__ci_bb_218
@@ -2156,16 +2108,7 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
 unsafe fn do_callout_dfa(__param_code: *const u8, __param_offsets: *mut c_ulong, __param_current_subject: *const u8, __param_ptr: *const u8, __param_mb: *mut dfa_match_block_8, __param_extracode: c_ulong, __param_lengthptr: *mut c_ulong) -> c_int {
     var __local_cb: *mut pcre2_callout_block_8 = (*__param_mb).cb
 
-    var __ci_expr_ternary_0: c_ulong = 0
-
-    if ((if (__param_code[__param_extracode]) == OP_CALLOUT: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = ((_pcre2_OP_lengths_8[OP_CALLOUT] as c_ulong)))
-    } else {
-        (__ci_expr_ternary_0 = ((((((((__param_code[((5 as c_ulong) +% (__param_extracode as c_ulong))]) as c_int) << (8 as c_uint)) as c_int) | ((__param_code[((((5 as c_ulong) +% (__param_extracode as c_ulong)) as c_ulong) +% (1 as c_ulong))]) as c_int)) as c_uint) as c_ulong)))
-    }
-
-    ((*__param_lengthptr) = __ci_expr_ternary_0)
-
+    ((*__param_lengthptr) = (((if (if (__param_code[__param_extracode]) == OP_CALLOUT: 1 else: 0) != 0: (_pcre2_OP_lengths_8[OP_CALLOUT] as c_ulong) else: (((((((__param_code[((5 as c_ulong) +% (__param_extracode as c_ulong))]) as c_int) << (8 as c_uint)) as c_int) | ((__param_code[((((5 as c_ulong) +% (__param_extracode as c_ulong)) as c_ulong) +% (1 as c_ulong))]) as c_int)) as c_uint) as c_ulong)) as c_ulong)))
 
     if ((if (*__param_mb).callout == null: 1 else: 0) != 0) {
         return 0
@@ -2214,15 +2157,7 @@ unsafe fn more_workspace(__param_rwsptr: *mut *mut RWS_anchor, __param_ovecsize:
         (__local_new = (*__local_rws).next)
 
     } else {
-        var __local_newsize: c_uint = with 0 as __ci_expr_seq_13 {
-            var __ci_expr_ternary_0: c_ulong = 0
-            if ((if (*__local_rws).size >= ((4294967295 as c_ulong) / (((sizeof[c_int]() as c_ulong) *% (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
-                (__ci_expr_ternary_0 = ((((4294967295 as c_ulong) / (sizeof[c_int]() as c_ulong)) as c_ulong)))
-            } else {
-                (__ci_expr_ternary_0 = (((((*__local_rws).size as c_uint) *% (2 as c_uint)) as c_ulong)))
-            }
-            (__ci_expr_ternary_0 as c_uint)
-        }
+        var __local_newsize: c_uint = (((if (if (*__local_rws).size >= ((4294967295 as c_ulong) / (((sizeof[c_int]() as c_ulong) *% (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0: (((4294967295 as c_ulong) / (sizeof[c_int]() as c_ulong)) as c_ulong) else: ((((*__local_rws).size as c_uint) *% (2 as c_uint)) as c_ulong)) as c_uint))
 
         var __local_newsizeK: c_uint = ((((__local_newsize as c_ulong) / (((1024 as c_ulong) / (sizeof[c_int]() as c_ulong)) as c_ulong)) as c_uint))
 
@@ -2558,199 +2493,197 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_logic_4: c_int = 0
 
-    var __ci_expr_ternary_5: c_ulong = 0
+    var __ci_expr_old_5: c_int = 0
 
-    var __ci_expr_ternary_6: c_int = 0
+    var __ci_expr_logic_6: c_int = 0
 
-    var __ci_expr_ternary_7: c_ulong = 0
-
-    var __ci_expr_old_8: c_int = 0
+    var __ci_expr_ternary_10: c_int = 0
 
     var __ci_expr_logic_9: c_int = 0
 
-    var __ci_expr_ternary_13: c_int = 0
+    var __ci_expr_logic_8: c_int = 0
+
+    var __ci_expr_logic_7: c_int = 0
+
+    var __ci_expr_old_11: c_int = 0
 
     var __ci_expr_logic_12: c_int = 0
 
-    var __ci_expr_logic_11: c_int = 0
+    var __ci_expr_old_13: c_int = 0
 
-    var __ci_expr_logic_10: c_int = 0
-
-    var __ci_expr_old_14: c_int = 0
+    var __ci_expr_logic_14: c_int = 0
 
     var __ci_expr_logic_15: c_int = 0
 
     var __ci_expr_old_16: c_int = 0
 
-    var __ci_expr_logic_17: c_int = 0
+    var __ci_expr_old_17: c_int = 0
 
-    var __ci_expr_logic_18: c_int = 0
+    var __ci_expr_logic_20: c_int = 0
 
-    var __ci_expr_old_19: c_int = 0
+    var __ci_expr_logic_21: c_int = 0
 
-    var __ci_expr_old_20: c_int = 0
+    var __ci_expr_old_22: c_int = 0
 
-    var __ci_expr_logic_23: c_int = 0
+    var __ci_expr_old_23: c_int = 0
 
-    var __ci_expr_ternary_24: c_int = 0
+    var __ci_expr_old_24: c_int = 0
 
-    var __ci_expr_logic_25: c_int = 0
+    var __ci_expr_old_25: c_int = 0
 
-    var __ci_expr_ternary_26: c_int = 0
+    var __ci_expr_old_26: c_int = 0
 
     var __ci_expr_old_27: c_int = 0
 
     var __ci_expr_old_28: c_int = 0
 
-    var __ci_expr_old_29: c_int = 0
+    var __ci_expr_logic_29: c_int = 0
 
     var __ci_expr_old_30: c_int = 0
 
-    var __ci_expr_old_31: c_int = 0
+    var __ci_expr_logic_39: c_int = 0
 
-    var __ci_expr_old_32: c_int = 0
+    var __ci_expr_logic_31: c_int = 0
 
-    var __ci_expr_old_33: c_int = 0
+    var __ci_expr_old_40: c_int = 0
 
-    var __ci_expr_logic_34: c_int = 0
+    var __ci_expr_old_41: c_int = 0
 
-    var __ci_expr_old_35: c_int = 0
+    var __ci_expr_old_42: c_int = 0
 
-    var __ci_expr_logic_44: c_int = 0
+    var __ci_expr_old_43: c_int = 0
 
-    var __ci_expr_logic_36: c_int = 0
+    var __ci_expr_logic_49: c_int = 0
 
-    var __ci_expr_old_45: c_int = 0
+    var __ci_expr_logic_53: c_int = 0
 
-    var __ci_expr_old_46: c_int = 0
+    var __ci_expr_logic_52: c_int = 0
 
-    var __ci_expr_old_47: c_int = 0
+    var __ci_expr_logic_51: c_int = 0
 
-    var __ci_expr_old_48: c_int = 0
+    var __ci_expr_logic_50: c_int = 0
 
-    var __ci_expr_logic_54: c_int = 0
+    var __ci_expr_old_54: c_int = 0
 
-    var __ci_expr_logic_58: c_int = 0
+    var __ci_expr_old_55: c_int = 0
 
-    var __ci_expr_logic_57: c_int = 0
+    var __ci_expr_logic_62: c_int = 0
 
-    var __ci_expr_logic_56: c_int = 0
+    var __ci_expr_old_63: c_int = 0
 
-    var __ci_expr_logic_55: c_int = 0
+    var __ci_expr_logic_64: c_int = 0
 
-    var __ci_expr_old_59: c_int = 0
+    var __ci_expr_logic_72: c_int = 0
 
-    var __ci_expr_old_60: c_int = 0
-
-    var __ci_expr_logic_67: c_int = 0
-
-    var __ci_expr_old_68: c_int = 0
-
-    var __ci_expr_logic_69: c_int = 0
+    var __ci_expr_old_73: c_int = 0
 
     var __ci_expr_logic_77: c_int = 0
 
+    var __ci_expr_logic_76: c_int = 0
+
+    var __ci_expr_logic_75: c_int = 0
+
+    var __ci_expr_logic_74: c_int = 0
+
     var __ci_expr_old_78: c_int = 0
-
-    var __ci_expr_logic_82: c_int = 0
-
-    var __ci_expr_logic_81: c_int = 0
-
-    var __ci_expr_logic_80: c_int = 0
 
     var __ci_expr_logic_79: c_int = 0
 
-    var __ci_expr_old_83: c_int = 0
+    var __ci_expr_logic_86: c_int = 0
 
-    var __ci_expr_logic_84: c_int = 0
+    var __ci_expr_old_87: c_int = 0
 
     var __ci_expr_logic_91: c_int = 0
 
+    var __ci_expr_logic_90: c_int = 0
+
+    var __ci_expr_logic_89: c_int = 0
+
+    var __ci_expr_logic_88: c_int = 0
+
     var __ci_expr_old_92: c_int = 0
 
-    var __ci_expr_logic_96: c_int = 0
+    var __ci_expr_ternary_97: c_int = 0
 
-    var __ci_expr_logic_95: c_int = 0
+    var __ci_expr_old_98: c_int = 0
 
-    var __ci_expr_logic_94: c_int = 0
+    var __ci_expr_logic_100: c_int = 0
 
-    var __ci_expr_logic_93: c_int = 0
+    var __ci_expr_logic_99: c_int = 0
 
-    var __ci_expr_old_97: c_int = 0
+    var __ci_expr_old_101: c_int = 0
 
-    var __ci_expr_ternary_102: c_int = 0
+    var __ci_expr_logic_103: c_int = 0
 
-    var __ci_expr_old_103: c_int = 0
+    var __ci_expr_old_104: c_int = 0
 
     var __ci_expr_logic_105: c_int = 0
 
-    var __ci_expr_logic_104: c_int = 0
+    var __ci_expr_logic_106: c_int = 0
 
-    var __ci_expr_old_106: c_int = 0
+    var __ci_expr_logic_109: c_int = 0
 
     var __ci_expr_logic_108: c_int = 0
 
-    var __ci_expr_old_109: c_int = 0
+    var __ci_expr_logic_107: c_int = 0
 
     var __ci_expr_logic_110: c_int = 0
 
     var __ci_expr_logic_111: c_int = 0
 
-    var __ci_expr_logic_114: c_int = 0
-
-    var __ci_expr_logic_113: c_int = 0
-
     var __ci_expr_logic_112: c_int = 0
 
     var __ci_expr_logic_115: c_int = 0
+
+    var __ci_expr_logic_114: c_int = 0
+
+    var __ci_expr_logic_113: c_int = 0
 
     var __ci_expr_logic_116: c_int = 0
 
     var __ci_expr_logic_117: c_int = 0
 
+    var __ci_expr_old_118: c_int = 0
+
     var __ci_expr_logic_120: c_int = 0
 
     var __ci_expr_logic_119: c_int = 0
-
-    var __ci_expr_logic_118: c_int = 0
 
     var __ci_expr_logic_121: c_int = 0
 
     var __ci_expr_logic_122: c_int = 0
 
-    var __ci_expr_old_123: c_int = 0
-
     var __ci_expr_logic_125: c_int = 0
 
     var __ci_expr_logic_124: c_int = 0
 
-    var __ci_expr_logic_126: c_int = 0
+    var __ci_expr_logic_123: c_int = 0
 
-    var __ci_expr_logic_127: c_int = 0
+    var __ci_expr_old_126: *const c_uint = null
+
+    var __ci_expr_logic_131: c_int = 0
 
     var __ci_expr_logic_130: c_int = 0
 
-    var __ci_expr_logic_129: c_int = 0
-
     var __ci_expr_logic_128: c_int = 0
 
-    var __ci_expr_old_131: *const c_uint = null
+    var __ci_expr_logic_127: c_int = 0
+
+    var __ci_expr_old_132: c_int = 0
+
+    var __ci_expr_old_133: c_int = 0
+
+    var __ci_expr_logic_138: c_int = 0
+
+    var __ci_expr_logic_137: c_int = 0
 
     var __ci_expr_logic_136: c_int = 0
 
     var __ci_expr_logic_135: c_int = 0
 
-    var __ci_expr_logic_133: c_int = 0
+    var __ci_expr_logic_134: c_int = 0
 
-    var __ci_expr_logic_132: c_int = 0
-
-    var __ci_expr_old_137: c_int = 0
-
-    var __ci_expr_old_138: c_int = 0
-
-    var __ci_expr_logic_143: c_int = 0
-
-    var __ci_expr_logic_142: c_int = 0
+    var __ci_expr_logic_150: c_int = 0
 
     var __ci_expr_logic_141: c_int = 0
 
@@ -2758,23 +2691,23 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_logic_139: c_int = 0
 
-    var __ci_expr_logic_155: c_int = 0
+    var __ci_expr_logic_151: c_int = 0
 
-    var __ci_expr_logic_146: c_int = 0
+    var __ci_expr_old_152: c_int = 0
 
-    var __ci_expr_logic_145: c_int = 0
+    var __ci_expr_old_153: c_int = 0
 
-    var __ci_expr_logic_144: c_int = 0
+    var __ci_expr_logic_158: c_int = 0
+
+    var __ci_expr_logic_157: c_int = 0
 
     var __ci_expr_logic_156: c_int = 0
 
-    var __ci_expr_old_157: c_int = 0
+    var __ci_expr_logic_155: c_int = 0
 
-    var __ci_expr_old_158: c_int = 0
+    var __ci_expr_logic_154: c_int = 0
 
-    var __ci_expr_logic_163: c_int = 0
-
-    var __ci_expr_logic_162: c_int = 0
+    var __ci_expr_logic_170: c_int = 0
 
     var __ci_expr_logic_161: c_int = 0
 
@@ -2782,21 +2715,21 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_logic_159: c_int = 0
 
+    var __ci_expr_old_171: c_int = 0
+
+    var __ci_expr_old_172: c_int = 0
+
+    var __ci_expr_logic_177: c_int = 0
+
+    var __ci_expr_logic_176: c_int = 0
+
     var __ci_expr_logic_175: c_int = 0
 
-    var __ci_expr_logic_166: c_int = 0
+    var __ci_expr_logic_174: c_int = 0
 
-    var __ci_expr_logic_165: c_int = 0
+    var __ci_expr_logic_173: c_int = 0
 
-    var __ci_expr_logic_164: c_int = 0
-
-    var __ci_expr_old_176: c_int = 0
-
-    var __ci_expr_old_177: c_int = 0
-
-    var __ci_expr_logic_182: c_int = 0
-
-    var __ci_expr_logic_181: c_int = 0
+    var __ci_expr_logic_189: c_int = 0
 
     var __ci_expr_logic_180: c_int = 0
 
@@ -2804,19 +2737,19 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_logic_178: c_int = 0
 
+    var __ci_expr_old_190: c_int = 0
+
+    var __ci_expr_logic_195: c_int = 0
+
     var __ci_expr_logic_194: c_int = 0
 
-    var __ci_expr_logic_185: c_int = 0
+    var __ci_expr_logic_193: c_int = 0
 
-    var __ci_expr_logic_184: c_int = 0
+    var __ci_expr_logic_192: c_int = 0
 
-    var __ci_expr_logic_183: c_int = 0
+    var __ci_expr_logic_191: c_int = 0
 
-    var __ci_expr_old_195: c_int = 0
-
-    var __ci_expr_logic_200: c_int = 0
-
-    var __ci_expr_logic_199: c_int = 0
+    var __ci_expr_logic_207: c_int = 0
 
     var __ci_expr_logic_198: c_int = 0
 
@@ -2824,23 +2757,23 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_logic_196: c_int = 0
 
+    var __ci_expr_old_208: c_int = 0
+
+    var __ci_expr_old_209: c_int = 0
+
+    var __ci_expr_old_210: c_int = 0
+
+    var __ci_expr_logic_215: c_int = 0
+
+    var __ci_expr_logic_214: c_int = 0
+
+    var __ci_expr_logic_213: c_int = 0
+
     var __ci_expr_logic_212: c_int = 0
 
-    var __ci_expr_logic_203: c_int = 0
+    var __ci_expr_logic_211: c_int = 0
 
-    var __ci_expr_logic_202: c_int = 0
-
-    var __ci_expr_logic_201: c_int = 0
-
-    var __ci_expr_old_213: c_int = 0
-
-    var __ci_expr_old_214: c_int = 0
-
-    var __ci_expr_old_215: c_int = 0
-
-    var __ci_expr_logic_220: c_int = 0
-
-    var __ci_expr_logic_219: c_int = 0
+    var __ci_expr_logic_227: c_int = 0
 
     var __ci_expr_logic_218: c_int = 0
 
@@ -2848,163 +2781,165 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_logic_216: c_int = 0
 
+    var __ci_expr_old_228: c_int = 0
+
+    var __ci_expr_old_229: c_int = 0
+
+    var __ci_expr_old_230: c_int = 0
+
     var __ci_expr_logic_232: c_int = 0
 
-    var __ci_expr_logic_223: c_int = 0
+    var __ci_expr_logic_231: c_int = 0
 
-    var __ci_expr_logic_222: c_int = 0
+    var __ci_expr_logic_233: c_int = 0
 
-    var __ci_expr_logic_221: c_int = 0
-
-    var __ci_expr_old_233: c_int = 0
-
-    var __ci_expr_old_234: c_int = 0
-
-    var __ci_expr_old_235: c_int = 0
+    var __ci_expr_logic_234: c_int = 0
 
     var __ci_expr_logic_237: c_int = 0
 
     var __ci_expr_logic_236: c_int = 0
 
-    var __ci_expr_logic_238: c_int = 0
+    var __ci_expr_logic_235: c_int = 0
 
-    var __ci_expr_logic_239: c_int = 0
+    var __ci_expr_old_238: *const c_uint = null
+
+    var __ci_expr_logic_243: c_int = 0
 
     var __ci_expr_logic_242: c_int = 0
 
-    var __ci_expr_logic_241: c_int = 0
-
     var __ci_expr_logic_240: c_int = 0
 
-    var __ci_expr_old_243: *const c_uint = null
-
-    var __ci_expr_logic_248: c_int = 0
-
-    var __ci_expr_logic_247: c_int = 0
-
-    var __ci_expr_logic_245: c_int = 0
+    var __ci_expr_logic_239: c_int = 0
 
     var __ci_expr_logic_244: c_int = 0
 
-    var __ci_expr_logic_249: c_int = 0
+    var __ci_expr_old_245: c_int = 0
 
-    var __ci_expr_old_250: c_int = 0
+    var __ci_expr_old_246: c_int = 0
 
-    var __ci_expr_old_251: c_int = 0
+    var __ci_expr_logic_247: c_int = 0
 
-    var __ci_expr_logic_252: c_int = 0
+    var __ci_expr_old_248: c_int = 0
+
+    var __ci_expr_old_249: c_int = 0
+
+    var __ci_expr_logic_250: c_int = 0
+
+    var __ci_expr_logic_251: c_int = 0
+
+    var __ci_expr_old_252: c_int = 0
 
     var __ci_expr_old_253: c_int = 0
 
-    var __ci_expr_old_254: c_int = 0
+    var __ci_expr_logic_254: c_int = 0
 
-    var __ci_expr_logic_255: c_int = 0
+    var __ci_expr_old_255: c_int = 0
 
-    var __ci_expr_logic_256: c_int = 0
+    var __ci_expr_old_256: c_int = 0
 
-    var __ci_expr_old_257: c_int = 0
+    var __ci_expr_logic_257: c_int = 0
 
     var __ci_expr_old_258: c_int = 0
 
-    var __ci_expr_logic_259: c_int = 0
+    var __ci_expr_old_259: c_int = 0
 
-    var __ci_expr_old_260: c_int = 0
+    var __ci_expr_logic_261: c_int = 0
 
-    var __ci_expr_old_261: c_int = 0
+    var __ci_expr_logic_260: c_int = 0
 
     var __ci_expr_logic_262: c_int = 0
 
-    var __ci_expr_old_263: c_int = 0
-
-    var __ci_expr_old_264: c_int = 0
+    var __ci_expr_logic_263: c_int = 0
 
     var __ci_expr_logic_266: c_int = 0
 
     var __ci_expr_logic_265: c_int = 0
 
-    var __ci_expr_logic_267: c_int = 0
+    var __ci_expr_logic_264: c_int = 0
 
-    var __ci_expr_logic_268: c_int = 0
+    var __ci_expr_old_267: *const c_uint = null
+
+    var __ci_expr_logic_272: c_int = 0
 
     var __ci_expr_logic_271: c_int = 0
 
-    var __ci_expr_logic_270: c_int = 0
-
     var __ci_expr_logic_269: c_int = 0
 
-    var __ci_expr_old_272: *const c_uint = null
-
-    var __ci_expr_logic_277: c_int = 0
-
-    var __ci_expr_logic_276: c_int = 0
-
-    var __ci_expr_logic_274: c_int = 0
+    var __ci_expr_logic_268: c_int = 0
 
     var __ci_expr_logic_273: c_int = 0
 
-    var __ci_expr_logic_278: c_int = 0
+    var __ci_expr_old_274: c_int = 0
 
-    var __ci_expr_old_279: c_int = 0
+    var __ci_expr_old_275: c_int = 0
 
-    var __ci_expr_old_280: c_int = 0
+    var __ci_expr_logic_276: c_int = 0
 
-    var __ci_expr_logic_281: c_int = 0
+    var __ci_expr_old_277: c_int = 0
+
+    var __ci_expr_old_278: c_int = 0
+
+    var __ci_expr_logic_279: c_int = 0
+
+    var __ci_expr_logic_280: c_int = 0
+
+    var __ci_expr_old_281: c_int = 0
 
     var __ci_expr_old_282: c_int = 0
 
-    var __ci_expr_old_283: c_int = 0
+    var __ci_expr_logic_283: c_int = 0
 
-    var __ci_expr_logic_284: c_int = 0
+    var __ci_expr_old_284: c_int = 0
 
-    var __ci_expr_logic_285: c_int = 0
+    var __ci_expr_old_285: c_int = 0
 
-    var __ci_expr_old_286: c_int = 0
+    var __ci_expr_logic_286: c_int = 0
 
     var __ci_expr_old_287: c_int = 0
 
-    var __ci_expr_logic_288: c_int = 0
+    var __ci_expr_old_288: c_int = 0
 
-    var __ci_expr_old_289: c_int = 0
+    var __ci_expr_logic_290: c_int = 0
 
-    var __ci_expr_old_290: c_int = 0
+    var __ci_expr_logic_289: c_int = 0
 
     var __ci_expr_logic_291: c_int = 0
 
-    var __ci_expr_old_292: c_int = 0
-
-    var __ci_expr_old_293: c_int = 0
+    var __ci_expr_logic_292: c_int = 0
 
     var __ci_expr_logic_295: c_int = 0
 
     var __ci_expr_logic_294: c_int = 0
 
-    var __ci_expr_logic_296: c_int = 0
+    var __ci_expr_logic_293: c_int = 0
 
-    var __ci_expr_logic_297: c_int = 0
+    var __ci_expr_old_296: *const c_uint = null
+
+    var __ci_expr_logic_301: c_int = 0
 
     var __ci_expr_logic_300: c_int = 0
 
-    var __ci_expr_logic_299: c_int = 0
-
     var __ci_expr_logic_298: c_int = 0
 
-    var __ci_expr_old_301: *const c_uint = null
+    var __ci_expr_logic_297: c_int = 0
 
-    var __ci_expr_logic_306: c_int = 0
+    var __ci_expr_old_302: c_int = 0
+
+    var __ci_expr_old_303: c_int = 0
+
+    var __ci_expr_old_304: c_int = 0
 
     var __ci_expr_logic_305: c_int = 0
 
-    var __ci_expr_logic_303: c_int = 0
-
-    var __ci_expr_logic_302: c_int = 0
+    var __ci_expr_old_306: c_int = 0
 
     var __ci_expr_old_307: c_int = 0
 
     var __ci_expr_old_308: c_int = 0
 
-    var __ci_expr_old_309: c_int = 0
+    var __ci_expr_logic_309: c_int = 0
 
-    var __ci_expr_logic_310: c_int = 0
+    var __ci_expr_old_310: c_int = 0
 
     var __ci_expr_old_311: c_int = 0
 
@@ -3012,7 +2947,7 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_old_313: c_int = 0
 
-    var __ci_expr_logic_314: c_int = 0
+    var __ci_expr_old_314: c_int = 0
 
     var __ci_expr_old_315: c_int = 0
 
@@ -3020,7 +2955,7 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_old_317: c_int = 0
 
-    var __ci_expr_old_318: c_int = 0
+    var __ci_expr_logic_318: c_int = 0
 
     var __ci_expr_old_319: c_int = 0
 
@@ -3040,7 +2975,7 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_old_327: c_int = 0
 
-    var __ci_expr_logic_328: c_int = 0
+    var __ci_expr_old_328: c_int = 0
 
     var __ci_expr_old_329: c_int = 0
 
@@ -3050,31 +2985,31 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_old_332: c_int = 0
 
-    var __ci_expr_old_333: c_int = 0
+    var __ci_expr_logic_333: c_int = 0
 
     var __ci_expr_old_334: c_int = 0
 
-    var __ci_expr_old_335: c_int = 0
+    var __ci_expr_logic_335: c_int = 0
 
-    var __ci_expr_old_336: c_int = 0
+    var __ci_expr_logic_336: c_int = 0
 
     var __ci_expr_old_337: c_int = 0
 
-    var __ci_expr_logic_338: c_int = 0
+    var __ci_expr_old_338: c_int = 0
 
-    var __ci_expr_old_339: c_int = 0
+    var __ci_expr_logic_339: c_int = 0
 
     var __ci_expr_logic_340: c_int = 0
 
-    var __ci_expr_logic_341: c_int = 0
-
-    var __ci_expr_old_342: c_int = 0
+    var __ci_expr_logic_342: c_int = 0
 
     var __ci_expr_old_343: c_int = 0
 
-    var __ci_expr_logic_344: c_int = 0
+    var __ci_expr_old_344: c_int = 0
 
     var __ci_expr_logic_345: c_int = 0
+
+    var __ci_expr_logic_346: c_int = 0
 
     var __ci_expr_logic_347: c_int = 0
 
@@ -3090,13 +3025,13 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_old_353: c_int = 0
 
-    var __ci_expr_old_354: c_int = 0
+    var __ci_expr_logic_354: c_int = 0
 
     var __ci_expr_logic_355: c_int = 0
 
-    var __ci_expr_logic_356: c_int = 0
+    var __ci_expr_old_356: c_int = 0
 
-    var __ci_expr_logic_357: c_int = 0
+    var __ci_expr_old_357: c_int = 0
 
     var __ci_expr_old_358: c_int = 0
 
@@ -3104,29 +3039,29 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_logic_360: c_int = 0
 
-    var __ci_expr_old_361: c_int = 0
+    var __ci_expr_logic_361: c_int = 0
 
     var __ci_expr_old_362: c_int = 0
 
     var __ci_expr_old_363: c_int = 0
 
-    var __ci_expr_logic_364: c_int = 0
+    var __ci_expr_old_364: c_int = 0
 
-    var __ci_expr_logic_365: c_int = 0
+    var __ci_expr_old_365: c_int = 0
 
-    var __ci_expr_logic_366: c_int = 0
+    var __ci_expr_old_366: c_int = 0
 
-    var __ci_expr_old_367: c_int = 0
+    var __ci_expr_logic_367: c_int = 0
 
     var __ci_expr_old_368: c_int = 0
 
-    var __ci_expr_ternary_369: c_int = 0
+    var __ci_expr_old_369: c_int = 0
 
     var __ci_expr_old_370: c_int = 0
 
     var __ci_expr_old_371: c_int = 0
 
-    var __ci_expr_old_372: c_int = 0
+    var __ci_expr_logic_372: c_int = 0
 
     var __ci_expr_logic_373: c_int = 0
 
@@ -3136,29 +3071,29 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_old_376: c_int = 0
 
-    var __ci_expr_old_377: c_int = 0
+    var __ci_expr_logic_377: c_int = 0
 
     var __ci_expr_logic_378: c_int = 0
 
-    var __ci_expr_logic_379: c_int = 0
+    var __ci_expr_old_379: c_int = 0
 
-    var __ci_expr_old_380: c_int = 0
+    var __ci_expr_logic_380: c_int = 0
 
-    var __ci_expr_old_381: c_int = 0
+    var __ci_expr_logic_382: c_int = 0
 
-    var __ci_expr_old_382: c_int = 0
+    var __ci_expr_logic_381: c_int = 0
 
     var __ci_expr_logic_383: c_int = 0
 
-    var __ci_expr_logic_384: c_int = 0
+    var __ci_expr_old_384: c_int = 0
 
     var __ci_expr_old_385: c_int = 0
 
-    var __ci_expr_logic_386: c_int = 0
+    var __ci_expr_old_386: c_int = 0
+
+    var __ci_expr_old_387: c_int = 0
 
     var __ci_expr_logic_388: c_int = 0
-
-    var __ci_expr_logic_387: c_int = 0
 
     var __ci_expr_logic_389: c_int = 0
 
@@ -3166,67 +3101,53 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __ci_expr_old_391: c_int = 0
 
-    var __ci_expr_old_392: c_int = 0
+    var __ci_expr_logic_393: c_int = 0
 
-    var __ci_expr_old_393: c_int = 0
+    var __ci_expr_logic_392: c_int = 0
 
-    var __ci_expr_logic_394: c_int = 0
+    var __ci_expr_old_394: *const u8 = null
 
-    var __ci_expr_logic_395: c_int = 0
+    var __ci_expr_old_395: c_int = 0
 
     var __ci_expr_old_396: c_int = 0
 
-    var __ci_expr_old_397: c_int = 0
+    var __ci_expr_logic_397: c_int = 0
 
-    var __ci_expr_ternary_398: c_uint = 0
+    var __ci_expr_logic_398: c_int = 0
 
-    var __ci_expr_logic_400: c_int = 0
+    var __ci_expr_old_399: c_int = 0
 
-    var __ci_expr_logic_399: c_int = 0
+    var __ci_expr_old_400: *const u8 = null
 
-    var __ci_expr_old_401: *const u8 = null
+    var __ci_expr_old_401: c_int = 0
 
-    var __ci_expr_old_402: c_int = 0
+    var __ci_expr_ternary_403: c_int = 0
 
-    var __ci_expr_old_403: c_int = 0
+    var __ci_expr_logic_402: c_int = 0
 
-    var __ci_expr_logic_404: c_int = 0
+    var __ci_expr_old_404: c_int = 0
 
     var __ci_expr_logic_405: c_int = 0
 
     var __ci_expr_old_406: c_int = 0
 
-    var __ci_expr_old_407: *const u8 = null
+    var __ci_expr_old_407: c_int = 0
 
-    var __ci_expr_old_408: c_int = 0
+    var __ci_expr_old_408: *const u8 = null
 
-    var __ci_expr_ternary_410: c_int = 0
+    var __ci_expr_old_409: c_int = 0
 
-    var __ci_expr_logic_409: c_int = 0
+    var __ci_expr_old_410: c_int = 0
 
     var __ci_expr_old_411: c_int = 0
 
-    var __ci_expr_logic_412: c_int = 0
+    var __ci_expr_logic_418: c_int = 0
 
-    var __ci_expr_old_413: c_int = 0
+    var __ci_expr_logic_414: c_int = 0
 
-    var __ci_expr_old_414: c_int = 0
+    var __ci_expr_logic_420: c_int = 0
 
-    var __ci_expr_old_415: *const u8 = null
-
-    var __ci_expr_old_416: c_int = 0
-
-    var __ci_expr_old_417: c_int = 0
-
-    var __ci_expr_old_418: c_int = 0
-
-    var __ci_expr_logic_425: c_int = 0
-
-    var __ci_expr_logic_421: c_int = 0
-
-    var __ci_expr_logic_427: c_int = 0
-
-    var __ci_expr_logic_426: c_int = 0
+    var __ci_expr_logic_419: c_int = 0
 
     goto '__ci_bb_0
 
@@ -3301,11 +3222,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_6 {
         (__local_end_code__goto_546_12 = __param_this_start_code)
-        (__ci_expr_logic_9 = 0)
+        (__ci_expr_logic_6 = 0)
         if ((if __local_rlevel == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_9 = (if (if (((*__param_mb).moptions as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_6 = (if (if (((*__param_mb).moptions as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_9 != 0) {
+        if (__ci_expr_logic_6 != 0) {
             goto '__ci_bb_35
         } else {
             goto '__ci_bb_36
@@ -3360,13 +3281,7 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_14 {
         (__local_current_offset__goto_628_12 = ((((((__local_current_subject as usize) -% (__local_start_subject__goto_553_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
-        (__ci_expr_ternary_5 = 0)
-        if ((if __local_current_offset__goto_628_12 < __local_max_back__goto_594_10: 1 else: 0) != 0) {
-            (__ci_expr_ternary_5 = __local_current_offset__goto_628_12)
-        } else {
-            (__ci_expr_ternary_5 = __local_max_back__goto_594_10)
-        }
-        (__local_gone_back__goto_595_10 = __ci_expr_ternary_5)
+        (__local_gone_back__goto_595_10 = (((if (if __local_current_offset__goto_628_12 < __local_max_back__goto_594_10: 1 else: 0) != 0: __local_current_offset__goto_628_12 else: __local_max_back__goto_594_10) as c_ulong)))
         (__local_current_subject = __local_current_subject - (__local_gone_back__goto_595_10 as usize))
         goto '__ci_bb_15
     }
@@ -3445,20 +3360,8 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_27 {
-        (__ci_expr_ternary_6 = 0)
-        if ((if (__local_end_code__goto_546_12[(1 + 2)]) == OP_REVERSE: 1 else: 0) != 0) {
-            (__ci_expr_ternary_6 = (((1 + 2) as c_int)))
-        } else {
-            (__ci_expr_ternary_6 = ((0 as c_int)))
-        }
-        (__local_revlen__goto_644_14 = ((__ci_expr_ternary_6 as c_uint)))
-        (__ci_expr_ternary_7 = 0)
-        if ((if __local_revlen__goto_644_14 == 0: 1 else: 0) != 0) {
-            (__ci_expr_ternary_7 = ((0 as c_ulong)))
-        } else {
-            (__ci_expr_ternary_7 = ((((((((__local_end_code__goto_546_12[(2 + 2)]) as c_int) << (8 as c_uint)) as c_int) | ((__local_end_code__goto_546_12[((2 + 2) + 1)]) as c_int)) as c_uint) as c_ulong)))
-        }
-        (__local_back__goto_645_12 = __ci_expr_ternary_7)
+        (__local_revlen__goto_644_14 = (((if (if (__local_end_code__goto_546_12[(1 + 2)]) == OP_REVERSE: 1 else: 0) != 0: ((1 + 2) as c_int) else: (0 as c_int)) as c_uint)))
+        (__local_back__goto_645_12 = (((if (if __local_revlen__goto_644_14 == 0: 1 else: 0) != 0: (0 as c_ulong) else: (((((((__local_end_code__goto_546_12[(2 + 2)]) as c_int) << (8 as c_uint)) as c_int) | ((__local_end_code__goto_546_12[((2 + 2) + 1)]) as c_int)) as c_uint) as c_ulong)) as c_ulong)))
         if ((if __local_back__goto_645_12 <= __local_gone_back__goto_595_10: 1 else: 0) != 0) {
             goto '__ci_bb_30
         } else {
@@ -3480,9 +3383,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_30 {
         (__local_bstate__goto_648_11 = (((((((((__local_end_code__goto_546_12 as usize) -% (__local_start_code__goto_555_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) + 1) + 2) + __local_revlen__goto_644_14) as c_int)))
-        (__ci_expr_old_8 = __local_new_count__goto_548_19)
+        (__ci_expr_old_5 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_8 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_5 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_32
         } else {
             goto '__ci_bb_33
@@ -3515,28 +3418,28 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_36 {
-        (__ci_expr_ternary_13 = 0)
+        (__ci_expr_ternary_10 = 0)
         if ((if (*__param_this_start_code) == OP_CBRA: 1 else: 0) != 0) {
-            (__ci_expr_logic_10 = (if true: 1 else: 0))
+            (__ci_expr_logic_7 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_10 = (if (if (*__param_this_start_code) == OP_SCBRA: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_7 = (if (if (*__param_this_start_code) == OP_SCBRA: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_10 != 0) {
-            (__ci_expr_logic_11 = (if true: 1 else: 0))
+        if (__ci_expr_logic_7 != 0) {
+            (__ci_expr_logic_8 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_11 = (if (if (*__param_this_start_code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_8 = (if (if (*__param_this_start_code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_11 != 0) {
-            (__ci_expr_logic_12 = (if true: 1 else: 0))
+        if (__ci_expr_logic_8 != 0) {
+            (__ci_expr_logic_9 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_12 = (if (if (*__param_this_start_code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_9 = (if (if (*__param_this_start_code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_12 != 0) {
-            (__ci_expr_ternary_13 = ((2 as c_int)))
+        if (__ci_expr_logic_9 != 0) {
+            (__ci_expr_ternary_10 = ((2 as c_int)))
         } else {
-            (__ci_expr_ternary_13 = ((0 as c_int)))
+            (__ci_expr_ternary_10 = ((0 as c_int)))
         }
-        (__local_length__goto_680_9 = ((((1 + 2) + __ci_expr_ternary_13) as c_int)))
+        (__local_length__goto_680_9 = ((((1 + 2) + __ci_expr_ternary_10) as c_int)))
         goto '__ci_bb_43
     }
 
@@ -3576,9 +3479,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_43 {
-        (__ci_expr_old_14 = __local_new_count__goto_548_19)
+        (__ci_expr_old_11 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_14 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_11 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_46
         } else {
             goto '__ci_bb_47
@@ -3634,15 +3537,15 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_52 {
-        (__ci_expr_logic_427 = 0)
-        (__ci_expr_logic_426 = 0)
+        (__ci_expr_logic_420 = 0)
+        (__ci_expr_logic_419 = 0)
         if ((if __local_match_count__goto_548_30 >= 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_426 = (if (if (((((*__param_mb).moptions as c_uint) | ((*__param_mb).poptions as c_uint)) as c_uint) & (536870912 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_419 = (if (if (((((*__param_mb).moptions as c_uint) | ((*__param_mb).poptions as c_uint)) as c_uint) & (536870912 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_426 != 0) {
-            (__ci_expr_logic_427 = (if (if __local_ptr__goto_545_12 < __local_end_subject__goto_554_12: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_419 != 0) {
+            (__ci_expr_logic_420 = (if (if __local_ptr__goto_545_12 < __local_end_subject__goto_554_12: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_427 != 0) {
+        if (__ci_expr_logic_420 != 0) {
             goto '__ci_bb_1873
         } else {
             goto '__ci_bb_1874
@@ -3674,11 +3577,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_55 {
         (__local_clen__goto_702_7 = ((1 as c_int)))
         (__local_c__goto_703_12 = (((*__local_ptr__goto_545_12) as c_uint)))
-        (__ci_expr_logic_15 = 0)
+        (__ci_expr_logic_12 = 0)
         if (__local_utf__goto_558_6 != 0) {
-            (__ci_expr_logic_15 = (if (if __local_c__goto_703_12 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_12 = (if (if __local_c__goto_703_12 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_15 != 0) {
+        if (__ci_expr_logic_12 != 0) {
             goto '__ci_bb_58
         } else {
             goto '__ci_bb_59
@@ -3824,9 +3727,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_78 {
-        (__ci_expr_old_16 = __local_new_count__goto_548_19)
+        (__ci_expr_old_13 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_16 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_13 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_81
         } else {
             goto '__ci_bb_82
@@ -3881,11 +3784,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_87 {
-        (__ci_expr_logic_17 = 0)
+        (__ci_expr_logic_14 = 0)
         if ((if (__local_active_states__goto_542_13[__local_j__goto_701_10]).offset == __local_state_offset__goto_757_9: 1 else: 0) != 0) {
-            (__ci_expr_logic_17 = (if (if (__local_active_states__goto_542_13[__local_j__goto_701_10]).count == (*__local_current_state__goto_753_17).count: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_14 = (if (if (__local_active_states__goto_542_13[__local_j__goto_701_10]).count == (*__local_current_state__goto_753_17).count: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_17 != 0) {
+        if (__ci_expr_logic_14 != 0) {
             goto '__ci_bb_90
         } else {
             goto '__ci_bb_91
@@ -3900,11 +3803,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_89 {
         (__local_code__goto_755_16 = __local_start_code__goto_555_12 + ((__local_state_offset__goto_757_9 as isize) as usize))
         (__local_codevalue__goto_756_14 = (((*__local_code__goto_755_16) as c_uint)))
-        (__ci_expr_logic_18 = 0)
+        (__ci_expr_logic_15 = 0)
         if ((if __local_clen__goto_702_7 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_18 = (if (if poptable[__local_codevalue__goto_756_14] != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_15 = (if (if poptable[__local_codevalue__goto_756_14] != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_18 != 0) {
+        if (__ci_expr_logic_15 != 0) {
             goto '__ci_bb_93
         } else {
             goto '__ci_bb_94
@@ -4197,9 +4100,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_137 {
-        (__ci_expr_old_19 = __local_active_count__goto_548_5)
+        (__ci_expr_old_16 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_19 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_16 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_140
         } else {
             goto '__ci_bb_141
@@ -4208,27 +4111,27 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_138 {
         if ((if __local_ptr__goto_545_12 > __local_current_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_23 = (if true: 1 else: 0))
+            (__ci_expr_logic_20 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_22: c_int = 0
+            var __ci_expr_logic_19: c_int = 0
 
             if ((if (((*__param_mb).moptions as c_uint) & (4 as c_uint)) == 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_21: c_int
+                var __ci_expr_logic_18: c_int
 
                 if ((if (((*__param_mb).moptions as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_21 = (if true: 1 else: 0))
+                    (__ci_expr_logic_18 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_21 = (if (if __local_current_subject > (__local_start_subject__goto_553_12 + ((*__param_mb).start_offset as usize)): 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_18 = (if (if __local_current_subject > (__local_start_subject__goto_553_12 + ((*__param_mb).start_offset as usize)): 1 else: 0) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_logic_22 = (if __ci_expr_logic_21 != 0: 1 else: 0))
+                (__ci_expr_logic_19 = (if __ci_expr_logic_18 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_logic_23 = (if __ci_expr_logic_22 != 0: 1 else: 0))
+            (__ci_expr_logic_20 = (if __ci_expr_logic_19 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_23 != 0) {
+        if (__ci_expr_logic_20 != 0) {
             goto '__ci_bb_148
         } else {
             goto '__ci_bb_149
@@ -4259,9 +4162,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_143 {
-        (__ci_expr_old_20 = __local_active_count__goto_548_5)
+        (__ci_expr_old_17 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_20 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_17 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_145
         } else {
             goto '__ci_bb_146
@@ -4300,25 +4203,19 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_150 {
-        (__ci_expr_ternary_24 = 0)
-        if ((if __local_offsetcount >= 2: 1 else: 0) != 0) {
-            (__ci_expr_ternary_24 = ((1 as c_int)))
-        } else {
-            (__ci_expr_ternary_24 = ((0 as c_int)))
-        }
-        (__local_match_count__goto_548_30 = __ci_expr_ternary_24)
+        (__local_match_count__goto_548_30 = (((if (if __local_offsetcount >= 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)))
         goto '__ci_bb_152
     }
 
     '__ci_bb_151 {
-        (__ci_expr_logic_25 = 0)
+        (__ci_expr_logic_21 = 0)
         if ((if __local_match_count__goto_548_30 > 0: 1 else: 0) != 0) {
             (__local_match_count__goto_548_30 = __local_match_count__goto_548_30 + 1)
 
-            (__ci_expr_logic_25 = (if (if (__local_match_count__goto_548_30 * 2) > ((__local_offsetcount as c_int)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_21 = (if (if (__local_match_count__goto_548_30 * 2) > ((__local_offsetcount as c_int)): 1 else: 0) != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_25 != 0) {
+        if (__ci_expr_logic_21 != 0) {
             goto '__ci_bb_153
         } else {
             goto '__ci_bb_154
@@ -4326,13 +4223,7 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_152 {
-        (__ci_expr_ternary_26 = 0)
-        if ((if __local_match_count__goto_548_30 == 0: 1 else: 0) != 0) {
-            (__ci_expr_ternary_26 = ((__local_offsetcount as c_int)))
-        } else {
-            (__ci_expr_ternary_26 = (((__local_match_count__goto_548_30 * 2) as c_int)))
-        }
-        (__local_count__goto_759_9 = (((__ci_expr_ternary_26 - 2) as c_int)))
+        (__local_count__goto_759_9 = ((((if (if __local_match_count__goto_548_30 == 0: 1 else: 0) != 0: (__local_offsetcount as c_int) else: ((__local_match_count__goto_548_30 * 2) as c_int)) - 2) as c_int)))
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_155
         } else {
@@ -4402,9 +4293,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_164 {
-        (__ci_expr_old_27 = __local_active_count__goto_548_5)
+        (__ci_expr_old_22 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_27 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_22 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_165
         } else {
             goto '__ci_bb_166
@@ -4431,9 +4322,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_169 {
-        (__ci_expr_old_28 = __local_active_count__goto_548_5)
+        (__ci_expr_old_23 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_28 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_23 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_172
         } else {
             goto '__ci_bb_173
@@ -4469,9 +4360,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_175 {
-        (__ci_expr_old_29 = __local_active_count__goto_548_5)
+        (__ci_expr_old_24 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_29 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_24 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_176
         } else {
             goto '__ci_bb_177
@@ -4503,9 +4394,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_180 {
-        (__ci_expr_old_30 = __local_active_count__goto_548_5)
+        (__ci_expr_old_25 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_30 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_25 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_182
         } else {
             goto '__ci_bb_183
@@ -4533,9 +4424,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_185 {
-        (__ci_expr_old_31 = __local_active_count__goto_548_5)
+        (__ci_expr_old_26 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_31 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_26 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_186
         } else {
             goto '__ci_bb_187
@@ -4572,9 +4463,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_191 {
-        (__ci_expr_old_32 = __local_active_count__goto_548_5)
+        (__ci_expr_old_27 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_32 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_27 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_192
         } else {
             goto '__ci_bb_193
@@ -4615,9 +4506,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_198 {
-        (__ci_expr_old_33 = __local_active_count__goto_548_5)
+        (__ci_expr_old_28 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_33 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_28 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_199
         } else {
             goto '__ci_bb_200
@@ -4640,11 +4531,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_202 {
-        (__ci_expr_logic_34 = 0)
+        (__ci_expr_logic_29 = 0)
         if ((if __local_ptr__goto_545_12 == __local_start_subject__goto_553_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_34 = (if (if (((*__param_mb).moptions as c_uint) & (1 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_29 = (if (if (((*__param_mb).moptions as c_uint) & (1 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_34 != 0) {
+        if (__ci_expr_logic_29 != 0) {
             goto '__ci_bb_203
         } else {
             goto '__ci_bb_204
@@ -4652,9 +4543,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_203 {
-        (__ci_expr_old_35 = __local_active_count__goto_548_5)
+        (__ci_expr_old_30 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_35 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_30 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_205
         } else {
             goto '__ci_bb_206
@@ -4681,69 +4572,69 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_208 {
-        (__ci_expr_logic_36 = 0)
+        (__ci_expr_logic_31 = 0)
         if ((if __local_ptr__goto_545_12 == __local_start_subject__goto_553_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_36 = (if (if (((*__param_mb).moptions as c_uint) & (1 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_31 = (if (if (((*__param_mb).moptions as c_uint) & (1 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_36 != 0) {
-            (__ci_expr_logic_44 = (if true: 1 else: 0))
+        if (__ci_expr_logic_31 != 0) {
+            (__ci_expr_logic_39 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_43: c_int = 0
+            var __ci_expr_logic_38: c_int = 0
 
-            var __ci_expr_logic_37: c_int
+            var __ci_expr_logic_32: c_int
 
             if ((if __local_ptr__goto_545_12 != __local_end_subject__goto_554_12: 1 else: 0) != 0) {
-                (__ci_expr_logic_37 = (if true: 1 else: 0))
+                (__ci_expr_logic_32 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_37 = (if (if (((*__param_mb).poptions as c_uint) & (2097152 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_32 = (if (if (((*__param_mb).poptions as c_uint) & (2097152 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_37 != 0) {
-                var __ci_expr_ternary_42: c_int = 0
+            if (__ci_expr_logic_32 != 0) {
+                var __ci_expr_ternary_37: c_int = 0
 
                 if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                    var __ci_expr_logic_38: c_int = 0
+                    var __ci_expr_logic_33: c_int = 0
 
                     if ((if __local_ptr__goto_545_12 > (*__param_mb).start_subject: 1 else: 0) != 0) {
-                        (__ci_expr_logic_38 = (if _pcre2_was_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).start_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                        (__ci_expr_logic_33 = (if _pcre2_was_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).start_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_ternary_42 = __ci_expr_logic_38)
+                    (__ci_expr_ternary_37 = __ci_expr_logic_33)
 
                 } else {
-                    var __ci_expr_logic_41: c_int = 0
+                    var __ci_expr_logic_36: c_int = 0
 
-                    var __ci_expr_logic_39: c_int = 0
+                    var __ci_expr_logic_34: c_int = 0
 
                     if ((if __local_ptr__goto_545_12 >= ((*__param_mb).start_subject + ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                        (__ci_expr_logic_39 = (if (if (*(__local_ptr__goto_545_12 - ((*__param_mb).nllen as usize))) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_34 = (if (if (*(__local_ptr__goto_545_12 - ((*__param_mb).nllen as usize))) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_39 != 0) {
-                        var __ci_expr_logic_40: c_int
+                    if (__ci_expr_logic_34 != 0) {
+                        var __ci_expr_logic_35: c_int
 
                         if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                            (__ci_expr_logic_40 = (if true: 1 else: 0))
+                            (__ci_expr_logic_35 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_40 = (if (if (*((__local_ptr__goto_545_12 - ((*__param_mb).nllen as usize)) + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_35 = (if (if (*((__local_ptr__goto_545_12 - ((*__param_mb).nllen as usize)) + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        (__ci_expr_logic_41 = (if __ci_expr_logic_40 != 0: 1 else: 0))
+                        (__ci_expr_logic_36 = (if __ci_expr_logic_35 != 0: 1 else: 0))
 
                     }
 
-                    (__ci_expr_ternary_42 = __ci_expr_logic_41)
+                    (__ci_expr_ternary_37 = __ci_expr_logic_36)
 
                 }
 
-                (__ci_expr_logic_43 = (if __ci_expr_ternary_42 != 0: 1 else: 0))
+                (__ci_expr_logic_38 = (if __ci_expr_ternary_37 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_logic_44 = (if __ci_expr_logic_43 != 0: 1 else: 0))
+            (__ci_expr_logic_39 = (if __ci_expr_logic_38 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_44 != 0) {
+        if (__ci_expr_logic_39 != 0) {
             goto '__ci_bb_209
         } else {
             goto '__ci_bb_210
@@ -4751,9 +4642,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_209 {
-        (__ci_expr_old_45 = __local_active_count__goto_548_5)
+        (__ci_expr_old_40 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_45 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_40 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_211
         } else {
             goto '__ci_bb_212
@@ -4804,9 +4695,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_218 {
-        (__ci_expr_old_46 = __local_active_count__goto_548_5)
+        (__ci_expr_old_41 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_46 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_41 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_220
         } else {
             goto '__ci_bb_221
@@ -4841,9 +4732,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_224 {
-        (__ci_expr_old_47 = __local_active_count__goto_548_5)
+        (__ci_expr_old_42 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_47 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_42 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_226
         } else {
             goto '__ci_bb_227
@@ -4878,9 +4769,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_230 {
-        (__ci_expr_old_48 = __local_active_count__goto_548_5)
+        (__ci_expr_old_43 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_48 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_43 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_232
         } else {
             goto '__ci_bb_233
@@ -4907,49 +4798,49 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_235 {
-        (__ci_expr_logic_54 = 0)
+        (__ci_expr_logic_49 = 0)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
-            var __ci_expr_ternary_53: c_int = 0
+            var __ci_expr_ternary_48: c_int = 0
 
             if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_49: c_int = 0
+                var __ci_expr_logic_44: c_int = 0
 
                 if ((if __local_ptr__goto_545_12 < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_49 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_44 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_53 = __ci_expr_logic_49)
+                (__ci_expr_ternary_48 = __ci_expr_logic_44)
 
             } else {
-                var __ci_expr_logic_52: c_int = 0
+                var __ci_expr_logic_47: c_int = 0
 
-                var __ci_expr_logic_50: c_int = 0
+                var __ci_expr_logic_45: c_int = 0
 
                 if ((if __local_ptr__goto_545_12 <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_50 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_45 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_50 != 0) {
-                    var __ci_expr_logic_51: c_int
+                if (__ci_expr_logic_45 != 0) {
+                    var __ci_expr_logic_46: c_int
 
                     if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_51 = (if true: 1 else: 0))
+                        (__ci_expr_logic_46 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_51 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_46 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_52 = (if __ci_expr_logic_51 != 0: 1 else: 0))
+                    (__ci_expr_logic_47 = (if __ci_expr_logic_46 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_53 = __ci_expr_logic_52)
+                (__ci_expr_ternary_48 = __ci_expr_logic_47)
 
             }
 
-            (__ci_expr_logic_54 = (if (if not (__ci_expr_ternary_53 != 0): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_49 = (if (if not (__ci_expr_ternary_48 != 0): 1 else: 0) != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_54 != 0) {
+        if (__ci_expr_logic_49 != 0) {
             goto '__ci_bb_236
         } else {
             goto '__ci_bb_237
@@ -4957,23 +4848,23 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_236 {
-        (__ci_expr_logic_58 = 0)
-        (__ci_expr_logic_57 = 0)
-        (__ci_expr_logic_56 = 0)
-        (__ci_expr_logic_55 = 0)
+        (__ci_expr_logic_53 = 0)
+        (__ci_expr_logic_52 = 0)
+        (__ci_expr_logic_51 = 0)
+        (__ci_expr_logic_50 = 0)
         if ((if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_55 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_50 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_55 != 0) {
-            (__ci_expr_logic_56 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_50 != 0) {
+            (__ci_expr_logic_51 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_56 != 0) {
-            (__ci_expr_logic_57 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_51 != 0) {
+            (__ci_expr_logic_52 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_57 != 0) {
-            (__ci_expr_logic_58 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_52 != 0) {
+            (__ci_expr_logic_53 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_58 != 0) {
+        if (__ci_expr_logic_53 != 0) {
             goto '__ci_bb_238
         } else {
             goto '__ci_bb_239
@@ -4991,9 +4882,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_239 {
-        (__ci_expr_old_59 = __local_new_count__goto_548_19)
+        (__ci_expr_old_54 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_59 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_54 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_241
         } else {
             goto '__ci_bb_242
@@ -5028,9 +4919,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_245 {
-        (__ci_expr_old_60 = __local_new_count__goto_548_19)
+        (__ci_expr_old_55 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_60 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_55 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_247
         } else {
             goto '__ci_bb_248
@@ -5058,55 +4949,55 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_250 {
         if ((if __local_clen__goto_702_7 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_67 = (if true: 1 else: 0))
+            (__ci_expr_logic_62 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_66: c_int = 0
+            var __ci_expr_logic_61: c_int = 0
 
-            var __ci_expr_ternary_65: c_int = 0
+            var __ci_expr_ternary_60: c_int = 0
 
             if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                var __ci_expr_logic_61: c_int = 0
+                var __ci_expr_logic_56: c_int = 0
 
                 if ((if __local_ptr__goto_545_12 < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_61 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                    (__ci_expr_logic_56 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_ternary_65 = __ci_expr_logic_61)
+                (__ci_expr_ternary_60 = __ci_expr_logic_56)
 
             } else {
-                var __ci_expr_logic_64: c_int = 0
+                var __ci_expr_logic_59: c_int = 0
 
-                var __ci_expr_logic_62: c_int = 0
+                var __ci_expr_logic_57: c_int = 0
 
                 if ((if __local_ptr__goto_545_12 <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_62 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_57 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_62 != 0) {
-                    var __ci_expr_logic_63: c_int
+                if (__ci_expr_logic_57 != 0) {
+                    var __ci_expr_logic_58: c_int
 
                     if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_63 = (if true: 1 else: 0))
+                        (__ci_expr_logic_58 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_63 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_58 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_64 = (if __ci_expr_logic_63 != 0: 1 else: 0))
+                    (__ci_expr_logic_59 = (if __ci_expr_logic_58 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_ternary_65 = __ci_expr_logic_64)
+                (__ci_expr_ternary_60 = __ci_expr_logic_59)
 
             }
 
-            if (__ci_expr_ternary_65 != 0) {
-                (__ci_expr_logic_66 = (if (if __local_ptr__goto_545_12 == (__local_end_subject__goto_554_12 - ((*__param_mb).nllen as usize)): 1 else: 0) != 0: 1 else: 0))
+            if (__ci_expr_ternary_60 != 0) {
+                (__ci_expr_logic_61 = (if (if __local_ptr__goto_545_12 == (__local_end_subject__goto_554_12 - ((*__param_mb).nllen as usize)): 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_67 = (if __ci_expr_logic_66 != 0: 1 else: 0))
+            (__ci_expr_logic_62 = (if __ci_expr_logic_61 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_67 != 0) {
+        if (__ci_expr_logic_62 != 0) {
             goto '__ci_bb_251
         } else {
             goto '__ci_bb_252
@@ -5130,9 +5021,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_254 {
-        (__ci_expr_old_68 = __local_active_count__goto_548_5)
+        (__ci_expr_old_63 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_68 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_63 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_255
         } else {
             goto '__ci_bb_256
@@ -5163,11 +5054,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_259 {
-        (__ci_expr_logic_69 = 0)
+        (__ci_expr_logic_64 = 0)
         if ((if __local_clen__goto_702_7 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_69 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_64 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_69 != 0) {
+        if (__ci_expr_logic_64 != 0) {
             goto '__ci_bb_261
         } else {
             goto '__ci_bb_262
@@ -5185,62 +5076,62 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_262 {
         if ((if __local_clen__goto_702_7 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_77 = (if true: 1 else: 0))
+            (__ci_expr_logic_72 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_76: c_int = 0
+            var __ci_expr_logic_71: c_int = 0
 
-            var __ci_expr_logic_75: c_int = 0
+            var __ci_expr_logic_70: c_int = 0
 
             if ((if (((*__param_mb).poptions as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
-                var __ci_expr_ternary_74: c_int = 0
+                var __ci_expr_ternary_69: c_int = 0
 
                 if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                    var __ci_expr_logic_70: c_int = 0
+                    var __ci_expr_logic_65: c_int = 0
 
                     if ((if __local_ptr__goto_545_12 < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                        (__ci_expr_logic_70 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                        (__ci_expr_logic_65 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_ternary_74 = __ci_expr_logic_70)
+                    (__ci_expr_ternary_69 = __ci_expr_logic_65)
 
                 } else {
-                    var __ci_expr_logic_73: c_int = 0
+                    var __ci_expr_logic_68: c_int = 0
 
-                    var __ci_expr_logic_71: c_int = 0
+                    var __ci_expr_logic_66: c_int = 0
 
                     if ((if __local_ptr__goto_545_12 <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                        (__ci_expr_logic_71 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_66 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_71 != 0) {
-                        var __ci_expr_logic_72: c_int
+                    if (__ci_expr_logic_66 != 0) {
+                        var __ci_expr_logic_67: c_int
 
                         if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                            (__ci_expr_logic_72 = (if true: 1 else: 0))
+                            (__ci_expr_logic_67 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_72 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_67 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        (__ci_expr_logic_73 = (if __ci_expr_logic_72 != 0: 1 else: 0))
+                        (__ci_expr_logic_68 = (if __ci_expr_logic_67 != 0: 1 else: 0))
 
                     }
 
-                    (__ci_expr_ternary_74 = __ci_expr_logic_73)
+                    (__ci_expr_ternary_69 = __ci_expr_logic_68)
 
                 }
 
-                (__ci_expr_logic_75 = (if __ci_expr_ternary_74 != 0: 1 else: 0))
+                (__ci_expr_logic_70 = (if __ci_expr_ternary_69 != 0: 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_75 != 0) {
-                (__ci_expr_logic_76 = (if (if __local_ptr__goto_545_12 == (__local_end_subject__goto_554_12 - ((*__param_mb).nllen as usize)): 1 else: 0) != 0: 1 else: 0))
+            if (__ci_expr_logic_70 != 0) {
+                (__ci_expr_logic_71 = (if (if __local_ptr__goto_545_12 == (__local_end_subject__goto_554_12 - ((*__param_mb).nllen as usize)): 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_77 = (if __ci_expr_logic_76 != 0: 1 else: 0))
+            (__ci_expr_logic_72 = (if __ci_expr_logic_71 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_77 != 0) {
+        if (__ci_expr_logic_72 != 0) {
             goto '__ci_bb_264
         } else {
             goto '__ci_bb_265
@@ -5252,9 +5143,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_264 {
-        (__ci_expr_old_78 = __local_active_count__goto_548_5)
+        (__ci_expr_old_73 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_78 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_73 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_267
         } else {
             goto '__ci_bb_268
@@ -5262,23 +5153,23 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_265 {
-        (__ci_expr_logic_82 = 0)
-        (__ci_expr_logic_81 = 0)
-        (__ci_expr_logic_80 = 0)
-        (__ci_expr_logic_79 = 0)
+        (__ci_expr_logic_77 = 0)
+        (__ci_expr_logic_76 = 0)
+        (__ci_expr_logic_75 = 0)
+        (__ci_expr_logic_74 = 0)
         if ((if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_79 = (if (if (((*__param_mb).moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_74 = (if (if (((*__param_mb).moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_79 != 0) {
-            (__ci_expr_logic_80 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_74 != 0) {
+            (__ci_expr_logic_75 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_80 != 0) {
-            (__ci_expr_logic_81 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_75 != 0) {
+            (__ci_expr_logic_76 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_81 != 0) {
-            (__ci_expr_logic_82 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_76 != 0) {
+            (__ci_expr_logic_77 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_82 != 0) {
+        if (__ci_expr_logic_77 != 0) {
             goto '__ci_bb_270
         } else {
             goto '__ci_bb_271
@@ -5318,9 +5209,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_272 {
         (__local_reset_could_continue__goto_564_6 = ((1 as c_int)))
-        (__ci_expr_old_83 = __local_new_count__goto_548_19)
+        (__ci_expr_old_78 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_83 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_78 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_275
         } else {
             goto '__ci_bb_276
@@ -5362,11 +5253,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_279 {
-        (__ci_expr_logic_84 = 0)
+        (__ci_expr_logic_79 = 0)
         if ((if __local_clen__goto_702_7 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_84 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_79 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_84 != 0) {
+        if (__ci_expr_logic_79 != 0) {
             goto '__ci_bb_282
         } else {
             goto '__ci_bb_283
@@ -5374,42 +5265,42 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_280 {
-        (__ci_expr_ternary_102 = 0)
+        (__ci_expr_ternary_97 = 0)
         if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_98: c_int = 0
+            var __ci_expr_logic_93: c_int = 0
 
             if ((if __local_ptr__goto_545_12 < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                (__ci_expr_logic_98 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                (__ci_expr_logic_93 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
             }
 
-            (__ci_expr_ternary_102 = __ci_expr_logic_98)
+            (__ci_expr_ternary_97 = __ci_expr_logic_93)
 
         } else {
-            var __ci_expr_logic_101: c_int = 0
+            var __ci_expr_logic_96: c_int = 0
 
-            var __ci_expr_logic_99: c_int = 0
+            var __ci_expr_logic_94: c_int = 0
 
             if ((if __local_ptr__goto_545_12 <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                (__ci_expr_logic_99 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_94 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_99 != 0) {
-                var __ci_expr_logic_100: c_int
+            if (__ci_expr_logic_94 != 0) {
+                var __ci_expr_logic_95: c_int
 
                 if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_100 = (if true: 1 else: 0))
+                    (__ci_expr_logic_95 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_100 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_95 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_logic_101 = (if __ci_expr_logic_100 != 0: 1 else: 0))
+                (__ci_expr_logic_96 = (if __ci_expr_logic_95 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_ternary_102 = __ci_expr_logic_101)
+            (__ci_expr_ternary_97 = __ci_expr_logic_96)
 
         }
-        if (__ci_expr_ternary_102 != 0) {
+        if (__ci_expr_ternary_97 != 0) {
             goto '__ci_bb_299
         } else {
             goto '__ci_bb_300
@@ -5427,56 +5318,56 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_283 {
         if ((if __local_clen__goto_702_7 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_91 = (if true: 1 else: 0))
+            (__ci_expr_logic_86 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_90: c_int = 0
+            var __ci_expr_logic_85: c_int = 0
 
             if ((if (((*__param_mb).poptions as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
-                var __ci_expr_ternary_89: c_int = 0
+                var __ci_expr_ternary_84: c_int = 0
 
                 if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                    var __ci_expr_logic_85: c_int = 0
+                    var __ci_expr_logic_80: c_int = 0
 
                     if ((if __local_ptr__goto_545_12 < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                        (__ci_expr_logic_85 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                        (__ci_expr_logic_80 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_ternary_89 = __ci_expr_logic_85)
+                    (__ci_expr_ternary_84 = __ci_expr_logic_80)
 
                 } else {
-                    var __ci_expr_logic_88: c_int = 0
+                    var __ci_expr_logic_83: c_int = 0
 
-                    var __ci_expr_logic_86: c_int = 0
+                    var __ci_expr_logic_81: c_int = 0
 
                     if ((if __local_ptr__goto_545_12 <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                        (__ci_expr_logic_86 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_81 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_86 != 0) {
-                        var __ci_expr_logic_87: c_int
+                    if (__ci_expr_logic_81 != 0) {
+                        var __ci_expr_logic_82: c_int
 
                         if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                            (__ci_expr_logic_87 = (if true: 1 else: 0))
+                            (__ci_expr_logic_82 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_87 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_82 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        (__ci_expr_logic_88 = (if __ci_expr_logic_87 != 0: 1 else: 0))
+                        (__ci_expr_logic_83 = (if __ci_expr_logic_82 != 0: 1 else: 0))
 
                     }
 
-                    (__ci_expr_ternary_89 = __ci_expr_logic_88)
+                    (__ci_expr_ternary_84 = __ci_expr_logic_83)
 
                 }
 
-                (__ci_expr_logic_90 = (if __ci_expr_ternary_89 != 0: 1 else: 0))
+                (__ci_expr_logic_85 = (if __ci_expr_ternary_84 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_logic_91 = (if __ci_expr_logic_90 != 0: 1 else: 0))
+            (__ci_expr_logic_86 = (if __ci_expr_logic_85 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_91 != 0) {
+        if (__ci_expr_logic_86 != 0) {
             goto '__ci_bb_285
         } else {
             goto '__ci_bb_286
@@ -5488,9 +5379,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_285 {
-        (__ci_expr_old_92 = __local_active_count__goto_548_5)
+        (__ci_expr_old_87 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_92 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_87 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_288
         } else {
             goto '__ci_bb_289
@@ -5498,23 +5389,23 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_286 {
-        (__ci_expr_logic_96 = 0)
-        (__ci_expr_logic_95 = 0)
-        (__ci_expr_logic_94 = 0)
-        (__ci_expr_logic_93 = 0)
+        (__ci_expr_logic_91 = 0)
+        (__ci_expr_logic_90 = 0)
+        (__ci_expr_logic_89 = 0)
+        (__ci_expr_logic_88 = 0)
         if ((if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_93 = (if (if (((*__param_mb).moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_88 = (if (if (((*__param_mb).moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_93 != 0) {
-            (__ci_expr_logic_94 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_88 != 0) {
+            (__ci_expr_logic_89 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_94 != 0) {
-            (__ci_expr_logic_95 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_89 != 0) {
+            (__ci_expr_logic_90 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_95 != 0) {
-            (__ci_expr_logic_96 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_90 != 0) {
+            (__ci_expr_logic_91 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_96 != 0) {
+        if (__ci_expr_logic_91 != 0) {
             goto '__ci_bb_291
         } else {
             goto '__ci_bb_292
@@ -5554,9 +5445,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_293 {
         (__local_reset_could_continue__goto_564_6 = ((1 as c_int)))
-        (__ci_expr_old_97 = __local_new_count__goto_548_19)
+        (__ci_expr_old_92 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_97 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_92 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_296
         } else {
             goto '__ci_bb_297
@@ -5590,9 +5481,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_299 {
-        (__ci_expr_old_103 = __local_active_count__goto_548_5)
+        (__ci_expr_old_98 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_103 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_98 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_301
         } else {
             goto '__ci_bb_302
@@ -5619,15 +5510,15 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_304 {
-        (__ci_expr_logic_105 = 0)
-        (__ci_expr_logic_104 = 0)
+        (__ci_expr_logic_100 = 0)
+        (__ci_expr_logic_99 = 0)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_104 = (if (if __local_c__goto_703_12 < 256: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_99 = (if (if __local_c__goto_703_12 < 256: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_104 != 0) {
-            (__ci_expr_logic_105 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_codevalue__goto_756_14] as c_int)) as c_int) ^ (toptable2[__local_codevalue__goto_756_14] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_99 != 0) {
+            (__ci_expr_logic_100 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_codevalue__goto_756_14] as c_int)) as c_int) ^ (toptable2[__local_codevalue__goto_756_14] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_105 != 0) {
+        if (__ci_expr_logic_100 != 0) {
             goto '__ci_bb_305
         } else {
             goto '__ci_bb_306
@@ -5635,9 +5526,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_305 {
-        (__ci_expr_old_106 = __local_new_count__goto_548_19)
+        (__ci_expr_old_101 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_106 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_101 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_307
         } else {
             goto '__ci_bb_308
@@ -5664,20 +5555,20 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_310 {
-        (__ci_expr_logic_108 = 0)
+        (__ci_expr_logic_103 = 0)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_107: c_int
+            var __ci_expr_logic_102: c_int
 
             if ((if __local_c__goto_703_12 >= 256: 1 else: 0) != 0) {
-                (__ci_expr_logic_107 = (if true: 1 else: 0))
+                (__ci_expr_logic_102 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_107 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_codevalue__goto_756_14] as c_int)) as c_int) ^ (toptable2[__local_codevalue__goto_756_14] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_102 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_codevalue__goto_756_14] as c_int)) as c_int) ^ (toptable2[__local_codevalue__goto_756_14] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_108 = (if __ci_expr_logic_107 != 0: 1 else: 0))
+            (__ci_expr_logic_103 = (if __ci_expr_logic_102 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_108 != 0) {
+        if (__ci_expr_logic_103 != 0) {
             goto '__ci_bb_311
         } else {
             goto '__ci_bb_312
@@ -5685,9 +5576,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_311 {
-        (__ci_expr_old_109 = __local_new_count__goto_548_19)
+        (__ci_expr_old_104 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_109 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_104 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_313
         } else {
             goto '__ci_bb_314
@@ -5762,11 +5653,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_323 {
         (__local_d__goto_703_15 = (((*__local_temp__goto_1104_22) as c_uint)))
-        (__ci_expr_logic_110 = 0)
+        (__ci_expr_logic_105 = 0)
         if (__local_utf__goto_558_6 != 0) {
-            (__ci_expr_logic_110 = (if (if __local_d__goto_703_15 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_105 = (if (if __local_d__goto_703_15 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_110 != 0) {
+        if (__ci_expr_logic_105 != 0) {
             goto '__ci_bb_327
         } else {
             goto '__ci_bb_328
@@ -5800,11 +5691,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_328 {
         if ((if __local_codevalue__goto_756_14 == 172: 1 else: 0) != 0) {
-            (__ci_expr_logic_111 = (if true: 1 else: 0))
+            (__ci_expr_logic_106 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_111 = (if (if __local_codevalue__goto_756_14 == 171: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_106 = (if (if __local_codevalue__goto_756_14 == 171: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_111 != 0) {
+        if (__ci_expr_logic_106 != 0) {
             goto '__ci_bb_341
         } else {
             goto '__ci_bb_342
@@ -5880,30 +5771,30 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
         (__local_chartype__goto_1114_17 = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_d__goto_703_15 as c_int) / 128)] as c_int) * 128) + ((__local_d__goto_703_15 as c_int) % 128))] as c_uint) as usize)).chartype as c_int)))
         (__local_category__goto_1115_17 = ((_pcre2_ucp_gentype_8[__local_chartype__goto_1114_17] as c_int)))
         if ((if __local_category__goto_1115_17 == ucp_L: 1 else: 0) != 0) {
-            (__ci_expr_logic_112 = (if true: 1 else: 0))
+            (__ci_expr_logic_107 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_112 = (if (if __local_category__goto_1115_17 == ucp_N: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_107 = (if (if __local_category__goto_1115_17 == ucp_N: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_112 != 0) {
-            (__ci_expr_logic_113 = (if true: 1 else: 0))
+        if (__ci_expr_logic_107 != 0) {
+            (__ci_expr_logic_108 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_113 = (if (if __local_chartype__goto_1114_17 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_108 = (if (if __local_chartype__goto_1114_17 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_113 != 0) {
-            (__ci_expr_logic_114 = (if true: 1 else: 0))
+        if (__ci_expr_logic_108 != 0) {
+            (__ci_expr_logic_109 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_114 = (if (if __local_chartype__goto_1114_17 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_109 = (if (if __local_chartype__goto_1114_17 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_left_word__goto_1100_13 = __ci_expr_logic_114)
+        (__local_left_word__goto_1100_13 = __ci_expr_logic_109)
         goto '__ci_bb_343
     }
 
     '__ci_bb_342 {
-        (__ci_expr_logic_115 = 0)
+        (__ci_expr_logic_110 = 0)
         if ((if __local_d__goto_703_15 < 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_115 = (if (if (((__local_ctypes__goto_544_16[__local_d__goto_703_15]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_110 = (if (if (((__local_ctypes__goto_544_16[__local_d__goto_703_15]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_left_word__goto_1100_13 = __ci_expr_logic_115)
+        (__local_left_word__goto_1100_13 = __ci_expr_logic_110)
         goto '__ci_bb_343
     }
 
@@ -5926,11 +5817,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_346 {
         if ((if __local_codevalue__goto_756_14 == 4: 1 else: 0) != 0) {
-            (__ci_expr_logic_122 = (if true: 1 else: 0))
+            (__ci_expr_logic_117 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_122 = (if (if __local_codevalue__goto_756_14 == 171: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_117 = (if (if __local_codevalue__goto_756_14 == 171: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if (if __local_left_word__goto_1100_13 == __local_right_word__goto_1100_24: 1 else: 0) == __ci_expr_logic_122: 1 else: 0) != 0) {
+        if ((if (if __local_left_word__goto_1100_13 == __local_right_word__goto_1100_24: 1 else: 0) == __ci_expr_logic_117: 1 else: 0) != 0) {
             goto '__ci_bb_357
         } else {
             goto '__ci_bb_358
@@ -5948,11 +5839,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_348 {
         if ((if __local_codevalue__goto_756_14 == 172: 1 else: 0) != 0) {
-            (__ci_expr_logic_117 = (if true: 1 else: 0))
+            (__ci_expr_logic_112 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_117 = (if (if __local_codevalue__goto_756_14 == 171: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_112 = (if (if __local_codevalue__goto_756_14 == 171: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_117 != 0) {
+        if (__ci_expr_logic_112 != 0) {
             goto '__ci_bb_354
         } else {
             goto '__ci_bb_355
@@ -5969,11 +5860,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_351 {
-        (__ci_expr_logic_116 = 0)
+        (__ci_expr_logic_111 = 0)
         if ((if __local_temp__goto_1129_24 < (*__param_mb).end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_116 = (if (if ((((*__local_temp__goto_1129_24) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_111 = (if (if ((((*__local_temp__goto_1129_24) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_116 != 0) {
+        if (__ci_expr_logic_111 != 0) {
             goto '__ci_bb_352
         } else {
             goto '__ci_bb_353
@@ -5993,30 +5884,30 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
         (__local_chartype__goto_1139_17 = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_703_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_703_12 as c_int) % 128))] as c_uint) as usize)).chartype as c_int)))
         (__local_category__goto_1140_17 = ((_pcre2_ucp_gentype_8[__local_chartype__goto_1139_17] as c_int)))
         if ((if __local_category__goto_1140_17 == ucp_L: 1 else: 0) != 0) {
-            (__ci_expr_logic_118 = (if true: 1 else: 0))
+            (__ci_expr_logic_113 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_118 = (if (if __local_category__goto_1140_17 == ucp_N: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_113 = (if (if __local_category__goto_1140_17 == ucp_N: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_118 != 0) {
-            (__ci_expr_logic_119 = (if true: 1 else: 0))
+        if (__ci_expr_logic_113 != 0) {
+            (__ci_expr_logic_114 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_119 = (if (if __local_chartype__goto_1139_17 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_114 = (if (if __local_chartype__goto_1139_17 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_119 != 0) {
-            (__ci_expr_logic_120 = (if true: 1 else: 0))
+        if (__ci_expr_logic_114 != 0) {
+            (__ci_expr_logic_115 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_120 = (if (if __local_chartype__goto_1139_17 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_115 = (if (if __local_chartype__goto_1139_17 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_right_word__goto_1100_24 = __ci_expr_logic_120)
+        (__local_right_word__goto_1100_24 = __ci_expr_logic_115)
         goto '__ci_bb_356
     }
 
     '__ci_bb_355 {
-        (__ci_expr_logic_121 = 0)
+        (__ci_expr_logic_116 = 0)
         if ((if __local_c__goto_703_12 < 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_121 = (if (if (((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_116 = (if (if (((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_right_word__goto_1100_24 = __ci_expr_logic_121)
+        (__local_right_word__goto_1100_24 = __ci_expr_logic_116)
         goto '__ci_bb_356
     }
 
@@ -6025,9 +5916,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_357 {
-        (__ci_expr_old_123 = __local_active_count__goto_548_5)
+        (__ci_expr_old_118 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_123 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_118 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_359
         } else {
             goto '__ci_bb_360
@@ -6089,16 +5980,16 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_367 {
         (__local_chartype__goto_1169_13 = (((*__local_prop__goto_1171_28).chartype as c_int)))
         if ((if __local_chartype__goto_1169_13 == ucp_Lu: 1 else: 0) != 0) {
-            (__ci_expr_logic_124 = (if true: 1 else: 0))
+            (__ci_expr_logic_119 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_124 = (if (if __local_chartype__goto_1169_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_119 = (if (if __local_chartype__goto_1169_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_124 != 0) {
-            (__ci_expr_logic_125 = (if true: 1 else: 0))
+        if (__ci_expr_logic_119 != 0) {
+            (__ci_expr_logic_120 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_125 = (if (if __local_chartype__goto_1169_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_120 = (if (if __local_chartype__goto_1169_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1168_14 = __ci_expr_logic_125)
+        (__local_OK__goto_1168_14 = __ci_expr_logic_120)
         goto '__ci_bb_366
     }
 
@@ -6119,22 +6010,22 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_371 {
         if ((if (*__local_prop__goto_1171_28).script == (__local_code__goto_755_16[2]): 1 else: 0) != 0) {
-            (__ci_expr_logic_126 = (if true: 1 else: 0))
+            (__ci_expr_logic_121 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_126 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_1171_28).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((__local_code__goto_755_16[2]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((__local_code__goto_755_16[2]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_121 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_1171_28).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((__local_code__goto_755_16[2]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((__local_code__goto_755_16[2]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1168_14 = __ci_expr_logic_126)
+        (__local_OK__goto_1168_14 = __ci_expr_logic_121)
         goto '__ci_bb_366
     }
 
     '__ci_bb_372 {
         (__local_chartype__goto_1169_13 = (((*__local_prop__goto_1171_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1169_13] == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_127 = (if true: 1 else: 0))
+            (__ci_expr_logic_122 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_127 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1169_13] == 3: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_122 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1169_13] == 3: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1168_14 = __ci_expr_logic_127)
+        (__local_OK__goto_1168_14 = __ci_expr_logic_122)
         goto '__ci_bb_366
     }
 
@@ -6367,21 +6258,21 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_403 {
         (__local_chartype__goto_1169_13 = (((*__local_prop__goto_1171_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1169_13] == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_128 = (if true: 1 else: 0))
+            (__ci_expr_logic_123 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_128 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1169_13] == 3: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_123 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1169_13] == 3: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_128 != 0) {
-            (__ci_expr_logic_129 = (if true: 1 else: 0))
+        if (__ci_expr_logic_123 != 0) {
+            (__ci_expr_logic_124 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_129 = (if (if __local_chartype__goto_1169_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_124 = (if (if __local_chartype__goto_1169_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_129 != 0) {
-            (__ci_expr_logic_130 = (if true: 1 else: 0))
+        if (__ci_expr_logic_124 != 0) {
+            (__ci_expr_logic_125 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_130 = (if (if __local_chartype__goto_1169_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_125 = (if (if __local_chartype__goto_1169_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1168_14 = __ci_expr_logic_130)
+        (__local_OK__goto_1168_14 = __ci_expr_logic_125)
         goto '__ci_bb_366
     }
 
@@ -6416,9 +6307,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_410 {
-        (__ci_expr_old_131 = __local_cp__goto_1170_25)
+        (__ci_expr_old_126 = __local_cp__goto_1170_25)
         (__local_cp__goto_1170_25 = __local_cp__goto_1170_25 + 1)
-        if ((if __local_c__goto_703_12 == (*__ci_expr_old_131): 1 else: 0) != 0) {
+        if ((if __local_c__goto_703_12 == (*__ci_expr_old_126): 1 else: 0) != 0) {
             goto '__ci_bb_411
         } else {
             goto '__ci_bb_412
@@ -6436,33 +6327,33 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_413 {
         if ((if __local_c__goto_703_12 == 36: 1 else: 0) != 0) {
-            (__ci_expr_logic_132 = (if true: 1 else: 0))
+            (__ci_expr_logic_127 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_132 = (if (if __local_c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_127 = (if (if __local_c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_132 != 0) {
-            (__ci_expr_logic_133 = (if true: 1 else: 0))
+        if (__ci_expr_logic_127 != 0) {
+            (__ci_expr_logic_128 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_133 = (if (if __local_c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_128 = (if (if __local_c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_133 != 0) {
-            (__ci_expr_logic_135 = (if true: 1 else: 0))
+        if (__ci_expr_logic_128 != 0) {
+            (__ci_expr_logic_130 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_134: c_int = 0
+            var __ci_expr_logic_129: c_int = 0
 
             if ((if __local_c__goto_703_12 >= 160: 1 else: 0) != 0) {
-                (__ci_expr_logic_134 = (if (if __local_c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_129 = (if (if __local_c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_135 = (if __ci_expr_logic_134 != 0: 1 else: 0))
+            (__ci_expr_logic_130 = (if __ci_expr_logic_129 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_135 != 0) {
-            (__ci_expr_logic_136 = (if true: 1 else: 0))
+        if (__ci_expr_logic_130 != 0) {
+            (__ci_expr_logic_131 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_136 = (if (if __local_c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_131 = (if (if __local_c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1168_14 = __ci_expr_logic_136)
+        (__local_OK__goto_1168_14 = __ci_expr_logic_131)
         goto '__ci_bb_366
     }
 
@@ -6578,9 +6469,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_429 {
-        (__ci_expr_old_137 = __local_new_count__goto_548_19)
+        (__ci_expr_old_132 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_137 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_132 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_431
         } else {
             goto '__ci_bb_432
@@ -6616,9 +6507,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_435 {
-        (__ci_expr_old_138 = __local_active_count__goto_548_5)
+        (__ci_expr_old_133 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_138 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_133 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_437
         } else {
             goto '__ci_bb_438
@@ -6649,27 +6540,27 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_440 {
-        (__ci_expr_logic_143 = 0)
-        (__ci_expr_logic_142 = 0)
-        (__ci_expr_logic_141 = 0)
-        (__ci_expr_logic_140 = 0)
-        (__ci_expr_logic_139 = 0)
+        (__ci_expr_logic_138 = 0)
+        (__ci_expr_logic_137 = 0)
+        (__ci_expr_logic_136 = 0)
+        (__ci_expr_logic_135 = 0)
+        (__ci_expr_logic_134 = 0)
         if ((if __local_d__goto_703_15 == 12: 1 else: 0) != 0) {
-            (__ci_expr_logic_139 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_134 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_139 != 0) {
-            (__ci_expr_logic_140 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_134 != 0) {
+            (__ci_expr_logic_135 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_140 != 0) {
-            (__ci_expr_logic_141 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_135 != 0) {
+            (__ci_expr_logic_136 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_141 != 0) {
-            (__ci_expr_logic_142 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_136 != 0) {
+            (__ci_expr_logic_137 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_142 != 0) {
-            (__ci_expr_logic_143 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_137 != 0) {
+            (__ci_expr_logic_138 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_143 != 0) {
+        if (__ci_expr_logic_138 != 0) {
             goto '__ci_bb_442
         } else {
             goto '__ci_bb_443
@@ -6687,84 +6578,84 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_443 {
-        (__ci_expr_logic_146 = 0)
-        (__ci_expr_logic_145 = 0)
-        (__ci_expr_logic_144 = 0)
+        (__ci_expr_logic_141 = 0)
+        (__ci_expr_logic_140 = 0)
+        (__ci_expr_logic_139 = 0)
         if ((if __local_c__goto_703_12 >= 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_144 = (if (if __local_d__goto_703_15 != 7: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_139 = (if (if __local_d__goto_703_15 != 7: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_144 != 0) {
-            (__ci_expr_logic_145 = (if (if __local_d__goto_703_15 != 9: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_139 != 0) {
+            (__ci_expr_logic_140 = (if (if __local_d__goto_703_15 != 9: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_145 != 0) {
-            (__ci_expr_logic_146 = (if (if __local_d__goto_703_15 != 11: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_140 != 0) {
+            (__ci_expr_logic_141 = (if (if __local_d__goto_703_15 != 11: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_146 != 0) {
-            (__ci_expr_logic_155 = (if true: 1 else: 0))
+        if (__ci_expr_logic_141 != 0) {
+            (__ci_expr_logic_150 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_154: c_int = 0
+            var __ci_expr_logic_149: c_int = 0
 
-            var __ci_expr_logic_153: c_int = 0
+            var __ci_expr_logic_148: c_int = 0
 
             if ((if __local_c__goto_703_12 < 256: 1 else: 0) != 0) {
-                var __ci_expr_logic_152: c_int
+                var __ci_expr_logic_147: c_int
 
                 if ((if __local_d__goto_703_15 != 12: 1 else: 0) != 0) {
-                    (__ci_expr_logic_152 = (if true: 1 else: 0))
+                    (__ci_expr_logic_147 = (if true: 1 else: 0))
                 } else {
-                    var __ci_expr_ternary_151: c_int = 0
+                    var __ci_expr_ternary_146: c_int = 0
 
                     if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                        var __ci_expr_logic_147: c_int = 0
+                        var __ci_expr_logic_142: c_int = 0
 
                         if ((if __local_ptr__goto_545_12 < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                            (__ci_expr_logic_147 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                            (__ci_expr_logic_142 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                         }
 
-                        (__ci_expr_ternary_151 = __ci_expr_logic_147)
+                        (__ci_expr_ternary_146 = __ci_expr_logic_142)
 
                     } else {
-                        var __ci_expr_logic_150: c_int = 0
+                        var __ci_expr_logic_145: c_int = 0
 
-                        var __ci_expr_logic_148: c_int = 0
+                        var __ci_expr_logic_143: c_int = 0
 
                         if ((if __local_ptr__goto_545_12 <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                            (__ci_expr_logic_148 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_143 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_148 != 0) {
-                            var __ci_expr_logic_149: c_int
+                        if (__ci_expr_logic_143 != 0) {
+                            var __ci_expr_logic_144: c_int
 
                             if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                                (__ci_expr_logic_149 = (if true: 1 else: 0))
+                                (__ci_expr_logic_144 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_149 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_144 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            (__ci_expr_logic_150 = (if __ci_expr_logic_149 != 0: 1 else: 0))
+                            (__ci_expr_logic_145 = (if __ci_expr_logic_144 != 0: 1 else: 0))
 
                         }
 
-                        (__ci_expr_ternary_151 = __ci_expr_logic_150)
+                        (__ci_expr_ternary_146 = __ci_expr_logic_145)
 
                     }
 
-                    (__ci_expr_logic_152 = (if (if not (__ci_expr_ternary_151 != 0): 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_147 = (if (if not (__ci_expr_ternary_146 != 0): 1 else: 0) != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_logic_153 = (if __ci_expr_logic_152 != 0: 1 else: 0))
+                (__ci_expr_logic_148 = (if __ci_expr_logic_147 != 0: 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_153 != 0) {
-                (__ci_expr_logic_154 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) as c_int) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            if (__ci_expr_logic_148 != 0) {
+                (__ci_expr_logic_149 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) as c_int) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_155 = (if __ci_expr_logic_154 != 0: 1 else: 0))
+            (__ci_expr_logic_150 = (if __ci_expr_logic_149 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_155 != 0) {
+        if (__ci_expr_logic_150 != 0) {
             goto '__ci_bb_445
         } else {
             goto '__ci_bb_446
@@ -6776,11 +6667,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_445 {
-        (__ci_expr_logic_156 = 0)
+        (__ci_expr_logic_151 = 0)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_156 = (if (if __local_codevalue__goto_756_14 == 95: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_151 = (if (if __local_codevalue__goto_756_14 == 95: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_156 != 0) {
+        if (__ci_expr_logic_151 != 0) {
             goto '__ci_bb_447
         } else {
             goto '__ci_bb_448
@@ -6799,9 +6690,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_448 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        (__ci_expr_old_157 = __local_new_count__goto_548_19)
+        (__ci_expr_old_152 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_157 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_152 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_449
         } else {
             goto '__ci_bb_450
@@ -6824,9 +6715,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_452 {
-        (__ci_expr_old_158 = __local_active_count__goto_548_5)
+        (__ci_expr_old_153 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_158 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_153 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_453
         } else {
             goto '__ci_bb_454
@@ -6853,27 +6744,27 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_456 {
-        (__ci_expr_logic_163 = 0)
-        (__ci_expr_logic_162 = 0)
-        (__ci_expr_logic_161 = 0)
-        (__ci_expr_logic_160 = 0)
-        (__ci_expr_logic_159 = 0)
+        (__ci_expr_logic_158 = 0)
+        (__ci_expr_logic_157 = 0)
+        (__ci_expr_logic_156 = 0)
+        (__ci_expr_logic_155 = 0)
+        (__ci_expr_logic_154 = 0)
         if ((if __local_d__goto_703_15 == 12: 1 else: 0) != 0) {
-            (__ci_expr_logic_159 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_154 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_159 != 0) {
-            (__ci_expr_logic_160 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_154 != 0) {
+            (__ci_expr_logic_155 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_160 != 0) {
-            (__ci_expr_logic_161 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_155 != 0) {
+            (__ci_expr_logic_156 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_161 != 0) {
-            (__ci_expr_logic_162 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_156 != 0) {
+            (__ci_expr_logic_157 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_162 != 0) {
-            (__ci_expr_logic_163 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_157 != 0) {
+            (__ci_expr_logic_158 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_163 != 0) {
+        if (__ci_expr_logic_158 != 0) {
             goto '__ci_bb_458
         } else {
             goto '__ci_bb_459
@@ -6891,84 +6782,84 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_459 {
-        (__ci_expr_logic_166 = 0)
-        (__ci_expr_logic_165 = 0)
-        (__ci_expr_logic_164 = 0)
+        (__ci_expr_logic_161 = 0)
+        (__ci_expr_logic_160 = 0)
+        (__ci_expr_logic_159 = 0)
         if ((if __local_c__goto_703_12 >= 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_164 = (if (if __local_d__goto_703_15 != 7: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_159 = (if (if __local_d__goto_703_15 != 7: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_164 != 0) {
-            (__ci_expr_logic_165 = (if (if __local_d__goto_703_15 != 9: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_159 != 0) {
+            (__ci_expr_logic_160 = (if (if __local_d__goto_703_15 != 9: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_165 != 0) {
-            (__ci_expr_logic_166 = (if (if __local_d__goto_703_15 != 11: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_160 != 0) {
+            (__ci_expr_logic_161 = (if (if __local_d__goto_703_15 != 11: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_166 != 0) {
-            (__ci_expr_logic_175 = (if true: 1 else: 0))
+        if (__ci_expr_logic_161 != 0) {
+            (__ci_expr_logic_170 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_174: c_int = 0
+            var __ci_expr_logic_169: c_int = 0
 
-            var __ci_expr_logic_173: c_int = 0
+            var __ci_expr_logic_168: c_int = 0
 
             if ((if __local_c__goto_703_12 < 256: 1 else: 0) != 0) {
-                var __ci_expr_logic_172: c_int
+                var __ci_expr_logic_167: c_int
 
                 if ((if __local_d__goto_703_15 != 12: 1 else: 0) != 0) {
-                    (__ci_expr_logic_172 = (if true: 1 else: 0))
+                    (__ci_expr_logic_167 = (if true: 1 else: 0))
                 } else {
-                    var __ci_expr_ternary_171: c_int = 0
+                    var __ci_expr_ternary_166: c_int = 0
 
                     if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                        var __ci_expr_logic_167: c_int = 0
+                        var __ci_expr_logic_162: c_int = 0
 
                         if ((if __local_ptr__goto_545_12 < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                            (__ci_expr_logic_167 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                            (__ci_expr_logic_162 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                         }
 
-                        (__ci_expr_ternary_171 = __ci_expr_logic_167)
+                        (__ci_expr_ternary_166 = __ci_expr_logic_162)
 
                     } else {
-                        var __ci_expr_logic_170: c_int = 0
+                        var __ci_expr_logic_165: c_int = 0
 
-                        var __ci_expr_logic_168: c_int = 0
+                        var __ci_expr_logic_163: c_int = 0
 
                         if ((if __local_ptr__goto_545_12 <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                            (__ci_expr_logic_168 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_163 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_168 != 0) {
-                            var __ci_expr_logic_169: c_int
+                        if (__ci_expr_logic_163 != 0) {
+                            var __ci_expr_logic_164: c_int
 
                             if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                                (__ci_expr_logic_169 = (if true: 1 else: 0))
+                                (__ci_expr_logic_164 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_169 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_164 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            (__ci_expr_logic_170 = (if __ci_expr_logic_169 != 0: 1 else: 0))
+                            (__ci_expr_logic_165 = (if __ci_expr_logic_164 != 0: 1 else: 0))
 
                         }
 
-                        (__ci_expr_ternary_171 = __ci_expr_logic_170)
+                        (__ci_expr_ternary_166 = __ci_expr_logic_165)
 
                     }
 
-                    (__ci_expr_logic_172 = (if (if not (__ci_expr_ternary_171 != 0): 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_167 = (if (if not (__ci_expr_ternary_166 != 0): 1 else: 0) != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_logic_173 = (if __ci_expr_logic_172 != 0: 1 else: 0))
+                (__ci_expr_logic_168 = (if __ci_expr_logic_167 != 0: 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_173 != 0) {
-                (__ci_expr_logic_174 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) as c_int) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            if (__ci_expr_logic_168 != 0) {
+                (__ci_expr_logic_169 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) as c_int) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_175 = (if __ci_expr_logic_174 != 0: 1 else: 0))
+            (__ci_expr_logic_170 = (if __ci_expr_logic_169 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_175 != 0) {
+        if (__ci_expr_logic_170 != 0) {
             goto '__ci_bb_461
         } else {
             goto '__ci_bb_462
@@ -6998,9 +6889,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_464 {
-        (__ci_expr_old_176 = __local_new_count__goto_548_19)
+        (__ci_expr_old_171 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_176 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_171 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_465
         } else {
             goto '__ci_bb_466
@@ -7023,9 +6914,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_468 {
-        (__ci_expr_old_177 = __local_active_count__goto_548_5)
+        (__ci_expr_old_172 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_177 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_172 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_469
         } else {
             goto '__ci_bb_470
@@ -7052,27 +6943,27 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_472 {
-        (__ci_expr_logic_182 = 0)
-        (__ci_expr_logic_181 = 0)
-        (__ci_expr_logic_180 = 0)
-        (__ci_expr_logic_179 = 0)
-        (__ci_expr_logic_178 = 0)
+        (__ci_expr_logic_177 = 0)
+        (__ci_expr_logic_176 = 0)
+        (__ci_expr_logic_175 = 0)
+        (__ci_expr_logic_174 = 0)
+        (__ci_expr_logic_173 = 0)
         if ((if __local_d__goto_703_15 == 12: 1 else: 0) != 0) {
-            (__ci_expr_logic_178 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_173 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_178 != 0) {
-            (__ci_expr_logic_179 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_173 != 0) {
+            (__ci_expr_logic_174 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_179 != 0) {
-            (__ci_expr_logic_180 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_174 != 0) {
+            (__ci_expr_logic_175 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_180 != 0) {
-            (__ci_expr_logic_181 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_175 != 0) {
+            (__ci_expr_logic_176 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_181 != 0) {
-            (__ci_expr_logic_182 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_176 != 0) {
+            (__ci_expr_logic_177 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_182 != 0) {
+        if (__ci_expr_logic_177 != 0) {
             goto '__ci_bb_474
         } else {
             goto '__ci_bb_475
@@ -7090,84 +6981,84 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_475 {
-        (__ci_expr_logic_185 = 0)
-        (__ci_expr_logic_184 = 0)
-        (__ci_expr_logic_183 = 0)
+        (__ci_expr_logic_180 = 0)
+        (__ci_expr_logic_179 = 0)
+        (__ci_expr_logic_178 = 0)
         if ((if __local_c__goto_703_12 >= 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_183 = (if (if __local_d__goto_703_15 != 7: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_178 = (if (if __local_d__goto_703_15 != 7: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_183 != 0) {
-            (__ci_expr_logic_184 = (if (if __local_d__goto_703_15 != 9: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_178 != 0) {
+            (__ci_expr_logic_179 = (if (if __local_d__goto_703_15 != 9: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_184 != 0) {
-            (__ci_expr_logic_185 = (if (if __local_d__goto_703_15 != 11: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_179 != 0) {
+            (__ci_expr_logic_180 = (if (if __local_d__goto_703_15 != 11: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_185 != 0) {
-            (__ci_expr_logic_194 = (if true: 1 else: 0))
+        if (__ci_expr_logic_180 != 0) {
+            (__ci_expr_logic_189 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_193: c_int = 0
+            var __ci_expr_logic_188: c_int = 0
 
-            var __ci_expr_logic_192: c_int = 0
+            var __ci_expr_logic_187: c_int = 0
 
             if ((if __local_c__goto_703_12 < 256: 1 else: 0) != 0) {
-                var __ci_expr_logic_191: c_int
+                var __ci_expr_logic_186: c_int
 
                 if ((if __local_d__goto_703_15 != 12: 1 else: 0) != 0) {
-                    (__ci_expr_logic_191 = (if true: 1 else: 0))
+                    (__ci_expr_logic_186 = (if true: 1 else: 0))
                 } else {
-                    var __ci_expr_ternary_190: c_int = 0
+                    var __ci_expr_ternary_185: c_int = 0
 
                     if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                        var __ci_expr_logic_186: c_int = 0
+                        var __ci_expr_logic_181: c_int = 0
 
                         if ((if __local_ptr__goto_545_12 < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                            (__ci_expr_logic_186 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                            (__ci_expr_logic_181 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                         }
 
-                        (__ci_expr_ternary_190 = __ci_expr_logic_186)
+                        (__ci_expr_ternary_185 = __ci_expr_logic_181)
 
                     } else {
-                        var __ci_expr_logic_189: c_int = 0
+                        var __ci_expr_logic_184: c_int = 0
 
-                        var __ci_expr_logic_187: c_int = 0
+                        var __ci_expr_logic_182: c_int = 0
 
                         if ((if __local_ptr__goto_545_12 <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                            (__ci_expr_logic_187 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_182 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_187 != 0) {
-                            var __ci_expr_logic_188: c_int
+                        if (__ci_expr_logic_182 != 0) {
+                            var __ci_expr_logic_183: c_int
 
                             if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                                (__ci_expr_logic_188 = (if true: 1 else: 0))
+                                (__ci_expr_logic_183 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_188 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_183 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            (__ci_expr_logic_189 = (if __ci_expr_logic_188 != 0: 1 else: 0))
+                            (__ci_expr_logic_184 = (if __ci_expr_logic_183 != 0: 1 else: 0))
 
                         }
 
-                        (__ci_expr_ternary_190 = __ci_expr_logic_189)
+                        (__ci_expr_ternary_185 = __ci_expr_logic_184)
 
                     }
 
-                    (__ci_expr_logic_191 = (if (if not (__ci_expr_ternary_190 != 0): 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_186 = (if (if not (__ci_expr_ternary_185 != 0): 1 else: 0) != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_logic_192 = (if __ci_expr_logic_191 != 0: 1 else: 0))
+                (__ci_expr_logic_187 = (if __ci_expr_logic_186 != 0: 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_192 != 0) {
-                (__ci_expr_logic_193 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) as c_int) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            if (__ci_expr_logic_187 != 0) {
+                (__ci_expr_logic_188 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) as c_int) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_194 = (if __ci_expr_logic_193 != 0: 1 else: 0))
+            (__ci_expr_logic_189 = (if __ci_expr_logic_188 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_194 != 0) {
+        if (__ci_expr_logic_189 != 0) {
             goto '__ci_bb_477
         } else {
             goto '__ci_bb_478
@@ -7197,9 +7088,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_480 {
-        (__ci_expr_old_195 = __local_new_count__goto_548_19)
+        (__ci_expr_old_190 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_195 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_190 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_481
         } else {
             goto '__ci_bb_482
@@ -7231,27 +7122,27 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_485 {
-        (__ci_expr_logic_200 = 0)
-        (__ci_expr_logic_199 = 0)
-        (__ci_expr_logic_198 = 0)
-        (__ci_expr_logic_197 = 0)
-        (__ci_expr_logic_196 = 0)
+        (__ci_expr_logic_195 = 0)
+        (__ci_expr_logic_194 = 0)
+        (__ci_expr_logic_193 = 0)
+        (__ci_expr_logic_192 = 0)
+        (__ci_expr_logic_191 = 0)
         if ((if __local_d__goto_703_15 == 12: 1 else: 0) != 0) {
-            (__ci_expr_logic_196 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_191 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_196 != 0) {
-            (__ci_expr_logic_197 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_191 != 0) {
+            (__ci_expr_logic_192 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_197 != 0) {
-            (__ci_expr_logic_198 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_192 != 0) {
+            (__ci_expr_logic_193 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_198 != 0) {
-            (__ci_expr_logic_199 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_193 != 0) {
+            (__ci_expr_logic_194 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_199 != 0) {
-            (__ci_expr_logic_200 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_194 != 0) {
+            (__ci_expr_logic_195 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_200 != 0) {
+        if (__ci_expr_logic_195 != 0) {
             goto '__ci_bb_487
         } else {
             goto '__ci_bb_488
@@ -7269,84 +7160,84 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_488 {
-        (__ci_expr_logic_203 = 0)
-        (__ci_expr_logic_202 = 0)
-        (__ci_expr_logic_201 = 0)
+        (__ci_expr_logic_198 = 0)
+        (__ci_expr_logic_197 = 0)
+        (__ci_expr_logic_196 = 0)
         if ((if __local_c__goto_703_12 >= 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_201 = (if (if __local_d__goto_703_15 != 7: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_196 = (if (if __local_d__goto_703_15 != 7: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_201 != 0) {
-            (__ci_expr_logic_202 = (if (if __local_d__goto_703_15 != 9: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_196 != 0) {
+            (__ci_expr_logic_197 = (if (if __local_d__goto_703_15 != 9: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_202 != 0) {
-            (__ci_expr_logic_203 = (if (if __local_d__goto_703_15 != 11: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_197 != 0) {
+            (__ci_expr_logic_198 = (if (if __local_d__goto_703_15 != 11: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_203 != 0) {
-            (__ci_expr_logic_212 = (if true: 1 else: 0))
+        if (__ci_expr_logic_198 != 0) {
+            (__ci_expr_logic_207 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_211: c_int = 0
+            var __ci_expr_logic_206: c_int = 0
 
-            var __ci_expr_logic_210: c_int = 0
+            var __ci_expr_logic_205: c_int = 0
 
             if ((if __local_c__goto_703_12 < 256: 1 else: 0) != 0) {
-                var __ci_expr_logic_209: c_int
+                var __ci_expr_logic_204: c_int
 
                 if ((if __local_d__goto_703_15 != 12: 1 else: 0) != 0) {
-                    (__ci_expr_logic_209 = (if true: 1 else: 0))
+                    (__ci_expr_logic_204 = (if true: 1 else: 0))
                 } else {
-                    var __ci_expr_ternary_208: c_int = 0
+                    var __ci_expr_ternary_203: c_int = 0
 
                     if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                        var __ci_expr_logic_204: c_int = 0
+                        var __ci_expr_logic_199: c_int = 0
 
                         if ((if __local_ptr__goto_545_12 < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                            (__ci_expr_logic_204 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                            (__ci_expr_logic_199 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                         }
 
-                        (__ci_expr_ternary_208 = __ci_expr_logic_204)
+                        (__ci_expr_ternary_203 = __ci_expr_logic_199)
 
                     } else {
-                        var __ci_expr_logic_207: c_int = 0
+                        var __ci_expr_logic_202: c_int = 0
 
-                        var __ci_expr_logic_205: c_int = 0
+                        var __ci_expr_logic_200: c_int = 0
 
                         if ((if __local_ptr__goto_545_12 <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                            (__ci_expr_logic_205 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_200 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_205 != 0) {
-                            var __ci_expr_logic_206: c_int
+                        if (__ci_expr_logic_200 != 0) {
+                            var __ci_expr_logic_201: c_int
 
                             if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                                (__ci_expr_logic_206 = (if true: 1 else: 0))
+                                (__ci_expr_logic_201 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_206 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_201 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            (__ci_expr_logic_207 = (if __ci_expr_logic_206 != 0: 1 else: 0))
+                            (__ci_expr_logic_202 = (if __ci_expr_logic_201 != 0: 1 else: 0))
 
                         }
 
-                        (__ci_expr_ternary_208 = __ci_expr_logic_207)
+                        (__ci_expr_ternary_203 = __ci_expr_logic_202)
 
                     }
 
-                    (__ci_expr_logic_209 = (if (if not (__ci_expr_ternary_208 != 0): 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_204 = (if (if not (__ci_expr_ternary_203 != 0): 1 else: 0) != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_logic_210 = (if __ci_expr_logic_209 != 0: 1 else: 0))
+                (__ci_expr_logic_205 = (if __ci_expr_logic_204 != 0: 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_210 != 0) {
-                (__ci_expr_logic_211 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) as c_int) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            if (__ci_expr_logic_205 != 0) {
+                (__ci_expr_logic_206 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) as c_int) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_212 = (if __ci_expr_logic_211 != 0: 1 else: 0))
+            (__ci_expr_logic_207 = (if __ci_expr_logic_206 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_212 != 0) {
+        if (__ci_expr_logic_207 != 0) {
             goto '__ci_bb_490
         } else {
             goto '__ci_bb_491
@@ -7371,9 +7262,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_492 {
-        (__ci_expr_old_213 = __local_new_count__goto_548_19)
+        (__ci_expr_old_208 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_213 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_208 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_495
         } else {
             goto '__ci_bb_496
@@ -7381,9 +7272,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_493 {
-        (__ci_expr_old_214 = __local_new_count__goto_548_19)
+        (__ci_expr_old_209 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_214 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_209 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_498
         } else {
             goto '__ci_bb_499
@@ -7425,9 +7316,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_501 {
-        (__ci_expr_old_215 = __local_active_count__goto_548_5)
+        (__ci_expr_old_210 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_215 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_210 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_502
         } else {
             goto '__ci_bb_503
@@ -7455,27 +7346,27 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_505 {
-        (__ci_expr_logic_220 = 0)
-        (__ci_expr_logic_219 = 0)
-        (__ci_expr_logic_218 = 0)
-        (__ci_expr_logic_217 = 0)
-        (__ci_expr_logic_216 = 0)
+        (__ci_expr_logic_215 = 0)
+        (__ci_expr_logic_214 = 0)
+        (__ci_expr_logic_213 = 0)
+        (__ci_expr_logic_212 = 0)
+        (__ci_expr_logic_211 = 0)
         if ((if __local_d__goto_703_15 == 12: 1 else: 0) != 0) {
-            (__ci_expr_logic_216 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_211 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (*__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_216 != 0) {
-            (__ci_expr_logic_217 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_211 != 0) {
+            (__ci_expr_logic_212 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_217 != 0) {
-            (__ci_expr_logic_218 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_212 != 0) {
+            (__ci_expr_logic_213 = (if (if (*__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_218 != 0) {
-            (__ci_expr_logic_219 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_213 != 0) {
+            (__ci_expr_logic_214 = (if (if (*__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_219 != 0) {
-            (__ci_expr_logic_220 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_214 != 0) {
+            (__ci_expr_logic_215 = (if (if __local_c__goto_703_12 == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_220 != 0) {
+        if (__ci_expr_logic_215 != 0) {
             goto '__ci_bb_507
         } else {
             goto '__ci_bb_508
@@ -7493,84 +7384,84 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_508 {
-        (__ci_expr_logic_223 = 0)
-        (__ci_expr_logic_222 = 0)
-        (__ci_expr_logic_221 = 0)
+        (__ci_expr_logic_218 = 0)
+        (__ci_expr_logic_217 = 0)
+        (__ci_expr_logic_216 = 0)
         if ((if __local_c__goto_703_12 >= 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_221 = (if (if __local_d__goto_703_15 != 7: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_216 = (if (if __local_d__goto_703_15 != 7: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_221 != 0) {
-            (__ci_expr_logic_222 = (if (if __local_d__goto_703_15 != 9: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_216 != 0) {
+            (__ci_expr_logic_217 = (if (if __local_d__goto_703_15 != 9: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_222 != 0) {
-            (__ci_expr_logic_223 = (if (if __local_d__goto_703_15 != 11: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_217 != 0) {
+            (__ci_expr_logic_218 = (if (if __local_d__goto_703_15 != 11: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_223 != 0) {
-            (__ci_expr_logic_232 = (if true: 1 else: 0))
+        if (__ci_expr_logic_218 != 0) {
+            (__ci_expr_logic_227 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_231: c_int = 0
+            var __ci_expr_logic_226: c_int = 0
 
-            var __ci_expr_logic_230: c_int = 0
+            var __ci_expr_logic_225: c_int = 0
 
             if ((if __local_c__goto_703_12 < 256: 1 else: 0) != 0) {
-                var __ci_expr_logic_229: c_int
+                var __ci_expr_logic_224: c_int
 
                 if ((if __local_d__goto_703_15 != 12: 1 else: 0) != 0) {
-                    (__ci_expr_logic_229 = (if true: 1 else: 0))
+                    (__ci_expr_logic_224 = (if true: 1 else: 0))
                 } else {
-                    var __ci_expr_ternary_228: c_int = 0
+                    var __ci_expr_ternary_223: c_int = 0
 
                     if ((if (*__param_mb).nltype != 0: 1 else: 0) != 0) {
-                        var __ci_expr_logic_224: c_int = 0
+                        var __ci_expr_logic_219: c_int = 0
 
                         if ((if __local_ptr__goto_545_12 < (*__param_mb).end_subject: 1 else: 0) != 0) {
-                            (__ci_expr_logic_224 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                            (__ci_expr_logic_219 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (*__param_mb).nltype, (*__param_mb).end_subject, ((&raw const (*__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                         }
 
-                        (__ci_expr_ternary_228 = __ci_expr_logic_224)
+                        (__ci_expr_ternary_223 = __ci_expr_logic_219)
 
                     } else {
-                        var __ci_expr_logic_227: c_int = 0
+                        var __ci_expr_logic_222: c_int = 0
 
-                        var __ci_expr_logic_225: c_int = 0
+                        var __ci_expr_logic_220: c_int = 0
 
                         if ((if __local_ptr__goto_545_12 <= ((*__param_mb).end_subject - ((*__param_mb).nllen as usize)): 1 else: 0) != 0) {
-                            (__ci_expr_logic_225 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_220 = (if (if (*__local_ptr__goto_545_12) == (*__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_225 != 0) {
-                            var __ci_expr_logic_226: c_int
+                        if (__ci_expr_logic_220 != 0) {
+                            var __ci_expr_logic_221: c_int
 
                             if ((if (*__param_mb).nllen == 1: 1 else: 0) != 0) {
-                                (__ci_expr_logic_226 = (if true: 1 else: 0))
+                                (__ci_expr_logic_221 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_226 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_221 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (*__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            (__ci_expr_logic_227 = (if __ci_expr_logic_226 != 0: 1 else: 0))
+                            (__ci_expr_logic_222 = (if __ci_expr_logic_221 != 0: 1 else: 0))
 
                         }
 
-                        (__ci_expr_ternary_228 = __ci_expr_logic_227)
+                        (__ci_expr_ternary_223 = __ci_expr_logic_222)
 
                     }
 
-                    (__ci_expr_logic_229 = (if (if not (__ci_expr_ternary_228 != 0): 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_224 = (if (if not (__ci_expr_ternary_223 != 0): 1 else: 0) != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_logic_230 = (if __ci_expr_logic_229 != 0: 1 else: 0))
+                (__ci_expr_logic_225 = (if __ci_expr_logic_224 != 0: 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_230 != 0) {
-                (__ci_expr_logic_231 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) as c_int) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            if (__ci_expr_logic_225 != 0) {
+                (__ci_expr_logic_226 = (if (if (((((__local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) as c_int) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_232 = (if __ci_expr_logic_231 != 0: 1 else: 0))
+            (__ci_expr_logic_227 = (if __ci_expr_logic_226 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_232 != 0) {
+        if (__ci_expr_logic_227 != 0) {
             goto '__ci_bb_510
         } else {
             goto '__ci_bb_511
@@ -7609,9 +7500,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_514 {
-        (__ci_expr_old_233 = __local_new_count__goto_548_19)
+        (__ci_expr_old_228 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_233 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_228 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_517
         } else {
             goto '__ci_bb_518
@@ -7619,9 +7510,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_515 {
-        (__ci_expr_old_234 = __local_new_count__goto_548_19)
+        (__ci_expr_old_229 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_234 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_229 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_520
         } else {
             goto '__ci_bb_521
@@ -7672,9 +7563,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_524 {
-        (__ci_expr_old_235 = __local_active_count__goto_548_5)
+        (__ci_expr_old_230 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_235 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_230 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_526
         } else {
             goto '__ci_bb_527
@@ -7732,16 +7623,16 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_533 {
         (__local_chartype__goto_1448_13 = (((*__local_prop__goto_1450_28).chartype as c_int)))
         if ((if __local_chartype__goto_1448_13 == ucp_Lu: 1 else: 0) != 0) {
-            (__ci_expr_logic_236 = (if true: 1 else: 0))
+            (__ci_expr_logic_231 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_236 = (if (if __local_chartype__goto_1448_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_231 = (if (if __local_chartype__goto_1448_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_236 != 0) {
-            (__ci_expr_logic_237 = (if true: 1 else: 0))
+        if (__ci_expr_logic_231 != 0) {
+            (__ci_expr_logic_232 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_237 = (if (if __local_chartype__goto_1448_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_232 = (if (if __local_chartype__goto_1448_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1447_14 = __ci_expr_logic_237)
+        (__local_OK__goto_1447_14 = __ci_expr_logic_232)
         goto '__ci_bb_532
     }
 
@@ -7762,22 +7653,22 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_537 {
         if ((if (*__local_prop__goto_1450_28).script == (__local_code__goto_755_16[3]): 1 else: 0) != 0) {
-            (__ci_expr_logic_238 = (if true: 1 else: 0))
+            (__ci_expr_logic_233 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_238 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_1450_28).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((__local_code__goto_755_16[3]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((__local_code__goto_755_16[3]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_233 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_1450_28).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((__local_code__goto_755_16[3]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((__local_code__goto_755_16[3]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1447_14 = __ci_expr_logic_238)
+        (__local_OK__goto_1447_14 = __ci_expr_logic_233)
         goto '__ci_bb_532
     }
 
     '__ci_bb_538 {
         (__local_chartype__goto_1448_13 = (((*__local_prop__goto_1450_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1448_13] == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_239 = (if true: 1 else: 0))
+            (__ci_expr_logic_234 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_239 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1448_13] == 3: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_234 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1448_13] == 3: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1447_14 = __ci_expr_logic_239)
+        (__local_OK__goto_1447_14 = __ci_expr_logic_234)
         goto '__ci_bb_532
     }
 
@@ -8010,21 +7901,21 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_569 {
         (__local_chartype__goto_1448_13 = (((*__local_prop__goto_1450_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1448_13] == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_240 = (if true: 1 else: 0))
+            (__ci_expr_logic_235 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_240 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1448_13] == 3: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_235 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1448_13] == 3: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_240 != 0) {
-            (__ci_expr_logic_241 = (if true: 1 else: 0))
+        if (__ci_expr_logic_235 != 0) {
+            (__ci_expr_logic_236 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_241 = (if (if __local_chartype__goto_1448_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_236 = (if (if __local_chartype__goto_1448_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_241 != 0) {
-            (__ci_expr_logic_242 = (if true: 1 else: 0))
+        if (__ci_expr_logic_236 != 0) {
+            (__ci_expr_logic_237 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_242 = (if (if __local_chartype__goto_1448_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_237 = (if (if __local_chartype__goto_1448_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1447_14 = __ci_expr_logic_242)
+        (__local_OK__goto_1447_14 = __ci_expr_logic_237)
         goto '__ci_bb_532
     }
 
@@ -8059,9 +7950,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_576 {
-        (__ci_expr_old_243 = __local_cp__goto_1449_25)
+        (__ci_expr_old_238 = __local_cp__goto_1449_25)
         (__local_cp__goto_1449_25 = __local_cp__goto_1449_25 + 1)
-        if ((if __local_c__goto_703_12 == (*__ci_expr_old_243): 1 else: 0) != 0) {
+        if ((if __local_c__goto_703_12 == (*__ci_expr_old_238): 1 else: 0) != 0) {
             goto '__ci_bb_577
         } else {
             goto '__ci_bb_578
@@ -8079,33 +7970,33 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_579 {
         if ((if __local_c__goto_703_12 == 36: 1 else: 0) != 0) {
-            (__ci_expr_logic_244 = (if true: 1 else: 0))
+            (__ci_expr_logic_239 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_244 = (if (if __local_c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_239 = (if (if __local_c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_244 != 0) {
-            (__ci_expr_logic_245 = (if true: 1 else: 0))
+        if (__ci_expr_logic_239 != 0) {
+            (__ci_expr_logic_240 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_245 = (if (if __local_c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_240 = (if (if __local_c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_245 != 0) {
-            (__ci_expr_logic_247 = (if true: 1 else: 0))
+        if (__ci_expr_logic_240 != 0) {
+            (__ci_expr_logic_242 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_246: c_int = 0
+            var __ci_expr_logic_241: c_int = 0
 
             if ((if __local_c__goto_703_12 >= 160: 1 else: 0) != 0) {
-                (__ci_expr_logic_246 = (if (if __local_c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_241 = (if (if __local_c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_247 = (if __ci_expr_logic_246 != 0: 1 else: 0))
+            (__ci_expr_logic_242 = (if __ci_expr_logic_241 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_247 != 0) {
-            (__ci_expr_logic_248 = (if true: 1 else: 0))
+        if (__ci_expr_logic_242 != 0) {
+            (__ci_expr_logic_243 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_248 = (if (if __local_c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_243 = (if (if __local_c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1447_14 = __ci_expr_logic_248)
+        (__local_OK__goto_1447_14 = __ci_expr_logic_243)
         goto '__ci_bb_532
     }
 
@@ -8221,11 +8112,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_595 {
-        (__ci_expr_logic_249 = 0)
+        (__ci_expr_logic_244 = 0)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_249 = (if (if __local_codevalue__goto_756_14 == 395: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_244 = (if (if __local_codevalue__goto_756_14 == 395: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_249 != 0) {
+        if (__ci_expr_logic_244 != 0) {
             goto '__ci_bb_597
         } else {
             goto '__ci_bb_598
@@ -8244,9 +8135,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_598 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        (__ci_expr_old_250 = __local_new_count__goto_548_19)
+        (__ci_expr_old_245 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_250 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_245 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_599
         } else {
             goto '__ci_bb_600
@@ -8278,9 +8169,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_603 {
-        (__ci_expr_old_251 = __local_active_count__goto_548_5)
+        (__ci_expr_old_246 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_251 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_246 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_605
         } else {
             goto '__ci_bb_606
@@ -8312,11 +8203,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_608 {
         (__local_ncount__goto_1568_13 = ((0 as c_int)))
-        (__ci_expr_logic_252 = 0)
+        (__ci_expr_logic_247 = 0)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_252 = (if (if __local_codevalue__goto_756_14 == 415: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_247 = (if (if __local_codevalue__goto_756_14 == 415: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_252 != 0) {
+        if (__ci_expr_logic_247 != 0) {
             goto '__ci_bb_610
         } else {
             goto '__ci_bb_611
@@ -8336,9 +8227,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_611 {
         _pcre2_extuni_8(__local_c__goto_703_12, (__local_ptr__goto_545_12 + ((__local_clen__goto_702_7 as isize) as usize)), (*__param_mb).start_subject, __local_end_subject__goto_554_12, __local_utf__goto_558_6, (&raw mut __local_ncount__goto_1568_13 as *mut c_int))
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        (__ci_expr_old_253 = __local_new_count__goto_548_19)
+        (__ci_expr_old_248 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_253 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_248 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_612
         } else {
             goto '__ci_bb_613
@@ -8371,9 +8262,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_616 {
-        (__ci_expr_old_254 = __local_active_count__goto_548_5)
+        (__ci_expr_old_249 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_254 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_249 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_618
         } else {
             goto '__ci_bb_619
@@ -8441,11 +8332,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_628 {
-        (__ci_expr_logic_256 = 0)
+        (__ci_expr_logic_251 = 0)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_256 = (if (if __local_codevalue__goto_756_14 == 435: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_251 = (if (if __local_codevalue__goto_756_14 == 435: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_256 != 0) {
+        if (__ci_expr_logic_251 != 0) {
             goto '__ci_bb_632
         } else {
             goto '__ci_bb_633
@@ -8453,11 +8344,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_629 {
-        (__ci_expr_logic_255 = 0)
+        (__ci_expr_logic_250 = 0)
         if ((if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) < __local_end_subject__goto_554_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_255 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == 10: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_250 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_255 != 0) {
+        if (__ci_expr_logic_250 != 0) {
             goto '__ci_bb_630
         } else {
             goto '__ci_bb_631
@@ -8481,9 +8372,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_633 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        (__ci_expr_old_257 = __local_new_count__goto_548_19)
+        (__ci_expr_old_252 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_257 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_252 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_634
         } else {
             goto '__ci_bb_635
@@ -8568,9 +8459,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_645 {
-        (__ci_expr_old_258 = __local_active_count__goto_548_5)
+        (__ci_expr_old_253 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_258 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_253 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_647
         } else {
             goto '__ci_bb_648
@@ -8683,11 +8574,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_662 {
-        (__ci_expr_logic_259 = 0)
+        (__ci_expr_logic_254 = 0)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_259 = (if (if __local_codevalue__goto_756_14 == 475: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_254 = (if (if __local_codevalue__goto_756_14 == 475: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_259 != 0) {
+        if (__ci_expr_logic_254 != 0) {
             goto '__ci_bb_664
         } else {
             goto '__ci_bb_665
@@ -8706,9 +8597,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_665 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        (__ci_expr_old_260 = __local_new_count__goto_548_19)
+        (__ci_expr_old_255 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_260 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_255 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_666
         } else {
             goto '__ci_bb_667
@@ -8741,9 +8632,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_670 {
-        (__ci_expr_old_261 = __local_active_count__goto_548_5)
+        (__ci_expr_old_256 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_261 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_256 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_672
         } else {
             goto '__ci_bb_673
@@ -8952,11 +8843,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_699 {
-        (__ci_expr_logic_262 = 0)
+        (__ci_expr_logic_257 = 0)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_262 = (if (if __local_codevalue__goto_756_14 == 455: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_257 = (if (if __local_codevalue__goto_756_14 == 455: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_262 != 0) {
+        if (__ci_expr_logic_257 != 0) {
             goto '__ci_bb_701
         } else {
             goto '__ci_bb_702
@@ -8975,9 +8866,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_702 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        (__ci_expr_old_263 = __local_new_count__goto_548_19)
+        (__ci_expr_old_258 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_263 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_258 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_703
         } else {
             goto '__ci_bb_704
@@ -9006,9 +8897,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_707 {
-        (__ci_expr_old_264 = __local_active_count__goto_548_5)
+        (__ci_expr_old_259 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_264 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_259 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_709
         } else {
             goto '__ci_bb_710
@@ -9067,16 +8958,16 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_716 {
         (__local_chartype__goto_1709_13 = (((*__local_prop__goto_1711_28).chartype as c_int)))
         if ((if __local_chartype__goto_1709_13 == ucp_Lu: 1 else: 0) != 0) {
-            (__ci_expr_logic_265 = (if true: 1 else: 0))
+            (__ci_expr_logic_260 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_265 = (if (if __local_chartype__goto_1709_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_260 = (if (if __local_chartype__goto_1709_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_265 != 0) {
-            (__ci_expr_logic_266 = (if true: 1 else: 0))
+        if (__ci_expr_logic_260 != 0) {
+            (__ci_expr_logic_261 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_266 = (if (if __local_chartype__goto_1709_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_261 = (if (if __local_chartype__goto_1709_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1708_14 = __ci_expr_logic_266)
+        (__local_OK__goto_1708_14 = __ci_expr_logic_261)
         goto '__ci_bb_715
     }
 
@@ -9097,22 +8988,22 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_720 {
         if ((if (*__local_prop__goto_1711_28).script == (__local_code__goto_755_16[3]): 1 else: 0) != 0) {
-            (__ci_expr_logic_267 = (if true: 1 else: 0))
+            (__ci_expr_logic_262 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_267 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_1711_28).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((__local_code__goto_755_16[3]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((__local_code__goto_755_16[3]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_262 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_1711_28).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((__local_code__goto_755_16[3]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((__local_code__goto_755_16[3]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1708_14 = __ci_expr_logic_267)
+        (__local_OK__goto_1708_14 = __ci_expr_logic_262)
         goto '__ci_bb_715
     }
 
     '__ci_bb_721 {
         (__local_chartype__goto_1709_13 = (((*__local_prop__goto_1711_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1709_13] == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_268 = (if true: 1 else: 0))
+            (__ci_expr_logic_263 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_268 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1709_13] == 3: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_263 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1709_13] == 3: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1708_14 = __ci_expr_logic_268)
+        (__local_OK__goto_1708_14 = __ci_expr_logic_263)
         goto '__ci_bb_715
     }
 
@@ -9345,21 +9236,21 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_752 {
         (__local_chartype__goto_1709_13 = (((*__local_prop__goto_1711_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1709_13] == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_269 = (if true: 1 else: 0))
+            (__ci_expr_logic_264 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_269 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1709_13] == 3: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_264 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1709_13] == 3: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_269 != 0) {
-            (__ci_expr_logic_270 = (if true: 1 else: 0))
+        if (__ci_expr_logic_264 != 0) {
+            (__ci_expr_logic_265 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_270 = (if (if __local_chartype__goto_1709_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_265 = (if (if __local_chartype__goto_1709_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_270 != 0) {
-            (__ci_expr_logic_271 = (if true: 1 else: 0))
+        if (__ci_expr_logic_265 != 0) {
+            (__ci_expr_logic_266 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_271 = (if (if __local_chartype__goto_1709_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_266 = (if (if __local_chartype__goto_1709_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1708_14 = __ci_expr_logic_271)
+        (__local_OK__goto_1708_14 = __ci_expr_logic_266)
         goto '__ci_bb_715
     }
 
@@ -9394,9 +9285,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_759 {
-        (__ci_expr_old_272 = __local_cp__goto_1710_25)
+        (__ci_expr_old_267 = __local_cp__goto_1710_25)
         (__local_cp__goto_1710_25 = __local_cp__goto_1710_25 + 1)
-        if ((if __local_c__goto_703_12 == (*__ci_expr_old_272): 1 else: 0) != 0) {
+        if ((if __local_c__goto_703_12 == (*__ci_expr_old_267): 1 else: 0) != 0) {
             goto '__ci_bb_760
         } else {
             goto '__ci_bb_761
@@ -9414,33 +9305,33 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_762 {
         if ((if __local_c__goto_703_12 == 36: 1 else: 0) != 0) {
-            (__ci_expr_logic_273 = (if true: 1 else: 0))
+            (__ci_expr_logic_268 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_273 = (if (if __local_c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_268 = (if (if __local_c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_273 != 0) {
-            (__ci_expr_logic_274 = (if true: 1 else: 0))
+        if (__ci_expr_logic_268 != 0) {
+            (__ci_expr_logic_269 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_274 = (if (if __local_c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_269 = (if (if __local_c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_274 != 0) {
-            (__ci_expr_logic_276 = (if true: 1 else: 0))
+        if (__ci_expr_logic_269 != 0) {
+            (__ci_expr_logic_271 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_275: c_int = 0
+            var __ci_expr_logic_270: c_int = 0
 
             if ((if __local_c__goto_703_12 >= 160: 1 else: 0) != 0) {
-                (__ci_expr_logic_275 = (if (if __local_c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_270 = (if (if __local_c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_276 = (if __ci_expr_logic_275 != 0: 1 else: 0))
+            (__ci_expr_logic_271 = (if __ci_expr_logic_270 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_276 != 0) {
-            (__ci_expr_logic_277 = (if true: 1 else: 0))
+        if (__ci_expr_logic_271 != 0) {
+            (__ci_expr_logic_272 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_277 = (if (if __local_c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_272 = (if (if __local_c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1708_14 = __ci_expr_logic_277)
+        (__local_OK__goto_1708_14 = __ci_expr_logic_272)
         goto '__ci_bb_715
     }
 
@@ -9557,11 +9448,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_778 {
         if ((if __local_codevalue__goto_756_14 == 394: 1 else: 0) != 0) {
-            (__ci_expr_logic_278 = (if true: 1 else: 0))
+            (__ci_expr_logic_273 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_278 = (if (if __local_codevalue__goto_756_14 == 396: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_273 = (if (if __local_codevalue__goto_756_14 == 396: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_278 != 0) {
+        if (__ci_expr_logic_273 != 0) {
             goto '__ci_bb_780
         } else {
             goto '__ci_bb_781
@@ -9579,9 +9470,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_781 {
-        (__ci_expr_old_279 = __local_new_count__goto_548_19)
+        (__ci_expr_old_274 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_279 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_274 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_782
         } else {
             goto '__ci_bb_783
@@ -9609,9 +9500,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_786 {
-        (__ci_expr_old_280 = __local_active_count__goto_548_5)
+        (__ci_expr_old_275 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_280 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_275 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_788
         } else {
             goto '__ci_bb_789
@@ -9645,11 +9536,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_791 {
         (__local_ncount__goto_1838_13 = ((0 as c_int)))
         if ((if __local_codevalue__goto_756_14 == 414: 1 else: 0) != 0) {
-            (__ci_expr_logic_281 = (if true: 1 else: 0))
+            (__ci_expr_logic_276 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_281 = (if (if __local_codevalue__goto_756_14 == 416: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_276 = (if (if __local_codevalue__goto_756_14 == 416: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_281 != 0) {
+        if (__ci_expr_logic_276 != 0) {
             goto '__ci_bb_793
         } else {
             goto '__ci_bb_794
@@ -9668,9 +9559,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_794 {
         _pcre2_extuni_8(__local_c__goto_703_12, (__local_ptr__goto_545_12 + ((__local_clen__goto_702_7 as isize) as usize)), (*__param_mb).start_subject, __local_end_subject__goto_554_12, __local_utf__goto_558_6, (&raw mut __local_ncount__goto_1838_13 as *mut c_int))
-        (__ci_expr_old_282 = __local_new_count__goto_548_19)
+        (__ci_expr_old_277 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_282 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_277 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_795
         } else {
             goto '__ci_bb_796
@@ -9699,9 +9590,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_799 {
-        (__ci_expr_old_283 = __local_active_count__goto_548_5)
+        (__ci_expr_old_278 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_283 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_278 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_801
         } else {
             goto '__ci_bb_802
@@ -9771,11 +9662,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_811 {
         if ((if __local_codevalue__goto_756_14 == 434: 1 else: 0) != 0) {
-            (__ci_expr_logic_285 = (if true: 1 else: 0))
+            (__ci_expr_logic_280 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_285 = (if (if __local_codevalue__goto_756_14 == 436: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_280 = (if (if __local_codevalue__goto_756_14 == 436: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_285 != 0) {
+        if (__ci_expr_logic_280 != 0) {
             goto '__ci_bb_815
         } else {
             goto '__ci_bb_816
@@ -9783,11 +9674,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_812 {
-        (__ci_expr_logic_284 = 0)
+        (__ci_expr_logic_279 = 0)
         if ((if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) < __local_end_subject__goto_554_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_284 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == 10: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_279 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_284 != 0) {
+        if (__ci_expr_logic_279 != 0) {
             goto '__ci_bb_813
         } else {
             goto '__ci_bb_814
@@ -9810,9 +9701,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_816 {
-        (__ci_expr_old_286 = __local_new_count__goto_548_19)
+        (__ci_expr_old_281 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_286 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_281 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_817
         } else {
             goto '__ci_bb_818
@@ -9893,9 +9784,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_828 {
-        (__ci_expr_old_287 = __local_active_count__goto_548_5)
+        (__ci_expr_old_282 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_287 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_282 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_830
         } else {
             goto '__ci_bb_831
@@ -10010,11 +9901,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_845 {
         if ((if __local_codevalue__goto_756_14 == 474: 1 else: 0) != 0) {
-            (__ci_expr_logic_288 = (if true: 1 else: 0))
+            (__ci_expr_logic_283 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_288 = (if (if __local_codevalue__goto_756_14 == 476: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_283 = (if (if __local_codevalue__goto_756_14 == 476: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_288 != 0) {
+        if (__ci_expr_logic_283 != 0) {
             goto '__ci_bb_847
         } else {
             goto '__ci_bb_848
@@ -10032,9 +9923,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_848 {
-        (__ci_expr_old_289 = __local_new_count__goto_548_19)
+        (__ci_expr_old_284 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_289 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_284 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_849
         } else {
             goto '__ci_bb_850
@@ -10063,9 +9954,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_853 {
-        (__ci_expr_old_290 = __local_active_count__goto_548_5)
+        (__ci_expr_old_285 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_290 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_285 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_855
         } else {
             goto '__ci_bb_856
@@ -10276,11 +10167,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_882 {
         if ((if __local_codevalue__goto_756_14 == 454: 1 else: 0) != 0) {
-            (__ci_expr_logic_291 = (if true: 1 else: 0))
+            (__ci_expr_logic_286 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_291 = (if (if __local_codevalue__goto_756_14 == 456: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_286 = (if (if __local_codevalue__goto_756_14 == 456: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_291 != 0) {
+        if (__ci_expr_logic_286 != 0) {
             goto '__ci_bb_884
         } else {
             goto '__ci_bb_885
@@ -10298,9 +10189,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_885 {
-        (__ci_expr_old_292 = __local_new_count__goto_548_19)
+        (__ci_expr_old_287 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_292 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_287 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_886
         } else {
             goto '__ci_bb_887
@@ -10332,9 +10223,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_890 {
-        (__ci_expr_old_293 = __local_active_count__goto_548_5)
+        (__ci_expr_old_288 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_293 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_288 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_892
         } else {
             goto '__ci_bb_893
@@ -10393,16 +10284,16 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_899 {
         (__local_chartype__goto_1995_13 = (((*__local_prop__goto_1997_28).chartype as c_int)))
         if ((if __local_chartype__goto_1995_13 == ucp_Lu: 1 else: 0) != 0) {
-            (__ci_expr_logic_294 = (if true: 1 else: 0))
+            (__ci_expr_logic_289 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_294 = (if (if __local_chartype__goto_1995_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_289 = (if (if __local_chartype__goto_1995_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_294 != 0) {
-            (__ci_expr_logic_295 = (if true: 1 else: 0))
+        if (__ci_expr_logic_289 != 0) {
+            (__ci_expr_logic_290 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_295 = (if (if __local_chartype__goto_1995_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_290 = (if (if __local_chartype__goto_1995_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1994_14 = __ci_expr_logic_295)
+        (__local_OK__goto_1994_14 = __ci_expr_logic_290)
         goto '__ci_bb_898
     }
 
@@ -10423,22 +10314,22 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_903 {
         if ((if (*__local_prop__goto_1997_28).script == (__local_code__goto_755_16[((1 + 2) + 2)]): 1 else: 0) != 0) {
-            (__ci_expr_logic_296 = (if true: 1 else: 0))
+            (__ci_expr_logic_291 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_296 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_1997_28).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((__local_code__goto_755_16[((1 + 2) + 2)]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((__local_code__goto_755_16[((1 + 2) + 2)]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_291 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((((*__local_prop__goto_1997_28).scriptx_bidiclass as c_int) & (1023 as c_int)) as isize) as usize))[(((__local_code__goto_755_16[((1 + 2) + 2)]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((__local_code__goto_755_16[((1 + 2) + 2)]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1994_14 = __ci_expr_logic_296)
+        (__local_OK__goto_1994_14 = __ci_expr_logic_291)
         goto '__ci_bb_898
     }
 
     '__ci_bb_904 {
         (__local_chartype__goto_1995_13 = (((*__local_prop__goto_1997_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1995_13] == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_297 = (if true: 1 else: 0))
+            (__ci_expr_logic_292 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_297 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_292 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1994_14 = __ci_expr_logic_297)
+        (__local_OK__goto_1994_14 = __ci_expr_logic_292)
         goto '__ci_bb_898
     }
 
@@ -10671,21 +10562,21 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_935 {
         (__local_chartype__goto_1995_13 = (((*__local_prop__goto_1997_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1995_13] == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_298 = (if true: 1 else: 0))
+            (__ci_expr_logic_293 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_298 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_293 = (if (if _pcre2_ucp_gentype_8[__local_chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_298 != 0) {
-            (__ci_expr_logic_299 = (if true: 1 else: 0))
+        if (__ci_expr_logic_293 != 0) {
+            (__ci_expr_logic_294 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_299 = (if (if __local_chartype__goto_1995_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_294 = (if (if __local_chartype__goto_1995_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_299 != 0) {
-            (__ci_expr_logic_300 = (if true: 1 else: 0))
+        if (__ci_expr_logic_294 != 0) {
+            (__ci_expr_logic_295 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_300 = (if (if __local_chartype__goto_1995_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_295 = (if (if __local_chartype__goto_1995_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1994_14 = __ci_expr_logic_300)
+        (__local_OK__goto_1994_14 = __ci_expr_logic_295)
         goto '__ci_bb_898
     }
 
@@ -10720,9 +10611,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_942 {
-        (__ci_expr_old_301 = __local_cp__goto_1996_25)
+        (__ci_expr_old_296 = __local_cp__goto_1996_25)
         (__local_cp__goto_1996_25 = __local_cp__goto_1996_25 + 1)
-        if ((if __local_c__goto_703_12 == (*__ci_expr_old_301): 1 else: 0) != 0) {
+        if ((if __local_c__goto_703_12 == (*__ci_expr_old_296): 1 else: 0) != 0) {
             goto '__ci_bb_943
         } else {
             goto '__ci_bb_944
@@ -10740,33 +10631,33 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_945 {
         if ((if __local_c__goto_703_12 == 36: 1 else: 0) != 0) {
-            (__ci_expr_logic_302 = (if true: 1 else: 0))
+            (__ci_expr_logic_297 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_302 = (if (if __local_c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_297 = (if (if __local_c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_302 != 0) {
-            (__ci_expr_logic_303 = (if true: 1 else: 0))
+        if (__ci_expr_logic_297 != 0) {
+            (__ci_expr_logic_298 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_303 = (if (if __local_c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_298 = (if (if __local_c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_303 != 0) {
-            (__ci_expr_logic_305 = (if true: 1 else: 0))
+        if (__ci_expr_logic_298 != 0) {
+            (__ci_expr_logic_300 = (if true: 1 else: 0))
         } else {
-            var __ci_expr_logic_304: c_int = 0
+            var __ci_expr_logic_299: c_int = 0
 
             if ((if __local_c__goto_703_12 >= 160: 1 else: 0) != 0) {
-                (__ci_expr_logic_304 = (if (if __local_c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_299 = (if (if __local_c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_305 = (if __ci_expr_logic_304 != 0: 1 else: 0))
+            (__ci_expr_logic_300 = (if __ci_expr_logic_299 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_305 != 0) {
-            (__ci_expr_logic_306 = (if true: 1 else: 0))
+        if (__ci_expr_logic_300 != 0) {
+            (__ci_expr_logic_301 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_306 = (if (if __local_c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_301 = (if (if __local_c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
         }
-        (__local_OK__goto_1994_14 = __ci_expr_logic_306)
+        (__local_OK__goto_1994_14 = __ci_expr_logic_301)
         goto '__ci_bb_898
     }
 
@@ -10909,9 +10800,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_965 {
-        (__ci_expr_old_307 = __local_new_count__goto_548_19)
+        (__ci_expr_old_302 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_307 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_302 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_968
         } else {
             goto '__ci_bb_969
@@ -10919,9 +10810,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_966 {
-        (__ci_expr_old_308 = __local_new_count__goto_548_19)
+        (__ci_expr_old_303 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_308 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_303 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_971
         } else {
             goto '__ci_bb_972
@@ -10971,9 +10862,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_975 {
-        (__ci_expr_old_309 = __local_active_count__goto_548_5)
+        (__ci_expr_old_304 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_309 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_304 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_977
         } else {
             goto '__ci_bb_978
@@ -11025,11 +10916,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_983 {
         (__local_nptr__goto_2120_20 = _pcre2_extuni_8(__local_c__goto_703_12, (__local_ptr__goto_545_12 + ((__local_clen__goto_702_7 as isize) as usize)), (*__param_mb).start_subject, __local_end_subject__goto_554_12, __local_utf__goto_558_6, (&raw mut __local_ncount__goto_2121_13 as *mut c_int)))
-        (__ci_expr_logic_310 = 0)
+        (__ci_expr_logic_305 = 0)
         if ((if __local_nptr__goto_2120_20 >= __local_end_subject__goto_554_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_310 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_305 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_310 != 0) {
+        if (__ci_expr_logic_305 != 0) {
             goto '__ci_bb_984
         } else {
             goto '__ci_bb_985
@@ -11051,9 +10942,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_986 {
-        (__ci_expr_old_311 = __local_new_count__goto_548_19)
+        (__ci_expr_old_306 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_311 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_306 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_989
         } else {
             goto '__ci_bb_990
@@ -11061,9 +10952,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_987 {
-        (__ci_expr_old_312 = __local_new_count__goto_548_19)
+        (__ci_expr_old_307 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_312 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_307 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_992
         } else {
             goto '__ci_bb_993
@@ -11115,9 +11006,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_996 {
-        (__ci_expr_old_313 = __local_active_count__goto_548_5)
+        (__ci_expr_old_308 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_313 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_308 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_998
         } else {
             goto '__ci_bb_999
@@ -11194,11 +11085,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1009 {
-        (__ci_expr_logic_314 = 0)
+        (__ci_expr_logic_309 = 0)
         if ((if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) < __local_end_subject__goto_554_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_314 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == 10: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_309 = (if (if (*(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == 10: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_314 != 0) {
+        if (__ci_expr_logic_309 != 0) {
             goto '__ci_bb_1010
         } else {
             goto '__ci_bb_1011
@@ -11230,9 +11121,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1014 {
-        (__ci_expr_old_315 = __local_new_count__goto_548_19)
+        (__ci_expr_old_310 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_315 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_310 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1017
         } else {
             goto '__ci_bb_1018
@@ -11240,9 +11131,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1015 {
-        (__ci_expr_old_316 = __local_new_count__goto_548_19)
+        (__ci_expr_old_311 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_316 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_311 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1020
         } else {
             goto '__ci_bb_1021
@@ -11346,9 +11237,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1031 {
-        (__ci_expr_old_317 = __local_active_count__goto_548_5)
+        (__ci_expr_old_312 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_317 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_312 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1033
         } else {
             goto '__ci_bb_1034
@@ -11489,9 +11380,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1052 {
-        (__ci_expr_old_318 = __local_new_count__goto_548_19)
+        (__ci_expr_old_313 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_318 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_313 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1055
         } else {
             goto '__ci_bb_1056
@@ -11499,9 +11390,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1053 {
-        (__ci_expr_old_319 = __local_new_count__goto_548_19)
+        (__ci_expr_old_314 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_319 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_314 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1058
         } else {
             goto '__ci_bb_1059
@@ -11553,9 +11444,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1062 {
-        (__ci_expr_old_320 = __local_active_count__goto_548_5)
+        (__ci_expr_old_315 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_320 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_315 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1064
         } else {
             goto '__ci_bb_1065
@@ -11792,9 +11683,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1095 {
-        (__ci_expr_old_321 = __local_new_count__goto_548_19)
+        (__ci_expr_old_316 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_321 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_316 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1098
         } else {
             goto '__ci_bb_1099
@@ -11802,9 +11693,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1096 {
-        (__ci_expr_old_322 = __local_new_count__goto_548_19)
+        (__ci_expr_old_317 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_322 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_317 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1101
         } else {
             goto '__ci_bb_1102
@@ -11848,11 +11739,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1104 {
-        (__ci_expr_logic_323 = 0)
+        (__ci_expr_logic_318 = 0)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_323 = (if (if __local_c__goto_703_12 == __local_d__goto_703_15: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_318 = (if (if __local_c__goto_703_12 == __local_d__goto_703_15: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_323 != 0) {
+        if (__ci_expr_logic_318 != 0) {
             goto '__ci_bb_1105
         } else {
             goto '__ci_bb_1106
@@ -11860,9 +11751,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1105 {
-        (__ci_expr_old_324 = __local_new_count__goto_548_19)
+        (__ci_expr_old_319 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_324 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_319 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1107
         } else {
             goto '__ci_bb_1108
@@ -11929,9 +11820,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1116 {
-        (__ci_expr_old_325 = __local_new_count__goto_548_19)
+        (__ci_expr_old_320 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_325 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_320 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1119
         } else {
             goto '__ci_bb_1120
@@ -11984,9 +11875,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1125 {
-        (__ci_expr_old_326 = __local_new_count__goto_548_19)
+        (__ci_expr_old_321 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_326 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_321 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1127
         } else {
             goto '__ci_bb_1128
@@ -12013,9 +11904,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1130 {
-        (__ci_expr_old_327 = __local_new_count__goto_548_19)
+        (__ci_expr_old_322 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_327 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_322 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1132
         } else {
             goto '__ci_bb_1133
@@ -12052,11 +11943,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_1136 {
         (__local_ncount__goto_2305_13 = ((0 as c_int)))
         (__local_nptr__goto_2306_20 = _pcre2_extuni_8(__local_c__goto_703_12, (__local_ptr__goto_545_12 + ((__local_clen__goto_702_7 as isize) as usize)), (*__param_mb).start_subject, __local_end_subject__goto_554_12, __local_utf__goto_558_6, (&raw mut __local_ncount__goto_2305_13 as *mut c_int)))
-        (__ci_expr_logic_328 = 0)
+        (__ci_expr_logic_323 = 0)
         if ((if __local_nptr__goto_2306_20 >= __local_end_subject__goto_554_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_328 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_323 = (if (if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_328 != 0) {
+        if (__ci_expr_logic_323 != 0) {
             goto '__ci_bb_1138
         } else {
             goto '__ci_bb_1139
@@ -12073,9 +11964,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1139 {
-        (__ci_expr_old_329 = __local_new_count__goto_548_19)
+        (__ci_expr_old_324 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_329 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_324 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1140
         } else {
             goto '__ci_bb_1141
@@ -12143,9 +12034,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1151 {
-        (__ci_expr_old_330 = __local_new_count__goto_548_19)
+        (__ci_expr_old_325 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_330 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_325 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1152
         } else {
             goto '__ci_bb_1153
@@ -12176,9 +12067,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1156 {
-        (__ci_expr_old_331 = __local_new_count__goto_548_19)
+        (__ci_expr_old_326 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_331 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_326 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1159
         } else {
             goto '__ci_bb_1160
@@ -12226,9 +12117,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1164 {
-        (__ci_expr_old_332 = __local_new_count__goto_548_19)
+        (__ci_expr_old_327 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_332 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_327 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1167
         } else {
             goto '__ci_bb_1168
@@ -12236,9 +12127,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1165 {
-        (__ci_expr_old_333 = __local_new_count__goto_548_19)
+        (__ci_expr_old_328 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_333 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_328 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1170
         } else {
             goto '__ci_bb_1171
@@ -12361,9 +12252,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1185 {
-        (__ci_expr_old_334 = __local_new_count__goto_548_19)
+        (__ci_expr_old_329 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_334 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_329 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1186
         } else {
             goto '__ci_bb_1187
@@ -12462,9 +12353,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1200 {
-        (__ci_expr_old_335 = __local_new_count__goto_548_19)
+        (__ci_expr_old_330 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_335 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_330 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1201
         } else {
             goto '__ci_bb_1202
@@ -12571,9 +12462,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1217 {
-        (__ci_expr_old_336 = __local_new_count__goto_548_19)
+        (__ci_expr_old_331 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_336 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_331 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1218
         } else {
             goto '__ci_bb_1219
@@ -12768,9 +12659,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1244 {
-        (__ci_expr_old_337 = __local_new_count__goto_548_19)
+        (__ci_expr_old_332 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_337 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_332 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1245
         } else {
             goto '__ci_bb_1246
@@ -12941,11 +12832,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1267 {
-        (__ci_expr_logic_338 = 0)
+        (__ci_expr_logic_333 = 0)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_338 = (if (if __local_c__goto_703_12 != __local_d__goto_703_15: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_333 = (if (if __local_c__goto_703_12 != __local_d__goto_703_15: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_338 != 0) {
+        if (__ci_expr_logic_333 != 0) {
             goto '__ci_bb_1268
         } else {
             goto '__ci_bb_1269
@@ -12953,9 +12844,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1268 {
-        (__ci_expr_old_339 = __local_new_count__goto_548_19)
+        (__ci_expr_old_334 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_339 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_334 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1270
         } else {
             goto '__ci_bb_1271
@@ -12990,11 +12881,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1274 {
-        (__ci_expr_logic_340 = 0)
+        (__ci_expr_logic_335 = 0)
         if (__local_utf_or_ucp__goto_559_6 != 0) {
-            (__ci_expr_logic_340 = (if (if __local_d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_335 = (if (if __local_d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_340 != 0) {
+        if (__ci_expr_logic_335 != 0) {
             goto '__ci_bb_1276
         } else {
             goto '__ci_bb_1277
@@ -13016,11 +12907,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1278 {
-        (__ci_expr_logic_341 = 0)
+        (__ci_expr_logic_336 = 0)
         if ((if __local_c__goto_703_12 != __local_d__goto_703_15: 1 else: 0) != 0) {
-            (__ci_expr_logic_341 = (if (if __local_c__goto_703_12 != __local_otherd__goto_2421_18: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_336 = (if (if __local_c__goto_703_12 != __local_otherd__goto_2421_18: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_341 != 0) {
+        if (__ci_expr_logic_336 != 0) {
             goto '__ci_bb_1279
         } else {
             goto '__ci_bb_1280
@@ -13028,9 +12919,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1279 {
-        (__ci_expr_old_342 = __local_new_count__goto_548_19)
+        (__ci_expr_old_337 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_342 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_337 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1281
         } else {
             goto '__ci_bb_1282
@@ -13072,9 +12963,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1286 {
-        (__ci_expr_old_343 = __local_active_count__goto_548_5)
+        (__ci_expr_old_338 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_343 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_338 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1288
         } else {
             goto '__ci_bb_1289
@@ -13118,11 +13009,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1293 {
-        (__ci_expr_logic_344 = 0)
+        (__ci_expr_logic_339 = 0)
         if (__local_utf_or_ucp__goto_559_6 != 0) {
-            (__ci_expr_logic_344 = (if (if __local_d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_339 = (if (if __local_d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_344 != 0) {
+        if (__ci_expr_logic_339 != 0) {
             goto '__ci_bb_1295
         } else {
             goto '__ci_bb_1296
@@ -13131,11 +13022,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1294 {
         if ((if __local_c__goto_703_12 == __local_d__goto_703_15: 1 else: 0) != 0) {
-            (__ci_expr_logic_345 = (if true: 1 else: 0))
+            (__ci_expr_logic_340 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_345 = (if (if __local_c__goto_703_12 == __local_otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_340 = (if (if __local_c__goto_703_12 == __local_otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_345 == (if __local_codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_340 == (if __local_codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
             goto '__ci_bb_1298
         } else {
             goto '__ci_bb_1299
@@ -13157,20 +13048,20 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1298 {
-        (__ci_expr_logic_347 = 0)
+        (__ci_expr_logic_342 = 0)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
-            var __ci_expr_logic_346: c_int
+            var __ci_expr_logic_341: c_int
 
             if ((if __local_codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                (__ci_expr_logic_346 = (if true: 1 else: 0))
+                (__ci_expr_logic_341 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_346 = (if (if __local_codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_341 = (if (if __local_codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
             }
 
-            (__ci_expr_logic_347 = (if __ci_expr_logic_346 != 0: 1 else: 0))
+            (__ci_expr_logic_342 = (if __ci_expr_logic_341 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_347 != 0) {
+        if (__ci_expr_logic_342 != 0) {
             goto '__ci_bb_1300
         } else {
             goto '__ci_bb_1301
@@ -13189,9 +13080,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1301 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        (__ci_expr_old_348 = __local_new_count__goto_548_19)
+        (__ci_expr_old_343 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_348 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_343 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1302
         } else {
             goto '__ci_bb_1303
@@ -13220,9 +13111,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1306 {
-        (__ci_expr_old_349 = __local_active_count__goto_548_5)
+        (__ci_expr_old_344 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_349 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_344 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1307
         } else {
             goto '__ci_bb_1308
@@ -13262,11 +13153,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1312 {
-        (__ci_expr_logic_350 = 0)
+        (__ci_expr_logic_345 = 0)
         if (__local_utf_or_ucp__goto_559_6 != 0) {
-            (__ci_expr_logic_350 = (if (if __local_d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_345 = (if (if __local_d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_350 != 0) {
+        if (__ci_expr_logic_345 != 0) {
             goto '__ci_bb_1314
         } else {
             goto '__ci_bb_1315
@@ -13275,11 +13166,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1313 {
         if ((if __local_c__goto_703_12 == __local_d__goto_703_15: 1 else: 0) != 0) {
-            (__ci_expr_logic_351 = (if true: 1 else: 0))
+            (__ci_expr_logic_346 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_351 = (if (if __local_c__goto_703_12 == __local_otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_346 = (if (if __local_c__goto_703_12 == __local_otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_351 == (if __local_codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_346 == (if __local_codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
             goto '__ci_bb_1317
         } else {
             goto '__ci_bb_1318
@@ -13302,11 +13193,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1317 {
         if ((if __local_codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-            (__ci_expr_logic_352 = (if true: 1 else: 0))
+            (__ci_expr_logic_347 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_352 = (if (if __local_codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_347 = (if (if __local_codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_352 != 0) {
+        if (__ci_expr_logic_347 != 0) {
             goto '__ci_bb_1319
         } else {
             goto '__ci_bb_1320
@@ -13324,9 +13215,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1320 {
-        (__ci_expr_old_353 = __local_new_count__goto_548_19)
+        (__ci_expr_old_348 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_353 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_348 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1321
         } else {
             goto '__ci_bb_1322
@@ -13355,9 +13246,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1325 {
-        (__ci_expr_old_354 = __local_active_count__goto_548_5)
+        (__ci_expr_old_349 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_354 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_349 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1326
         } else {
             goto '__ci_bb_1327
@@ -13397,11 +13288,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1331 {
-        (__ci_expr_logic_355 = 0)
+        (__ci_expr_logic_350 = 0)
         if (__local_utf_or_ucp__goto_559_6 != 0) {
-            (__ci_expr_logic_355 = (if (if __local_d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_350 = (if (if __local_d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_355 != 0) {
+        if (__ci_expr_logic_350 != 0) {
             goto '__ci_bb_1333
         } else {
             goto '__ci_bb_1334
@@ -13410,11 +13301,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1332 {
         if ((if __local_c__goto_703_12 == __local_d__goto_703_15: 1 else: 0) != 0) {
-            (__ci_expr_logic_356 = (if true: 1 else: 0))
+            (__ci_expr_logic_351 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_356 = (if (if __local_c__goto_703_12 == __local_otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_351 = (if (if __local_c__goto_703_12 == __local_otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_356 == (if __local_codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_351 == (if __local_codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
             goto '__ci_bb_1336
         } else {
             goto '__ci_bb_1337
@@ -13437,11 +13328,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1336 {
         if ((if __local_codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-            (__ci_expr_logic_357 = (if true: 1 else: 0))
+            (__ci_expr_logic_352 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_357 = (if (if __local_codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_352 = (if (if __local_codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_357 != 0) {
+        if (__ci_expr_logic_352 != 0) {
             goto '__ci_bb_1338
         } else {
             goto '__ci_bb_1339
@@ -13459,9 +13350,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1339 {
-        (__ci_expr_old_358 = __local_new_count__goto_548_19)
+        (__ci_expr_old_353 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_358 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_353 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1340
         } else {
             goto '__ci_bb_1341
@@ -13512,11 +13403,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1347 {
-        (__ci_expr_logic_359 = 0)
+        (__ci_expr_logic_354 = 0)
         if (__local_utf_or_ucp__goto_559_6 != 0) {
-            (__ci_expr_logic_359 = (if (if __local_d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_354 = (if (if __local_d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_359 != 0) {
+        if (__ci_expr_logic_354 != 0) {
             goto '__ci_bb_1349
         } else {
             goto '__ci_bb_1350
@@ -13525,11 +13416,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1348 {
         if ((if __local_c__goto_703_12 == __local_d__goto_703_15: 1 else: 0) != 0) {
-            (__ci_expr_logic_360 = (if true: 1 else: 0))
+            (__ci_expr_logic_355 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_360 = (if (if __local_c__goto_703_12 == __local_otherd__goto_2571_18: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_355 = (if (if __local_c__goto_703_12 == __local_otherd__goto_2571_18: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_360 == (if __local_codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_355 == (if __local_codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
             goto '__ci_bb_1352
         } else {
             goto '__ci_bb_1353
@@ -13564,9 +13455,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1354 {
-        (__ci_expr_old_361 = __local_new_count__goto_548_19)
+        (__ci_expr_old_356 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_361 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_356 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1357
         } else {
             goto '__ci_bb_1358
@@ -13574,9 +13465,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1355 {
-        (__ci_expr_old_362 = __local_new_count__goto_548_19)
+        (__ci_expr_old_357 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_362 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_357 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1360
         } else {
             goto '__ci_bb_1361
@@ -13624,9 +13515,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1364 {
-        (__ci_expr_old_363 = __local_active_count__goto_548_5)
+        (__ci_expr_old_358 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_363 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_358 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1365
         } else {
             goto '__ci_bb_1366
@@ -13667,11 +13558,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1370 {
-        (__ci_expr_logic_364 = 0)
+        (__ci_expr_logic_359 = 0)
         if (__local_utf_or_ucp__goto_559_6 != 0) {
-            (__ci_expr_logic_364 = (if (if __local_d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_359 = (if (if __local_d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_364 != 0) {
+        if (__ci_expr_logic_359 != 0) {
             goto '__ci_bb_1372
         } else {
             goto '__ci_bb_1373
@@ -13680,11 +13571,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1371 {
         if ((if __local_c__goto_703_12 == __local_d__goto_703_15: 1 else: 0) != 0) {
-            (__ci_expr_logic_365 = (if true: 1 else: 0))
+            (__ci_expr_logic_360 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_365 = (if (if __local_c__goto_703_12 == __local_otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_360 = (if (if __local_c__goto_703_12 == __local_otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if __ci_expr_logic_365 == (if __local_codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+        if ((if __ci_expr_logic_360 == (if __local_codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
             goto '__ci_bb_1375
         } else {
             goto '__ci_bb_1376
@@ -13707,11 +13598,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1375 {
         if ((if __local_codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-            (__ci_expr_logic_366 = (if true: 1 else: 0))
+            (__ci_expr_logic_361 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_366 = (if (if __local_codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_361 = (if (if __local_codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_366 != 0) {
+        if (__ci_expr_logic_361 != 0) {
             goto '__ci_bb_1377
         } else {
             goto '__ci_bb_1378
@@ -13738,9 +13629,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1379 {
-        (__ci_expr_old_367 = __local_new_count__goto_548_19)
+        (__ci_expr_old_362 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_367 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_362 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1382
         } else {
             goto '__ci_bb_1383
@@ -13748,9 +13639,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1380 {
-        (__ci_expr_old_368 = __local_new_count__goto_548_19)
+        (__ci_expr_old_363 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_368 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_363 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1385
         } else {
             goto '__ci_bb_1386
@@ -13863,13 +13754,7 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1399 {
-        (__ci_expr_ternary_369 = 0)
-        if ((if __local_c__goto_703_12 > 255: 1 else: 0) != 0) {
-            (__ci_expr_ternary_369 = (((if __local_codevalue__goto_756_14 == 111: 1 else: 0) as c_int)))
-        } else {
-            (__ci_expr_ternary_369 = (((if (((((__local_code__goto_755_16 + ((1 as isize) as usize))[((__local_c__goto_703_12 as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_c__goto_703_12 as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) as c_int)))
-        }
-        (__local_isinclass__goto_2647_14 = __ci_expr_ternary_369)
+        (__local_isinclass__goto_2647_14 = (((if (if __local_c__goto_703_12 > 255: 1 else: 0) != 0: ((if __local_codevalue__goto_756_14 == 111: 1 else: 0) as c_int) else: ((if (((((__local_code__goto_755_16 + ((1 as isize) as usize))[((__local_c__goto_703_12 as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_c__goto_703_12 as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) as c_int)) as c_int)))
         goto '__ci_bb_1400
     }
 
@@ -13890,9 +13775,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1403 {
-        (__ci_expr_old_370 = __local_active_count__goto_548_5)
+        (__ci_expr_old_364 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_370 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_364 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1404
         } else {
             goto '__ci_bb_1405
@@ -13937,9 +13822,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1410 {
-        (__ci_expr_old_371 = __local_new_count__goto_548_19)
+        (__ci_expr_old_365 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_371 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_365 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1411
         } else {
             goto '__ci_bb_1412
@@ -13971,9 +13856,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1415 {
-        (__ci_expr_old_372 = __local_active_count__goto_548_5)
+        (__ci_expr_old_366 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_372 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_366 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1417
         } else {
             goto '__ci_bb_1418
@@ -14004,11 +13889,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1420 {
-        (__ci_expr_logic_373 = 0)
+        (__ci_expr_logic_367 = 0)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_373 = (if (if (*__local_ecode__goto_2649_20) == OP_CRPOSPLUS: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_367 = (if (if (*__local_ecode__goto_2649_20) == OP_CRPOSPLUS: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_373 != 0) {
+        if (__ci_expr_logic_367 != 0) {
             goto '__ci_bb_1422
         } else {
             goto '__ci_bb_1423
@@ -14027,9 +13912,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1423 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        (__ci_expr_old_374 = __local_new_count__goto_548_19)
+        (__ci_expr_old_368 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_374 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_368 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1424
         } else {
             goto '__ci_bb_1425
@@ -14052,9 +13937,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1427 {
-        (__ci_expr_old_375 = __local_active_count__goto_548_5)
+        (__ci_expr_old_369 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_375 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_369 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1428
         } else {
             goto '__ci_bb_1429
@@ -14099,9 +13984,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1434 {
-        (__ci_expr_old_376 = __local_new_count__goto_548_19)
+        (__ci_expr_old_370 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_376 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_370 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1435
         } else {
             goto '__ci_bb_1436
@@ -14133,9 +14018,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1439 {
-        (__ci_expr_old_377 = __local_active_count__goto_548_5)
+        (__ci_expr_old_371 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_377 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_371 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1441
         } else {
             goto '__ci_bb_1442
@@ -14167,11 +14052,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1444 {
         (__local_max__goto_2753_17 = ((((((((__local_ecode__goto_2649_20[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | ((__local_ecode__goto_2649_20[((1 + 2) + 1)]) as c_int)) as c_uint) as c_int)))
-        (__ci_expr_logic_378 = 0)
+        (__ci_expr_logic_372 = 0)
         if ((if (*__local_ecode__goto_2649_20) == OP_CRPOSRANGE: 1 else: 0) != 0) {
-            (__ci_expr_logic_378 = (if (if __local_count__goto_759_9 >= ((((((((__local_ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_ecode__goto_2649_20[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_372 = (if (if __local_count__goto_759_9 >= ((((((((__local_ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_ecode__goto_2649_20[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_378 != 0) {
+        if (__ci_expr_logic_372 != 0) {
             goto '__ci_bb_1446
         } else {
             goto '__ci_bb_1447
@@ -14189,12 +14074,12 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1447 {
-        (__ci_expr_logic_379 = 0)
+        (__ci_expr_logic_373 = 0)
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
         if ((if __local_count__goto_759_9 >= __local_max__goto_2753_17: 1 else: 0) != 0) {
-            (__ci_expr_logic_379 = (if (if __local_max__goto_2753_17 != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_373 = (if (if __local_max__goto_2753_17 != 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_379 != 0) {
+        if (__ci_expr_logic_373 != 0) {
             goto '__ci_bb_1448
         } else {
             goto '__ci_bb_1449
@@ -14202,9 +14087,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1448 {
-        (__ci_expr_old_380 = __local_new_count__goto_548_19)
+        (__ci_expr_old_374 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_380 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_374 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1451
         } else {
             goto '__ci_bb_1452
@@ -14212,9 +14097,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1449 {
-        (__ci_expr_old_381 = __local_new_count__goto_548_19)
+        (__ci_expr_old_375 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_381 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_375 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1454
         } else {
             goto '__ci_bb_1455
@@ -14264,9 +14149,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1458 {
-        (__ci_expr_old_382 = __local_new_count__goto_548_19)
+        (__ci_expr_old_376 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_382 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_376 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1460
         } else {
             goto '__ci_bb_1461
@@ -14435,11 +14320,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_1482 {
         (__local_rc__goto_2789_13 = ((internal_dfa_match(__param_mb, __local_code__goto_755_16, __local_ptr__goto_545_12, (((((__local_ptr__goto_545_12 as usize) -% (__local_start_subject__goto_553_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong), __local_local_offsets__goto_2791_21, (2 as c_uint), __local_local_workspace__goto_2790_14, (1000 as c_int), __local_rlevel, __local_RWS) as c_int)))
         ((*__local_rws__goto_2793_21).free = ((((*__local_rws__goto_2793_21).free +% (((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)) as c_uint)))
-        (__ci_expr_logic_383 = 0)
+        (__ci_expr_logic_377 = 0)
         if ((if __local_rc__goto_2789_13 < 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_383 = (if (if __local_rc__goto_2789_13 != -1: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_377 = (if (if __local_rc__goto_2789_13 != -1: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_383 != 0) {
+        if (__ci_expr_logic_377 != 0) {
             goto '__ci_bb_1483
         } else {
             goto '__ci_bb_1484
@@ -14452,11 +14337,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1484 {
         if ((if __local_codevalue__goto_756_14 == 128: 1 else: 0) != 0) {
-            (__ci_expr_logic_384 = (if true: 1 else: 0))
+            (__ci_expr_logic_378 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_384 = (if (if __local_codevalue__goto_756_14 == 130: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_378 = (if (if __local_codevalue__goto_756_14 == 130: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if (if __local_rc__goto_2789_13 >= 0: 1 else: 0) == __ci_expr_logic_384: 1 else: 0) != 0) {
+        if ((if (if __local_rc__goto_2789_13 >= 0: 1 else: 0) == __ci_expr_logic_378: 1 else: 0) != 0) {
             goto '__ci_bb_1485
         } else {
             goto '__ci_bb_1486
@@ -14464,9 +14349,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1485 {
-        (__ci_expr_old_385 = __local_active_count__goto_548_5)
+        (__ci_expr_old_379 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_385 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_379 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1487
         } else {
             goto '__ci_bb_1488
@@ -14495,11 +14380,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_1490 {
         (__local_codelink__goto_2832_13 = ((((((((__local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as c_int)))
         if ((if (__local_code__goto_755_16[(2 + 1)]) == OP_CALLOUT: 1 else: 0) != 0) {
-            (__ci_expr_logic_386 = (if true: 1 else: 0))
+            (__ci_expr_logic_380 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_386 = (if (if (__local_code__goto_755_16[(2 + 1)]) == OP_CALLOUT_STR: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_380 = (if (if (__local_code__goto_755_16[(2 + 1)]) == OP_CALLOUT_STR: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_386 != 0) {
+        if (__ci_expr_logic_380 != 0) {
             goto '__ci_bb_1491
         } else {
             goto '__ci_bb_1492
@@ -14518,16 +14403,16 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_1492 {
         (__local_condcode__goto_2833_21 = (((__local_code__goto_755_16[(2 + 1)]) as u8)))
         if ((if __local_condcode__goto_2833_21 == OP_CREF: 1 else: 0) != 0) {
-            (__ci_expr_logic_387 = (if true: 1 else: 0))
+            (__ci_expr_logic_381 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_387 = (if (if __local_condcode__goto_2833_21 == OP_DNCREF: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_381 = (if (if __local_condcode__goto_2833_21 == OP_DNCREF: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_387 != 0) {
-            (__ci_expr_logic_388 = (if true: 1 else: 0))
+        if (__ci_expr_logic_381 != 0) {
+            (__ci_expr_logic_382 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_388 = (if (if __local_condcode__goto_2833_21 == OP_DNRREF: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_382 = (if (if __local_condcode__goto_2833_21 == OP_DNRREF: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_388 != 0) {
+        if (__ci_expr_logic_382 != 0) {
             goto '__ci_bb_1497
         } else {
             goto '__ci_bb_1498
@@ -14561,11 +14446,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1498 {
         if ((if __local_condcode__goto_2833_21 == OP_FALSE: 1 else: 0) != 0) {
-            (__ci_expr_logic_389 = (if true: 1 else: 0))
+            (__ci_expr_logic_383 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_389 = (if (if __local_condcode__goto_2833_21 == OP_FAIL: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_383 = (if (if __local_condcode__goto_2833_21 == OP_FAIL: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_389 != 0) {
+        if (__ci_expr_logic_383 != 0) {
             goto '__ci_bb_1499
         } else {
             goto '__ci_bb_1500
@@ -14573,9 +14458,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1499 {
-        (__ci_expr_old_390 = __local_active_count__goto_548_5)
+        (__ci_expr_old_384 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_390 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_384 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1502
         } else {
             goto '__ci_bb_1503
@@ -14610,9 +14495,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1505 {
-        (__ci_expr_old_391 = __local_active_count__goto_548_5)
+        (__ci_expr_old_385 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_391 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_385 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1508
         } else {
             goto '__ci_bb_1509
@@ -14683,9 +14568,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1516 {
-        (__ci_expr_old_392 = __local_active_count__goto_548_5)
+        (__ci_expr_old_386 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_392 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_386 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1519
         } else {
             goto '__ci_bb_1520
@@ -14693,9 +14578,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1517 {
-        (__ci_expr_old_393 = __local_active_count__goto_548_5)
+        (__ci_expr_old_387 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_393 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_387 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1522
         } else {
             goto '__ci_bb_1523
@@ -14777,11 +14662,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_1531 {
         (__local_rc__goto_2887_15 = ((internal_dfa_match(__param_mb, __local_asscode__goto_2890_22, __local_ptr__goto_545_12, (((((__local_ptr__goto_545_12 as usize) -% (__local_start_subject__goto_553_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong), __local_local_offsets__goto_2889_23, (2 as c_uint), __local_local_workspace__goto_2888_16, (1000 as c_int), __local_rlevel, __local_RWS) as c_int)))
         ((*__local_rws__goto_2892_23).free = ((((*__local_rws__goto_2892_23).free +% (((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)) as c_uint)))
-        (__ci_expr_logic_394 = 0)
+        (__ci_expr_logic_388 = 0)
         if ((if __local_rc__goto_2887_15 < 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_394 = (if (if __local_rc__goto_2887_15 != -1: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_388 = (if (if __local_rc__goto_2887_15 != -1: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_394 != 0) {
+        if (__ci_expr_logic_388 != 0) {
             goto '__ci_bb_1532
         } else {
             goto '__ci_bb_1533
@@ -14794,11 +14679,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1533 {
         if ((if __local_condcode__goto_2833_21 == OP_ASSERT: 1 else: 0) != 0) {
-            (__ci_expr_logic_395 = (if true: 1 else: 0))
+            (__ci_expr_logic_389 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_395 = (if (if __local_condcode__goto_2833_21 == OP_ASSERTBACK: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_389 = (if (if __local_condcode__goto_2833_21 == OP_ASSERTBACK: 1 else: 0) != 0: 1 else: 0))
         }
-        if ((if (if __local_rc__goto_2887_15 >= 0: 1 else: 0) == __ci_expr_logic_395: 1 else: 0) != 0) {
+        if ((if (if __local_rc__goto_2887_15 >= 0: 1 else: 0) == __ci_expr_logic_389: 1 else: 0) != 0) {
             goto '__ci_bb_1534
         } else {
             goto '__ci_bb_1535
@@ -14806,9 +14691,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1534 {
-        (__ci_expr_old_396 = __local_active_count__goto_548_5)
+        (__ci_expr_old_390 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_396 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_390 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1537
         } else {
             goto '__ci_bb_1538
@@ -14816,9 +14701,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1535 {
-        (__ci_expr_old_397 = __local_active_count__goto_548_5)
+        (__ci_expr_old_391 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_397 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_391 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1540
         } else {
             goto '__ci_bb_1541
@@ -14862,13 +14747,7 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_1543 {
         (__local_rws__goto_2937_21 = ((__local_RWS as *mut RWS_anchor)))
         (__local_callpat__goto_2938_20 = __local_start_code__goto_555_12 + (((((((__local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as usize))
-        (__ci_expr_ternary_398 = 0)
-        if ((if __local_callpat__goto_2938_20 == (*__param_mb).start_code: 1 else: 0) != 0) {
-            (__ci_expr_ternary_398 = ((0 as c_uint)))
-        } else {
-            (__ci_expr_ternary_398 = (((((((__local_callpat__goto_2938_20[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | ((__local_callpat__goto_2938_20[((1 + 2) + 1)]) as c_int)) as c_uint)))
-        }
-        (__local_recno__goto_2939_18 = __ci_expr_ternary_398)
+        (__local_recno__goto_2939_18 = (((if (if __local_callpat__goto_2938_20 == (*__param_mb).start_code: 1 else: 0) != 0: (0 as c_uint) else: ((((((__local_callpat__goto_2938_20[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | ((__local_callpat__goto_2938_20[((1 + 2) + 1)]) as c_int)) as c_uint)) as c_uint)))
         if ((if (__local_code__goto_755_16[(1 + 2)]) == OP_CREF: 1 else: 0) != 0) {
             goto '__ci_bb_1544
         } else {
@@ -14923,15 +14802,15 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1551 {
-        (__ci_expr_logic_400 = 0)
-        (__ci_expr_logic_399 = 0)
+        (__ci_expr_logic_393 = 0)
+        (__ci_expr_logic_392 = 0)
         if ((if __local_recno__goto_2939_18 == (*__local_ri__goto_2960_34).group_num: 1 else: 0) != 0) {
-            (__ci_expr_logic_399 = (if (if __local_ptr__goto_545_12 == (*__local_ri__goto_2960_34).subject_position: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_392 = (if (if __local_ptr__goto_545_12 == (*__local_ri__goto_2960_34).subject_position: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_399 != 0) {
-            (__ci_expr_logic_400 = (if (if (*__param_mb).last_used_ptr == (*__local_ri__goto_2960_34).last_used_ptr: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_logic_392 != 0) {
+            (__ci_expr_logic_393 = (if (if (*__param_mb).last_used_ptr == (*__local_ri__goto_2960_34).last_used_ptr: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_400 != 0) {
+        if (__ci_expr_logic_393 != 0) {
             goto '__ci_bb_1554
         } else {
             goto '__ci_bb_1555
@@ -15045,9 +14924,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1568 {
-        (__ci_expr_old_401 = __local_p__goto_3009_26)
+        (__ci_expr_old_394 = __local_p__goto_3009_26)
         (__local_p__goto_3009_26 = __local_p__goto_3009_26 + 1)
-        if ((if ((((*__ci_expr_old_401) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0) {
+        if ((if ((((*__ci_expr_old_394) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0) {
             goto '__ci_bb_1570
         } else {
             goto '__ci_bb_1571
@@ -15068,9 +14947,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1572 {
-        (__ci_expr_old_402 = __local_new_count__goto_548_19)
+        (__ci_expr_old_395 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_402 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_395 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1575
         } else {
             goto '__ci_bb_1576
@@ -15078,9 +14957,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1573 {
-        (__ci_expr_old_403 = __local_active_count__goto_548_5)
+        (__ci_expr_old_396 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_403 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_396 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1578
         } else {
             goto '__ci_bb_1579
@@ -15206,11 +15085,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_1594 {
         ((*__local_rws__goto_3041_21).free = ((((*__local_rws__goto_3041_21).free +% (((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)) as c_uint)))
         if ((if __local_matched_count__goto_3039_31 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_404 = (if true: 1 else: 0))
+            (__ci_expr_logic_397 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_404 = (if __local_allow_zero__goto_3042_14 != 0: 1 else: 0))
+            (__ci_expr_logic_397 = (if __local_allow_zero__goto_3042_14 != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_404 != 0) {
+        if (__ci_expr_logic_397 != 0) {
             goto '__ci_bb_1601
         } else {
             goto '__ci_bb_1602
@@ -15275,11 +15154,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1605 {
         (__local_next_state_offset__goto_3103_15 = ((((((((__local_end_subpattern__goto_3102_22 as usize) -% (__local_start_code__goto_555_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) + 2) + 1) as c_int)))
-        (__ci_expr_logic_405 = 0)
+        (__ci_expr_logic_398 = 0)
         if ((if (__local_i__goto_701_7 + 1) >= __local_active_count__goto_548_5: 1 else: 0) != 0) {
-            (__ci_expr_logic_405 = (if (if __local_new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_398 = (if (if __local_new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_405 != 0) {
+        if (__ci_expr_logic_398 != 0) {
             goto '__ci_bb_1606
         } else {
             goto '__ci_bb_1607
@@ -15289,9 +15168,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_1606 {
         (__local_ptr__goto_545_12 = __local_local_ptr__goto_3040_20)
         (__local_clen__goto_702_7 = ((0 as c_int)))
-        (__ci_expr_old_406 = __local_new_count__goto_548_19)
+        (__ci_expr_old_399 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_406 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_399 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1609
         } else {
             goto '__ci_bb_1610
@@ -15333,9 +15212,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1613 {
-        (__ci_expr_old_408 = __local_new_count__goto_548_19)
+        (__ci_expr_old_401 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_408 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_401 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1619
         } else {
             goto '__ci_bb_1620
@@ -15351,9 +15230,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1615 {
-        (__ci_expr_old_407 = __local_p__goto_3123_24)
+        (__ci_expr_old_400 = __local_p__goto_3123_24)
         (__local_p__goto_3123_24 = __local_p__goto_3123_24 + 1)
-        if ((if ((((*__ci_expr_old_407) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0) {
+        if ((if ((((*__ci_expr_old_400) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0) {
             goto '__ci_bb_1617
         } else {
             goto '__ci_bb_1618
@@ -15462,18 +15341,18 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     '__ci_bb_1632 {
         (__local_next_state_offset__goto_3172_15 = ((((((((__local_end_subpattern__goto_3170_22 as usize) -% (__local_start_code__goto_555_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) + 2) + 1) as c_int)))
-        (__ci_expr_ternary_410 = 0)
+        (__ci_expr_ternary_403 = 0)
         if ((if (*__local_end_subpattern__goto_3170_22) == OP_KETRMAX: 1 else: 0) != 0) {
-            (__ci_expr_logic_409 = (if true: 1 else: 0))
+            (__ci_expr_logic_402 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_409 = (if (if (*__local_end_subpattern__goto_3170_22) == OP_KETRMIN: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_402 = (if (if (*__local_end_subpattern__goto_3170_22) == OP_KETRMIN: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_409 != 0) {
-            (__ci_expr_ternary_410 = (((((((__local_end_subpattern__goto_3170_22 as usize) -% (__local_start_code__goto_555_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) - ((((((__local_end_subpattern__goto_3170_22[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_end_subpattern__goto_3170_22[(1 + 1)]) as c_int)) as c_uint)) as c_int)))
+        if (__ci_expr_logic_402 != 0) {
+            (__ci_expr_ternary_403 = (((((((__local_end_subpattern__goto_3170_22 as usize) -% (__local_start_code__goto_555_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) - ((((((__local_end_subpattern__goto_3170_22[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_end_subpattern__goto_3170_22[(1 + 1)]) as c_int)) as c_uint)) as c_int)))
         } else {
-            (__ci_expr_ternary_410 = ((-1 as c_int)))
+            (__ci_expr_ternary_403 = ((-1 as c_int)))
         }
-        (__local_repeat_state_offset__goto_3172_34 = __ci_expr_ternary_410)
+        (__local_repeat_state_offset__goto_3172_34 = __ci_expr_ternary_403)
         if ((if __local_charcount__goto_3171_22 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_1633
         } else {
@@ -15482,9 +15361,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1633 {
-        (__ci_expr_old_411 = __local_active_count__goto_548_5)
+        (__ci_expr_old_404 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_411 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_404 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1636
         } else {
             goto '__ci_bb_1637
@@ -15492,11 +15371,11 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1634 {
-        (__ci_expr_logic_412 = 0)
+        (__ci_expr_logic_405 = 0)
         if ((if (__local_i__goto_701_7 + 1) >= __local_active_count__goto_548_5: 1 else: 0) != 0) {
-            (__ci_expr_logic_412 = (if (if __local_new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_405 = (if (if __local_new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
         }
-        if (__ci_expr_logic_412 != 0) {
+        if (__ci_expr_logic_405 != 0) {
             goto '__ci_bb_1639
         } else {
             goto '__ci_bb_1640
@@ -15525,9 +15404,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     '__ci_bb_1639 {
         (__local_ptr__goto_545_12 = __local_ptr__goto_545_12 + (__local_charcount__goto_3171_22 as usize))
         (__local_clen__goto_702_7 = ((0 as c_int)))
-        (__ci_expr_old_413 = __local_new_count__goto_548_19)
+        (__ci_expr_old_406 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_413 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_406 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1642
         } else {
             goto '__ci_bb_1643
@@ -15569,9 +15448,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
         (__local_next_active_state__goto_543_13 = __local_active_states__goto_542_13)
         (__local_active_count__goto_548_5 = ((0 as c_int)))
         (__local_i__goto_701_7 = ((-1 as c_int)))
-        (__ci_expr_old_414 = __local_active_count__goto_548_5)
+        (__ci_expr_old_407 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_414 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_407 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1647
         } else {
             goto '__ci_bb_1648
@@ -15604,9 +15483,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1651 {
-        (__ci_expr_old_416 = __local_new_count__goto_548_19)
+        (__ci_expr_old_409 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_416 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_409 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1657
         } else {
             goto '__ci_bb_1658
@@ -15622,9 +15501,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1653 {
-        (__ci_expr_old_415 = __local_p__goto_3226_26)
+        (__ci_expr_old_408 = __local_p__goto_3226_26)
         (__local_p__goto_3226_26 = __local_p__goto_3226_26 + 1)
-        if ((if ((((*__ci_expr_old_415) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0) {
+        if ((if ((((*__ci_expr_old_408) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0) {
             goto '__ci_bb_1655
         } else {
             goto '__ci_bb_1656
@@ -15665,9 +15544,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1660 {
-        (__ci_expr_old_417 = __local_new_count__goto_548_19)
+        (__ci_expr_old_410 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
-        if ((if __ci_expr_old_417 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_410 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1662
         } else {
             goto '__ci_bb_1663
@@ -15724,9 +15603,9 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1670 {
-        (__ci_expr_old_418 = __local_active_count__goto_548_5)
+        (__ci_expr_old_411 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
-        if ((if __ci_expr_old_418 < __local_wscount: 1 else: 0) != 0) {
+        if ((if __ci_expr_old_411 < __local_wscount: 1 else: 0) != 0) {
             goto '__ci_bb_1672
         } else {
             goto '__ci_bb_1673
@@ -17301,56 +17180,56 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_1869 {
-        (__ci_expr_logic_425 = 0)
-        (__ci_expr_logic_421 = 0)
+        (__ci_expr_logic_418 = 0)
+        (__ci_expr_logic_414 = 0)
         if (__local_could_continue__goto_705_8 != 0) {
-            var __ci_expr_logic_420: c_int
+            var __ci_expr_logic_413: c_int
 
             if ((if (((*__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
-                (__ci_expr_logic_420 = (if true: 1 else: 0))
+                (__ci_expr_logic_413 = (if true: 1 else: 0))
             } else {
-                var __ci_expr_logic_419: c_int = 0
+                var __ci_expr_logic_412: c_int = 0
 
                 if ((if (((*__param_mb).moptions as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_419 = (if (if __local_match_count__goto_548_30 < 0: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_412 = (if (if __local_match_count__goto_548_30 < 0: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                (__ci_expr_logic_420 = (if __ci_expr_logic_419 != 0: 1 else: 0))
+                (__ci_expr_logic_413 = (if __ci_expr_logic_412 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_logic_421 = (if __ci_expr_logic_420 != 0: 1 else: 0))
+            (__ci_expr_logic_414 = (if __ci_expr_logic_413 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_421 != 0) {
-            var __ci_expr_logic_424: c_int
+        if (__ci_expr_logic_414 != 0) {
+            var __ci_expr_logic_417: c_int
 
             if (__local_partial_newline__goto_704_8 != 0) {
-                (__ci_expr_logic_424 = (if true: 1 else: 0))
+                (__ci_expr_logic_417 = (if true: 1 else: 0))
             } else {
-                var __ci_expr_logic_423: c_int = 0
+                var __ci_expr_logic_416: c_int = 0
 
                 if ((if __local_ptr__goto_545_12 >= __local_end_subject__goto_554_12: 1 else: 0) != 0) {
-                    var __ci_expr_logic_422: c_int
+                    var __ci_expr_logic_415: c_int
 
                     if ((if __local_ptr__goto_545_12 > (*__param_mb).start_used_ptr: 1 else: 0) != 0) {
-                        (__ci_expr_logic_422 = (if true: 1 else: 0))
+                        (__ci_expr_logic_415 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_422 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
+                        (__ci_expr_logic_415 = (if (*__param_mb).allowemptypartial != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_423 = (if __ci_expr_logic_422 != 0: 1 else: 0))
+                    (__ci_expr_logic_416 = (if __ci_expr_logic_415 != 0: 1 else: 0))
 
                 }
 
-                (__ci_expr_logic_424 = (if __ci_expr_logic_423 != 0: 1 else: 0))
+                (__ci_expr_logic_417 = (if __ci_expr_logic_416 != 0: 1 else: 0))
 
             }
 
-            (__ci_expr_logic_425 = (if __ci_expr_logic_424 != 0: 1 else: 0))
+            (__ci_expr_logic_418 = (if __ci_expr_logic_417 != 0: 1 else: 0))
 
         }
-        if (__ci_expr_logic_425 != 0) {
+        if (__ci_expr_logic_418 != 0) {
             goto '__ci_bb_1871
         } else {
             goto '__ci_bb_1872

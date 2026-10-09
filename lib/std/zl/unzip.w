@@ -869,16 +869,7 @@ pub unsafe fn unzReadCurrentFile(__param_file: *mut c_void, __param_buf: *mut c_
             }
 
             if (__ci_expr_logic_4 != 0) {
-                var __ci_expr_ternary_5: c_int = 0
-
-                if ((if __local_iRead == 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_5 = ((0 as c_int)))
-                } else {
-                    (__ci_expr_ternary_5 = ((__local_iRead as c_int)))
-                }
-
-                return __ci_expr_ternary_5
-
+                return (if (if __local_iRead == 0: 1 else: 0) != 0: (0 as c_int) else: (__local_iRead as c_int))
             }
 
 
@@ -935,13 +926,13 @@ pub unsafe fn unzReadCurrentFile(__param_file: *mut c_void, __param_buf: *mut c_
 
                 (__local_err = ((inflate(((&raw const (*__local_pfile_in_zip_read_info).stream as *const z_stream_s) as *mut z_stream_s), __local_flush) as c_int)))
 
-                var __ci_expr_logic_6: c_int = 0
+                var __ci_expr_logic_5: c_int = 0
 
                 if ((if __local_err >= 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_6 = (if (if (*(&raw const (*__local_pfile_in_zip_read_info).stream as *const z_stream_s)).msg != null: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_5 = (if (if (*(&raw const (*__local_pfile_in_zip_read_info).stream as *const z_stream_s)).msg != null: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_6 != 0) {
+                if (__ci_expr_logic_5 != 0) {
                     (__local_err = ((-3 as c_int)))
                 }
 
@@ -963,16 +954,7 @@ pub unsafe fn unzReadCurrentFile(__param_file: *mut c_void, __param_buf: *mut c_
                 (__local_iRead = (__local_iRead +% (((__local_uTotalOutAfter as c_ulong) -% (__local_uTotalOutBefore as c_ulong)) as c_uint)))
 
                 if ((if __local_err == 1: 1 else: 0) != 0) {
-                    var __ci_expr_ternary_7: c_int = 0
-
-                    if ((if __local_iRead == 0: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_7 = ((0 as c_int)))
-                    } else {
-                        (__ci_expr_ternary_7 = ((__local_iRead as c_int)))
-                    }
-
-                    return __ci_expr_ternary_7
-
+                    return (if (if __local_iRead == 0: 1 else: 0) != 0: (0 as c_int) else: (__local_iRead as c_int))
                 }
 
                 if ((if __local_err != 0: 1 else: 0) != 0) {
@@ -1324,16 +1306,7 @@ unsafe fn strcmpcasenosensitive_internal(__param_fileName1: *const i8, __param_f
 
 
         if ((if __local_c1 == 0: 1 else: 0) != 0) {
-            var __ci_expr_ternary_4: c_int = 0
-
-            if ((if __local_c2 == 0: 1 else: 0) != 0) {
-                (__ci_expr_ternary_4 = ((0 as c_int)))
-            } else {
-                (__ci_expr_ternary_4 = ((-1 as c_int)))
-            }
-
-            return __ci_expr_ternary_4
-
+            return (if (if __local_c2 == 0: 1 else: 0) != 0: (0 as c_int) else: (-1 as c_int))
         }
 
         if ((if __local_c2 == 0: 1 else: 0) != 0) {
@@ -1396,16 +1369,7 @@ unsafe fn unz64local_SearchCentralDir(__param_pzlib_filefunc_def: *const zlib_fi
 
         (__local_uReadPos = ((((__local_uSizeFile as c_ulong) -% (__local_uBackRead as c_ulong)) as c_ulong)))
 
-        var __ci_expr_ternary_0: c_ulong = 0
-
-        if ((if 1028 < ((__local_uSizeFile as c_ulong) -% (__local_uReadPos as c_ulong)): 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = ((1028 as c_ulong)))
-        } else {
-            (__ci_expr_ternary_0 = ((((__local_uSizeFile as c_ulong) -% (__local_uReadPos as c_ulong)) as c_ulong)))
-        }
-
-        (__local_uReadSize = __ci_expr_ternary_0)
-
+        (__local_uReadSize = (((if (if 1028 < ((__local_uSizeFile as c_ulong) -% (__local_uReadPos as c_ulong)): 1 else: 0) != 0: (1028 as c_ulong) else: (((__local_uSizeFile as c_ulong) -% (__local_uReadPos as c_ulong)) as c_ulong)) as c_ulong)))
 
         if ((if call_zseek64((&raw const (*__param_pzlib_filefunc_def) as *const zlib_filefunc64_32_def_s), __param_filestream, __local_uReadPos, (0 as c_int)) != 0: 1 else: 0) != 0) {
             break
@@ -1418,33 +1382,33 @@ unsafe fn unz64local_SearchCentralDir(__param_pzlib_filefunc_def: *const zlib_fi
         (__local_i = ((((__local_uReadSize as c_int) - 3) as c_int)))
 
         while true {
-            var __ci_expr_old_1: c_int = __local_i
+            var __ci_expr_old_0: c_int = __local_i
 
             (__local_i = __local_i - 1)
 
-            if (not ((if __ci_expr_old_1 > 0: 1 else: 0) != 0)) {
+            if (not ((if __ci_expr_old_0 > 0: 1 else: 0) != 0)) {
                 break
             }
-
-            var __ci_expr_logic_4: c_int = 0
 
             var __ci_expr_logic_3: c_int = 0
 
             var __ci_expr_logic_2: c_int = 0
 
+            var __ci_expr_logic_1: c_int = 0
+
             if ((if (*(__local_buf + ((__local_i as isize) as usize))) == 80: 1 else: 0) != 0) {
-                (__ci_expr_logic_2 = (if (if (*((__local_buf + ((__local_i as isize) as usize)) + ((1 as isize) as usize))) == 75: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_1 = (if (if (*((__local_buf + ((__local_i as isize) as usize)) + ((1 as isize) as usize))) == 75: 1 else: 0) != 0: 1 else: 0))
+            }
+
+            if (__ci_expr_logic_1 != 0) {
+                (__ci_expr_logic_2 = (if (if (*((__local_buf + ((__local_i as isize) as usize)) + ((2 as isize) as usize))) == 5: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_2 != 0) {
-                (__ci_expr_logic_3 = (if (if (*((__local_buf + ((__local_i as isize) as usize)) + ((2 as isize) as usize))) == 5: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_3 = (if (if (*((__local_buf + ((__local_i as isize) as usize)) + ((3 as isize) as usize))) == 6: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_3 != 0) {
-                (__ci_expr_logic_4 = (if (if (*((__local_buf + ((__local_i as isize) as usize)) + ((3 as isize) as usize))) == 6: 1 else: 0) != 0: 1 else: 0))
-            }
-
-            if (__ci_expr_logic_4 != 0) {
                 (__local_uPosFound = ((((__local_uReadPos as c_ulong) +% ((__local_i as c_uint) as c_ulong)) as c_ulong)))
 
                 break
@@ -1514,16 +1478,7 @@ unsafe fn unz64local_SearchCentralDir64(__param_pzlib_filefunc_def: *const zlib_
 
         (__local_uReadPos = ((((__local_uSizeFile as c_ulong) -% (__local_uBackRead as c_ulong)) as c_ulong)))
 
-        var __ci_expr_ternary_0: c_ulong = 0
-
-        if ((if 1028 < ((__local_uSizeFile as c_ulong) -% (__local_uReadPos as c_ulong)): 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = ((1028 as c_ulong)))
-        } else {
-            (__ci_expr_ternary_0 = ((((__local_uSizeFile as c_ulong) -% (__local_uReadPos as c_ulong)) as c_ulong)))
-        }
-
-        (__local_uReadSize = __ci_expr_ternary_0)
-
+        (__local_uReadSize = (((if (if 1028 < ((__local_uSizeFile as c_ulong) -% (__local_uReadPos as c_ulong)): 1 else: 0) != 0: (1028 as c_ulong) else: (((__local_uSizeFile as c_ulong) -% (__local_uReadPos as c_ulong)) as c_ulong)) as c_ulong)))
 
         if ((if call_zseek64((&raw const (*__param_pzlib_filefunc_def) as *const zlib_filefunc64_32_def_s), __param_filestream, __local_uReadPos, (0 as c_int)) != 0: 1 else: 0) != 0) {
             break
@@ -1536,33 +1491,33 @@ unsafe fn unz64local_SearchCentralDir64(__param_pzlib_filefunc_def: *const zlib_
         (__local_i = ((((__local_uReadSize as c_int) - 3) as c_int)))
 
         while true {
-            var __ci_expr_old_1: c_int = __local_i
+            var __ci_expr_old_0: c_int = __local_i
 
             (__local_i = __local_i - 1)
 
-            if (not ((if __ci_expr_old_1 > 0: 1 else: 0) != 0)) {
+            if (not ((if __ci_expr_old_0 > 0: 1 else: 0) != 0)) {
                 break
             }
-
-            var __ci_expr_logic_4: c_int = 0
 
             var __ci_expr_logic_3: c_int = 0
 
             var __ci_expr_logic_2: c_int = 0
 
+            var __ci_expr_logic_1: c_int = 0
+
             if ((if (*(__local_buf + ((__local_i as isize) as usize))) == 80: 1 else: 0) != 0) {
-                (__ci_expr_logic_2 = (if (if (*((__local_buf + ((__local_i as isize) as usize)) + ((1 as isize) as usize))) == 75: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_1 = (if (if (*((__local_buf + ((__local_i as isize) as usize)) + ((1 as isize) as usize))) == 75: 1 else: 0) != 0: 1 else: 0))
+            }
+
+            if (__ci_expr_logic_1 != 0) {
+                (__ci_expr_logic_2 = (if (if (*((__local_buf + ((__local_i as isize) as usize)) + ((2 as isize) as usize))) == 6: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_2 != 0) {
-                (__ci_expr_logic_3 = (if (if (*((__local_buf + ((__local_i as isize) as usize)) + ((2 as isize) as usize))) == 6: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_3 = (if (if (*((__local_buf + ((__local_i as isize) as usize)) + ((3 as isize) as usize))) == 7: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_3 != 0) {
-                (__ci_expr_logic_4 = (if (if (*((__local_buf + ((__local_i as isize) as usize)) + ((3 as isize) as usize))) == 7: 1 else: 0) != 0: 1 else: 0))
-            }
-
-            if (__ci_expr_logic_4 != 0) {
                 (__local_uPosFound = ((((__local_uReadPos as c_ulong) +% ((__local_i as c_uint) as c_ulong)) as c_ulong)))
 
                 break
