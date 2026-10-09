@@ -19406,10 +19406,11 @@ impl Sema:
             elem_origins.push(elem)
             elem_types.push(et as i32)
             elem_roles.push(D22_JOIN_ROLE_EXPR)
-            // #605: a whole non-Copy (Drop) local moved into a plain array element is
-            // consumed (use-after-move + drop-once). Only for array targets — Vec and
-            // other collection literals manage element ownership separately.
-            if target_base == 0 and self.ast.kind(elem) == NodeKind.NK_IDENT and self.type_needs_drop(et as i32) != 0:
+            // #605: a whole non-Copy (Drop) local moved into an element is
+            // consumed (use-after-move + drop-once), whatever collection the
+            // literal builds: MIR moved it into a Vec too, and a later use
+            // read the vacated local.
+            if self.ast.kind(elem) == NodeKind.NK_IDENT and self.type_needs_drop(et as i32) != 0:
                 self.mark_moved_if_consumed(elem)
             // #1281: a field element (`[s.r]`, `[make().1]`) is an implicit
             // field move into ANY sequence target (§2.2, D32) — the base kept
@@ -25957,6 +25958,10 @@ impl Sema:
             self.stmt_pos_depth = 0
         var out = self.check_expr(node)
         out = self.value_to_option_at_demand(node, expected, out)
+        // D93: every demand on a literal's binding counts, the ones its
+        // default (a Vec, D113) already meets too, so two that disagree are
+        // an error at the second.
+        self.note_literal_demand(node, expected as i32, node)
         self.stmt_pos_depth = saved_stmt_depth
         self.match_in_stmt_pos = saved_match_stmt
         self.current_value_expr_root = saved_value_root

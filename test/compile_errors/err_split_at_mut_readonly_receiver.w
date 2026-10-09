@@ -1,4 +1,8 @@
-//! expect-check-fail: split_at_mut() requires a mutable place receiver
+//! expect-check-fail: method 'Vec.split_at_mut' requires a mutable receiver
+
+// A read-only view of a Vec cannot be split into mutable halves.
+fn halves(xs: &Vec[i32]):
+    let _parts = xs.split_at_mut(1)
 
 fn main:
-    let _parts = [1, 2, 3].split_at_mut(1)
+    halves([1, 2, 3])

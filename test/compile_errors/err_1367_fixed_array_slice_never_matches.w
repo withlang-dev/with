@@ -4,6 +4,6 @@
 // whose length cannot match the fixed array is a compile error, not a
 // demand for an else branch.
 fn main:
-    let arr = [1, 2, 3]
+    let arr: [i32; 3] = [1, 2, 3]
     let [a, b] = arr
     print(f"{a} {b}")

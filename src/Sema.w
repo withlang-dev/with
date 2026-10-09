@@ -4014,6 +4014,9 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     // cannot be stored past them, and a borrowed `CStr` a facade returns is
     // kept inside its origin's life by the ordinary view analysis.
     s.ephemeral_types.insert(s.pool_intern("CStr"), 1)
+    // A `VecRange` (`split_at`, `range`) views the Vec it came from: it
+    // cannot outlive it, a statement temporary included.
+    s.ephemeral_types.insert(s.pool_intern("VecRange"), 1)
 
     // Sub-byte and non-standard integer widths for bitpacked structs.
     for w in 1..8:

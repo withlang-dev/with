@@ -33,7 +33,7 @@ fn test_enum_pattern_filters:
     assert(qualified_sum == 13)
 
 fn test_slice_rest_pattern:
-    let rows = [
+    let rows: Vec[[i32; 3]] = [
         [1, 2, 3],
         [4, 5, 6],
     ]
