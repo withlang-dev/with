@@ -355,7 +355,11 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
     integrity.action = run_corpus_integrity_action
     integrity = integrity.input(corpus_stamp_path(corpus))
     integrity = target_with_corpus_module_inputs(integrity, ctx, corpus)
-    for dir in corpus.extra_generated_dirs: integrity = integrity.input(dir.clone())
+    // Each generated file, never the directory: a directory input names the
+    // target that produces it, and the check would re-promote what it checks.
+    for dir in corpus.extra_generated_dirs:
+        for path in ctx.fs().list_files(dir):
+            if path.ends_with(".w"): integrity = integrity.input(path.clone())
     integrity = integrity.write_scope("out/corpus-integrity").allow_parallel()
     graph = graph.add_target(integrity)
 
