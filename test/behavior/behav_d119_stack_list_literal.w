@@ -14,6 +14,8 @@
 //! expect-stdout: 9
 //! expect-stdout: p0p1p2p3
 //! expect-stdout: q3
+//! expect-stdout: true
+//! expect-stdout: 7
 
 // §4.3c (D119): a List literal that is never pushed, grown, moved out,
 // stored or retained does not touch the heap. Each shape here either keeps
@@ -88,3 +90,10 @@ fn main:
         let cur = [f"q{i}"]
         last = cur
     print(last[0])
+    // Its capacity covers its elements.
+    print(f"{t.capacity() >= t.len()}")
+    // The buffer's address handed out (for a C call): written through, so
+    // the constants stay in the frame rather than in read-only data.
+    let raw = [1, 2]
+    unsafe { *raw.as_mut_ptr() = 7 }
+    print(f"{raw[0]}")
