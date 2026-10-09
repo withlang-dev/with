@@ -2731,11 +2731,13 @@ fn ci_estimate_type_size(ty: &str) -> i64:
     if ty == "i8" or ty == "u8" or ty == "bool" or ty == "c_char": return 1
     if ty == "i16" or ty == "u16" or ty == "c_short" or ty == "c_ushort": return 2
     if ty == "i32" or ty == "u32" or ty == "f32" or ty == "c_int" or ty == "c_uint": return 4
-    if ty == "i64" or ty == "u64" or ty == "f64" or ty == "isize" or ty == "usize": return 8
-    if ty == "c_long" or ty == "c_ulong" or ty == "c_longlong" or ty == "c_ulonglong": return 8
+    if ty == "i64" or ty == "u64" or ty == "f64": return 8
+    if ty == "isize" or ty == "usize": return target_spec_size_bytes()
+    if ty == "c_long" or ty == "c_ulong": return if target_spec_os() == "Windows" or target_spec_is_wasm() and target_spec_ptr_bytes() == 4: 4 else: 8
+    if ty == "c_longlong" or ty == "c_ulonglong": return 8
     if ty == "c_longdouble": return 8
     if ty == "i128" or ty == "u128": return 16
-    if ci_starts_with(ty, "*"): return 8
+    if ci_starts_with(ty, "*"): return target_spec_ptr_bytes()
     if ci_starts_with(ty, "Option["): return 8
     8  // default assumption
 

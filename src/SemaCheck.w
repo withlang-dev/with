@@ -1312,6 +1312,22 @@ impl Sema:
             return self.aggregate_repr_differs(er, self.get_type_d0(ar) as TypeId, 0) != 0
         false
 
+    // §4.2.6: which argument of which call `arg` is, for the narrowing
+    // diagnostic (" (argument 2 of `get_tag`)"); "" when `call` is not the
+    // call that holds it.
+    fn call_arg_target_note(call: i32, arg: i32) -> str:
+        if call <= 0 or arg <= 0 or self.ast.kind(call) != NodeKind.NK_CALL:
+            return ""
+        let start = self.ast.get_data1(call)
+        for i in 0..self.ast.get_data2(call):
+            if self.ast.get_extra(start + i) != arg:
+                continue
+            let callee = self.ast.get_data0(call)
+            let kind = self.ast.kind(callee)
+            let name = if kind == NodeKind.NK_FIELD_ACCESS: self.pool_resolve(self.ast.get_data1(callee)) else if kind == NodeKind.NK_IDENT: self.pool_resolve(self.ast.get_data0(callee)) else: ""
+            return if name.len() > 0: f" (argument {i + 1} of `{name}`)" else: f" (argument {i + 1})"
+        ""
+
     mut fn note_call_arg_coercion(expected: i32, actual: i32, arg_node: i32, err_node: i32):
         if self.can_auto_ref_arg(expected, actual) != 0:
             if arg_node <= 0:
@@ -1323,7 +1339,9 @@ impl Sema:
             // non-Copy field reached through a view cannot satisfy it. The
             // auto-ref path above already returned for &T parameters.
             self.reject_owned_demand_from_view_projection(arg_node, expected, "call argument")
+            self.narrowing_target_note = self.call_arg_target_note(err_node, arg_node)
             let _ = self.reject_implicit_numeric_narrowing(arg_node, expected, actual)
+            self.narrowing_target_note = ""
             let _ = self.record_contextual_copy_adjustment(arg_node, expected, actual)
 
     // #1627 (§3.8, D22): an enum payload is a demand like a parameter. A
@@ -10018,13 +10036,16 @@ impl Sema:
                 // takes the INDEX (passing the node id here OOB'd the compact
                 // string table — #660's id-confusion class).
                 let lit_text = self.ast.int_literal_digits(node as NodeId)
-                self.emit_error(f"integer literal does not fit default type ('{lit_text}', suffix_ty={suffix_ty}, expected_ty={expected_ty})", node)
-                self.typed_expr_types.insert(node, self.ty_i64 as i32)
-                return self.ty_i64
-            let value = fast.value
-            let ty: i32 = if value < -2147483648 or value > 2147483647: self.ty_i64 else: self.ty_i32
-            self.typed_expr_types.insert(node, ty as i32)
-            return ty
+                self.emit_error(f"integer literal `{lit_text}` does not fit `isize`, the default integer type; give it a fixed-width suffix such as `u64` (§4.1)", node)
+                self.typed_expr_types.insert(node, self.ty_isize as i32)
+                return self.ty_isize
+            // D114 (§4.1): a literal nothing demands a width of is `isize`,
+            // checked at the target's width, not the host's.
+            let fits = if self.in_negated_literal_context != 0: self.int_literal_fits_type_negated(node, self.ty_isize as i32) else: self.int_literal_fits_type(node, self.ty_isize as i32)
+            if not fits:
+                self.emit_error(f"integer literal does not fit `isize` on this target ({target_spec_size_bytes() * 8} bits); give it a fixed-width suffix such as `i64` (§4.1)", node)
+            self.typed_expr_types.insert(node, self.ty_isize as i32)
+            return self.ty_isize
 
         if kind == NodeKind.NK_FLOAT_LIT:
             let suffix = self.ast.literal_suffix(node)
@@ -14631,11 +14652,15 @@ impl Sema:
             return 0
         let sym = self.ast.get_data0(expr)
         // The latest such `let` of that name in this function.
-        var k = self.fn_literal_lets.len() as i32 - 3
-        while k >= 0:
-            if self.fn_literal_lets[k] == self.current_fn_sig_idx and self.fn_literal_lets[k + 1] == sym: return self.fn_literal_lets[k + 2]
-            k = k - 3
-        0
+        self.fn_literal_lets.get((self.current_fn_sig_idx as i64) * 4294967296 + sym as i64) ?? 0
+
+    // An unsuffixed integer literal, negated or grouped or not (`0`, `-1`).
+    fn is_bare_int_literal(expr: i32) -> bool:
+        if expr <= 0: return false
+        let kind = self.ast.kind(expr)
+        if kind == NodeKind.NK_GROUPED: return self.is_bare_int_literal(self.ast.get_data0(expr))
+        if kind == NodeKind.NK_UNARY and self.ast.get_data0(expr) == UnaryOp.UOP_NEGATE: return self.is_bare_int_literal(self.ast.get_data1(expr))
+        kind == NodeKind.NK_INT_LIT and self.ast.literal_suffix(expr as NodeId) == 0
 
     // A use of `expr` that needs the type `demanded`: a parameter, a typed
     // place, a return. The collections a list builds are demanded (`List`,
@@ -14647,12 +14672,19 @@ impl Sema:
             return
         let want = self.auto_deref_ref_ptr_type(self.resolve_alias(demanded as TypeId)) as i32
         let kind = self.get_type_kind(want as TypeId)
-        if kind == TypeKind.TY_GENERIC_INST:
-            let base = self.canonical_symbol_by_text(self.get_generic_inst_base(want))
-            if base != self.syms.list and base != self.syms.hashset and base != self.syms.btreeset:
-                return
-        else if kind != TypeKind.TY_ARRAY:
+        // D114 prototype: an unsuffixed integer literal's binding takes the
+        // integer type its uses demand, as a bracket literal takes its
+        // collection; `isize` when nothing demands one.
+        let int_let = self.is_bare_int_literal(self.ast.get_data1(let_node))
+        if int_let != (kind == TypeKind.TY_INT):
             return
+        if not int_let:
+            if kind == TypeKind.TY_GENERIC_INST:
+                let base = self.canonical_symbol_by_text(self.get_generic_inst_base(want))
+                if base != self.syms.list and base != self.syms.hashset and base != self.syms.btreeset:
+                    return
+            else if kind != TypeKind.TY_ARRAY:
+                return
         self.literal_demands.push(let_node)
         self.literal_demands.push(want)
         self.literal_demands.push(use_node)
@@ -14755,23 +14787,27 @@ impl Sema:
     pub fn literal_decisions_from_demands() -> List[i32]:
         // (let, type, second type or 0, use, second use), in this check's ids.
         var found: List[i32] = List.new()
+        var found_at = sema_new_map_i32_i32()
         var i = 0
         while i + 2 < self.literal_demands.len() as i32:
             let let_node: i32 = self.literal_demands[i]
             let want: i32 = self.literal_demands[i + 1]
             let use_node: i32 = self.literal_demands[i + 2]
             i = i + 3
-            var at = -1
-            var k = 0
-            while k + 4 < found.len() as i32:
-                if found[k] == let_node: at = k
-                k = k + 5
+            let at = found_at.get(let_node) ?? -1
             if at < 0:
+                found_at.insert(let_node, found.len() as i32)
                 found.push(let_node)
                 found.push(want)
                 found.push(0)
                 found.push(use_node)
                 found.push(0)
+            else if found[at + 1] != want and found[at + 2] == 0 and self.get_type_kind(want as TypeId) == TypeKind.TY_INT and self.get_type_kind(found[at + 1] as TypeId) == TypeKind.TY_INT and (self.int_narrowing_requires_cast(want as TypeId, found[at + 1] as TypeId) == 0 or self.int_narrowing_requires_cast(found[at + 1] as TypeId, want as TypeId) == 0):
+                // Integer demands one of which widens into the other: the
+                // narrower meets both (`i32` passes where `i64` is wanted).
+                if self.int_narrowing_requires_cast(found[at + 1] as TypeId, want as TypeId) == 0:
+                    found[at + 1] = want
+                    found[at + 3] = use_node
             else if found[at + 1] != want and found[at + 2] == 0:
                 found[at + 2] = want
                 found[at + 4] = use_node
@@ -14795,19 +14831,27 @@ impl Sema:
     // The type the uses of the binding declared at `let_node` decided, or 0.
     // Two demanded types are an error at the second use (§4.3c).
     mut fn literal_decision(let_node: i32) -> i32:
-        var k = 0
-        while k + 4 < self.literal_decisions.len() as i32:
-            let first_len: i32 = self.literal_decisions[k + 3]
-            let second_len: i32 = self.literal_decisions[k + 4 + first_len]
-            if self.literal_decisions[k] == let_node:
-                let codes = sema_clone_i32_list(&self.literal_decisions)
-                let decided = (self.literal_type_decode(&codes, k + 4) / 4294967296) as i32
-                if second_len != 0:
-                    let other = (self.literal_type_decode(&codes, k + 5 + first_len) / 4294967296) as i32
-                    self.emit_error_with_help(f"this use demands `{self.type_name(other)}` of a binding another use demands `{self.type_name(decided)}` of (§4.3c)", self.literal_decisions[k + 2], "write the binding's type")
-                return decided
-            k = k + 5 + first_len + second_len
-        0
+        if self.literal_decision_at.len() == 0:
+            var walk = 0
+            while walk + 4 < self.literal_decisions.len() as i32:
+                self.literal_decision_at.insert(self.literal_decisions[walk], walk)
+                let walk_first: i32 = self.literal_decisions[walk + 3]
+                walk = walk + 5 + walk_first + self.literal_decisions[walk + 4 + walk_first]
+        let at = self.literal_decision_at.get(let_node)
+        if at.is_none():
+            return 0
+        let k: i32 = at.unwrap()
+        let first_len: i32 = self.literal_decisions[k + 3]
+        let second_len: i32 = self.literal_decisions[k + 4 + first_len]
+        // A type the first check already had is its id (tag 0): no rebuild.
+        if second_len == 0 and self.literal_decisions[k + 4] == 0:
+            return self.literal_decisions[k + 5]
+        let codes = sema_clone_i32_list(&self.literal_decisions)
+        let decided = (self.literal_type_decode(&codes, k + 4) / 4294967296) as i32
+        if second_len != 0:
+            let other = (self.literal_type_decode(&codes, k + 5 + first_len) / 4294967296) as i32
+            self.emit_error_with_help(f"this use demands `{self.type_name(other)}` of a binding another use demands `{self.type_name(decided)}` of (§4.3c)", self.literal_decisions[k + 2], "write the binding's type")
+        decided
 
     // The generic type a bare name in an annotation names (`List`, `Option`,
     // a user `Pair`), or 0: a name with arguments, a non-generic type, or
@@ -14859,9 +14903,10 @@ impl Sema:
 
         // D93: no annotation, an element-form literal, and uses that
         // demanded a collection: the binding has that type.
-        if ann_extra < 0 and value != 0 and self.ast.kind(value) == NodeKind.NK_ARRAY_LIT and self.literal_watermark == 0:
+        let use_typed = ann_extra < 0 and value != 0 and (self.ast.kind(value) == NodeKind.NK_ARRAY_LIT or self.is_bare_int_literal(value))
+        if use_typed and self.literal_watermark == 0:
             self.literal_watermark = self.type_kinds.len() as i32
-        if ann_extra < 0 and value != 0 and self.ast.kind(value) == NodeKind.NK_ARRAY_LIT and self.literal_decisions.len() > 0:
+        if use_typed and self.literal_decisions.len() > 0:
             let decided = self.literal_decision(node)
             if decided != 0: ann_type = decided as TypeId
 
@@ -14972,9 +15017,7 @@ impl Sema:
         self.binding_decl_nodes.insert(name, node)
         self.binding_value_nodes.insert(name, value)
         // D93: a literal's binding, or a later `let` of the name that is not one.
-        self.fn_literal_lets.push(self.current_fn_sig_idx)
-        self.fn_literal_lets.push(name)
-        self.fn_literal_lets.push(if ann_extra < 0 and self.ast.kind(value) == NodeKind.NK_ARRAY_LIT and self.ast.kind(node) == NodeKind.NK_LET_BINDING: node else: 0)
+        self.fn_literal_lets.insert((self.current_fn_sig_idx as i64) * 4294967296 + name as i64, if use_typed and self.ast.kind(node) == NodeKind.NK_LET_BINDING: node else: 0)
         if self.type_carries_callable(bind_type as i32):
             self.callable_let_decls.insert(node, 1)
             self.note_callable_binding_value(node, value)
@@ -26173,7 +26216,7 @@ impl Sema:
             self.emit_error(f"a float where an integer is demanded needs an explicit conversion: `x as {want}` truncates, `x.round() as {want}` rounds (§4.2.6)", node)
             return true
         if ek == TypeKind.TY_INT and vk == TypeKind.TY_INT and self.int_narrowing_requires_cast(expected as TypeId, value as TypeId) != 0:
-            self.emit_error(f"implicit integer narrowing or sign change from `{got}` to `{want}`; use an explicit `as` cast (§4.2.6)", node)
+            self.emit_error(f"implicit integer narrowing or sign change from `{got}` to `{want}`{self.narrowing_target_note}; use an explicit `as` cast (§4.2.6)", node)
             return true
         if ek == TypeKind.TY_FLOAT and vk == TypeKind.TY_INT:
             self.emit_error(f"an integer where a float is demanded needs an explicit `as {want}` (§4.2.6: no implicit integer-to-float conversion)", node)
@@ -29392,7 +29435,7 @@ impl Sema:
             return self.ensure_tuple_type(elems, 2) as i32
         if owner == self.syms.enumerateiter:
             let elems2: List[i32] = List.new()
-            elems2.push(self.ty_i64 as i32)
+            elems2.push(self.ty_isize as i32)
             elems2.push(self.get_generic_inst_arg(resolved as i32, 1))
             return self.ensure_tuple_type(elems2, 2) as i32
         if owner == self.syms.zipwithiter:
@@ -29795,10 +29838,10 @@ impl Sema:
         0
 
     fn collection_len_method_return_type(method_name: &str) -> i32:
-        // D11 (§18.6): len() is signed Int (i64) on every collection —
-        // never usize, never Option. Do not revert to usize.
+        // D114 (§18.6): len() is `isize`, the target's size width, signed
+        // (D11) — never usize, never Option.
         if method_name == "len":
-            return self.ty_i64 as i32
+            return self.ty_isize as i32
         if method_name == "is_empty":
             return self.ty_bool as i32
         if method_name == "len32":
@@ -30033,13 +30076,13 @@ impl Sema:
             if field == self.syms.any or field == self.syms.all or field == self.syms.none_pred:
                 return self.ty_bool as i32
             if field == self.syms.position:
-                return self.ensure_option_type_for(self.ty_i64 as i32)
+                return self.ensure_option_type_for(self.ty_isize as i32)
             if field == self.syms.for_each:
                 return self.ty_void as i32
             if field == self.syms.reduce:
                 return self.ensure_option_type_for(iter_elem_ty)
             if field == self.syms.count:
-                return self.ty_i64 as i32
+                return self.ty_isize as i32
             if field == self.syms.collect:
                 return self.ensure_list_type_for(iter_elem_ty)
             if field == self.syms.partition:
@@ -30090,7 +30133,7 @@ impl Sema:
                 if method_name == "len_i64":
                     return self.ty_i64 as i32
                 if method_name == "capacity":
-                    return self.ty_i64 as i32
+                    return self.ty_isize as i32
                 if method_name == "is_empty" or method_name == "push_byte" or method_name == "push_str" or method_name == "equals":
                     return self.ty_bool as i32
                 if method_name == "clear":
@@ -30180,7 +30223,7 @@ impl Sema:
             if field == self.syms.contains or field == self.syms.starts_with or field == self.syms.ends_with:
                 return self.ty_bool as i32
             if method_name == "find" or method_name == "index_of":
-                return self.ty_i64 as i32
+                return self.ty_isize as i32
             if field == self.syms.to_lower or field == self.syms.to_upper or field == self.syms.lower or field == self.syms.upper or field == self.syms.replace or field == self.syms.slice or method_name == "repeat":
                 return self.ty_str as i32
             if method_name == "split":
@@ -32770,7 +32813,7 @@ impl Sema:
                 if mc_method_name_raw == "len_i64":
                     return self.ty_i64 as i32
                 if mc_method_name_raw == "capacity":
-                    return self.ty_i64 as i32
+                    return self.ty_isize as i32
                 if mc_method_name_raw == "is_empty" or mc_method_name_raw == "push_byte" or mc_method_name_raw == "push_str" or mc_method_name_raw == "equals":
                     return self.ty_bool as i32
                 if mc_method_name_raw == "clear":
@@ -32988,13 +33031,13 @@ impl Sema:
                     if field == self.syms.min or field == self.syms.max or field == self.syms.min_by or field == self.syms.max_by or field == self.syms.find:
                         return self.ensure_option_type_for(iter_elem_ty)
                     if field == self.syms.position:
-                        return self.ensure_option_type_for(self.ty_i64 as i32)
+                        return self.ensure_option_type_for(self.ty_isize as i32)
                     if field == self.syms.any or field == self.syms.all or field == self.syms.none_pred:
                         return self.ty_bool as i32
                     if field == self.syms.for_each:
                         return self.ty_void as i32
                     if field == self.syms.count:
-                        return self.ty_i64 as i32
+                        return self.ty_isize as i32
                     if field == self.syms.collect:
                         return self.ensure_list_type_for(iter_elem_ty)
                     if field == self.syms.partition:

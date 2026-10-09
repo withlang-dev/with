@@ -34,7 +34,7 @@ impl[T: Ord] SortedList[T]:
             let right = unsafe { &(*(b as *const Slot[T])).value }
             if left < right: -1 else if left > right: 1 else: 0
 
-    pub fn len() -> i32: unsafe { sortedarray_length(self.array) } as i32
+    pub fn len() -> isize: unsafe { sortedarray_length(self.array) } as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     unsafe fn slot_at(index: i32) -> *mut Slot[T]:

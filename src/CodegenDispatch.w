@@ -9430,8 +9430,15 @@ impl Codegen:
         self.mir_finish_intrinsic_call(body, dest_place, next_bb, result)
         true
 
-    mut fn mir_finish_intrinsic_call(body: &MirBody, dest_place: i32, next_bb: i32, result: i64):
-        if dest_place >= 0 and result != 0:
+    mut fn mir_finish_intrinsic_call(body: &MirBody, dest_place: i32, next_bb: i32, raw_result: i64):
+        if dest_place >= 0 and raw_result != 0:
+            var result = raw_result
+            // D114: a length is `isize`; the runtime's size fields are i64
+            // until the collection headers take the size width, so a 32-bit
+            // target narrows the read here, at the one store.
+            let dest_sema = self.sema.resolve_alias(self.mir_place_sema_type(body, dest_place) as TypeId)
+            if dest_sema != 0 and self.sema.get_type_kind(dest_sema) == TypeKind.TY_INT and self.sema.get_type_d2(dest_sema) != 0 and wl_get_type_kind(wl_type_of(result)) == wl_integer_type_kind():
+                result = self.coerce_int(result, self.sema_type_to_llvm(dest_sema as i32))
             let result_ty = wl_type_of(result)
             if result_ty != wl_void_type(self.context):
                 let dest_ptr = self.mir_place_ptr(body, dest_place, true, result_ty)
@@ -13601,7 +13608,7 @@ impl Codegen:
             let elem = self.mir_generic_arg_tid(iter_sema, 1)
             if elem != 0:
                 let elems2: List[i32] = List.new()
-                elems2.push(self.sema.ty_i64 as i32)
+                elems2.push(self.sema.ty_isize as i32)
                 elems2.push(elem)
                 return self.sema.find_tuple_type(elems2, 2) as i32
             return 0
@@ -14109,7 +14116,7 @@ impl Codegen:
             let merge_bb_en = wl_append_bb(self.context, self.current_function, "enumerate.merge")
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next_en), some_bb_en, none_bb_en)
             wl_position_at_end(self.builder, some_bb_en)
-            let idx_val_en = wl_build_load(self.builder, wl_i64_type(self.context), idx_ptr_en)
+            let idx_val_en = wl_build_load(self.builder, wl_struct_get_type_at(iter_ty, 1), idx_ptr_en)
             let payload_en = self.option_payload_value(next_en, raw_elem_ty_en)
             let pair_alloc_en = self.create_entry_alloca(elem_ty)
             wl_build_store(self.builder, self.build_default_value(elem_ty), pair_alloc_en)
@@ -14117,7 +14124,7 @@ impl Codegen:
             wl_build_store(self.builder, idx_val_en, en0)
             let en1 = self.tuple_elem_ptr(elem_ty, pair_alloc_en, 1)
             wl_build_store(self.builder, payload_en, en1)
-            wl_build_store(self.builder, wl_build_add(self.builder, idx_val_en, wl_const_int(wl_i64_type(self.context), 1, 0)), idx_ptr_en)
+            wl_build_store(self.builder, wl_build_add(self.builder, idx_val_en, wl_const_int(wl_type_of(idx_val_en), 1, 0)), idx_ptr_en)
             let pair_val_en = wl_build_load(self.builder, elem_ty, pair_alloc_en)
             let some_val_en = self.build_option_some(pair_val_en, opt_type)
             wl_build_br(self.builder, merge_bb_en)
@@ -14375,7 +14382,7 @@ impl Codegen:
             wl_build_store(self.builder, self.coerce_value_to_type(fn_zw, wl_struct_get_type_at(adapter_ty, 2)), f2zw)
         if kind == MirIntrinsic.ITER_ENUMERATE:
             let f1e = wl_build_struct_gep(self.builder, adapter_ty, alloca, 1)
-            wl_build_store(self.builder, wl_const_int(wl_i64_type(self.context), 0, 0), f1e)
+            wl_build_store(self.builder, wl_const_int(wl_struct_get_type_at(adapter_ty, 1), 0, 0), f1e)
         if kind == MirIntrinsic.ITER_DROP_WHILE:
             let f2dw = wl_build_struct_gep(self.builder, adapter_ty, alloca, 2)
             wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), f2dw)

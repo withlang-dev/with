@@ -863,12 +863,15 @@ pub type Sema {
     // binding at the type decided (literal_decisions; its layout is
     // literal_decisions_from_demands's).
     literal_demands: List[i32],
-    // Every literal binding checked so far, as (function signature, name,
-    // `let`) triples: a return is judged after the body's scopes have
-    // closed, and a generic callee's body is checked in the middle of its
-    // caller's.
-    fn_literal_lets: List[i32],
+    // The latest literal binding of each name in each function, keyed
+    // function signature * 2^32 + name: a return is judged after the body's
+    // scopes have closed, and a generic callee's body is checked in the
+    // middle of its caller's.
+    fn_literal_lets: HashMap[i64, i32],
     literal_decisions: List[i32],
+    // literal_decisions by `let`: the offset of each binding's entry, built
+    // at the first lookup (one walk, not one per binding).
+    literal_decision_at: HashMap[i32, i32],
     // The number of types when the first such binding was reached: the two
     // checks are the same check up to there, so a type below this mark has
     // one id in both, and a type above it is rebuilt from its structure.
@@ -1623,6 +1626,9 @@ pub type Sema {
     // binds a non-Copy value by value, or a Drop type is taken apart). Every
     // other by-value place subject is observed in place by MirLower.
     consuming_pattern_subjects: HashMap[i32, i32],
+    // §4.2.6: where a narrowed integer is going (" (argument 2 of `get_tag`)"),
+    // appended to the narrowing diagnostic; "" when not known.
+    narrowing_target_note: str,
     // D115 (§9.7): slice pattern nodes that take an owned subject apart by
     // value; every other slice pattern observes its subject. The rest
     // binding's type, keyed by the same node.
@@ -3143,9 +3149,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         field_demand_uses: List.new(),
         field_decisions: List.new(),
         literal_demands: List.new(),
-        fn_literal_lets: List.new(),
+        fn_literal_lets: HashMap.new(),
         literal_watermark: 0,
         literal_decisions: List.new(),
+        literal_decision_at: sema_new_map_i32_i32(),
         field_last_use: HashMap.new(),
         effect_prov: HashMap.new(),
         effect_note_origin_node: 0,
@@ -3569,6 +3576,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         autoderef_step_tys: List.new(),
         pattern_value_syms: sema_new_map_i32_i32(),
         consuming_pattern_subjects: sema_new_map_i32_i32(),
+        narrowing_target_note: "",
         owned_slice_patterns: sema_new_map_i32_i32(),
         slice_rest_types: sema_new_map_i32_i32(),
         pattern_list_removal: 0,
@@ -4005,9 +4013,12 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.ty_never = s.add_type(TypeKind.TY_NEVER, 0, 0, 0)
     s.ty_str = s.add_type(TypeKind.TY_STR, 0, 0, 0)
     s.ty_str_view = s.add_type(TypeKind.TY_REF, s.ty_str, 0, 0)
-    // Pointer-width integers: d2=1 marks them as usize/isize (64-bit on arm64)
-    s.ty_usize = s.add_type(TypeKind.TY_INT, 64, 0, 1)
-    s.ty_isize = s.add_type(TypeKind.TY_INT, 64, 1, 1)
+    // D114: usize/isize have the target's size width (d2=1 marks them), 32
+    // bits on wasm32, so widening and narrowing (§4.2.6) and literal range
+    // checks are the target's.
+    let size_bits = (target_spec_size_bytes() * 8) as i32
+    s.ty_usize = s.add_type(TypeKind.TY_INT, size_bits, 0, 1)
+    s.ty_isize = s.add_type(TypeKind.TY_INT, size_bits, 1, 1)
     s.ty_c_va_list = s.add_type(TypeKind.TY_VA_LIST, 0, 0, 0)
     s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_i8, 0, 0)
     let cstr_field_names: List[str] = List.new()

@@ -56,7 +56,7 @@ pub fn HashIndex.new[K: Key, V]() -> HashIndex[K, V]:
     HashIndex { map: map, probe: probe }
 
 impl[K, V] HashIndex[K, V]:
-    pub fn len() -> i32: unsafe { (*self.map).count } as i32
+    pub fn len() -> isize: unsafe { (*self.map).count } as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     /// Drops every key and value and frees their slots; the engine's

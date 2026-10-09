@@ -508,6 +508,7 @@ impl Sema:
 
         self.collecting_types = 0
         self.resolve_deferred_non_generic_type_decls()
+        self.warn_size_width_layout_fields()
         self.collect_enum_constructor_imports()
 
         // Pass 3: collect function signatures and top-level let decls.
@@ -1043,6 +1044,32 @@ impl Sema:
     mut fn check_duplicate_field(type_name: i32, seen: &List[i32], f_name: i32, node: i32):
         if seen.contains(f_name):
             self.emit_error(f"duplicate field `{self.pool_resolve(f_name)}` in `{self.pool_resolve(type_name)}`", node)
+
+    // D114 (§4.1): a value that leaves the process, serialized or laid out for
+    // C, has a fixed width; an `isize` field there changes size with the
+    // target. A c_import record mirrors C's own size_t and is not warned.
+    mut fn warn_size_width_layout_fields():
+        let serialize = self.pool_lookup_symbol("Serialize")
+        let deserialize = self.pool_lookup_symbol("Deserialize")
+        for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di) or (di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0):
+                continue
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL or not self.type_decl_tids.contains(decl):
+                continue
+            let tid = self.type_decl_tids.get(decl).unwrap()
+            if self.get_type_kind(tid as TypeId) != TypeKind.TY_STRUCT:
+                continue
+            let name = self.get_type_d0(tid as TypeId)
+            let layout = if self.repr_c_types.contains(tid): "C-layout" else if (serialize != 0 and self.select_trait_impl(name, serialize) != 0) or (deserialize != 0 and self.select_trait_impl(name, deserialize) != 0): "serialized" else: ""
+            if layout.len() == 0:
+                continue
+            let te_start = self.get_type_d1(tid as TypeId)
+            for fi in 0..self.get_type_d2(tid as TypeId):
+                let f_tid = self.resolve_alias(self.type_extra[te_start + fi * 3 + 1] as TypeId)
+                if self.get_type_kind(f_tid) == TypeKind.TY_INT and self.get_type_d2(f_tid) != 0:
+                    let width = if self.get_type_d1(f_tid) != 0: "i" else: "u"
+                    self.emit_warning(f"field `{self.pool_resolve(self.type_extra[te_start + fi * 3])}` of {layout} struct `{self.pool_resolve(name)}` is `{self.type_name(f_tid as i32)}`, whose width is the target's; a value that leaves the process has a fixed width, such as `{width}64` (§4.1, D114)", decl)
 
     mut fn collect_type_decl(node: i32, is_local: i32):
         let name = self.ast.get_data0(node)
