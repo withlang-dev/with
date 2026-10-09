@@ -470,6 +470,19 @@ the dotted `fn Type.name` — is associated / free (no receiver).
 | `fn Type.m()` at top level | none (associated) | `Type.m()` | — |
 | `mut`/`move fn` at top level | *error* — mode with no receiver | — | — |
 
+**One name may have an observing form and an owned form; the receiver's
+syntax selects (D117).** A type may declare a method name twice, once as
+`fn` and once as `move fn`. A call on an owned receiver — a temporary, or a
+place spelled `move`, as in `(move xs).rest()` — selects the `move fn`; a
+call on a place selects the `fn`. This is the slice pattern's rule (§9.7):
+ownership is read from the syntax, never from whether a later line uses the
+receiver, so an edit elsewhere in the body never changes which form a call
+selects or what it returns. A name declared once is called as declared. The
+two forms must be the same operation, differing only in the ownership of the
+result (a view against the value it views); a name whose two forms do
+different things is a defect. Nothing can check that mechanically, so the
+spec states it and review enforces it.
+
 **A `mut fn` may not duplicate the receiver's ownership into its return
 (D21).** The caller retains the receiver place across a `mut fn` call, so a
 non-`Copy` owned return may not be the receiver itself or another owner of

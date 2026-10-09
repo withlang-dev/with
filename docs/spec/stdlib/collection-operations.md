@@ -94,6 +94,23 @@ let report = transactions.iter()
     |> join("\n")
 ```
 
+**Sequence ends (D117).** On a `Vec`, a slice or a fixed array:
+
+| Operation | Description |
+|-----------|-------------|
+| `first()` | `Option` of the first element |
+| `last()` | `Option` of the last element |
+| `rest()` | The elements after the first; empty for an empty sequence |
+
+`xs.first()` and `xs.rest()` are the expression forms of `[first, ..rest]`
+(§9.7), with its modes, selected by the receiver's syntax (§9.5, D117). On a
+place, `first()` and `last()` give `Option[&T]` and `rest()` a `[]T` view. On
+an owned receiver (a temporary, or `move xs`), `first()` and `last()` give
+`Option[T]`, and `rest()` gives the owned remainder: for a `Vec`, a `Vec[T]`
+sharing its buffer; for a fixed array, `[T; N-1]`. `rest()` is O(1) on a
+place and on an owned `Vec`. Indexing an empty sequence (`xs[0]`) panics;
+`first()` answers `None`.
+
 **Lookup observes; removal transfers (D22).**
 
 Every owning keyed map in the standard library, including `HashMap[K, V]`

@@ -294,7 +294,10 @@ has one spelling for element access, `xs[i]`; it has no positional `get`
 (D71). Out-of-range positional access panics — for positional access,
 absence is a bug, not a value, so no `Option` appears. (Keyed maps differ:
 absence is normal there, so `get` returns `Option[&V]` per D22.) The
-ownership-transfer operation is `remove(i) -> T`.
+ownership-transfer operation is `remove(i) -> T`. `first()` and `last()`
+(§13.3, D117) do return an `Option`: "is there a first element?" has a
+normal answer of no, while an out-of-range index is a bug. That is the
+distinction this rule draws, and why Rust keeps `first()` beside `[0]`.
 
 An element view follows the contextual rules of §3.8 and D22: when
 `T: Copy`, an owned-value demand materializes an independent copy; when
