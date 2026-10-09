@@ -12210,6 +12210,22 @@ impl Codegen:
             let elem_ty = if elem_ty0 != 0: elem_ty0 else: i64_ty
             let list_ty0 = self.mir_dest_llvm_type(body, dest_place)
             let list_ty = if list_ty0 != 0: list_ty0 else: self.get_or_create_list_type(0, elem_ty)
+            if body.is_stack_literal_call(args_id):
+                // §4.3c (D119): the elements live in the frame; capacity 0
+                // says the header owns no buffer, so its drop frees nothing.
+                let buf = self.create_entry_alloca(wl_array_type(elem_ty, arg_count as i64))
+                for i in 0..arg_count:
+                    let raw = self.mir_intrinsic_arg(body, args_id, i)
+                    let elem = self.mir_intrinsic_value_as(body, args_id, i, raw, elem_ty)
+                    let at = [wl_const_int(i64_ty, i as i64, 0)]
+                    wl_build_store(self.builder, elem, wl_build_gep(self.builder, elem_ty, buf, list_data_i64(&at), 1))
+                var header = wl_get_undef(list_ty)
+                header = wl_build_insert_value(self.builder, header, buf, 0)
+                header = wl_build_insert_value(self.builder, header, wl_const_int(i64_ty, arg_count as i64, 0), 1)
+                header = wl_build_insert_value(self.builder, header, wl_const_int(i64_ty, 0, 0), 2)
+                header = wl_build_insert_value(self.builder, header, wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0), 3)
+                self.mir_finish_intrinsic_call(body, dest_place, next_bb, header)
+                return true
             let out_ptr = self.create_entry_alloca(list_ty)
             wl_build_store(self.builder, self.build_default_value(list_ty), out_ptr)
             let new_fn = self.ensure_list_runtime_fn("with_vec_new_out", void_ty, 2)

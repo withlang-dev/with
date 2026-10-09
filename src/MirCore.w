@@ -241,6 +241,10 @@ pub type MirBody {
     // every str it carries; MIR_HOLD_TAKE, the value itself at the source's last
     // use (the source is blanked: no retain, no release).
     operand_holds: HashMap[i32, i32],
+    // §4.3c (D119): the List literal calls whose value is never pushed,
+    // grown, moved out, stored or retained (MirLower decides; codegen places
+    // the elements on the stack and the header owns no heap buffer).
+    stack_literal_calls: HashMap[i32, i32],
     // MathBuiltins row id for MATH_FN calls (parallel; -1 otherwise)
     call_math_fn_ids: List[i32],
     // AST call node for generic calls (parallel to call_arg_starts, 0 if N/A)
@@ -553,6 +557,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         call_arg_operands: List.new(),
         call_intrinsic_kinds: List.new(),
         operand_holds: HashMap.new(),
+        stack_literal_calls: HashMap.new(),
         call_math_fn_ids: List.new(),
         call_ast_nodes: List.new(),
         call_sig_indices: List.new(),
@@ -829,6 +834,10 @@ impl MirBody:
     mut fn set_operand_hold(operand_id: i32, hold: i32): self.operand_holds.insert(operand_id, hold)
 
     fn operand_hold(operand_id: i32) -> i32: self.operand_holds.get(operand_id) ?? 0
+
+    mut fn set_stack_literal_call(call_id: i32): self.stack_literal_calls.insert(call_id, 1)
+
+    fn is_stack_literal_call(call_id: i32): self.stack_literal_calls.contains(call_id)
 
     mut fn set_call_intrinsic(call_id: i32, kind: MirIntrinsic):
         if call_id >= 0 and call_id < self.call_intrinsic_kinds.len():

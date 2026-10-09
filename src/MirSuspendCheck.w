@@ -974,8 +974,9 @@ fn suspend_held_copy_local(body: &MirBody, operand_id: i32) -> i32:
     suspend_direct_place_local(body, body.operand_d0[operand_id])
 
 // What a statement does with `local` first: 1 reads it, 2 overwrites or ends
-// it whole, 0 neither. A borrow or a partial write counts as a read.
-fn last_use_stmt_event(body: &MirBody, stmt_id: i32, local: i32) -> i32:
+// it whole, 0 neither. A borrow or a partial write counts as a read, and so
+// does a drop when `drops_read` (the D111 last-use pass ends a value there).
+fn last_use_stmt_event(body: &MirBody, stmt_id: i32, local: i32, drops_read: bool) -> i32:
     let kind = body.stmt_kind(stmt_id)
     let d0 = body.stmt_data0(stmt_id)
     if kind == StmtKind.Assign:
@@ -996,12 +997,14 @@ fn last_use_stmt_event(body: &MirBody, stmt_id: i32, local: i32) -> i32:
             return 1
         return 0
     if (kind == StmtKind.StorageDead or kind == StmtKind.Drop) and suspend_place_root_local(body, d0) == local:
-        return 2
+        // A drop releases what the local holds: a read of it, to a caller
+        // asking whether the value is still owed anything.
+        return if drops_read and kind == StmtKind.Drop: 1 else: 2
     0
 
 // What a block's terminator does with `local`: 1 reads it, 2 defines it, 0
-// neither.
-fn last_use_term_event(body: &MirBody, bb: i32, local: i32) -> i32:
+// neither (a drop reads it when `drops_read`).
+fn last_use_term_event(body: &MirBody, bb: i32, local: i32, drops_read: bool) -> i32:
     let kind = body.term_kind(bb)
     if kind == TermKind.TK_CALL:
         let operands = suspend_call_operands(body, body.term_data1(bb))
@@ -1019,6 +1022,7 @@ fn last_use_term_event(body: &MirBody, bb: i32, local: i32) -> i32:
             return 1
         return 0
     if kind == TermKind.TK_DROP_AND_GOTO and suspend_place_root_local(body, body.term_data0(bb)) == local:
+        if drops_read: return 1
         return 2
     0
 
@@ -1042,17 +1046,17 @@ fn last_use_successors(body: &MirBody, bb: i32) -> List[i32]:
 // For one local: per block, whether it is read on some path from the block's
 // start before anything overwrites or ends it (one bit per block, to a fixed
 // point).
-fn last_use_live_in(body: &MirBody, local: i32) -> List[i32]:
+fn last_use_live_in(body: &MirBody, local: i32, drops_read: bool) -> List[i32]:
     let bb_count = body.block_count()
     var first: List[i32] = List.new()
     for bb in 0..bb_count:
         var event = 0
         var si = 0
         while si < body.bb_stmt_counts[bb] and event == 0:
-            event = last_use_stmt_event(body, body.bb_stmt_starts[bb] + si, local)
+            event = last_use_stmt_event(body, body.bb_stmt_starts[bb] + si, local, drops_read)
             si = si + 1
         if event == 0:
-            event = last_use_term_event(body, bb, local)
+            event = last_use_term_event(body, bb, local, drops_read)
         first.push(event)
     var live: List[i32] = List.new()
     for bb in 0..bb_count: live.push(if first[bb] == 1: 1 else: 0)
@@ -1073,15 +1077,15 @@ fn last_use_live_in(body: &MirBody, local: i32) -> List[i32]:
 
 // Whether `local` is read after point `stmt_index` of `bb` (the terminator
 // when stmt_index is the block's statement count), before anything ends it.
-fn last_use_live_after(body: &MirBody, live_in: &List[i32], bb: i32, stmt_index: i32, local: i32) -> bool:
+fn last_use_live_after(body: &MirBody, live_in: &List[i32], bb: i32, stmt_index: i32, local: i32, drops_read: bool) -> bool:
     var si = stmt_index + 1
     while si < body.bb_stmt_counts[bb]:
-        let event = last_use_stmt_event(body, body.bb_stmt_starts[bb] + si, local)
+        let event = last_use_stmt_event(body, body.bb_stmt_starts[bb] + si, local, drops_read)
         if event != 0:
             return event == 1
         si = si + 1
     if stmt_index < body.bb_stmt_counts[bb]:
-        let term_event = last_use_term_event(body, bb, local)
+        let term_event = last_use_term_event(body, bb, local, drops_read)
         if term_event != 0:
             return term_event == 1
     let succs = last_use_successors(body, bb)
@@ -1126,7 +1130,7 @@ pub fn mir_mark_last_use_holds(body: MirBody) -> MirBody:
     for local in 1..local_count:
         if held[local] == 0 or view_free[local] == 0 or out.local_is_global[local] != 0 or out.local_is_caller_place[local] != 0:
             continue
-        let live_in = last_use_live_in(&out, local)
+        let live_in = last_use_live_in(&out, local, false)
         for bb in 0..out.block_count():
             for si in 0..out.bb_stmt_counts[bb] + 1:
                 let operands = if si < out.bb_stmt_counts[bb]:
@@ -1140,7 +1144,7 @@ pub fn mir_mark_last_use_holds(body: MirBody) -> MirBody:
                     if suspend_place_root_local(&out, out.operand_d0[operands[oi]]) == local:
                         reads = reads + 1
                         if suspend_held_copy_local(&out, operands[oi]) == local: held_op = operands[oi]
-                if reads == 1 and held_op >= 0 and not last_use_live_after(&out, &live_in, bb, si, local):
+                if reads == 1 and held_op >= 0 and not last_use_live_after(&out, &live_in, bb, si, local, false):
                     out.set_operand_hold(held_op, MIR_HOLD_TAKE)
     out
 
