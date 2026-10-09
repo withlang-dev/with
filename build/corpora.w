@@ -195,18 +195,17 @@ fn corpus_migrator_generation(ctx: &ActionCtx) -> str:
     for path in corpus_migrator_sources(): listing = listing ++ path ++ "\t" ++ ctx.fs().sha256_file(path) ++ "\n"
     corpus_sha256_text(listing)
 
-fn corpus_generated_dirs(corpus: &Corpus) -> Vec[str]:
-    var dirs: Vec[str] = Vec.new()
-    dirs.push(corpus.corpus_dir.clone())
-    for dir in corpus.extra_generated_dirs: dirs.push(dir.clone())
-    dirs
-
-/// Every module in the corpus's generated directories, by path and content.
-fn corpus_modules_hash(ctx: &ActionCtx, corpus: &Corpus) -> str:
+/// One directory's modules, by path and content.
+fn corpus_dir_listing(ctx: &ActionCtx, dir: &str) -> str:
     var listing = ""
-    for dir in corpus_generated_dirs(corpus):
-        for path in corpus_sorted(ctx.fs().list_files(dir)):
-            if path.ends_with(".w"): listing = listing ++ path ++ "\t" ++ ctx.fs().sha256_file(path) ++ "\n"
+    for path in corpus_sorted(ctx.fs().list_files(dir)):
+        if path.ends_with(".w"): listing = listing ++ path ++ "\t" ++ ctx.fs().sha256_file(path) ++ "\n"
+    listing
+
+/// Every module in the corpus's generated directories.
+fn corpus_modules_hash(ctx: &ActionCtx, corpus: &Corpus) -> str:
+    var listing = corpus_dir_listing(ctx, corpus.corpus_dir)
+    for dir in corpus.extra_generated_dirs: listing = listing ++ corpus_dir_listing(ctx, dir)
     corpus_sha256_text(listing)
 
 pub fn corpus_stamp_path(corpus: &Corpus) -> str: corpus.corpus_dir ++ "/corpus.stamp"
@@ -355,7 +354,7 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
     var integrity = corpus_target(.Action, corpus, "integrity", "out/corpus-integrity/" ++ corpus.stem ++ ".ok")
     integrity.action = run_corpus_integrity_action
     integrity = integrity.input(corpus_stamp_path(corpus))
-    integrity = target_with_corpus_module_inputs(move integrity, ctx, corpus)
+    integrity = target_with_corpus_module_inputs(integrity, ctx, corpus)
     for dir in corpus.extra_generated_dirs: integrity = integrity.input(dir.clone())
     integrity = integrity.write_scope("out/corpus-integrity").allow_parallel()
     graph = graph.add_target(integrity)
@@ -371,9 +370,9 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
 
     var stamp = corpus_target(.Action, corpus, "stamp", "out/corpus-stamp/" ++ corpus.stem ++ ".ok")
     stamp.action = run_corpus_stamp_action
-    stamp = corpus_migrating_target(move stamp, release_compiler)
+    stamp = corpus_migrating_target(stamp, release_compiler)
     stamp = stamp.input(up.reference.clone()).input(corpus.corpus_dir ++ "/bundle.w")
-    stamp = target_with_corpus_module_inputs(move stamp, ctx, corpus)
+    stamp = target_with_corpus_module_inputs(stamp, ctx, corpus)
     stamp = stamp.dep(corpus.stem ++ "-prepare-reference")
     stamp = stamp.write_scope("out/corpus-stamp").write_scope(corpus.corpus_dir.clone())
     graph = graph.add_target(stamp)

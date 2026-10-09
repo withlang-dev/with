@@ -1,2 +1,3 @@
 # A grant for a ceremony count above the bar (tools/ceremony_census.w):
 # pattern<TAB>area<TAB>bar it was made against<TAB>new ceiling<TAB>why
+clone-call	build	169	176	D112 corpus code: the pinned seed predates D111, so a str read from a borrowed Corpus record or a &str passed where build-layer APIs take str is cloned (each removal was refused by the seed); the post-D111-seed build/ sweep removes them
