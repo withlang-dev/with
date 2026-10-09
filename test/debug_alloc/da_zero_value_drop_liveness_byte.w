@@ -57,12 +57,12 @@ fn main:
     closes = 0
     list_case()
     let list_closed = closes
-    print(f"vec closed {vec_closed}")
+    print(f"vec closed {list_closed}")
     closes = 0
     payload()
     let payload_closed = closes
     closes = 0
     moved()
     let moved_closed = closes
-    print(f"total {vec_closed + payload_closed + moved_closed}")
+    print(f"total {list_closed + payload_closed + moved_closed}")
     print("ok")

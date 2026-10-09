@@ -1,4 +1,4 @@
-// std.collections.sorted_vec — SortedList[T]: a sorted contiguous collection
+// std.collections.sorted_list — SortedList[T]: a sorted contiguous collection
 // over the migrated c-algorithms sorted array (docs/proposals/stdlib_sourcing_plan.md,
 // Phase 1). The engine keeps an array of slot pointers in comparator order;
 // the facade owns every value (std.collections.engine_slot).

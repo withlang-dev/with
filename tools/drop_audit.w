@@ -642,7 +642,7 @@ fn sc_facade_prelude(facade: &str):
     "    fn cmp(other: &R) -> i32: if self.id < other.id: -1 else if self.id > other.id: 1 else: 0\n"
 
 fn sc_sorted_list(kind: &str):
-    var source = sc_facade_prelude("sorted_vec.SortedList") ++ "fn go(slot: *mut i32):\n    var sorted = SortedList[R].new()\n"
+    var source = sc_facade_prelude("sorted_list.SortedList") ++ "fn go(slot: *mut i32):\n    var sorted = SortedList[R].new()\n"
     if kind == "empty": return source
     source = source ++ "    for i in 1..9: sorted.insert(mk(9 - i, slot))\n" ++
         "    assert(sorted.get(0).id == 1 and sorted.get(7).id == 8)\n"
@@ -695,10 +695,10 @@ fn build_cells():
     cells.push(cell("hash_index_partial/facade", sc_hash_index("partial"), 36))
     cells.push(cell("hash_index_replace/facade", sc_hash_index("replace"), 39))
     cells.push(cell("hash_index_cursor/facade", sc_hash_index("cursor"), 36))
-    cells.push(cell("sorted_vec_empty/facade", sc_sorted_list("empty"), 0))
-    cells.push(cell("sorted_vec_full/facade", sc_sorted_list("full"), 36))
-    cells.push(cell("sorted_vec_partial/facade", sc_sorted_list("partial"), 36))
-    cells.push(cell("sorted_vec_cursor/facade", sc_sorted_list("cursor"), 36))
+    cells.push(cell("sorted_list_empty/facade", sc_sorted_list("empty"), 0))
+    cells.push(cell("sorted_list_full/facade", sc_sorted_list("full"), 36))
+    cells.push(cell("sorted_list_partial/facade", sc_sorted_list("partial"), 36))
+    cells.push(cell("sorted_list_cursor/facade", sc_sorted_list("cursor"), 36))
     cells.push(cell("binary_heap_empty/facade", sc_binary_heap("empty"), 0))
     cells.push(cell("binary_heap_full/facade", sc_binary_heap("full"), 36))
     cells.push(cell("binary_heap_partial/facade", sc_binary_heap("partial"), 36))

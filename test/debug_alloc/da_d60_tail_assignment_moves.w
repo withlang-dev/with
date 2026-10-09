@@ -69,7 +69,7 @@ fn try_store(ok: bool) -> Result[str, str]:
 
 fn main:
     print(f"str {local_str()}")
-    print(f"vec {local_vec().len()}")
+    print(f"vec {local_list().len()}")
     let h = local_struct()
     print(f"struct {h.n} {h.name}")
     let o = local_opt() ?? "none"

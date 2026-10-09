@@ -8,7 +8,7 @@
 // second Option[i32]. A generic body re-checked before lowering then joined
 // its `if` at the duplicate while the first check had joined at the
 // original: "internal error: conflicting contextual join decisions for one
-// expression" (first seen in std/collections/sorted_vec.w index_of).
+// expression" (first seen in std/collections/sorted_list.w index_of).
 
 use std.collections.HashMap
 

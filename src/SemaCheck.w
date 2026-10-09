@@ -27341,7 +27341,7 @@ impl Sema:
     // a generic fn body does (check_generic_body switches the same way): the
     // layout, field, variant or return type of `SortedList[T] { array: *mut
     // _SortedArray }` asked for from a user module resolves `_SortedArray`
-    // in std.collections.sorted_vec, never against the user's imports
+    // in std.collections.sorted_list, never against the user's imports
     // (#1362: an engine corpus type is never the user's).
     mut fn resolve_type_expr_in_owner_module(node: i32) -> i32:
         let owner = self.node_module_path(node)

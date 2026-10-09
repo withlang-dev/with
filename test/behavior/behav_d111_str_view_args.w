@@ -33,5 +33,5 @@ fn main:
     hash.insert(parts[1], 2)
     var list: List[str] = List.new()
     list.push(parts[0])
-    print(f"{bag.items.len()} {tree.len()} {hash.len()} {vec.len()}")
-    print(f"{parts[0]} {parts[1]} {vec[0]} {bag.items[0]}")
+    print(f"{bag.items.len()} {tree.len()} {hash.len()} {list.len()}")
+    print(f"{parts[0]} {parts[1]} {list[0]} {bag.items[0]}")

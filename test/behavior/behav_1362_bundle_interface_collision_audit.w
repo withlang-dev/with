@@ -29,7 +29,7 @@ fn main:
     p7_assert_success(audited, "audit:all over user fns named like std.re/std.zl interface fns")
     assert(audited.stdout.contains("violations=0"))
 
-    let corpora = "use std.collections.sorted_vec.SortedList\nuse std.collections.hash_index\n" ++ helpers_text() ++
+    let corpora = "use std.collections.sorted_list.SortedList\nuse std.collections.hash_index\n" ++ helpers_text() ++
         "fn main:\n" ++
         "    assert(is_alpha(1) and is_digit(2) and is_alnum(4) and to_lower(1) == 2)\n" ++
         "    assert(u128_mul_would_overflow(6, 7) == 42 and __ci_unreachable() == 11)\n" ++

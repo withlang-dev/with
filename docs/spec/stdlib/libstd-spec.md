@@ -59,7 +59,7 @@ document does not redefine them; each module's header comment does.
 | `result` | `Result[T, E]` — Ok, Err, ContextError, `?` operator |
 | `traits` | Eq, Ord, Key, Debug, Display, Default, Clone, Drop, Scoped, ScopedMut, Iter, IntoIter, MultiIndex, MultiIndexMut, Add/Sub/Mul/Div/MatMul/Neg, Try, ControlFlow, Deref, **Error** (`display`, `source`), Contains, IndexGet, IndexPlace |
 | `collections` | List, HashMap, HashSet, BTreeMap, BTreeSet, SlotMap/Handle, Atomic, Order, fence, Iterable/IntoIter and the adapter family (Map, Filter, FilterMap, Take, Drop, TakeWhile, DropWhile, Zip, ZipWith, Enumerate, Chain, StepBy, FlatMap), IndexSpec |
-| `collections/sorted_vec`, `collections/binary_heap`, `collections/trie`, `collections/hash_index`, `collections/engine_slot` | Facades over migrated engines (c-algorithms, TommyDS) — see *Sourced from corpora* |
+| `collections/sorted_list`, `collections/binary_heap`, `collections/trie`, `collections/hash_index`, `collections/engine_slot` | Facades over migrated engines (c-algorithms, TommyDS) — see *Sourced from corpora* |
 | `box`, `rc` | `Box[T]` single-owner heap cell; `Rc[T]` explicit reference counting |
 | `string`, `str`, `fixed_string`, `internal/str_abi` | String methods (ASCII classifiers); `str` shim; `FixedString[N]` for core/no_std; raw-pointer bridge |
 | `fmt` | fmt_int, fmt_float, fmt_bool |
@@ -173,7 +173,7 @@ that touch the filesystem.
 
 #### 1.2 List sorting and search — methods on `collections.List`
 
-**Resolved by the corpus sourcing plan (Phase 3, STC — pending).** `List.sort`, `sort_stable`, `is_sorted`, `binary_search`, `reverse`, `dedup` are the `std.algorithms` facade over STC's migrated algorithm layer (`docs/proposals/stdlib_sourcing_plan.md`, facade map rows `sort`/`binary_search`/`lower_bound`/`reverse`/`shuffle`; #940). `stable_sort` is exposed only if upstream's stability contract holds. Already landed from Phase 1: `std.collections.sorted_vec.SortedList[T]` and `std.collections.binary_heap.BinaryHeap[T]` (c-algorithms). Nothing native is written for this section.
+**Resolved by the corpus sourcing plan (Phase 3, STC — pending).** `List.sort`, `sort_stable`, `is_sorted`, `binary_search`, `reverse`, `dedup` are the `std.algorithms` facade over STC's migrated algorithm layer (`docs/proposals/stdlib_sourcing_plan.md`, facade map rows `sort`/`binary_search`/`lower_bound`/`reverse`/`shuffle`; #940). `stable_sort` is exposed only if upstream's stability contract holds. Already landed from Phase 1: `std.collections.sorted_list.SortedList[T]` and `std.collections.binary_heap.BinaryHeap[T]` (c-algorithms). Nothing native is written for this section.
 
 #### 1.3 `std.toml` — TOML parser
 
