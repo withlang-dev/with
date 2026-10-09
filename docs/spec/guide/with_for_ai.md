@@ -237,7 +237,7 @@ Int  = i64
 UInt = u64
 ```
 
-Unsuffixed integer literals default to `i32`; floats default to `f64`, unless context says otherwise.
+Unsuffixed integer literals default to `isize` (the target's size width, D114); floats default to `f64`, unless context says otherwise. Brackets make a `Vec` (D113).
 
 ### Structs
 

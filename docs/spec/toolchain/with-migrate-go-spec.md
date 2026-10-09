@@ -185,8 +185,8 @@ any / interface{}          →  // @migrate: see Tier 3
 uintptr                    →  usize
 ```
 
-Go `int` is platform-sized (32 or 64 bit). Default to `i32`
-and flag. `string` → `str`. `[]T` → `Vec[T]`.
+Go `int` is platform-sized (32 or 64 bit): it is `isize`, the
+target's size width (D114). `string` → `str`. `[]T` → `Vec[T]`.
 `map[K]V` → `HashMap[K, V]`. `byte` → `u8`. `rune` → `i32`.
 
 #### Slices and arrays

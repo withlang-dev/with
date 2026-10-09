@@ -1,5 +1,9 @@
 # D108 — Length is pointer-width: `len()` returns `isize`
 
+**Definition amended by D114 (2026-10-08):** `isize`/`usize` are the
+target's *size* width (C's `size_t`/`ptrdiff_t`), not pointer width; `len()`
+returning `isize` stands.
+
 **Laws:** 1, 4 (docs/mission.md).
 
 Ruled by Eric, 2026-10-07. Extends D11, which ruled signedness and left

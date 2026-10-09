@@ -335,6 +335,13 @@ precedent. Precedent is evidence of how long the defect has gone unraised,
 not of what's correct. If you are about to write the same workaround a second
 time, that's a report.
 
+**Integer width (D114).** No code depends on `isize` being 32 or 64 bits,
+and a value whose range isn't bounded by memory is written with a fixed
+width: timestamps, file sizes and offsets, hashes, IDs, money, anything
+serialized or crossing into a C struct layout. Supported targets today are
+64-bit hosts and wasm32; other widths must stay possible later without a
+redesign.
+
 **The backstop: the ceremony census.** `tools/ceremony_census.w` counts the
 known ceremony patterns across the tree. The bar is main's own counts:
 `:install-user` publishes them to the green store when main is reseeded, so

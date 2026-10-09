@@ -4,8 +4,14 @@
 
 Signed integers: `i8`, `i16`, `i32`, `i64`
 Unsigned integers: `u8`, `u16`, `u32`, `u64`
-Pointer-sized integers: `usize`, `isize` (pointer-width: 64 bits on every
-supported target but wasm32, where they are 32)
+Size integers: `usize`, `isize`: the target's size width, C's `size_t`/`ptrdiff_t`,
+wide enough for any length or offset into memory. They are not defined as
+pointer-sized; an integer that holds a pointer is a separate FFI type if one
+is ever needed. Supported targets today are 64-bit hosts and wasm32; nothing
+in the language, stdlib or compiler may assume a particular `isize` width
+(D114). Values not bounded by memory use a fixed width: timestamps, file
+sizes and offsets, hashes, IDs, money, anything serialized or crossing into a
+C struct layout. A serialized or C-layout struct with an `isize` field warns.
 Floating point: `f32`, `f64`
 Boolean: `bool`
 Unit: `Unit` (zero-sized)
@@ -74,8 +80,12 @@ the language surface syntax.
 **Default literal types:** if no suffix and no surrounding context forces
 another numeric type:
 
-- Unsuffixed integer literals default to `i32`
+- Unsuffixed integer literals default to `isize`, everywhere, including in
+  bracket literals (`[1, 2, 3]` is a `Vec[isize]`, D113, D114)
 - Unsuffixed float literals default to `f64`
+
+Literals and comptime arithmetic are checked at the target's width, not the
+host's (D114).
 
 **Contextual numeric inference:** unsuffixed numeric literals are resolved
 from surrounding type context before falling back to the defaults above.
@@ -722,14 +732,15 @@ b[2] = 3.14
 
 ```
 [T; N]           // type: array of N elements of type T
-[v0, v1, ..., vN] // literal: array from elements
-[value; N]       // repeat: array of N elements, value evaluated for each
+[v0, v1, ..., vN] // literal: an array where `[T; N]` is demanded (§4.3c)
+[value; N]       // repeat: N elements, value evaluated for each
 arr[i]           // index: access element i
 arr.len()        // length: returns N (compile-time constant)
 ```
 
-`[value; N]` is an array of N elements, `value` evaluated once for each
-element, in order; `N` is a compile-time constant (§9.1b).
+`[value; N]` is N elements, `value` evaluated once for each element, in
+order; `N` is a compile-time constant (§9.1b). Where a fixed array type is
+demanded it builds that array; elsewhere it is a `Vec` (D113, §4.3c).
 
 **Semantics:**
 
@@ -867,23 +878,23 @@ result is masked to the type's range.
 
 Bracket literals are With's one collection-literal family. The
 element form builds sequences and sets; the `key: value` form builds
-maps. The concrete collection is selected by **expected type**, with
-sensible defaults — the same rule as numeric literals (§4.2.1) and
-enum variant shorthand (§4.4):
+maps. Brackets make a `Vec` (D113); another collection is built where its
+type is demanded, as with numeric literals (§4.2.1) and enum variant
+shorthand (§4.4):
 
 ```
-let a = [1, 2, 3]                      // [i32; 3] — fixed array (default)
-let v: Vec[i32] = [1, 2, 3]            // Vec via expected type
-let w: Vec = [1, 2, 3]                 // Vec[i32]: the elements decide T
-let xs = [1, 2, 3]                     // Vec[i32]: `total` below takes one
-print(total(xs))                       // fn total(xs: &Vec[i32])
-var ys = []                            // Vec[i64]: `push` demands a Vec,
+let a = [1, 2, 3]                      // Vec[isize]: brackets make a Vec
+let v: Vec[i32] = [1, 2, 3]            // Vec[i32]: the demand types the elements
+let t: [i32; 4] = [1, 2, 3, 4]         // fixed array: its type is demanded
+for flag in ["-v", "-q"]: use(flag)    // Vec[str]; never grown or kept
+print(total([1, 2, 3]))                // fn total(xs: &Vec[i32])
+var ys = []                            // Vec: `push` says what it holds,
 ys.push(big)                           // and `big: i64` its element type
-let s: HashSet[str] = ["a", "b"]       // HashSet via expected type
-let o: BTreeSet[i32] = [3, 1, 2]       // BTreeSet via expected type
+let s: HashSet[str] = ["a", "b"]       // HashSet: a set is demanded
+let o: BTreeSet[i32] = [3, 1, 2]       // BTreeSet: a set is demanded
 
 let colors = ["red": 0xFF0000, "green": 0x00FF00]
-// HashMap[str, i32] — the map-literal default
+// HashMap[str, isize] — the map-literal default
 
 let ranks: BTreeMap[str, i32] = ["a": 1, "b": 2]
 
@@ -893,22 +904,33 @@ let none: Vec[i32] = []                // empty sequence (type from context)
 
 **Rules:**
 
-1. The element form `[a, b, c]` builds the collection its expected type
-   names: `Vec[T]`, `HashSet[T]`, `BTreeSet[T]`, or a fixed array `[T; N]`
-   (§4.3a). An annotation may name the collection without its arguments,
-   and the elements decide them: `let w: Vec = [1, 2, 3]` is a `Vec[i32]`.
+1. A bracket literal is a `Vec[T]`, unless the demanded type is another
+   collection that can be built from a list, such as a fixed array or a
+   set. Then the literal builds that collection. The collections built
+   from a list are `Vec[T]`, `HashSet[T]`, `BTreeSet[T]` and the fixed
+   array `[T; N]` (§4.3a). An annotation may name the collection without
+   its arguments, and the elements decide them: `let w: Vec = [1, 2, 3]` is
+   a `Vec[isize]`.
 
-   A binding with no annotation takes its type from its uses, as an
-   unsuffixed numeric literal does (§4.2.1). A use demands a type when the
-   binding is passed to a parameter, assigned to or from a typed place, or
-   returned, as one of those collections or a view of one; or when a
-   method is called that exactly one of those collections has (`push`
-   demands a `Vec`). The literal builds the demanded collection with the
-   demanded element type. A slice demand is met by a fixed array and
-   demands nothing. Uses that demand two different types are an error at
-   the second, naming both. With no demand, a non-empty literal is a fixed
-   array, and an empty literal is an error asking for its element type.
-   Demands are taken from the binding's own function only.
+   The element type comes from the elements, or from the demand: a
+   parameter, a typed place assigned to or from, a return, or a method
+   only one collection has (`push`). An empty literal waits for the first
+   push or the first use to say what it holds. Uses that demand two
+   different types are an error at the second, naming both. Demands are
+   taken from the literal's own function only. A slice demand views the
+   literal (a `Vec` coerces to `[]T`, §4.8a) and demands nothing. The repeat
+   form `[value; N]` follows the same rule: a `Vec` of N elements unless a
+   fixed array is demanded (D113).
+
+   A literal that is never grown or retained needn't touch the heap: the
+   compiler may place it on the stack, or in static data when its elements
+   are constants. The program cannot tell the difference.
+
+   Duplicate constants in a set literal warn: `["a", "a"]` demanded as a
+   set is almost always a typo. A `Vec` keeps every element: `let v =
+   ["a", "a"]` is a `Vec[str]` of length 2, and `v[0]` and `v[1]` are both
+   `"a"`.
+
 2. The map form `[k: v, ...]` defaults to `HashMap[K, V]`. When the
    expected type is `BTreeMap[K, V]`, it builds that instead. `[:]`
    is the empty map and requires an expected map type.
