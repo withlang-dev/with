@@ -74,3 +74,51 @@ the D115 header change.
 
 **What would reopen it.** A C idiom over a local array that needs its
 elements inline (none known: C cannot assign or pass a local array).
+
+## Amendment 1 (2026-10-09): dimensions in index order
+
+**Context.** D119 step 1 had the migrator write C's `int a[2][3]` as
+`[[c_int; 3]; 2]`, which lists the dimensions inside-out. Compared in all
+ten references (`.reference/`): index order in C# (`new int[5, 10]`,
+`csharp-12.0/collection-expressions.md`), Go (`[16][4]int`), Zig
+(`[10][16]u8`), Vale (`[#2][#2]int`), Swift (`[3 of [3 of Int]]`), Scala
+(`Array.ofDim[T](n1, n2)`) and Vx (`Tensor<f32, [128, 128]>`, row-major);
+inside-out in Rust (`[[u8; 16]; 20]`), Mojo (`InlineArray[T, N]`, nested)
+and Goose (`u8[4][6]`, six rows of four).
+
+**Ruling (Eric, verbatim, from the case he gave).** "The type.
+`[T; d1, d2, …, dk]`: the element type, a semicolon, then the dimensions in
+the order you index them, outermost first. … It's sugar, not a new type.
+`[T; 2, 3]` *is* `[[T; 3]; 2]`: the same type, the same layout. Row-major,
+contiguous … Indexing. `a[i][j]`, exactly as in C. `a[i]` is a row of type
+`[T; 3]` … Lengths. `a.len()` is the outer dimension (2) … `a.shape()`
+returns `[2, 3]` … Migration. `int a[2][3]` becomes `[c_int; 2, 3]`: the
+same numbers in the same order. Canonical spelling. The nested form stays
+legal, because generics produce it … But the compiler always *prints* the
+flat form, and the formatter rewrites nested to flat."
+
+On the brief's three corrections: "All three corrections are right … 1.
+Rule array-length generics in principle now, implement them as their own
+stage. … ("array lengths can be generic parameters, by the mechanism
+`Vector` already uses") … While it's being extended, one consistency note:
+`Vector[N, f32]` puts the count before the element, and `[f32; N]` puts the
+element first. The two should agree on order, or at least the
+length-generics brief should decide whether they need to. 2. Keep D113 as
+the one rule. … `let grid = [0; 2, 3]  // List[[isize; 3]]: a list of
+fixed rows` … `let fixed: [c_int; 2, 3] = [0; 2, 3]  // a fixed array,
+because the type demands one` … 3. Agreed, no ruling chose `[T; N]`. …
+`shape()` in §13.3 beside `first()`/`rest()`, yes. … on a fixed array it's
+a compile-time constant. On a `List[[T; 3]]` the same method … returning
+`[len, 3]`, but the outer entry is a run-time value."
+
+**Spec projection.** §4.3a "Multidimensional arrays"; §13.3 `shape()`;
+`with-migrate-spec.md` Arrays: a nested field is `[T; M, N]`.
+
+**Costs, stated with the ruling.** Two spellings name one type (the nested
+form is what generics produce; only the flat form is printed or
+formatted). `len()` is the outer dimension, not the element count.
+
+**Open.** Whether `Vector[N, T]` and `[T; N]` should agree on order: the
+array-length-generics brief decides. Not ruled here: `a[i, j]` as
+`a[i][j]` through `MultiIndex`, and whether the retired `[N]T` becomes an
+error with a fix-it.

@@ -358,7 +358,7 @@ the C program can do with it:
   `sizeof(t) / sizeof(t[0])` becomes `t.len()`. A two-dimensional local
   `int a[4][4]` is `List[[i32; 4]]`: its rows are inline values and the
   whole is contiguous.
-- **A struct or union field stays `[T; N]`** (`[[T; N]; M]` when nested).
+- **A struct or union field stays `[T; N]`** (`[T; M, N]` for C's `T f[M][N]`: the same dimensions in the same order).
   Migrated C treats structs as bytes — `memcpy(&a, &b, sizeof a)`,
   `memset(&s, 0, sizeof s)`, `fwrite(&rec, sizeof rec, 1, f)` — and struct
   assignment copies the array inline. A `List` field would copy a header

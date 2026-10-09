@@ -101,6 +101,7 @@ let report = transactions.iter()
 | `first()` | `Option` of the first element |
 | `last()` | `Option` of the last element |
 | `rest()` | The elements after the first; empty for an empty sequence |
+| `shape()` | The dimensions, outermost first (D119): a compile-time constant `[isize; k]` on a fixed array (`[2, 3]` for `[T; 2, 3]`); on a `List[[T; 3]]`, `[len, 3]`, the outer entry known at run time |
 
 `xs.first()` and `xs.rest()` are the expression forms of `[first, ..rest]`
 (§9.7), with its modes, selected by the receiver's syntax (§9.5, D117). On a

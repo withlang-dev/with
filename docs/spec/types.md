@@ -792,6 +792,34 @@ match items:
     [first, ..rest] => "head: {first}, {rest.len()} more"
 ```
 
+**Multidimensional arrays (D119).** `[T; d1, d2, …]` writes a nested
+fixed array with its dimensions in the order they are indexed, outermost
+first: `[c_int; 2, 3]` is `[[c_int; 3]; 2]`, the same type, row-major and
+contiguous. `a[i]` is a row of type `[c_int; 3]`, a fixed array like any
+other; `a.len()` is the outer dimension and `a.shape()` lists all of them
+(§13.3). A fill or a literal has the shape of its type: `[v; 2, 3]` repeats
+`v` in that shape, and a literal nests brackets outermost first. Brackets
+make a `List` (D113), so an undemanded fill is a list of fixed rows; a
+fixed array is built where one is demanded:
+
+```
+let grid = [0; 2, 3]                    // List[[isize; 3]]: a list of fixed rows
+let fixed: [c_int; 2, 3] = [0; 2, 3]    // a fixed array: the type demands one
+let m: [f32; 2, 2] = [[1.0, 0.0], [0.0, 1.0]]
+let x = fixed[1][2]
+```
+
+The nested spelling names the same type and stays legal, since generics
+produce it (`[Row; 2]` with `Row = [f32; 3]`); the compiler prints the
+flat form and the formatter writes it. Array lengths are generic
+parameters, by the mechanism `Vector[N, T]` uses (§4.3d); this lands as
+its own stage:
+
+```
+fn trace[N](m: [f32; N, N]) -> f32
+fn transpose[R, C](m: [f32; R, C]) -> [f32; C, R]
+```
+
 ### 4.3b Bitpacked Structs
 
 The `@[bitpacked]` attribute provides bit-level field packing where
