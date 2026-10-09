@@ -17473,7 +17473,8 @@ fn stack_literal_final(fwd: &List[i32], local: i32) -> i32:
 // of it, or passes it anywhere but a reading intrinsic, a `&` parameter or a
 // reading receiver, and nothing reads a local it left. Shared borrows and
 // element writes are reads of the buffer and keep it. Codegen then builds
-// the elements in the frame, and the header owns no buffer (capacity 0, so
+// the elements in the frame (as static data when they are constants nothing
+// writes in place), and the header owns no buffer (capacity 0, so
 // its drop frees nothing and a growth would copy out rather than free).
 fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
     var out = body
@@ -17486,17 +17487,19 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
     var holds: List[i32] = List.new()
     var fwd: List[i32] = List.new()
     var disqualified: List[i32] = List.new()
+    var written: List[i32] = List.new()
     for _ in 0..local_count:
         holds.push(0)
         fwd.push(-1)
         disqualified.push(0)
+        written.push(0)
     for bb in 0..out.block_count():
         if out.term_kind(bb) != TermKind.TK_CALL:
             continue
         let call = out.term_data1(bb)
         if out.call_intrinsic(call) != MirIntrinsic.COLLECTION_LITERAL:
             continue
-        let dest = suspend_direct_place_local(&out, out.term_data2(bb))
+        let dest = suspend_direct_place_local(out, out.term_data2(bb))
         if dest <= 0 or dest >= local_count or out.local_is_global[dest] != 0:
             continue
         if sema.std_generic_of(out.local_type_ids[dest]) != StdGeneric.List:
@@ -17520,14 +17523,14 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
         for stmt in 0..out.stmt_kinds.len() as i32:
             if out.stmt_kind(stmt) != StmtKind.Assign:
                 continue
-            let to = suspend_direct_place_local(&out, out.stmt_data0(stmt))
+            let to = suspend_direct_place_local(out, out.stmt_data0(stmt))
             let rval = out.stmt_data1(stmt)
             if to <= 0 or to >= local_count or out.rval_kinds[rval] != RvalueKind.RK_USE:
                 continue
             let op = out.rval_d0[rval]
             if link_op[op] != 0 or out.operand_kinds[op] != OperandKind.OK_MOVE:
                 continue
-            let from = suspend_direct_place_local(&out, out.operand_d0[op])
+            let from = suspend_direct_place_local(out, out.operand_d0[op])
             if from <= 0 or from >= local_count or holds[from] == 0 or from == to or out.local_is_global[to] != 0:
                 continue
             holds[to] = holds[to] + holds[from]
@@ -17542,7 +17545,7 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
         if out.term_kind(bb) != TermKind.TK_CALL:
             continue
         let call = out.term_data1(bb)
-        let dest = suspend_direct_place_local(&out, out.term_data2(bb))
+        let dest = suspend_direct_place_local(out, out.term_data2(bb))
         // Only a literal's own call may write its first holder whole.
         if dest > 0 and dest < local_count and holds[dest] > 0 and literal_dest_of_call[call] != dest:
             disqualified[dest] = 1
@@ -17552,7 +17555,7 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
             let op = out.call_arg_operands[out.call_arg_starts[call] + ai]
             if out.operand_kinds[op] != OperandKind.OK_COPY:
                 continue
-            let local = suspend_direct_place_local(&out, out.operand_d0[op])
+            let local = suspend_direct_place_local(out, out.operand_d0[op])
             if local <= 0 or local >= local_count or holds[local] == 0:
                 continue
             let reads = if kind != MirIntrinsic.NONE: stack_literal_reads(kind)
@@ -17560,37 +17563,46 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
                 else if ai == 0 and sema.sig_receiver_mode(sig) == ReceiverMode.Read: true
                 else: ai < sema.sig_get_param_count(sig) and sema.get_type_kind(sema.resolve_alias(sema.sig_param_type(sig, ai) as TypeId)) == TypeKind.TY_REF
             if reads: reading_copy[op] = 1
+            // A write of an element in place: the stack keeps it; a constant
+            // table cannot.
+            if kind == MirIntrinsic.LIST_SET or kind == MirIntrinsic.LIST_CLEAR or kind == MirIntrinsic.LIST_SLOT or kind == MirIntrinsic.LIST_ITER_PLACE or kind == MirIntrinsic.LIST_GET_DISJOINT: written[local] = 1
     // Every other operand of a holder, and any read of a local a literal left.
     for oi in 0..out.operand_kinds.len() as i32:
         let kind = out.operand_kinds[oi]
         if link_op[oi] != 0 or (kind != OperandKind.OK_COPY and kind != OperandKind.OK_MOVE):
             continue
-        let local = suspend_direct_place_local(&out, out.operand_d0[oi])
+        let local = suspend_direct_place_local(out, out.operand_d0[oi])
         if local <= 0 or local >= local_count:
             continue
         if fwd[local] >= 0:
-            disqualified[stack_literal_final(&fwd, local)] = 1
+            disqualified[stack_literal_final(fwd, local)] = 1
         else if holds[local] > 0 and (kind == OperandKind.OK_MOVE or reading_copy[oi] == 0):
             disqualified[local] = 1
     for ri in 0..out.rval_kinds.len() as i32:
         let rk = out.rval_kinds[ri]
-        let local = if rk == RvalueKind.RK_REF and out.rval_d0[ri] == BorrowKind.EXCLUSIVE as i32: suspend_direct_place_local(&out, out.rval_d1[ri])
-            else if rk == RvalueKind.RK_ADDR_OF: suspend_place_root_local(&out, out.rval_d0[ri])
+        if rk == RvalueKind.RK_REF and out.rval_d0[ri] == BorrowKind.EXCLUSIVE as i32:
+            let root = suspend_place_root_local(out, out.rval_d1[ri])
+            if root > 0 and root < local_count: written[root] = 1
+        let local = if rk == RvalueKind.RK_REF and out.rval_d0[ri] == BorrowKind.EXCLUSIVE as i32: suspend_direct_place_local(out, out.rval_d1[ri])
+            else if rk == RvalueKind.RK_ADDR_OF: suspend_place_root_local(out, out.rval_d0[ri])
             else: -1
         if local > 0 and local < local_count and (holds[local] > 0 or fwd[local] >= 0):
-            disqualified[stack_literal_final(&fwd, local)] = 1
-    // A holder written whole by anything but a move of a literal into it.
+            disqualified[stack_literal_final(fwd, local)] = 1
+    // An element store marks its list written; a holder written whole by
+    // anything but a move of a literal into it does not qualify.
     for stmt in 0..out.stmt_kinds.len() as i32:
         if out.stmt_kind(stmt) != StmtKind.Assign:
             continue
-        let local = suspend_direct_place_local(&out, out.stmt_data0(stmt))
+        let root = suspend_place_root_local(out, out.stmt_data0(stmt))
+        if root > 0 and root < local_count and out.place_proj_counts[out.stmt_data0(stmt)] != 0: written[root] = 1
+        let local = suspend_direct_place_local(out, out.stmt_data0(stmt))
         if local <= 0 or local >= local_count or holds[local] == 0:
             continue
         let rval = out.stmt_data1(stmt)
         if out.rval_kinds[rval] != RvalueKind.RK_USE or link_op[out.rval_d0[rval]] == 0:
             disqualified[local] = 1
     for ci in 0..call_ids.len():
-        if disqualified[stack_literal_final(&fwd, call_dest[ci])] != 0:
+        if disqualified[stack_literal_final(fwd, call_dest[ci])] != 0:
             continue
         // One buffer per call site: when the call runs again, no holder the
         // literal passes through may still owe the last run's value a read
@@ -17599,11 +17611,23 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
         var owed = false
         var at = fwd[call_dest[ci]]
         while at >= 0 and not owed:
-            let live_in = last_use_live_in(&out, at, true)
-            owed = last_use_live_after(&out, &live_in, bb, out.bb_stmt_counts[bb] - 1, at, true)
+            let live_in = last_use_live_in(out, at, true)
+            owed = last_use_live_after(out, live_in, bb, out.bb_stmt_counts[bb] - 1, at, true)
             at = fwd[at]
-        if not owed:
-            out.set_stack_literal_call(call_ids[ci])
+        if owed:
+            continue
+        // Constants nothing writes in place, of a type with no drop: the
+        // elements are static data, built once rather than on every call.
+        let list_ty = sema.resolve_alias(out.local_type_ids[call_dest[ci]] as TypeId)
+        let elem_ty = sema.get_generic_inst_arg(list_ty as i32, 0)
+        var constant = sema.is_copy_frozen(elem_ty as TypeId) != 0 and sema.type_needs_drop_frozen(elem_ty) == 0
+        for ai in 0..out.call_arg_counts[call_ids[ci]]:
+            if out.operand_kinds[out.call_arg_operands[out.call_arg_starts[call_ids[ci]] + ai]] != OperandKind.OK_CONSTANT: constant = false
+        var at_holder = call_dest[ci]
+        while at_holder >= 0 and constant:
+            if written[at_holder] != 0: constant = false
+            at_holder = fwd[at_holder]
+        out.set_stack_literal_call(call_ids[ci], if constant: MIR_LITERAL_STATIC else: MIR_LITERAL_STACK)
     out
 
 fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> LoweredFunction:

@@ -13,6 +13,11 @@ use std.string.StringBuilder
 pub const MIR_HOLD_RETAIN: i32 = 1
 pub const MIR_HOLD_TAKE: i32 = 2
 
+// §4.3c (D119): MirBody.stack_literal_calls values: the elements of a List
+// literal live in the frame, or (constants nothing writes) in static data.
+pub const MIR_LITERAL_STACK: i32 = 1
+pub const MIR_LITERAL_STATIC: i32 = 2
+
 pub type BlockId = distinct i32
 impl Copy for BlockId
 impl Copy for TermKind
@@ -835,9 +840,11 @@ impl MirBody:
 
     fn operand_hold(operand_id: i32) -> i32: self.operand_holds.get(operand_id) ?? 0
 
-    mut fn set_stack_literal_call(call_id: i32): self.stack_literal_calls.insert(call_id, 1)
+    mut fn set_stack_literal_call(call_id: i32, kind: i32): self.stack_literal_calls.insert(call_id, kind)
 
     fn is_stack_literal_call(call_id: i32): self.stack_literal_calls.contains(call_id)
+
+    fn stack_literal_kind(call_id: i32) -> i32: self.stack_literal_calls.get(call_id) ?? 0
 
     mut fn set_call_intrinsic(call_id: i32, kind: MirIntrinsic):
         if call_id >= 0 and call_id < self.call_intrinsic_kinds.len():

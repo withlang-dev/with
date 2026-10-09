@@ -12213,12 +12213,26 @@ impl Codegen:
             if body.is_stack_literal_call(args_id):
                 // §4.3c (D119): the elements live in the frame; capacity 0
                 // says the header owns no buffer, so its drop frees nothing.
-                let buf = self.create_entry_alloca(wl_array_type(elem_ty, arg_count as i64))
+                let buf_ty = wl_array_type(elem_ty, arg_count as i64)
+                let elems: List[i64] = List.new()
                 for i in 0..arg_count:
                     let raw = self.mir_intrinsic_arg(body, args_id, i)
-                    let elem = self.mir_intrinsic_value_as(body, args_id, i, raw, elem_ty)
-                    let at = [wl_const_int(i64_ty, i as i64, 0)]
-                    wl_build_store(self.builder, elem, wl_build_gep(self.builder, elem_ty, buf, list_data_i64(&at), 1))
+                    elems.push(self.mir_intrinsic_value_as(body, args_id, i, raw, elem_ty))
+                // Constants nothing writes are built once, as static data.
+                var all_constant = body.stack_literal_kind(args_id) == MIR_LITERAL_STATIC
+                for e in elems: all_constant = all_constant and wl_is_constant(e) != 0
+                let buf = if all_constant:
+                    let table = wl_add_global(self.llmod, buf_ty, "__with_list_literal")
+                    wl_set_initializer(table, wl_const_array(elem_ty, list_data_i64(&elems), arg_count))
+                    wl_set_global_constant(table, 1)
+                    wl_set_linkage(table, wl_private_linkage())
+                    table
+                else:
+                    let frame = self.create_entry_alloca(buf_ty)
+                    for i in 0..arg_count:
+                        let at = [wl_const_int(i64_ty, i as i64, 0)]
+                        wl_build_store(self.builder, elems[i], wl_build_gep(self.builder, elem_ty, frame, list_data_i64(&at), 1))
+                    frame
                 var header = wl_get_undef(list_ty)
                 header = wl_build_insert_value(self.builder, header, buf, 0)
                 header = wl_build_insert_value(self.builder, header, wl_const_int(i64_ty, arg_count as i64, 0), 1)

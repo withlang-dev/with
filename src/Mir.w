@@ -317,7 +317,7 @@ fn mir_term_text(body: &MirBody, bb: i32, pool: &InternPool, sema: &Sema) -> str
         let args_text = mir_call_args_text(body, d1, pool, sema)
         let dest_text = mir_place_text_named(body, d2, pool, sema)
         // §4.3c (D119): a literal whose elements stay in the frame.
-        let stack_text = if body.is_stack_literal_call(d1): " [stack literal]" else: ""
+        let stack_text = if body.stack_literal_kind(d1) == MIR_LITERAL_STATIC: " [static literal]" else if body.is_stack_literal_call(d1): " [stack literal]" else: ""
         return f"call {fn_text}({args_text}) -> [return: {dest_text}, next: bb{d3}];{stack_text}"
 
     if kind == TermKind.TK_DROP_AND_GOTO:
