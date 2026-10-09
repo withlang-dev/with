@@ -343,7 +343,7 @@ unsafe fn hashlin_grow_step(__param_hashlin: *mut tommy_hashlin_struct) {
         var __local_split_target: c_ulonglong = ((((2 as c_ulonglong) *% ((*__param_hashlin).count as c_ulonglong)) as c_ulonglong))
 
         while ((if (((*__param_hashlin).split as c_ulonglong) +% ((*__param_hashlin).low_max as c_ulonglong)) < __local_split_target: 1 else: 0) != 0) {
-            var __local_split: [2]*mut *mut tommy_node_struct
+            var __local_split: [*mut *mut tommy_node_struct; 2]
 
             var __local_j: *mut tommy_node_struct
 
@@ -420,7 +420,7 @@ unsafe fn hashlin_shrink_step(__param_hashlin: *mut tommy_hashlin_struct) {
         var __local_split_target: c_ulonglong = ((((8 as c_ulonglong) *% ((*__param_hashlin).count as c_ulonglong)) as c_ulonglong))
 
         while ((if (((*__param_hashlin).split as c_ulonglong) +% ((*__param_hashlin).low_max as c_ulonglong)) > __local_split_target: 1 else: 0) != 0) {
-            var __local_split: [2]*mut *mut tommy_node_struct
+            var __local_split: [*mut *mut tommy_node_struct; 2]
 
             ((*__param_hashlin).split = ((*__param_hashlin).split -% 1))
 

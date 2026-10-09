@@ -65,7 +65,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     var __local_req_cu2__goto_6986_13: u8 = 0
 
-    var __local_null_str__goto_6988_13: [1]u8
+    var __local_null_str__goto_6988_13: [u8; 1]
 
     var __local_original_subject__goto_6989_12: *const u8 = null
 
@@ -245,7 +245,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
         (__local_first_cu2__goto_6984_13 = ((0 as u8)))
         (__local_req_cu__goto_6985_13 = ((0 as u8)))
         (__local_req_cu2__goto_6986_13 = ((0 as u8)))
-        (__local_null_str__goto_6988_13 = [(205 as u8)])
+        (__local_null_str__goto_6988_13 = [205])
         (__local_original_subject__goto_6989_12 = __local_subject)
         (__local_utf__goto_7005_6 = ((0 as c_int)))
         (__local_ucp__goto_7008_6 = ((0 as c_int)))
@@ -48566,6 +48566,6 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
 }
 
-let rep_min: [11]c_uint = [(0 as c_uint), (0 as c_uint), (1 as c_uint), (1 as c_uint), (0 as c_uint), (0 as c_uint), (0 as c_uint), (0 as c_uint), (0 as c_uint), (1 as c_uint), (0 as c_uint)]
-let rep_max: [11]c_uint = [4294967295u32, 4294967295u32, 4294967295u32, 4294967295u32, 1, 1, 0, 0, 4294967295u32, 4294967295u32, 1]
-let rep_typ: [12]c_uint = [(1 as c_uint), (0 as c_uint), (1 as c_uint), (0 as c_uint), (1 as c_uint), (0 as c_uint), (1 as c_uint), (0 as c_uint), (2 as c_uint), (2 as c_uint), (2 as c_uint), (2 as c_uint)]
+let rep_min: [c_uint; 11] = [0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0]
+let rep_max: [c_uint; 11] = [4294967295u32, 4294967295u32, 4294967295u32, 4294967295u32, 1, 1, 0, 0, 4294967295u32, 4294967295u32, 1]
+let rep_typ: [c_uint; 12] = [1, 0, 1, 0, 1, 0, 1, 0, 2, 2, 2, 2]

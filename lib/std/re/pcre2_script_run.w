@@ -33,9 +33,9 @@ pub unsafe fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const
     var __local_ptr = __param_ptr
     var __local_require_state: c_uint = ((0 as c_uint))
 
-    var __local_require_map: [6]c_uint
+    var __local_require_map: [c_uint; 6]
 
-    var __local_map: [6]c_uint
+    var __local_map: [c_uint; 6]
 
     var __local_require_digitset: c_uint = ((0 as c_uint))
 

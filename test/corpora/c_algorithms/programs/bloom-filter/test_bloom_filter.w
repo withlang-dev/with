@@ -102,7 +102,7 @@ pub fn test_bloom_filter_read_load() writes allocation_limit {
 
     var __local_filter2: *mut _BloomFilter
 
-    var __local_state: [16]u8
+    var __local_state: [u8; 16]
 
     (__local_filter1 = bloom_filter_new((128 as c_uint), Some(string_hash), (4 as c_uint)))
 
@@ -302,4 +302,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [7]Option[extern "C" fn() -> Unit] = [Some(test_bloom_filter_new_free), Some(test_bloom_filter_insert_query), Some(test_bloom_filter_read_load), Some(test_bloom_filter_intersection), Some(test_bloom_filter_union), Some(test_bloom_filter_mismatch), null]
+var tests: [Option[extern "C" fn() -> Unit]; 7] = [Some(test_bloom_filter_new_free), Some(test_bloom_filter_insert_query), Some(test_bloom_filter_read_load), Some(test_bloom_filter_intersection), Some(test_bloom_filter_union), Some(test_bloom_filter_mismatch), null]

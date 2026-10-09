@@ -42,7 +42,7 @@ pub unsafe fn inflateBack(__param_strm: *mut z_stream_s, __param_in_: unsafe ext
 
     var __local_ret__goto_204_9: c_int = 0
 
-    var __local_order__goto_205_33: [19]c_ushort
+    var __local_order__goto_205_33: [c_ushort; 19]
 
     var __ci_expr_logic_0: c_int = 0
 
@@ -101,7 +101,7 @@ pub unsafe fn inflateBack(__param_strm: *mut z_stream_s, __param_in_: unsafe ext
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_order__goto_205_33 = [(16 as c_ushort), (17 as c_ushort), (18 as c_ushort), (0 as c_ushort), (8 as c_ushort), (7 as c_ushort), (9 as c_ushort), (6 as c_ushort), (10 as c_ushort), (5 as c_ushort), (11 as c_ushort), (4 as c_ushort), (12 as c_ushort), (3 as c_ushort), (13 as c_ushort), (2 as c_ushort), (14 as c_ushort), (1 as c_ushort), (15 as c_ushort)])
+        (__local_order__goto_205_33 = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15])
         if ((if __param_strm == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if true: 1 else: 0))
         } else {

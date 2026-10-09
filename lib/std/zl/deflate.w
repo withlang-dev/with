@@ -1820,7 +1820,7 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: c_int,
 
     var __local_wrap: c_int = ((1 as c_int))
 
-    var __local_my_version: [6]c_char = [(49 as c_char), (46 as c_char), (51 as c_char), (46 as c_char), (50 as c_char), (0 as c_char)]
+    var __local_my_version: [c_char; 6] = [49, 46, 51, 46, 50, 0]
 
     var __ci_expr_logic_1: c_int
 
@@ -4086,4 +4086,4 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: c_uin
 
 }
 
-let configuration_table: [10]config_s = [config_s { good_length: 0, max_lazy: 0, nice_length: 0, max_chain: 0, func: Some(deflate_stored) }, config_s { good_length: 4, max_lazy: 4, nice_length: 8, max_chain: 4, func: Some(deflate_fast) }, config_s { good_length: 4, max_lazy: 5, nice_length: 16, max_chain: 8, func: Some(deflate_fast) }, config_s { good_length: 4, max_lazy: 6, nice_length: 32, max_chain: 32, func: Some(deflate_fast) }, config_s { good_length: 4, max_lazy: 4, nice_length: 16, max_chain: 16, func: Some(deflate_slow) }, config_s { good_length: 8, max_lazy: 16, nice_length: 32, max_chain: 32, func: Some(deflate_slow) }, config_s { good_length: 8, max_lazy: 16, nice_length: 128, max_chain: 128, func: Some(deflate_slow) }, config_s { good_length: 8, max_lazy: 32, nice_length: 128, max_chain: 256, func: Some(deflate_slow) }, config_s { good_length: 32, max_lazy: 128, nice_length: 258, max_chain: 1024, func: Some(deflate_slow) }, config_s { good_length: 32, max_lazy: 258, nice_length: 258, max_chain: 4096, func: Some(deflate_slow) }]
+let configuration_table: [config_s; 10] = [config_s { good_length: 0, max_lazy: 0, nice_length: 0, max_chain: 0, func: Some(deflate_stored) }, config_s { good_length: 4, max_lazy: 4, nice_length: 8, max_chain: 4, func: Some(deflate_fast) }, config_s { good_length: 4, max_lazy: 5, nice_length: 16, max_chain: 8, func: Some(deflate_fast) }, config_s { good_length: 4, max_lazy: 6, nice_length: 32, max_chain: 32, func: Some(deflate_fast) }, config_s { good_length: 4, max_lazy: 4, nice_length: 16, max_chain: 16, func: Some(deflate_slow) }, config_s { good_length: 8, max_lazy: 16, nice_length: 32, max_chain: 32, func: Some(deflate_slow) }, config_s { good_length: 8, max_lazy: 16, nice_length: 128, max_chain: 128, func: Some(deflate_slow) }, config_s { good_length: 8, max_lazy: 32, nice_length: 128, max_chain: 256, func: Some(deflate_slow) }, config_s { good_length: 32, max_lazy: 128, nice_length: 258, max_chain: 1024, func: Some(deflate_slow) }, config_s { good_length: 32, max_lazy: 258, nice_length: 258, max_chain: 4096, func: Some(deflate_slow) }]

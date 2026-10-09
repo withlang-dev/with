@@ -476,6 +476,6 @@ unsafe fn set_enlarge(__param_set: *mut _Set) -> c_int {
 
 }
 
-let set_primes: [24]c_uint = [(193 as c_uint), (389 as c_uint), (769 as c_uint), (1543 as c_uint), (3079 as c_uint), (6151 as c_uint), (12289 as c_uint), (24593 as c_uint), (49157 as c_uint), (98317 as c_uint), (196613 as c_uint), (393241 as c_uint), (786433 as c_uint), (1572869 as c_uint), (3145739 as c_uint), (6291469 as c_uint), (12582917 as c_uint), (25165843 as c_uint), (50331653 as c_uint), (100663319 as c_uint), (201326611 as c_uint), (402653189 as c_uint), (805306457 as c_uint), (1610612741 as c_uint)]
+let set_primes: [c_uint; 24] = [193, 389, 769, 1543, 3079, 6151, 12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739, 6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189, 805306457, 1610612741]
 let set_num_primes: c_uint = 24
 let set_null_value: *mut c_void = null

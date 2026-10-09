@@ -2641,7 +2641,7 @@ unsafe fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __para
 
     var __local_list: *const c_uint
 
-    var __local_tmp: [3]c_uint
+    var __local_tmp: [c_uint; 3]
 
     var __local_result: c_ulong = ((2 as c_ulong))
 
@@ -4783,4 +4783,4 @@ unsafe fn compile_class_binary_loose(__param_context: *mut eclass_context, __par
 
 }
 
-let char_list_starts: [3]c_uint = [(65536 as c_uint), (32768 as c_uint), (256 as c_uint)]
+let char_list_starts: [c_uint; 3] = [65536, 32768, 256]

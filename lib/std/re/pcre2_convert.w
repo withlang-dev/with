@@ -35,9 +35,9 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
     var __local_ccontext = __param_ccontext
     var __local_rc: c_int
 
-    var __local_null_str: [1]u8 = [(205 as u8)]
+    var __local_null_str: [u8; 1] = [205]
 
-    var __local_dummy_buffer: [100]u8
+    var __local_dummy_buffer: [u8; 100]
 
     var __local_use_buffer: *mut u8 = ((&raw const __local_dummy_buffer[0] as *mut u8))
 

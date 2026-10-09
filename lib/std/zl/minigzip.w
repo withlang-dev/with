@@ -57,7 +57,7 @@ unsafe fn error_(__param_msg: *const i8) {
 }
 
 unsafe fn gz_compress(__param_in_: *mut c_void, __param_out: *mut gzFile_s) {
-    var __local_buf: [16384]c_char
+    var __local_buf: [c_char; 16384]
 
     var __local_len: c_int
 
@@ -92,7 +92,7 @@ unsafe fn gz_compress(__param_in_: *mut c_void, __param_out: *mut gzFile_s) {
 }
 
 unsafe fn gz_uncompress(__param_in_: *mut gzFile_s, __param_out: *mut c_void) {
-    var __local_buf: [16384]c_char
+    var __local_buf: [c_char; 16384]
 
     var __local_len: c_int
 
@@ -127,7 +127,7 @@ unsafe fn gz_uncompress(__param_in_: *mut gzFile_s, __param_out: *mut c_void) {
 }
 
 unsafe fn file_compress(__param_file: *mut i8, __param_mode: *mut i8) -> Unit {
-    var __local_outfile: [1025]c_char
+    var __local_outfile: [c_char; 1025]
 
     var __local_end: *mut c_char
 
@@ -174,7 +174,7 @@ unsafe fn file_compress(__param_file: *mut i8, __param_mode: *mut i8) -> Unit {
 }
 
 unsafe fn file_uncompress(__param_file: *mut i8) -> Unit {
-    var __local_buf: [1025]c_char
+    var __local_buf: [c_char; 1025]
 
     var __local_infile: *mut c_char
 
@@ -256,7 +256,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     var __local_bname: *mut c_char
 
-    var __local_outmode: [5]c_char
+    var __local_outmode: [c_char; 5]
 
 
     string_copy((&__local_outmode[0] as *mut c_char), c"wb6 ".ptr, ((5 * (sizeof[c_char]() as usize)) as c_ulong))

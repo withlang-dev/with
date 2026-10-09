@@ -183,7 +183,7 @@ pub fn test_trie_insert() writes allocation_limit, test_array {
 pub fn test_trie_lookup() writes allocation_limit, test_array {
     var __local_trie: *mut _Trie
 
-    var __local_buf: [10]c_char
+    var __local_buf: [c_char; 10]
 
     var __local_val: *mut c_int
 
@@ -229,7 +229,7 @@ pub fn test_trie_lookup() writes allocation_limit, test_array {
 pub fn test_trie_remove() writes allocation_limit, test_array {
     var __local_trie: *mut _Trie
 
-    var __local_buf: [10]c_char
+    var __local_buf: [c_char; 10]
 
     var __local_i: c_int
 
@@ -324,7 +324,7 @@ pub fn test_trie_replace() writes allocation_limit, test_array {
 pub fn test_trie_insert_empty() writes allocation_limit {
     var __local_trie: *mut _Trie
 
-    var __local_buf: [10]c_char
+    var __local_buf: [c_char; 10]
 
     (__local_trie = trie_new())
 
@@ -384,7 +384,7 @@ fn test_trie_free_long() {
 }
 
 fn test_trie_negative_keys() {
-    var __local_my_key: [6]c_char = [(97 as c_char), (98 as c_char), (99 as c_char), (-50 as c_char), (-20 as c_char), (0 as c_char)]
+    var __local_my_key: [c_char; 6] = [97, 98, 99, (-50 as c_char), (-20 as c_char), 0]
 
     var __local_trie: *mut _Trie
 
@@ -591,4 +591,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [12]Option[extern "C" fn() -> Unit] = [Some(test_trie_new_free), Some(test_trie_insert), Some(test_trie_lookup), Some(test_trie_remove), Some(test_trie_replace), Some(test_trie_insert_empty), Some(test_trie_free_long), Some(test_trie_negative_keys), Some(test_trie_insert_binary), Some(test_trie_insert_out_of_memory), Some(test_trie_remove_binary), null]
+var tests: [Option[extern "C" fn() -> Unit]; 12] = [Some(test_trie_new_free), Some(test_trie_insert), Some(test_trie_lookup), Some(test_trie_remove), Some(test_trie_replace), Some(test_trie_insert_empty), Some(test_trie_free_long), Some(test_trie_negative_keys), Some(test_trie_insert_binary), Some(test_trie_insert_out_of_memory), Some(test_trie_remove_binary), null]

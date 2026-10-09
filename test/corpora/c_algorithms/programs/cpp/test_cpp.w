@@ -83,11 +83,11 @@ fn test_compare_pointer() -> Unit {
 }
 
 fn test_compare_string() -> Unit {
-    var __local_s1: [6]c_char = [(104 as c_char), (101 as c_char), (108 as c_char), (108 as c_char), (111 as c_char), (0 as c_char)]
+    var __local_s1: [c_char; 6] = [104, 101, 108, 108, 111, 0]
 
-    var __local_s2: [6]c_char = [(104 as c_char), (101 as c_char), (108 as c_char), (108 as c_char), (111 as c_char), (0 as c_char)]
+    var __local_s2: [c_char; 6] = [104, 101, 108, 108, 111, 0]
 
-    var __local_s3: [6]c_char = [(119 as c_char), (111 as c_char), (114 as c_char), (108 as c_char), (100 as c_char), (0 as c_char)]
+    var __local_s3: [c_char; 6] = [119, 111, 114, 108, 100, 0]
 
     if (((if not ((if not (unsafe { string_equal((&__local_s1[0] as *mut c_char), (&__local_s3[0] as *mut c_char)) } != 0): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_compare_string".ptr, c"test-cpp.c".ptr, (75 as c_int), c"!string_equal(s1, s3)".ptr)
@@ -165,11 +165,11 @@ fn test_hash_pointer() -> Unit {
 }
 
 fn test_hash_string() -> Unit {
-    var __local_s1: [6]c_char = [(104 as c_char), (101 as c_char), (108 as c_char), (108 as c_char), (111 as c_char), (0 as c_char)]
+    var __local_s1: [c_char; 6] = [104, 101, 108, 108, 111, 0]
 
-    var __local_s2: [6]c_char = [(104 as c_char), (101 as c_char), (108 as c_char), (108 as c_char), (111 as c_char), (0 as c_char)]
+    var __local_s2: [c_char; 6] = [104, 101, 108, 108, 111, 0]
 
-    var __local_s3: [6]c_char = [(119 as c_char), (111 as c_char), (114 as c_char), (108 as c_char), (100 as c_char), (0 as c_char)]
+    var __local_s3: [c_char; 6] = [119, 111, 114, 108, 100, 0]
 
     if (((if not ((if unsafe { string_hash((&__local_s1[0] as *mut c_char)) } != unsafe { string_hash((&__local_s3[0] as *mut c_char)) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_string".ptr, c"test-cpp.c".ptr, (106 as c_int), c"string_hash(s1) != string_hash(s3)".ptr)
@@ -311,4 +311,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [18]Option[extern "C" fn() -> Unit] = [Some(test_compare_int), Some(test_compare_pointer), Some(test_compare_string), Some(test_hash_int), Some(test_hash_pointer), Some(test_hash_string), Some(test_arraylist), Some(test_avl_tree), Some(test_binary_heap), Some(test_binomial_heap), Some(test_bloom_filter), Some(test_hash_table), Some(test_list), Some(test_queue), Some(test_set), Some(test_slist), Some(test_trie), null]
+var tests: [Option[extern "C" fn() -> Unit]; 18] = [Some(test_compare_int), Some(test_compare_pointer), Some(test_compare_string), Some(test_hash_int), Some(test_hash_pointer), Some(test_hash_string), Some(test_arraylist), Some(test_avl_tree), Some(test_binary_heap), Some(test_binomial_heap), Some(test_bloom_filter), Some(test_hash_table), Some(test_list), Some(test_queue), Some(test_set), Some(test_slist), Some(test_trie), null]

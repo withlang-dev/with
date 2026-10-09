@@ -263,7 +263,7 @@ pub unsafe fn unzLocateFile(__param_file: *mut c_void, __param_szFileName: *cons
     (__local_err = ((unzGoToFirstFile(__param_file) as c_int)))
 
     while ((if __local_err == 0: 1 else: 0) != 0) {
-        var __local_szCurrentFileName: [257]c_char
+        var __local_szCurrentFileName: [c_char; 257]
 
         (__local_err = ((unzGetCurrentFileInfo64(__param_file, (null as *mut unz_file_info64_s), (&__local_szCurrentFileName[0] as *mut c_char), ((((257 * (sizeof[c_char]() as usize)) as c_ulong) -% (1 as c_ulong)) as c_ulong), null, (0 as c_ulong), (null as *mut i8), (0 as c_ulong)) as c_int)))
 
@@ -488,7 +488,7 @@ pub unsafe fn unzOpenCurrentFile3(__param_file: *mut c_void, __param_method: *mu
 
     var __local_size_local_extrafield: c_uint
 
-    var __local_source: [12]c_char
+    var __local_source: [c_char; 12]
 
     if ((if __param_file == null: 1 else: 0) != 0) {
         return -102
@@ -1205,7 +1205,7 @@ unsafe fn init_keys(__param_passwd: *const i8, __param_pkeys: *mut c_ulong, __pa
 }
 
 unsafe fn unz64local_getShort(__param_pzlib_filefunc_def: *const zlib_filefunc64_32_def_s, __param_filestream: *mut c_void, __param_pX: *mut c_ulong) -> c_int {
-    var __local_c: [2]u8
+    var __local_c: [u8; 2]
 
     var __local_err: c_int = (((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (&__local_c[0] as *mut u8), (2 as c_ulong)) as c_int))
 
@@ -1226,7 +1226,7 @@ unsafe fn unz64local_getShort(__param_pzlib_filefunc_def: *const zlib_filefunc64
 }
 
 unsafe fn unz64local_getLong(__param_pzlib_filefunc_def: *const zlib_filefunc64_32_def_s, __param_filestream: *mut c_void, __param_pX: *mut c_ulong) -> c_int {
-    var __local_c: [4]u8
+    var __local_c: [u8; 4]
 
     var __local_err: c_int = (((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (&__local_c[0] as *mut u8), (4 as c_ulong)) as c_int))
 
@@ -1247,7 +1247,7 @@ unsafe fn unz64local_getLong(__param_pzlib_filefunc_def: *const zlib_filefunc64_
 }
 
 unsafe fn unz64local_getLong64(__param_pzlib_filefunc_def: *const zlib_filefunc64_32_def_s, __param_filestream: *mut c_void, __param_pX: *mut c_ulong) -> c_int {
-    var __local_c: [8]u8
+    var __local_c: [u8; 8]
 
     var __local_err: c_int = (((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (&__local_c[0] as *mut u8), (8 as c_ulong)) as c_int))
 

@@ -472,4 +472,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [6]Option[extern "C" fn() -> Unit] = [Some(test_malloc_free), Some(test_realloc), Some(test_calloc), Some(test_strdup), Some(test_limits), null]
+var tests: [Option[extern "C" fn() -> Unit]; 6] = [Some(test_malloc_free), Some(test_realloc), Some(test_calloc), Some(test_strdup), Some(test_limits), null]

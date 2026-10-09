@@ -354,7 +354,7 @@ unsafe fn tommy_chain_merge_degenerated(__param_first: *mut tommy_chain_struct, 
 }
 
 unsafe fn tommy_chain_mergesort(__param_chain: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) -> Unit {
-    var __local_bit: [65]tommy_chain_struct
+    var __local_bit: [tommy_chain_struct; 65]
 
     var __local_counter: c_ulonglong
 

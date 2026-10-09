@@ -63,7 +63,7 @@ pub unsafe fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
 
     var __local_min__goto_2056_7: c_int = 0
 
-    var __local_backref_cache__goto_2057_7: [129]c_int
+    var __local_backref_cache__goto_2057_7: [c_int; 129]
 
     var __ci_expr_logic_0: c_int = 0
 
@@ -3473,7 +3473,7 @@ unsafe fn set_table_bit(__param_re: *mut pcre2_real_code_8, __param_p: *const u8
             (__local_c = ((((__local_c as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as c_int) / 128)] as c_int) * 128) + ((__local_c as c_int) % 128))] as c_uint) as usize)).other_case) as c_uint)))
 
             if (__param_utf != 0) {
-                var __local_buff: [6]u8
+                var __local_buff: [u8; 6]
 
                 _pcre2_ord2utf_8(__local_c, (&__local_buff[0] as *mut u8))
 
@@ -3519,7 +3519,7 @@ unsafe fn set_type_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type: c
 
     while ((if __local_c < 256: 1 else: 0) != 0) {
         if ((if (((((*__param_re).tables[((512 as c_uint) +% (((__local_c as c_uint) / (8 as c_uint)) as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
-            var __local_buff: [6]u8
+            var __local_buff: [u8; 6]
 
             _pcre2_ord2utf_8(__local_c, (&__local_buff[0] as *mut u8))
 
@@ -3578,9 +3578,9 @@ unsafe fn study_char_list(__param_code: *const u8, __param_start_bitmap: *mut u8
 
     var __local_next_char: *const u8
 
-    var __local_start_buffer: [6]u8
+    var __local_start_buffer: [u8; 6]
 
-    var __local_end_buffer: [6]u8
+    var __local_end_buffer: [u8; 6]
 
 
     var __local_start: u8
@@ -3742,7 +3742,7 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
 
     var __local_p__goto_1225_25: *const c_uint = null
 
-    var __local_buff__goto_1231_25: [6]u8
+    var __local_buff__goto_1231_25: [u8; 6]
 
     var __local_done__goto_1264_17: c_int = 0
 

@@ -335,4 +335,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [7]Option[extern "C" fn() -> Unit] = [Some(test_binomial_heap_new_free), Some(test_binomial_heap_insert), Some(test_min_heap), Some(test_max_heap), Some(test_insert_out_of_memory), Some(test_pop_out_of_memory), null]
+var tests: [Option[extern "C" fn() -> Unit]; 7] = [Some(test_binomial_heap_new_free), Some(test_binomial_heap_insert), Some(test_min_heap), Some(test_max_heap), Some(test_insert_out_of_memory), Some(test_pop_out_of_memory), null]

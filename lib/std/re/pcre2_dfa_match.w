@@ -39,7 +39,7 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
 
     var __local_original_options__goto_3347_10: c_uint = 0
 
-    var __local_null_str__goto_3349_13: [1]u8
+    var __local_null_str__goto_3349_13: [u8; 1]
 
     var __local_original_subject__goto_3350_12: *const u8 = null
 
@@ -83,7 +83,7 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
 
     var __local_mb__goto_3377_18: *mut dfa_match_block_8 = null
 
-    var __local_base_recursion_workspace__goto_3384_5: [7680]c_int
+    var __local_base_recursion_workspace__goto_3384_5: [c_int; 7680]
 
     var __local_rws__goto_3385_13: *mut RWS_anchor = null
 
@@ -218,7 +218,7 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     '__ci_bb_0 {
         (__local_re__goto_3346_24 = __param_code)
         (__local_original_options__goto_3347_10 = __local_options)
-        (__local_null_str__goto_3349_13 = [(205 as u8)])
+        (__local_null_str__goto_3349_13 = [205])
         (__local_original_subject__goto_3350_12 = __local_subject)
         (__local_has_first_cu__goto_3357_6 = ((0 as c_int)))
         (__local_has_req_cu__goto_3358_6 = ((0 as c_int)))
@@ -17263,7 +17263,7 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
 }
 
-let coptable: [173]u8 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-let poptable: [173]u8 = [(0 as u8), (0 as u8), (0 as u8), (0 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (1 as u8), (1 as u8)]
-let toptable1: [14]u8 = [0, 0, 0, 0, 0, 0, 0x08, 0x08, 0x01, 0x01, 0x10, 0x10, 0, 0]
-let toptable2: [14]u8 = [0, 0, 0, 0, 0, 0, 0x08, 0, 0x01, 0, 0x10, 0, 1, 1]
+let coptable: [u8; 173] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+let poptable: [u8; 173] = [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]
+let toptable1: [u8; 14] = [0, 0, 0, 0, 0, 0, 0x08, 0x08, 0x01, 0x01, 0x10, 0x10, 0, 0]
+let toptable2: [u8; 14] = [0, 0, 0, 0, 0, 0, 0x08, 0, 0x01, 0, 0x10, 0, 1, 1]

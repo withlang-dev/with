@@ -188,7 +188,7 @@ pub fn test_out_of_memory() writes allocation_limit {
 
     var __local_value: *mut c_int
 
-    var __local_values: [16]c_int = [(15 as c_int), (14 as c_int), (13 as c_int), (12 as c_int), (11 as c_int), (10 as c_int), (9 as c_int), (8 as c_int), (7 as c_int), (6 as c_int), (5 as c_int), (4 as c_int), (3 as c_int), (2 as c_int), (1 as c_int), (0 as c_int)]
+    var __local_values: [c_int; 16] = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
 
     var __local_i: c_int
 
@@ -272,4 +272,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [6]Option[extern "C" fn() -> Unit] = [Some(test_binary_heap_new_free), Some(test_binary_heap_insert), Some(test_min_heap), Some(test_max_heap), Some(test_out_of_memory), null]
+var tests: [Option[extern "C" fn() -> Unit]; 6] = [Some(test_binary_heap_new_free), Some(test_binary_heap_insert), Some(test_min_heap), Some(test_max_heap), Some(test_out_of_memory), null]

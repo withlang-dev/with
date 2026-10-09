@@ -13,7 +13,7 @@ use std.option
 pub fn generate_hash_table() -> *mut _HashTable writes allocation_limit {
     var __local_hash_table: *mut _HashTable
 
-    var __local_buf: [10]c_char
+    var __local_buf: [c_char; 10]
 
     var __local_value: *mut c_char
 
@@ -100,7 +100,7 @@ pub fn test_hash_table_new_free() -> Unit writes allocation_limit, value1, value
 pub fn test_hash_table_insert_lookup() writes allocation_limit {
     var __local_hash_table: *mut _HashTable
 
-    var __local_buf: [10]c_char
+    var __local_buf: [c_char; 10]
 
     var __local_value: *mut c_char
 
@@ -168,7 +168,7 @@ pub fn test_hash_table_insert_lookup() writes allocation_limit {
 pub fn test_hash_table_remove() writes allocation_limit {
     var __local_hash_table: *mut _HashTable
 
-    var __local_buf: [10]c_char
+    var __local_buf: [c_char; 10]
 
     (__local_hash_table = generate_hash_table())
 
@@ -271,7 +271,7 @@ pub fn test_hash_table_iterating_remove() writes allocation_limit {
 
     var __local_iterator: _HashTableIterator
 
-    var __local_buf: [10]c_char
+    var __local_buf: [c_char; 10]
 
     var __local_val: *mut c_char
 
@@ -503,7 +503,7 @@ pub fn test_hash_table_free_functions() -> Unit writes allocated_keys, allocated
 pub fn test_hash_table_out_of_memory() writes allocation_limit {
     var __local_hash_table: *mut _HashTable
 
-    var __local_values: [66]c_int
+    var __local_values: [c_int; 66]
 
     var __local_i: c_uint
 
@@ -622,4 +622,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [9]Option[extern "C" fn() -> Unit] = [Some(test_hash_table_new_free), Some(test_hash_table_insert_lookup), Some(test_hash_table_remove), Some(test_hash_table_iterating), Some(test_hash_table_iterating_remove), Some(test_hash_table_free_functions), Some(test_hash_table_out_of_memory), Some(test_hash_iterator_key_pair), null]
+var tests: [Option[extern "C" fn() -> Unit]; 9] = [Some(test_hash_table_new_free), Some(test_hash_table_insert_lookup), Some(test_hash_table_remove), Some(test_hash_table_iterating), Some(test_hash_table_iterating_remove), Some(test_hash_table_free_functions), Some(test_hash_table_out_of_memory), Some(test_hash_iterator_key_pair), null]

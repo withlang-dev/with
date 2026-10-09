@@ -310,7 +310,7 @@ pub let AVL_TREE_NODE_RIGHT: c_int = 1
 pub type AVLTreeCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
 
 @[repr(C)]
-pub type _AVLTreeNode { pub children: [2]*mut _AVLTreeNode = [null as *mut _AVLTreeNode; 2], pub parent: *mut _AVLTreeNode = null, pub key: *mut c_void = null, pub value: *mut c_void = null, pub height: c_int = 0 }
+pub type _AVLTreeNode { pub children: [*mut _AVLTreeNode; 2] = [null as *mut _AVLTreeNode; 2], pub parent: *mut _AVLTreeNode = null, pub key: *mut c_void = null, pub value: *mut c_void = null, pub height: c_int = 0 }
 impl Copy for _AVLTreeNode
 
 @[repr(C)]
@@ -457,7 +457,7 @@ pub type RBTreeNodeSide = c_uint
 pub let RB_TREE_NODE_LEFT: c_int = 0
 pub let RB_TREE_NODE_RIGHT: c_int = 1
 @[repr(C)]
-pub type _RBTreeNode { pub color: i32 = 0, pub key: *mut c_void = null, pub value: *mut c_void = null, pub parent: *mut _RBTreeNode = null, pub children: [2]*mut _RBTreeNode = [null as *mut _RBTreeNode; 2] }
+pub type _RBTreeNode { pub color: i32 = 0, pub key: *mut c_void = null, pub value: *mut c_void = null, pub parent: *mut _RBTreeNode = null, pub children: [*mut _RBTreeNode; 2] = [null as *mut _RBTreeNode; 2] }
 impl Copy for _RBTreeNode
 
 @[repr(C)]
@@ -522,7 +522,7 @@ pub type _SortedArray { pub data: *mut *mut c_void = null, pub length: c_uint = 
 impl Copy for _SortedArray
 
 pub let SORTED_ARRAY_NULL: *mut c_void = null
-pub var test_array: [1000]c_int = [0 as c_int; 1000]
+pub var test_array: [c_int; 1000] = [0 as c_int; 1000]
 
 pub var counter: c_int = 0
 
@@ -534,7 +534,7 @@ pub type TrieValue = *mut c_void
 pub type TrieNode = _TrieNode
 
 @[repr(C)]
-pub type _TrieNode { pub data: *mut c_void = null, pub use_count: c_uint = 0, pub next: [256]*mut _TrieNode = [null as *mut _TrieNode; 256] }
+pub type _TrieNode { pub data: *mut c_void = null, pub use_count: c_uint = 0, pub next: [*mut _TrieNode; 256] = [null as *mut _TrieNode; 256] }
 impl Copy for _TrieNode
 
 @[repr(C)]

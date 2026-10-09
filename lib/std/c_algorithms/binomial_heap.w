@@ -298,7 +298,7 @@ unsafe fn binomial_heap_merge(__param_heap: *mut _BinomialHeap, __param_other: *
 
     var __local_new_roots_length: c_uint
 
-    var __local_vals: [3]*mut _BinomialTree
+    var __local_vals: [*mut _BinomialTree; 3]
 
     var __local_num_vals: c_int
 

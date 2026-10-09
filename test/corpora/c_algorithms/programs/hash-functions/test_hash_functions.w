@@ -9,7 +9,7 @@ use std.libc
 use std.option
 
 pub fn test_pointer_hash() {
-    var __local_array: [200]c_int
+    var __local_array: [c_int; 200]
 
     var __local_i: c_int
 
@@ -54,7 +54,7 @@ pub fn test_pointer_hash() {
 }
 
 pub fn test_int_hash() -> Unit {
-    var __local_array: [200]c_int
+    var __local_array: [c_int; 200]
 
     var __local_i: c_int
 
@@ -109,15 +109,15 @@ pub fn test_int_hash() -> Unit {
 }
 
 pub fn test_string_hash() -> Unit {
-    var __local_test1: [15]c_char = [(116 as c_char), (104 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (97 as c_char), (32 as c_char), (116 as c_char), (101 as c_char), (115 as c_char), (116 as c_char), (0 as c_char)]
+    var __local_test1: [c_char; 15] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 0]
 
-    var __local_test2: [15]c_char = [(116 as c_char), (104 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (97 as c_char), (32 as c_char), (116 as c_char), (101 as c_char), (115 as c_char), (117 as c_char), (0 as c_char)]
+    var __local_test2: [c_char; 15] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 117, 0]
 
-    var __local_test3: [16]c_char = [(116 as c_char), (104 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (97 as c_char), (32 as c_char), (116 as c_char), (101 as c_char), (115 as c_char), (116 as c_char), (32 as c_char), (0 as c_char)]
+    var __local_test3: [c_char; 16] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 0]
 
-    var __local_test4: [15]c_char = [(116 as c_char), (104 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (97 as c_char), (32 as c_char), (116 as c_char), (101 as c_char), (115 as c_char), (116 as c_char), (0 as c_char)]
+    var __local_test4: [c_char; 15] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 0]
 
-    var __local_test5: [15]c_char = [(84 as c_char), (104 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (97 as c_char), (32 as c_char), (116 as c_char), (101 as c_char), (115 as c_char), (116 as c_char), (0 as c_char)]
+    var __local_test5: [c_char; 15] = [84, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 0]
 
     if (((if not ((if unsafe { string_hash((&__local_test1[0] as *mut c_char)) } != unsafe { string_hash((&__local_test2[0] as *mut c_char)) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_string_hash".ptr, c"test-hash-functions.c".ptr, (86 as c_int), c"string_hash(test1) != string_hash(test2)".ptr)
@@ -146,15 +146,15 @@ pub fn test_string_hash() -> Unit {
 }
 
 pub fn test_string_nocase_hash() -> Unit {
-    var __local_test1: [15]c_char = [(116 as c_char), (104 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (97 as c_char), (32 as c_char), (116 as c_char), (101 as c_char), (115 as c_char), (116 as c_char), (0 as c_char)]
+    var __local_test1: [c_char; 15] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 0]
 
-    var __local_test2: [15]c_char = [(116 as c_char), (104 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (97 as c_char), (32 as c_char), (116 as c_char), (101 as c_char), (115 as c_char), (117 as c_char), (0 as c_char)]
+    var __local_test2: [c_char; 15] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 117, 0]
 
-    var __local_test3: [16]c_char = [(116 as c_char), (104 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (97 as c_char), (32 as c_char), (116 as c_char), (101 as c_char), (115 as c_char), (116 as c_char), (32 as c_char), (0 as c_char)]
+    var __local_test3: [c_char; 16] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 0]
 
-    var __local_test4: [15]c_char = [(116 as c_char), (104 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (97 as c_char), (32 as c_char), (116 as c_char), (101 as c_char), (115 as c_char), (116 as c_char), (0 as c_char)]
+    var __local_test4: [c_char; 15] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 0]
 
-    var __local_test5: [15]c_char = [(84 as c_char), (104 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (105 as c_char), (115 as c_char), (32 as c_char), (97 as c_char), (32 as c_char), (116 as c_char), (101 as c_char), (115 as c_char), (116 as c_char), (0 as c_char)]
+    var __local_test5: [c_char; 15] = [84, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 0]
 
     if (((if not ((if unsafe { string_nocase_hash((&__local_test1[0] as *mut c_char)) } != unsafe { string_nocase_hash((&__local_test2[0] as *mut c_char)) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_string_nocase_hash".ptr, c"test-hash-functions.c".ptr, (107 as c_int), c"string_nocase_hash(test1) != string_nocase_hash(test2)".ptr)
@@ -189,4 +189,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [5]Option[extern "C" fn() -> Unit] = [Some(test_pointer_hash), Some(test_int_hash), Some(test_string_hash), Some(test_string_nocase_hash), null]
+var tests: [Option[extern "C" fn() -> Unit]; 5] = [Some(test_pointer_hash), Some(test_int_hash), Some(test_string_hash), Some(test_string_nocase_hash), null]

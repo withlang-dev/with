@@ -275,7 +275,7 @@ unsafe fn search_callback(__param_arg: *const c_void, __param_obj: *const c_void
 pub fn test_hash() writes compare_counter {
     var __local_i: c_uint
 
-    var __local_buffer: [16]u8
+    var __local_buffer: [u8; 16]
 
     var __local_COUNT: c_uint = ((16777216 as c_uint))
 
@@ -1864,7 +1864,7 @@ pub fn test_trie() writes compare_counter {
 
     var __local_OBJ: *mut object_trie
 
-    var __local_DUP: [2]object_trie
+    var __local_DUP: [object_trie; 2]
 
     var __local_i: c_uint
 
@@ -2004,7 +2004,7 @@ pub fn test_trie_inplace() writes compare_counter {
 
     var __local_OBJ: *mut object_trie_inplace
 
-    var __local_DUP: [2]object_trie_inplace
+    var __local_DUP: [object_trie_inplace; 2]
 
     var __local_i: c_uint
 
@@ -2160,7 +2160,7 @@ pub fn main() -> c_int writes SEED, compare_counter {
 
 }
 
-var the_cache: [16777216]u8 = [0 as u8; 16777216]
+var the_cache: [u8; 16777216] = [0 as u8; 16777216]
 var the_str: *const i8 = null
 var the_start: c_ulonglong = 0
 var the_count: c_uint = 0

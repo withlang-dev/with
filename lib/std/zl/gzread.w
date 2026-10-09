@@ -271,7 +271,7 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
 }
 
 pub unsafe fn gzgetc(__param_file: *mut gzFile_s) -> c_int {
-    var __local_buf: [1]u8
+    var __local_buf: [u8; 1]
 
     var __local_state: *mut gz_state
 

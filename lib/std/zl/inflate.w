@@ -46,9 +46,9 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
     var __local_ret__goto_487_9: c_int = 0
 
-    var __local_hbuf__goto_489_19: [4]u8
+    var __local_hbuf__goto_489_19: [u8; 4]
 
-    var __local_order__goto_491_33: [19]c_ushort
+    var __local_order__goto_491_33: [c_ushort; 19]
 
     var __ci_expr_logic_2: c_int = 0
 
@@ -195,7 +195,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_order__goto_491_33 = [(16 as c_ushort), (17 as c_ushort), (18 as c_ushort), (0 as c_ushort), (8 as c_ushort), (7 as c_ushort), (9 as c_ushort), (6 as c_ushort), (10 as c_ushort), (5 as c_ushort), (11 as c_ushort), (4 as c_ushort), (12 as c_ushort), (3 as c_ushort), (13 as c_ushort), (2 as c_ushort), (14 as c_ushort), (1 as c_ushort), (15 as c_ushort)])
+        (__local_order__goto_491_33 = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15])
         if (inflateStateCheck(__param_strm) != 0) {
             (__ci_expr_logic_0 = (if true: 1 else: 0))
         } else {
@@ -4753,7 +4753,7 @@ pub unsafe fn inflateSync(__param_strm: *mut z_stream_s) -> c_int {
     var __local_out: c_ulong
 
 
-    var __local_buf: [4]u8
+    var __local_buf: [u8; 4]
 
     var __local_state: *mut inflate_state
 

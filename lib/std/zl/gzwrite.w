@@ -288,7 +288,7 @@ pub unsafe fn gzputs(__param_file: *mut gzFile_s, __param_s: *const i8) -> c_int
 pub unsafe fn gzputc(__param_file: *mut gzFile_s, __param_c: c_int) -> c_int {
     var __local_have: c_uint
 
-    var __local_buf: [1]u8
+    var __local_buf: [u8; 1]
 
     var __local_state: *mut gz_state
 

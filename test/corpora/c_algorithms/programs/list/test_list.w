@@ -535,7 +535,7 @@ pub fn test_list_remove_entry() writes allocation_limit, variable1, variable2, v
 }
 
 pub fn test_list_remove_data() writes allocation_limit {
-    var __local_entries: [13]c_int = [(89 as c_int), (4 as c_int), (23 as c_int), (42 as c_int), (4 as c_int), (16 as c_int), (15 as c_int), (4 as c_int), (8 as c_int), (99 as c_int), (50 as c_int), (30 as c_int), (4 as c_int)]
+    var __local_entries: [c_int; 13] = [89, 4, 23, 42, 4, 16, 15, 4, 8, 99, 50, 30, 4]
 
     var __local_num_entries: c_uint = ((13 as c_uint))
 
@@ -635,9 +635,9 @@ pub fn test_list_remove_data() writes allocation_limit {
 pub fn test_list_sort() -> Unit writes allocation_limit {
     var __local_list: *mut _ListEntry
 
-    var __local_entries: [13]c_int = [(89 as c_int), (4 as c_int), (23 as c_int), (42 as c_int), (4 as c_int), (16 as c_int), (15 as c_int), (4 as c_int), (8 as c_int), (99 as c_int), (50 as c_int), (30 as c_int), (4 as c_int)]
+    var __local_entries: [c_int; 13] = [89, 4, 23, 42, 4, 16, 15, 4, 8, 99, 50, 30, 4]
 
-    var __local_sorted: [13]c_int = [(4 as c_int), (4 as c_int), (4 as c_int), (4 as c_int), (8 as c_int), (15 as c_int), (16 as c_int), (23 as c_int), (30 as c_int), (42 as c_int), (50 as c_int), (89 as c_int), (99 as c_int)]
+    var __local_sorted: [c_int; 13] = [4, 4, 4, 4, 8, 15, 16, 23, 30, 42, 50, 89, 99]
 
     var __local_num_entries: c_uint = ((13 as c_uint))
 
@@ -702,7 +702,7 @@ pub fn test_list_sort() -> Unit writes allocation_limit {
 }
 
 pub fn test_list_find_data() writes allocation_limit {
-    var __local_entries: [10]c_int = [(89 as c_int), (23 as c_int), (42 as c_int), (16 as c_int), (15 as c_int), (4 as c_int), (8 as c_int), (99 as c_int), (50 as c_int), (30 as c_int)]
+    var __local_entries: [c_int; 10] = [89, 23, 42, 16, 15, 4, 8, 99, 50, 30]
 
     var __local_num_entries: c_int = ((10 as c_int))
 
@@ -939,7 +939,7 @@ pub fn test_list_iterate_bad_remove() writes allocation_limit {
 
     var __local_iter: _ListIterator
 
-    var __local_values: [49]c_int
+    var __local_values: [c_int; 49]
 
     var __local_i: c_int
 
@@ -993,4 +993,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [15]Option[extern "C" fn() -> Unit] = [Some(test_list_append), Some(test_list_prepend), Some(test_list_free), Some(test_list_next), Some(test_list_nth_entry), Some(test_list_nth_data), Some(test_list_length), Some(test_list_remove_entry), Some(test_list_remove_data), Some(test_list_sort), Some(test_list_find_data), Some(test_list_to_array), Some(test_list_iterate), Some(test_list_iterate_bad_remove), null]
+var tests: [Option[extern "C" fn() -> Unit]; 15] = [Some(test_list_append), Some(test_list_prepend), Some(test_list_free), Some(test_list_next), Some(test_list_nth_entry), Some(test_list_nth_data), Some(test_list_length), Some(test_list_remove_entry), Some(test_list_remove_data), Some(test_list_sort), Some(test_list_find_data), Some(test_list_to_array), Some(test_list_iterate), Some(test_list_iterate_bad_remove), null]

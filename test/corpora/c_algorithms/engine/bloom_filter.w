@@ -6,7 +6,7 @@ use std.option
 pub fn bloom_filter_new(__param_table_size: c_uint, __param_hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_uint], __param_num_functions: c_uint) -> *mut _BloomFilter writes allocation_limit {
     var __local_filter: *mut _BloomFilter
 
-    if ((if __param_num_functions > (((64 * (sizeof[c_uint]() as usize)) as c_ulong) / (sizeof[c_uint]() as c_ulong)): 1 else: 0) != 0) {
+    if ((if __param_num_functions > ((salts.len() as c_ulong)): 1 else: 0) != 0) {
         return ((null as *mut _BloomFilter))
 
     }
@@ -241,4 +241,4 @@ pub unsafe fn bloom_filter_intersection(__param_filter1: *mut _BloomFilter, __pa
 
 }
 
-let salts: [64]c_uint = [(424919842 as c_uint), (1485623063 as c_uint), (1690263564 as c_uint), (2797485885 as c_uint), (874119914 as c_uint), (363868695 as c_uint), (990259288 as c_uint), (1498873094 as c_uint), (414540367 as c_uint), (3820882758 as c_uint), (553635164 as c_uint), (2740845867 as c_uint), (532982207 as c_uint), (1472486748 as c_uint), (2825264202 as c_uint), (1327199442 as c_uint), (1517149715 as c_uint), (991484614 as c_uint), (94941119 as c_uint), (3151638498 as c_uint), (2723286392 as c_uint), (3885189193 as c_uint), (3577855093 as c_uint), (161831767 as c_uint), (2603899618 as c_uint), (4230817455 as c_uint), (946314479 as c_uint), (2176654861 as c_uint), (1699119534 as c_uint), (1262323629 as c_uint), (3590263035 as c_uint), (598945639 as c_uint), (2949112678 as c_uint), (3717553837 as c_uint), (3888335644 as c_uint), (4272742566 as c_uint), (3944149149 as c_uint), (1012377389 as c_uint), (746755269 as c_uint), (3130156586 as c_uint), (3445304596 as c_uint), (1949906632 as c_uint), (613007103 as c_uint), (3334827520 as c_uint), (1956967942 as c_uint), (2990844234 as c_uint), (1591723043 as c_uint), (4052752692 as c_uint), (615478929 as c_uint), (4140403493 as c_uint), (3928338246 as c_uint), (1993732838 as c_uint), (1580453362 as c_uint), (1147056983 as c_uint), (2287299538 as c_uint), (1892801146 as c_uint), (1413780328 as c_uint), (940581052 as c_uint), (470098111 as c_uint), (4158933314 as c_uint), (2726177368 as c_uint), (1720086469 as c_uint), (307338471 as c_uint), (1132102742 as c_uint)]
+let salts: [c_uint; 64] = [424919842, 1485623063, 1690263564, 2797485885, 874119914, 363868695, 990259288, 1498873094, 414540367, 3820882758, 553635164, 2740845867, 532982207, 1472486748, 2825264202, 1327199442, 1517149715, 991484614, 94941119, 3151638498, 2723286392, 3885189193, 3577855093, 161831767, 2603899618, 4230817455, 946314479, 2176654861, 1699119534, 1262323629, 3590263035, 598945639, 2949112678, 3717553837, 3888335644, 4272742566, 3944149149, 1012377389, 746755269, 3130156586, 3445304596, 1949906632, 613007103, 3334827520, 1956967942, 2990844234, 1591723043, 4052752692, 615478929, 4140403493, 3928338246, 1993732838, 1580453362, 1147056983, 2287299538, 1892801146, 1413780328, 940581052, 470098111, 4158933314, 2726177368, 1720086469, 307338471, 1132102742]

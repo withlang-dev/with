@@ -310,7 +310,7 @@ pub let AVL_TREE_NODE_RIGHT: c_int = 1
 pub type AVLTreeCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
 
 @[repr(C)]
-pub type _AVLTreeNode { pub children: [2]*mut _AVLTreeNode = [null as *mut _AVLTreeNode; 2], pub parent: *mut _AVLTreeNode = null, pub key: *mut c_void = null, pub value: *mut c_void = null, pub height: c_int = 0 }
+pub type _AVLTreeNode { pub children: [*mut _AVLTreeNode; 2] = [null as *mut _AVLTreeNode; 2], pub parent: *mut _AVLTreeNode = null, pub key: *mut c_void = null, pub value: *mut c_void = null, pub height: c_int = 0 }
 impl Copy for _AVLTreeNode
 
 @[repr(C)]
@@ -457,7 +457,7 @@ pub type RBTreeNodeSide = c_uint
 pub let RB_TREE_NODE_LEFT: c_int = 0
 pub let RB_TREE_NODE_RIGHT: c_int = 1
 @[repr(C)]
-pub type _RBTreeNode { pub color: i32 = 0, pub key: *mut c_void = null, pub value: *mut c_void = null, pub parent: *mut _RBTreeNode = null, pub children: [2]*mut _RBTreeNode = [null as *mut _RBTreeNode; 2] }
+pub type _RBTreeNode { pub color: i32 = 0, pub key: *mut c_void = null, pub value: *mut c_void = null, pub parent: *mut _RBTreeNode = null, pub children: [*mut _RBTreeNode; 2] = [null as *mut _RBTreeNode; 2] }
 impl Copy for _RBTreeNode
 
 @[repr(C)]
@@ -530,17 +530,17 @@ pub type Trie = _Trie
 
 pub type TrieValue = *mut c_void
 
-pub var test_array: [10000]c_int = [0 as c_int; 10000]
+pub var test_array: [c_int; 10000] = [0 as c_int; 10000]
 
-pub var test_strings: [10000][10]c_char = [[0 as c_char; 10] as [10]c_char; 10000]
+pub var test_strings: [[c_char; 10]; 10000] = [[0 as c_char; 10] as [c_char; 10]; 10000]
 
-pub var bin_key: [7]u8 = [(97 as u8), (98 as u8), (99 as u8), (0 as u8), (1 as u8), (2 as u8), (255 as u8)]
+pub var bin_key: [u8; 7] = [97, 98, 99, 0, 1, 2, 255]
 
-pub var bin_key2: [8]u8 = [(97 as u8), (98 as u8), (99 as u8), (0 as u8), (1 as u8), (2 as u8), (255 as u8), (0 as u8)]
+pub var bin_key2: [u8; 8] = [97, 98, 99, 0, 1, 2, 255, 0]
 
-pub var bin_key3: [3]u8 = [(97 as u8), (98 as u8), (99 as u8)]
+pub var bin_key3: [u8; 3] = [97, 98, 99]
 
-pub var bin_key4: [4]u8 = [(122 as u8), (0 as u8), (122 as u8), (122 as u8)]
+pub var bin_key4: [u8; 4] = [122, 0, 122, 122]
 
 pub let TRIE_NULL: *mut c_void = null
 pub let NUM_TEST_VALUES: c_int = 10000
@@ -548,5 +548,5 @@ pub let LONG_STRING_LEN: c_int = 4096
 pub type TrieNode = _TrieNode
 
 @[repr(C)]
-pub type _TrieNode { pub data: *mut c_void = null, pub use_count: c_uint = 0, pub next: [256]*mut _TrieNode = [null as *mut _TrieNode; 256] }
+pub type _TrieNode { pub data: *mut c_void = null, pub use_count: c_uint = 0, pub next: [*mut _TrieNode; 256] = [null as *mut _TrieNode; 256] }
 impl Copy for _TrieNode

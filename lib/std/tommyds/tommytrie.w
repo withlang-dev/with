@@ -397,7 +397,7 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
 
     var __local_ptr__goto_174_8: *mut c_void = null
 
-    var __local_let_back__goto_175_20: [10]*mut *mut tommy_node_struct
+    var __local_let_back__goto_175_20: [*mut *mut tommy_node_struct; 10]
 
     var __local_level__goto_176_15: c_uint = 0
 
