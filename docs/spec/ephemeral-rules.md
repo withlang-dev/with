@@ -6,7 +6,7 @@ compiler carries the origin and provenance facts needed to make that safe.
 Type-level ephemerality is structural. References carry origin
 constraints. Declared-ephemeral types are ephemeral by declaration.
 Aggregates and generic containers whose type structurally contains an
-ephemeral component are ephemeral by structure, such as `Vec[&T]`. This
+ephemeral component are ephemeral by structure, such as `List[&T]`. This
 determines which type shapes can carry ephemeral constraints.
 
 Value-level ephemerality is provenance-tracked. Binding-level
@@ -52,17 +52,17 @@ precision debt, not user ceremony.
 | 9 | Escaping closure captures ephemeral value | Reject |
 | 10 | Guarded `with` block (Form 1) result is ephemeral | Reject |
 
-Rule 7: A `Vec[T]` where `T` is ephemeral becomes an ephemeral `Vec`. It
+Rule 7: A `List[T]` where `T` is ephemeral becomes an ephemeral `List`. It
 cannot be stored in a struct or sent to another thread; returned from a
 function, it makes the caller's binding ephemeral (rule 8). This
 enables common patterns like collecting tokens from a parser:
 
 ```
 // Token is ephemeral (contains StrView)
-let tokens = with Vec.new() as mut toks:
+let tokens = with List.new() as mut toks:
     while let Some(tok) = parser.next_token():
         toks.push(tok)
-// tokens: Vec[Token] is itself ephemeral — valid only in this scope
+// tokens: List[Token] is itself ephemeral — valid only in this scope
 // Cannot store tokens in a struct; returning it makes the caller's binding ephemeral
 ```
 
@@ -115,12 +115,12 @@ help: take an independent Copy value:
 For a non-`Copy` join, the diagnostic must explain both branch contracts:
 
 ```text
-error: `??` would need to copy `Vec[Job]`, which is not `Copy`
- --> queues.get("ready") ?? Vec.new()
-note: the successful branch is `&Vec[Job]`, a view into `queues`
-note: the default branch is an owned `Vec[Job]`
-help: clone the found value into an independent Vec:
-      queues.get("ready").cloned() ?? Vec.new()
+error: `??` would need to copy `List[Job]`, which is not `Copy`
+ --> queues.get("ready") ?? List.new()
+note: the successful branch is `&List[Job]`, a view into `queues`
+note: the default branch is an owned `List[Job]`
+help: clone the found value into an independent List:
+      queues.get("ready").cloned() ?? List.new()
 help: or borrow the default too:
       queues.get("ready") ?? &empty
 ```

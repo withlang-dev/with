@@ -282,7 +282,7 @@ Calculate the factorial of 5
 
 Calculate the greatest common divisor of 20, 35, and 50
 
-    with -e 'let n:Vec[i32]=[20,35,50];var g=n[0];for x in n{var b=x;while b!=0{let t=b;b=g%b;g=t}};print_i32(g)'
+    with -e 'let n:List[i32]=[20,35,50];var g=n[0];for x in n{var b=x;while b!=0{let t=b;b=g%b;g=t}};print_i32(g)'
     POSSIBLE_IMPROVE
 
 Calculate the greatest common divisor of 20 and 35 with Euclid's algorithm

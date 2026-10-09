@@ -304,18 +304,18 @@ in the standard library.
 a collection. If any element is `None` or `Err`, the whole result is:
 
 ```
-// Vec[Option[T]] → Option[Vec[T]]
-let inputs: Vec[Option[i32]] = [Some(1), Some(2), Some(3)]
+// List[Option[T]] → Option[List[T]]
+let inputs: List[Option[i32]] = [Some(1), Some(2), Some(3)]
 let result = inputs.sequence()       // Some([1, 2, 3])
 
-let bad: Vec[Option[i32]] = [Some(1), None, Some(3)]
+let bad: List[Option[i32]] = [Some(1), None, Some(3)]
 let result = bad.sequence()          // None
 
-// Vec[Result[T, E]] → Result[Vec[T], E]
-let results: Vec[Result[i32, str]] = [Ok(1), Ok(2), Ok(3)]
+// List[Result[T, E]] → Result[List[T], E]
+let results: List[Result[i32, str]] = [Ok(1), Ok(2), Ok(3)]
 let all = results.sequence()         // Ok([1, 2, 3])
 
-let mixed: Vec[Result[i32, str]] = [Ok(1), Err("bad"), Ok(3)]
+let mixed: List[Result[i32, str]] = [Ok(1), Err("bad"), Ok(3)]
 let all = mixed.sequence()           // Err("bad")
 ```
 

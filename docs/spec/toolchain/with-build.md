@@ -257,7 +257,7 @@ Three tiers:
 | Alloc | `std = false`, `alloc = true` | `core` + heap types |
 | Freestanding | `std = false` | `core` only — no heap |
 
-With `alloc = true`, you get `Vec[T]`, `Box[T]`, `str`, `HashMap`, and
+With `alloc = true`, you get `List[T]`, `Box[T]`, `str`, `HashMap`, and
 `HashSet` without I/O or OS features. Provide a `@[global_allocator]` to
 back the heap.
 
@@ -433,7 +433,7 @@ Runs external tools with argv. No shell command strings.
 
 ```with
 let proc = ctx.process_runner()
-let args: Vec[str] = Vec.new()
+let args: List[str] = List.new()
 args |> push("tool")
 args |> push("--version")
 let result = proc.run_capture(args, "out/tool.stdout", "out/tool.stderr", 30000)

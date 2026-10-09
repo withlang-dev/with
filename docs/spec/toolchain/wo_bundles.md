@@ -67,7 +67,7 @@ calls from a corpus into libc remain what they are today.
 
 An object compiled by an older compiler is linked into a newer one. That
 is safe only if the calling convention at the boundary does not move with
-the compiler. Today `FnAbi`, the `str`/`Vec` headers, view
+the compiler. Today `FnAbi`, the `str`/`List` headers, view
 representations, the drop protocol, and mangling may change with any
 commit. For `.wo` they change only deliberately:
 
@@ -208,9 +208,9 @@ The registry replaces that with two records and one loop:
 Adding a corpus: one `build/<corpus>.w` with `pub fn <corpus>_corpus() ->
 Corpus` (its facts and hooks; the lanes hook registers its upstream test
 lane), one line in `corpus_at`, and `corpus_count` bumped. The registry
-is indexed rather than a `Vec[Corpus]` because a `Corpus` is ephemeral
+is indexed rather than a `List[Corpus]` because a `Corpus` is ephemeral
 (its hooks take references, which a plain record may not hold) and the
-pinned seed's comptime evaluator iterates a `Vec` of ephemeral records
+pinned seed's comptime evaluator iterates a `List` of ephemeral records
 incorrectly; every other shape in the registry is what the seed already
 evaluates for `Target`.
 

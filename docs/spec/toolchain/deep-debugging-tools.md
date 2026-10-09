@@ -429,8 +429,8 @@ in between, on any CFG path. Each violation names the function, the binding,
 the producer, the source line, the call that poisons the view and the direct
 grower it reaches. Fix by owning the text at the binding
 (`intern.resolve(sym).clone()`) or finishing with the view before the call. Not
-covered: a view stored into an aggregate, a view from a builtin (`Vec.get`),
-and a view into a container the function itself owns (`&Vec[str]` parameter).
+covered: a view stored into an aggregate, a view from a builtin (`List.get`),
+and a view into a container the function itself owns (`&List[str]` parameter).
 
 Cost: instant on a repro; on the compiler itself (`analyze src/main.w
 audit:all`, the batch-tier step) about 170 s and 20 GB resident at 12033103.
@@ -676,9 +676,9 @@ fixtures are `test/compile_errors/err_2248_comptime_*_not_transitive.w`.
 before Sema (`comptime_transform_module`), so `typed_expr_types` is empty
 for everything being folded and `node_type_or` falls to its fallback.
 `WITH_TRACE_COMPTIME=1` prints, at each static constructor,
-`[ct] static_new node=… recv='Vec' result='Vec[i32]' from=sema|demand|receiver`:
-`from=receiver` with a generic base is the class (#2220: `Vec.new()` under
-`var v: Vec[i32] =` saw only `Vec`). The evaluator carries a demand stack
+`[ct] static_new node=… recv='List' result='List[i32]' from=sema|demand|receiver`:
+`from=receiver` with a generic base is the class (#2220: `List.new()` under
+`var v: List[i32] =` saw only `List`). The evaluator carries a demand stack
 (`expected_types`, Law 2's demand) that a `let` annotation pushes; a site
 that needs an instance reads it. A `from=receiver` where Sema would have
 typed the node is a missing demand source, not a missing type.
@@ -1132,7 +1132,7 @@ Environment switches (set on the compiler's run unless noted):
 | `WITH_DEBUG_TYPE_LAYOUT=1` | codegen | each struct field's resolved type as the layout is built |
 | `WITH_DEBUG_POOL_FLOW=1` | codegen | the AST and symbol pool sizes handed to the backend |
 | `WITH_TRACE_CMP=1` | codegen | each integer `==`/`!=` with its operand types and signedness |
-| `WITH_TRACE_VECDROP=1` | codegen | each Vec drop and whether its elements need dropping |
+| `WITH_TRACE_VECDROP=1` | codegen | each List drop and whether its elements need dropping |
 | `WITH_TRACE_CARGS=1` | C backend | each extern call's signature and argument count |
 | `WITH_ANALYZE_TRACE=pool-views` | analyze | `audit:pool-views`'s per-body walk |
 | `WITH_TRACE_GRAPH=1` | build | the build graph as it materializes |

@@ -81,7 +81,7 @@ re-created per line, an undeclared assignment is "undefined variable", and
 there is no `last`/END. Blocked: `sed '$p'`, `sed -n '/START/,/END/p'`,
 `awk '{s+=$2} END{print s}'`, `awk '!seen[$0]++'`, `wc -l`, `tail -n 1`. All
 are expressible in `-e` with a loop over `stdin.lines()`, which already
-materializes the input as `Vec[str]`, so `last`/END cost nothing. Proposal:
+materializes the input as `List[str]`, so `last`/END cost nothing. Proposal:
 hoist a snippet's top-level `var` declarations out of the loop and bind
 `last: bool`.
 
@@ -98,7 +98,7 @@ exist, and the only integer parser is the free function
 `std.string.parse(s) -> i32`. Blocked: `awk '{print $2}'`, `awk -F: NF`,
 `$2 + 0`.
 
-**4. No `Vec.sort` and no `str.reverse` (#960).** `sort` and `rev` have no
+**4. No `List.sort` and no `str.reverse` (#960).** `sort` and `rev` have no
 spelling; aggregation (`uniq -c`) does.
 
 **5. `std.json` stops at `field`/`raw` (#961).** `.a` and `.b.c` work;
@@ -350,7 +350,7 @@ with -e 'use std.random;for line in stdin.lines(){var a=line.split("\t");var i=a
 with -e 'var n=1;for i in 1..=5{n*=i};print_i32(n)'
 
 # Calculate the GCD of 20, 35, and 50
-with -e 'let n:Vec[i32]=[20,35,50];var g=n[0];for x in n{var b=x;while b!=0{let t=b;b=g%b;g=t}};print_i32(g)'
+with -e 'let n:List[i32]=[20,35,50];var g=n[0];for x in n{var b=x;while b!=0{let t=b;b=g%b;g=t}};print_i32(g)'
 
 # Calculate the GCD of 20 and 35 with Euclid's algorithm
 with -e 'var a=20;var b=35;while b!=0{let t=b;b=a%b;a=t};print_i32(a)'
@@ -616,7 +616,7 @@ Potential design changes:
 - Add `std.encoding.html.escape` and a real HTML text tokenizer/extractor.
   Regex tag stripping is not correct for script/style content, comments, or
   malformed markup.
-- Implement generic `Serialize` for `Vec[T]` and a top-level `json.encode(value)`
+- Implement generic `Serialize` for `List[T]` and a top-level `json.encode(value)`
   so arrays do not require manual commas and quoting.
 - Make package-qualified `use` in one-liners able to resolve and fetch ecosystem
   codecs, analogous to Perl's module loading but integrated with With's package
@@ -748,7 +748,7 @@ small number of reusable surfaces:
    language-wide implicit topic.
 6. Close the parity gaps the 2026-09-03 audit filed: persistent state and
    `last`/END in `-n`/`-p` (#957), file operands and `-i` (#958),
-   `str.fields()` and `parse_i64` (#959), `Vec.sort` and `str.reverse`
+   `str.fields()` and `parse_i64` (#959), `List.sort` and `str.reverse`
    (#960), the jq surface on `JsonView` and `std.json` as an implicit import
    (#961) — each with its matrix rows as a `cli-selfhost-one-liner-tests`
    case, so parity is a battery invariant.

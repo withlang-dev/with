@@ -108,7 +108,7 @@ a consuming closure may be invoked once.
   (§14.19): C receives the code pointer alone.
 
 ```with
-let xs = Vec.new()
+let xs = List.new()
 let f = () => xs.push(1)   // capture effect on xs: {write}
 f()                     // mutates xs
 
@@ -120,11 +120,11 @@ let k = 42
 let s = move () => k + 1   // move: s holds its own copy of k
 let m = s()             // k unchanged, m is 43
 
-let owned = Vec.from([1, 2, 3])
+let owned = List.from([1, 2, 3])
 let h = move () => owned.len()
 // owned is invalid after closure creation; h owns it
 
-let ys = Vec.from([1])
+let ys = List.from([1])
 let c = () => take(ys)     // consuming view of ys
 c()                     // moves ys; a second c() is an error
 ```

@@ -303,14 +303,14 @@ An element view follows the contextual rules of §3.8 and D22: when
 `T: Copy`, an owned-value demand materializes an independent copy; when
 `T` is not `Copy`, an owned demand is rejected (D22 §13.6) — borrow the
 element, clone it, or remove it from the collection. These semantics are
-uniform across `Vec`, fixed arrays, slices, and user types implementing
+uniform across `List`, fixed arrays, slices, and user types implementing
 `IndexGet`/`IndexPlace`.
 
 **Examples:**
 
 ```
 // A matrix type that supports m[row, col] syntax
-type Matrix { data: Vec[f64], rows: usize, cols: usize }
+type Matrix { data: List[f64], rows: usize, cols: usize }
 
 impl Index[(usize, usize), f64] for Matrix:
     fn index(self: &Self, (r, c): (usize, usize)) -> &f64:
@@ -424,12 +424,12 @@ trait Ord:
 
 **Keys (D96).** A type is a *key*, a `HashMap` key or a `HashSet` element,
 when its `==` is structural and no part of it is a float: the integers,
-`bool`, `str`, raw pointers, and tuples, fixed arrays, `Vec`, `Option`,
+`bool`, `str`, raw pointers, and tuples, fixed arrays, `List`, `Option`,
 `Result`, `Box` and declared types whose parts are keys. Every key
 implements `Key`, which is the bound a generic container states
 (`K: Key`). A float part is refused as a key; the error names `std`'s
 `TotalF64`, a float with a total order. The map owns its keys and nothing
-else can mutate one while it is inside, so a `Vec` is as good a key as an
+else can mutate one while it is inside, so a `List` is as good a key as an
 integer.
 
 `std.TotalF64` (and `TotalF32`) wraps a float as a key. Its `==` is
@@ -499,7 +499,7 @@ Standard library implementations:
 |------|-------------------|-----------|
 | `[T; N]` (array) | `T` where `T: Eq` | Linear scan |
 | `[]T` (slice) | `T` where `T: Eq` | Linear scan |
-| `Vec[T]` | `T` where `T: Eq` | Linear scan |
+| `List[T]` | `T` where `T: Eq` | Linear scan |
 | `HashSet[T]` | `T` where `T: Key` | O(1) lookup |
 | `HashMap[K, V]` | `K` where `K: Key` | Key existence |
 | `BTreeSet[T]` | `T` where `T: Ord` | O(log n) lookup |

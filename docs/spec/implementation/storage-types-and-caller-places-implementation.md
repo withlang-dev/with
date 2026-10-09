@@ -581,7 +581,7 @@ and it is *relative to the reserved place*. It is a per-parameter
 effect, `EFF_INVALIDATE_DESCENDANTS`, carried on a receiver or
 caller-place parameter: passing a container through that parameter may
 move, destroy, or shrink storage that lives *inside* the container
-(`Vec.push`, `Vec.insert`, `Vec.remove`, `Vec.pop`, `HashMap.insert`,
+(`List.push`, `List.insert`, `List.remove`, `List.pop`, `HashMap.insert`,
 ... all set it on `self`). It applies only when the reserved place is a
 descendant of the argument bound to that parameter:
 
@@ -602,7 +602,7 @@ a method-level property. A `mut self` receiver is one carrier; an
 `inout` parameter is another:
 
 ```
-fn grow(v: inout Vec[i32]): v.push(1)
+fn grow(v: inout List[i32]): v.push(1)
 f(inout xs[0], grow(inout xs))     // reject: grow's param carries the effect
 ```
 

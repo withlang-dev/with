@@ -91,7 +91,7 @@ All additive to `rt/rt_core.w`; pure `.w`.
   non-allocating `rt_getenv` (`with_getenv_str` would deadlock the non-reentrant allocator
   lock) and cached.
 - **Instrumented alloc/free.** `rt_alloc` records (or, on address reuse, resets) an entry.
-  Tagged front doors such as `with_alloc`, Vec buffer growth, channel allocation, and fiber
+  Tagged front doors such as `with_alloc`, List buffer growth, channel allocation, and fiber
   record allocation store a coarse allocation-origin token. `rt_free` looks up the entry
   *before* the existing ownership check: if already freed -> **double-free**, print
   `debug-alloc: DOUBLE FREE addr=<a> size=<n> origin=<site> first_drop=<tag> second_drop=<tag>`
@@ -99,7 +99,7 @@ All additive to `rt/rt_core.w`; pure `.w`.
   double-pushes the existing `rt_payload_start_can_be_owned` panic can miss.
 - **Scribble on free (opt-in: `WITH_DEBUG_ALLOC_SCRIBBLE`).** Freed small payloads are
   overwritten with `0xDE` so use-after-free reads corrupt loudly. It is **off by default**
-  because, for a `Vec[Drop]` buffer, poisoning the freed payload turns a subsequent
+  because, for a `List[Drop]` buffer, poisoning the freed payload turns a subsequent
   double-drop's element read into a use-after-free crash *before* the ledger reports the
   buffer's double-free — masking the clean verdict. Enable it to hunt use-after-free
   specifically. The freelist link lives in the header word (`payload-16`), untouched.

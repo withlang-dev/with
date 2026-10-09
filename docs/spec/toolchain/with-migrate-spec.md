@@ -152,7 +152,7 @@ Each block has:
 type BasicBlock = {
     id: i32,
     label: str,          // "" if unlabeled
-    stmts: Vec[Cursor],  // statement cursors in this block
+    stmts: List[Cursor],  // statement cursors in this block
     terminator: Terminator,
 }
 
@@ -163,7 +163,7 @@ type Terminator =
     | Fallthrough(next_id: i32)
     | Break
     | Continue
-    | Switch(cond: Cursor, cases: Vec[(i64, str)])
+    | Switch(cond: Cursor, cases: List[(i64, str)])
 ```
 
 **Step 3: Build a stackify graph.**
@@ -618,7 +618,7 @@ resolution — all from CImport.w.
 Add `ci_function_has_goto(session, cursor) -> bool` — walk AST,
 return true if any GotoStmt (kind 232) is found.
 
-Add `ci_build_basic_blocks(session, cursor) -> Vec[BasicBlock]`:
+Add `ci_build_basic_blocks(session, cursor) -> List[BasicBlock]`:
 - Walk the CompoundStmt
 - Split at labels and gotos
 - Record terminators

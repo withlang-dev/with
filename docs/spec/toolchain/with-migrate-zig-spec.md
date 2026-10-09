@@ -128,7 +128,7 @@ fn read(fd: i32) ![]u8 { ... }
 const data = try read(fd);
 
 // With
-fn read(fd: i32) -> Result[Vec[u8], Error]: ...
+fn read(fd: i32) -> Result[List[u8], Error]: ...
 let data = read(fd)?
 ```
 
@@ -448,7 +448,7 @@ fn parse(allocator: std.mem.Allocator, input: []const u8) !Ast {
 // With
 fn parse(input: &[u8]) -> Result[Ast, Error]:
     // @migrate: allocator parameter removed — With uses implicit allocation
-    var list = Vec[u8].new()
+    var list = List[u8].new()
     defer list.free()
     // ...
 ```
@@ -456,7 +456,7 @@ fn parse(input: &[u8]) -> Result[Ast, Error]:
 **Rules:**
 1. Remove `allocator: std.mem.Allocator` parameter
 2. Remove `allocator` argument from call sites
-3. `ArrayList(T).init(allocator)` → `Vec[T].new()`
+3. `ArrayList(T).init(allocator)` → `List[T].new()`
 4. `list.deinit()` → `list.free()` or just remove (With has Drop)
 5. `allocator.alloc(T, n)` → `alloc(n * sizeof[T]()) as *mut T`
 6. `allocator.free(ptr)` → `free(ptr)`
@@ -488,7 +488,7 @@ std.mem.indexOf(u8, h, n)  →  h.find(n)       // @migrate: verify API
 std.sort.sort(T, items, ctx, cmp) → items.sort(cmp)
 std.fmt.bufPrint(...)      →  f"..."           // @migrate: approximate
 std.fs.cwd()               →  // @migrate: use std.fs functions
-std.ArrayList(T)           →  Vec[T]
+std.ArrayList(T)           →  List[T]
 std.HashMap(K, V, ...)     →  HashMap[K, V]
 std.AutoHashMap(K, V)      →  HashMap[K, V]
 std.StringHashMap(V)       →  HashMap[str, V]
@@ -611,7 +611,7 @@ fn Matrix(comptime T: type, comptime rows: usize, comptime cols: usize) type {
 // With
 // @migrate: comptime type function — no direct equivalent.
 // With options:
-//   1. Use generic type: type Matrix[T] = { data: Vec[T], rows: i32, cols: i32 }
+//   1. Use generic type: type Matrix[T] = { data: List[T], rows: i32, cols: i32 }
 //   2. Use comptime if for a fixed set of instantiations
 // Original Zig code preserved as comment below.
 ```
@@ -785,7 +785,7 @@ Port and extend `transformZig` from Migrate.zig:
 - `[*]T` → `*mut T`
 - `*T` → `*mut T`, `*const T` → `*const T`
 - `[N]T` → `[T; N]`
-- `std.ArrayList(T)` → `Vec[T]`
+- `std.ArrayList(T)` → `List[T]`
 - `std.AutoHashMap(K, V)` → `HashMap[K, V]`
 - `void` → omit, `noreturn` → `Never`
 - `anytype` → `T` with flag

@@ -33,7 +33,7 @@ use math.vector.{Vec3, dot, cross}
 - `Bool.{true, false}`
 - Primitive types (`i32`, `i64`, `f64`, `bool`, `Int`, `UInt`, etc.)
 - `Unit`
-- `Vec[T]`, `String` / `str`
+- `List[T]`, `String` / `str`
 - Traits: `Eq`, `Ord`, `Key`, `Debug`, `Display`, `Default`, `Drop`
 - `print`, `eprint` — `print[T: Display](v: &T)`: any `Display` value
   prints; `&str` is one instance. A `match` whose arms do not share a
@@ -169,7 +169,7 @@ bindings are user-visible:
 
 | Binding | Modes | Type / Meaning |
 |---------|-------|----------------|
-| `args` | all | `Vec[str]` containing arguments after `--` |
+| `args` | all | `List[str]` containing arguments after `--` |
 | `line` | `-n`, `-p` | current stdin line, without trailing newline or CRLF `\r` |
 | `nr` | `-n`, `-p` | 1-based line number, `i64` |
 
@@ -200,7 +200,7 @@ use std.math
 use std.collections
 use std.builtins
 
-let args: Vec[str] = ...
+let args: List[str] = ...
 print("hello")
 ```
 
@@ -392,7 +392,7 @@ that doesn't need a heap allocator or OS:
 | Category | Requires `std` | Why |
 |----------|---------------|-----|
 | `str`, `String` | Yes | Heap-allocated |
-| `Vec[T]` | Yes | Heap-allocated |
+| `List[T]` | Yes | Heap-allocated |
 | `HashMap`, `HashSet` | Yes | Heap-allocated |
 | `Box[T]` | Yes | Heap-allocated |
 | `print`, `eprint`, `write`, `ewrite` | Yes | Needs stdout/stderr |
@@ -437,7 +437,7 @@ fn start -> Never:
         // main loop
 ```
 
-**Allocator opt-in:** You can get `Vec`, `str`, `Box`, and
+**Allocator opt-in:** You can get `List`, `str`, `Box`, and
 other heap types back without pulling in the full `std` by
 providing a global allocator:
 
@@ -456,7 +456,7 @@ global ALLOC: BumpAllocator = BumpAllocator.new(
 )
 ```
 
-With `alloc = true`, you get `Vec[T]`, `Box[T]`, `str`,
+With `alloc = true`, you get `List[T]`, `Box[T]`, `str`,
 `String`, `HashMap`, and `HashSet` — but still no I/O, no
 filesystem, no async runtime, no OS-dependent features.
 

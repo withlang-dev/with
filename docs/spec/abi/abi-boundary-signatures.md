@@ -2,7 +2,7 @@
 
 A signature at an ABI boundary — an `extern` declaration, a
 `@[c_export]` function, or a `c_import`-generated binding — may use
-only C-representable types. A With-managed type (`str`, `Vec`, `Box`,
+only C-representable types. A With-managed type (`str`, `List`, `Box`,
 closures, or any type containing one) in such a signature, owned or
 borrowed, is a compile error; the diagnostic names the §16.3c modeled
 coercion for the call-site direction and the explicit

@@ -388,8 +388,8 @@ fn contiguous(a: &Array) -> Array
 fn clone(a: &Array) -> Array
 fn cat(arrays: &[&Array], dim: i32 = 0) -> Array
 fn stack(arrays: &[&Array], dim: i32 = 0) -> Array
-fn split(a: &Array, sections: i32, dim: i32 = 0) -> Vec[Array]
-fn chunk(a: &Array, chunks: i32, dim: i32 = 0) -> Vec[Array]
+fn split(a: &Array, sections: i32, dim: i32 = 0) -> List[Array]
+fn chunk(a: &Array, chunks: i32, dim: i32 = 0) -> List[Array]
 fn gather(a: &Array, dim: i32, index: &Array) -> Array
 fn scatter(a: &Array, dim: i32, index: &Array, src: &Array) -> Array
 fn index_select(a: &Array, dim: i32, index: &Array) -> Array
@@ -843,7 +843,7 @@ fn save_csv(path: str, a: &Array, delimiter: str = ",",
 
 // Binary
 fn from_bytes(data: &[u8], dtype: DType, shape: Shape) -> Array
-fn to_bytes(a: &Array) -> Vec[u8]
+fn to_bytes(a: &Array) -> List[u8]
 
 // Safetensors (ML weight format — interop with Weld ecosystem)
 fn load_safetensors(path: str) -> HashMap[str, Array]

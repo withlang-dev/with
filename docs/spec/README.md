@@ -57,7 +57,7 @@ partway drops what it cloned (#2161). The implementation is NON-COMPLIANT
 until it catches up.
 **Changelog v7.23:** a collection literal's binding, 2026-10-05 (D93).
 §4.3c rule 1: an annotation may name the collection without its arguments
-(`let w: Vec = [1, 2, 3]`); a binding with no annotation takes its type
+(`let w: List = [1, 2, 3]`); a binding with no annotation takes its type
 from its uses (a parameter, a typed place, a return, a method exactly one
 collection has), element type included; a slice demand is met by the fixed
 array; two demanded types are an error; an empty literal with no demand is

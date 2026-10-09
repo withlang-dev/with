@@ -304,7 +304,7 @@ structural representation:
 | struct | `TypeName { field: value, field: value }` |
 | enum | `Variant`, or `Variant(payload, payload)` |
 | `Option[T]` / `Result[T, E]` | `Some(value)` / `None`, `Ok(value)` / `Err(error)` |
-| `Vec[T]`, array, slice | `[elem, elem]` |
+| `List[T]`, array, slice | `[elem, elem]` |
 | `HashMap[K, V]` | `{key: value, key: value}`, entries ordered by the Debug text of their keys |
 | `BTreeMap[K, V]` | `{key: value, key: value}`, in key order |
 | `HashSet[T]` | `{elem, elem}`, elements ordered by their Debug text |
@@ -350,8 +350,8 @@ f"{player}"      // error: struct type Player has no default
 #### 15.4.9 Concatenation (`++`, `++=`)
 
 `a ++ b` concatenates two sequences into a new value: two `str` give a
-`str`; any two of a `Vec`, a slice, a fixed array or a list literal, with
-the same element type, give a `Vec[T]` (a `[T; N+M]` where one is
+`str`; any two of a `List`, a slice, a fixed array or a list literal, with
+the same element type, give a `List[T]` (a `[T; N+M]` where one is
 demanded). Both operands are observed and left untouched; at an operand's
 last use the compiler reuses its buffer, so `xs = xs ++ more` costs only
 the append. Elements that are not `Copy` are moved, so such an operand

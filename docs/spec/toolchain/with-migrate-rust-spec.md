@@ -88,7 +88,7 @@ static mut X: i32 = 5; → var X: i32 = 5    // @migrate: was static mut
 #### Generic syntax
 
 ```rust
-Vec<T>                 →  Vec[T]
+Vec<T>                 →  List[T]
 HashMap<K, V>          →  HashMap[K, V]
 Result<T, E>           →  Result[T, E]
 impl<T: Clone>         →  impl[T: Clone]
@@ -213,7 +213,7 @@ pub(super) fn foo()        →  fn foo   // @migrate: was pub(super)
 #### Type aliases
 
 ```rust
-type Alias = Vec<i32>;     →  type Alias = Vec[i32]
+type Alias = Vec<i32>;     →  type Alias = List[i32]
 ```
 
 #### Struct / Enum
@@ -409,8 +409,8 @@ end of Result-returning functions.
 #### `vec![]` and other macros
 
 ```rust
-vec![1, 2, 3]              →  [1, 2, 3]   // @migrate: verify Vec literal syntax
-vec![]                      →  Vec.new()
+vec![1, 2, 3]              →  [1, 2, 3]   // @migrate: verify List literal syntax
+vec![]                      →  List.new()
 HashMap::new()              →  HashMap.new()
 ```
 
@@ -593,7 +593,7 @@ impl Serialize for Foo { ... }
 let x = iter.collect::<Vec<_>>();
 
 // With
-let x: Vec[_] = iter.collect()
+let x: List[_] = iter.collect()
 // @migrate: turbofish ::<> converted to type annotation
 ```
 
@@ -707,7 +707,7 @@ extend with:
 - `Box<T>` → `T`
 - `String` → `str`
 - `&'a str` → `&str` (strip lifetime)
-- `Vec<T>` → `Vec[T]`
+- `Vec<T>` → `List[T]`
 - `Option<T>` → `Option[T]`
 - `Result<T, E>` → `Result[T, E]`
 - `Arc<Mutex<T>>` → `Mutex[T]` (with flag)
@@ -719,7 +719,7 @@ extend with:
 
 - `format!` → f-string
 - `println!`/`eprintln!` → `print`/`eprint`
-- `vec![]` → array literal or `Vec.new()`
+- `vec![]` → array literal or `List.new()`
 - `assert!`/`assert_eq!`/`assert_ne!` → `assert`
 - `panic!`/`todo!`/`unreachable!` → `panic`/`unreachable`
 

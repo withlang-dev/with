@@ -11,7 +11,7 @@ Assignment moves by default. After a move, the source binding is
 invalid.
 
 ```
-let a = Vec.new()
+let a = List.new()
 let b = a            // a is moved; b is the new owner
 // a.push(1)         // COMPILE ERROR: use of moved value `a`
 ```
@@ -39,7 +39,7 @@ diverge.
 
 ```
 fn demo(cond: bool):
-    let v = Vec.new()
+    let v = List.new()
     if cond:
         consume(v)        // moves v on the cond == true path
     v.push(1)             // COMPILE ERROR: v may have been moved
@@ -47,11 +47,11 @@ fn demo(cond: bool):
 
 ```
 fn demo(cond: bool):
-    var v = Vec.new()
+    var v = List.new()
     if cond:
         consume(v)        // moved on this path
     else:
-        v = Vec.new()     // reinitialized on this path
+        v = List.new()     // reinitialized on this path
     v.push(1)             // COMPILE ERROR: not reinitialized on the
                           // cond == true path
 ```
@@ -87,7 +87,7 @@ let b = a            // copy; both a and b are valid
    a value with a destructor would cause double-free — the two copies
    would both run `Drop`.
 
-3. **Types containing owning pointers** (`Box[T]`, `String`, `Vec[T]`,
+3. **Types containing owning pointers** (`Box[T]`, `String`, `List[T]`,
    `Rc[T]`, `Arc[T]`) are not `Copy` because those types implement
    `Drop`. This is enforced by rule 1 (their fields are not `Copy`).
 
@@ -98,7 +98,7 @@ impl Copy for Point                       // OK
 type Handle { id: u32, gen: u32 }      // OK: u32 is Copy
 impl Copy for Handle                      // OK
 
-type Buffer { data: Vec[u8] }          // Vec is NOT Copy (has Drop)
+type Buffer { data: List[u8] }          // List is NOT Copy (has Drop)
 impl Copy for Buffer                      // ERROR: field `data` is not Copy
 
 type File { fd: i32 }
@@ -316,7 +316,7 @@ neither of which depends on the compiler's static analysis being correct:
 **Ownership is a property of the handle, not of its contents.** Every value
 that owns heap — a container, a box, an owned buffer — releases it when its
 owner's scope ends, regardless of whether its *elements* need destruction:
-`Vec[i32]` frees its buffer exactly as `Vec[File]` does; trivially-copyable
+`List[i32]` frees its buffer exactly as `List[File]` does; trivially-copyable
 elements merely skip the per-element destructor loop. (Replacement is
 already covered by §2.2's drop-on-reassignment.) Leaking memory therefore
 requires a deliberate, visible act — owning the memory from a named scope —

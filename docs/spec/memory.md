@@ -30,13 +30,13 @@ rejected if the allocator's lifetime cannot cover it):
 
 ```
 fn example(arena: &FrameArena):
-    // Vec borrows the arena → ephemeral
-    var candidates = Vec.new_in(arena)
+    // List borrows the arena → ephemeral
+    var candidates = List.new_in(arena)
     candidates.push(1)           // OK: used as local
     // candidates cannot escape this scope
 
     // For storable containers, use an owned allocator handle:
-    var stored = Vec.new_in(Rc.clone(&shared_arena))
+    var stored = List.new_in(Rc.clone(&shared_arena))
     // stored is NOT ephemeral — it owns its allocator handle
 ```
 

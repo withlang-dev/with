@@ -2,7 +2,7 @@
 
 > **Refreshed 2026-09-22** against main `f9c11b6d`: every module below carries
 > a **Status** line taken from the tree, and the four sections the corpus
-> sourcing plan resolved (Vec sorting, encoding, compress, regex) are
+> sourcing plan resolved (List sorting, encoding, compress, regex) are
 > collapsed to pointers. This is a *plan*, not a specification: since D48
 > (`db6f935e`) the language specification no longer catalogues `lib/std`,
 > and each landed module's own document (`docs/regex-spec.md`,
@@ -58,7 +58,7 @@ document does not redefine them; each module's header comment does.
 | `option` | `Option[T]` — Some, None, unwrap, map |
 | `result` | `Result[T, E]` — Ok, Err, ContextError, `?` operator |
 | `traits` | Eq, Ord, Key, Debug, Display, Default, Clone, Drop, Scoped, ScopedMut, Iter, IntoIter, MultiIndex, MultiIndexMut, Add/Sub/Mul/Div/MatMul/Neg, Try, ControlFlow, Deref, **Error** (`display`, `source`), Contains, IndexGet, IndexPlace |
-| `collections` | Vec, HashMap, HashSet, BTreeMap, BTreeSet, SlotMap/Handle, Atomic, Order, fence, Iterable/IntoIter and the adapter family (Map, Filter, FilterMap, Take, Drop, TakeWhile, DropWhile, Zip, ZipWith, Enumerate, Chain, StepBy, FlatMap), IndexSpec |
+| `collections` | List, HashMap, HashSet, BTreeMap, BTreeSet, SlotMap/Handle, Atomic, Order, fence, Iterable/IntoIter and the adapter family (Map, Filter, FilterMap, Take, Drop, TakeWhile, DropWhile, Zip, ZipWith, Enumerate, Chain, StepBy, FlatMap), IndexSpec |
 | `collections/sorted_vec`, `collections/binary_heap`, `collections/trie`, `collections/hash_index`, `collections/engine_slot` | Facades over migrated engines (c-algorithms, TommyDS) — see *Sourced from corpora* |
 | `box`, `rc` | `Box[T]` single-owner heap cell; `Rc[T]` explicit reference counting |
 | `string`, `str`, `fixed_string`, `internal/str_abi` | String methods (ASCII classifiers); `str` shim; `FixedString[N]` for core/no_std; raw-pointer bridge |
@@ -111,10 +111,10 @@ test suite as the drift lane. What that resolves in this plan:
 |---|---|---|---|
 | **pcre2** | landed (first bundle) | `std.regex` | §3.4 |
 | **zlib + minizip** | landed (second bundle; minizip writer waits on setjmp #1217) | `std.zlib`, `std.zip` | §3.1, part of §3.2 |
-| **c-algorithms** | Phase 1 landed 2026-09-13 (`5809ac10`) | `SortedVec[T]`, `BinaryHeap[T]`, `Trie[V]` (+ `engine_slot`) | part of §1.2 |
+| **c-algorithms** | Phase 1 landed 2026-09-13 (`5809ac10`) | `SortedList[T]`, `BinaryHeap[T]`, `Trie[V]` (+ `engine_slot`) | part of §1.2 |
 | **TommyDS** | Phase 2 landed 2026-09-14 (`#1139`) | `HashIndex[K, V]` over `hashdyn`; hash-engine benchmark recorded | comparison yardstick for the default map |
-| **STC** | Phase 3 — **pending** (the macro-migrator campaign) | `Vec` engine, `Deque`, `Stack`, `Queue`, `PriorityQueue`, `List`, `HashMap`/`HashSet` (default engine), `OrderedMap`/`OrderedSet`, `BitSet`, spans, `std.algorithms` (`sort`, `binary_search`, bounds, `reverse`, `shuffle`) | §1.2 (#940), #938, #939 |
-| **M\*LIB `m-bptree`** | Phase 4 — pending | `BTreeMap`/`BTreeSet` (retires the sorted-Vec implementation, #937) | — |
+| **STC** | Phase 3 — **pending** (the macro-migrator campaign) | `List` engine, `Deque`, `Stack`, `Queue`, `PriorityQueue`, `LinkedList`, `HashMap`/`HashSet` (default engine), `OrderedMap`/`OrderedSet`, `BitSet`, spans, `std.algorithms` (`sort`, `binary_search`, bounds, `reverse`, `shuffle`) | §1.2 (#940), #938, #939 |
+| **M\*LIB `m-bptree`** | Phase 4 — pending | `BTreeMap`/`BTreeSet` (retires the sorted-List implementation, #937) | — |
 
 Sections below that the sourcing plan covers say so in their first line
 and carry no native API to implement. Candidates named in other status
@@ -156,7 +156,7 @@ fn Path.normalize(self: &Self) -> Path
 fn Path.relative_to(self: &Self, base: &Path) -> Option[Path]
 fn Path.with_extension(self: &Self, ext: &str) -> Path
 fn Path.with_filename(self: &Self, name: &str) -> Path
-fn Path.components(self: &Self) -> Vec[str]
+fn Path.components(self: &Self) -> List[str]
 fn Path.exists(self: &Self) -> bool
 fn Path.is_file(self: &Self) -> bool
 fn Path.is_dir(self: &Self) -> bool
@@ -171,9 +171,9 @@ with `/` accepted. `normalize` resolves `.` and `..` lexically
 (no syscalls). `exists`/`is_file`/`is_dir` are the only methods
 that touch the filesystem.
 
-#### 1.2 Vec sorting and search — methods on `collections.Vec`
+#### 1.2 List sorting and search — methods on `collections.List`
 
-**Resolved by the corpus sourcing plan (Phase 3, STC — pending).** `Vec.sort`, `sort_stable`, `is_sorted`, `binary_search`, `reverse`, `dedup` are the `std.algorithms` facade over STC's migrated algorithm layer (`docs/proposals/stdlib_sourcing_plan.md`, facade map rows `sort`/`binary_search`/`lower_bound`/`reverse`/`shuffle`; #940). `stable_sort` is exposed only if upstream's stability contract holds. Already landed from Phase 1: `std.collections.sorted_vec.SortedVec[T]` and `std.collections.binary_heap.BinaryHeap[T]` (c-algorithms). Nothing native is written for this section.
+**Resolved by the corpus sourcing plan (Phase 3, STC — pending).** `List.sort`, `sort_stable`, `is_sorted`, `binary_search`, `reverse`, `dedup` are the `std.algorithms` facade over STC's migrated algorithm layer (`docs/proposals/stdlib_sourcing_plan.md`, facade map rows `sort`/`binary_search`/`lower_bound`/`reverse`/`shuffle`; #940). `stable_sort` is exposed only if upstream's stability contract holds. Already landed from Phase 1: `std.collections.sorted_vec.SortedList[T]` and `std.collections.binary_heap.BinaryHeap[T]` (c-algorithms). Nothing native is written for this section.
 
 #### 1.3 `std.toml` — TOML parser
 
@@ -188,7 +188,7 @@ type TomlValue =
     | Integer(i64)
     | Float(f64)
     | Boolean(bool)
-    | Array(Vec[TomlValue])
+    | Array(List[TomlValue])
     | Table(TomlTable)
     | DateTime(str)
 
@@ -201,7 +201,7 @@ fn TomlTable.get_str(self: &Self, key: &str) -> Option[str]
 fn TomlTable.get_int(self: &Self, key: &str) -> Option[i64]
 fn TomlTable.get_float(self: &Self, key: &str) -> Option[f64]
 fn TomlTable.get_bool(self: &Self, key: &str) -> Option[bool]
-fn TomlTable.get_array(self: &Self, key: &str) -> Option[&Vec[TomlValue]]
+fn TomlTable.get_array(self: &Self, key: &str) -> Option[&List[TomlValue]]
 fn TomlTable.get_table(self: &Self, key: &str) -> Option[&TomlTable]
 
 type TomlError = {
@@ -225,7 +225,7 @@ No serialization in v1. Parse-only.
 
 #### 1.4 `std.encoding` — Base64 and Hex
 
-**Resolved — landed 2026-08-31 (`aacace23`, `f89a4cec`), specified in `docs/spec/stdlib/std-encoding-rfc4648.md`.** `lib/std/encoding.w` (shared `DecodeError`: `InvalidLength`, `InvalidByte`, `InvalidPadding`, `NonCanonicalBits`) plus `encoding/base64.w` (`base64_encode`/`base64_decode`), `encoding/base64url.w`, `encoding/base16.w` (`base16_encode`/`base16_decode`), `encoding/base32.w`, `encoding/base32hex.w`. Module-prefixed names, `[]u8`/`&str` in, `Result[Vec[u8], DecodeError]` out. Not exposed: `encoded_len`/`decoded_len`, an upper-case hex encoder.
+**Resolved — landed 2026-08-31 (`aacace23`, `f89a4cec`), specified in `docs/spec/stdlib/std-encoding-rfc4648.md`.** `lib/std/encoding.w` (shared `DecodeError`: `InvalidLength`, `InvalidByte`, `InvalidPadding`, `NonCanonicalBits`) plus `encoding/base64.w` (`base64_encode`/`base64_decode`), `encoding/base64url.w`, `encoding/base16.w` (`base16_encode`/`base16_decode`), `encoding/base32.w`, `encoding/base32hex.w`. Module-prefixed names, `[]u8`/`&str` in, `Result[List[u8], DecodeError]` out. Not exposed: `encoded_len`/`decoded_len`, an upper-case hex encoder.
 
 #### 1.5 `std.testing` — Test framework utilities
 
@@ -267,7 +267,7 @@ the assertion vocabulary.
 
 ```
 type Buf = {
-    data: Vec[u8],
+    data: List[u8],
     read_pos: usize,
     write_pos: usize,
 }
@@ -276,7 +276,7 @@ type Buf = {
 fn Buf.new() -> Buf
 fn Buf.with_capacity(n: usize) -> Buf
 fn Buf.from_slice(data: &[u8]) -> Buf
-fn Buf.from_owned(data: Vec[u8]) -> Buf
+fn Buf.from_owned(data: List[u8]) -> Buf
 
 // Properties
 fn Buf.len(self: &Self) -> usize
@@ -323,7 +323,7 @@ fn Buf.get_f32_be(self: &mut Self) -> Result[f32, BufError]
 fn Buf.get_f32_le(self: &mut Self) -> Result[f32, BufError]
 fn Buf.get_f64_be(self: &mut Self) -> Result[f64, BufError]
 fn Buf.get_f64_le(self: &mut Self) -> Result[f64, BufError]
-fn Buf.get_bytes(self: &mut Self, n: usize) -> Result[Vec[u8], BufError]
+fn Buf.get_bytes(self: &mut Self, n: usize) -> Result[List[u8], BufError]
 fn Buf.get_str(self: &mut Self, n: usize) -> Result[str, BufError]
 
 // Zero-copy views
@@ -430,8 +430,8 @@ This module adds the trait and traversal utilities.
 
 ```
 fn is_valid_utf8(data: &[u8]) -> bool
-fn utf8_decode(data: &[u8]) -> Vec[i32]
-fn utf8_encode(codepoint: i32) -> Vec[u8]
+fn utf8_decode(data: &[u8]) -> List[i32]
+fn utf8_encode(codepoint: i32) -> List[u8]
 fn utf8_len(codepoint: i32) -> i32
 fn codepoint_len_utf8(first_byte: u8) -> i32
 
@@ -491,7 +491,7 @@ fn FlagSet.int(self: &mut Self, name: str, default: i32, help: str) -> &i32
 fn FlagSet.bool(self: &mut Self, name: str, default: bool, help: str) -> &bool
 fn FlagSet.float(self: &mut Self, name: str, default: f64, help: str) -> &f64
 
-fn FlagSet.parse(self: &mut Self, args: &[str]) -> Result[Vec[str], FlagError]
+fn FlagSet.parse(self: &mut Self, args: &[str]) -> Result[List[str], FlagError]
 fn FlagSet.usage(self: &Self) -> str
 
 fn FlagSet.add_subcommand(self: &mut Self, name: str, description: str) -> &mut FlagSet
@@ -506,7 +506,7 @@ Supports:
 - Subcommands with their own flag sets
 - Auto-generated `--help`
 
-Positional arguments are returned as the `Vec[str]` from `parse`.
+Positional arguments are returned as the `List[str]` from `parse`.
 
 No derive macros, no proc macros, no code generation. Explicit
 registration. This keeps it simple and debuggable.
@@ -583,7 +583,7 @@ These round out the standard library for production use.
 
 #### 3.1 `std.compress` — Compression
 
-**Resolved by the corpus sourcing plan — landed (`1ca0beac`, `b509e340`).** `lib/std/zlib.w` is the facade over migrated zlib (`lib/std/zl/`, the second `.wo` bundle): `compress`, `compress_level`, `decompress`, `decompress_with_limit`, `compress_gzip`, `compress_gzip_level`, `decompress_gzip`, `decompress_gzip_with_limit`, `ZlibError`; `&Vec[u8]` in, `Result[Vec[u8], ZlibError]` out. The pure-With deflate this section demanded is superseded by the hardenedness rule. Not yet facaded: streaming `Inflater`/`Deflater` (the in-place `z_stream` resource — modeled-C stage 4b/D54 pinned resources are the mechanism) and raw-deflate entry points.
+**Resolved by the corpus sourcing plan — landed (`1ca0beac`, `b509e340`).** `lib/std/zlib.w` is the facade over migrated zlib (`lib/std/zl/`, the second `.wo` bundle): `compress`, `compress_level`, `decompress`, `decompress_with_limit`, `compress_gzip`, `compress_gzip_level`, `decompress_gzip`, `decompress_gzip_with_limit`, `ZlibError`; `&List[u8]` in, `Result[List[u8], ZlibError]` out. The pure-With deflate this section demanded is superseded by the hardenedness rule. Not yet facaded: streaming `Inflater`/`Deflater` (the in-place `z_stream` resource — modeled-C stage 4b/D54 pinned resources are the mechanism) and raw-deflate entry points.
 
 #### 3.2 `std.archive` — Tar
 
@@ -607,7 +607,7 @@ type TarEntry = {
 fn TarReader.open(path: &str) -> Result[TarReader, TarError]
 fn TarReader.from_bytes(data: &[u8]) -> Result[TarReader, TarError]
 fn TarReader.next(self: &mut Self) -> Option[Result[TarEntry, TarError]]
-fn TarReader.read_data(self: &mut Self) -> Result[Vec[u8], TarError]
+fn TarReader.read_data(self: &mut Self) -> Result[List[u8], TarError]
 fn TarReader.extract_all(self: &mut Self, dest: &str) -> Result[(), TarError]
 
 fn TarWriter.create(path: &str) -> Result[TarWriter, TarError]
@@ -645,8 +645,8 @@ fn IpAddr.is_loopback(self: &Self) -> bool
 fn IpAddr.is_private(self: &Self) -> bool
 
 // DNS resolution
-fn resolve(hostname: &str) -> Result[Vec[IpAddr], DnsError]
-fn resolve_addr(hostname: &str, port: u16) -> Result[Vec[SocketAddr], DnsError]
+fn resolve(hostname: &str) -> Result[List[IpAddr], DnsError]
+fn resolve_addr(hostname: &str, port: u16) -> Result[List[SocketAddr], DnsError]
 
 // Socket options (on existing tcp/udp fds)
 fn set_timeout(fd: i32, timeout: Duration)
@@ -677,8 +677,8 @@ fn CsvReader.from_file(path: &str) -> Result[CsvReader, CsvError]
 fn CsvReader.delimiter(self: Self, d: u8) -> Self
 fn CsvReader.has_header(self: Self, h: bool) -> Self
 
-gen fn CsvReader.records(self: &mut Self) -> Result[Vec[str], CsvError]
-fn CsvReader.header(self: &Self) -> Option[&Vec[str]]
+gen fn CsvReader.records(self: &mut Self) -> Result[List[str], CsvError]
+fn CsvReader.header(self: &Self) -> Option[&List[str]]
 
 fn CsvWriter.to_file(path: &str) -> Result[CsvWriter, CsvError]
 fn CsvWriter.delimiter(self: Self, d: u8) -> Self
@@ -695,7 +695,7 @@ and embedded delimiters.
 
 ```
 type XmlToken =
-    | StartElement(str, Vec[XmlAttr])
+    | StartElement(str, List[XmlAttr])
     | EndElement(str)
     | CharData(str)
     | Comment(str)
@@ -750,7 +750,7 @@ a Buf.
 **Status (2026-09-22): not started.** No `random_bytes`/`random_fill` anywhere in `lib/std` outside the migrated corpora; the runtime entropy seam (`getrandom`/`SecRandomCopyBytes`/`BCryptGenRandom`) is the port to own natively under the sourcing rule (runtime primitive, not a library).
 
 ```
-fn random_bytes(n: usize) -> Vec[u8]
+fn random_bytes(n: usize) -> List[u8]
 fn random_u32() -> u32
 fn random_u64() -> u64
 fn random_fill(buf: &mut [u8])
@@ -768,7 +768,7 @@ Currently internal to the crypto modules — expose it.
 **Status (2026-09-22): not started.** Nothing of `stack_trace`/`on_panic`/`MemoryStats`; the native debug allocator (`docs/spec/toolchain/debug-allocator.md`) is the existing adjacent tooling.
 
 ```
-fn stack_trace() -> Vec[StackFrame]
+fn stack_trace() -> List[StackFrame]
 fn print_stack_trace()
 
 type StackFrame = {
@@ -820,14 +820,14 @@ fn Url.to_str(self: &Self) -> str
 
 fn query_encode(s: &str) -> str
 fn query_decode(s: &str) -> Result[str, UrlError]
-fn query_parse(s: &str) -> Vec[(str, str)]
+fn query_parse(s: &str) -> List[(str, str)]
 ```
 
 RFC 3986 compliant parsing.
 
 #### 4.2 `std.io.buffered` — Buffered I/O
 
-**Status (2026-09-22): not started.** `io.w` has `Stdin.lines()` returning a whole `Vec[str]`; no `BufReader`/`BufWriter`.
+**Status (2026-09-22): not started.** `io.w` has `Stdin.lines()` returning a whole `List[str]`; no `BufReader`/`BufWriter`.
 
 ```
 type BufReader = { ... }
@@ -836,8 +836,8 @@ type BufWriter = { ... }
 fn BufReader.new(fd: i32) -> BufReader
 fn BufReader.new_sized(fd: i32, capacity: usize) -> BufReader
 fn BufReader.read_line(self: &mut Self) -> Option[str]
-fn BufReader.read_bytes(self: &mut Self, n: usize) -> Vec[u8]
-fn BufReader.read_until(self: &mut Self, delim: u8) -> Vec[u8]
+fn BufReader.read_bytes(self: &mut Self, n: usize) -> List[u8]
+fn BufReader.read_until(self: &mut Self, delim: u8) -> List[u8]
 fn BufReader.peek(self: &Self, n: usize) -> &[u8]
 gen fn BufReader.lines(self: &mut Self) -> str
 
@@ -928,7 +928,7 @@ prefix (path, toml, bytes) is still entirely absent.
 | 5 | `std.testing` | partial (`assert_*` only) |
 | 8 | `std.errors` | partial (`Error` trait in `traits`) |
 | 23 | `std.env` | partial and unconsolidated (duplicated in `process`/`os`) |
-| 2 | Vec sort / search | → sourcing plan Phase 3 (STC), not started; #940 open |
+| 2 | List sort / search | → sourcing plan Phase 3 (STC), not started; #940 open |
 | 1, 3, 6, 7, 9, 10, 11, 13, 14, 16–22, 24 | everything else | not started (`context` name taken by a different design) |
 
 Refreshed order for the native remainder, by what it unblocks:

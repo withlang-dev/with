@@ -340,7 +340,7 @@ type Regex = {
     code: *mut pcre2_real_code_8,       // compiled pattern
     pattern: str,                        // original pattern string
     num_captures: i32,
-    capture_names: Vec[str],
+    capture_names: List[str],
 }
 ```
 
@@ -362,7 +362,7 @@ Internally calls `pcre2_compile_8`.
 ```
 fn Regex.is_match(self: &Self, text: str) -> bool
 fn Regex.find(self: &Self, text: str) -> Option[Match]
-fn Regex.find_all(self: &Self, text: str) -> Vec[Match]
+fn Regex.find_all(self: &Self, text: str) -> List[Match]
 fn Regex.find_at(self: &Self, text: str, start: i32) -> Option[Match]
 ```
 
@@ -372,7 +372,7 @@ Internally calls `pcre2_match_8`.
 
 ```
 fn Regex.captures(self: &Self, text: str) -> Option[Captures]
-fn Regex.captures_all(self: &Self, text: str) -> Vec[Captures]
+fn Regex.captures_all(self: &Self, text: str) -> List[Captures]
 
 type Match = {
     start: i32,
@@ -381,7 +381,7 @@ type Match = {
 }
 
 type Captures = {
-    groups: Vec[Option[Match]],
+    groups: List[Option[Match]],
     named: HashMap[str, i32],
 }
 
@@ -407,8 +407,8 @@ Internally calls `pcre2_substitute_8`.
 ### Splitting
 
 ```
-fn Regex.split(self: &Self, text: str) -> Vec[str]
-fn Regex.splitn(self: &Self, text: str, n: i32) -> Vec[str]
+fn Regex.split(self: &Self, text: str) -> List[str]
+fn Regex.splitn(self: &Self, text: str, n: i32) -> List[str]
 ```
 
 ### Introspection
@@ -416,7 +416,7 @@ fn Regex.splitn(self: &Self, text: str, n: i32) -> Vec[str]
 ```
 fn Regex.pattern(self: &Self) -> str
 fn Regex.num_captures(self: &Self) -> i32
-fn Regex.capture_names(self: &Self) -> Vec[str]
+fn Regex.capture_names(self: &Self) -> List[str]
 fn Regex.capture_index(self: &Self, name: str) -> Option[i32]
 ```
 

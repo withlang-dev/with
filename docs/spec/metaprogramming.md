@@ -350,7 +350,7 @@ cascades automatically:
 comptime fn generate_storage[T: type]:
     // These are all comptime — no prefix needed inside comptime fn:
     for field in T.fields():
-        if field.type_name.starts_with("Vec["):
+        if field.type_name.starts_with("List["):
             emit_vec_storage(field)
         else:
             emit_scalar_storage(field)
@@ -451,8 +451,8 @@ type Transform { position: Vec3, rotation: Quat, scale: f32 }
 // Automatically generate SoA layout from AoS definition
 comptime fn make_soa[T: type](capacity: usize) -> SoaStorage[T]:
     let fields = T.fields()
-    // Generates a struct with one Vec per field:
-    // { positions: Vec[Vec3], rotations: Vec[Quat], scales: Vec[f32] }
+    // Generates a struct with one List per field:
+    // { positions: List[Vec3], rotations: List[Quat], scales: List[f32] }
     // Plus accessors that reconstruct T from the parallel arrays
 ```
 

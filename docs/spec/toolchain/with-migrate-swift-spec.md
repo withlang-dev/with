@@ -126,7 +126,7 @@ Double                     →  f64
 Bool                       →  bool
 String                     →  str
 Character                  →  i32         // @migrate: Unicode scalar → rune
-[T]                        →  Vec[T]
+[T]                        →  List[T]
 [K: V]                     →  HashMap[K, V]
 Set<T>                     →  HashSet[T]
 T?                         →  Option[T]
@@ -136,7 +136,7 @@ Never                      →  Never
 ```
 
 Swift `Int` is platform-sized (64-bit on modern platforms) → `i64`.
-`String` → `str`. `[T]` (array) → `Vec[T]`.
+`String` → `str`. `[T]` (array) → `List[T]`.
 `[K: V]` (dictionary) → `HashMap[K, V]`.
 
 #### Optionals
@@ -203,8 +203,8 @@ extension Array where Element: Comparable {
 impl Drawable for User:
     fn draw(self: &Self, canvas: &Canvas): ...
 
-extend Vec[T] where T: Ord:
-    fn sorted(self: &Self) -> Vec[T]: ...
+extend List[T] where T: Ord:
+    fn sorted(self: &Self) -> List[T]: ...
 ```
 
 `extension Type: Protocol` → `impl Protocol for Type` (already
@@ -513,7 +513,7 @@ func largest<T: Comparable>(in array: [T]) -> T { ... }
 // With
 fn swap[T](a: T, b: T) -> (T, T): ...
 type Stack[T] = { ... }
-fn largest[T: Ord](array: &Vec[T]) -> T: ...
+fn largest[T: Ord](array: &List[T]) -> T: ...
 ```
 
 `<T>` → `[T]`. `Comparable` → `Ord`. `Equatable` → `Eq`.
@@ -823,7 +823,7 @@ fn makeShape() -> impl Shape: Circle { radius: 5.0 }
 let shapes: [any Shape] = [circle, square]
 
 // With
-let shapes: Vec[dyn Shape] = [circle, square]
+let shapes: List[dyn Shape] = [circle, square]
 // @migrate: `any Shape` → `dyn Shape` (trait object with vtable)
 ```
 

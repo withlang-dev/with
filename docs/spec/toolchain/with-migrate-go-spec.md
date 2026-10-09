@@ -176,7 +176,7 @@ bool                       →  bool
 string                     →  str
 byte                       →  u8
 rune                       →  i32
-[]T                        →  Vec[T]
+[]T                        →  List[T]
 [N]T                       →  [T; N]
 map[K]V                    →  HashMap[K, V]
 *T                         →  *mut T
@@ -186,7 +186,7 @@ uintptr                    →  usize
 ```
 
 Go `int` is platform-sized (32 or 64 bit): it is `isize`, the
-target's size width (D114). `string` → `str`. `[]T` → `Vec[T]`.
+target's size width (D114). `string` → `str`. `[]T` → `List[T]`.
 `map[K]V` → `HashMap[K, V]`. `byte` → `u8`. `rune` → `i32`.
 
 #### Slices and arrays
@@ -200,7 +200,7 @@ s[1:3]
 copy(dst, src)
 
 // With
-var s = Vec[i32].with_capacity(10)
+var s = List[i32].with_capacity(10)
 s.push(42)
 s.len()
 s.cap()
@@ -208,8 +208,8 @@ s.slice(1, 3)           // @migrate: verify slice semantics (view vs copy)
 mem_copy(dst, src, n)
 ```
 
-`make([]T, len, cap)` → `Vec[T].with_capacity(cap)` or
-`Vec[T].new()`. `append` → `.push()`. `len()` → `.len()`.
+`make([]T, len, cap)` → `List[T].with_capacity(cap)` or
+`List[T].new()`. `append` → `.push()`. `len()` → `.len()`.
 `cap()` → `.cap()`. `s[a:b]` → `.slice(a, b)`.
 
 #### Maps
@@ -373,7 +373,7 @@ with 15 lines of error checking becomes 3 lines.
 
 ```go
 func divide(a, b int) (int, error) { ... }  →  fn divide(a: i32, b: i32) -> Result[i32, Error]
-func minmax(s []int) (int, int) { ... }     →  fn minmax(s: &Vec[i32]) -> (i32, i32)
+func minmax(s []int) (int, int) { ... }     →  fn minmax(s: &List[i32]) -> (i32, i32)
 func get(m map[K]V, k K) (V, bool) { ... }  →  fn get(m: &HashMap[K, V], k: K) -> Option[&V]  // borrowed lookup
 ```
 
@@ -612,7 +612,7 @@ func fetch(ctx context.Context, url string) ([]byte, error) {
 }
 
 // With
-async fn fetch(ctx: &Context, url: str) -> Result[Vec[u8], Error]:
+async fn fetch(ctx: &Context, url: str) -> Result[List[u8], Error]:
     // @migrate: context.Context → With std.context.Context
     // Same concept: cancellation + deadline + values
     let req = http.get(url).await?
@@ -834,7 +834,7 @@ func search(query string) []Result {
 // @migrate: goroutine fan-out — verify all spawned fibers are joined.
 // With fibers that are abandoned without await may leak.
 // Use await_all:
-async fn search(query: str) -> Vec[Result]:
+async fn search(query: str) -> List[Result]:
     let tasks = sources.map(s => spawn s.search(query))
     await_all(tasks)
 ```
@@ -910,8 +910,8 @@ func Map[T, U any](s []T, f func(T) U) []U {
 }
 
 // With
-fn map_slice[T, U](s: &Vec[T], f: fn(&T) -> U) -> Vec[U]:
-    var result = Vec[U].with_capacity(s.len())
+fn map_slice[T, U](s: &List[T], f: fn(&T) -> U) -> List[U]:
+    var result = List[U].with_capacity(s.len())
     for v in s:
         result.push(f(v))
     result

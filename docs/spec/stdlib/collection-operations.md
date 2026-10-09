@@ -71,7 +71,7 @@ let total = numbers.iter() |> fold(0, (acc, x) => acc + x)
 
 let words = lines.iter()
     |> flat_map(line => line.split(' '))
-    |> collect[Vec[String]]()
+    |> collect[List[String]]()
 
 let (adults, minors) = people.iter()
     |> partition(p => p.age >= 18)
@@ -79,11 +79,11 @@ let (adults, minors) = people.iter()
 // zip_with: combine two iterators with a function
 let distances = xs.iter()
     |> zip_with(ys.iter(), (x, y) => (x - y).abs())
-    |> collect[Vec]()
+    |> collect[List]()
 
 // unfold: generate sequence from state
 let powers_of_2 = Iter.unfold(1, n => Some((n, n * 2)))
-    |> take(10) |> collect[Vec]()
+    |> take(10) |> collect[List]()
 // [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
 
 let report = transactions.iter()
@@ -94,7 +94,7 @@ let report = transactions.iter()
     |> join("\n")
 ```
 
-**Sequence ends (D117).** On a `Vec`, a slice or a fixed array:
+**Sequence ends (D117).** On a `List`, a slice or a fixed array:
 
 | Operation | Description |
 |-----------|-------------|
@@ -106,9 +106,9 @@ let report = transactions.iter()
 (§9.7), with its modes, selected by the receiver's syntax (§9.5, D117). On a
 place, `first()` and `last()` give `Option[&T]` and `rest()` a `[]T` view. On
 an owned receiver (a temporary, or `move xs`), `first()` and `last()` give
-`Option[T]`, and `rest()` gives the owned remainder: for a `Vec`, a `Vec[T]`
+`Option[T]`, and `rest()` gives the owned remainder: for a `List`, a `List[T]`
 sharing its buffer; for a fixed array, `[T; N-1]`. `rest()` is O(1) on a
-place and on an owned `Vec`. Indexing an empty sequence (`xs[0]`) panics;
+place and on an owned `List`. Indexing an empty sequence (`xs[0]`) panics;
 `first()` answers `None`.
 
 **Lookup observes; removal transfers (D22).**
@@ -131,7 +131,7 @@ independent of subsequent mutation or destruction of the map. A separately
 named copying or cloning convenience may produce an owned value, but `get`
 itself never changes return shape according to whether `V` implements `Copy`.
 
-`Vec`, string, array, and slice indexing or lookup APIs are not
+`List`, string, array, and slice indexing or lookup APIs are not
 restandardized by D22. The general rules of §3.8, §9.7, §10, and §21.1 apply
 to their existing signatures exactly as written. Any change to those
 signatures is a separate ruling, provisionally identified as a D23 candidate.
@@ -178,11 +178,11 @@ An independent collection is spelled where it is wanted, because it
 allocates and requires `Clone`:
 
 ```
-let names = ages.keys() |> map(it.clone()) |> collect[Vec]()   // Vec[str], owned
-let sorted = ages.keys() |> collect[Vec]() |> sorted()          // ephemeral Vec of views (§22.1 rule 7)
+let names = ages.keys() |> map(it.clone()) |> collect[List]()   // List[str], owned
+let sorted = ages.keys() |> collect[List]() |> sorted()          // ephemeral List of views (§22.1 rule 7)
 ```
 
-A typed binding does not collect: `let ks: Vec[K] = m.keys()` is a type
+A typed binding does not collect: `let ks: List[K] = m.keys()` is a type
 error, not a request to clone. §3.8 materializes `Copy` because a copy is
 free; it never turns an annotation into an allocation.
 
@@ -204,7 +204,7 @@ worker_counts.increment(id)       // .update(id, 0, n => n + 1)
 worker_counts.decrement(id)       // .update(id, 0, n => n - 1)
 
 // Convenience: append to collection values
-event_log.append(user_id, event)  // .entry(id).or_insert(Vec.new()).push(event)
+event_log.append(user_id, event)  // .entry(id).or_insert(List.new()).push(event)
 ```
 
 These methods cover the most common HashMap mutation patterns

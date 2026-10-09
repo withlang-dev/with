@@ -241,9 +241,9 @@ are otherwise unchanged.
 | `float` | `f64` |
 | `bool` | `bool` |
 | `str` | `str` |
-| `bytes` | `Vec[u8]` |
-| `list[T]` | `Vec[T]` |
-| `List[T]` | `Vec[T]` |
+| `bytes` | `List[u8]` |
+| `list[T]` | `List[T]` |
+| `List[T]` | `List[T]` |
 | `dict[K, V]` | `HashMap[K, V]` |
 | `Dict[K, V]` | `HashMap[K, V]` |
 | `set[T]` | `HashSet[T]` |
@@ -256,9 +256,9 @@ are otherwise unchanged.
 | `Any` | `// @migrate: Any — replace with concrete type` |
 | `None` (return type) | *(omit return type — void)* |
 | `Callable[[A, B], R]` | `(A, B) -> R` |
-| `Iterator[T]` | `// @migrate: Iterator[T] — use Vec[T] or custom iter` |
-| `Iterable[T]` | `Vec[T]` (with flag if not a list) |
-| `Sequence[T]` | `Vec[T]` |
+| `Iterator[T]` | `// @migrate: Iterator[T] — use List[T] or custom iter` |
+| `Iterable[T]` | `List[T]` (with flag if not a list) |
+| `Sequence[T]` | `List[T]` |
 | `Mapping[K, V]` | `HashMap[K, V]` |
 | `ClassVar[T]` | `// @migrate: class variable — use module-level let` |
 | `Final[T]` | `T` (const semantics via `let`) |
@@ -311,7 +311,7 @@ def find(items: list[str], target: str) -> Optional[str]:
     return None
 ```
 ```
-fn find(items: Vec[str], target: str) -> Option[str]:
+fn find(items: List[str], target: str) -> Option[str]:
     for item in items:
         if item == target:
             return Option.Some(item)
@@ -715,12 +715,12 @@ class Stack(Generic[T]):
 ```
 ```
 type Stack[T] = {
-    items: Vec[T],
+    items: List[T],
 }
 
 extend Stack[T]:
     fn new() -> Stack[T]:
-        Stack { items: Vec.new() }
+        Stack { items: List.new() }
 
     mut fn push(item: T):
         self.items.push(item)
@@ -898,7 +898,7 @@ if n > 10:
 #### Generators — simple cases
 
 Simple generator functions that build a sequence are converted to
-Vec builders:
+List builders:
 
 ```python
 def squares(n: int) -> Iterator[int]:
@@ -906,8 +906,8 @@ def squares(n: int) -> Iterator[int]:
         yield i * i
 ```
 ```
-fn squares(n: i64) -> Vec[i64]:
-    var result: Vec[i64] = Vec.new()
+fn squares(n: i64) -> List[i64]:
+    var result: List[i64] = List.new()
     for i in 0..n:
         result.push(i * i)
     result
@@ -925,7 +925,7 @@ def fibonacci():
 ```
 ```
 // @migrate: infinite generator — implement as custom iterator type
-fn fibonacci() -> Vec[i64]:
+fn fibonacci() -> List[i64]:
     panic("stub: infinite generator — implement custom iterator")
 ```
 
@@ -993,9 +993,9 @@ def log(*args, **kwargs):
     print(args, kwargs)
 ```
 ```
-// @migrate: variadic *args — replace with Vec[T] parameter
+// @migrate: variadic *args — replace with List[T] parameter
 // @migrate: keyword **kwargs — replace with struct parameter
-fn log(args: Vec[str]):  // @migrate: inferred as str; verify
+fn log(args: List[str]):  // @migrate: inferred as str; verify
     print(args)
 ```
 
@@ -1058,7 +1058,7 @@ class LoggedList(list):
 ```
 ```
 type LoggedList[T] = {
-    inner: Vec[T],
+    inner: List[T],
 }
 
 extend LoggedList[T]:
@@ -1156,7 +1156,7 @@ For each collected usage, infer types from:
    infer `status_code: i64`
 3. **Argument types**: if `requests.get(url)` is called with `url: str`,
    record `url: str`
-4. **Assignment targets**: `data: bytes = resp.content` infers `content: Vec[u8]`
+4. **Assignment targets**: `data: bytes = resp.content` infers `content: List[u8]`
 5. **Fallback**: `PyObject` (opaque struct representing unknown Python object)
 
 **Step 4: Generate stub file.**
@@ -1243,7 +1243,7 @@ def mean_values(data: list[float]) -> float:
 - `requests.exceptions.RequestException` → opaque exception type
 
 **Usage scan for `numpy`:**
-- `np.array(data)` where `data: list[float]` → `fn numpy_array_f64(data: Vec[f64]) -> NumpyNdarray`
+- `np.array(data)` where `data: list[float]` → `fn numpy_array_f64(data: List[f64]) -> NumpyNdarray`
 - `np.mean(arr)` where return converted to `float` → `fn numpy_mean(arr: NumpyNdarray) -> f64`
 
 **Generated `requests_stubs.w`:**
@@ -1284,7 +1284,7 @@ type NumpyNdarray = {
 }
 
 @[stub("numpy")]
-fn numpy_array_f64(data: Vec[f64]) -> NumpyNdarray:
+fn numpy_array_f64(data: List[f64]) -> NumpyNdarray:
     panic("stub: numpy.array — implement or bind native")
 
 @[stub("numpy")]
@@ -1309,7 +1309,7 @@ fn fetch_json(url: str, timeout: i64 = 30) -> Option[HashMap[str, PyObject]]:
             Option.Some(resp.json())
         // @migrate: error path — bind requests.exceptions.RequestException to Err variant
 
-fn mean_values(data: Vec[f64]) -> f64:
+fn mean_values(data: List[f64]) -> f64:
     let arr = numpy_array_f64(data)
     numpy_mean(arr)
 ```
@@ -1348,7 +1348,7 @@ as far as possible.
 1. **Explicit annotation wins.** `x: int = 5` → `i64`.
 
 2. **Literal assignment.** `x = 42` → `i64`. `x = 3.14` → `f64`.
-   `x = "hello"` → `str`. `x = True` → `bool`. `x = []` → `Vec[_]`
+   `x = "hello"` → `str`. `x = True` → `bool`. `x = []` → `List[_]`
    (element type deferred). `x = {}` → `HashMap[_, _]` (deferred).
 
 3. **Call return type.** If `func` is known (stdlib-mapped or annotated),
@@ -1362,7 +1362,7 @@ as far as possible.
 6. **Conditional narrowing.** Inside `if isinstance(x, int):`, `x`
    narrows to `i64` in that branch.
 
-7. **Container element inference.** `items = [1, 2, 3]` → `Vec[i64]`.
+7. **Container element inference.** `items = [1, 2, 3]` → `List[i64]`.
    `pairs = {1: "a", 2: "b"}` → `HashMap[i64, str]`.
 
 8. **Cross-function propagation.** If a function is called with a known
@@ -1449,7 +1449,7 @@ generated stubs the same as third-party packages:
 |---|---|---|
 | `datetime` | `datetime_stubs.w` | Use `std.time` where possible |
 | `io.StringIO` | `io_stubs.w` | Use `str` builder instead |
-| `io.BytesIO` | `io_stubs.w` | Use `Vec[u8]` builder instead |
+| `io.BytesIO` | `io_stubs.w` | Use `List[u8]` builder instead |
 | `socket` | `socket_stubs.w` | Use `std.net` when available |
 | `threading` | `threading_stubs.w` | Flag; suggest `std.fiber` |
 | `asyncio` | `asyncio_stubs.w` | Flag; suggest With async |
@@ -1466,7 +1466,7 @@ generated stubs the same as third-party packages:
 | `ctypes` | `ctypes_stubs.w` | Use `unsafe` + `c_import` |
 | `multiprocessing` | Flag | Use `std.fiber` or processes |
 | `concurrent.futures` | `futures_stubs.w` | Use `std.async` |
-| `collections.deque` | `// @migrate: deque — use Vec[T]` | |
+| `collections.deque` | `// @migrate: deque — use List[T]` | |
 
 ---
 
@@ -1570,7 +1570,7 @@ def fill(items: list[int], value: int) -> None:
         items[i] = value
 ```
 ```
-fn fill(mut items: Vec[i64], value: i64) -> Vec[i64]:
+fn fill(mut items: List[i64], value: i64) -> List[i64]:
     for i in 0..items.len():
         items.set(i, value)
     items
@@ -1594,7 +1594,7 @@ gets flagged:
 items: list[Optional[int]] = [1, None, 3]
 ```
 ```
-let items: Vec[Option[i64]] = [Option.Some(1), Option.None, Option.Some(3)]
+let items: List[Option[i64]] = [Option.Some(1), Option.None, Option.Some(3)]
 ```
 
 ### Float equality
@@ -1652,7 +1652,7 @@ fn fetch_json(url: str, timeout: i64 = 30) -> Option[HashMap[str, PyObject]]:
     resp.raise_for_status()
     Option.Some(resp.json())
 
-fn mean_values(data: Vec[f64]) -> f64:
+fn mean_values(data: List[f64]) -> f64:
     let arr = numpy_array_f64(data)
     numpy_mean(arr)
 ```

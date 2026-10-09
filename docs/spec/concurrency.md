@@ -605,11 +605,11 @@ async scope s =>
    before it leaves the scope.
 
 ```
-async fn handle_batch(ids: Vec[UserId]) -> Vec[Result[User, ApiError]]:
+async fn handle_batch(ids: List[UserId]) -> List[Result[User, ApiError]]:
     async scope s =>
         let tasks = ids.iter()
             |> map(id => s.track(fetch_user(id)))
-            |> collect[Vec]()
+            |> collect[List]()
         tasks |> map(t => t.await) |> collect()
     // all tracked tasks guaranteed complete here
 ```
@@ -796,11 +796,11 @@ let results = tasks |> await_settled
 
 Collection combinators follow deterministic semantics:
 
-- `await_all(Task[T]) -> Vec[T]` waits for all tasks and returns results in input order.
-- `await_all(Task[Result[T, E]]) -> Result[Vec[T], E]` is fail-fast: on first `Err`, it cancels and joins remaining tasks, then returns that `Err`.
+- `await_all(Task[T]) -> List[T]` waits for all tasks and returns results in input order.
+- `await_all(Task[Result[T, E]]) -> Result[List[T], E]` is fail-fast: on first `Err`, it cancels and joins remaining tasks, then returns that `Err`.
 - `await_first(Task[T]) -> T` returns the first completed result, then cancels and joins losers before returning.
-- `await_any(Task[Result[T, E]]) -> Result[T, Vec[E]]` returns first `Ok(T)` (then cancels + joins losers); if all fail, returns `Err(Vec[E])` in input order.
-- `await_settled(Task[Result[T, E]]) -> Vec[Result[T, E]]` never cancels, waits for all, and returns in input order.
+- `await_any(Task[Result[T, E]]) -> Result[T, List[E]]` returns first `Ok(T)` (then cancels + joins losers); if all fail, returns `Err(List[E])` in input order.
+- `await_settled(Task[Result[T, E]]) -> List[Result[T, E]]` never cancels, waits for all, and returns in input order.
 
 **Latency note:** "cancels and joins" means the combinator does not
 return until every losing task has actually stopped. Cancellation is
@@ -812,7 +812,7 @@ Empty-input behavior:
 
 - `await_first([])` panics with stable message:
   `"await_first: empty input"`.
-- `await_any([])` returns `Err(Vec.new())`.
+- `await_any([])` returns `Err(List.new())`.
 - For non-empty input, `await_any` all-fail result is guaranteed
   non-empty (`Err(errors)` where `errors.len() > 0`).
 
@@ -836,7 +836,7 @@ See `lib/std/async.w` and `lib/std/async/` docs for API details.
 Because fibers have real stacks, references across `await` are safe:
 
 ```
-async fn process(mut data: Vec[i32]) -> Vec[i32]:
+async fn process(mut data: List[i32]) -> List[i32]:
     let first = &data[0]
     some_io().await              // fiber suspends; reference still valid
     print(first)               // safe to use
@@ -858,7 +858,7 @@ No specialized `AsyncIterator` or `Stream` traits are needed:
 let results = urls.iter()
     |> map(url => fetch(url).await)
     |> filter(r => r.is_ok())
-    |> collect[Vec]()
+    |> collect[List]()
 
 // .await inside fold
 let total = ids.iter()
@@ -1023,9 +1023,9 @@ let task = fetch_user(id)              // id: UserId is owned
 // task is Task[Result[User, DbError]], storable, Send
 
 // Borrowing task: ephemeral — cannot be stored or sent
-async fn process(data: &Vec[i32]) -> Unit: ...
-let task = process(&my_vec)            // captures &my_vec
-// task is ephemeral — it borrows my_vec
+async fn process(data: &List[i32]) -> Unit: ...
+let task = process(&my_list)            // captures &my_list
+// task is ephemeral — it borrows my_list
 // Cannot store in a struct, cannot send to another thread
 ```
 
@@ -1089,7 +1089,7 @@ task.await?                       // OK: used immediately
 **`async scope` is the ergonomic solution** for borrowing tasks:
 
 ```
-async fn process_all(mut data: Vec[i32]) -> Vec[i32]:
+async fn process_all(mut data: List[i32]) -> List[i32]:
     async scope s =>
         // These tasks borrow data — ephemeral
         let t1 = s.track(transform(&data[0..100]))

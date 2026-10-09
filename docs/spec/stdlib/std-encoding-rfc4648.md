@@ -12,11 +12,11 @@ functions.
 
 | Module | Encode | Decode |
 |---|---|---|
-| `std.encoding.base16` | `base16_encode(data: []u8) -> str` | `base16_decode(text: &str) -> Result[Vec[u8], DecodeError]` |
-| `std.encoding.base32` | `base32_encode(data: []u8) -> str` | `base32_decode(text: &str) -> Result[Vec[u8], DecodeError]` |
-| `std.encoding.base32hex` | `base32hex_encode(data: []u8) -> str` | `base32hex_decode(text: &str) -> Result[Vec[u8], DecodeError]` |
-| `std.encoding.base64` | `base64_encode(data: []u8) -> str` | `base64_decode(text: &str) -> Result[Vec[u8], DecodeError]` |
-| `std.encoding.base64url` | `base64url_encode(data: []u8) -> str` | `base64url_decode(text: &str) -> Result[Vec[u8], DecodeError]` |
+| `std.encoding.base16` | `base16_encode(data: []u8) -> str` | `base16_decode(text: &str) -> Result[List[u8], DecodeError]` |
+| `std.encoding.base32` | `base32_encode(data: []u8) -> str` | `base32_decode(text: &str) -> Result[List[u8], DecodeError]` |
+| `std.encoding.base32hex` | `base32hex_encode(data: []u8) -> str` | `base32hex_decode(text: &str) -> Result[List[u8], DecodeError]` |
+| `std.encoding.base64` | `base64_encode(data: []u8) -> str` | `base64_decode(text: &str) -> Result[List[u8], DecodeError]` |
+| `std.encoding.base64url` | `base64url_encode(data: []u8) -> str` | `base64url_decode(text: &str) -> Result[List[u8], DecodeError]` |
 
 Encoders accept borrowed byte slices; decoders borrow input text and return
 owned bytes. Behavior tests cover bound fixed arrays and vectors remaining

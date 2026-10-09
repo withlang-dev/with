@@ -19,14 +19,14 @@ The prelude is always in scope. Prefer unqualified names for common
 types and traits:
 
 ```
-let users: Vec[User] = Vec.new()
+let users: List[User] = List.new()
 let name: String = "alice"
 
 fn render[T](value: T):
     print(f"{value}")
 ```
 
-No `use` is needed for `Vec`, `String`, `Option`, `Result`,
+No `use` is needed for `List`, `String`, `Option`, `Result`,
 `Debug`/`Display`/`Default`, `Iter`/`IntoIter`, `Eq`/`Key`/`Ord`,
 or core print/assert helpers.
 
@@ -155,13 +155,13 @@ bidirectional type inference. Use it.
 // ✗ over-annotated
 let x: i32 = 42
 let name: str = "Alice"
-let items: Vec[i32] = Vec.new()
+let items: List[i32] = List.new()
 let found: bool = list.contains(x)
 
 // ✓ idiomatic
 let x = 42
 let name = "Alice"
-let items = Vec[i32].new()
+let items = List[i32].new()
 let found = list.contains(x)
 ```
 
@@ -316,13 +316,13 @@ and the body ends with a statement, the compiler wraps it.
 
 ```
 // ✗ ceremony
-fn save_all(items: &Vec[Item]) -> Result[Unit, DbError]:
+fn save_all(items: &List[Item]) -> Result[Unit, DbError]:
     for item in items:
         db.insert(item)?
     Ok(())
 
 // ✓ idiomatic — implicit Ok(())
-fn save_all(items: &Vec[Item]) -> Result[Unit, DbError]:
+fn save_all(items: &List[Item]) -> Result[Unit, DbError]:
     for item in items:
         db.insert(item)?
 ```
@@ -580,7 +580,7 @@ let report = raw_data
     |> render_chart
 ```
 
-Collections support implicit iteration: `Vec`, arrays, slices, `HashMap`, and
+Collections support implicit iteration: `List`, arrays, slices, `HashMap`, and
 `HashSet` flow directly into `map`/`filter`/`count` without an explicit
 `.iter()`, and the result is again a collection (no terminal `.collect()`).
 
@@ -799,7 +799,7 @@ for item in items:
 
 ```
 // ✗ manual accumulation
-var result = Vec[i32].new()
+var result = List[i32].new()
 for x in 0..10:
     result.push(x * x)
 
@@ -865,11 +865,11 @@ impl Show for Point: fn show(self: &Point) -> String: f"({self.x}, {self.y})"
 // ✓ multi-line when it doesn't fit
 trait DataSource:
     async fn fetch(self: &Self, id: i32) -> Result[Data, Error]
-    async fn batch(self: &Self, ids: &Vec[i32]) -> Result[Vec[Data], Error]
+    async fn batch(self: &Self, ids: &List[i32]) -> Result[List[Data], Error]
 
-extend Vec[T]:
-    fn is_empty(self: &Vec[T]) -> bool: self.len() == 0
-    fn first(self: &Vec[T]) -> Option[&T]: if self.is_empty() then None else Some(&self[0])
+extend List[T]:
+    fn is_empty(self: &List[T]) -> bool: self.len() == 0
+    fn first(self: &List[T]) -> Option[&T]: if self.is_empty() then None else Some(&self[0])
 ```
 
 ```
@@ -921,7 +921,7 @@ mismatch.
 // ✗ pointer-based — fragile, cache-unfriendly
 type Entity:
     parent: *Entity
-    children: Vec[*Entity]
+    children: List[*Entity]
 
 // ✓ idiomatic — handle-based, data-oriented
 type Entity = Handle[EntityRow]
@@ -958,11 +958,11 @@ for (entity, tf, sprite) in query2(&world.transforms, &world.sprites):
 
 When applying a fallible function to a collection, use
 `traverse` instead of a manual loop with error handling.
-Use `sequence` when you already have `Vec[Result[T, E]]`.
+Use `sequence` when you already have `List[Result[T, E]]`.
 
 ```
 // ✗ manual loop with error handling
-var results = Vec[i32].new()
+var results = List[i32].new()
 for s in strings:
     match s.parse_int():
         Ok(n)  => results.push(n)
@@ -972,11 +972,11 @@ for s in strings:
 let results = strings.traverse(s => s.parse_int())?
 ```
 
-`sequence` converts `Vec[Result[T, E]]` to `Result[Vec[T], E]`:
+`sequence` converts `List[Result[T, E]]` to `Result[List[T], E]`:
 
 ```
 // ✗ manual unwrapping
-var users = Vec[User].new()
+var users = List[User].new()
 for result in fetch_results:
     users.push(result?)
 
@@ -1022,7 +1022,7 @@ let profiles = async scope s =>
 Scoped borrows — tasks can borrow local data without lifetimes:
 
 ```
-async fn process_all(data: &Vec[i32]):
+async fn process_all(data: &List[i32]):
     async scope s =>
         s.track(transform(&data[0..100]))
         s.track(transform(&data[100..200]))

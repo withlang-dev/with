@@ -20,7 +20,7 @@ heap containers, global storage, or escaping closures.
 Ephemerality propagates through type constructors:
 
 - If `T` is ephemeral, then `Option[T]`, `Result[T, E]`, `(T, U)`, and
-  any generic `F[T]` — including heap containers such as `Vec[T]`,
+  any generic `F[T]` — including heap containers such as `List[T]`,
   `HashMap[K, T]`, `Box[T]`, `Rc[T]`, `Arc[T]` — are ephemeral.
 - If any field of a struct is ephemeral, the struct is ephemeral. A
   struct definition with ephemeral fields is rejected unless the
@@ -32,7 +32,7 @@ Ephemerality propagates through type constructors:
   heap container or a non-ephemeral struct field, or boxing it is a
   compile error — enforced by borrow-origin tracking, so a container
   that borrows a live outer value (e.g. a batch of handles whose fields
-  are all owned, like `Vec[Workspace]`) is unrestricted, while one that
+  are all owned, like `List[Workspace]`) is unrestricted, while one that
   borrows a stack local it would outlive is rejected. (BDFL ruling
   2026-07-04, revised after reference-implementation review, #625: this
   is the model of Rust lifetimes and Vale regions — control the escape,
@@ -63,7 +63,7 @@ compute ephemeral `&str`/`&[u8]` on demand from an owned buffer.
 type Request {
     buf:     Bytes,
     path:    BufSlice,
-    headers: Vec[Header],
+    headers: List[Header],
 }
 
 extend Request:
@@ -113,7 +113,7 @@ match tok.kind:
 while let Some(tok) = parser.next_token():
     process(tok)
 
-// LIMITATION: Cannot collect ephemeral tokens into a Vec directly.
+// LIMITATION: Cannot collect ephemeral tokens into a List directly.
 // Each Token borrows from parser.source (Rule 6, §21.1), so holding
 // one Token prevents calling next_token() again.
 //
@@ -125,13 +125,13 @@ extend Parser:
         let tok = self.next_raw_token()?
         Some(OwnedToken { start: tok.start, end: tok.end, kind: tok.kind, span: tok.span })
 
-let tokens = with Vec.new() as mut toks:
+let tokens = with List.new() as mut toks:
     while let Some(tok) = parser.next_owned_token():
         toks.push(tok)    // OwnedToken is NOT ephemeral — no borrows
-// tokens: Vec[OwnedToken] is storable
+// tokens: List[OwnedToken] is storable
 
 // ERROR: cannot store in a non-ephemeral struct
-type Module { tokens: Vec[Token] }   // REJECTED: ephemeral field
+type Module { tokens: List[Token] }   // REJECTED: ephemeral field
 ```
 
 **When to use ephemeral structs vs tuples:**

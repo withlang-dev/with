@@ -5,7 +5,7 @@
    construct, owning type, explicit allocation API, or compiler-owned
    adapter whose cost model is documented and diagnosable.
 2. **Allocation-producing constructs are enumerated.** Examples include
-   allocator calls, `Vec.new()`, `.to_owned()`, owned buffer
+   allocator calls, `List.new()`, `.to_owned()`, owned buffer
    constructors, comprehensions, f-strings, owned string literals when
    not elided, `async fn` calls and `async:` blocks that allocate
    fibers/tasks, and modeled FFI temporaries such as call-scoped

@@ -40,7 +40,7 @@ functions.
 With keeps a practical prelude in scope for every module. You do not
 need to import:
 
-- `Vec`, `HashMap`, `HashSet`, `Option`, `Result`, `String`
+- `List`, `HashMap`, `HashSet`, `Option`, `Result`, `String`
 - `Debug`, `Display`, `Default`, `Iter`, `IntoIter`, `Eq`, `Key`, `Ord`
 - `print`, `println`, `assert` and related assertion/panic helpers
 
@@ -92,7 +92,7 @@ Option<T>
 
 ```with
 // With
-Vec[T]
+List[T]
 HashMap[K, V]
 Result[T, E]
 Option[T]
@@ -588,7 +588,7 @@ let callback = move |x| captured_value + x;
 ```with
 // With
 let add = (a, b) => a + b
-let double = nums |> map(x => x * 2) |> collect[Vec]()
+let double = nums |> map(x => x * 2) |> collect[List]()
 // move closures: With infers capture mode from usage
 let callback = x => captured_value + x
 ```
@@ -631,7 +631,7 @@ let updated = { user with name: "new_name", active: false }
 |------|------|
 | `{ }` blocks | `:` + indentation |
 | `let mut x` | `var x` |
-| `Vec<T>` | `Vec[T]` |
+| `Vec<T>` | `List[T]` |
 | `impl Foo` | `extend Foo` |
 | `impl Trait for Foo` | `impl Trait for Foo` (same) |
 | `&self` | `self: &Foo` |
@@ -767,7 +767,7 @@ const data = readFile("config.txt") catch |err| {
 
 ```with
 // With
-fn read_file(path: &str) -> Result[Vec[u8], IoError]:
+fn read_file(path: &str) -> Result[List[u8], IoError]:
     let file = fs.open(path)?
     defer file.close()
     file.read_to_end()
@@ -810,7 +810,7 @@ fn processItems(allocator: std.mem.Allocator, items: []const Item) !void {
 ```with
 // With — no allocator parameter needed
 fn process_items(items: &[Item]) -> Result[Unit, AppError]:
-    var list = Vec[Item].new()
+    var list = List[Item].new()
     for item in items:
         list.push(item)
     // implicit Ok(())
@@ -824,7 +824,7 @@ with Arena.new(1024 * 1024) as arena:
 When converting Zig code, strip `allocator` parameters. Replace
 `allocator.create(T)` with normal construction. Replace
 `allocator.free(x)` with nothing (RAII handles it). Replace
-`ArrayList(T).init(allocator)` with `Vec[T].new()`.
+`ArrayList(T).init(allocator)` with `List[T].new()`.
 
 ## Defer
 
@@ -967,7 +967,7 @@ let arr = [1_u8, 2, 3]
 let sub = slice[1..3]
 ```
 
-`[]const T` → `[]T`. `[]T` → `[]mut T`. Owned arrays → `Vec[T]`.
+`[]const T` → `[]T`. `[]T` → `[]mut T`. Owned arrays → `List[T]`.
 
 ## Ownership (New Concept for Zig Programmers)
 
@@ -1013,7 +1013,7 @@ runtime cost.
 | `!T` (error union) | `Result[T, E]` |
 | `?T` (optional) | `Option[T]` |
 | `[]const u8` | `&str` or `&[u8]` |
-| `std.ArrayList(T)` | `Vec[T]` |
+| `std.ArrayList(T)` | `List[T]` |
 | `std.AutoHashMap(K,V)` | `HashMap[K, V]` |
 | `@as(T, val)` | `val as T` |
 | `@intCast(val)` | `val as T` |
@@ -1105,7 +1105,7 @@ let custom = Config { port: 9090 }     // override one field
 ```
 
 Unlike Go's zero values (always the zero of the type), With defaults
-can be any expression: `Duration.seconds(30)`, `Vec.new()`, etc.
+can be any expression: `Duration.seconds(30)`, `List.new()`, etc.
 Fields without defaults must always be provided.
 
 ## Variables
@@ -1377,7 +1377,7 @@ let val = m.get("a")      // returns Option[&i32]
 m.remove("b")
 ```
 
-Go slices → `Vec[T]`. Go maps → `HashMap[K, V]`. Append →
+Go slices → `List[T]`. Go maps → `HashMap[K, V]`. Append →
 `.push()`. `delete` → `.remove()`.
 
 Positional access observes the stored element. An inferred binding from either
@@ -1515,7 +1515,7 @@ let clone = shared.clone()   // both point to same data
 | `context.Context` | (deleted — structured concurrency) |
 | `defer` | `defer` |
 | `nil` | `None` |
-| `make([]T, 0)` | `Vec[T].new()` |
+| `make([]T, 0)` | `List[T].new()` |
 | `make(map[K]V)` | `HashMap[K, V].new()` |
 | `append(s, x)` | `s.push(x)` |
 | `for i, v := range x` | `for (i, v) in x.enumerate():` |
@@ -1593,10 +1593,10 @@ auto buf = std::make_unique<Buffer>();
 ```with
 // With
 type Buffer = {
-    data: Vec[u8],
+    data: List[u8],
 }
 
-// No explicit destructor needed; Vec cleans itself up.
+// No explicit destructor needed; List cleans itself up.
 let buf = Box.new(Buffer { data: vec![0; 1024] })
 ```
 
@@ -1614,7 +1614,7 @@ With uses strict ownership. When a value goes out of scope, it is destroyed. If 
 
 ```with
 // With
-use std.collections.Vec
+use std.collections.List
 use math_utils.clamp
 
 // No build script needed for pure With code. Just `with build`.
@@ -1738,7 +1738,7 @@ With has no token-level macros. Instead, `comptime` allows you to execute normal
 | `T& ref` | `&T` (or `mut fn` receiver for mutation) |
 | `auto x = 5;` | `let x = 5` |
 | `const int x = 5;` | `let x: i32 = 5` (variables are immutable by default) |
-| `std::vector<T>` | `Vec[T]` |
+| `std::vector<T>` | `List[T]` |
 | `std::unordered_map<K,V>` | `HashMap[K, V]` |
 | `std::unique_ptr<T>` | `Box[T]` |
 | `std::shared_ptr<T>` | `Arc[T]` |
@@ -1799,9 +1799,9 @@ type Shape =
 // class → owned type (no ARC)
 // Default field values (§4.3) match Swift's property defaults:
 type ViewModel = {
-    items: Vec[Item] = Vec.new(),
+    items: List[Item] = List.new(),
 }
-let vm = ViewModel {}    // items defaults to empty Vec
+let vm = ViewModel {}    // items defaults to empty List
 ```
 
 Swift `struct` → With `type` (both are value types).
@@ -1971,14 +1971,14 @@ impl Drawable for Circle {
         }
 }
 
-extend Vec[T: Add]
-    fn sum(self: &Vec[T]) -> T:
+extend List[T: Add]
+    fn sum(self: &List[T]) -> T:
         self.iter() |> fold(T.zero(), (a, x) => a + x)
 ```
 
 `protocol` → `trait`. `extension Type: Protocol` →
 `impl Trait for Type`. Protocol extensions with `where` →
-`extend Vec[T: Trait]` (for inherent methods).
+`extend List[T: Trait]` (for inherent methods).
 
 Swift's protocol-oriented programming maps directly to With's
 trait-oriented design.
@@ -2004,9 +2004,9 @@ fetchData(from: url) { result in
 ```with
 // With
 let double = (x: i32) => x * 2
-let names = users.iter() |> map(u => u.name) |> collect[Vec]()
-let adults = users.iter() |> filter(u => u.age >= 18) |> collect[Vec]()
-let sorted = users.iter() |> sorted_by((a, b) => a.name.cmp(&b.name)) |> collect[Vec]()
+let names = users.iter() |> map(u => u.name) |> collect[List]()
+let adults = users.iter() |> filter(u => u.age >= 18) |> collect[List]()
+let sorted = users.iter() |> sorted_by((a, b) => a.name.cmp(&b.name)) |> collect[List]()
 
 // No trailing closure syntax — use pipeline or named functions
 let result = fetch_data(url).await
@@ -2059,8 +2059,8 @@ async fn fetch_user(id: i32) -> Result[User, ApiError]:
 async scope s =>
     let tasks = ids.iter()
         |> map(id => s.track(fetch_user(id)))
-        |> collect[Vec]()
-    tasks |> map(t => t.await) |> collect[Vec]()
+        |> collect[List]()
+    tasks |> map(t => t.await) |> collect[List]()
 ```
 
 `async throws` → `async fn ... -> Result[T, E]`.
@@ -2174,7 +2174,7 @@ case .loading(let progress):
 ```with
 // With
 type NetworkResult =
-    | Success(Vec[u8])
+    | Success(List[u8])
     | Failure(NetworkError)
     | Loading(progress: f64)
 
@@ -2186,8 +2186,8 @@ match result
 
 Nearly identical. `.success` → `.Success`. `case` keyword dropped.
 `switch` → `match`. Enum accessor methods are auto-generated:
-`result.is_success()`, `result.as_success() -> Option[Vec[u8]]`,
-`result.as_success_ref() -> Option[&Vec[u8]]`.
+`result.is_success()`, `result.as_success() -> Option[List[u8]]`,
+`result.as_success_ref() -> Option[&List[u8]]`.
 
 Exhaustiveness rule differs by position:
 - expression-position `match` must be exhaustive;
@@ -2207,7 +2207,7 @@ let set: Set<Int> = [1, 2, 3]
 
 ```with
 // With
-var items: Vec[i32] = vec![1, 2, 3]
+var items: List[i32] = vec![1, 2, 3]
 items.push(4)
 var dict = HashMap[str, i32].new()
 dict.insert("a", 1)
@@ -2217,7 +2217,7 @@ let val = dict.get("a")   // Option[&i32]
 let set = HashSet[i32].from([1, 2, 3])
 ```
 
-`[T]` → `Vec[T]`. `[K: V]` → `HashMap[K, V]`. `Set<T>` →
+`[T]` → `List[T]`. `[K: V]` → `HashMap[K, V]`. `Set<T>` →
 `HashSet[T]`. `.append` → `.push`. Subscript assignment →
 `.insert`.
 
@@ -2251,7 +2251,7 @@ owned non-Copy target needs explicit `.cloned()` or consuming `remove`.
 | `withThrowingTaskGroup` | `async scope s =>` |
 | `group.addTask` | `s.track(task)` |
 | `defer { }` | `defer expr` |
-| `[T]` (Array) | `Vec[T]` |
+| `[T]` (Array) | `List[T]` |
 | `[K: V]` (Dictionary) | `HashMap[K, V]` |
 | `Set<T>` | `HashSet[T]` |
 | `weak var` | `&T` (borrow) or restructure |
@@ -2455,7 +2455,7 @@ with build --no-std firmware.w
 `c_import`, full ownership/borrowing, `comptime`, `unsafe`, and
 `match`. Everything that doesn't need a heap or an OS works.
 
-**What you lose:** `str` (heap-allocated), `Vec[T]`, `HashMap`,
+**What you lose:** `str` (heap-allocated), `List[T]`, `HashMap`,
 `HashSet`, `Box[T]`, `println`/`print` (needs stdout), `async fn`
 (needs fiber runtime), and all of `std.io`/`std.fs`/`std.net`.
 
@@ -2474,7 +2474,7 @@ fn start -> i32:
 | Tier | Flag | What you get |
 |------|------|--------------|
 | Full | (default) | Everything |
-| Alloc | `--no-std --alloc` | Core + heap types (Vec, str, HashMap) |
+| Alloc | `--no-std --alloc` | Core + heap types (List, str, HashMap) |
 | Freestanding | `--no-std` | Core only — no heap |
 
 ---

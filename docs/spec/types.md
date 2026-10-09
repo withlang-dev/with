@@ -81,7 +81,7 @@ the language surface syntax.
 another numeric type:
 
 - Unsuffixed integer literals default to `isize`, everywhere, including in
-  bracket literals (`[1, 2, 3]` is a `Vec[isize]`, D113, D114)
+  bracket literals (`[1, 2, 3]` is a `List[isize]`, D113, D114)
 - Unsuffixed float literals default to `f64`
 
 Literals and comptime arithmetic are checked at the target's width, not the
@@ -665,7 +665,7 @@ type definition time. Each construction gets a fresh evaluation:
 type Request {
     id: RequestId = RequestId.generate(),   // unique per construction
     created_at: Instant = Instant.now(),    // evaluated when constructed
-    headers: Vec[Header] = Vec.new(),       // fresh Vec each time
+    headers: List[Header] = List.new(),       // fresh List each time
 }
 ```
 
@@ -740,7 +740,7 @@ arr.len()        // length: returns N (compile-time constant)
 
 `[value; N]` is N elements, `value` evaluated once for each element, in
 order; `N` is a compile-time constant (§9.1b). Where a fixed array type is
-demanded it builds that array; elsewhere it is a `Vec` (D113, §4.3c).
+demanded it builds that array; elsewhere it is a `List` (D113, §4.3c).
 
 **Semantics:**
 
@@ -820,7 +820,7 @@ type IpHeader = {
    field to last, with no gaps.
 2. Total size is `ceil(sum_of_field_bits / 8)` bytes.
 3. All field types must have a known bit width. Pointers, slices,
-   strings, structs (except nested bitpacked), and Vecs are not
+   strings, structs (except nested bitpacked), and Lists are not
    allowed. Compile error: "bitpacked fields must be integer, bool,
    or bitpacked struct type."
 4. `bool` occupies 1 bit. `true` is `1`, `false` is `0`.
@@ -878,17 +878,18 @@ result is masked to the type's range.
 
 Bracket literals are With's one collection-literal family. The
 element form builds sequences and sets; the `key: value` form builds
-maps. Brackets make a `Vec` (D113); another collection is built where its
+maps. Brackets make a `List` (D113); another collection is built where its
 type is demanded, as with numeric literals (§4.2.1) and enum variant
-shorthand (§4.4):
+shorthand (§4.4). `List[T]` is the growable sequence (D118); `Vec` names no
+type, and writing it is an error that suggests `List`:
 
 ```
-let a = [1, 2, 3]                      // Vec[isize]: brackets make a Vec
-let v: Vec[i32] = [1, 2, 3]            // Vec[i32]: the demand types the elements
+let a = [1, 2, 3]                      // List[isize]: brackets make a List
+let v: List[i32] = [1, 2, 3]            // List[i32]: the demand types the elements
 let t: [i32; 4] = [1, 2, 3, 4]         // fixed array: its type is demanded
-for flag in ["-v", "-q"]: use(flag)    // Vec[str]; never grown or kept
-print(total([1, 2, 3]))                // fn total(xs: &Vec[i32])
-var ys = []                            // Vec: `push` says what it holds,
+for flag in ["-v", "-q"]: use(flag)    // List[str]; never grown or kept
+print(total([1, 2, 3]))                // fn total(xs: &List[i32])
+var ys = []                            // List: `push` says what it holds,
 ys.push(big)                           // and `big: i64` its element type
 let s: HashSet[str] = ["a", "b"]       // HashSet: a set is demanded
 let o: BTreeSet[i32] = [3, 1, 2]       // BTreeSet: a set is demanded
@@ -899,18 +900,18 @@ let colors = ["red": 0xFF0000, "green": 0x00FF00]
 let ranks: BTreeMap[str, i32] = ["a": 1, "b": 2]
 
 let empty: HashMap[str, i32] = [:]     // the empty map literal
-let none: Vec[i32] = []                // empty sequence (type from context)
+let none: List[i32] = []                // empty sequence (type from context)
 ```
 
 **Rules:**
 
-1. A bracket literal is a `Vec[T]`, unless the demanded type is another
+1. A bracket literal is a `List[T]`, unless the demanded type is another
    collection that can be built from a list, such as a fixed array or a
    set. Then the literal builds that collection. The collections built
-   from a list are `Vec[T]`, `HashSet[T]`, `BTreeSet[T]` and the fixed
+   from a list are `List[T]`, `HashSet[T]`, `BTreeSet[T]` and the fixed
    array `[T; N]` (§4.3a). An annotation may name the collection without
-   its arguments, and the elements decide them: `let w: Vec = [1, 2, 3]` is
-   a `Vec[isize]`.
+   its arguments, and the elements decide them: `let w: List = [1, 2, 3]` is
+   a `List[isize]`.
 
    The element type comes from the elements, or from the demand: a
    parameter, a typed place assigned to or from, a return, or a method
@@ -918,8 +919,8 @@ let none: Vec[i32] = []                // empty sequence (type from context)
    push or the first use to say what it holds. Uses that demand two
    different types are an error at the second, naming both. Demands are
    taken from the literal's own function only. A slice demand views the
-   literal (a `Vec` coerces to `[]T`, §4.8a) and demands nothing. The repeat
-   form `[value; N]` follows the same rule: a `Vec` of N elements unless a
+   literal (a `List` coerces to `[]T`, §4.8a) and demands nothing. The repeat
+   form `[value; N]` follows the same rule: a `List` of N elements unless a
    fixed array is demanded (D113).
 
    A literal that is never grown or retained needn't touch the heap: the
@@ -927,8 +928,8 @@ let none: Vec[i32] = []                // empty sequence (type from context)
    are constants. The program cannot tell the difference.
 
    Duplicate constants in a set literal warn: `["a", "a"]` demanded as a
-   set is almost always a typo. A `Vec` keeps every element: `let v =
-   ["a", "a"]` is a `Vec[str]` of length 2, and `v[0]` and `v[1]` are both
+   set is almost always a typo. A `List` keeps every element: `let v =
+   ["a", "a"]` is a `List[str]` of length 2, and `v[0]` and `v[1]` are both
    `"a"`.
 
 2. The map form `[k: v, ...]` defaults to `HashMap[K, V]`. When the
@@ -1079,7 +1080,7 @@ without cloning:
 ```
 enum JsonValue:
     | Null | Bool(bool) | Number(f64) | Str(str)
-    | Array(Vec[JsonValue]) | Object(HashMap[str, JsonValue])
+    | Array(List[JsonValue]) | Object(HashMap[str, JsonValue])
 
 // Navigate a JSON tree without cloning anything:
 let stars = config
@@ -1461,7 +1462,7 @@ let _ = cache.set(key, value).await.unwrap_or()   // instead of .unwrap_or(())
 
 ### 4.8a Slices
 
-Slices are borrowed views into contiguous memory (arrays, Vecs):
+Slices are borrowed views into contiguous memory (arrays, Lists):
 
 ```
 []T         shared (immutable) slice
@@ -1469,7 +1470,7 @@ Slices are borrowed views into contiguous memory (arrays, Vecs):
 ```
 
 A slice is a fat pointer: `(ptr: *const T, len: usize)`. It does
-not own the data — it borrows from an array, Vec, or other
+not own the data — it borrows from an array, List, or other
 contiguous storage.
 
 ```
@@ -1516,7 +1517,7 @@ let (left, right) = data.split_at_mut(mid)
 ```
 
 The standard library must provide `split_at(i)` and `split_at_mut(i)`
-on slices, arrays, and `Vec[T]`. As with array indices (§3.6), range
+on slices, arrays, and `List[T]`. As with array indices (§3.6), range
 disjointness is not inferred at compile time — `split_at_mut` is the
 safe primitive for simultaneous mutable access to disjoint ranges. In
 parameter position, `[]T` and `[]mut T` follow §3.8's borrow mode:
@@ -1548,7 +1549,7 @@ fn get_user(id: i32) -> Result[User, DbError]:
     User.from_row(row)                   // auto-wrapped in Ok(...)
 
 // Result[Unit, E] — no trailing expression needed
-fn save_all(items: &Vec[Item]) -> Result[Unit, DbError]:
+fn save_all(items: &List[Item]) -> Result[Unit, DbError]:
     for item in items:
         db.insert(item)?
     // implicitly returns Ok(())
@@ -1659,7 +1660,7 @@ Built-in implementations:
 | `bool` | `false` |
 | `str` | `""` |
 | `Option[T]` | `None` |
-| `Vec[T]` | empty vec |
+| `List[T]` | empty list |
 | `HashMap[K, V]` | empty map |
 | `HashSet[T]` | empty set |
 

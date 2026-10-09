@@ -494,8 +494,8 @@ LLVM/libclang), so they never route through `--emit-c`.
 
 Consequently several intrinsic families are **LLVM-only by design**, and the C
 backend loudly `self.fail(...)`s on them instead of lowering them: dyn-trait
-method dispatch, `MultiIndex`, `Vec.get_disjoint` (tuple-valued slots),
-`SlotMap`, and `VecRange` (plus their `len32`/`len64`/`ulen32` variants). The
+method dispatch, `MultiIndex`, `List.get_disjoint` (tuple-valued slots),
+`SlotMap`, and `ListRange` (plus their `len32`/`len64`/`ulen32` variants). The
 compiler does not use any of these internally, so they can never block this
 bootstrap. The guarantee is enforced, not assumed: if a future compiler change
 starts using one of them, the `with build :emit-c-fixpoint` gate above fails

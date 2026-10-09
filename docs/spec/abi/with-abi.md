@@ -77,7 +77,7 @@ generated code and `rt/rt_core.w`:
 | Type | Layout | Size |
 |---|---|---|
 | `str` | `{ ptr: *const u8, len: i64 }` | 16 |
-| `Vec[T]` | `{ ptr: *mut u8, len: i64, cap: i64, start: i64 }`: `ptr` is the first live element, `start` the elements before it in the allocation (D115); the element size is static, never stored | 32 |
+| `List[T]` | `{ ptr: *mut u8, len: i64, cap: i64, start: i64 }`: `ptr` is the first live element, `start` the elements before it in the allocation (D115); the element size is static, never stored | 32 |
 | `HashMap[K, V]` / `HashSet[T]` | handle: one pointer to a 64-byte runtime header (`keys, vals, occupied, cap, len, key_size, val_size, is_str_key`) | 8 |
 | `SlotMap[T]` | handle: one pointer to a 56-byte runtime header (`values, next, generations, len, cap, elem_size, free_head: u32, free_tail: u32`) | 8 |
 | `Handle[T]` | `{ index: u32, generation: u32 }` | 8 |
@@ -132,7 +132,7 @@ through a hidden `sret` pointer and passed as a pointer to a caller-made
 copy, applied by the compiler on both sides (`internal_abi_needs_sret`,
 `internal_abi_needs_indirect_param`, `fn_abi_platform_aggregate_indirect`);
 on windows-x86_64 the line is one word (8 bytes). So `str` and a `&str`
-view (16 bytes) pass and return by value; a `Vec` header (32 bytes) and
+view (16 bytes) pass and return by value; a `List` header (32 bytes) and
 any larger struct go through memory. The pointer is a plain pointer, never
 LLVM `byval`, on every target; `byval` belongs to the C convention on SysV
 x86_64 alone (`fn_abi_indirect_uses_byval`).
@@ -151,8 +151,8 @@ source interface, not encoded in the object.
 ## 5. Symbols
 
 A function's link name is its semantic symbol text — `main`, `peek`,
-`Vec.push`, and for specializations the mono name Sema assigns
-(`Vec.iter__receiver__158_16` style) — qualified by module when objects
+`List.push`, and for specializations the mono name Sema assigns
+(`List.iter__receiver__158_16` style) — qualified by module when objects
 are built per module: `__with_mod_<hash>__<base>`, where `<hash>` is
 `with_str_hash` (FNV) of the canonical module path
 (`module_link_name_for_path`). Runtime ABI symbols (`with_*`) keep their
@@ -176,7 +176,7 @@ cleanup use that same storage so a field moved out by the body is not
 dropped again. This physical mode does not turn `move self` into a borrow.
 
 Drop glue is generated per type by codegen (`mir_emit_drop_*`): a `str`
-frees its buffer through the runtime allocator; a `Vec[T]` drops each
+frees its buffer through the runtime allocator; a `List[T]` drops each
 element then its buffer; enums drop the live variant's payload; structs
 drop fields in declaration order. The runtime allocator's header is 16
 bytes with the aligned payload size in the first word; `.wo` objects
@@ -193,7 +193,7 @@ executable.
 - symbol naming in `src/Codegen.w` (`module_link_name_for_path`,
   `function_symbol_name`, `codegen_canonical_module_path`) and
   `with_str_hash` — §5.
-- the header layouts in `rt/rt_core.w` (`str`, Vec, HashMap, SlotMap,
+- the header layouts in `rt/rt_core.w` (`str`, List, HashMap, SlotMap,
   FmtBuffer sections) and the allocator header — §3, §6.
 - drop glue in `src/CodegenDispatch.w` (`mir_emit_drop_*`) — §6.
 - the LLVM version and target triple the object is built for (part of

@@ -445,7 +445,7 @@ controlled equivalent.
 ### 9.5 Extension Blocks
 
 ```
-extend Vec[T]:
+extend List[T]:
     fn is_empty() -> bool: self.len() == 0
 ```
 
@@ -606,7 +606,7 @@ generic substitution. A `mut fn` stage with any other return type continues
 with its returned value under the ordinary pipeline rule.
 
 ```
-var v: Vec[i32] = Vec.new()
+var v: List[i32] = List.new()
 
 v
 |> push(1)       // push mutates v and returns Unit; the pipeline still carries v
@@ -636,7 +636,7 @@ remains alive and mutated in its enclosing scope, while the next stage receives
 the returned value:
 
 ```
-var v: Vec[i32] = Vec.new()
+var v: List[i32] = List.new()
 
 let popped = v
     |> push(1)    // Unit: still carrying v
@@ -662,15 +662,15 @@ temporary-drop rules (§2.2, §2.4) then apply without pipeline-specific
 ownership behavior:
 
 ```
-Vec.new() |> push(1)
-// The hidden Vec place is dropped at statement end.
+List.new() |> push(1)
+// The hidden List place is dropped at statement end.
 
-let v: Vec[i32] = Vec.new() |> push(1)
-// The hidden Vec remains the final pipeline value and assignment moves it to v.
+let v: List[i32] = List.new() |> push(1)
+// The hidden List remains the final pipeline value and assignment moves it to v.
 
-let item: Option[i32] = Vec.new() |> push(1) |> pop()
+let item: Option[i32] = List.new() |> push(1) |> pop()
 // pop changes the pipeline value to Option; item receives the Option and the
-// now-empty hidden Vec is dropped at statement end.
+// now-empty hidden List is dropped at statement end.
 ```
 
 A stage resolving to `Never` is not Unit: it diverges, there is no pipeline
@@ -710,7 +710,7 @@ closures:
 
 ```
 let normalize = x => strip_accents(lowercase(trim(x)))
-names |> map(normalize) |> collect[Vec]()
+names |> map(normalize) |> collect[List]()
 ```
 
 ### 9.7 Pattern Matching
@@ -903,13 +903,13 @@ For fixed-size arrays, the compiler performs compile-time length matching:
 elements between the matched ends. If the subject is owned — a temporary,
 or a place moved with `move` — the pattern takes it apart by value: each
 binding is an owned element, and `rest` is the owned remainder (`[T; N-k]`
-for a fixed array, `Vec[T]` for a `Vec`). A `Vec` remainder shares the
+for a fixed array, `List[T]` for a `List`). A `List` remainder shares the
 subject's buffer without copying, so taking it is O(1), as taking a view of
 a place is. If the subject is a place, the pattern observes it: elements
 bind as views and `rest` is a `[]T` view of it. Its length is `rest.len()`.
 
 A shared remainder keeps the whole original buffer alive: a three-element
-`rest` taken from a million-element `Vec` holds the million-element
+`rest` taken from a million-element `List` holds the million-element
 allocation until it is dropped. Growing the remainder reallocates, and
 `shrink_to_fit()` releases the prefix.
 
@@ -1078,7 +1078,7 @@ references to the inner fields. No explicit `&` is needed in the
 pattern:
 
 ```
-let items: Vec[(str, i32)] = [("alice", 1), ("bob", 2)]
+let items: List[(str, i32)] = [("alice", 1), ("bob", 2)]
 
 // .iter() yields &(str, i32)
 // Destructuring binds key: &str, val: &i32 automatically
@@ -1135,7 +1135,7 @@ let results = world
     |> where((pos, _) => pos.x > 0.0)
     |> order_by((_, vel) => vel.magnitude())
     |> limit(100)
-    |> collect[Vec]()
+    |> collect[List]()
 ```
 
 **HTTP request builder:**
@@ -1339,7 +1339,7 @@ test. The membership test appears in filter expressions:
 ```
 let valid = tokens
     |> filter(t => t.kind in [Ident, Number, String])
-    |> collect[Vec]()
+    |> collect[List]()
 ```
 
 **Interaction with match patterns:**
@@ -1388,7 +1388,7 @@ fn is_valid_port(port: u16) -> bool:
 let dangerous_ops = ["rm", "format", "drop", "truncate"]
 let safe_commands = commands
     |> filter(cmd => cmd.op not in dangerous_ops)
-    |> collect[Vec]()
+    |> collect[List]()
 
 // Compound conditions
 if user.role in ["admin", "moderator"] and action in allowed_actions:

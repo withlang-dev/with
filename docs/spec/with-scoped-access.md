@@ -92,7 +92,7 @@ let config = with Config.default() as mut c:
     c.timeout = 30
 
 // To extract a computed value, bind the builder, then compute:
-let v = with Vec.new() as mut v:
+let v = with List.new() as mut v:
     v.push(1)
     v.push(2)
 let len = v.len()
@@ -308,7 +308,7 @@ fn find_value(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32]:
             None    => ()
     None
 
-fn process_all(lock: &Mutex[Vec[Item]]) -> Result[Unit, AppError]:
+fn process_all(lock: &Mutex[List[Item]]) -> Result[Unit, AppError]:
     with lock.lock() as items:
         for item in items:
             if item.is_invalid():
@@ -316,7 +316,7 @@ fn process_all(lock: &Mutex[Vec[Item]]) -> Result[Unit, AppError]:
             validate(item)?              // propagates to process_all
     // implicit Ok(())
 
-fn process_until_done(lock: &Mutex[Vec[Item]]):
+fn process_until_done(lock: &Mutex[List[Item]]):
     'outer for i in 0..10:
         with lock.lock() as items:
             if items[i].is_terminal():

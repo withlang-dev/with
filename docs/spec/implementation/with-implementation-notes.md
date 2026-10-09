@@ -325,7 +325,7 @@ bindings per scope. It does not need fixpoint iteration because
 ephemerality is structural (determined by types, not by data flow).
 
 Rule 7 is permissive in local scope: containers that receive ephemeral
-elements (for example `Vec[TokenView]`) become ephemeral themselves,
+elements (for example `List[TokenView]`) become ephemeral themselves,
 but are still usable as locals. Reject only when they escape via
 storage, return, or thread transfer.
 
@@ -1645,7 +1645,7 @@ working, testable subset:
 | `std.io` | Reader, Writer, print/println | `stdio.h` (fread, fwrite) |
 | `std.fs` | File, read_file, write_file | `fcntl.h`, `unistd.h`, `dirent.h` |
 | `std.string` | String methods, StrView methods | `string.h`, `ctype.h` |
-| `std.collections` | Vec, HashMap, HashSet | none (pure With) |
+| `std.collections` | List, HashMap, HashSet | none (pure With) |
 
 After Phase 3a, users can write real programs that read files,
 process strings, use collections, and print output — without ever
@@ -1683,7 +1683,7 @@ Phase 4 (fiber runtime, async/await, std.net) builds on top of 3c.
 
 Some modules are pure With code with no C dependency:
 
-- `std.collections` (Vec, HashMap, HashSet, SlotMap, BTreeMap)
+- `std.collections` (List, HashMap, HashSet, SlotMap, BTreeMap)
 - `std.hash`
 - Option/Result combinator methods
 
@@ -1704,8 +1704,8 @@ natural:
 | `File` | `Scoped` | `with File.open(path)? as f:` |
 | `Mutex[T]` | `ScopedMut` | `with mutex.lock() as mut data:` |
 | `RwLock[T]` | `Scoped` / `ScopedMut` | `with rwlock.read() as data:` |
-| `Vec[T]` | `Iter[T]` | `for x in vec:` |
-| `Vec[T]` | `Index[usize, T]` | `vec[i]` |
+| `List[T]` | `Iter[T]` | `for x in vec:` |
+| `List[T]` | `Index[usize, T]` | `vec[i]` |
 | `HashMap[K,V]` | `Index[K, V]` | `map[key]` |
 | `String` | `Iter[char]` | `for ch in string:` |
 | `Result[T,E]` | `Try[T, E]` | `result?` |
@@ -2576,7 +2576,7 @@ variable being dropped:
 
 ```
 fn example():
-    var v: Vec[&i32] = Vec.new()
+    var v: List[&i32] = List.new()
     var x = 5
     v.push(&x)
     // End of scope: x drops first (no Drop impl), then v drops.
@@ -3110,8 +3110,8 @@ fn ci_mangle_collision(name: str, counts: HashMap[str, i32]) -> str:
 ### 54.1 Problem
 
 The compiler passes heap-owning aggregate types (AstPool, Sema) by
-value, creating shallow copies that alias Vec backing stores. If any
-copy mutates a Vec past its capacity, `realloc` moves the buffer and
+value, creating shallow copies that alias List backing stores. If any
+copy mutates a List past its capacity, `realloc` moves the buffer and
 all other copies retain dangling pointers.
 
 ### 54.2 Solution
@@ -3129,8 +3129,8 @@ Sema type tables are immutable after type-checking:
    diagnostic if called after freeze.
 
 3. **Pre-registration:** `Sema.preregister_mir_types()` creates all
-   generic instantiation types that MirLower needs (VecIter[T] for
-   every Vec[T], Vec[str] for str.split()) BEFORE freezing. MirLower
+   generic instantiation types that MirLower needs (ListIter[T] for
+   every List[T], List[str] for str.split()) BEFORE freezing. MirLower
    then uses read-only lookups (`find_generic_inst`, `find_range_type`)
    instead of mutating the type tables.
 
@@ -3218,7 +3218,7 @@ PoolAllocator) use empty bodies and rely on transitive field glue — an
 explicit `self.field.drop()` in a drop body would double-free, because
 the field glue also visits the field (a body must CONSUME a field to
 take over its cleanup, per `drop_consumed_field`). Residual POD
-`Vec` backings intentionally leak under the narrow drop gate (#608,
+`List` backings intentionally leak under the narrow drop gate (#608,
 da_pod_vec) until the wide flip is scheduled.
 
 ## 56. Containers of Ephemerals: Viral-Escape, Not a Ban (spec §5.1, §5.2)
@@ -3235,7 +3235,7 @@ control the escape, not the container.
 
 **Why not the blanket ban.** The first implementation banned an ephemeral
 element type at every annotation/push/literal. It broke the stdlib's own
-`parallel(workspaces: Vec[Workspace])` — the only container-of-ephemeral
+`parallel(workspaces: List[Workspace])` — the only container-of-ephemeral
 in the whole stdlib — even though `Workspace{token: str, id: i32}` is
 all-owned and memory-safe to batch. And it could not distinguish a
 dangling `StrView{ptr: *const u8, …}` from a safe `Workspace`: both are
@@ -3248,7 +3248,7 @@ view-origin* — exactly what borrow-origin tracking already computes.
 - **Stores propagate origins.** At the `method_arg_stores_value` site
   (SemaCheck.w), `v.push(elem)` / `m.insert(k, elem)` on a local unions
   the element's view-origins onto the container binding via
-  `add_binding_view_deps` (Sema.w). `Vec.new()` receivers that are
+  `add_binding_view_deps` (Sema.w). `List.new()` receivers that are
   element-erased (not a full `GENERIC_INST`) are recognized by extending
   the base-symbol extraction in `method_arg_stores_value` to bare
   container structs.
@@ -3267,8 +3267,8 @@ view-origin* — exactly what borrow-origin tracking already computes.
   existing #600 heap-boxing gate (`check_ephemeral_task_arg_escape`)
   fires on `Box.new(View{…})`.
 
-A container that borrows only owned or parameter values (`Vec[Workspace]`,
-`fn f(src: &i32) -> Vec[View]: … v.push(View{p: src}); v`) carries no
+A container that borrows only owned or parameter values (`List[Workspace]`,
+`fn f(src: &i32) -> List[View]: … v.push(View{p: src}); v`) carries no
 stack-local origin and is unrestricted; one that borrows a stack local it
 would outlive is a compile error ("returned ephemeral value may outlive
 its origin 'x'").
@@ -3289,7 +3289,7 @@ its origin 'x'").
 
 **Mission alignment.** "Exactly as safe as Rust" is a *bar*, and here we
 meet it with Rust's *own* model — while the app developer writes no
-lifetime and a memory-safe batch of owned handles (`Vec[Workspace]`) is
+lifetime and a memory-safe batch of owned handles (`List[Workspace]`) is
 never rejected. Banning safe code would be "ceremony for something that
 doesn't matter," which the mission forbids; Vale, the design compass,
 points the same way.
@@ -3340,17 +3340,17 @@ newtype slot, not the wrapped pointer).
 Option (`.None`) / Result (`.Ok(default)`) and fell to `CK_UNIT` (a zeroed
 struct) for everything else. For `HashMap`/`HashSet` that zeroed struct has
 null buckets and SEGFAULTs on the first use of the defaulted value (§4.10
-promises a usable default). A zeroed `Vec` happens to work (push grows from
+promises a usable default). A zeroed `List` happens to work (push grows from
 null/0-cap) but has `elem_size = 0`, so it is not byte-identical to
-`Vec.new()`.
+`List.new()`.
 
 Fix: for a `HashMap`/`HashSet` generic-inst default, emit `MAP_NEW`
-(`emit_map_new_into` — both map and set lower `new` to `MAP_NEW`); for `Vec`,
+(`emit_map_new_into` — both map and set lower `new` to `MAP_NEW`); for `List`,
 emit `VEC_NEW` (`emit_vec_new_into`). The implicit default now equals `.new()`.
 `str`/`int`/`float`/`bool`/`ptr` keep the zeroed default — it is their
 canonical value (empty `str` is `{null, 0}`, verified usable; there is no
 `str.new()` to match). Audited against `type_has_default_value`
-(SemaCheck.w): every generic-inst it blesses (Option/Result/Vec/HashMap/
+(SemaCheck.w): every generic-inst it blesses (Option/Result/List/HashMap/
 HashSet) now produces a valid value.
 
 References: Go zero values (spirit adopted — a default must be fully usable;

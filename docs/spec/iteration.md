@@ -33,7 +33,7 @@ ephemerality, preventing the caller from knowing the restriction.
 
 ```
 // 1. Collect into owned container (small allocation cost)
-fn find_matches(text: &String, pat: &str) -> Vec[String]:
+fn find_matches(text: &String, pat: &str) -> List[String]:
     text.split(pat) |> map(s => s.to_string()) |> collect()
 
 // 2. Generator (lazy, zero-copy, no allocation; the caller's `for`
@@ -46,7 +46,7 @@ gen fn find_matches(text: &String, pat: &str) -> StrView:
 let results = text.split(pat)
     |> filter(s => s.len() > 0)
     |> map(s => s.to_string())
-    |> collect[Vec]()
+    |> collect[List]()
 ```
 
 This trade-off is fundamental to With's design. Rust allows returning
@@ -69,8 +69,8 @@ unambiguous type inference — the compiler knows exactly what type
 `x` is without annotation:
 
 ```
-// OK: Vec[i32]'s iterator yields &i32
-for x in my_vec:
+// OK: List[i32]'s iterator yields &i32
+for x in my_list:
     print(x)           // x: &i32, unambiguous
 
 // ERROR: conflicting Iter implementations
@@ -89,7 +89,7 @@ iterator-returning method: it declares that the returned iterator
 borrows the *receiver* (the underlying collection), not the iterator
 struct itself. The registered borrow on the receiver is shared, lives
 as long as the iterator, and is the origin of any references the
-iterator's `next()` yields. The stdlib applies it to `Vec.iter()`,
+iterator's `next()` yields. The stdlib applies it to `List.iter()`,
 `HashMap.iter()`, and the other collection iterators; any library may
 apply it to its own iterator constructors (tensor views, ECS queries,
 dataset readers). Future versions may infer this property from the
@@ -128,7 +128,7 @@ gen fn fibonacci -> i64:
         a = b
         b = next
 
-let first_10 = fibonacci() |> take(10) |> collect[Vec]()
+let first_10 = fibonacci() |> take(10) |> collect[List]()
 
 gen fn upto(count: i32) -> i32:
     for i in 0..count:
@@ -182,7 +182,7 @@ frame is live, so the view is valid for that run of the body and is not
 retained past it (§21.1); keeping an element is spelled `.clone()`.
 
 ```
-gen fn nonempty(lines: &Vec[str]) -> &str:
+gen fn nonempty(lines: &List[str]) -> &str:
     for line in lines:
         if line.len() > 0:
             yield line                    // a view into the argument
@@ -256,13 +256,13 @@ automatically:
 
 ```
 // These are equivalent:
-for item in my_vec:           // compiler inserts .iter()
-for item in my_vec.iter():    // explicit (also valid)
+for item in my_list:           // compiler inserts .iter()
+for item in my_list.iter():    // explicit (also valid)
 
 // For place-based or consuming iteration, be explicit:
-for item in my_vec.iter_place():  // yields VecSlot handles for in-place mutation
-for item in my_vec.iter_ref():    // yields &T references (zero-copy)
-for item in my_vec.into_iter():   // consuming (moves elements)
+for item in my_list.iter_place():  // yields ListSlot handles for in-place mutation
+for item in my_list.iter_ref():    // yields &T references (zero-copy)
+for item in my_list.into_iter():   // consuming (moves elements)
 ```
 
 `for pattern in expr: body` desugars to calling `next()` in a loop.
@@ -790,17 +790,17 @@ collection** (the Scala lesson: don't invent a syntax per container).
 The element form builds sequences and sets; the `key: value` form
 builds maps. The target is selected by expected type — the same
 inference rule as enum variant shorthand (§4.4) and numeric literals
-(§4.2.1) — with `Vec` and `HashMap` as the defaults:
+(§4.2.1) — with `List` and `HashMap` as the defaults:
 
 ```
 let squares = [x * x for x in 0..10]
-// Vec[i32]: [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+// List[i32]: [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
 
 let evens = [x for x in 0..100 if x % 2 == 0]
-// Vec[i32]: [0, 2, 4, ..., 98]
+// List[i32]: [0, 2, 4, ..., 98]
 
 let coords = [(x, y) for x in 0..3 for y in 0..3 if x != y]
-// Vec[(i32, i32)]: [(0,1), (0,2), (1,0), (1,2), (2,0), (2,1)]
+// List[(i32, i32)]: [(0,1), (0,2), (1,0), (1,2), (2,0), (2,1)]
 
 // Expected type selects the target collection:
 let words: HashSet[str] = [w.clone() for w in tokens]
@@ -821,7 +821,7 @@ cloned explicitly (D45).
 [expr for x in iter if cond]
 // →
 iter |> filter(x => cond) |> map(x => expr) |> collect[C]()
-// where C is the expected collection type, defaulting to Vec
+// where C is the expected collection type, defaulting to List
 
 [k_expr: v_expr for x in iter if cond]
 // →

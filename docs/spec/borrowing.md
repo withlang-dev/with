@@ -65,10 +65,10 @@ consumes the ephemeral value (by copying data out, converting to
 owned, etc.) rather than returning it.
 
 ```
-fn first(xs: &Vec[i32]) -> Option[&i32]:
+fn first(xs: &List[i32]) -> Option[&i32]:
     if xs.is_empty(): None else: Some(&xs[0])
 
-fn caller(xs: &Vec[i32]):
+fn caller(xs: &List[i32]):
     let r = first(xs)        // OK: ephemeral local binding
     match r:
         Some(v) => print(v) // OK: local use

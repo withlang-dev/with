@@ -63,7 +63,7 @@ At every program point, the following must hold:
    prevents use-after-free in cases like:
 
    ```
-   var v: Vec[&i32] = Vec.new()
+   var v: List[&i32] = List.new()
    var x = 5
    v.push(&x)
    // End of scope: x drops first, then v drops.

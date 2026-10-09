@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D118 — The growable sequence is `List[T]`; `Vec` names no type and stays unbound; STC's linked list is `LinkedList`](2026-10-09-D118-vec-is-renamed-list.md)
 - [D117 — `first()`, `last()`, `rest()` are the expression forms of `[first, ..rest]`; one method name may have an observing and an owned form, selected by the receiver's syntax](2026-10-09-D117-first-last-rest-and-receiver-mode-selection.md)
 - [D116 — `++` concatenates sequences and observes its operands (the buffer is reused at last use); `++=` extends in place; `+` stays off `Vec`](2026-10-09-D116-concatenation-observes-its-operands.md)
 - [D115 — A slice pattern's `rest` names the remaining elements; an owned subject is taken apart by value, a place is observed (supersedes the "remaining count" clause); Amendment 1: an owned Vec remainder shares the buffer, O(1), and the offset replaces `elem_size`](2026-10-09-D115-rest-binding-follows-subject-ownership.md)
