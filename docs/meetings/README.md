@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D121 — `with get` builds a package's facade from evidence, strongest first (proof from the library's source, shipped annotations, a shared per-package registry, adopted profiles); users never write facades for packages](2026-10-09-D121-with-get-builds-the-facade-from-evidence.md)
 - [D120 — Collections and structs of values are values (copy-on-write, atomic count); a Drop impl, a resource field or `resource type` makes a resource; merges within 2% on self-host and corpus suites](2026-10-09-D120-collections-and-structs-of-values-are-values.md)
 - [D119 — A C local or table array becomes a `List`; a struct or union field stays `[T; N]`; the no-heap lowering of a never-grown literal is guaranteed; Amendment 1: `[T; 2, 3]` writes dimensions in index order](2026-10-09-D119-c-arrays-become-lists-fields-stay-fixed.md)
 - [D118 — The growable sequence is `List[T]`; `Vec` names no type and stays unbound; STC's linked list is `LinkedList`](2026-10-09-D118-vec-is-renamed-list.md)
