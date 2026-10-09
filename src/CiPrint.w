@@ -494,9 +494,7 @@ pub fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
     if kind == CiTypeKind.CT_ARRAY:
         let elem = (types.get_d0(id)) as CiTypeId
         let size = types.get_d1(id)
-        if size == CI_SIZE_INCOMPLETE:
-            return "[]" ++ ci_print_type(types, elem)
-        return "[" ++ i32_to_string(size) ++ "]" ++ ci_print_type(types, elem)
+        return ci_array_text(ci_print_type(types, elem), if size == CI_SIZE_INCOMPLETE: "" else: i32_to_string(size))
     if kind == CiTypeKind.CT_STRUCT:
         return with_str_clone_ref(types.get_string(types.get_d0(id)))
     if kind == CiTypeKind.CT_ENUM:
@@ -625,12 +623,9 @@ fn ci_print_sizeof_type_text(text: &str) -> str:
         return "usize"
     if ci_starts_with_str(text, "*"):
         return "usize"
-    if text.len() > 0 and text[0] == 91:
-        var i = 1
-        while i < text.len() as i32 and text[i] != 93:
-            i = i + 1
-        if i < text.len() as i32:
-            return text.slice(0, (i + 1) as i64) ++ ci_print_sizeof_type_text(text.slice((i + 1) as i64, text.len()))
+    let elem = ci_array_text_elem(text)
+    if elem.len() > 0:
+        return ci_array_text(ci_print_sizeof_type_text(elem), ci_array_text_count(text))
     with_str_clone_ref(text)
 
 fn i32_to_string(n: i32) -> str:
@@ -850,13 +845,17 @@ pub fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_
         let start = exprs.get_d0(id)
         let count = exprs.get_d1(id)
         let ty_id = exprs.get_type(id)
+        // D119: an array's elements are typed by the array; a literal that
+        // C converted to the element type is the literal.
+        let array_elem_text = if (ty_id as i32) != 0 and types.kind(ty_id) == CiTypeKind.CT_ARRAY: ci_print_type(types, (types.get_d0(ty_id)) as CiTypeId) else: ""
         var items = ""
         var i: i32 = 0
         while i < count:
             if i > 0:
                 items = items ++ ", "
             let item = (exprs.get_extra(start + i)) as CiExprId
-            items = items ++ ci_print_expr(exprs, types, item, 0, 0)
+            let literal = ci_print_array_item_literal(exprs, types, item, array_elem_text)
+            items = items ++ (if literal.len() > 0: literal else: ci_print_expr(exprs, types, item, 0, 0))
             i = i + 1
         if (ty_id as i32) != 0 and types.kind(ty_id) == CiTypeKind.CT_ARRAY:
             // C zero-fills the elements an initializer leaves out. A lone
@@ -1287,7 +1286,7 @@ fn ci_roundtrip_types -> i32:
     fails = fails + ci_expect_eq("ty_int_8_unsigned", ci_print_type(types, u8_ty), "u8")
     fails = fails + ci_expect_eq("ty_bool", ci_print_type(types, bool_ty), "bool")
     fails = fails + ci_expect_eq("ty_ptr_mut_i32", ci_print_type(types, ptr_i32), "*mut i32")
-    fails = fails + ci_expect_eq("ty_array_10_i32", ci_print_type(types, arr_10_i32), "[10]i32")
+    fails = fails + ci_expect_eq("ty_array_10_i32", ci_print_type(types, arr_10_i32), "[i32; 10]")
     fails = fails + ci_expect_eq("ty_array_open_u8", ci_print_type(types, arr_open_u8), "[]u8")
     fails
 
@@ -1379,26 +1378,53 @@ pub fn ci_ir_roundtrip_test -> i32:
 
 let _ci_print_eof_guard = 0
 
-// `[16]u8` → 16 (0 when the text is not `[N]T` with a positive N).
+// D119: the bare text of an array initializer item that is a decimal integer
+// literal C converted to the element type, when the element type holds it
+// on every target; "" otherwise (the item keeps its cast).
+fn ci_print_array_item_literal(exprs: CiExprPool, types: CiTypePool, item: CiExprId, elem_text: &str) -> str:
+    if elem_text.len() == 0 or exprs.kind(item) != CiExprKind.CIE_CAST:
+        return ""
+    if ci_print_type(types, (exprs.get_d0(item)) as CiTypeId) != elem_text:
+        return ""
+    let operand = (exprs.get_d1(item)) as CiExprId
+    if exprs.kind(operand) != CiExprKind.CIE_INT_LIT:
+        return ""
+    let text = exprs.get_string(exprs.get_d0(operand))
+    let max = ci_print_int_type_max(elem_text)
+    if text.len() == 0 or max.len() == 0:
+        return ""
+    for k in 0..text.len():
+        if text[k] < '0' or text[k] > '9':
+            return ""
+    let fits = text.len() < max.len() or (text.len() == max.len() and text <= max)
+    if fits: with_str_clone_ref(text) else: ""
+
+// The largest value an integer type holds on every target, as decimal text;
+// "" for anything else. The target-width types (c_long, c_ulong, usize,
+// isize) answer their 32-bit range.
+fn ci_print_int_type_max(ty: &str) -> str:
+    if ty == "u8" or ty == "c_uchar": "255"
+    else if ty == "i8" or ty == "c_schar" or ty == "c_char": "127"
+    else if ty == "u16" or ty == "c_ushort": "65535"
+    else if ty == "i16" or ty == "c_short": "32767"
+    else if ty == "u32" or ty == "c_uint" or ty == "c_ulong" or ty == "usize": "4294967295"
+    else if ty == "i32" or ty == "c_int" or ty == "c_long" or ty == "isize": "2147483647"
+    else if ty == "u64" or ty == "c_ulonglong": "18446744073709551615"
+    else if ty == "i64" or ty == "c_longlong": "9223372036854775807"
+    else: ""
+
+// `[u8; 16]` → 16 (0 when the text is not an array with a literal positive
+// count).
 fn ci_print_array_len_from_text(ty: &str) -> i32:
-    if ty.len() < 3 or ty[0] != '[':
+    let count = ci_array_text_count(ty)
+    if count.len() == 0:
         return 0
     var n = 0
-    var i = 1
-    while i < ty.len() as i32 and ty[i] != ']':
-        if ty[i] < '0' or ty[i] > '9':
+    for i in 0..count.len():
+        if count[i] < '0' or count[i] > '9':
             return 0
-        n = n * 10 + (ty[i] - '0')
-        i = i + 1
-    if i >= ty.len() as i32:
-        return 0
+        n = n * 10 + (count[i] - '0') as i32
     n
 
-// `[16]u8` → `u8` ("" when the text is not `[N]T`).
-fn ci_print_array_elem_from_text(ty: &str) -> str:
-    var i = 1
-    while i < ty.len() as i32 and ty[i] != ']':
-        i = i + 1
-    if i + 1 >= ty.len() as i32:
-        return ""
-    ty.slice((i + 1) as i64, ty.len())
+// `[u8; 16]` → `u8` ("" when the text is not an array).
+fn ci_print_array_elem_from_text(ty: &str): ci_array_text_elem(ty)

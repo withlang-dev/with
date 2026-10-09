@@ -41,6 +41,49 @@ pub fn ci_ir_owned_text(text: &str) -> str:
         return ""
     with_str_clone_ref(text)
 
+// D119: a fixed array's type text is `[T; N]`, nested `[[T; 4]; 8]`; the
+// `[N]T` form it had before is still read, and `[]T` is a slice. The one
+// parser of that text: the index of the top-level `;` (-1 for the old form
+// and a slice) and of the `]` that closes the count, or -1 when `ty` is not
+// an array.
+fn ci_array_text_split(ty: &str) -> (i64, i64):
+    if ty.len() < 3 or ty[0] != '[':
+        return (-1, -1)
+    var depth = 0
+    var i: i64 = 1
+    while i < ty.len():
+        let c = ty[i]
+        if c == '[' or c == '(':
+            depth += 1
+        else if c == ']' or c == ')':
+            if depth == 0:
+                return (-1, i)
+            depth -= 1
+        else if c == ';' and depth == 0:
+            var close = ty.len() - 1
+            while close > i and ty[close] != ']': close -= 1
+            return (i, close)
+        i += 1
+    (-1, -1)
+
+/// The element type text of an array type text, "" when it is not one.
+pub fn ci_array_text_elem(ty: &str) -> str:
+    let (semi, close) = ci_array_text_split(ty)
+    if semi > 0: ty.slice(1, semi).trim()
+    else if close > 0: ty.slice(close + 1, ty.len()).trim()
+    else: ""
+
+/// The count text of an array type text, "" for a slice or a non-array.
+pub fn ci_array_text_count(ty: &str) -> str:
+    let (semi, close) = ci_array_text_split(ty)
+    if semi > 0: ty.slice(semi + 1, close).trim()
+    else if close > 0: ty.slice(1, close).trim()
+    else: ""
+
+/// `[elem; count]`, or `[]elem` for a slice (no count).
+pub fn ci_array_text(elem: &str, count: &str) -> str:
+    if count.len() == 0: "[]" ++ elem else: "[" ++ elem ++ "; " ++ count ++ "]"
+
 fn ci_ir_free_list_i32(v: &List[i32]): with_vec_free(v as *const List[i32] as *mut u8)
 
 fn ci_ir_free_list_str(v: &List[str]): with_vec_free(v as *const List[str] as *mut u8)

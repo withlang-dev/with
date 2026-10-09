@@ -1116,10 +1116,12 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             return elem_str
         var buf: [2048]u8 = [0 as u8; 2048]
         var pos: i64 = 0
+        // D119: `[T; N]`.
         buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "[\0" as *const u8)
+        buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, elem_str as *const u8)
+        buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "; \0" as *const u8)
         buf_append_i64(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, size)
         buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "]\0" as *const u8)
-        buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, elem_str as *const u8)
         return session_strdup(s, &buf as *const [2048]u8 as *const u8)
 
     if kind == CXType_IncompleteArray:

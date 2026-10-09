@@ -2433,7 +2433,7 @@ fn ci_migrate_var_owner_type(session: i64, idx: i32) -> str:
     var actual_type = with_cimport_var_storage_type_translated(session, idx)
     if actual_type.len() == 0:
         return ci_unsafe_fn_ptr_type(with_cimport_var_type_translated(session, idx))
-    if ci_starts_with(actual_type, "[0]"):
+    if ci_array_text_count(actual_type) == "0":
         let cursor = with_cimport_decl_cursor(session, idx)
         if cursor >= 0:
             let init_cursor = with_ci_var_initializer(session, cursor)

@@ -1545,10 +1545,8 @@ pub fn ci_unsafe_fn_ptr_type(t: &str) -> str:
     // an array of function pointers by its element (the declared type and
     // the call through an element must agree on `unsafe`).
     if ci_starts_with(t, "Option[") and t.ends_with("]"): return "Option[" ++ ci_unsafe_fn_ptr_type(t.slice(7, t.len() - 1)) ++ "]"
-    if t.len() > 2 and t[0] == '[':
-        var close = 1
-        while close < t.len() as i32 and t[close] != ']': close = close + 1
-        if close < t.len() as i32: return t.slice(0, close + 1) ++ ci_unsafe_fn_ptr_type(t.slice(close + 1, t.len()))
+    let array_elem = ci_array_text_elem(t)
+    if array_elem.len() > 0: return ci_array_text(ci_unsafe_fn_ptr_type(array_elem), ci_array_text_count(t))
     var normalized = with_str_clone_ref(t)
     if (ci_starts_with(normalized, "unsafe extern \"C\" fn(") or ci_starts_with(normalized, "extern \"C\" fn(") or ci_starts_with(normalized, "fn(")) and normalized.ends_with("-> void"):
         normalized = normalized.slice(0, normalized.len() - 4) ++ "Unit"
@@ -1579,16 +1577,10 @@ fn ci_field_type_is_demoted(ftype: &str, demoted: &str) -> bool:
     // Direct embedding: field type exactly matches a demoted name
     if ci_str_contains(demoted, "|" ++ ftype ++ "|"):
         return true
-    // Array of demoted type: [N]DemotedName
-    if ftype[0] == 91:
-        var i = 1
-        while i < ftype.len() as i32:
-            if ftype[i] == 93:
-                let elem = ftype.slice(i as i64 + 1, ftype.len())
-                if ci_str_contains(demoted, "|" ++ elem ++ "|"):
-                    return true
-                break
-            i = i + 1
+    // Array of demoted type: [DemotedName; N]
+    let elem = ci_array_text_elem(ftype)
+    if elem.len() > 0 and ci_str_contains(demoted, "|" ++ elem ++ "|"):
+        return true
     // Pointer to demoted type is OK — pointers have fixed size
     false
 
@@ -2555,12 +2547,12 @@ pub fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs
             field_str = field_str ++ ci_build_one_field(session, idx, fi, known_structs)
         fi = fi + 1
 
-    // Detect flexible array member: last field is [0]T or [1]T (strict-flex-arrays=1)
+    // Detect flexible array member: last field is [T; 0] or [T; 1] (strict-flex-arrays=1)
     var flex_accessor = ""
     if field_count > 0 and not is_union:
         let last_ftype = with_cimport_struct_field_type_translated(session, idx, field_count - 1)
-        if ci_starts_with(last_ftype, "[0]") or ci_starts_with(last_ftype, "[1]"):
-            let elem_type = last_ftype.slice(3, last_ftype.len())
+        if ci_array_is_flexible(last_ftype):
+            let elem_type = ci_array_text_elem(last_ftype)
             let last_fname = with_cimport_struct_field_name(session, idx, field_count - 1)
             let accessor_name = if last_fname.len() > 0: last_fname else: "data"
             // Rename the field to _name in field_str by replacing the last occurrence
@@ -2791,15 +2783,11 @@ pub fn ci_default_for_type(ty: &str) -> str:
     // But NOT struct types — those need struct-literal defaults, not integer 0.
     // Check: if the type resolves to a primitive int alias, use 0.
     // Otherwise leave empty (no default) for struct/union/opaque types.
-    // Array types [N]T → emit [0 as T; N]
+    // Array types [T; N] → emit [0 as T; N]
     if ty.len() > 0 and ty[0] == 91:
-        // Parse [N]T to get element type and count
-        var close = 1
-        while close as i64 < ty.len() and ty[close] != 93:
-            close = close + 1
-        if close as i64 < ty.len():
-            let count = ty.slice(1, close as i64)
-            let elem = ty.slice((close + 1) as i64, ty.len())
+        let elem = ci_array_text_elem(ty)
+        let count = ci_array_text_count(ty)
+        if elem.len() > 0 and count.len() > 0:
             let elem_default = ci_default_for_type(elem)
             if elem_default.len() > 0:
                 return "[" ++ elem_default ++ " as " ++ elem ++ "; " ++ count ++ "]"
@@ -2919,10 +2907,10 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: &str) -> str:
     let safe_name = ci_escape_reserved(name)
     with_cimport_mark_name_emitted(name)
 
-    // Convert incomplete arrays ([0]T) to pointer types
+    // Convert incomplete arrays ([T; 0]) to pointer types
     var actual_type = with_str_clone_ref(var_type)
-    if ci_starts_with(var_type, "[0]"):
-        actual_type = "*mut " ++ var_type.slice(3, var_type.len())
+    if ci_array_text_count(var_type) == "0":
+        actual_type = "*mut " ++ ci_array_text_elem(var_type)
 
     let tl_attr = if is_threadlocal != 0: "@[threadlocal]\n" else: ""
 
@@ -3206,12 +3194,18 @@ fn ci_offsetof_text_args(expr: &str) -> List[str]:
     out
 
 // The name c_import gives field `fi` of `count` (typed `ty`): a trailing
-// `[0]T` or `[1]T` array in a struct is the flexible array member, renamed
-// `_name` beside its accessor method (ci_build_struct).
+// `[T; 0]` or `[T; 1]` array in a struct is the flexible array member,
+// renamed `_name` beside its accessor method (ci_build_struct).
 fn ci_offsetof_field_emitted_name(field: &str, ty: &str, fi: i32, count: i32, is_union: bool) -> str:
-    if not is_union and fi == count - 1 and (ci_starts_with(ty, "[0]") or ci_starts_with(ty, "[1]")):
+    if not is_union and fi == count - 1 and ci_array_is_flexible(ty):
         return "_" ++ ci_escape_reserved(field)
     ci_escape_reserved(field)
+
+// A trailing `[T; 0]` or `[T; 1]` (strict-flex-arrays=1): the C flexible
+// array member idiom.
+fn ci_array_is_flexible(ty: &str) -> bool:
+    let count = ci_array_text_count(ty)
+    count == "0" or count == "1"
 
 // Field `field` of the record `record` names (a tag, or a typedef of one
 // resolved through typedefs, or a typedef of an anonymous record), as
@@ -5126,9 +5120,6 @@ fn ci_has_stringify(body: &str, params: &str) -> bool:
         i = i + 1
     false
 
-// Parse [N]T and return the byte offset of T (after the ']').
-// Returns 0 if not an array type.
-// Check if a string is a decimal integer > 2147483647 (i32 max)
 // Returns true if `ty_str` denotes a small integer type (u8/u16/i8/i16,
 // or the C-typedef forms c_uchar/c_schar/c_ushort/c_short). C integer
 // promotion rules promote these to `int` before arithmetic and
@@ -5331,15 +5322,6 @@ fn ci_is_decimal_literal(s: &str) -> bool:
         if c < 48 or c > 57: return false
         i = i + 1
     true
-
-fn ci_find_array_elem_start(ty: &str) -> i32:
-    if ty.len() == 0 or ty[0] != 91: return 0
-    var i = 1
-    while i as i64 < ty.len() and ty[i] != 93:
-        i = i + 1
-    if i as i64 < ty.len():
-        return i + 1  // skip past ']'
-    0
 
 pub fn ci_is_ident_start(c: i32) -> bool:
     (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95
@@ -5617,10 +5599,9 @@ fn ci_render_sizeof_type(c_type: &str) -> str:
     if t.len() == 0:
         return ""
     if t[0] == 91:
-        let close = ci_find_matching_bracket(t, 0)
-        if close > 0 and close < t.len() as i32 - 1:
-            let count = ci_trim(t.slice(1, close as i64))
-            let elem = ci_trim(t.slice(close as i64 + 1, t.len()))
+        let count = ci_array_text_count(t)
+        let elem = ci_array_text_elem(t)
+        if elem.len() > 0:
             let inner = ci_render_sizeof_type(elem)
             if count.len() > 0 and inner.len() > 0:
                 return "(" ++ count ++ " * " ++ inner ++ ")"
@@ -7765,7 +7746,7 @@ impl CiTypePool:
         // #1653: `[16]u8` is an array type, not a name — an initializer typed
         // by it prints as `[…]` and pads to the size (uuid.h's UUID_NULL).
         if ty.len() > 0 and ty[0] == '[':
-            let elem_text = ci_array_element_type(ty)
+            let elem_text = ci_array_elem_type(ty)
             let elem = self.type_from_translated_text(elem_text)
             if (elem as i32) != 0:
                 let size = ci_array_length_from_type(ty)
@@ -8212,7 +8193,7 @@ fn ci_record_zero_invalid_field(session: i64, ty_text: &str, ty: i32) -> str:
         let ftext = ci_init_list_record_field_type(session, ty_text, ty, fi)
         var elem = with_str_clone_ref(ftext)
         while ci_starts_with(elem, "[") and not ci_starts_with(elem, "[]"):
-            elem = ci_array_element_type(elem)
+            elem = ci_array_elem_type(elem)
         if ci_starts_with(elem, "&") or ci_starts_with(elem, "[]") or elem == "str" or (ci_type_text_is_fn_ptr(elem) and not ci_starts_with(elem, "Option[")):
             return fname ++ " (" ++ ftext ++ ")"
         let fcx = ci_init_list_record_field_cxtype(session, ty_text, ty, fi)
@@ -8590,7 +8571,7 @@ impl CiExprPool:
 
         if ty_str.len() > 0 and ty_str[0] == 91:
             let elem_cxtype = with_ci_type_array_element(session, init_ty)
-            let elem_ty_str = ci_array_element_type(ty_str)
+            let elem_ty_str = ci_array_elem_type(ty_str)
             let elem_field_count = ci_init_list_record_field_count(session, elem_ty_str, elem_cxtype)
             let elem_ty_id = if elem_cxtype >= 0: types.type_from_libclang(session, elem_cxtype) else: 0 as CiTypeId
             var item_ids: List[i32] = List.new()
@@ -8752,6 +8733,9 @@ impl CiExprPool:
             let glibc_ctype_mask_id = self.lower_glibc_ctype_mask_macro(session, cursor, types, scope)
             if (glibc_ctype_mask_id as i32) != 0:
                 return glibc_ctype_mask_id
+            let len_id = self.lower_array_length_ratio(session, cursor, types, scope)
+            if (len_id as i32) != 0:
+                return len_id
             let bin_id = self.lower_binary_simple(session, cursor, types, scope)
             if (bin_id as i32) != 0:
                 return bin_id
@@ -8935,6 +8919,46 @@ impl CiExprPool:
         ci_record_raw_expr_kind(kind)
         0 as CiExprId
 
+    // D119: `sizeof(t) / sizeof(x)` with x of t's element type (`t[0]`,
+    // `*t`, or the type itself) is t's length, `t.len()`, converted to the
+    // division's C type.
+    fn lower_array_length_ratio(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
+        if with_ci_num_children(session, cursor) < 2 or with_ci_binary_op(session, cursor) != BO_DIV:
+            return 0 as CiExprId
+        let lhs = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+        let rhs = ci_peel_transparent(session, with_ci_child(session, cursor, 1))
+        if not ci_cursor_is_sizeof(session, lhs) or not ci_cursor_is_sizeof(session, rhs) or with_ci_num_children(session, lhs) < 1:
+            return 0 as CiExprId
+        let array = ci_peel_transparent(session, with_ci_child(session, lhs, 0))
+        let array_ty = with_ci_type_translated(session, with_ci_cursor_type(session, array))
+        let elem = ci_array_text_elem(array_ty)
+        if elem.len() == 0 or ci_array_text_count(array_ty).len() == 0:
+            return 0 as CiExprId
+        // The divisor is the size of one element: its operand (an expression
+        // or a type reference) has the element type.
+        var divides_by_element = false
+        if with_ci_num_children(session, rhs) >= 1:
+            let probe = ci_peel_transparent(session, with_ci_child(session, rhs, 0))
+            divides_by_element = with_ci_type_translated(session, with_ci_cursor_type(session, probe)) == elem
+        else:
+            let src = ci_trim(with_ci_cursor_source_text(session, rhs))
+            let open = ci_find_substr(src, "(")
+            if open > 0:
+                let close = ci_find_matching_paren(src, open)
+                if close > open:
+                    divides_by_element = ci_map_sizeof_type(ci_trim(src.slice((open + 1) as i64, close as i64))) == elem
+        if not divides_by_element:
+            return 0 as CiExprId
+        let array_id = self.lower_expr_ir(session, array, types, scope)
+        if (array_id as i32) == 0:
+            return 0 as CiExprId
+        let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+        if (result_ty as i32) == 0:
+            return 0 as CiExprId
+        let method = self.add(CiExprKind.CIE_FIELD, array_id as i32, self.add_string("len"), 2, 0 as CiTypeId)
+        let len_call = self.add(CiExprKind.CIE_CALL, method as i32, self.extra_len() as i32, 0, 0 as CiTypeId)
+        self.cast(result_ty, len_call)
+
     fn lower_binary_simple(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
         let nc = with_ci_num_children(session, cursor)
         if nc < 2:
@@ -9101,18 +9125,21 @@ fn ci_array_elem_type_from_cursor(session: i64, cursor: i32) -> str:
             let translated = with_ci_type_translated(session, elem_ty)
             if translated.len() > 0:
                 return translated
-    // Fallback: parse the translated string form `[N]T` or `[]T`
+    // Fallback: parse the translated string form `[T; N]` or `[]T`
     // to recover `T`.
-    let arr_ty = with_ci_type_translated(session, ty)
-    let elem_start = ci_find_array_elem_start(arr_ty)
-    if elem_start > 0:
-        return arr_ty.slice(elem_start as i64, arr_ty.len())
-    ""
+    ci_array_text_elem(with_ci_type_translated(session, ty))
 
 // Peel through transparent wrappers (ImplicitCast, ParenExpr,
 // UnexposedExpr) to reach the semantically meaningful operand.
 // Used to detect array-to-pointer decay casts so the arithmetic
 // handler can re-apply the decay in the output.
+// A `sizeof` expression, read as the IR lowering of CXK_UNARY_EXPR reads it
+// (the operator from the source text, or from the spelling under a macro).
+fn ci_cursor_is_sizeof(session: i64, cursor: i32) -> bool:
+    if with_ci_cursor_kind(session, cursor) != CXK_UNARY_EXPR:
+        return false
+    ci_starts_with(with_ci_cursor_source_text(session, cursor), "sizeof") or ci_starts_with(with_ci_cursor_spelling_head(session, cursor), "sizeof")
+
 fn ci_peel_transparent(session: i64, cursor: i32) -> i32:
     var c = cursor
     var depth = 0
@@ -11585,6 +11612,9 @@ impl CiStmtPool:
             let glibc_ctype_mask_id = exprs.lower_glibc_ctype_mask_macro(session, cursor, types, scope)
             if (glibc_ctype_mask_id as i32) != 0:
                 return ci_value_ir_plain(glibc_ctype_mask_id)
+            let len_id = exprs.lower_array_length_ratio(session, cursor, types, scope)
+            if (len_id as i32) != 0:
+                return ci_value_ir_plain(len_id)
             let lhs_cursor = with_ci_child(session, cursor, 0)
             let rhs_cursor = with_ci_child(session, cursor, 1)
             let op = with_ci_binary_op(session, cursor)
@@ -13079,15 +13109,7 @@ fn ci_location_path(loc: &str) -> str:
         return with_str_clone_ref(loc)
     loc.slice(0, second_last as i64)
 
-pub fn ci_array_elem_type(ty: &str) -> str:
-    if ty.len() == 0 or ty[0] != 91:
-        return ""
-    var close = 1
-    while close as i64 < ty.len() and ty[close] != 93:
-        close = close + 1
-    if close as i64 >= ty.len():
-        return ""
-    ty.slice((close + 1) as i64, ty.len())
+pub fn ci_array_elem_type(ty: &str): ci_array_text_elem(ty)
 
 
 fn ci_try_eval_var_init(session: i64, idx: i32) -> str:
@@ -13132,7 +13154,7 @@ fn ci_option_fn_init_fixup(text: &str, ty: &str) -> str:
     if ci_nullable_fn_ptr_inner(ty).len() > 0:
         return ci_coerce_init_value_for_type(text, ty)
     if ty.len() > 0 and ty[0] == '[' and text.len() > 1 and text[0] == '[' and text.ends_with("]"):
-        let elem_ty = ci_array_element_type(ty)
+        let elem_ty = ci_array_elem_type(ty)
         if ci_nullable_fn_ptr_inner(elem_ty).len() == 0:
             return with_str_clone_ref(text)
         let items = ci_split_top_level_items(text.slice(1, text.len() - 1))
@@ -14807,7 +14829,7 @@ fn ci_hex_digit_value(c: i32) -> i32:
     0
 
 fn ci_render_string_literal_as_byte_array(value: &str, ty: &str) -> str:
-    let elem_ty = ci_array_element_type(ty)
+    let elem_ty = ci_array_elem_type(ty)
     if not ci_is_byte_array_element_type(elem_ty):
         return ""
     let target_len = ci_array_length_from_type(ty)
@@ -14904,7 +14926,7 @@ fn ci_render_string_literal_as_byte_array(value: &str, ty: &str) -> str:
     parts.join("")
 
 fn ci_is_byte_array_type(ty: &str) -> bool:
-    ty.len() > 0 and ty[0] == 91 and ci_is_byte_array_element_type(ci_array_element_type(ty))
+    ty.len() > 0 and ty[0] == 91 and ci_is_byte_array_element_type(ci_array_elem_type(ty))
 
 // #880: true when `s` contains a preprocessor `#define` OUTSIDE any string
 // literal — the signature of a cursor whose token/source text is a slice of
@@ -15695,21 +15717,8 @@ fn ci_extract_var_initializer_text(s: &str) -> str:
         end = end - 1
     ci_trim(text.slice((eq_pos + 1) as i64, end as i64))
 
-fn ci_array_element_type(ty: &str) -> str:
-    if ty.len() == 0 or ty[0] != 91:
-        return ""
-    let close = ci_find_substr(ty, "]")
-    if close < 0 or close as i64 + 1 >= ty.len():
-        return ""
-    ci_trim(ty.slice((close + 1) as i64, ty.len()))
-
 fn ci_array_length_from_type(ty: &str) -> i32:
-    if ty.len() == 0 or ty[0] != 91:
-        return -1
-    let close = ci_find_substr(ty, "]")
-    if close <= 1:
-        return -1
-    let len_text = ci_trim(ty.slice(1, close as i64))
+    let len_text = ci_array_text_count(ty)
     if len_text.len() == 0:
         return -1
     ci_parse_i64(len_text) as i32
@@ -15925,7 +15934,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
         return designated
 
     if ty.len() > 0 and ty[0] == 91:
-        let elem_ty = ci_array_element_type(ty)
+        let elem_ty = ci_array_elem_type(ty)
         if elem_ty.len() == 0:
             return ""
         let elem_cxtype = if cxtype >= 0: with_ci_type_array_element(session, cxtype) else: -1
