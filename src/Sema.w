@@ -1623,6 +1623,14 @@ pub type Sema {
     // binds a non-Copy value by value, or a Drop type is taken apart). Every
     // other by-value place subject is observed in place by MirLower.
     consuming_pattern_subjects: HashMap[i32, i32],
+    // D115 (§9.7): slice pattern nodes that take an owned subject apart by
+    // value; every other slice pattern observes its subject. The rest
+    // binding's type, keyed by the same node.
+    owned_slice_patterns: HashMap[i32, i32],
+    slice_rest_types: HashMap[i32, i32],
+    // The owned-Vec slice pattern of the pattern being checked that removes
+    // elements from its Vec, 0 when none (a match guard cannot follow one).
+    pattern_vec_removal: i32,
     // Regex literal metadata sidecars, keyed by NK_REGEX_LIT/NK_PAT_REGEX node.
     regex_capture_counts: HashMap[i32, i32],
     regex_capture_name_starts: HashMap[i32, i32],
@@ -3561,6 +3569,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         autoderef_step_tys: Vec.new(),
         pattern_value_syms: sema_new_map_i32_i32(),
         consuming_pattern_subjects: sema_new_map_i32_i32(),
+        owned_slice_patterns: sema_new_map_i32_i32(),
+        slice_rest_types: sema_new_map_i32_i32(),
+        pattern_vec_removal: 0,
         regex_capture_counts: sema_new_map_i32_i32(),
         regex_capture_name_starts: sema_new_map_i32_i32(),
         regex_capture_name_counts: sema_new_map_i32_i32(),

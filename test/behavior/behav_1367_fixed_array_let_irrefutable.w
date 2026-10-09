@@ -7,7 +7,7 @@
 
 // #1367 (§9.7): a slice pattern over a fixed-size array is decided at compile
 // time, so one that always matches is irrefutable: `let` needs no else. Rest
-// forms (a rest binds the remaining count), a nested array inside a tuple, a
+// forms (D115: a rest names the remaining elements), a nested array inside a tuple, a
 // struct field, `var`, and a parameter pattern. Brackets make a Vec (D113),
 // so each array here is demanded: by `sum3`'s parameter, an annotation, or a
 // field.
@@ -20,7 +20,7 @@ fn main:
     let [a, b, c] = arr
     print(f"{a} {b} {c}")
     let [first, ..mid, last] = arr
-    print(f"{first} {last} {mid}")
+    print(f"{first} {last} {mid.len()}")
     let pair: (i32, [i32; 2]) = (7, [8, 9])
     let (x, [y, z]) = pair
     print(f"{x} {y} {z}")
@@ -28,7 +28,7 @@ fn main:
     let Grid { row: [_, p, q] } = g
     print(f"{p} {q}")
     let four: [i32; 3] = [4, 5, 6]
-    var [m, ..] = four
+    var [m, ..] = move four
     m = m + 0
     let six: [i32; 3] = [0, 5, 6]
     let [_, n, o] = six

@@ -33,13 +33,13 @@ fn test_enum_pattern_filters:
     assert(qualified_sum == 13)
 
 fn test_slice_rest_pattern:
-    let rows: Vec[[i32; 3]] = [
+    let rows = [
         [1, 2, 3],
         [4, 5, 6],
     ]
     var total: i64 = 0
     for [first, ..rest] in rows:
-        total = total + first + rest
+        total = total + first + rest.len()
     assert(total == 9)
 
 fn test_refutable_range_pattern_skips:
