@@ -163,7 +163,7 @@ fn get_user(id: UserId) -> Result[User, DbError]:
 For `Result[Unit, E]`, ending the function normally returns `Ok(())`.
 
 ```with
-fn save_all(items: &Vec[Item]) -> Result[Unit, DbError]:
+fn save_all(items: &List[Item]) -> Result[Unit, DbError]:
     for item in items:
         db.insert(item)?
     // implicit Ok(())
@@ -237,7 +237,7 @@ Int  = i64
 UInt = u64
 ```
 
-Unsuffixed integer literals default to `isize` (the target's size width, D114); floats default to `f64`, unless context says otherwise. Brackets make a `Vec` (D113).
+Unsuffixed integer literals default to `isize` (the target's size width, D114); floats default to `f64`, unless context says otherwise. Brackets make a `List` (D113).
 
 ### Structs
 
@@ -346,7 +346,7 @@ Slices are ephemeral borrowed views.
 Values have one owner. Assignment moves by default.
 
 ```with
-let a = Vec.new()
+let a = List.new()
 let b = a
 // a is invalid after move
 ```
@@ -532,14 +532,14 @@ Ephemerality propagates:
 ```text
 &T is ephemeral
 Option[&T] is ephemeral
-Vec[&T] becomes an ephemeral Vec
+List[&T] becomes an ephemeral List
 Structs with ephemeral fields must be marked ephemeral
 ```
 
 A container containing ephemeral values may exist as a local ephemeral container, but it cannot escape.
 
 ```with
-let refs: Vec[&str] = collect_refs()
+let refs: List[&str] = collect_refs()
 process(refs)
 // OK only if refs remains local/ephemeral and does not escape
 ```
@@ -767,7 +767,7 @@ Pipelines:
 let names = users
     |> filter(it.active)
     |> map(it.name)
-    |> collect[Vec]()
+    |> collect[List]()
 ```
 
 `it` is an implicit single-argument closure parameter. Do not nest `it`; use explicit closure parameters inside nested closures.
@@ -1158,7 +1158,7 @@ If a container borrows an allocator, the container becomes ephemeral:
 
 ```with
 fn example(arena: &FrameArena):
-    var xs = Vec.new_in(arena)
+    var xs = List.new_in(arena)
     xs.push(1)
     // xs cannot escape
 ```
@@ -1217,7 +1217,7 @@ with world.entities.slot(entity) as mut e:
 let names = users
     |> filter(it.active)
     |> map(it.name)
-    |> collect[Vec]()
+    |> collect[List]()
 ```
 
 ### Error chain
@@ -1270,7 +1270,7 @@ or store offsets/handles.
 ### Do not write safe `&mut`
 
 ```with
-fn process(data: &mut Vec[i32])  // wrong With
+fn process(data: &mut List[i32])  // wrong With
 ```
 
 Use `mut self: Self`, `move self: Self`, `var`, `with ... as mut`, or place projections.
@@ -1460,7 +1460,7 @@ match token:
 let Some(user) = find_user(id) else return Err(.NotFound)
 
 // pipeline
-let active = users |> filter(it.active) |> collect[Vec]()
+let active = users |> filter(it.active) |> collect[List]()
 
 // f-string
 print(f"user={user.name} score={score:?}")

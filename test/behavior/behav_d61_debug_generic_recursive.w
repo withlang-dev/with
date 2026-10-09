@@ -15,8 +15,8 @@ enum Maybe[T]:
     Nothing
 type Cell[K, V] { key: K, values: Vec[V] }
 
-enum List:
-    Cons(i32, Box[List])
+enum Chain:
+    Cons(i32, Box[Chain])
     Nil
 
 type Node { label: str, left: Option[Box[Node]], right: Option[Box[Node]] }
@@ -48,9 +48,9 @@ fn main:
     let boxed_pair = Box.new(Pair { left: "l", right: "r" })
     check(f"{boxed_pair:?}", r#"Pair { left: "l", right: "r" }"#)
 
-    let list = List.Cons(1, Box.new(List.Cons(2, Box.new(List.Cons(3, Box.new(List.Nil))))))
+    let list = Chain.Cons(1, Box.new(Chain.Cons(2, Box.new(Chain.Cons(3, Box.new(Chain.Nil))))))
     check(f"{list:?}", "Cons(1, Cons(2, Cons(3, Nil)))")
-    check(f"{List.Nil:?}", "Nil")
+    check(f"{Chain.Nil:?}", "Nil")
 
     let tree = Node { label: "root", left: Some(Box.new(leaf("l"))), right: Some(Box.new(Node { label: "r", left: None, right: Some(Box.new(leaf("rr"))) })) }
     check(f"{tree:?}", r#"Node { label: "root", left: Some(Node { label: "l", left: None, right: None }), right: Some(Node { label: "r", left: None, right: Some(Node { label: "rr", left: None, right: None }) }) }"#)

@@ -23,8 +23,8 @@ enum Tree:
     Leaf(n: i64)
     Branch(kids: Vec[Tree])
 
-enum List:
-    Cons(v: i64, next: Option[Box[List]])
+enum Chain:
+    Cons(v: i64, next: Option[Box[Chain]])
     Nil
 
 enum Named:
@@ -44,7 +44,7 @@ fn tree_sum(t: &Tree) -> i64:
                 total = total + tree_sum(k)
             total
 
-fn list_sum(l: &List) -> i64:
+fn list_sum(l: &Chain) -> i64:
     match l:
         .Cons(v, next) =>
             match next:
@@ -61,7 +61,7 @@ fn main:
     kids.push(Tree.Leaf(1))
     kids.push(Tree.Leaf(2))
     print(tree_sum(Tree.Branch(kids)))
-    print(list_sum(List.Cons(4, Some(Box.new(List.Cons(5, None))))))
+    print(list_sum(Chain.Cons(4, Some(Box.new(Chain.Cons(5, None))))))
     let m: HashMap[str, Named] = HashMap.new()
     let named = Named.Many(m)
     match named:

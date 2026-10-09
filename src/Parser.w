@@ -508,10 +508,16 @@ impl Parser:
         self.emit_error("expected identifier")
         0
 
+    // D118 step (a), transitional: the identifier `List` interns as `Vec`, so
+    // the seed cut from this compiler accepts the new name everywhere the old
+    // one is special-cased. Step (c) makes `List` the type's own name and
+    // deletes this (#2296).
     fn intern_current() -> i32:
         let s = self.current_start()
         let e = self.current_end()
         let text = self.source.slice(s as i64, e as i64)
+        if text == "List":
+            return self.intern.intern("Vec")
         self.intern.intern(text)
 
     fn is_ident_named(name: &str) -> bool:
