@@ -18860,7 +18860,10 @@ impl Sema:
                     self.emit_argument_type_mismatch("Vec.literal", 0, arg_index, arg_index, elem_ty, actual_ty, elem_node)
 
     mut fn check_runtime_index_operand(index_node: i32) -> i32:
-        let index_ty = self.check_expr_with_expected(index_node, 0 as TypeId)
+        // An index is a value wherever its place stands, an assignment
+        // target included: `xs[if c: 1 else: 2] = v` typed the `if` as a
+        // statement (Unit).
+        let index_ty = self.check_expr_value_context(index_node)
         if index_ty == 0:
             return 0
         let index_unwrapped = self.unwrap_builtin_arg_distinct(index_ty)
@@ -18872,7 +18875,7 @@ impl Sema:
                 let _ = self.record_contextual_copy_adjustment(index_node, index_pointee, index_ty as i32)
                 numeric_index_ty = pointee_numeric
         if self.get_type_kind(numeric_index_ty) != TypeKind.TY_INT:
-            self.emit_error("index expression must be an integer", index_node)
+            self.emit_error(f"index expression must be an integer; this one is `{self.type_name(index_ty as i32)}`", index_node)
         return index_ty as i32
 
     mut fn check_index(node: i32) -> i32:
