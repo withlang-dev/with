@@ -2500,13 +2500,18 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
     let empty = complexity_allocation_count(trace, "empty")
     let control = complexity_allocation_count(trace, "control")
     let removal = complexity_allocation_count(trace, "hash-remove")
-    if empty != 0 or control <= 0 or removal < 0:
-        ctx.diagnostics().error(f"stdlib-complexity: invalid allocation trace empty={empty} control={control} removal={removal}\n" ++ trace)
+    let literal = complexity_allocation_count(trace, "list-literal")
+    if empty != 0 or control <= 0 or removal < 0 or literal < 0:
+        ctx.diagnostics().error(f"stdlib-complexity: invalid allocation trace empty={empty} control={control} removal={removal} literal={literal}\n" ++ trace)
+    // §4.3c (D119): the no-heap lowering of a literal that is never pushed,
+    // grown, moved out, stored or retained is guaranteed, not an optimization.
+    if literal != 0:
+        ctx.diagnostics().error(f"stdlib-complexity: 1000 calls over unmodified List literals allocated {literal} times; such a literal does not touch the heap (§4.3c, D119)\n" ++ trace)
     // #939, D96: a removal leaves a tombstone and moves no other entry, so
     // it allocates nothing.
     if removal != 0:
         ctx.diagnostics().error(f"stdlib-complexity: HashMap removal allocated {removal} times; it allocates nothing (#939, D96)\n" ++ trace)
-    let report = fs.read_text(timing_out) ++ f"PASS hash-remove-allocation allocations={removal}\n"
+    let report = fs.read_text(timing_out) ++ f"PASS hash-remove-allocation allocations={removal}\nPASS list-literal-allocation allocations={literal}\n"
     if fs.write_text(build_project_join(output, "report.txt"), report) != 0:
         ctx.diagnostics().error("stdlib-complexity: cannot write report")
     if fs.write_text(build_project_join(output, ".stamp"), "ok") != 0: return 1

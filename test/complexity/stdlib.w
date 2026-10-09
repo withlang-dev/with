@@ -253,7 +253,29 @@ fn measure(name: &str, work: &fn(i32) -> i32, n: i32, issue: i32):
         assert(not within_bound)
         print(f"XFAIL {name} #{issue}")
 
+// §4.3c (D119): a literal that is never pushed, grown, moved out, stored or
+// retained does not touch the heap.
+fn literal_sum():
+    let t = [1, 2, 3, 4]
+    t[0] + t[1] + t[2] + t[3]
+
+fn literal_ends(xs: &List[i32]): xs[0] + xs[xs.len() - 1]
+
+fn literal_names():
+    let names = ["ab", "cde"]
+    names[0].len() + names[1].len()
+
 fn allocations:
+    eprint("complexity: list-literal begin")
+    var literal_total: i64 = 0
+    for _ in 0..1000:
+        literal_total = literal_total + literal_sum() + literal_ends([5, 6, 7]) + literal_names()
+    eprint("complexity: list-literal end")
+    assert(literal_total == 1000 * (10 + 12 + 5))
+    // A literal that grows is an ordinary List.
+    var grown = [1, 2]
+    grown.push(3)
+    assert(grown.len() == 3 and grown[2] == 3)
     eprint("complexity: empty begin")
     eprint("complexity: empty end")
     eprint("complexity: control begin")
