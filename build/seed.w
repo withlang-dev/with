@@ -448,7 +448,7 @@ pub fn seed_lock_workflow_drift(fs: &ToolFs, lock: &str) -> List[str]:
             if line.contains("${{"): continue
             for akey in ["seed_asset:", "WITH_SEED_ASSET:"]:
                 let at = line.index_of(akey)
-                if at >= 0: pending_asset = line.slice(at + akey.len(), line.len()).trim()
+                if at >= 0: pending_asset = line.slice(at + akey.len(), line.len()).trim().to_owned()  // #2307: owned until the seed copies interior views
             for vkey in ["seed_version:", "WITH_SEED_VERSION:"]:
                 let at = line.index_of(vkey)
                 if at >= 0:
@@ -482,7 +482,7 @@ pub fn sdk_lock_workflow_drift(fs: &ToolFs, lock: &str) -> List[str]:
             if line.contains("${{"): continue
             for akey in ["sdk_asset:", "WITH_SDK_ASSET:"]:
                 let at = line.index_of(akey)
-                if at >= 0: pending_asset = line.slice(at + akey.len(), line.len()).trim()
+                if at >= 0: pending_asset = line.slice(at + akey.len(), line.len()).trim().to_owned()  // #2307: owned until the seed copies interior views
             for vkey in ["sdk_version:", "WITH_SDK_VERSION:"]:
                 let at = line.index_of(vkey)
                 if at >= 0:
