@@ -161,8 +161,8 @@ F-strings may not be nested.
 - Each `{expr}` is type-checked at compile time.
 - Non-`str` expressions are converted to `str` via built-in
   formatting functions (no trait dispatch).
-- The `++` operator is `str`-only. Non-`str` operands are a
-  compile-time error. Use f-strings to format values into strings.
+- `++` concatenates sequences (§15.4.9); it does not format. Use
+  f-strings to format values into strings.
 - F-strings always produce owned `str` (they allocate).
 
 #### 15.4.1 Format Specification Grammar
@@ -347,14 +347,24 @@ f"{player}"      // error: struct type Player has no default
                  //   display; use :? for debug
 ```
 
-#### 15.4.9 String Concatenation (`++`)
+#### 15.4.9 Concatenation (`++`, `++=`)
 
-The `++` operator concatenates two `str` values. Both operands
-must be `str` — non-`str` operands are a compile-time error.
+`a ++ b` concatenates two sequences into a new value: two `str` give a
+`str`; any two of a `Vec`, a slice, a fixed array or a list literal, with
+the same element type, give a `Vec[T]` (a `[T; N+M]` where one is
+demanded). Both operands are observed and left untouched; at an operand's
+last use the compiler reuses its buffer, so `xs = xs ++ more` costs only
+the append. Elements that are not `Copy` are moved, so such an operand
+must be at its last use or spelled `move`; otherwise write `.clone()`.
+
+`a ++= b` extends `a` in place, and `v ++= [x]` appends one element.
+`push` remains the method for a single element.
 
 ```
 let greeting = "hello" ++ " " ++ "world"  // "hello world"
 let msg = f"count: {n}" ++ "!"            // f-string ++ str
+let all = defaults ++ extras              // defaults, extras still usable
+args ++= ["-v"]                           // extend in place
 ```
 
 To include non-string values in a string, use f-strings:

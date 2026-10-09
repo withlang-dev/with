@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D116 — `++` concatenates sequences and observes its operands (the buffer is reused at last use); `++=` extends in place; `+` stays off `Vec`](2026-10-09-D116-concatenation-observes-its-operands.md)
 - [D115 — A slice pattern's `rest` names the remaining elements; an owned subject is taken apart by value, a place is observed (supersedes the "remaining count" clause)](2026-10-09-D115-rest-binding-follows-subject-ownership.md)
 - [D114 — `isize` is the target's size width (C's size_t/ptrdiff_t); unsuffixed integers default to `isize`; no code assumes a width](2026-10-08-D114-isize-is-the-targets-size-width.md)
 - [D113 — Brackets make a Vec, unless a fixed array or a set is demanded (supersedes D93's array default)](2026-10-08-D113-brackets-make-a-vec.md)
