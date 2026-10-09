@@ -546,6 +546,16 @@ type Config:
 No methods, no constructors, no inheritance. Functions are associated
 with types via extension blocks (Section 9.5).
 
+A struct whose fields are all values is a value (§2.3, D120). One whose
+meaning forbids duplication declares itself a resource with `resource type`:
+
+```
+resource type Permit { id: u64 }    // value fields, but never copied
+```
+
+`resource` is contextual: it is a keyword only before `type`. A `Drop` impl
+implies it; on a `Drop` type the keyword is allowed and redundant.
+
 **Struct literal forms:**
 
 ```

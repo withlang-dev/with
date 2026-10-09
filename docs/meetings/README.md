@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D120 — Collections and structs of values are values (copy-on-write, atomic count); a Drop impl, a resource field or `resource type` makes a resource; merges within 2% on self-host and corpus suites](2026-10-09-D120-collections-and-structs-of-values-are-values.md)
 - [D119 — A C local or table array becomes a `List`; a struct or union field stays `[T; N]`; the no-heap lowering of a never-grown literal is guaranteed](2026-10-09-D119-c-arrays-become-lists-fields-stay-fixed.md)
 - [D118 — The growable sequence is `List[T]`; `Vec` names no type and stays unbound; STC's linked list is `LinkedList`](2026-10-09-D118-vec-is-renamed-list.md)
 - [D117 — `first()`, `last()`, `rest()` are the expression forms of `[first, ..rest]`; one method name may have an observing and an owned form, selected by the receiver's syntax](2026-10-09-D117-first-last-rest-and-receiver-mode-selection.md)

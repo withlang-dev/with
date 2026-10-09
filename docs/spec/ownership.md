@@ -133,7 +133,8 @@ that; an operation that only needs to look yields a view.
 **Values and resources (D111).** Copy-or-move is decided by identity, not
 by representation. Values have no identity (integers, floats, strings,
 keys): passing one copies it, and the caller's is untouched. Resources have
-identity (files, tasks, sockets, handles, buffers being filled): passing one
+identity (files, tasks, sockets, handles, a buffer lent to the OS or to C
+while being filled): passing one
 transfers it. Having a heap buffer does not make something a resource. `str`
 is a value. Passing a `str` always copies. Code using `str` never sees "use
 of moved value" and never needs `.clone()`. Semantics are copy; the
@@ -141,6 +142,22 @@ implementation is an immutable, shared, reference-counted buffer: a copy is a
 pointer plus a count increment, the last holder frees. At a variable's last
 use the compiler turns the copy into a move, with no count traffic. Text that
 is built or edited goes through a builder type that produces a `str`.
+
+**Collections and structs of values are values (D120).** Identity is
+compositional. A `List`, `HashMap`, `HashSet` or `BTreeMap` whose elements
+(keys and values) are values is a value, and so is a struct whose every
+field is a value, that has no `Drop`, and that is not declared
+`resource type`. A collection holding a resource (`List[File]`) is a
+resource, as is a struct with a resource field, a `Drop` impl, or a
+`resource type` declaration — a permit, an ID allocator, a one-shot token:
+value fields, but copying one would be a bug. A value collection copies in
+O(1): the buffer is shared under an atomic count, and the first mutation of a
+shared buffer copies it (copy-on-write). A buffer never shared is mutated in
+place; where the compiler cannot prove that, the mutation checks the count,
+and the check is hoisted out of loops. Before a mutable pointer into a list
+is handed to C, the list is made unique. A generic function decides per
+instantiation: `fn f[T](xs: List[T])` copies a list of values and moves a
+list of resources.
 
 **Size warning:** The compiler emits a **warning** (not an error)
 when `Copy` is implemented for types exceeding a size threshold. The
