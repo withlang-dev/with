@@ -13070,15 +13070,73 @@ impl Sema:
         // the cast truncates (`3.7 as i32` is 3).
         if self.untyped_expr_is_float(src):
             return 0 as TypeId
+        // A shift's defined wrap (§4.2.4) is not exact: `1 << 100` folds to
+        // 0 at 64 bits, so 64 bits hold the value only if no shift lost bits.
+        let shifts_exact = not self.constant_shift_loses_bits(src)
         let signed = self.fold_literal_int_arith_at(src, self.ty_i64 as i32)
-        if signed.ok != 0 and signed.overflow == 0:
+        if shifts_exact and signed.ok != 0 and signed.overflow == 0:
             return self.ty_i64
         let unsigned = self.fold_literal_int_arith_at(src, self.ty_u64 as i32)
-        if unsigned.ok != 0 and unsigned.overflow == 0:
+        if shifts_exact and unsigned.ok != 0 and unsigned.overflow == 0:
             return self.ty_u64
+        // Wider than 64 bits: evaluated at i128 or u128, where the checker's
+        // own literal and arithmetic checks apply (D125: no width limit; 128
+        // bits is this compiler's limit, said as such).
+        if self.constant_literals_fit(src, self.ty_i128 as i32):
+            return self.ty_i128
+        if self.constant_literals_fit(src, self.ty_u128 as i32):
+            return self.ty_u128
         // Never a silent fallback to isize: that is the failure D124 removes.
-        self.emit_error("this constant cannot be evaluated exactly under the cast: its value needs more than 64 bits or it divides by zero (D124; constant arithmetic is 64-bit until comptime-int-width lands)", src)
+        self.emit_error("this constant needs more than 128 bits; D125 evaluates constants exactly, and 128 bits is this compiler's limit", src)
         0 as TypeId
+
+    // Whether a left shift in an untyped constant expression drops set bits
+    // at 64 bits (its exact value then needs more), or cannot be folded.
+    fn constant_shift_loses_bits(node: i32) -> bool:
+        if node <= 0:
+            return false
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_GROUPED:
+            return self.constant_shift_loses_bits(self.ast.get_data0(node))
+        if kind == NodeKind.NK_UNARY:
+            return self.constant_shift_loses_bits(self.ast.get_data1(node))
+        if kind == NodeKind.NK_IDENT:
+            let init = self.untyped_const_initializer(node)
+            return init != 0 and self.constant_shift_loses_bits(init)
+        if kind != NodeKind.NK_BINARY:
+            return false
+        let lhs = self.ast.get_data1(node)
+        let rhs = self.ast.get_data2(node)
+        if self.constant_shift_loses_bits(lhs) or self.constant_shift_loses_bits(rhs):
+            return true
+        if self.ast.get_data0(node) != BinaryOp.OP_SHL:
+            return false
+        let value = self.fold_literal_int_arith_at(lhs, self.ty_i64 as i32)
+        let amount = self.fold_literal_int_arith_at(rhs, self.ty_u32 as i32)
+        if value.ok == 0 or amount.ok == 0:
+            return true
+        if value.value == 0:
+            return false
+        if amount.value >= 63:
+            return true
+        ((value.value << (amount.value as u32)) >> (amount.value as u32)) != value.value
+
+    // Whether every literal in an untyped constant expression fits `ty`.
+    fn constant_literals_fit(node: i32, ty: i32) -> bool:
+        if node <= 0:
+            return false
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_INT_LIT:
+            return self.int_literal_fits_type(node, ty)
+        if kind == NodeKind.NK_GROUPED:
+            return self.constant_literals_fit(self.ast.get_data0(node), ty)
+        if kind == NodeKind.NK_UNARY:
+            return self.constant_literals_fit(self.ast.get_data1(node), ty)
+        if kind == NodeKind.NK_BINARY:
+            return self.constant_literals_fit(self.ast.get_data1(node), ty) and self.constant_literals_fit(self.ast.get_data2(node), ty)
+        if kind == NodeKind.NK_IDENT:
+            return self.constant_literals_fit(self.untyped_const_initializer(node), ty)
+        false
 
     // D88: the initializer an untyped constant's use stands for — recorded
     // once the use is checked, else found from its declaration (a cast
