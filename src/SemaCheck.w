@@ -1360,10 +1360,17 @@ impl Sema:
             // non-Copy field reached through a view cannot satisfy it. The
             // auto-ref path above already returned for &T parameters.
             self.reject_owned_demand_from_view_projection(arg_node, expected, "call argument")
+            // §4.2.1 rule 2: an untyped literal argument takes its parameter's
+            // type. A path that checked the arguments before it knew the
+            // parameters (a generic call infers T from them) types it here.
+            var arg_ty = actual
+            if self.expr_is_untyped_literal_arith(arg_node) and self.is_plain_numeric_type(expected) and self.resolve_alias(expected as TypeId) != self.resolve_alias(actual as TypeId):
+                let retyped = self.check_expr_with_expected(arg_node, expected as TypeId)
+                if retyped != 0: arg_ty = retyped as i32
             self.narrowing_target_note = self.call_arg_target_note(err_node, arg_node)
-            let _ = self.reject_implicit_numeric_narrowing(arg_node, expected, actual)
+            self.reject_implicit_numeric_narrowing(arg_node, expected, arg_ty)
             self.narrowing_target_note = ""
-            let _ = self.record_contextual_copy_adjustment(arg_node, expected, actual)
+            self.record_contextual_copy_adjustment(arg_node, expected, arg_ty)
 
     // #1627 (§3.8, D22): an enum payload is a demand like a parameter. A
     // place against a `&T` payload (`Some(ctx)` for `Option[&Ctx]`) is
