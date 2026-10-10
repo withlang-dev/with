@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D123 — std.mssql may read and port from permissive TDS drivers, recorded in `THIRD_PARTY` from day one; `Decimal`, the date and time types and `Guid` are std types, `Decimal` over a real `i128`; phases wait on the customer's login method](2026-10-09-D123-mssql-permissive-references-and-std-value-types.md)
 - [D122 — A borrow through a borrow is a borrow of the same origin; `text param` and owned text returns (`text return, owned, freed by F`), proved from the body; the detach fact is the follow-on](2026-10-09-D122-borrow-through-borrow-and-text.md)
 - [D121 — `with get` builds a package's facade from evidence, strongest first (proof from the library's source, shipped annotations, a shared per-package registry, adopted profiles); users never write facades for packages](2026-10-09-D121-with-get-builds-the-facade-from-evidence.md)
 - [D120 — Collections and structs of values are values (copy-on-write, atomic count); a Drop impl, a resource field or `resource type` makes a resource; merges within 2% on self-host and corpus suites](2026-10-09-D120-collections-and-structs-of-values-are-values.md)
