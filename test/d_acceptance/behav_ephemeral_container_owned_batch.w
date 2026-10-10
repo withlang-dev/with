@@ -4,7 +4,7 @@
 // so it is freely usable as a local and by-value parameter.
 type Handle ephemeral { token: str, id: i32 }
 fn batch(hs: List[Handle]) -> i32:
-    var total = 0
+    var total: i32 = 0
     for h in hs:
         total = total + h.id
     total

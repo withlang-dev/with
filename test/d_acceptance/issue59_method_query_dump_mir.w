@@ -7,7 +7,7 @@ type Entry {
 }
 
 fn score(entries: List[Entry], lookup: HashMap[str, i32]) -> i32:
-    var total = 0
+    var total: i32 = 0
     var i = 0
     while i < entries.len():
         let entry = entries[i]

@@ -9,7 +9,7 @@ type Pair[T] { a: T, b: T }
 type Duo[A, B] { pending_a: A, anchor_a: A, pending_b: B, anchor_b: B }
 
 fn sum_pairs[T](items: List[Pair[T]]) -> i32:
-    var s = 0
+    var s: i32 = 0
     for p in &items:
         s = s + 1
     s

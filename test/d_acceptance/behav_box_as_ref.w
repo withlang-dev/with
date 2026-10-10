@@ -3,5 +3,5 @@
 // Previously segfaulted — the transparent-box receiver was passed one
 // indirection too shallow to the generic `&self` method.
 fn main:
-    let b = Box.new(42)
+    let b = Box.new(42i32)
     print_i32(*b.as_ref())

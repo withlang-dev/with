@@ -4,7 +4,7 @@
 // followed by a read leave the single receiver owner live until scope exit,
 // where both elements and the List buffer drop exactly once.
 
-var COUNT = 0
+var COUNT: i32 = 0
 
 type W { tag: i32 }
 impl Drop for W:

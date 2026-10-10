@@ -20,7 +20,7 @@ fn run(slot: *mut i32):
     holder.replace_pair(slot)
 
 fn main:
-    var count = 0
+    var count: i32 = 0
     run(&raw mut count)
     if count == 4:
         print("ok")
