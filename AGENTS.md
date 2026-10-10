@@ -579,8 +579,10 @@ same violation as C in the compiler. With IS a scripting language; there is no
   - `grep pat`          →  `... | with -n 'if line.contains("pat"): print(line)'`
     (also `.starts_with`/`.ends_with`; `grep -i` is `line =~ /pat/i`)
   - `cut -f2`           →  `... | with -n 'print(line.split("\t")[1])'`
-  - `awk '{print $2}'`  →  `... | with -n 'print(line.split(" ")[1])'` — exact
-    separator only until `str.fields()` lands (#959)
+  - `awk '{print $2}'`  →  `... | with -n 'print(line.fields()[1])'` (runs of
+    blanks separate fields, as in awk; `NF` is `line.fields().len()`). Unlike
+    awk, a line with too few fields panics (D71: indexing past the end), where
+    awk prints an empty field or uses 0; check `.len()` first if lines can be short
   - `wc -l`, `tail`, sums → `with -e` with a loop over `stdin.lines()` (the
     whole input, so END-style work is a print after the loop); `-n` gains
     persistent state and `last` with #957

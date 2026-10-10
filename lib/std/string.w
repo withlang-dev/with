@@ -262,6 +262,25 @@ impl str:
             end -= 1
         self[0..end]
 
+    /// The whitespace-separated fields, awk's default `$1`, `$2`, … (#959):
+    /// runs of the ASCII whitespace `trim` strips separate fields, and
+    /// leading, trailing or repeated blanks make no empty field (unlike
+    /// `split(" ")`). `" a\tb  c ".fields()` is `["a", "b", "c"]`; an
+    /// all-blank string has none. Owned, like `lines()` and `split()`.
+    pub fn fields() -> List[str]:
+        var out: List[str] = List.new()
+        let n = self.len()
+        var i: i64 = 0
+        while i < n:
+            while i < n and str_is_ascii_space(self[i]):
+                i += 1
+            let start = i
+            while i < n and not str_is_ascii_space(self[i]):
+                i += 1
+            if i > start:
+                out.push(self.slice(start, i))
+        out
+
     /// The bytes, one at a time (#2206): `for b in s.bytes()`.
     @[iter_of_self]
     pub fn bytes() -> ByteIter: ByteIter { bytes: self.as_bytes(), at: 0 }

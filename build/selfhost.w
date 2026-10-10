@@ -1406,6 +1406,12 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p-semicolon", bs_one_liner_args("-p", "line = line.upper(); line = line ++ \"!\""), "a\n", "A!")
     if rc != 0: return rc
 
+    // #959: awk's whitespace fields. awk '{print $2}' and awk '{print NF}'.
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-fields", bs_one_liner_args("-n", "print(line.fields()[1])"), "beta  20 y\n", "20")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-fields-count", bs_one_liner_args("-n", "print(f\"{line.fields().len()}\")"), "  a b\t c \n\n", "3\n0")
+    if rc != 0: return rc
+
     // The code is spliced verbatim: a multi-line string literal keeps its
     // continuation lines' bytes (#1334: each gained four spaces of indent).
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p-multiline-literal", bs_one_liner_args("-p", "line = \"a\n  b\""), "x\n", "a\n  b")

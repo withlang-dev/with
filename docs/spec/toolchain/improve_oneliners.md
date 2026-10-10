@@ -91,11 +91,13 @@ source file" — §18.5b's own sentence, so the fix is a spec edit (trailing
 operands are inputs; `filename`/`fnr` bindings; `-i` through a temp sibling
 and rename).
 
-**3. No whitespace-run fields and no integer parse on `str` (#959).**
+**3. No integer parse on `str` (#959); whitespace-run fields have landed.**
 `line.split(" ")` yields an empty field for a double space (awk's `$N`
-ignores runs; `wc -w` overcounts the fixture 18 for 17), `fields()` does not
-exist, and the only integer parser is the free function
-`std.string.parse(s) -> i32`. Blocked: `awk '{print $2}'`, `awk -F: NF`,
+ignores runs; `wc -w` overcounts the fixture 18 for 17). `str.fields()` now
+splits on runs the way awk does, so `awk '{print $2}'` is
+`print(line.fields()[1])` and awk's `NF` is `line.fields().len()`; unlike
+awk, `[1]` on a line with one field panics (D71). The only integer parser is
+still the free function `std.string.parse(s) -> i32`. Blocked: `awk -F: NF`,
 `$2 + 0`.
 
 **4. No `List.sort` and no `str.reverse` (#960).** `sort` and `rev` have no
@@ -116,7 +118,7 @@ before it runs.
 ### Cheat-sheet consequences
 
 CLAUDE.md's one-liner cheat-sheet now maps the range, delete, backreference,
-awk-field (with the exact-separator caveat until #959), END-style, and jq
+awk-field (`line.fields()[N]`, with the short-line panic caveat), END-style, and jq
 idioms, so the next reader reaches for `nr` instead of `sed -n`.
 
 ## Explicit line topic and output plumbing
@@ -748,7 +750,8 @@ small number of reusable surfaces:
    language-wide implicit topic.
 6. Close the parity gaps the 2026-09-03 audit filed: persistent state and
    `last`/END in `-n`/`-p` (#957), file operands and `-i` (#958),
-   `str.fields()` and `parse_i64` (#959), `List.sort` and `str.reverse`
+   a generic `s.parse()` typed from its use (#959; `str.fields()` has
+   landed), `List.sort` and `str.reverse`
    (#960), the jq surface on `JsonView` and `std.json` as an implicit import
    (#961) — each with its matrix rows as a `cli-selfhost-one-liner-tests`
    case, so parity is a battery invariant.
