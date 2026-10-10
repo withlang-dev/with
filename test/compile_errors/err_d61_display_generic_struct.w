@@ -1,4 +1,4 @@
-//! expect-error: type 'Pair[i32]' has no default display; use :? for debug
+//! expect-error: type 'Pair[isize]' has no default display; use :? for debug
 
 type Pair[T] { a: T, b: T }
 

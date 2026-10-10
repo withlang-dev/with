@@ -7,6 +7,6 @@ extend i32:
     mut fn bump(): self += 1
 
 fn main:
-    let (n, s) = (5, "hello")
+    let (n, s): (i32, str) = (5, "hello")
     n.bump()
     print(f"{n} {s}")

@@ -7,5 +7,5 @@ extend i32:
     mut fn bump(): self += 1
 
 fn main:
-    let y = 5
+    let y: i32 = 5
     y.bump()
