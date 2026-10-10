@@ -4691,6 +4691,11 @@ impl Sema:
                             let ok_type = self.get_generic_inst_arg(ret_resolved, 0)
                             if self.types_compatible(ok_type, body_ty) != 0 or self.arithmetic_result_type(ok_type, body_ty) != 0:
                                 ok_wrapped = true
+                            else:
+                                // D111 / D22 §6.2: a Copy view (`&str`) meets the owned
+                                // payload by a copy, as it meets a plain `-> str`.
+                                let tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
+                                ok_wrapped = self.record_contextual_copy_adjustment(tail, ok_type, body_ty as i32) != 0
                     if not ok_wrapped:
                         self.emit_return_mismatch("return type mismatch", body, body_expected_ret as i32)
 
@@ -9096,6 +9101,9 @@ impl Sema:
                 if self.types_compatible(ok_type, actual) != 0:
                     return 1
                 if self.arithmetic_result_type(ok_type as TypeId, actual as TypeId) != 0:
+                    return 1
+                // D111 / D22 §6.2: a Copy view meets the payload by a copy.
+                if self.can_contextually_copy_ref(ok_type, actual) != 0:
                     return 1
         0
 
@@ -26389,7 +26397,7 @@ impl Sema:
         let exact = self.check_expr_with_expected(node, expected)
         if expected != 0 and exact != 0:
             self.reject_implicit_numeric_narrowing(node, self.implicit_ok_payload_demand(expected as i32, exact as i32), exact as i32)
-            if self.record_contextual_copy_adjustment(node, expected as i32, exact as i32) == 0:
+            if self.record_contextual_copy_adjustment(node, self.implicit_ok_payload_demand(expected as i32, exact as i32), exact as i32) == 0:
                 let _ = self.record_contextual_str_clone_adjustment(node, expected as i32, exact as i32)
         exact
 
@@ -26468,13 +26476,16 @@ impl Sema:
             return 0
         if self.expr_is_untyped_literal_arith(self.ast.get_data1(decl)): decl else: 0
 
-    // §4.9: a number where a `Result[T, E]` is demanded is wrapped in `Ok`,
-    // so the demand on the number is `T` (§4.2.6 then applies to it).
+    // §4.9: a value where a `Result[T, E]` is demanded is wrapped in `Ok`,
+    // so the demand on the value is `T` (§4.2.6 and D22's copy apply to it).
     fn implicit_ok_payload_demand(expected: i32, actual: i32) -> i32:
         let er = self.resolve_alias(expected as TypeId)
         if self.get_type_kind(er) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(er) != self.syms.result or self.get_generic_inst_arg_count(er) != 2:
             return expected
-        if not self.is_plain_numeric_type(actual):
+        // A Result value meets the Result itself; anything else is the
+        // payload `Ok` wraps (D111: a `&str` there is copied to the `str`).
+        let ar = self.resolve_alias(actual as TypeId)
+        if actual == 0 or (self.get_type_kind(ar) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(ar) == self.syms.result):
             return expected
         self.get_generic_inst_arg(er, 0)
 
