@@ -406,7 +406,7 @@ impl Sema:
         if not self.is_vector_or_mask_type(recv_ty): return -1
         let name = self.pool_resolve_symbol(field).clone()
         let type_text = self.type_name(recv_ty)
-        var op = 0
+        var op: i32 = 0
         if self.is_mask_type(recv_ty):
             if name == "select": return self.check_vector_select(node, recv_ty, self.ast.get_data1(node), arg_count)
             if name == "all": op = VectorOp.ALL as i32

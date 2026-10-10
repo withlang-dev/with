@@ -1260,7 +1260,7 @@ fn facade_render_item_deps(pool: AstPool, intern: InternPool, ci: &List[i32], it
     let out_refs: List[i32] = List.new()
     let borrow_refs: List[i32] = List.new()
     let borrow_owners: List[i32] = List.new()
-    var last_producer = -2
+    var last_producer: i32 = -2
     var independent = false
     var init_fn: i32 = 0
     var preinit_fn: i32 = 0
@@ -1375,7 +1375,7 @@ fn facade_render_deps(pool: AstPool, intern: InternPool, producers: &List[i32], 
         for dj in 0..di:
             if deps.owners[dj] == deps.owners[di] and deps.resources[dj] == deps.resources[di]:
                 seen = seen + 1
-        var slot = -1
+        var slot: i32 = -1
         var k = 0
         for si in 0..deps.slot_res.len() as i32:
             if deps.slot_res[si] == deps.resources[di]:
@@ -2494,7 +2494,7 @@ pub fn facade_render_param_ref(pool: AstPool, intern: InternPool, decl: i32, ref
     let rk = pool.get_data0(ref_node as NodeId)
     if rk == FACADE_PARAM_REF_INDEX:
         let digits: str = intern.resolve(pool.get_data1(ref_node as NodeId))
-        var idx = 0
+        var idx: i32 = 0
         for i in 0..digits.len() as i32:
             idx = idx * 10 + (digits[i] - '0') as i32
         return if idx < count: idx else: -1
@@ -2505,7 +2505,7 @@ pub fn facade_render_param_ref(pool: AstPool, intern: InternPool, decl: i32, ref
                 return pi
         return -1
     let want = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_data1(ref_node as NodeId) as NodeId))
-    var found = -1
+    var found: i32 = -1
     var matches = 0
     for pi in 0..count:
         if facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)) == want:

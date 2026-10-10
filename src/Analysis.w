@@ -260,7 +260,7 @@ fn analysis_collect_trait_declarations(report: &AnalysisReport, sema: &Sema, sou
             let receiver_flags = if mode != ReceiverMode.None and param_count > 0: sema.ast.fn_param_flags(param_start, 0) else: 0
             let synthetic_receiver = fn_param_is_synth_receiver(receiver_flags) != 0
             let explicit_receiver = mode != ReceiverMode.None and not synthetic_receiver
-            var effects = 0
+            var effects: i32 = 0
             if mode == ReceiverMode.Read: effects = EFF_READ
             else if mode == ReceiverMode.Mut: effects = EFF_READ | EFF_WRITE
             else if mode == ReceiverMode.Move: effects = EFF_READ | EFF_CONSUME
@@ -592,7 +592,7 @@ fn analysis_collect_signatures(report: &AnalysisReport, sema: &Sema, source_path
 
 fn analysis_collect_effect_edges(report: &AnalysisReport, sema: &Sema):
     var at = 0
-    var edge = 0
+    var edge: i32 = 0
     while at + 3 < sema.effect_flow_edges.len() as i32:
         let caller_sig = sema.effect_flow_edges[at]
         let caller_pi = sema.effect_flow_edges[(at + 1)]
@@ -1121,7 +1121,7 @@ fn analysis_audit_pool(report: &AnalysisReport, sema: &Sema):
 
 fn analysis_audit_storage(report: &AnalysisReport, sema: &Sema):
     let node_count = sema.ast.node_count()
-    var resolved_calls = 0
+    var resolved_calls: i32 = 0
     var resolved_args = 0
     for node in 1..node_count:
         let has_start = sema.call_resolved_arg_starts.contains(node)
@@ -1162,8 +1162,8 @@ fn analysis_audit_storage(report: &AnalysisReport, sema: &Sema):
     report.note(fact.detail)
     report.add(move fact)
 
-    var trait_count = 0
-    var trait_methods = 0
+    var trait_count: i32 = 0
+    var trait_methods: i32 = 0
     for di in 0..sema.ast.decl_count():
         let trait_node = sema.ast.get_decl(di)
         if sema.ast.kind(trait_node) != NodeKind.NK_TRAIT_DECL: continue
@@ -1197,8 +1197,8 @@ fn analysis_audit_storage(report: &AnalysisReport, sema: &Sema):
     report.note(trait_fact.detail)
     report.add(move trait_fact)
 
-    var impl_count = 0
-    var extend_count = 0
+    var impl_count: i32 = 0
+    var extend_count: i32 = 0
     for di in 0..sema.ast.decl_count():
         let impl_node = sema.ast.get_decl(di)
         if sema.ast.kind(impl_node) != NodeKind.NK_IMPL_DECL:
@@ -2590,7 +2590,7 @@ pub fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool
     analysis_collect_requested_node(&report, sema, request, source_path, source_text)
     analysis_collect_mir(&report, mir_mod, sema, pool, source_path, source_text)
     var text = ""
-    var status = 0
+    var status: i32 = 0
     var needs_codegen = false
     var codegen_query = ""
 

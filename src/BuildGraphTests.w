@@ -193,8 +193,8 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
     // is how ten gate chains each surfaced exactly one bug).
     let jobs_limit = build_graph_test_jobs()
     var failed_paths: List[str] = List.new()
-    var first_failure = 0
-    var next = 0
+    var first_failure: i32 = 0
+    var next: i32 = 0
     var finished = 0
     let active: List[BuildGraphExternalTestJob] = List.new()
     let active_keys: List[str] = List.new()

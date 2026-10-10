@@ -433,7 +433,7 @@ fn stackify_compute_preds(graph: &StackifyGraph) -> StackifyPreds:
         counts[i] = 0
         i = i + 1
     let pred_data = stackify_bool_list(total, 0)
-    var b2 = 0
+    var b2: i32 = 0
     while b2 < n:
         let blk = graph.blocks[b2]
         var si = 0
@@ -709,7 +709,7 @@ fn stackify_ctrl_label(entry: &StackifyCtrlEntry) -> i32:
 
 impl StackifyContext:
     fn resolve_target(target: i32) -> i32:
-        var depth = 0
+        var depth: i32 = 0
         var i = self.ctrl_stack.len() as i32 - 1
         while i >= 0:
             if stackify_ctrl_label(self.ctrl_stack[i]) == target:
@@ -783,7 +783,7 @@ impl StackifyContext:
         let targets_count: i32 = b.targets_count
         let default_target: i32 = b.default_target
         let labels_start = self.tree.labels.len() as i32
-        var ti = 0
+        var ti: i32 = 0
         while ti < targets_count:
             self.tree.labels.push(ti)
             ti = ti + 1

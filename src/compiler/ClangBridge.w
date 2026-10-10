@@ -3010,7 +3010,7 @@ pub fn with_cimport_struct_field_type_translated(session: i64, idx: isize, field
         let cache = ((*s).caches as i64 + idx as i64 * sizeof[DeclCache]()) as *const DeclCache
         if field < 0 or field >= (*cache).field_count: return ""
         let fi = ((*cache).fields as i64 + field as i64 * sizeof[FieldInfo]()) as *const FieldInfo
-        let is_last = if field == (*cache).field_count - 1: 1 else: 0
+        let is_last: i32 = if field == (*cache).field_count - 1: 1 else: 0
         let result = option_wrapped(s, (*fi).clang_type, translate_type_recursive(s, (*fi).clang_type, 0, is_last))
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
@@ -3160,7 +3160,7 @@ pub fn with_ci_cursor_in_file(session: i64, cursor_idx: i32, path: &str) -> i32:
         if presumed_name as i64 != 0 and *presumed_name != 0:
             let actual_buf = with_alloc(4096)
             let target_buf = with_alloc(4096)
-            var presumed_matches = 0
+            var presumed_matches: i32 = 0
             if actual_buf as i64 != 0 and target_buf as i64 != 0:
                 let actual_real = realpath(presumed_name, actual_buf)
                 let target_real = realpath(c_path as *const u8, target_buf)
@@ -3192,7 +3192,7 @@ pub fn with_ci_cursor_in_file(session: i64, cursor_idx: i32, path: &str) -> i32:
         let fname_str = clang_getCString(fname)
         let actual_buf = with_alloc(4096)
         let target_buf = with_alloc(4096)
-        var matches = 0
+        var matches: i32 = 0
         if fname_str as i64 != 0 and actual_buf as i64 != 0 and target_buf as i64 != 0:
             let actual_real = realpath(fname_str, actual_buf)
             let target_real = realpath(c_path as *const u8, target_buf)
@@ -3460,7 +3460,7 @@ unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *c
     var name_end = define_start
     while *(name_end) != 0 and *(name_end) != 32 and *(name_end) != 9 and *(name_end) != 40 and *(name_end) != 10:
         name_end = (name_end as i64 + 1) as *const u8
-    let is_fn_like = if *(name_end) == 40: 1 else: 0
+    let is_fn_like: i32 = if *(name_end) == 40: 1 else: 0
     let name_len = name_end as i64 - define_start as i64
     if name_len <= 0:
         return
@@ -3536,7 +3536,7 @@ unsafe fn collect_macro_def(cursor: CXCursor, parent: CXCursor, data: *mut u8) -
     let loc = macro_location_from_cursor(s, cursor)
     let is_system = macro_location_is_system_from_cursor(cursor)
     let is_input = clang_Location_isFromMainFile(clang_getCursorLocation(cursor))
-    let origin_flags = is_system | (if is_input != 0: 2 else: 0)
+    let origin_flags = if is_input != 0: is_system | 2 else: is_system
     var source = macro_source_line_from_cursor(s, cursor)
     if not macro_source_is_define_line(source):
         source = cursor_source_text_from_cursor(s, cursor)
@@ -3722,7 +3722,7 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str, cxx:
 
 // The probe file is the header, a newline, then one probe per line.
 pub fn with_cimport_macro_probe_first_line(header_code: &str) -> i32:
-    var lines = 2
+    var lines: i32 = 2
     for i in 0..header_code.len() as i32:
         if header_code[i] == '\n': lines = lines + 1
     lines
@@ -3778,7 +3778,7 @@ pub fn with_cimport_macro_location(session: i64, idx: i32) -> str:
         if (*ms).locations as i64 == 0: return ""
         make_str(*(((*ms).locations as i64 + idx as i64 * 8) as *const *const u8))
 
-fn macro_origin_flags(session: i64, idx: i32):
+fn macro_origin_flags(session: i64, idx: i32) -> i32:
     unsafe:
         let ms = session as *mut MacroSession
         if session == 0 or idx < 0 or idx >= (*ms).count: return 0

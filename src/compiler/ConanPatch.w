@@ -21,7 +21,7 @@ fn cp_header_path(line: &str) -> str:
 fn cp_hunk_old_start(line: &str) -> i32:
     let dash = line.find("-")
     if dash < 0: return -1
-    var n = 0
+    var n: i32 = 0
     var i = dash as i32 + 1
     var digits = 0
     while i < line.len() as i32 and line[i] >= '0' and line[i] <= '9':

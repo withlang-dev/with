@@ -366,7 +366,7 @@ impl ResolveState:
         var pending_fn_nodes: List[i32] = List.new()
         var pending_fn_defs: List[i32] = List.new()
 
-        var import_index = 0
+        var import_index: i32 = 0
 
         // Pass 1: reserve imports + top-level defs/bindings.
         for di in 0..ast_pool.decl_count():
@@ -384,7 +384,7 @@ impl ResolveState:
                 let path_count = ast_pool.get_data1(decl)
                 let dotted = self.use_path_dotted(ast_pool, path_start, path_count)
                 let resolved_path = self.resolve_use_file(module_id, ast_pool, path_start, path_count)
-                var target_module = -1
+                var target_module: i32 = -1
                 if resolved_path.len() > 0:
                     target_module = self.reserve_module(resolved_path, resolve_dirname(resolved_path), -1)
                 else:
@@ -422,7 +422,7 @@ impl ResolveState:
             // type in the rendered file.
             if kind == NodeKind.NK_C_FACADE and (self.facade_declares_pinned_resource(ast_pool, decl) or self.facade_declares_kept_userdata(ast_pool, decl)):
                 let resolved_path = self.resolve_use_file_dotted(module_id, "std.box")
-                var target_module = -1
+                var target_module: i32 = -1
                 if resolved_path.len() > 0:
                     target_module = self.reserve_module(resolved_path, resolve_dirname(resolved_path), -1)
                 else:
@@ -1125,7 +1125,7 @@ impl ResolveState:
         self.module_import_starts[module_id] = self.result.imports.len() as i32
         let module_scope = self.add_scope(module_id, -1, -1, ScopeKind.SK_MODULE)
         self.module_scope_ids[module_id] = module_scope
-        var import_index = 0
+        var import_index: i32 = 0
         let lines = text.split("\n")
         for i in 0..lines.len() as i32:
             let line = lines[i]
@@ -1133,7 +1133,7 @@ impl ResolveState:
                 continue
             let dotted = line.slice(4, line.len()).trim().to_owned()
             let resolved_path = self.resolve_use_file_dotted(module_id, dotted)
-            var target_module = -1
+            var target_module: i32 = -1
             if resolved_path.len() > 0:
                 target_module = self.reserve_module(resolved_path, resolve_dirname(resolved_path), -1)
             else:

@@ -673,7 +673,7 @@ fn ci_compound_literal_type_name(raw_type: &str) -> str:
         t = ci_trim(t.slice(6, t.len()))
     ci_escape_reserved(ci_normalize_translated_type_name(t))
 
-fn ci_find_compound_literal_brace(s: &str) -> i32:
+fn ci_find_compound_literal_brace(s: &str) -> isize:
     var paren_depth = 0
     var i = 0
     while i < s.len() as i32:
@@ -3445,7 +3445,7 @@ fn ci_macro_is_migration_private(session: i64, index: i32):
 
 // Token boundaries for a C macro replacement list. In particular, parameters
 // never substitute inside strings, character literals, or preprocessing numbers.
-fn ci_macro_token_end(text: &str, start: i32):
+fn ci_macro_token_end(text: &str, start: isize):
     let first = text[start]
     var end = start + 1
     if first == 34 or first == 39:
@@ -3467,7 +3467,7 @@ fn ci_macro_token_end(text: &str, start: i32):
 
 fn ci_macro_substitute_arguments(session: i64, index: i32, body: &str, args: &List[str]):
     var output = ""
-    var pos: i32 = 0
+    var pos: isize = 0
     while pos < body.len():
         let end = ci_macro_token_end(body, pos)
         let token = body.slice(pos, end)
@@ -3487,7 +3487,7 @@ fn ci_macro_substitute_arguments(session: i64, index: i32, body: &str, args: &Li
 fn ci_expand_private_macro_body(session: i64, indices: &HashMap[str, i32], body: &str, params: &str, disabled: &str, depth: i32) -> str:
     if depth > 16: return ""
     var output = ""
-    var pos: i32 = 0
+    var pos: isize = 0
     while pos < body.len():
         var end = ci_macro_token_end(body, pos)
         let token = body.slice(pos, end)
@@ -3560,7 +3560,7 @@ fn ci_macro_expands_empty(session: i64, indices: &HashMap[str, i32], index: i32,
     let name = with_cimport_macro_name(session, index)
     if disabled.contains("|" ++ name ++ "|"): return false
     let body = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, index)))
-    var pos: i32 = 0
+    var pos: isize = 0
     while pos < body.len():
         if ci_is_space(body[pos]):
             pos += 1
@@ -4524,7 +4524,7 @@ fn ci_ensure_bool(expr: &str) -> str:
     expr ++ " != 0"
 
 // Helper: find a two-char operator at paren depth 0 (leftmost occurrence)
-fn ci_find_op_at_depth0(s: &str, op: &str) -> i32:
+fn ci_find_op_at_depth0(s: &str, op: &str) -> isize:
     if op.len() != 2:
         return -1
     let c0 = op[0]
@@ -4549,7 +4549,7 @@ fn ci_find_op_at_depth0(s: &str, op: &str) -> i32:
     -1
 
 // Helper: find single-char operator at depth 0, excluding doubled version
-fn ci_find_single_op_at_depth0(s: &str, ch: i32, doubled: i32) -> i32:
+fn ci_find_single_op_at_depth0(s: &str, ch: i32, doubled: i32) -> isize:
     var depth = 0
     var i = 0
     while i < s.len() as i32:
@@ -4570,7 +4570,7 @@ fn ci_find_single_op_at_depth0(s: &str, ch: i32, doubled: i32) -> i32:
     -1
 
 // Helper: find single char at depth 0
-fn ci_find_char_op_at_depth0(s: &str, ch: i32) -> i32:
+fn ci_find_char_op_at_depth0(s: &str, ch: i32) -> isize:
     var depth = 0
     var i = 0
     while i < s.len() as i32:
@@ -4742,7 +4742,7 @@ fn ci_has_depth0_bitwise_or_ternary(s: &str) -> bool:
 
 // The first `<`, `>`, `<=` or `>=` at paren depth 0 — not a shift, not an
 // arrow — or -1.
-fn ci_find_relational_op(s: &str) -> i32:
+fn ci_find_relational_op(s: &str) -> isize:
     var depth = 0
     var i = 0
     let n = s.len() as i32
@@ -5774,7 +5774,7 @@ fn ci_eval_const_expr_ctx(s: &str, known: &str) -> str:
         return ci_render_int_value(ci_lookup_known(trimmed, known))
     ""
 
-fn ci_find_matching_paren(s: &str, start: i32) -> i32:
+fn ci_find_matching_paren(s: &str, start: isize) -> isize:
     var depth = 0
     var i = start
     while i < s.len() as i32:
@@ -5788,7 +5788,7 @@ fn ci_find_matching_paren(s: &str, start: i32) -> i32:
         i = i + 1
     -1
 
-fn ci_find_matching_brace(s: &str, start: i32) -> i32:
+fn ci_find_matching_brace(s: &str, start: isize) -> isize:
     var depth = 0
     var i = start
     while i < s.len() as i32:
@@ -5985,7 +5985,7 @@ fn ci_find_last_comma_at_depth0(s: &str) -> i32:
         i = i + 1
     last_comma
 
-fn ci_find_ternary(s: &str) -> i32:
+fn ci_find_ternary(s: &str) -> isize:
     var depth = 0
     var i = 0
     while i < s.len() as i32:
@@ -5999,7 +5999,7 @@ fn ci_find_ternary(s: &str) -> i32:
         i = i + 1
     -1
 
-fn ci_find_ternary_colon(s: &str) -> i32:
+fn ci_find_ternary_colon(s: &str) -> isize:
     var depth = 0
     var i = 0
     while i < s.len() as i32:
@@ -8169,7 +8169,7 @@ fn ci_record_count_cache_store(key: &str, value: i32) -> Unit:
     g_ci_record_count_cache_keys.push(with_str_clone_ref(key))
     g_ci_record_count_cache_values.push(value)
 
-fn ci_record_field_cache_lookup_index(key: &str) -> i32:
+fn ci_record_field_cache_lookup_index(key: &str) -> isize:
     var i = 0
     while i < g_ci_record_field_cache_keys.len() as i32:
         if g_ci_record_field_cache_keys[i] == key:
@@ -8371,7 +8371,7 @@ fn ci_anon_member_field_index(session: i64, decl_cursor: i32, slot: i32, name: &
     if anon_decl < 0:
         return -1
     let nc = with_ci_num_children(session, anon_decl)
-    var seen = 0
+    var seen: i32 = 0
     var i = 0
     while i < nc:
         let child = with_ci_child(session, anon_decl, i)
@@ -8433,7 +8433,7 @@ impl CiExprPool:
         while si < field_count:
             slot_exprs.push(0)
             si = si + 1
-        var next_positional = 0
+        var next_positional: i32 = 0
         var ci2 = 0
         while ci2 < nc:
             let child = with_ci_child(session, cursor, ci2)
@@ -9947,7 +9947,7 @@ fn ci_fn_decl_index_ensure(session: i64):
     var by_escaped: HashMap[str, i32] = HashMap.new()
     var by_raw: HashMap[str, i32] = HashMap.new()
     let count = with_cimport_decl_count(session)
-    var i = 0
+    var i: i32 = 0
     while i < count:
         if with_cimport_decl_kind(session, i) == CK_FUNCTION:
             let raw_name = with_cimport_decl_name(session, i)
@@ -13553,7 +13553,7 @@ fn ci_scope_type_for_cursor(session: i64, cursor: i32, scope: CiScope) -> str:
     let name = ci_escape_reserved(with_ci_cursor_spelling(session, peeled))
     ci_scope_lookup_type(scope, name)
 
-fn ci_find_char(s: &str, c: i32) -> i32:
+fn ci_find_char(s: &str, c: i32) -> isize:
     var i = 0
     while i < s.len() as i32:
         if s[i] == c:
@@ -16213,7 +16213,7 @@ fn ci_macro_arg_for_initializer_param(session: i64, var_cursor: i32, param_name:
     let macro_session = if g_migrate_macro_session != 0: g_migrate_macro_session else: session
     let count = with_cimport_macro_count(macro_session)
     var macro_idx: i32 = -1
-    var i = 0
+    var i: i32 = 0
     while i < count:
         if with_cimport_macro_is_fn_like(macro_session, i) != 0 and with_cimport_macro_name(macro_session, i) == macro_name:
             macro_idx = i
@@ -16976,7 +16976,7 @@ fn ci_subtree_has_labels(session: i64, cursor: i32) -> bool:
         i = i + 1
     false
 
-pub fn ci_find_substr(haystack: &str, needle: &str) -> i32:
+pub fn ci_find_substr(haystack: &str, needle: &str) -> isize:
     let hlen = haystack.len() as i32
     let nlen = needle.len() as i32
     if nlen > hlen: return -1
@@ -16990,7 +16990,7 @@ pub fn ci_find_substr(haystack: &str, needle: &str) -> i32:
 // Collect all variable declarations in a goto-lowered function body.
 // Names are made unique at the declaration site because all locals are hoisted
 // into one With function scope.
-fn ci_find_hoisted_var_decl_index(decls: &List[CiHoistedVarDecl], name: &str) -> i32:
+fn ci_find_hoisted_var_decl_index(decls: &List[CiHoistedVarDecl], name: &str) -> isize:
     var i = 0
     while i < decls.len() as i32:
         if decls[i].name == name:
@@ -17199,7 +17199,7 @@ impl CiGotoCfgContext:
         self.state.cfg.graph.set_unreachable(self.state.current)
         self.state.current = -1
 
-    fn find_label(name: &str) -> i32:
+    fn find_label(name: &str) -> isize:
         var i = 0
         while i < self.state.label_names.len() as i32:
             if self.state.label_names[i] == name:

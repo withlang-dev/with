@@ -1476,10 +1476,10 @@ impl AstPool:
     fn compiler_hook_count() -> i32:
         self.state.compiler_hook_fn_nodes.len() as i32
 
-    fn compiler_hook_node(idx: i32) -> NodeId:
+    fn compiler_hook_node(idx: isize) -> NodeId:
         self.state.compiler_hook_fn_nodes[idx] as NodeId
 
-    fn compiler_hook_phase_at(idx: i32) -> i32:
+    fn compiler_hook_phase_at(idx: isize) -> i32:
         self.state.compiler_hook_phase_syms[idx]
 
     fn mark_global_allocator_decl(node: NodeId):
@@ -1490,7 +1490,7 @@ impl AstPool:
         if self.state.global_allocator_decl_set.contains(node as i32): return 1
         0
 
-    fn get_extra(idx: i32) -> i32:
+    fn get_extra(idx: isize) -> i32:
         self.state.extra[idx]
 
     fn optional_chain_is_call(extra_start: i32) -> i32:
@@ -1537,7 +1537,7 @@ impl AstPool:
     fn decl_count() -> i32:
         self.state.decls.len() as i32
 
-    fn get_decl(idx: i32) -> NodeId:
+    fn get_decl(idx: isize) -> NodeId:
         (self.state.decls[idx]) as NodeId
 
     mut fn set_local_decl_count(n: i32):
@@ -1999,13 +1999,13 @@ impl AstPool:
     // is no such access.
     fn receiver_field_access_owner(node: i32) -> i32: self.state.receiver_field_accesses.get(node) ?? 0
 
-    fn fn_param_name(param_start: i32, param_idx: i32) -> i32:
+    fn fn_param_name(param_start: i32, param_idx: isize) -> i32:
         self.get_extra(param_start + param_idx * FN_PARAM_STRIDE)
 
-    fn fn_param_type(param_start: i32, param_idx: i32) -> i32:
+    fn fn_param_type(param_start: i32, param_idx: isize) -> i32:
         self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 1)
 
-    fn fn_param_flags(param_start: i32, param_idx: i32) -> i32:
+    fn fn_param_flags(param_start: i32, param_idx: isize) -> i32:
         self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 2)
 
     fn set_fn_param_default(param_start: i32, param_idx: i32, default_node: i32):

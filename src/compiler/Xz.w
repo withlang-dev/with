@@ -123,7 +123,7 @@ impl XzLzma:
         self.rep2 = 0
         self.rep3 = 0
 
-    mut fn bit(index: i32) -> i32:
+    mut fn bit(index: isize) -> i32:
         let p = self.probs[index] as i64
         let bound = (self.range >> 11) * p
         var result = 0

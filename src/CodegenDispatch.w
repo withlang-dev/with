@@ -17464,10 +17464,10 @@ impl Codegen:
             with_eprint("===== END PRE MIR CLEANUP =====\n")
         // A field of a packed record is accessed unaligned (§16.4), before
         // any pass reads the alignment (wl_relax_packed_access_alignment).
-        let _ = wl_relax_packed_access_alignment(function)
+        wl_relax_packed_access_alignment(function)
         // Large aggregate moves become memmove/memset before SROA can
         // scalarize them into a store per leaf (see wl_lower_aggregate_copies).
-        let _ = wl_lower_aggregate_copies(function, self.context, wl_get_module_data_layout(self.llmod), 64)
+        wl_lower_aggregate_copies(function, self.context, wl_get_module_data_layout(self.llmod), 64)
         // A codegen unit's promotion runs on its emit thread, over the whole
         // module, instead of serially here (codegen_unit_emit_module).
         let rc = if self.unit_total > 1 and not should_dump: 0 else: wl_run_function_passes(function, self.target_machine, "sroa,mem2reg")
@@ -18581,7 +18581,7 @@ impl Codegen:
             if p_kind == NodeKind.NK_TYPE_NAMED or p_kind == NodeKind.NK_IDENT:
                 let p_sym = self.pool.get_data0(p_type_node)
                 let arg_sema = self.sema_type_of_node(arg_node)
-                var canonical_tp_sym = 0
+                var canonical_tp_sym: i32 = 0
                 let want_text = self.intern.resolve(p_sym)
                 for ti in 0..tp_syms.len() as i32:
                     let candidate = tp_syms[ti]
@@ -18618,7 +18618,7 @@ impl Codegen:
                         if inner_llvm == 0:
                             continue
                         let inner_sema = self.sema.get_generic_inst_arg(arg_sema_tid, gi)
-                        var canonical_inner_sym = 0
+                        var canonical_inner_sym: i32 = 0
                         let inner_text = self.intern.resolve(inner_sym)
                         for ti in 0..tp_syms.len() as i32:
                             let candidate = tp_syms[ti]
@@ -18647,7 +18647,7 @@ impl Codegen:
         // arguments, laid out from Sema's record.
         let inst_args: List[i32] = List.new()
         for ti in 0..tp_syms.len() as i32:
-            var arg_sema = 0
+            var arg_sema: i32 = 0
             for bi in 0..bind_syms.len() as i32:
                 if bind_syms[bi] == tp_syms[ti]:
                     arg_sema = bind_sema_tys[bi]

@@ -1386,7 +1386,7 @@ fn single_run_reruns(rc: i32) -> List[str]:
 
 // ── Deep debug commands ─────────────────────────────────────────
 
-fn cli_double_dash_index(argc: i32) -> i32:
+fn cli_double_dash_index(argc: i32) -> isize:
     var i = 2
     while i < argc:
         if with_arg_at(i) == "--":
@@ -1456,7 +1456,7 @@ fn reduce_join_lines(lines: &List[str], skip_idx: i32) -> str:
 // while <name> still fails in the stage the original failed in (build vs
 // run) and, with --contains, with the same text.
 type ReducePredicate {
-    dashdash: i32,
+    dashdash: isize,
     contains: str,
     exit_mode: i32,
     exit_want: i32,
@@ -2622,7 +2622,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     // Declaration order stays the program order — the pool only overlaps runs
     // of consecutive marked targets; any other execution drains it first.
     var pool = PoolState.new()
-    var pool_failed_rc = 0
+    var pool_failed_rc: i32 = 0
     let pool_width = build_pool_width()
     // #921: the native runner is ensured lazily at the first eligible
     // Action target so non-action invocations never pay its compile.
@@ -2875,7 +2875,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 with_eprint("survey: skipping evidence target '" ++ target.name ++ "' (earlier failures)")
                 continue
             if not build_action_worker_env_enabled():
-                var worker_rc = 0
+                var worker_rc: i32 = 0
                 if build_runner_target_eligible(target, options, runner_path, &runner_fallback):
                     let effects_path = build_runner_effects_path(root, target.name)
                     let raw_rc = run_build_action_runner_process(runner_path, target, effects_path)
@@ -5273,7 +5273,7 @@ fn doc_field(line: &str, key: &str) -> str:
     ""
 
 fn doc_parse_span_start(span: &str) -> i32:
-    var value = 0
+    var value: i32 = 0
     var i = 0
     while i < span.len() as i32:
         let ch = span[i]

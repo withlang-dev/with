@@ -1050,7 +1050,7 @@ fn last_use_live_in(body: &MirBody, local: i32, drops_read: bool) -> List[i32]:
     let bb_count = body.block_count()
     var first: List[i32] = List.new()
     for bb in 0..bb_count:
-        var event = 0
+        var event: i32 = 0
         var si = 0
         while si < body.bb_stmt_counts[bb] and event == 0:
             event = last_use_stmt_event(body, body.bb_stmt_starts[bb] + si, local, drops_read)

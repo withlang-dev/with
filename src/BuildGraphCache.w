@@ -1246,7 +1246,7 @@ fn build_cache_parse_i64(text: &str) -> i64:
 
 fn build_cache_parse_i32(text: &str, fallback: i32) -> i32:
     var seen = false
-    var value = 0
+    var value: i32 = 0
     for i in 0..text.len() as i32:
         let c = text[i]
         if c < '0' or c > '9': break

@@ -418,8 +418,8 @@ fn comptime_configured_string_budget(default_budget: i64) -> i64:
     default_budget
 
 fn comptime_source_loc(text: &str, offset: i32) -> ComptimeSourceLoc:
-    var line = 1
-    var col = 1
+    var line: i32 = 1
+    var col: i32 = 1
     var i = 0
     while i < offset and i < text.len() as i32:
         if text[i] == 10:
@@ -2813,7 +2813,7 @@ fn comptime_count_ones(value: i64, width: i32) -> i32:
 
 fn comptime_count_leading_zeros(value: i64, width: i32) -> i32:
     let raw = comptime_bit_pattern(value, width)
-    var count = 0
+    var count: i32 = 0
     var bit = width - 1
     while bit >= 0:
         if (raw & exact_int_pow2_word(bit)) != 0:
@@ -2824,7 +2824,7 @@ fn comptime_count_leading_zeros(value: i64, width: i32) -> i32:
 
 fn comptime_count_trailing_zeros(value: i64, width: i32) -> i32:
     let raw = comptime_bit_pattern(value, width)
-    var count = 0
+    var count: i32 = 0
     for bit in 0..width:
         if (raw & exact_int_pow2_word(bit)) != 0:
             return count
@@ -3597,7 +3597,7 @@ impl ComptimeEvaluator:
         for ti in 0..tp_count:
             let tp_sym = self.ast.get_extra(tp_pos)
             let bound_count = self.ast.get_extra(tp_pos + 1)
-            var found_ty = 0
+            var found_ty: i32 = 0
             for si in 0..subst_count:
                 if self.sema.concrete_specialization_subst_syms[(subst_start + si)] == tp_sym:
                     found_ty = self.sema.concrete_specialization_subst_types[(subst_start + si)]
@@ -4246,8 +4246,8 @@ fn comptime_module_name_for_path(root: &str, path: &str) -> str:
     out
 
 fn comptime_line_column_for_offset(text: &str, offset: i32) -> ComptimeLineColumn:
-    var line = 0
-    var column = 0
+    var line: i32 = 0
+    var column: i32 = 0
     var i = 0
     let clamped = if offset < 0: 0 else if offset > text.len() as i32: text.len() as i32 else: offset
     while i < clamped:
@@ -4864,7 +4864,7 @@ impl ComptimeEvaluator:
         let source_paths: List[str] = List.new()
         let source_texts: List[str] = List.new()
         var absolute_source = ""
-        var has_strings = 0
+        var has_strings: i32 = 0
         if record.string_names.len() > 0:
             if output_kind != 0 and output_kind != 5:
                 let _ = self.fail(node, "Workspace.compile source strings currently support binary or check output only")
@@ -8283,7 +8283,7 @@ impl ComptimeEvaluator:
                             return self.fail(ppat, "comptime argument did not match parameter pattern")
 
         let body_signal = self.eval_expr(self.ast.get_data1(fn_node))
-        var has_mut_receiver = 0
+        var has_mut_receiver: i32 = 0
         var final_mut_receiver = comptime_value_invalid()
         if param_count > 0 and fn_param_is_mut_self(self.ast.fn_param_flags(param_start, 0)) != 0:
             let receiver_name = self.ast.fn_param_name(param_start, 0)

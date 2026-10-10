@@ -9142,6 +9142,9 @@ type BodyReturnTypeInfo {
     value_type: i32,
     mismatch: i32,
     mismatch_node: i32,
+    // §4.2.1: the type of the untyped literal values returned (`return 0`),
+    // kept apart so they take the typed returns' type instead of joining.
+    literal_type: i32,
 }
 
 impl Sema:
@@ -9175,11 +9178,16 @@ impl Sema:
             out.mismatch = rhs.mismatch
             out.mismatch_node = rhs.mismatch_node
         if rhs.saw_value_return != 0:
-            out = self.merge_body_return_type_info(move out, rhs.value_type, rhs.mismatch_node)
+            out.saw_value_return = 1
+            if rhs.value_type != 0:
+                out = self.merge_body_return_type_info(move out, rhs.value_type, rhs.mismatch_node)
+        if rhs.literal_type != 0:
+            let joined = if out.literal_type == 0: 0 else: self.arithmetic_result_type(out.literal_type as TypeId, rhs.literal_type as TypeId) as i32
+            out.literal_type = if joined != 0: joined else: rhs.literal_type
         out
 
     mut fn body_return_type_info(node: i32) -> BodyReturnTypeInfo:
-        var info = BodyReturnTypeInfo { 0, 0, 0, 0, node }
+        var info = BodyReturnTypeInfo { 0, 0, 0, 0, node, 0 }
         if node == 0:
             return info
         let kind = self.ast.kind(node)
@@ -9189,6 +9197,13 @@ impl Sema:
             let value = self.ast.get_data0(node)
             if value == 0:
                 info.saw_bare_return = 1
+                return info
+            let literal_ty = if self.expr_is_untyped_literal_arith(value): self.recorded_expr_type_or_zero(value) else: 0
+            if literal_ty != 0 and literal_ty != self.ty_void and literal_ty != self.ty_never:
+                if self.literal_return_retype != 0:
+                    self.check_expr_with_expected(value, self.literal_return_retype as TypeId)
+                info.saw_value_return = 1
+                info.literal_type = literal_ty
                 return info
             return self.merge_body_return_type_info(move info, self.recorded_expr_type_or_zero(value), node)
         if kind == NodeKind.NK_BLOCK:
@@ -9488,7 +9503,29 @@ impl Sema:
             let falls_off = body_ty == 0 or body_ty == self.ty_void
             if falls_off and entry_point == 0 and self.body_can_fall_through(body) != 0 and self.type_is_result_of_unit(info.value_type) == 0:
                 self.emit_error("missing return", body)
-            return info.value_type
+            if info.literal_type == 0:
+                return info.value_type
+            // §4.2.1: untyped literal returns take the type of the typed
+            // returns, else of a typed tail, as a literal arm of an `if` does
+            // (`if c: return 0` beside an `i32` tail is i32, not isize), and
+            // are checked again at it.
+            let tail_ty = if falls_off or body_ty == self.ty_never: 0 else: body_ty as i32
+            let anchor = if info.value_type != 0: info.value_type else: tail_ty
+            if anchor == 0 or not self.is_plain_numeric_type(anchor) or not self.is_plain_numeric_type(info.literal_type):
+                if info.value_type == 0:
+                    return info.literal_type
+                let had_mismatch: i32 = info.mismatch
+                let literal_ty: i32 = info.literal_type
+                let joined = self.merge_body_return_type_info(move info, literal_ty, body)
+                if joined.mismatch != 0 and had_mismatch == 0:
+                    self.emit_error("return type mismatch", body)
+                return joined.value_type
+            if anchor != info.literal_type:
+                let saved_retype: i32 = self.literal_return_retype
+                self.literal_return_retype = anchor
+                self.body_return_type_info(body)
+                self.literal_return_retype = saved_retype
+            return anchor
         if body_ty != 0:
             return body_ty as i32
         self.ty_void as i32
@@ -13357,7 +13394,13 @@ impl Sema:
             // or invalidated reaches the join, as for a diverging `if` arm.
             let dq_entry_states = self.save_scope_states()
             let dq_entry_mf = self.save_moved_field_state()
-            rhs = if join_expected != 0: self.check_expr_with_expected(rhs_node, join_expected as TypeId) else: self.check_expr_value_context(rhs_node)
+            // §4.2.1 rule 3: an untyped literal fallback takes the payload's
+            // numeric type, viewed or not (`m.get(k) ?? -1` is the value's
+            // type, never the isize default).
+            let payload = self.resolve_alias(unwrapped as TypeId)
+            let payload_value = if self.get_type_kind(payload) == TypeKind.TY_REF: self.get_type_d0(payload) else: payload as i32
+            let literal_peer = if join_expected == 0 and rhs_is_num_lit and self.is_numeric_type(payload_value): payload_value else: join_expected
+            rhs = if literal_peer != 0: self.check_expr_with_expected(rhs_node, literal_peer as TypeId) else: self.check_expr_value_context(rhs_node)
             if rhs == 0:
                 return 0
             if self.get_type_kind(self.resolve_alias(rhs)) == TypeKind.TY_NEVER:

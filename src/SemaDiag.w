@@ -73,7 +73,7 @@ impl Sema:
             out = out ++ f"  join[{index}].arm[{ai}] role={d22_join_arm_role_name(arm_role)} kind={d22_join_arm_kind_name(arm_kind)} node={arm_node} origin-node={origin_node} exact={self.type_name(arm_ty)}\n"
         out
 
-    fn call_param_name(fn_sym: i32, param_i: i32) -> str:
+    fn call_param_name(fn_sym: i32, param_i: isize) -> str:
         if fn_sym <= 0 or param_i < 0:
             return ""
         if not self.fn_decl_nodes.contains(fn_sym):
@@ -119,7 +119,7 @@ impl Sema:
                     return 1
         0
 
-    mut fn emit_argument_type_mismatch(call_name: &str, fn_sym: i32, arg_index: i32, param_i: i32, expected_ty: i32, actual_ty: i32, arg_node: i32):
+    mut fn emit_argument_type_mismatch(call_name: &str, fn_sym: i32, arg_index: isize, param_i: isize, expected_ty: i32, actual_ty: i32, arg_node: i32):
         // D93: a parameter demands its collection of a literal's binding.
         self.note_literal_demand(arg_node, expected_ty, arg_node)
         if self.suppress_errors != 0:

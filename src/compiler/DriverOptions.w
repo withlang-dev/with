@@ -351,7 +351,7 @@ pub type DriverTargetParseResult {
 }
 
 pub fn driver_parse_build_target(argc: i32) -> DriverTargetParseResult:
-    var kind = 0
+    var kind: i32 = 0
     var explicit = false
     var i = 2
     while i < argc:

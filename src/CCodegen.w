@@ -1055,7 +1055,7 @@ fn cc_path_with_slashes(path: &str) -> str:
             out.push_byte(ch as u8)
     out.to_str()
 
-fn cc_path_find(text: &str, needle: &str) -> i32:
+fn cc_path_find(text: &str, needle: &str) -> isize:
     if needle.len() == 0 or text.len() < needle.len():
         return -1
     var i = 0
@@ -1200,7 +1200,7 @@ impl CCodegen:
             return 0
         if self.canonical_body_cache.contains(fn_sym):
             return self.canonical_body_cache.get(fn_sym).unwrap()
-        var out = 0
+        var out: i32 = 0
         if self.body_fn_map.contains(fn_sym):
             out = fn_sym
         if out != 0:
@@ -1224,7 +1224,7 @@ impl CCodegen:
         let cached = self.body_fn_name_map.get(name)
         if cached.is_some():
             return cached.unwrap()
-        var out = 0
+        var out: i32 = 0
         for i in 0..self.mir_mod.body_fn_syms.len() as i32:
             let sym = self.mir_mod.body_fn_syms[i]
             if cc_intern_resolve(self.intern, sym) == name:
@@ -1779,7 +1779,7 @@ impl CCodegen:
         let name = cc_intern_resolve(self.intern, field_id)
         if name.len() == 0:
             return -1
-        var idx = 0
+        var idx: i32 = 0
         for i in 0..name.len() as i32:
             let ch = name[i]
             if ch < 48 or ch > 57:
@@ -5358,7 +5358,7 @@ impl CCodegen:
         if self.sig_idx_cache.contains(fn_sym):
             return self.sig_idx_cache.get(fn_sym).unwrap()
 
-        var out = -1
+        var out: i32 = -1
         let canon = self.canonical_body_sym(fn_sym)
         if canon != 0:
             let canon_sig = self.sema.get_sig(canon)

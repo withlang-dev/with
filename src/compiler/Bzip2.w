@@ -56,8 +56,8 @@ type BzHuffman {
 }
 
 fn bz_huffman(lengths: &List[i32]) -> BzHuffman:
-    var min_len = 32
-    var max_len = 0
+    var min_len: i32 = 32
+    var max_len: i32 = 0
     for i in 0..lengths.len() as i32:
         if lengths[i] > max_len: max_len = lengths[i]
         if lengths[i] < min_len: min_len = lengths[i]

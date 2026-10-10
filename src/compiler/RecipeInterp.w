@@ -143,7 +143,7 @@ fn py_lex(src: &str) -> List[PyTok]:
     while i < n:
         if at_line_start and depth == 0:
             // Measure the indentation; a blank or comment-only line has none.
-            var col = 0
+            var col: i32 = 0
             var j = i
             while j < n and (src[j] == ' ' or src[j] == '\t'):
                 col = if src[j] == '\t': (col / 8 + 1) * 8 else: col + 1
@@ -253,7 +253,7 @@ fn py_lex_string_body(src: &str, at: i32) -> (str, i32, i32):
     let triple = at + 2 < n and src[at + 1] == q and src[at + 2] == q
     var i = if triple: at + 3 else: at + 1
     let start = i
-    var lines = 0
+    var lines: i32 = 0
     while i < n:
         let c = src[i]
         if c == '\\' and i + 1 < n:
@@ -811,7 +811,7 @@ impl PyParser:
         if self.is_word("import") or self.is_word("from") or self.is_word("assert") or self.is_word("global") or self.is_word("nonlocal"):
             self.skip_line()
             return -1
-        var node = -1
+        var node: i32 = -1
         if self.accept_word("return"):
             let value = if self.kind() == PT_NEWLINE or self.kind() == PT_EOF: -1 else: self.expression_list()
             node = self.mk(N_RETURN, value, -1, -1, "", List.new(), line)

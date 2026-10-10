@@ -322,7 +322,7 @@ impl Sema:
             let owned_path = frontend_owned_text(mod.path)
             self.module_paths.push(owned_path)
             self.module_import_starts.push(self.module_import_targets.len() as i32)
-            var visible_count = 0
+            var visible_count: i32 = 0
             for ii in 0..mod.import_count:
                 let imp = resolved.imports[(mod.import_start + ii)]
                 if imp.namespace.len() > 0 and (imp.target_module >= 0 or imp.module_text.len() == 0):
@@ -2336,7 +2336,7 @@ impl Zcu:
                 while li < lines.len() as i32 and (lines[li].starts_with(" ") or lines[li].starts_with("\t") or lines[li].len() == 0 or lines[li].starts_with("//")):
                     li = li + 1
                 var declaration = StringBuilder.new()
-                var count = 0
+                var count: i32 = 0
                 for bi in start..li:
                     declaration.push_str(lines[bi])
                     declaration.push_str("\n")

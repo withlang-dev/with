@@ -464,7 +464,7 @@ fn uat_run_steps(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> U
             let label = f"step-{steps}"
             let stdout_path = uat_join(capture_dir, label ++ ".stdout")
             let stderr_path = uat_join(capture_dir, label ++ ".stderr")
-            var rc = 0
+            var rc: i32 = 0
             if have_stdin:
                 if cwd != root:
                     return uat_fail(steps, step, "'stdin:' cannot follow 'new directory' yet: the runtime has no capture-with-input-and-cwd seam; put the stdin step before 'new directory'", "", move human)

@@ -769,7 +769,7 @@ pub fn project_config_absolutize_path(path: &str) -> str:
         return with_str_clone_ref(path)
     project_config_normalize_absolute_path(resolve_join(cwd, path))
 
-fn project_config_find_char(text: &str, ch: i32) -> i32:
+fn project_config_find_char(text: &str, ch: i32) -> isize:
     var i = 0
     while i < text.len() as i32:
         if text[i] == ch:

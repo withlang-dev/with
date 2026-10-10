@@ -386,13 +386,13 @@ impl TokenList:
     fn len() -> i32:
         self.tags.len() as i32
 
-    fn get_tag(index: i32) -> i32:
+    fn get_tag(index: isize) -> i32:
         self.tags[index]
 
-    fn get_start(index: i32) -> i32:
+    fn get_start(index: isize) -> i32:
         self.starts[index]
 
-    fn get_end(index: i32) -> i32:
+    fn get_end(index: isize) -> i32:
         self.ends[index]
 
     // Convenience: construct a Span for token at index with a given file_id.

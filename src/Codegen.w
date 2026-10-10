@@ -3947,7 +3947,7 @@ impl Codegen:
         let tp_count = tp_count_opt.unwrap()
         let sema_args: List[i32] = List.new()
         for ti in 0..tp_count:
-            var arg_sema = 0
+            var arg_sema: i32 = 0
             if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
                 arg_sema = self.mono_struct_tp_flat_sema_types[(tp_flat_start + ti)]
             if arg_sema == 0 and tp_flat_start + ti < self.mono_struct_tp_flat_types.len() as i32:
@@ -4237,7 +4237,7 @@ impl Codegen:
                     let tp_count = tp_count_opt.unwrap()
                     let sema_args: List[i32] = List.new()
                     for ti in 0..tp_count:
-                        var arg_sema = 0
+                        var arg_sema: i32 = 0
                         if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
                             arg_sema = self.mono_struct_tp_flat_sema_types[(tp_flat_start + ti)]
                         if arg_sema == 0 and tp_flat_start + ti < self.mono_struct_tp_flat_types.len() as i32:
@@ -5344,7 +5344,7 @@ impl Codegen:
         // reference sees (the repr integer, or the tagged struct), so it is
         // registered with the rows below before any payload is resolved: a
         // payload's resolution can define another enum on demand (#1430).
-        var any_has_payload = 0
+        var any_has_payload: i32 = 0
         var scan = extra_start + 2
         for vi in 0..variant_count:
             let scan_count = self.pool.get_extra(scan + 2)
@@ -6120,7 +6120,7 @@ impl Codegen:
         fat = wl_build_insert_value(self.builder, fat, function, 0)
         wl_build_insert_value(self.builder, fat, wl_const_null(wl_ptr_type(self.context)), 1)
 
-    fn fn_abi_arg(abi: i32, pi: i32) -> ArgAbi: self.fn_abi_args[self.fn_abis[abi].arg_start + pi]
+    fn fn_abi_arg(abi: i32, pi: isize) -> ArgAbi: self.fn_abi_args[self.fn_abis[abi].arg_start + pi]
 
     // FnAbi's answer for whether parameter `pi` of `fn_sym` arrives as an
     // address — PM_INDIRECT (a copy the caller made), PM_INDIRECT_PLACE (the
@@ -6136,7 +6136,7 @@ impl Codegen:
     // Both MIR operands and synthesized/thunk values arrive here after their
     // semantic adjustments. Only this routine turns an ArgAbi into a value,
     // a pointer to a copy, or a pointer to the caller's place.
-    mut fn push_call_arg(abi: i32, pi: i32, value: i64, place: i64) -> i64:
+    mut fn push_call_arg(abi: i32, pi: isize, value: i64, place: i64) -> i64:
         let arg = self.fn_abi_arg(abi, pi)
         self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.DirectValue
         if arg.owned_place and place != 0:
@@ -6689,7 +6689,7 @@ impl Codegen:
     fn c_abi_sysv_register_cost(abi_ty: i64) -> i32:
         let kind = wl_get_type_kind(abi_ty)
         if kind == wl_struct_type_kind():
-            var cost = 0
+            var cost: i32 = 0
             for fi in 0..wl_count_struct_elem_types(abi_ty):
                 cost = cost + self.c_abi_sysv_register_cost(wl_struct_get_type_at(abi_ty, fi))
             return cost

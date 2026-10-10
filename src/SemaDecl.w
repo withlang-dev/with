@@ -244,7 +244,7 @@ impl Sema:
             let kind = self.ast.kind(decl)
             if kind == NodeKind.NK_IMPL_DECL:
                 let trait_sym = self.ast.get_data2(decl)
-                var origin = 0
+                var origin: i32 = 0
                 if trait_sym != 0:
                     origin = 1
                 let impl_start = self.ast.get_start(decl)
@@ -342,7 +342,7 @@ impl Sema:
         var last_path = ""
         var last_flag = 0
         for di in 0..decl_count:
-            var flag = 0
+            var flag: i32 = 0
             if di < self.decl_source_paths.len() as i32:
                 let path = self.decl_source_paths[di]
                 if path == last_path:

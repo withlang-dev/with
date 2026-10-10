@@ -1074,7 +1074,7 @@ impl Sema:
     // The callback-scope handle whose representation is `tid`, or -1 (none,
     // or several: a representation two handles wrap names neither).
     fn facade_handle_wrapping(tid: i32) -> i32:
-        var found = -1
+        var found: i32 = -1
         var n = 0
         for ri in 0..self.facade_resources.len() as i32:
             if self.facade_resources[ri].handle != 0 and self.facade_same_type(self.facade_resources[ri].repr_tid, tid):
@@ -1683,7 +1683,7 @@ impl Sema:
                 if tid == 0:
                     return c
                 let rt = self.resolve_alias(tid as TypeId)
-                var ckind = 0
+                var ckind: i32 = 0
                 let callback_ref = self.ast.get_extra(cops + 2)
                 let retainer_ref = self.ast.get_extra(cops + 4)
                 if callback_ref != 0 or retainer_ref != 0:
@@ -1852,7 +1852,7 @@ impl Sema:
         let fname: str = self.pool_resolve(fn_sym)
         if rk == FACADE_PARAM_REF_INDEX:
             let digits: str = self.pool_resolve(self.ast.get_data1(ref_node))
-            var idx = 0
+            var idx: i32 = 0
             for i in 0..digits.len() as i32:
                 idx = idx * 10 + ((digits[i] as i32) - 48)
             if idx >= count:
@@ -2841,7 +2841,7 @@ impl Sema:
         if source < 0: return -1
         if ci < 0: return source
         let c = &self.foreign_contracts[ci]
-        var presented = 0
+        var presented: i32 = 0
         for pi in 0..(source + 1):
             if c.fixed_params.contains(pi) or c.buffer_len.contains(pi) or c.consumes_destroyed_by.contains(pi):
                 if pi == source: return -1
@@ -4679,7 +4679,7 @@ impl Sema:
             // consumed userdata's callback is kept by C past the call and
             // is not modeled nullable; nor is any other parameter here.
             let paired_cb = self.facade_contract_callback_param(ci)
-            var nullable = 0
+            var nullable: i32 = 0
             var bad: i32 = -1
             for k in 0..self.foreign_contracts[ci].nullable_params.len() as i32:
                 let npi = self.foreign_contracts[ci].nullable_params[k]

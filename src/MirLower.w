@@ -1615,7 +1615,7 @@ impl MirBuilder:
             i = i - 1
         LoopInfo { label: 0, target_kind: 0, continue_bb: -1, break_bb: -1, result_place: -1, break_drop_depth: 0, break_defer_depth: 0, break_scope_depth: 0 }
 
-    fn find_goto_label_index(label: i32) -> i32:
+    fn find_goto_label_index(label: i32) -> isize:
         var i = 0
         while i < self.goto_label_syms.len():
             if self.goto_label_syms[i] == label:
@@ -1623,7 +1623,7 @@ impl MirBuilder:
             i = i + 1
         -1
 
-    mut fn ensure_goto_label(label: i32, scope_depth: i32) -> i32:
+    mut fn ensure_goto_label(label: i32, scope_depth: i32) -> isize:
         let existing = self.find_goto_label_index(label)
         if existing >= 0:
             if scope_depth >= 0 and self.goto_label_scope_depths[existing] < 0:
@@ -1644,7 +1644,7 @@ impl MirBuilder:
             return
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_LABEL:
-            let _ = self.ensure_goto_label(self.ast.get_data0(node), scope_depth)
+            self.ensure_goto_label(self.ast.get_data0(node), scope_depth)
             self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
             return
         if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_ASYNC_SCOPE or kind == NodeKind.NK_SCOPE:
@@ -1998,7 +1998,7 @@ impl MirBuilder:
             return 0
         // Check for second type argument (d2 of NodeKind.NK_INDEX) — HashMap[K, V]
         let type_arg2_node = self.ast.get_data2(node)
-        var arg2_type = 0
+        var arg2_type: i32 = 0
         if type_arg2_node != 0:
             arg2_type = self.resolve_type_arg_node(type_arg2_node)
         // The instance Sema.check_index created. #2000: by identity, not by
@@ -2130,7 +2130,7 @@ impl MirBuilder:
             field_name = self.sema.pool_resolve(field_token)
         if field_name.len() == 0:
             return -1
-        var idx = 0
+        var idx: i32 = 0
         for vi in 0..field_name.len():
             let ch = field_name[vi]
             if ch >= 48 and ch <= 57:
@@ -2548,7 +2548,7 @@ impl MirBuilder:
                 continue
 
             if proj_kind == ProjKind.PK_FIELD:
-                var field_ty = 0
+                var field_ty: i32 = 0
                 if active_variant_idx >= 0:
                     field_ty = self.enum_payload_type(current_ty, active_variant_idx, proj_d0)
                 else if tk == TypeKind.TY_TUPLE:
@@ -6676,7 +6676,7 @@ impl MirBuilder:
                     let ip_idx_tmp = self.new_temp(ip_idx_ty)
                     let ip_idx_place = self.place_for_local(ip_idx_tmp)
                     self.assign_operand_to_place(ip_idx_place, ip_idx_op, self.ast.get_start(place_expr))
-                    var ip_val_op = 0
+                    var ip_val_op: i32 = 0
                     let ip_is_compound = self.ast.kind(rhs_expr) == NodeKind.NK_BINARY and self.ast.get_data1(rhs_expr) == place_expr
                     if ip_is_compound:
                         let ip_get_sym = self.sema.pool_lookup_symbol("get")
@@ -14759,7 +14759,7 @@ impl MirBuilder:
             let mapped_op = self.lower_call_with_operand_args(mapper_op, call_args, result_ty, node)
             self.assign_operand_to_place(result_place, mapped_op, span)
         else:
-            var payload_op = 0
+            var payload_op: i32 = 0
             if lowering == MethodLowering.OptMap:
                 let call_args2: List[i32] = List.new()
                 call_args2.push(self.operand_for_place(payload_place, payload_ty))
@@ -17007,7 +17007,7 @@ impl MirBuilder:
             // type), failing codegen when annotated and silently corrupting the
             // values when un-annotated. Mirrors the NK_TUPLE per-element rebind.
             let arr_saved_expected = self.expected_type
-            var arr_elem_expected = 0
+            var arr_elem_expected: i32 = 0
             var arr_lit_ty = self.expr_type(node)
             if arr_lit_ty == 0 or arr_lit_ty == self.sema.ty_void as i32:
                 // Annotated bindings (`let a: [?i32] = [...]`) type the literal via

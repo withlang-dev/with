@@ -458,7 +458,7 @@ fn cstr_thread_id() -> i64:
         return tid
     1
 
-fn cstr_slot_for_current_thread() -> i32:
+fn cstr_slot_for_current_thread() -> isize:
     let tid = cstr_thread_id()
     var slot = -1
     cstr_lock()
@@ -708,7 +708,7 @@ pub fn wl_get_type_kind(ty: i64) -> i32: unsafe { LLVMGetTypeKind(ty as *mut u8)
 pub fn wl_get_return_type(ft: i64) -> i64: unsafe { LLVMGetReturnType(ft as *mut u8) as i64 }
 pub fn wl_count_params(fn_val: i64) -> i32: unsafe { LLVMCountParams(fn_val as *mut u8) as i32 }
 pub fn wl_count_param_types(ft: i64) -> i32: unsafe { LLVMCountParamTypes(ft as *mut u8) as i32 }
-pub fn wl_get_param(fn_val: i64, i: i32) -> i64: unsafe { LLVMGetParam(fn_val as *mut u8, i as u32) as i64 }
+pub fn wl_get_param(fn_val: i64, i: isize) -> i64: unsafe { LLVMGetParam(fn_val as *mut u8, i as u32) as i64 }
 pub fn wl_get_int_type_width(ty: i64) -> i32: unsafe { LLVMGetIntTypeWidth(ty as *mut u8) as i32 }
 pub fn wl_is_fn_var_arg(ft: i64) -> i32: unsafe { LLVMIsFunctionVarArg(ft as *mut u8) }
 pub fn wl_global_get_value_type(v: i64) -> i64:
@@ -1097,7 +1097,7 @@ pub fn wl_parse_bitcode_in_context(ctx: i64, path: &str) -> i64:
 pub fn wl_fn_is_declaration(f: i64) -> i32: unsafe { LLVMIsDeclaration(f as *mut u8) }
 pub fn wl_fn_block_count(f: i64) -> i32: unsafe { LLVMCountBasicBlocks(f as *mut u8) as i32 }
 
-pub fn wl_fn_instruction_count(f: i64) -> i32:
+pub fn wl_fn_instruction_count(f: i64) -> isize:
     var count = 0
     unsafe:
         var bb = LLVMGetFirstBasicBlock(f as *mut u8)
@@ -1118,7 +1118,7 @@ pub fn wl_fn_instruction_count(f: i64) -> i32:
 // is guaranteed: the target emits an unaligned access ("The compiler emits
 // unaligned loads/stores"). Runs before the per-function cleanup passes;
 // returns the number of accesses relaxed.
-pub fn wl_relax_packed_access_alignment(f: i64) -> i32:
+pub fn wl_relax_packed_access_alignment(f: i64) -> isize:
     var relaxed = 0
     unsafe:
         var bb = LLVMGetFirstBasicBlock(f as *mut u8)
@@ -1167,7 +1167,7 @@ fn wl_address_through_packed_struct(addr: i64) -> bool:
 // destination may be the same place), a store of a zero aggregate becomes
 // `llvm.memset`, and a load left without uses is erased. Runs before the
 // per-function cleanup passes; returns the number of stores rewritten.
-pub fn wl_lower_aggregate_copies(f: i64, ctx: i64, dl: i64, min_bytes: i64) -> i32:
+pub fn wl_lower_aggregate_copies(f: i64, ctx: i64, dl: i64, min_bytes: i64) -> isize:
     var rewritten = 0
     unsafe:
         let builder = LLVMCreateBuilderInContext(ctx as *mut u8)
@@ -1333,7 +1333,7 @@ pub fn wl_build_insert_value(b: i64, agg: i64, val: i64, idx: i32) -> i64:
 
 // ── Builder: call ───────────────────────────────────────────────
 
-pub fn wl_build_call(b: i64, fn_ty: i64, fn_val: i64, args_ptr: i64, cnt: i32) -> i64:
+pub fn wl_build_call(b: i64, fn_ty: i64, fn_val: i64, args_ptr: i64, cnt: isize) -> i64:
     unsafe:
         let args = if cnt > 0: args_ptr as *const *mut u8 else: 0 as *const *mut u8
         LLVMBuildCall2(b as *mut u8, fn_ty as *mut u8, fn_val as *mut u8, args, cnt as u32, empty_cstr()) as i64

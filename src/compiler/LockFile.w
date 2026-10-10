@@ -58,7 +58,7 @@ fn lock_json_string(key: &str, value: &str, comma: bool) -> str:
     let suffix = if comma: "," else: ""
     "      " ++ q ++ key ++ q ++ ": " ++ q ++ lock_json_escape(value) ++ q ++ suffix ++ "\n"
 
-fn lock_find_text(text: &str, needle: &str) -> i32:
+fn lock_find_text(text: &str, needle: &str) -> isize:
     if needle.len() == 0:
         return 0
     let n = text.len() as i32
@@ -326,7 +326,7 @@ fn lock_ref_version(req: &str) -> str:
     let slash = lock_find_text(req, "/")
     if slash <= 0:
         return ""
-    var end = req.len() as i32
+    var end = req.len()
     let at = lock_find_text(req, "@")
     if at > slash:
         end = at

@@ -23,7 +23,7 @@ fn http_empty_response(status: i32) -> HttpResponse:
 fn http_parse_url(url: &str) -> HttpUrl:
     var host: str = ""
     var path: str = "/"
-    let port = 443
+    let port: i32 = 443
     if not url.starts_with("https://"):
         return HttpUrl { host, path, port }
 

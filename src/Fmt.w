@@ -234,8 +234,8 @@ pub fn format_source_styled(input: &str, style: i32) -> str:
     var block_kw_active = false
     var close_stack: List[i32] = List.new()
     var suppress_stack: List[i32] = List.new()
-    var brace_depth = 0
-    var semi_indent = -1
+    var brace_depth: i32 = 0
+    var semi_indent: i32 = -1
     // prefer-brace: `}`s owed on this line by inline `: expr` conversions
     var inline_close_count = 0
     // Paren/bracket nesting: a colon inside (…) or […] is a parameter or

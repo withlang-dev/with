@@ -2071,6 +2071,10 @@ pub type Sema {
     infer_tail_node: i32,
     infer_tail_is_closure: i32,
     infer_tail_join: i32,
+    // §4.2.1: the type an unannotated function's untyped literal `return`
+    // values are checked again at once its return type is inferred; 0 when
+    // body_return_type_info only reads.
+    literal_return_retype: i32,
     // §9.1 / D43: the block that is a function's or closure's own body. Only
     // its tail, never an arm block's, is discarded when it is an assignment.
     body_tail_block: i32,
@@ -3752,6 +3756,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         infer_tail_node: 0,
         infer_tail_is_closure: 0,
         infer_tail_join: 0,
+        literal_return_retype: 0,
         body_tail_block: 0,
         body_tail_holder: 0,
         body_tail_discards: true,
@@ -4228,7 +4233,7 @@ impl Sema:
         // path, but it is the importer's IMPORT (tier 3), not its own
         // declaration (tier 2): the module's own `fn twice` outranks the
         // header's `twice`, which its namespace still names (D70).
-        var own_import = 0
+        var own_import: i32 = 0
         var i = head
         while i >= 0 and chosen == 0:
             if self.displaced_fn_paths[i] == self.current_module_path:
@@ -5101,7 +5106,7 @@ impl Sema:
 
     fn lookup_named_type_filtered(sym: i32, gated: i32) -> i32:
         let named_tid = if self.named_types.contains(sym): self.named_types.get(sym).unwrap() else: 0
-        var global_tid = 0
+        var global_tid: i32 = 0
         var saw_recorded: i32 = 0
         var saw_named_tid: i32 = 0
         // The scoped tier first (#1967): `Self` and a generic type parameter
@@ -5733,7 +5738,7 @@ impl Sema:
 
     fn index_exact_type(tid: i32, kind: i32, d0: i32, d1: i32, d2: i32):
         let key = sema_exact_type_hash(kind, d0, d1, d2)
-        var head = -1
+        var head: i32 = -1
         if self.exact_type_cache_heads.contains(key):
             head = self.exact_type_cache_heads.get(key).unwrap()
         var existing = head
@@ -6449,7 +6454,7 @@ impl Sema:
         // user module's `type PullCore { .. }` beside std.task's private
         // `PullCore[G]`) must not pick a non-generic namesake.
         let base_sym = self.get_type_d0(resolved)
-        var generic_only = 0
+        var generic_only: i32 = 0
         var i = self.named_type_candidate_head(base_sym)
         while i >= 0:
             let candidate_tid = self.resolve_alias(self.named_type_candidate_tids[i] as TypeId) as i32
@@ -6758,7 +6763,7 @@ impl Sema:
             let d0_text = self.pool_resolve_symbol(d0)
             if d0_text.len() == 0:
                 return tid
-            var found = 0
+            var found: i32 = 0
             var found_count = 0
             for si2 in 0..count:
                 let subst_sym2 = subst_syms[si2]
@@ -9661,7 +9666,7 @@ impl Sema:
     fn sig_return_type(idx: i32) -> i32:
         self.sig_ret_types[idx]
 
-    fn sig_param_type(idx: i32, param_i: i32) -> i32:
+    fn sig_param_type(idx: i32, param_i: isize) -> i32:
         let start = self.sig_param_starts[idx]
         self.sig_params[(start + param_i)]
 
@@ -10064,7 +10069,7 @@ impl Sema:
                         if self.get_type_kind(box_exp_arg_r) == TypeKind.TY_TRAIT_OBJ:
                             if self.type_implements_trait(box_act_arg, self.get_type_d0(box_exp_arg_r)) != 0:
                                 return 1
-                    var gi_all_match = 1
+                    var gi_all_match: i32 = 1
                     for gi_i in 0..gi_ac:
                         let gi_exp_arg = self.get_generic_inst_arg(exp_r, gi_i)
                         let gi_act_arg = self.get_generic_inst_arg(act_r, gi_i)
@@ -10324,7 +10329,7 @@ impl Sema:
                         if self.get_type_kind(box_exp_arg_r) == TypeKind.TY_TRAIT_OBJ:
                             if self.type_implements_trait_frozen(box_act_arg, self.get_type_d0(box_exp_arg_r)) != 0:
                                 return 1
-                    var gi_all_match = 1
+                    var gi_all_match: i32 = 1
                     for gi_i in 0..gi_ac:
                         let gi_exp_arg = self.get_generic_inst_arg(exp_r, gi_i)
                         let gi_act_arg = self.get_generic_inst_arg(act_r, gi_i)
@@ -10583,7 +10588,7 @@ impl Sema:
                 return 0
             self.copy_visit_stack.insert(resolved as i32)
 
-            var out = 1
+            var out: i32 = 1
             if tk == TypeKind.TY_ARRAY:
                 out = self.is_copy(self.get_type_d0(resolved))
             else if tk == TypeKind.TY_TUPLE:

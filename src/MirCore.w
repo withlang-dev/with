@@ -1282,7 +1282,7 @@ pub fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
         child_counts[base] = child_counts[base] + 1
     var child_starts: List[i32] = List.new()
     var fill: List[i32] = List.new()
-    var total = 0
+    var total: i32 = 0
     for li in 0..local_count:
         child_starts.push(total)
         fill.push(total)
@@ -1828,7 +1828,7 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
     succ_starts.push(succs.len() as i32)
     var pred_starts: List[i32] = List.new()
     var fill: List[i32] = List.new()
-    var total = 0
+    var total: i32 = 0
     for bb in 0..bb_count:
         pred_starts.push(total)
         fill.push(total)
@@ -3892,7 +3892,7 @@ fn mir_validate_place_prefix_type(mir_mod: &MirModule, body: &MirBody, place_id:
             continue
 
         if proj_kind == ProjKind.PK_FIELD:
-            var field_ty = 0
+            var field_ty: i32 = 0
             if active_variant_idx >= 0:
                 field_ty = mir_validate_enum_payload_type(mir_mod, current_ty, active_variant_idx, proj_d0)
             else if tk == TypeKind.TY_TUPLE:

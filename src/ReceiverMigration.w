@@ -146,7 +146,7 @@ fn relocation_fact_at(facts: &RelocationFacts, path: &str, offset: i32) -> i32:
     -1
 
 impl RelocationFacts:
-    mut fn relocate_file(path: &str, apply: bool, list_methods: bool) -> i32:
+    mut fn relocate_file(path: &str, apply: bool, list_methods: bool) -> isize:
         let text = with_fs_read_file(path)
         let tlen = text.len() as i32
         if tlen == 0:
@@ -492,7 +492,7 @@ pub fn run_receiver_migration -> i32:
     let selected = count_selected(&facts, &excludes)
     // Always complete a no-write structural preflight over the whole semantic
     // selection before the first file can be changed.
-    var preflight = 0
+    var preflight: isize = 0
     for i in 0..paths.len() as i32:
         let changed = facts.relocate_file(paths[i], false, list_methods)
         if changed < 0: exit_code(1)
@@ -505,7 +505,7 @@ pub fn run_receiver_migration -> i32:
         print(f"receiver-relocation: selected={selected} matched={preflight} files={paths.len() as i32} mode=report")
         return 0
     facts.reset_matches()
-    var changed_total = 0
+    var changed_total: isize = 0
     for i in 0..paths.len() as i32:
         let changed = facts.relocate_file(paths[i], true, false)
         if changed < 0: exit_code(1)
