@@ -10186,12 +10186,13 @@ impl Sema:
                             break
                     if gi_all_ok != 0:
                         return 1
-        // Auto-referencing: T → &T. The reference views the argument's own
-        // place, so its numeric type is the pointee's: an `i32` place viewed
-        // as `&i64` read eight bytes of four (-1 read as 4294967295).
+        // Auto-referencing: T → &T. A narrower argument widens into the
+        // pointee (§4.2.6; #2336 materializes it); a wider one or another
+        // sign would be an implicit narrowing, which no position makes.
         if exp_k == TypeKind.TY_REF:
             if self.get_type_d1(exp_r) == 0:
-                if self.numeric_types_differ(self.get_type_d0(exp_r), act_r as i32):
+                let auto_pointee = self.get_type_d0(exp_r)
+                if self.numeric_types_differ(auto_pointee, act_r as i32) and self.implicit_numeric_join(auto_pointee as TypeId, act_r) != self.resolve_alias(auto_pointee as TypeId):
                     return 0
                 if self.types_compatible(self.get_type_d0(exp_r), act_r) != 0:
                     return 1

@@ -13040,10 +13040,12 @@ impl Sema:
             return 1
         let sig_idx = self.lookup_method_sig(owner_sym, contains_sym)
         let trait_arg_ty = self.membership_contains_trait_arg_type(rhs_ty, contains_trait_sym)
-        if trait_arg_ty != 0 and self.call_arg_type_compatible(trait_arg_ty, lhs_ty) == 0:
+        // `1 in w` at `contains(item: &i32)`: the literal is that i32 (§4.2.1).
+        var value_ty = if trait_arg_ty != 0: self.retype_literal_call_arg(lhs_node, trait_arg_ty, lhs_ty) else: lhs_ty
+        if trait_arg_ty != 0 and self.call_arg_type_compatible(trait_arg_ty, value_ty) == 0:
             let trait_method_name = self.pool_resolve(owner_sym) ++ ".contains"
             let trait_fn_sym = self.lookup_method_fn(owner_sym, contains_sym)
-            self.emit_argument_type_mismatch(trait_method_name, trait_fn_sym, 0, 1, trait_arg_ty, lhs_ty, lhs_node)
+            self.emit_argument_type_mismatch(trait_method_name, trait_fn_sym, 0, 1, trait_arg_ty, value_ty, lhs_node)
             return 0
         if sig_idx < 0:
             return 1
@@ -13057,8 +13059,9 @@ impl Sema:
             self.emit_argument_type_mismatch(method_name, fn_sym, 0, 0, recv_expected, rhs_ty, node)
             return 0
         let value_expected = self.sig_param_type(sig_idx, 1)
-        if value_expected != 0 and self.call_arg_type_compatible(value_expected, lhs_ty) == 0:
-            self.emit_argument_type_mismatch(method_name, fn_sym, 0, 1, value_expected, lhs_ty, lhs_node)
+        if value_expected != 0: value_ty = self.retype_literal_call_arg(lhs_node, value_expected, value_ty)
+        if value_expected != 0 and self.call_arg_type_compatible(value_expected, value_ty) == 0:
+            self.emit_argument_type_mismatch(method_name, fn_sym, 0, 1, value_expected, value_ty, lhs_node)
             return 0
         let ret = self.sig_return_type(sig_idx)
         if self.types_compatible(self.ty_bool as i32, ret) == 0:
@@ -13824,6 +13827,15 @@ impl Sema:
             if lhs_ptr_like != rhs_ptr_like and ptr_zero_cmp == 0 and ptr_none_cmp == 0:
                 self.emit_error("comparison operands must have compatible types", node)
                 return 0
+            // Two instances of one generic type: `Option[i32]` beside
+            // `Option[isize]` has no comparison short of converting a payload,
+            // and an aggregate's elements do not convert (#1368). Accepting
+            // it left MIR to refuse it.
+            let lhs_cmp_value = if lhs_cmp_kind == TypeKind.TY_REF: self.auto_deref_ref_ptr_type(self.resolve_alias(lhs)) else: self.resolve_alias(lhs)
+            let rhs_cmp_value = if rhs_cmp_kind == TypeKind.TY_REF: self.auto_deref_ref_ptr_type(self.resolve_alias(rhs)) else: self.resolve_alias(rhs)
+            if self.get_type_kind(lhs_cmp_value) == TypeKind.TY_GENERIC_INST and self.get_type_kind(rhs_cmp_value) == TypeKind.TY_GENERIC_INST and self.aggregate_repr_differs(lhs_cmp_value, rhs_cmp_value, 0) != 0:
+                self.emit_error(f"comparison operands must have the same type: `{self.type_name(lhs_cmp_value as i32)}` and `{self.type_name(rhs_cmp_value as i32)}`; an aggregate's elements do not convert (§4.2.6)", node)
+                return 0
             if bool_int_cmp == 0 and ptr_like_cmp == 0 and ptr_zero_cmp == 0 and ptr_none_cmp == 0 and self.builtin_arg_type_compatible(lhs, rhs) == 0 and self.builtin_arg_type_compatible(rhs, lhs) == 0:
                 self.emit_error("comparison operands must have compatible types", node)
                 return 0
@@ -13867,15 +13879,6 @@ impl Sema:
                 if not self.types_identical(lhs_tuple, rhs_tuple):
                     self.emit_error(f"comparison operands must have the same tuple type: `{self.type_name(lhs_tuple)}` and `{self.type_name(rhs_tuple)}`", node)
                     return 0
-            // So with two instances of one generic type: `Option[i32]` beside
-            // `Option[isize]` has no comparison short of converting a payload,
-            // and an aggregate's elements do not convert (#1368). Accepting
-            // it left MIR to refuse it.
-            let lhs_cmp_value = if lhs_cmp_kind == TypeKind.TY_REF: self.auto_deref_ref_ptr_type(self.resolve_alias(lhs)) else: self.resolve_alias(lhs)
-            let rhs_cmp_value = if rhs_cmp_kind == TypeKind.TY_REF: self.auto_deref_ref_ptr_type(self.resolve_alias(rhs)) else: self.resolve_alias(rhs)
-            if self.get_type_kind(lhs_cmp_value) == TypeKind.TY_GENERIC_INST and self.get_type_kind(rhs_cmp_value) == TypeKind.TY_GENERIC_INST and self.aggregate_repr_differs(lhs_cmp_value, rhs_cmp_value, 0) != 0:
-                self.emit_error(f"comparison operands must have the same type: `{self.type_name(lhs_cmp_value as i32)}` and `{self.type_name(rhs_cmp_value as i32)}`; an aggregate's elements do not convert (§4.2.6)", node)
-                return 0
             if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ:
                 self.note_structural_equality(lhs as i32, node)
             return self.ty_bool as i32
@@ -24021,6 +24024,17 @@ impl Sema:
         let end = self.ast.get_data1(node)
         let inclusive = self.ast.get_data2(node)
         var elem_type: TypeId = self.ty_i32
+        // §4.2.1 rule 1: a demanded range types its untyped bounds, as a
+        // demanded collection types its elements (`let r: Range[i32] = 2..7`).
+        let demanded = if self.has_expected_type != 0 and self.expected_expr_type != 0: self.resolve_alias(self.expected_expr_type) else: 0 as TypeId
+        let demanded_elem = if demanded != 0 and self.get_type_kind(demanded) == TypeKind.TY_RANGE: self.get_type_d0(demanded) else: 0
+        if demanded_elem != 0 and self.is_numeric_type(demanded_elem) and self.get_type_d1(demanded) == inclusive:
+            let first = if start != 0: start else: end
+            if first != 0 and self.expr_is_untyped_literal_arith(first):
+                elem_type = self.check_expr_with_expected(first, demanded_elem as TypeId)
+                if start != 0 and end != 0:
+                    let _ = self.check_expr_with_owned_demand(end, elem_type)
+                return self.ensure_exact_type(TypeKind.TY_RANGE, elem_type as i32, inclusive, 0) as i32
         // §4.2.1 rule 3: an untyped literal bound takes its peer's type, so
         // `0..n` with `n: i64` is a Range[i64] (#1803: the end is an owned
         // demand of the start's type, and would otherwise narrow).

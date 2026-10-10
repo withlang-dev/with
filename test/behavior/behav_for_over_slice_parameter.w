@@ -22,5 +22,5 @@ fn sum_array(xs: &[3]i32) -> i32:
 fn main:
     let nums = [1, 2, 3]
     let words = ["one", "two"]
-    let big = [4, 5, 6, 7]
+    let big: List[i32] = [4, 5, 6, 7]
     print(f"{sum(nums[..])} {join(words[..])} {sum_array(&nums) + sum(big[0..0]) + 3} {sum(big[2..2])}")
