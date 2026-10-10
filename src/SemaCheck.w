@@ -1261,6 +1261,13 @@ impl Sema:
     // The type an unsuffixed numeric literal takes from its operator peer: a
     // Copy view of a number is the number (#1477: `&i64 + 1` typed the literal
     // i32 and computed the sum at i32, truncating the pointee).
+    // A comparison compares values: a variant constructor beside a view
+    // (`o.get(h).unwrap() == Some(13)`, `&Option[i32]`) is typed by the
+    // viewed type, so its literal payload is an i32, not the isize default.
+    fn comparison_value_peer(ty: TypeId) -> TypeId:
+        let resolved = self.resolve_alias(ty)
+        if self.get_type_kind(resolved) == TypeKind.TY_REF: self.get_type_d0(resolved) as TypeId else: ty
+
     mut fn literal_peer_type(ty: i32) -> i32:
         let pointee = self.shared_copy_pointee(ty)
         // §4.3d: a literal beside a vector is a lane value (it broadcasts).
@@ -13600,7 +13607,7 @@ impl Sema:
         if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE:
             if self.ast.kind(lhs_node) == NodeKind.NK_VARIANT_SHORTHAND or self.comparison_operand_is_variant_call(lhs_node) != 0:
                 rhs = self.check_expr_value_context(rhs_node)
-                lhs = self.check_expr_with_expected(lhs_node, rhs)
+                lhs = self.check_expr_with_expected(lhs_node, self.comparison_value_peer(rhs))
             else if self.ast.kind(lhs_node) == NodeKind.NK_NULL_LIT:
                 rhs = self.check_expr_value_context(rhs_node)
                 let expected_null = self.null_comparison_expected_type(rhs)
@@ -13640,7 +13647,7 @@ impl Sema:
                 else:
                     lhs = self.check_expr_value_context(lhs_node)
                 if self.ast.kind(rhs_node) == NodeKind.NK_VARIANT_SHORTHAND or (rhs == 0 and self.comparison_operand_is_variant_call(rhs_node) != 0):
-                    rhs = self.check_expr_with_expected(rhs_node, lhs)
+                    rhs = self.check_expr_with_expected(rhs_node, self.comparison_value_peer(lhs))
                 else if rhs == 0 and rhs_is_num_lit and not lhs_is_num_lit:
                     let lhs_peer = self.literal_peer_type(lhs as i32)
                     rhs = self.check_expr_with_expected(rhs_node, lhs_peer as TypeId)
