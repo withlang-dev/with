@@ -7057,6 +7057,23 @@ impl Codegen:
             if d0 < 0 or d0 >= body.place_locals.len() as i32:
                 return false
             let dst_local = body.place_locals[d0]
+            // D127 (§3.1): a constant whose view is taken is an immutable
+            // static of the demanded type, never a frame slot a returned view
+            // would outlive. Its value is the global's initializer.
+            if body.place_proj_counts[d0] == 0 and body.is_static_const_local(dst_local) and not self.mir_local_ptrs.contains(dst_local) and d1 >= 0 and body.rval_kinds[d1] == RvalueKind.RK_USE:
+                let sc_sema = self.mir_place_sema_type(body, d0)
+                let sc_ty = self.mir_sema_type_to_llvm(sc_sema)
+                let sc_op = body.rval_d0[d1]
+                let sc_raw = self.mir_eval_operand(body, sc_op, 0)
+                let sc_unsigned = self.mir_operand_is_unsigned(body, sc_op)
+                let sc_val = self.mir_coerce_value_to_sema_type(sc_raw, sc_ty, sc_sema, sc_unsigned)
+                let sc_global = wl_add_global(self.llmod, sc_ty, "with.const.view")
+                wl_set_initializer(sc_global, sc_val)
+                wl_set_global_constant(sc_global, 1)
+                wl_set_linkage(sc_global, wl_private_linkage())
+                self.mir_memory_locals.insert(dst_local, 1)
+                self.mir_local_ptrs.insert(dst_local, sc_global)
+                return true
             var dst_ptr = self.mir_place_ptr(body, d0, false, 0)
             let has_projections = body.place_proj_counts[d0] > 0
             let dst_sema_ty = self.mir_place_sema_type(body, d0)

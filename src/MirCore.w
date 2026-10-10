@@ -250,6 +250,8 @@ pub type MirBody {
     // grown, moved out, stored or retained (MirLower decides; codegen places
     // the elements on the stack and the header owns no heap buffer).
     stack_literal_calls: HashMap[i32, i32],
+    // D127: locals backed by an immutable static (mark_static_const_local).
+    static_const_locals: HashMap[i32, i32],
     // MathBuiltins row id for MATH_FN calls (parallel; -1 otherwise)
     call_math_fn_ids: List[i32],
     // AST call node for generic calls (parallel to call_arg_starts, 0 if N/A)
@@ -563,6 +565,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         call_intrinsic_kinds: List.new(),
         operand_holds: HashMap.new(),
         stack_literal_calls: HashMap.new(),
+        static_const_locals: HashMap.new(),
         call_math_fn_ids: List.new(),
         call_ast_nodes: List.new(),
         call_sig_indices: List.new(),
@@ -845,6 +848,12 @@ impl MirBody:
     fn is_stack_literal_call(call_id: i32): self.stack_literal_calls.contains(call_id)
 
     fn stack_literal_kind(call_id: i32) -> i32: self.stack_literal_calls.get(call_id) ?? 0
+
+    // D127 (§3.1): the locals holding a constant whose view is taken
+    // (`&-1`); codegen backs each with an immutable static.
+    mut fn mark_static_const_local(local_id: i32): self.static_const_locals.insert(local_id, 1)
+
+    fn is_static_const_local(local_id: i32): self.static_const_locals.contains(local_id)
 
     mut fn set_call_intrinsic(call_id: i32, kind: MirIntrinsic):
         if call_id >= 0 and call_id < self.call_intrinsic_kinds.len():
