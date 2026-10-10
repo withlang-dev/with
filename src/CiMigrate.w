@@ -1536,11 +1536,9 @@ fn ci_migrate_validate_module_paths(input_dir: &str, files: &List[str]):
         owners.insert(module_path, path.clone())
     true
 
-fn ci_migrate_print_progress(file_path: &str, current: i32, total: i32):
+fn ci_migrate_print_progress(file_path: &str, current: isize, total: isize):
     let base = ci_migrate_path_basename(file_path)
-    var percent = 0
-    if total > 0:
-        percent = (current * 100) / total
+    let percent = if total > 0: (current * 100) / total else: 0
     with_write_stdout(f"migrate: processing {base} - {current}/{total}, {percent}% completed\n")
     with_flush_stdout()
 

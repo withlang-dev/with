@@ -407,7 +407,7 @@ pub fn type_decl_is_bitpacked(packed: i32) -> i32:
 pub const TDK_PACK_UNIT: i32 = 1024
 
 pub fn type_decl_pack_bits(n: i32) -> i32:
-    var e = 1
+    var e: i32 = 1
     var v = n
     while v > 1:
         v = v / 2

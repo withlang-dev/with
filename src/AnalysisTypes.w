@@ -294,12 +294,12 @@ pub fn analysis_find_from(text: &str, needle: &str, start: i32) -> i32:
 
 pub fn analysis_parse_i32(text: &str) -> i32:
     if text.len() == 0: return 0
-    var sign = 1
+    var sign: i32 = 1
     var i = 0
     if text[0] == 45:
         sign = -1
         i = 1
-    var value = 0
+    var value: i32 = 0
     while i < text.len() as i32:
         let ch = text[i] as i32
         if ch < 48 or ch > 57: return 0

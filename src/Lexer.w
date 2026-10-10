@@ -601,7 +601,7 @@ fn lex_fstring_quote_source_backslash_count(raw_backslashes: i32) -> i32:
 fn lex_raw_string_end(src: &str, pos: i32) -> i32:
     let slen = src.len() as i32
     var p = pos
-    var hash_count = 0
+    var hash_count: i32 = 0
     while p < slen and src[p] == CharCode.Hash:
         hash_count = hash_count + 1
         p = p + 1

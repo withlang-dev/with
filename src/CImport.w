@@ -5456,9 +5456,9 @@ pub fn ci_find_str(text: &str, needle: &str) -> i32:
 
 fn ci_find_binary_op_ext(s: &str) -> i32:
     // Like ci_find_binary_op but also handles comparison and logical ops
-    var best_pos = -1
+    var best_pos: i32 = -1
     var best_prec = 100
-    var best_len = 0
+    var best_len: i32 = 0
     var paren_depth = 0
     var idx: i32 = 0
     let slen = s.len() as i32
@@ -6068,9 +6068,9 @@ fn ci_lookup_simple_literal_macro_value(name: &str) -> str:
     ""
 
 fn ci_find_binary_op(s: &str) -> i32:
-    var best_pos = -1
+    var best_pos: i32 = -1
     var best_prec = 100
-    var best_len = 0
+    var best_len: i32 = 0
     var paren_depth = 0
     var idx: i32 = 0
     let slen = s.len() as i32
@@ -7855,7 +7855,7 @@ impl CiExprPool:
                     return 0 as CiExprId
                 let esc = text[(i + 1)]
                 if esc == 120 or esc == 88:
-                    var hex_value = 0
+                    var hex_value: i32 = 0
                     var j = i + 2
                     var digits = 0
                     while j < end:
@@ -7870,7 +7870,7 @@ impl CiExprPool:
                     value = hex_value & 255
                     i = j
                 else if esc >= 48 and esc <= 55:
-                    var oct_value = 0
+                    var oct_value: i32 = 0
                     var j2 = i + 1
                     var oct_digits = 0
                     while j2 < end and oct_digits < 3:
@@ -14868,7 +14868,7 @@ fn ci_render_string_literal_as_byte_array(value: &str, ty: &str) -> str:
                 return ""
             let esc = value[(i + 1)]
             if esc >= 48 and esc <= 55:
-                var byte = 0
+                var byte: i32 = 0
                 var j = i + 1
                 var digits = 0
                 while j < slen and digits < 3:
@@ -14882,7 +14882,7 @@ fn ci_render_string_literal_as_byte_array(value: &str, ty: &str) -> str:
                 i = j
                 continue
             if esc == 120 or esc == 88:
-                var byte = 0
+                var byte: i32 = 0
                 var j = i + 2
                 var digits = 0
                 while j < slen and ci_is_hex_digit(value[j]):
@@ -15012,7 +15012,7 @@ fn ci_concat_strings(s: &str) -> str:
                         continue
                     let next = s[(i + 1)]
                     if next >= 48 and next <= 55:
-                        var value = 0
+                        var value: i32 = 0
                         var j = i + 1
                         var digits = 0
                         while j < slen and digits < 3:
@@ -15029,7 +15029,7 @@ fn ci_concat_strings(s: &str) -> str:
                         i = j
                         continue
                     if next == 120 or next == 88:
-                        var value = 0
+                        var value: i32 = 0
                         var j = i + 2
                         while j < slen:
                             let d = s[j]

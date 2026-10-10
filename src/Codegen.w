@@ -6583,7 +6583,7 @@ impl Codegen:
             return -1
         let kind = wl_get_type_kind(ty)
         if kind == wl_float_type_kind() or kind == wl_double_type_kind():
-            let scalar_kind = if kind == wl_float_type_kind(): 1 else: 2
+            let scalar_kind: i32 = if kind == wl_float_type_kind(): 1 else: 2
             if state == 0:
                 return scalar_kind * 16 + 1
             let prev_kind = state / 16

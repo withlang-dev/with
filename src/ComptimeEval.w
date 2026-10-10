@@ -1332,12 +1332,12 @@ fn ce_clone_compile_plan(p: &ComptimeWorkspaceCompilePlan) -> ComptimeWorkspaceC
 fn comptime_parse_i32_default(text: &str, default_value: i32) -> i32:
     if text.len() == 0:
         return default_value
-    var sign = 1
+    var sign: i32 = 1
     var i: i64 = 0
     if text[0] == 45:
         sign = -1
         i = 1
-    var v = 0
+    var v: i32 = 0
     var any = 0
     while i < text.len():
         let ch = text[i]

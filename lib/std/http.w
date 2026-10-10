@@ -47,7 +47,7 @@ fn http_build_get(host: &str, path: &str) -> str:
         "Accept: */*\r\n" ++
         "Connection: close\r\n\r\n"
 
-fn http_find_header_end(data: &str) -> i32:
+fn http_find_header_end(data: &str) -> isize:
     let len = data.len() as i32
     var i = 0
     while i < len - 3:

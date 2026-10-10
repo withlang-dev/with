@@ -1673,7 +1673,7 @@ impl Parser:
         // Parameters
         var params_start: i32 = 0
         var param_count: i32 = 0
-        var required_param_count = 0
+        var required_param_count: i32 = 0
         var is_variadic = 0
         self.last_param_pattern_start = self.pool.fn_param_patterns_len()
         self.last_param_pattern_count = 0
@@ -2207,7 +2207,7 @@ impl Parser:
 
         while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
             // Check for per-field @[align(N)] attribute
-            var field_align = 0
+            var field_align: i32 = 0
             if self.peek() == TokenKind.TK_AT:
                 let saved: i32 = self.pos
                 self.advance()
@@ -2276,7 +2276,7 @@ impl Parser:
             else if cur_col != field_col:
                 break
 
-            var field_align = 0
+            var field_align: i32 = 0
             if self.peek() == TokenKind.TK_AT:
                 let saved: i32 = self.pos
                 self.advance()
@@ -2917,8 +2917,8 @@ impl Parser:
         let no_methods_types: List[i32] = List.new()
         var no_methods_all: i32 = 0
         let only_names: List[i32] = List.new()
-        var strict_flag = 0
-        var cxx_flag = 0
+        var strict_flag: i32 = 0
+        var cxx_flag: i32 = 0
         let owns_entries: List[i32] = List.new()
         let borrows_entries: List[i32] = List.new()
         let retains_entries: List[i32] = List.new()
@@ -5412,7 +5412,7 @@ impl Parser:
                 var depth = 1
                 var expr_start_pos = i + 1
                 var j = expr_start_pos
-                var colon_pos = -1
+                var colon_pos: i32 = -1
                 var in_string = false
                 var in_raw_string = false
                 var in_char = false
@@ -5538,7 +5538,7 @@ impl Parser:
 fn interp_brace_char(code: i32) -> str:
     str_from_byte(code)
 
-fn interp_quote_source_backslash_count(raw_backslashes: i32) -> i32:
+fn interp_quote_source_backslash_count(raw_backslashes: isize) -> isize:
     raw_backslashes / 2
 
 impl Parser:
@@ -5664,14 +5664,14 @@ impl Parser:
         if slen == 0:
             return 0 as NodeId
         var fill = ' ' as i32
-        var align = 0  // 0=default, 1=left, 2=right, 3=center
-        var sign_plus = 0
-        var alternate = 0
-        var zero_pad = 0
+        var align: i32 = 0  // 0=default, 1=left, 2=right, 3=center
+        var sign_plus: i32 = 0
+        var alternate: i32 = 0
+        var zero_pad: i32 = 0
         var width: i32 = 0
         var precision: i32 = -1
-        var mode = 0
-        var at = 0
+        var mode: i32 = 0
+        var at: i32 = 0
         // [fill]align: a fill byte counts only when an align follows it.
         if at + 1 < slen:
             let next_align = fstring_spec_align(spec_text[at + 1])

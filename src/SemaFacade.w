@@ -3187,7 +3187,7 @@ impl Sema:
             // in-place constructor's are preinit's, then init's after `self`.
             // The receiver method on a parent (`db.prepare(sql)`) has the
             // same indices: its `self` is C's first parameter.
-            var shift = 0
+            var shift: i32 = 0
             if owner == FACADE_DEP_INIT and self.facade_resources[ri].preinit != 0:
                 shift = self.sig_get_param_count(self.get_sig(self.facade_resources[ri].preinit))
             let slot = self.facade_owner_skip(ri, owner)
@@ -3834,7 +3834,7 @@ impl Sema:
                     continue
                 let ci = self.facade_contract_for(f)
                 let domains = self.facade_domains_touched(self.facade_fn_file(f), ci)
-                var shift = 0
+                var shift: i32 = 0
                 if owner == FACADE_DEP_INIT and self.facade_resources[ri].preinit != 0:
                     shift = self.sig_get_param_count(self.get_sig(self.facade_resources[ri].preinit))
                 let slot = self.facade_owner_skip(ri, owner)

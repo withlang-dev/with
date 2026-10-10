@@ -1644,7 +1644,7 @@ fn fixpoint_arg(argc: i32, index: i32, fallback: &str) -> str:
             return v
     with_str_clone_ref(fallback)
 
-fn fixpoint_byte_at(text: &str, idx: i32) -> i32:
+fn fixpoint_byte_at(text: &str, idx: isize) -> i32:
     if idx < 0 or idx >= text.len() as i32:
         return -1
     text[idx]
@@ -4079,12 +4079,12 @@ fn maybe_synthesize_test_source(target: &str) -> str:
     synthesize_test_main_source(text, discovery.test_names)
 
 fn test_parse_i32(text: &str) -> i32:
-    var sign = 1
+    var sign: i32 = 1
     var i = 0
     if text.len() > 0 and text[0] == 45:
         sign = -1
         i = 1
-    var value = 0
+    var value: i32 = 0
     while i < text.len() as i32:
         let ch = text[i]
         if ch < 48 or ch > 57:

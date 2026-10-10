@@ -155,7 +155,7 @@ impl XzLzma:
         result
 
     mut fn bittree(base: i32, bits: i32) -> i32:
-        var m = 1
+        var m: i32 = 1
         for _ in 0..bits:
             m = (m << 1) + self.bit(base + m)
         m - (1 << (bits as u32))

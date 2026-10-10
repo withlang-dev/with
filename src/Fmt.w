@@ -170,7 +170,7 @@ fn flatten_nested_arrays(source: &str) -> str:
     text
 
 // The source text from token `a` through token `b`.
-fn token_span(source: &str, tokens: &TokenList, a: i32, b: i32) -> str:
+fn token_span(source: &str, tokens: &TokenList, a: isize, b: isize) -> str:
     source.slice(tokens.get_start(a), tokens.get_end(b))
 
 fn flatten_nested_arrays_once(source: &str) -> str:

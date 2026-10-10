@@ -9839,7 +9839,7 @@ impl Sema:
         if expr_ty > 0 and self.type_is_raw_pointer_value(expr_ty) == 0:
             return 0
         var node = expr_node
-        var mask = 0
+        var mask: i32 = 0
         let seen: HashMap[i32, i32] = HashMap.new()
         while node > 0 and not seen.contains(node):
             seen.insert(node, 1)
