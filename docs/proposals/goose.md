@@ -136,7 +136,7 @@ Non-Copy elements with Drop still require destruction. Bulk reclamation can remo
 
 **Acceptance experiment:** build linked nodes while appending, retain a read view, attempt mutation/reset/removal, and exercise scope exits with observable Drop values. Measure reservation, committed pages, resident memory, and cleanup separately. Compare a segmented implementation with virtual reservation on native and constrained targets.
 
-**Recommendation:** explore as an optional storage contract. With's [handles](../spec/handles.md) already cover dynamic removal; stable borrows and reusable handles solve different problems.
+**Recommendation:** explore as an optional storage contract. With's [handles](../spec/006_handles.md) already cover dynamic removal; stable borrows and reusable handles solve different problems.
 
 ## 5. Narrow links should carry type and region meaning
 
@@ -213,9 +213,9 @@ These mechanisms remain useful reference material, but do not drive the current 
 
 Goose's implementation is most persuasive where it makes a cost or proof explicit. It is least suitable as a direct model for With where that simplicity depends on a weaker or narrower contract.
 
-* **No destructor-free cleanup model.** `EmitRestores` is not sufficient for With's owned resources. The controlling text is [§2.1](../spec/ownership.md): “All values have a single owner. When a variable binding goes out of scope, its value is destroyed. Destruction is deterministic.”
+* **No destructor-free cleanup model.** `EmitRestores` is not sufficient for With's owned resources. The controlling text is [§2.1](../spec/002_ownership.md): “All values have a single owner. When a variable binding goes out of scope, its value is destroyed. Destruction is deterministic.”
 * **No same-type stale-slot substitution.** `B_FREE` puts an in-range index on a freelist; slice reallocation uses `memmove`, and old references do not retarget themselves. Use scoped invalidation proofs or generation-checked handles with a deliberate wrap/exhaustion policy. Type-valid bytes do not establish object identity.
-* **No inferred parameter ownership from body behavior.** With [§3.8](../spec/borrowing.md) says: “The parameter's declared type states the mode.” Goose's reference adaptation does not override that ruling.
+* **No inferred parameter ownership from body behavior.** With [§3.8](../spec/003_borrowing.md) says: “The parameter's declared type states the mode.” Goose's reference adaptation does not override that ruling.
 * **No blanket adoption of packed ABI access.** `LayoutFields` and generated pointer casts need independent target/alignment scrutiny before use in With. Layout choices cannot reconstruct semantic types or passing modes downstream.
 * **No unqualified zero-allocation or zero-copy claims.** Queue nodes, external resources, array-prefix slides, and adapted block results have explicit allocation/copy paths in the inspected source.
 * **No C implementation transplant.** Goose emits C and implements native layers in C/C++. With's repository requires With implementations over native APIs. Borrow algorithms and contracts, not glue code.
