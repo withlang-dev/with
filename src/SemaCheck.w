@@ -26595,6 +26595,54 @@ impl Sema:
             for d in self.literal_binding_lets_in(self.ast.get_data2(node)): out.push(d)
         out
 
+    // D128: the `let` that bound `node`, when it has no annotation and a
+    // tuple literal with an untyped integer literal element for its value.
+    fn unannotated_tuple_literal_binding(node: i32) -> i32:
+        if self.ast.kind(node) != NodeKind.NK_IDENT: return 0
+        let decl = self.binding_decl_nodes.get(self.ast.get_data0(node)) ?? 0
+        if decl <= 0 or self.ast.kind(decl) != NodeKind.NK_LET_BINDING or self.local_let_type_ann_extra(self.ast.get_data2(decl)) >= 0: return 0
+        let value = self.ast.get_data1(decl)
+        if value == 0 or self.ast.kind(value) != NodeKind.NK_TUPLE: return 0
+        let start = self.ast.get_data0(value)
+        for ei in 0..self.ast.get_data1(value):
+            if self.expr_is_untyped_literal_arith(self.ast.get_extra(start + ei)): return decl
+        0
+
+    // D128: an argument mismatch that is a demand on a literal-typed local
+    // (`index.remove(&i)` at `&i32`; `eat(move a)` with `a = (r, 7)` at
+    // `(R, i32)`), recorded for the body's second check. True when recorded.
+    mut fn note_int_local_arg_demand(arg_node: i32, expected: i32, actual: i32) -> bool:
+        if self.int_local_rechecking != 0 or arg_node <= 0 or expected == 0 or actual == 0: return false
+        var inner = arg_node
+        while inner > 0 and (self.ast.kind(inner) == NodeKind.NK_GROUPED or self.ast.kind(inner) == NodeKind.NK_MOVE_ARG or (self.ast.kind(inner) == NodeKind.NK_UNARY and self.ast.get_data0(inner) == UnaryOp.UOP_REF)):
+            inner = if self.ast.kind(inner) == NodeKind.NK_UNARY: self.ast.get_data1(inner) else: self.ast.get_data0(inner)
+        if inner <= 0 or self.ast.kind(inner) != NodeKind.NK_IDENT: return false
+        var want = self.resolve_alias(expected as TypeId)
+        var have = self.resolve_alias(actual as TypeId)
+        if self.get_type_kind(want) == TypeKind.TY_REF: want = self.resolve_alias(self.get_type_d0(want) as TypeId)
+        if self.get_type_kind(have) == TypeKind.TY_REF: have = self.resolve_alias(self.get_type_d0(have) as TypeId)
+        let int_decl = self.unannotated_literal_binding(inner)
+        if int_decl != 0:
+            if not self.is_plain_numeric_type(want as i32) or self.int_local_decisions.contains(int_decl): return false
+            self.int_local_demands.push(int_decl)
+            self.int_local_demands.push(want as i32)
+            self.int_local_demands.push(arg_node)
+            return true
+        let tuple_decl = self.unannotated_tuple_literal_binding(inner)
+        if tuple_decl == 0 or self.int_local_decisions.contains(tuple_decl): return false
+        if self.get_type_kind(want) != TypeKind.TY_TUPLE or self.get_type_kind(have) != TypeKind.TY_TUPLE or self.get_type_d1(want) != self.get_type_d1(have): return false
+        let value = self.ast.get_data1(tuple_decl)
+        let elems = self.ast.get_data0(value)
+        for ei in 0..self.get_type_d1(want):
+            let w: i32 = self.type_extra[self.get_type_d0(want) + ei]
+            let h: i32 = self.type_extra[self.get_type_d0(have) + ei]
+            if self.types_identical(w, h): continue
+            if not (self.is_plain_numeric_type(w) and self.is_plain_numeric_type(h) and self.expr_is_untyped_literal_arith(self.ast.get_extra(elems + ei))): return false
+        self.int_local_demands.push(tuple_decl)
+        self.int_local_demands.push(want as i32)
+        self.int_local_demands.push(arg_node)
+        true
+
     // §4.9: a number where a `Result[T, E]` is demanded is wrapped in `Ok`,
     // so the demand on the number is `T` (§4.2.6 then applies to it).
     fn implicit_ok_payload_demand(expected: i32, actual: i32) -> i32:

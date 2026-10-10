@@ -122,6 +122,10 @@ impl Sema:
     mut fn emit_argument_type_mismatch(call_name: &str, fn_sym: i32, arg_index: isize, param_i: isize, expected_ty: i32, actual_ty: i32, arg_node: i32):
         // D93: a parameter demands its collection of a literal's binding.
         self.note_literal_demand(arg_node, expected_ty, arg_node)
+        // D128: a literal-typed local reaching a parameter as `&name`, `move
+        // name`, or a tuple literal's binding, is a demand the body's second
+        // check honors.
+        if self.note_int_local_arg_demand(arg_node, expected_ty, actual_ty): return
         if self.suppress_errors != 0:
             return
         let start = self.ast.get_start(arg_node)

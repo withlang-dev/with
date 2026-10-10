@@ -1,4 +1,4 @@
-//! expect-stdout: 42 6 3 10 12 9 36
+//! expect-stdout: 42 6 3 10 12 9 36 6 7
 
 // D126 (§4.2.1): a local its literal typed takes the type its demanding
 // uses agree on. `var total = 0` returned as i32, `var sum = 0` as an Ok
@@ -24,6 +24,8 @@ fn summed(ok: bool) -> Result[i32, str]:
 
 fn sample(x: i32, y: i32) -> i32: x + y
 fn pay(n: i32) -> i32: n
+fn index_of(k: &i32) -> i32: *k * 2
+fn eat(x: (str, i32)) -> i32: x.1
 fn tot(values: []i32) -> i32:
     var t: i32 = 0
     for v in values: t += v
@@ -42,6 +44,10 @@ fn main:
     var bonus = 7
     let paid = pay(bonus + 5)
     let values = [4, -2, 7]
+    var key = 3
+    let found = index_of(&key)
+    var pair = ("r", 7)
+    let second = eat(move pair)
     var ids: i32 = 0
     for i in 1..9: ids += pay(i)
-    print(f"{total_of()} {summed(true).unwrap()} {hits} {untouched} {paid} {tot(values)} {ids}")
+    print(f"{total_of()} {summed(true).unwrap()} {hits} {untouched} {paid} {tot(values)} {ids} {found} {second}")
