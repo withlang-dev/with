@@ -8,7 +8,7 @@ fn collect_one(src: &i32) -> List[View]:
     v.push(View { p: src })
     v
 fn main:
-    let x = 5
+    let x: i32 = 5
     let v = collect_one(&x)
     for view in v:
         print_i32(*view.p)

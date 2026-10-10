@@ -13,7 +13,7 @@ fn select_else() -> i32:
         7
 
 fn sum_unrolled() -> i32:
-    var total = 0
+    var total: i32 = 0
     comptime for i in [1, 2, 3, 4, 5]:
         total = total + i
     total

@@ -44,7 +44,7 @@ fn split_tabs(line: &str) -> List[str]:
     out
 
 fn parse_int(text: &str) -> i32:
-    var out = 0
+    var out: i32 = 0
     var any = 0
     for i in 0..text.len() as i32:
         let b = text[i] as i32

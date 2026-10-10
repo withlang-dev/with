@@ -1,12 +1,12 @@
 //! expect-stdout: ok
 
 fn choose_then_some(ok: bool) -> i32:
-    match if ok: Some(7) else: None:
+    match if ok: Some(7i32) else: None:
         Some(v) => v
         None => 0
 
 fn choose_then_none(ok: bool) -> i32:
-    match if ok: None else: Some(9):
+    match if ok: None else: Some(9i32):
         Some(v) => v
         None => 0
 

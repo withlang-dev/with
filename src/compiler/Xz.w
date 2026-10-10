@@ -71,24 +71,24 @@ type XzLzma {
 }
 
 // Probability array layout (offsets into probs).
-let P_IS_MATCH = 0
-let P_IS_REP = 192
-let P_IS_REP_G0 = 204
-let P_IS_REP_G1 = 216
-let P_IS_REP_G2 = 228
-let P_IS_REP0_LONG = 240
-let P_POS_SLOT = 432
-let P_SPEC_POS = 688
-let P_ALIGN = 802
-let P_LEN = 818
-let P_REP_LEN = 1332
-let P_LITERAL = 1846
+const P_IS_MATCH = 0
+const P_IS_REP = 192
+const P_IS_REP_G0 = 204
+const P_IS_REP_G1 = 216
+const P_IS_REP_G2 = 228
+const P_IS_REP0_LONG = 240
+const P_POS_SLOT = 432
+const P_SPEC_POS = 688
+const P_ALIGN = 802
+const P_LEN = 818
+const P_REP_LEN = 1332
+const P_LITERAL = 1846
 // A length coder: choice, choice2, low[16][8], mid[16][8], high[256].
-let LEN_CHOICE = 0
-let LEN_CHOICE2 = 1
-let LEN_LOW = 2
-let LEN_MID = 130
-let LEN_HIGH = 258
+const LEN_CHOICE = 0
+const LEN_CHOICE2 = 1
+const LEN_LOW = 2
+const LEN_MID = 130
+const LEN_HIGH = 258
 
 impl XzLzma:
     mut fn fail(message: &str):
@@ -123,10 +123,10 @@ impl XzLzma:
         self.rep2 = 0
         self.rep3 = 0
 
-    mut fn bit(index: i32) -> i32:
+    mut fn bit(index: isize) -> i32:
         let p = self.probs[index] as i64
         let bound = (self.range >> 11) * p
-        var result = 0
+        var result: i32 = 0
         if self.code < bound:
             self.range = bound
             self.probs[index] = (p + ((2048 - p) >> 5)) as i32
@@ -155,14 +155,14 @@ impl XzLzma:
         result
 
     mut fn bittree(base: i32, bits: i32) -> i32:
-        var m = 1
+        var m: i32 = 1
         for _ in 0..bits:
             m = (m << 1) + self.bit(base + m)
         m - (1 << (bits as u32))
 
     mut fn bittree_reverse(base: i32, bits: i32) -> i32:
         var m = 1
-        var symbol = 0
+        var symbol: i32 = 0
         for i in 0..bits:
             let b = self.bit(base + m)
             m = (m << 1) + b
@@ -220,13 +220,13 @@ impl XzLzma:
     // One LZMA chunk: `unpacked` bytes out, reading the chunk's packed bytes.
     mut fn decode_chunk(unpacked: i64):
         let goal = self.out.len() + unpacked
-        let pb_mask = (1 << (self.pb as u32)) - 1
+        let pb_mask: i32 = (1 << (self.pb as u32)) - 1
         while self.out.len() < goal and self.problem.len() == 0:
             let pos_state = (self.out.len() as i32) & pb_mask
             if self.bit(P_IS_MATCH + (self.state << 4) + pos_state) == 0:
                 self.literal()
                 continue
-            var len = 0
+            var len: i32 = 0
             if self.bit(P_IS_REP + self.state) == 0:
                 self.rep3 = self.rep2
                 self.rep2 = self.rep1

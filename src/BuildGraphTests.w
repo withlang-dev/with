@@ -57,7 +57,7 @@ fn build_graph_append_test_args(argv: &str, target: &BuildGraphTarget) -> str:
     out
 
 fn build_graph_test_parse_jobs(value: &str) -> i32:
-    var out = 0
+    var out: i32 = 0
     for i in 0..value.len() as i32:
         let ch = value[i]
         if ch < 48 or ch > 57:
@@ -193,8 +193,8 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
     // is how ten gate chains each surfaced exactly one bug).
     let jobs_limit = build_graph_test_jobs()
     var failed_paths: List[str] = List.new()
-    var first_failure = 0
-    var next = 0
+    var first_failure: i32 = 0
+    var next: i32 = 0
     var finished = 0
     let active: List[BuildGraphExternalTestJob] = List.new()
     let active_keys: List[str] = List.new()

@@ -11,11 +11,11 @@ use std.fs
 use Lexer
 use Token
 
-fn find_from(text: &str, needle: &str, start: i64) -> i64:
+fn find_from(text: &str, needle: &str, start: isize) -> isize:
     if needle.len() == 0: return start
     var i = start
     while i + needle.len() <= text.len():
-        var j: i64 = 0
+        var j: isize = 0
         while j < needle.len() and text[i + j] == needle[j]: j = j + 1
         if j == needle.len(): return i
         i = i + 1
@@ -35,27 +35,27 @@ fn diagnostic_source_path(path: &str) -> str:
     path.clone()
 
 fn parse_i32_text(text: &str) -> i32:
-    var out = 0
+    var out: i32 = 0
     for i in 0..text.len() as i32:
         let b = text[i] as i32
         if b < 48 or b > 57: return -1
         out = out * 10 + b - 48
     out
 
-fn source_line_start(text: &str, wanted: i32) -> i32:
+fn source_line_start(text: &str, wanted: i32) -> isize:
     if wanted <= 1: return 0
     var line = 1
     var i = 0
-    while i < text.len() as i32:
+    while i < text.len():
         if text[i] as i32 == 10:
             line = line + 1
             if line == wanted: return i + 1
         i = i + 1
     -1
 
-fn source_line_end(text: &str, start: i32) -> i32:
+fn source_line_end(text: &str, start: isize) -> isize:
     var i = start
-    while i < text.len() as i32 and text[i] as i32 != 10: i = i + 1
+    while i < text.len() and text[i] as i32 != 10: i = i + 1
     i
 
 type Edits {
@@ -104,7 +104,7 @@ fn parse_diagnostics(text: &str) -> Edits:
 
         let label_prefix = "= label @"
         var label_at = find_from(block, label_prefix, 0)
-        var binding_line = -1
+        var binding_line: i32 = -1
         while label_at >= 0:
             let label = line_text(block, label_at)
             if label.contains("`" ++ name ++ "` views"):

@@ -5,7 +5,7 @@
 use std.builtins.print_i32
 type Handle ephemeral { token: str, id: i32 }
 fn batch(hs: List[Handle]) -> i32:
-    var total = 0
+    var total: i32 = 0
     for h in hs:
         total = total + h.id
     total

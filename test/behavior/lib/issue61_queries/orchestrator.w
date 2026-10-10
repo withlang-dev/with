@@ -6,7 +6,7 @@ use issue61_queries.shared
 use std.collections.HashMap
 
 pub fn mirrored_score(state: State, lookup: HashMap[str, i32]) -> i32:
-    var total = 0
+    var total: i32 = 0
     var i = 0
     while i < state.entries.len():
         total = total + edge_score(state.entries[i].name)

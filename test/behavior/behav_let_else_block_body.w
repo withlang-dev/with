@@ -108,7 +108,7 @@ fn main:
         if v > 50: break
         total = total + v
     print(f"{total}")
-    var n = 0
+    var n: i32 = 0
     loop:
         let Some(_) = below(n) else:
             print("done")

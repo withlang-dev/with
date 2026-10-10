@@ -24,7 +24,7 @@ fn bump_a_copy(x: i32) -> i32:
 
 fn main:
     // Straight line: mutation reaches the caller.
-    var x = 10
+    var x: i32 = 10
     x.bump()
     assert(x == 11)
     x.double()
@@ -36,7 +36,7 @@ fn main:
     assert(x == 22)
 
     // Branch and loop shapes drive the same place.
-    var n = 0
+    var n: i32 = 0
     for i in 0..5:
         if i % 2 == 0:
             n.bump()

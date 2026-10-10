@@ -23,14 +23,14 @@ impl Counted:
 
 fn main:
     var h = Holder { v: List.new(), r: None }
-    let n = 5
+    let n: i32 = 5
     h.keep(&n)
     print(f"same scope: {h.v.len32()}")
-    let m = 5
+    let m: i32 = 5
     var h2 = Holder { v: List.new(), r: None }
     h2.keep(&m)
     print(f"outer origin: {h2.r.unwrap()} {h2.v[0]}")
-    let k = 9
+    let k: i32 = 9
     var c = Counted { v: List.new() }
     c.keep(&k)
     print("ok")

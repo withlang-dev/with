@@ -8,7 +8,7 @@ fn main:
         "use constants\n" ++
         "pub type Pads {}\n" ++
         "const PRIVATE_ID: i32 = 11\n" ++
-        "var sequence = 0\n" ++
+        "var sequence: i32 = 0\n" ++
         "fn next() -> i32 { sequence += 1; sequence }\n" ++
         "pub fn Pads.open(id: i32 = DEFAULT_ID, add: i32 = 0) -> i32 { id + add }\n" ++
         "pub fn Pads.private_default(id: i32 = PRIVATE_ID) -> i32 { id }\n" ++

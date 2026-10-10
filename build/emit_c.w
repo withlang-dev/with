@@ -213,7 +213,7 @@ fn emitc_push_system_libs(argv: List[str]) -> List[str]:
             argv |> push("-lm")
     argv
 
-fn emitc_index_of(text: &str, needle: &str) -> i32:
+fn emitc_index_of(text: &str, needle: &str) -> isize:
     if needle.len() == 0:
         return 0
     if text.len() < needle.len():
@@ -260,7 +260,7 @@ fn emitc_c_export_symbol(line: &str) -> str:
         i = i + 1
     ""
 
-fn emitc_find_matching_paren(text: &str, open_at: i32) -> i32:
+fn emitc_find_matching_paren(text: &str, open_at: isize) -> isize:
     var depth = 0
     var i = open_at
     while i < text.len() as i32:
@@ -322,7 +322,7 @@ fn emitc_parse_param(param_text: &str) -> EmitCParam:
     let name = emitc_trim(trimmed.slice(0, colon as i64))
     // A default (`packed: bool = false`) is not part of the C prototype.
     let default_at = emitc_index_of(trimmed, "=")
-    let type_end = if default_at > colon: default_at else: trimmed.len() as i32
+    let type_end = if default_at > colon: default_at else: trimmed.len()
     let with_type = emitc_trim(trimmed.slice((colon + 1) as i64, type_end as i64))
     EmitCParam { name, c_type: emitc_c_type(with_type) }
 
@@ -345,7 +345,7 @@ fn emitc_parse_export_function(symbol: &str, line: &str) -> EmitCFunction:
     let fn_at = emitc_index_of(line, "fn ")
     if fn_at < 0:
         return EmitCFunction { symbol: emit_c_owned_text(symbol), return_type: "", params, ok: 0 }
-    var open_at = -1
+    var open_at: isize = -1
     var i = fn_at
     while i < line.len() as i32:
         if line[i] == 40:

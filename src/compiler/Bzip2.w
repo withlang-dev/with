@@ -56,8 +56,8 @@ type BzHuffman {
 }
 
 fn bz_huffman(lengths: &List[i32]) -> BzHuffman:
-    var min_len = 32
-    var max_len = 0
+    var min_len: i32 = 32
+    var max_len: i32 = 0
     for i in 0..lengths.len() as i32:
         if lengths[i] > max_len: max_len = lengths[i]
         if lengths[i] < min_len: min_len = lengths[i]
@@ -145,10 +145,10 @@ pub fn bzip2_decompress(data: &str) -> List[str]:
             // The symbol map: which of the 256 byte values occur.
             let used16 = bits.bits(16)
             let seq_to_unseq: List[i32] = List.new()
-            for i in 0..16:
+            for i in 0i32..16:
                 if (used16 >> ((15 - i) as u32)) & 1 == 1:
                     let used = bits.bits(16)
-                    for j in 0..16:
+                    for j in 0i32..16:
                         if (used >> ((15 - j) as u32)) & 1 == 1: seq_to_unseq.push(i * 16 + j)
             let in_use = seq_to_unseq.len() as i32
             if in_use == 0:
@@ -198,7 +198,7 @@ pub fn bzip2_decompress(data: &str) -> List[str]:
                 tables.push(bz_huffman(&lengths))
             // The MTF/RLE2 symbols into the BWT vector `tt`.
             let mtf: List[i32] = List.new()
-            for i in 0..256: mtf.push(i)
+            for i in 0i32..256: mtf.push(i)
             let counts: List[i64] = List.new()
             for _ in 0..256: counts.push(0)
             let tt: List[i32] = List.new()

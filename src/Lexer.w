@@ -601,7 +601,7 @@ fn lex_fstring_quote_source_backslash_count(raw_backslashes: i32) -> i32:
 fn lex_raw_string_end(src: &str, pos: i32) -> i32:
     let slen = src.len() as i32
     var p = pos
-    var hash_count = 0
+    var hash_count: i32 = 0
     while p < slen and src[p] == CharCode.Hash:
         hash_count = hash_count + 1
         p = p + 1
@@ -882,7 +882,7 @@ pub fn column_of(source: &str, pos: i32) -> i32:
 // indented body (§29.13 Form 2).
 pub fn line_indent_of(source: &str, pos: i32) -> i32:
     let line_start = pos - column_of(source, pos)
-    var indent = 0
+    var indent: i32 = 0
     while line_start + indent < source.len() and (source[line_start + indent] == CharCode.Space or source[line_start + indent] == CharCode.Tab):
         indent = indent + 1
     indent

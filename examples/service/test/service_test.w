@@ -33,7 +33,7 @@ fn find_user(users: &[5]User, id: i32) -> ServiceResult:
     if found: Ok else: NotFound
 
 fn get_user_score(users: &[5]User, id: i32) -> i32:
-    var score = 0
+    var score: i32 = 0
     for i in 0..5:
         if users[i].id == id:
             score = users[i].score

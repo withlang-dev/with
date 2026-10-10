@@ -1038,7 +1038,7 @@ fn gate_test_lanes(graph: &Build) -> List[str]:
 // The whole seconds of a build-times.tsv duration ("20.0s" -> 20); -1 when
 // the column is not one.
 fn gate_whole_seconds(text: &str) -> i32:
-    var n = 0
+    var n: i32 = 0
     var digits = 0
     for i in 0..text.len() as i32:
         let b = text[i]
@@ -2434,7 +2434,7 @@ fn run_move_audit_action(ctx: ActionCtx) -> i32:
 
 fn complexity_allocation_count(report: &str, span: &str) -> i32:
     var state = 0
-    var count = 0
+    var count: i32 = 0
     for line in report.split("\n"):
         if line == "complexity: " ++ span ++ " begin":
             if state != 0: return -1
@@ -2446,7 +2446,7 @@ fn complexity_allocation_count(report: &str, span: &str) -> i32:
             count = count + 1
     if state == 2: count else: -1
 
-fn run_stdlib_complexity_action(ctx: ActionCtx):
+fn run_stdlib_complexity_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let output = ctx.output()
     if fs.mkdir_all(output) != 0:

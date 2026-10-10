@@ -17,7 +17,7 @@ use std.time
 // download for as long as the kernel keeps trying. build/source_fetch.w runs
 // the probe under a short process timeout before it starts a download
 // (#2062): an unreachable source costs seconds, not the download's deadline.
-let ATTEMPTS = 5
+const ATTEMPTS = 5
 
 // "host:port" of an https URL ("" when it is not one); 443 unless it names one.
 fn host_port(url: &str) -> str:
@@ -33,7 +33,7 @@ fn host_port(url: &str) -> str:
     if authority.contains(":"): authority else: authority ++ ":443"
 
 fn port_number(text: &str) -> i32:
-    var value = 0
+    var value: i32 = 0
     for i in 0..text.len() as i32:
         if text[i] < '0' or text[i] > '9': return -1
         value = value * 10 + (text[i] - '0') as i32
@@ -65,7 +65,7 @@ fn main -> i32:
     if argv[1] == "--probe": return probe(argv[2])
     let url = argv[1] ++ ""
     let output = argv[2] ++ ""
-    for attempt in 1..ATTEMPTS + 1:
+    for attempt in 1i32..ATTEMPTS + 1:
         if https_download(url.clone(), output.clone()) == 0: return 0
         if attempt < ATTEMPTS:
             print(f"HTTPS download failed (attempt {attempt} of {ATTEMPTS}), retrying: " ++ url)

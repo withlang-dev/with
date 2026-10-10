@@ -215,12 +215,12 @@ pub fn build_graph_emit(graph: &BuildGraph) -> str:
     out
 
 fn build_graph_parse_i32(text: &str) -> i32:
-    var sign = 1
+    var sign: i32 = 1
     var i = 0
     if text.len() > 0 and text[0] == 45:
         sign = -1
         i = 1
-    var value = 0
+    var value: i32 = 0
     while i < text.len() as i32:
         let ch = text[i]
         if ch < 48 or ch > 57:

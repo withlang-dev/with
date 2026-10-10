@@ -23,7 +23,7 @@ fn test_tuple_mixed_types:
     assert(t.1 == true)
 
 fn test_tuple_pass_to_fn:
-    let p = (3, 7)
+    let p: (i32, i32) = (3, 7)
     assert(sum_pair(p) == 10)
     assert(sum_pair((100, 200)) == 300)
 

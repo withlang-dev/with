@@ -107,7 +107,7 @@ fn stmt_partial(p: Point, out: str) -> str:
     s
 
 fn byref(ps: &List[Point]) -> i32:
-    var n = 0
+    var n: i32 = 0
     for Point { x, y } in ps:
         n = n + x * 10 + y
     for { x, .. } in ps:
@@ -117,7 +117,7 @@ fn byref(ps: &List[Point]) -> i32:
 // A refutable `for` pattern skips the elements it does not match
 // (behav_for_full_patterns); a literal field is part of that test.
 fn filtered(ps: &List[Point]) -> i32:
-    var n = 0
+    var n: i32 = 0
     for Point { x: 0, y } in ps:
         n = n + y
     n

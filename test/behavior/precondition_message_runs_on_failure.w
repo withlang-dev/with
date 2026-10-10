@@ -10,6 +10,6 @@ fn message(n: i32) -> str:
     f"require failed: {n}"
 
 fn main:
-    let n = 7
+    let n: i32 = 7
     require(n < 0, message(n))
     print("unreachable")

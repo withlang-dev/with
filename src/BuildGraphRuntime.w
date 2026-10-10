@@ -10,7 +10,7 @@ extern fn with_exec_child_maxrss() -> i64
 extern fn with_self_maxrss() -> i64
 extern fn with_exec_binary(path: &str) -> i32
 extern fn with_exec_argv(args: &str) -> i32
-extern fn with_arg_at(idx: i32) -> str
+extern fn with_arg_at(idx: isize) -> str
 extern fn with_getenv_str(name: &str) -> str
 extern fn with_setenv_str(name: &str, value: &str) -> i32
 extern fn with_fs_chmod(path: &str, mode: i32) -> i32

@@ -1282,7 +1282,7 @@ pub fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
         child_counts[base] = child_counts[base] + 1
     var child_starts: List[i32] = List.new()
     var fill: List[i32] = List.new()
-    var total = 0
+    var total: i32 = 0
     for li in 0..local_count:
         child_starts.push(total)
         fill.push(total)
@@ -1828,7 +1828,7 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
     succ_starts.push(succs.len() as i32)
     var pred_starts: List[i32] = List.new()
     var fill: List[i32] = List.new()
-    var total = 0
+    var total: i32 = 0
     for bb in 0..bb_count:
         pred_starts.push(total)
         fill.push(total)
@@ -2108,7 +2108,7 @@ pub fn dump_place_map_body(mir_mod: &MirModule, body: &MirBody, pool: &InternPoo
 fn mir_parse_positive_i32(text: &str) -> i32:
     if text.len() == 0:
         return -1
-    var out = 0
+    var out: i32 = 0
     for i in 0..text.len():
         let ch = text[i]
         if ch < '0' or ch > '9':
@@ -2489,7 +2489,7 @@ fn mir_copy_into_consuming_param(mir_mod: &MirModule, body: &MirBody, bb: i32, d
     if call_id < 0 or call_id >= body.call_arg_starts.len():
         return ""
     let intrinsic = body.call_intrinsic(call_id)
-    var sym = 0
+    var sym: i32 = 0
     if intrinsic == MirIntrinsic.NONE:
         sym = mir_call_const_fn_sym(body, body.term_data0(bb))
     else if intrinsic == MirIntrinsic.GENERIC_CALL and not body.call_is_machinery_dispatch(call_id):
@@ -2613,7 +2613,7 @@ fn validate_read_after_drop(body: &MirBody) -> str:
     var slot: List[i32] = List.new()
     for _ in 0..local_count:
         slot.push(-1)
-    var width = 0
+    var width: i32 = 0
     for bb in 0..block_count:
         for si in body.bb_stmt_starts[bb]..body.bb_stmt_starts[bb] + body.bb_stmt_counts[bb]:
             if body.stmt_kind(si) == StmtKind.Drop:
@@ -3088,7 +3088,7 @@ pub fn mir_name_fn_syms(text: &str, pool: &InternPool) -> str:
     while i < n:
         if i + 6 <= n and text.slice(i as i64, (i + 6) as i64) == "fn sym":
             var j = i + 6
-            var sym = 0
+            var sym: i32 = 0
             while j < n and text[j] >= '0' and text[j] <= '9':
                 sym = sym * 10 + (text[j] - '0') as i32
                 j += 1
@@ -3874,7 +3874,7 @@ fn mir_validate_place_prefix_type(mir_mod: &MirModule, body: &MirBody, place_id:
     let proj_count = body.place_proj_counts[place_id] - trailing
     if proj_count <= 0:
         return current_ty
-    var active_variant_idx = -1
+    var active_variant_idx: i32 = -1
 
     for pi in 0..proj_count:
         let proj_kind = body.proj_kinds[(proj_start + pi)]
@@ -3892,7 +3892,7 @@ fn mir_validate_place_prefix_type(mir_mod: &MirModule, body: &MirBody, place_id:
             continue
 
         if proj_kind == ProjKind.PK_FIELD:
-            var field_ty = 0
+            var field_ty: i32 = 0
             if active_variant_idx >= 0:
                 field_ty = mir_validate_enum_payload_type(mir_mod, current_ty, active_variant_idx, proj_d0)
             else if tk == TypeKind.TY_TUPLE:
@@ -4015,7 +4015,7 @@ fn mir_validate_call_unmaterialized_view(mir_mod: &MirModule, body: &MirBody, ca
     let arg_start = body.call_arg_starts[call_id]
     let arg_count = body.call_arg_counts[call_id]
     let intrinsic = body.call_intrinsic(call_id)
-    let str_index_args = if intrinsic == MirIntrinsic.STR_SLICE: 2 else if intrinsic == MirIntrinsic.STR_BYTE_AT or intrinsic == MirIntrinsic.STR_REPEAT: 1 else: 0
+    let str_index_args: i32 = if intrinsic == MirIntrinsic.STR_SLICE: 2 else if intrinsic == MirIntrinsic.STR_BYTE_AT or intrinsic == MirIntrinsic.STR_REPEAT: 1 else: 0
     if str_index_args > 0:
         for ai in 1..(str_index_args + 1):
             if ai >= arg_count: break

@@ -1,6 +1,6 @@
 // Structured CLI option values for compiler-driver commands.
 
-extern fn with_arg_at(idx: i32) -> str
+extern fn with_arg_at(idx: isize) -> str
 extern fn with_getenv_str(name: &str) -> str
 extern fn with_str_len(s: &str) -> i64
 extern fn with_str_byte_at_ref(s: &str, index: i64) -> i32
@@ -351,7 +351,7 @@ pub type DriverTargetParseResult {
 }
 
 pub fn driver_parse_build_target(argc: i32) -> DriverTargetParseResult:
-    var kind = 0
+    var kind: i32 = 0
     var explicit = false
     var i = 2
     while i < argc:
@@ -393,7 +393,7 @@ fn driver_build_target_arg(argc: i32) -> str:
     ""
 
 fn driver_build_opt_level(argc: i32) -> i32:
-    var level = 1
+    var level: i32 = 1
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)

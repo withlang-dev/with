@@ -33,7 +33,7 @@ fn col_of(text: &str, offset: i32):
         j = j - 1
     offset - (j + 1)
 
-fn slice(text: &str, a: i32, b: i32): text.slice(a as i64, b as i64)
+fn slice(text: &str, a: isize, b: isize): text.slice(a, b)
 
 fn trim(s: &str):
     let m = s.len() as i32
@@ -93,7 +93,7 @@ fn reindent(text: &str, pad: &str):
     parts.join("")
 
 // Count top-level comma-separated segments in the bytes of a `[...]` group text.
-fn count_args(inner: &str) -> i32:
+fn count_args(inner: &str) -> isize:
     let m = inner.len() as i32
     if m == 0:
         return 0
@@ -146,7 +146,7 @@ fn relocation_fact_at(facts: &RelocationFacts, path: &str, offset: i32) -> i32:
     -1
 
 impl RelocationFacts:
-    mut fn relocate_file(path: &str, apply: bool, list_methods: bool) -> i32:
+    mut fn relocate_file(path: &str, apply: bool, list_methods: bool) -> isize:
         let text = with_fs_read_file(path)
         let tlen = text.len() as i32
         if tlen == 0:
@@ -161,7 +161,7 @@ impl RelocationFacts:
         var count = 0
         var skipped = 0
 
-        var i = 0
+        var i: i32 = 0
         while i < n:
             // Blank lines emit a NEWLINE token at column 0 — skip them; they are not
             // decls and must not reset an open impl group.
@@ -204,7 +204,7 @@ impl RelocationFacts:
             // optional method type params `[...]`, then `(`
             var k = type_idx + 3
             var has_tp = false
-            var tp_open = 0
+            var tp_open: i32 = 0
             var tp_inner_a = 0
             var tp_inner_b = 0
             if k < n and tokens.get_tag(k) == TokenKind.TK_L_BRACKET:
@@ -437,7 +437,7 @@ fn unique_relocation_paths(facts: &RelocationFacts, excludes: &List[str]) -> Lis
         if not seen: paths.push(with_str_clone_ref(path))
     paths
 
-fn count_selected(facts: &RelocationFacts, excludes: &List[str]) -> i32:
+fn count_selected(facts: &RelocationFacts, excludes: &List[str]) -> isize:
     var count = 0
     for i in 0..facts.paths.len() as i32:
         if not path_excluded(facts.paths[i], excludes): count = count + 1
@@ -492,7 +492,7 @@ pub fn run_receiver_migration -> i32:
     let selected = count_selected(&facts, &excludes)
     // Always complete a no-write structural preflight over the whole semantic
     // selection before the first file can be changed.
-    var preflight = 0
+    var preflight: isize = 0
     for i in 0..paths.len() as i32:
         let changed = facts.relocate_file(paths[i], false, list_methods)
         if changed < 0: exit_code(1)
@@ -505,7 +505,7 @@ pub fn run_receiver_migration -> i32:
         print(f"receiver-relocation: selected={selected} matched={preflight} files={paths.len() as i32} mode=report")
         return 0
     facts.reset_matches()
-    var changed_total = 0
+    var changed_total: isize = 0
     for i in 0..paths.len() as i32:
         let changed = facts.relocate_file(paths[i], true, false)
         if changed < 0: exit_code(1)

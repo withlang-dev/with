@@ -7,7 +7,7 @@
 fn take(o: Option[i32]) -> i32: o.unwrap_or(0)
 fn run(f: fn() -> Option[i32]) -> Option[i32]: f()
 fn main:
-    let n = 5
+    let n: i32 = 5
     print(take(run(() => .Some(n))))
     print(take(run(() => Some(n))))
     let g: fn() -> Option[i32] = () => .Some(n)

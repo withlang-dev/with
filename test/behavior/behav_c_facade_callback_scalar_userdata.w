@@ -31,6 +31,6 @@ fn step(n: c_int, scale: &i32):
 
 fn main:
     let e = Engine.new(10).unwrap()
-    let scale = 2
+    let scale: i32 = 2
     print(f"run returned {e.run(step, scale)}")
     print("ok")

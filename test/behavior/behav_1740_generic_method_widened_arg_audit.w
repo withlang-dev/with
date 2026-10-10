@@ -20,7 +20,7 @@ fn program_text -> str:
         "        self.shift(i) + self.shift(lens)\n" ++
         "fn main:\n" ++
         "    let b: Bag[i64] = Bag { items: [1, 2] }\n" ++
-        "    let names: BTreeMap[i32, str] = [x: (if x == 1: \"ten\" else: \"thirty\") for x in 0..4 if x > 0]\n" ++
+        "    let names: BTreeMap[i32, str] = [x: (if x == 1: \"ten\" else: \"thirty\") for x in 0i32..4 if x > 0]\n" ++
         "    var text = \"map\"\n" ++
         "    for (k, v) in names:\n" ++
         "        text = text ++ f\" {k}:{v}\"\n" ++

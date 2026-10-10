@@ -19,7 +19,7 @@ fn pod_consume_iter() -> i32:
     let ns: List[i32] = List.new()
     ns.push(4)
     ns.push(5)
-    var s = 0
+    var s: i32 = 0
     for n in ns:                       // POD List by-value iter — NOT rejected
         s = s + n
     s                                  // 9

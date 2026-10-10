@@ -19,9 +19,9 @@ fn run_b(slot: *mut i32):
     let e = E.B(7)
 
 fn main:
-    var ca = 0
+    var ca: i32 = 0
     run_a(&raw mut ca)
-    var cb = 0
+    var cb: i32 = 0
     run_b(&raw mut cb)
     if ca == 1 and cb == 0:
         print("ok")

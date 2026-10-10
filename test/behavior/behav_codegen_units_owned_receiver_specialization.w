@@ -12,7 +12,7 @@
 // seed failed this way linking stage1 once src/MirCore.w cloned a List[i32].
 
 fn big(n: i32) -> i32:
-    var acc = 0
+    var acc: i32 = 0
     for i in 0..n:
         acc = acc + i * 3
         if acc % 7 == 0: acc = acc - 1

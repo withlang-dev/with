@@ -7,7 +7,7 @@ fn observe_task(task: &Task[i32]) -> i32:
     1
 
 fn main:
-    let value = 41
+    let value: i32 = 41
     let task = process(&value)
     assert(observe_task(&task) == 1)
     assert(task.await == 42)

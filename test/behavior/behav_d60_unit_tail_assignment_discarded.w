@@ -13,15 +13,15 @@ var log: i32 = 0
 
 fn unit_decl -> Unit: g += 1
 fn unit_block -> Unit:
-    let a = 3
+    let a: i32 = 3
     g = a
 fn unannotated: g += 1
 fn unannotated_block:
-    let a = 2
+    let a: i32 = 2
     g *= a
 unsafe fn unsafe_unannotated(p: *mut i32): *p = 9
 unsafe fn unsafe_unannotated_block(p: *mut i32):
-    let v = 9
+    let v: i32 = 9
     *p = v
 
 fn note(x: i32): log += x

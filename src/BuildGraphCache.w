@@ -391,7 +391,7 @@ fn build_cache_sorted_unique_strings(items: &List[str]) -> List[str]:
         sorted = tracked_input_insert_unique(move sorted, items[i])
     sorted
 
-fn build_cache_last_colon(text: &str) -> i32:
+fn build_cache_last_colon(text: &str) -> isize:
     var last = -1
     for i in 0..text.len() as i32:
         if text[i] == 58:
@@ -1246,7 +1246,7 @@ fn build_cache_parse_i64(text: &str) -> i64:
 
 fn build_cache_parse_i32(text: &str, fallback: i32) -> i32:
     var seen = false
-    var value = 0
+    var value: i32 = 0
     for i in 0..text.len() as i32:
         let c = text[i]
         if c < '0' or c > '9': break

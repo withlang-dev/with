@@ -25,7 +25,7 @@ fn test_list_single:
 
 fn test_list_many_pushes:
     let v: List[i32] = List.new()
-    var i = 0
+    var i: i32 = 0
     while i < 100:
         v.push(i)
         i = i + 1
@@ -58,7 +58,7 @@ fn test_list_for_loop:
     assert(sum == 60)
 
 fn list_sum(v: List[i32]) -> i32:
-    var total = 0
+    var total: i32 = 0
     for val in v:
         total = total + val
     total

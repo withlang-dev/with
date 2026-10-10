@@ -4,7 +4,7 @@ fn slice_sum(data: []i32) -> i32:
     data[0] + data[1] + data[2]
 
 fn main:
-    var arr = [10, 20, 30]
+    var arr: List[i32] = [10, 20, 30]
     assert(arr[0] == 10)
     arr[1] = 99
     assert(arr[1] == 99)

@@ -11,7 +11,7 @@ impl[T] ScopedMut[T] for GenericGuard[T]:
     mut fn with_exit_mut(value: T) -> Unit: unsafe *self.ptr = move value
 
 fn main:
-    var n = 41
+    var n: i32 = 41
     var before = 0
     with GenericGuard { ptr: &raw mut n } as value:
         before = *value

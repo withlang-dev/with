@@ -4,7 +4,7 @@
 // the outer column. The whole chain keys the dangling-else check off the
 // ORIGINAL if's column, not each arm's (column-shifted) `if` token.
 fn classify(a: bool, b: bool, c: bool, d: bool, e: bool) -> i32:
-    var r = -1
+    var r: i32 = -1
     if a:
         r = 1
     else if b:

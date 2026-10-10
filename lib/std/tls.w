@@ -367,7 +367,7 @@ unsafe fn tls_send_client_hello(conn: *mut TlsConn, hostname: *const u8, hostnam
     fill_random(&raw mut conn.client_random[0] as *mut u8, 32)
 
     var buf: [u8; 512] = [0u8; 512]
-    var pos = 0
+    var pos: i32 = 0
 
     // Handshake header (filled later with length)
     buf[pos] = HS_CLIENT_HELLO

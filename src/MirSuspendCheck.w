@@ -72,7 +72,7 @@ fn suspend_copy_block_bits(src: SuspendBits, local_count: i32, bb: i32) -> Suspe
     out
 
 fn suspend_store_block_bits(dst: SuspendBits, local_count: i32, bb: i32, src: SuspendBits) -> i32:
-    var changed = 0
+    var changed: i32 = 0
     for li in 0..local_count:
         let idx = suspend_bit_index(local_count, bb, li)
         let old = dst.vget(idx as i64)
@@ -648,7 +648,7 @@ fn suspend_prov_transfer_stmts(bits: SuspendBits, sema: &Sema, body: &MirBody, g
 fn suspend_prov_or_block_into(dst: SuspendBits, local_count: i32, guard_count: i32, target_bb: i32, src: SuspendBits) -> i32:
     if target_bb < 0:
         return 0
-    var changed = 0
+    var changed: i32 = 0
     for li in 0..local_count:
         for gi in 0..guard_count:
             if src.vget(suspend_prov_local_index(guard_count, li, gi) as i64) == 0:
@@ -672,7 +672,7 @@ fn suspend_prov_add_successors(body: &MirBody, prov_in: SuspendBits, local_count
     let d1 = body.term_data1(bb)
     let d2 = body.term_data2(bb)
     let d3 = body.term_data3(bb)
-    var changed = 0
+    var changed: i32 = 0
 
     if kind == TermKind.TK_GOTO:
         if suspend_prov_add_successor(body, prov_in, local_count, guard_count, d0, out_bits) != 0:
@@ -1050,8 +1050,8 @@ fn last_use_live_in(body: &MirBody, local: i32, drops_read: bool) -> List[i32]:
     let bb_count = body.block_count()
     var first: List[i32] = List.new()
     for bb in 0..bb_count:
-        var event = 0
-        var si = 0
+        var event: i32 = 0
+        var si: i32 = 0
         while si < body.bb_stmt_counts[bb] and event == 0:
             event = last_use_stmt_event(body, body.bb_stmt_starts[bb] + si, local, drops_read)
             si = si + 1
@@ -1139,7 +1139,7 @@ pub fn mir_mark_last_use_holds(body: MirBody) -> MirBody:
                 else if out.term_kind(bb) == TermKind.TK_CALL: suspend_call_operands(&out, out.term_data1(bb))
                 else: List.new()
                 var reads = 0
-                var held_op = -1
+                var held_op: i32 = -1
                 for oi in 0..operands.len():
                     if suspend_place_root_local(&out, out.operand_d0[operands[oi]]) == local:
                         reads = reads + 1

@@ -6,7 +6,7 @@ use std.process
 use UnitReturnReview
 
 fn review_file(path: &str, before: &str, after: &str, reviews: &str) -> i32:
-    var missing = 0
+    var missing: i32 = 0
     if not path.ends_with(".w"): return missing
     for signature in added_unit_returns(before, after):
         if unit_return_reviewed(reviews, path, signature):

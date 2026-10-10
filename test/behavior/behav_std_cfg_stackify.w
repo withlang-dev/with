@@ -6,7 +6,7 @@ fn no_args -> List[i32]:
     List.new()
 
 fn count_kind(tree: &StackifyTree, kind: i32) -> i32:
-    var count = 0
+    var count: i32 = 0
     var i = 0
     while i < tree.nodes.len() as i32:
         if tree.nodes[i as i64].kind == kind:

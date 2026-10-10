@@ -5,7 +5,7 @@
 // in `main` would expose premature or duplicate cleanup via heap corruption.
 
 use std.builtins.print_i32
-var COUNT = 0
+var COUNT: i32 = 0
 
 type W { tag: i32 }
 impl Drop for W:

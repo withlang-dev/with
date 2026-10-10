@@ -15,7 +15,7 @@ async fn producer(tx: Sender[i32]) -> i32:
     0
 
 async fn consumer(rx: Receiver[i32]) -> i32:
-    var sum = 0
+    var sum: i32 = 0
     for msg in rx:
         if msg == 2:
             continue
@@ -23,7 +23,7 @@ async fn consumer(rx: Receiver[i32]) -> i32:
     sum
 
 async fn breaker(rx: Receiver[i32]) -> i32:
-    var seen = 0
+    var seen: i32 = 0
     for msg in rx:
         seen = seen + msg
         if seen >= 3:

@@ -170,7 +170,7 @@ fn comp_first_trimmed_line(text: &str) -> str:
             break
     comp_trim(text.slice(0, end as i64))
 
-fn comp_index_of(text: &str, needle: &str) -> i32:
+fn comp_index_of(text: &str, needle: &str) -> isize:
     if needle.len() == 0:
         return 0
     if text.len() < needle.len():
@@ -190,9 +190,9 @@ fn comp_replace_all(text: &str, needle: &str, replacement: &str) -> str:
     if needle.len() == 0:
         return compiler_owned_text(text)
     var out = ""
-    var start = 0
+    var start: isize = 0
     while start < text.len() as i32:
-        let remaining = text.len() as i32 - start
+        let remaining = text.len() - start
         if remaining < needle.len() as i32:
             out = out ++ text.slice(start as i64, text.len())
             return out
@@ -202,7 +202,7 @@ fn comp_replace_all(text: &str, needle: &str, replacement: &str) -> str:
             return out
         let matched_at = start + at
         out = out ++ text.slice(start as i64, matched_at as i64) ++ replacement
-        start = matched_at + needle.len() as i32
+        start = matched_at + needle.len()
     out
 
 fn comp_normalize_line_endings(text: &str) -> str:
@@ -600,7 +600,7 @@ fn comp_arg_allowed_for_compiler(arg: &str):
 // under qemu-user) override via WITH_BUILD_STEP_TIMEOUT_MS.
 fn comp_step_timeout_ms() -> i32:
     let raw = env("WITH_BUILD_STEP_TIMEOUT_MS")
-    var parsed = 0
+    var parsed: i32 = 0
     for i in 0..raw.len() as i32:
         let ch = raw[i]
         if ch < 48 or ch > 57:
@@ -839,7 +839,7 @@ fn comp_run_first_line(ctx: &ActionCtx, capture_dir: &str, label: &str, argv: Li
 fn comp_parse_nonnegative_i32(text: &str) -> i32:
     if text.len() == 0:
         return -1
-    var value = 0
+    var value: i32 = 0
     for i in 0..text.len() as i32:
         let ch = text[i]
         if ch < 48 or ch > 57:
@@ -870,7 +870,7 @@ fn comp_stack_binary_format(bytes: List[u8]) -> str:
 
 fn comp_stack_collect_after_marker(text: &str, marker: &str, sizes: List[i32]) -> List[i32]:
     var out = sizes
-    var start = 0
+    var start: isize = 0
     while start < text.len() as i32:
         let at = comp_find_from(text, marker, start)
         if at < 0:
@@ -881,7 +881,7 @@ fn comp_stack_collect_after_marker(text: &str, marker: &str, sizes: List[i32]) -
             if ch != 9 and ch != 32:
                 break
             pos = pos + 1
-        var sign = 1
+        var sign: i32 = 1
         if pos < text.len() as i32:
             let sign_ch = text[pos]
             if sign_ch == 43:
@@ -889,7 +889,7 @@ fn comp_stack_collect_after_marker(text: &str, marker: &str, sizes: List[i32]) -
             else if sign_ch == 45:
                 sign = -1
                 pos = pos + 1
-        var value = 0
+        var value: i32 = 0
         var seen_digit = false
         while pos < text.len() as i32:
             let ch = text[pos]
@@ -906,11 +906,11 @@ fn comp_stack_collect_after_marker(text: &str, marker: &str, sizes: List[i32]) -
     out
 
 fn comp_stack_summarize(path: &str, format: &str, sizes: List[i32]) -> StackBudgetReport:
-    var max_frame = 0
-    var ge_16k = 0
-    var ge_64k = 0
-    var ge_128k = 0
-    var ge_256k = 0
+    var max_frame: i32 = 0
+    var ge_16k: i32 = 0
+    var ge_64k: i32 = 0
+    var ge_128k: i32 = 0
+    var ge_256k: i32 = 0
     for i in 0..sizes.len() as i32:
         let size = sizes[i]
         if size > max_frame:
@@ -951,7 +951,7 @@ fn comp_stack_tool_process_path(root: &str, tool: &str) -> str:
     comp_abs(root, tool)
 
 fn comp_count_actual_c_export_attrs(text: &str) -> i32:
-    var count = 0
+    var count: i32 = 0
     var line_start: i64 = 0
     var i: i64 = 0
     while i <= text.len():
@@ -1067,7 +1067,7 @@ fn comp_is_ident_start(ch: i32) -> bool:
 fn comp_is_ident_continue(ch: i32) -> bool:
     comp_is_ident_start(ch) or (ch >= 48 and ch <= 57)
 
-fn comp_find_from(text: &str, needle: &str, start: i32) -> i32:
+fn comp_find_from(text: &str, needle: &str, start: isize) -> isize:
     if start < 0 or start >= text.len() as i32:
         return -1
     let at = comp_index_of(text.slice(start as i64, text.len()), needle)
@@ -1079,7 +1079,7 @@ fn comp_spec_subsection(text: &str, heading: &str) -> str:
     let start = comp_index_of(text, heading)
     if start < 0:
         return ""
-    var end = text.len() as i32
+    var end = text.len()
     var i = start + 1
     while i < text.len() as i32:
         if text[i] == 10:
@@ -1107,7 +1107,7 @@ fn comp_first_fenced_block(text: &str) -> str:
 
 fn comp_collect_quoted_after(text: &str, prefix: &str) -> List[str]:
     var out: List[str] = List.new()
-    var start = 0
+    var start: isize = 0
     while start < text.len() as i32:
         let at = comp_find_from(text, prefix, start)
         if at < 0:
@@ -1124,7 +1124,7 @@ fn comp_collect_quoted_after(text: &str, prefix: &str) -> List[str]:
 
 fn comp_collect_attr_names(items: List[str], text: &str) -> List[str]:
     var out = items
-    var start = 0
+    var start: isize = 0
     while start < text.len() as i32:
         let at = comp_find_from(text, "@[", start)
         if at < 0:
@@ -1237,7 +1237,7 @@ fn comp_spec_cli_commands(spec: &str) -> List[str]:
                 part_start = pi + 1
             pi = pi + 1
     let package_sec = comp_spec_subsection(spec, "# 18.8 Package Management")
-    var tick = 0
+    var tick: isize = 0
     while tick < package_sec.len() as i32:
         let open = comp_find_from(package_sec, "`", tick)
         if open < 0:
@@ -1422,7 +1422,7 @@ pub fn run_check_compiler_no_new_c_export_action(ctx: ActionCtx) -> i32:
 // was 178 before the conversion and is held at 0.
 fn comp_mirlower_name_compare_lines(text: &str) -> List[i32]:
     let hits: List[i32] = List.new()
-    var line_no = 1
+    var line_no: i32 = 1
     for line in text.split("\n"):
         let t = line.trim()
         if not t.starts_with("//"):
@@ -1469,7 +1469,7 @@ fn comp_fn_body_text(text: &str, header: &str) -> str:
     let start = comp_index_of(text, header)
     if start < 0:
         return ""
-    var end = text.len() as i32
+    var end = text.len()
     for stop in ["\nfn ", "\npub fn ", "\nimpl ", "\nlet ", "\ntype "]:
         let at = comp_find_from(text, stop, start + header.len() as i32)
         if at >= 0 and at < end: end = at
@@ -1933,7 +1933,7 @@ pub fn run_stack_budget_check_action(ctx: ActionCtx) -> i32:
     if not fs.exists(binary_path):
         return comp_fail(ctx, "missing binary: " ++ binary_path)
 
-    var max_frame_budget = 64 * 1024
+    var max_frame_budget: i32 = 64 * 1024
     let budget_arg = comp_arg_value(ctx.args(), "max-frame=")
     if budget_arg.len() > 0:
         max_frame_budget = comp_parse_nonnegative_i32(budget_arg)

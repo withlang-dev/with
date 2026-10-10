@@ -36,6 +36,23 @@ fn comptime_parse_float(text: &str) -> f64:
         Ok(c) => unsafe { strtod(c.as_cstr().ptr(), 0 as *mut *mut i8) }
         Err(_) => 0.0
 
+// D125 (§4.2.6): a float to an integer of `bits` truncates toward zero,
+// saturates to the integer's range, and NaN gives 0; the result is the
+// integer's bits in an i64.
+fn comptime_float_to_int_saturating(real: f64, bits: i32, unsigned: bool) -> i64:
+    if real != real:
+        return 0
+    let width = if bits > 64: 64 else: bits
+    var limit: f64 = 1.0
+    for _ in 0..(if unsigned: width else: width - 1): limit = limit * 2.0
+    if unsigned:
+        if real <= 0.0: return 0
+        if real >= limit: return exact_int_low_mask(width)
+        return (real as u64) as i64
+    if real >= limit: return exact_int_low_mask(width - 1)
+    if real <= 0.0 - limit: return ~exact_int_low_mask(width - 1)
+    real as i64
+
 fn comptime_float_of(value: &ComptimeValue) -> f64:
     if value.kind == ComptimeValueKind.CV_FLOAT:
         return value.real
@@ -59,7 +76,7 @@ extern fn with_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path:
 extern fn with_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> i32
 extern fn with_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32
 extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
-extern fn with_arg_at(idx: i32) -> str
+extern fn with_arg_at(idx: isize) -> str
 @[effect(fn_ptr: escape_value, ctx: escape_value)]
 extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
 extern fn with_thread_join(handle: i64) -> i32
@@ -418,8 +435,8 @@ fn comptime_configured_string_budget(default_budget: i64) -> i64:
     default_budget
 
 fn comptime_source_loc(text: &str, offset: i32) -> ComptimeSourceLoc:
-    var line = 1
-    var col = 1
+    var line: i32 = 1
+    var col: i32 = 1
     var i = 0
     while i < offset and i < text.len() as i32:
         if text[i] == 10:
@@ -743,7 +760,7 @@ fn comptime_tar_build_header(name: &str, mode: i32, size: i64, kind: i32, link_n
     if name_field.len() == 0 or mode_field.len() == 0 or uid_field.len() == 0 or gid_field.len() == 0 or size_field.len() == 0 or mtime_field.len() == 0:
         return ""
     let prefix = name_field ++ mode_field ++ uid_field ++ gid_field ++ size_field ++ mtime_field
-    let typeflag = if kind == 1: 53 else: (if kind == 2: 50 else: 48)
+    let typeflag: i32 = if kind == 1: 53 else: (if kind == 2: 50 else: 48)
     let suffix = with_str_from_byte(typeflag) ++ comptime_tar_padded_str(link_name, 100) ++ comptime_tar_padded_str("ustar", 6) ++ comptime_tar_padded_str("00", 2) ++ comptime_tar_zeroes(80) ++ comptime_tar_padded_str(path_prefix, 155) ++ comptime_tar_zeroes(12)
     if suffix.len() != 356:
         return ""
@@ -839,7 +856,7 @@ fn comptime_tar_trim_payload_name(text: &str) -> str:
 fn comptime_pax_parse_decimal(text: &str, start: i32, end: i32) -> i32:
     if start >= end:
         return -1
-    var value = 0
+    var value: i32 = 0
     var i = start
     while i < end:
         let ch = text[i]
@@ -850,7 +867,7 @@ fn comptime_pax_parse_decimal(text: &str, start: i32, end: i32) -> i32:
     value
 
 fn comptime_pax_value(text: &str, key: &str) -> str:
-    var pos = 0
+    var pos: i32 = 0
     while pos < text.len() as i32:
         var space = pos
         while space < text.len() as i32 and text[space] != 32:
@@ -1332,12 +1349,12 @@ fn ce_clone_compile_plan(p: &ComptimeWorkspaceCompilePlan) -> ComptimeWorkspaceC
 fn comptime_parse_i32_default(text: &str, default_value: i32) -> i32:
     if text.len() == 0:
         return default_value
-    var sign = 1
+    var sign: i32 = 1
     var i: i64 = 0
     if text[0] == 45:
         sign = -1
         i = 1
-    var v = 0
+    var v: i32 = 0
     var any = 0
     while i < text.len():
         let ch = text[i]
@@ -2805,7 +2822,7 @@ fn comptime_bit_result(value: i64, width: i32, is_unsigned: bool) -> i64:
 
 fn comptime_count_ones(value: i64, width: i32) -> i32:
     let raw = comptime_bit_pattern(value, width)
-    var count = 0
+    var count: i32 = 0
     for bit in 0..width:
         if (raw & exact_int_pow2_word(bit)) != 0:
             count = count + 1
@@ -2813,7 +2830,7 @@ fn comptime_count_ones(value: i64, width: i32) -> i32:
 
 fn comptime_count_leading_zeros(value: i64, width: i32) -> i32:
     let raw = comptime_bit_pattern(value, width)
-    var count = 0
+    var count: i32 = 0
     var bit = width - 1
     while bit >= 0:
         if (raw & exact_int_pow2_word(bit)) != 0:
@@ -2824,7 +2841,7 @@ fn comptime_count_leading_zeros(value: i64, width: i32) -> i32:
 
 fn comptime_count_trailing_zeros(value: i64, width: i32) -> i32:
     let raw = comptime_bit_pattern(value, width)
-    var count = 0
+    var count: i32 = 0
     for bit in 0..width:
         if (raw & exact_int_pow2_word(bit)) != 0:
             return count
@@ -2947,7 +2964,7 @@ impl ComptimeEvaluator:
                 return 0
             let args: List[i32] = List.new()
             args.push(arg1)
-            var arg_count = 1
+            var arg_count: i32 = 1
             if self.ast.get_data2(node) != 0:
                 let arg2 = self.static_type_expr(self.ast.get_data2(node))
                 if arg2 == 0:
@@ -3393,7 +3410,7 @@ impl ComptimeEvaluator:
         // §10.5's non-closure combinators. The closure-taking ones (map,
         // and_then, filter) wait on comptime closure evaluation (#665.3).
         let method = self.pool.resolve(field)
-        let is_some = if recv_value.data0 as i32 == self.sema.syms.some: 1 else: 0
+        let is_some: i32 = if recv_value.data0 as i32 == self.sema.syms.some: 1 else: 0
 
         if method == "is_some":
             if arg_count != 0:
@@ -3597,7 +3614,7 @@ impl ComptimeEvaluator:
         for ti in 0..tp_count:
             let tp_sym = self.ast.get_extra(tp_pos)
             let bound_count = self.ast.get_extra(tp_pos + 1)
-            var found_ty = 0
+            var found_ty: i32 = 0
             for si in 0..subst_count:
                 if self.sema.concrete_specialization_subst_syms[(subst_start + si)] == tp_sym:
                     found_ty = self.sema.concrete_specialization_subst_types[(subst_start + si)]
@@ -3626,7 +3643,7 @@ impl ComptimeEvaluator:
             return self.fail(node, "method receiver type is unavailable in comptime")
 
         var fn_sym = self.sema.lookup_generic_method_fn(owner, method)
-        var concrete_sig = -1
+        var concrete_sig: i32 = -1
         var type_args = ComptimeGenericResolvedArgs { ok: 1, tp_syms: List.new(), tp_tys: List.new() }
         if fn_sym != 0:
             let ret_ty = self.sema.check_generic_method_call(owner, resolved_recv as i32, fn_sym, 0, recv_node, arg_types, extra_start, arg_count, node)
@@ -3727,7 +3744,7 @@ impl ComptimeEvaluator:
             if resolved_sig.is_some():
                 let sig: i32 = resolved_sig.unwrap()
                 let call_ret = self.sema.sig_return_type(sig)
-                let threads_receiver = if self.sema.sig_receiver_mode(sig) == ReceiverMode.Mut and self.sema.resolve_alias(call_ret as TypeId) == self.sema.ty_void: 1 else: 0
+                let threads_receiver: i32 = if self.sema.sig_receiver_mode(sig) == ReceiverMode.Mut and self.sema.resolve_alias(call_ret as TypeId) == self.sema.ty_void: 1 else: 0
                 self.sema.pipeline_method_calls.insert(node, method)
                 self.sema.pipeline_call_return_types.insert(node, call_ret)
                 self.sema.pipeline_carrier_kinds.insert(node, threads_receiver)
@@ -3776,8 +3793,8 @@ impl ComptimeEvaluator:
         let lhs = self.ast.get_data0(node)
         let rhs = self.ast.get_data1(node)
         var callee = rhs
-        var args_start = -1
-        var arg_count = 0
+        var args_start: i32 = -1
+        var arg_count: i32 = 0
         if self.ast.kind(rhs) == NodeKind.NK_CALL:
             callee = self.ast.get_data0(rhs)
             args_start = self.ast.get_data1(rhs)
@@ -4246,8 +4263,8 @@ fn comptime_module_name_for_path(root: &str, path: &str) -> str:
     out
 
 fn comptime_line_column_for_offset(text: &str, offset: i32) -> ComptimeLineColumn:
-    var line = 0
-    var column = 0
+    var line: i32 = 0
+    var column: i32 = 0
     var i = 0
     let clamped = if offset < 0: 0 else if offset > text.len() as i32: text.len() as i32 else: offset
     while i < clamped:
@@ -4786,7 +4803,7 @@ impl ComptimeEvaluator:
                 return comptime_workspace_compile_plan_invalid()
             let migrate_source = self.workspace_path(capability.project_root, migrate_source_option)
             var migrate_output = self.workspace_str_option(migrate_options, "output_path")
-            let migrate_is_dir = if with_fs_is_dir(migrate_source) != 0 or (migrate_source.len() > 2 and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".c" and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".h"): 1 else: 0
+            let migrate_is_dir: i32 = if with_fs_is_dir(migrate_source) != 0 or (migrate_source.len() > 2 and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".c" and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".h"): 1 else: 0
             if migrate_output.len() == 0:
                 if migrate_is_dir != 0:
                     migrate_output = migrate_source_option ++ "_migrated"
@@ -4864,7 +4881,7 @@ impl ComptimeEvaluator:
         let source_paths: List[str] = List.new()
         let source_texts: List[str] = List.new()
         var absolute_source = ""
-        var has_strings = 0
+        var has_strings: i32 = 0
         if record.string_names.len() > 0:
             if output_kind != 0 and output_kind != 5:
                 let _ = self.fail(node, "Workspace.compile source strings currently support binary or check output only")
@@ -5826,7 +5843,7 @@ impl ComptimeEvaluator:
                 self.extra_values.push(comptime_value_str(raw_files[i]))
             return comptime_control_value(comptime_value_list(list_type, start, raw_files.len() as i32))
         if method == "write_text" or method == "copy_file" or method == "chmod" or method == "rename" or method == "copy_tree" or method == "symlink":
-            let expected =
+            let expected: i32 =
                 if method == "chmod":
                     2
                 else:
@@ -6055,7 +6072,7 @@ impl ComptimeEvaluator:
             let rc = if has_cwd: with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, spec_cwd.text) else if has_stdin: with_exec_argv_capture_input(argv, stdout_path, stderr_path, timeout_ms, spec_stdin.text) else: with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
             self.process_env_restore(saved_env)
             return self.tool_process_result(rc, stdout_path, stderr_path, node)
-        let expected =
+        let expected: i32 =
             if method == "run":
                 1
             else if method == "spawn_capture":
@@ -6224,7 +6241,7 @@ impl ComptimeEvaluator:
             return comptime_control_value(self.str_list_value(record.env, node))
         if method == "network":
             return comptime_control_value(comptime_value_bool(if record.network != 0: 1 else: 0))
-        let child_kind =
+        let child_kind: i32 =
             if method == "project_info":
                 CapabilityKind.CK_BUILD_PROJECT_INFO
             else if method == "diagnostics":
@@ -6666,9 +6683,32 @@ impl ComptimeEvaluator:
         let target_type = self.node_type_or(node, self.sema.resolve_type_expr(self.ast.get_data1(node)) as i32)
         if target_type == 0:
             return self.fail(node, "comptime cast target type is unknown")
-        if comptime_value_is_intlike(value_signal.value) != 0:
-            return comptime_control_value(comptime_value_int(target_type, comptime_value_intlike(value_signal.value)))
-        if value_signal.value.kind == ComptimeValueKind.CV_STR and self.sema.resolve_alias(target_type as TypeId) == self.sema.ty_str:
+        // D125 (§4.2.6): the same conversion a runtime cast performs.
+        let target = self.sema.resolve_alias(target_type as TypeId)
+        let target_kind = self.sema.get_type_kind(target)
+        let is_float = value_signal.value.kind == ComptimeValueKind.CV_FLOAT
+        let is_int = comptime_value_is_intlike(value_signal.value) != 0
+        if target_kind == TypeKind.TY_INT and is_int:
+            // Keep the low bits in two's complement.
+            let bits = self.sema.get_type_d0(target)
+            return comptime_control_value(comptime_value_int(target_type, int_truncate_to_width(comptime_value_intlike(value_signal.value), bits, self.sema.get_type_d1(target) == 0)))
+        if target_kind == TypeKind.TY_INT and is_float:
+            let bits = self.sema.get_type_d0(target)
+            return comptime_control_value(comptime_value_int(target_type, comptime_float_to_int_saturating(value_signal.value.real, bits, self.sema.get_type_d1(target) == 0)))
+        if target_kind == TypeKind.TY_FLOAT and (is_int or is_float):
+            // Round to nearest, ties to even, once, at the target's width;
+            // too large for a narrower float is infinity.
+            let narrow = self.sema.get_type_d0(target) == 32
+            let source_unsigned = is_int and self.sema.is_unsigned_int_type(value_signal.value.type_id)
+            let raw = comptime_value_intlike(value_signal.value)
+            let real = if is_float and narrow: (value_signal.value.real as f32) as f64
+                else if is_float: value_signal.value.real
+                else if narrow and source_unsigned: ((raw as u64) as f32) as f64
+                else if narrow: (raw as f32) as f64
+                else if source_unsigned: (raw as u64) as f64
+                else: raw as f64
+            return comptime_control_value(comptime_value_float(target_type, real, ""))
+        if value_signal.value.kind == ComptimeValueKind.CV_STR and target == self.sema.ty_str:
             return value_signal
         self.fail(node, "comptime cast is not supported for this value")
 
@@ -6994,7 +7034,7 @@ impl ComptimeEvaluator:
         self.fail(node, "comparison requires comptime scalar values")
 
     mut fn eval_binary_membership(node: i32, lhs: &ComptimeValue, rhs: &ComptimeValue, negate: i32) -> ComptimeControl:
-        var matched = 0
+        var matched: i32 = 0
         if rhs.kind == ComptimeValueKind.CV_ARRAY or rhs.kind == ComptimeValueKind.CV_TUPLE or rhs.kind == ComptimeValueKind.CV_LIST:
             for i in 0..rhs.extra_count:
                 let item = self.extra_value_at((rhs.extra_start + i) as i64)
@@ -7527,7 +7567,7 @@ impl ComptimeEvaluator:
             return iterable_signal
         let binding = self.ast.get_data0(node)
         let body = self.ast.get_data2(node)
-        var count = 0
+        var count: i32 = 0
         // #2220: a map iterates its entries as (key, value) tuples, D44's
         // `for (k, v) in map`; the entries sit in extra_values as pairs.
         let is_map = iterable_signal.value.kind == ComptimeValueKind.CV_MAP
@@ -8090,7 +8130,7 @@ impl ComptimeEvaluator:
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0 or self.ast.fn_meta_tp_count(meta) == 0:
             return ComptimeGenericResolvedArgs { ok: 1, tp_syms: List.new(), tp_tys: List.new() }
-        var concrete_sig = -1
+        var concrete_sig: i32 = -1
         let recorded = self.sema.resolved_call_sigs.get(node)
         if recorded.is_some():
             concrete_sig = recorded.unwrap()
@@ -8283,7 +8323,7 @@ impl ComptimeEvaluator:
                             return self.fail(ppat, "comptime argument did not match parameter pattern")
 
         let body_signal = self.eval_expr(self.ast.get_data1(fn_node))
-        var has_mut_receiver = 0
+        var has_mut_receiver: i32 = 0
         var final_mut_receiver = comptime_value_invalid()
         if param_count > 0 and fn_param_is_mut_self(self.ast.fn_param_flags(param_start, 0)) != 0:
             let receiver_name = self.ast.fn_param_name(param_start, 0)

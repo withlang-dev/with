@@ -58,7 +58,7 @@ pub fn contains(arr: [i32], target: i32) -> bool:
 
 /// Sum all elements from a ListIter[i32].
 pub fn iter_sum(iter: ListIter[i32]) -> i32:
-    var total = 0
+    var total: i32 = 0
     var done = false
     while not done:
         let item = iter.next()

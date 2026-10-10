@@ -29,7 +29,7 @@ unsafe fn trie_key_bytes(key: &str) -> *mut u8:
     unsafe { *(key as *const str as *const *mut u8) }
 
 impl[V] Trie[V]:
-    pub fn len() -> i64: unsafe { trie_num_entries(self.trie) } as i64
+    pub fn len() -> isize: unsafe { trie_num_entries(self.trie) } as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     unsafe fn lookup(key: &str) -> *mut Slot[V]:

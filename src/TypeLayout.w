@@ -116,7 +116,7 @@ impl Sema:
             return 0
         let saved_subst_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
         let saved_subst_types = sema_clone_i32_list(&self.generic_subst_type_ids)
-        var field_tid = 0
+        var field_tid: i32 = 0
         if self.setup_generic_inst_substitution(resolved as i32, base_sym) == 0:
             if self.named_types.contains(base_sym):
                 let base_tid = self.named_types.get(base_sym).unwrap()

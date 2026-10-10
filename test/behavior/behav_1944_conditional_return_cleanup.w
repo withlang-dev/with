@@ -39,7 +39,7 @@ fn exercise(mode: i32, early: bool):
     assert(result.kind == if early: 0 else: 1)
 
 fn main:
-    for mode in 0..3:
+    for mode in 0i32..3:
         exercise(mode, false)
         assert(DROPS == mode * 3 + 2)
         exercise(mode, true)

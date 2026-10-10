@@ -244,7 +244,7 @@ impl Sema:
             let kind = self.ast.kind(decl)
             if kind == NodeKind.NK_IMPL_DECL:
                 let trait_sym = self.ast.get_data2(decl)
-                var origin = 0
+                var origin: i32 = 0
                 if trait_sym != 0:
                     origin = 1
                 let impl_start = self.ast.get_start(decl)
@@ -340,9 +340,9 @@ impl Sema:
         let eager = self.interface_eager != 0
         var iface_count = 0
         var last_path = ""
-        var last_flag = 0
+        var last_flag: i32 = 0
         for di in 0..decl_count:
-            var flag = 0
+            var flag: i32 = 0
             if di < self.decl_source_paths.len() as i32:
                 let path = self.decl_source_paths[di]
                 if path == last_path:
@@ -508,6 +508,7 @@ impl Sema:
 
         self.collecting_types = 0
         self.resolve_deferred_non_generic_type_decls()
+        self.warn_size_width_layout_fields()
         self.collect_enum_constructor_imports()
 
         // Pass 3: collect function signatures and top-level let decls.
@@ -900,7 +901,7 @@ impl Sema:
             return 1
         // Also visible if the user explicitly declared it (extern fn, fn, type, etc.)
         // in a non-c_import context. User declarations override c_import scoping.
-        var di = 0
+        var di: i32 = 0
         while di < self.ast.decl_count():
             if di < self.decl_is_c_import.len() as i32:
                 if self.decl_is_c_import[di] != 0:
@@ -1018,7 +1019,7 @@ impl Sema:
     // dormant everywhere else; the tid maps let frozen-phase queries recover the
     // declaring node and tier without symbol re-resolution.
     mut fn record_type_decl_tier(name: i32):
-        let bit = if sema_tier_path_is_std_implementation(self.current_module_path) != 0: 1 else: 2
+        let bit: i32 = if sema_tier_path_is_std_implementation(self.current_module_path) != 0: 1 else: 2
         let old = if self.type_sym_tier_mask.contains(name): self.type_sym_tier_mask.get(name).unwrap() else: 0
         self.type_sym_tier_mask.insert(name, old | bit)
 
@@ -1030,7 +1031,7 @@ impl Sema:
         if self.get_type_kind(tid as TypeId) == TypeKind.TY_ALIAS: return
         let resolved = self.resolve_alias(tid as TypeId) as i32
         self.type_decl_nodes_by_tid.insert(resolved, node)
-        let is_std = if sema_tier_path_is_std_implementation(self.current_module_path) != 0: 1 else: 0
+        let is_std: i32 = if sema_tier_path_is_std_implementation(self.current_module_path) != 0: 1 else: 0
         self.type_tid_is_std.insert(resolved, is_std)
 
     // #1344: a variant name listed twice gave `E.A` two meanings and the
@@ -1043,6 +1044,32 @@ impl Sema:
     mut fn check_duplicate_field(type_name: i32, seen: &List[i32], f_name: i32, node: i32):
         if seen.contains(f_name):
             self.emit_error(f"duplicate field `{self.pool_resolve(f_name)}` in `{self.pool_resolve(type_name)}`", node)
+
+    // D114 (§4.1): a value that leaves the process, serialized or laid out for
+    // C, has a fixed width; an `isize` field there changes size with the
+    // target. A c_import record mirrors C's own size_t and is not warned.
+    mut fn warn_size_width_layout_fields():
+        let serialize = self.pool_lookup_symbol("Serialize")
+        let deserialize = self.pool_lookup_symbol("Deserialize")
+        for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di) or (di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0):
+                continue
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL or not self.type_decl_tids.contains(decl):
+                continue
+            let tid = self.type_decl_tids.get(decl).unwrap()
+            if self.get_type_kind(tid as TypeId) != TypeKind.TY_STRUCT:
+                continue
+            let name = self.get_type_d0(tid as TypeId)
+            let layout = if self.repr_c_types.contains(tid): "C-layout" else if (serialize != 0 and self.select_trait_impl(name, serialize) != 0) or (deserialize != 0 and self.select_trait_impl(name, deserialize) != 0): "serialized" else: ""
+            if layout.len() == 0:
+                continue
+            let te_start = self.get_type_d1(tid as TypeId)
+            for fi in 0..self.get_type_d2(tid as TypeId):
+                let f_tid = self.resolve_alias(self.type_extra[te_start + fi * 3 + 1] as TypeId)
+                if self.get_type_kind(f_tid) == TypeKind.TY_INT and self.get_type_d2(f_tid) != 0:
+                    let width = if self.get_type_d1(f_tid) != 0: "i" else: "u"
+                    self.emit_warning(f"field `{self.pool_resolve(self.type_extra[te_start + fi * 3])}` of {layout} struct `{self.pool_resolve(name)}` is `{self.type_name(f_tid as i32)}`, whose width is the target's; a value that leaves the process has a fixed width, such as `{width}64` (§4.1, D114)", decl)
 
     mut fn collect_type_decl(node: i32, is_local: i32):
         let name = self.ast.get_data0(node)
@@ -1059,7 +1086,7 @@ impl Sema:
         let extra_start = self.ast.get_data1(node)
         let packed_kind = self.ast.get_data2(node)
         let sub_kind = type_decl_sub_kind(packed_kind)
-        let decl_is_pub = if type_decl_is_pub(self.ast, extra_start, sub_kind): 1 else: 0
+        let decl_is_pub: i32 = if type_decl_is_pub(self.ast, extra_start, sub_kind): 1 else: 0
         self.record_decl_visibility(name, node, decl_is_pub)
         let is_ephemeral = type_decl_is_ephemeral(packed_kind)
         let is_generic_decl = if self.type_decl_tp_count(node) != 0: 1 else: 0
@@ -1678,7 +1705,7 @@ impl Sema:
         let p_type_node = self.ast.fn_param_type(param_start, param_idx)
         if p_type_node == 0:
             return 0
-        var p_sym = 0
+        var p_sym: i32 = 0
         let p_kind = self.ast.kind(p_type_node)
         if p_kind == NodeKind.NK_TYPE_NAMED:
             p_sym = self.ast.get_data0(p_type_node)
@@ -1923,7 +1950,7 @@ impl Sema:
         let method_owner_sym = self.method_decl_owner_symbol(node, parsed_fn_name)
         let method_base_sym = self.method_decl_base_symbol(node, parsed_fn_name)
         var fn_name = method_base_sym
-        var dispatch_fn_name = 0
+        var dispatch_fn_name: i32 = 0
         if method_owner_sym != 0 and self.method_decl_is_extension(node) != 0:
             fn_name = self.extension_method_unique_symbol_at(decl_index, method_base_sym)
         // Record the authoritative Sema-pool identity for every declaration.
@@ -1942,7 +1969,7 @@ impl Sema:
         if is_local != 0:
             self.set_pretty_symbol(fn_name, self.extract_decl_name_after(node, "fn"))
         let fn_flags = self.ast.get_data2(node)
-        let decl_is_pub = if (fn_flags / FnFlags.PUB) % 2 == 1: 1 else: 0
+        let decl_is_pub: i32 = if (fn_flags / FnFlags.PUB) % 2 == 1: 1 else: 0
         self.record_decl_visibility(fn_name, node, decl_is_pub)
         if method_owner_sym == 0:
             self.record_displaced_fn(fn_name, decl_is_pub)
@@ -2016,7 +2043,7 @@ impl Sema:
 
         // Bind Self to method owner type for dot-name methods
         let self_sym: i32 = self.syms.self_type
-        var self_type_id = 0
+        var self_type_id: i32 = 0
         let fn_name_str = self.pool_resolve(method_base_sym).clone()
         if method_owner_sym != 0:
             self_type_id = self.lookup_named_type_visible(method_owner_sym)
@@ -2331,7 +2358,7 @@ impl Sema:
         if self.is_opaque_value_type(tid) != 0:
             self.emit_error("opaque types cannot be declared as extern values; use a pointer or reference", type_node)
         // Register the extern var for scope lookup
-        let is_mut = if self.ast.get_data2(node) != 0: 1 else: 0
+        let is_mut: i32 = if self.ast.get_data2(node) != 0: 1 else: 0
         if is_mut != 0:
             self.mutable_global_syms.insert(name, 1)
         self.register_top_level_global_decl(name, tid, is_mut, node, GLOBAL_VALUE_DECL_EXTERN)
@@ -2674,7 +2701,7 @@ impl Sema:
                 bind_name = self.extract_decl_name_after(node, "var")
             self.set_pretty_symbol(name, bind_name)
         let flags = self.ast.get_data2(node)
-        let decl_is_pub = if (flags / 2) % 2 == 1: 1 else: 0
+        let decl_is_pub: i32 = if (flags / 2) % 2 == 1: 1 else: 0
         self.record_decl_visibility(name, node, decl_is_pub)
         if self.record_displaced_fn(name, decl_is_pub):
             self.displaced_global_syms.insert(name, 1)
@@ -2995,7 +3022,7 @@ impl Sema:
                         if ab_count > 0:
                             let at_name_sym: i32 = self.trait_assoc_names[at_global_idx]
                             // Find the concrete type from impl's associated type bindings
-                            var impl_at_type_node = 0
+                            var impl_at_type_node: i32 = 0
                             for iai in 0..impl_at_count:
                                 let impl_at_name = self.ast.get_extra(impl_extra_start + 1 + iai * 2)
                                 if impl_at_name == at_name_sym:
@@ -3020,7 +3047,7 @@ impl Sema:
             let tp_start = self.ast.state.impl_type_params[(tp_meta_idx + 1)]
             let tp_count = self.ast.state.impl_type_params[(tp_meta_idx + 2)]
             let bound_start = self.blanket_bound_syms.len() as i32
-            var total_bounds = 0
+            var total_bounds: i32 = 0
             var tp_off: i32 = tp_start
             for tpi in 0..tp_count:
                 let bound_count = self.ast.get_extra(tp_off + 1)
@@ -3035,7 +3062,7 @@ impl Sema:
             self.blanket_bound_counts.push(total_bounds)
             // Store target base sym for generic blanket impls (e.g., impl[T] Trait for List[T])
             let target_type_nd = self.ast.find_impl_target_type_node(node)
-            var target_base_sym = 0
+            var target_base_sym: i32 = 0
             if target_type_nd != 0 and self.ast.kind(target_type_nd) == NodeKind.NK_TYPE_GENERIC:
                 target_base_sym = self.ast.get_data0(target_type_nd)
             self.blanket_target_base_syms.push(target_base_sym)

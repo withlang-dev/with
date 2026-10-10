@@ -247,7 +247,7 @@ pub fn rt_close(fd: i32) -> i32:
 // The file status flags F_GETFL and F_SETFL carry, between std.libc's
 // numbering and Darwin's (O_APPEND 0x008, O_NONBLOCK 0x004).
 fn rt_status_flags_to_native(flags: i32) -> i32:
-    var native = 0
+    var native: i32 = 0
     if (flags & 0x800) != 0: native = native | 0x008
     if (flags & 0x2000) != 0: native = native | 0x004
     native
@@ -1213,7 +1213,7 @@ fn posix_wait_child(pid: i32, timeout_ms: i32) -> i32:
 fn posix_argv_blob_count(blob: *const u8, len: i64) -> i32:
     if len <= 0:
         return 0
-    var count = 0
+    var count: i32 = 0
     var offset: i64 = 0
     while offset < len:
         count += 1
@@ -1223,7 +1223,7 @@ fn posix_argv_blob_count(blob: *const u8, len: i64) -> i32:
     count
 
 fn posix_fill_argv(blob: *const u8, len: i64, argv: *mut *const u8) -> i32:
-    var argi = 0
+    var argi: i32 = 0
     var offset: i64 = 0
     while offset < len:
         unsafe *((argv as i64 + argi as i64 * 8) as *mut *const u8) = (blob as i64 + offset) as *const u8

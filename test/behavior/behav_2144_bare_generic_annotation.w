@@ -16,7 +16,7 @@ use std.collections.BTreeMap
 
 type Pair[A, B] { first: A, second: B }
 
-fn total(xs: &List[i32]): xs.iter() |> sum()
+fn total(xs: &List[isize]): xs.iter() |> sum()
 
 fn main:
     let xs: List = [1, 2, 3]

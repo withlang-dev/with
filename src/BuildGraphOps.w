@@ -555,7 +555,7 @@ pub fn build_graph_run_corpus_test(root: &str, target: &BuildGraphTarget) -> i32
     argv = build_graph_argv_append(argv, runner_path)
     for ai in 0..target.args.len() as i32:
         argv = build_graph_argv_append(argv, target.args[ai])
-    let timeout_ms = 300000
+    let timeout_ms: i32 = 300000
     // Compile provenance (#2249): the binary a corpus test ran, in the log.
     var prov_args = ""
     for pai in 0..target.args.len() as i32: prov_args = prov_args ++ " " ++ target.args[pai]
@@ -601,7 +601,7 @@ pub fn build_graph_run_command(root: &str, target: &BuildGraphTarget) -> i32:
     argv = build_graph_argv_append(argv, runner_path)
     for ai in 0..target.args.len() as i32:
         argv = build_graph_argv_append(argv, target.args[ai])
-    let timeout_ms = 300000
+    let timeout_ms: i32 = 300000
     // Compile provenance (#2249): the binary a corpus test ran, in the log.
     var prov_args = ""
     for pai in 0..target.args.len() as i32: prov_args = prov_args ++ " " ++ target.args[pai]
@@ -658,7 +658,7 @@ pub fn build_graph_copy_file(root: &str, target: &BuildGraphTarget) -> i32:
 pub fn build_graph_parse_octal_mode(text: &str) -> i32:
     if text.len() == 0:
         return -1
-    var mode = 0
+    var mode: i32 = 0
     for i in 0..text.len() as i32:
         let ch = text[i]
         if ch < 48 or ch > 55:

@@ -25,7 +25,7 @@ impl Viewed:
     mut fn value_ref() -> &i32: &self.value
 
 fn main:
-    var n = 40
+    var n: i32 = 40
     let copied = n.bump_and_get()
     assert(n == 41)
     assert(copied == 41)

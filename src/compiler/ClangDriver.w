@@ -21,7 +21,7 @@ use compiler.AbiStamp
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_arg_count() -> i32
-extern fn with_arg_at(idx: i32) -> str
+extern fn with_arg_at(idx: isize) -> str
 extern fn with_getenv_str(name: &str) -> str
 extern fn with_str_hash(s: &str) -> u64
 extern fn with_fs_file_exists(path: &str) -> i32

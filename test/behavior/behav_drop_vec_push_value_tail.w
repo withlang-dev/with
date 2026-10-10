@@ -6,7 +6,7 @@
 // element and buffer exactly once.
 
 use std.builtins.print_i32
-var COUNT = 0
+var COUNT: i32 = 0
 
 type W { tag: i32 }
 impl Drop for W:

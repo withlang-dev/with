@@ -86,7 +86,7 @@ impl ZipArchive:
     /// Writes every member under `dest` (created if missing) and returns the
     /// number of files written. An entry whose name would land outside
     /// `dest` fails the extraction.
-    pub fn extract_all(dest: &str) -> Result[i32, ZipError]:
+    pub fn extract_all(dest: &str) -> Result[isize, ZipError]:
         if mkdir_p(dest) != 0: return Err(zip_error(UNZ_ERRNO, "cannot create " ++ dest))
         var written = 0
         var rc = unsafe { unzGoToFirstFile(self.handle) }
@@ -107,7 +107,7 @@ impl ZipArchive:
         written
 
 /// Extracts the archive at `path` under `dest`; the number of files written.
-pub fn extract(path: &str, dest: &str) -> Result[i32, ZipError]:
+pub fn extract(path: &str, dest: &str) -> Result[isize, ZipError]:
     let archive = ZipArchive.open(path)?
     archive.extract_all(dest)
 
@@ -144,7 +144,7 @@ unsafe fn zip_drain_current(handle: *mut c_void, stream: *mut c_void) -> Result[
     if opened != UNZ_OK: return Err(zip_error(opened, "cannot open an entry (an encrypted or unsupported method)"))
     let buf = with_alloc(ZIP_CHUNK as i64) as *mut u8
     var bytes: List[u8] = List.new()
-    var failure = 0
+    var failure: i32 = 0
     var n = unsafe { unzReadCurrentFile(handle, buf as *mut c_void, ZIP_CHUNK as c_uint) }
     while n > 0 and failure == 0:
         if stream != null:

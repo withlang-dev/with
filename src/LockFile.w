@@ -3,4 +3,4 @@
 
 use compiler.LockFile
 
-let _lock_file_facade_eof_guard = 0
+const _lock_file_facade_eof_guard = 0

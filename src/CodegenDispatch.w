@@ -473,7 +473,7 @@ impl Codegen:
             let reference = self.sema.get_type_kind(self.sema.resolve_alias(tid)) == TypeKind.TY_REF
             places.push(self.sema.callable_param_uses_value_ref_abi(resolved, pi) | (if reference: 2 else: 0))
         // #1832: a C variadic function pointer keeps the variadic convention.
-        let variadic = if kind == TypeKind.TY_EXTERN_FN and self.sema.fn_type_is_variadic(resolved): 1 else: 0
+        let variadic: i32 = if kind == TypeKind.TY_EXTERN_FN and self.sema.fn_type_is_variadic(resolved): 1 else: 0
         let index = self.compute_fn_abi(ret, sources, places, convention, variadic)
         self.fn_abi_callables.insert(key, index)
         index
@@ -1239,7 +1239,7 @@ impl Codegen:
         if cur_ty == 0:
             return 0
         let p_start = body.place_proj_starts[place_id]
-        var active_variant_idx = -1
+        var active_variant_idx: i32 = -1
         for i in 0..p_count:
             let pk = body.proj_kinds[(p_start + i)]
             let pd = body.proj_d0[(p_start + i)]
@@ -1439,7 +1439,7 @@ impl Codegen:
                 cur_ty = self.mir_sema_type_to_llvm(cur_sema_ty)
                 if cur_ty != 0:
                     self.mir_local_types.insert(base_local, cur_ty)
-        var active_variant_idx = -1
+        var active_variant_idx: i32 = -1
         for i in 0..p_count:
             let pk = body.proj_kinds[(p_start + i)]
             let pd = body.proj_d0[(p_start + i)]
@@ -2657,7 +2657,7 @@ impl Codegen:
     // `{tag, data}`.
     mut fn mir_emit_eq_enum_walk(lp: i64, rp: i64, ty: i64, resolved: i32, variant_count: i32, differ: i64):
         if wl_get_type_kind(ty) == wl_pointer_type_kind():
-            var some_idx = -1
+            var some_idx: i32 = -1
             for vi in 0..variant_count:
                 if self.mir_enum_variant_payload_count(resolved, vi) == 1: some_idx = vi
             let lv = wl_build_load(self.builder, ty, lp)
@@ -2943,7 +2943,7 @@ impl Codegen:
     mut fn mir_emit_cmp_enum_walk(lp: i64, rp: i64, ty: i64, resolved: i32, variant_count: i32, decided: i64, result_slot: i64):
         if wl_get_type_kind(ty) == wl_pointer_type_kind():
             // The Option niche: null is None, declared before Some.
-            var some_idx = -1
+            var some_idx: i32 = -1
             for vi in 0..variant_count:
                 if self.mir_enum_variant_payload_count(resolved, vi) == 1: some_idx = vi
             let lv = wl_build_load(self.builder, ty, lp)
@@ -3291,7 +3291,7 @@ impl Codegen:
     mut fn mir_emit_hash_enum_walk(p: i64, ty: i64, resolved: i32, variant_count: i32, state: i64):
         let i8_ty = wl_i8_type(self.context)
         if wl_get_type_kind(ty) == wl_pointer_type_kind():
-            var some_idx = -1
+            var some_idx: i32 = -1
             for vi in 0..variant_count:
                 if self.mir_enum_variant_payload_count(resolved, vi) == 1: some_idx = vi
             let is_none = wl_build_icmp(self.builder, wl_int_eq(), wl_build_load(self.builder, ty, p), wl_const_null(ty))
@@ -3460,6 +3460,25 @@ impl Codegen:
             if is_unsigned: return wl_build_urem(self.builder, l, r)
             return wl_build_srem(self.builder, l, r)
         wl_get_undef(wl_type_of(l))
+
+    // D125 (§4.2.6): a float to an integer truncates toward zero, saturates
+    // out of range and gives 0 for NaN: llvm.fpto[su]i.sat, scalar or vector
+    // (plain fptosi is poison out of range; wasm lowers this to trunc_sat).
+    mut fn cg_build_fp_to_int_sat(val: i64, dst_ty: i64, is_unsigned: bool) -> i64:
+        let name = if is_unsigned: "llvm.fptoui.sat" else: "llvm.fptosi.sat"
+        let intrinsic_id = wl_lookup_intrinsic_id(name)
+        if intrinsic_id == 0:
+            self.had_error = 1
+            self.codegen_error_detail = "missing LLVM intrinsic " ++ name
+            return wl_get_undef(dst_ty)
+        let overloads: List[i64] = List.new()
+        overloads.push(dst_ty)
+        overloads.push(wl_type_of(val))
+        let fn_val = wl_get_intrinsic_decl(self.llmod, intrinsic_id, list_data_i64(overloads), 2)
+        let fn_ty = wl_intrinsic_get_type(self.context, intrinsic_id, list_data_i64(overloads), 2)
+        let args: List[i64] = List.new()
+        args.push(val)
+        wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(args), 1)
 
     mut fn mir_build_checked_int_bin_op(op: i32, l: i64, r: i64, wider_ty: i64, is_unsigned: bool) -> i64:
         let name = self.mir_checked_overflow_intrinsic_name(op, is_unsigned)
@@ -4254,8 +4273,8 @@ impl Codegen:
     // copied, and the join frees the copy).
     mut fn gen_display_nullable_option(val: i64, enum_sema_ty: i32, str_ty: i64) -> i64:
         let variant_count = self.mir_enum_variant_count(enum_sema_ty)
-        var some_idx = -1
-        var none_idx = -1
+        var some_idx: i32 = -1
+        var none_idx: i32 = -1
         for vi in 0..variant_count:
             if self.mir_enum_variant_payload_count(enum_sema_ty, vi) > 0:
                 some_idx = vi
@@ -4296,7 +4315,7 @@ impl Codegen:
         let result_ptr = self.create_entry_alloca(str_ty)
         let merge_bb = wl_append_bb(self.context, self.current_function, "fmt.enum.merge")
         let default_bb = wl_append_bb(self.context, self.current_function, "fmt.enum.default")
-        var vi = 0
+        var vi: i32 = 0
         while vi < variant_count:
             let case_bb = wl_append_bb(self.context, self.current_function, "fmt.enum.case")
             let else_bb = if vi + 1 < variant_count: wl_append_bb(self.context, self.current_function, "fmt.enum.next") else: default_bb
@@ -5232,11 +5251,9 @@ impl Codegen:
                 let ck = wl_get_type_kind(cast_ty)
                 // Float → Int
                 if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and ck == wl_integer_type_kind():
-                    // The integer destination determines FPToUI vs FPToSI.
-                    // A float source has no integer signedness to consult.
-                    if d1 > 0 and self.mir_sema_type_is_unsigned(d1):
-                        return wl_build_fp_to_ui(self.builder, val, cast_ty)
-                    return wl_build_fp_to_si(self.builder, val, cast_ty)
+                    // The integer destination decides signed or unsigned;
+                    // a float source has no integer signedness to consult.
+                    return self.cg_build_fp_to_int_sat(val, cast_ty, d1 > 0 and self.mir_sema_type_is_unsigned(d1))
                 // Int → Float
                 if vk == wl_integer_type_kind() and (ck == wl_float_type_kind() or ck == wl_double_type_kind()):
                     if src_unsigned:
@@ -5410,7 +5427,7 @@ impl Codegen:
             let field_ty: i64 = self.struct_field_types[field_slot]
             let llvm_fi = self.get_llvm_field_index(ty, fi)
             let field_ptr = wl_build_struct_gep(self.builder, ty, ptr, llvm_fi)
-            var field_sema_ty = 0
+            var field_sema_ty: i32 = 0
             if owner_sema_ty > 0:
                 field_sema_ty = self.mir_project_field_sema_type(owner_sema_ty, field_sym)
             if field_sema_ty > 0:
@@ -5656,10 +5673,10 @@ impl Codegen:
             return
         // Skip entirely if no variant carries a drop-needing payload.
         var any_drops = false
-        var vc = 0
+        var vc: i32 = 0
         while vc < variant_count:
             let pc = self.mir_enum_variant_payload_count(enum_sema_ty, vc)
-            var pf = 0
+            var pf: i32 = 0
             while pf < pc:
                 if self.sema.type_needs_drop_frozen(self.mir_enum_payload_sema_type(enum_sema_ty, vc, pf)) != 0:
                     any_drops = true
@@ -5676,11 +5693,11 @@ impl Codegen:
         // all-zero payload; the guarded payload drop then skips it.
         self.member_drop_depth = self.member_drop_depth + 1
         let merge_bb = wl_append_bb(self.context, self.current_function, "drop.enum.merge")
-        var vi = 0
+        var vi: i32 = 0
         while vi < variant_count:
             let pc = self.mir_enum_variant_payload_count(enum_sema_ty, vi)
             var variant_has_drop = false
-            var pf2 = 0
+            var pf2: i32 = 0
             while pf2 < pc:
                 if self.sema.type_needs_drop_frozen(self.mir_enum_payload_sema_type(enum_sema_ty, vi, pf2)) != 0:
                     variant_has_drop = true
@@ -5698,7 +5715,7 @@ impl Codegen:
                     if self.sema.type_needs_drop_frozen(psema) != 0 and payload_ty != 0:
                         self.mir_emit_drop_ptr_for_sema_type(data_ptr, payload_ty, psema)
                 else if payload_ty != 0 and wl_get_type_kind(payload_ty) == wl_struct_type_kind():
-                    var pf3 = 0
+                    var pf3: i32 = 0
                     while pf3 < pc:
                         let psema = self.mir_enum_payload_sema_type(enum_sema_ty, vi, pf3)
                         if self.sema.type_needs_drop_frozen(psema) != 0:
@@ -5720,7 +5737,7 @@ impl Codegen:
     // the null test is also the moved-out guard.
     mut fn mir_emit_drop_nullable_option_ptr(ptr: i64, ty: i64, enum_sema_ty: i32) -> Unit:
         let variant_count = self.mir_enum_variant_count(enum_sema_ty)
-        var some_idx = -1
+        var some_idx: i32 = -1
         for vi in 0..variant_count:
             if self.mir_enum_variant_payload_count(enum_sema_ty, vi) > 0:
                 some_idx = vi
@@ -6456,7 +6473,7 @@ impl Codegen:
             return
         if tk == TypeKind.TY_GENERIC_INST and self.mir_emit_drop_slotmap_ptr(ptr, ty, drop_sema_ty):
             return
-        var type_sym = 0
+        var type_sym: i32 = 0
         if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
             type_sym = self.sema.get_type_d0(resolved as TypeId)
         if tk == TypeKind.TY_GENERIC_INST and self.mir_emit_generic_inst_drop_method(ptr, ty, drop_sema_ty):
@@ -8542,7 +8559,7 @@ impl Codegen:
                 return stored
         // Fallback: walk projections using sema snapshot
         var ty: i32 = local_ty
-        var active_variant_idx = -1
+        var active_variant_idx: i32 = -1
         let p_start = body.place_proj_starts[place_id]
         for pi in 0..p_count:
             let pk = body.proj_kinds[(p_start + pi)]
@@ -9057,7 +9074,7 @@ impl Codegen:
     mut fn mir_emit_dyn_trait_call(body: &MirBody, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
         let co_k = body.operand_kinds[callee_operand]
         let co_d = body.operand_d0[callee_operand]
-        var method_sym = 0
+        var method_sym: i32 = 0
         if co_k == OperandKind.OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
             if body.const_kinds[co_d] == ConstKind.CK_FN:
                 let raw_method_sym = body.const_d0[co_d]
@@ -9131,8 +9148,8 @@ impl Codegen:
                 return self.mir_emit_dyn_call_error("error: dyn trait sret destination could not be materialized", next_bb)
             call_args.push(sret_dst)
         call_args.push(data_ptr)
-        let sret_off = if has_sret: 1 else: 0
-        var ai = 1
+        let sret_off: i32 = if has_sret: 1 else: 0
+        var ai: i32 = 1
         while ai < arg_count:
             let op_id = body.call_arg_operands[(arg_start + ai)]
             var expected_ty: i64 = 0
@@ -9270,7 +9287,7 @@ impl Codegen:
                 return 0
             let args: List[i32] = List.new()
             args.push(arg1)
-            var arg_count = 1
+            var arg_count: i32 = 1
             if self.pool.get_data2(node) != 0:
                 let arg2 = self.ast_static_type_expr(self.pool.get_data2(node))
                 if arg2 == 0:
@@ -9347,8 +9364,8 @@ impl Codegen:
         let method_name = self.codegen_ast_method_symbol_text(method_sym)
         if method_name.len() == 0:
             return 0
-        var found_decl = 0
-        var found_trait = 0
+        var found_decl: i32 = 0
+        var found_trait: i32 = 0
         for di in 0..self.pool.decl_count():
             let decl = self.pool.get_decl(di)
             if self.pool.kind(decl) != NodeKind.NK_IMPL_DECL:
@@ -9430,8 +9447,15 @@ impl Codegen:
         self.mir_finish_intrinsic_call(body, dest_place, next_bb, result)
         true
 
-    mut fn mir_finish_intrinsic_call(body: &MirBody, dest_place: i32, next_bb: i32, result: i64):
-        if dest_place >= 0 and result != 0:
+    mut fn mir_finish_intrinsic_call(body: &MirBody, dest_place: i32, next_bb: i32, raw_result: i64):
+        if dest_place >= 0 and raw_result != 0:
+            var result = raw_result
+            // D114: a length is `isize`; the runtime's size fields are i64
+            // until the collection headers take the size width, so a 32-bit
+            // target narrows the read here, at the one store.
+            let dest_sema = self.sema.resolve_alias(self.mir_place_sema_type(body, dest_place) as TypeId)
+            if dest_sema != 0 and self.sema.get_type_kind(dest_sema) == TypeKind.TY_INT and self.sema.get_type_d2(dest_sema) != 0 and wl_get_type_kind(wl_type_of(result)) == wl_integer_type_kind():
+                result = self.coerce_int(result, self.sema_type_to_llvm(dest_sema as i32))
             let result_ty = wl_type_of(result)
             if result_ty != wl_void_type(self.context):
                 let dest_ptr = self.mir_place_ptr(body, dest_place, true, result_ty)
@@ -10082,7 +10106,7 @@ impl Codegen:
             var hm_val_size: i64 = 8
             var hm_ty: i64 = 0
             var hm_base_sym = 0
-            var hm_key_sema = 0
+            var hm_key_sema: i32 = 0
             var hm_key_llvm: i64 = 0
             let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
             if dest_sema > 0:
@@ -11740,7 +11764,7 @@ impl Codegen:
             let ar_val_ptr = wl_build_struct_gep(self.builder, ar_recv_ty, ar_recv_ptr, 0)
             let ar_order = if self.is_const_int_value(ar_order_raw): wl_const_int_sext_val(ar_order_raw) as i32 else: AtomicOrdering.SEQ_CST
             let ar_recv_op = body.call_arg_operands[arg_start]
-            var ar_payload_sema = 0
+            var ar_payload_sema: i32 = 0
             var ar_recv_sema = self.mir_operand_sema_type(body, ar_recv_op)
             var ar_recv_resolved = if ar_recv_sema > 0: self.mir_resolve_alias_at(ar_recv_sema) else: 0
             if ar_recv_resolved > 0:
@@ -11782,7 +11806,7 @@ impl Codegen:
             let cas_val_ptr = wl_build_struct_gep(self.builder, cas_recv_ty, cas_recv_ptr, 0)
             let cas_success_order = if self.is_const_int_value(cas_success_raw): wl_const_int_sext_val(cas_success_raw) as i32 else: AtomicOrdering.SEQ_CST
             let cas_failure_order = if self.is_const_int_value(cas_failure_raw): wl_const_int_sext_val(cas_failure_raw) as i32 else: AtomicOrdering.SEQ_CST
-            let cas_is_weak = if intrinsic == MirIntrinsic.ATOMIC_CAS_WEAK: 1 else: 0
+            let cas_is_weak: i32 = if intrinsic == MirIntrinsic.ATOMIC_CAS_WEAK: 1 else: 0
             let cas_result = wl_build_cmpxchg(self.builder, cas_val_ptr, cas_expected, cas_desired, cas_success_order, cas_failure_order, cas_is_weak)
             let cas_old = wl_extract_value(self.builder, cas_result, 0)
             let cas_ok = wl_extract_value(self.builder, cas_result, 1)
@@ -13047,7 +13071,7 @@ impl Codegen:
             let create_cap = self.mir_intrinsic_arg(body, args_id, 0)
             // Determine element size from destination type (Channel[T])
             var chan_elem_size: i64 = 8  // default for i64
-            var chan_elem_sema_ty = 0
+            var chan_elem_sema_ty: i32 = 0
             let dest_sema_ch = self.mir_intrinsic_dest_sema_type(body, dest_place)
             if dest_sema_ch > 0:
                 let resolved_ch = self.mir_resolve_alias_at(dest_sema_ch)
@@ -13098,7 +13122,7 @@ impl Codegen:
             let recv_handle = wl_build_extract_value(self.builder, recv_self, 0)
             // Dest is the Option[T] instantiation recorded by sema.
             var recv_opt_ty = wl_i32_type(self.context)
-            var recv_opt_sema = 0
+            var recv_opt_sema: i32 = 0
             if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
                 let dst_local = body.place_locals[dest_place]
                 let dst_sema_ty = body.local_type_ids[dst_local]
@@ -13539,7 +13563,7 @@ impl Codegen:
                 return ""
             let snapshot_len = self.mir_type_kinds_len() as i32
             let tk = self.mir_type_kind_at(resolved)
-            var raw_sym = 0
+            var raw_sym: i32 = 0
             if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_GENERIC_INST:
                 raw_sym = self.mir_type_d0_at(resolved)
             else if tk == 0 and resolved >= snapshot_len:
@@ -13601,7 +13625,7 @@ impl Codegen:
             let elem = self.mir_generic_arg_tid(iter_sema, 1)
             if elem != 0:
                 let elems2: List[i32] = List.new()
-                elems2.push(self.sema.ty_i64 as i32)
+                elems2.push(self.sema.ty_isize as i32)
                 elems2.push(elem)
                 return self.sema.find_tuple_type(elems2, 2) as i32
             return 0
@@ -14109,7 +14133,7 @@ impl Codegen:
             let merge_bb_en = wl_append_bb(self.context, self.current_function, "enumerate.merge")
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next_en), some_bb_en, none_bb_en)
             wl_position_at_end(self.builder, some_bb_en)
-            let idx_val_en = wl_build_load(self.builder, wl_i64_type(self.context), idx_ptr_en)
+            let idx_val_en = wl_build_load(self.builder, wl_struct_get_type_at(iter_ty, 1), idx_ptr_en)
             let payload_en = self.option_payload_value(next_en, raw_elem_ty_en)
             let pair_alloc_en = self.create_entry_alloca(elem_ty)
             wl_build_store(self.builder, self.build_default_value(elem_ty), pair_alloc_en)
@@ -14117,7 +14141,7 @@ impl Codegen:
             wl_build_store(self.builder, idx_val_en, en0)
             let en1 = self.tuple_elem_ptr(elem_ty, pair_alloc_en, 1)
             wl_build_store(self.builder, payload_en, en1)
-            wl_build_store(self.builder, wl_build_add(self.builder, idx_val_en, wl_const_int(wl_i64_type(self.context), 1, 0)), idx_ptr_en)
+            wl_build_store(self.builder, wl_build_add(self.builder, idx_val_en, wl_const_int(wl_type_of(idx_val_en), 1, 0)), idx_ptr_en)
             let pair_val_en = wl_build_load(self.builder, elem_ty, pair_alloc_en)
             let some_val_en = self.build_option_some(pair_val_en, opt_type)
             wl_build_br(self.builder, merge_bb_en)
@@ -14375,7 +14399,7 @@ impl Codegen:
             wl_build_store(self.builder, self.coerce_value_to_type(fn_zw, wl_struct_get_type_at(adapter_ty, 2)), f2zw)
         if kind == MirIntrinsic.ITER_ENUMERATE:
             let f1e = wl_build_struct_gep(self.builder, adapter_ty, alloca, 1)
-            wl_build_store(self.builder, wl_const_int(wl_i64_type(self.context), 0, 0), f1e)
+            wl_build_store(self.builder, wl_const_int(wl_struct_get_type_at(adapter_ty, 1), 0, 0), f1e)
         if kind == MirIntrinsic.ITER_DROP_WHILE:
             let f2dw = wl_build_struct_gep(self.builder, adapter_ty, alloca, 2)
             wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), f2dw)
@@ -14439,7 +14463,7 @@ impl Codegen:
         let dest_resolved = self.mir_resolve_alias_at(dest_sema)
         let dest_kind = self.mir_type_kind_at(dest_resolved)
         var dest_base_sym = 0
-        var dest_arg_start = 0
+        var dest_arg_start: i32 = 0
         var dest_arg_count = 0
         if dest_kind == TypeKind.TY_GENERIC_INST:
             dest_base_sym = self.sema_sym_to_codegen_sym(self.mir_type_d0_at(dest_resolved))
@@ -14492,8 +14516,8 @@ impl Codegen:
             return collected
 
         if dest_base_sym == self.sym_hashset or dest_base_sym == self.sym_hashmap:
-            var key_tid = 0
-            var val_tid = 0
+            var key_tid: i32 = 0
+            var val_tid: i32 = 0
             var key_ty = elem_ty
             var val_ty = byte_ty
             if dest_base_sym == self.sym_hashset:
@@ -15792,7 +15816,7 @@ impl Codegen:
                 return true
             let gc_node = body.call_ast_node(args_id)
             if gc_node <= 0:
-                var gc0_callee_sym = 0
+                var gc0_callee_sym: i32 = 0
                 let gc0_co_k = body.operand_kinds[callee_operand]
                 let gc0_co_d = body.operand_d0[callee_operand]
                 if gc0_co_k == OperandKind.OK_CONSTANT and gc0_co_d >= 0 and gc0_co_d < body.const_kinds.len() as i32:
@@ -15825,7 +15849,7 @@ impl Codegen:
                 // Extract callee sym from ConstKind.CK_FN constant
                 let gc_co_k = body.operand_kinds[callee_operand]
                 let gc_co_d = body.operand_d0[callee_operand]
-                var gc_callee_sym = 0
+                var gc_callee_sym: i32 = 0
                 if gc_co_k == OperandKind.OK_CONSTANT and gc_co_d >= 0 and gc_co_d < body.const_kinds.len() as i32:
                     gc_callee_sym = body.const_d0[gc_co_d]
                 // Which builtin a call is is Sema's record (#2043); the AST
@@ -15982,7 +16006,7 @@ impl Codegen:
                             gc_is_static_field_access_call = true
                         let gc_static_probe_recv = self.pool.get_data0(gc_static_probe_callee)
                         let gc_static_probe_kind = self.pool.kind(gc_static_probe_recv)
-                        var gc_static_probe_owner = 0
+                        var gc_static_probe_owner: i32 = 0
                         if gc_static_probe_kind == NodeKind.NK_TYPE_NAMED:
                             gc_static_probe_owner = self.pool.get_data0(gc_static_probe_recv)
                         else if gc_static_probe_kind == NodeKind.NK_TYPE_GENERIC or gc_static_probe_kind == NodeKind.NK_INDEX:
@@ -16015,9 +16039,9 @@ impl Codegen:
                         // queried PER PARAMETER (not just param 0) — every IndirectPlace
                         // argument marshals through the one policy, which is what lets a
                         // non-receiver share-place param be passed correctly here.
-                        var gc_ra_param_start = -1
-                        var gc_ra_owner_sym = 0
-                        var gc_ra_owner_ty = 0
+                        var gc_ra_param_start: i32 = -1
+                        var gc_ra_owner_sym: i32 = 0
+                        var gc_ra_owner_ty: i32 = 0
                         let gc_fn_meta = self.pool.find_fn_meta(gc_gf.unwrap())
                         if gc_fn_meta >= 0:
                             gc_ra_param_start = self.pool.fn_meta_param_start(gc_fn_meta)
@@ -16210,7 +16234,7 @@ impl Codegen:
                         self.ensure_async_runtime_declared()
                         // Extract element type from generic call's type argument
                         var chan_elem_size: i64 = 4  // default for i32
-                        var chan_elem_sema_ty = 0
+                        var chan_elem_sema_ty: i32 = 0
                         // Also try sema typed_expr_types for the call node
                         let chan_dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
                         if chan_dest_sema > 0:
@@ -16336,7 +16360,7 @@ impl Codegen:
                 if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
                     let gc_static_self = self.pool.get_data0(gc_callee_field)
                     let gc_static_method_sym = self.pool.get_data1(gc_callee_field)
-                    var gc_static_owner_sym = 0
+                    var gc_static_owner_sym: i32 = 0
                     let gc_static_self_kind = self.pool.kind(gc_static_self)
                     if gc_static_self_kind == NodeKind.NK_IDENT or gc_static_self_kind == NodeKind.NK_TYPE_NAMED:
                         gc_static_owner_sym = self.pool.get_data0(gc_static_self)
@@ -16372,7 +16396,7 @@ impl Codegen:
                                 gc_static_arg_nodes.push(gc_static_arg_node)
                                 gc_static_args.push(self.marshal_mir_call_arg(body, args_id, gc_static_op, gc_static_ai, gc_static_val))
                                 gc_static_arg_tys.push(wl_type_of(gc_static_val))
-                            var gc_static_mono_sym = 0
+                            var gc_static_mono_sym: i32 = 0
                             if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
                                 let gc_static_local_id = body.place_locals[dest_place]
                                 if gc_static_local_id >= 0 and gc_static_local_id < body.local_type_ids.len() as i32:
@@ -16616,7 +16640,7 @@ impl Codegen:
                     let gc_fb_mir_start = body.call_arg_starts[args_id]
                     let gc_fb_mir_count = body.call_arg_counts[args_id]
                     // Try qualified name lookups: OwnerType.method, then TraitName.method
-                    var gc_fb_fn_sym = 0
+                    var gc_fb_fn_sym: i32 = 0
                     let gc_fb_recv = self.pool.get_data0(gc_callee_field)
                     let gc_fb_is_direct_self =
                         self.pool.kind(gc_fb_recv) == NodeKind.NK_IDENT and self.pool.get_data0(gc_fb_recv) == self.sym_self
@@ -16968,7 +16992,7 @@ impl Codegen:
             return false
 
         var arg_start = 0
-        var arg_count = 0
+        var arg_count: i32 = 0
         if args_id >= 0 and args_id < body.call_arg_starts.len() as i32:
             arg_start = body.call_arg_starts[args_id]
             arg_count = body.call_arg_counts[args_id]
@@ -17037,7 +17061,7 @@ impl Codegen:
         let param_types: List[i64] = List.new()
         for pi in 0..param_count: param_types.push(0)
         if param_count > 0: wl_get_param_types(call_ft, list_data_i64(&param_types))
-        let abi_has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let abi_has_sret: i32 = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let abi_sret_ty = abi.ret.source_ty
         let abi_byval_types = self.fn_abi_byval_attr_types(call_abi)
         let abi_direct_ret_ty = if abi.ret.pass == PM_DIRECT and abi.ret.llvm_ty != abi.ret.source_ty: abi.ret.source_ty else: 0
@@ -17050,7 +17074,7 @@ impl Codegen:
         // try_ci_coercion keys on ci_syms, not on the calling convention).
         // Keying on the convention passed the str header's address to a
         // translated inline function (#1589).
-        let lends_c_strings = if abi.convention == FN_ABI_C or (callee_raw_fn_sym != 0 and self.sema.ci_syms.contains(callee_raw_fn_sym)): 1 else: 0
+        let lends_c_strings: i32 = if abi.convention == FN_ABI_C or (callee_raw_fn_sym != 0 and self.sema.ci_syms.contains(callee_raw_fn_sym)): 1 else: 0
         let args: List[i64] = List.new()
         let call_temp_cleanups: List[i64] = List.new()
         if is_indirect:
@@ -17069,7 +17093,7 @@ impl Codegen:
             let abi_param_offset = param_offset + (if abi_has_sret != 0: 1 else: 0)
             if abi_param_offset < param_count:
                 expected_ty = param_types[abi_param_offset]
-            var expected_sema_ty = 0
+            var expected_sema_ty: i32 = 0
             if ai < c_promoted.len() as i32 and c_promoted[ai] != 0:
                 expected_sema_ty = c_promoted[ai]
                 if ai >= abi.arg_count:
@@ -17225,7 +17249,7 @@ impl Codegen:
             if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
                 return false
             let dst_local = body.place_locals[dest_place]
-            var call_dst_sema_ty = 0
+            var call_dst_sema_ty: i32 = 0
             if dst_local >= 0 and dst_local < body.local_type_ids.len() as i32:
                 call_dst_sema_ty = body.local_type_ids[dst_local]
             // Resolve destination type before creating the place alloca.
@@ -17352,7 +17376,7 @@ impl Codegen:
                 if d2 >= 0 and d2 < self.mir_bb_values.len() as i32:
                     default_bb = self.mir_bb_values[d2]
             var case_start = 0
-            var case_count = 0
+            var case_count: i32 = 0
             if d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
                 case_start = body.switch_table_starts[d1]
                 case_count = body.switch_table_counts[d1]
@@ -17457,10 +17481,10 @@ impl Codegen:
             with_eprint("===== END PRE MIR CLEANUP =====\n")
         // A field of a packed record is accessed unaligned (§16.4), before
         // any pass reads the alignment (wl_relax_packed_access_alignment).
-        let _ = wl_relax_packed_access_alignment(function)
+        wl_relax_packed_access_alignment(function)
         // Large aggregate moves become memmove/memset before SROA can
         // scalarize them into a store per leaf (see wl_lower_aggregate_copies).
-        let _ = wl_lower_aggregate_copies(function, self.context, wl_get_module_data_layout(self.llmod), 64)
+        wl_lower_aggregate_copies(function, self.context, wl_get_module_data_layout(self.llmod), 64)
         // A codegen unit's promotion runs on its emit thread, over the whole
         // module, instead of serially here (codegen_unit_emit_module).
         let rc = if self.unit_total > 1 and not should_dump: 0 else: wl_run_function_passes(function, self.target_machine, "sroa,mem2reg")
@@ -17602,8 +17626,8 @@ impl Codegen:
         self.mir_bind_global_locals(body)
 
         let meta = self.pool.find_fn_meta(fn_node)
-        var param_start = 0
-        var param_count = 0
+        var param_start: i32 = 0
+        var param_count: i32 = 0
         var has_ast_params = 0
         if meta >= 0:
             param_start = self.pool.fn_meta_param_start(meta)
@@ -18047,8 +18071,8 @@ impl Codegen:
         self.mir_bind_global_locals(body)
 
         let meta = if fn_node > 0: self.pool.find_fn_meta(fn_node) else: -1
-        var param_start = 0
-        var param_count = 0
+        var param_start: i32 = 0
+        var param_count: i32 = 0
         if meta >= 0:
             param_start = self.pool.fn_meta_param_start(meta)
             param_count = self.pool.fn_meta_param_count(meta)
@@ -18574,7 +18598,7 @@ impl Codegen:
             if p_kind == NodeKind.NK_TYPE_NAMED or p_kind == NodeKind.NK_IDENT:
                 let p_sym = self.pool.get_data0(p_type_node)
                 let arg_sema = self.sema_type_of_node(arg_node)
-                var canonical_tp_sym = 0
+                var canonical_tp_sym: i32 = 0
                 let want_text = self.intern.resolve(p_sym)
                 for ti in 0..tp_syms.len() as i32:
                     let candidate = tp_syms[ti]
@@ -18611,7 +18635,7 @@ impl Codegen:
                         if inner_llvm == 0:
                             continue
                         let inner_sema = self.sema.get_generic_inst_arg(arg_sema_tid, gi)
-                        var canonical_inner_sym = 0
+                        var canonical_inner_sym: i32 = 0
                         let inner_text = self.intern.resolve(inner_sym)
                         for ti in 0..tp_syms.len() as i32:
                             let candidate = tp_syms[ti]
@@ -18640,7 +18664,7 @@ impl Codegen:
         // arguments, laid out from Sema's record.
         let inst_args: List[i32] = List.new()
         for ti in 0..tp_syms.len() as i32:
-            var arg_sema = 0
+            var arg_sema: i32 = 0
             for bi in 0..bind_syms.len() as i32:
                 if bind_syms[bi] == tp_syms[ti]:
                     arg_sema = bind_sema_tys[bi]
@@ -18764,7 +18788,7 @@ impl Codegen:
         if wl_get_type_kind(payload_ty) == wl_struct_type_kind():
             var payload = wl_get_undef(payload_ty)
             let field_count = self.tuple_elem_count(payload_ty)
-            var ai = 0
+            var ai: i32 = 0
             while ai < arg_count and ai < field_count:
                 let field_ty = self.tuple_elem_type(payload_ty, ai)
                 let coerced = self.coerce_value_to_type(args[ai], field_ty)
@@ -19047,7 +19071,7 @@ impl Codegen:
             // MIR's own, by place.
             let protocol = ci < closure_body.anonymous_capture_kinds.len() as i32 and closure_body.anonymous_capture_kinds[ci] == MIR_CAPTURE_PROTOCOL
             let by_place = protocol or self.sema.closure_capture_by_place(node, ci)
-            let by_ref = if self.mode_decide(MODE_SITE_CAPTURE_BY_PLACE, by_place, self.pool.is_move_closure(node) == 0, self.current_function_name_sym, node): 1 else: 0
+            let by_ref: i32 = if self.mode_decide(MODE_SITE_CAPTURE_BY_PLACE, by_place, self.pool.is_move_closure(node) == 0, self.current_function_name_sym, node): 1 else: 0
             capture_ref_modes.push(by_ref)
 
         // Build capture struct type from captured variable types
@@ -19094,7 +19118,7 @@ impl Codegen:
         let closure_abi_index = self.compute_fn_abi(ret_ty, param_types, closure_places, if is_extern_closure: FN_ABI_C else: FN_ABI_CLOSURE, 0)
         let closure_abi: FnAbi = self.fn_abis[closure_abi_index]
         let closure_has_sret = closure_abi.ret.pass == PM_INDIRECT
-        let closure_param_offset = (if is_extern_closure: 0 else: 1) + (if closure_has_sret: 1 else: 0)
+        let closure_param_offset: i32 = (if is_extern_closure: 0 else: 1) + (if closure_has_sret: 1 else: 0)
         let fn_ty = closure_abi.llvm_ty
         let closure_fn = wl_add_function(self.llmod, "__closure", fn_ty)
         let closure_sym = self.intern.intern(f"$closure_abi${self.closure_counter}")

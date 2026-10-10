@@ -26,7 +26,7 @@ fn test_copy_in_loop:
     assert(x == 10)  // x still valid
 
 fn test_copy_to_function:
-    let n = 7
+    let n: i32 = 7
     let r = double(n)
     assert(r == 14)
     assert(n == 7)  // n still valid after pass

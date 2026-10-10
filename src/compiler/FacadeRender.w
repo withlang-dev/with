@@ -201,7 +201,7 @@ fn facade_render_item_rename_of(pool: AstPool, intern: InternPool, item: i32) ->
 // clause names, on the resource itself or on the one parent it holds — or
 // "" when the resource states none (Sema refuses a clause that is neither).
 fn facade_render_message_call(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32) -> str:
-    var named = 0
+    var named: i32 = 0
     let extra_start = pool.get_data1(resource as NodeId)
     for k in 0..pool.get_data2(resource as NodeId):
         let clause = pool.get_extra(extra_start + 1 + k)
@@ -577,7 +577,7 @@ fn facade_render_borrowed_type(pool: AstPool, intern: InternPool, ci: &List[i32]
 
 pub fn facade_render_borrowed_name(name: &str) -> str: "Borrowed" ++ name
 
-fn facade_render_resources_wrapping(pool: AstPool, intern: InternPool, repr: &str) -> i32:
+fn facade_render_resources_wrapping(pool: AstPool, intern: InternPool, repr: &str) -> isize:
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
     var n = 0
     for i in 0..items.len() as i32:
@@ -1043,13 +1043,13 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &List[i32], ite
     let out_refs: List[i32] = List.new()   // parallel to producers; 0 for a direct return
     // The `borrows` and `independent` clauses are read by
     // facade_render_item_deps, the one dependency derivation.
-    var drop_fn = 0
-    var init_fn = 0
-    var preinit_fn = 0
+    var drop_fn: i32 = 0
+    var init_fn: i32 = 0
+    var preinit_fn: i32 = 0
     // `ok C1, C2, …` (§16.2b.4): every listed status is success.
     let ok_syms: List[i32] = List.new()
     var movable = false
-    var abandon_fn = 0
+    var abandon_fn: i32 = 0
     let destroyers: List[i32] = List.new()
     for k in 0..clause_count:
         let clause = pool.get_extra(extra_start + 1 + k)
@@ -1260,10 +1260,10 @@ fn facade_render_item_deps(pool: AstPool, intern: InternPool, ci: &List[i32], it
     let out_refs: List[i32] = List.new()
     let borrow_refs: List[i32] = List.new()
     let borrow_owners: List[i32] = List.new()
-    var last_producer = -2
+    var last_producer: i32 = -2
     var independent = false
-    var init_fn = 0
-    var preinit_fn = 0
+    var init_fn: i32 = 0
+    var preinit_fn: i32 = 0
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(extra_start + 1 + k)
         let kind = pool.get_data0(clause as NodeId)
@@ -1292,7 +1292,7 @@ fn facade_render_parent_field(pool: AstPool, intern: InternPool, ci: &List[i32],
     let deps = facade_render_item_deps(pool, intern, ci, item)
     if not deps.ok:
         return ""
-    var found = -1
+    var found: i32 = -1
     for si in 0..deps.slot_res.len() as i32:
         if intern.resolve(pool.get_data0(deps.slot_res[si] as NodeId)) == parent:
             if found >= 0:
@@ -1375,7 +1375,7 @@ fn facade_render_deps(pool: AstPool, intern: InternPool, producers: &List[i32], 
         for dj in 0..di:
             if deps.owners[dj] == deps.owners[di] and deps.resources[dj] == deps.resources[di]:
                 seen = seen + 1
-        var slot = -1
+        var slot: i32 = -1
         var k = 0
         for si in 0..deps.slot_res.len() as i32:
             if deps.slot_res[si] == deps.resources[di]:
@@ -1443,7 +1443,7 @@ fn facade_render_dep_values(pool: AstPool, intern: InternPool, deps: &FacadeDeps
 fn facade_render_received(pool: AstPool, intern: InternPool, ptext: &str) -> i32:
     let p = facade_render_unalias(pool, intern, ptext)
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
-    var found = 0
+    var found: i32 = 0
     for i in 0..items.len() as i32:
         let res = items[i]
         let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(res as NodeId)) as NodeId))
@@ -1836,7 +1836,7 @@ fn facade_render_has_clause(pool: AstPool, resource: i32, kind: i32) -> bool:
 // `fclose(FILE *)` the program imported.
 fn facade_render_find_fn(pool: AstPool, intern: InternPool, ci: &List[i32], sym: i32) -> i32:
     let want: str = intern.resolve(sym)
-    var fallback = 0
+    var fallback: i32 = 0
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         let kind = pool.kind(decl)
@@ -2494,7 +2494,7 @@ pub fn facade_render_param_ref(pool: AstPool, intern: InternPool, decl: i32, ref
     let rk = pool.get_data0(ref_node as NodeId)
     if rk == FACADE_PARAM_REF_INDEX:
         let digits: str = intern.resolve(pool.get_data1(ref_node as NodeId))
-        var idx = 0
+        var idx: i32 = 0
         for i in 0..digits.len() as i32:
             idx = idx * 10 + (digits[i] - '0') as i32
         return if idx < count: idx else: -1
@@ -2505,7 +2505,7 @@ pub fn facade_render_param_ref(pool: AstPool, intern: InternPool, decl: i32, ref
                 return pi
         return -1
     let want = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_data1(ref_node as NodeId) as NodeId))
-    var found = -1
+    var found: i32 = -1
     var matches = 0
     for pi in 0..count:
         if facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)) == want:
@@ -2676,7 +2676,7 @@ fn facade_render_index_ref(pool: AstPool, intern: InternPool, ref_node: i32) -> 
     if ref_node == 0 or pool.get_data0(ref_node as NodeId) != FACADE_PARAM_REF_INDEX:
         return -1
     let digits: str = intern.resolve(pool.get_data1(ref_node as NodeId))
-    var idx = 0
+    var idx: i32 = 0
     for i in 0..digits.len() as i32:
         idx = idx * 10 + (digits[i] - '0') as i32
     idx
@@ -3016,7 +3016,7 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &List[i32],
     if hosted and not repr.starts_with("*") and not in_place:
         return ""
     let pinned = in_place and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_MOVABLE)
-    let skip = if hosted: 1 else: 0
+    let skip: i32 = if hosted: 1 else: 0
     let indent = if hosted: "        " else: "    "
     var out = ""
     let items: List[i32] = List.new()

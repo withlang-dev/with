@@ -21,7 +21,7 @@ fn run(s: *mut i32):
         H { items } => ()
 
 fn main:
-    var c = 0
+    var c: i32 = 0
     run(&raw mut c)
     if c == 1:
         print("ok")

@@ -41,7 +41,7 @@ fn main:
     print(f"{missing.len()} ok")
 
     var xs: List[i32] = List.new()
-    for i in 0..500000: xs.push(i)
+    for i in 0i32..500000: xs.push(i)
     let o: Option[List[i32]] = Some(xs)
     let w = o.unwrap_or(List.new())
     print(f"{w.len()} ok")

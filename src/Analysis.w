@@ -26,7 +26,7 @@ pub type CompilerAnalysisResult {
 }
 
 fn analysis_line_for_offset(source: &str, offset: i32) -> i32:
-    var line = 1
+    var line: i32 = 1
     let stop = if offset < source.len() as i32: offset else: source.len() as i32
     for i in 0..stop:
         if source[i] as i32 == 10:
@@ -260,7 +260,7 @@ fn analysis_collect_trait_declarations(report: &AnalysisReport, sema: &Sema, sou
             let receiver_flags = if mode != ReceiverMode.None and param_count > 0: sema.ast.fn_param_flags(param_start, 0) else: 0
             let synthetic_receiver = fn_param_is_synth_receiver(receiver_flags) != 0
             let explicit_receiver = mode != ReceiverMode.None and not synthetic_receiver
-            var effects = 0
+            var effects: i32 = 0
             if mode == ReceiverMode.Read: effects = EFF_READ
             else if mode == ReceiverMode.Mut: effects = EFF_READ | EFF_WRITE
             else if mode == ReceiverMode.Move: effects = EFF_READ | EFF_CONSUME
@@ -379,7 +379,7 @@ fn analysis_collect_expressions(report: &AnalysisReport, sema: &Sema):
 fn analysis_parse_node_id(text: &str) -> i32:
     if text.len() == 0:
         return -1
-    var value = 0
+    var value: i32 = 0
     for i in 0..text.len() as i32:
         let ch = text[i] as i32
         if ch < 48 or ch > 57:
@@ -492,7 +492,7 @@ fn analysis_collect_ast_node_tree(report: &AnalysisReport, sema: &Sema, node: i3
     let d2 = sema.ast.get_data2(node)
     let typed = sema.typed_expr_types.get(node)
     let resolved = sema.comp_resolved.get(node)
-    var symbol = 0
+    var symbol: i32 = 0
     if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED:
         symbol = d0
     else if kind == NodeKind.NK_FIELD_ACCESS:
@@ -592,7 +592,7 @@ fn analysis_collect_signatures(report: &AnalysisReport, sema: &Sema, source_path
 
 fn analysis_collect_effect_edges(report: &AnalysisReport, sema: &Sema):
     var at = 0
-    var edge = 0
+    var edge: i32 = 0
     while at + 3 < sema.effect_flow_edges.len() as i32:
         let caller_sig = sema.effect_flow_edges[at]
         let caller_pi = sema.effect_flow_edges[(at + 1)]
@@ -887,7 +887,7 @@ fn analysis_call_argument_node(sema: &Sema, call_node: i32, arg_index: i32, mir_
     if call_node <= 0 or call_node >= sema.ast.node_count() or sema.ast.kind(call_node) != NodeKind.NK_CALL: return 0
     let resolved = sema.has_resolved_call_args(call_node) != 0
     let source_count = if resolved: sema.get_resolved_call_arg_count(call_node) else: sema.ast.get_data2(call_node)
-    let receiver_offset = if source_count + 1 == mir_count: 1 else: 0
+    let receiver_offset: i32 = if source_count + 1 == mir_count: 1 else: 0
     if receiver_offset == 1 and arg_index == 0: return analysis_call_receiver_node(sema, call_node)
     let source_index = arg_index - receiver_offset
     if source_index < 0 or source_index >= source_count: return 0
@@ -1024,7 +1024,7 @@ fn analysis_audit_effects(report: &AnalysisReport, sema: &Sema):
         else if mode == ReceiverMode.Mut and (required & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
             report.fail(f"sig {si}: mut receiver requires move")
     var at = 0
-    var edge_index = 0
+    var edge_index: i32 = 0
     while at + 3 < sema.effect_flow_edges.len() as i32:
         let caller_sig = sema.effect_flow_edges[at]
         let caller_pi = sema.effect_flow_edges[(at + 1)]
@@ -1121,7 +1121,7 @@ fn analysis_audit_pool(report: &AnalysisReport, sema: &Sema):
 
 fn analysis_audit_storage(report: &AnalysisReport, sema: &Sema):
     let node_count = sema.ast.node_count()
-    var resolved_calls = 0
+    var resolved_calls: i32 = 0
     var resolved_args = 0
     for node in 1..node_count:
         let has_start = sema.call_resolved_arg_starts.contains(node)
@@ -1162,8 +1162,8 @@ fn analysis_audit_storage(report: &AnalysisReport, sema: &Sema):
     report.note(fact.detail)
     report.add(move fact)
 
-    var trait_count = 0
-    var trait_methods = 0
+    var trait_count: i32 = 0
+    var trait_methods: i32 = 0
     for di in 0..sema.ast.decl_count():
         let trait_node = sema.ast.get_decl(di)
         if sema.ast.kind(trait_node) != NodeKind.NK_TRAIT_DECL: continue
@@ -1197,8 +1197,8 @@ fn analysis_audit_storage(report: &AnalysisReport, sema: &Sema):
     report.note(trait_fact.detail)
     report.add(move trait_fact)
 
-    var impl_count = 0
-    var extend_count = 0
+    var impl_count: i32 = 0
+    var extend_count: i32 = 0
     for di in 0..sema.ast.decl_count():
         let impl_node = sema.ast.get_decl(di)
         if sema.ast.kind(impl_node) != NodeKind.NK_IMPL_DECL:
@@ -1991,7 +1991,7 @@ fn analysis_seam_row(sema: &Sema, body: &MirBody, fn_name: &str, path: &str, spa
     if class.len() == 0:
         return none
     let place_text = mir_place_text(body, place_id)
-    let class_idx = if class == "move-through-ref": 0
+    let class_idx: i32 = if class == "move-through-ref": 0
         else if class == "move-raw-deref": 1
         else if class == "copy-elem-drop": 2
         else if class == "copy-view-drop": 3
@@ -2590,7 +2590,7 @@ pub fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool
     analysis_collect_requested_node(&report, sema, request, source_path, source_text)
     analysis_collect_mir(&report, mir_mod, sema, pool, source_path, source_text)
     var text = ""
-    var status = 0
+    var status: i32 = 0
     var needs_codegen = false
     var codegen_query = ""
 

@@ -167,7 +167,7 @@ pub fn corpus_copy_w_files(ctx: &ActionCtx, source_dir: &str, destination: &str)
     0
 
 pub fn corpus_count_w_files(ctx: &ActionCtx, dir: &str) -> i32:
-    var count = 0
+    var count: i32 = 0
     for path in ctx.fs().list_files(dir):
         if path.ends_with(".w"): count = count + 1
     count
@@ -388,7 +388,7 @@ pub fn corpus_check_every_module(ctx: &ActionCtx, corpus: &Corpus, generated: &s
 /// floor rather than promoting a partial corpus. Returns the error count.
 pub fn corpus_reject_bad_output(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32:
     let fs = ctx.fs()
-    var errors = 0
+    var errors: i32 = 0
     var modules = 0
     for path in fs.list_files(generated):
         if not path.ends_with(".w"): continue
@@ -449,7 +449,7 @@ pub fn corpus_reject_foreign_symbols(ctx: &ActionCtx, corpus: &Corpus, generated
     var permitted = corpus_permitted_externs()
     for i in 0..corpus.declared_externs.len() as i32: permitted = permitted ++ corpus.declared_externs[i] ++ "|"
     var defined = "|"
-    var errors = 0
+    var errors: i32 = 0
     let files = fs.list_files(generated)
     for i in 0..files.len() as i32:
         let path = files[i]

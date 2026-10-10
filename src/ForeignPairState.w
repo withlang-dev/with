@@ -29,7 +29,7 @@ fn foreign_pair_add(state: &ForeignPairState, alternative: ForeignPairAlternativ
 
 pub fn foreign_pair_initial(defaults: bool) -> ForeignPairState:
     let state = ForeignPairState { alternatives: List.new() }
-    let ty = if defaults: 0 else: -1
+    let ty: i32 = if defaults: 0 else: -1
     foreign_pair_add(state, ForeignPairAlternative { callback_type: ty, userdata_type: ty, userdata_origin: -1, guard: -1, succeeded: true })
     state
 

@@ -23,8 +23,8 @@ fn classify(x: i32) -> str {
 }
 
 fn sum_to(n: i32) -> i32 {
-    var total = 0
-    var i = 1
+    var total: i32 = 0
+    var i: i32 = 1
     while i <= n {
         total = total + i
         i = i + 1
@@ -33,7 +33,7 @@ fn sum_to(n: i32) -> i32 {
 }
 
 fn count_items() -> i32 {
-    var count = 0
+    var count: i32 = 0
     for x in 0..5 {
         count = count + 1
     }
@@ -41,7 +41,7 @@ fn count_items() -> i32 {
 }
 
 fn loop_break() -> i32 {
-    var i = 0
+    var i: i32 = 0
     loop {
         i = i + 1
         if i >= 10 {

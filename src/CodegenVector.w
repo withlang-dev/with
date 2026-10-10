@@ -119,13 +119,13 @@ impl Codegen:
         let n = wl_get_vector_size(vec_ty)
         let elem_ty = wl_get_element_type(vec_ty)
         if self.cg_lane_is_float(lane):
-            let lane_bits = if wl_get_type_kind(elem_ty) == wl_float_type_kind(): 32 else: 64
+            let lane_bits: i32 = if wl_get_type_kind(elem_ty) == wl_float_type_kind(): 32 else: 64
             if op == BinaryOp.OP_ADD: return wl_build_fadd(self.builder, l, r)
             if op == BinaryOp.OP_SUB: return wl_build_fsub(self.builder, l, r)
             if op == BinaryOp.OP_MUL: return wl_build_fmul(self.builder, l, r)
             if op == BinaryOp.OP_DIV: return wl_build_fdiv(self.builder, l, r)
             if op == BinaryOp.OP_MOD: return wl_build_frem(self.builder, l, r)
-            var pred = -1
+            var pred: i32 = -1
             if op == BinaryOp.OP_EQ: pred = wl_real_oeq()
             if op == BinaryOp.OP_NEQ: pred = wl_real_une()
             if op == BinaryOp.OP_LT: pred = wl_real_olt()
@@ -137,7 +137,7 @@ impl Codegen:
             return self.cg_vector_unsupported("float vector operator")
         let unsigned = self.cg_lane_is_unsigned(lane)
         let width = wl_get_int_type_width(elem_ty)
-        var ipred = -1
+        var ipred: i32 = -1
         if op == BinaryOp.OP_EQ: ipred = wl_int_eq()
         if op == BinaryOp.OP_NEQ: ipred = wl_int_ne()
         if op == BinaryOp.OP_LT: ipred = if unsigned: wl_int_ult() else: wl_int_slt()
@@ -282,7 +282,7 @@ impl Codegen:
         let dst_float = self.cg_lane_is_float(dst_lane)
         if src_float and dst_float: return wl_build_fp_cast(self.builder, val, dst_ty)
         if src_float:
-            return if self.cg_lane_is_unsigned(dst_lane): wl_build_fp_to_ui(self.builder, val, dst_ty) else: wl_build_fp_to_si(self.builder, val, dst_ty)
+            return self.cg_build_fp_to_int_sat(val, dst_ty, self.cg_lane_is_unsigned(dst_lane))
         if dst_float:
             return if self.cg_lane_is_unsigned(src_lane): wl_build_ui_to_fp(self.builder, val, dst_ty) else: wl_build_si_to_fp(self.builder, val, dst_ty)
         let src_w = wl_get_int_type_width(wl_get_element_type(src_ty))

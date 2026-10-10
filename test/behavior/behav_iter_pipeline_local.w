@@ -7,7 +7,7 @@ fn make_iter(xs: &List[i32]) -> ListIter[i32]:
     xs.iter()
 
 fn sum_iter(iter: ListIter[i32]) -> i32:
-    var total = 0
+    var total: i32 = 0
     var done = false
     while not done:
         let item = iter.next()
