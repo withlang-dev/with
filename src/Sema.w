@@ -10121,6 +10121,11 @@ impl Sema:
         if exp_k == TypeKind.TY_SLICE and act_k == TypeKind.TY_SLICE:
             if self.get_type_d1(exp_r) != 0 and self.get_type_d1(act_r) == 0:
                 return 0
+            // A slice views its elements in place, as a reference views its
+            // pointee: an `[]i64` accepted as `[]i32` read half of each
+            // element (§4.2.6 converts values, never a view's elements).
+            if self.ref_numeric_pointees_differ(exp_r, act_r) != 0:
+                return 0
             return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
         if exp_k == TypeKind.TY_ARRAY and act_k == TypeKind.TY_ARRAY:
             if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
@@ -10160,9 +10165,16 @@ impl Sema:
                             break
                     if gi_all_ok != 0:
                         return 1
-        // Auto-referencing: T → &T
+        // Auto-referencing: T → &T. The reference views the argument's own
+        // place, so its numeric type is the pointee's: an `i32` place viewed
+        // as `&i64` read eight bytes of four (-1 read as 4294967295).
         if exp_k == TypeKind.TY_REF:
             if self.get_type_d1(exp_r) == 0:
+                let auto_pointee = self.resolve_alias(self.get_type_d0(exp_r))
+                let pk = self.get_type_kind(auto_pointee)
+                if (pk == TypeKind.TY_INT or pk == TypeKind.TY_FLOAT) and (act_k == TypeKind.TY_INT or act_k == TypeKind.TY_FLOAT) and auto_pointee != act_r:
+                    if (pk != act_k) or self.get_type_d0(auto_pointee) != self.get_type_d0(act_r) or self.get_type_d1(auto_pointee) != self.get_type_d1(act_r):
+                        return 0
                 if self.types_compatible(self.get_type_d0(exp_r), act_r) != 0:
                     return 1
         0
