@@ -98,12 +98,24 @@ The compiler may infer an unsuffixed literal's type from:
 5. A known array element type
 6. A known struct field type
 7. The target type of a cast (`as`)
+8. The other arms of a join. In an `if`, `match` or `??`, and among a
+   function's returns when its return type is inferred, an untyped literal
+   arm takes the type of the typed arms. So does a tuple of untyped
+   literals, or an `if` whose every arm is one. Beside a view of a number it
+   takes the number's type. When every arm is untyped, the join is itself an
+   untyped literal expression, and an outer context types it
+   (`let x: u8 = if c: 1 else: 2` is `u8`). When the typed arms disagree
+   (`i32` in one arm, `i64` in another), the join is an error (§4.2.6); no
+   arm's width wins (D125).
 
 An untyped constant expression is evaluated exactly, with no width, until
 a context gives it a type. A cast is such a context. The cast converts the
 exact value with the same wrap and truncate rule a runtime cast uses. An
 untyped constant never passes through `isize` on its way to a cast. Float
 constants in a cast follow the runtime rule too: `3.7 as i32` gives 3 (D124).
+Exact evaluation has no width limit; a compiler that cannot represent a
+value says so as its own limitation, never by typing the constant narrower
+(D125).
 
 ```
 (0 - 1) as u32            // 4294967295 on every target
@@ -506,6 +518,14 @@ This catches a class of silent data corruption bugs inherited from
 C. The `as` keyword signals that the programmer understands the
 conversion may lose data. Signed-to-unsigned and unsigned-to-signed
 conversions also require `as`, even at the same width.
+
+**What a cast does.** `v as T` between integer types takes `v`'s
+mathematical value and keeps its low bits in two's complement, so widening
+sign- or zero-extends. From a float to an integer it truncates toward zero;
+a value out of range saturates to `T`'s minimum or maximum, and NaN gives
+0. From an integer to a float, and from a wider float to a narrower one, it
+rounds to nearest, ties to even; a value too large for the narrower float
+becomes ±infinity (D125).
 
 #### 4.2.7 Comparison Operators and Chaining
 

@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.30
+# The With Programming Language — Specification v7.31
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,16 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.31:** literal join arms and what a cast does, 2026-10-09
+(D125). §4.2.1 rule 8: an untyped literal arm of an `if`, `match` or `??`,
+or a literal return of a function whose return type is inferred, takes the
+typed arms' type (a tuple of literals and an all-literal `if` too; beside a
+view, the number's type); an all-literal join is typed by its outer context;
+typed arms that disagree are an error. §4.2.1: exact constant evaluation has
+no width limit. §4.2.6: integer casts keep the low two's-complement bits;
+float to integer truncates and saturates, NaN gives 0; to a float, nearest
+ties-to-even, overflow to ±infinity. The implementation is NON-COMPLIANT
+until it catches up.
 **Changelog v7.30:** a cast converts an untyped constant exactly,
 2026-10-09 (D124). §4.2.1: an untyped constant expression is evaluated
 exactly, with no width, until a context types it; a cast is such a context

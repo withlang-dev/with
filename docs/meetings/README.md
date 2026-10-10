@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D125 — A literal arm of a join takes the typed arms' type (§4.2.1 rule 8; outer context types an all-literal join; disagreeing typed arms are an error); `as` keeps low bits, float-to-integer saturates (NaN 0), nearest-even to floats; exact constants have no width limit](2026-10-09-D125-literal-join-arms-and-what-a-cast-does.md)
 - [D124 — An untyped constant expression has no width until a context types it; a cast is such a context and converts the exact value (C's modular rule at compile time, never through `isize`); floats follow the runtime rule](2026-10-09-D124-a-cast-converts-an-untyped-constant-exactly.md)
 - [D123 — std.mssql may read and port from permissive TDS drivers, recorded in `THIRD_PARTY` from day one; `Decimal`, the date and time types and `Guid` are std types, `Decimal` over a real `i128`; phases wait on the customer's login method](2026-10-09-D123-mssql-permissive-references-and-std-value-types.md)
 - [D122 — A borrow through a borrow is a borrow of the same origin; `text param` and owned text returns (`text return, owned, freed by F`), proved from the body; the detach fact is the follow-on](2026-10-09-D122-borrow-through-borrow-and-text.md)
