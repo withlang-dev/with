@@ -19,14 +19,14 @@ impl Drop for Tag:
 fn ints():
     var heap = BinaryHeap[i32].new()
     assert(heap.is_empty() and heap.peek().is_none() and heap.pop().is_none())
-    for v in [3, 9, 1, 7, 9, 4]: heap.push(v)
+    for v in [3i32, 9, 1, 7, 9, 4]: heap.push(v)
     assert(heap.len() == 6)
     assert(*heap.peek().unwrap() == 9)
     var expected = [9, 9, 7, 4, 3, 1]
     for i in 0..6: assert(heap.pop().unwrap() == expected[i])
     assert(heap.pop().is_none())
     var low = BinaryHeap[i32].new_min()
-    for v in [3, 9, 1, 7]: low.push(v)
+    for v in [3i32, 9, 1, 7]: low.push(v)
     assert(*low.peek().unwrap() == 1)
     assert(low.pop().unwrap() == 1 and low.pop().unwrap() == 3)
     assert(low.len() == 2)

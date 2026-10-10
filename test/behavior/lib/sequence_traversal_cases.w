@@ -19,7 +19,7 @@ fn join_array_ref(words: &[2]str) -> str:
     out
 
 fn sum(xs: &[i32]) -> i32:
-    var total = 0
+    var total: i32 = 0
     for x in xs: total = total + x
     total
 
@@ -43,7 +43,7 @@ fn main:
     for n in holder.names: held = held ++ n
     for n in holder.names: held = held ++ n
     assert(held == "a1b2a1b2")
-    let nums = [1, 2, 3]
+    let nums: List[i32] = [1, 2, 3]
     let none: [0]i32 = []
     assert(sum(nums[..]) == 6 and sum(nums[1..1]) == 0 and sum(none[..]) == 0)
     print("ok")

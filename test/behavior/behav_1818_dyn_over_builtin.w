@@ -26,7 +26,7 @@ fn show_display(d: &dyn Display): print(d.to_str())
 fn main:
     let a = "abc"
     show_dyn(&a)
-    let n = 7
+    let n: i32 = 7
     show_dyn(&n)
     show_display(&a)
     show_display(&n)
