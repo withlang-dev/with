@@ -118,7 +118,7 @@ fn ex_below_marker(text: &str) -> str:
 
 /// One verdict per copy that is not the toolchain's file byte for byte.
 fn ex_facade_copy_failures(ctx: &ActionCtx) -> i32:
-    var failures = 0
+    var failures: i32 = 0
     let fs = ctx.fs()
     for path in ex_facade_copies():
         let original = ex_facade_original(path)

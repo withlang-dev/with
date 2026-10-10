@@ -63,7 +63,7 @@ pub fn run_tools_tests_action(ctx: ActionCtx) -> i32:
         var args: List[str] = List.new()
         args.push(compiler.clone())
         var label = ""
-        var timeout_ms = 600000
+        var timeout_ms: i32 = 600000
         if tl_checked_only(fs, source):
             args.push("check")
             args.push(tl_abs(root, source))
