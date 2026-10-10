@@ -13082,7 +13082,7 @@ impl Sema:
         // The initializer as written: the comptime transform folded the
         // declaration itself to its value at the default type.
         let value = self.ast.untyped_const_init_of(decl)
-        if value == 0 or not self.expr_is_literal_arith_depth(value, false, depth + 1):
+        if value == 0 or not self.expr_is_literal_arith_depth(value, false, false, depth + 1):
             return 0
         value
 
@@ -13160,24 +13160,31 @@ impl Sema:
     // asks for a value known here: a shift's amount must be one too. Without
     // it, the question is whether a context decides the type, and a shift's
     // type is its left operand's alone.
-    fn expr_is_literal_arith_of(node: i32, constant: bool): self.expr_is_literal_arith_depth(node, constant, 0)
+    fn expr_is_literal_arith_of(node: i32, constant: bool): self.expr_is_literal_arith_depth(node, constant, not constant, 0)
 
-    fn expr_is_literal_arith_depth(node: i32, constant: bool, depth: i32) -> bool:
+    fn expr_is_literal_arith_depth(node: i32, constant: bool, ifs: bool, depth: i32) -> bool:
         if node == 0:
             return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT:
             return constant or self.literal_suffix_type(self.ast.literal_suffix(node)) == 0
         if kind == NodeKind.NK_GROUPED:
-            return self.expr_is_literal_arith_depth(self.ast.get_data0(node), constant, depth)
+            return self.expr_is_literal_arith_depth(self.ast.get_data0(node), constant, ifs, depth)
         if kind == NodeKind.NK_UNARY and (self.ast.get_data0(node) == UnaryOp.UOP_NEGATE or self.ast.get_data0(node) == UnaryOp.UOP_BIT_NOT):
-            return self.expr_is_literal_arith_depth(self.ast.get_data1(node), constant, depth)
+            return self.expr_is_literal_arith_depth(self.ast.get_data1(node), constant, ifs, depth)
         if kind == NodeKind.NK_BINARY:
             let op = self.ast.get_data0(node)
             if sema_binary_op_is_arithmetic(op) or op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR:
-                return self.expr_is_literal_arith_depth(self.ast.get_data1(node), constant, depth) and self.expr_is_literal_arith_depth(self.ast.get_data2(node), constant, depth)
+                return self.expr_is_literal_arith_depth(self.ast.get_data1(node), constant, ifs, depth) and self.expr_is_literal_arith_depth(self.ast.get_data2(node), constant, ifs, depth)
             if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
-                return self.expr_is_literal_arith_depth(self.ast.get_data1(node), constant, depth) and (not constant or self.expr_is_literal_arith_depth(self.ast.get_data2(node), true, depth))
+                return self.expr_is_literal_arith_depth(self.ast.get_data1(node), constant, ifs, depth) and (not constant or self.expr_is_literal_arith_depth(self.ast.get_data2(node), true, false, depth))
+        // §4.2.1: an `if` whose every arm is such an expression (`if c: 1
+        // else: 0`) is one too: the context reaches its literals through the
+        // join. Not for a constant's initializer (D88 names operators only).
+        if ifs and kind == NodeKind.NK_IF_EXPR:
+            return self.expr_is_literal_arith_depth(self.ast.get_data1(node), constant, ifs, depth) and self.expr_is_literal_arith_depth(self.ast.get_data2(node), constant, ifs, depth)
+        if ifs and kind == NodeKind.NK_BLOCK and self.ast.get_data1(node) == 0:
+            return self.expr_is_literal_arith_depth(self.ast.get_data2(node), constant, ifs, depth)
         // D88: a constant with no numeric type of its own is its initializer.
         if kind == NodeKind.NK_IDENT:
             return self.untyped_const_init_depth(self.ast.get_data0(node), depth) != 0
@@ -15041,7 +15048,7 @@ impl Sema:
         // D93: a literal's binding, or a later `let` of the name that is not one.
         let fn_name_key = (self.current_fn_sig_idx as i64) * 4294967296 + name as i64
         self.fn_literal_lets.insert(fn_name_key, if use_typed and self.ast.kind(node) == NodeKind.NK_LET_BINDING: node else: 0)
-        let int_literal_let = self.ast.kind(node) == NodeKind.NK_LET_BINDING and ann_type == 0 and self.expr_is_untyped_int_literal_valued(value)
+        let int_literal_let = self.ast.kind(node) == NodeKind.NK_LET_BINDING and ann_type == 0 and self.expr_is_untyped_literal_arith(value)
         self.fn_int_literal_lets.insert(fn_name_key, if self.fn_int_literal_lets.contains(fn_name_key) or not int_literal_let: -1 else: node)
         if self.type_carries_callable(bind_type as i32):
             self.callable_let_decls.insert(node, 1)
@@ -26230,24 +26237,7 @@ impl Sema:
         let decl = if in_scope != 0: in_scope else: self.fn_int_literal_lets.get((self.current_fn_sig_idx as i64) * 4294967296 + sym as i64) ?? 0
         if decl <= 0 or self.ast.kind(decl) != NodeKind.NK_LET_BINDING or self.local_let_type_ann_extra(self.ast.get_data2(decl)) >= 0:
             return 0
-        if self.expr_is_untyped_int_literal_valued(self.ast.get_data1(decl)): decl else: 0
-
-    // An expression whose integer value only untyped literals decide: a
-    // literal (negated or not), or an `if` whose every arm is one
-    // (`if c: 1 else: 0`), the values a binding's literal default types.
-    fn expr_is_untyped_int_literal_valued(node: i32) -> bool:
-        if node <= 0:
-            return false
-        let kind = self.ast.kind(node)
-        if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_NEGATE:
-            return self.expr_is_untyped_int_literal_valued(self.ast.get_data1(node))
-        if kind == NodeKind.NK_GROUPED:
-            return self.expr_is_untyped_int_literal_valued(self.ast.get_data0(node))
-        if kind == NodeKind.NK_BLOCK and self.ast.get_data1(node) == 0:
-            return self.expr_is_untyped_int_literal_valued(self.ast.get_data2(node))
-        if kind == NodeKind.NK_IF_EXPR:
-            return self.expr_is_untyped_int_literal_valued(self.ast.get_data1(node)) and self.expr_is_untyped_int_literal_valued(self.ast.get_data2(node))
-        kind == NodeKind.NK_INT_LIT and self.ast.literal_suffix(node as NodeId) == 0
+        if self.expr_is_untyped_literal_arith(self.ast.get_data1(decl)): decl else: 0
 
     mut fn reject_implicit_numeric_narrowing(node: i32, expected: i32, actual: i32) -> bool:
         if node <= 0 or expected == 0 or actual == 0:
