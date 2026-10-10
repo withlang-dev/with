@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.31
+# The With Programming Language — Specification v7.32
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,12 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.32:** slice demands and views of constants, 2026-10-09
+(D126, D127). §4.3c: a slice demand supplies the element type to a literal
+in argument position and views it; it demands no collection. §3.1: a view
+of a constant is a view of an immutable static, materialized once at the
+demanded type, with static lifetime; a mutable view of a constant is an
+error. The implementation is NON-COMPLIANT until it catches up.
 **Changelog v7.31:** literal join arms and what a cast does, 2026-10-09
 (D125). §4.2.1 rule 8: an untyped literal arm of an `if`, `match` or `??`,
 or a literal return of a function whose return type is inferred, takes the

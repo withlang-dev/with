@@ -13,6 +13,11 @@ receivers), `with` scoped access, and `IndexPlace` projections.
 For unsafe FFI, raw pointers (`*const T`, `*mut T`) and address-of
 (`&raw mut x`) provide mutable pointer semantics (§19).
 
+A view of a constant (`&-1`, `&CONST`) is a view of an immutable static,
+materialized once at the demanded type, with static lifetime; it is never a
+temporary, so `opt ?? &-1` cannot dangle. A mutable view of a constant is an
+error (D127).
+
 ### 3.2 Aliasing Rule
 
 Active shared borrows (`&T`) of a place are invalidated when that
