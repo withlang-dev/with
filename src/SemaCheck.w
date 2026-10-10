@@ -4288,7 +4288,33 @@ impl Sema:
                 let method_name3: str = self.pool_resolve(contract.method_sym)
                 self.emit_error(f"impl method '{method_name3}' return type does not match trait '{trait_name3}'", node)
 
+    // D126 (§4.2.1): a local its literal typed takes the type its demanding
+    // uses agree on. The first check records each demand narrower than
+    // isize instead of refusing it; a body that recorded one is checked
+    // again, once, with each such `let` at its first demand, and a use that
+    // cannot take that type reports both uses. A body that records nothing
+    // is checked once, so no local in a program that compiles without the
+    // rule changes type. Every body, plain or instantiated, comes through here.
     mut fn check_fn_body_with_sig_at(node: i32, sig_idx: i32, decl_index: i32):
+        let demands_start = self.int_local_demands.len() as i32
+        let diags_start = self.diags.items.len() as i32
+        self.check_fn_body_with_sig_once(node, sig_idx, decl_index)
+        if self.int_local_rechecking != 0 or self.int_local_demands.len() as i32 == demands_start:
+            return
+        var di = demands_start
+        while di + 2 < self.int_local_demands.len() as i32:
+            let let_node: i32 = self.int_local_demands[di]
+            if not self.int_local_decisions.contains(let_node):
+                self.int_local_decisions.insert(let_node, (self.int_local_demands[di + 1] as i64) * 4294967296 + self.int_local_demands[di + 2] as i64)
+            di += 3
+        while self.int_local_demands.len() as i32 > demands_start: self.int_local_demands.pop()
+        while self.diags.items.len() as i32 > diags_start: self.diags.items.pop()
+        self.int_local_rechecking += 1
+        self.int_local_rechecks += 1
+        self.check_fn_body_with_sig_once(node, sig_idx, decl_index)
+        self.int_local_rechecking -= 1
+
+    mut fn check_fn_body_with_sig_once(node: i32, sig_idx: i32, decl_index: i32):
         let fn_name = self.fn_decl_semantic_symbol_at(node, self.ast.get_data0(node), decl_index)
         let body = self.ast.get_data1(node)
         let flags = self.ast.get_data2(node)
@@ -14980,14 +15006,22 @@ impl Sema:
             return
         let want = self.auto_deref_ref_ptr_type(self.resolve_alias(demanded as TypeId)) as i32
         let kind = self.get_type_kind(want as TypeId)
+        var decided = want
         if kind == TypeKind.TY_GENERIC_INST:
             let base = self.canonical_symbol_by_text(self.get_generic_inst_base(want))
             if base != self.syms.list and base != self.syms.hashset and base != self.syms.btreeset:
                 return
+        else if kind == TypeKind.TY_SLICE:
+            // D126: a slice demands no collection of an argument literal, but
+            // of a literal's binding it says the element: `range_of(values)`
+            // at `[]i32` makes `let values = [4, -2]` a List[i32].
+            let elem_args: List[i32] = List.new()
+            elem_args.push(self.get_type_d0(want as TypeId))
+            decided = self.ensure_generic_inst_type(self.syms.list, elem_args, 1) as i32
         else if kind != TypeKind.TY_ARRAY:
             return
         self.literal_demands.push(let_node)
-        self.literal_demands.push(want)
+        self.literal_demands.push(decided)
         self.literal_demands.push(use_node)
 
     // A method called on `recv_expr` that exactly one of the collections a
@@ -15204,6 +15238,9 @@ impl Sema:
         if use_typed and self.literal_decisions.len() > 0:
             let decided = self.literal_decision(node)
             if decided != 0: ann_type = decided as TypeId
+        // D126: a local its integer literal typed, at the type its uses agree on.
+        if ann_extra < 0 and value != 0 and self.int_local_decisions.contains(node):
+            ann_type = ((self.int_local_decisions.get(node).unwrap() / 4294967296) as i32) as TypeId
 
         // var x: T (no initializer) — zero-initialized
         if value == 0:
@@ -15314,7 +15351,7 @@ impl Sema:
         // D93: a literal's binding, or a later `let` of the name that is not one.
         let fn_name_key = (self.current_fn_sig_idx as i64) * 4294967296 + name as i64
         self.fn_literal_lets.insert(fn_name_key, if use_typed and self.ast.kind(node) == NodeKind.NK_LET_BINDING: node else: 0)
-        let int_literal_let = self.ast.kind(node) == NodeKind.NK_LET_BINDING and ann_type == 0 and self.expr_is_untyped_literal_arith(value)
+        let int_literal_let = self.ast.kind(node) == NodeKind.NK_LET_BINDING and (ann_type == 0 or self.int_local_decisions.contains(node)) and self.expr_is_untyped_literal_arith(value)
         self.fn_int_literal_lets.insert(fn_name_key, if self.fn_int_literal_lets.contains(fn_name_key) or not int_literal_let: -1 else: node)
         if self.type_carries_callable(bind_type as i32):
             self.callable_let_decls.insert(node, 1)
@@ -26529,6 +26566,24 @@ impl Sema:
             return 0
         if self.expr_is_untyped_literal_arith(self.ast.get_data1(decl)): decl else: 0
 
+    // D126: the literal-typed locals an expression's value comes from: a
+    // bare name, or names combined by arithmetic (`sum + bonus.points`).
+    fn literal_binding_lets_in(node: i32) -> List[i32]:
+        var out: List[i32] = List.new()
+        if node <= 0: return out
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_IDENT:
+            let decl = self.unannotated_literal_binding(node)
+            if decl != 0: out.push(decl)
+        else if kind == NodeKind.NK_GROUPED:
+            return self.literal_binding_lets_in(self.ast.get_data0(node))
+        else if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_NEGATE:
+            return self.literal_binding_lets_in(self.ast.get_data1(node))
+        else if kind == NodeKind.NK_BINARY and sema_binary_op_is_arithmetic(self.ast.get_data0(node)):
+            for d in self.literal_binding_lets_in(self.ast.get_data1(node)): out.push(d)
+            for d in self.literal_binding_lets_in(self.ast.get_data2(node)): out.push(d)
+        out
+
     // §4.9: a number where a `Result[T, E]` is demanded is wrapped in `Ok`,
     // so the demand on the number is `T` (§4.2.6 then applies to it).
     fn implicit_ok_payload_demand(expected: i32, actual: i32) -> i32:
@@ -26564,6 +26619,26 @@ impl Sema:
             // D114: a name whose type its literal chose (`var i = 0` is
             // `isize`) is pointed at, since the use alone does not say why.
             let literal_let = self.unannotated_literal_binding(node)
+            // D126: the literal chose isize; a use that wants narrower is a
+            // demand the body's second check honors, not a mistake, until
+            // two demands disagree.
+            if self.int_local_rechecking == 0:
+                let lets = self.literal_binding_lets_in(node)
+                var undecided = lets.len() > 0
+                for d in lets:
+                    if self.int_local_decisions.contains(d): undecided = false
+                if undecided:
+                    for d in lets:
+                        self.int_local_demands.push(d)
+                        self.int_local_demands.push(expected)
+                        self.int_local_demands.push(node)
+                    return false
+            if literal_let != 0 and self.int_local_decisions.contains(literal_let):
+                let decided = self.int_local_decisions.get(literal_let).unwrap()
+                let first_use = (decided % 4294967296) as i32
+                let name: str = self.pool_resolve(self.ast.get_data0(node))
+                self.emit_error_with_label(f"`{name}` is `{got}` from its use here, and `{want}` is demanded at this use; a local's uses must agree on its type (§4.2.1)", node, first_use, f"`{name}` is `{got}` from this use")
+                return true
             if literal_let == 0: self.emit_error(msg, node)
             else: self.emit_error_with_label(msg, node, literal_let, f"`{self.pool_resolve(self.ast.get_data0(node))}` is `{got}` from its literal here (§4.1)")
             return true
@@ -27143,6 +27218,11 @@ impl Sema:
                 let eg_arg_node = if pi < arg_nodes.len() as i32: arg_nodes[pi] else: 0
                 self.check_ephemeral_task_arg_escape(if eg_arg_node > 0: eg_arg_node else: call_node, 0, 0, fn_sym, pi)
         if literal_args.len() > 0:
+            // Law 2: an untyped literal operand is an unknown, so it leaves T
+            // open; the demand binds it in phase one (`let x: Option[i32] =
+            // ident(3)` is T := i32), and the default applies only where
+            // nothing demands.
+            self.bind_unbound_type_params_from_result(ret_node, tp_start, tp_count, call_node)
             for pi in literal_args:
                 // A literal meets `T`, or `&T` by auto-reference (§3.8:
                 // `print(0)` at `v: &T`).
@@ -27151,8 +27231,20 @@ impl Sema:
                     p_type_node = self.ast.get_data0(p_type_node)
                 if p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_NAMED:
                     let tp_sym = self.ast.get_data0(p_type_node)
-                    if self.type_param_exists(tp_start, tp_count, tp_sym) != 0 and self.lookup_generic_subst(tp_sym) == 0:
-                        self.put_generic_subst(tp_sym, arg_types[pi], call_node)
+                    if self.type_param_exists(tp_start, tp_count, tp_sym) != 0:
+                        let bound = self.lookup_generic_subst(tp_sym)
+                        if bound == 0:
+                            self.put_generic_subst(tp_sym, arg_types[pi], call_node)
+                        else if not self.is_plain_numeric_type(bound):
+                            // The demand bound T to a carrier (`Option[i32]`); a
+                            // literal operand is its payload (D103), so T is
+                            // the payload: `Some(ident(3))`, never `ident(Some(3))`.
+                            let payload = self.option_demand_payload(bound as TypeId) as i32
+                            if payload != 0 and self.is_plain_numeric_type(payload):
+                                var si = self.generic_subst_param_syms.len() as i32 - 1
+                                while si >= 0:
+                                    if self.generic_subst_param_syms[si] == tp_sym: self.generic_subst_type_ids[si] = payload
+                                    si -= 1
         self.bind_type_params_from_bounds(tp_start, tp_count, call_node)
 
         // Obligation model: collect and solve trait bounds for each bound type parameter.

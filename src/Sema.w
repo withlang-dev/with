@@ -2204,6 +2204,15 @@ pub type Sema {
     // than as a standalone value. `2147483648` is not a valid i32, but
     // `-2147483648` is exactly i32::MIN.
     in_negated_literal_context: i32,
+    // D126 (§4.2.1): per body, each demand narrower than isize on a local its
+    // literal typed (the `let`, the demanded type, the use); such a body is
+    // checked again with each such `let` at its first demand
+    // (check_fn_body_with_sig_at). int_local_rechecks counts the bodies
+    // checked twice: zero over a program that compiles without the rule.
+    int_local_demands: List[i32],
+    int_local_decisions: HashMap[i32, i64],
+    int_local_rechecking: i32,
+    pub int_local_rechecks: i32,
     // §4.2.1 rule 8: a join re-checking its literal arms (an `if` arm's
     // condition was checked in a scope that is now closed).
     literal_arm_retype_depth: i32,
@@ -3821,6 +3830,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         in_unsafe: 0,
         in_bitwise_literal_context: 0,
         in_negated_literal_context: 0,
+        int_local_demands: List.new(),
+        int_local_decisions: HashMap.new(),
+        int_local_rechecking: 0,
+        int_local_rechecks: 0,
         literal_arm_retype_depth: 0,
         unsafe_scope_used: List.new(),
         unsafe_scope_nodes: List.new(),
