@@ -19,12 +19,17 @@ So every module is written from:
 
 Never from FreeTDS's source, headers or tests, nor from any GPL or LGPL
 client. Each module's header names the MS-TDS sections it implements, and
-each commit's evidence cites them. Permissive implementations as further
-references are an open question for Eric (`mssql.md`):
-- Microsoft's `mssql-jdbc` and `SqlClient` (MIT);
+each commit's evidence cites them. Permissive implementations are further
+references (D123), for the behavior MS-TDS does not document:
+- Microsoft's `mssql-jdbc` and `SqlClient` (MIT), the authority on server
+  quirks;
 - `go-mssqldb` (BSD-3);
 - `tedious` (MIT);
-- tiberius (Apache-2.0).
+- tiberius (Apache-2.0), the closest design.
+
+Anything ported or closely followed from them is recorded in
+`lib/std/mssql/THIRD_PARTY` in the commit that adds it, with the copyright
+notice and, for tiberius, Apache-2.0's NOTICE.
 
 Eric is asking FreeTDS's authors to relicense. That needs every copyright
 holder's agreement, so the work does not wait on it. If FreeTDS becomes
@@ -186,7 +191,7 @@ Each column's TYPE_INFO decides its With type:
 | binary, varbinary, `varbinary(max)` | `List[u8]` |
 | date, time, datetime2, datetime, smalldatetime | `Date`, `Time`, `DateTime` (new) |
 | datetimeoffset | `DateTimeOffset` (new) |
-| uniqueidentifier | `Guid` (new; mixed byte order on the wire) |
+| uniqueidentifier | `Guid` (new; canonical in std, mixed byte order only on the wire) |
 | any of the above, NULL | `Option[...]` of it |
 
 - **Text.** `nchar`/`nvarchar` are UTF-16LE and decode to `str`.
@@ -198,10 +203,17 @@ Each column's TYPE_INFO decides its With type:
   a total length, which may be unknown, then chunks, then a zero
   terminator. They are read into one value; streaming large values is a
   later feature.
-- **Prerequisites.** `Decimal`, the date and time types and `Guid` do not
-  exist in std yet (`std.time` has `now` and `Duration` only). They are
-  added as std types in their own changes before phase 2. `Decimal` needs
-  `i128` (`i128.md`) or a two-word representation until then.
+- **GUIDs.** `uniqueidentifier` stores its first three fields
+  little-endian on the wire. `std.guid` holds the canonical byte order, and
+  the conversion lives only in this module, so a GUID read from SQL Server
+  prints and compares the same as one from anywhere else.
+- **Prerequisites (D123).** `Decimal`, the date and time types and `Guid`
+  do not exist in std yet (`std.time` has `now` and `Duration` only). They
+  are added as std modules in their own changes before phase 2:
+  `std.decimal`, `std.time` (`Date`, `Time` to 100 ns, `DateTime`,
+  `DateTimeOffset` with a fixed offset; no time zones in the first
+  version) and `std.guid`. `Decimal` is built over `i128` (`i128.md`),
+  which lands first; there is no two-word stand-in.
 
 ## Requests (MS-TDS: SQL batch, RPC request)
 
@@ -255,11 +267,9 @@ A class-20-or-higher error, or a protocol error, ends the connection (it is
 
 ## Open questions
 
-1. Permissive drivers as references beside the specification (Eric;
-   prediction yes, 85%, in `mssql.md`).
-2. Where `Decimal`, `Date`/`Time`/`DateTime`/`DateTimeOffset` and `Guid`
-   live: `std.decimal`, `std.time`, `std.guid`, or inside `std.mssql`
-   until another library needs them. Prediction: std modules (70%),
-   because JSON, CSV and other databases need the same values.
-3. Async: the first release is blocking, one request per connection.
+Ruled in D123: permissive drivers are references; the value types are std
+modules. Still open:
+
+1. The customer's login method, which fixes the phases (`mssql.md`).
+2. Async: the first release is blocking, one request per connection.
    `std.task` integration follows the async proposal.

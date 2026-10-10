@@ -62,7 +62,7 @@ and documentation of freeTDS. I'll not be encumbered with lgpl."
 Tests are written fresh, from the specification and against a live server.
 Nobody translates FreeTDS's test programs.
 
-### The open question: Microsoft's MIT and BSD drivers
+### Permissive drivers (D123: yes)
 
 Microsoft publishes its own SQL Server drivers under permissive licenses
 (checked on GitHub, 2026-10-09):
@@ -80,9 +80,14 @@ header. None is C, so the migrator does not apply; a port is by hand. They
 also implement what FreeTDS lacks: Entra ID (Azure AD) token login
 (FEDAUTH) and Always Encrypted.
 
-Prediction (85%): yes, as references beside the specification, with their
-notices kept: the vendor's own permissive code is the hardened source the
-sourcing rule asks for, and it is not encumbered.
+Ruled yes (D123). Reading for behavior needs nothing. Anything ported or
+closely followed is recorded in `lib/std/mssql/THIRD_PARTY` (source, file,
+license, copyright notice, and for tiberius Apache-2.0's NOTICE) in the
+commit that adds it. Their value is the behavior MS-TDS does not document:
+version-specific token oddities, Azure behavior, collation edge cases.
+Microsoft's .NET and JDBC drivers are the authority on those; tiberius is
+the closest design (a systems-language, async, zero-copy client). FreeTDS
+stays off the reading list until its license changes.
 
 ## Scope
 
@@ -115,7 +120,10 @@ sourcing rule asks for, and it is not encumbered.
 - Table-valued parameters.
 
 Question for the customer: which login method do their servers use (SQL
-login, Windows/NTLM, Kerberos, Entra ID)? That orders the "later" list.
+login, Windows/NTLM, Kerberos, Entra ID)? The phases are fixed only after
+the answer (D123): SQL authentication is a few hundred lines, Entra ID
+token login is moderate, and Windows integrated authentication (Kerberos
+or NTLM) is a project of its own that can rival the rest of the driver.
 
 ## Building blocks the stdlib needs first
 
