@@ -2197,6 +2197,9 @@ pub type Sema {
     // than as a standalone value. `2147483648` is not a valid i32, but
     // `-2147483648` is exactly i32::MIN.
     in_negated_literal_context: i32,
+    // §4.2.1 rule 8: a join re-checking its literal arms (an `if` arm's
+    // condition was checked in a scope that is now closed).
+    literal_arm_retype_depth: i32,
     // Active lexical unsafe blocks: 0 unused, 1 definite unsafe operation,
     // 2 a global read whose need depends on completed mutation facts.
     unsafe_scope_used: List[i32],
@@ -3809,6 +3812,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         in_unsafe: 0,
         in_bitwise_literal_context: 0,
         in_negated_literal_context: 0,
+        literal_arm_retype_depth: 0,
         unsafe_scope_used: List.new(),
         unsafe_scope_nodes: List.new(),
         unsafe_global_scope_reads: List.new(),
@@ -6638,9 +6642,12 @@ impl Sema:
         exact_int_fits_unsigned_bits(mag, bits)
 
     mut fn numeric_literal_expected_type(node: i32) -> i32:
-        if self.has_expected_type == 0 or self.expected_expr_type == 0:
+        // One reading of a literal's context, shared with literal expressions
+        // (an Option or Result payload, a `&N` auto-reference; §4.2.1).
+        let context = self.untyped_literal_context_type()
+        if context == 0:
             return 0
-        let expected = self.numeric_operand_type(self.expected_expr_type as i32)
+        let expected = self.numeric_operand_type(context as i32)
         if not self.is_numeric_type(expected):
             return 0
         if self.in_bitwise_literal_context != 0:
@@ -6935,15 +6942,20 @@ impl Sema:
     // four-byte place, and a `&u32` as `&i32` rereads the bits with the other
     // sign. The numeric pointees of two references must have one layout.
     fn ref_numeric_pointees_differ(exp_r: i32, act_r: i32) -> i32:
-        let ep = self.resolve_alias(self.get_type_d0(exp_r) as TypeId)
-        let ap = self.resolve_alias(self.get_type_d0(act_r) as TypeId)
+        if self.numeric_types_differ(self.get_type_d0(exp_r), self.get_type_d0(act_r)): 1 else: 0
+
+    // Two numeric types of different layouts (width, sign, int beside float).
+    // A non-numeric type on either side is not this question.
+    fn numeric_types_differ(a: i32, b: i32) -> bool:
+        let ep = self.resolve_alias(a as TypeId)
+        let ap = self.resolve_alias(b as TypeId)
         let ek = self.get_type_kind(ep)
         let ak = self.get_type_kind(ap)
         if ek == TypeKind.TY_INT and ak == TypeKind.TY_INT:
-            return if self.get_type_d0(ep) != self.get_type_d0(ap) or self.get_type_d1(ep) != self.get_type_d1(ap): 1 else: 0
+            return self.get_type_d0(ep) != self.get_type_d0(ap) or self.get_type_d1(ep) != self.get_type_d1(ap)
         if ek == TypeKind.TY_FLOAT and ak == TypeKind.TY_FLOAT:
-            return if self.get_type_d0(ep) != self.get_type_d0(ap): 1 else: 0
-        if (ek == TypeKind.TY_INT and ak == TypeKind.TY_FLOAT) or (ek == TypeKind.TY_FLOAT and ak == TypeKind.TY_INT): 1 else: 0
+            return self.get_type_d0(ep) != self.get_type_d0(ap)
+        (ek == TypeKind.TY_INT and ak == TypeKind.TY_FLOAT) or (ek == TypeKind.TY_FLOAT and ak == TypeKind.TY_INT)
 
     mut fn pointer_pointees_compatible(exp_r: i32, act_r: i32) -> i32:
         let exp_mut = self.get_type_d1(exp_r)
@@ -10058,8 +10070,10 @@ impl Sema:
         if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_GENERIC_INST:
             if self.generic_inst_accepts_unit_enum_value(act_r, exp_r) != 0:
                 return 1
+        // A range's bounds and a generic instance's arguments are part of
+        // its layout: their numeric types match exactly (#1368).
         if exp_k == TypeKind.TY_RANGE and act_k == TypeKind.TY_RANGE:
-            if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
+            if self.get_type_d1(exp_r) != self.get_type_d1(act_r) or self.numeric_types_differ(self.get_type_d0(exp_r), self.get_type_d0(act_r)):
                 return 0
             return self.types_compatible_fast(self.get_type_d0(exp_r), self.get_type_d0(act_r))
         // TypeKind.TY_GENERIC_INST: compatible if same base and all args compatible
@@ -10079,7 +10093,7 @@ impl Sema:
                         let gi_exp_arg = self.get_generic_inst_arg(exp_r, gi_i)
                         let gi_act_arg = self.get_generic_inst_arg(act_r, gi_i)
                         if gi_exp_arg != self.ty_void and gi_act_arg != self.ty_void:
-                            if self.types_compatible_fast(gi_exp_arg, gi_act_arg) == 0:
+                            if self.numeric_types_differ(gi_exp_arg, gi_act_arg) or self.types_compatible_fast(gi_exp_arg, gi_act_arg) == 0:
                                 gi_all_match = 0
                     return gi_all_match
             return 0
@@ -10160,6 +10174,13 @@ impl Sema:
                                 return 1
                     var gi_all_ok = 1
                     for gi_i in 0..gi_ec:
+                        // A type argument is part of the layout: an
+                        // aggregate's elements do not convert (#1368), so
+                        // `Box[isize]` is not a `Box[i32]` (an impl for one
+                        // read the other's fields at the wrong offsets).
+                        if self.numeric_types_differ(self.get_generic_inst_arg(exp_r, gi_i), self.get_generic_inst_arg(act_r, gi_i)):
+                            gi_all_ok = 0
+                            break
                         if self.types_compatible(self.get_generic_inst_arg(exp_r, gi_i), self.get_generic_inst_arg(act_r, gi_i)) == 0:
                             gi_all_ok = 0
                             break
@@ -10170,11 +10191,8 @@ impl Sema:
         // as `&i64` read eight bytes of four (-1 read as 4294967295).
         if exp_k == TypeKind.TY_REF:
             if self.get_type_d1(exp_r) == 0:
-                let auto_pointee = self.resolve_alias(self.get_type_d0(exp_r))
-                let pk = self.get_type_kind(auto_pointee)
-                if (pk == TypeKind.TY_INT or pk == TypeKind.TY_FLOAT) and (act_k == TypeKind.TY_INT or act_k == TypeKind.TY_FLOAT) and auto_pointee != act_r:
-                    if (pk != act_k) or self.get_type_d0(auto_pointee) != self.get_type_d0(act_r) or self.get_type_d1(auto_pointee) != self.get_type_d1(act_r):
-                        return 0
+                if self.numeric_types_differ(self.get_type_d0(exp_r), act_r as i32):
+                    return 0
                 if self.types_compatible(self.get_type_d0(exp_r), act_r) != 0:
                     return 1
         0

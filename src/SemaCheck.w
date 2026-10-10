@@ -1041,7 +1041,9 @@ impl Sema:
                     while self.ast.kind(literal) == NodeKind.NK_BLOCK and self.ast.get_data2(literal) != 0:
                         blocks.push(literal)
                         literal = self.ast.get_data2(literal)
+                    self.literal_arm_retype_depth += 1
                     let retyped = self.check_expr_with_expected(literal, final_type as TypeId)
+                    self.literal_arm_retype_depth -= 1
                     if retyped != 0:
                         for block in blocks: self.typed_expr_types.insert(block, retyped as i32)
                         resolved_arm_types[ai] = retyped as i32
@@ -13379,7 +13381,13 @@ impl Sema:
     fn untyped_literal_context_type() -> TypeId:
         if self.has_expected_type == 0 or self.expected_expr_type == 0:
             return 0 as TypeId
-        let payload = self.option_demand_payload(self.expected_expr_type)
+        var payload = self.option_demand_payload(self.expected_expr_type)
+        // §4.9: a number where `Result[T, E]` is demanded is its `Ok` payload
+        // (`fn f() -> Result[i32, str]: 2`), so the demand on it is `T`.
+        if payload == 0:
+            let ok_demand = self.implicit_ok_payload_demand(self.expected_expr_type as i32, self.ty_isize as i32)
+            if ok_demand != self.expected_expr_type as i32 and self.type_has_unresolved_parts(ok_demand) == 0:
+                payload = ok_demand as TypeId
         var demanded = if payload != 0: payload else: self.expected_expr_type
         // §3.8: a `&i32` demand auto-references an i32; the literal is that
         // i32 (`7 in bag`, `contains(value: &T)`), never an isize behind it.
@@ -15349,7 +15357,11 @@ impl Sema:
         let saved_has_expected: i32 = self.has_expected_type
         self.expected_expr_type = 0 as TypeId
         self.has_expected_type = 0
-        self.check_bool_condition(cond, "if")
+        // A literal arm is checked again only for its literals (rule 8); its
+        // condition was checked in a scope the join has closed (`.Flag(b) =>
+        // if b: 1 else: 0`).
+        if self.literal_arm_retype_depth == 0 or not self.typed_expr_types.contains(cond):
+            self.check_bool_condition(cond, "if")
         self.expected_expr_type = saved_expected
         self.has_expected_type = saved_has_expected
         // Only the statement root (and its `else if` chain) is discard context.
@@ -24050,6 +24062,11 @@ impl Sema:
         let name = decode_with_binding_sym(encoded_name)
         let is_mut = decode_with_binding_is_mut(encoded_name)
         var source_ty = self.check_expr_value_context(source)   // #1349: the source is a value
+        // Law 2: Form 2's value is its binding (§7.2), so a demand on the
+        // `with` is a demand on its source: `fn f() -> List[i32]: with
+        // List.new() as mut out` binds the List's T before the body pushes.
+        if is_mut != 0 and self.has_expected_type != 0 and self.expected_expr_type != 0 and self.type_is_generic_base_of(source_ty as i32, self.expected_expr_type as i32) != 0:
+            source_ty = self.check_expr_with_expected(source, self.expected_expr_type)
         let form = self.classify_guarded_with(node, source_ty as i32, is_mut)
         if form == WithFormKind.Guarded or form == WithFormKind.GuardedMut:
             let payload_ty: i32 = self.with_payload_types.get(node).unwrap()
@@ -27028,9 +27045,10 @@ impl Sema:
 
         // Infer type parameter substitutions from call argument types.
         // §4.2.1: an untyped literal argument binds a type parameter only
-        // where nothing else does. The typed arguments and the call's demand
-        // come first (`apply(2147483647, (x: i32) -> i64 => x)` is T = i32);
-        // the literal default is the last resort.
+        // where no typed argument does (`apply(2147483647, (x: i32) -> i64
+        // => x)` is T = i32); the literal default is the last resort. Every
+        // argument is an operand, so all of them bind before the call's demand
+        // fills what remains (law 2).
         let literal_args: List[i32] = List.new()
         for pi in 0..param_count:
             if pi >= arg_count:
@@ -27050,7 +27068,6 @@ impl Sema:
                 let eg_arg_node = if pi < arg_nodes.len() as i32: arg_nodes[pi] else: 0
                 self.check_ephemeral_task_arg_escape(if eg_arg_node > 0: eg_arg_node else: call_node, 0, 0, fn_sym, pi)
         if literal_args.len() > 0:
-            self.bind_unbound_type_params_from_result(ret_node, tp_start, tp_count, call_node)
             for pi in literal_args:
                 // A literal meets `T`, or `&T` by auto-reference (§3.8:
                 // `print(0)` at `v: &T`).
