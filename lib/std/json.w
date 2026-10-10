@@ -439,7 +439,7 @@ pub fn json_int(js: &str, tokens: *const JsonToken, idx: i32) -> i32:
         start = (*(tokens + idx as u64)).start
         end = (*(tokens + idx as u64)).end
     // Manual int parse
-    var val = 0
+    var val: i32 = 0
     var neg = false
     var pos = start
     if pos < end and js[pos] == 45:

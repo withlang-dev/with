@@ -6195,7 +6195,7 @@ fn ci_bitor(a: i32, b: i32) -> i32:
     var result: i32 = 0
     var aa = a
     var bb = b
-    var bit = 1
+    var bit: i32 = 1
     var count = 0
     while count < 32:
         let ab = aa - (aa / 2) * 2
@@ -6212,7 +6212,7 @@ fn ci_bitand(a: i32, b: i32) -> i32:
     var result: i32 = 0
     var aa = a
     var bb = b
-    var bit = 1
+    var bit: i32 = 1
     var count = 0
     while count < 32:
         let ab = aa - (aa / 2) * 2
@@ -6229,7 +6229,7 @@ fn ci_bitxor(a: i32, b: i32) -> i32:
     var result: i32 = 0
     var aa = a
     var bb = b
-    var bit = 1
+    var bit: i32 = 1
     var count = 0
     while count < 32:
         let ab = aa - (aa / 2) * 2

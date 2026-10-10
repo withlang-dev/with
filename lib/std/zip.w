@@ -86,7 +86,7 @@ impl ZipArchive:
     /// Writes every member under `dest` (created if missing) and returns the
     /// number of files written. An entry whose name would land outside
     /// `dest` fails the extraction.
-    pub fn extract_all(dest: &str) -> Result[i32, ZipError]:
+    pub fn extract_all(dest: &str) -> Result[isize, ZipError]:
         if mkdir_p(dest) != 0: return Err(zip_error(UNZ_ERRNO, "cannot create " ++ dest))
         var written = 0
         var rc = unsafe { unzGoToFirstFile(self.handle) }
@@ -107,7 +107,7 @@ impl ZipArchive:
         written
 
 /// Extracts the archive at `path` under `dest`; the number of files written.
-pub fn extract(path: &str, dest: &str) -> Result[i32, ZipError]:
+pub fn extract(path: &str, dest: &str) -> Result[isize, ZipError]:
     let archive = ZipArchive.open(path)?
     archive.extract_all(dest)
 

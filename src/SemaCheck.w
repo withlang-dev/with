@@ -895,9 +895,9 @@ impl Sema:
         if expected == 0:
             for ai in 0..arm_count:
                 let arm_ty = resolved_arm_types[ai]
-                if arm_ty == 0 or arm_nodes[ai] <= 0 or not self.is_plain_numeric_type(arm_ty):
+                if arm_ty == 0 or arm_nodes[ai] <= 0 or not self.join_literal_adaptable_type(arm_ty):
                     continue
-                if self.expr_is_untyped_literal_arith(arm_nodes[ai]):
+                if self.expr_is_untyped_literal_aggregate(arm_nodes[ai]):
                     literal_arm_count = literal_arm_count + 1
                 else if self.body_can_fall_through(arm_nodes[ai]) != 0:
                     typed_numeric_arm = 1
@@ -917,7 +917,7 @@ impl Sema:
             if reach_node > 0 and self.body_can_fall_through(reach_node) == 0:
                 continue
             reaching_count = reaching_count + 1
-            if literal_arms_adapt and self.expr_is_untyped_literal_arith(reach_node):
+            if literal_arms_adapt and self.expr_is_untyped_literal_aggregate(reach_node):
                 continue
             if self.get_type_kind(resolved) == TypeKind.TY_REF:
                 let prior_reference = reference_candidate
@@ -1012,10 +1012,10 @@ impl Sema:
         // The untyped literal arms take the typed arms' type, checked again
         // under that demand so their recorded type and constant fold agree
         // with the join (a literal that does not fit reports here).
-        if (literal_arms_adapt or literals_take_payload) and self.is_plain_numeric_type(final_type):
+        if (literal_arms_adapt or literals_take_payload) and self.join_literal_adaptable_type(final_type):
             for ai in 0..arm_count:
                 let arm_node = arm_nodes[ai]
-                if resolved_arm_types[ai] != 0 and arm_node > 0 and self.expr_is_untyped_literal_arith(arm_node):
+                if resolved_arm_types[ai] != 0 and arm_node > 0 and self.expr_is_untyped_literal_aggregate(arm_node):
                     let retyped = self.check_expr_with_expected(arm_node, final_type as TypeId)
                     if retyped != 0:
                         resolved_arm_types[ai] = retyped as i32
@@ -1128,7 +1128,13 @@ impl Sema:
         let context_key = sema_pair_key(self.current_fn_sig_idx, report_node)
         if self.contextual_join_decision_indices.contains(context_key):
             let prior = self.contextual_join_decision(report_node)
-            if prior.final_type != final_type or prior.expected_type != expected:
+            if (prior.final_type != final_type or prior.expected_type != expected) and prior.expected_type == 0 and self.is_plain_numeric_type(final_type) and self.expr_is_untyped_literal_arith(report_node):
+                // §4.2.1: a join of untyped literals (`if c: 1 else: 0`) was
+                // decided at the literal default, then a demand reached it (a
+                // peer, a field, an enclosing join) and typed its literals.
+                let decision_index = self.contextual_join_decision_indices.get(context_key).copied() ?? -1
+                self.contextual_join_decisions[decision_index] = decision
+            else if prior.final_type != final_type or prior.expected_type != expected:
                 self.emit_error(f"internal error: conflicting contextual join decisions for one expression (sig {self.current_fn_sig_idx}: first expected {self.type_name(prior.expected_type)} [{prior.expected_type}] final {self.type_name(prior.final_type)} [{prior.final_type}], now expected {self.type_name(expected)} [{expected}] final {self.type_name(final_type)} [{final_type}])", report_node)
                 return 0
         else:
@@ -3510,7 +3516,7 @@ impl Sema:
             if live.state != BORROW_LIVE or (at_end and live.last_use == 0 and not live.loop_view):
                 continue
             let decl = self.binding_decl_node(ref_sym)
-            let flags = (if live.loop_view: 1 else: 0) + (if live.gen_loop_view: 2 else: 0)
+            let flags: i32 = (if live.loop_view: 1 else: 0) + (if live.gen_loop_view: 2 else: 0)
             self.push_global_view_check(call, self.borrow_places[bi], ref_sym, if decl != 0: decl else: self.borrow_creation_nodes[bi], live.last_use, flags)
 
     // #1827: whether dropping a value of type `tid` runs a user Drop impl —
@@ -4585,7 +4591,7 @@ impl Sema:
         // as on a `return` (check_return).
         if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
             let tail_block = if self.ast.kind(source_body) == NodeKind.NK_BLOCK: self.ast.get_data2(source_body) else: source_body
-            let _ = self.reject_implicit_numeric_narrowing(if tail_block != 0: tail_block else: body, body_expected_ret as i32, body_ty as i32)
+            self.reject_implicit_numeric_narrowing(if tail_block != 0: tail_block else: body, self.implicit_ok_payload_demand(body_expected_ret as i32, body_ty as i32), body_ty as i32)
         if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
             if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0 and body_materializes_copy == 0:
                 self.emit_error("return type mismatch", body)
@@ -13050,6 +13056,23 @@ impl Sema:
             if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM) and self.type_decl_type_param_count(self.get_type_d0(elem as TypeId)) > 0: return true
         false
 
+    // §4.2.1 through an aggregate (#1996), for a join arm: untyped literal
+    // arithmetic, or a tuple of such (`(1, 0)` beside an `(i32, i32)` arm).
+    fn expr_is_untyped_literal_aggregate(node: i32) -> bool:
+        if self.expr_is_untyped_literal_arith(node):
+            return true
+        if node <= 0 or self.ast.kind(node) != NodeKind.NK_TUPLE or self.ast.get_data1(node) == 0:
+            return false
+        let extra_start = self.ast.get_data0(node)
+        for ei in 0..self.ast.get_data1(node):
+            if not self.expr_is_untyped_literal_aggregate(self.ast.get_extra(extra_start + ei)):
+                return false
+        true
+
+    // A join type whose untyped literal arms adapt to it: a number, or a tuple.
+    fn join_literal_adaptable_type(ty: i32) -> bool:
+        self.is_plain_numeric_type(ty) or self.get_type_kind(self.resolve_alias(ty as TypeId)) == TypeKind.TY_TUPLE
+
     fn comparison_operand_is_aggregate_literal(node: i32) -> bool:
         let kind = self.ast.kind(node)
         kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT
@@ -13417,7 +13440,9 @@ impl Sema:
             // type, never the isize default).
             let payload = self.resolve_alias(unwrapped as TypeId)
             let payload_value = if self.get_type_kind(payload) == TypeKind.TY_REF: self.get_type_d0(payload) else: payload as i32
-            let literal_peer = if join_expected == 0 and rhs_is_num_lit and self.is_numeric_type(payload_value): payload_value else: join_expected
+            // `&` of one (`m.get(k) ?? &-1`) views the payload's type.
+            let rhs_is_literal_ref = self.ast.kind(rhs_node) == NodeKind.NK_UNARY and self.ast.get_data0(rhs_node) == UnaryOp.UOP_REF and self.expr_is_untyped_literal_arith(self.ast.get_data1(rhs_node))
+            let literal_peer = if join_expected == 0 and rhs_is_num_lit and self.is_numeric_type(payload_value): payload_value else if rhs_is_literal_ref and payload as i32 != payload_value and self.is_numeric_type(payload_value): payload as i32 else: join_expected
             rhs = if literal_peer != 0: self.check_expr_with_expected(rhs_node, literal_peer as TypeId) else: self.check_expr_value_context(rhs_node)
             if rhs == 0:
                 return 0
@@ -26170,7 +26195,7 @@ impl Sema:
     mut fn check_expr_with_owned_demand(node: i32, expected: TypeId) -> TypeId:
         let exact = self.check_expr_with_expected(node, expected)
         if expected != 0 and exact != 0:
-            let _ = self.reject_implicit_numeric_narrowing(node, expected as i32, exact as i32)
+            self.reject_implicit_numeric_narrowing(node, self.implicit_ok_payload_demand(expected as i32, exact as i32), exact as i32)
             if self.record_contextual_copy_adjustment(node, expected as i32, exact as i32) == 0:
                 let _ = self.record_contextual_str_clone_adjustment(node, expected as i32, exact as i32)
         exact
@@ -26249,6 +26274,16 @@ impl Sema:
         if decl <= 0 or self.ast.kind(decl) != NodeKind.NK_LET_BINDING or self.local_let_type_ann_extra(self.ast.get_data2(decl)) >= 0:
             return 0
         if self.expr_is_untyped_literal_arith(self.ast.get_data1(decl)): decl else: 0
+
+    // §4.9: a number where a `Result[T, E]` is demanded is wrapped in `Ok`,
+    // so the demand on the number is `T` (§4.2.6 then applies to it).
+    fn implicit_ok_payload_demand(expected: i32, actual: i32) -> i32:
+        let er = self.resolve_alias(expected as TypeId)
+        if self.get_type_kind(er) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(er) != self.syms.result or self.get_generic_inst_arg_count(er) != 2:
+            return expected
+        if not self.is_plain_numeric_type(actual):
+            return expected
+        self.get_generic_inst_arg(er, 0)
 
     mut fn reject_implicit_numeric_narrowing(node: i32, expected: i32, actual: i32) -> bool:
         if node <= 0 or expected == 0 or actual == 0:

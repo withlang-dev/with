@@ -19101,7 +19101,7 @@ impl Codegen:
         let closure_abi_index = self.compute_fn_abi(ret_ty, param_types, closure_places, if is_extern_closure: FN_ABI_C else: FN_ABI_CLOSURE, 0)
         let closure_abi: FnAbi = self.fn_abis[closure_abi_index]
         let closure_has_sret = closure_abi.ret.pass == PM_INDIRECT
-        let closure_param_offset = (if is_extern_closure: 0 else: 1) + (if closure_has_sret: 1 else: 0)
+        let closure_param_offset: i32 = (if is_extern_closure: 0 else: 1) + (if closure_has_sret: 1 else: 0)
         let fn_ty = closure_abi.llvm_ty
         let closure_fn = wl_add_function(self.llmod, "__closure", fn_ty)
         let closure_sym = self.intern.intern(f"$closure_abi${self.closure_counter}")
