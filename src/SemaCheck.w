@@ -27019,7 +27019,11 @@ impl Sema:
         if literal_args.len() > 0:
             self.bind_unbound_type_params_from_result(ret_node, tp_start, tp_count, call_node)
             for pi in literal_args:
-                let p_type_node = self.ast.fn_param_type(param_start, pi)
+                // A literal meets `T`, or `&T` by auto-reference (§3.8:
+                // `print(0)` at `v: &T`).
+                var p_type_node = self.ast.fn_param_type(param_start, pi)
+                if p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_REF:
+                    p_type_node = self.ast.get_data0(p_type_node)
                 if p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_NAMED:
                     let tp_sym = self.ast.get_data0(p_type_node)
                     if self.type_param_exists(tp_start, tp_count, tp_sym) != 0 and self.lookup_generic_subst(tp_sym) == 0:
