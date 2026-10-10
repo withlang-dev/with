@@ -204,7 +204,7 @@ impl RelocationFacts:
             // optional method type params `[...]`, then `(`
             var k = type_idx + 3
             var has_tp = false
-            var tp_open = 0
+            var tp_open: i32 = 0
             var tp_inner_a = 0
             var tp_inner_b = 0
             if k < n and tokens.get_tag(k) == TokenKind.TK_L_BRACKET:

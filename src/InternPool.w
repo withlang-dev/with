@@ -34,7 +34,7 @@ type ValueId = i32
 // Append-only page chain for interned string data. Pages are never
 // freed or moved, so pointers into the arena are stable forever.
 
-let INTERN_PAGE_SIZE: i64 = 1048576  // 1MB per page
+const INTERN_PAGE_SIZE = 1048576  // 1MB per page
 
 type InternStringArena {
     pages: List[*mut u8],

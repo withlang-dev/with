@@ -123,7 +123,7 @@ fn http_is_chunked(headers: &str) -> bool:
 
 fn http_decode_chunked(data: &str) -> str:
     var result = StringBuilder.new()
-    let dlen = data.len() as i32
+    let dlen = data.len()
     var pos = 0
     while pos < dlen:
         var chunk_size = 0

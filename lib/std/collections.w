@@ -192,9 +192,9 @@ fn debug_entry_order(keys: &List[str], values: &List[str]) -> List[i64]:
     for i in 0..n:
         order.push(i)
         scratch.push(i)
-    var width: i64 = 1
+    var width: isize = 1
     while width < n:
-        var lo: i64 = 0
+        var lo: isize = 0
         while lo < n:
             let mid = if lo + width < n: lo + width else: n
             let hi = if lo + 2 * width < n: lo + 2 * width else: n

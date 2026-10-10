@@ -929,7 +929,11 @@ impl Sema:
                 if not self.expr_is_untyped_literal_arith(reach_node):
                     owned_arms_all_literal = false
                 let prior_candidate = owned_candidate
-                owned_candidate = self.merge_contextual_owned_join_types(owned_candidate, arm_ty)
+                // D125 (§4.2.1 rule 8): with no outer demand, typed arms of
+                // different numeric types are an error; no arm's width wins.
+                // Under a demand each arm meets it alone (§4.2.6).
+                let arms_disagree = expected == 0 and prior_candidate != 0 and self.is_plain_numeric_type(prior_candidate) and self.is_plain_numeric_type(arm_ty) and self.resolve_alias(prior_candidate as TypeId) != resolved
+                owned_candidate = if arms_disagree: 0 else: self.merge_contextual_owned_join_types(owned_candidate, arm_ty)
                 if owned_candidate == 0:
                     if self.infer_tail_join != 0:
                         // D43: two meanings remain; the programmer spells the choice.
@@ -10452,10 +10456,9 @@ impl Sema:
             var cast_src_null = src_node
             while cast_src_null != 0 and self.ast.kind(cast_src_null) == NodeKind.NK_GROUPED:
                 cast_src_null = self.ast.get_data0(cast_src_null)
-            let src_tid = if cast_src_null != 0 and self.ast.kind(cast_src_null) == NodeKind.NK_NULL_LIT and self.type_allows_null_literal(cast_tid) != 0:
-                self.check_expr_with_expected(src_node, cast_tid)
-            else:
-                self.check_expr_with_expected(src_node, self.cast_constant_operand_type(src_node))
+            let cast_null = cast_src_null != 0 and self.ast.kind(cast_src_null) == NodeKind.NK_NULL_LIT and self.type_allows_null_literal(cast_tid) != 0
+            let constant_ty = if cast_null: 0 as TypeId else: self.cast_constant_operand_type(src_node)
+            let src_tid = self.check_expr_with_expected(src_node, if cast_null: cast_tid else: constant_ty)
             // D65 (§12): a function cast to a pointer or an integer
             // (`coro_main as *const u8`) is its code address, not its callable.
             if cast_tid != 0 and self.get_type_kind(self.resolve_alias(cast_tid)) != TypeKind.TY_FN:
@@ -13060,16 +13063,30 @@ impl Sema:
     // cast is evaluated exactly, never in `isize`: at i64, or at u64 when its
     // value fits only unsigned; the cast then wraps or truncates it as it
     // would a runtime value. 0 for any other operand (no demand).
-    fn cast_constant_operand_type(src: i32) -> TypeId:
+    mut fn cast_constant_operand_type(src: i32) -> TypeId:
         if not self.expr_is_literal_arith_depth(src, false, false, 0):
             return 0 as TypeId
-        // A float constant does not fold as an integer; it takes its own
-        // default and the cast truncates it, as at run time.
+        // A float constant follows the runtime rule: its own default, then
+        // the cast truncates (`3.7 as i32` is 3).
+        if self.untyped_expr_is_float(src):
+            return 0 as TypeId
         let signed = self.fold_literal_int_arith_at(src, self.ty_i64 as i32)
         if signed.ok != 0 and signed.overflow == 0:
             return self.ty_i64
         let unsigned = self.fold_literal_int_arith_at(src, self.ty_u64 as i32)
-        if unsigned.ok != 0 and unsigned.overflow == 0: self.ty_u64 else: 0 as TypeId
+        if unsigned.ok != 0 and unsigned.overflow == 0:
+            return self.ty_u64
+        // Never a silent fallback to isize: that is the failure D124 removes.
+        self.emit_error("this constant cannot be evaluated exactly under the cast: its value needs more than 64 bits or it divides by zero (D124; constant arithmetic is 64-bit until comptime-int-width lands)", src)
+        0 as TypeId
+
+    // D88: the initializer an untyped constant's use stands for — recorded
+    // once the use is checked, else found from its declaration (a cast
+    // operand is folded before it is checked, D124); 0 if none.
+    fn untyped_const_initializer(node: i32) -> i32:
+        if self.untyped_const_uses.contains(node):
+            return self.untyped_const_uses.get(node).unwrap()
+        self.untyped_const_init_depth(self.ast.get_data0(node), 0)
 
     // §4.2.1 through an aggregate (#1996), for a join arm: untyped literal
     // arithmetic, or a tuple of such (`(1, 0)` beside an `(i32, i32)` arm).
@@ -13147,7 +13164,7 @@ impl Sema:
         if kind == NodeKind.NK_GROUPED: return self.untyped_expr_is_float(self.ast.get_data0(node))
         if kind == NodeKind.NK_UNARY: return self.untyped_expr_is_float(self.ast.get_data1(node))
         if kind == NodeKind.NK_BINARY: return self.untyped_expr_is_float(self.ast.get_data1(node)) or self.untyped_expr_is_float(self.ast.get_data2(node))
-        if kind == NodeKind.NK_IDENT and self.untyped_const_uses.contains(node): return self.untyped_expr_is_float(self.untyped_const_uses.get(node).unwrap())
+        if kind == NodeKind.NK_IDENT: return self.untyped_expr_is_float(self.untyped_const_initializer(node))
         false
 
     // The nodes of an untyped constant's initializer that take the type of
@@ -13336,8 +13353,7 @@ impl Sema:
         let recorded = if self.typed_expr_types.contains(node): self.typed_expr_types.get(node).unwrap() else: 0
         let ty = if force != 0: force else: recorded
         if kind == NodeKind.NK_IDENT:
-            if not self.untyped_const_uses.contains(node): return failed
-            return self.fold_literal_int_arith_at(self.untyped_const_uses.get(node).unwrap(), ty)
+            return self.fold_literal_int_arith_at(self.untyped_const_initializer(node), ty)
         let resolved = self.resolve_alias(self.numeric_operand_type(ty) as TypeId)
         if ty == 0 or self.get_type_kind(resolved) != TypeKind.TY_INT:
             return failed
@@ -13363,7 +13379,11 @@ impl Sema:
             return failed
         let lhs = self.fold_literal_int_arith_at(self.ast.get_data1(node), force)
         let op_kind = self.ast.get_data0(node)
-        let amount_force = if op_kind == BinaryOp.OP_SHL or op_kind == BinaryOp.OP_SHR: 0 else: force
+        // §4.2.1: a shift amount types on its own; an untyped one not yet
+        // checked (a cast operand, D124) is u32, its default.
+        let is_shift = op_kind == BinaryOp.OP_SHL or op_kind == BinaryOp.OP_SHR
+        let amount_unchecked = is_shift and not self.typed_expr_types.contains(self.ast.get_data2(node)) and self.expr_is_untyped_literal_arith(self.ast.get_data2(node))
+        let amount_force = if amount_unchecked: self.ty_u32 as i32 else if is_shift: 0 else: force
         let rhs = self.fold_literal_int_arith_at(self.ast.get_data2(node), amount_force)
         if lhs.ok == 0 or lhs.overflow != 0 or rhs.ok == 0 or rhs.overflow != 0:
             return failed
@@ -13374,7 +13394,7 @@ impl Sema:
         if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
             // §4.2.4: a shift by the width or more is 0, or -1 for a negative
             // value shifted right; below it, the usual meaning.
-            let amount_type = self.typed_expr_types.get(self.ast.get_data2(node)) ?? 0
+            let amount_type = if amount_unchecked: self.ty_u32 as i32 else: self.typed_expr_types.get(self.ast.get_data2(node)) ?? 0
             let amount_unsigned = self.is_unsigned_int_type(amount_type)
             let wide = rhs.value < 0 or rhs.value >= bits as i64
             if not amount_unsigned:

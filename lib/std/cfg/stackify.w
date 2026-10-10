@@ -797,7 +797,7 @@ impl StackifyContext:
         var body: List[i32] = List.new()
         body.push(select_id)
         var extra = targets_count + 1
-        var idx = 0
+        var idx: i32 = 0
         while idx < targets_count + 1:
             extra = extra - 1
             let target_index = if idx < targets_count: targets_start + idx else: default_target

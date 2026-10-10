@@ -482,8 +482,8 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
                 out = project_config_load_dep_component(move out, name, version, req)
                 continue
             let colon = project_config_find_char(req, 58)
-            let req_name = req.slice(0, slash as i64)
-            let req_version = req.slice((slash + 1) as i64, if colon > slash: colon as i64 else: req.len())
+            let req_name = req.slice(0, slash)
+            let req_version = req.slice(slash + 1, if colon > slash: colon else: req.len())
             let req_component = if colon > slash: req.slice((colon + 1) as i64, req.len()) else: ""
             out = project_config_load_dep_component(move out, req_name, req_version, req_component)
     out
