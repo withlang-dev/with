@@ -1378,6 +1378,17 @@ impl Sema:
             return if name.len() > 0: f" (argument {i + 1} of `{name}`)" else: f" (argument {i + 1})"
         ""
 
+    // §4.2.1 rule 2: a literal argument checked before its call's parameters
+    // were known (a generic specialization, a generic method) takes the
+    // parameter's type once it is, behind an auto-referenced `&` too (`7 in
+    // bag` at `value: &T`, T = i32). Returns the argument's type.
+    mut fn retype_literal_call_arg(arg_node: i32, expected: i32, actual: i32) -> i32:
+        if arg_node <= 0 or not self.expr_is_untyped_literal_arith(arg_node): return actual
+        let value_ty = self.comparison_value_peer(expected as TypeId)
+        if not self.is_plain_numeric_type(value_ty as i32) or self.resolve_alias(value_ty) == self.resolve_alias(actual as TypeId): return actual
+        let retyped = self.check_expr_with_expected(arg_node, value_ty)
+        if retyped != 0: retyped as i32 else: actual
+
     mut fn note_call_arg_coercion(expected: i32, actual: i32, arg_node: i32, err_node: i32):
         if self.can_auto_ref_arg(expected, actual) != 0:
             if arg_node <= 0:
@@ -13369,7 +13380,12 @@ impl Sema:
         if self.has_expected_type == 0 or self.expected_expr_type == 0:
             return 0 as TypeId
         let payload = self.option_demand_payload(self.expected_expr_type)
-        let demanded = if payload != 0: payload else: self.expected_expr_type
+        var demanded = if payload != 0: payload else: self.expected_expr_type
+        // §3.8: a `&i32` demand auto-references an i32; the literal is that
+        // i32 (`7 in bag`, `contains(value: &T)`), never an isize behind it.
+        let demanded_resolved = self.resolve_alias(demanded)
+        if self.get_type_kind(demanded_resolved) == TypeKind.TY_REF and self.is_numeric_type(self.get_type_d0(demanded_resolved)):
+            demanded = self.get_type_d0(demanded_resolved) as TypeId
         if self.is_numeric_type(demanded as i32): demanded else: 0 as TypeId
 
     // The integer type an enclosing context demands of an untyped operand of
@@ -13843,6 +13859,15 @@ impl Sema:
                 if not self.types_identical(lhs_tuple, rhs_tuple):
                     self.emit_error(f"comparison operands must have the same tuple type: `{self.type_name(lhs_tuple)}` and `{self.type_name(rhs_tuple)}`", node)
                     return 0
+            // So with two instances of one generic type: `Option[i32]` beside
+            // `Option[isize]` has no comparison short of converting a payload,
+            // and an aggregate's elements do not convert (#1368). Accepting
+            // it left MIR to refuse it.
+            let lhs_cmp_value = if lhs_cmp_kind == TypeKind.TY_REF: self.auto_deref_ref_ptr_type(self.resolve_alias(lhs)) else: self.resolve_alias(lhs)
+            let rhs_cmp_value = if rhs_cmp_kind == TypeKind.TY_REF: self.auto_deref_ref_ptr_type(self.resolve_alias(rhs)) else: self.resolve_alias(rhs)
+            if self.get_type_kind(lhs_cmp_value) == TypeKind.TY_GENERIC_INST and self.get_type_kind(rhs_cmp_value) == TypeKind.TY_GENERIC_INST and self.aggregate_repr_differs(lhs_cmp_value, rhs_cmp_value, 0) != 0:
+                self.emit_error(f"comparison operands must have the same type: `{self.type_name(lhs_cmp_value as i32)}` and `{self.type_name(rhs_cmp_value as i32)}`; an aggregate's elements do not convert (§4.2.6)", node)
+                return 0
             if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ:
                 self.note_structural_equality(lhs as i32, node)
             return self.ty_bool as i32
@@ -26934,12 +26959,13 @@ impl Sema:
                 self.record_effect_edge(sig_idx, ai, arg_nodes[ai])
                 self.check_closure_arg_against_param(arg_nodes[ai], fn_sym, sig_idx, ai, call_node)
             let expected_ty = self.sig_param_type(sig_idx, ai)
-            let actual_ty = arg_types[ai]
+            var actual_ty: i32 = arg_types[ai]
             if expected_ty == 0 or actual_ty == 0:
                 continue
             if self.type_is_dyn_object(self.resolve_alias(expected_ty)) != 0:
                 continue
             let arg_node = if ai < arg_nodes.len() as i32: arg_nodes[ai] else: call_node
+            actual_ty = self.retype_literal_call_arg(arg_node, expected_ty, actual_ty)
             if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
                 let slice_kind = self.note_slice_coerce_call_arg(expected_ty, actual_ty, arg_node, if arg_node > 0: arg_node else: call_node)
                 if slice_kind == 2: slice_mut_args.push(arg_node)
@@ -29168,10 +29194,11 @@ impl Sema:
             if pi3 >= param_count:
                 break
             let expected_ty = self.resolve_type_node_with_current_subst(self.ast.fn_param_type(param_start, pi3), concrete_owner)
-            let actual_ty = arg_types[ai3]
+            var actual_ty: i32 = arg_types[ai3]
             sc_all_args.push(self.ast.get_extra(extra_start + ai3))
             if expected_ty != 0 and actual_ty != 0:
                 let gen_method_arg = self.ast.get_extra(extra_start + ai3)
+                actual_ty = self.retype_literal_call_arg(gen_method_arg, expected_ty, actual_ty)
                 if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
                     let sc_kind = self.note_slice_coerce_call_arg(expected_ty, actual_ty, gen_method_arg, gen_method_arg)
                     if sc_kind == 2:
