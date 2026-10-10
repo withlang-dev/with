@@ -2417,7 +2417,7 @@ fn ci_migrate_var_priority(session: i64, idx: i32, primary_path: &str) -> i32:
     1
 
 fn ci_migrate_find_best_var_decl(session: i64, count: i32, name: &str, primary_path: &str) -> i32:
-    var best = -1
+    var best: i32 = -1
     var best_priority = -1
     var i: i32 = 0
     while i < count:

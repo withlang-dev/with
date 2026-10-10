@@ -1390,7 +1390,7 @@ impl CCodegen:
         if self.type_is_payload_enum(enum_tid) == 0 or payload_tid == 0:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
-        var found = -1
+        var found: i32 = -1
         for vi in 0..variant_count:
             if self.sema.type_reflection_variant_payload_count(enum_tid, vi) != 1:
                 continue
@@ -1407,7 +1407,7 @@ impl CCodegen:
         if self.type_is_payload_enum(enum_tid) == 0:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
-        var found = -1
+        var found: i32 = -1
         for vi in 0..variant_count:
             if self.sema.type_reflection_variant_payload_count(enum_tid, vi) <= 0:
                 continue
@@ -1420,7 +1420,7 @@ impl CCodegen:
         if self.type_is_payload_enum(enum_tid) == 0:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
-        var found = -1
+        var found: i32 = -1
         for vi in 0..variant_count:
             if self.sema.type_reflection_variant_payload_count(enum_tid, vi) != 0:
                 continue
@@ -4229,7 +4229,7 @@ impl CCodegen:
             return 0
         if depth > 8:
             return 0
-        var out = 0
+        var out: i32 = 0
         for bb in 0..body.block_count():
             let start = body.bb_stmt_starts[bb]
             let count = body.bb_stmt_counts[bb]
@@ -4586,7 +4586,7 @@ impl CCodegen:
         let base_name = cc_base_name(raw)
         let arg_count = self.call_arg_count(body, args_id)
         let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
-        var match_sym = 0
+        var match_sym: i32 = 0
         var match_score = -1
         for si in 0..self.sema.sig_names.len() as i32:
             let sym: i32 = self.sema.sig_names[si]
@@ -4695,7 +4695,7 @@ impl CCodegen:
     mut fn infer_direct_call_sym_scan(body: &MirBody, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
         let arg_count = self.call_arg_count(body, args_id)
         let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
-        var match_sym = 0
+        var match_sym: i32 = 0
         var match_score = -1
         for si in 0..self.sema.sig_names.len() as i32:
             let sym: i32 = self.sema.sig_names[si]
@@ -5205,7 +5205,7 @@ impl CCodegen:
             let first_arg_tid = self.call_first_arg_resolved_tid(body, args_id)
             preferred_owner = self.type_owner_text(first_arg_tid)
 
-        var match_sym = 0
+        var match_sym: i32 = 0
         var match_score = -1
         for si in 0..self.sema.sig_names.len() as i32:
             let sym: i32 = self.sema.sig_names[si]
@@ -5280,7 +5280,7 @@ impl CCodegen:
         let wanted = "." ++ raw
         let argc = self.call_arg_count(body, args_id)
         let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
-        var match_sym = 0
+        var match_sym: i32 = 0
         var match_score = -1
         for si in 0..self.sema.sig_names.len() as i32:
             let sym: i32 = self.sema.sig_names[si]
@@ -5375,7 +5375,7 @@ impl CCodegen:
                     out = si
                     break
             if out < 0 and cc_str_contains_dot(raw) != 0:
-                var match_idx = -1
+                var match_idx: i32 = -1
                 for si in 0..self.sema.sig_names.len() as i32:
                     let sym_text = cc_intern_resolve(self.intern, self.sema.sig_names[si])
                     if sym_text != raw:
@@ -5391,7 +5391,7 @@ impl CCodegen:
                 // #785: a dotless name (plain extern like with_print_str) must
                 // first try the EXACT sig-name match; without it the callee sig
                 // stays unresolved and call args skip pointer marshalling.
-                var exact_idx = -1
+                var exact_idx: i32 = -1
                 for si in 0..self.sema.sig_names.len() as i32:
                     let sym_text = cc_intern_resolve(self.intern, self.sema.sig_names[si])
                     if sym_text != raw:
@@ -5405,7 +5405,7 @@ impl CCodegen:
                     out = exact_idx
             if out < 0 and cc_str_contains_dot(raw) == 0:
                 let wanted = "." ++ raw
-                var match_idx = -1
+                var match_idx: i32 = -1
                 for si in 0..self.sema.sig_names.len() as i32:
                     let sym_text = cc_intern_resolve(self.intern, self.sema.sig_names[si])
                     if cc_str_ends_with(sym_text, wanted) == 0:
@@ -8324,7 +8324,7 @@ impl CCodegen:
         let _ = bb
         let argc = self.call_arg_count(body, args_id)
         let ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
-        let has_ret = if self.is_void_tid(ret_tid) == 0: 1 else: 0
+        let has_ret: i32 = if self.is_void_tid(ret_tid) == 0: 1 else: 0
         if kind == CcBuiltin.VA_START or kind == CcBuiltin.VA_ARG or kind == CcBuiltin.VA_END:
             return self.emit_c_variadic_call_term(body, kind, args_id, dest_place, next_bb)
 

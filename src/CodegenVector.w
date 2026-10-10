@@ -119,7 +119,7 @@ impl Codegen:
         let n = wl_get_vector_size(vec_ty)
         let elem_ty = wl_get_element_type(vec_ty)
         if self.cg_lane_is_float(lane):
-            let lane_bits = if wl_get_type_kind(elem_ty) == wl_float_type_kind(): 32 else: 64
+            let lane_bits: i32 = if wl_get_type_kind(elem_ty) == wl_float_type_kind(): 32 else: 64
             if op == BinaryOp.OP_ADD: return wl_build_fadd(self.builder, l, r)
             if op == BinaryOp.OP_SUB: return wl_build_fsub(self.builder, l, r)
             if op == BinaryOp.OP_MUL: return wl_build_fmul(self.builder, l, r)

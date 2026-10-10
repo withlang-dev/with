@@ -57,7 +57,7 @@ fn build_graph_append_test_args(argv: &str, target: &BuildGraphTarget) -> str:
     out
 
 fn build_graph_test_parse_jobs(value: &str) -> i32:
-    var out = 0
+    var out: i32 = 0
     for i in 0..value.len() as i32:
         let ch = value[i]
         if ch < 48 or ch > 57:

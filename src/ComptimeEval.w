@@ -743,7 +743,7 @@ fn comptime_tar_build_header(name: &str, mode: i32, size: i64, kind: i32, link_n
     if name_field.len() == 0 or mode_field.len() == 0 or uid_field.len() == 0 or gid_field.len() == 0 or size_field.len() == 0 or mtime_field.len() == 0:
         return ""
     let prefix = name_field ++ mode_field ++ uid_field ++ gid_field ++ size_field ++ mtime_field
-    let typeflag = if kind == 1: 53 else: (if kind == 2: 50 else: 48)
+    let typeflag: i32 = if kind == 1: 53 else: (if kind == 2: 50 else: 48)
     let suffix = with_str_from_byte(typeflag) ++ comptime_tar_padded_str(link_name, 100) ++ comptime_tar_padded_str("ustar", 6) ++ comptime_tar_padded_str("00", 2) ++ comptime_tar_zeroes(80) ++ comptime_tar_padded_str(path_prefix, 155) ++ comptime_tar_zeroes(12)
     if suffix.len() != 356:
         return ""
@@ -839,7 +839,7 @@ fn comptime_tar_trim_payload_name(text: &str) -> str:
 fn comptime_pax_parse_decimal(text: &str, start: i32, end: i32) -> i32:
     if start >= end:
         return -1
-    var value = 0
+    var value: i32 = 0
     var i = start
     while i < end:
         let ch = text[i]
@@ -2805,7 +2805,7 @@ fn comptime_bit_result(value: i64, width: i32, is_unsigned: bool) -> i64:
 
 fn comptime_count_ones(value: i64, width: i32) -> i32:
     let raw = comptime_bit_pattern(value, width)
-    var count = 0
+    var count: i32 = 0
     for bit in 0..width:
         if (raw & exact_int_pow2_word(bit)) != 0:
             count = count + 1
@@ -3393,7 +3393,7 @@ impl ComptimeEvaluator:
         // §10.5's non-closure combinators. The closure-taking ones (map,
         // and_then, filter) wait on comptime closure evaluation (#665.3).
         let method = self.pool.resolve(field)
-        let is_some = if recv_value.data0 as i32 == self.sema.syms.some: 1 else: 0
+        let is_some: i32 = if recv_value.data0 as i32 == self.sema.syms.some: 1 else: 0
 
         if method == "is_some":
             if arg_count != 0:
@@ -3727,7 +3727,7 @@ impl ComptimeEvaluator:
             if resolved_sig.is_some():
                 let sig: i32 = resolved_sig.unwrap()
                 let call_ret = self.sema.sig_return_type(sig)
-                let threads_receiver = if self.sema.sig_receiver_mode(sig) == ReceiverMode.Mut and self.sema.resolve_alias(call_ret as TypeId) == self.sema.ty_void: 1 else: 0
+                let threads_receiver: i32 = if self.sema.sig_receiver_mode(sig) == ReceiverMode.Mut and self.sema.resolve_alias(call_ret as TypeId) == self.sema.ty_void: 1 else: 0
                 self.sema.pipeline_method_calls.insert(node, method)
                 self.sema.pipeline_call_return_types.insert(node, call_ret)
                 self.sema.pipeline_carrier_kinds.insert(node, threads_receiver)
@@ -4786,7 +4786,7 @@ impl ComptimeEvaluator:
                 return comptime_workspace_compile_plan_invalid()
             let migrate_source = self.workspace_path(capability.project_root, migrate_source_option)
             var migrate_output = self.workspace_str_option(migrate_options, "output_path")
-            let migrate_is_dir = if with_fs_is_dir(migrate_source) != 0 or (migrate_source.len() > 2 and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".c" and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".h"): 1 else: 0
+            let migrate_is_dir: i32 = if with_fs_is_dir(migrate_source) != 0 or (migrate_source.len() > 2 and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".c" and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".h"): 1 else: 0
             if migrate_output.len() == 0:
                 if migrate_is_dir != 0:
                     migrate_output = migrate_source_option ++ "_migrated"

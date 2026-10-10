@@ -188,7 +188,7 @@ impl Zcu:
         self.tracked_input_paths = tracked_input_insert_unique(move paths, path)
 
 fn count_non_use_decls_frontend(pool: AstPool) -> i32:
-    var count = 0
+    var count: i32 = 0
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_USE_DECL:

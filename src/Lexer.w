@@ -882,7 +882,7 @@ pub fn column_of(source: &str, pos: i32) -> i32:
 // indented body (§29.13 Form 2).
 pub fn line_indent_of(source: &str, pos: i32) -> i32:
     let line_start = pos - column_of(source, pos)
-    var indent = 0
+    var indent: i32 = 0
     while line_start + indent < source.len() and (source[line_start + indent] == CharCode.Space or source[line_start + indent] == CharCode.Tab):
         indent = indent + 1
     indent

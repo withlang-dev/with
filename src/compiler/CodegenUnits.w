@@ -124,7 +124,7 @@ pub fn codegen_units_assign_from_mir(mir_ptr: i64, unit_count: i32) -> CodegenUn
             total_cost = total_cost + cost
             var best: i32 = 0
             var best_load = bin_loads[0]
-            var k = 1
+            var k: i32 = 1
             while k < unit_count:
                 if bin_loads[k] < best_load:
                     best = k

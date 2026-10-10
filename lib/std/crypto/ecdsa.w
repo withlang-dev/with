@@ -135,7 +135,7 @@ unsafe fn ecdsa_p256_verify(
     i31_encode(&raw mut v_bytes[0] as *mut u8, 32, &v[0] as *const u32)
     i31_encode(&raw mut r_bytes[0] as *mut u8, 32, &r[0] as *const u32)
 
-    var match_val = 1
+    var match_val: i32 = 1
     var ci = 0
     while ci < 32:
         if v_bytes[ci] != r_bytes[ci]:

@@ -214,7 +214,7 @@ impl Sema:
     fn node_line(node: i32) -> i32:
         let text = self.source_text_view_for_file_id(self.ast.file(node as NodeId) as i32)
         let start = self.ast.get_start(node)
-        var line = 1
+        var line: i32 = 1
         for i in 0..start:
             if i < text.len() as i32 and text[i] == '\n': line += 1
         line
@@ -468,7 +468,7 @@ impl Sema:
 
     // The adjustments in the program's own sources, without the embedded
     // stdlib's: what a fixture pins, unmoved by an edit to std.
-    fn contextual_copy_adjustments_outside_std() -> i32:
+    fn contextual_copy_adjustments_outside_std() -> isize:
         var paths: HashMap[i32, str] = HashMap.new()
         for di in 0..self.decl_source_file_ids.len():
             let file_id = self.decl_source_file_ids[di]

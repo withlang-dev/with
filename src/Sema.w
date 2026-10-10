@@ -868,6 +868,10 @@ pub type Sema {
     // scopes have closed, and a generic callee's body is checked in the
     // middle of its caller's.
     fn_literal_lets: HashMap[i64, i32],
+    // D114: per (function, name), the one unannotated `let` whose integer
+    // literal chose its type, or -1 once the name is bound twice; names it
+    // in a narrowing error after the binding's scope has closed (a tail).
+    fn_int_literal_lets: HashMap[i64, i32],
     literal_decisions: List[i32],
     // literal_decisions by `let`: the offset of each binding's entry, built
     // at the first lookup (one walk, not one per binding).
@@ -3154,6 +3158,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         field_decisions: List.new(),
         literal_demands: List.new(),
         fn_literal_lets: HashMap.new(),
+        fn_int_literal_lets: HashMap.new(),
         literal_watermark: 0,
         literal_decisions: List.new(),
         literal_decision_at: sema_new_map_i32_i32(),
@@ -4353,7 +4358,7 @@ impl Sema:
     // last. -1 when no explicit import provides the name.
     fn last_import_provider(sym: i32, cands: &List[i32], paths: &List[str], pubs: &List[i32]) -> i32:
         let name: str = with_str_clone_ref(self.pool_resolve(sym))
-        var best = -1
+        var best: i32 = -1
         var best_pos = -1
         for ci in 0..cands.len() as i32:
             let pos = self.import_position_of(cands[ci], paths[ci], pubs[ci], name)
@@ -4392,7 +4397,7 @@ impl Sema:
         let to: i32 = target.unwrap()
         if from < 0 or from >= self.module_import_starts.len() as i32:
             return -1
-        var best = -1
+        var best: i32 = -1
         let start = self.module_import_starts[from]
         for ei in 0..self.module_import_counts[from]:
             let idx = start + ei
@@ -8221,7 +8226,7 @@ impl Sema:
         if self.needs_drop_visit.contains(resolved as i32):
             return 0
         self.needs_drop_visit.insert(resolved as i32)
-        var result = 0
+        var result: i32 = 0
         if tk == TypeKind.TY_TUPLE:
             let te_start = self.get_type_d0(resolved)
             let elem_count = self.get_type_d1(resolved)
@@ -8449,7 +8454,7 @@ impl Sema:
         if self.needs_drop_visit.contains(resolved as i32):
             return 0
         self.needs_drop_visit.insert(resolved as i32)
-        var result = 0
+        var result: i32 = 0
         if tk == TypeKind.TY_GENERIC_INST:
             for ai in 0..self.get_generic_inst_arg_count(resolved as i32):
                 if self.type_owns_user_drop(self.get_generic_inst_arg(resolved as i32, ai)) != 0:
@@ -8489,7 +8494,7 @@ impl Sema:
         if self.needs_drop_visit.contains(resolved as i32):
             return 0
         self.needs_drop_visit.insert(resolved as i32)
-        var result = 0
+        var result: i32 = 0
         let tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_GENERIC_INST:
             let arg_count = self.get_generic_inst_arg_count(resolved as i32)
@@ -9251,7 +9256,7 @@ impl Sema:
         self.drop_owner_for_fn_symbol(self.sig_names[sig]) != 0
 
     fn receiver_required_effect_for_decl(node: i32) -> i32:
-        var required = 0
+        var required: i32 = 0
         for si in 0..self.sig_names.len() as i32:
             if self.receiver_decl_node_for_sig(si) == node and self.sig_get_param_count(si) > 0:
                 required = required | (self.sig_param_effect(si, 0) & EFF_DECLARED_MASK)
@@ -9319,7 +9324,7 @@ pub fn receiver_required_mode_text(eff: i32) -> str:
     "read"
 
 impl Sema:
-    fn receiver_contract_error_count() -> i32:
+    fn receiver_contract_error_count() -> isize:
         var errors = 0
         for si in 0..self.sig_receiver_modes.len() as i32:
             let declared = self.sig_receiver_mode(si)
@@ -9485,7 +9490,7 @@ impl Sema:
                     if sema_pair_hi(entry) == self.binding_use_epoch:
                         last = sema_pair_lo(entry)
                 if last != 0:
-                    let verdict = if last > site_seq: 2 else: 1
+                    let verdict: i32 = if last > site_seq: 2 else: 1
                     self.consume_call_sites[(i + 8)] = verdict
             i = i + 9
 
@@ -9928,7 +9933,7 @@ fn sema_levenshtein(a: &str, b: &str, max: i32) -> i32:
 impl Sema:
     fn suggest_name(target: &str, node: i32) -> str:
         if target.len() == 0: return ""
-        let max_dist = if target.len() as i32 <= 3: 1 else: 2
+        let max_dist: i32 = if target.len() as i32 <= 3: 1 else: 2
         var best_name = ""
         var best_dist = max_dist + 1
         // Search scope bindings
@@ -9955,7 +9960,7 @@ impl Sema:
     fn suggest_type_name(target: &str, node: i32) -> str:
         if target.len() == 0 or sema_str_has_data(target) == 0:
             return ""
-        let max_dist = if target.len() as i32 <= 3: 1 else: 2
+        let max_dist: i32 = if target.len() as i32 <= 3: 1 else: 2
         var best_name = ""
         var best_dist = max_dist + 1
         // Search named types by scanning type table

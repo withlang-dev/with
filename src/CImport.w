@@ -4583,7 +4583,7 @@ fn ci_find_char_op_at_depth0(s: &str, ch: i32) -> isize:
     -1
 
 // Scan identifier length at start of string. Returns 0 if no ident.
-fn ci_scan_ident(s: &str) -> i32:
+fn ci_scan_ident(s: &str) -> isize:
     var i = 0
     while i < s.len() as i32:
         let c = s[i]
@@ -4596,8 +4596,8 @@ fn ci_scan_ident(s: &str) -> i32:
 // Translate postfix chain: .field, ->field, [expr]
 fn ci_translate_postfix(base: &str, rest: &str, params: &str, known: &str) -> str:
     var result = with_str_clone_ref(base)
-    var pos: i32 = 0
-    let slen = rest.len() as i32
+    var pos: isize = 0
+    let slen = rest.len()
     while pos < slen:
         let c = rest[pos]
         // Arrow ->field → .field
@@ -4772,7 +4772,7 @@ fn ci_is_bool_expr(s: &str) -> bool:
     if ci_str_contains(s, " and ") or ci_str_contains(s, " or "): return true
     false
 
-fn ci_find_matching_bracket(s: &str, start: i32) -> i32:
+fn ci_find_matching_bracket(s: &str, start: isize) -> isize:
     var depth = 0
     var i = start
     while i < s.len() as i32:
@@ -5972,7 +5972,7 @@ fn ci_translate_comma_block(s: &str, params: &str, known: &str) -> str:
     // The last expression is the value of the block
     "{ " ++ exprs ++ " }"
 
-fn ci_find_last_comma_at_depth0(s: &str) -> i32:
+fn ci_find_last_comma_at_depth0(s: &str) -> isize:
     var depth = 0
     var last_comma = -1
     var i = 0
@@ -6192,7 +6192,7 @@ fn ci_shr(a: i32, b: i32) -> i32:
 
 fn ci_bitor(a: i32, b: i32) -> i32:
     // Bit-by-bit OR using arithmetic
-    var result = 0
+    var result: i32 = 0
     var aa = a
     var bb = b
     var bit = 1
@@ -6209,7 +6209,7 @@ fn ci_bitor(a: i32, b: i32) -> i32:
     result
 
 fn ci_bitand(a: i32, b: i32) -> i32:
-    var result = 0
+    var result: i32 = 0
     var aa = a
     var bb = b
     var bit = 1
@@ -6226,7 +6226,7 @@ fn ci_bitand(a: i32, b: i32) -> i32:
     result
 
 fn ci_bitxor(a: i32, b: i32) -> i32:
-    var result = 0
+    var result: i32 = 0
     var aa = a
     var bb = b
     var bit = 1
@@ -16840,7 +16840,7 @@ fn ci_condition_null_sense(session: i64, cursor: i32, name: &str) -> i32:
 // `if`/`?:` are the tests; an `if` without `else` whose truth means
 // non-NULL continues past it, which is a handled NULL.
 pub fn ci_body_null_test_evidence(session: i64, cursor: i32, name: &str) -> i32:
-    var verdict = 0
+    var verdict: i32 = 0
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
     if (kind == CXK_IF_STMT or kind == CXK_CONDITIONAL_OP) and nc >= 2:
@@ -18273,7 +18273,7 @@ impl CiStmtPool:
 fn ci_find_var_cursor(session: i64, name: &str) -> i32:
     let root = with_ci_root_cursor(session)
     let n = with_ci_num_children(session, root)
-    var fallback = -1
+    var fallback: i32 = -1
     var i = 0
     while i < n:
         let child = with_ci_child(session, root, i)
@@ -19121,7 +19121,7 @@ fn ci_map_libc_call(callee: &str, args: &str) -> str:
     // Not a libc function we map
     ""
 
-pub fn ci_count_substring(haystack: &str, needle: &str) -> i32:
+pub fn ci_count_substring(haystack: &str, needle: &str) -> isize:
     if needle.len() == 0:
         return 0
     var count = 0

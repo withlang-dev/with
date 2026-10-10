@@ -86,7 +86,7 @@ const GEN_EXIT_CONTINUE: i32 = 1
 const GEN_EXIT_GOTO: i32 = 2
 
 fn gen_loop_code_bit(code: i32) -> i32:
-    var bit = 1
+    var bit: i32 = 1
     for _ in 0..code:
         bit = bit * 2
     bit
@@ -2499,7 +2499,7 @@ impl MirBuilder:
             if uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
                 let inner_ty = self.expr_type(self.ast.get_data1(node))
                 if inner_ty != 0 and inner_ty != self.sema.ty_void as i32:
-                    let raw_mut = if uop == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
+                    let raw_mut: i32 = if uop == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
                     let ptr_ty = self.sema.find_exact_type(TypeKind.TY_PTR, inner_ty, raw_mut, 0) as i32
                     if ptr_ty != 0:
                         return ptr_ty
@@ -8404,7 +8404,7 @@ impl MirBuilder:
 
         // g.each(body)
         let closure_local = self.new_temp(body_fn_ty)
-        let in_loop = if self.loop_break_bbs.len() > 0: 1 else: 0
+        let in_loop: i32 = if self.loop_break_bbs.len() > 0: 1 else: 0
         let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, key_node, body_sym, in_loop, body_fn_ty)
         let closure_const_op = self.body.new_operand(OperandKind.OK_CONSTANT, closure_const)
         let closure_rv = self.body.new_rvalue(RvalueKind.RK_USE, closure_const_op, 0, 0)
@@ -13568,7 +13568,7 @@ impl MirBuilder:
             let payload_ty = payloads[pi]
             let field_place = self.body.new_field_place(variant_place, pi, payload_ty)
             if accessor_kind == 3 or accessor_kind == 4:
-                let ref_mut = if accessor_kind == 4: 1 else: 0
+                let ref_mut: i32 = if accessor_kind == 4: 1 else: 0
                 let elem_ty = if tuple_elem_start > 0: self.sema.type_extra[(tuple_elem_start + pi)] else: self.sema.find_exact_type(TypeKind.TY_REF, payload_ty, ref_mut, 0) as i32
                 let borrow_kind = if accessor_kind == 4: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
                 let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, borrow_kind, field_place, 0)
@@ -15892,7 +15892,7 @@ impl MirBuilder:
         // d2 = 1 when the closure expression sits inside a loop of this body:
         // one site then creates a closure per iteration, and codegen gives each
         // its own environment (#1471, §12.4 Copy capture copies at creation).
-        let in_loop = if self.loop_break_bbs.len() > 0: 1 else: 0
+        let in_loop: i32 = if self.loop_break_bbs.len() > 0: 1 else: 0
         let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, node, body_sym, in_loop, ty)
         let op = self.body.new_operand(OperandKind.OK_CONSTANT, closure_const)
         let rv = self.body.new_rvalue(RvalueKind.RK_USE, op, 0, 0)

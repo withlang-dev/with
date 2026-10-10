@@ -72,7 +72,7 @@ fn suspend_copy_block_bits(src: SuspendBits, local_count: i32, bb: i32) -> Suspe
     out
 
 fn suspend_store_block_bits(dst: SuspendBits, local_count: i32, bb: i32, src: SuspendBits) -> i32:
-    var changed = 0
+    var changed: i32 = 0
     for li in 0..local_count:
         let idx = suspend_bit_index(local_count, bb, li)
         let old = dst.vget(idx as i64)
@@ -648,7 +648,7 @@ fn suspend_prov_transfer_stmts(bits: SuspendBits, sema: &Sema, body: &MirBody, g
 fn suspend_prov_or_block_into(dst: SuspendBits, local_count: i32, guard_count: i32, target_bb: i32, src: SuspendBits) -> i32:
     if target_bb < 0:
         return 0
-    var changed = 0
+    var changed: i32 = 0
     for li in 0..local_count:
         for gi in 0..guard_count:
             if src.vget(suspend_prov_local_index(guard_count, li, gi) as i64) == 0:
@@ -672,7 +672,7 @@ fn suspend_prov_add_successors(body: &MirBody, prov_in: SuspendBits, local_count
     let d1 = body.term_data1(bb)
     let d2 = body.term_data2(bb)
     let d3 = body.term_data3(bb)
-    var changed = 0
+    var changed: i32 = 0
 
     if kind == TermKind.TK_GOTO:
         if suspend_prov_add_successor(body, prov_in, local_count, guard_count, d0, out_bits) != 0:

@@ -393,7 +393,7 @@ fn driver_build_target_arg(argc: i32) -> str:
     ""
 
 fn driver_build_opt_level(argc: i32) -> i32:
-    var level = 1
+    var level: i32 = 1
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)

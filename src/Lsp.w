@@ -50,7 +50,7 @@ fn lsp_write_response(json: &str):
     with_flush_stdout()
 
 fn lsp_parse_int(s: &str) -> i32:
-    var result = 0
+    var result: i32 = 0
     var started = false
     for i in 0..s.len() as i32:
         let ch = s[i]
@@ -641,7 +641,7 @@ fn uri_to_path(uri: &str) -> str:
 // ── Line/column utilities ────────────────────────────────────
 
 fn lsp_offset_to_line(text: &str, offset: i32) -> i32:
-    var line = 0
+    var line: i32 = 0
     var i = 0
     while i < offset and i < text.len() as i32:
         if text[i] == 10:
@@ -650,7 +650,7 @@ fn lsp_offset_to_line(text: &str, offset: i32) -> i32:
     line
 
 fn lsp_offset_to_col(text: &str, offset: i32) -> i32:
-    var col = 0
+    var col: i32 = 0
     var i = 0
     while i < offset and i < text.len() as i32:
         if text[i] == 10:

@@ -1824,7 +1824,7 @@ impl PyInterp:
 // The recipe's ConanFile class: the one that defines `package_info`, else
 // the last class in the file.
 fn recipe_class(tree: &PyModule) -> i32:
-    var last = -1
+    var last: i32 = -1
     for t in tree.top:
         if tree.nodes[t].kind != N_CLASS: continue
         last = t

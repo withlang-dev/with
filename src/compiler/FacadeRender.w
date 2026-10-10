@@ -577,7 +577,7 @@ fn facade_render_borrowed_type(pool: AstPool, intern: InternPool, ci: &List[i32]
 
 pub fn facade_render_borrowed_name(name: &str) -> str: "Borrowed" ++ name
 
-fn facade_render_resources_wrapping(pool: AstPool, intern: InternPool, repr: &str) -> i32:
+fn facade_render_resources_wrapping(pool: AstPool, intern: InternPool, repr: &str) -> isize:
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
     var n = 0
     for i in 0..items.len() as i32:
@@ -1443,7 +1443,7 @@ fn facade_render_dep_values(pool: AstPool, intern: InternPool, deps: &FacadeDeps
 fn facade_render_received(pool: AstPool, intern: InternPool, ptext: &str) -> i32:
     let p = facade_render_unalias(pool, intern, ptext)
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
-    var found = 0
+    var found: i32 = 0
     for i in 0..items.len() as i32:
         let res = items[i]
         let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(res as NodeId)) as NodeId))
@@ -1836,7 +1836,7 @@ fn facade_render_has_clause(pool: AstPool, resource: i32, kind: i32) -> bool:
 // `fclose(FILE *)` the program imported.
 fn facade_render_find_fn(pool: AstPool, intern: InternPool, ci: &List[i32], sym: i32) -> i32:
     let want: str = intern.resolve(sym)
-    var fallback = 0
+    var fallback: i32 = 0
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         let kind = pool.kind(decl)
@@ -2676,7 +2676,7 @@ fn facade_render_index_ref(pool: AstPool, intern: InternPool, ref_node: i32) -> 
     if ref_node == 0 or pool.get_data0(ref_node as NodeId) != FACADE_PARAM_REF_INDEX:
         return -1
     let digits: str = intern.resolve(pool.get_data1(ref_node as NodeId))
-    var idx = 0
+    var idx: i32 = 0
     for i in 0..digits.len() as i32:
         idx = idx * 10 + (digits[i] - '0') as i32
     idx

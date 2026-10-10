@@ -411,7 +411,7 @@ impl AnalysisReport:
                 lines.push("\n")
         lines.join("")
 
-    fn count_matching(query: &str) -> i32:
+    fn count_matching(query: &str) -> isize:
         var count = 0
         for i in 0..self.facts.len() as i32:
             let fact = self.facts[i]

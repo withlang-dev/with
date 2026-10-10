@@ -2108,7 +2108,7 @@ pub fn dump_place_map_body(mir_mod: &MirModule, body: &MirBody, pool: &InternPoo
 fn mir_parse_positive_i32(text: &str) -> i32:
     if text.len() == 0:
         return -1
-    var out = 0
+    var out: i32 = 0
     for i in 0..text.len():
         let ch = text[i]
         if ch < '0' or ch > '9':

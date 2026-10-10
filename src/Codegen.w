@@ -2838,7 +2838,7 @@ impl Codegen:
         let start = self.pool.get_start(node)
         if start <= 0: return 1
         let src = self.source_text
-        var line = 1
+        var line: i32 = 1
         for i in 0..start:
             if i < src.len() as i32:
                 if src[i] == 10:
@@ -3803,7 +3803,7 @@ impl Codegen:
                 if inner_ty > 0:
                     if op == UnaryOp.UOP_REF:
                         return self.sema.find_exact_type(TypeKind.TY_REF, inner_ty, 0, 0) as i32
-                    let is_mut = if op == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
+                    let is_mut: i32 = if op == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
                     return self.sema.find_exact_type(TypeKind.TY_PTR, inner_ty, is_mut, 0) as i32
         // Literal types
         if nk == NodeKind.NK_STRING_LIT:
@@ -4940,7 +4940,7 @@ impl Codegen:
                     let pad_size = max_align - remainder
                     padded_types.push(wl_array_type(wl_i8_type(self.context), pad_size))
 
-            let packed_flag = if use_packed: 1 else: 0
+            let packed_flag: i32 = if use_packed: 1 else: 0
             wl_struct_set_body(st_type, list_data_i64(&padded_types), padded_types.len() as i32, packed_flag)
             if max_align > self.abi_align_of(st_type):
                 self.struct_declared_align.insert(st_type, max_align)
@@ -5559,7 +5559,7 @@ impl Codegen:
         self.module_object_mode != 0 or self.path_is_bundle_provided(source_path)
 
     fn module_link_name_for_path(source_path: &str, base_name: &str) -> str:
-        let mode = if self.path_uses_module_link_names(source_path): 1 else: 0
+        let mode: i32 = if self.path_uses_module_link_names(source_path): 1 else: 0
         fn_abi_module_link_name(mode, source_path, base_name)
 
     // D39: the prefixes of `--link-bundle` manifests join the embedded ones,
@@ -6091,7 +6091,7 @@ impl Codegen:
         wl_position_at_end(self.builder, wl_append_bb(self.context, function, "entry"))
         let args: List[i64] = List.new()
         var result_buf: i64 = 0
-        let has_sret = if target.ret.pass == PM_INDIRECT: 1 else: 0
+        let has_sret: i32 = if target.ret.pass == PM_INDIRECT: 1 else: 0
         if has_sret != 0:
             result_buf = self.create_entry_alloca(target.ret.source_ty)
             args.push(result_buf)
@@ -6224,7 +6224,7 @@ impl Codegen:
         for pi in 0..param_count: places.push(self.sig_abi_param_flags(sig_idx, pi))
         let abi_index = self.compute_fn_abi(ret_ty, param_types, places, fn_abi_definition_convention(false, self.sema.sig_is_variadic(sig_idx) != 0), self.sema.sig_is_variadic(sig_idx))
         let abi = self.fn_abis[abi_index]
-        let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let has_sret: i32 = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let sret_ty: i64 = abi.ret.source_ty
         let fn_type: i64 = abi.llvm_ty
         // #839: reuse only a same-typed entry. A mismatched occupant (e.g. a

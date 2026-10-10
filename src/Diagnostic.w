@@ -215,7 +215,7 @@ impl DiagnosticList:
     fn count() -> i32:
         self.items.len() as i32
 
-    fn count_by_severity(severity: i32) -> i32:
+    fn count_by_severity(severity: i32) -> isize:
         var n = 0
         for i in 0..self.items.len() as i32:
             if self.items[i].severity == severity:

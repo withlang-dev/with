@@ -658,7 +658,7 @@ pub fn build_graph_copy_file(root: &str, target: &BuildGraphTarget) -> i32:
 pub fn build_graph_parse_octal_mode(text: &str) -> i32:
     if text.len() == 0:
         return -1
-    var mode = 0
+    var mode: i32 = 0
     for i in 0..text.len() as i32:
         let ch = text[i]
         if ch < 48 or ch > 55:

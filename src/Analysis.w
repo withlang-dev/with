@@ -26,7 +26,7 @@ pub type CompilerAnalysisResult {
 }
 
 fn analysis_line_for_offset(source: &str, offset: i32) -> i32:
-    var line = 1
+    var line: i32 = 1
     let stop = if offset < source.len() as i32: offset else: source.len() as i32
     for i in 0..stop:
         if source[i] as i32 == 10:
@@ -379,7 +379,7 @@ fn analysis_collect_expressions(report: &AnalysisReport, sema: &Sema):
 fn analysis_parse_node_id(text: &str) -> i32:
     if text.len() == 0:
         return -1
-    var value = 0
+    var value: i32 = 0
     for i in 0..text.len() as i32:
         let ch = text[i] as i32
         if ch < 48 or ch > 57:
@@ -1991,7 +1991,7 @@ fn analysis_seam_row(sema: &Sema, body: &MirBody, fn_name: &str, path: &str, spa
     if class.len() == 0:
         return none
     let place_text = mir_place_text(body, place_id)
-    let class_idx = if class == "move-through-ref": 0
+    let class_idx: i32 = if class == "move-through-ref": 0
         else if class == "move-raw-deref": 1
         else if class == "copy-elem-drop": 2
         else if class == "copy-view-drop": 3

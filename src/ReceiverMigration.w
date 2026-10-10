@@ -93,7 +93,7 @@ fn reindent(text: &str, pad: &str):
     parts.join("")
 
 // Count top-level comma-separated segments in the bytes of a `[...]` group text.
-fn count_args(inner: &str) -> i32:
+fn count_args(inner: &str) -> isize:
     let m = inner.len() as i32
     if m == 0:
         return 0
@@ -437,7 +437,7 @@ fn unique_relocation_paths(facts: &RelocationFacts, excludes: &List[str]) -> Lis
         if not seen: paths.push(with_str_clone_ref(path))
     paths
 
-fn count_selected(facts: &RelocationFacts, excludes: &List[str]) -> i32:
+fn count_selected(facts: &RelocationFacts, excludes: &List[str]) -> isize:
     var count = 0
     for i in 0..facts.paths.len() as i32:
         if not path_excluded(facts.paths[i], excludes): count = count + 1

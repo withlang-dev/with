@@ -473,7 +473,7 @@ impl Codegen:
             let reference = self.sema.get_type_kind(self.sema.resolve_alias(tid)) == TypeKind.TY_REF
             places.push(self.sema.callable_param_uses_value_ref_abi(resolved, pi) | (if reference: 2 else: 0))
         // #1832: a C variadic function pointer keeps the variadic convention.
-        let variadic = if kind == TypeKind.TY_EXTERN_FN and self.sema.fn_type_is_variadic(resolved): 1 else: 0
+        let variadic: i32 = if kind == TypeKind.TY_EXTERN_FN and self.sema.fn_type_is_variadic(resolved): 1 else: 0
         let index = self.compute_fn_abi(ret, sources, places, convention, variadic)
         self.fn_abi_callables.insert(key, index)
         index
@@ -9347,7 +9347,7 @@ impl Codegen:
         let method_name = self.codegen_ast_method_symbol_text(method_sym)
         if method_name.len() == 0:
             return 0
-        var found_decl = 0
+        var found_decl: i32 = 0
         var found_trait: i32 = 0
         for di in 0..self.pool.decl_count():
             let decl = self.pool.get_decl(di)
@@ -11789,7 +11789,7 @@ impl Codegen:
             let cas_val_ptr = wl_build_struct_gep(self.builder, cas_recv_ty, cas_recv_ptr, 0)
             let cas_success_order = if self.is_const_int_value(cas_success_raw): wl_const_int_sext_val(cas_success_raw) as i32 else: AtomicOrdering.SEQ_CST
             let cas_failure_order = if self.is_const_int_value(cas_failure_raw): wl_const_int_sext_val(cas_failure_raw) as i32 else: AtomicOrdering.SEQ_CST
-            let cas_is_weak = if intrinsic == MirIntrinsic.ATOMIC_CAS_WEAK: 1 else: 0
+            let cas_is_weak: i32 = if intrinsic == MirIntrinsic.ATOMIC_CAS_WEAK: 1 else: 0
             let cas_result = wl_build_cmpxchg(self.builder, cas_val_ptr, cas_expected, cas_desired, cas_success_order, cas_failure_order, cas_is_weak)
             let cas_old = wl_extract_value(self.builder, cas_result, 0)
             let cas_ok = wl_extract_value(self.builder, cas_result, 1)
@@ -17044,7 +17044,7 @@ impl Codegen:
         let param_types: List[i64] = List.new()
         for pi in 0..param_count: param_types.push(0)
         if param_count > 0: wl_get_param_types(call_ft, list_data_i64(&param_types))
-        let abi_has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let abi_has_sret: i32 = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let abi_sret_ty = abi.ret.source_ty
         let abi_byval_types = self.fn_abi_byval_attr_types(call_abi)
         let abi_direct_ret_ty = if abi.ret.pass == PM_DIRECT and abi.ret.llvm_ty != abi.ret.source_ty: abi.ret.source_ty else: 0
@@ -17057,7 +17057,7 @@ impl Codegen:
         // try_ci_coercion keys on ci_syms, not on the calling convention).
         // Keying on the convention passed the str header's address to a
         // translated inline function (#1589).
-        let lends_c_strings = if abi.convention == FN_ABI_C or (callee_raw_fn_sym != 0 and self.sema.ci_syms.contains(callee_raw_fn_sym)): 1 else: 0
+        let lends_c_strings: i32 = if abi.convention == FN_ABI_C or (callee_raw_fn_sym != 0 and self.sema.ci_syms.contains(callee_raw_fn_sym)): 1 else: 0
         let args: List[i64] = List.new()
         let call_temp_cleanups: List[i64] = List.new()
         if is_indirect:
@@ -19054,7 +19054,7 @@ impl Codegen:
             // MIR's own, by place.
             let protocol = ci < closure_body.anonymous_capture_kinds.len() as i32 and closure_body.anonymous_capture_kinds[ci] == MIR_CAPTURE_PROTOCOL
             let by_place = protocol or self.sema.closure_capture_by_place(node, ci)
-            let by_ref = if self.mode_decide(MODE_SITE_CAPTURE_BY_PLACE, by_place, self.pool.is_move_closure(node) == 0, self.current_function_name_sym, node): 1 else: 0
+            let by_ref: i32 = if self.mode_decide(MODE_SITE_CAPTURE_BY_PLACE, by_place, self.pool.is_move_closure(node) == 0, self.current_function_name_sym, node): 1 else: 0
             capture_ref_modes.push(by_ref)
 
         // Build capture struct type from captured variable types

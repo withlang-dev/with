@@ -126,7 +126,7 @@ impl XzLzma:
     mut fn bit(index: isize) -> i32:
         let p = self.probs[index] as i64
         let bound = (self.range >> 11) * p
-        var result = 0
+        var result: i32 = 0
         if self.code < bound:
             self.range = bound
             self.probs[index] = (p + ((2048 - p) >> 5)) as i32
@@ -162,7 +162,7 @@ impl XzLzma:
 
     mut fn bittree_reverse(base: i32, bits: i32) -> i32:
         var m = 1
-        var symbol = 0
+        var symbol: i32 = 0
         for i in 0..bits:
             let b = self.bit(base + m)
             m = (m << 1) + b

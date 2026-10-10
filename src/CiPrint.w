@@ -1415,7 +1415,7 @@ fn ci_print_int_type_max(ty: &str) -> str:
 
 // `[u8; 16]` → 16 (0 when the text is not an array with a literal positive
 // count).
-fn ci_print_array_len_from_text(ty: &str) -> i32:
+fn ci_print_array_len_from_text(ty: &str) -> isize:
     let count = ci_array_text_count(ty)
     if count.len() == 0:
         return 0

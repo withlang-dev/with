@@ -1873,7 +1873,7 @@ impl Sema:
         let tid = self.resolve_type_expr(self.ast.get_data1(ref_node)) as i32
         if tid == 0:
             return -1
-        var found = -1
+        var found: i32 = -1
         var matches = 0
         for pi in 0..count:
             if self.resolve_alias(self.sig_param_type(sig, pi) as TypeId) == self.resolve_alias(tid as TypeId):
@@ -1959,7 +1959,7 @@ impl Sema:
 
     fn facade_callable_userdata_slot_count(sig: i32, pi: i32) -> i32:
         let callable = self.callable_type_resolved(self.sig_param_type(sig, pi))
-        var n = 0
+        var n: i32 = 0
         for k in 0..self.get_type_d1(callable):
             if self.facade_type_is_void_ptr(self.type_extra[self.get_type_d0(callable) + k]):
                 n = n + 1
@@ -2055,7 +2055,7 @@ impl Sema:
         if ref_node == 0 or self.ast.get_data0(ref_node) != FACADE_PARAM_REF_INDEX:
             return -1
         let digits: str = self.pool_resolve(self.ast.get_data1(ref_node))
-        var idx = 0
+        var idx: i32 = 0
         for i in 0..digits.len() as i32:
             idx = idx * 10 + (digits[i] - '0') as i32
         idx
@@ -2854,7 +2854,7 @@ impl Sema:
         let raw = self.facade_touch_params_mask(fn_sym, ci, 0)
         let sig = self.get_sig(fn_sym)
         if sig < 0: return 0
-        var mask = 0
+        var mask: i32 = 0
         for pi in 0..self.sig_get_param_count(sig):
             if (raw & sema_param_origin_bit(pi)) != 0:
                 let projected = self.facade_presented_param_index(ci, pi)
@@ -3969,7 +3969,7 @@ impl Sema:
         let sig = self.get_sig(fn_sym)
         if sig < 0:
             return 0
-        var mask = 0
+        var mask: i32 = 0
         for pi in first..self.sig_get_param_count(sig):
             if self.facade_param_receives(fn_sym, pi).len() != 1:
                 continue
@@ -4554,7 +4554,7 @@ impl Sema:
     // representation.
     fn facade_callable_handle_slots(sig: i32, pi: i32, h: i32) -> i32:
         let callable = self.callable_type_resolved(self.sig_param_type(sig, pi))
-        var n = 0
+        var n: i32 = 0
         for k in 0..self.get_type_d1(callable):
             if self.facade_same_type(self.type_extra[self.get_type_d0(callable) + k], self.facade_resources[h].repr_tid): n = n + 1
         n
@@ -4715,7 +4715,7 @@ impl Sema:
             // contract names is withheld from the method — the compiler
             // supplies it.
             let cb = self.facade_contract_callback_param(ci)
-            let receiver_params = if hosted: 1 else: 0
+            let receiver_params: i32 = if hosted: 1 else: 0
             let ud_projected = self.facade_presented_param_index(ci, ud)
             let cb_projected = self.facade_presented_param_index(ci, cb)
             let ud_r = if ud_projected >= receiver_params: ud_projected - receiver_params else: -1
@@ -4793,7 +4793,7 @@ impl Sema:
             let mname = self.facade_presented(ri, fname)
             if mname.len() == 0:
                 continue
-            let invokes = if self.foreign_contracts[ci].callbacks_none != 0: 0 else: 1
+            let invokes: i32 = if self.foreign_contracts[ci].callbacks_none != 0: 0 else: 1
             if self.foreign_contracts[ci].variadic_node != 0:
                 for k in 0..self.foreign_contracts[ci].variadic_case_syms.len() as i32:
                     let mtext = host ++ "." ++ self.facade_variadic_case_name(mname, ci, k)
@@ -4888,7 +4888,7 @@ impl Sema:
         if ok_sym != 0:
             let decl = self.facade_const_decl(ok_sym)
             if decl != 0: guard_ok = self.facade_const_int_value(self.ast.get_data1(decl))
-        let invokes = if self.foreign_contracts[ci].callbacks_none != 0: 0 else: 1
+        let invokes: i32 = if self.foreign_contracts[ci].callbacks_none != 0: 0 else: 1
         let action = if kind == FACADE_VARIADIC_CALLBACK: FOREIGN_PAIR_CALLBACK else: FOREIGN_PAIR_USERDATA
         self.facade_add_pair_op(sig, ci, self.foreign_contracts[ci].variadic_slots[slot].resource, action, slot, u_tid, guard_ok, invokes)
 

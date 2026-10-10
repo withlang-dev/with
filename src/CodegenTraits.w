@@ -558,7 +558,7 @@ impl Codegen:
         let final_ret_ty = self.sema_type_to_llvm(self.sema.sig_return_type(sig_idx))
         let abi_index = self.compute_fn_abi(final_ret_ty, param_types, param_flags, FN_ABI_WITH, 0)
         let abi: FnAbi = self.fn_abis[abi_index]
-        let param_offset = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let param_offset: i32 = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let fn_ty = abi.llvm_ty
         if fn_ty == 0 or wl_get_type_kind(fn_ty) != wl_function_type_kind():
             return
@@ -871,7 +871,7 @@ impl Codegen:
             let trait_method_idx = method_start + mi
             let param_start = self.trait_method_param_starts[trait_method_idx]
             let param_count = self.trait_method_param_counts[trait_method_idx]
-            let consumes_self =
+            let consumes_self: i32 =
                 if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
                 else: 0
             // The impl's method is the one Sema registered for this impl's
@@ -978,7 +978,7 @@ impl Codegen:
             let trait_method_idx = method_start + mi
             let param_start = self.trait_method_param_starts[trait_method_idx]
             let param_count = self.trait_method_param_counts[trait_method_idx]
-            let consumes_self =
+            let consumes_self: i32 =
                 if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
                 else: 0
             let method_name = self.intern.resolve(method_sym).clone()
@@ -1032,7 +1032,7 @@ impl Codegen:
             let trait_method_idx = method_start + mi
             let param_start = self.trait_method_param_starts[trait_method_idx]
             let param_count = self.trait_method_param_counts[trait_method_idx]
-            let consumes_self =
+            let consumes_self: i32 =
                 if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
                 else: 0
             let method_text: str = with_str_clone_ref(self.intern.resolve(method_sym))

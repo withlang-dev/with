@@ -340,7 +340,7 @@ impl Sema:
         let eager = self.interface_eager != 0
         var iface_count = 0
         var last_path = ""
-        var last_flag = 0
+        var last_flag: i32 = 0
         for di in 0..decl_count:
             var flag: i32 = 0
             if di < self.decl_source_paths.len() as i32:
@@ -1031,7 +1031,7 @@ impl Sema:
         if self.get_type_kind(tid as TypeId) == TypeKind.TY_ALIAS: return
         let resolved = self.resolve_alias(tid as TypeId) as i32
         self.type_decl_nodes_by_tid.insert(resolved, node)
-        let is_std = if sema_tier_path_is_std_implementation(self.current_module_path) != 0: 1 else: 0
+        let is_std: i32 = if sema_tier_path_is_std_implementation(self.current_module_path) != 0: 1 else: 0
         self.type_tid_is_std.insert(resolved, is_std)
 
     // #1344: a variant name listed twice gave `E.A` two meanings and the
@@ -1086,7 +1086,7 @@ impl Sema:
         let extra_start = self.ast.get_data1(node)
         let packed_kind = self.ast.get_data2(node)
         let sub_kind = type_decl_sub_kind(packed_kind)
-        let decl_is_pub = if type_decl_is_pub(self.ast, extra_start, sub_kind): 1 else: 0
+        let decl_is_pub: i32 = if type_decl_is_pub(self.ast, extra_start, sub_kind): 1 else: 0
         self.record_decl_visibility(name, node, decl_is_pub)
         let is_ephemeral = type_decl_is_ephemeral(packed_kind)
         let is_generic_decl = if self.type_decl_tp_count(node) != 0: 1 else: 0
@@ -1969,7 +1969,7 @@ impl Sema:
         if is_local != 0:
             self.set_pretty_symbol(fn_name, self.extract_decl_name_after(node, "fn"))
         let fn_flags = self.ast.get_data2(node)
-        let decl_is_pub = if (fn_flags / FnFlags.PUB) % 2 == 1: 1 else: 0
+        let decl_is_pub: i32 = if (fn_flags / FnFlags.PUB) % 2 == 1: 1 else: 0
         self.record_decl_visibility(fn_name, node, decl_is_pub)
         if method_owner_sym == 0:
             self.record_displaced_fn(fn_name, decl_is_pub)
@@ -2358,7 +2358,7 @@ impl Sema:
         if self.is_opaque_value_type(tid) != 0:
             self.emit_error("opaque types cannot be declared as extern values; use a pointer or reference", type_node)
         // Register the extern var for scope lookup
-        let is_mut = if self.ast.get_data2(node) != 0: 1 else: 0
+        let is_mut: i32 = if self.ast.get_data2(node) != 0: 1 else: 0
         if is_mut != 0:
             self.mutable_global_syms.insert(name, 1)
         self.register_top_level_global_decl(name, tid, is_mut, node, GLOBAL_VALUE_DECL_EXTERN)
@@ -2701,7 +2701,7 @@ impl Sema:
                 bind_name = self.extract_decl_name_after(node, "var")
             self.set_pretty_symbol(name, bind_name)
         let flags = self.ast.get_data2(node)
-        let decl_is_pub = if (flags / 2) % 2 == 1: 1 else: 0
+        let decl_is_pub: i32 = if (flags / 2) % 2 == 1: 1 else: 0
         self.record_decl_visibility(name, node, decl_is_pub)
         if self.record_displaced_fn(name, decl_is_pub):
             self.displaced_global_syms.insert(name, 1)

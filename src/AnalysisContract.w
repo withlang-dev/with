@@ -53,7 +53,7 @@ fn contract_site(sema: &Sema, decl: i32, source_path: &str, source_text: &str) -
     }
 
 fn contract_line(source: &str, offset: i32) -> i32:
-    var line = 1
+    var line: i32 = 1
     let stop = if offset < source.len() as i32: offset else: source.len() as i32
     for i in 0..stop:
         if source[i] == '\n': line = line + 1
