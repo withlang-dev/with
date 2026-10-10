@@ -10455,7 +10455,7 @@ impl Sema:
             let src_tid = if cast_src_null != 0 and self.ast.kind(cast_src_null) == NodeKind.NK_NULL_LIT and self.type_allows_null_literal(cast_tid) != 0:
                 self.check_expr_with_expected(src_node, cast_tid)
             else:
-                self.check_expr_with_expected(src_node, 0 as TypeId)
+                self.check_expr_with_expected(src_node, self.cast_constant_operand_type(src_node))
             // D65 (§12): a function cast to a pointer or an integer
             // (`coro_main as *const u8`) is its code address, not its callable.
             if cast_tid != 0 and self.get_type_kind(self.resolve_alias(cast_tid)) != TypeKind.TY_FN:
@@ -13055,6 +13055,21 @@ impl Sema:
             if kind == TypeKind.TY_TUPLE and self.tuple_has_open_generic(elem): return true
             if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM) and self.type_decl_type_param_count(self.get_type_d0(elem as TypeId)) > 0: return true
         false
+
+    // D124 (§4.2.1 rule 7): an untyped integer constant expression under a
+    // cast is evaluated exactly, never in `isize`: at i64, or at u64 when its
+    // value fits only unsigned; the cast then wraps or truncates it as it
+    // would a runtime value. 0 for any other operand (no demand).
+    fn cast_constant_operand_type(src: i32) -> TypeId:
+        if not self.expr_is_literal_arith_depth(src, false, false, 0):
+            return 0 as TypeId
+        // A float constant does not fold as an integer; it takes its own
+        // default and the cast truncates it, as at run time.
+        let signed = self.fold_literal_int_arith_at(src, self.ty_i64 as i32)
+        if signed.ok != 0 and signed.overflow == 0:
+            return self.ty_i64
+        let unsigned = self.fold_literal_int_arith_at(src, self.ty_u64 as i32)
+        if unsigned.ok != 0 and unsigned.overflow == 0: self.ty_u64 else: 0 as TypeId
 
     // §4.2.1 through an aggregate (#1996), for a join arm: untyped literal
     // arithmetic, or a tuple of such (`(1, 0)` beside an `(i32, i32)` arm).
