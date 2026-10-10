@@ -20,7 +20,7 @@ first serious consumer, but no COBOL concept appears in these rules;
 layered on top.
 
 Status: proposal. Not spec-normative until accepted and merged into
-`docs/spec/types.md` (targets: a new chapter alongside §4 for
+`docs/spec/004_types.md` (targets: a new chapter alongside §4 for
 Part A; §9 and §21 amendments for Part B; ABI doc for the alias contract).
 
 ---

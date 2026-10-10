@@ -174,14 +174,14 @@ disagree, this document follows the code. Paths written `Vx …` are under
   (`src/MirCore.w:1111` the drop-state keys, `:1649` the per-block state,
   `src/Mir.w:639` the plan dump) and calls a leak a defect. Device memory is
   memory.
-- **Regions as blocks.** `docs/spec/concurrency.md:300-330` (§14.7 and
+- **Regions as blocks.** `docs/spec/014_concurrency.md:300-330` (§14.7 and
   §14.22): an `async:` block captures under closure rules, its `Task` is
   ephemeral when it captures a view, and dropping an un-awaited task cancels
   it. `src/AsyncLower.w:62` (`lower_async_module`) is how such a block
   becomes an outlined body. A region is that block with a processor. This
   plan depends on the cancel-on-drop rule being enforced, and step 2 tests
   it (V.8).
-- **Target-conditional compilation.** `docs/spec/metaprogramming.md:349-395`
+- **Target-conditional compilation.** `docs/spec/017_metaprogramming.md:349-395`
   (§17.5, D91): `comptime match Target.os`, exhaustive, the untaken branch
   parsed and not compiled; `src/SemaCheck.w:23153` (`select_comptime_if_branch`)
   and `src/ComptimeTransform.w:626` do the pruning; `lib/std/os.w:40-56`
@@ -201,7 +201,7 @@ disagree, this document follows the code. Paths written `Vx …` are under
   `with analyze … select:kind=…` and the `lldb:` and `path:call` requests
   over the live MIR call graph. Placement, route, capacity and traffic
   become kinds 29-32; there is no second schema to version.
-- **Modeled C.** `docs/spec/ffi.md:351-375` (§16.2b, the `c facade` block:
+- **Modeled C.** `docs/spec/016_ffi.md:351-375` (§16.2b, the `c facade` block:
   `resource X wraps *mut T`, producers `from`, `drop`, `destroys`, `ok`);
   `src/SemaFacade.w`. When dispatch comes, the runtime is facades over the
   driver APIs, in With, not Vx's twenty C++ files under `Vx runtime/`.

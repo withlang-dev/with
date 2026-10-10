@@ -111,7 +111,7 @@ fn main:
 
 Today the facade is a file in your project
 ([`lib/facades/sqlite3.w`](lib/facades/sqlite3.w) is the one used here).
-The rules are in [spec §16.2b](docs/spec/ffi.md).
+The rules are in [spec §16.2b](docs/spec/016_ffi.md).
 
 ## Translate C into With
 
@@ -202,7 +202,7 @@ after
 
 Here With sets a stricter bar than Rust. Rust classifies a leak as safe.
 With's specification classifies it as a defect: a program that does nothing
-special does not leak ([spec §2](docs/spec/ownership.md)). The compiler has
+special does not leak ([spec §2](docs/spec/002_ownership.md)). The compiler has
 a debug allocator built in to check it:
 
 ```sh

@@ -24,7 +24,7 @@ It is not general C++ support. Out of scope:
 A header that needs more than this fails as loudly as it does today.
 
 Eric approved this plan, including the wording in §6, on 2026-09-27.
-This is a plan, not the specification: `docs/spec/ffi.md` does not change
+This is a plan, not the specification: `docs/spec/016_ffi.md` does not change
 until the §6 wording lands there, as its own step. Paths are relative to
 the repository root and were verified at `99939352`.
 
@@ -255,7 +255,7 @@ it gets only the imported types and constants.
 
 ## 6. Proposed spec wording (approved with the plan, 2026-09-27; not yet in the spec)
 
-For `docs/spec/ffi.md` §16.1, after the list of imported declaration kinds:
+For `docs/spec/016_ffi.md` §16.1, after the list of imported declaration kinds:
 
 > `lang: "c++"` reads the header as C++ and imports only its declarations
 > with C language linkage, the structs, unions, enums and typedefs they use,
