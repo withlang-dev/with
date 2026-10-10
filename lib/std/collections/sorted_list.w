@@ -37,7 +37,7 @@ impl[T: Ord] SortedList[T]:
     pub fn len() -> isize: unsafe { sortedarray_length(self.array) } as isize
     pub fn is_empty() -> bool: self.len() == 0
 
-    unsafe fn slot_at(index: i32) -> *mut Slot[T]:
+    unsafe fn slot_at(index: isize) -> *mut Slot[T]:
         assert(index >= 0 and index < self.len())
         unsafe { sortedarray_get(self.array, index as c_uint) } as *mut Slot[T]
 
@@ -48,11 +48,11 @@ impl[T: Ord] SortedList[T]:
         assert(unsafe { sortedarray_insert(self.array, slot as *mut c_void) } != 0)
 
     /// Observes the value at `index`; panics out of range (D27).
-    pub fn get(index: i32) -> &T:
+    pub fn get(index: isize) -> &T:
         unsafe { &(*unsafe { self.slot_at(index) }).value }
 
     /// Transfers the value at `index` out; panics out of range.
-    pub mut fn remove(index: i32) -> T:
+    pub mut fn remove(index: isize) -> T:
         var slot = unsafe { self.slot_at(index) }
         assert(unsafe { sortedarray_remove(self.array, index as c_uint) } != 0)
         let value: T = unsafe { move slot.value }
@@ -98,7 +98,7 @@ impl[T] Drop for SortedList[T]:
 
 /// Cursor over a SortedList; obtain via `sorted.iter()`. `next()` yields
 /// `Some(&T)` in ascending order, then `None`.
-pub type SortedListIter[T] ephemeral { array: i64, index: i32, len: i32 }
+pub type SortedListIter[T] ephemeral { array: i64, index: isize, len: isize }
 
 impl[T] SortedListIter[T]:
     pub mut fn next() -> Option[&T]:
