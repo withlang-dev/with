@@ -281,7 +281,7 @@ impl Sema:
         var diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         diag.add_label(self.diagnostic_node_span(label_node), label)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     mut fn emit_warning(msg: &str, node: i32, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         var diag = Diagnostic.warn(facade_render_shown_names(msg), self.diagnostic_node_span(node))

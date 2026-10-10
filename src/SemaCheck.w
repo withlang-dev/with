@@ -9544,7 +9544,7 @@ impl Sema:
                     return info.literal_type
                 let had_mismatch: i32 = info.mismatch
                 let literal_ty: i32 = info.literal_type
-                let joined = self.merge_body_return_type_info(move info, literal_ty, body)
+                let joined = self.merge_body_return_type_info(info, literal_ty, body)
                 if joined.mismatch != 0 and had_mismatch == 0:
                     self.emit_error("return type mismatch", body)
                 return joined.value_type

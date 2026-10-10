@@ -3474,11 +3474,11 @@ impl Codegen:
         let overloads: List[i64] = List.new()
         overloads.push(dst_ty)
         overloads.push(wl_type_of(val))
-        let fn_val = wl_get_intrinsic_decl(self.llmod, intrinsic_id, list_data_i64(&overloads), 2)
-        let fn_ty = wl_intrinsic_get_type(self.context, intrinsic_id, list_data_i64(&overloads), 2)
+        let fn_val = wl_get_intrinsic_decl(self.llmod, intrinsic_id, list_data_i64(overloads), 2)
+        let fn_ty = wl_intrinsic_get_type(self.context, intrinsic_id, list_data_i64(overloads), 2)
         let args: List[i64] = List.new()
         args.push(val)
-        wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 1)
+        wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(args), 1)
 
     mut fn mir_build_checked_int_bin_op(op: i32, l: i64, r: i64, wider_ty: i64, is_unsigned: bool) -> i64:
         let name = self.mir_checked_overflow_intrinsic_name(op, is_unsigned)

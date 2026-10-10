@@ -142,7 +142,7 @@ fn main:
     for h in s.halves():
         halves = halves ++ "[" ++ h ++ "]"
     print(f"str {halves} from {s}")
-    let k = 3
+    let k: i32 = 3
     var cd = ""
     for i in k.countdown():
         cd = cd ++ f"{i}"
