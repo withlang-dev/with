@@ -12535,7 +12535,13 @@ impl MirBuilder:
         self.contextual_copy_raw_node = saved_raw_node
 
         let reference_place = self.materialize_operand(reference_op, adjustment.exact_source_type, self.ast.get_start(node))
-        let pointee_place = self.new_deref_place(reference_place)
+        var pointee_place = self.new_deref_place(reference_place)
+        // D111: Sema recorded the value a view of a view reads (`&&str` to
+        // `str`); its intermediate view is copied out and dereferenced again.
+        let first_pointee = self.sema.get_type_d0(self.sema.resolve_alias(adjustment.exact_source_type as TypeId))
+        if self.sema.resolve_alias(first_pointee as TypeId) != self.sema.resolve_alias(adjustment.owned_value_type as TypeId):
+            let inner_view = self.materialize_operand(self.body.new_operand(OperandKind.OK_COPY, pointee_place), first_pointee, self.ast.get_start(node))
+            pointee_place = self.new_deref_place(inner_view)
         // D111: an operand that only reads bytes (a comparison, a concat part)
         // takes the pointee's bits and owns nothing.
         if self.observing_str_read == node and node != 0 and self.type_id_is_str(adjustment.owned_value_type) != 0:

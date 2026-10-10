@@ -440,25 +440,35 @@ impl Sema:
     // `&*mut u8` view supplying an owned `*mut u8`, D22 §6.1) — a `&T` view
     // never decays to `*T` because compat(*T, T) fails below.
     mut fn can_contextually_copy_ref(expected: i32, actual: i32) -> i32:
+        if self.contextual_copy_value_type(expected, actual) != 0: 1 else: 0
+
+    // D22 §6.2: the Copy value an owned demand `expected` reads through the
+    // shared view `actual` — its pointee, or, for a view of a view (`&&str`
+    // in a `match` on `&Option[&str]`), the pointee's pointee (D111). 0 when
+    // the demand is not met by such a copy.
+    mut fn contextual_copy_value_type(expected: i32, actual: i32) -> i32:
         if expected == 0 or actual == 0:
             return 0
         let expected_resolved = self.resolve_alias(expected as TypeId)
         let expected_kind = self.get_type_kind(expected_resolved)
         if expected_kind == TypeKind.TY_REF:
             return 0
-        let actual_resolved = self.resolve_alias(actual as TypeId)
-        if self.get_type_kind(actual_resolved) != TypeKind.TY_REF or self.get_type_d1(actual_resolved) != 0:
-            return 0
-        let pointee = self.get_type_d0(actual_resolved)
-        if pointee == 0 or self.is_copy(pointee as TypeId) == 0:
-            return 0
-        if expected_kind == TypeKind.TY_PTR:
+        var view = self.resolve_alias(actual as TypeId)
+        for _ in 0..2:
+            if self.get_type_kind(view) != TypeKind.TY_REF or self.get_type_d1(view) != 0:
+                return 0
+            let pointee = self.get_type_d0(view)
+            if pointee == 0 or self.is_copy(pointee as TypeId) == 0:
+                return 0
             // A pointer-typed demand is a strict pointee match: `&*mut u8`
             // supplies `*mut u8`. builtin_arg_type_compatible's arithmetic
             // promotion must not apply (`&f64 as *const f64` is an address
             // cast, not a materialization).
-            return if self.types_compatible(expected as TypeId, pointee as TypeId) != 0: 1 else: 0
-        self.builtin_arg_type_compatible(expected, pointee)
+            let met = if expected_kind == TypeKind.TY_PTR: self.types_compatible(expected as TypeId, pointee as TypeId) != 0 else: self.builtin_arg_type_compatible(expected, pointee) != 0
+            if met:
+                return pointee
+            view = self.resolve_alias(pointee as TypeId)
+        0
 
     // Whether casting the shared reference `ref_ty` (`&T`) to `cast_ty` is the
     // reference relabeled as a raw pointer to the same pointee (`*const T` or
@@ -599,12 +609,12 @@ impl Sema:
             if tail == 0:
                 return 0
             return self.record_contextual_copy_adjustment(tail, expected, actual)
-        if self.can_contextually_copy_ref(expected, actual) == 0:
+        // The value read: one dereference, or two through a view of a view.
+        let pointee = self.contextual_copy_value_type(expected, actual)
+        if pointee == 0:
             return 0
         let context_sig = self.current_fn_sig_idx
         let context_key = sema_pair_key(context_sig, source_node)
-        let actual_resolved = self.resolve_alias(actual as TypeId)
-        let pointee = self.get_type_d0(actual_resolved)
         var post_copy_type: i32 = 0
         if self.resolve_alias(expected as TypeId) != self.resolve_alias(pointee as TypeId):
             post_copy_type = expected
