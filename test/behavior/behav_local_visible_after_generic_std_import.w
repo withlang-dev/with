@@ -12,6 +12,6 @@ fn take_box(x: Box[i32]):
     let sink = x
 
 fn main:
-    let b = Box.new(41)
+    let b: Box[i32] = Box.new(41)
     take_box(b)
     print("ok")

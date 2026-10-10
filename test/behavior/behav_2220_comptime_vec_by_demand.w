@@ -7,7 +7,7 @@
 fn total(n: i32) -> i32:
     var v: List[i32] = List.new()
     for i in 0..n: v.push(i)
-    var s = 0
+    var s: i32 = 0
     for x in v: s = s + x
     s
 

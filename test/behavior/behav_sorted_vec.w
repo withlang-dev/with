@@ -18,7 +18,7 @@ impl Drop for Tag:
 
 fn ints():
     var sorted = SortedList[i32].new()
-    for v in [5, 1, 4, 1, 3]: sorted.insert(v)
+    for v in [5i32, 1, 4, 1, 3]: sorted.insert(v)
     assert(sorted.len() == 5)
     var expected = [1, 1, 3, 4, 5]
     for i in 0..5: assert(*sorted.get(i) == expected[i])

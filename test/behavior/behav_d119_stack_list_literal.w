@@ -30,7 +30,7 @@ fn total(xs: &List[i32]):
     for x in xs: sum = sum + x
     sum
 
-fn made(): [1, 2, 3]
+fn made() -> List[i32]: [1, 2, 3]
 
 fn kept():
     let held = [4, 5]
@@ -62,7 +62,7 @@ fn main:
     c.clear()
     print(f"{c.len()}")
     // Moved into another binding.
-    let u = [1, 2, 3]
+    let u: List[i32] = [1, 2, 3]
     let v = u
     print(f"{total(&v)}")
     // A temporary handed to a `&` parameter.

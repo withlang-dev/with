@@ -32,7 +32,7 @@ fn main:
         assert(original == "original value")
         assert(replacement == "reused storage")
         assert(direct("direct value").unwrap() == "direct value")
-        for tag in [0, 1]:
+        for tag in [0i32, 1]:
             let first = selected("original value", tag).unwrap()
             let second = selected("reused storage", tag).unwrap()
             assert(first == "original value")

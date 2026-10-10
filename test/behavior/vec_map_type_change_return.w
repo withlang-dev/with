@@ -22,7 +22,7 @@ fn first_name(v: List[U]) -> str:
 
 // chained off a type-changing map
 fn total_age(v: List[U]) -> i32:
-    var sum = 0
+    var sum: i32 = 0
     for a in v.map(it.age):
         sum = sum + a
     sum

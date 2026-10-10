@@ -7,7 +7,7 @@
 // an `if` does; `fn main:` here infers i32 and the MIR return local agrees.
 fn get() -> Result[i32, str]: Ok(4)
 fn pick(c: bool) -> i32:
-    let v = if c: return 7 else: 2
+    let v: i32 = if c: return 7 else: 2
     v
 fn main:
     let Ok(x) = get() else: return 1

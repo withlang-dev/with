@@ -13,10 +13,10 @@ fn score(entry: ImportedEntry) -> i32:
 fn local_from_match(ok: bool) -> LocalPair:
     match ok:
         true =>
-            let base = 4
+            let base: i32 = 4
             LocalPair { left: base, right: base + 1 }
         false =>
-            let base = 9
+            let base: i32 = 9
             LocalPair { left: base, right: base + 1 }
 
 fn imported_from_match(ok: bool) -> ImportedEntry:

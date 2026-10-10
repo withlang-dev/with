@@ -18,7 +18,7 @@ fn wide(a: i32,
     a + b
 
 fn pick(c: bool) -> i32:
-    let v = if c:
+    let v: i32 = if c:
         1
     else:
         2

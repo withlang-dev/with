@@ -9,7 +9,7 @@ fn describe_pair(value: &Pair) -> str:
     out
 
 fn sum_pair(value: &Pair) -> i32:
-    var total = 0
+    var total: i32 = 0
     comptime for field in Pair.fields():
         total = total + value.{field.name}
     total

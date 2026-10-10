@@ -5,7 +5,7 @@
 // a whole array by reference, and an empty slice.
 
 fn sum(xs: &[i32]) -> i32:
-    var total = 0
+    var total: i32 = 0
     for x in xs: total = total + x
     total
 
@@ -15,7 +15,7 @@ fn join(words: &[str]) -> str:
     out
 
 fn sum_array(xs: &[3]i32) -> i32:
-    var total = 0
+    var total: i32 = 0
     for x in xs: total = total + x
     total
 

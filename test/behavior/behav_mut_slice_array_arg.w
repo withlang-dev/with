@@ -10,7 +10,7 @@ fn fill(buf: []mut i32, val: i32):
         i = i + 1
 
 fn main:
-    var a = [0, 0, 0]
+    var a: List[i32] = [0, 0, 0]
     fill(a, 7)
     assert(a[0] + a[1] + a[2] == 21)
     print("ok")

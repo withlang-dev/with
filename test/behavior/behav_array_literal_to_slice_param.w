@@ -19,7 +19,7 @@ fn total(xs: []str) -> i64:
     n
 
 fn count(xs: []List[i32]) -> i32:
-    var n = 0
+    var n: i32 = 0
     for x in xs: n = n + x.len() as i32
     n
 

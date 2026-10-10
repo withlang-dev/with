@@ -9,7 +9,7 @@ fn Acc.add(mut self: Self, x: i32):
     self.total = self.total + x
 fn run() -> i32:
     var a = Acc { total: 0 }
-    for i in 1..4:
+    for i in 1i32..4:
         a.add(i)
     a.total
 fn main:

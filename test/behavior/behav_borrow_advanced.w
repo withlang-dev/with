@@ -8,6 +8,6 @@ fn takes_ref(x: &i32) -> i32:
     *x
 
 fn main:
-    var a = 10
+    var a: i32 = 10
     let v = takes_ref(&a)
     assert(v == 10)

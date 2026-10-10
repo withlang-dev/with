@@ -25,7 +25,7 @@ fn ends(t: &(i32, i32, i32, i32)) -> str:
         (a, .., z) => f"pair {a} {z}"
 
 comptime fn middle_sum() -> i32:
-    let (_, ..mid, _) = (1, 3, 4, 9)
+    let (_, ..mid, _): (i32, i32, i32, i32) = (1, 3, 4, 9)
     mid.0 + mid.1
 
 fn main:

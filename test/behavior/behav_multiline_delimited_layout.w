@@ -25,7 +25,7 @@ fn apply(
     ) + first
 
 fn main:
-    let pair = (
+    let pair: (i32, i32) = (
         7,
         9,
     )

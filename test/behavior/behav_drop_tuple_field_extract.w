@@ -19,7 +19,7 @@ fn run(slot: *mut i32):
     let b = move pair.1
 
 fn main:
-    var count = 0
+    var count: i32 = 0
     run(&raw mut count)
     if count == 2:
         print("ok")

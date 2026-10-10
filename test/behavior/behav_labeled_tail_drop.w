@@ -6,7 +6,7 @@ type R { id: i32 }
 impl Drop for R:
     fn drop(move self: Self): DROPS = DROPS + 1
 fn f() -> R:
-    let x = 5
+    let x: i32 = 5
     'done:
         R { id: x }
 fn main:

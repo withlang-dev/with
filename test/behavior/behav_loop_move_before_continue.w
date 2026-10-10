@@ -16,7 +16,7 @@ fn consume(d: D): ()
 fn f(n: i32) -> i32:
     let fresh = D { id: 1 }
     consume(move fresh)        // moved before the loop; never used inside it
-    var seen = 0
+    var seen: i32 = 0
     for i in 0..n:
         if i > 0:
             continue           // back-edge: `fresh` was already MOVED at entry

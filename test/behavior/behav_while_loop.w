@@ -96,7 +96,7 @@ fn test_while_nested_break:
 
 fn collatz_steps(n: i32) -> i32:
     var val = n
-    var steps = 0
+    var steps: i32 = 0
     while val != 1:
         if val % 2 == 0:
             val = val / 2

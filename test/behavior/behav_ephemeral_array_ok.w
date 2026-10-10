@@ -4,6 +4,6 @@
 use std.builtins.print_i32
 type View ephemeral { p: &i32 }
 fn main:
-    let x = 7
+    let x: i32 = 7
     let a = [View { p: &x }]
     print_i32(*a[0].p)

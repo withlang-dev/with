@@ -41,7 +41,7 @@ fn main:
 
     // Loop: repeated replacement drops each predecessor exactly once.
     var c = make(10)
-    for i in 0..4:
+    for i in 0i32..4:
         c.reset(20 + i)
     assert(c.tag == 23)
 

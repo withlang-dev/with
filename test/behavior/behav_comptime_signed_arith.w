@@ -16,11 +16,11 @@ comptime fn neg_mod() -> i32:
     -10 % 3
 
 comptime fn neg_negate() -> i32:
-    let x = 42
+    let x: i32 = 42
     -x
 
 comptime fn neg_double_negate() -> i32:
-    let x = -99
+    let x: i32 = -99
     -x
 
 comptime fn i16_basic() -> i16:

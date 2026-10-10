@@ -13,7 +13,7 @@
 fn below(n: i32, lim: i32) -> Option[i32]: if n < lim: Some(n * 10 + 7) else: None
 
 fn count_to(lim: i32) -> i32:
-    var n = 0
+    var n: i32 = 0
     var out: List[i32] = List.new()
     while true:
         let Some(x) = below(n, lim) else: break

@@ -48,7 +48,7 @@ c facade dbs:
         ok DB_OK
 
 fn rows(db: &Database) -> Result[i32, StepError]:
-    var n = 0
+    var n: i32 = 0
     while db.step()? == DB_ROW: n += 1
     n
 

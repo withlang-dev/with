@@ -17,7 +17,7 @@ use std.libc
 
 unsafe fn sum(n: i32, ...) -> i32:
     var ap = va_start()
-    var total = 0
+    var total: i32 = 0
     for i in 0..n:
         total = total + ap.arg[i32]()
     total
@@ -77,7 +77,7 @@ unsafe fn restart(n: i32, ...):
 // An early return ends the list on its way out.
 unsafe fn find(target: i32, ...) -> i32:
     var ap = va_start()
-    for i in 0..10:
+    for i in 0i32..10:
         if ap.arg[i32]() == target:
             return i
     -1

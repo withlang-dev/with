@@ -35,7 +35,7 @@ fn break_after_write() -> str:
 
 fn view_inside_loop() -> i32:
     var x = S { s: "ab" ++ "cd", n: 0 }
-    var total = 0
+    var total: i32 = 0
     for i in 0..2:
         let p = x.s
         total += p.len() as i32

@@ -15,7 +15,7 @@ fn run(slot: *mut i32):
     let a = [W { slot: slot }, W { slot: slot }, W { slot: slot }]
 
 fn main:
-    var count = 0
+    var count: i32 = 0
     run(&raw mut count)
     if count == 3:
         print("ok")

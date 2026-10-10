@@ -30,7 +30,7 @@ fn main:
     let inside = ((a > 1) & (a < 4)).select(a, i32x4.splat(0))
     print(f"select {picked[0]} {picked[1]} {picked[2]} {picked[3]} | range {inside[1]} {inside[2]}")
 
-    let s = 2
+    let s: i32 = 2
     let scaled = s * a
     let u = u32x4(3, 263, 9, 0)
     let masked = 0xff & u

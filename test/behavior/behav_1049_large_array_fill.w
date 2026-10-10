@@ -25,7 +25,7 @@ fn check(name: str, n: i32, bad: i32):
 
 fn main:
     let a64 = [5 as u32; 64]
-    var bad = 0
+    var bad: i32 = 0
     for i in 0..64:
         if a64[i] != 5 as u32: bad = bad + 1
     check("u32", 64, bad)

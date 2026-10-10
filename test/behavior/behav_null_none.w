@@ -25,7 +25,7 @@ fn test_none_unwrap_or:
     assert(val == -1)
 
 fn find_index(arr: [i32; 5], target: i32) -> Option[i32]:
-    var i = 0
+    var i: i32 = 0
     while i < 5:
         if arr[i] == target:
             return Some(i)

@@ -15,7 +15,7 @@ fn big(seed: i32) -> i32:
     while i < 16384:
         buf[i] = seed + i as i32
         i = i + 1
-    var sum = 0
+    var sum: i32 = 0
     i = 0
     while i < 16384:
         sum = sum + buf[i]

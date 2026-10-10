@@ -41,7 +41,7 @@ fn moved_into_struct(slot: *mut i32):
     let holder = Holder { items: xs }
 
 fn main:
-    var count = 0
+    var count: i32 = 0
     scope_drop(&raw mut count)
     clear_drop(&raw mut count)
     remove_drop(&raw mut count)

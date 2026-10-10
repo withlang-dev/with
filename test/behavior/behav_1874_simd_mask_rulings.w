@@ -21,7 +21,7 @@ fn main:
 
     let v = i32x4(1, 2, 3, 4)
     let odd = (v < 3) & m32x4(true, false, true, false)
-    let s = 7
+    let s: i32 = 7
     let left = odd.select(s, v)
     let right = m.select(v * 10, v)
     let both: i32x4 = odd.select(5, 0)

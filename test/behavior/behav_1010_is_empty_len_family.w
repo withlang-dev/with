@@ -24,7 +24,7 @@ fn main:
     let s = "x"
     print(f"str {e.is_empty()} {s.is_empty()}")
     print(f"str ref {str_ref_empty(e)} {str_ref_empty(s)}")
-    let a = [1, 2, 3]
+    let a: List[i32] = [1, 2, 3]
     print(f"array {a.is_empty()}")
     print(f"slice {slice_empty(a)}")
     var m: HashMap[i32, i32] = HashMap.new()

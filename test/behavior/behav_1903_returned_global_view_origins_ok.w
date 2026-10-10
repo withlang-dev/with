@@ -28,7 +28,7 @@ fn peek() -> &Config: &CONFIG
 fn set(n: i32): CONFIG = Config { limit: n }
 
 fn grow_other():
-    for i in 0..100: OTHER.push(i)
+    for i in 0i32..100: OTHER.push(i)
 
 fn pick(p: &List[i32], c: bool) -> &i32 from p, HIDDEN:
     if c: &p[0] else: &HIDDEN[0]

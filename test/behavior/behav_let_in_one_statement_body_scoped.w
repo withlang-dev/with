@@ -26,7 +26,7 @@ fn arm(c: bool, id: i32):
         let _t = T { id }
     print(f"after arm {dropped}")
 
-var ticks = 0
+var ticks: i32 = 0
 
 fn tick() -> i32:
     ticks += 1
