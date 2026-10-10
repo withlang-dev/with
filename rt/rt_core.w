@@ -2664,8 +2664,8 @@ fn rt_fmt_f64_spec_buf(val: f64, flags: i64, width: i32, precision: i32, mode: i
 pub fn with_fmt_str_spec_ref(val: &str, flags: i64, width: i32, precision: i32) -> str:
     var sp = str_data(val)
     var slen = str_length(val)
-    if precision >= 0 and precision as i64 < slen:
-        slen = precision as i64
+    if precision >= 0 and precision < slen:
+        slen = precision
     if width > 0 and slen < width as i64:
         let fill_char = ((flags >> 8) & 255) as i32
         let align_mode = ((flags >> 16) & 3) as i32
@@ -4645,7 +4645,7 @@ pub fn with_clzl(n: i64) -> i32:
     if n == 0: return 64
     var x = n as u64
     var count: i32 = 0
-    if (x & (0xFFFFFFFF as u64 << 32)) == 0:
+    if (x & (0xFFFFFFFFu64 << 32)) == 0:
         count = count + 32
         x = x << 32
     if (x & (0xFFFF as u64 << 48)) == 0:
