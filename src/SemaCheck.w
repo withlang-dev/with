@@ -895,7 +895,12 @@ impl Sema:
         if expected == 0:
             for ai in 0..arm_count:
                 let arm_ty = resolved_arm_types[ai]
-                if arm_ty == 0 or arm_nodes[ai] <= 0 or not self.join_literal_adaptable_type(arm_ty):
+                if arm_ty == 0 or not self.join_literal_adaptable_type(arm_ty):
+                    continue
+                // A carrier's payload (`opt.unwrap_or(0)`, `opt ?? 0`) is a
+                // typed arm with no node of its own.
+                if arm_nodes[ai] <= 0:
+                    if arm_roles[ai] == D22_JOIN_ROLE_CARRIER_PAYLOAD: typed_numeric_arm = 1
                     continue
                 if self.expr_is_untyped_literal_aggregate(arm_nodes[ai]):
                     literal_arm_count = literal_arm_count + 1
@@ -1015,8 +1020,11 @@ impl Sema:
 
         // The untyped literal arms take the typed arms' type, checked again
         // under that demand so their recorded type and constant fold agree
-        // with the join (a literal that does not fit reports here).
-        if (literal_arms_adapt or literals_take_payload) and self.join_literal_adaptable_type(final_type):
+        // with the join (a literal that does not fit reports here). Under an
+        // outer demand too: an arm checked before the join knew it (the
+        // argument of `opt.unwrap_or(0)`) still carries the default.
+        let retype_literal_arms = literal_arms_adapt or literals_take_payload or (expected != 0 and final_type == expected)
+        if retype_literal_arms and self.join_literal_adaptable_type(final_type):
             for ai in 0..arm_count:
                 let arm_node = arm_nodes[ai]
                 if resolved_arm_types[ai] != 0 and arm_node > 0 and self.expr_is_untyped_literal_aggregate(arm_node):
