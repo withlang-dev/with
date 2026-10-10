@@ -97,7 +97,6 @@ pub fn Diagnostics.error(self: &Self, location: &SourceLocation, message: str):
     if self.output_path.len() == 0:
         with_eprint("error: Diagnostics.error called without a driver diagnostic output")
         exit(1)
-        return
     let old = with_fs_read_file(self.output_path)
     let line = "error\t" ++
         compiler_hook_escape(location.file) ++ "\t" ++
@@ -113,7 +112,6 @@ pub fn SourceEmitter.emit_source(self: &Self, source: str):
     if self.output_path.len() == 0:
         with_eprint("error: SourceEmitter.emit_source called without a driver emitted-source output")
         exit(1)
-        return
     let old = with_fs_read_file(self.output_path)
     if with_fs_write_file(self.output_path, old ++ "\n" ++ source ++ "\n") != 0:
         with_eprint("error: failed to write compiler hook emitted source")

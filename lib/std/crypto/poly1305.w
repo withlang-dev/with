@@ -103,11 +103,11 @@ unsafe fn poly1305_update(ctx: *mut Poly1305, data: *const u8, len: i32):
         poly1305_block(ctx, pp as *const u8, 0 as u32)
 
 unsafe fn poly1305_finish(ctx: *mut Poly1305, out: *mut u8):
-    var h0 = ctx.h[0]
-    var h1 = ctx.h[1]
-    var h2 = ctx.h[2]
-    var h3 = ctx.h[3]
-    var h4 = ctx.h[4]
+    var h0: u32 = ctx.h[0]
+    var h1: u32 = ctx.h[1]
+    var h2: u32 = ctx.h[2]
+    var h3: u32 = ctx.h[3]
+    var h4: u32 = ctx.h[4]
 
     var c: u32 = h1 >> 26 as u32
     h1 = h1 & 0x03FFFFFF as u32
