@@ -87,6 +87,23 @@ another numeric type:
 Literals and comptime arithmetic are checked at the target's width, not the
 host's (D114).
 
+**Locals typed by their uses (D128).** A binding with no annotation whose
+initializer is an untyped integer literal expression has the type its
+demanding uses in its own function agree on: a parameter, a return, an `Ok`
+payload, a typed place, reached by the name or through arithmetic on it.
+Where no use demands a type narrower than `isize`, the binding is `isize`.
+Uses that demand two different types are an error at the second, naming
+both. The rule never changes the type of a binding in a program that
+compiles without it. A list literal's binding takes the element type a
+slice demand names the same way (§4.3c).
+
+```
+fn fetch_bytes() -> i32:
+    var total = 0          // i32: the return demands it
+    total = total + read()
+    total
+```
+
 **Contextual numeric inference:** unsuffixed numeric literals are resolved
 from surrounding type context before falling back to the defaults above.
 The compiler may infer an unsuffixed literal's type from:

@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.32
+# The With Programming Language — Specification v7.33
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,10 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.33:** locals typed by their uses, 2026-10-10 (D128). §4.2.1: a
+binding whose untyped integer literal typed it takes the type its demanding
+uses in its function agree on; `isize` where none narrows; two demands
+that differ are an error naming both; never changes a compiling program.
 **Changelog v7.32:** slice demands and views of constants, 2026-10-09
 (D126, D127). §4.3c: a slice demand supplies the element type to a literal
 in argument position and views it; it demands no collection. §3.1: a view
