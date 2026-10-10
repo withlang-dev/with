@@ -1,10 +1,11 @@
-//! expect-stdout: 42 6 3 10 12 9
+//! expect-stdout: 42 6 3 10 12 9 36
 
 // D126 (§4.2.1): a local its literal typed takes the type its demanding
 // uses agree on. `var total = 0` returned as i32, `var sum = 0` as an Ok
 // payload, `var x = 40` handed to an i32 parameter, a local reaching an i32
 // parameter through arithmetic, and a list literal handed to a `[]i32`
-// parameter are typed by those uses; the programmer writes nothing. A local
+// parameter, and a loop variable over a literal range (`for i in 1..9`),
+// are typed by those uses; the programmer writes nothing. A local
 // nothing narrows stays isize.
 fn column() -> i32: 21
 
@@ -41,4 +42,6 @@ fn main:
     var bonus = 7
     let paid = pay(bonus + 5)
     let values = [4, -2, 7]
-    print(f"{total_of()} {summed(true).unwrap()} {hits} {untouched} {paid} {tot(values)}")
+    var ids: i32 = 0
+    for i in 1..9: ids += pay(i)
+    print(f"{total_of()} {summed(true).unwrap()} {hits} {untouched} {paid} {tot(values)} {ids}")

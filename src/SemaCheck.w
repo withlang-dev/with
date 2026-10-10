@@ -17757,7 +17757,13 @@ impl Sema:
         // #1349: the iterable is a value (`for p in if c: xs else: ys`).
         let outer_loop_iterable: i32 = self.loop_iterable_node
         self.loop_iterable_node = iterable
-        let iter_type = self.check_expr_value_context(iterable)
+        // D128: a loop variable over a literal range is a literal-typed local;
+        // the body's second check types the range at the variable's decision.
+        let range_literal = iterable != 0 and self.ast.kind(iterable) == NodeKind.NK_RANGE and self.expr_is_untyped_literal_arith(self.ast.get_data0(iterable)) and (self.ast.get_data1(iterable) == 0 or self.expr_is_untyped_literal_arith(self.ast.get_data1(iterable)))
+        let iter_type = if range_literal and self.int_local_decisions.contains(node):
+            self.check_expr_with_expected(iterable, self.ensure_exact_type(TypeKind.TY_RANGE, (self.int_local_decisions.get(node).unwrap() / 4294967296) as i32, self.ast.get_data2(iterable), 0))
+        else:
+            self.check_expr_value_context(iterable)
         self.loop_iterable_node = outer_loop_iterable
         // §13.6a: over an Option or Result the `for` is a one-clause
         // comprehension, not a loop — the body runs once on Some/Ok, not at
@@ -17828,6 +17834,7 @@ impl Sema:
                     self.register_for_binding_borrow(sym, iterable)
         else:
             self.scope_put_at(binding, elem_type, 0, node)
+            if range_literal and binding != 0: self.int_local_for_decls.insert(binding, node)
         if yields_views != 0 and binding != 0:
             self.scope_set_is_view_bound(binding)
         if binding != 0 and not self.ast.for_binding_is_pattern(node) and self.type_is_ephemeral_value(elem_type) != 0:
@@ -17855,6 +17862,7 @@ impl Sema:
             self.drop_control_flow_depth = self.drop_control_flow_depth + 1
         self.push_live_loop(body, for_live_depth)
         let for_body_type = self.check_expr_statement_context(body)
+        if range_literal and binding != 0 and not self.ast.for_binding_is_pattern(node): self.int_local_for_decls.remove(binding)
         self.pop_live_loop()
         self.drop_control_flow_depth = saved_drop_cf_for
         // `for` exits when the iterable is exhausted (like a condition) → has_condition_exit = 1.
@@ -26560,6 +26568,9 @@ impl Sema:
         if self.ast.kind(node) != NodeKind.NK_IDENT:
             return 0
         let sym = self.ast.get_data0(node)
+        // D128: a loop variable over a literal range (`for i in 1..9`).
+        let for_decl = self.int_local_for_decls.get(sym) ?? 0
+        if for_decl != 0: return for_decl
         let in_scope = self.binding_decl_nodes.get(sym) ?? 0
         let decl = if in_scope != 0: in_scope else: self.fn_int_literal_lets.get((self.current_fn_sig_idx as i64) * 4294967296 + sym as i64) ?? 0
         if decl <= 0 or self.ast.kind(decl) != NodeKind.NK_LET_BINDING or self.local_let_type_ann_extra(self.ast.get_data2(decl)) >= 0:
