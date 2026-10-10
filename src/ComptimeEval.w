@@ -5826,7 +5826,7 @@ impl ComptimeEvaluator:
                 self.extra_values.push(comptime_value_str(raw_files[i]))
             return comptime_control_value(comptime_value_list(list_type, start, raw_files.len() as i32))
         if method == "write_text" or method == "copy_file" or method == "chmod" or method == "rename" or method == "copy_tree" or method == "symlink":
-            let expected =
+            let expected: i32 =
                 if method == "chmod":
                     2
                 else:
@@ -6055,7 +6055,7 @@ impl ComptimeEvaluator:
             let rc = if has_cwd: with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, spec_cwd.text) else if has_stdin: with_exec_argv_capture_input(argv, stdout_path, stderr_path, timeout_ms, spec_stdin.text) else: with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
             self.process_env_restore(saved_env)
             return self.tool_process_result(rc, stdout_path, stderr_path, node)
-        let expected =
+        let expected: i32 =
             if method == "run":
                 1
             else if method == "spawn_capture":
@@ -6224,7 +6224,7 @@ impl ComptimeEvaluator:
             return comptime_control_value(self.str_list_value(record.env, node))
         if method == "network":
             return comptime_control_value(comptime_value_bool(if record.network != 0: 1 else: 0))
-        let child_kind =
+        let child_kind: i32 =
             if method == "project_info":
                 CapabilityKind.CK_BUILD_PROJECT_INFO
             else if method == "diagnostics":
@@ -7527,7 +7527,7 @@ impl ComptimeEvaluator:
             return iterable_signal
         let binding = self.ast.get_data0(node)
         let body = self.ast.get_data2(node)
-        var count = 0
+        var count: i32 = 0
         // #2220: a map iterates its entries as (key, value) tuples, D44's
         // `for (k, v) in map`; the entries sit in extra_values as pairs.
         let is_map = iterable_signal.value.kind == ComptimeValueKind.CV_MAP

@@ -4051,7 +4051,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.ephemeral_types.insert(s.pool_intern("ListRange"), 1)
 
     // Sub-byte and non-standard integer widths for bitpacked structs.
-    for w in 1..8:
+    for w in 1i32..8:
         s.add_type(TypeKind.TY_INT, w, 0, 0)  // u1-u7
         s.add_type(TypeKind.TY_INT, w, 1, 0)  // i1-i7
     s.add_type(TypeKind.TY_INT, 12, 0, 0)  // u12
@@ -5640,7 +5640,7 @@ impl Sema:
         let source_len = if source_index == 0: self.source_text.len() as i32 else: self.source_texts[(source_index - 1)].len() as i32
         if clamped > source_len:
             clamped = source_len
-        var lo = 0
+        var lo: i32 = 0
         var hi = offsets.len() as i32
         while lo < hi:
             let mid = lo + (hi - lo) / 2
@@ -9917,7 +9917,7 @@ fn sema_levenshtein(a: &str, b: &str, max: i32) -> i32:
         var cur: List[i32] = List.new()
         cur.push(i)
         for j in 1..bl + 1:
-            let cost = if a[(i - 1)] == b[(j - 1)]: 0 else: 1
+            let cost: i32 = if a[(i - 1)] == b[(j - 1)]: 0 else: 1
             let del = prev[j] + 1
             let ins = cur[(j - 1)] + 1
             let sub = prev[(j - 1)] + cost

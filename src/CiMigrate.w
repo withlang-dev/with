@@ -1606,7 +1606,7 @@ fn ci_migrate_fn_nullable_index(name: &str) -> i32:
 /// D107: 1 when parameter `index` of corpus function `name` is `Option`,
 /// 0 when the corpus decided it non-null, -1 when the corpus has no
 /// verdict (not a corpus definition: D102's declaration rules apply).
-pub fn ci_migrate_fn_param_nullable(name: &str, index: i32) -> i32:
+pub fn ci_migrate_fn_param_nullable(name: &str, index: isize) -> i32:
     let i = ci_migrate_fn_nullable_index(name)
     if i < 0: return -1
     let bits = g_migrate_fn_nullable_bits[i]
@@ -1615,7 +1615,7 @@ pub fn ci_migrate_fn_param_nullable(name: &str, index: i32) -> i32:
     if c == '1': 1 else if c == '0': 0 else: -1
 
 /// The reason behind `ci_migrate_fn_param_nullable`'s verdict, or "".
-pub fn ci_migrate_fn_param_reason(name: &str, index: i32) -> str:
+pub fn ci_migrate_fn_param_reason(name: &str, index: isize) -> str:
     let i = ci_migrate_fn_nullable_index(name)
     if i < 0: return ""
     let parts = g_migrate_fn_nullable_reasons[i].split("|")

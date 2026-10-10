@@ -4280,7 +4280,7 @@ pub fn with_ci_type_arg_count(session: i64, type_idx: i32) -> i32:
         let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
         clang_getNumArgTypes(ty)
 
-pub fn with_ci_type_arg(session: i64, type_idx: i32, index: i32) -> i32:
+pub fn with_ci_type_arg(session: i64, type_idx: i32, index: isize) -> i32:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return -1

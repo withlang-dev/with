@@ -44,7 +44,7 @@ impl Source:
         if clamped > self.text.len() as i32:
             clamped = self.text.len() as i32
 
-        var lo = 0
+        var lo: i32 = 0
         var hi = self.line_offsets.len() as i32
         while lo < hi:
             let mid = lo + ((hi - lo) / 2)

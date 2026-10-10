@@ -203,7 +203,7 @@ fn flatten_nested_arrays_once(source: &str) -> str:
             continue
         // The outer `; d_out]`.
         depth = 0
-        var outer_close: i32 = -1
+        var outer_close: isize = -1
         var k = inner_close + 2
         while k < n:
             let t = tokens.get_tag(k)

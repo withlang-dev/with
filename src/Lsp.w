@@ -1519,7 +1519,7 @@ impl LspState:
         // Walk backward to find the opening ( and count commas for active param
         var paren_depth = 0
         var comma_count: i32 = 0
-        var fn_name_tok: i32 = -1
+        var fn_name_tok: isize = -1
         var ti = cursor_tok
         while ti >= 0:
             let tag = tokens.get_tag(ti)

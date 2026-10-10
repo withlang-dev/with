@@ -256,7 +256,7 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = t
     0
 
-@[weak] pub fn with_ci_type_arg(s: i64, t: i32, i: i32) -> i32:
+@[weak] pub fn with_ci_type_arg(s: i64, t: i32, i: isize) -> i32:
     let _ = s
     let _ = t
     let _ = i

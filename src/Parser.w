@@ -2231,7 +2231,7 @@ impl Parser:
                 else:
                     self.pos = saved
 
-            var field_pub = 0
+            var field_pub: i32 = 0
             if self.peek() == TokenKind.TK_KW_PUB:
                 field_pub = 1
                 self.advance()
@@ -2299,7 +2299,7 @@ impl Parser:
                         self.pos = saved
                 else:
                     self.pos = saved
-            var field_pub = 0
+            var field_pub: i32 = 0
             if self.peek() == TokenKind.TK_KW_PUB:
                 field_pub = 1
                 self.advance()
@@ -3873,7 +3873,7 @@ impl Parser:
 
             var m_params_start: i32 = 0
             var param_count: i32 = 0
-            var required_param_count = 0
+            var required_param_count: i32 = 0
             // D7 P2: a plain `fn` inside an INHERENT impl / `extend` is a read-borrow
             // instance method (`self: &Self`); `mut fn`/`move fn` set their own mode.
             // In a TRAIT impl (`impl Trait for T`), the trait dictates each method's
@@ -5728,7 +5728,7 @@ impl Parser:
         attempt.node
 
 // §15.4.1 align: 1 left `<`, 2 right `>`, 3 center `^`; 0 for any other byte.
-fn fstring_spec_align(ch: u8): if ch == '<': 1 else if ch == '>': 2 else if ch == '^': 3 else: 0
+fn fstring_spec_align(ch: u8) -> i32: if ch == '<': 1 else if ch == '>': 2 else if ch == '^': 3 else: 0
 
 fn fstring_spec_digit(ch: u8): ch >= '0' and ch <= '9'
 
@@ -9414,7 +9414,7 @@ impl Parser:
                 break
 
             var type_node: NodeId = 0 as NodeId
-            var extra_flags = 0
+            var extra_flags: i32 = 0
             // docs/completed/mut.md Rev 8 §5.1 / docs/completed/mutability.md — receiver-place modes.
             // Tag the param so later sema phases can enforce receiver constraints.
             let is_self_param = name != 0 and self.intern.resolve(name) == "self"

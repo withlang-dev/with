@@ -887,7 +887,7 @@ fn analysis_call_argument_node(sema: &Sema, call_node: i32, arg_index: i32, mir_
     if call_node <= 0 or call_node >= sema.ast.node_count() or sema.ast.kind(call_node) != NodeKind.NK_CALL: return 0
     let resolved = sema.has_resolved_call_args(call_node) != 0
     let source_count = if resolved: sema.get_resolved_call_arg_count(call_node) else: sema.ast.get_data2(call_node)
-    let receiver_offset = if source_count + 1 == mir_count: 1 else: 0
+    let receiver_offset: i32 = if source_count + 1 == mir_count: 1 else: 0
     if receiver_offset == 1 and arg_index == 0: return analysis_call_receiver_node(sema, call_node)
     let source_index = arg_index - receiver_offset
     if source_index < 0 or source_index >= source_count: return 0

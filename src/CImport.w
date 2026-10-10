@@ -1071,7 +1071,7 @@ fn ci_decl_name_index_ensure(session: i64):
         let name = with_cimport_decl_name(session, i)
         if name.len() == 0: continue
         let kind = with_cimport_decl_kind(session, i)
-        var bits = 0
+        var bits: i32 = 0
         if kind == CK_STRUCT or kind == CK_UNION or kind == CK_ENUM or kind == CK_TYPEDEF: bits = bits | CI_NAME_TYPE
         let escaped = ci_escape_reserved(name)
         let escaped_have: i32 = flags.get(escaped) ?? 0
@@ -7798,7 +7798,7 @@ pub fn ci_type_is_fn_ptr(types: CiTypePool, ty: CiTypeId) -> bool:
 // corpus's evidence verdict (ci_migrate_fn_param_nullable) says so. The
 // one place the verdict reaches a rendered type: the signature, the body
 // copy and every prototype of the function read it, so all units agree.
-pub fn ci_migrated_param_type(session: i64, idx: i32, pi: i32) -> str:
+pub fn ci_migrated_param_type(session: i64, idx: i32, pi: isize) -> str:
     let raw = with_cimport_fn_param_type_translated(session, idx, pi)
     if not ci_type_text_is_fn_ptr(raw) or ci_nullable_fn_ptr_inner(raw).len() > 0: return raw
     let verdict = ci_migrate_fn_param_nullable(with_cimport_decl_name(session, idx), pi)
@@ -12357,7 +12357,7 @@ fn ci_extract_for_parts(session: i64, cursor: i32) -> CiForParts:
         let header_len = body_start - for_start
         let limit = if header_len < for_src.len() as i32: header_len else: for_src.len() as i32
         var paren_depth = 0
-        var i = 0
+        var i: i32 = 0
         while i < limit:
             let c = for_src[i]
             if c == 40:
@@ -12559,7 +12559,7 @@ impl CiStmtPool:
             i = i + 1
         self.block(new_start, new_count)
 
-    fn lower_switch_prong_forward_ir(session: i64, body_cursor: i32, start_idx: i32, total: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
+    fn lower_switch_prong_forward_ir(session: i64, body_cursor: i32, start_idx: isize, total: isize, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
         var part_ids: List[i32] = List.new()
         let start_child = with_ci_child(session, body_cursor, start_idx)
         let start_kind = with_ci_cursor_kind(session, start_child)
