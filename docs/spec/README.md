@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.29
+# The With Programming Language — Specification v7.30
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,12 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.30:** a cast converts an untyped constant exactly,
+2026-10-09 (D124). §4.2.1: an untyped constant expression is evaluated
+exactly, with no width, until a context types it; a cast is such a context
+(rule 7) and converts the exact value with the runtime cast's wrap and
+truncate rule, never through `isize`; float constants follow the runtime
+rule. The implementation is NON-COMPLIANT until it catches up.
 **Changelog v7.29:** `offsetof[T](field)`, 2026-10-07 (D109, delegated).
 §16.12: a built-in generic function returning a field's byte offset in a
 struct's layout for the compilation target, beside `sizeof` and

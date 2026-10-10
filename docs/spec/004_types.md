@@ -97,6 +97,19 @@ The compiler may infer an unsuffixed literal's type from:
 4. The enclosing function's declared return type for tail expressions
 5. A known array element type
 6. A known struct field type
+7. The target type of a cast (`as`)
+
+An untyped constant expression is evaluated exactly, with no width, until
+a context gives it a type. A cast is such a context. The cast converts the
+exact value with the same wrap and truncate rule a runtime cast uses. An
+untyped constant never passes through `isize` on its way to a cast. Float
+constants in a cast follow the runtime rule too: `3.7 as i32` gives 3 (D124).
+
+```
+(0 - 1) as u32            // 4294967295 on every target
+4294967295 as u32         // fits u32; never an isize first
+(1 << 40) as u64          // exact, also where isize is 32 bits
+```
 
 Examples:
 
