@@ -878,6 +878,10 @@ impl Sema:
         var reaching_count = 0
         var owned_candidate: i32 = 0
         var reference_candidate: i32 = 0
+        // Whether every owned arm that reached the join is an untyped literal
+        // (`if c: xs[i] else: 0`): beside a view they take its value type.
+        var owned_arms_all_literal = true
+        var literals_take_payload = false
 
         // §4.2.1, as at an operator (contextualize the literal to its peer):
         // with no enclosing demand, an untyped literal arm — a bare unsuffixed
@@ -922,6 +926,8 @@ impl Sema:
                     self.emit_error(join_name ++ " arms view `" ++ self.type_name(prior_reference) ++ "` and `" ++ self.type_name(arm_ty) ++ "`; a reference cannot convert its pointee (§4.2.6), so every arm must view one type", report_node)
                     return 0
             else:
+                if not self.expr_is_untyped_literal_arith(reach_node):
+                    owned_arms_all_literal = false
                 let prior_candidate = owned_candidate
                 owned_candidate = self.merge_contextual_owned_join_types(owned_candidate, arm_ty)
                 if owned_candidate == 0:
@@ -959,8 +965,13 @@ impl Sema:
                 // `Option[&i64]` eliminator joined with a literal `0` anchored
                 // the join at i32 and the materialized pointee was silently
                 // truncated to 32 bits (the analyze-audit segfault class).
+                // D114: promotion is no longer the rule for literal arms; their
+                // default is isize, so `if c: xs[i] else: 0` of an `&i32` view
+                // was isize. Untyped literal arms take the payload's type.
                 let ref_payload = self.get_type_d0(self.resolve_alias(reference_candidate as TypeId))
-                let mixed = self.merge_contextual_owned_join_types(owned_candidate, ref_payload)
+                if owned_arms_all_literal and self.is_plain_numeric_type(ref_payload):
+                    literals_take_payload = true
+                let mixed = if literals_take_payload: ref_payload else: self.merge_contextual_owned_join_types(owned_candidate, ref_payload)
                 if mixed == 0 and report_node == self.display_join_node:
                     // D55: a view arm and an owned arm of different types share
                     // no Display type; name the owned arm in the fix-it.
@@ -1001,7 +1012,7 @@ impl Sema:
         // The untyped literal arms take the typed arms' type, checked again
         // under that demand so their recorded type and constant fold agree
         // with the join (a literal that does not fit reports here).
-        if literal_arms_adapt and self.is_plain_numeric_type(final_type):
+        if (literal_arms_adapt or literals_take_payload) and self.is_plain_numeric_type(final_type):
             for ai in 0..arm_count:
                 let arm_node = arm_nodes[ai]
                 if resolved_arm_types[ai] != 0 and arm_node > 0 and self.expr_is_untyped_literal_arith(arm_node):
