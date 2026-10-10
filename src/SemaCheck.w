@@ -866,8 +866,35 @@ impl Sema:
     // expressions eligible for Stage 2 adjustments. Synthetic carrier payloads
     // and lazy closure results use node 0 plus an origin node and role; later MIR
     // consumes that classification without pretending either is an AST value.
-    mut fn resolve_contextual_join(expected: i32, arm_nodes: &List[i32], origin_nodes: &List[i32], arm_types: &List[i32], arm_roles: &List[i32], report_node: i32, join_name: &str) -> i32:
+    // §4.9: when `report_node` is the final expression of the function's own
+    // body, the return is Result[T, E], and no arm is itself a Result, the
+    // join's value is the payload `Ok` wraps: T. Otherwise `expected`.
+    fn tail_join_ok_payload(expected: i32, report_node: i32, arm_types: &List[i32]) -> i32:
+        if self.body_tail_block == 0 or self.closure_body_depth != 0 or self.current_fn_sig_idx < 0:
+            return expected
+        let tail = if self.ast.kind(self.body_tail_block) == NodeKind.NK_BLOCK: self.ast.get_data2(self.body_tail_block) else: self.body_tail_block
+        if tail != report_node:
+            return expected
+        // The tail is often checked with no expected type; the declared
+        // return is the function's own.
+        let declared = if expected != 0: expected else: self.sig_return_type(self.current_fn_sig_idx)
+        if declared == 0:
+            return expected
+        let er = self.resolve_alias(declared as TypeId)
+        if self.get_type_kind(er) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(er) != self.syms.result or self.get_generic_inst_arg_count(er) != 2:
+            return expected
+        for ai in 0..arm_types.len():
+            let arm = self.resolve_alias(arm_types[ai] as TypeId)
+            if arm_types[ai] == 0 or (self.get_type_kind(arm) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(arm) == self.syms.result):
+                return expected
+        self.get_generic_inst_arg(er, 0)
+
+    mut fn resolve_contextual_join(expected_in: i32, arm_nodes: &List[i32], origin_nodes: &List[i32], arm_types: &List[i32], arm_roles: &List[i32], report_node: i32, join_name: &str) -> i32:
         let arm_count = arm_types.len() as i32
+        // §4.9: the function's final expression under a Result[T, E] return,
+        // with no arm a Result, is the payload Ok wraps; its arms meet T
+        // (D111: a `&str` arm is copied to the `str`).
+        let expected = self.tail_join_ok_payload(expected_in, report_node, arm_types)
         if arm_nodes.len() as i32 != arm_count or origin_nodes.len() as i32 != arm_count or arm_roles.len() as i32 != arm_count:
             self.emit_error("internal error: malformed contextual join inputs", report_node)
             return 0
@@ -4646,7 +4673,9 @@ impl Sema:
             let tail_block = if self.ast.kind(source_body) == NodeKind.NK_BLOCK: self.ast.get_data2(source_body) else: source_body
             self.reject_implicit_numeric_narrowing(if tail_block != 0: tail_block else: body, self.implicit_ok_payload_demand(body_expected_ret as i32, body_ty as i32), body_ty as i32)
         if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
-            if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0 and body_materializes_copy == 0:
+            // §4.9 / D111: the tail may be a Copy view of the Ok payload.
+            let tail_copies = self.can_contextually_copy_ref(self.tail_ok_payload(body_expected_ret as i32, body_ty as i32), body_ty as i32) != 0
+            if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0 and body_materializes_copy == 0 and not tail_copies:
                 self.emit_error("return type mismatch", body)
         if not has_ret_annotation:
             // §14.4: calling an `async fn` returns a `Task[T]` handle; the body
@@ -4696,7 +4725,9 @@ impl Sema:
                                 // payload by a copy, as it meets a plain `-> str`.
                                 let tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
                                 ok_wrapped = self.record_contextual_copy_adjustment(tail, ok_type, body_ty as i32) != 0
-                    if not ok_wrapped:
+                    if ok_wrapped:
+                        self.implicit_ok_tail_sigs.insert(sig_idx, 1)
+                    else:
                         self.emit_return_mismatch("return type mismatch", body, body_expected_ret as i32)
 
         // @[tailrec] enforcement: verify all recursive calls are in tail position
@@ -9102,9 +9133,6 @@ impl Sema:
                     return 1
                 if self.arithmetic_result_type(ok_type as TypeId, actual as TypeId) != 0:
                     return 1
-                // D111 / D22 §6.2: a Copy view meets the payload by a copy.
-                if self.can_contextually_copy_ref(ok_type, actual) != 0:
-                    return 1
         0
 
     fn recorded_expr_type_or_zero(node: i32) -> i32:
@@ -9149,6 +9177,18 @@ impl Sema:
         // each match arm / if branch weakens by its own projection shape.
         let leaf_eff = self.weaken_projection_owning_effects(node, effect)
         self.note_place_effect(node, leaf_eff)
+
+    // §4.9: the type a final-expression value of type `actual` meets under the
+    // return `expected`: the Ok payload when `expected` is Result[T, E] and
+    // the value is not itself a Result, else `expected`.
+    fn tail_ok_payload(expected: i32, actual: i32) -> i32:
+        let er = self.resolve_alias(expected as TypeId)
+        if self.get_type_kind(er) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(er) != self.syms.result or self.get_generic_inst_arg_count(er) != 2:
+            return expected
+        let ar = self.resolve_alias(actual as TypeId)
+        if self.get_type_kind(ar) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(ar) == self.syms.result:
+            return expected
+        self.get_generic_inst_arg(er, 0)
 
     mut fn check_body_explicit_value_results(node: i32, value_path: i32, expected: i32, msg: &str) -> i32:
         if node == 0:
@@ -9207,7 +9247,10 @@ impl Sema:
             if actual != 0 and actual != self.ty_void and actual != self.ty_never:
                 if self.expr_mutates_any_current_binding(node) != 0:
                     return 1
-                if self.return_value_type_compatible(expected, actual) == 0 and self.record_contextual_copy_adjustment(node, expected, actual) == 0:
+                // §4.9: a final-expression leaf that is not a Result is the
+                // payload Ok wraps; a Copy view meets it by a copy (D111). An
+                // early `return` is the NK_RETURN branch, never wrapped.
+                if self.return_value_type_compatible(expected, actual) == 0 and self.record_contextual_copy_adjustment(node, self.tail_ok_payload(expected, actual), actual) == 0:
                     // D93: a return demands its collection of a literal's binding.
                     self.note_literal_demand(node, expected, node)
                     self.emit_error(msg, node)
@@ -26397,7 +26440,7 @@ impl Sema:
         let exact = self.check_expr_with_expected(node, expected)
         if expected != 0 and exact != 0:
             self.reject_implicit_numeric_narrowing(node, self.implicit_ok_payload_demand(expected as i32, exact as i32), exact as i32)
-            if self.record_contextual_copy_adjustment(node, self.implicit_ok_payload_demand(expected as i32, exact as i32), exact as i32) == 0:
+            if self.record_contextual_copy_adjustment(node, expected as i32, exact as i32) == 0:
                 let _ = self.record_contextual_str_clone_adjustment(node, expected as i32, exact as i32)
         exact
 
@@ -26476,16 +26519,13 @@ impl Sema:
             return 0
         if self.expr_is_untyped_literal_arith(self.ast.get_data1(decl)): decl else: 0
 
-    // §4.9: a value where a `Result[T, E]` is demanded is wrapped in `Ok`,
-    // so the demand on the value is `T` (§4.2.6 and D22's copy apply to it).
+    // §4.9: a number where a `Result[T, E]` is demanded is wrapped in `Ok`,
+    // so the demand on the number is `T` (§4.2.6 then applies to it).
     fn implicit_ok_payload_demand(expected: i32, actual: i32) -> i32:
         let er = self.resolve_alias(expected as TypeId)
         if self.get_type_kind(er) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(er) != self.syms.result or self.get_generic_inst_arg_count(er) != 2:
             return expected
-        // A Result value meets the Result itself; anything else is the
-        // payload `Ok` wraps (D111: a `&str` there is copied to the `str`).
-        let ar = self.resolve_alias(actual as TypeId)
-        if actual == 0 or (self.get_type_kind(ar) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(ar) == self.syms.result):
+        if not self.is_plain_numeric_type(actual):
             return expected
         self.get_generic_inst_arg(er, 0)
 

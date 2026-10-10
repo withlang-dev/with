@@ -17827,31 +17827,24 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
                 sema_phase_bug(f"BUG: `{bug_fn}`'s body is typed {builder.sema.type_name(sema_body_ty)} but lowered to no value; §4.10 never defaults a non-Unit tail (body node={body_expr})")
             body_result
 
-    // Implicit Ok wrapping: if return type is Result[T, E] and body type is T,
-    // wrap the result in Ok(value) — an enum variant construction with tag 0.
-    let ret_resolved = builder.sema.resolve_alias(ret_ty)
-    if body_falls_through != 0 and not ret_is_void and builder.sema.get_type_kind(ret_resolved) == TypeKind.TY_GENERIC_INST:
-        let ret_base = builder.sema.get_generic_inst_base(ret_resolved)
-        if builder.sema.std_generic_of(ret_resolved as i32) == StdGeneric.Result and builder.sema.get_generic_inst_arg_count(ret_resolved) == 2:
-            let result_body_ty = builder.expr_type(body_expr)
-            let ok_type = builder.sema.get_generic_inst_arg(ret_resolved, 0)
-            if result_body_ty != 0 and result_body_ty != ret_ty:
-                if builder.sema.types_compatible_frozen(ok_type, result_body_ty) != 0 or builder.sema.arithmetic_result_type(ok_type, result_body_ty) != 0:
-                    // Wrap in Ok variant (tag=0)
-                    let ok_fields: List[i32] = List.new()
-                    let ok_names: List[i32] = List.new()
-                    ok_fields.push(result)
-                    ok_names.push(0)
-                    let ok_fid = builder.body.new_agg_fields(ok_fields, ok_names)
-                    let ok_rv = builder.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, ok_fid, 0)
-                    let ok_tmp = builder.new_temp(ret_ty)
-                    let ok_place = builder.place_for_local(ok_tmp)
-                    builder.body.push_stmt(builder.cur_bb, StmtKind.Assign, ok_place, ok_rv, builder.ast.get_end(fn_node))
-                    // The payload now belongs to Ok. In particular, an if or
-                    // match tail leaves an owned join temporary in the body
-                    // frame; consume it before that frame emits cleanup.
-                    builder.consume_moved_operand(result)
-                    result = builder.body.new_operand(OperandKind.OK_COPY, ok_place)
+    // Implicit Ok wrapping (§4.9): the tail becomes Ok(value), an enum variant
+    // construction with tag 0. D65: Sema decided the wrap
+    // (implicit_ok_tail_sigs); MIR does not re-derive it from the types.
+    if body_falls_through != 0 and not ret_is_void and sig_idx >= 0 and builder.sema.implicit_ok_tail_sigs.contains(sig_idx):
+        let ok_fields: List[i32] = List.new()
+        let ok_names: List[i32] = List.new()
+        ok_fields.push(result)
+        ok_names.push(0)
+        let ok_fid = builder.body.new_agg_fields(ok_fields, ok_names)
+        let ok_rv = builder.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, ok_fid, 0)
+        let ok_tmp = builder.new_temp(ret_ty)
+        let ok_place = builder.place_for_local(ok_tmp)
+        builder.body.push_stmt(builder.cur_bb, StmtKind.Assign, ok_place, ok_rv, builder.ast.get_end(fn_node))
+        // The payload now belongs to Ok. In particular, an if or match tail
+        // leaves an owned join temporary in the body frame; consume it before
+        // that frame emits cleanup.
+        builder.consume_moved_operand(result)
+        result = builder.body.new_operand(OperandKind.OK_COPY, ok_place)
 
     // Implicit return value assignment for non-diverging tail expressions.
     if body_falls_through != 0 and not ret_is_void:

@@ -872,6 +872,9 @@ pub type Sema {
     // literal chose its type, or -1 once the name is bound twice; names it
     // in a narrowing error after the binding's scope has closed (a tail).
     fn_int_literal_lets: HashMap[i64, i32],
+    // §4.9 (D65): the signatures whose body tail Sema accepted by wrapping
+    // it in `Ok`; MIR wraps exactly these, never re-deciding.
+    implicit_ok_tail_sigs: HashMap[i32, i32],
     literal_decisions: List[i32],
     // literal_decisions by `let`: the offset of each binding's entry, built
     // at the first lookup (one walk, not one per binding).
@@ -3162,6 +3165,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         literal_demands: List.new(),
         fn_literal_lets: HashMap.new(),
         fn_int_literal_lets: HashMap.new(),
+        implicit_ok_tail_sigs: HashMap.new(),
         literal_watermark: 0,
         literal_decisions: List.new(),
         literal_decision_at: sema_new_map_i32_i32(),
