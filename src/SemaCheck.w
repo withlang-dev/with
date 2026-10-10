@@ -797,6 +797,10 @@ impl Sema:
             return lhs
         if rhs_kind == TypeKind.TY_GENERIC_INST and (lhs_kind == TypeKind.TY_STRUCT or lhs_kind == TypeKind.TY_ENUM) and self.get_generic_inst_base(rhs_resolved as i32) == self.get_type_d0(lhs_resolved):
             return rhs
+        // An aggregate's elements do not convert (#1368): `(str, i32)` beside
+        // `(str, isize)` is two types, and neither arm becomes the other.
+        if self.aggregate_repr_differs(lhs_resolved, rhs_resolved, 0) != 0:
+            return 0
         let lhs_accepts_rhs = self.contextual_join_value_accepts(lhs, rhs)
         let rhs_accepts_lhs = self.contextual_join_value_accepts(rhs, lhs)
         if lhs_accepts_rhs != 0 and rhs_accepts_lhs == 0:
@@ -959,6 +963,8 @@ impl Sema:
                         self.emit_display_join_mismatch(join_name, prior_candidate, arm_ty, arm_nodes[ai], report_node)
                     else if self.is_plain_numeric_type(prior_candidate) and self.is_plain_numeric_type(arm_ty):
                         self.emit_error(join_name ++ " arms have types `" ++ self.type_name(prior_candidate) ++ "` and `" ++ self.type_name(arm_ty) ++ "`; no implicit conversion joins them (§4.2.6), so spell one arm with `as`", report_node)
+                    else if self.aggregate_repr_differs(self.resolve_alias(prior_candidate as TypeId), resolved, 0) != 0:
+                        self.emit_error(join_name ++ " arms have types `" ++ self.type_name(prior_candidate) ++ "` and `" ++ self.type_name(arm_ty) ++ "`; an aggregate's elements do not convert (§4.2.6)", report_node)
                     else:
                         self.emit_error(join_name ++ " expressions do not establish one compatible owned result type", report_node)
                     return 0
