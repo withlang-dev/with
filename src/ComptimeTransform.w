@@ -3282,7 +3282,7 @@ impl Sema:
         let ordered_file_ids: List[i32] = List.new()
         let ordered_ci: List[i32] = List.new()
         let base_decl_count = out.decl_count()
-        var generated_local_count = 0
+        var generated_local_count: i32 = 0
         // A derive diagnostic is rendered against the declaring file, not
         // whichever file the pre-sema last checked (it pointed a module's
         // derive error at a `use` line of the importer).

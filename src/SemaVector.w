@@ -36,12 +36,12 @@ impl Sema:
         for li in 0..lanes.len() as i32:
             let lane = lanes[li]
             let bits = self.get_type_d0(lane as TypeId)
-            for total in [128, 256, 512]:
+            for total in [128i32, 256, 512]:
                 let n = total / bits
                 let tid = self.vector_type(lane, n)
                 self.register_prim(self.type_name(lane) ++ f"x{n}", tid)
-        for w in [8, 16, 32, 64, 128]:
-            for total in [128, 256, 512]:
+        for w in [8i32, 16, 32, 64, 128]:
+            for total in [128i32, 256, 512]:
                 let n = total / w
                 self.register_prim(f"m{w}x{n}", self.mask_type(w, n))
 

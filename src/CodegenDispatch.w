@@ -9131,8 +9131,8 @@ impl Codegen:
                 return self.mir_emit_dyn_call_error("error: dyn trait sret destination could not be materialized", next_bb)
             call_args.push(sret_dst)
         call_args.push(data_ptr)
-        let sret_off = if has_sret: 1 else: 0
-        var ai = 1
+        let sret_off: i32 = if has_sret: 1 else: 0
+        var ai: i32 = 1
         while ai < arg_count:
             let op_id = body.call_arg_operands[(arg_start + ai)]
             var expected_ty: i64 = 0
@@ -16343,7 +16343,7 @@ impl Codegen:
                 if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
                     let gc_static_self = self.pool.get_data0(gc_callee_field)
                     let gc_static_method_sym = self.pool.get_data1(gc_callee_field)
-                    var gc_static_owner_sym = 0
+                    var gc_static_owner_sym: i32 = 0
                     let gc_static_self_kind = self.pool.kind(gc_static_self)
                     if gc_static_self_kind == NodeKind.NK_IDENT or gc_static_self_kind == NodeKind.NK_TYPE_NAMED:
                         gc_static_owner_sym = self.pool.get_data0(gc_static_self)

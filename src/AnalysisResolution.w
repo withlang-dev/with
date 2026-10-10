@@ -296,7 +296,7 @@ fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mo
         let node_key = resolution_span_key(file, sema.ast.get_start(node))
         let node_end_key = resolution_span_key(file, sema.ast.get_end(node))
         // Last span starting at or before the node.
-        var lo = 0
+        var lo: i32 = 0
         var hi = order.len() as i32
         while lo < hi:
             let mid = (lo + hi) / 2

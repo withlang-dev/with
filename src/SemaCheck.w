@@ -1394,7 +1394,7 @@ impl Sema:
             return
         self.emit_error(f"{call_name} copies its key when it inserts it, and `{self.type_name(key_ty)}` is not a value it can copy; use `entry(key)`", node)
 
-    mut fn check_builtin_method_call_arg(call_name: &str, arg_index: i32, expected: i32, actual: i32, arg_node: i32) -> i32:
+    mut fn check_builtin_method_call_arg(call_name: &str, arg_index: isize, expected: i32, actual: i32, arg_node: i32) -> i32:
         if expected == 0 or actual == 0:
             return 1
         if self.call_arg_type_compatible(expected, actual) == 0:
@@ -3130,7 +3130,7 @@ impl Sema:
         for wi in 0..self.global_write_records.len() as i32 / GLOBAL_WRITE_STRIDE:
             if self.global_write_records[wi * GLOBAL_WRITE_STRIDE + 1] == sym:
                 writers.insert(self.global_write_records[wi * GLOBAL_WRITE_STRIDE], 1)
-        var found = -1
+        var found: i32 = -1
         var k = 0
         while k < work.len() as i32 and found == -1:
             let body: i32 = work[k]
@@ -9863,7 +9863,7 @@ impl Sema:
                 node = self.ast.get_data1(node)
             else:
                 break
-        var raw_params = 0
+        var raw_params: i32 = 0
         for pi in 0..self.current_fn_param_syms.len() as i32:
             if self.type_is_raw_pointer_value(self.sig_param_type(self.current_fn_sig_idx, pi)) != 0:
                 raw_params = raw_params | sema_param_origin_bit(pi)
@@ -11048,8 +11048,8 @@ impl Sema:
             let val_expr = self.ast.get_extra(comp_start2 + 1)
             let clause_count2 = self.ast.get_data1(node)
             var map_target_ty: i32 = 0
-            var key_expected = 0
-            var val_expected = 0
+            var key_expected: i32 = 0
+            var val_expected: i32 = 0
             if self.has_expected_type != 0 and self.expected_expr_type != 0:
                 let expected2 = self.resolve_alias(self.expected_expr_type)
                 if self.get_type_kind(expected2) != TypeKind.TY_GENERIC_INST:
@@ -19580,8 +19580,8 @@ impl Sema:
         let extra_start = self.ast.get_data0(node)
         let pair_count = self.ast.get_data1(node)
         var target_ty: i32 = 0
-        var key_expected = 0
-        var val_expected = 0
+        var key_expected: i32 = 0
+        var val_expected: i32 = 0
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
             let expected = self.resolve_alias(self.expected_expr_type)
             if self.get_type_kind(expected) != TypeKind.TY_GENERIC_INST:
@@ -21040,7 +21040,7 @@ impl Sema:
     // heads; a length no row covers is the witness (`[_, _]`).
     mut fn exh_missing_slice(m: &SemaPatRows, heads: &List[i32], origins: &List[i32], rest_tys: &List[i32]) -> SemaPatMissing:
         let width = rest_tys.len() as i32 + 1
-        var longest = 0
+        var longest: i32 = 0
         for hi in 0..heads.len() as i32:
             let h = heads[hi]
             if h != 0 and self.ast.kind(h) == NodeKind.NK_PAT_SLICE:
@@ -23407,7 +23407,7 @@ impl Sema:
     mut fn check_generic_pipeline_call(node: i32, lhs: i32, lhs_ty: i32, rhs: i32) -> i32:
         var callee = rhs
         var args_start = -1
-        var args_count = 0
+        var args_count: i32 = 0
         if self.ast.kind(rhs) == NodeKind.NK_CALL:
             callee = self.ast.get_data0(rhs)
             args_start = self.ast.get_data1(rhs)
@@ -23490,7 +23490,7 @@ impl Sema:
         if rhs != 0:
             if self.ast.kind(rhs) == NodeKind.NK_CALL:
                 let rhs_callee = self.ast.get_data0(rhs)
-                var rhs_method = 0
+                var rhs_method: i32 = 0
                 if self.ast.kind(rhs_callee) == NodeKind.NK_IDENT:
                     rhs_method = self.ast.get_data0(rhs_callee)
                 else if self.ast.kind(rhs_callee) == NodeKind.NK_TYPE_GENERIC:
@@ -24188,7 +24188,7 @@ impl Sema:
         let elem_count = if is_tuple != 0: self.get_type_d1(resolved) else: 0
         // Check for rest pattern (negative sym value)
         var has_rest = false
-        var rest_pos = -1
+        var rest_pos: i32 = -1
         for ni in 0..name_count:
             let n_sym = self.ast.get_extra(extra_start + ni)
             if n_sym < 0:
@@ -31279,7 +31279,7 @@ impl Sema:
             // Fallback: re-resolve from the method's return type AST node.
             // Generic impl methods register in generic_fn_nodes, not
             // fn_decl_nodes (#912) — consult both.
-            var fallback_fn_node = 0
+            var fallback_fn_node: i32 = 0
             if method_fn_sym != 0:
                 if self.fn_decl_nodes.contains(method_fn_sym):
                     fallback_fn_node = self.fn_decl_nodes.get(method_fn_sym).unwrap()

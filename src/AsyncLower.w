@@ -370,7 +370,7 @@ fn async_fn_flavor(ast: AstPool, fn_decl: NodeId) -> i32:
     AsyncBodyKind.Sync
 
 fn async_snapshot_for_span(body: &MirBody, span_start: i32) -> AsyncSnapshot:
-    var storage_live = 0
+    var storage_live: i32 = 0
     var storage_dead: i32 = 0
     var drop_count: i32 = 0
 

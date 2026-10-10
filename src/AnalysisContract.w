@@ -730,7 +730,7 @@ pub fn analysis_audit_contract(report: &AnalysisReport, sema: &Sema, source_path
         let raw = e.sig == sema.get_sig(e.fn_sym)
         let fname = sema.safe_symbol_text(e.fn_sym)
         let form = if raw: f"the C call '{fname}'" else: f"the rendered call of '{fname}'"
-        for pi in 0..31:
+        for pi in 0i32..31:
             if (e.touch_params & sema_param_origin_bit(pi)) == 0:
                 continue
             if pi >= count:

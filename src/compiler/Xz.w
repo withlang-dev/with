@@ -220,7 +220,7 @@ impl XzLzma:
     // One LZMA chunk: `unpacked` bytes out, reading the chunk's packed bytes.
     mut fn decode_chunk(unpacked: i64):
         let goal = self.out.len() + unpacked
-        let pb_mask = (1 << (self.pb as u32)) - 1
+        let pb_mask: i32 = (1 << (self.pb as u32)) - 1
         while self.out.len() < goal and self.problem.len() == 0:
             let pos_state = (self.out.len() as i32) & pb_mask
             if self.bit(P_IS_MATCH + (self.state << 4) + pos_state) == 0:

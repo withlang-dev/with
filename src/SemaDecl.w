@@ -1019,7 +1019,7 @@ impl Sema:
     // dormant everywhere else; the tid maps let frozen-phase queries recover the
     // declaring node and tier without symbol re-resolution.
     mut fn record_type_decl_tier(name: i32):
-        let bit = if sema_tier_path_is_std_implementation(self.current_module_path) != 0: 1 else: 2
+        let bit: i32 = if sema_tier_path_is_std_implementation(self.current_module_path) != 0: 1 else: 2
         let old = if self.type_sym_tier_mask.contains(name): self.type_sym_tier_mask.get(name).unwrap() else: 0
         self.type_sym_tier_mask.insert(name, old | bit)
 

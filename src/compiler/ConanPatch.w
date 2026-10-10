@@ -57,7 +57,7 @@ fn cp_patched_text(path: &str, creates: bool, original: &str, hunks: &List[CpHun
     // A trailing newline leaves one empty piece after the last line.
     if file.len() > 0 and file[file.len() - 1].len() == 0:
         let _last = file.pop()
-    var shift = 0
+    var shift: i32 = 0
     for hi in 0..hunks.len() as i32:
         let want: i32 = hunks[hi].old_start - 1 + shift
         let at = if hunks[hi].old.len() == 0: (if want < 0: 0 else: want) else: cp_locate(&file, want, &hunks[hi].old)

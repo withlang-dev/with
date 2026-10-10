@@ -4015,7 +4015,7 @@ fn mir_validate_call_unmaterialized_view(mir_mod: &MirModule, body: &MirBody, ca
     let arg_start = body.call_arg_starts[call_id]
     let arg_count = body.call_arg_counts[call_id]
     let intrinsic = body.call_intrinsic(call_id)
-    let str_index_args = if intrinsic == MirIntrinsic.STR_SLICE: 2 else if intrinsic == MirIntrinsic.STR_BYTE_AT or intrinsic == MirIntrinsic.STR_REPEAT: 1 else: 0
+    let str_index_args: i32 = if intrinsic == MirIntrinsic.STR_SLICE: 2 else if intrinsic == MirIntrinsic.STR_BYTE_AT or intrinsic == MirIntrinsic.STR_REPEAT: 1 else: 0
     if str_index_args > 0:
         for ai in 1..(str_index_args + 1):
             if ai >= arg_count: break

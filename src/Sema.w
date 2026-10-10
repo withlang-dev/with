@@ -6499,7 +6499,7 @@ impl Sema:
             return 0
         self.get_type_d2(tid)
 
-    fn get_generic_inst_arg(tid: i32, index: i32) -> i32:
+    fn get_generic_inst_arg(tid: i32, index: isize) -> i32:
         if self.get_type_kind(tid as TypeId) != TypeKind.TY_GENERIC_INST:
             return 0
         let extra_start = self.get_type_d1(tid)

@@ -394,7 +394,7 @@ impl Codegen:
         let dyn_ret_ty = wl_get_return_type(dyn_ft)
         let dyn_param_count = wl_count_param_types(dyn_ft)
         let has_sret = dyn_ret_ty == wl_void_type(self.context) and dyn_param_count == orig_param_count + 1
-        let base = if has_sret: 1 else: 0
+        let base: i32 = if has_sret: 1 else: 0
         // For the sret and async paths dyn_ft is authoritative (win64 aggregate
         // sret lowering / the reconstructed Task type). For a plain sync by-value
         // return the IMPL fn's actual monomorphized return is authoritative:

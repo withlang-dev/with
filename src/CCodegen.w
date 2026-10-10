@@ -4250,7 +4250,7 @@ impl CCodegen:
                     continue
                 let ok = body.operand_kinds[src_operand]
                 let od = body.operand_d0[src_operand]
-                var cand = 0
+                var cand: i32 = 0
                 if ok == OperandKind.OK_CONSTANT:
                     if od < 0 or od >= body.const_kinds.len() as i32:
                         continue

@@ -3016,7 +3016,7 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &List[i32],
     if hosted and not repr.starts_with("*") and not in_place:
         return ""
     let pinned = in_place and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_MOVABLE)
-    let skip = if hosted: 1 else: 0
+    let skip: i32 = if hosted: 1 else: 0
     let indent = if hosted: "        " else: "    "
     var out = ""
     let items: List[i32] = List.new()

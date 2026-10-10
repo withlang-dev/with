@@ -351,7 +351,7 @@ fn analysis_fact_field(fact: &AnalysisFact, field: &str) -> str:
 
 fn analysis_term_matches(fact: &AnalysisFact, term: &str) -> bool:
     var op = analysis_find_from(term, "&=", 0)
-    var op_len = 2
+    var op_len: i32 = 2
     var mode = 3
     if op < 0:
         op = analysis_find_from(term, "!=", 0)

@@ -10032,7 +10032,7 @@ impl MirBuilder:
     mut fn lower_gen_loop_label_exit(label: i32, kind: i32) -> i32:
         if self.gen_loop_flag_local < 0:
             sema_phase_bug(f"BUG: break/continue/goto has no target in this body (label sym {label}, exit kind {kind})")
-        var exit = -1
+        var exit: i32 = -1
         for ei in 0..self.gen_loop_exit_labels.len() as i32:
             if self.gen_loop_exit_labels[ei] == label and self.gen_loop_exit_kinds[ei] == kind:
                 exit = ei
@@ -12059,7 +12059,7 @@ impl MirBuilder:
             if sig_ret != 0:
                 actual_ret_type_id = sig_ret
         let args: List[i32] = List.new()
-        var arg_pos = 0
+        var arg_pos: i32 = 0
         if recv_op >= 0:
             args.push(recv_op)
             arg_pos = 1
@@ -13157,7 +13157,7 @@ impl MirBuilder:
                     gc_args.push(gc_recv_op)
                 let gc_has_resolved_args = self.sema.has_resolved_call_args(node)
                 let gc_arg_count = if gc_has_resolved_args != 0: self.sema.get_resolved_call_arg_count(node) else: arg_count
-                let gc_param_offset = if gc_is_static: 0 else: 1
+                let gc_param_offset: i32 = if gc_is_static: 0 else: 1
                 let gc_closure_ops: List[i32] = List.new()
                 for gc_mai in 0..gc_arg_count:
                     let gc_ma_node = if gc_has_resolved_args != 0: self.sema.get_resolved_call_arg(node, gc_mai) else: self.ast.get_extra(arg_start + gc_mai)

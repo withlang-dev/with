@@ -6665,7 +6665,7 @@ impl Codegen:
         let is_sse = kind == wl_float_type_kind() or kind == wl_double_type_kind()
         if not is_sse and kind != wl_integer_type_kind() and kind != wl_pointer_type_kind(): return -1
         if self.abi_size_of(ty) > 8 or offset >= 16: return -1
-        let bit = if is_sse: 2 else: 1
+        let bit: i32 = if is_sse: 2 else: 1
         classes | (if offset >= 8: bit * 4 else: bit)
 
     // The scalar one eightbyte travels as. Two floats sharing an SSE
