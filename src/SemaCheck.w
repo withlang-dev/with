@@ -30265,6 +30265,41 @@ impl Sema:
         if method_name == "from_fn": return true
         false
 
+    // The owned collection type demanded of the collect call `node`: its
+    // expected type, or, as the function's final expression (the call or
+    // the pipeline ending in it), the declared return. 0 if none.
+    fn collect_demanded_type(node: i32) -> i32:
+        if self.has_expected_type != 0 and self.expected_expr_type != 0:
+            return self.expected_expr_type as i32
+        if self.body_tail_block == 0 or self.closure_body_depth != 0 or self.current_fn_sig_idx < 0:
+            return 0
+        let tail = if self.ast.kind(self.body_tail_block) == NodeKind.NK_BLOCK: self.ast.get_data2(self.body_tail_block) else: self.body_tail_block
+        let is_tail = tail == node or (tail > 0 and self.ast.kind(tail) == NodeKind.NK_PIPELINE and (self.ast.get_data0(tail) == node or self.ast.get_data1(tail) == node))
+        if is_tail: self.sig_return_type(self.current_fn_sig_idx) else: 0
+
+    // D111 / D22 §6.2: a collect whose demanded `base[T]` owns the values the
+    // iterator views (`&str` items into `List[str]`) copies each element; it
+    // is recorded for codegen and the demanded type returned. 0 otherwise.
+    mut fn collect_copy_target(base_sym: i32, iter_elem_ty: i32, node: i32) -> i32:
+        let demanded = self.collect_demanded_type(node)
+        if demanded == 0:
+            return 0
+        let dr = self.resolve_alias(demanded as TypeId)
+        if self.get_type_kind(dr) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(dr) != base_sym or self.get_generic_inst_arg_count(dr) != 1:
+            return 0
+        let owned = self.get_generic_inst_arg(dr, 0)
+        if self.contextual_copy_value_type(owned, iter_elem_ty) == 0:
+            return 0
+        self.collect_copy_elements.insert(node, owned)
+        demanded
+
+    // An explicit `collect[List[str]]()` over `&str` items copies each one.
+    mut fn collect_copies_elements(owned: i32, iter_elem_ty: i32, node: i32) -> bool:
+        if self.contextual_copy_value_type(owned, iter_elem_ty) == 0:
+            return false
+        self.collect_copy_elements.insert(node, owned)
+        true
+
     mut fn collect_target_type_from_type_node(type_node: i32, iter_elem_ty: i32, node: i32) -> i32:
         if type_node == 0:
             self.emit_error("collect[C]() requires a collection target type", node)
@@ -30279,9 +30314,13 @@ impl Sema:
                 ""
         if target_name == "List":
             if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
+                let list_copy = self.collect_copy_target(self.syms.list, iter_elem_ty, node)
+                if list_copy != 0: return list_copy
                 return self.ensure_list_type_for(iter_elem_ty)
         if target_name == "HashSet":
             if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
+                let set_copy = self.collect_copy_target(self.syms.hashset, iter_elem_ty, node)
+                if set_copy != 0: return set_copy
                 let hs_args: List[i32] = List.new()
                 hs_args.push(iter_elem_ty)
                 return self.ensure_generic_inst_type(self.syms.hashset, hs_args, 1) as i32
@@ -30341,20 +30380,23 @@ impl Sema:
         if base_sym == self.syms.list:
             let elem_ty = self.get_generic_inst_arg(target_resolved as i32, 0)
             if self.types_compatible(elem_ty as TypeId, iter_elem_ty as TypeId) == 0:
-                self.emit_error("collect[List[T]] element type does not match iterator element type", node)
-                return 0
+                if not self.collect_copies_elements(elem_ty, iter_elem_ty, node):
+                    self.emit_error("collect[List[T]] element type does not match iterator element type", node)
+                    return 0
             return target_ty
         if base_sym == self.syms.hashset:
             let elem_ty2 = self.get_generic_inst_arg(target_resolved as i32, 0)
             if self.types_compatible(elem_ty2 as TypeId, iter_elem_ty as TypeId) == 0:
-                self.emit_error("collect[HashSet[T]] element type does not match iterator element type", node)
-                return 0
+                if not self.collect_copies_elements(elem_ty2, iter_elem_ty, node):
+                    self.emit_error("collect[HashSet[T]] element type does not match iterator element type", node)
+                    return 0
             return target_ty
         if base_sym == self.syms.btreeset:
             let elem_ty_b = self.get_generic_inst_arg(target_resolved as i32, 0)
             if self.types_compatible(elem_ty_b as TypeId, iter_elem_ty as TypeId) == 0:
-                self.emit_error("collect[BTreeSet[T]] element type does not match iterator element type", node)
-                return 0
+                if not self.collect_copies_elements(elem_ty_b, iter_elem_ty, node):
+                    self.emit_error("collect[BTreeSet[T]] element type does not match iterator element type", node)
+                    return 0
             let ord_trait_b = self.pool_lookup_symbol("Ord")
             if ord_trait_b != 0 and self.type_implements_trait(elem_ty_b, ord_trait_b) == 0:
                 self.emit_error("collect[BTreeSet[T]] element type must implement Ord", node)

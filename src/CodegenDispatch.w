@@ -14447,6 +14447,21 @@ impl Codegen:
         wl_position_at_end(self.builder, end_bb)
         wl_build_load(self.builder, acc_ty, acc_ptr)
 
+    // One element taken from the iterator's `Some`: the value itself, or,
+    // when collect copies (`copy_tid` is the owned type, D111), the owned value
+    // read through the view with the hold its drop will release.
+    mut fn collect_element(next: i64, iter_ty: i64, owned_ty: i64, owned_tid: i32, copy_tid: i32) -> i64:
+        let raw = self.option_payload_value(next, iter_ty)
+        if copy_tid == 0:
+            return raw
+        let slot = self.create_entry_alloca(owned_ty)
+        // A view whose representation is the value's own (a `&str` is the
+        // str's bits) is the value already; any other is an address.
+        let value = if iter_ty == owned_ty: raw else: wl_build_load(self.builder, owned_ty, raw)
+        wl_build_store(self.builder, value, slot)
+        self.mir_emit_copy_glue_ptr(slot, owned_ty, owned_tid)
+        wl_build_load(self.builder, owned_ty, slot)
+
     mut fn mir_emit_iter_collect(body: &MirBody, args_id: i32, dest_place: i32) -> i64:
         let i64_ty = wl_i64_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
@@ -14455,8 +14470,16 @@ impl Codegen:
         let arg_start = body.call_arg_starts[args_id]
         let recv_op = body.call_arg_operands[arg_start]
         let recv_sema = self.mir_operand_sema_type(body, recv_op)
-        let elem_tid = self.mir_iter_elem_tid(recv_sema)
-        let elem_ty0 = self.mir_sema_type_to_llvm(elem_tid)
+        let iter_elem_tid = self.mir_iter_elem_tid(recv_sema)
+        let iter_elem_ty0 = self.mir_sema_type_to_llvm(iter_elem_tid)
+        let iter_elem_ty = if iter_elem_ty0 != 0: iter_elem_ty0 else: self.type_fallback()
+        // D111 (D65): Sema recorded that the destination owns the values the
+        // iterator views; the collection holds that type and each element is
+        // copied in (collect_element).
+        let call_node = if args_id >= 0 and args_id < body.call_ast_nodes.len(): body.call_ast_nodes[args_id] else: 0
+        let copy_owned_tid = if call_node > 0: self.sema.collect_copy_elements.get(call_node) ?? 0 else: 0
+        let elem_tid = if copy_owned_tid != 0: copy_owned_tid else: iter_elem_tid
+        let elem_ty0 = if copy_owned_tid != 0: self.mir_sema_type_to_llvm(elem_tid) else: iter_elem_ty
         let elem_ty = if elem_ty0 != 0: elem_ty0 else: self.type_fallback()
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
@@ -14486,10 +14509,10 @@ impl Codegen:
             let end_bb = wl_append_bb(self.context, self.current_function, "itercollectstr.end")
             wl_build_br(self.builder, loop_bb)
             wl_position_at_end(self.builder, loop_bb)
-            let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
+            let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, iter_elem_tid)
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), push_bb, end_bb)
             wl_position_at_end(self.builder, push_bb)
-            let elem = self.option_payload_value(next, elem_ty)
+            let elem = self.collect_element(next, iter_elem_ty, elem_ty, elem_tid, copy_owned_tid)
             wl_build_store(self.builder, elem, tmp)
             let push_fn = self.ensure_list_runtime_fn("with_vec_push", void_ty, 2)
             let push_ty = self.get_list_fn_type("with_vec_push", void_ty, 2)
@@ -14559,10 +14582,10 @@ impl Codegen:
             let end_bb2 = wl_append_bb(self.context, self.current_function, "itercollectmap.end")
             wl_build_br(self.builder, loop_bb2)
             wl_position_at_end(self.builder, loop_bb2)
-            let next2 = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
+            let next2 = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, iter_elem_tid)
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next2), insert_bb, end_bb2)
             wl_position_at_end(self.builder, insert_bb)
-            let elem2 = self.option_payload_value(next2, elem_ty)
+            let elem2 = self.collect_element(next2, iter_elem_ty, elem_ty, elem_tid, copy_owned_tid)
             var key_val = elem2
             var val_val = wl_const_int(byte_ty, 1, 0)
             if dest_base_sym == self.sym_hashmap:
@@ -14627,11 +14650,11 @@ impl Codegen:
             let end_bb_b = wl_append_bb(self.context, self.current_function, "itercollectbtree.end")
             wl_build_br(self.builder, loop_bb_b)
             wl_position_at_end(self.builder, loop_bb_b)
-            let next_b = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
+            let next_b = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, iter_elem_tid)
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next_b), item_bb_b, end_bb_b)
 
             wl_position_at_end(self.builder, item_bb_b)
-            let elem_b = self.option_payload_value(next_b, elem_ty)
+            let elem_b = self.collect_element(next_b, iter_elem_ty, elem_ty, elem_tid, copy_owned_tid)
             var key_b = elem_b
             if dest_base_sym == self.sym_btreemap:
                 key_b = wl_build_extract_value(self.builder, elem_b, 0)
@@ -14733,10 +14756,10 @@ impl Codegen:
         let end_bb = wl_append_bb(self.context, self.current_function, "itercollect.end")
         wl_build_br(self.builder, loop_bb)
         wl_position_at_end(self.builder, loop_bb)
-        let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
+        let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, iter_elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), push_bb, end_bb)
         wl_position_at_end(self.builder, push_bb)
-        let elem = self.option_payload_value(next, elem_ty)
+        let elem = self.collect_element(next, iter_elem_ty, elem_ty, elem_tid, copy_owned_tid)
         wl_build_store(self.builder, elem, tmp)
         let push_fn = self.ensure_list_runtime_fn("with_vec_push", void_ty, 2)
         let push_ty = self.get_list_fn_type("with_vec_push", void_ty, 2)
