@@ -1028,8 +1028,16 @@ impl Sema:
             for ai in 0..arm_count:
                 let arm_node = arm_nodes[ai]
                 if resolved_arm_types[ai] != 0 and arm_node > 0 and self.expr_is_untyped_literal_aggregate(arm_node):
-                    let retyped = self.check_expr_with_expected(arm_node, final_type as TypeId)
+                    // Only the literal is checked again; a block arm's
+                    // statements ran once and its blocks take the tail's type.
+                    var literal: i32 = arm_node
+                    let blocks: List[i32] = List.new()
+                    while self.ast.kind(literal) == NodeKind.NK_BLOCK and self.ast.get_data2(literal) != 0:
+                        blocks.push(literal)
+                        literal = self.ast.get_data2(literal)
+                    let retyped = self.check_expr_with_expected(literal, final_type as TypeId)
                     if retyped != 0:
+                        for block in blocks: self.typed_expr_types.insert(block, retyped as i32)
                         resolved_arm_types[ai] = retyped as i32
 
         // Complete context-dependent variant shorthands only after the final
@@ -13166,6 +13174,10 @@ impl Sema:
     fn expr_is_untyped_literal_aggregate(node: i32) -> bool:
         if self.expr_is_untyped_literal_arith(node):
             return true
+        // A block's value is its tail: `Err(_) => { assert(false); 0 }` is a
+        // literal arm (§4.2.1 rule 8); its statements type nothing.
+        if node > 0 and self.ast.kind(node) == NodeKind.NK_BLOCK and self.ast.get_data2(node) != 0:
+            return self.expr_is_untyped_literal_aggregate(self.ast.get_data2(node))
         if node <= 0 or self.ast.kind(node) != NodeKind.NK_TUPLE or self.ast.get_data1(node) == 0:
             return false
         let extra_start = self.ast.get_data0(node)
@@ -19570,11 +19582,15 @@ impl Sema:
         var target_ty: i32 = 0
         var target_base: i32 = 0
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
-            let expected = self.resolve_alias(self.expected_expr_type)
+            // §4.3c: a `&` demand is a demand on the literal it views
+            // (`total([1, 2, 3])` at `xs: &List[i32]`); the caller still
+            // decides whether a view is acceptable there.
+            let demanded = self.resolve_alias(self.expected_expr_type)
+            let expected = if self.get_type_kind(demanded) == TypeKind.TY_REF: self.resolve_alias(self.get_type_d0(demanded) as TypeId) else: demanded
             let expected_kind = self.get_type_kind(expected)
             if expected_kind == TypeKind.TY_ARRAY:
                 expected_elem = self.get_type_d0(expected)
-                target_ty = self.expected_expr_type as i32
+                target_ty = if expected == demanded: self.expected_expr_type as i32 else: expected as i32
             else if expected_kind == TypeKind.TY_SLICE:
                 // #1229: a slice expectation types the ELEMENTS, never the
                 // literal. A literal typed as `[]T` reached MIR as an
@@ -26972,9 +26988,18 @@ impl Sema:
         self.clear_generic_substitution()
 
         // Infer type parameter substitutions from call argument types.
+        // §4.2.1: an untyped literal argument binds a type parameter only
+        // where nothing else does. The typed arguments and the call's demand
+        // come first (`apply(2147483647, (x: i32) -> i64 => x)` is T = i32);
+        // the literal default is the last resort.
+        let literal_args: List[i32] = List.new()
         for pi in 0..param_count:
             if pi >= arg_count:
                 break
+            let lit_node = if pi < arg_nodes.len() as i32: arg_nodes[pi] else: 0
+            if lit_node > 0 and self.expr_is_untyped_literal_arith(lit_node):
+                literal_args.push(pi)
+                continue
             let p_type_node = self.ast.fn_param_type(param_start, pi)
             let arg_ty = arg_types[pi]
             self.bind_type_params_from_type_expr(p_type_node, arg_ty, tp_start, tp_count, call_node)
@@ -26985,6 +27010,14 @@ impl Sema:
             if arg_ty != 0 and self.type_is_ephemeral_value(arg_ty as TypeId) != 0:
                 let eg_arg_node = if pi < arg_nodes.len() as i32: arg_nodes[pi] else: 0
                 self.check_ephemeral_task_arg_escape(if eg_arg_node > 0: eg_arg_node else: call_node, 0, 0, fn_sym, pi)
+        if literal_args.len() > 0:
+            self.bind_unbound_type_params_from_result(ret_node, tp_start, tp_count, call_node)
+            for pi in literal_args:
+                let p_type_node = self.ast.fn_param_type(param_start, pi)
+                if p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_NAMED:
+                    let tp_sym = self.ast.get_data0(p_type_node)
+                    if self.type_param_exists(tp_start, tp_count, tp_sym) != 0 and self.lookup_generic_subst(tp_sym) == 0:
+                        self.put_generic_subst(tp_sym, arg_types[pi], call_node)
         self.bind_type_params_from_bounds(tp_start, tp_count, call_node)
 
         // Obligation model: collect and solve trait bounds for each bound type parameter.
