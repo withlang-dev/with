@@ -18,10 +18,10 @@ use std.fs
 use Lexer
 use Token
 
-fn slice(text: &str, a: i32, b: i32): text.slice(a as i64, b as i64)
+fn slice(text: &str, a: isize, b: isize): text.slice(a, b)
 
 fn line_of(text: &str, offset: i32) -> i32:
-    var line = 1
+    var line: i32 = 1
     for i in 0..offset:
         if text[i] == '\n': line = line + 1
     line
@@ -34,7 +34,7 @@ fn process(path: &str, apply: bool) -> i32:
     let n = tokens.len() as i32
     var out = ""
     var pos = 0
-    var count = 0
+    var count: i32 = 0
     for i in 0..n - 1:
         if tokens.get_tag(i) != TokenKind.TK_KW_ELSE or tokens.get_tag(i + 1) != TokenKind.TK_NEWLINE: continue
         // The logical line's first token: walk back over balanced brackets

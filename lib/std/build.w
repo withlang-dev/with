@@ -2503,9 +2503,9 @@ fn build_https_fetch_source() -> str:
     "use std.net\n" ++
     "use std.process\n" ++
     "use std.time\n\n" ++
-    "let ATTEMPTS = 5\n\n" ++
+    "const ATTEMPTS = 5\n\n" ++
     "fn number(text: &str) -> i32:\n" ++
-    "    var value = 0\n" ++
+    "    var value: i32 = 0\n" ++
     "    for i in 0..text.len() as i32:\n" ++
     "        if text[i] < '0' or text[i] > '9': return -1\n" ++
     "        value = value * 10 + (text[i] - '0') as i32\n" ++
@@ -2544,7 +2544,7 @@ fn build_https_fetch_source() -> str:
     "            print(f\"no connection to {host}:{port} (waited at most {connect_ms / 1000} s)\")\n" ++
     "            return 3\n" ++
     "        let _ = socket_close(fd)\n" ++
-    "    for attempt in 1..ATTEMPTS + 1:\n" ++
+    "    for attempt in 1i32..ATTEMPTS + 1:\n" ++
     "        if https_download_timeout(url.clone(), output.clone(), connect_ms, idle_ms) == 0: return 0\n" ++
     "        if attempt < ATTEMPTS:\n" ++
     "            print(f\"HTTPS download failed (attempt {attempt} of {ATTEMPTS}), retrying: \" ++ url)\n" ++

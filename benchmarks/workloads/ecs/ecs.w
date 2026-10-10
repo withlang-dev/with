@@ -82,7 +82,7 @@ extend World:
                 self.mask[i] = 0
 
     fn count_alive(self: &Self) -> i32:
-        var n = 0
+        var n: i32 = 0
         for i in 0..self.count:
             if self.mask[i] != 0: n += 1
         n

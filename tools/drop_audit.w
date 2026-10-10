@@ -808,12 +808,12 @@ fn last_int_line(s: str) -> str:
 
 // Writes the cell's program and starts `with run --debug-alloc` on it; the
 // verdict is read by classify_cell once the child exits.
-fn start_cell(with_bin: &str, dir: &str, idx: i32, source: &str) -> i32:
+fn start_cell(with_bin: &str, dir: &str, idx: isize, source: &str) -> i32:
     let path = dir ++ f"/cell_{idx}.w"
     let _ = write_file(path, source)
     spawn_capture(argv4(with_bin, "run", "--debug-alloc", path), dir ++ f"/cell_{idx}.out", dir ++ f"/cell_{idx}.err")
 
-fn classify_cell(dir: &str, idx: i32, rc: i32, expect_sum: i32, expect_clean: bool) -> str:
+fn classify_cell(dir: &str, idx: isize, rc: i32, expect_sum: i32, expect_clean: bool) -> str:
     let outp = dir ++ f"/cell_{idx}.out"
     let errp = dir ++ f"/cell_{idx}.err"
     let err = read_file(errp)
@@ -870,7 +870,7 @@ fn main:
     var started: List[i64] = List.new()
     var live: List[i32] = List.new()
     let width = if cpu_count() > 1: cpu_count() else: 1
-    var next = 0
+    var next: i32 = 0
     var finished = 0
     while finished < total:
         if next < total and live.len() as i32 < width:

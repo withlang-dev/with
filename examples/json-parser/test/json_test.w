@@ -21,8 +21,8 @@ fn update_depth(depth: i32, cls: i32) -> i32:
 fn max(a: i32, b: i32) -> i32: if a > b: a else: b
 
 fn count_depth(input: [10]i32, len: i32) -> i32:
-    var max_depth = 0
-    var depth = 0
+    var max_depth: i32 = 0
+    var depth: i32 = 0
     for i in 0..len:
         let cls = classify_char(input[i])
         depth = update_depth(depth, cls)

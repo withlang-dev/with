@@ -44,7 +44,7 @@ type EditPlan {
 
 fn parse_int(text: &str) -> i32:
     if text.len() == 0: return -1
-    var n = 0
+    var n: i32 = 0
     for i in 0..text.len() as i32:
         let b = text[i]
         if b < 48 or b > 57: return -1
@@ -82,7 +82,7 @@ fn classify(line: &str) -> i32:
     0
 
 fn count_carets(line: &str) -> i32:
-    var n = 0
+    var n: i32 = 0
     for i in 0..line.len() as i32:
         if line[i] == 94: n = n + 1
     n
@@ -140,7 +140,7 @@ fn load_skips(skip_path: &str) -> List[str]:
 
 // List.push sites must carry a `has type &str` label when any type label is
 // present at all; labels follow the caret line as `  = ` continuations.
-fn push_label_ok(dlines: &List[str], caret_idx: i32) -> bool:
+fn push_label_ok(dlines: &List[str], caret_idx: isize) -> bool:
     var li = caret_idx + 1
     var label_seen = 0
     var label_ok = 0
@@ -155,7 +155,7 @@ fn push_label_ok(dlines: &List[str], caret_idx: i32) -> bool:
 
 // A wrong-argument site is wrappable only when the argument is a &str
 // meeting a consuming owned-str parameter (labels follow the caret line).
-fn wrong_arg_label_ok(dlines: &List[str], caret_idx: i32) -> bool:
+fn wrong_arg_label_ok(dlines: &List[str], caret_idx: isize) -> bool:
     var li = caret_idx + 1
     var borrowed_arg = 0
     var owned_param = 0
@@ -400,7 +400,7 @@ fn process_file(path: &str, sites: &List[Site], skips: &List[str], apply: i32) -
 
 fn main -> i32:
     let argv = args()
-    var apply = 0
+    var apply: i32 = 0
     var finalize = 0
     var diag_path = ""
     var skip_path = ""

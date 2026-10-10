@@ -21,7 +21,7 @@ extern fn with_fs_read_file(path: &str) -> str
 extern fn with_fs_list_files(path: &str) -> str
 extern fn with_fs_write_file(path: &str, data: &str) -> i32
 
-fn slice(text: &str, a: i32, b: i32): text.slice(a as i64, b as i64)
+fn slice(text: &str, a: isize, b: isize): text.slice(a, b)
 
 type ReceiverModeFacts {
     lines: List[i32],
@@ -31,7 +31,7 @@ type ReceiverModeFacts {
 }
 
 fn line_for_offset(text: &str, offset: i32) -> i32:
-    var line = 1
+    var line: i32 = 1
     for i in 0..offset:
         if text[i] as i32 == 10:
             line = line + 1
@@ -100,7 +100,7 @@ fn annotate_file(path: &str, exact_facts: &ReceiverModeFacts) -> i32:
     var starts: List[i32] = List.new()
     var ends: List[i32] = List.new()
     var repls: List[str] = List.new()
-    var count = 0
+    var count: i32 = 0
     var candidates = 0
 
     var i = 0
@@ -276,7 +276,7 @@ fn annotate_integrated_path(path: &str, excludes: &List[str]) -> i32:
     if path.ends_with(".w"):
         return annotate_integrated_file(path, excludes)
     let listing = unsafe { with_fs_list_files(path) }
-    var changed = 0
+    var changed: i32 = 0
     var failures = 0
     var start = 0
     for i in 0..listing.len() as i32 + 1:
