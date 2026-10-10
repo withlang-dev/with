@@ -36,6 +36,23 @@ fn comptime_parse_float(text: &str) -> f64:
         Ok(c) => unsafe { strtod(c.as_cstr().ptr(), 0 as *mut *mut i8) }
         Err(_) => 0.0
 
+// D125 (§4.2.6): a float to an integer of `bits` truncates toward zero,
+// saturates to the integer's range, and NaN gives 0; the result is the
+// integer's bits in an i64.
+fn comptime_float_to_int_saturating(real: f64, bits: i32, unsigned: bool) -> i64:
+    if real != real:
+        return 0
+    let width = if bits > 64: 64 else: bits
+    var limit: f64 = 1.0
+    for _ in 0..(if unsigned: width else: width - 1): limit = limit * 2.0
+    if unsigned:
+        if real <= 0.0: return 0
+        if real >= limit: return exact_int_low_mask(width)
+        return (real as u64) as i64
+    if real >= limit: return exact_int_low_mask(width - 1)
+    if real <= 0.0 - limit: return ~exact_int_low_mask(width - 1)
+    real as i64
+
 fn comptime_float_of(value: &ComptimeValue) -> f64:
     if value.kind == ComptimeValueKind.CV_FLOAT:
         return value.real
@@ -6666,9 +6683,32 @@ impl ComptimeEvaluator:
         let target_type = self.node_type_or(node, self.sema.resolve_type_expr(self.ast.get_data1(node)) as i32)
         if target_type == 0:
             return self.fail(node, "comptime cast target type is unknown")
-        if comptime_value_is_intlike(value_signal.value) != 0:
-            return comptime_control_value(comptime_value_int(target_type, comptime_value_intlike(value_signal.value)))
-        if value_signal.value.kind == ComptimeValueKind.CV_STR and self.sema.resolve_alias(target_type as TypeId) == self.sema.ty_str:
+        // D125 (§4.2.6): the same conversion a runtime cast performs.
+        let target = self.sema.resolve_alias(target_type as TypeId)
+        let target_kind = self.sema.get_type_kind(target)
+        let is_float = value_signal.value.kind == ComptimeValueKind.CV_FLOAT
+        let is_int = comptime_value_is_intlike(value_signal.value) != 0
+        if target_kind == TypeKind.TY_INT and is_int:
+            // Keep the low bits in two's complement.
+            let bits = self.sema.get_type_d0(target)
+            return comptime_control_value(comptime_value_int(target_type, int_truncate_to_width(comptime_value_intlike(value_signal.value), bits, self.sema.get_type_d1(target) == 0)))
+        if target_kind == TypeKind.TY_INT and is_float:
+            let bits = self.sema.get_type_d0(target)
+            return comptime_control_value(comptime_value_int(target_type, comptime_float_to_int_saturating(value_signal.value.real, bits, self.sema.get_type_d1(target) == 0)))
+        if target_kind == TypeKind.TY_FLOAT and (is_int or is_float):
+            // Round to nearest, ties to even, once, at the target's width;
+            // too large for a narrower float is infinity.
+            let narrow = self.sema.get_type_d0(target) == 32
+            let source_unsigned = is_int and self.sema.is_unsigned_int_type(value_signal.value.type_id)
+            let raw = comptime_value_intlike(value_signal.value)
+            let real = if is_float and narrow: (value_signal.value.real as f32) as f64
+                else if is_float: value_signal.value.real
+                else if narrow and source_unsigned: ((raw as u64) as f32) as f64
+                else if narrow: (raw as f32) as f64
+                else if source_unsigned: (raw as u64) as f64
+                else: raw as f64
+            return comptime_control_value(comptime_value_float(target_type, real, ""))
+        if value_signal.value.kind == ComptimeValueKind.CV_STR and target == self.sema.ty_str:
             return value_signal
         self.fail(node, "comptime cast is not supported for this value")
 

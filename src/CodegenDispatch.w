@@ -3461,6 +3461,25 @@ impl Codegen:
             return wl_build_srem(self.builder, l, r)
         wl_get_undef(wl_type_of(l))
 
+    // D125 (§4.2.6): a float to an integer truncates toward zero, saturates
+    // out of range and gives 0 for NaN: llvm.fpto[su]i.sat, scalar or vector
+    // (plain fptosi is poison out of range; wasm lowers this to trunc_sat).
+    mut fn cg_build_fp_to_int_sat(val: i64, dst_ty: i64, is_unsigned: bool) -> i64:
+        let name = if is_unsigned: "llvm.fptoui.sat" else: "llvm.fptosi.sat"
+        let intrinsic_id = wl_lookup_intrinsic_id(name)
+        if intrinsic_id == 0:
+            self.had_error = 1
+            self.codegen_error_detail = "missing LLVM intrinsic " ++ name
+            return wl_get_undef(dst_ty)
+        let overloads: List[i64] = List.new()
+        overloads.push(dst_ty)
+        overloads.push(wl_type_of(val))
+        let fn_val = wl_get_intrinsic_decl(self.llmod, intrinsic_id, list_data_i64(&overloads), 2)
+        let fn_ty = wl_intrinsic_get_type(self.context, intrinsic_id, list_data_i64(&overloads), 2)
+        let args: List[i64] = List.new()
+        args.push(val)
+        wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 1)
+
     mut fn mir_build_checked_int_bin_op(op: i32, l: i64, r: i64, wider_ty: i64, is_unsigned: bool) -> i64:
         let name = self.mir_checked_overflow_intrinsic_name(op, is_unsigned)
         let intrinsic_id = wl_lookup_intrinsic_id(name)
@@ -5232,11 +5251,9 @@ impl Codegen:
                 let ck = wl_get_type_kind(cast_ty)
                 // Float → Int
                 if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and ck == wl_integer_type_kind():
-                    // The integer destination determines FPToUI vs FPToSI.
-                    // A float source has no integer signedness to consult.
-                    if d1 > 0 and self.mir_sema_type_is_unsigned(d1):
-                        return wl_build_fp_to_ui(self.builder, val, cast_ty)
-                    return wl_build_fp_to_si(self.builder, val, cast_ty)
+                    // The integer destination decides signed or unsigned;
+                    // a float source has no integer signedness to consult.
+                    return self.cg_build_fp_to_int_sat(val, cast_ty, d1 > 0 and self.mir_sema_type_is_unsigned(d1))
                 // Int → Float
                 if vk == wl_integer_type_kind() and (ck == wl_float_type_kind() or ck == wl_double_type_kind()):
                     if src_unsigned:

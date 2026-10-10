@@ -303,8 +303,6 @@ extern fn LLVMBuildSExt(b: *mut u8, v: *mut u8, ty: *mut u8, name: *const u8) ->
 extern fn LLVMBuildTrunc(b: *mut u8, v: *mut u8, ty: *mut u8, name: *const u8) -> *mut u8
 extern fn LLVMBuildSIToFP(b: *mut u8, v: *mut u8, ty: *mut u8, name: *const u8) -> *mut u8
 extern fn LLVMBuildUIToFP(b: *mut u8, v: *mut u8, ty: *mut u8, name: *const u8) -> *mut u8
-extern fn LLVMBuildFPToSI(b: *mut u8, v: *mut u8, ty: *mut u8, name: *const u8) -> *mut u8
-extern fn LLVMBuildFPToUI(b: *mut u8, v: *mut u8, ty: *mut u8, name: *const u8) -> *mut u8
 extern fn LLVMBuildBitCast(b: *mut u8, v: *mut u8, ty: *mut u8, name: *const u8) -> *mut u8
 extern fn LLVMBuildIntToPtr(b: *mut u8, v: *mut u8, ty: *mut u8, name: *const u8) -> *mut u8
 extern fn LLVMBuildPtrToInt(b: *mut u8, v: *mut u8, ty: *mut u8, name: *const u8) -> *mut u8
@@ -1303,8 +1301,6 @@ pub fn wl_build_sext(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildSExt(b a
 pub fn wl_build_trunc(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildTrunc(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
 pub fn wl_build_si_to_fp(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildSIToFP(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
 pub fn wl_build_ui_to_fp(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildUIToFP(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_fp_to_si(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildFPToSI(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_fp_to_ui(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildFPToUI(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
 pub fn wl_build_bitcast(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildBitCast(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
 pub fn wl_build_int_to_ptr(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildIntToPtr(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
 pub fn wl_build_ptr_to_int(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildPtrToInt(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }

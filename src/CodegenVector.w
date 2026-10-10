@@ -282,7 +282,7 @@ impl Codegen:
         let dst_float = self.cg_lane_is_float(dst_lane)
         if src_float and dst_float: return wl_build_fp_cast(self.builder, val, dst_ty)
         if src_float:
-            return if self.cg_lane_is_unsigned(dst_lane): wl_build_fp_to_ui(self.builder, val, dst_ty) else: wl_build_fp_to_si(self.builder, val, dst_ty)
+            return self.cg_build_fp_to_int_sat(val, dst_ty, self.cg_lane_is_unsigned(dst_lane))
         if dst_float:
             return if self.cg_lane_is_unsigned(src_lane): wl_build_ui_to_fp(self.builder, val, dst_ty) else: wl_build_si_to_fp(self.builder, val, dst_ty)
         let src_w = wl_get_int_type_width(wl_get_element_type(src_ty))
