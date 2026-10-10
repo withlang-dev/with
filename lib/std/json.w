@@ -119,6 +119,10 @@ impl Serialize for i64:
     fn serialize(self: &i64, out: JsonWriter) -> JsonWriter:
         out.value_i64(*self)
 
+impl Serialize for isize:
+    fn serialize(self: &isize, out: JsonWriter) -> JsonWriter:
+        out.value_i64(*self)
+
 impl Serialize for bool:
     fn serialize(self: &bool, out: JsonWriter) -> JsonWriter:
         out.value_bool(*self)
@@ -550,6 +554,17 @@ impl Deserialize for i64:
         if input.token_type() != JSON_PRIMITIVE:
             json_panic("expected JSON integer")
         json_i64(input.source, input.tokens, input.index)
+
+// D114: a value an isize cannot hold (a 32-bit target) is refused, never
+// truncated.
+impl Deserialize for isize:
+    fn deserialize(input: JsonView) -> isize:
+        if input.token_type() != JSON_PRIMITIVE:
+            json_panic("expected JSON integer")
+        let wide = json_i64(input.source, input.tokens, input.index)
+        if wide as isize as i64 != wide:
+            json_panic("JSON integer does not fit isize")
+        wide as isize
 
 impl Deserialize for bool:
     fn deserialize(input: JsonView) -> bool:
