@@ -5037,6 +5037,9 @@ impl MirBuilder:
         self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
 
     mut fn lower_bin_op(op: i32, lhs_expr: i32, rhs_expr: i32, node: i32):
+        // D116: `a ++ b` over sequences builds a List.
+        if op == BinaryOp.OP_CONCAT and self.sema.concat_sequence_nodes.contains(node):
+            return self.lower_list_concat(node)
         // Short-circuit evaluation for logical and/or
         if op == 11 or op == 12:
             return self.lower_short_circuit(op, lhs_expr, rhs_expr, node)
@@ -6185,6 +6188,78 @@ impl MirBuilder:
             return alias_field
         -1
 
+    // Whether two expressions name one place: the same node (a compound
+    // assignment reuses its target node as the operator's left operand), or
+    // the same local by name.
+    fn same_place_expr(a: i32, b: i32) -> bool:
+        if a == b: return true
+        self.ast.kind(a) == NodeKind.NK_IDENT and self.ast.kind(b) == NodeKind.NK_IDENT and self.ast.get_data0(a) == self.ast.get_data0(b)
+
+    // D116: a sequence operand of `++`: a List or a fixed array goes by its
+    // place (codegen reads the header or the storage through the address);
+    // a slice is its value; a List whose elements move (not Copy) is
+    // consumed here, as Sema marked it, so no drop of it follows and the
+    // runtime frees its buffer once the elements are taken. A temporary
+    // operand (a literal, a call) is materialized to a place first.
+    mut fn lower_concat_operand(expr: i32, elem: i32) -> i32:
+        let ty = self.expr_type(expr)
+        var resolved = self.sema.resolve_alias(ty as TypeId)
+        if self.sema.get_type_kind(resolved) == TypeKind.TY_REF: resolved = self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId)
+        let kind = self.sema.get_type_kind(resolved)
+        if kind == TypeKind.TY_SLICE:
+            return self.lower_expr(expr)
+        let moves = kind == TypeKind.TY_GENERIC_INST and self.sema.is_copy_frozen(elem as TypeId) == 0
+        let ek = self.ast.kind(expr)
+        let is_place = ek == NodeKind.NK_IDENT or ek == NodeKind.NK_FIELD_ACCESS or ek == NodeKind.NK_INDEX
+        if is_place:
+            let place = self.lower_expr_place(expr)
+            if moves:
+                let op = self.body.new_operand(OperandKind.OK_MOVE, place)
+                self.consume_moved_operand(op)
+                return op
+            return self.body.new_operand(OperandKind.OK_COPY, place)
+        let value = self.lower_expr(expr)
+        let place = self.materialize_operand(value, ty, self.ast.get_start(expr))
+        if moves:
+            let op = self.body.new_operand(OperandKind.OK_MOVE, place)
+            self.consume_moved_operand(op)
+            return op
+        self.body.new_operand(OperandKind.OK_COPY, place)
+
+    mut fn lower_list_concat(node: i32) -> i32:
+        let elem: i32 = self.sema.concat_sequence_nodes.get(node) ?? 0
+        let result_ty = self.expr_type(node)
+        let a = self.lower_concat_operand(self.ast.get_data1(node), elem)
+        let b = self.lower_concat_operand(self.ast.get_data2(node), elem)
+        let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("concat"), self.sema.ty_void)
+        let args: List[i32] = List.new()
+        args.push(a)
+        args.push(b)
+        let args_id = self.body.new_call_args(args)
+        let result_local = self.new_temp(result_ty)
+        let result_place = self.place_for_local(result_local)
+        let next_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+        self.switch_to(next_bb)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_CONCAT)
+        self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
+    mut fn lower_list_extend(place_expr: i32, more_expr: i32, concat_node: i32):
+        let elem: i32 = self.sema.concat_sequence_nodes.get(concat_node) ?? 0
+        let target = self.lower_expr_place(place_expr)
+        let more = self.lower_concat_operand(more_expr, elem)
+        let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("extend"), self.sema.ty_void)
+        let args: List[i32] = List.new()
+        args.push(self.body.new_operand(OperandKind.OK_COPY, target))
+        args.push(more)
+        let args_id = self.body.new_call_args(args)
+        let result_local = self.new_temp(self.sema.ty_void)
+        let result_place = self.place_for_local(result_local)
+        let next_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+        self.switch_to(next_bb)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_EXTEND)
+
     mut fn lower_list_literal_push(list_place: i32, elem_node: i32, elem_ty: i32):
         if elem_node == 0:
             return
@@ -6653,6 +6728,14 @@ impl MirBuilder:
     // view of the place) — read after the store (read_assigned_place); 0 for
     // a statement, and -1 is returned.
     mut fn lower_assign(place_expr: i32, rhs_expr: i32, read_back: i32) -> i32:
+        // D116 (§15.4.9): `xs ++= more`, and `xs = xs ++ more` spelled out,
+        // extend the List in place: the left operand's buffer is reused and
+        // only the append is paid.
+        if rhs_expr != 0 and self.ast.kind(rhs_expr) == NodeKind.NK_BINARY and self.sema.concat_sequence_nodes.contains(rhs_expr) and self.same_place_expr(place_expr, self.ast.get_data1(rhs_expr)) and self.sema.sequence_is_list(self.expr_type(place_expr)):
+            if read_back != 0:
+                sema_phase_bug(f"BUG: a `++=` reached a tail read: node={place_expr}")
+            self.lower_list_extend(place_expr, self.ast.get_data2(rhs_expr), rhs_expr)
+            return -1
         // §4.3d (v7.16): `m[i] = b` rewrites the mask with lane i set.
         if self.ast.kind(place_expr) == NodeKind.NK_INDEX and (self.sema.vector_ops.get(place_expr) ?? 0) == VectorOp.MASK_LANE as i32:
             return self.lower_mask_lane_write(place_expr, rhs_expr, read_back)
@@ -12499,15 +12582,27 @@ impl MirBuilder:
             return -1
         if self.sema.can_auto_ref_arg_frozen(expected_ty, actual_ty) == 0:
             return -1
-        let place = self.lower_expr_place(arg_node)
-        if self.place_type_is_str(place) != 0:
-            self.mark_string_place_copied(place)
+        let span = self.ast.get_start(arg_node)
+        // §4.2.6 (#2336): a narrower integer widens into the pointee, so the
+        // view is of a temporary at the pointee's width, never of the
+        // narrower place (an `&i64` over a four-byte `i32` read -1 as
+        // 4294967295). Sema accepted the widening; this materializes it.
+        let pointee = self.sema.get_type_d0(self.sema.resolve_alias(expected_ty as TypeId))
+        let place = if pointee != 0 and self.sema.numeric_types_differ(pointee, actual_ty):
+            let narrow_value = self.lower_expr(arg_node)
+            let widened = self.lower_value_cast(narrow_value, actual_ty, pointee, span)
+            self.materialize_operand(widened, pointee, span)
         else:
-            self.mark_string_base_fields_may_alias(self.place_base_local(place))
+            let narrow = self.lower_expr_place(arg_node)
+            if self.place_type_is_str(narrow) != 0:
+                self.mark_string_place_copied(narrow)
+            else:
+                self.mark_string_base_fields_may_alias(self.place_base_local(narrow))
+            narrow
         let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, place, 0)
         let temp = self.new_temp(expected_ty)
         let temp_place = self.place_for_local(temp)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, self.ast.get_start(arg_node))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, span)
         self.body.new_operand(OperandKind.OK_COPY, temp_place)
 
     // D22 call arguments consume the same Sema record as every other

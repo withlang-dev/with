@@ -181,8 +181,11 @@ impl Lexer:
             self.pos = self.pos + 1
             if self.pos < slen:
                 let c2 = src[(self.pos)]
-                if c2 == CharCode.Plus:  // ++
+                if c2 == CharCode.Plus:  // ++ or ++= (D116)
                     self.pos = self.pos + 1
+                    if self.pos < slen and src[(self.pos)] == CharCode.Eq:
+                        self.pos = self.pos + 1
+                        return TokenKind.TK_PLUS_PLUS_EQ
                     return TokenKind.TK_PLUS_PLUS
                 if c2 == CharCode.Percent:  // +% or +%=
                     self.pos = self.pos + 1

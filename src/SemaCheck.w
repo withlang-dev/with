@@ -382,6 +382,13 @@ impl Sema:
         let actual_resolved = self.resolve_alias(actual as TypeId)
         if pointee_resolved == actual_resolved:
             return 1
+        // §4.2.6 (#2336): a narrower integer widens into the pointee, the
+        // rule types_compatible accepted; the reference is then of the
+        // widened temporary MIR materializes (lower_auto_ref_call_arg). The
+        // value went by value before, and an `&i64` read an `i32` place
+        // eight bytes wide.
+        if self.is_plain_numeric_type(pointee_resolved as i32) and self.is_plain_numeric_type(actual_resolved as i32):
+            return if self.numeric_types_differ(pointee_resolved as i32, actual_resolved as i32) and self.implicit_numeric_join(pointee_resolved, actual_resolved) != pointee_resolved: 0 else: 1
         let pointee_kind = self.get_type_kind(pointee_resolved)
         let actual_kind = self.get_type_kind(actual_resolved)
         if pointee_kind == TypeKind.TY_STRUCT and actual_kind == TypeKind.TY_STRUCT:
@@ -414,6 +421,13 @@ impl Sema:
         let actual_resolved = self.resolve_alias(actual as TypeId)
         if pointee_resolved == actual_resolved:
             return 1
+        // §4.2.6 (#2336): a narrower integer widens into the pointee, the
+        // rule types_compatible accepted; the reference is then of the
+        // widened temporary MIR materializes (lower_auto_ref_call_arg). The
+        // value went by value before, and an `&i64` read an `i32` place
+        // eight bytes wide.
+        if self.is_plain_numeric_type(pointee_resolved as i32) and self.is_plain_numeric_type(actual_resolved as i32):
+            return if self.numeric_types_differ(pointee_resolved as i32, actual_resolved as i32) and self.implicit_numeric_join(pointee_resolved, actual_resolved) != pointee_resolved: 0 else: 1
         let pointee_kind = self.get_type_kind(pointee_resolved)
         let actual_kind = self.get_type_kind(actual_resolved)
         if pointee_kind == TypeKind.TY_STRUCT and actual_kind == TypeKind.TY_STRUCT:
@@ -4381,7 +4395,7 @@ impl Sema:
             var di = demands_start
             while di + 2 < self.int_local_demands.len():
                 let let_node: i32 = self.int_local_demands[di]
-                if not self.int_local_decisions.contains(let_node):
+                if not self.int_local_decisions.contains(let_node) or self.list_literal_let(let_node):
                     self.int_local_decisions.insert(let_node, (self.int_local_demands[di + 1] as i64) * 4294967296 + self.int_local_demands[di + 2] as i64)
                 di += 3
             while self.int_local_demands.len() > demands_start: self.int_local_demands.pop()
@@ -11239,6 +11253,7 @@ impl Sema:
                 if self.gen_for_elem_types.contains(iterable):
                     self.register_gen_loop_view_borrows(iterable)
                 pushed_scopes = pushed_scopes + 1
+                self.register_iter_literal_bindings(binding, self.ast.comprehension_binding_is_pattern(node, binding), iterable)
                 if self.ast.comprehension_binding_is_pattern(node, binding):
                     self.check_pattern(binding, elem_ty)
                 else:
@@ -11257,6 +11272,9 @@ impl Sema:
                 if elem_value != 0 and self.record_contextual_copy_adjustment(expr, elem_value, result_elem as i32) != 0:
                     result_elem = elem_value as TypeId
             self.record_gen_comprehension_captures(node, comp_start, &gen_outer_counts)
+            for ci in 0..clause_count:
+                let base = comp_start + ci * 3
+                self.unregister_iter_literal_bindings(self.ast.get_extra(base), self.ast.comprehension_binding_is_pattern(node, self.ast.get_extra(base)))
             for _ in 0..pushed_scopes:
                 self.pop_scope()
             self.truncate_for_view_bindings(comp_view_count)
@@ -13432,6 +13450,18 @@ impl Sema:
                 for i in 0..self.untyped_const_alt_decls.len():
                     let alt: i32 = self.untyped_const_alt_decls[i]
                     if self.ast.get_data0(alt) == sym and self.decl_source_path_for_node(alt) == self.current_module_path: decl = alt
+        else:
+            // #2333 (D70, #1703): a module's own constant that a same-named
+            // root declaration displaced is registered under its displaced
+            // identity; the module's bare name reaches it through the
+            // displaced record whose path is this module.
+            var di = self.displaced_fn_index.get(sym) ?? -1
+            while di >= 0:
+                let displaced: i32 = self.displaced_fn_syms[di]
+                if self.displaced_fn_paths[di] == self.current_module_path and self.untyped_const_decls.contains(displaced):
+                    decl = self.untyped_const_decls.get(displaced).unwrap()
+                    break
+                di = self.displaced_fn_prev[di]
         if decl == 0:
             return 0
         // The initializer as written: the comptime transform folded the
@@ -13937,6 +13967,16 @@ impl Sema:
                         rhs = self.check_expr_value_context(rhs_node)
                 if lhs == 0:
                     lhs = self.check_expr_value_context(lhs_node)
+        else if op == BinaryOp.OP_CONCAT and (self.ast.kind(lhs_node) == NodeKind.NK_ARRAY_LIT) != (self.ast.kind(rhs_node) == NodeKind.NK_ARRAY_LIT):
+            // D116: a list literal beside a sequence takes that sequence's
+            // element type (`xs ++ [1, 2]` over a List[i32] pushes i32s).
+            let lit_first = self.ast.kind(lhs_node) == NodeKind.NK_ARRAY_LIT
+            let other = self.check_expr_value_context(if lit_first: rhs_node else: lhs_node)
+            let other_elem = self.sequence_elem_type(other as i32)
+            let lit_expected = if other_elem != 0: self.ensure_list_type_for(other_elem) else: 0
+            let lit = self.check_expr_with_expected(if lit_first: lhs_node else: rhs_node, lit_expected as TypeId)
+            lhs = if lit_first: lit else: other
+            rhs = if lit_first: other else: lit
         else:
             lhs = self.check_expr_value_context(lhs_node)
             rhs = self.check_expr_value_context(rhs_node)
@@ -14197,6 +14237,11 @@ impl Sema:
         if op == BinaryOp.OP_CONCAT:
             if self.reject_unit_operand("++", lhs_node, lhs as i32) or self.reject_unit_operand("++", rhs_node, rhs as i32):
                 return 0
+            let sequence = self.sequence_concat_result(node, lhs_node, rhs_node, lhs as i32, rhs as i32)
+            if sequence < 0:
+                return 0
+            if sequence != 0:
+                return sequence
             let lhs_resolved = self.resolve_alias(lhs)
             let rhs_resolved = self.resolve_alias(rhs)
             let lhs_k = self.get_type_kind(lhs_resolved)
@@ -14208,6 +14253,63 @@ impl Sema:
             return self.ty_str as i32
 
         0
+
+    fn sequence_is_list(ty: i32) -> bool:
+        if ty == 0: return false
+        let resolved = self.resolve_alias(ty as TypeId)
+        self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(resolved as i32) == self.syms.list
+
+    // D116 (§15.4.9): the element type of a sequence operand of `++`: a
+    // List[T], a slice `[]T`, a fixed array `[T; N]`, through one reference;
+    // 0 for anything else (a str is the other rule).
+    fn sequence_elem_type(ty: i32) -> i32:
+        if ty == 0: return 0
+        var resolved = self.resolve_alias(ty as TypeId)
+        if self.get_type_kind(resolved) == TypeKind.TY_REF: resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+        let kind = self.get_type_kind(resolved)
+        if kind == TypeKind.TY_SLICE or kind == TypeKind.TY_ARRAY: return self.get_type_d0(resolved)
+        if kind == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(resolved as i32) == self.syms.list and self.get_generic_inst_arg_count(resolved as i32) == 1:
+            return self.get_generic_inst_arg(resolved as i32, 0)
+        0
+
+    // D116 (§15.4.9): `a ++ b` over two sequences of one element type is a
+    // new List[T]. Both operands are observed; elements that are not Copy
+    // are moved, so such a List operand is consumed (a later use is the
+    // usual moved-value error, and `.clone()` is the spelling for a copy),
+    // and a slice or fixed array of them cannot be an operand. 0 when
+    // neither operand is a sequence; an error and -1 when only one is.
+    mut fn sequence_concat_result(node: i32, lhs_node: i32, rhs_node: i32, lhs: i32, rhs: i32) -> i32:
+        let le = self.sequence_elem_type(lhs)
+        let re = self.sequence_elem_type(rhs)
+        if le == 0 and re == 0: return 0
+        if le == 0 or re == 0:
+            let str_side = if self.resolve_alias((if le == 0: lhs else: rhs) as TypeId) == self.ty_str: " (a `str` is text, not a byte sequence: build the text, or make the bytes a `str`)" else: ""
+            self.emit_error(f"`++` concatenates two sequences, or two `str`; here one operand is `{self.type_name(lhs)}` and the other `{self.type_name(rhs)}`{str_side} (§15.4.9)", node)
+            return -1
+        var elem = le
+        if not self.types_identical(le, re):
+            // The elements share one storage, so the types must be one. A
+            // literal-typed operand (`let xs = [1, 2]`) takes the other's
+            // element as a demand (D128); the body's second check agrees.
+            if self.note_int_local_arg_demand(lhs_node, self.ensure_list_type_for(re), lhs): elem = re
+            else if self.note_int_local_arg_demand(rhs_node, self.ensure_list_type_for(le), rhs): elem = le
+            else:
+                self.emit_error(f"`++` needs one element type: `{self.type_name(le)}` beside `{self.type_name(re)}` (§15.4.9)", node)
+                return -1
+        if self.is_copy(elem as TypeId) == 0:
+            for side in 0..2:
+                let operand_node = if side == 0: lhs_node else: rhs_node
+                let operand_ty = if side == 0: lhs else: rhs
+                var operand_resolved = self.resolve_alias(operand_ty as TypeId)
+                if self.get_type_kind(operand_resolved) == TypeKind.TY_REF: operand_resolved = self.resolve_alias(self.get_type_d0(operand_resolved) as TypeId)
+                if self.get_type_kind(operand_resolved) != TypeKind.TY_GENERIC_INST:
+                    self.emit_error_with_help(f"`++` moves elements of `{self.type_name(elem)}`, which is not Copy, and a `{self.type_name(operand_ty)}` cannot be moved out of (§15.4.9)", operand_node, "concatenate Lists, or clone the elements into one first")
+                    return -1
+                self.mark_moved_if_consumed(operand_node)
+        let result = self.ensure_list_type_for(elem)
+        self.concat_sequence_nodes.insert(node, elem)
+        self.typed_expr_types.insert(node, result)
+        result
 
     // #1862 (D65): a Unit operand of `++` or arithmetic is a type error here,
     // never a codegen failure. The operand-kind lists below enumerated what
@@ -15335,7 +15437,9 @@ impl Sema:
 
         // D93: no annotation, an element-form literal, and uses that
         // demanded a collection: the binding has that type.
-        let use_typed = ann_extra < 0 and value != 0 and self.ast.kind(value) == NodeKind.NK_ARRAY_LIT
+        // D128 (#2343): a comprehension's binding too (`let sums = [a + b for
+        // (a, b) in src]` passed at `[]i32`).
+        let use_typed = ann_extra < 0 and value != 0 and (self.ast.kind(value) == NodeKind.NK_ARRAY_LIT or self.ast.kind(value) == NodeKind.NK_ARRAY_COMPREHENSION)
         if use_typed and self.literal_watermark == 0:
             self.literal_watermark = self.type_kinds.len() as i32
         if use_typed and self.literal_decisions.len() > 0:
@@ -17946,6 +18050,7 @@ impl Sema:
         self.push_scope()
         if gen_elem != 0:
             self.register_gen_loop_view_borrows(iterable)
+        self.register_iter_literal_bindings(binding, self.ast.for_binding_is_pattern(node), iterable)
         if self.ast.for_binding_is_pattern(node):
             self.check_pattern(binding, elem_type)
             self.record_pattern_view_bindings(binding, iterable)
@@ -17983,6 +18088,7 @@ impl Sema:
         self.push_live_loop(body, for_live_depth)
         let for_body_type = self.check_expr_statement_context(body)
         if range_literal and binding != 0 and not self.ast.for_binding_is_pattern(node): self.int_local_for_decls.remove(binding)
+        self.unregister_iter_literal_bindings(binding, self.ast.for_binding_is_pattern(node))
         self.pop_live_loop()
         self.drop_control_flow_depth = saved_drop_cf_for
         // `for` exits when the iterable is exhausted (like a condition) → has_condition_exit = 1.
@@ -26705,6 +26811,136 @@ impl Sema:
         if self.expr_is_untyped_literal_arith(bound): return true
         self.literal_binding_lets_in(bound).len() > 0
 
+    // D128 (#2343): the `let` of a literal's binding that a loop or a
+    // comprehension clause walks (`for x in xs` with `let xs = [1, 2]`), when
+    // it has no annotation and an element-form literal for its value; 0
+    // otherwise.
+    fn iterated_literal_let(iterable: i32) -> i32:
+        if iterable == 0 or self.ast.kind(iterable) != NodeKind.NK_IDENT: return 0
+        let decl = self.binding_decl_nodes.get(self.ast.get_data0(iterable)) ?? 0
+        if not self.list_literal_let(decl): return 0
+        decl
+
+    // Whether every element of the list literal at `decl` is an untyped
+    // numeric literal expression at `pos` (-1: the element itself; k: the
+    // k-th part of a tuple element), so a numeric demand can type it.
+    fn list_literal_untyped_at(decl: i32, pos: i32) -> bool:
+        let value = self.ast.get_data1(decl)
+        let start = self.ast.get_data0(value)
+        let count = self.ast.get_data1(value)
+        if count == 0: return false
+        for ei in 0..count:
+            var elem = self.ast.get_extra(start + ei)
+            if pos >= 0:
+                if self.ast.kind(elem) != NodeKind.NK_TUPLE or pos >= self.ast.get_data1(elem): return false
+                elem = self.ast.get_extra(self.ast.get_data0(elem) + pos)
+            if not self.expr_is_untyped_literal_arith(elem): return false
+        true
+
+    // Whether `decl` is an unannotated `let` of an element-form list literal.
+    fn list_literal_let(decl: i32) -> bool:
+        if decl <= 0 or self.ast.kind(decl) != NodeKind.NK_LET_BINDING or self.local_let_type_ann_extra(self.ast.get_data2(decl)) >= 0: return false
+        let value = self.ast.get_data1(decl)
+        value != 0 and self.ast.kind(value) == NodeKind.NK_ARRAY_LIT and self.ast.get_data2(value) == 0
+
+    // The names a loop or comprehension clause binds over a literal's binding,
+    // each at its tuple position (`(a, b)`: 0 and 1; a plain name: -1).
+    mut fn register_iter_literal_bindings(binding: i32, is_pattern: bool, iterable: i32):
+        let decl = self.iterated_literal_let(iterable)
+        if decl == 0 or binding == 0: return
+        // A plain name is a symbol in a `for` and an identifier pattern in a
+        // comprehension clause (AstPool.mark_pattern_binding).
+        if not is_pattern or self.ast.kind(binding) == NodeKind.NK_PAT_IDENT:
+            let sym = if is_pattern: self.ast.get_data0(binding) else: binding
+            self.iter_literal_lets.insert(sym, decl)
+            self.iter_literal_positions.insert(sym, -1)
+            return
+        if self.ast.kind(binding) != NodeKind.NK_PAT_TUPLE: return
+        let start = self.ast.get_data0(binding)
+        for pi in 0..self.ast.get_data1(binding):
+            let sub = self.ast.get_extra(start + pi)
+            if self.ast.kind(sub) != NodeKind.NK_PAT_IDENT: continue
+            self.iter_literal_lets.insert(self.ast.get_data0(sub), decl)
+            self.iter_literal_positions.insert(self.ast.get_data0(sub), pi)
+
+    mut fn unregister_iter_literal_bindings(binding: i32, is_pattern: bool):
+        if binding == 0: return
+        if not is_pattern or self.ast.kind(binding) == NodeKind.NK_PAT_IDENT:
+            let sym = if is_pattern: self.ast.get_data0(binding) else: binding
+            self.iter_literal_lets.remove(sym)
+            self.iter_literal_positions.remove(sym)
+            return
+        if self.ast.kind(binding) != NodeKind.NK_PAT_TUPLE: return
+        let start = self.ast.get_data0(binding)
+        for pi in 0..self.ast.get_data1(binding):
+            let sub = self.ast.get_extra(start + pi)
+            if self.ast.kind(sub) != NodeKind.NK_PAT_IDENT: continue
+            self.iter_literal_lets.remove(self.ast.get_data0(sub))
+            self.iter_literal_positions.remove(self.ast.get_data0(sub))
+
+    // The tuple position of the first name in `expr` that walks the literal
+    // bound at `decl` (-1 for the element itself), or -2 when none does.
+    fn iter_binding_positions_in(expr: i32, decl: i32) -> List[i32]:
+        var out: List[i32] = List.new()
+        if expr <= 0: return out
+        let kind = self.ast.kind(expr)
+        if kind == NodeKind.NK_IDENT:
+            let sym = self.ast.get_data0(expr)
+            if (self.iter_literal_lets.get(sym) ?? 0) == decl: out.push(self.iter_literal_positions.get(sym) ?? -2)
+        else if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG: return self.iter_binding_positions_in(self.ast.get_data0(expr), decl)
+        else if kind == NodeKind.NK_BLOCK: return self.iter_binding_positions_in(self.ast.get_data2(expr), decl)
+        else if kind == NodeKind.NK_UNARY: return self.iter_binding_positions_in(self.ast.get_data1(expr), decl)
+        else if kind == NodeKind.NK_IF_EXPR or kind == NodeKind.NK_BINARY:
+            for p in self.iter_binding_positions_in(self.ast.get_data1(expr), decl): out.push(p)
+            for p in self.iter_binding_positions_in(self.ast.get_data2(expr), decl): out.push(p)
+        out
+
+    // D128 (#2343): the type a demand of `want` on `expr` makes of the local
+    // `decl`: `want` itself; or, when `decl` is a literal's binding walked by
+    // a name in `expr`, the List of its element with that name's position at
+    // `want` and the other positions as already decided. 0 when the demand
+    // adds nothing to the decision in force.
+    fn int_local_demand_type(decl: i32, want: i32, expr: i32) -> i32:
+        if not self.list_literal_let(decl): return want
+        let positions = self.iter_binding_positions_in(expr, decl)
+        if positions.len() == 0:
+            // The demand reached the binding itself (a `++` operand, a
+            // sequence demand): the List of the element, when the literal's
+            // elements are untyped numbers a demand can type.
+            if not self.is_plain_numeric_type(want) or not self.list_literal_untyped_at(decl, -1): return 0
+            let whole_args: List[i32] = List.new()
+            whole_args.push(want)
+            let whole = self.ensure_generic_inst_type(self.syms.list, whole_args, 1) as i32
+            let current_whole = if self.int_local_decisions.contains(decl): (self.int_local_decisions.get(decl).unwrap() / 4294967296) as i32 else: 0
+            if current_whole != 0 and self.types_identical(whole, current_whole): return 0
+            return whole
+        let value = self.ast.get_data1(decl)
+        let current = if self.int_local_decisions.contains(decl): (self.int_local_decisions.get(decl).unwrap() / 4294967296) as i32 else: self.typed_expr_types.get(value) ?? 0
+        for pos in positions:
+            var elem = want
+            if not self.list_literal_untyped_at(decl, pos): continue
+            if pos >= 0:
+                let cur_r = self.resolve_alias(current as TypeId)
+                if self.get_type_kind(cur_r) != TypeKind.TY_GENERIC_INST: continue
+                let tuple = self.resolve_alias(self.get_generic_inst_arg(cur_r as i32, 0) as TypeId)
+                if self.get_type_kind(tuple) != TypeKind.TY_TUPLE or pos >= self.get_type_d1(tuple): continue
+                let elems: List[i32] = List.new()
+                for ei in 0..self.get_type_d1(tuple): elems.push(if ei == pos: want else: self.type_extra[self.get_type_d0(tuple) + ei])
+                elem = self.ensure_tuple_type(elems, elems.len() as i32) as i32
+            let args: List[i32] = List.new()
+            args.push(elem)
+            let decided = self.ensure_generic_inst_type(self.syms.list, args, 1) as i32
+            if self.int_local_decisions.contains(decl) and self.types_identical(decided, current): continue
+            return decided
+        0
+
+    // Whether a demand of `want` on `expr` still has something to decide
+    // about the local `decl` (a literal walked by a tuple pattern is decided
+    // one position at a time).
+    fn int_local_undecided(decl: i32, want: i32, expr: i32) -> bool:
+        if not self.int_local_decisions.contains(decl): return true
+        self.list_literal_let(decl) and self.int_local_demand_type(decl, want, expr) != 0
+
     // D126: the literal-typed locals an expression's value comes from: a
     // bare name, or names combined by arithmetic (`sum + bonus.points`).
     fn literal_binding_lets_in(node: i32) -> List[i32]: self.literal_binding_lets_in_depth(node, 0)
@@ -26727,6 +26963,18 @@ impl Sema:
                     return out
                 if not self.untyped_expr_is_float(self.ast.get_data1(decl)): out.push(decl)
                 return out
+            // D128 (#2343): a loop or comprehension binding over a literal's
+            // binding carries the demand to that literal.
+            let walked = self.iter_literal_lets.get(self.ast.get_data0(node)) ?? 0
+            if walked != 0:
+                out.push(walked)
+                return out
+            // D116/D128: a list literal's binding itself (`let xs = [1, 2]`),
+            // demanded as a sequence or as a `++` operand.
+            let list_decl = self.binding_decl_nodes.get(self.ast.get_data0(node)) ?? 0
+            if self.list_literal_let(list_decl):
+                out.push(list_decl)
+                return out
             // A local derived from such locals (`let mid = lo + (hi - lo) / 2`)
             // carries the demand to them.
             let derived = self.binding_decl_nodes.get(self.ast.get_data0(node)) ?? 0
@@ -26743,7 +26991,7 @@ impl Sema:
             // A view of the local (`let left_view = &left`) carries a demand on
             // the value it views to the local.
             return self.literal_binding_lets_in_depth(self.ast.get_data1(node), depth)
-        else if kind == NodeKind.NK_BINARY and sema_binary_op_is_arithmetic(self.ast.get_data0(node)):
+        else if kind == NodeKind.NK_BINARY and (sema_binary_op_is_arithmetic(self.ast.get_data0(node)) or self.ast.get_data0(node) == BinaryOp.OP_CONCAT):
             for d in self.literal_binding_lets_in_depth(self.ast.get_data1(node), depth): out.push(d)
             for d in self.literal_binding_lets_in_depth(self.ast.get_data2(node), depth): out.push(d)
         out
@@ -26803,12 +27051,20 @@ impl Sema:
         if self.get_type_kind(have) == TypeKind.TY_REF: have = self.resolve_alias(self.get_type_d0(have) as TypeId)
         let int_lets = self.literal_binding_lets_in(inner)
         if int_lets.len() > 0:
-            if not self.is_plain_numeric_type(want as i32): return false
+            // D116/D128: a sequence demand (`[]i32`, `List[i32]`) on a list
+            // literal's binding, or on a `++` of such bindings, demands the
+            // element of each.
+            var want_value = want as i32
+            let want_seq_elem = self.sequence_elem_type(want as i32)
+            if want_seq_elem != 0 and self.is_plain_numeric_type(want_seq_elem): want_value = want_seq_elem
+            if not self.is_plain_numeric_type(want_value): return false
             var noted = false
             for int_decl in int_lets:
-                if self.int_local_decisions.contains(int_decl) or self.untyped_expr_is_float(self.ast.get_data1(int_decl)): continue
+                if not self.int_local_undecided(int_decl, want_value, inner) or self.untyped_expr_is_float(self.ast.get_data1(int_decl)): continue
+                let demand = self.int_local_demand_type(int_decl, want_value, inner)
+                if demand == 0: continue
                 self.int_local_demands.push(int_decl)
-                self.int_local_demands.push(want as i32)
+                self.int_local_demands.push(demand)
                 self.int_local_demands.push(arg_node)
                 noted = true
             return noted
@@ -26891,14 +27147,16 @@ impl Sema:
                 let lets = self.literal_binding_lets_in(node)
                 var undecided = false
                 for d in lets:
-                    if not self.int_local_decisions.contains(d): undecided = true
+                    if self.int_local_undecided(d, expected, node): undecided = true
                 if self.note_index_literal_demands(node, expected) > 0 and self.literal_decisions.len() == 0:
                     return false
                 if undecided:
                     for d in lets:
-                        if self.int_local_decisions.contains(d): continue
+                        if not self.int_local_undecided(d, expected, node): continue
+                        let demand = self.int_local_demand_type(d, expected, node)
+                        if demand == 0: continue
                         self.int_local_demands.push(d)
-                        self.int_local_demands.push(expected)
+                        self.int_local_demands.push(demand)
                         self.int_local_demands.push(node)
                     return false
             if literal_let != 0 and self.int_local_decisions.contains(literal_let):

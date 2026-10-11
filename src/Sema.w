@@ -1541,6 +1541,10 @@ pub type Sema {
     // Operator method calls: NK_BINARY node -> resolved function symbol, plus
     // node -> 1 when the right operand is the receiver.
     operator_method_calls: HashMap[i32, i32],
+    // D116 (§15.4.9): each `++` over two sequences, node → the element
+    // type of the List[T] it builds. MirLower lowers it as LIST_CONCAT, or
+    // LIST_EXTEND when it is the value assigned back to its left operand.
+    concat_sequence_nodes: HashMap[i32, i32],
     operator_method_reversed: HashMap[i32, i32],
     // §11.7: node -> the comparison operator derived from the family's
     // primitive (`Ord.cmp` for the ordered four, `Eq.eq` for `!=`); the call
@@ -2218,6 +2222,13 @@ pub type Sema {
     // (`for i in 1..9`), a literal-typed local like a `let` (no shadowing,
     // so the name is the key).
     int_local_for_decls: HashMap[i32, i32],
+    // D128 (#2343): a loop or comprehension binding that walks a literal's
+    // binding (`for x in xs`, `[a + b for (a, b) in src]` over `let src =
+    // [(1, 2)]`): the name → that `let`, and the name → its position in the
+    // clause's tuple pattern (-1: the element itself). A demand on the name
+    // is a demand on the literal's element at that position.
+    iter_literal_lets: HashMap[i32, i32],
+    iter_literal_positions: HashMap[i32, i32],
     // D128: per (function, name), the last unannotated `let` of a tuple
     // literal or a pending generic constructor (demand_let_of).
     fn_demand_lets: HashMap[i64, i32],
@@ -3532,6 +3543,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         pipeline_call_return_types: sema_new_map_i32_i32(),
         pipeline_carrier_kinds: sema_new_map_i32_i32(),
         operator_method_calls: sema_new_map_i32_i32(),
+        concat_sequence_nodes: sema_new_map_i32_i32(),
         operator_method_reversed: sema_new_map_i32_i32(),
         operator_method_derived: sema_new_map_i32_i32(),
         try_continue_tys: sema_new_map_i32_i32(),
@@ -3847,6 +3859,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         int_local_rechecks: 0,
         int_local_recheck_names: List.new(),
         int_local_for_decls: HashMap.new(),
+        iter_literal_lets: HashMap.new(),
+        iter_literal_positions: HashMap.new(),
         fn_demand_lets: HashMap.new(),
         label_break_expected: List.new(),
         literal_arm_retype_depth: 0,

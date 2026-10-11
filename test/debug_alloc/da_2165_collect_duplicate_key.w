@@ -7,7 +7,7 @@ use std.collections.BTreeMap
 
 fn main:
     let names: List[str] = ["A".to_lower(), "A".to_lower(), "B".to_lower()]
-    let set = names.iter() |> map(n => n.clone()) |> collect[HashSet[str]]()
+    let set = names.iter() |> map(n => n) |> collect[HashSet[str]]()
     assert(set.len() == 2)
     let map = names.iter() |> map(n => (n.clone(), n.to_upper())) |> collect[HashMap[str, str]]()
     assert(map.len() == 2)
