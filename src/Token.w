@@ -162,6 +162,7 @@ pub enum TokenKind: i32:
     TK_BANG_TILDE = 138
     TK_KW_DO = 139
     TK_KW_NO_SUSPEND = 140
+    TK_PLUS_PLUS_EQ = 141
 
 // Lookup table: keyword string -> tag. Returns -1 if not a keyword.
 pub fn tag_from_keyword(s: &str) -> i32:
@@ -306,6 +307,7 @@ pub fn tag_name(tag: i32) -> str:
     if tag == TokenKind.TK_KW_COPY: return "'copy'"
     if tag == TokenKind.TK_KW_DO: return "'do'"
     if tag == TokenKind.TK_KW_NO_SUSPEND: return "'no_suspend'"
+    if tag == TokenKind.TK_PLUS_PLUS_EQ: return "'++='"
     if tag == TokenKind.TK_REGEX_LIT: return "regex literal"
     if tag == TokenKind.TK_EQ: return "'='"
     if tag == TokenKind.TK_EQ_EQ: return "'=='"

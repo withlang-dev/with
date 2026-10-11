@@ -6093,6 +6093,100 @@ impl Codegen:
         wl_build_br(self.builder, done_bb)
         wl_position_at_end(self.builder, done_bb)
 
+    // A runtime helper with the runtime's real prototype (rt/rt_core.w).
+    mut fn mir_list_helper_call(name: &str, params: &List[i64], args: &List[i64]) -> i64:
+        var f = wl_get_named_function(self.llmod, name)
+        let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(params), params.len() as i32, 0)
+        if f == 0:
+            f = wl_add_function(self.llmod, name, fn_ty)
+        wl_build_call(self.builder, fn_ty, f, list_data_i64(args), args.len() as i32)
+
+    // D116: append `n` elements at `data` to the List at `out_ptr`.
+    mut fn mir_emit_list_extend_from(out_ptr: i64, data: i64, n: i64, es: i64, elem_is_str: bool):
+        let i64_ty = wl_i64_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
+        let params: List[i64] = List.new()
+        params.push(ptr_ty)
+        params.push(ptr_ty)
+        params.push(i64_ty)
+        let args: List[i64] = List.new()
+        args.push(out_ptr)
+        args.push(data)
+        args.push(n)
+        if elem_is_str:
+            let _ = self.mir_list_helper_call("with_vec_extend_str", params, args)
+            return
+        params.push(i64_ty)
+        args.push(wl_const_int(i64_ty, es, 0))
+        let _ = self.mir_list_helper_call("with_vec_extend_bits_es", params, args)
+
+    // D116 (§15.4.9): LIST_CONCAT builds the result List from two sequence
+    // arguments; LIST_EXTEND appends argument 1 to the List at argument 0.
+    // A List argument whose elements move (MIR consumed it) is taken whole.
+    mut fn mir_emit_list_concat(body: &MirBody, args_id: i32, dest_place: i32, intrinsic: MirIntrinsic) -> i64:
+        let i64_ty = wl_i64_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
+        let void_ty = wl_void_type(self.context)
+        let arg_start = body.call_arg_starts[args_id]
+        let in_place = intrinsic == MirIntrinsic.LIST_EXTEND
+        var list_sema: i32 = 0
+        var out_ptr: i64 = 0
+        if in_place:
+            list_sema = self.mir_unwrap_ref_like_sema_type(self.mir_operand_sema_type(body, body.call_arg_operands[arg_start]))
+            out_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        else:
+            list_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        let elem_sema = if list_sema > 0: self.mir_list_elem_sema_type_from_sema_type(list_sema) else: 0
+        if elem_sema <= 0:
+            sema_phase_bug("BUG: `++` over sequences reached codegen without an element type (D116)")
+        let es = self.mir_list_elem_size_of_sema(elem_sema)
+        let elem_is_str = self.mir_resolve_alias_at(elem_sema) == self.mir_resolve_alias_at(self.sema.ty_str as i32)
+        var list_ty: i64 = 0
+        if not in_place:
+            list_ty = self.mir_sema_type_to_llvm(list_sema)
+            out_ptr = self.create_entry_alloca(list_ty)
+            wl_build_store(self.builder, self.build_default_value(list_ty), out_ptr)
+            let new_fn = self.ensure_list_runtime_fn("with_vec_new_out", void_ty, 2)
+            let new_ty = self.get_list_fn_type("with_vec_new_out", void_ty, 2)
+            let new_args: List[i64] = List.new()
+            new_args.push(out_ptr)
+            new_args.push(wl_const_int(i64_ty, es, 0))
+            let _ = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(&new_args), 2)
+        let first: i32 = if in_place: 1 else: 0
+        for i in first..2:
+            let op = body.call_arg_operands[(arg_start + i)]
+            let src_sema = self.mir_unwrap_ref_like_sema_type(self.mir_operand_sema_type(body, op))
+            let src_kind = self.mir_type_kind_at(src_sema)
+            if src_kind == TypeKind.TY_SLICE:
+                let val = self.mir_intrinsic_arg(body, args_id, i)
+                if wl_get_type_kind(wl_type_of(val)) != wl_struct_type_kind():
+                    sema_phase_bug("BUG: a slice operand of `++` is not a fat value (D116)")
+                let data = wl_build_extract_value(self.builder, val, 0)
+                let n = self.coerce_int(wl_build_extract_value(self.builder, val, 1), i64_ty)
+                self.mir_emit_list_extend_from(out_ptr, data, n, es, elem_is_str)
+            else if src_kind == TypeKind.TY_ARRAY:
+                let aptr = self.mir_intrinsic_arg_ptr(body, args_id, i)
+                let n = wl_const_int(i64_ty, self.mir_type_d1_at(src_sema) as i64, 0)
+                self.mir_emit_list_extend_from(out_ptr, aptr, n, es, elem_is_str)
+            else:
+                let hptr = self.mir_intrinsic_arg_ptr(body, args_id, i)
+                if body.operand_kinds[op] == OperandKind.OK_MOVE:
+                    let params: List[i64] = List.new()
+                    params.push(ptr_ty)
+                    params.push(ptr_ty)
+                    params.push(i64_ty)
+                    let args: List[i64] = List.new()
+                    args.push(out_ptr)
+                    args.push(hptr)
+                    args.push(wl_const_int(i64_ty, es, 0))
+                    let _ = self.mir_list_helper_call("with_vec_take_into_es", params, args)
+                else:
+                    let data = wl_build_load(self.builder, ptr_ty, hptr)
+                    let n = wl_build_load(self.builder, i64_ty, self.mir_list_header_word_ptr(hptr, 8))
+                    self.mir_emit_list_extend_from(out_ptr, data, n, es, elem_is_str)
+        if in_place: return 0
+        wl_build_load(self.builder, list_ty, out_ptr)
+
     // D115 Amendment 1: the element size a sized List helper takes, from the
     // receiver's Sema type, never from the header (whose word 3 becomes
     // `start`). An element Sema did not type is a missing fact, not a size.
@@ -7793,10 +7887,15 @@ impl Codegen:
                 self.mir_type_d0_at(resolved)
         current
 
-    mut fn mir_intrinsic_recv_ptr(body: &MirBody, args_id: i32) -> i64:
-        // Get a pointer to the receiver (arg 0) for instance method intrinsics.
+    // A pointer to the receiver (arg 0) for instance method intrinsics.
+    mut fn mir_intrinsic_recv_ptr(body: &MirBody, args_id: i32) -> i64: self.mir_intrinsic_arg_ptr(body, args_id, 0)
+
+    // The address of argument `i` of an intrinsic call: a place's address
+    // (a List header, an array's storage), a reference's pointee, else a
+    // temporary holding the evaluated value.
+    mut fn mir_intrinsic_arg_ptr(body: &MirBody, args_id: i32, i: i32) -> i64:
         let arg_start = body.call_arg_starts[args_id]
-        let recv_op = body.call_arg_operands[arg_start]
+        let recv_op = body.call_arg_operands[(arg_start + i)]
         let ok = body.operand_kinds[recv_op]
         let od = body.operand_d0[recv_op]
         // If operand is a place (Copy/Move), get its address directly. This must
@@ -10086,6 +10185,10 @@ impl Codegen:
             let args: List[i64] = List.new()
             args.push(recv_ptr)
             result = wl_build_call(self.builder, clear_ty, clear_fn, list_data_i64(&args), 1)
+
+        else if intrinsic == MirIntrinsic.LIST_CONCAT or intrinsic == MirIntrinsic.LIST_EXTEND:
+            let cat = self.mir_emit_list_concat(body, args_id, dest_place, intrinsic)
+            if cat != 0: result = cat
 
         else if intrinsic == MirIntrinsic.LIST_POP:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)

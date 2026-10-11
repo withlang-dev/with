@@ -88,6 +88,8 @@ enum CcBuiltin: i32:
     OPT_UNWRAP
     OPT_EXPECT
     LIST_POP
+    LIST_CONCAT
+    LIST_EXTEND
     STR_LEN
     STR_BYTE_AT
     STR_SLICE
@@ -197,6 +199,7 @@ fn cc_builtin_uses_list_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.LIST_REMOVE: return true
     if kind == CcBuiltin.LIST_CLEAR: return true
     if kind == CcBuiltin.LIST_POP: return true
+    if kind == CcBuiltin.LIST_EXTEND: return true
     if kind == CcBuiltin.LIST_ITER: return true
     if kind == CcBuiltin.LIST_MAP: return true
     if kind == CcBuiltin.LIST_FILTER: return true
@@ -4186,6 +4189,65 @@ impl CCodegen:
             return "0"
         "sizeof(" ++ self.c_type(elem_tid, 0) ++ ")"
 
+    // D116 (§15.4.9): `a ++ b` (a new List) and `a ++= b` (in place).
+    mut fn emit_list_concat(body: &MirBody, args_id: i32, dest_place: i32, kind: CcBuiltin, has_ret: i32, next_bb: i32) -> str:
+        let in_place = kind == CcBuiltin.LIST_EXTEND
+        var list_tid: i32 = 0
+        if in_place:
+            let recv_operand = self.call_arg_operand(body, args_id, 0)
+            var recv_tid = self.sema.resolve_alias(self.operand_tid(body, recv_operand))
+            let recv_tk = self.sema.get_type_kind(recv_tid)
+            if recv_tk == TypeKind.TY_PTR or recv_tk == TypeKind.TY_REF:
+                recv_tid = self.sema.resolve_alias(self.sema.get_type_d0(recv_tid))
+            list_tid = recv_tid as i32
+        else:
+            list_tid = self.place_local_tid(body, dest_place)
+        let elem_tid = self.list_element_tid(list_tid)
+        if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+            self.fail("`++` over sequences without an element type (D116)")
+            return "    abort();"
+        let elem_c = self.c_type(elem_tid, 0)
+        let es = "sizeof(" ++ elem_c ++ ")"
+        let is_str = self.sema.resolve_alias(elem_tid as TypeId) == self.sema.ty_str
+        let target = if in_place: self.list_recv_ptr_text(body, args_id) else: "&__with_cat"
+        var out = "    " ++ cc_lbrace()
+        if not in_place:
+            out = out ++ " with_vec __with_cat; with_vec_new_out((uint8_t*)&__with_cat, " ++ es ++ ");"
+        let first: i32 = if in_place: 1 else: 0
+        for i in first..2:
+            let op = self.call_arg_operand(body, args_id, i)
+            let text = self.operand_text(body, op)
+            var tid = self.sema.resolve_alias(self.operand_tid(body, op))
+            let tk = self.sema.get_type_kind(tid)
+            var deref = ""
+            if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+                tid = self.sema.resolve_alias(self.sema.get_type_d0(tid))
+                deref = "*"
+            let src_kind = self.sema.get_type_kind(tid)
+            var data = ""
+            var n = ""
+            if src_kind == TypeKind.TY_SLICE:
+                data = "(uint8_t*)(" ++ deref ++ "(" ++ text ++ ")).ptr"
+                n = "(int64_t)(" ++ deref ++ "(" ++ text ++ ")).len"
+            else if src_kind == TypeKind.TY_ARRAY:
+                data = "(uint8_t*)&(" ++ deref ++ "(" ++ text ++ "))"
+                n = f"(int64_t){self.sema.get_type_d1(tid)}"
+            else:
+                let header = if deref == "*": "((with_vec*)(" ++ text ++ "))" else: "(&(" ++ text ++ "))"
+                if body.operand_kinds[op] == OperandKind.OK_MOVE:
+                    out = out ++ " with_vec_take_into_es((uint8_t*)" ++ target ++ ", (uint8_t*)" ++ header ++ ", " ++ es ++ ");"
+                    continue
+                data = "(uint8_t*)" ++ header ++ "->ptr"
+                n = "(int64_t)" ++ header ++ "->len"
+            if is_str:
+                out = out ++ " with_vec_extend_str((uint8_t*)" ++ target ++ ", " ++ data ++ ", " ++ n ++ ");"
+            else:
+                out = out ++ " with_vec_extend_bits_es((uint8_t*)" ++ target ++ ", " ++ data ++ ", " ++ n ++ ", " ++ es ++ ");"
+        if not in_place and has_ret != 0:
+            out = out ++ " " ++ self.place_text(body, dest_place) ++ " = __with_cat;"
+        out = out ++ " " ++ cc_rbrace() ++ "\n"
+        out ++ f"    goto bb{next_bb};"
+
     mut fn atomic_recv_ptr_text(body: &MirBody, args_id: i32) -> str:
         let recv_operand = self.call_arg_operand(body, args_id, 0)
         let recv = self.operand_text(body, recv_operand)
@@ -6591,6 +6653,8 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.VA_END: return CcBuiltin.VA_END
     if intrinsic == MirIntrinsic.LIST_NEW: return CcBuiltin.LIST_NEW
     if intrinsic == MirIntrinsic.LIST_PUSH: return CcBuiltin.LIST_PUSH
+    if intrinsic == MirIntrinsic.LIST_CONCAT: return CcBuiltin.LIST_CONCAT
+    if intrinsic == MirIntrinsic.LIST_EXTEND: return CcBuiltin.LIST_EXTEND
     if intrinsic == MirIntrinsic.LIST_GET: return CcBuiltin.LIST_GET
     if intrinsic == MirIntrinsic.LIST_GET_REF: return CcBuiltin.LIST_GET
     if intrinsic == MirIntrinsic.LIST_LEN: return CcBuiltin.LIST_LEN
@@ -6891,6 +6955,9 @@ impl CCodegen:
             var out = "    with_vec_clear(" ++ recv_ptr ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
+
+        if kind == CcBuiltin.LIST_CONCAT or kind == CcBuiltin.LIST_EXTEND:
+            return self.emit_list_concat(body, args_id, dest_place, kind, has_ret, next_bb)
 
         if kind == CcBuiltin.LIST_POP:
             if argc < 1:

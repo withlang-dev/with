@@ -3341,6 +3341,31 @@ pub fn with_vec_push_es(v: *mut u8, elem: *const u8, es: i64):
     rt_memcpy(dst, elem, es)
     list_set_len(v, vlen + 1)
 
+// D116 (§15.4.9): `a ++ b` and `a ++= b`. Elements append by bits; a str
+// element is retained first (a copy is a count increment, D111); a List
+// whose elements move is taken whole and its buffer freed.
+pub fn with_vec_extend_bits_es(v: *mut u8, src: *const u8, n: i64, es: i64):
+    if n <= 0: return
+    let vlen = list_get_len(v)
+    while list_get_cap(v) < vlen + n:
+        list_grow_es(v, es)
+    rt_memcpy((list_get_ptr_field(v) as i64 + vlen * es) as *mut u8, src, n * es)
+    list_set_len(v, vlen + n)
+
+pub fn with_vec_extend_str(v: *mut u8, src: *const u8, n: i64):
+    var i: i64 = 0
+    while i < n:
+        with_str_retain((src as i64 + i * 16) as *const u8)
+        i = i + 1
+    with_vec_extend_bits_es(v, src, n, 16)
+
+pub fn with_vec_take_into_es(v: *mut u8, src: *mut u8, es: i64):
+    with_vec_extend_bits_es(v, list_get_ptr_field(src) as *const u8, list_get_len(src), es)
+    with_vec_free_buffer(list_get_ptr_field(src), list_get_cap(src), es)
+    list_set_ptr_field(src, 0 as *mut u8)
+    list_set_len(src, 0)
+    list_set_cap(src, 0)
+
 pub fn with_vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8: with_vec_get_ptr_es(v, idx, list_get_elem_size(v))
 
 pub fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8:

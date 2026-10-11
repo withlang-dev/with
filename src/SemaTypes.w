@@ -129,6 +129,10 @@ pub enum MirIntrinsic: i32:
     LIST_REMOVE
     LIST_CLEAR
     LIST_POP
+    // D116: `a ++ b` over sequences builds a List (the call's result);
+    // `a ++= b` extends the receiver (arg 0) by the sequence in arg 1.
+    LIST_CONCAT
+    LIST_EXTEND
     MAP_NEW
     MAP_INSERT
     MAP_GET

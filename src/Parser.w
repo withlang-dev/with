@@ -9732,6 +9732,7 @@ fn parse_i64(text: &str) -> i64:
 // assignment grammar and the C migrator's write scan (CiMigrate) read it.
 pub fn parser_compound_assign_op(t: i32) -> i32:
     if t == TokenKind.TK_PLUS_EQ: return BinaryOp.OP_ADD
+    if t == TokenKind.TK_PLUS_PLUS_EQ: return BinaryOp.OP_CONCAT
     if t == TokenKind.TK_MINUS_EQ: return BinaryOp.OP_SUB
     if t == TokenKind.TK_STAR_EQ: return BinaryOp.OP_MUL
     if t == TokenKind.TK_SLASH_EQ: return BinaryOp.OP_DIV
