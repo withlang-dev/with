@@ -639,7 +639,7 @@ impl Sema:
             // D128: a body's later check retypes its locals, so the same
             // expression may now copy another type; the latest check decides.
             if self.int_local_rechecking != 0:
-                self.contextual_copy_adjustments[existing_index] = move adjustment
+                self.contextual_copy_adjustments[existing_index] = adjustment
                 return 1
             self.emit_error("internal error: conflicting contextual Copy demands for one expression", source_node)
             return 0
@@ -4327,8 +4327,8 @@ impl Sema:
     // is checked once, so no local in a program that compiles without the
     // rule changes type. Every body, plain or instantiated, comes through here.
     mut fn check_fn_body_with_sig_at(node: i32, sig_idx: i32, decl_index: i32):
-        let demands_start = self.int_local_demands.len() as i32
-        let diags_start = self.diags.items.len() as i32
+        let demands_start = self.int_local_demands.len()
+        let diags_start = self.diags.items.len()
         // A decision can make a new demand (`sum: i32` then `sum = sum + i`
         // demands of `i`), so the body is checked until no undecided local is
         // demanded; each pass decides at least one, so it ends.
@@ -4336,24 +4336,24 @@ impl Sema:
         while true:
             let errors_start = self.diags.count_by_severity(DiagSeverity.Error)
             self.check_fn_body_with_sig_once(node, sig_idx, decl_index)
-            if self.int_local_demands.len() as i32 == demands_start: break
+            if self.int_local_demands.len() == demands_start: break
             // A pass with an error of its own rejects the program whatever the
             // locals' types; its diagnostics stand and it is not checked again
             // (a recheck would re-emit through once-only tables, or not).
             if self.diags.count_by_severity(DiagSeverity.Error) > errors_start:
-                while self.int_local_demands.len() as i32 > demands_start: self.int_local_demands.pop()
+                while self.int_local_demands.len() > demands_start: self.int_local_demands.pop()
                 break
             if passes >= 64:
                 self.emit_error("BUG: the literal-typed locals of this body did not settle in 64 checks (D128)", node)
                 break
             var di = demands_start
-            while di + 2 < self.int_local_demands.len() as i32:
+            while di + 2 < self.int_local_demands.len():
                 let let_node: i32 = self.int_local_demands[di]
                 if not self.int_local_decisions.contains(let_node):
                     self.int_local_decisions.insert(let_node, (self.int_local_demands[di + 1] as i64) * 4294967296 + self.int_local_demands[di + 2] as i64)
                 di += 3
-            while self.int_local_demands.len() as i32 > demands_start: self.int_local_demands.pop()
-            while self.diags.items.len() as i32 > diags_start: self.diags.items.pop()
+            while self.int_local_demands.len() > demands_start: self.int_local_demands.pop()
+            while self.diags.items.len() > diags_start: self.diags.items.pop()
             self.int_local_rechecks += 1
             if passes == 0: self.int_local_recheck_names.push(self.pool_resolve(self.ast.get_data0(node)))
             passes += 1
@@ -27477,7 +27477,7 @@ impl Sema:
         if literal_args.len() > 0:
             let literal_arg_types: List[i32] = List.new()
             for pi in literal_args: literal_arg_types.push(arg_types[pi])
-            self.bind_literal_arg_type_params(&literal_args, &literal_arg_types, param_start, tp_start, tp_count, ret_node, call_node, self.task_fns.contains(fn_sym))
+            self.bind_literal_arg_type_params(literal_args, literal_arg_types, param_start, tp_start, tp_count, ret_node, call_node, self.task_fns.contains(fn_sym))
         self.bind_type_params_from_bounds(tp_start, tp_count, call_node)
 
         // Obligation model: collect and solve trait bounds for each bound type parameter.
@@ -29553,7 +29553,7 @@ impl Sema:
                     literal_arg_types2.push(arg_types[ai2])
                     continue
                 self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi2), arg_types[ai2], fn_tp_start, fn_tp_count, node)
-            self.bind_literal_arg_type_params(&literal_params2, &literal_arg_types2, param_start, fn_tp_start, fn_tp_count, self.ast.fn_meta_ret(meta), node, self.task_fns.contains(method_fn_sym))
+            self.bind_literal_arg_type_params(literal_params2, literal_arg_types2, param_start, fn_tp_start, fn_tp_count, self.ast.fn_meta_ret(meta), node, self.task_fns.contains(method_fn_sym))
             // D66 (#1652): a callback-only pair setter's `U` comes from the
             // callback's own signature (SemaFacade.w).
             self.facade_bind_pair_callback_u(fn_node, arg_types, arg_count, fn_tp_start, fn_tp_count, node)
