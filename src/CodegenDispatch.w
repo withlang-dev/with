@@ -6151,7 +6151,7 @@ impl Codegen:
             let new_args: List[i64] = List.new()
             new_args.push(out_ptr)
             new_args.push(wl_const_int(i64_ty, es, 0))
-            let _ = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(&new_args), 2)
+            let _ = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(new_args), 2)
         let first: i32 = if in_place: 1 else: 0
         for i in first..2:
             let op = body.call_arg_operands[(arg_start + i)]
@@ -6221,7 +6221,7 @@ impl Codegen:
     // Free the buffer by value and blank the pointer word. The header's
     // address never reaches a call, so an aggregate that holds the List stays
     // promotable (see with_vec_free_buffer in the runtime).
-    fn mir_emit_list_free_ptr(ptr: i64, elem_size_bytes: i64) -> Unit:
+    fn mir_emit_list_free_ptr(ptr: i64, elem_size_bytes: i64):
         if ptr == 0:
             return
         let i64_ty = wl_i64_type(self.context)

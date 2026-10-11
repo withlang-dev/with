@@ -3393,7 +3393,7 @@ pub fn with_vec_free_buffer(p: *mut u8, cap: i64, es: i64) -> Unit:
 
 pub fn with_vec_free(v: *mut u8) -> Unit: with_vec_free_es(v, list_get_elem_size(v))
 
-pub fn with_vec_free_es(v: *mut u8, es: i64) -> Unit:
+pub fn with_vec_free_es(v: *mut u8, es: i64):
     with_vec_free_buffer(list_get_ptr_field(v), list_get_cap(v), es)
     list_set_ptr_field(v, 0 as *mut u8)
     list_set_len(v, 0)
@@ -3401,7 +3401,7 @@ pub fn with_vec_free_es(v: *mut u8, es: i64) -> Unit:
 
 pub fn with_vec_free_drop_origin(v: *mut u8, drop_origin: *const u8, drop_origin_len: i64) -> Unit: with_vec_free_drop_origin_es(v, list_get_elem_size(v), drop_origin, drop_origin_len)
 
-pub fn with_vec_free_drop_origin_es(v: *mut u8, es: i64, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
+pub fn with_vec_free_drop_origin_es(v: *mut u8, es: i64, drop_origin: *const u8, drop_origin_len: i64):
     with_vec_free_buffer_drop_origin(list_get_ptr_field(v), list_get_cap(v), es, drop_origin, drop_origin_len)
     list_set_ptr_field(v, 0 as *mut u8)
     list_set_len(v, 0)

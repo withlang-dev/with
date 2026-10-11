@@ -26881,23 +26881,19 @@ impl Sema:
     // The tuple position of the first name in `expr` that walks the literal
     // bound at `decl` (-1 for the element itself), or -2 when none does.
     fn iter_binding_positions_in(expr: i32, decl: i32) -> List[i32]:
-        let out: List[i32] = List.new()
-        self.collect_iter_binding_positions(expr, decl, out)
-
-    fn collect_iter_binding_positions(expr: i32, decl: i32, out: List[i32]) -> List[i32]:
-        var acc = move out
-        if expr <= 0: return acc
+        var out: List[i32] = List.new()
+        if expr <= 0: return out
         let kind = self.ast.kind(expr)
         if kind == NodeKind.NK_IDENT:
             let sym = self.ast.get_data0(expr)
-            if (self.iter_literal_lets.get(sym) ?? 0) == decl: acc.push(self.iter_literal_positions.get(sym) ?? -2)
-        else if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG: acc = self.collect_iter_binding_positions(self.ast.get_data0(expr), decl, move acc)
-        else if kind == NodeKind.NK_BLOCK: acc = self.collect_iter_binding_positions(self.ast.get_data2(expr), decl, move acc)
-        else if kind == NodeKind.NK_UNARY: acc = self.collect_iter_binding_positions(self.ast.get_data1(expr), decl, move acc)
+            if (self.iter_literal_lets.get(sym) ?? 0) == decl: out.push(self.iter_literal_positions.get(sym) ?? -2)
+        else if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG: return self.iter_binding_positions_in(self.ast.get_data0(expr), decl)
+        else if kind == NodeKind.NK_BLOCK: return self.iter_binding_positions_in(self.ast.get_data2(expr), decl)
+        else if kind == NodeKind.NK_UNARY: return self.iter_binding_positions_in(self.ast.get_data1(expr), decl)
         else if kind == NodeKind.NK_IF_EXPR or kind == NodeKind.NK_BINARY:
-            acc = self.collect_iter_binding_positions(self.ast.get_data1(expr), decl, move acc)
-            acc = self.collect_iter_binding_positions(self.ast.get_data2(expr), decl, move acc)
-        acc
+            for p in self.iter_binding_positions_in(self.ast.get_data1(expr), decl): out.push(p)
+            for p in self.iter_binding_positions_in(self.ast.get_data2(expr), decl): out.push(p)
+        out
 
     // D128 (#2343): the type a demand of `want` on `expr` makes of the local
     // `decl`: `want` itself; or, when `decl` is a literal's binding walked by
