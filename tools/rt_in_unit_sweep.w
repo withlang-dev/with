@@ -10,7 +10,7 @@ use std.fs
 fn owned(s: &str): s ++ ""     // #762: .clone() on a &str view
 
 fn arg_or(argv: &List[str], i: i32, fallback: &str) -> str:
-    if argv.len() as i32 > i:
+    if argv.len() > i:
         return owned(argv[i])
     owned(fallback)
 
@@ -37,7 +37,7 @@ fn sweep(out_path: &str) -> i32:
         if rc != 0:
             fails.push(owned(line))
     var out = ""
-    for i in 0..fails.len() as i32:
+    for i in 0..fails.len():
         out = out ++ fails[i] ++ "\n"
     let _ = write_file(out_path, out)
     eprint(f"lane_sweep: ran={ran} failed={fails.len()} -> {out_path}\n")

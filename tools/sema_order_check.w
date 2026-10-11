@@ -65,17 +65,17 @@ for source in sources:
     let b = base_name(source)
     pids.push(spawn_check(with_bin, source, false, out_dir ++ "/" ++ b ++ ".fwd"))
     pids.push(spawn_check(with_bin, source, true, out_dir ++ "/" ++ b ++ ".rev"))
-    while pids.len() as i32 - next_wait > 16:
+    while pids.len() - next_wait > 16:
         codes.push(wait(pids[next_wait]))
         next_wait = next_wait + 1
-while next_wait < pids.len() as i32:
+while next_wait < pids.len():
     codes.push(wait(pids[next_wait]))
     next_wait = next_wait + 1
 var differing = 0
 var unexpected = 0
 var runner_failures = 0
 var report = ""
-for si in 0..sources.len() as i32:
+for si in 0..sources.len():
     let source = sources[si]
     let b = base_name(source)
     let p = out_dir ++ "/" ++ b

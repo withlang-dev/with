@@ -28,7 +28,7 @@ fn http_parse_url(url: &str) -> HttpUrl:
         return HttpUrl { host, path, port }
 
     var start = 8
-    let url_len = url.len() as i32
+    let url_len = url.len()
     var host_end = start
     while host_end < url_len:
         if url[host_end] == 47:
@@ -48,7 +48,7 @@ fn http_build_get(host: &str, path: &str) -> str:
         "Connection: close\r\n\r\n"
 
 fn http_find_header_end(data: &str) -> isize:
-    let len = data.len() as i32
+    let len = data.len()
     var i = 0
     while i < len - 3:
         if data[i] == 13 and data[(i + 1)] == 10 and data[(i + 2)] == 13 and data[(i + 3)] == 10:
@@ -60,11 +60,11 @@ fn http_status(headers: &str) -> i32:
     if headers.len() < 12:
         return -1
     var i = 0
-    while i < headers.len() as i32 and headers[i] != 32:
+    while i < headers.len() and headers[i] != 32:
         if headers[i] == 10:
             return -1
         i = i + 1
-    if i + 3 >= headers.len() as i32:
+    if i + 3 >= headers.len():
         return -1
     i = i + 1
     let c1 = headers[i]
@@ -82,14 +82,14 @@ fn http_ascii_lower(ch: i32) -> i32:
 fn http_name_matches(line: &str, name: &str) -> bool:
     if line.len() < name.len() + 1:
         return false
-    for i in 0..name.len() as i32:
+    for i in 0..name.len():
         if http_ascii_lower(line[i]) != http_ascii_lower(name[i]):
             return false
     line[name.len()] == 58
 
 fn http_trim_header_value(value: &str) -> str:
     var start = 0
-    var end = value.len() as i32
+    var end = value.len()
     while start < end:
         let ch = value[start]
         if ch != 32 and ch != 9:
@@ -105,8 +105,8 @@ fn http_trim_header_value(value: &str) -> str:
 fn http_header_value(headers: &str, name: &str) -> str:
     var line_start = 0
     var i = 0
-    while i <= headers.len() as i32:
-        let at_end = i == headers.len() as i32
+    while i <= headers.len():
+        let at_end = i == headers.len()
         if at_end or headers[i] == 10:
             var line = headers.slice(line_start as i64, i as i64)
             if line.len() > 0 and line[line.len() - 1] == 13:
@@ -171,7 +171,7 @@ fn http_content_length(headers: &str) -> i64:
     let text = http_header_value(headers, "Content-Length")
     if text.len() == 0: return -1
     var value: i64 = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] < '0' or text[i] > '9': return -1
         value = value * 10 + (text[i] - '0') as i64
     value

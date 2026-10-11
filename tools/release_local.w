@@ -87,7 +87,7 @@ fn darwin_leg(version: &str, channel: &str) -> i32:
     gates.push(":last-green")
     let build_argv = argv2(seed, "build")
     if step("darwin build", &build_argv) != 0: return 1
-    for gi in 0..gates.len() as i32:
+    for gi in 0..gates.len():
         let target = gates[gi]
         let argv = argv3(seed, "build", target)
         if step("darwin " ++ target, &argv) != 0: return 1
@@ -97,7 +97,7 @@ fn darwin_leg(version: &str, channel: &str) -> i32:
     finals.push(":release-uat")
     finals.push(":package-current-host")
     finals.push(":package-llvm-sdk")
-    for fi in 0..finals.len() as i32:
+    for fi in 0..finals.len():
         let target = finals[fi]
         let argv = argv3(release, "build", target)
         if step("darwin " ++ target, &argv) != 0: return 1
@@ -179,9 +179,9 @@ fn main -> i32:
     var do_darwin = true
     var do_aarch64 = true
     var i = 2
-    while i < argv.len() as i32:
+    while i < argv.len():
         let a = argv[i].clone()
-        if a == "--channel" and i + 1 < argv.len() as i32:
+        if a == "--channel" and i + 1 < argv.len():
             channel = argv[i + 1].clone()
             i += 1
         else if a == "--skip-darwin": do_darwin = false

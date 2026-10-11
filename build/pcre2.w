@@ -27,7 +27,7 @@ fn pcre2_join(left: &str, right: &str) -> str:
 
 fn pcre2_safe_label(text: &str) -> str:
     var out = ""
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
         if keep:
@@ -43,9 +43,9 @@ fn pcre2_scratch_dir(ctx: &ActionCtx) -> str:
 
 fn pcre2_dirname(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
-            last_slash = i
+            last_slash = i as i32
     if last_slash < 0:
         return "."
     if last_slash == 0:
@@ -54,9 +54,9 @@ fn pcre2_dirname(path: &str) -> str:
 
 fn pcre2_basename(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
-            last_slash = i
+            last_slash = i as i32
     path.slice((last_slash + 1) as i64, path.len())
 
 fn pcre2_abs(root: &str, path: &str) -> str:
@@ -68,8 +68,8 @@ fn pcre2_split_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()
     var start = 0
     var i = 0
-    while i <= text.len() as i32:
-        let at_end = i == text.len() as i32
+    while i <= text.len():
+        let at_end = i == text.len()
         if at_end or text[i] == 10:
             var line = text.slice(start as i64, i as i64)
             if line.len() > 0 and line[line.len() - 1] == 13:
@@ -106,7 +106,7 @@ fn pcre2_append_normalized_heap_line(out: &str, line: &str, frame_count: i32) ->
 
 fn pcre2_normalize_heap_output(text: &str) -> str:
     let lines = pcre2_split_lines(text)
-    var line_count = lines.len() as i32
+    var line_count = lines.len()
     while line_count > 0 and lines[(line_count - 1)].len() == 0:
         line_count = line_count - 1
     var out = ""
@@ -181,15 +181,15 @@ fn pcre2_insert_after_defs_import(text: &str, insertion: &str) -> str:
     var out = ""
     var inserted = false
     var line_start = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] == 10:
             let line = text.slice(line_start as i64, (i + 1) as i64)
             out = out ++ line
             if not inserted and line == marker:
                 out = out ++ insertion
                 inserted = true
-            line_start = i + 1
-    if line_start < text.len() as i32:
+            line_start = (i + 1) as i32
+    if line_start < text.len():
         let line = text.slice(line_start as i64, text.len())
         out = out ++ line
         if not inserted and line == "use std.re.defs":
@@ -217,7 +217,7 @@ fn pcre2_copy_w_files(ctx: &ActionCtx, source_dir: &str, dest_dir: &str) -> i32:
     var copied = 0
     if fs.mkdir_all(dest_dir) != 0:
         return pcre2_fail(ctx, "could not create destination directory: " ++ dest_dir)
-    for fi in 0..files.len() as i32:
+    for fi in 0..files.len():
         let source_path = files[fi]
         if source_path.ends_with(".w"):
             let dest_path = pcre2_join(dest_dir, pcre2_basename(source_path))
@@ -270,7 +270,7 @@ fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: &str) -> 
         return 0
     let modules = fs.list_files(generated_dir)
     var imports = ""
-    for mi in 0..modules.len() as i32:
+    for mi in 0..modules.len():
         let mod_name = pcre2_module_name(modules[mi])
         if mod_name != "defs" and mod_name != "pcre2test" and mod_name != "bundle":
             imports = imports ++ "use std.re." ++ mod_name ++ "\n"

@@ -41,7 +41,7 @@ fn facts(root: &str, query: &str) -> List[str]:
 
 fn column(row: &str, index: i32) -> str:
     let parts = row.split("\t")
-    if index < parts.len() as i32: parts[index].to_owned() else: "".to_owned()
+    if index < parts.len(): parts[index].to_owned() else: "".to_owned()
 
 // The package a module path belongs to, as Sema spells it when no project
 // manifest names one: the std tier is one package, the program another.
@@ -112,7 +112,7 @@ if apply:
         // Highest offset first, so earlier offsets stay valid.
         while remaining.len() > 0:
             var best = 0
-            for k in 1..remaining.len() as i32:
+            for k in 1..remaining.len():
                 if remaining[k] > remaining[best]: best = k
             let at: i64 = remaining[best]
             remaining.remove(best)

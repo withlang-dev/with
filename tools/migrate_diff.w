@@ -67,7 +67,7 @@ fn dump_side(label: &str, src_dir: &str, main: &str, sub: &str) -> str:
     for entry in list_files_text(src_dir).split("\n"):
         if not entry.ends_with(".w"): continue
         let parts = entry.split("/")
-        let name = parts[parts.len() as i32 - 1].to_owned()
+        let name = parts[parts.len() - 1].to_owned()
         let text = read_or_fail(src_dir ++ "/" ++ name)
         if write_file(lib_dir ++ "/" ++ name, text) != 0: fail("could not copy " ++ name)
     // The corpus on its source and without the prelude, as its bundle

@@ -40,7 +40,7 @@ fn scan(path: &str, want_extern: bool, aliases: &List[str]) -> List[str]:
     if text.len() == 0: return found
     var lexer = Lexer.init(text.slice(0, text.len()), 0)
     let toks = lexer.tokenize()
-    let n = toks.len() as i32
+    let n = toks.len()
     for i in 0..n:
         if toks.get_tag(i) != TokenKind.TK_KW_FN: continue
         if i + 1 >= n or toks.get_tag(i + 1) != TokenKind.TK_IDENT: continue
@@ -124,7 +124,7 @@ fn normalize_type_text(body: &str) -> str:
 
 fn expand_aliases(sig: &str, rt_aliases: &List[str]) -> str:
     var out = normalize_type_text(sig)
-    for i in 0..rt_aliases.len() as i32:
+    for i in 0..rt_aliases.len():
         let rec = rt_aliases[i]
         let bar = rec.find("|")
         let alias = rec.slice(0, bar as i64)
@@ -156,7 +156,7 @@ roots.push("lib/std")
 roots.push("src")
 roots.push("tools")
 roots.push("test")
-for ri in 0..roots.len() as i32:
+for ri in 0..roots.len():
     for r in collect(roots[ri], true, &aliases):
         decls.push(owned(r))
 
@@ -164,10 +164,10 @@ for ri in 0..roots.len() as i32:
 // definition per backend, and a decl that disagrees with the contract
 // disagrees with all of them.
 var bad = 0
-for ei in 0..decls.len() as i32:
+for ei in 0..decls.len():
     let ename = field(decls[ei], 0)
     let esig = field(decls[ei], 1)
-    for di in 0..defs.len() as i32:
+    for di in 0..defs.len():
         if field(defs[di], 0) != ename: continue
         let dsig = field(defs[di], 1)
         if esig == dsig: continue

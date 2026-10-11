@@ -28,7 +28,7 @@ fn normalize(line: &str) -> str:
         let parts = s.split("\t")
         if parts.len() >= 21:
             var out = "fact\t" ++ parts[1] ++ "\t" ++ parts[2]
-            for i in 3..parts.len() as i32:
+            for i in 3..parts.len():
                 out = out ++ "\t" ++ (if i >= 3 and i <= 13: "N".to_owned() else: parts[i].to_owned())
             s = out
     s = /\b(sig|mono|decl-node|name-decl-node|fn|node|owner|probe-sig|return|ty|type)=-?[0-9]+/g.replace(s, "$1=N")

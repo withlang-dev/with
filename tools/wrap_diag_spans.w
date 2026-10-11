@@ -45,7 +45,7 @@ type EditPlan {
 fn parse_int(text: &str) -> i32:
     if text.len() == 0: return -1
     var n: i32 = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let b = text[i]
         if b < 48 or b > 57: return -1
         n = n * 10 + (b - 48)
@@ -83,13 +83,13 @@ fn classify(line: &str) -> i32:
 
 fn count_carets(line: &str) -> i32:
     var n: i32 = 0
-    for i in 0..line.len() as i32:
+    for i in 0..line.len():
         if line[i] == 94: n = n + 1
     n
 
 fn is_ident_or_field(span: &str) -> bool:
     if span.len() == 0: return false
-    for i in 0..span.len() as i32:
+    for i in 0..span.len():
         let b = span[i]
         let ok = (b >= 48 and b <= 57) or (b >= 65 and b <= 90) or (b >= 97 and b <= 122) or b == 95 or b == 46
         if not ok: return false
@@ -133,7 +133,7 @@ fn load_skips(skip_path: &str) -> List[str]:
     if skip_path.len() == 0: return skips
     let skip_text = read_file(skip_path ++ "") ?? ""
     let skip_lines = skip_text.split("\n")
-    for i in 0..skip_lines.len() as i32:
+    for i in 0..skip_lines.len():
         let s = skip_lines[i]
         if s.len() > 0: skips.push(s ++ "")
     skips
@@ -203,7 +203,7 @@ fn collect_sites(dlines: &List[str]) -> List[Site]:
             continue
         let key = path ++ f":{line_no}:{col}:{kind}"
         var dup = false
-        for si in 0..seen_keys.len() as i32:
+        for si in 0..seen_keys.len():
             if seen_keys[si] == key: dup = true
         if dup: continue
         seen_keys.push(key)
@@ -212,23 +212,23 @@ fn collect_sites(dlines: &List[str]) -> List[Site]:
 
 fn unique_files(sites: &List[Site]) -> List[str]:
     var files: List[str] = List.new()
-    for si in 0..sites.len() as i32:
+    for si in 0..sites.len():
         let p = sites[si].path
         var have = false
-        for fi in 0..files.len() as i32:
+        for fi in 0..files.len():
             if files[fi] == p: have = true
         if not have: files.push(p ++ "")
     files
 
 fn in_list(items: &List[str], key: &str) -> bool:
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         if items[i] == key: return true
     false
 
 fn line_offsets(flines: &List[str]) -> List[i64]:
     var offsets: List[i64] = List.new()
     var acc: i64 = 0
-    for li in 0..flines.len() as i32:
+    for li in 0..flines.len():
         offsets.push(acc)
         acc = acc + flines[li].len() + 1
     offsets
@@ -240,7 +240,7 @@ fn plan_edits(path: &str, text: &str, sites: &List[Site], skips: &List[str]) -> 
     var ends: List[i64] = List.new()
     var texts: List[str] = List.new()
     let clone_fn = owned_fn_name(path)
-    for si in 0..sites.len() as i32:
+    for si in 0..sites.len():
         let site = sites[si]
         if site.path != path: continue
         let tag = path ++ f":{site.line_no}:{site.col}"
@@ -308,7 +308,7 @@ fn plan_edits(path: &str, text: &str, sites: &List[Site], skips: &List[str]) -> 
                 continue
             new_text = clone_fn ++ "(" ++ span ++ ")"
         var overlap = false
-        for ei in 0..starts.len() as i32:
+        for ei in 0..starts.len():
             if ed_start < ends[ei] and starts[ei] < ed_end: overlap = true
         if overlap:
             print("skip-overlap " ++ tag)
@@ -321,9 +321,9 @@ fn plan_edits(path: &str, text: &str, sites: &List[Site], skips: &List[str]) -> 
 
 fn apply_edits(text_in: str, plan: &EditPlan) -> str:
     var text = text_in
-    let edit_count = plan.starts.len() as i32
+    let edit_count = plan.starts.len()
     var order: List[i32] = List.new()
-    for ei in 0..edit_count: order.push(ei)
+    for ei in 0..edit_count: order.push(ei as i32)
     for a in 0..edit_count:
         var best = a
         for b in (a + 1)..edit_count:
@@ -347,18 +347,18 @@ fn ensure_decl(path: &str, text_in: str) -> str:
     if text_in.contains("fn " ++ clone_fn ++ "(s: &str)"): return text_in
     let out_lines = text_in.split("\n")
     var insert_at: i64 = -1
-    for li in 0..out_lines.len() as i32:
+    for li in 0..out_lines.len():
         if out_lines[li].starts_with("extern fn "):
             insert_at = li as i64
             break
     if insert_at < 0:
         var last_use: i64 = -1
-        for li in 0..out_lines.len() as i32:
+        for li in 0..out_lines.len():
             if li >= 60: break
             if out_lines[li].starts_with("use "): last_use = li as i64
         insert_at = last_use + 1
     var sb = StringBuilder.new()
-    for li in 0..out_lines.len() as i32:
+    for li in 0..out_lines.len():
         if li as i64 == insert_at:
             sb.push_str("fn " ++ clone_fn ++ "(s: &str): s ++ \"\"\n")
         sb.push_str(out_lines[li])
@@ -434,11 +434,11 @@ fn main -> i32:
     print(f"sites collected: {site_count}")
     let files = unique_files(&sites)
     if finalize == 1:
-        for fi in 0..files.len() as i32:
+        for fi in 0..files.len():
             if finalize_existing(files[fi]) != 0: return 1
         return 0
     var total = 0
-    for fi in 0..files.len() as i32:
+    for fi in 0..files.len():
         let n = process_file(files[fi], &sites, &skips, apply)
         if n < 0: return 1
         total = total + n

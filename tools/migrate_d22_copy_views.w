@@ -36,7 +36,7 @@ fn diagnostic_source_path(path: &str) -> str:
 
 fn parse_i32_text(text: &str) -> i32:
     var out: i32 = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let b = text[i] as i32
         if b < 48 or b > 57: return -1
         out = out * 10 + b - 48
@@ -69,7 +69,7 @@ fn edit_key(path: &str, line: i32, name: &str) -> str: path ++ ":" ++ line.to_st
 
 fn has_edit(edits: &Edits, path: &str, line: i32, name: &str) -> bool:
     let wanted = edit_key(path, line, name)
-    for i in 0..edits.paths.len() as i32:
+    for i in 0..edits.paths.len():
         if edit_key(edits.paths[i], edits.lines[i], edits.names[i]) == wanted: return true
     false
 
@@ -173,7 +173,7 @@ fn main:
     let candidate = argv[1].clone()
     var source_path = "src/main.w".clone()
     var apply = false
-    for ai in 2..argv.len() as i32:
+    for ai in 2..argv.len():
         let arg = argv[ai]
         if arg == "--apply":
             apply = true
@@ -203,7 +203,7 @@ fn main:
         print("error: candidate failed but supplied no actionable D22 Copy-view diagnostics")
         exit_code(1)
     var failures = 0
-    for i in 0..edits.paths.len() as i32:
+    for i in 0..edits.paths.len():
         if apply_one(edits.paths[i], edits.lines[i], edits.names[i], edits.types[i], apply) < 0:
             failures = failures + 1
     print(f"D22 migration: {edits.paths.len()} proven binding(s), failures={failures}")

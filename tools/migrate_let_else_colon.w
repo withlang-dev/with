@@ -31,7 +31,7 @@ fn process(path: &str, apply: bool) -> i32:
     if text.len() == 0: return 0
     var lexer = Lexer.init(text.slice(0, text.len()), 0)
     let tokens = lexer.tokenize()
-    let n = tokens.len() as i32
+    let n = tokens.len()
     var out = ""
     var pos = 0
     var count: i32 = 0
@@ -67,7 +67,7 @@ let argv = args()
 var apply = false
 var total = 0
 var failed = false
-for ai in 1..argv.len() as i32:
+for ai in 1..argv.len():
     let arg = argv[ai]
     if arg == "--apply":
         apply = true

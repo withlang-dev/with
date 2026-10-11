@@ -8,7 +8,7 @@ use std.process
 
 fn esc(chunk: str) -> str:
     var out = ""
-    for i in 0..chunk.len() as i32:
+    for i in 0..chunk.len():
         let b = chunk[i]
         if b == 92:
             out = out ++ "\\\\"

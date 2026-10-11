@@ -20,7 +20,7 @@ fn renamed(name: &str) -> str:
     // Strip leading underscores for the With-side spelling (_exit →
     // rt_libc_exit, __error → rt_libc_error); the link_name keeps the truth.
     var i = 0
-    while i < name.len() as i32 and name[i] == 95:
+    while i < name.len() and name[i] == 95:
         i = i + 1
     "rt_libc_" ++ name.slice(i as i64, name.len())
 
@@ -31,7 +31,7 @@ fn process(path: &str) -> i32:
         return 1
     var lexer = Lexer.init(text.slice(0, text.len()), 0)
     let tokens = lexer.tokenize()
-    let n = tokens.len() as i32
+    let n = tokens.len()
 
     // Pass 1: collect the bare extern names declared in this file.
     var names: List[str] = List.new()
@@ -43,7 +43,7 @@ fn process(path: &str) -> i32:
         let name = slice(text, tokens.get_start(i + 2), tokens.get_end(i + 2))
         if is_bare(name):
             var seen = false
-            for j in 0..names.len() as i32:
+            for j in 0..names.len():
                 if names[j] == name: seen = true
             if not seen:
                 names.push(name)
@@ -64,7 +64,7 @@ fn process(path: &str) -> i32:
         let te = tokens.get_end(i)
         let tok = slice(text, ts, te)
         var hit = false
-        for j in 0..names.len() as i32:
+        for j in 0..names.len():
             if names[j] == tok: hit = true
         if not hit:
             continue
@@ -91,7 +91,7 @@ fn process(path: &str) -> i32:
 
 let argv = args()
 var rc: i32 = 0
-for ai in 1..argv.len() as i32:
+for ai in 1..argv.len():
     if process(argv[ai]) != 0:
         rc = 1
 exit_code(rc)

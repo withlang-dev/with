@@ -424,7 +424,7 @@ fn corpus_retired_host_symbols() -> List[str]:
 // evaluator has no trim yet.
 fn corpus_trim(text: &str) -> str:
     var start = 0
-    var end = text.len() as i32
+    var end = text.len()
     while start < end and (text[start] == ' ' or text[start] == '\t' or text[start] == '\r'):
         start = start + 1
     while end > start and (text[end - 1] == ' ' or text[end - 1] == '\t' or text[end - 1] == '\r'):
@@ -433,7 +433,7 @@ fn corpus_trim(text: &str) -> str:
 
 fn corpus_ident_prefix(text: &str) -> str:
     var end = 0
-    while end < text.len() as i32:
+    while end < text.len():
         let ch = text[end]
         let ident = (ch >= 'a' and ch <= 'z') or (ch >= 'A' and ch <= 'Z') or (ch >= '0' and ch <= '9') or ch == '_'
         if not ident: break
@@ -447,11 +447,11 @@ fn corpus_ident_prefix(text: &str) -> str:
 pub fn corpus_reject_foreign_symbols(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32:
     let fs = ctx.fs()
     var permitted = corpus_permitted_externs()
-    for i in 0..corpus.declared_externs.len() as i32: permitted = permitted ++ corpus.declared_externs[i] ++ "|"
+    for i in 0..corpus.declared_externs.len(): permitted = permitted ++ corpus.declared_externs[i] ++ "|"
     var defined = "|"
     var errors: i32 = 0
     let files = fs.list_files(generated)
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         if not path.ends_with(".w"): continue
         for line in fs.read_text(path).split("\n"):
@@ -460,7 +460,7 @@ pub fn corpus_reject_foreign_symbols(ctx: &ActionCtx, corpus: &Corpus, generated
                 if l.starts_with(head):
                     defined = defined ++ corpus_ident_prefix(l.slice(head.len(), l.len())) ++ "|"
                     break
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         if not path.ends_with(".w"): continue
         let text = fs.read_text(path)

@@ -20,10 +20,10 @@ fn pkg_join(left: &str, right: &str) -> str:
 
 fn pkg_dirname(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 47 or ch == 92:
-            last_slash = i
+            last_slash = i as i32
     if last_slash < 0:
         return "."
     if last_slash == 0:
@@ -50,7 +50,7 @@ fn pkg_is_abs(path: &str) -> bool:
 
 fn pkg_trim_line(text: &str) -> str:
     var end = 0
-    while end < text.len() as i32:
+    while end < text.len():
         let ch = text[end]
         if ch == 10 or ch == 13:
             break
@@ -70,7 +70,7 @@ fn pkg_trim_line(text: &str) -> str:
 
 fn pkg_normalize_path(path: &str) -> str:
     var out = ""
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 92:
             out = out ++ "/"
@@ -95,11 +95,11 @@ fn pkg_str_compare(a: &str, b: &str) -> i32:
 
 fn pkg_sort_strings(items: List[str]) -> List[str]:
     var sorted: List[str] = List.new()
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let item = items[i]
         var inserted = false
         var out: List[str] = List.new()
-        for j in 0..sorted.len() as i32:
+        for j in 0..sorted.len():
             let existing = sorted[j]
             if not inserted and pkg_str_compare(item, existing) < 0:
                 out.push(package_owned_text(item))
@@ -112,7 +112,7 @@ fn pkg_sort_strings(items: List[str]) -> List[str]:
 
 fn pkg_add_unique(items: List[str], item: &str) -> List[str]:
     var out = items
-    for i in 0..out.len() as i32:
+    for i in 0..out.len():
         if out[i] == item:
             return out
     out.push(package_owned_text(item))
@@ -128,7 +128,7 @@ fn pkg_rel_path(root: &str, path: &str) -> str:
 
 fn pkg_add_parent_dirs(dirs: List[str], top_dir: &str, rel_path: &str) -> List[str]:
     var out = pkg_add_unique(move dirs, top_dir)
-    for i in 0..rel_path.len() as i32:
+    for i in 0..rel_path.len():
         if rel_path[i] == 47:
             out = pkg_add_unique(move out, top_dir ++ "/" ++ rel_path.slice(0, i as i64))
     out
@@ -185,7 +185,7 @@ fn pkg_process_path(root: &str, path: &str) -> str:
 
 fn pkg_ascii_lower(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         if ch >= 65 and ch <= 90:
             out.push_byte((ch + 32) as u8)
@@ -210,7 +210,7 @@ fn pkg_forbidden_dependency(text: &str, platform: &str) -> str:
         needles.push("msvcp")
         needles.push("vcruntime")
         needles.push("zlib")
-    for i in 0..needles.len() as i32:
+    for i in 0..needles.len():
         let needle = needles[i]
         if lower.contains(needle):
             return package_owned_text(needle)
@@ -395,7 +395,7 @@ fn pkg_write_sha256sums(ctx: &ActionCtx, stage_root: &str) -> i32:
     let fs = ctx.fs()
     let files = pkg_sort_strings(fs.list_files(stage_root))
     var manifest = ""
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         let rel = pkg_rel_path(stage_root, path)
         if rel.len() == 0:
@@ -451,16 +451,16 @@ fn pkg_write_archive(ctx: &ActionCtx, compiler_path: &str, stage_root: &str, top
     let fs = ctx.fs()
     let files = pkg_sort_strings(fs.list_files(stage_root))
     var dirs: List[str] = List.new()
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let rel = pkg_rel_path(stage_root, files[i])
         if rel.len() == 0:
             return pkg_fail(ctx, "package file is outside stage root: " ++ files[i])
         dirs = pkg_add_parent_dirs(move dirs, top_dir, rel)
     dirs = pkg_sort_strings(dirs)
     let entries: List[ArchiveEntry] = List.new()
-    for i in 0..dirs.len() as i32:
+    for i in 0..dirs.len():
         entries.push(archive_dir_entry(package_owned_text(dirs[i]), 0o755))
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let source = files[i]
         let rel = pkg_rel_path(stage_root, source)
         entries.push(archive_file_entry(package_owned_text(source), top_dir ++ "/" ++ rel, 0o644))

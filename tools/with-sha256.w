@@ -30,7 +30,7 @@ fn main:
     if argv.len() < 2:
         ewrite("usage: with-sha256 <file>...\n")
         exit_code(1)
-    for i in 1..argv.len() as i32:
+    for i in 1..argv.len():
         let path = argv[i]
         if unsafe { with_fs_file_exists(path) } == 0:
             ewrite("with-sha256: missing file: " ++ path ++ "\n")

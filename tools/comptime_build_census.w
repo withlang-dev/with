@@ -76,13 +76,13 @@ fn defined_fns(text: &str) -> List[str]:
     out
 
 fn contains_name(names: &List[str], name: &str) -> bool:
-    for i in 0..names.len() as i32:
+    for i in 0..names.len():
         if names[i] == name: return true
     false
 
 fn index_of_name(names: &List[str], name: &str) -> i32:
-    for i in 0..names.len() as i32:
-        if names[i] == name: return i
+    for i in 0..names.len():
+        if names[i] == name: return i as i32
     -1
 
 let argv = args()
@@ -112,11 +112,11 @@ for path in census_files():
 // Alphabetical, so the table is stable across runs: pick the least
 // remaining name each round.
 var taken: List[bool] = List.new()
-for i in 0..names.len() as i32: taken.push(false)
+for i in 0..names.len(): taken.push(false)
 var gaps = 0
-for round in 0..names.len() as i32:
+for round in 0..names.len():
     var best = -1
-    for i in 0..names.len() as i32:
+    for i in 0..names.len():
         if taken[i]: continue
         if best < 0 or names[i] < names[best]: best = i
     taken[best] = true

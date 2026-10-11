@@ -60,14 +60,14 @@ pub fn run_benchmarks_check_action(ctx: ActionCtx) -> i32:
         jobs.push(par_job(args, stdout, stderr, 300000))
     let rcs = par_run(&ctx, &jobs, par_width(&jobs))
     var failures = 0
-    for i in 0..rcs.len() as i32:
+    for i in 0..rcs.len():
         if rcs[i] == 0: continue
         failures += 1
         print(f"benchmarks-check: {sources[i]} failed `with check` with exit code {rcs[i]}")
         let stderr = fs.read_text_opt(jobs[i].stderr).unwrap_or("")
         let detail = bm_error_lines(stderr)
         if detail.len() > 0: print(detail) else: print(stderr)
-    let total = jobs.len() as i32
+    let total = jobs.len()
     if total < 2:
         ctx.diagnostics().error("benchmarks-check: found no workloads under benchmarks/workloads/*/*.w")
     if failures > 0:

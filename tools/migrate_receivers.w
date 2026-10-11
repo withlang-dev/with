@@ -42,7 +42,7 @@ type ReceiverDeclFacts {
 fn compiler_receiver_decls(path: &str) -> ReceiverDeclFacts:
     let result = compiler_analyze_file(path, "select:kind=declaration")
     let facts = ReceiverDeclFacts { starts: List.new(), ends: List.new(), modes: List.new(), flags: List.new() }
-    for i in 0..result.report.facts.len() as i32:
+    for i in 0..result.report.facts.len():
         let fact = result.report.facts[i]
         if fact.kind != AnalysisFactKind.Declaration or fact.path != path: continue
         let mode = fact.flags & 255
@@ -56,13 +56,13 @@ fn compiler_receiver_decls(path: &str) -> ReceiverDeclFacts:
     facts
 
 fn receiver_fact_at(facts: &ReceiverDeclFacts, offset: i32) -> i32:
-    for i in 0..facts.starts.len() as i32:
-        if offset >= facts.starts[i] and offset < facts.ends[i]: return i
+    for i in 0..facts.starts.len():
+        if offset >= facts.starts[i] and offset < facts.ends[i]: return i as i32
     -1
 
 fn migrate_file(path: &str) -> i32:
     let text = unsafe { with_fs_read_file(path) }
-    let tlen = text.len() as i32
+    let tlen = text.len()
     if tlen == 0:
         return 0
     let declarations = compiler_receiver_decls(path)
@@ -186,7 +186,7 @@ fn migrate_file(path: &str) -> i32:
     if failures != 0:
         print(f"error: {path}: {failures} receiver declarations failed semantic preflight; file left unchanged")
         return -1
-    let m = starts.len() as i32
+    let m = starts.len()
     if m == 0:
         return 0
     // Edits are ascending (fn_pos < del_start; methods top-to-bottom): apply L→R.
@@ -206,7 +206,7 @@ fn migrate_file(path: &str) -> i32:
     methods
 
 fn path_excluded(path: &str, excludes: &List[str]) -> bool:
-    for i in 0..excludes.len() as i32:
+    for i in 0..excludes.len():
         if path == excludes[i]: return true
     false
 
@@ -219,8 +219,8 @@ fn migrate_path(path: &str, excludes: &List[str]) -> i32:
     let listing = unsafe { with_fs_list_files(path) }
     var total: i32 = 0
     var start = 0
-    for i in 0..listing.len() as i32 + 1:
-        if i != listing.len() as i32 and listing[i] as i32 != 10: continue
+    for i in 0..listing.len() + 1:
+        if i != listing.len() and listing[i] as i32 != 10: continue
         if i > start:
             let file = slice(listing, start, i)
             if file.ends_with(".w") and not path_excluded(file, excludes):
@@ -239,9 +239,9 @@ fn main:
     let excludes: List[str] = List.new()
     let paths: List[str] = List.new()
     var arg = 1
-    while arg < argv.len() as i32:
+    while arg < argv.len():
         if argv[arg] == "--exclude":
-            if arg + 1 >= argv.len() as i32:
+            if arg + 1 >= argv.len():
                 print("error: --exclude requires a file path")
                 exit_code(1)
             arg = arg + 1
@@ -253,7 +253,7 @@ fn main:
         print("error: no migration paths supplied")
         exit_code(1)
     var total = 0
-    for i in 0..paths.len() as i32:
+    for i in 0..paths.len():
         let changed = migrate_path(paths[i], &excludes)
         if changed < 0: exit_code(1)
         total = total + changed

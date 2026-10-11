@@ -48,9 +48,9 @@ fn without_ids(line: &str, key: &str) -> str:
     let parts = line.split(key)
     if parts.len() == 0: return ""
     var out = parts[0].clone()
-    for i in 1..parts.len() as i32:
+    for i in 1..parts.len():
         var skip = 0
-        while skip < parts[i].len() as i32 and parts[i][skip] >= '0' and parts[i][skip] <= '9': skip += 1
+        while skip < parts[i].len() and parts[i][skip] >= '0' and parts[i][skip] <= '9': skip += 1
         out = out ++ key ++ parts[i].slice(skip, parts[i].len())
     out
 
@@ -74,7 +74,7 @@ fn normalized(dump: str) -> str:
 
 fn indent_of(line: &str) -> i32:
     var n: i32 = 0
-    while n < line.len() as i32 and line[n] == ' ': n += 1
+    while n < line.len() and line[n] == ' ': n += 1
     n
 
 // `fn f(...) -> T: body` or `fn f(...) -> T:` with the return type removed,
@@ -103,7 +103,7 @@ fn without_annotation(line: &str) -> str:
 
 // `var acc = init` / `for x in xs: acc += e` / `acc` at lines i, i+1, i+2.
 fn accumulator_at(lines: &List[str], i: i32) -> str:
-    if i + 2 >= lines.len() as i32: return ""
+    if i + 2 >= lines.len(): return ""
     let head = lines[i].trim()
     if not head.starts_with("var "): return ""
     let eq = head.find(" = ")
@@ -134,7 +134,7 @@ fn candidates(lines: &List[str]) -> List[Candidate]:
 
 fn with_line(lines: &List[str], at: i32, replacement: &str) -> str:
     var out: List[str] = List.new()
-    for i in 0..lines.len() as i32: out.push(if i == at: replacement.clone() else: lines[i].clone())
+    for i in 0..lines.len(): out.push(if i == at: replacement.clone() else: lines[i].clone())
     out.join("\n")
 
 // The fenced With blocks of a Markdown file, each with the line it starts on.
@@ -177,8 +177,8 @@ fn audit(compiler: &str, source: &Source, dir: &str, fix_path: &str) -> i32:
             findings += 1
             if fix_path.len() > 0: lines[candidate.line] = candidate.replacement.clone()
             print(f"{source.label}:{source.first_line + candidate.line}: {candidate.kind}: {candidate.detail}: {candidate.replacement.trim()}")
-    for i in 0..lines.len() as i32:
-        let pipeline = accumulator_at(&lines, i)
+    for i in 0..lines.len():
+        let pipeline = accumulator_at(&lines, i as i32)
         if pipeline.len() > 0:
             findings += 1
             print(f"{source.label}:{source.first_line + i}: accumulator: a loop that only adds is a pipeline: {pipeline}")
@@ -192,12 +192,12 @@ fn main:
     var fix = false
     var scratch = ""
     var i = 1
-    while i < argv.len() as i32:
-        if argv[i] == "--with" and i + 1 < argv.len() as i32:
+    while i < argv.len():
+        if argv[i] == "--with" and i + 1 < argv.len():
             compiler = argv[i + 1].clone()
             i += 2
             continue
-        if argv[i] == "--scratch" and i + 1 < argv.len() as i32:
+        if argv[i] == "--scratch" and i + 1 < argv.len():
             scratch = argv[i + 1].clone()
             i += 2
             continue

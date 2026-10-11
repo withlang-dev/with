@@ -203,7 +203,7 @@ fn parse_pairs(table: &str) -> List[Pair]:
     out
 
 fn lookup(pairs: &List[Pair], key: &str) -> str:
-    for i in 0..pairs.len() as i32:
+    for i in 0..pairs.len():
         if pairs[i].key == key: return pairs[i].value.clone()
     ""
 
@@ -240,7 +240,7 @@ fn is_heading(line: &str) -> bool: line.starts_with("#")
 // GitHub-style anchor for a heading's text.
 fn anchor(text: &str) -> str:
     var out = ""
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let c = text[i]
         if is_digit(c) or is_lower(c) or c == '-' or c == '_': out = out ++ text.slice(i, i + 1)
         else if is_upper(c): out = out ++ text.slice(i, i + 1).to_lower()
@@ -250,7 +250,7 @@ fn anchor(text: &str) -> str:
 fn slug(text: &str) -> str:
     var out = ""
     var dash = true
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let c = text[i]
         if is_digit(c) or is_lower(c):
             out = out ++ text.slice(i, i + 1)
@@ -270,7 +270,7 @@ fn slug(text: &str) -> str:
 
 fn dirname(path: &str) -> str:
     var last = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == '/': last = i
     if last < 0: return ""
     path.slice(0, last)
@@ -296,8 +296,8 @@ fn push_range(dst: List[str], src: &List[str], from: i32, to: i32) -> List[str]:
 
 fn rfind_byte(text: &str, c: i32) -> i32:
     var last: i32 = -1
-    for i in 0..text.len() as i32:
-        if text[i] == c: last = i
+    for i in 0..text.len():
+        if text[i] == c: last = i as i32
     last
 
 // Index of the next heading line at or after `from` that is outside a code fence
@@ -431,15 +431,15 @@ fn reassemble_spec -> List[str]:
     let readme = read_lines("docs/spec/README.md")
     var out: List[str] = List.new()
     var toc: i32 = -1
-    for i in 0..readme.len() as i32:
+    for i in 0..readme.len():
         if readme[i] == "## Table of Contents":
-            toc = i
+            toc = i as i32
             break
     assert(toc > 0)
     out = push_range(move out, readme, 0, toc)
     var i = toc + 1
     var in_raw = false
-    while i < readme.len() as i32:
+    while i < readme.len():
         let line = readme[i].clone()
         if line.starts_with("### Part "):
             out.push("# " ++ line.slice(4, line.len()))
@@ -457,13 +457,13 @@ fn inline_chapter(path: &str, acc: List[str]) -> List[str]:
     let lines = read_lines(path)
     out.push("#" ++ lines[0])
     var i = 1
-    while i < lines.len() as i32:
+    while i < lines.len():
         let sfile = strip_pointer_file(lines[i])
         if sfile.len() > 0:
             let sec = read_lines("docs/spec/" ++ sfile)
             out.push("##" ++ sec[0])
             out = push_range(move out, sec, 1, sec.len() as i32)
-            if sec.len() > 1 and sec[sec.len() - 1].len() == 0 and i + 1 < lines.len() as i32 and lines[i + 1].len() == 0: i = i + 1
+            if sec.len() > 1 and sec[sec.len() - 1].len() == 0 and i + 1 < lines.len() and lines[i + 1].len() == 0: i = i + 1
         else:
             out.push(lines[i].clone())
         i = i + 1
@@ -477,12 +477,12 @@ fn report_compare(label: &str, rebuilt: &List[str], original_path: &str) -> i32:
         print(label ++ ": reassembled text is byte-identical to " ++ original_path ++ f" ({original_text.len()} bytes, {original.len()} lines)")
         return 0
     var k = 0
-    while k < rebuilt.len() as i32 and k < original.len() as i32 and rebuilt[k] == original[k]: k = k + 1
+    while k < rebuilt.len() and k < original.len() and rebuilt[k] == original[k]: k = k + 1
     let out_path = "out/docs-restructure/" ++ label ++ "-reassembled.md"
     write_lines(out_path, rebuilt)
     eprint(label ++ f": DIFFERS at line {k + 1} (rebuilt {rebuilt.len()} lines, original {original.len()} lines); rebuilt text in " ++ out_path)
-    if k < original.len() as i32: eprint("  original: " ++ original[k])
-    if k < rebuilt.len() as i32: eprint("  rebuilt:  " ++ rebuilt[k])
+    if k < original.len(): eprint("  original: " ++ original[k])
+    if k < rebuilt.len(): eprint("  rebuilt:  " ++ rebuilt[k])
     1
 
 // ---------------------------------------------------------------- split-decisions
@@ -495,7 +495,7 @@ fn entry_date(lines: &List[str], start: i32, end: i32) -> str:
 fn entry_id(title: &str) -> str:
     if not title.starts_with("D"): return ""
     var k = 1
-    while k < title.len() as i32 and is_digit(title[k]): k = k + 1
+    while k < title.len() and is_digit(title[k]): k = k + 1
     if k == 1 or not title.slice(k, title.len()).starts_with(" — "): return ""
     title.slice(0, k)
 
@@ -546,9 +546,9 @@ fn reassemble_decisions -> List[str]:
     let readme = read_lines("docs/meetings/README.md")
     var out: List[str] = List.new()
     var idx: i32 = -1
-    for i in 0..readme.len() as i32:
+    for i in 0..readme.len():
         if readme[i] == "## Decisions":
-            idx = i
+            idx = i as i32
             break
     assert(idx > 0)
     out = push_range(move out, readme, 0, idx)
@@ -563,7 +563,7 @@ fn reassemble_decisions -> List[str]:
 
 fn move_files:
     let moves = parse_pairs(move_table())
-    for i in 0..moves.len() as i32:
+    for i in 0..moves.len():
         let src = moves[i].key.clone()
         let dst = moves[i].value.clone()
         if not file_exists(src):
@@ -581,7 +581,7 @@ fn move_files:
 
 fn list_moves:
     let moves = parse_pairs(move_table())
-    for i in 0..moves.len() as i32: print(moves[i].key ++ " -> " ++ moves[i].value)
+    for i in 0..moves.len(): print(moves[i].key ++ " -> " ++ moves[i].value)
 
 // ---------------------------------------------------------------- rewrite-refs
 
@@ -596,8 +596,8 @@ fn spec_file_for(id: &str, chapters: &List[Pair], sections: &List[Pair]) -> str:
         if dot < 0: break
         probe = probe.slice(0, dot)
     var k = 0
-    while k < id.len() as i32 and is_digit(id[k]): k = k + 1
-    if k < id.len() as i32 and is_lower(id[k]) and (k + 1 == id.len() as i32 or id[k + 1] == '.'): k = k + 1
+    while k < id.len() and is_digit(id[k]): k = k + 1
+    if k < id.len() and is_lower(id[k]) and (k + 1 == id.len() or id[k + 1] == '.'): k = k + 1
     let hit = lookup(chapters, id.slice(0, k))
     if hit.len() > 0: return "docs/spec/" ++ hit
     "docs/spec/README.md"
@@ -633,7 +633,7 @@ fn nearest_section_ref(line: &str, pos: i64) -> str:
     best_before
 
 fn decision_ref_at(line: &str, at: i32) -> str:
-    let n = line.len() as i32
+    let n = line.len()
     if at > 0 and is_alnum(line[at - 1]): return ""
     var k = at + 1
     while k < n and is_digit(line[k]): k = k + 1
@@ -642,9 +642,9 @@ fn decision_ref_at(line: &str, at: i32) -> str:
 
 fn nearest_decision_ref(line: &str, pos: i64) -> str:
     var best_before = ""
-    for i in 0..line.len() as i32:
+    for i in 0..line.len():
         if line[i] != 'D': continue
-        let id = decision_ref_at(line, i)
+        let id = decision_ref_at(line, i as i32)
         if id.len() == 0: continue
         if i > pos: return id
         best_before = id
@@ -658,8 +658,8 @@ fn meeting_files -> List[Pair]:
         let tail = name.slice(11, name.len())
         if not tail.starts_with("D"): continue
         var k = 1
-        while k < tail.len() as i32 and is_digit(tail[k]): k = k + 1
-        if k > 1 and k < tail.len() as i32 and tail[k] == '-':
+        while k < tail.len() and is_digit(tail[k]): k = k + 1
+        if k > 1 and k < tail.len() and tail[k] == '-':
             out.push(Pair { key: tail.slice(0, k), value: "docs/meetings/" ++ name })
     out
 
@@ -682,7 +682,7 @@ fn rewrite_line(line: &str, moves: &List[Pair], chapters: &List[Pair], sections:
         let hit = if id.len() > 0: lookup(meetings, id) else: ""
         let target = if hit.len() > 0: hit else: "docs/meetings/README.md"
         out = out.slice(0, at) ++ target ++ out.slice(at + dec.len(), out.len())
-    for i in 0..moves.len() as i32:
+    for i in 0..moves.len():
         out = replace_all(out, moves[i].key, moves[i].value)
     out
 
@@ -698,7 +698,7 @@ fn rewrite_refs:
     var sorted: List[Pair] = List.new()
     while moves.len() > 0:
         var best = 0
-        for i in 0..moves.len() as i32:
+        for i in 0..moves.len():
             if moves[i].key.len() > moves[best].key.len(): best = i
         sorted.push(Pair { key: moves[best].key.clone(), value: moves[best].value.clone() })
         moves.remove(best)

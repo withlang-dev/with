@@ -18,13 +18,13 @@ fn slice(text: &str, start: isize, end: isize): text.slice(start, end)
 
 fn source_path(path: &str) -> str:
     let embedded = "<embedded-std>/"
-    if path.starts_with(embedded): "lib/" ++ slice(path, embedded.len() as i32, path.len() as i32) else: path.clone()
+    if path.starts_with(embedded): "lib/" ++ slice(path, embedded.len(), path.len()) else: path.clone()
 
 let message = "error: List has no 'get': element access is spelled 'xs[i]' (§ Element access, D71)"
 
 fn parse_i32(s: &str) -> i32:
     var out: i32 = 0
-    for i in 0..s.len() as i32:
+    for i in 0..s.len():
         let ch = s[i]
         if ch < 48 or ch > 57: return out
         out = out * 10 + (ch - 48) as i32
@@ -47,7 +47,7 @@ fn line_col_offset(text: &str, want_line: i32, want_col: i32) -> i32:
 
 fn count_carets(line: &str) -> i32:
     var n: i32 = 0
-    for i in 0..line.len() as i32:
+    for i in 0..line.len():
         if line[i] == '^': n = n + 1
     n
 
@@ -58,8 +58,8 @@ fn collect_sites(log_path: &str) -> List[GetSite]:
     let lines = log.split("\n")
     let sites: List[GetSite] = List.new()
     var li = 0
-    while li < lines.len() as i32:
-        if lines[li] == message and li + 3 < lines.len() as i32 and lines[(li + 1)].starts_with(" --> "):
+    while li < lines.len():
+        if lines[li] == message and li + 3 < lines.len() and lines[(li + 1)].starts_with(" --> "):
             let loc = lines[(li + 1)]
             let parts = loc.slice(5, loc.len()).split(":")
             if parts.len() < 3:
@@ -99,7 +99,7 @@ fn collect_sites(log_path: &str) -> List[GetSite]:
                 li = li + 4
                 continue
             var dup = false
-            for si in 0..sites.len() as i32:
+            for si in 0..sites.len():
                 if sites[si].path == path and sites[si].start == start:
                     dup = true
             if not dup:
@@ -123,7 +123,7 @@ fn migrate_file(path: &str, sites: &List[GetSite], apply: bool) -> i32:
     let pos: List[i32] = List.new()
     let lens: List[i32] = List.new()
     let kinds: List[i32] = List.new()
-    for i in 0..sites.len() as i32:
+    for i in 0..sites.len():
         let site = sites[i]
         if site.path != path: continue
         // The call node ends at its `)`; walk back to the matching `(`.
@@ -176,7 +176,7 @@ fn migrate_file(path: &str, sites: &List[GetSite], apply: bool) -> i32:
 
     // Insertion sort by position; every edit is a distinct byte range.
     var i = 1
-    while i < pos.len() as i32:
+    while i < pos.len():
         var j = i
         while j > 0 and pos[(j - 1)] > pos[j]:
             let tp: i32 = pos[(j - 1)]
@@ -190,7 +190,7 @@ fn migrate_file(path: &str, sites: &List[GetSite], apply: bool) -> i32:
             kinds[j] = tk
             j = j - 1
         i = i + 1
-    for ei in 1..pos.len() as i32:
+    for ei in 1..pos.len():
         if pos[(ei - 1)] + lens[(ei - 1)] > pos[ei]:
             print(f"migrate-vec-get: overlapping edits in {path} at {pos[ei]}")
             exit_code(1)
@@ -199,11 +199,11 @@ fn migrate_file(path: &str, sites: &List[GetSite], apply: bool) -> i32:
     if not apply or count == 0: return count
     let chunks: List[str] = List.new()
     var cursor = 0
-    for ei in 0..pos.len() as i32:
+    for ei in 0..pos.len():
         chunks.push(slice(text, cursor, pos[ei]))
         chunks.push(if kinds[ei] == 0: "[".clone() else: "]".clone())
         cursor = pos[ei] + lens[ei]
-    chunks.push(slice(text, cursor, text.len() as i32))
+    chunks.push(slice(text, cursor, text.len()))
     if write_file(path, chunks.join("")) != 0:
         print("migrate-vec-get: failed to write " ++ path)
         exit_code(1)
@@ -213,30 +213,30 @@ fn main:
     let argv = args()
     var apply = false
     let logs: List[str] = List.new()
-    for ai in 1..argv.len() as i32:
+    for ai in 1..argv.len():
         if argv[ai] == "--apply": apply = true
         else: logs.push(argv[ai].clone())
     if logs.len() == 0:
         print("usage: migrate_vec_get [--apply] <check.log>...")
         exit_code(1)
     let sites: List[GetSite] = List.new()
-    for li in 0..logs.len() as i32:
+    for li in 0..logs.len():
         let found = collect_sites(logs[li])
-        for fi in 0..found.len() as i32:
+        for fi in 0..found.len():
             var dup = false
-            for si in 0..sites.len() as i32:
+            for si in 0..sites.len():
                 if sites[si].path == found[fi].path and sites[si].start == found[fi].start:
                     dup = true
             if not dup:
                 sites.push(GetSite { path: found[fi].path.clone(), start: found[fi].start, end: found[fi].end })
     let paths: List[str] = List.new()
-    for si in 0..sites.len() as i32:
+    for si in 0..sites.len():
         var seen = false
-        for pi in 0..paths.len() as i32:
+        for pi in 0..paths.len():
             if paths[pi] == sites[si].path: seen = true
         if not seen: paths.push(sites[si].path.clone())
     var total = 0
-    for pi in 0..paths.len() as i32:
+    for pi in 0..paths.len():
         total = total + migrate_file(paths[pi], sites, apply)
     let mode = if apply: "rewritten" else: "(dry run)"
     print(f"migrate-vec-get: {total} site(s) in {paths.len()} file(s) {mode}")

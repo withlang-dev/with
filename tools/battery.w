@@ -194,7 +194,7 @@ fn merge_times(ledger: &str, times: &str):
             let cols = line.split("\t")
             if cols.len() < 3 or cols[0] == "target" or cols[0] == "TOTAL": continue
             var found = false
-            for i in 0..names.len() as i32:
+            for i in 0..names.len():
                 if names[i] == cols[0]:
                     lines[i] = line.clone()
                     found = true
@@ -202,12 +202,12 @@ fn merge_times(ledger: &str, times: &str):
                 names.push(cols[0].clone())
                 lines.push(line.clone())
     var text = "target\tseconds\tpeak_rss\n"
-    var remaining = lines.len() as i32
+    var remaining = lines.len()
     var taken: List[i32] = List.new()
-    for i in 0..names.len() as i32: taken.push(0)
+    for i in 0..names.len(): taken.push(0)
     while remaining > 0:
         var best = -1
-        for i in 0..names.len() as i32:
+        for i in 0..names.len():
             if taken[i] != 0: continue
             if best < 0 or names[i] < names[best]: best = i
         taken[best] = 1

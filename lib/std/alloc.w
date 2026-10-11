@@ -119,7 +119,7 @@ pub fn Arena.alloc(mut self: Arena, size: i32) -> *i8:
     let out = (self.current as i64 + self.offset as i64) as *i8
     self.offset = self.offset + n
     var used = self.offset as i64
-    let block_count = self.blocks.len() as i32
+    let block_count = self.blocks.len()
     if block_count > 1:
         for i in 0..block_count - 1:
             used = used + self.block_sizes[i] as i64
@@ -134,7 +134,7 @@ pub fn FrameArena.alloc(mut self: FrameArena, size: i32) -> *i8:
     let out = (self.current as i64 + self.offset as i64) as *i8
     self.offset = self.offset + n
     var used = self.offset as i64
-    let block_count = self.blocks.len() as i32
+    let block_count = self.blocks.len()
     if block_count > 1:
         for i in 0..block_count - 1:
             used = used + self.block_sizes[i] as i64
@@ -163,7 +163,7 @@ pub fn Arena.mark(self: &Arena) -> i64:
 pub fn Arena.reset_to(mut self: Arena, mark: i64) -> Unit:
     let block_index = mark / alloc_mark_unit()
     let mark_offset = (mark - block_index * alloc_mark_unit()) as i32
-    let n = self.blocks.len() as i32
+    let n = self.blocks.len()
     var new_blocks: List[i64] = List.new()
     var new_sizes: List[i32] = List.new()
     for i in 0..n:
@@ -177,7 +177,7 @@ pub fn Arena.reset_to(mut self: Arena, mark: i64) -> Unit:
     self.blocks = new_blocks
     self.block_sizes = new_sizes
     if self.blocks.len() > 0:
-        let last = self.blocks.len() as i32 - 1
+        let last = self.blocks.len() - 1
         self.current = self.blocks[last] as *i8
         self.capacity = self.block_sizes[last]
         self.offset = if mark_offset >= 0 and mark_offset <= self.capacity: mark_offset else: 0
@@ -197,7 +197,7 @@ pub fn FrameArena.reset(mut self: FrameArena) -> Unit:
         return
     let first: i64 = self.blocks[0]
     let first_size: i32 = self.block_sizes[0]
-    for i in 1..self.blocks.len() as i32:
+    for i in 1..self.blocks.len():
         let raw = self.blocks[i]
         if raw != 0:
             free_mem(raw as *i8)
@@ -321,7 +321,7 @@ pub fn PoolAllocator.new(item_size: i32, capacity: i32) -> PoolAllocator:
 pub fn Pool.alloc(mut self: Pool) -> *i8:
     if self.free_list.len() == 0:
         self.add_slab()
-    let last = self.free_list.len() as i32 - 1
+    let last = self.free_list.len() - 1
     let raw: i64 = self.free_list[last]
     self.free_list.remove(last as i64)
     raw as *i8

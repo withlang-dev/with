@@ -37,9 +37,9 @@ fn emitc_abs(root: &str, path: &str) -> str:
 
 fn emitc_dirname(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
-            last_slash = i
+            last_slash = i as i32
     if last_slash < 0:
         return "."
     if last_slash == 0:
@@ -48,9 +48,9 @@ fn emitc_dirname(path: &str) -> str:
 
 fn emitc_basename(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
-            last_slash = i
+            last_slash = i as i32
     path.slice((last_slash + 1) as i64, path.len())
 
 fn emitc_exe_name(name: &str) -> str:
@@ -60,7 +60,7 @@ fn emitc_exe_name(name: &str) -> str:
 
 fn emitc_trim(text: &str) -> str:
     var start = 0
-    var end = text.len() as i32
+    var end = text.len()
     while start < end:
         let ch = text[start]
         if ch != 9 and ch != 10 and ch != 13 and ch != 32:
@@ -219,10 +219,10 @@ fn emitc_index_of(text: &str, needle: &str) -> isize:
     if text.len() < needle.len():
         return -1
     var i = 0
-    while i <= text.len() as i32 - needle.len() as i32:
+    while i <= text.len() - needle.len():
         var j = 0
         var matched = true
-        while j < needle.len() as i32:
+        while j < needle.len():
             if text[(i + j)] != needle[j]:
                 matched = false
                 break
@@ -236,8 +236,8 @@ fn emitc_split_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()
     var start = 0
     var i = 0
-    while i <= text.len() as i32:
-        let at_end = i == text.len() as i32
+    while i <= text.len():
+        let at_end = i == text.len()
         if at_end or text[i] == 10:
             var line = text.slice(start as i64, i as i64)
             if line.len() > 0 and line[line.len() - 1] == 13:
@@ -252,9 +252,9 @@ fn emitc_c_export_symbol(line: &str) -> str:
     let start = emitc_index_of(line, prefix)
     if start < 0:
         return ""
-    let symbol_start = start + prefix.len() as i32
+    let symbol_start = start + prefix.len()
     var i = symbol_start
-    while i < line.len() as i32:
+    while i < line.len():
         if line[i] == 34:
             return line.slice(symbol_start as i64, i as i64)
         i = i + 1
@@ -263,7 +263,7 @@ fn emitc_c_export_symbol(line: &str) -> str:
 fn emitc_find_matching_paren(text: &str, open_at: isize) -> isize:
     var depth = 0
     var i = open_at
-    while i < text.len() as i32:
+    while i < text.len():
         let ch = text[i]
         if ch == 40:
             depth = depth + 1
@@ -313,9 +313,9 @@ fn emitc_stub_return(c_type: &str) -> str:
 fn emitc_parse_param(param_text: &str) -> EmitCParam:
     let trimmed = emitc_trim(param_text)
     var colon = -1
-    for i in 0..trimmed.len() as i32:
+    for i in 0..trimmed.len():
         if trimmed[i] == 58:
-            colon = i
+            colon = i as i32
             break
     if colon < 0:
         return EmitCParam { name: "", c_type: "" }
@@ -330,8 +330,8 @@ fn emitc_parse_params(text: &str) -> List[EmitCParam]:
     let params: List[EmitCParam] = List.new()
     var start = 0
     var i = 0
-    while i <= text.len() as i32:
-        let at_end = i == text.len() as i32
+    while i <= text.len():
+        let at_end = i == text.len()
         if at_end or text[i] == 44:
             let piece = emitc_trim(text.slice(start as i64, i as i64))
             if piece.len() > 0:
@@ -347,7 +347,7 @@ fn emitc_parse_export_function(symbol: &str, line: &str) -> EmitCFunction:
         return EmitCFunction { symbol: emit_c_owned_text(symbol), return_type: "", params, ok: 0 }
     var open_at: isize = -1
     var i = fn_at
-    while i < line.len() as i32:
+    while i < line.len():
         if line[i] == 40:
             open_at = i
             break
@@ -361,7 +361,7 @@ fn emitc_parse_export_function(symbol: &str, line: &str) -> EmitCFunction:
     // D27: `get` observes through a view; end the view's scope before any
     // return moves parsed_params into the result.
     var params_ok = 1
-    for pi in 0..parsed_params.len() as i32:
+    for pi in 0..parsed_params.len():
         let param = parsed_params[pi]
         if param.name.len() == 0 or param.c_type.len() == 0:
             params_ok = 0
@@ -374,9 +374,9 @@ fn emitc_parse_export_function(symbol: &str, line: &str) -> EmitCFunction:
     if arrow >= 0:
         let after_arrow = rest.slice((arrow + 2) as i64, rest.len())
         var colon = -1
-        for ci in 0..after_arrow.len() as i32:
+        for ci in 0..after_arrow.len():
             if after_arrow[ci] == 58:
-                colon = ci
+                colon = ci as i32
                 break
         if colon < 0:
             return EmitCFunction { symbol: emit_c_owned_text(symbol), return_type: "", params: parsed_params, ok: 0 }
@@ -389,7 +389,7 @@ fn emitc_collect_exports_from_text(ctx: &ActionCtx, text: &str, source_path: &st
     let exports: List[EmitCFunction] = List.new()
     let lines = emitc_split_lines(text)
     var pending_symbol = ""
-    for li in 0..lines.len() as i32:
+    for li in 0..lines.len():
         let line = emitc_trim(lines[li])
         let symbol = emitc_c_export_symbol(line)
         if symbol.len() > 0:
@@ -421,7 +421,7 @@ fn emitc_public_function_name(line: &str) -> str:
     if start < 0:
         return ""
     var i = start
-    while i < line.len() as i32:
+    while i < line.len():
         let ch = line[i]
         if ch == 40 or ch == 32 or ch == 58:
             break
@@ -436,7 +436,7 @@ fn emitc_is_bridge_abi_symbol(name: &str) -> bool:
 fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: &str) -> List[EmitCFunction]:
     let exports: List[EmitCFunction] = List.new()
     let lines = emitc_split_lines(text)
-    for li in 0..lines.len() as i32:
+    for li in 0..lines.len():
         let line = emitc_trim(lines[li])
         let name = emitc_public_function_name(line)
         if name.len() == 0 or not emitc_is_bridge_abi_symbol(name):
@@ -451,7 +451,7 @@ fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: 
 fn emitc_collect_public_abi(ctx: &ActionCtx, sources: List[str]) -> List[EmitCFunction]:
     let all: List[EmitCFunction] = List.new()
     let fs = ctx.fs()
-    for si in 0..sources.len() as i32:
+    for si in 0..sources.len():
         let source_path = sources[si]
         let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
         if text.len() == 0:
@@ -467,7 +467,7 @@ fn emitc_collect_public_abi(ctx: &ActionCtx, sources: List[str]) -> List[EmitCFu
 fn emitc_collect_exports(ctx: &ActionCtx, sources: List[str]) -> List[EmitCFunction]:
     let all: List[EmitCFunction] = List.new()
     let fs = ctx.fs()
-    for si in 0..sources.len() as i32:
+    for si in 0..sources.len():
         let source_path = sources[si]
         let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
         if text.len() == 0:
@@ -485,7 +485,7 @@ fn emitc_function_proto(fn_sig: &EmitCFunction) -> str:
     if fn_sig.params.len() == 0:
         out = out ++ "void"
     else:
-        for pi in 0..fn_sig.params.len() as i32:
+        for pi in 0..fn_sig.params.len():
             if pi > 0:
                 out = out ++ ", "
             let param = fn_sig.params[pi]
@@ -514,12 +514,12 @@ fn emitc_generate_stub_files(ctx: &ActionCtx, dir: &str) -> i32:
     decls = decls ++ "#include \"with_runtime.h\"\n\n"
     var stubs = "// Auto-generated by with build emit-c.\n"
     stubs = stubs ++ "#include \"wl_decls.h\"\n\n"
-    for ei in 0..stub_exports.len() as i32:
+    for ei in 0..stub_exports.len():
         let fn_sig = stub_exports[ei]
         let proto = emitc_function_proto(fn_sig)
         decls = decls ++ proto ++ ";\n"
         stubs = stubs ++ proto ++ " {\n"
-        for pi in 0..fn_sig.params.len() as i32:
+        for pi in 0..fn_sig.params.len():
             let param = fn_sig.params[pi]
             stubs = stubs ++ "    (void)" ++ param.name ++ ";\n"
         stubs = stubs ++ emitc_stub_return(fn_sig.return_type)
@@ -730,7 +730,7 @@ fn emitc_test_target_files(ctx: &ActionCtx, entry: &str) -> List[str]:
     let dir = emitc_dirname(entry)
     let suffix = entry.slice((star + 1) as i64, entry.len())
     let all = ctx.fs().list_files(dir)
-    for i in 0..all.len() as i32:
+    for i in 0..all.len():
         let path = all[i]
         if suffix.len() == 0 or path.ends_with(suffix):
             files.push(emit_c_owned_text(path))
@@ -740,7 +740,7 @@ fn emitc_run_test_group(ctx: &ActionCtx, compiler_path: &str, entry: &str, label
     let files = emitc_test_target_files(ctx, entry)
     if files.len() == 0:
         return emitc_fail(ctx, "matched no tests: " ++ entry)
-    for fi in 0..files.len() as i32:
+    for fi in 0..files.len():
         let test_path = files[fi]
         let base = emitc_basename(test_path)
         let rc = emitc_run_single_test(ctx, compiler_path, test_path, label ++ "-" ++ base)

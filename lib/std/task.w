@@ -53,7 +53,7 @@ pub fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[List[
     for task in tasks.into_iter():
         pending.push(task)
 
-    let total = pending.len() as i32
+    let total = pending.len()
     let finished: List[i32] = List.new()
     let order: List[i32] = List.new()
     let values: List[Option[T]] = List.new()
@@ -70,7 +70,7 @@ pub fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[List[
         // Awaited tasks are removed from pending in lockstep with
         // finished/order, so everything still here is un-awaited and the
         // bound is the live length (the await_first pattern).
-        while cleanup_i < pending.len() as i32:
+        while cleanup_i < pending.len():
             pending[cleanup_i].join_cleanup()
             cleanup_i = cleanup_i + 1
 
@@ -109,7 +109,7 @@ pub fn await_all[T](tasks: impl IntoIter[Task[T]]) -> List[T]:
     var cleanup_i = 0
     defer:
         // Awaited tasks were removed, so everything live is un-awaited.
-        while cleanup_i < pending.len() as i32:
+        while cleanup_i < pending.len():
             pending[cleanup_i].join_cleanup()
             cleanup_i = cleanup_i + 1
 
@@ -127,7 +127,7 @@ pub fn await_first[T](tasks: impl IntoIter[Task[T]]) -> T:
     if pending.is_empty():
         todo("await_first: empty input")
 
-    let total = pending.len() as i32
+    let total = pending.len()
     let finished: List[i32] = List.new()
     var i = 0
     while i < total:
@@ -138,7 +138,7 @@ pub fn await_first[T](tasks: impl IntoIter[Task[T]]) -> T:
     defer:
         // The winner was removed from BOTH vecs, so indices stay aligned and
         // the bound must be the live length, not the captured total.
-        while cleanup_i < pending.len() as i32:
+        while cleanup_i < pending.len():
             if finished[cleanup_i] == 0:
                 pending[cleanup_i].join_cleanup()
             cleanup_i = cleanup_i + 1
@@ -161,7 +161,7 @@ pub fn await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, Li
     for task in tasks.into_iter():
         pending.push(task)
 
-    let total = pending.len() as i32
+    let total = pending.len()
     if pending.is_empty():
         let empty: List[E] = List.new()
         return Err(empty)
@@ -181,7 +181,7 @@ pub fn await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, Li
     defer:
         // Awaited tasks are removed in lockstep, so everything live is
         // un-awaited and the bound is the live length.
-        while cleanup_i < pending.len() as i32:
+        while cleanup_i < pending.len():
             pending[cleanup_i].join_cleanup()
             cleanup_i = cleanup_i + 1
 
@@ -218,7 +218,7 @@ pub fn await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> List[Res
     var cleanup_i = 0
     defer:
         // Awaited tasks were removed, so everything live is un-awaited.
-        while cleanup_i < pending.len() as i32:
+        while cleanup_i < pending.len():
             pending[cleanup_i].join_cleanup()
             cleanup_i = cleanup_i + 1
 

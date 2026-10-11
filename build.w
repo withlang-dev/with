@@ -26,9 +26,9 @@ fn build_owned_text(s: &str): s ++ ""
 
 fn build_project_dirname(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
-            last_slash = i
+            last_slash = i as i32
     if last_slash < 0:
         return "."
     if last_slash == 0:
@@ -61,7 +61,7 @@ fn runtime_producer_target(name: &str, compiler: &str, dir: &str, object_targets
     target = target.compiler(compiler)
     target = target.write_scope(build_owned_text(dir))
     target = target.write_scope("out/command/" ++ name)
-    for i in 0..object_targets.len() as i32:
+    for i in 0..object_targets.len():
         target = target.dep(build_owned_text(object_targets[i]))
     target
 
@@ -114,7 +114,7 @@ fn cross_wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle) -> Build
 // Every registered corpus's plan for one cross tag, in registry order.
 fn cross_wo_plans(ctx: &BuildCtx, host_plans: &List[WoBundle], tag: &str) -> List[WoBundle]:
     var plans: List[WoBundle] = List.new()
-    for pi in 0..host_plans.len() as i32:
+    for pi in 0..host_plans.len():
         plans.push(cross_wo_plan(ctx, host_plans[pi], tag))
     plans
 
@@ -409,7 +409,7 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     compiler = compiler.write_scope(build_owned_text(bin_dir))
     compiler = compiler.extra_output("out/command/" ++ p ++ "link-compiler")
     compiler = compiler.timeout(1800000)
-    for pi in 0..plans.len() as i32:
+    for pi in 0..plans.len():
         compiler = target_with_link_bundle(move compiler, ctx, plans[pi])
     out = out.add_target(compiler)
 
@@ -501,20 +501,20 @@ fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpu
     names.push("fiber")
     names.push("fiber_asm")
     names.push("rt_core")
-    for ni in 0..names.len() as i32:
+    for ni in 0..names.len():
         embedded = embedded.input(dir ++ "/" ++ names[ni] ++ ".o")
         embedded = embedded.arg(names[ni] ++ "_o")
     embedded = embedded.input(dir ++ "/" ++ host_runtime.platform_install_object)
     embedded = embedded.arg(build_owned_text(host_runtime.platform_symbol))
     let empty_syms = embedded_platform_symbols()
-    for ei in 0..empty_syms.len() as i32:
+    for ei in 0..empty_syms.len():
         let esym = empty_syms[ei]
         if esym != host_runtime.platform_symbol:
             out = out.add_target(empty_file_target(empty_platform_blob_target("stage1-empty-", esym), empty_platform_blob_path(dir, esym)))
             objects.push(empty_platform_blob_target("stage1-empty-", esym))
             embedded = embedded.input(empty_platform_blob_path(dir, esym))
             embedded = embedded.arg(build_owned_text(esym))
-    for oi in 0..objects.len() as i32:
+    for oi in 0..objects.len():
         embedded = embedded.dep(build_owned_text(objects[oi]))
     for pi in 0..corpus_plans.len():
         embedded = target_with_wo_blobs(move embedded, corpus_plans[pi])
@@ -531,7 +531,7 @@ fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpu
 
     out = out.add_target(runtime_producer_target("stage1-runtime-producer", stage1, dir, &objects))
     var group = target_new(.Group, "stage1-runtime", "")
-    for oi in 0..objects.len() as i32:
+    for oi in 0..objects.len():
         group = group.dep(build_owned_text(objects[oi]))
     group = group.dep("stage1-runtime-producer")
     out.add_target(group)
@@ -554,7 +554,7 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("cross-llvm-link-metadata: could not list: " ++ lib_dir)
     var clang_archives: List[str] = List.new()
     var llvm_archives: List[str] = List.new()
-    for i in 0..lib_files.len() as i32:
+    for i in 0..lib_files.len():
         let path = lib_files[i]
         let name = comp_path_basename(path)
         if name.ends_with(".a"):
@@ -565,10 +565,10 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
                     llvm_archives.push(build_owned_text(path))
     var ld_rsp = comp_rsp_path(libclang) ++ "\n"
     let sorted_clang = comp_sort_strings(clang_archives)
-    for i in 0..sorted_clang.len() as i32:
+    for i in 0..sorted_clang.len():
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_clang[i]) ++ "\n"
     let sorted_llvm = comp_sort_strings(llvm_archives)
-    for i in 0..sorted_llvm.len() as i32:
+    for i in 0..sorted_llvm.len():
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
     // #1915 (D81): the target SDK's static libc++ (libc++abi and libunwind
     // in it); Link.w adds the target sysroot's crt objects, libc and
@@ -630,7 +630,7 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("cross-windows-llvm-link-metadata: could not list: " ++ lib_dir)
     var clang_archives: List[str] = List.new()
     var llvm_archives: List[str] = List.new()
-    for i in 0..lib_files.len() as i32:
+    for i in 0..lib_files.len():
         let path = lib_files[i]
         let name = comp_path_basename(path)
         if name.ends_with(".lib"):
@@ -641,10 +641,10 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
                     llvm_archives.push(build_owned_text(path))
     var ld_rsp = comp_rsp_path(libclang) ++ "\n"
     let sorted_clang = comp_sort_strings(clang_archives)
-    for i in 0..sorted_clang.len() as i32:
+    for i in 0..sorted_clang.len():
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_clang[i]) ++ "\n"
     let sorted_llvm = comp_sort_strings(llvm_archives)
-    for i in 0..sorted_llvm.len() as i32:
+    for i in 0..sorted_llvm.len():
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
     // #1915: a compiler cross-linked for Windows carries no `with __ld`;
@@ -692,7 +692,7 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: could not list: " ++ lib_dir)
     var clang_archives: List[str] = List.new()
     var llvm_archives: List[str] = List.new()
-    for i in 0..lib_files.len() as i32:
+    for i in 0..lib_files.len():
         let path = lib_files[i]
         let name = comp_path_basename(path)
         if name.ends_with(".lib"):
@@ -703,10 +703,10 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
                     llvm_archives.push(build_owned_text(path))
     var ld_rsp = comp_rsp_path(libclang) ++ "\n"
     let sorted_clang = comp_sort_strings(clang_archives)
-    for i in 0..sorted_clang.len() as i32:
+    for i in 0..sorted_clang.len():
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_clang[i]) ++ "\n"
     let sorted_llvm = comp_sort_strings(llvm_archives)
-    for i in 0..sorted_llvm.len() as i32:
+    for i in 0..sorted_llvm.len():
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
     // #1915: a compiler cross-linked for Windows carries no `with __ld`;
@@ -819,7 +819,7 @@ fn empty_wo_blob_target(prefix: &str, name: &str, kind: &str) -> str:
 fn add_empty_wo_blob_targets(out0: Build, prefix: &str, dir: &str, name: &str) -> Build:
     var out = out0
     let kinds = wo_blob_kinds()
-    for ki in 0..kinds.len() as i32:
+    for ki in 0..kinds.len():
         let kind = kinds[ki]
         out = out.add_target(empty_file_target(empty_wo_blob_target(prefix, name, kind), empty_wo_blob_path(dir, name, kind)))
     out
@@ -827,7 +827,7 @@ fn add_empty_wo_blob_targets(out0: Build, prefix: &str, dir: &str, name: &str) -
 fn target_with_empty_wo_blobs(target: Target, prefix: &str, dir: &str, name: &str) -> Target:
     var out = target
     let kinds = wo_blob_kinds()
-    for ki in 0..kinds.len() as i32:
+    for ki in 0..kinds.len():
         let kind = kinds[ki]
         out = out.input(empty_wo_blob_path(dir, name, kind))
         out = out.arg("wo_" ++ name ++ "_" ++ kind)
@@ -866,7 +866,7 @@ fn target_with_link_bundle(target: Target, ctx: &BuildCtx, plan: &WoBundle) -> T
 fn target_with_embedded_stdlib_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
     let files = ctx.fs().list_files("lib/std")
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         // A bundled corpus is provided by its .wo, never embedded as source
         // (build/corpora.w names them).
@@ -877,7 +877,7 @@ fn target_with_embedded_stdlib_inputs(target: Target, ctx: &BuildCtx) -> Target:
 fn target_with_embedded_runtime_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
     let files = ctx.fs().list_files("rt")
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         if path.ends_with(".w"):
             out = out.input(build_owned_text(path))
@@ -889,9 +889,9 @@ fn target_with_compiler_c_export_audit_inputs(target: Target, ctx: &BuildCtx) ->
     roots.push("src")
     roots.push("rt")
     roots.push("lib/std")
-    for ri in 0..roots.len() as i32:
+    for ri in 0..roots.len():
         let files = ctx.fs().list_files(roots[ri])
-        for fi in 0..files.len() as i32:
+        for fi in 0..files.len():
             let path = files[fi]
             if path.ends_with(".w"):
                 out = out.input(build_owned_text(path))
@@ -910,9 +910,9 @@ fn target_with_compiler_source_inputs(target: Target, ctx: &BuildCtx) -> Target:
     // never reads them, and the action-code signature (#686) already tracks
     // the action's own module closure. Declaring them re-created the
     // rebuild-the-world-on-any-build-edit tax.
-    for ri in 0..roots.len() as i32:
+    for ri in 0..roots.len():
         let files = ctx.fs().list_files(roots[ri])
-        for fi in 0..files.len() as i32:
+        for fi in 0..files.len():
             let path = files[fi]
             if path.ends_with(".w"):
                 out = out.input(build_owned_text(path))
@@ -933,16 +933,16 @@ fn target_with_compiler_source_inputs(target: Target, ctx: &BuildCtx) -> Target:
 fn target_with_generation_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
     let dirs = compiler_generation_dirs()
-    for di in 0..dirs.len() as i32:
+    for di in 0..dirs.len():
         let files = ctx.fs().list_files(dirs[di])
-        for fi in 0..files.len() as i32:
+        for fi in 0..files.len():
             if files[fi].ends_with(".w"):
                 out = out.input(build_owned_text(files[fi]))
     out
 
 fn build_project_trim_line(text: &str) -> str:
     var end = 0
-    while end < text.len() as i32:
+    while end < text.len():
         let ch = text[end]
         if ch == 10 or ch == 13:
             break
@@ -978,7 +978,7 @@ fn target_with_version_inputs(target: Target, ctx: &BuildCtx) -> Target:
 
 fn target_with_live_targets(target: Target, graph: &Build) -> Target:
     var out = target
-    for i in 0..graph.targets.len() as i32:
+    for i in 0..graph.targets.len():
         out = out.arg("live-target=" ++ graph.targets[i].name)
     out
 
@@ -1019,17 +1019,17 @@ fn gate_test_lanes(graph: &Build) -> List[str]:
     pending.push("test")
     var seen: List[str] = List.new()
     var next = 0
-    while next < pending.len() as i32:
+    while next < pending.len():
         let name = pending[next].clone()
         next = next + 1
         if seen.contains(name): continue
         seen.push(name.clone())
         if name == "test-green" or name == "seed-driver": continue
-        for i in 0..graph.targets.len() as i32:
+        for i in 0..graph.targets.len():
             let target = &graph.targets[i]
             if target.name != name: continue
             if target.kind == BuildKind.Group:
-                for d in 0..target.deps.len() as i32: pending.push(target.deps[d].clone())
+                for d in 0..target.deps.len(): pending.push(target.deps[d].clone())
             else:
                 lanes.push(name.clone())
             break
@@ -1040,7 +1040,7 @@ fn gate_test_lanes(graph: &Build) -> List[str]:
 fn gate_whole_seconds(text: &str) -> i32:
     var n: i32 = 0
     var digits = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let b = text[i]
         if b == '.' or b == 's': break
         if b < '0' or b > '9': return -1
@@ -1070,7 +1070,7 @@ fn run_gate_shape_action(ctx: ActionCtx) -> i32:
     var measured = ""
     var count = 0
     let args = ctx.args()
-    for i in 0..args.len() as i32:
+    for i in 0..args.len():
         let arg = args[i]
         if not arg.starts_with("measured="): continue
         measured = measured ++ " " ++ arg.slice(9, arg.len())
@@ -1950,9 +1950,9 @@ fn run_validate_all_async_action(ctx: ActionCtx) -> i32:
     dirs.push("test/debug_alloc")
     dirs.push("test/phase")
     var count = 0
-    for di in 0..dirs.len() as i32:
+    for di in 0..dirs.len():
         let files = fs.list_files(dirs[di])
-        for fi in 0..files.len() as i32:
+        for fi in 0..files.len():
             let p = files[fi]
             if p.ends_with(".w") and not p.contains("/lib/") and validate_all_async_selected(fs.read_text(p)):
                 args.push(build_project_abs(root, p))
@@ -2002,7 +2002,7 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
     check_args.push(driver_bin)
     check_args.push("check")
     check_args.push(compiler)
-    for i in 0..fixtures.len() as i32:
+    for i in 0..fixtures.len():
         let p = fixtures[i]
         if p.ends_with(".w"):
             check_args.push(build_project_abs(root, p))
@@ -2032,7 +2032,7 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
 fn contract_view_directives(text: &str, prefix: &str) -> List[str]:
     var out: List[str] = List.new()
     let lines = text.split("\n")
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if line.starts_with(prefix):
             out.push(line.slice(prefix.len(), line.len()))
@@ -2060,13 +2060,13 @@ fn contract_view_run(ctx: &ActionCtx, root: &str, compiler: &str, fixture: &str,
 fn uat_tests_strip_timings(report: &str) -> str:
     var out = ""
     let lines = report.split("\n")
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         var line = build_owned_text(lines[i])
         let steps = line.find(" steps, ")
         if steps >= 0 and line.ends_with("s)"):
             line = line.slice(0, steps) ++ " steps)"
         out = out ++ line
-        if i + 1 < lines.len() as i32:
+        if i + 1 < lines.len():
             out = out ++ "\n"
     out
 
@@ -2163,7 +2163,7 @@ fn run_release_uat_action(ctx: ActionCtx) -> i32:
     print(report)
     var failed = 0
     let lines = report.split("\n")
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if not line.starts_with("uat: "):
             continue
@@ -2200,7 +2200,7 @@ fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
     let fixtures = fs.list_files("test/contract")
     var checked = 0
     var errors = 0
-    for i in 0..fixtures.len() as i32:
+    for i in 0..fixtures.len():
         let fixture = fixtures[i]
         if not fixture.ends_with(".w"):
             continue
@@ -2217,12 +2217,12 @@ fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
             eprint("error: " ++ f"contract-view-tests: {fixture}: audit:contract failed rc={rc}:\n" ++ audit)
             errors = errors + 1
         let wanted = contract_view_directives(text, "//! expect-contract: ")
-        for k in 0..wanted.len() as i32:
+        for k in 0..wanted.len():
             if not audit.contains(wanted[k]):
                 eprint("error: " ++ "contract-view-tests: " ++ fixture ++ ": audit:contract is missing '" ++ wanted[k] ++ "':\n" ++ audit)
                 errors = errors + 1
         let unwanted = contract_view_directives(text, "//! expect-contract-not: ")
-        for k in 0..unwanted.len() as i32:
+        for k in 0..unwanted.len():
             if audit.contains(unwanted[k]):
                 eprint("error: " ++ "contract-view-tests: " ++ fixture ++ ": audit:contract flagged the clean case '" ++ unwanted[k] ++ "':\n" ++ audit)
                 errors = errors + 1
@@ -3132,7 +3132,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     clang_resource = clang_resource.arg("clang-driver=" ++ (if sdk_driver: "yes" else: "no"))
     let sdk_lld_flavors = comp_sdk_lld_flavors(ctx.fs(), sdk_lib_dir, os())
     var sdk_lld_text = ""
-    for li in 0..sdk_lld_flavors.len() as i32:
+    for li in 0..sdk_lld_flavors.len():
         sdk_lld_text = sdk_lld_text ++ " " ++ sdk_lld_flavors[li]
     clang_resource = clang_resource.arg("lld=" ++ sdk_lld_text)
     clang_resource = clang_resource.arg("dsymutil=" ++ (if comp_sdk_has_dsymutil(ctx.fs(), sdk_lib_dir, os()): "yes" else: "no"))
@@ -3387,7 +3387,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("bootstrap-rt-core-object", "seed", "rt/rt_core.w", "out/bootstrap-lib/rt_core.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-rt-platform-object", "seed", host_runtime.platform_source, host_runtime.bootstrap_platform_object, "-O1", ""))
     let bootstrap_empty_syms = embedded_platform_symbols()
-    for bi in 0..bootstrap_empty_syms.len() as i32:
+    for bi in 0..bootstrap_empty_syms.len():
         let bsym = bootstrap_empty_syms[bi]
         if bsym != host_runtime.platform_symbol:
             out = out.add_target(empty_file_target(empty_platform_blob_target("bootstrap-empty-", bsym), empty_platform_blob_path("out/bootstrap-lib", bsym)))
@@ -3422,7 +3422,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg("rt_core_o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.input(build_owned_text(host_runtime.bootstrap_platform_object))
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.platform_symbol))
-    for bi2 in 0..bootstrap_empty_syms.len() as i32:
+    for bi2 in 0..bootstrap_empty_syms.len():
         let bsym2 = bootstrap_empty_syms[bi2]
         if bsym2 != host_runtime.platform_symbol:
             bootstrap_embedded_objects = bootstrap_embedded_objects.input(empty_platform_blob_path("out/bootstrap-lib", bsym2))
@@ -3438,7 +3438,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-fiber-asm-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-rt-core-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-rt-platform-object")
-    for bi3 in 0..bootstrap_empty_syms.len() as i32:
+    for bi3 in 0..bootstrap_empty_syms.len():
         let bsym3 = bootstrap_empty_syms[bi3]
         if bsym3 != host_runtime.platform_symbol:
             bootstrap_embedded_objects = bootstrap_embedded_objects.dep(empty_platform_blob_target("bootstrap-empty-", bsym3))
@@ -3464,7 +3464,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-llvm-link-metadata")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-core-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-platform-object")
-    for bi4 in 0..bootstrap_empty_syms.len() as i32:
+    for bi4 in 0..bootstrap_empty_syms.len():
         let bsym4 = bootstrap_empty_syms[bi4]
         if bsym4 != host_runtime.platform_symbol:
             bootstrap_runtime = bootstrap_runtime.dep(empty_platform_blob_target("bootstrap-empty-", bsym4))
@@ -3480,7 +3480,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // #1815: the seed's generation compiled out/bootstrap-lib, so it links
     // only stage1 (the seed's own link) and is what stage1 embeds.
     var bootstrap_object_targets: List[str] = List.new()
-    for bdi in 0..bootstrap_runtime.deps.len() as i32:
+    for bdi in 0..bootstrap_runtime.deps.len():
         bootstrap_object_targets.push(build_owned_text(bootstrap_runtime.deps[bdi]))
     out = out.add_target(runtime_producer_target("bootstrap-runtime-producer", "seed", "out/bootstrap-lib", &bootstrap_object_targets))
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-runtime-producer")
@@ -3577,7 +3577,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // as <compiler_dir>/../lib — its own embedded runtime is the seed's.
     out = add_stage1_runtime_targets(move out, &host_runtime, &corpus_plans, &corpus_plans_wasm32)
 
-    for pi in 0..corpus_plans.len() as i32:
+    for pi in 0..corpus_plans.len():
         out = wo_bundle_targets(move out, ctx, corpus_plans[pi], bootstrap_compiler_bin("with-stage1"), "stage1")
 
     // Dev tier (D14): the sanctioned iterate loop. One self-compile —
@@ -3605,7 +3605,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2 = stage2.dep("compiler-main-source")
     stage2 = stage2.dep("compat-runtime-source")
     stage2 = stage2.dep("embedded-clang-resource-source")
-    for pi in 0..corpus_plans.len() as i32:
+    for pi in 0..corpus_plans.len():
         stage2 = target_with_link_bundle(move stage2, ctx, corpus_plans[pi])
     stage2 = stage2.input("out/stage/lib/embedded_objects.o")
     stage2 = stage2.arg("embedded-object=out/stage/lib/embedded_objects.o")
@@ -3633,7 +3633,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3 = stage3.dep("compiler-main-source")
     stage3 = stage3.dep("compat-runtime-source")
     stage3 = stage3.dep("embedded-clang-resource-source")
-    for pi in 0..corpus_plans.len() as i32:
+    for pi in 0..corpus_plans.len():
         stage3 = target_with_link_bundle(move stage3, ctx, corpus_plans[pi])
     stage3 = stage3.input("out/stage/lib/embedded_objects.o")
     stage3 = stage3.arg("embedded-object=out/stage/lib/embedded_objects.o")
@@ -3661,7 +3661,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2_fixpoint = stage2_fixpoint.dep("compiler-main-source")
     stage2_fixpoint = stage2_fixpoint.dep("compat-runtime-source")
     stage2_fixpoint = stage2_fixpoint.dep("embedded-clang-resource-source")
-    for pi in 0..corpus_plans.len() as i32:
+    for pi in 0..corpus_plans.len():
         stage2_fixpoint = target_with_link_bundle(move stage2_fixpoint, ctx, corpus_plans[pi])
     out = out.add_target(stage2_fixpoint)
 
@@ -3679,7 +3679,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3_fixpoint = stage3_fixpoint.dep("compiler-main-source")
     stage3_fixpoint = stage3_fixpoint.dep("compat-runtime-source")
     stage3_fixpoint = stage3_fixpoint.dep("embedded-clang-resource-source")
-    for pi in 0..corpus_plans.len() as i32:
+    for pi in 0..corpus_plans.len():
         stage3_fixpoint = target_with_link_bundle(move stage3_fixpoint, ctx, corpus_plans[pi])
     out = out.add_target(stage3_fixpoint)
 
@@ -3775,7 +3775,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("rt-core-object", stage_compiler_bin("with-stage2"), "rt/rt_core.w", "out/lib/rt_core.o", "-O1", "stage2"))
     out = out.add_target(with_object_target("rt-platform-object", stage_compiler_bin("with-stage2"), host_runtime.platform_source, host_runtime.platform_object, "-O1", "stage2"))
     let empty_syms = embedded_platform_symbols()
-    for ei in 0..empty_syms.len() as i32:
+    for ei in 0..empty_syms.len():
         let esym = empty_syms[ei]
         if esym != host_runtime.platform_symbol:
             out = out.add_target(empty_file_target(empty_platform_blob_target("empty-", esym), empty_platform_blob_path("out/lib", esym)))
@@ -3813,7 +3813,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.arg("rt_core_o")
     embedded_objects = embedded_objects.input(build_owned_text(host_runtime.platform_object))
     embedded_objects = embedded_objects.arg(build_owned_text(host_runtime.platform_symbol))
-    for ei2 in 0..empty_syms.len() as i32:
+    for ei2 in 0..empty_syms.len():
         let esym2 = empty_syms[ei2]
         if esym2 != host_runtime.platform_symbol:
             embedded_objects = embedded_objects.input(empty_platform_blob_path("out/lib", esym2))
@@ -3839,7 +3839,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.dep("fiber-asm-object")
     embedded_objects = embedded_objects.dep("rt-core-object")
     embedded_objects = embedded_objects.dep("rt-platform-object")
-    for ei3 in 0..empty_syms.len() as i32:
+    for ei3 in 0..empty_syms.len():
         let esym3 = empty_syms[ei3]
         if esym3 != host_runtime.platform_symbol:
             embedded_objects = embedded_objects.dep(empty_platform_blob_target("empty-", esym3))
@@ -3856,7 +3856,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var runtime = target_new(.Group, "runtime", "")
     runtime = runtime.dep("embedded-objects-object")
     runtime = runtime.dep("runtime-producer")
-    for ei4 in 0..empty_syms.len() as i32:
+    for ei4 in 0..empty_syms.len():
         let esym4 = empty_syms[ei4]
         if esym4 != host_runtime.platform_symbol:
             runtime = runtime.dep(empty_platform_blob_target("empty-", esym4))
@@ -4075,7 +4075,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler = compiler.arg("runtime-root=out/lib")
     compiler = compiler.input("out/lib/.producer")
     compiler = compiler.dep("runtime-producer")
-    for pi in 0..corpus_plans.len() as i32:
+    for pi in 0..corpus_plans.len():
         compiler = target_with_link_bundle(move compiler, ctx, corpus_plans[pi])
     out = out.add_target(compiler)
 
@@ -4104,7 +4104,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stamp = stamp.dep("link-compiler")
     // #1157: publishing each bundle into the store happens here, behind the
     // millisecond stamp, instead of upstream of every stage compile.
-    for pi in 0..corpus_plans.len() as i32:
+    for pi in 0..corpus_plans.len():
         stamp = stamp.dep(wo_group_target_name(corpus_plans[pi]))
     out = out.add_target(stamp)
 
@@ -4599,7 +4599,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     invariance_labels.push("let-parser")
     invariance_labels.push("let-main")
     var invariance_check = target_new(.Group, "invariance-check", "")
-    for ii in 0..invariance_labels.len() as i32:
+    for ii in 0..invariance_labels.len():
         let inv_label = invariance_labels[ii]
         var inv = target_new(.Action, "invariance-" ++ inv_label, "").output("out/test-graph/invariance-" ++ inv_label)
         inv.action = invariance_variant_action
@@ -4995,13 +4995,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     gate_shape = gate_shape.write_scope("out/.build-state")
     if ctx.fs().exists(gate_times_ledger_path()):
         gate_shape = gate_shape.input(gate_times_ledger_path())
-    for mi in 0..gate_measured.len() as i32:
+    for mi in 0..gate_measured.len():
         gate_shape = gate_shape.arg("measured=" ++ gate_measured[mi])
     out = out.add_target(gate_shape)
     var gate = target_new(.Group, "gate", "")
-    for fi in 0..gate_fixed.len() as i32:
+    for fi in 0..gate_fixed.len():
         gate = gate.dep(gate_fixed[fi].clone())
-    for mi in 0..gate_measured.len() as i32:
+    for mi in 0..gate_measured.len():
         gate = gate.dep(gate_measured[mi].clone())
     gate = gate.dep("gate-shape")
     out = out.add_target(gate)
