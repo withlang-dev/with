@@ -6692,6 +6692,10 @@ impl ComptimeEvaluator:
             // Keep the low bits in two's complement.
             let bits = self.sema.get_type_d0(target)
             return comptime_control_value(comptime_value_int(target_type, int_truncate_to_width(comptime_value_intlike(value_signal.value), bits, self.sema.get_type_d1(target) == 0)))
+        // An integer constant names a `repr` enum's variant by value, and an
+        // enum value is its repr (`5 as BuildKind`, `kind as i32`).
+        if target_kind == TypeKind.TY_ENUM and is_int and self.sema.enum_repr_type(target as i32) != 0:
+            return comptime_control_value(comptime_value_int(target_type, comptime_value_intlike(value_signal.value)))
         if target_kind == TypeKind.TY_INT and is_float:
             let bits = self.sema.get_type_d0(target)
             return comptime_control_value(comptime_value_int(target_type, comptime_float_to_int_saturating(value_signal.value.real, bits, self.sema.get_type_d1(target) == 0)))

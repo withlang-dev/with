@@ -2213,10 +2213,17 @@ pub type Sema {
     int_local_decisions: HashMap[i32, i64],
     int_local_rechecking: i32,
     pub int_local_rechecks: i32,
+    pub int_local_recheck_names: List[str],
     // D128: the `for` whose literal range binds each loop variable in scope
     // (`for i in 1..9`), a literal-typed local like a `let` (no shadowing,
     // so the name is the key).
     int_local_for_decls: HashMap[i32, i32],
+    // D128: per (function, name), the last unannotated `let` of a tuple
+    // literal or a pending generic constructor (demand_let_of).
+    fn_demand_lets: HashMap[i64, i32],
+    // Per label frame, the numeric type the enclosing demand wants of a
+    // `loop`'s value, so an untyped `break 42` takes it (§4.2.1 rule 4).
+    label_break_expected: List[i32],
     // §4.2.1 rule 8: a join re-checking its literal arms (an `if` arm's
     // condition was checked in a scope that is now closed).
     literal_arm_retype_depth: i32,
@@ -3838,7 +3845,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         int_local_decisions: HashMap.new(),
         int_local_rechecking: 0,
         int_local_rechecks: 0,
+        int_local_recheck_names: List.new(),
         int_local_for_decls: HashMap.new(),
+        fn_demand_lets: HashMap.new(),
+        label_break_expected: List.new(),
         literal_arm_retype_depth: 0,
         unsafe_scope_used: List.new(),
         unsafe_scope_nodes: List.new(),

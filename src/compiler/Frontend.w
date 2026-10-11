@@ -2222,6 +2222,7 @@ impl Zcu:
         if do_profile:
             let sema_ns = runtime_clock_nanos() - t_sema
             runtime_eprint(f"[profile] frontend.sema  {sema_ns / 1000000}.{(sema_ns % 1000000) / 1000} ms  decls={pool.decl_count()}  int-local-rechecks={sema.int_local_rechecks}")
+            for rechecked in sema.int_local_recheck_names: runtime_eprint(f"[profile] int-local-recheck {rechecked}")
         self.diagnostics = move sema.diags
         self.sync_from_sema(move sema)
         frontend_dump_type_decl_names("post-sema", self.last_sema.ast, self.last_sema.pool)
