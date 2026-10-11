@@ -5661,6 +5661,10 @@ impl MirBuilder:
                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, fn_ref_place, fn_rv, self.ast.get_start(node))
                 return self.body.new_operand(OperandKind.OK_COPY, fn_ref_place)
             let place = self.lower_expr_place(expr)
+            // D127 (§3.1): a view of a constant views an immutable static,
+            // never the frame temporary the constant was lowered into.
+            if op == UnaryOp.UOP_REF and self.sema.expr_is_literal_arith_of(expr, true) and self.body.place_proj_counts[place] == 0:
+                self.body.mark_static_const_local(self.place_base_local(place))
             if self.place_type_is_str(place) != 0:
                 self.mark_string_place_copied(place)
             else:
