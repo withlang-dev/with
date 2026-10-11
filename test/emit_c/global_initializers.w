@@ -9,7 +9,7 @@
 // assigned them, so the program printed zeros.
 fn double(x: i32) -> i32: x * 2
 
-let SHIFTED = 1 << 3
+let SHIFTED: i32 = 1 << 3
 let TABLE = [7u16, 9u16]
 let MAYBE = Some(3)
 let TWICE = double(SHIFTED)

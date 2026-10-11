@@ -14,11 +14,11 @@ fn check(i: i32, bad: i32) -> Result[str, str]:
     Ok(f"ok{i}")
 
 fn checked_list(bad: i32) -> Result[List[str], str]:
-    let v = [check(i, bad)? for i in 0..6]
+    let v = [check(i, bad)? for i in 0i32..6]
     Ok(v)
 
 fn checked_set(bad: i32) -> Result[HashSet[str], str]:
-    let s: HashSet[str] = [check(i, bad)? for i in 0..6]
+    let s: HashSet[str] = [check(i, bad)? for i in 0i32..6]
     Ok(s)
 
 fn main:

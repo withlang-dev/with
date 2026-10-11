@@ -40,7 +40,7 @@ async fn map_parent -> i32:
 
 async fn fold_parent -> i32:
     let xs: List[i32] = [1, 2, 3]
-    let total = xs.fold(0, (acc, n) => acc + forever_value(n).await)
+    let total = xs.fold(0i32, (acc, n) => acc + forever_value(n).await)
     resumed.fetch_add(1, .SeqCst)
     total
 

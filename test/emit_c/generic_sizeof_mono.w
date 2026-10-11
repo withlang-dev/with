@@ -25,7 +25,7 @@ type B { a: i8 }
 
 fn main:
     print(f"{sz(3)} {sz(A { a: 1, b: 2, c: 3 })}")
-    print(f"{PC.make(1).y} {PC.make(7 as i64).y}")
+    print(f"{PC.make(1i32).y} {PC.make(7 as i64).y}")
     let x = Box.new(A { a: 1, b: 2, c: 3 })
     let y = Box.new(B { a: 1 })
     print(f"{x.a + x.b + x.c + 18} {y.a}")

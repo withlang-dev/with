@@ -57,13 +57,13 @@ async fn next_parent -> i32:
 
 async fn fold_parent -> i32:
     let xs: List[i32] = [1, 2, 3]
-    let total = xs.iter().fold(0, (acc, n) => acc + forever_value(n).await)
+    let total = xs.iter().fold(0i32, (acc, n) => acc + forever_value(n).await)
     resumed.fetch_add(1, .SeqCst)
     total
 
 async fn map_fold_parent -> i32:
     let xs: List[i32] = [1, 2, 3]
-    let total = xs.iter().map(n => forever_value(n).await).fold(0, (a, b) => a + b)
+    let total = xs.iter().map(n => forever_value(n).await).fold(0i32, (a, b) => a + b)
     resumed.fetch_add(1, .SeqCst)
     total
 
