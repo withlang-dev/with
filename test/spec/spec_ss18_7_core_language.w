@@ -18,7 +18,7 @@ impl Area for P:
 
 @[entry]
 fn start -> i32:
-    let t = (1, 2, 3)
+    let t: (i32, i32, i32) = (1, 2, 3)
     var acc = t.0 + t.1 * t.2
     for i in 0..3:
         acc = acc + i

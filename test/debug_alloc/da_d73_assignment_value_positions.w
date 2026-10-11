@@ -11,7 +11,7 @@
 // `while (n = next()) != 0`), a non-Copy place binds a view (`let t = (s =
 // e)`: `t` reads what `s` holds, `s` stays the owner). Nothing is duplicated.
 
-var ticks = 0
+var ticks: i32 = 0
 fn next() -> i32:
     ticks += 1
     if ticks > 3: 0 else: ticks

@@ -41,7 +41,7 @@ fn main:
     let a = [f"a{i}" for i in 0..3]
     print(f"fstr {a.join("|")}")
 
-    let hm: HashMap[str, i32] = [f"k{i}": i * 10 for i in 0..3]
+    let hm: HashMap[str, i32] = [f"k{i}": i * 10 for i in 0i32..3]
     print(f"map {hm.len()} k0={hm.get("k0") ?? -1} k1={hm.get("k1") ?? -1} k2={hm.get("k2") ?? -1}")
 
     let kept = [i for i in 0..4 if f"{i}" != "1"]

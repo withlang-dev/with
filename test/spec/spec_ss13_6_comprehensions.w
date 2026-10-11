@@ -55,12 +55,12 @@ fn test_list_source:
     assert_list_i32(doubled, 4, 8, 12)
 
 fn test_pattern_binding:
-    let src = [(1, 2), (3, 4), (5, 6)]
+    let src: List[(i32, i32)] = [(1, 2), (3, 4), (5, 6)]
     let sums = [a + b for (a, b) in src]
     assert_list_i32(sums, 3, 7, 11)
 
 fn test_hashset_target:
-    let values: HashSet[i32] = [x for x in 0..6 if x % 2 == 0]
+    let values: HashSet[i32] = [x for x in 0i32..6 if x % 2 == 0]
     assert(values.contains(0))
     assert(values.contains(2))
     assert(values.contains(4))
@@ -75,22 +75,22 @@ fn test_hashmap_default:
     assert(index.get("missing").is_none())
 
 fn test_hashmap_expected_type:
-    let pairs = [("a", 1), ("b", 2), ("a", 3)]
+    let pairs: List[(str, i32)] = [("a", 1), ("b", 2), ("a", 3)]
     let index: HashMap[str, i32] = [k: v * 2 for (k, v) in pairs]
     assert(index.get("a").unwrap() == 6)
     assert(index.get("b").unwrap() == 4)
 
 fn test_btreeset_target:
-    let values: BTreeSet[i32] = [x for x in 5..0 if x >= 0]
+    let values: BTreeSet[i32] = [x for x in 5i32..0 if x >= 0]
     assert(values.len() == 0)
-    let ordered: BTreeSet[i32] = [x for x in 0..6 if x % 2 == 0]
+    let ordered: BTreeSet[i32] = [x for x in 0i32..6 if x % 2 == 0]
     let items = ordered.items()
     assert(items[0] == 0)
     assert(items[1] == 2)
     assert(items[2] == 4)
 
 fn test_btreemap_expected_type:
-    let pairs = [("b", 2), ("a", 1), ("b", 4)]
+    let pairs: List[(str, i32)] = [("b", 2), ("a", 1), ("b", 4)]
     let index: BTreeMap[str, i32] = [k: v * 2 for (k, v) in pairs]
     assert(index.len() == 2)
     assert(index.get("a").unwrap() == 2)
