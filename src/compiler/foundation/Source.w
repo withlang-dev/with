@@ -30,7 +30,7 @@ pub fn Source.from_file(path: &str, file_id: FileId) -> Source:
     Source.from_string(path, text, file_id)
 
 pub fn Source.line_count(self: &Self) -> i32:
-    self.line_offsets.len()
+    self.line_offsets.len() as i32
 
 pub fn Source.offset_to_location(self: &Self, offset: i32) -> SourceLocation:
     if offset <= 0:
@@ -38,10 +38,10 @@ pub fn Source.offset_to_location(self: &Self, offset: i32) -> SourceLocation:
 
     var clamped = offset
     if clamped > self.text.len():
-        clamped = self.text.len()
+        clamped = self.text.len() as i32
 
     var lo = 0
-    var hi = self.line_offsets.len()
+    var hi = self.line_offsets.len() as i32
     while lo < hi:
         let mid = lo + ((hi - lo) / 2)
         if self.line_offsets[mid] <= clamped:

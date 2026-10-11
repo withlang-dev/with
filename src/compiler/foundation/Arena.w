@@ -39,7 +39,7 @@ impl Arena:
     pub fn len(): self.slots.len()
 
     pub mut fn alloc_i32(value: i32) -> ArenaId:
-        let id = arena_id_from_raw(self.slots.len())
+        let id = arena_id_from_raw(self.slots.len() as i32)
         self.slots.push(ArenaSlot {
             kind: ARENA_SLOT_I32(),
             int_value: value,
@@ -48,7 +48,7 @@ impl Arena:
         id
 
     pub mut fn alloc_str(value: &str) -> ArenaId:
-        let id = arena_id_from_raw(self.slots.len())
+        let id = arena_id_from_raw(self.slots.len() as i32)
         self.slots.push(ArenaSlot {
             kind: ARENA_SLOT_STR(),
             int_value: 0,

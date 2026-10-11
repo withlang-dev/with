@@ -104,7 +104,7 @@ pub fn InternPool.intern_str(self: &Self, s: &str) -> Symbol:
             return symbol_from_raw(raw)
         raw = raw + 1
 
-    let id = st.symbol_texts.len()
+    let id = st.symbol_texts.len() as i32
     let owned = st.strings.store(s)
     st.symbol_texts.push(owned.clone())
     st.symbol_map.insert(owned, id)
@@ -125,7 +125,7 @@ pub fn InternPool.intern_type(self: &Self, key: TypeKey) -> TypeId:
     if existing.is_some():
         return type_id_from_raw(existing.unwrap())
 
-    let id = st.type_keys.len()
+    let id = st.type_keys.len() as i32
     st.type_keys.push(key)
     st.type_map.insert(st.strings.store(canon), id)
     type_id_from_raw(id)
@@ -145,7 +145,7 @@ pub fn InternPool.intern_value(self: &Self, key: ValueKey) -> ValueId:
     if existing.is_some():
         return value_id_from_raw(existing.unwrap())
 
-    let id = st.value_keys.len()
+    let id = st.value_keys.len() as i32
     st.value_keys.push(key)
     st.value_map.insert(st.strings.store(canon), id)
     value_id_from_raw(id)
@@ -159,10 +159,10 @@ pub fn InternPool.resolve_value(self: &Self, id: ValueId) -> ValueKey:
     value_key_clone(self.state.value_keys[raw])
 
 pub fn InternPool.symbol_count(self: &Self) -> i32:
-    self.state.symbol_texts.len() - 1
+    (self.state.symbol_texts.len() - 1) as i32
 
 pub fn InternPool.type_count(self: &Self) -> i32:
-    self.state.type_keys.len() - 1
+    (self.state.type_keys.len() - 1) as i32
 
 pub fn InternPool.value_count(self: &Self) -> i32:
-    self.state.value_keys.len() - 1
+    (self.state.value_keys.len() - 1) as i32
