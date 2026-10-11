@@ -102,7 +102,7 @@ pub fn empty_build_graph_target -> BuildGraphTarget:
 
 fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()
-    let text_len = text.len() as i32
+    let text_len = text.len()
     var start = 0
     var i = 0
     while i <= text_len:
@@ -123,7 +123,7 @@ fn build_graph_split_fields(line: &str) -> List[str]:
     let fields: List[str] = List.new()
     var cur = ""
     var escaped = false
-    for i in 0..line.len() as i32:
+    for i in 0..line.len():
         let ch = line[i]
         if escaped:
             if ch == 110:
@@ -147,7 +147,7 @@ fn build_graph_split_fields(line: &str) -> List[str]:
 
 fn build_graph_escape(value: &str) -> str:
     var out = ""
-    for i in 0..value.len() as i32:
+    for i in 0..value.len():
         let ch = value[i]
         if ch == 92:
             out = out ++ "\\\\"
@@ -168,10 +168,10 @@ pub fn build_graph_emit(graph: &BuildGraph) -> str:
         with_eprint(f"[emit] dt.len={graph.default_target.len()} dt=" ++ graph.default_target)
     if graph.default_target.len() > 0:
         out = out ++ "default_target\t" ++ build_graph_escape(graph.default_target) ++ "\n"
-    for gi in 0..graph.generated_sources.len() as i32:
+    for gi in 0..graph.generated_sources.len():
         let generated = graph.generated_sources[gi]
         out = out ++ "generated_source\t" ++ build_graph_escape(generated.path) ++ "\t" ++ build_graph_escape(generated.contents) ++ "\n"
-    for ti in 0..graph.targets.len() as i32:
+    for ti in 0..graph.targets.len():
         let target = &graph.targets[ti]
         out = out ++ "target\t"
         out = out ++ f"{target.kind}\t"
@@ -182,31 +182,31 @@ pub fn build_graph_emit(graph: &BuildGraph) -> str:
         out = out ++ build_graph_escape(target.output) ++ "\n"
         if target.rss_limit_bytes > 0:
             out = out ++ f"arg\t{ti}\trss-limit-bytes={target.rss_limit_bytes}\n"
-        for li in 0..target.system_libs.len() as i32:
+        for li in 0..target.system_libs.len():
             out = out ++ "system_lib\t" ++ f"{ti}\t" ++ build_graph_escape(target.system_libs[li]) ++ "\n"
-        for pi in 0..target.library_paths.len() as i32:
+        for pi in 0..target.library_paths.len():
             out = out ++ "library_path\t" ++ f"{ti}\t" ++ build_graph_escape(target.library_paths[pi]) ++ "\n"
-        for ri in 0..target.rpaths.len() as i32:
+        for ri in 0..target.rpaths.len():
             out = out ++ "rpath\t" ++ f"{ti}\t" ++ build_graph_escape(target.rpaths[ri]) ++ "\n"
-        for ii in 0..target.include_paths.len() as i32:
+        for ii in 0..target.include_paths.len():
             out = out ++ "include_path\t" ++ f"{ti}\t" ++ build_graph_escape(target.include_paths[ii]) ++ "\n"
-        for di in 0..target.defines.len() as i32:
+        for di in 0..target.defines.len():
             out = out ++ "define\t" ++ f"{ti}\t" ++ build_graph_escape(target.defines[di]) ++ "\n"
-        for ini in 0..target.inputs.len() as i32:
+        for ini in 0..target.inputs.len():
             out = out ++ "input\t" ++ f"{ti}\t" ++ build_graph_escape(target.inputs[ini]) ++ "\n"
-        for outi in 0..target.extra_outputs.len() as i32:
+        for outi in 0..target.extra_outputs.len():
             out = out ++ "extra_output\t" ++ f"{ti}\t" ++ build_graph_escape(target.extra_outputs[outi]) ++ "\n"
-        for wsi in 0..target.write_scopes.len() as i32:
+        for wsi in 0..target.write_scopes.len():
             out = out ++ "write_scope\t" ++ f"{ti}\t" ++ build_graph_escape(target.write_scopes[wsi]) ++ "\n"
-        for depi in 0..target.deps.len() as i32:
+        for depi in 0..target.deps.len():
             out = out ++ "dep\t" ++ f"{ti}\t" ++ build_graph_escape(target.deps[depi]) ++ "\n"
-        for ai in 0..target.args.len() as i32:
+        for ai in 0..target.args.len():
             out = out ++ "arg\t" ++ f"{ti}\t" ++ build_graph_escape(target.args[ai]) ++ "\n"
         if target.timeout_ms != 0:
             out = out ++ "timeout_ms\t" ++ f"{ti}\t" ++ f"{target.timeout_ms}" ++ "\n"
         if target.cwd.len() > 0:
             out = out ++ "cwd\t" ++ f"{ti}\t" ++ build_graph_escape(target.cwd) ++ "\n"
-        for ei in 0..target.env.len() as i32:
+        for ei in 0..target.env.len():
             out = out ++ "env\t" ++ f"{ti}\t" ++ build_graph_escape(target.env[ei]) ++ "\n"
         if target.network != 0:
             out = out ++ "network\t" ++ f"{ti}\t1\n"
@@ -221,7 +221,7 @@ fn build_graph_parse_i32(text: &str) -> i32:
         sign = -1
         i = 1
     var value: i32 = 0
-    while i < text.len() as i32:
+    while i < text.len():
         let ch = text[i]
         if ch < 48 or ch > 57:
             break
@@ -248,7 +248,7 @@ pub fn parse_build_graph(text: &str) -> BuildGraph:
     var has_current = false
     var current = build_graph_target_new(0, "", "", 0, 0, "")
     var i = 1
-    while i < lines.len() as i32:
+    while i < lines.len():
         let fields = build_graph_split_fields(lines[i])
         if fields.len() == 0:
             i = i + 1
@@ -371,7 +371,7 @@ pub fn parse_build_graph(text: &str) -> BuildGraph:
 fn build_graph_parse_rss_limit(text: &str):
     var value: i64 = 0
     if text.len() == 0: return -1 as i64
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         if ch < 48 or ch > 57: return -1 as i64
         let digit = ch - 48
@@ -381,11 +381,11 @@ fn build_graph_parse_rss_limit(text: &str):
 
 pub fn build_graph_resolve_rss_budgets(graph: BuildGraph) -> BuildGraph:
     var out = graph
-    for ti in 0..out.targets.len() as i32:
+    for ti in 0..out.targets.len():
         let target = &out.targets[ti]
         let args: List[str] = List.new()
         var limit: i64 = target.rss_limit_bytes
-        for ai in 0..target.args.len() as i32:
+        for ai in 0..target.args.len():
             let arg = &target.args[ai]
             if arg.starts_with("rss-limit-bytes="):
                 let parsed = build_graph_parse_rss_limit(arg.slice(16, arg.len()))
@@ -402,7 +402,7 @@ pub fn build_graph_resolve_rss_budgets(graph: BuildGraph) -> BuildGraph:
 
 pub fn bg_clone_str_list(values: &List[str]) -> List[str]:
     let out: List[str] = List.new()
-    for i in 0..values.len() as i32:
+    for i in 0..values.len():
         out.push(with_str_clone_ref(values[i]))
     out
 
@@ -438,7 +438,7 @@ fn build_graph_target_deep_copy(t: &BuildGraphTarget) -> BuildGraphTarget:
     }
 
 fn build_graph_output_index(paths: &List[str], path: &str) -> i64:
-    for i in 0..paths.len() as i32:
+    for i in 0..paths.len():
         if paths[i] == path:
             return i as i64
     -1
@@ -458,23 +458,23 @@ pub fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
     var out = graph
     let out_paths: List[str] = List.new()
     let out_owners: List[str] = List.new()
-    for i in 0..out.targets.len() as i32:
+    for i in 0..out.targets.len():
         let t = &out.targets[i]
         if t.output.len() > 0:
             out_paths.push(with_str_clone_ref(t.output))
             out_owners.push(with_str_clone_ref(t.name))
-        for oi in 0..t.extra_outputs.len() as i32:
+        for oi in 0..t.extra_outputs.len():
             out_paths.push(with_str_clone_ref(t.extra_outputs[oi]))
             out_owners.push(with_str_clone_ref(t.name))
-    for i in 0..out.targets.len() as i32:
+    for i in 0..out.targets.len():
         let to_add: List[str] = List.new()
         let t = &out.targets[i]
         let consumed: List[str] = List.new()
         if t.entry.len() > 0:
             consumed.push(with_str_clone_ref(t.entry))
-        for ii in 0..t.inputs.len() as i32:
+        for ii in 0..t.inputs.len():
             consumed.push(with_str_clone_ref(t.inputs[ii]))
-        for ci in 0..consumed.len() as i32:
+        for ci in 0..consumed.len():
             let producer_idx = build_graph_output_index(&out_paths, consumed[ci])
             if producer_idx < 0:
                 continue
@@ -484,7 +484,7 @@ pub fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
             if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
                 with_eprint("[graph] inferred edge " ++ t.name ++ " -> " ++ producer)
             to_add.push(with_str_clone_ref(producer))
-        for ai in 0..to_add.len() as i32:
+        for ai in 0..to_add.len():
             out.targets[i].deps.push(with_str_clone_ref(to_add[ai]))
     out
 
@@ -496,11 +496,11 @@ pub fn build_graph_filter_target(graph: &BuildGraph, target_name: &str) -> Build
     out.package_name = with_str_clone_ref(graph.package_name)
     out.package_version = with_str_clone_ref(graph.package_version)
     out.default_target = with_str_clone_ref(graph.default_target)
-    for gi in 0..graph.generated_sources.len() as i32:
+    for gi in 0..graph.generated_sources.len():
         let bgm_gen = &graph.generated_sources[gi]
         out.generated_sources.push(BuildGraphGeneratedSource { path: with_str_clone_ref(bgm_gen.path), contents: with_str_clone_ref(bgm_gen.contents) })
     if target_name.len() == 0:
-        for ti_all in 0..graph.targets.len() as i32:
+        for ti_all in 0..graph.targets.len():
             out.targets.push(build_graph_target_deep_copy(&graph.targets[ti_all]))
         out.raw_text = build_graph_emit(out)
         return out
@@ -509,7 +509,7 @@ pub fn build_graph_filter_target(graph: &BuildGraph, target_name: &str) -> Build
         out.ok = false
         out.error_msg = move selected.error_msg
     else:
-        for ti in 0..selected.targets.len() as i32:
+        for ti in 0..selected.targets.len():
             out.targets.push(build_graph_target_deep_copy(&selected.targets[ti]))
         if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
             with_eprint("[filt] pre-emit dt=" ++ out.default_target)
@@ -524,7 +524,7 @@ pub fn build_graph_filter_single_target(graph: &BuildGraph, target_name: &str) -
     out.package_name = with_str_clone_ref(graph.package_name)
     out.package_version = with_str_clone_ref(graph.package_version)
     out.default_target = with_str_clone_ref(graph.default_target)
-    for gi in 0..graph.generated_sources.len() as i32:
+    for gi in 0..graph.generated_sources.len():
         let bgm_gen = &graph.generated_sources[gi]
         out.generated_sources.push(BuildGraphGeneratedSource { path: with_str_clone_ref(bgm_gen.path), contents: with_str_clone_ref(bgm_gen.contents) })
     if target_name.len() == 0:
@@ -550,28 +550,28 @@ fn build_graph_selected_targets_new -> BuildGraphSelectedTargets:
     }
 
 fn build_graph_name_list_contains(names: &List[str], name: &str) -> bool:
-    for i in 0..names.len() as i32:
+    for i in 0..names.len():
         if names[i] == name:
             return true
     false
 
 fn build_graph_find_target_index(graph: &BuildGraph, name: &str) -> i32:
-    for i in 0..graph.targets.len() as i32:
+    for i in 0..graph.targets.len():
         // Borrow the stored target. List.get currently materializes an owned
         // aggregate here, so merely searching would drop aliases of its nine
         // owned vectors and corrupt the graph before dependency traversal.
         let candidate = &graph.targets[i]
         if candidate.name == name:
-            return i
+            return i as i32
     -1
 
 fn build_graph_find_output_producer_index(graph: &BuildGraph, path: &str, consumer_name: &str) -> i32:
     if path.len() == 0:
         return -1
-    for i in 0..graph.targets.len() as i32:
+    for i in 0..graph.targets.len():
         let target = &graph.targets[i]
         if target.name != consumer_name and target.output.len() > 0 and target.output == path:
-            return i
+            return i as i32
     -1
 
 fn build_graph_selected_targets_add(selected: BuildGraphSelectedTargets, graph: &BuildGraph, name: &str) -> BuildGraphSelectedTargets:
@@ -591,7 +591,7 @@ fn build_graph_selected_targets_add(selected: BuildGraphSelectedTargets, graph: 
         return out
     let target = &graph.targets[index]
     out.visiting_names.push(with_str_clone_ref(name))
-    for di in 0..target.deps.len() as i32:
+    for di in 0..target.deps.len():
         out = build_graph_selected_targets_add(move out, graph, target.deps[di])
         if not out.ok:
             return out
@@ -601,7 +601,7 @@ fn build_graph_selected_targets_add(selected: BuildGraphSelectedTargets, graph: 
         out = build_graph_selected_targets_add(move out, graph, producer.name)
         if not out.ok:
             return out
-    for ii in 0..target.inputs.len() as i32:
+    for ii in 0..target.inputs.len():
         let input_producer = build_graph_find_output_producer_index(graph, target.inputs[ii], target.name)
         if input_producer >= 0:
             let producer = &graph.targets[input_producer]

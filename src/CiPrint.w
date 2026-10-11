@@ -52,7 +52,7 @@ fn ci_reindent_spaces(text: &str, spaces: i32) -> str:
     // two trailing newlines after each child, and we need the same.
     var parts: List[str] = List.new()
     var start = 0
-    let tlen = text.len() as i32
+    let tlen = text.len()
     while start < tlen:
         var end = start
         while end < tlen and text[end] != 10:
@@ -941,7 +941,7 @@ fn ci_print_note_unknown(detail: &str):
 /// The printer's unrenderable-node records since the last take; taking clears.
 pub fn ci_print_take_unknowns() -> List[str]:
     var taken: List[str] = List.new()
-    for i in 0..g_ci_print_unknowns.len() as i32:
+    for i in 0..g_ci_print_unknowns.len():
         taken.push(g_ci_print_unknowns[i].clone())
     g_ci_print_unknowns.clear()
     taken
@@ -1119,7 +1119,7 @@ pub fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id
             let body_id = (stmts.get_extra(cursor)) as CiStmtId
             cursor = cursor + 1
             var hi: i32 = 0
-            while hi < arm_heads.len() as i32:
+            while hi < arm_heads.len():
                 let arm_head = arm_heads[hi]
                 if brace:
                     out = out ++ ci_make_indent(depth + 4) ++ arm_head ++ " => {\n"

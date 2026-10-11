@@ -195,8 +195,8 @@ var g_own_tree: str = ""
 
 fn runtime_path_parent(path: &str) -> str:
     var last = -1
-    for i in 0..path.len() as i32:
-        if path[i] == '/' or path[i] == '\\': last = i
+    for i in 0..path.len():
+        if path[i] == '/' or path[i] == '\\': last = i as i32
     if last <= 0: "" else: path.slice(0, last as i64)
 
 pub fn runtime_own_tree_root() -> str:

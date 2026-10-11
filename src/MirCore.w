@@ -617,7 +617,7 @@ impl MirBody:
 
 impl MirBody:
     mut fn new_block() -> BlockId:
-        let id = self.bb_stmt_starts.len() as i32
+        let id = self.bb_stmt_starts.len()
         self.bb_stmt_starts.push(self.stmt_kinds.len() as i32)
         self.bb_stmt_counts.push(0)
         self.bb_term_kinds.push(TermKind.TK_UNREACHABLE)
@@ -737,7 +737,7 @@ impl MirBody:
         self.new_place_with_projection_decl(base, ProjKind.PK_FIELD, field_sym, decl, sema_ty)
 
     fn proj_decl_index(proj_idx: i32) -> i32:
-        if proj_idx < 0 or proj_idx >= self.proj_decl.len() as i32: return -1
+        if proj_idx < 0 or proj_idx >= self.proj_decl.len(): return -1
         self.proj_decl[proj_idx]
 
     mut fn new_tuple_index_place(base: i32, elem_idx: i32, sema_ty: i32) -> i32:
@@ -1175,7 +1175,7 @@ pub type MirDropStateKeys {
 }
 
 impl MirDropStateKeys:
-    fn len(): self.names.len() as i32
+    fn len(): self.names.len()
 
     fn chunk_count(): (self.len() + self.chunk - 1) / self.chunk
 
@@ -1188,7 +1188,7 @@ impl MirDropStateKeys:
         var own: List[i32] = List.new()
         var refs: List[i32] = List.new()
         for c in 0..self.chunk_count():
-            refs.push(-(c + 1))
+            refs.push((-(c + 1)) as i32)
         for id in 0..self.chunk_count() * self.chunk:
             if id >= self.len() or id >= body.local_count():
                 own.push(MirDropState.Absent)
@@ -1268,12 +1268,12 @@ pub fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
         if li >= 0 and li < local_count:
             owned_cleanup[li] = 1
     var place_key: List[i32] = List.new()
-    for p in 0..body.place_locals.len() as i32:
+    for p in 0..body.place_locals.len():
         let base: i32 = body.place_locals[p]
         if body.place_proj_counts[p] == 0:
             place_key.push(base)
             continue
-        let text = mir_place_text(body, p)
+        let text = mir_place_text(body, p as i32)
         var id = match index.get(text):
             Some(found) => *found
             None => -1
@@ -1359,12 +1359,12 @@ impl MirDropStateMap:
         let r: i32 = self.refs[c]
         if r < 0:
             return (-r - 1) * keys.chunk
-        let slot = self.own.len() as i32 / keys.chunk
+        let slot = self.own.len() / keys.chunk
         let base = r * keys.chunk
         for k in 0..keys.chunk:
             self.own.push(keys.chunk_data[base + k])
-        self.refs[c] = -(slot + 1)
-        slot * keys.chunk
+        self.refs[c] = (-(slot + 1)) as i32
+        (slot * keys.chunk) as i32
 
     mut fn set(keys: &MirDropStateKeys, id: i32, state: i32):
         if self.get(keys, id) == state:
@@ -1514,12 +1514,12 @@ impl MirDropStateMap:
     fn format(keys: &MirDropStateKeys) -> str:
         var present = 0
         for i in 0..keys.len():
-            if self.get(keys, i) != MirDropState.Absent:
+            if self.get(keys, i as i32) != MirDropState.Absent:
                 present = present + 1
         var out = ""
         var emitted = 0
         for i in 0..keys.len():
-            let state = self.get(keys, i)
+            let state = self.get(keys, i as i32)
             if state == MirDropState.Absent:
                 continue
             if emitted > 0:
@@ -1539,7 +1539,7 @@ impl MirDropStateMap:
         var out = ""
         var emitted = 0
         for i in 0..keys.len():
-            let state = self.get(keys, i)
+            let state = self.get(keys, i as i32)
             if state == MirDropState.Absent:
                 continue
             if not mir_ownership_key_matches(keys.names[i], target):
@@ -1586,7 +1586,7 @@ pub fn mir_drop_state_local_key(local_id: i32) -> str:
     while mir_local_key_cache_lock.swap(1, .Acquire) != 0:
         let _ = 0
     while mir_local_key_cache.len() <= local_id:
-        let n = mir_local_key_cache.len() as i32
+        let n = mir_local_key_cache.len()
         mir_local_key_cache.push(f"_{n}")
     let key = mir_local_key_cache[local_id] ++ ""
     mir_local_key_cache_lock.store(0, .Release)
@@ -1816,7 +1816,7 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
     let initial = keys.initial(body)
     var entry: List[i32] = List.new()
     for c in 0..keys.chunk_count():
-        entry.push(keys.intern_chunk(initial.own, c * keys.chunk))
+        entry.push(keys.intern_chunk(initial.own, (c * keys.chunk) as i32))
     var computed: List[i32] = List.new()
     var pred_counts: List[i32] = List.new()
     for _ in 0..bb_count:
@@ -2169,10 +2169,10 @@ fn mir_drop_state_key_places(keys: &MirDropStateKeys) -> List[i32]:
     var out: List[i32] = List.new()
     for _ in 0..keys.len():
         out.push(-1)
-    for p in 0..keys.place_key.len() as i32:
+    for p in 0..keys.place_key.len():
         let k: i32 = keys.place_key[p]
         if out[k] < 0:
-            out[k] = p
+            out[k] = p as i32
     out
 
 // #1394: the key of a sub-place of `place_id` that the drop of `place_id`
@@ -2536,7 +2536,7 @@ fn mir_local_partially_vacated(body: &MirBody, keys: &MirDropStateKeys, state: &
     if place_id < 0 or place_id >= body.place_locals.len() or body.place_proj_counts[place_id] != 0:
         return false
     let local_id = body.place_locals[place_id]
-    if local_id < 0 or local_id + 1 >= keys.child_starts.len() as i32:
+    if local_id < 0 or local_id + 1 >= keys.child_starts.len():
         return false
     for ci in keys.child_starts[local_id]..keys.child_starts[local_id + 1]:
         if state.get(keys, keys.children[ci]) != MirDropState.Init:
@@ -2614,7 +2614,7 @@ impl MirDroppedSet:
 // Must-dropped: a read on a path that dropped only on some paths is not
 // judged here.
 fn validate_read_after_drop(body: &MirBody) -> str:
-    let local_count = body.local_type_ids.len() as i32
+    let local_count = body.local_type_ids.len()
     let block_count = body.block_count()
     if local_count <= 0 or block_count <= 0:
         return ""
@@ -3039,7 +3039,7 @@ fn mir_rvalue_read_locals(body: &MirBody, rv: i32) -> List[i32]:
 // the use in the emitted order, which is the shape lowering bugs produce; a use
 // reached only by a back edge is never flagged.
 fn validate_use_after_kill_body(body: &MirBody, pool: &InternPool) -> str:
-    let local_count = body.local_type_ids.len() as i32
+    let local_count = body.local_type_ids.len()
     if local_count <= 0 or local_count > 20000:
         return ""
     let killed: List[i32] = List.new()
@@ -3093,7 +3093,7 @@ pub fn validate_use_after_kill(body: &MirBody, pool: &InternPool) -> str:
 pub fn mir_name_fn_syms(text: &str, pool: &InternPool) -> str:
     var out = StringBuilder.new()
     var i = 0
-    let n = text.len() as i32
+    let n = text.len()
     while i < n:
         if i + 6 <= n and text.slice(i as i64, (i + 6) as i64) == "fn sym":
             var j = i + 6
@@ -3176,7 +3176,7 @@ fn mir_span_in_range(start: i32, count: i32, len: i32) -> bool:
     start >= 0 and count >= 0 and start + count <= len
 
 pub fn validate_mir_module(mir_mod: &MirModule) -> str:
-    let body_count = mir_mod.bodies.len() as i32
+    let body_count = mir_mod.bodies.len()
     if body_count != mir_mod.body_fn_syms.len():
         return "bodies/body_fn_syms length mismatch"
 
@@ -3529,22 +3529,22 @@ pub fn mir_validation_has_error(err: &MirValidationError) -> bool:
     err.message.len() > 0
 
 fn mir_validate_find_named_type(mir_mod: &MirModule, type_sym: i32) -> i32:
-    for ti in 0..mir_mod.sema_type_kinds.len() as i32:
+    for ti in 0..mir_mod.sema_type_kinds.len():
         let tk = mir_mod.sema_type_kinds[ti]
         // Only match TY_STRUCT and TY_ENUM — their d0 stores the name symbol.
         // TY_ALIAS d0 stores the alias TARGET, not the name.
         if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_ENUM:
             continue
         if mir_mod.sema_type_d0[ti] == type_sym:
-            return ti
+            return ti as i32
     0
 
 fn mir_validate_find_int_type(mir_mod: &MirModule, bits: i32, signed: i32) -> i32:
-    for ti in 0..mir_mod.sema_type_kinds.len() as i32:
+    for ti in 0..mir_mod.sema_type_kinds.len():
         if mir_mod.sema_type_kinds[ti] != TypeKind.TY_INT:
             continue
         if mir_mod.sema_type_d0[ti] == bits and mir_mod.sema_type_d1[ti] == signed:
-            return ti
+            return ti as i32
     0
 
 fn mir_validate_get_generic_inst_arg_count(mir_mod: &MirModule, tid: i32) -> i32:
@@ -4492,7 +4492,7 @@ pub fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValida
     // #2108: after Sema every local has a concrete type. A generic
     // declaration with its type parameters unbound has no layout; codegen
     // failed on one (`var best = None`) while this validator said ok.
-    for li in 0..body.local_type_ids.len() as i32:
+    for li in 0..body.local_type_ids.len():
         if mir_mod.sema_uninstantiated_generic_types.contains(mir_mod.mir_resolve_alias(body.local_type_ids[li])):
             return mir_validation_fail(body.fn_sym, 0, f"local _{li} has ty={body.local_type_ids[li]}, a generic declaration with no type arguments")
     let stmt_count = body.stmt_count()

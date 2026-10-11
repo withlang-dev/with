@@ -40,7 +40,7 @@ pub fn with_dlltool_cli_main() -> i32:
     for i in 2..with_arg_count(): args.push(with_arg_at(i))
     unsafe:
         let argv = with_alloc((args.len() + 1) * 8) as *mut *mut u8
-        for i in 0..args.len() as i32:
+        for i in 0..args.len():
             *((argv as i64 + i as i64 * 8) as *mut *mut u8) = dt_c_string(args[i])
         *((argv as i64 + args.len() * 8) as *mut *mut u8) = 0 as *mut u8
         with_dlltool_main(DlltoolArgs { data: argv as *const *mut u8, len: args.len() })

@@ -83,12 +83,12 @@ fn suspend_store_block_bits(dst: SuspendBits, local_count: i32, bb: i32, src: Su
     changed
 
 fn suspend_place_root_local(body: &MirBody, place_id: i32) -> i32:
-    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+    if place_id < 0 or place_id >= body.place_locals.len():
         return -1
     body.place_locals[place_id]
 
 fn suspend_direct_place_local(body: &MirBody, place_id: i32) -> i32:
-    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+    if place_id < 0 or place_id >= body.place_locals.len():
         return -1
     if body.place_proj_counts[place_id] != 0:
         return -1
@@ -101,14 +101,14 @@ fn suspend_kill_place(bits: SuspendBits, body: &MirBody, place_id: i32):
     suspend_set_bit(bits, suspend_place_root_local(body, place_id), 0)
 
 fn suspend_gen_operand(bits: SuspendBits, body: &MirBody, operand_id: i32):
-    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len():
         return
     let kind = body.operand_kinds[operand_id]
     if kind == OperandKind.OK_COPY or kind == OperandKind.OK_MOVE:
         suspend_gen_place(bits, body, body.operand_d0[operand_id])
 
 fn suspend_gen_call_args(bits: SuspendBits, body: &MirBody, call_id: i32):
-    if call_id < 0 or call_id >= body.call_arg_starts.len() as i32:
+    if call_id < 0 or call_id >= body.call_arg_starts.len():
         return
     let start = body.call_arg_starts[call_id]
     let count = body.call_arg_counts[call_id]
@@ -116,7 +116,7 @@ fn suspend_gen_call_args(bits: SuspendBits, body: &MirBody, call_id: i32):
         suspend_gen_operand(bits, body, body.call_arg_operands[(start + ai)])
 
 fn suspend_gen_agg_fields(bits: SuspendBits, body: &MirBody, field_id: i32):
-    if field_id < 0 or field_id >= body.agg_field_starts.len() as i32:
+    if field_id < 0 or field_id >= body.agg_field_starts.len():
         return
     let start = body.agg_field_starts[field_id]
     let count = body.agg_field_counts[field_id]
@@ -124,7 +124,7 @@ fn suspend_gen_agg_fields(bits: SuspendBits, body: &MirBody, field_id: i32):
         suspend_gen_operand(bits, body, body.agg_field_operands[(start + fi)])
 
 fn suspend_gen_rvalue(bits: SuspendBits, body: &MirBody, rval_id: i32):
-    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+    if rval_id < 0 or rval_id >= body.rval_kinds.len():
         return
     let kind = body.rval_kinds[rval_id]
     let d0 = body.rval_d0[rval_id]
@@ -178,7 +178,7 @@ fn suspend_type_has_semantic_drop(sema: &Sema, tid: i32) -> i32:
 
 fn suspend_drop_is_semantic(sema: &Sema, body: &MirBody, place_id: i32) -> i32:
     let local = suspend_place_root_local(body, place_id)
-    if local < 0 or local >= body.local_type_ids.len() as i32:
+    if local < 0 or local >= body.local_type_ids.len():
         return 0
     suspend_type_has_semantic_drop(sema, body.local_type_ids[local])
 
@@ -252,7 +252,7 @@ fn suspend_compute_live_out_for_block(body: &MirBody, live_in: SuspendBits, loca
     else if kind == TermKind.TK_DROP_AND_GOTO:
         suspend_add_successor_live(body, live_in, local_count, d1, out_bits)
     else if kind == TermKind.TK_SWITCH_INT:
-        if d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
+        if d1 >= 0 and d1 < body.switch_table_starts.len():
             let start = body.switch_table_starts[d1]
             let count = body.switch_table_counts[d1]
             for ti in 0..count:
@@ -280,12 +280,12 @@ fn suspend_is_scheduler_yield_intrinsic(intrinsic: MirIntrinsic) -> i32:
     0
 
 fn suspend_callee_sym(body: &MirBody, operand_id: i32) -> i32:
-    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len():
         return 0
     if body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
         return 0
     let const_id = body.operand_d0[operand_id]
-    if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+    if const_id < 0 or const_id >= body.const_kinds.len():
         return 0
     if body.const_kinds[const_id] != ConstKind.CK_FN:
         return 0
@@ -299,10 +299,10 @@ fn suspend_term_directly_yields(body: &MirBody, bb: i32) -> i32:
 
 fn suspend_build_body_index(mir_mod: &MirModule) -> HashMap[i32, i32]:
     let body_by_fn: HashMap[i32, i32] = HashMap.new()
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.fn_sym != 0:
-            body_by_fn.insert(body.fn_sym, bi)
+            body_by_fn.insert(body.fn_sym, bi as i32)
     body_by_fn
 
 fn suspend_body_index_for_sym(body_by_fn: &HashMap[i32, i32], fn_sym: i32) -> i32:
@@ -321,29 +321,29 @@ fn suspend_body_has_direct_yield(body: &MirBody) -> i32:
 // The closure body a call argument hands over, when the argument is the
 // local a closure constant was assigned to; -1 otherwise.
 fn suspend_closure_arg_body(body: &MirBody, body_by_fn: &HashMap[i32, i32], operand_id: i32) -> i32:
-    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len():
         return -1
     let ok = body.operand_kinds[operand_id]
     if ok != OperandKind.OK_MOVE and ok != OperandKind.OK_COPY:
         return -1
     let place = body.operand_d0[operand_id]
-    if place < 0 or place >= body.place_locals.len() as i32 or body.place_proj_counts[place] != 0:
+    if place < 0 or place >= body.place_locals.len() or body.place_proj_counts[place] != 0:
         return -1
     let local = body.place_locals[place]
-    for si in 0..body.stmt_kinds.len() as i32:
+    for si in 0..body.stmt_kinds.len():
         if body.stmt_kinds[si] != StmtKind.Assign:
             continue
         let dst = body.stmt_d0[si]
-        if dst < 0 or dst >= body.place_locals.len() as i32 or body.place_locals[dst] != local or body.place_proj_counts[dst] != 0:
+        if dst < 0 or dst >= body.place_locals.len() or body.place_locals[dst] != local or body.place_proj_counts[dst] != 0:
             continue
         let rv = body.stmt_d1[si]
-        if rv < 0 or rv >= body.rval_kinds.len() as i32 or body.rval_kinds[rv] != RvalueKind.RK_USE:
+        if rv < 0 or rv >= body.rval_kinds.len() or body.rval_kinds[rv] != RvalueKind.RK_USE:
             continue
         let src_op = body.rval_d0[rv]
-        if src_op < 0 or src_op >= body.operand_kinds.len() as i32 or body.operand_kinds[src_op] != OperandKind.OK_CONSTANT:
+        if src_op < 0 or src_op >= body.operand_kinds.len() or body.operand_kinds[src_op] != OperandKind.OK_CONSTANT:
             continue
         let const_id = body.operand_d0[src_op]
-        if const_id >= 0 and const_id < body.const_kinds.len() as i32 and body.const_kinds[const_id] == ConstKind.CK_CLOSURE:
+        if const_id >= 0 and const_id < body.const_kinds.len() and body.const_kinds[const_id] == ConstKind.CK_CLOSURE:
             return suspend_body_index_for_sym(body_by_fn, body.const_d1[const_id])
     -1
 
@@ -352,7 +352,7 @@ fn suspend_closure_arg_body(body: &MirBody, body_by_fn: &HashMap[i32, i32], oper
 // closure's body may.
 fn suspend_call_passes_suspending_closure(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, bb: i32) -> i32:
     let call_id = body.term_data1(bb)
-    if call_id < 0 or call_id >= body.call_arg_starts.len() as i32:
+    if call_id < 0 or call_id >= body.call_arg_starts.len():
         return 0
     let start = body.call_arg_starts[call_id]
     for ai in 0..body.call_arg_counts[call_id]:
@@ -381,7 +381,7 @@ fn suspend_compute_may_suspend(mir_mod: &MirModule, body_by_fn: &HashMap[i32, i3
     for bi in 0..body_count:
         let body = &mir_mod.bodies[bi]
         if suspend_body_has_direct_yield(body) != 0:
-            body_may_suspend.vset(bi, 1)
+            body_may_suspend.vset(bi as i32, 1)
 
     var changed = 1
     while changed != 0:
@@ -391,7 +391,7 @@ fn suspend_compute_may_suspend(mir_mod: &MirModule, body_by_fn: &HashMap[i32, i3
                 continue
             let body = &mir_mod.bodies[bi2]
             if suspend_body_calls_may_suspend(body, body_by_fn, body_may_suspend) != 0:
-                body_may_suspend.vset(bi2, 1)
+                body_may_suspend.vset(bi2 as i32, 1)
                 changed = 1
     body_may_suspend
 
@@ -420,7 +420,7 @@ fn suspend_type_is_ref_like(sema: &Sema, tid: i32) -> i32:
     0
 
 fn suspend_local_is_ref_like(sema: &Sema, body: &MirBody, local: i32) -> i32:
-    if local < 0 or local >= body.local_type_ids.len() as i32:
+    if local < 0 or local >= body.local_type_ids.len():
         return 0
     suspend_type_is_ref_like(sema, body.local_type_ids[local])
 
@@ -446,19 +446,19 @@ fn suspend_collect_guard_locals(sema: &Sema, body: &MirBody) -> List[i32]:
     out
 
 fn suspend_guard_index(guard_locals: &List[i32], guard_local: i32) -> i32:
-    for gi in 0..guard_locals.len() as i32:
+    for gi in 0..guard_locals.len():
         if guard_locals[gi] == guard_local:
-            return gi
+            return gi as i32
     -1
 
 fn suspend_guard_index_for_sym(body: &MirBody, guard_locals: &List[i32], sym: i32) -> i32:
     if sym == 0:
         return -1
-    for gi in 0..guard_locals.len() as i32:
+    for gi in 0..guard_locals.len():
         let local = guard_locals[gi]
-        if local >= 0 and local < body.local_names.len() as i32:
+        if local >= 0 and local < body.local_names.len():
             if body.local_names[local] == sym:
-                return gi
+                return gi as i32
     -1
 
 fn suspend_prov_index(local_count: i32, guard_count: i32, bb: i32, local: i32, guard_idx: i32) -> i32:
@@ -532,7 +532,7 @@ fn suspend_prov_origins_from_borrowed_place(bits: SuspendBits, body: &MirBody, g
 
 fn suspend_prov_origins_from_operand(bits: SuspendBits, body: &MirBody, guard_count: i32, operand_id: i32) -> SuspendBits:
     let origins = suspend_prov_origins_empty(guard_count)
-    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len():
         return origins
     let kind = body.operand_kinds[operand_id]
     if kind == OperandKind.OK_COPY or kind == OperandKind.OK_MOVE:
@@ -541,7 +541,7 @@ fn suspend_prov_origins_from_operand(bits: SuspendBits, body: &MirBody, guard_co
 
 fn suspend_prov_origins_from_rvalue(bits: SuspendBits, body: &MirBody, guard_locals: &List[i32], guard_count: i32, rval_id: i32) -> SuspendBits:
     let origins = suspend_prov_origins_empty(guard_count)
-    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+    if rval_id < 0 or rval_id >= body.rval_kinds.len():
         return origins
     let kind = body.rval_kinds[rval_id]
     let d0 = body.rval_d0[rval_id]
@@ -571,7 +571,7 @@ fn suspend_sig_for_callee(sema: &Sema, body: &MirBody, callee_operand: i32) -> i
 
 fn suspend_prov_origins_from_call(bits: SuspendBits, sema: &Sema, body: &MirBody, guard_locals: &List[i32], guard_count: i32, callee_operand: i32, call_id: i32) -> SuspendBits:
     let origins = suspend_prov_origins_empty(guard_count)
-    if call_id < 0 or call_id >= body.call_arg_starts.len() as i32:
+    if call_id < 0 or call_id >= body.call_arg_starts.len():
         return origins
 
     let sig_idx = suspend_sig_for_callee(sema, body, callee_operand)
@@ -684,7 +684,7 @@ fn suspend_prov_add_successors(body: &MirBody, prov_in: SuspendBits, local_count
         if suspend_prov_add_successor(body, prov_in, local_count, guard_count, d1, out_bits) != 0:
             changed = 1
     else if kind == TermKind.TK_SWITCH_INT:
-        if d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
+        if d1 >= 0 and d1 < body.switch_table_starts.len():
             let start = body.switch_table_starts[d1]
             let count = body.switch_table_counts[d1]
             for ti in 0..count:
@@ -698,7 +698,7 @@ fn suspend_compute_prov_in_for_body(sema: &Sema, body: &MirBody, guard_locals: &
     let local_count = body.local_count()
     let bb_count = body.block_count()
     let guard_count = guard_locals.len() as i32
-    let prov_in = suspend_bits_fill(local_count * guard_count * bb_count, 0)
+    let prov_in = suspend_bits_fill((local_count * guard_count * bb_count) as i32, 0)
     if local_count <= 0 or bb_count <= 0 or guard_count <= 0:
         return prov_in
 
@@ -737,7 +737,7 @@ fn suspend_site_span(ast: AstPool, body: &MirBody, bb: i32) -> SuspendSiteSpan:
     SuspendSiteSpan { start, end }
 
 fn suspend_reported_site(reported_starts: &List[i32], reported_ends: &List[i32], reported_locals: &List[i32], reported_origins: &List[i32], site: SuspendSiteSpan, live_local: i32, origin_local: i32) -> bool:
-    let count = reported_starts.len() as i32
+    let count = reported_starts.len()
     for i in 0..count:
         if reported_starts[i] == site.start and reported_ends[i] == site.end and reported_locals[i] == live_local and reported_origins[i] == origin_local:
             return true
@@ -753,7 +753,7 @@ fn suspend_no_suspend_site_span(ast: AstPool, body: &MirBody, bb: i32, no_suspen
     site
 
 fn suspend_reported_no_suspend_site(reported_starts: &List[i32], reported_ends: &List[i32], reported_nodes: &List[i32], site: SuspendSiteSpan, no_suspend_node: i32) -> bool:
-    let count = reported_starts.len() as i32
+    let count = reported_starts.len()
     for i in 0..count:
         if reported_starts[i] == site.start and reported_ends[i] == site.end and reported_nodes[i] == no_suspend_node:
             return true
@@ -794,8 +794,8 @@ fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: &Sema, body: &MirB
 
 fn suspend_emit_guard_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, site: SuspendSiteSpan, guard_local: i32) -> DiagnosticList:
     var out = diags
-    let guard_ty = if guard_local >= 0 and guard_local < body.local_type_ids.len() as i32: body.local_type_ids[guard_local] else: 0
-    let guard_name_sym = if guard_local >= 0 and guard_local < body.local_names.len() as i32: body.local_names[guard_local] else: 0
+    let guard_ty = if guard_local >= 0 and guard_local < body.local_type_ids.len(): body.local_type_ids[guard_local] else: 0
+    let guard_name_sym = if guard_local >= 0 and guard_local < body.local_names.len(): body.local_names[guard_local] else: 0
     let guard_name = if guard_name_sym != 0: with_str_clone_ref(sema.pool_resolve(guard_name_sym)) else: "guard"
     let guard_type_name = sema.type_name(guard_ty)
     var diag = Diagnostic.err("E0701: " ++ guard_type_name ++ " value is live across a suspension point", Span { file: sema.local_file_id, start: site.start, end: site.end })
@@ -807,9 +807,9 @@ fn suspend_emit_guard_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, 
 
 fn suspend_emit_derived_guard_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, site: SuspendSiteSpan, view_local: i32, guard_local: i32) -> DiagnosticList:
     var out = diags
-    let guard_ty = if guard_local >= 0 and guard_local < body.local_type_ids.len() as i32: body.local_type_ids[guard_local] else: 0
-    let guard_name_sym = if guard_local >= 0 and guard_local < body.local_names.len() as i32: body.local_names[guard_local] else: 0
-    let view_name_sym = if view_local >= 0 and view_local < body.local_names.len() as i32: body.local_names[view_local] else: 0
+    let guard_ty = if guard_local >= 0 and guard_local < body.local_type_ids.len(): body.local_type_ids[guard_local] else: 0
+    let guard_name_sym = if guard_local >= 0 and guard_local < body.local_names.len(): body.local_names[guard_local] else: 0
+    let view_name_sym = if view_local >= 0 and view_local < body.local_names.len(): body.local_names[view_local] else: 0
     let guard_name = if guard_name_sym != 0: with_str_clone_ref(sema.pool_resolve(guard_name_sym)) else: "guard"
     let view_name = if view_name_sym != 0: with_str_clone_ref(sema.pool_resolve(view_name_sym)) else: "derived view"
     let guard_type_name = sema.type_name(guard_ty)
@@ -876,7 +876,7 @@ fn suspend_check_body(ast: AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32],
             if suspend_type_is_no_await_guard(sema, view_ty) != 0:
                 continue
             for gi in 0..guard_count:
-                if suspend_prov_get_local_origin(prov_bits, guard_count, vi, gi) == 0:
+                if suspend_prov_get_local_origin(prov_bits, guard_count, vi, gi as i32) == 0:
                     continue
                 let guard_local = guard_locals[gi]
                 let site2 = suspend_site_span(ast, body, bb)
@@ -940,7 +940,7 @@ fn suspend_liveness(sema: &Sema, body: &MirBody) -> SuspendLiveness:
 // suspend_gen_rvalue gens.
 fn suspend_rvalue_operands(body: &MirBody, rval_id: i32) -> List[i32]:
     var out: List[i32] = List.new()
-    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+    if rval_id < 0 or rval_id >= body.rval_kinds.len():
         return out
     let kind = body.rval_kinds[rval_id]
     let d0 = body.rval_d0[rval_id]
@@ -952,7 +952,7 @@ fn suspend_rvalue_operands(body: &MirBody, rval_id: i32) -> List[i32]:
         out.push(body.rval_d2[rval_id])
     else if kind == RvalueKind.RK_UN_OP:
         out.push(d1)
-    else if kind == RvalueKind.RK_AGGREGATE and d1 >= 0 and d1 < body.agg_field_starts.len() as i32:
+    else if kind == RvalueKind.RK_AGGREGATE and d1 >= 0 and d1 < body.agg_field_starts.len():
         for fi in 0..body.agg_field_counts[d1]:
             out.push(body.agg_field_operands[body.agg_field_starts[d1] + fi])
     else if kind == RvalueKind.RK_STR_CONCAT_N:
@@ -961,7 +961,7 @@ fn suspend_rvalue_operands(body: &MirBody, rval_id: i32) -> List[i32]:
 
 fn suspend_call_operands(body: &MirBody, call_id: i32) -> List[i32]:
     var out: List[i32] = List.new()
-    if call_id < 0 or call_id >= body.call_arg_starts.len() as i32:
+    if call_id < 0 or call_id >= body.call_arg_starts.len():
         return out
     for ai in 0..body.call_arg_counts[call_id]:
         out.push(body.call_arg_operands[body.call_arg_starts[call_id] + ai])
@@ -969,7 +969,7 @@ fn suspend_call_operands(body: &MirBody, call_id: i32) -> List[i32]:
 
 // The whole local a retained copy operand names, or -1.
 fn suspend_held_copy_local(body: &MirBody, operand_id: i32) -> i32:
-    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32 or body.operand_kinds[operand_id] != OperandKind.OK_COPY or body.operand_hold(operand_id) != MIR_HOLD_RETAIN:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() or body.operand_kinds[operand_id] != OperandKind.OK_COPY or body.operand_hold(operand_id) != MIR_HOLD_RETAIN:
         return -1
     suspend_direct_place_local(body, body.operand_d0[operand_id])
 
@@ -984,9 +984,9 @@ fn last_use_stmt_event(body: &MirBody, stmt_id: i32, local: i32, drops_read: boo
         let operands = suspend_rvalue_operands(body, rval)
         for oi in 0..operands.len():
             let op = operands[oi]
-            if op >= 0 and op < body.operand_kinds.len() as i32 and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE) and suspend_place_root_local(body, body.operand_d0[op]) == local:
+            if op >= 0 and op < body.operand_kinds.len() and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE) and suspend_place_root_local(body, body.operand_d0[op]) == local:
                 return 1
-        if rval >= 0 and rval < body.rval_kinds.len() as i32:
+        if rval >= 0 and rval < body.rval_kinds.len():
             let rk = body.rval_kinds[rval]
             let borrowed = if rk == RvalueKind.RK_REF: body.rval_d1[rval] else: if rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN: body.rval_d0[rval] else: -1
             if suspend_place_root_local(body, borrowed) == local:
@@ -1011,14 +1011,14 @@ fn last_use_term_event(body: &MirBody, bb: i32, local: i32, drops_read: bool) ->
         operands.push(body.term_data0(bb))
         for oi in 0..operands.len():
             let op = operands[oi]
-            if op >= 0 and op < body.operand_kinds.len() as i32 and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE) and suspend_place_root_local(body, body.operand_d0[op]) == local:
+            if op >= 0 and op < body.operand_kinds.len() and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE) and suspend_place_root_local(body, body.operand_d0[op]) == local:
                 return 1
         if suspend_direct_place_local(body, body.term_data2(bb)) == local:
             return 2
         return 0
     if kind == TermKind.TK_SWITCH_INT:
         let op = body.term_data0(bb)
-        if op >= 0 and op < body.operand_kinds.len() as i32 and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE) and suspend_place_root_local(body, body.operand_d0[op]) == local:
+        if op >= 0 and op < body.operand_kinds.len() and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE) and suspend_place_root_local(body, body.operand_d0[op]) == local:
             return 1
         return 0
     if kind == TermKind.TK_DROP_AND_GOTO and suspend_place_root_local(body, body.term_data0(bb)) == local:
@@ -1037,7 +1037,7 @@ fn last_use_successors(body: &MirBody, bb: i32) -> List[i32]:
         out.push(body.term_data1(bb))
     else if kind == TermKind.TK_SWITCH_INT:
         let table = body.term_data1(bb)
-        if table >= 0 and table < body.switch_table_starts.len() as i32:
+        if table >= 0 and table < body.switch_table_starts.len():
             for ti in 0..body.switch_table_counts[table]:
                 out.push(body.switch_table_targets[body.switch_table_starts[table] + ti])
         out.push(body.term_data2(bb))
@@ -1152,7 +1152,7 @@ pub fn check_no_await_guard_suspends(mir_mod: &MirModule, ast: AstPool, sema: &S
     var out = diags
     let body_by_fn = suspend_build_body_index(mir_mod)
     let body_may_suspend = suspend_compute_may_suspend(mir_mod, body_by_fn)
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         out = suspend_check_no_suspend_body(ast, sema, body_by_fn, body_may_suspend, body, move out)
         out = suspend_check_body(ast, sema, body_by_fn, body_may_suspend, body, move out)

@@ -22,7 +22,7 @@ fn ci_omitted_field(record: &str, idx: i32) -> str:
     var first = -1
     var second = -1
     var i = 0
-    let n = record.len() as i32
+    let n = record.len()
     while i < n:
         if record[i] == 124:
             if first < 0:
@@ -198,7 +198,7 @@ impl Sema:
     mut fn emit_unknown_type_error(sym: i32, node: i32):
         if with_getenv_str("WITH_DEBUG_SUBST").len() > 0:
             let ut_named = if self.named_types.contains(sym): 1 else: 0
-            with_eprint(f"[unknown-type] sym={sym} '{self.pool_resolve(sym)}' subst_frame_len={self.generic_subst_param_syms.len() as i32} named_has={ut_named}")
+            with_eprint(f"[unknown-type] sym={sym} '{self.pool_resolve(sym)}' subst_frame_len={self.generic_subst_param_syms.len()} named_has={ut_named}")
         if sym <= 0:
             self.emit_error("unknown type", node)
             return
@@ -220,7 +220,7 @@ impl Sema:
         let start = self.ast.get_start(node)
         var line: i32 = 1
         for i in 0..start:
-            if i < text.len() as i32 and text[i] == '\n': line += 1
+            if i < text.len() and text[i] == '\n': line += 1
         line
 
     // `with check --ceremony-census`: one line per recorded ceremony site,
@@ -479,7 +479,7 @@ impl Sema:
             if not paths.contains(file_id) and di < self.decl_source_paths.len():
                 paths.insert(file_id, self.decl_source_paths[di].clone())
         var n = 0
-        for ai in 0..self.contextual_copy_adjustments.len() as i32:
+        for ai in 0..self.contextual_copy_adjustments.len():
             let file_id = self.ast.file(self.contextual_copy_adjustments[ai].source_node as NodeId) as i32
             let path = paths.get(file_id) ?? &""
             if sema_tier_path_is_std_implementation(path) == 0: n += 1
@@ -493,7 +493,7 @@ impl Sema:
         out.push_str(f"typed module decls={dump_decl_count}\n")
         out.push_str(f"typed contextual-copy-adjustments={self.contextual_copy_adjustments.len()}\n")
         out.push_str(f"typed contextual-copy-adjustments-outside-std={self.contextual_copy_adjustments_outside_std()}\n")
-        for ai in 0..self.contextual_copy_adjustments.len() as i32:
+        for ai in 0..self.contextual_copy_adjustments.len():
             let adjustment = self.contextual_copy_adjustments[ai]
             out.push_str(f"adjust[{ai}] node={adjustment.source_node} exact={self.type_name(adjustment.exact_source_type)} owned={self.type_name(adjustment.owned_value_type)} target={self.type_name(adjustment.target_type)}")
             if adjustment.post_copy_type != 0:
@@ -502,8 +502,8 @@ impl Sema:
                 out.push_str(" post=identity")
             out.push_str("\n")
         out.push_str(f"typed contextual-joins={self.contextual_join_decisions.len()}\n")
-        for ji in 0..self.contextual_join_decisions.len() as i32:
-            out.push_str(self.contextual_join_dump_text(ji))
+        for ji in 0..self.contextual_join_decisions.len():
+            out.push_str(self.contextual_join_dump_text(ji as i32))
 
         for di in 0..dump_decl_count:
             let decl = self.ast.get_decl(di)
@@ -671,7 +671,7 @@ impl Sema:
         with_write(f"typed module decls={dump_decl_count}\n")
         with_write(f"typed contextual-copy-adjustments={self.contextual_copy_adjustments.len()}\n")
         with_write(f"typed contextual-copy-adjustments-outside-std={self.contextual_copy_adjustments_outside_std()}\n")
-        for ai in 0..self.contextual_copy_adjustments.len() as i32:
+        for ai in 0..self.contextual_copy_adjustments.len():
             let adjustment = self.contextual_copy_adjustments[ai]
             with_write(f"adjust[{ai}] node={adjustment.source_node} exact={self.type_name(adjustment.exact_source_type)} owned={self.type_name(adjustment.owned_value_type)} target={self.type_name(adjustment.target_type)}")
             if adjustment.post_copy_type != 0:
@@ -680,8 +680,8 @@ impl Sema:
                 with_write(" post=identity")
             with_write("\n")
         with_write(f"typed contextual-joins={self.contextual_join_decisions.len()}\n")
-        for ji in 0..self.contextual_join_decisions.len() as i32:
-            with_write(self.contextual_join_dump_text(ji))
+        for ji in 0..self.contextual_join_decisions.len():
+            with_write(self.contextual_join_dump_text(ji as i32))
 
         for di in 0..dump_decl_count:
             let decl = self.ast.get_decl(di)

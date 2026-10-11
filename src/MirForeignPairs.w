@@ -51,12 +51,12 @@ type PairsStepSite {
 impl Copy for PairsStepSite
 
 fn pairs_place_key(keys: &MirDropStateKeys, place_id: i32) -> i32:
-    if place_id < 0 or place_id >= keys.place_key.len() as i32:
+    if place_id < 0 or place_id >= keys.place_key.len():
         return -1
     keys.place_key[place_id]
 
 fn pairs_operand_place(body: &MirBody, operand_id: i32) -> i32:
-    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len():
         return -1
     let kind = body.operand_kinds[operand_id]
     if kind == OperandKind.OK_COPY or kind == OperandKind.OK_MOVE:
@@ -64,14 +64,14 @@ fn pairs_operand_place(body: &MirBody, operand_id: i32) -> i32:
     -1
 
 fn pairs_operand_is_move(body: &MirBody, operand_id: i32) -> bool:
-    operand_id >= 0 and operand_id < body.operand_kinds.len() as i32 and body.operand_kinds[operand_id] == OperandKind.OK_MOVE
+    operand_id >= 0 and operand_id < body.operand_kinds.len() and body.operand_kinds[operand_id] == OperandKind.OK_MOVE
 
 // The integer a constant operand carries.
 fn pairs_operand_const(body: &MirBody, operand_id: i32) -> (bool, i64):
-    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32 or body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() or body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
         return (false, -1)
     let cid = body.operand_d0[operand_id]
-    if cid < 0 or cid >= body.const_kinds.len() as i32 or body.const_kinds[cid] != ConstKind.CK_INT:
+    if cid < 0 or cid >= body.const_kinds.len() or body.const_kinds[cid] != ConstKind.CK_INT:
         return (false, -1)
     var value: i64 = body.const_d0[cid]
     value = value + (body.const_d1[cid] as i64) * 4294967296
@@ -81,7 +81,7 @@ fn pairs_operand_const(body: &MirBody, operand_id: i32) -> (bool, i64):
 // projection (a field of a struct that may outlive the frame; the flow does
 // not know, so the conservative answer holds).
 fn pairs_place_escapes(body: &MirBody, place_id: i32) -> bool:
-    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+    if place_id < 0 or place_id >= body.place_locals.len():
         return false
     body.place_locals[place_id] == 0 or body.place_proj_counts[place_id] != 0
 
@@ -119,7 +119,7 @@ fn pairs_list_i64(count: i32, value: i64) -> List[i64]:
 // Whether the body can touch a pair at all: some place is a pair resource
 // or a reference to one. Everything else is skipped without building keys.
 fn pairs_body_relevant(sema: &Sema, body: &MirBody) -> bool:
-    for p in 0..body.place_sema_types.len() as i32:
+    for p in 0..body.place_sema_types.len():
         if sema.facade_pair_resource_for_type(body.place_sema_types[p]) >= 0:
             return true
     false
@@ -162,11 +162,11 @@ type PairsBody {
 
 fn pairs_body_new(body: &MirBody) -> PairsBody:
     let keys = mir_drop_state_keys_new(body)
-    let width = keys.len()
+    let width = keys.len() as i32
     PairsBody { keys: move keys, key_resource: pairs_list_i32(width, -1), key_alias: pairs_list_i32(width, -1), key_is_ref: pairs_list_i32(width, 0), ref_origin: pairs_list_i32(width, -2), origin_key: pairs_list_i32(width, 0), origin_bb: pairs_list_i32(width, -1), guard_alias: pairs_list_i32(width, -1), guard_ok: pairs_list_i64(width, -1), cond_guard: pairs_list_i32(width, -1), cond_is_eq: pairs_list_i32(width, 1), steps: List.new(), sites: List.new(), starts: List.new(), counts: List.new(), edges: List.new() }
 
 impl PairsBody:
-    fn width(): self.key_resource.len() as i32
+    fn width(): self.key_resource.len()
 
     fn key_of(place_id: i32) -> i32:
         let raw = pairs_place_key(self.keys, place_id)
@@ -180,10 +180,10 @@ impl PairsBody:
 
     // The base local of a place key, and its user name when it has one.
     fn key_name(sema: &Sema, body: &MirBody, key: i32) -> str:
-        if key < 0 or key >= self.keys.base_local.len() as i32:
+        if key < 0 or key >= self.keys.base_local.len():
             return "this value"
         let local = self.keys.base_local[key]
-        let sym = if local >= 0 and local < body.local_names.len() as i32: body.local_names[local] else: 0
+        let sym = if local >= 0 and local < body.local_names.len(): body.local_names[local] else: 0
         if sym != 0:
             return "'" ++ sema.pool_resolve(sym) ++ "'"
         "this value"
@@ -220,12 +220,12 @@ impl PairsBody:
     mut fn classify(sema: &Sema, body: &MirBody):
         // A projection through a reference local names what the local
         // refers to: its key is the local's, whose targets a BORROW set.
-        for p in 0..body.place_sema_types.len() as i32:
-            let raw = pairs_place_key(self.keys, p)
+        for p in 0..body.place_sema_types.len():
+            let raw = pairs_place_key(self.keys, p as i32)
             if raw < 0 or body.place_proj_counts[p] == 0:
                 continue
             let base = body.place_locals[p]
-            if base < 0 or base >= body.local_type_ids.len() as i32:
+            if base < 0 or base >= body.local_type_ids.len():
                 continue
             let base_ty = sema.resolve_alias(body.local_type_ids[base] as TypeId)
             if sema.get_type_kind(base_ty) == TypeKind.TY_REF and sema.facade_pair_resource_for_type(base_ty as i32) >= 0:
@@ -257,7 +257,7 @@ impl PairsBody:
                 continue
             let dest = self.key_of(body.stmt_data0(stmt))
             let rv = body.stmt_data1(stmt)
-            if dest < 0 or rv < 0 or rv >= body.rval_kinds.len() as i32:
+            if dest < 0 or rv < 0 or rv >= body.rval_kinds.len():
                 continue
             if body.rval_kinds[rv] == RvalueKind.RK_REF:
                 self.note_ref(dest, self.key_of(body.rval_d1[rv]))
@@ -273,7 +273,7 @@ impl PairsBody:
             if body.term_kind(bb) != TermKind.TK_CALL:
                 continue
             let call_id = body.term_data1(bb)
-            if call_id < 0 or call_id >= body.call_sig_indices.len() as i32:
+            if call_id < 0 or call_id >= body.call_sig_indices.len():
                 continue
             let opi = sema.facade_pair_op_for_sig(body.call_sig_indices[call_id])
             if opi < 0:
@@ -295,7 +295,7 @@ impl PairsBody:
                 continue
             let dest = self.key_of(body.stmt_data0(stmt))
             let rv = body.stmt_data1(stmt)
-            if dest < 0 or rv < 0 or rv >= body.rval_kinds.len() as i32 or body.rval_kinds[rv] != RvalueKind.RK_USE:
+            if dest < 0 or rv < 0 or rv >= body.rval_kinds.len() or body.rval_kinds[rv] != RvalueKind.RK_USE:
                 continue
             let src = self.key_of(pairs_operand_place(body, body.rval_d0[rv]))
             if src < 0:
@@ -309,7 +309,7 @@ impl PairsBody:
                 continue
             let dest = self.key_of(body.stmt_data0(stmt))
             let rv = body.stmt_data1(stmt)
-            if dest < 0 or rv < 0 or rv >= body.rval_kinds.len() as i32 or body.rval_kinds[rv] != RvalueKind.RK_BIN_OP:
+            if dest < 0 or rv < 0 or rv >= body.rval_kinds.len() or body.rval_kinds[rv] != RvalueKind.RK_BIN_OP:
                 continue
             let bop = body.rval_d0[rv]
             if bop != BinaryOp.OP_EQ and bop != BinaryOp.OP_NEQ:
@@ -376,7 +376,7 @@ impl PairsBody:
         let dest_place = body.stmt_data0(stmt)
         let dest = self.key_of(dest_place)
         let rv = body.stmt_data1(stmt)
-        if dest < 0 or rv < 0 or rv >= body.rval_kinds.len() as i32:
+        if dest < 0 or rv < 0 or rv >= body.rval_kinds.len():
             return
         let rk = body.rval_kinds[rv]
         if rk == RvalueKind.RK_USE:
@@ -395,7 +395,7 @@ impl PairsBody:
             return
         if rk == RvalueKind.RK_AGGREGATE:
             let fields = body.rval_d1[rv]
-            if fields < 0 or fields >= body.agg_field_starts.len() as i32:
+            if fields < 0 or fields >= body.agg_field_starts.len():
                 return
             let start = body.agg_field_starts[fields]
             let count = body.agg_field_counts[fields]
@@ -425,11 +425,11 @@ impl PairsBody:
 
     mut fn build_call_args(sema: &Sema, body: &MirBody, bb: i32):
         let call_id = body.term_data1(bb)
-        if call_id < 0 or call_id >= body.call_arg_starts.len() as i32:
+        if call_id < 0 or call_id >= body.call_arg_starts.len():
             return
         let start = body.call_arg_starts[call_id]
         let count = body.call_arg_counts[call_id]
-        let sig = if call_id < body.call_sig_indices.len() as i32: body.call_sig_indices[call_id] else: -1
+        let sig = if call_id < body.call_sig_indices.len(): body.call_sig_indices[call_id] else: -1
         let opi = sema.facade_pair_op_for_sig(sig)
         if opi >= 0 and count > 0:
             let action = sema.facade_pair_ops[opi].action
@@ -485,7 +485,7 @@ impl PairsBody:
             if cond >= 0 and self.cond_guard[cond] >= 0:
                 guard = self.cond_guard[cond]
                 is_eq = self.cond_is_eq[cond] != 0
-            if d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
+            if d1 >= 0 and d1 < body.switch_table_starts.len():
                 let start = body.switch_table_starts[d1]
                 let count = body.switch_table_counts[d1]
                 for i in 0..count:
@@ -514,13 +514,13 @@ impl PairsBody:
                 else if self.is_origin(key):
                     self.push(pairs_step(FOREIGN_STEP_EXPIRE, key, -1, pairs_keep()), pairs_site(PAIRS_SITE_EXPIRE, bb, -1, key, -1))
             self.starts.push(first)
-            self.counts.push(self.steps.len() as i32 - first)
+            self.counts.push((self.steps.len() - first) as i32)
             self.build_edges(body, bb)
 
 fn pairs_site_span(ast: AstPool, body: &MirBody, pb: &PairsBody, site: PairsStepSite) -> (i32, i32):
     // A retained origin that dies or moves is reported at the setter that
     // retained it: the death is a generated drop with no source of its own.
-    if (site.kind == PAIRS_SITE_EXPIRE or site.kind == PAIRS_SITE_MOVED) and site.key >= 0 and site.key < pb.origin_bb.len() as i32 and pb.origin_bb[site.key] >= 0:
+    if (site.kind == PAIRS_SITE_EXPIRE or site.kind == PAIRS_SITE_MOVED) and site.key >= 0 and site.key < pb.origin_bb.len() and pb.origin_bb[site.key] >= 0:
         let retained_at = pb.origin_bb[site.key]
         if body.term_kind(retained_at) == TermKind.TK_CALL:
             let node = body.call_ast_node(body.term_data1(retained_at))
@@ -529,9 +529,9 @@ fn pairs_site_span(ast: AstPool, body: &MirBody, pb: &PairsBody, site: PairsStep
                 let e = ast.get_end(node)
                 if e > s: return (s, e)
     var start: i32 = 0
-    if site.stmt >= 0 and site.stmt < body.stmt_spans.len() as i32:
+    if site.stmt >= 0 and site.stmt < body.stmt_spans.len():
         start = body.stmt_spans[site.stmt]
-    else if site.bb >= 0 and site.bb < body.bb_term_spans.len() as i32:
+    else if site.bb >= 0 and site.bb < body.bb_term_spans.len():
         start = body.bb_term_spans[site.bb]
         if body.term_kind(site.bb) == TermKind.TK_CALL:
             let node = body.call_ast_node(body.term_data1(site.bb))
@@ -562,11 +562,11 @@ fn pairs_describe(ast: AstPool, sema: &Sema, body: &MirBody, pb: &PairsBody, sit
     // A dying or moving origin names the resource that retained it: the
     // subject of the setter that did.
     var named = site.key
-    if (site.kind == PAIRS_SITE_EXPIRE or site.kind == PAIRS_SITE_MOVED) and site.key >= 0 and site.key < pb.origin_bb.len() as i32 and pb.origin_bb[site.key] >= 0:
+    if (site.kind == PAIRS_SITE_EXPIRE or site.kind == PAIRS_SITE_MOVED) and site.key >= 0 and site.key < pb.origin_bb.len() and pb.origin_bb[site.key] >= 0:
         let call_id = body.term_data1(pb.origin_bb[site.key])
-        let opi = if call_id >= 0 and call_id < body.call_sig_indices.len() as i32: sema.facade_pair_op_for_sig(body.call_sig_indices[call_id]) else: -1
+        let opi = if call_id >= 0 and call_id < body.call_sig_indices.len(): sema.facade_pair_op_for_sig(body.call_sig_indices[call_id]) else: -1
         let subject = if opi >= 0: sema.facade_pair_ops[opi].subject_param else: -1
-        if subject >= 0 and call_id < body.call_arg_starts.len() as i32 and subject < body.call_arg_counts[call_id]:
+        if subject >= 0 and call_id < body.call_arg_starts.len() and subject < body.call_arg_counts[call_id]:
             named = pb.key_of(pairs_operand_place(body, body.call_arg_operands[body.call_arg_starts[call_id] + subject]))
     let resource = pb.resource_name(sema, named)
     if site.kind == PAIRS_SITE_INVOKE:
@@ -583,23 +583,23 @@ fn pairs_describe(ast: AstPool, sema: &Sema, body: &MirBody, pb: &PairsBody, sit
 // operation it matched, the steps per block, the edges with their guard
 // refinement, and the violating steps.
 fn pairs_dump(sema: &Sema, body: &MirBody, pb: &PairsBody, flow: &ForeignPairPlaceFlow):
-    eprint(f"pair-flow fn {sema.pool_resolve(body.fn_sym)} keys={pb.width()} steps={pb.steps.len() as i32} edges={pb.edges.len() as i32}")
-    for oi in 0..sema.facade_pair_ops.len() as i32:
+    eprint(f"pair-flow fn {sema.pool_resolve(body.fn_sym)} keys={pb.width()} steps={pb.steps.len()} edges={pb.edges.len()}")
+    for oi in 0..sema.facade_pair_ops.len():
         let op = &sema.facade_pair_ops[oi]
         eprint(f"  op{oi} action={op.action} resource={sema.pool_resolve(sema.facade_resources[op.resource].name)} slot={op.slot} u={op.userdata_tid} ok={op.guard_ok} invokes={op.invokes}")
     for bb in 0..body.block_count():
         if body.term_kind(bb) == TermKind.TK_CALL:
             let call_id = body.term_data1(bb)
-            let sig = if call_id >= 0 and call_id < body.call_sig_indices.len() as i32: body.call_sig_indices[call_id] else: -1
+            let sig = if call_id >= 0 and call_id < body.call_sig_indices.len(): body.call_sig_indices[call_id] else: -1
             eprint(f"  bb{bb} call sig={sig} op={sema.facade_pair_op_for_sig(sig)} dest_key={pb.key_of(body.term_data2(bb))}")
         for si in pb.starts[bb]..pb.starts[bb] + pb.counts[bb]:
             let s = &pb.steps[si]
             let c = &s.contract
             eprint(f"  bb{bb} step{si} kind={s.action} place={s.place}:{pb.key_name(sema, body, s.place)} source={s.source} op={c.action} ty={c.ty} origin={c.origin} guard={c.guard} can_fail={c.can_fail} invokes={c.invokes} site={pb.sites[si].kind} tyname={sema.type_name(c.ty)}")
-    for ei in 0..pb.edges.len() as i32:
+    for ei in 0..pb.edges.len():
         let e = &pb.edges[ei]
         eprint(f"  edge bb{e.from}->bb{e.to} guard={e.guard} succeeded={e.succeeded}")
-    for vi in 0..flow.violations.len() as i32:
+    for vi in 0..flow.violations.len():
         eprint(f"  violation step{flow.violations[vi]}")
 
 // The module's findings, collected body by body.
@@ -618,7 +618,7 @@ impl PairsReport:
         // Entry: parameters carry a pair the caller proved compatible (its
         // own flow checks that at the call); every other place is absent.
         let width = pb.width()
-        var entry = foreign_pair_places(width)
+        var entry = foreign_pair_places(width as i32)
         for li in 1..(body.n_params + 1):
             if li < width and (pb.is_resource(li) or pb.is_ref(li)):
                 entry.values[li] = foreign_pair_initial(false)
@@ -627,12 +627,12 @@ impl PairsReport:
             pairs_dump(sema, body, pb, flow)
         let reported_starts: List[i32] = List.new()
         let reported_kinds: List[i32] = List.new()
-        for vi in 0..flow.violations.len() as i32:
+        for vi in 0..flow.violations.len():
             let si = flow.violations[vi]
             let site = pb.sites[si]
             let (start, _) = pairs_site_span(ast, body, pb, site)
             var seen = false
-            for ri in 0..reported_starts.len() as i32:
+            for ri in 0..reported_starts.len():
                 if reported_starts[ri] == start and reported_kinds[ri] == site.kind: seen = true
             if seen:
                 continue
@@ -640,7 +640,7 @@ impl PairsReport:
             reported_kinds.push(site.kind)
             self.findings.push(pairs_describe(ast, sema, body, pb, site))
             if pairs_dump_enabled():
-                let last = self.findings.len() as i32 - 1
+                let last = self.findings.len() - 1
                 eprint(f"  finding {self.findings[last].start}..{self.findings[last].end}: {self.findings[last].message}")
 
 pub fn pairs_dump_enabled() -> bool: with_getenv_str("WITH_DUMP_PAIR_FLOW").len() > 0
@@ -652,6 +652,6 @@ pub fn check_foreign_pairs(mir_mod: &MirModule, ast: AstPool, sema: &Sema) -> Pa
     var report = PairsReport { findings: List.new() }
     if sema.facade_pair_ops.len() == 0:
         return report
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         report.check_body(ast, sema, &mir_mod.bodies[bi])
     report

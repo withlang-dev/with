@@ -579,7 +579,7 @@ fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
 
 fn cli_escape_with_string(value: &str) -> str:
     var out = StringBuilder.with_capacity(value.len())
-    for i in 0..value.len() as i32:
+    for i in 0..value.len():
         let ch = value[i]
         if ch == 92:
             out.push_str("\\\\")
@@ -620,7 +620,7 @@ fn cli_rewrite_semicolons(code: &str) -> str:
             out.push_str(code.slice(cursor as i64, start as i64))
         out.push_str("\n")
         cursor = end
-    if cursor < code.len() as i32:
+    if cursor < code.len():
         out.push_str(code.slice(cursor as i64, code.len()))
     out.to_str()
 
@@ -650,12 +650,12 @@ fn cli_leading_use_len(code: &str) -> isize:
             if t == TokenKind.TK_NEWLINE and depth <= 0: break
             j = j + 1
         if j >= tokens.len() or tokens.get_tag(j) != TokenKind.TK_NEWLINE:
-            return code.len() as i32
+            return code.len()
         var newline_at = tokens.get_start(j)
-        while newline_at < code.len() as i32 and code[newline_at] != '\n':
+        while newline_at < code.len() and code[newline_at] != '\n':
             newline_at = newline_at + 1
-        if newline_at >= code.len() as i32:
-            return code.len() as i32
+        if newline_at >= code.len():
+            return code.len()
         end = newline_at + 1
         i = j + 1
     end
@@ -674,7 +674,7 @@ fn cli_blank_prefix(code: &str, n: isize) -> str:
 fn c_header_path_for(artifact_path: &str) -> str:
     var dot = -1
     var i = 0
-    while i < artifact_path.len() as i32:
+    while i < artifact_path.len():
         let c = artifact_path[i]
         if c == 46: dot = i
         if c == 47: dot = -1
@@ -686,13 +686,13 @@ fn c_header_path_for(artifact_path: &str) -> str:
 fn c_header_guard_for(h_path: &str) -> str:
     var start = 0
     var i = 0
-    while i < h_path.len() as i32:
+    while i < h_path.len():
         if h_path[i] == 47: start = i + 1
         i = i + 1
     var g = StringBuilder.new()
     g.push_str("WITH_CHDR_")
     var j = start
-    while j < h_path.len() as i32:
+    while j < h_path.len():
         let c = h_path[j]
         if (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122):
             g.push_byte(c as u8)
@@ -722,7 +722,7 @@ fn cli_one_liner_source_name(mode: i32, count: i32) -> str:
 fn cli_build_args_binding(args: &List[str]) -> str:
     var out = StringBuilder.new()
     out.push_str("let args: List[str] = List.new()\n")
-    for i in 0..args.len() as i32:
+    for i in 0..args.len():
         let escaped = cli_escape_with_string(args[i])
         out.push_str("args.push(\"")
         out.push_str(escaped)
@@ -740,7 +740,7 @@ fn cli_synthetic_source_new -> CliSyntheticSource:
 
 fn cli_synthetic_add_mapping(syn: CliSyntheticSource, start: i32, text: &str, source_name: &str) -> CliSyntheticSource:
     syn.gen_starts.push(start)
-    syn.gen_ends.push(start + text.len() as i32 + 1)
+    syn.gen_ends.push((start + text.len() + 1) as i32)
     syn.source_names.push(with_str_clone_ref(source_name))
     syn.source_texts.push(with_str_clone_ref(text))
     syn
@@ -765,7 +765,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     source.push_str("use std.builtins\n\n")
     source.push_str(cli_build_args_binding(one.args))
     if one.mode == CliOneLinerMode.Eval:
-        for i in 0..one.code_parts.len() as i32:
+        for i in 0..one.code_parts.len():
             let rewritten = cli_rewrite_semicolons(one.code_parts[i])
             let start = source.len() as i32
             source.push_str(rewritten)
@@ -842,7 +842,7 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(false)
     comp.set_statements_entry(true)
-    for mi in 0..synthetic.gen_starts.len() as i32:
+    for mi in 0..synthetic.gen_starts.len():
         comp.add_cli_diag_mapping(
             synthetic.gen_starts[mi],
             synthetic.gen_ends[mi],
@@ -1375,7 +1375,7 @@ fn finish_test_binary(bin_path: &str, keep: bool, rerun_tests: &List[str], quiet
         return
     let kept = test_binary_absolute_path(bin_path)
     with_eprint("test binary kept: " ++ kept)
-    for ti in 0..rerun_tests.len() as i32:
+    for ti in 0..rerun_tests.len():
         with_eprint("rerun: " ++ test_child_env_prefix(rerun_tests[ti], quiet) ++ kept)
 
 fn single_run_reruns(rc: i32) -> List[str]:
@@ -1426,8 +1426,8 @@ fn reduce_split_lines_keep_empty(text: &str) -> List[str]:
     let lines: List[str] = List.new()
     var start = 0
     var i = 0
-    while i <= text.len() as i32:
-        let at_end = i == text.len() as i32
+    while i <= text.len():
+        let at_end = i == text.len()
         // A trailing newline ends the last line; it does not open an empty one.
         if at_end and i == start and i > 0:
             break
@@ -1443,7 +1443,7 @@ fn reduce_split_lines_keep_empty(text: &str) -> List[str]:
 
 fn reduce_join_lines(lines: &List[str], skip_idx: i32) -> str:
     var out = ""
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         if i == skip_idx:
             continue
         out = out ++ lines[i]
@@ -1503,7 +1503,7 @@ fn reduce_exit_matches(mode: i32, want: i32, original_rc: i32, rc: i32) -> bool:
 
 fn reduce_stderr_has_line(text: &str, line: &str) -> bool:
     let lines = reduce_split_lines_keep_empty(text)
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         if lines[i] == line:
             return true
     false
@@ -1512,7 +1512,7 @@ fn reduce_stderr_has_line(text: &str, line: &str) -> bool:
 fn reduce_failure_stage(text: &str) -> str:
     let prefix = " = stage: "
     let lines = reduce_split_lines_keep_empty(text)
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if line.starts_with(prefix):
             return line.slice(prefix.len(), line.len())
@@ -1524,7 +1524,7 @@ fn reduce_failure_stage(text: &str) -> str:
 fn reduce_discard_kept_test_binary(text: &str):
     let prefix = "test binary kept: "
     let lines = reduce_split_lines_keep_empty(text)
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if line.starts_with(prefix):
             cleanup_binary_artifacts(line.slice(prefix.len(), line.len()))
@@ -1609,7 +1609,7 @@ fn run_reduce_command(argc: i32) -> i32:
     while changed:
         changed = false
         var i: i32 = 0
-        while i < lines.len() as i32:
+        while i < lines.len():
             let candidate = reduce_join_lines(&lines, i)
             if with_fs_write_file(candidate_path, candidate) != 0:
                 with_eprint("error: reduce could not write candidate")
@@ -1628,7 +1628,7 @@ fn run_reduce_command(argc: i32) -> i32:
     if with_fs_write_file(output, final_text) != 0:
         with_eprint("error: reduce could not write output: " ++ output)
         return 1
-    with_write("reduce: wrote " ++ output ++ f" ({lines.len() as i32} lines)\n")
+    with_write("reduce: wrote " ++ output ++ f" ({lines.len()} lines)\n")
     0
 
 fn fixpoint_default_left() -> str:
@@ -1645,7 +1645,7 @@ fn fixpoint_arg(argc: i32, index: i32, fallback: &str) -> str:
     with_str_clone_ref(fallback)
 
 fn fixpoint_byte_at(text: &str, idx: isize) -> i32:
-    if idx < 0 or idx >= text.len() as i32:
+    if idx < 0 or idx >= text.len():
         return -1
     text[idx]
 
@@ -1657,8 +1657,8 @@ fn fixpoint_diff_report(left_path: &str, right_path: &str) -> str:
     if right.len() == 0:
         return "fixpoint-diff: could not read right file: " ++ right_path ++ "\n"
     var out = "fixpoint-diff\n"
-    out = out ++ "left: " ++ left_path ++ f" bytes={left.len() as i32}\n"
-    out = out ++ "right: " ++ right_path ++ f" bytes={right.len() as i32}\n"
+    out = out ++ "left: " ++ left_path ++ f" bytes={left.len()}\n"
+    out = out ++ "right: " ++ right_path ++ f" bytes={right.len()}\n"
     if left == right:
         return out ++ "classification: exact match\n"
     let min_len = if left.len() < right.len(): left.len() else: right.len()
@@ -1721,7 +1721,7 @@ fn build_action_run_result_with_effects(rc: i32, effects: List[str]) -> BuildAct
 
 fn build_action_safe_label(text: &str) -> str:
     var out = ""
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
         if keep:
@@ -1853,7 +1853,7 @@ fn build_runner_link_root(root: &str) -> str:
     dirs.push("out/bootstrap-lib")
     dirs.push("out/lib")
     let platform_object = link_stage_host_platform_runtime_object()
-    for i in 0..dirs.len() as i32:
+    for i in 0..dirs.len():
         let dir = resolve_join(root, dirs[i])
         if with_fs_file_exists(dir ++ "/cimport_stubs.o") == 0: continue
         if platform_object.len() > 0 and with_fs_file_exists(dir ++ "/" ++ platform_object) == 0: continue
@@ -1892,7 +1892,7 @@ fn build_runner_load_fallback(root: &str) -> List[str]:
     var out: List[str] = List.new()
     let text = with_fs_read_file(build_runner_fallback_list_path(root))
     let lines = text.split("\n")
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         if lines[i].len() > 0:
             out.push(with_str_clone_ref(lines[i]))
     out
@@ -1907,7 +1907,7 @@ fn build_runner_note_fallback(root: &str, name: &str):
 fn build_runner_target_eligible(target: &BuildGraphTarget, options: &BuildCommandOptions, runner_path: &str, fallback: &List[str]) -> bool:
     if runner_path.len() == 0 or target.kind != 23 or options.strict_effects:
         return false
-    for i in 0..fallback.len() as i32:
+    for i in 0..fallback.len():
         if fallback[i] == target.name:
             return false
     true
@@ -1924,11 +1924,11 @@ fn build_runner_read_effects(path: &str) -> List[str]:
     var out: List[str] = List.new()
     let text = with_fs_read_file(path)
     let lines = text.split("\n")
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         if lines[i].len() > 0:
             out.push(with_str_clone_ref(lines[i]))
     let reads = build_graph_rt_list_files(path ++ ".reads").split("\n")
-    for i in 0..reads.len() as i32:
+    for i in 0..reads.len():
         if reads[i].len() > 0:
             out.push("read\t" ++ with_fs_read_file(reads[i]))
     out
@@ -1945,7 +1945,7 @@ fn build_runner_validate_outputs(root: &str, target: &BuildGraphTarget) -> i32:
         if with_fs_file_exists(output_path) == 0:
             with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
             return 1
-    for oi in 0..target.extra_outputs.len() as i32:
+    for oi in 0..target.extra_outputs.len():
         let extra_output = build_graph_resolve_project_path(root, target.extra_outputs[oi])
         if with_fs_file_exists(extra_output) == 0:
             with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ extra_output)
@@ -1976,8 +1976,8 @@ fn run_build_action_runner_process(runner_path: &str, target: &BuildGraphTarget,
 fn build_runner_discard_partial_outputs(root: &str, target: &BuildGraphTarget):
     var paths: List[str] = List.new()
     if target.output.len() > 0: paths.push(target.output.clone())
-    for oi in 0..target.extra_outputs.len() as i32: paths.push(target.extra_outputs[oi].clone())
-    for pi in 0..paths.len() as i32:
+    for oi in 0..target.extra_outputs.len(): paths.push(target.extra_outputs[oi].clone())
+    for pi in 0..paths.len():
         let path = build_graph_resolve_project_path(root, paths[pi])
         if with_fs_file_exists(path) == 0: continue
         let rc = if with_fs_is_dir(path) != 0: with_fs_remove_tree(path) else: with_fs_remove_file(path)
@@ -2078,7 +2078,7 @@ fn run_build_action_worker_process(target: &BuildGraphTarget, options: &BuildCom
 
 fn build_pool_parse_jobs(value: &str) -> i32:
     var out: i32 = 0
-    for i in 0..value.len() as i32:
+    for i in 0..value.len():
         let ch = value[i]
         if ch < 48 or ch > 57:
             break
@@ -2167,9 +2167,9 @@ fn PoolState.new() -> Self:
     PoolState { names: List.new(), pids: List.new(), t0s: List.new(), outs: List.new(), errs: List.new(), timeouts: List.new(), via_runner: List.new(), effects_paths: List.new(), done: List.new(), done_rcs: List.new(), done_ats: List.new(), done_rsss: List.new(), oldest: 0 }
 
 impl PoolState:
-    fn has_live(): self.oldest < self.names.len() as i32
+    fn has_live(): self.oldest < self.names.len()
 
-    fn live_len(): self.names.len() as i32 - self.oldest
+    fn live_len(): self.names.len() - self.oldest
 
     // Children still running: spawned and not yet reaped by a sweep.
     fn running_len() -> isize:
@@ -2298,7 +2298,7 @@ fn build_action_preflight(root: &str, target: &BuildGraphTarget) -> i32:
     let arg_rc = build_graph_validate_process_args(target)
     if arg_rc != 0:
         return arg_rc
-    for ii in 0..target.inputs.len() as i32:
+    for ii in 0..target.inputs.len():
         let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
         if with_fs_file_exists(input_path) == 0:
             with_eprint("error: action target '" ++ target.name ++ "' missing declared input: " ++ input_path)
@@ -2345,7 +2345,7 @@ unsafe fn run_build_action_from_build_w(root: &str, cfg: &ProjectConfig, target:
     if with_fs_file_exists(output_path) == 0:
         with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
         return build_action_run_result_with_effects(1, move result.effect_records)
-    for oi in 0..target.extra_outputs.len() as i32:
+    for oi in 0..target.extra_outputs.len():
         let extra_output = build_graph_resolve_project_path(root, target.extra_outputs[oi])
         if with_fs_file_exists(extra_output) == 0:
             with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ extra_output)
@@ -2425,7 +2425,7 @@ fn build_graph_restore_env(name: &str, old_value: &str) -> i32:
     with_setenv_str(name, old_value)
 
 fn build_graph_trim_trailing_line_endings(text: &str) -> str:
-    var end = text.len() as i32
+    var end = text.len()
     while end > 0:
         let ch = text[(end - 1)]
         if ch != 10 and ch != 13:
@@ -2438,22 +2438,22 @@ fn build_graph_find_substr(text: &str, needle: &str) -> i32:
         return 0
     if text.len() < needle.len():
         return -1
-    let last = text.len() as i32 - needle.len() as i32
+    let last = text.len() - needle.len()
     for i in 0..(last + 1):
         var matched = true
-        for j in 0..needle.len() as i32:
+        for j in 0..needle.len():
             if text[(i + j)] != needle[j]:
                 matched = false
                 break
         if matched:
-            return i
+            return i as i32
     -1
 
 fn build_graph_replace_once(text: &str, needle: &str, replacement: &str) -> str:
     let at = build_graph_find_substr(text, needle)
     if at < 0:
         return ""
-    text.slice(0, at as i64) ++ replacement ++ text.slice((at + needle.len() as i32) as i64, text.len())
+    text.slice(0, at as i64) ++ replacement ++ text.slice((at + needle.len()) as i64, text.len())
 
 fn build_graph_run_tool_capture(root: &str, target: &BuildGraphTarget, tool_name: &str, argv: &str, timeout_ms: i32) -> i32:
     let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
@@ -2494,7 +2494,7 @@ fn build_graph_run_cli_capture(root: &str, target: &BuildGraphTarget, compiler_p
 
 fn build_graph_trim_space_and_newlines(text: &str) -> str:
     var start = 0
-    var end = text.len() as i32
+    var end = text.len()
     while start < end:
         let ch = text[start]
         if ch != 32 and ch != 9 and ch != 10 and ch != 13:
@@ -2535,7 +2535,7 @@ fn build_graph_early_cutoff_enabled() -> bool: with_getenv_str("WITH_BUILD_NO_EA
 fn build_graph_dep_outputs_unchanged(root: &str, graph: &BuildGraph, dep_name: &str, names: &List[str], digests: &List[str]) -> bool:
     if not build_graph_early_cutoff_enabled(): return false
     var before = ""
-    for i in 0..names.len() as i32:
+    for i in 0..names.len():
         if names[i] == dep_name: before = digests[i].clone()
     if before.len() == 0: return false
     let index = build_graph_find_target_index_by_name(graph, dep_name)
@@ -2643,9 +2643,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     // driver says so (build_runner_explain_no_root).
     let bootstrap_root_target = BUILD_RUNNER_ROOT_PREPARE
     var bootstrap_root_scheduled = false
-    for bi in 0..graph.targets.len() as i32:
+    for bi in 0..graph.targets.len():
         if (&graph.targets[bi]).name == bootstrap_root_target: bootstrap_root_scheduled = true
-    for ti in 0..graph.targets.len() as i32:
+    for ti in 0..graph.targets.len():
         let target = &graph.targets[ti]
         if timing_name.len() > 0:
             let spent = with_clock_nanos() - timing_t0
@@ -2673,19 +2673,19 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         if not build_graph_target_is_host(target.target_kind):
             with_eprint("error: build.w cross-target platform " ++ build_graph_target_name(target.target_kind) ++ " is not implemented yet for '" ++ target.name ++ "'; host is " ++ build_graph_target_name(build_graph_host_target_kind()))
             return 1
-        for di in 0..target.defines.len() as i32:
+        for di in 0..target.defines.len():
             let define = target.defines[di]
             if not build_graph_define_valid(define):
                 with_eprint("error: invalid build.w define for '" ++ target.name ++ "': " ++ define)
                 return 1
         var pool_dep_inflight = false
         if pool.has_live():
-            for di in 0..target.deps.len() as i32:
+            for di in 0..target.deps.len():
                 if pool.dep_inflight(target.deps[di]):
                     pool_dep_inflight = true
                     break
         var dep_rebuilt = false
-        for di in 0..target.deps.len() as i32:
+        for di in 0..target.deps.len():
             let dep_name = target.deps[di]
             if not skipped_targets.contains(dep_name):
                 if completed_targets.contains(dep_name):
@@ -2716,7 +2716,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         // that re-ran to byte-identical outputs did not rebuild anything.
         if target.kind != 9 and dep_rebuilt:
             dep_rebuilt = false
-            for di in 0..target.deps.len() as i32:
+            for di in 0..target.deps.len():
                 let dep_name = target.deps[di]
                 if skipped_targets.contains(dep_name) or not completed_targets.contains(dep_name): continue
                 if build_graph_dep_outputs_unchanged(root, graph, dep_name, &cutoff_names, &cutoff_digests): continue
@@ -2941,7 +2941,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     completed_targets.push(with_str_clone_ref(target.name))
                     continue
                 build_test_clear_worker_env_for_children()
-                for fi in 0..test_files.len() as i32:
+                for fi in 0..test_files.len():
                     if survey_target_failed:
                         break
                     let test_path = test_files[fi]
@@ -3056,9 +3056,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             return 1
     if times_top_level:
         if not build_graph_quiet_times: build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
-    if survey and survey_failed.len() as i32 > 0:
-        with_eprint(f"survey: {survey_failed.len() as i32} target(s) failed:")
-        for sfi in 0..survey_failed.len() as i32:
+    if survey and survey_failed.len() > 0:
+        with_eprint(f"survey: {survey_failed.len()} target(s) failed:")
+        for sfi in 0..survey_failed.len():
             with_eprint("  failed: " ++ survey_failed[sfi])
         return 1
     if survey:
@@ -3092,7 +3092,7 @@ fn explain_kind_name(kind: i32) -> str:
 
 fn explain_build_target(root: &str, graph: &BuildGraph, name: &str) -> i32:
     var found = false
-    for i in 0..graph.targets.len() as i32:
+    for i in 0..graph.targets.len():
         let target = &graph.targets[i]
         if target.name == name:
             found = true
@@ -3104,19 +3104,19 @@ fn explain_build_target(root: &str, graph: &BuildGraph, name: &str) -> i32:
                 with_write("  output: " ++ target.output ++ "\n")
             if target.deps.len() > 0:
                 with_write("  deps:\n")
-                for j in 0..target.deps.len() as i32:
+                for j in 0..target.deps.len():
                     with_write("    - " ++ target.deps[j] ++ "\n")
             if target.inputs.len() > 0:
                 with_write("  inputs:\n")
-                for j in 0..target.inputs.len() as i32:
+                for j in 0..target.inputs.len():
                     with_write("    - " ++ target.inputs[j] ++ "\n")
             if target.extra_outputs.len() > 0:
                 with_write("  extra_outputs:\n")
-                for j in 0..target.extra_outputs.len() as i32:
+                for j in 0..target.extra_outputs.len():
                     with_write("    - " ++ target.extra_outputs[j] ++ "\n")
             if target.args.len() > 0:
                 with_write("  args:\n")
-                for j in 0..target.args.len() as i32:
+                for j in 0..target.args.len():
                     with_write("    - " ++ target.args[j] ++ "\n")
             if target.timeout_ms != 0:
                 with_write(f"  timeout_ms: {target.timeout_ms}\n")
@@ -3124,7 +3124,7 @@ fn explain_build_target(root: &str, graph: &BuildGraph, name: &str) -> i32:
                 with_write("  cwd: " ++ target.cwd ++ "\n")
             if target.env.len() > 0:
                 with_write("  env:\n")
-                for j in 0..target.env.len() as i32:
+                for j in 0..target.env.len():
                     with_write("    - " ++ target.env[j] ++ "\n")
             if target.network != 0:
                 with_write("  network: true\n")
@@ -3133,7 +3133,7 @@ fn explain_build_target(root: &str, graph: &BuildGraph, name: &str) -> i32:
     if not found:
         with_eprint("error: target '" ++ name ++ "' not found in build graph\n")
         with_eprint("available targets:\n")
-        for i in 0..graph.targets.len() as i32:
+        for i in 0..graph.targets.len():
             let target = &graph.targets[i]
             with_eprint("  " ++ target.name ++ " (" ++ explain_kind_name(target.kind) ++ ")\n")
         return 1
@@ -3149,9 +3149,9 @@ fn run_graph_target_command(target_name: &str) -> i32:
 // inputs/outputs/args vectors out of the caller's graph, and the copy's drop
 // freed buffers the graph still owned (#715 class). Callers borrow the element.
 fn build_graph_find_target_index_by_name(graph: &BuildGraph, target_name: &str) -> i32:
-    for i in 0..graph.targets.len() as i32:
+    for i in 0..graph.targets.len():
         if (&graph.targets[i]).name == target_name:
-            return i
+            return i as i32
     -1
 
 fn repo_lock_path() -> str:
@@ -3164,14 +3164,14 @@ fn repo_lock_owner_path() -> str:
 
 fn repo_lock_parse_pid(owner: &str) -> i32:
     var start = -1
-    for i in 0..(owner.len() as i32 - 4):
+    for i in 0..(owner.len() - 4):
         if owner.slice(i as i64, (i + 4) as i64) == "pid=":
-            start = i + 4
+            start = (i + 4) as i32
             break
     if start < 0:
         return -1
     var end = start
-    while end < owner.len() as i32:
+    while end < owner.len():
         let ch = owner[end]
         if ch < 48 or ch > 57:
             break
@@ -3250,7 +3250,7 @@ fn build_command_validate_target(options: &BuildCommandOptions, cfg: &ProjectCon
 // map named the worktree its WITH_FILE_PREFIX_MAP was declared to hide.)
 fn build_graph_apply_target_env(target: &BuildGraphTarget) -> List[str]:
     var saved: List[str] = List.new()
-    for i in 0..target.env.len() as i32:
+    for i in 0..target.env.len():
         let entry = target.env[i]
         let eq = entry.find("=")
         if eq <= 0: continue
@@ -3260,7 +3260,7 @@ fn build_graph_apply_target_env(target: &BuildGraphTarget) -> List[str]:
     saved
 
 fn build_graph_restore_target_env(saved: &List[str]):
-    var i = saved.len() as i32 - 1
+    var i = saved.len() - 1
     while i >= 0:
         let entry = saved[i]
         let eq = entry.find("=")
@@ -4013,7 +4013,7 @@ fn synthesize_bench_main_source(text: &str, bench_names: &List[str]) -> str:
     out.push_str("use test.bench\n")
     out.push_str("\nfn main:\n")
     out.push_str("    let __with_bench_filter = env(\"WITH_BENCH_FILTER\")\n")
-    for bi in 0..bench_names.len() as i32:
+    for bi in 0..bench_names.len():
         let bench_name = bench_names[bi]
         out.push_str("    if __with_bench_filter.len() == 0 or \"")
         out.push_str(bench_name)
@@ -4038,7 +4038,7 @@ fn synthesize_test_main_source(text: &str, test_names: &List[str]) -> str:
     out.push_str("\nfn main:\n")
     out.push_str("    let __with_test_filter = env(\"WITH_TEST_FILTER\")\n")
     out.push_str("    if __with_test_filter.len() > 0:\n")
-    for ti in 0..test_names.len() as i32:
+    for ti in 0..test_names.len():
         let test_name = test_names[ti]
         var prefix = "        else if "
         if ti == 0:
@@ -4053,7 +4053,7 @@ fn synthesize_test_main_source(text: &str, test_names: &List[str]) -> str:
         out.push_str("            return\n")
     out.push_str("        else:\n")
     out.push_str("            exit_code(1)\n")
-    for ti in 0..test_names.len() as i32:
+    for ti in 0..test_names.len():
         out.push_str("    ")
         out.push_str(test_names[ti])
         out.push_str("()\n")
@@ -4085,7 +4085,7 @@ fn test_parse_i32(text: &str) -> i32:
         sign = -1
         i = 1
     var value: i32 = 0
-    while i < text.len() as i32:
+    while i < text.len():
         let ch = text[i]
         if ch < 48 or ch > 57:
             break
@@ -4124,7 +4124,7 @@ fn test_gate_matches(value: &str) -> i32:
         return if test_arch_matches(value, with_sysinfo_arch()): 1 else: 0
     var dash = -1
     var gi = 0
-    while gi < value.len() as i32:
+    while gi < value.len():
         if value[gi] == 45:
             dash = gi
             break
@@ -4149,7 +4149,7 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
     let text = with_fs_read_file(target)
     if text.len() == 0:
         return result
-    let text_len = text.len() as i32
+    let text_len = text.len()
 
     let expect_stdout_prefix = "//! expect-stdout: "
     let expect_stdout_contains_prefix = "//! expect-stdout-contains: "
@@ -4321,7 +4321,7 @@ fn test_directive_line_is_known(line: &str) -> bool:
 fn test_orphan_directive_error(text: &str, from: i32, line_no: i32) -> str:
     var start = from
     var n = line_no
-    let text_len = text.len() as i32
+    let text_len = text.len()
     var i = from
     while i <= text_len:
         if i == text_len or text[i] == 10:
@@ -4343,8 +4343,8 @@ fn test_append_extra_args(argv: &str, extra_args: &str) -> str:
     var out = with_str_clone_ref(argv)
     var start = 0
     var i = 0
-    while i <= extra_args.len() as i32:
-        let at_end = i == extra_args.len() as i32
+    while i <= extra_args.len():
+        let at_end = i == extra_args.len()
         let ch = if at_end: 32 else: extra_args[i]
         if ch == 32 or ch == 9:
             if i > start:
@@ -4407,7 +4407,7 @@ fn emit_test_child_stderr(stderr: &str):
     if text[text.len() - 1] == 10:
         text = text.slice(0, text.len() - 1)
     let lines = text.split("\n")
-    let n = lines.len() as i32
+    let n = lines.len()
     var start = n - 40
     if start < 0: start = 0
     for i in start..n:
@@ -4431,7 +4431,7 @@ fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: 
         if not test_output_contains_expected(result.stderr, directives.expect_check_fail):
             emit_test_stage_error("missing expected check error: " ++ directives.expect_check_fail, target, "check", "")
             return 1
-        for i in 0..directives.expect_check_fail_not.len() as i32:
+        for i in 0..directives.expect_check_fail_not.len():
             let forbidden = directives.expect_check_fail_not[i]
             if forbidden.len() > 0 and test_output_contains_expected(result.stderr, forbidden):
                 emit_test_stage_error("unexpected check error: " ++ forbidden, target, "check", "")
@@ -4453,7 +4453,7 @@ fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: 
             emit_test_stage_error(f"build failed with exit code {result.rc}", target, "build", "")
             emit_test_child_stderr(result.stderr)
             return 1
-        for i in 0..directives.expect_build_stderr.len() as i32:
+        for i in 0..directives.expect_build_stderr.len():
             let expected = directives.expect_build_stderr[i]
             if not test_output_contains_expected(result.stderr, expected):
                 emit_test_stage_error("missing expected build stderr: " ++ expected, target, "build", "")
@@ -4466,12 +4466,12 @@ fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: 
             emit_test_stage_error(test_check_failure_message(result.rc), target, "check", "")
             emit_test_child_stderr(result.stderr)
             return 1
-        for i in 0..directives.expect_check_stdout.len() as i32:
+        for i in 0..directives.expect_check_stdout.len():
             let expected = directives.expect_check_stdout[i]
             if not test_output_contains_expected(result.stdout, expected):
                 emit_test_stage_error("missing expected check stdout: " ++ expected, target, "check", "")
                 return 1
-        for i in 0..directives.expect_check_stdout_not.len() as i32:
+        for i in 0..directives.expect_check_stdout_not.len():
             let forbidden = directives.expect_check_stdout_not[i]
             if forbidden.len() > 0 and test_output_contains_expected(result.stdout, forbidden):
                 emit_test_stage_error("unexpected check stdout: " ++ forbidden, target, "check", "")
@@ -4490,8 +4490,8 @@ fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: 
 fn test_extra_arg_present(args: &str, wanted: &str) -> bool:
     var start = 0
     var i = 0
-    while i <= args.len() as i32:
-        let at_end = i == args.len() as i32
+    while i <= args.len():
+        let at_end = i == args.len()
         let ch = if at_end: 32 else: args[i]
         if ch == 32 or ch == 9:
             if i > start and args.slice(start as i64, i as i64) == wanted:
@@ -4518,7 +4518,7 @@ fn test_effective_prelude_mode(default_mode: i32, args: &str) -> i32:
 
 fn split_nonempty_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()
-    let text_len = text.len() as i32
+    let text_len = text.len()
     var start = 0
     var i = 0
     while i <= text_len:
@@ -4617,7 +4617,7 @@ fn run_test_process(bin_path: &str, test_name: &str, quiet: bool) -> TestRunResu
     TestRunResult { rc, stdout: out_text, stderr: err_text }
 
 fn test_validate_output(stream_name: &str, actual: &str, expected_values: &List[str], target: &str, test_name: &str) -> bool:
-    for ei in 0..expected_values.len() as i32:
+    for ei in 0..expected_values.len():
         let expected = expected_values[ei]
         if not actual.contains(expected):
             emit_test_stage_error(stream_name ++ " mismatch; missing expected output: " ++ expected, target, "run", test_name)
@@ -4628,7 +4628,7 @@ fn test_validate_output(stream_name: &str, actual: &str, expected_values: &List[
 // platform's, and a last line without `\n` still counts.
 fn test_output_lines(text: &str) -> List[str]:
     var lines: List[str] = List.new()
-    let n = text.len() as i32
+    let n = text.len()
     var start = 0
     while start < n:
         var end = start
@@ -4641,26 +4641,26 @@ fn test_output_lines(text: &str) -> List[str]:
 
 fn test_line_count(lines: &List[str], wanted: &str) -> isize:
     var n = 0
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         if lines[i] == wanted: n = n + 1
     n
 
 fn test_line_containing(lines: &List[str], fragment: &str) -> str:
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         if lines[i].contains(fragment): return lines[i].clone()
     ""
 
 // The number of leading lines the two agree on.
 fn test_lines_agree(expected: &List[str], actual: &List[str]) -> isize:
     var k = 0
-    while k < expected.len() as i32 and k < actual.len() as i32 and expected[k] == actual[k]: k = k + 1
+    while k < expected.len() and k < actual.len() and expected[k] == actual[k]: k = k + 1
     k
 
 fn test_lines_in_order(expected: &List[str], actual: &List[str]) -> bool:
     var k = 0
-    for i in 0..actual.len() as i32:
-        if k < expected.len() as i32 and actual[i] == expected[k]: k = k + 1
-    k == expected.len() as i32
+    for i in 0..actual.len():
+        if k < expected.len() and actual[i] == expected[k]: k = k + 1
+    k == expected.len()
 
 // Why the printed lines are not the expected ones, from the class a
 // substring match also caught to the ones it hid (#1855): a line printed
@@ -4668,12 +4668,12 @@ fn test_lines_in_order(expected: &List[str], actual: &List[str]) -> bool:
 // a line printed more or fewer times than listed (a double drop), the lines
 // out of order, and lines the expectations do not list.
 fn test_stdout_mismatch(expected: &List[str], actual: &List[str], stdout: &str) -> str:
-    for i in 0..expected.len() as i32:
+    for i in 0..expected.len():
         if not stdout.contains(expected[i]): return "missing expected output: " ++ expected[i]
-    for i in 0..expected.len() as i32:
+    for i in 0..expected.len():
         if expected[i].len() > 0 and test_line_count(actual, expected[i]) == 0:
             return "expected line `" ++ expected[i] ++ "` is printed only inside `" ++ test_line_containing(actual, expected[i]) ++ "`"
-    for i in 0..expected.len() as i32:
+    for i in 0..expected.len():
         let listed = test_line_count(expected, expected[i])
         let printed = test_line_count(actual, expected[i])
         if listed != printed: return "line `" ++ expected[i] ++ f"` is expected {listed} times and printed {printed} times"
@@ -4681,11 +4681,11 @@ fn test_stdout_mismatch(expected: &List[str], actual: &List[str], stdout: &str) 
     "stdout has lines the expectations do not list"
 
 fn stdout_line_at(lines: &List[str], k: isize):
-    if k < lines.len() as i32: "`" ++ lines[k] ++ "`" else: "no more lines"
+    if k < lines.len(): "`" ++ lines[k] ++ "`" else: "no more lines"
 
 // A window of `lines` from just before line `k`, numbered from 1.
 fn test_eprint_lines(label: &str, lines: &List[str], k: isize):
-    let total = lines.len() as i32
+    let total = lines.len()
     with_eprint(f" = {label} ({total} lines):")
     var from = k - 3
     if from < 0: from = 0
@@ -4700,7 +4700,7 @@ fn test_eprint_lines(label: &str, lines: &List[str], k: isize):
 fn test_validate_stdout_lines(stdout: &str, expected: &List[str], target: &str, test_name: &str) -> bool:
     let actual = test_output_lines(stdout)
     let k = test_lines_agree(expected, actual)
-    if k == expected.len() as i32 and k == actual.len() as i32: return true
+    if k == expected.len() and k == actual.len(): return true
     emit_test_stage_error("stdout mismatch; " ++ test_stdout_mismatch(expected, actual, stdout), target, "run", test_name)
     with_eprint(f" = first difference at line {k + 1}: expected " ++ stdout_line_at(expected, k) ++ ", printed " ++ stdout_line_at(actual, k))
     test_eprint_lines("expected", expected, k)
@@ -4762,7 +4762,7 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
     if env_directives.env_pairs.len() == 0:
         return run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, link_search_paths, link_rpaths)
     let saved: List[str] = List.new()
-    for ei in 0..env_directives.env_pairs.len() as i32:
+    for ei in 0..env_directives.env_pairs.len():
         let pair = env_directives.env_pairs[ei]
         let eq = pair.find("=")
         if eq >= 0:
@@ -4772,7 +4772,7 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
         else:
             saved.push("")
     let env_rc = run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, link_search_paths, link_rpaths)
-    for ei in 0..env_directives.env_pairs.len() as i32:
+    for ei in 0..env_directives.env_pairs.len():
         let pair = env_directives.env_pairs[ei]
         let eq = pair.find("=")
         if eq >= 0:
@@ -4863,7 +4863,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
         var run_quiet = quiet
         if verbose:
             run_quiet = false
-        for ti in 0..discovery.test_names.len() as i32:
+        for ti in 0..discovery.test_names.len():
             let test_name = discovery.test_names[ti]
             if filter.len() > 0 and not test_name.contains(filter):
                 continue
@@ -4943,14 +4943,14 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
     // first failure ended the run, so a set of tests took their sum and
     // hid every failure after the first.
     var files: List[str] = List.new()
-    for ti in 0..targets.len() as i32:
+    for ti in 0..targets.len():
         let target = targets[ti]
         if test_target_is_directory(target):
             let dir_files = collect_test_files(target)
             if dir_files.len() == 0:
                 with_eprint(f"error: no test sources found in '{target}'")
                 return 1
-            for fi in 0..dir_files.len() as i32: files.push(with_str_clone_ref(dir_files[fi]))
+            for fi in 0..dir_files.len(): files.push(with_str_clone_ref(dir_files[fi]))
         else:
             files.push(with_str_clone_ref(target))
     if files.len() > 1:
@@ -5024,7 +5024,7 @@ fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, 
             with_eprint("error: no sources found in '" ++ target ++ "'")
             return 1
         var any_failed = false
-        for fi in 0..files.len() as i32:
+        for fi in 0..files.len():
             let file = files[fi]
             let text = with_fs_read_file(file)
             if text.len() == 0:
@@ -5066,7 +5066,7 @@ fn migrate_apply_std_use_fixits(output_path: &str) -> i32:
     while pass < 3:
         let result = compiler_analyze_file(output_path, "select:kind=diagnostic")
         var block = ""
-        for i in 0..result.report.facts.len() as i32:
+        for i in 0..result.report.facts.len():
             let fact = result.report.facts[i]
             if fact.kind != AnalysisFactKind.Diagnostic or fact.flags != AnalysisDiagnosticSeverity.Error as i32:
                 continue
@@ -5261,12 +5261,12 @@ fn cli_read_all_stdin() -> str:
 fn doc_field(line: &str, key: &str) -> str:
     let needle = key ++ "="
     var i = 0
-    while i + needle.len() as i32 <= line.len() as i32:
+    while i + needle.len() <= line.len():
         let at_field = i == 0 or line[(i - 1)] == 32
-        if at_field and line.slice(i as i64, (i + needle.len() as i32) as i64) == needle:
-            let start = i + needle.len() as i32
+        if at_field and line.slice(i as i64, (i + needle.len()) as i64) == needle:
+            let start = i + needle.len()
             var end = start
-            while end < line.len() as i32 and line[end] != 32:
+            while end < line.len() and line[end] != 32:
                 end = end + 1
             return line.slice(start as i64, end as i64)
         i = i + 1
@@ -5275,7 +5275,7 @@ fn doc_field(line: &str, key: &str) -> str:
 fn doc_parse_span_start(span: &str) -> i32:
     var value: i32 = 0
     var i = 0
-    while i < span.len() as i32:
+    while i < span.len():
         let ch = span[i]
         if ch < 48 or ch > 57:
             return value
@@ -5311,14 +5311,14 @@ fn doc_source_line_at(text: &str, offset: i32) -> str:
     var start = offset
     if start < 0:
         start = 0
-    if start > text.len() as i32:
+    if start > text.len():
         start = text.len() as i32
     while start > 0 and text[(start - 1)] != 10:
         start = start - 1
     var end = offset
     if end < start:
         end = start
-    while end < text.len() as i32 and text[end] != 10:
+    while end < text.len() and text[end] != 10:
         end = end + 1
     text.slice(start as i64, end as i64).trim().to_owned()
 
@@ -5339,7 +5339,7 @@ fn doc_extract_comment(text: &str, decl_start: i32) -> str:
         while pos >= 0 and (text[pos] == 32 or text[pos] == 9 or text[pos] == 13 or text[pos] == 10):
             pos = pos - 1
     var out = ""
-    var i = lines.len() as i32 - 1
+    var i = lines.len() - 1
     while i >= 0:
         if out.len() > 0:
             out = out ++ "\n"
@@ -5365,7 +5365,7 @@ fn doc_markdown_entry(kind: &str, path: &str, name: &str, detail: &str, source_t
 
 fn doc_project_root(info: &str) -> str:
     let lines = split_nonempty_lines(info)
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if line.starts_with("config root="):
             return doc_field(line, "root")
@@ -5374,7 +5374,7 @@ fn doc_project_root(info: &str) -> str:
 fn doc_collect_modules(info: &str, root: &str, source_path: &str) -> str:
     let lines = split_nonempty_lines(info)
     var out = ""
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if not line.starts_with("module "):
             continue
@@ -5385,7 +5385,7 @@ fn doc_collect_modules(info: &str, root: &str, source_path: &str) -> str:
     out
 
 fn doc_path_seen(paths: &List[str], path: &str) -> bool:
-    for i in 0..paths.len() as i32:
+    for i in 0..paths.len():
         if paths[i] == path:
             return true
     false
@@ -5393,7 +5393,7 @@ fn doc_path_seen(paths: &List[str], path: &str) -> bool:
 fn doc_module_paths(info: &str, root: &str, source_path: &str) -> List[str]:
     let paths: List[str] = List.new()
     let lines = split_nonempty_lines(info)
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if not line.starts_with("module "):
             continue
@@ -5409,7 +5409,7 @@ fn doc_module_paths(info: &str, root: &str, source_path: &str) -> List[str]:
 fn doc_collect_entries(info: &str, root: &str, source_path: &str, fallback_source_text: &str, wanted_kind: &str) -> str:
     let lines = split_nonempty_lines(info)
     var out = ""
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if not line.starts_with(wanted_kind ++ " "):
             continue
@@ -5474,7 +5474,7 @@ fn run_doc_command(argc: i32, source: &str, output: &str, no_std: bool, alloc_mo
     let root = doc_project_root(info)
     let module_paths = doc_module_paths(info, root, source_path)
     var all_info = ""
-    for mi in 0..module_paths.len() as i32:
+    for mi in 0..module_paths.len():
         let module_path = module_paths[mi]
         var module_comp = Compilation.init()
         module_comp.configure(0, no_std, alloc_mode, runtime_available)
@@ -5614,7 +5614,7 @@ fn run_fmt_command(argc: i32) -> i32:
         return 0
     var any_changed = false
     var fi = 0
-    while fi < files.len() as i32:
+    while fi < files.len():
         let path = files[fi]
         let source = with_fs_read_file(path)
         let formatted = format_source_styled(source, fmt_style)
@@ -6030,7 +6030,7 @@ fn print_help_attributes:
 fn cli_parse_small_int(s: &str) -> i32:
     var result: i32 = 0
     var i = 0
-    let len = s.len() as i32
+    let len = s.len()
     while i < len:
         let ch = s[i]
         if ch >= 48 and ch <= 57:
@@ -6043,7 +6043,7 @@ fn cli_parse_nonnegative_i64(s: &str) -> i64:
         return -1
     var result: i64 = 0
     var i = 0
-    let len = s.len() as i32
+    let len = s.len()
     while i < len:
         let ch = s[i]
         if ch < 48 or ch > 57:
@@ -6073,7 +6073,7 @@ fn cli_configure_build_memory_limit() -> i32:
 
 fn cli_trim_line(text: &str) -> str:
     var start = 0
-    var end = text.len() as i32
+    var end = text.len()
     while start < end:
         let ch = text[start]
         if ch != 32 and ch != 9 and ch != 10 and ch != 13:
@@ -6089,9 +6089,9 @@ fn cli_trim_line(text: &str) -> str:
 fn cli_dep_line_matches(line: &str, pkg_name: &str) -> bool:
     let trimmed = cli_trim_line(line)
     var eq = -1
-    for i in 0..trimmed.len() as i32:
+    for i in 0..trimmed.len():
         if trimmed[i] == 61:
-            eq = i
+            eq = i as i32
             break
     if eq < 0:
         return false
@@ -6126,7 +6126,7 @@ fn cli_update_manifest_dep(toml: &str, pkg_name: &str, pkg_version: &str) -> str
     var in_deps = false
     var start = 0
     var i = 0
-    let n = toml.len() as i32
+    let n = toml.len()
     while i <= n:
         let at_end = i == n
         let ch = if at_end: 10 else: toml[i]
@@ -6164,7 +6164,7 @@ fn cli_remove_manifest_dep(toml: &str, pkg_name: &str) -> CliManifestRemoveResul
     var in_deps = false
     var start = 0
     var i = 0
-    let n = toml.len() as i32
+    let n = toml.len()
     while i <= n:
         let at_end = i == n
         let ch = if at_end: 10 else: toml[i]
@@ -6190,7 +6190,7 @@ fn cli_manifest_c_deps(toml: &str) -> List[CliManifestDep]:
     var in_deps = false
     var start = 0
     var i = 0
-    let n = toml.len() as i32
+    let n = toml.len()
     while i <= n:
         let at_end = i == n
         let ch = if at_end: 10 else: toml[i]
@@ -6203,9 +6203,9 @@ fn cli_manifest_c_deps(toml: &str) -> List[CliManifestDep]:
                 in_deps = false
             else if in_deps:
                 var eq = -1
-                for j in 0..trimmed.len() as i32:
+                for j in 0..trimmed.len():
                     if trimmed[j] == 61:
-                        eq = j
+                        eq = j as i32
                         break
                 if eq > 0:
                     let key = cli_trim_line(trimmed.slice(0, eq as i64))
@@ -6236,7 +6236,7 @@ fn cli_path_basename(path_raw: &str) -> str:
     if path == "/":
         return path
 
-    var end = path.len() as i32
+    var end = path.len()
     while end > 1 and path[(end - 1)] == 47:
         end = end - 1
 
@@ -6491,8 +6491,8 @@ fn get_command_valid_pkg_char(ch: i32) -> bool:
 fn get_command_with_pkg_name(spec: &str) -> str:
     if spec.len() == 0:
         return ""
-    var name_end = spec.len() as i32
-    for i in 0..spec.len() as i32:
+    var name_end = spec.len()
+    for i in 0..spec.len():
         if spec[i] == 64:
             name_end = i
             break
@@ -6503,7 +6503,7 @@ fn get_command_with_pkg_name(spec: &str) -> str:
     for i in 0..name_end:
         if not get_command_valid_pkg_char(spec[i]):
             return ""
-    if name_end < spec.len() as i32 and name_end + 1 >= spec.len() as i32:
+    if name_end < spec.len() and name_end + 1 >= spec.len():
         return ""
     spec.slice(0, name_end as i64)
 
@@ -6549,7 +6549,7 @@ fn run_get_command(argc: i32) -> i32:
     let pkg_part = spec.slice(2, spec.len())
     var pkg_name = with_str_clone_ref(pkg_part)
     var pkg_version = ""
-    for i in 0..pkg_part.len() as i32:
+    for i in 0..pkg_part.len():
         if pkg_part[i] == 64:
             pkg_name = pkg_part.slice(0, i as i64)
             pkg_version = pkg_part.slice((i + 1) as i64, pkg_part.len())
@@ -6630,7 +6630,7 @@ fn run_update_command(argc: i32) -> i32:
         with_eprint("no C dependencies to update")
         return 0
     var next_lock = lock_load(root)
-    for i in 0..deps.len() as i32:
+    for i in 0..deps.len():
         let dep = deps[i]
         let resolved_version = conan_install(dep.name, dep.constraint, root, true)
         if resolved_version.len() == 0:

@@ -100,7 +100,7 @@ pub fn embedded_bundle_prefixes() -> List[str]:
     let out: List[str] = List.new()
     for bi in 0..embedded_bundle_count():
         let prefixes = bundle_manifest_prefixes(embedded_bundle_manifest_text(bi))
-        for pi in 0..prefixes.len() as i32:
+        for pi in 0..prefixes.len():
             out.push(with_str_clone_ref(prefixes[pi]))
     out
 

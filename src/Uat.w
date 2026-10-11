@@ -98,14 +98,14 @@ fn uat_indented_block(lines: &List[str], at: i32) -> (str, i32):
     var i = at + 1
     var indent = -1
     var out = ""
-    while i < lines.len() as i32:
+    while i < lines.len():
         let raw = lines[i]
         if raw.trim().len() == 0:
             out = out ++ "\n"
             i = i + 1
             continue
         var spaces = 0
-        while spaces < raw.len() as i32 and raw[spaces] == ' ': spaces = spaces + 1
+        while spaces < raw.len() and raw[spaces] == ' ': spaces = spaces + 1
         if spaces == 0:
             break
         if indent < 0: indent = spaces
@@ -124,9 +124,9 @@ fn uat_parse_int(text: &str) -> (bool, i64):
     if text.len() > 0 and (text[0] == '-' or text[0] == '+'):
         neg = text[0] == '-'
         i = 1
-    if i >= text.len() as i32: return (false, 0)
+    if i >= text.len(): return (false, 0)
     var value: i64 = 0
-    while i < text.len() as i32:
+    while i < text.len():
         let c = text[i]
         if c < '0' or c > '9': return (false, 0)
         value = value * 10 + (c - '0') as i64
@@ -135,7 +135,7 @@ fn uat_parse_int(text: &str) -> (bool, i64):
 
 fn uat_sort_strings(items: List[str]) -> List[str]:
     var sorted = move items
-    for i in 1..sorted.len() as i32:
+    for i in 1..sorted.len():
         var j = i
         while j > 0 and sorted[j - 1] > sorted[j]:
             let t = sorted[j - 1].clone()
@@ -151,9 +151,9 @@ fn uat_error(sc: UatScenario, line: isize, message: &str) -> UatScenario:
 
 fn uat_stem(path: &str) -> str:
     var start = 0
-    for i in 0..path.len() as i32:
-        if path[i] == '/': start = i + 1
-    var end = path.len() as i32
+    for i in 0..path.len():
+        if path[i] == '/': start = (i + 1) as i32
+    var end = path.len()
     if path.ends_with(".uat"): end = end - 4
     path.slice(start, end).clone()
 
@@ -164,7 +164,7 @@ fn uat_parse(path: &str, text: &str) -> UatScenario:
         lines.push(uat_trim_trailing_line_endings(raw).clone())
     var i: i32 = 0
     var header_done = false
-    while i < lines.len() as i32:
+    while i < lines.len():
         let lineno = i + 1
         let line = lines[i].trim()
         if line.len() == 0 or line.starts_with("#"):
@@ -273,7 +273,7 @@ fn uat_split_command(text: &str) -> List[str]:
     var have = false
     var quote = 0
     var i = 0
-    while i < text.len() as i32:
+    while i < text.len():
         let c = text[i]
         if quote != 0:
             if c == quote:
@@ -300,7 +300,7 @@ fn uat_split_command(text: &str) -> List[str]:
 
 fn uat_argv_blob(items: &List[str]) -> str:
     var out = ""
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         out = out ++ items[i] ++ "\0"
     out
 
@@ -371,10 +371,10 @@ fn uat_skip_reason(sc: &UatScenario, scratch: &str) -> str:
     if sc.platforms.len() > 0:
         let host = uat_host_platform()
         var listed = false
-        for i in 0..sc.platforms.len() as i32:
+        for i in 0..sc.platforms.len():
             if sc.platforms[i] == host: listed = true
         if not listed: return "platforms: " ++ host ++ " not listed"
-    for i in 0..sc.requires.len() as i32:
+    for i in 0..sc.requires.len():
         let why = uat_unmet(sc.requires[i], scratch)
         if why.len() > 0: return why
     ""
@@ -395,8 +395,8 @@ fn uat_join(dir: &str, path: &str) -> str:
 
 fn uat_dirname(path: &str) -> str:
     var cut = -1
-    for i in 0..path.len() as i32:
-        if path[i] == '/': cut = i
+    for i in 0..path.len():
+        if path[i] == '/': cut = i as i32
     if cut <= 0: "." else: path.slice(0, cut).clone()
 
 fn uat_write_text(path: &str, text: &str) -> i32:
@@ -422,7 +422,7 @@ fn uat_toolchain(self_path: &str) -> str:
 // before the run is the project's and stays.
 fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> UatOutcome:
     var created: List[str] = List.new()
-    for si in 0..sc.steps.len() as i32:
+    for si in 0..sc.steps.len():
         let verb = sc.steps[si].verb
         if verb == UAT_NEW_DIRECTORY: break
         if verb != UAT_WRITE_FROM and verb != UAT_WRITE_INLINE: continue
@@ -445,7 +445,7 @@ fn uat_run_steps(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> U
     var last = UatRun { rc: 0, stdout: "", stderr: "", label: "" }
     var have_run = false
     var steps = 0
-    for si in 0..sc.steps.len() as i32:
+    for si in 0..sc.steps.len():
         let step = &sc.steps[si]
         steps = steps + 1
         let verb = step.verb
@@ -561,7 +561,7 @@ pub fn run_uat_command(argv: &List[str]) -> i32:
     var list_only = false
     var keep = false
     var wanted = ""
-    for i in 2..argv.len() as i32:
+    for i in 2..argv.len():
         let a = argv[i]
         if a == "--list": list_only = true
         else if a == "--keep": keep = true
@@ -586,7 +586,7 @@ pub fn run_uat_command(argv: &List[str]) -> i32:
     var fail = 0
     var found = false
     var human_all = ""
-    for pi in 0..paths.len() as i32:
+    for pi in 0..paths.len():
         // Reported paths are the project's own (`uat/<name>.uat`).
         let shown = if paths[pi].starts_with(root ++ "/"): paths[pi].slice(root.len() + 1, paths[pi].len()) else: paths[pi].clone()
         let sc = uat_parse(shown, uat_read_text(paths[pi]))
@@ -599,9 +599,9 @@ pub fn run_uat_command(argv: &List[str]) -> i32:
         let why = uat_skip_reason(sc, scratch)
         if list_only:
             var reqs = ""
-            for ri in 0..sc.requires.len() as i32: reqs = reqs ++ (if ri > 0: ", " else: "") ++ sc.requires[ri]
+            for ri in 0..sc.requires.len(): reqs = reqs ++ (if ri > 0: ", " else: "") ++ sc.requires[ri]
             var plats = ""
-            for qi in 0..sc.platforms.len() as i32: plats = plats ++ (if qi > 0: ", " else: "") ++ sc.platforms[qi]
+            for qi in 0..sc.platforms.len(): plats = plats ++ (if qi > 0: ", " else: "") ++ sc.platforms[qi]
             let applies = if why.len() == 0: "applies here" else: "skip (" ++ why ++ ")"
             print(uat_dots(sc.name) ++ applies ++ (if reqs.len() > 0: "  requires: " ++ reqs else: "") ++ (if plats.len() > 0: "  platforms: " ++ plats else: ""))
             continue
@@ -626,7 +626,7 @@ pub fn run_uat_command(argv: &List[str]) -> i32:
                     let shown_err = if outcome.stderr_path.starts_with(root ++ "/"): outcome.stderr_path.slice(root.len() + 1, outcome.stderr_path.len()) else: outcome.stderr_path.clone()
                     print("        stderr: " ++ last_line ++ "  (" ++ shown_err ++ ")")
             fail = fail + 1
-        for hi in 0..outcome.human.len() as i32:
+        for hi in 0..outcome.human.len():
             human_all = human_all ++ "  " ++ sc.name ++ ": " ++ outcome.human[hi] ++ "\n"
     if not found:
         eprint("error: no scenario named '" ++ wanted ++ "' in uat/")

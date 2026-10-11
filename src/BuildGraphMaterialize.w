@@ -95,7 +95,7 @@ fn build_graph_materialized_target(kind: i32, name: &str, entry: &str, target_ki
 
 impl BuildGraphMaterializer:
     fn target_name_exists(graph: &BuildGraph, name: &str) -> bool:
-        for i in 0..graph.targets.len() as i32:
+        for i in 0..graph.targets.len():
             if graph.targets[i].name == name:
                 return true
         false
@@ -186,9 +186,9 @@ impl BuildGraphMaterializer:
             return empty
         let defining = found.unwrap()
         var start_module: i32 = -1
-        for mi in 0..self.sema.module_paths.len() as i32:
+        for mi in 0..self.sema.module_paths.len():
             if self.sema.module_paths[mi] == defining:
-                start_module = mi
+                start_module = mi as i32
                 break
         if start_module < 0:
             build_graph_rt_eprint("[graph] action closure MISS (module not found) for '" ++ self.sema.pool_resolve(action_sym) ++ "' defined in '" ++ defining ++ "'")
@@ -198,7 +198,7 @@ impl BuildGraphMaterializer:
         visited.push(start_module)
         queue.push(start_module)
         var qi = 0
-        while qi < queue.len() as i32:
+        while qi < queue.len():
             let m = queue[qi]
             qi = qi + 1
             let istart = self.sema.module_import_starts[m]
@@ -208,7 +208,7 @@ impl BuildGraphMaterializer:
                 if t < 0:
                     continue
                 var seen = false
-                for vi in 0..visited.len() as i32:
+                for vi in 0..visited.len():
                     if visited[vi] == t:
                         seen = true
                         break
@@ -216,7 +216,7 @@ impl BuildGraphMaterializer:
                     visited.push(t)
                     queue.push(t)
         let paths: List[str] = List.new()
-        for i in 0..visited.len() as i32:
+        for i in 0..visited.len():
             paths.push(with_str_clone_ref(self.sema.module_paths[visited[i]]))
         paths
 

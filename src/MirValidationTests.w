@@ -157,7 +157,7 @@ fn payload_read_verdict(payload_is_unit: bool, declared_is_enum: bool) -> str:
     let payload_ty = if payload_is_unit: unit_ty else: int_ty
     // The variant record: its name, its payload count, its payload types.
     mir_mod.sema_type_d0[enum_ty] = 7
-    mir_mod.sema_type_d1[enum_ty] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d1[enum_ty] = mir_mod.sema_type_extra.len()
     mir_mod.sema_type_d2[enum_ty] = 1
     mir_mod.sema_type_extra.push(0)
     mir_mod.sema_type_extra.push(1)
@@ -235,7 +235,7 @@ fn indirect_arity_verdict(arg_count: i32) -> str:
     let unit_ty = 1
     let int_ty = 2
     let fn_ty = 3
-    mir_mod.sema_type_d0[fn_ty] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d0[fn_ty] = mir_mod.sema_type_extra.len()
     mir_mod.sema_type_d1[fn_ty] = 1
     mir_mod.sema_type_d2[fn_ty] = unit_ty
     mir_mod.sema_type_extra.push(int_ty)
@@ -342,24 +342,24 @@ fn generic_payload_derived(g_is_option: bool) -> i32:
     mir_mod.sema_type_d1[1] = 1
     // H: X(t: T) | Y
     mir_mod.sema_type_d0[2] = h_sym
-    mir_mod.sema_type_d1[2] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d1[2] = mir_mod.sema_type_extra.len()
     mir_mod.sema_type_d2[2] = 2
     for word in [201, 1, 6, 202, 0]:
         mir_mod.sema_type_extra.push(word)
     // H[T]
     mir_mod.sema_type_d0[3] = h_sym
-    mir_mod.sema_type_d1[3] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d1[3] = mir_mod.sema_type_extra.len()
     mir_mod.sema_type_d2[3] = 1
     mir_mod.sema_type_extra.push(6)
     // G: A(h: H[T]) | B(n: i64)
     mir_mod.sema_type_d0[4] = g_sym
-    mir_mod.sema_type_d1[4] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d1[4] = mir_mod.sema_type_extra.len()
     mir_mod.sema_type_d2[4] = 2
     for word in [203, 1, 3, 204, 1, 1]:
         mir_mod.sema_type_extra.push(word)
     // G[i64]
     mir_mod.sema_type_d0[5] = g_sym
-    mir_mod.sema_type_d1[5] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d1[5] = mir_mod.sema_type_extra.len()
     mir_mod.sema_type_d2[5] = 1
     mir_mod.sema_type_extra.push(1)
     mir_mod.sema_type_d0[6] = 103
@@ -502,7 +502,7 @@ fn vacated_payload_verdict(arm: i32, payload_drops: bool) -> str:
     let payload_ty = 2
     let enum_ty = 3
     mir_mod.sema_type_d0[enum_ty] = 7
-    mir_mod.sema_type_d1[enum_ty] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d1[enum_ty] = mir_mod.sema_type_extra.len()
     mir_mod.sema_type_d2[enum_ty] = 1
     mir_mod.sema_type_extra.push(0)
     mir_mod.sema_type_extra.push(1)
@@ -835,7 +835,7 @@ fn resolution_verdict(callee_is_place: bool, mark: MirIntrinsic, argc: i32, answ
     let unit_ty = 1
     let int_ty = 2
     let fn_ty = 3
-    mir_mod.sema_type_d0[fn_ty] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d0[fn_ty] = mir_mod.sema_type_extra.len()
     mir_mod.sema_type_d1[fn_ty] = 1
     mir_mod.sema_type_d2[fn_ty] = int_ty
     mir_mod.sema_type_extra.push(int_ty)
@@ -976,7 +976,7 @@ fn aggregate_borrow_verdict(arg_is_ref: bool) -> str:
     let enum_ty = 3
     mir_mod.sema_type_d0[ref_ty] = ctx_ty
     mir_mod.sema_type_d0[enum_ty] = 7
-    mir_mod.sema_type_d1[enum_ty] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d1[enum_ty] = mir_mod.sema_type_extra.len()
     mir_mod.sema_type_d2[enum_ty] = 1
     mir_mod.sema_type_extra.push(0)
     mir_mod.sema_type_extra.push(1)
@@ -1020,7 +1020,7 @@ fn aggregate_scalar_verdict(arg_is_wide: bool) -> str:
     mir_mod.sema_type_d0[i64_ty] = 64
     mir_mod.sema_type_d1[i64_ty] = 1
     mir_mod.sema_type_d0[enum_ty] = 7
-    mir_mod.sema_type_d1[enum_ty] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d1[enum_ty] = mir_mod.sema_type_extra.len()
     mir_mod.sema_type_d2[enum_ty] = 1
     mir_mod.sema_type_extra.push(0)
     mir_mod.sema_type_extra.push(1)

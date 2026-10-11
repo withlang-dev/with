@@ -85,9 +85,9 @@ fn es_linux_pack() -> str:
 
 fn es_dirname(path: &str) -> str:
     var last = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == '/':
-            last = i
+            last = i as i32
     if last <= 0: "" else: path.slice(0, last as i64)
 
 // The user's cache directory for what this compiler materializes.
@@ -110,7 +110,7 @@ fn es_parse_size(text: &str) -> i64:
     if text.len() == 0:
         return -1
     var n: i64 = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         if ch < '0' or ch > '9':
             return -1

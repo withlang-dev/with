@@ -107,14 +107,14 @@ fn fs_cache_path() -> str:
 
 fn fs_basename(path: &str) -> str:
     var start = 0
-    for i in 0..path.len() as i32:
-        if path[i] == '/': start = i + 1
+    for i in 0..path.len():
+        if path[i] == '/': start = (i + 1) as i32
     path.slice(start, path.len())
 
 fn fs_dirname(path: &str) -> str:
     var last = -1
-    for i in 0..path.len() as i32:
-        if path[i] == '/': last = i
+    for i in 0..path.len():
+        if path[i] == '/': last = i as i32
     if last <= 0: "/" else: path.slice(0, last)
 
 fn fs_cache_error(message: &str) -> DscCache:
@@ -136,7 +136,7 @@ fn fs_open_cache() -> DscCache:
         if name.starts_with(base ++ ".") and not name.ends_with(".map") and not name.ends_with(".atlas") and not name.ends_with(".symbols"):
             files.push(fs_dirname(main_path) ++ "/" ++ name)
     var cache = DscCache { fds: List.new(), mappings: List.new(), images: List.new(), problem: "" }
-    for f in 0..files.len() as i32:
+    for f in 0..files.len():
         let fd = fs_open(files[f])
         if fd < 0:
             return fs_cache_error("could not open " ++ files[f])
@@ -166,26 +166,26 @@ fn fs_open_cache() -> DscCache:
     cache
 
 fn fs_close_cache(cache: &DscCache):
-    for i in 0..cache.fds.len() as i32:
+    for i in 0..cache.fds.len():
         let _ = rt_close(cache.fds[i])
 
 // `len` bytes at VM address `address`, from the file its mapping lies in.
 fn fs_read_vm(cache: &DscCache, address: i64, len: i64) -> str:
-    for i in 0..cache.mappings.len() as i32:
+    for i in 0..cache.mappings.len():
         let m = cache.mappings[i]
         if address >= m.address and address < m.address + m.size:
             return fs_read_at(m.fd, m.file_offset + (address - m.address), len)
     ""
 
 fn fs_image_address(cache: &DscCache, install_name: &str) -> i64:
-    for i in 0..cache.images.len() as i32:
+    for i in 0..cache.images.len():
         if cache.images[i].path == install_name: return cache.images[i].address
     -1
 
 // /System/Library/Frameworks/<Name>.framework/.../<Name>, as the cache lists it.
 fn fs_framework_install_name(cache: &DscCache, name: &str) -> str:
     let prefix = "/System/Library/Frameworks/" ++ name ++ ".framework/"
-    for i in 0..cache.images.len() as i32:
+    for i in 0..cache.images.len():
         let path = cache.images[i].path
         if path.starts_with(prefix) and path.ends_with("/" ++ name):
             return path.clone()
@@ -313,20 +313,20 @@ fn fs_str_less(a: &str, b: &str) -> bool:
 fn fs_sorted(items: &List[str]) -> List[str]:
     if items.len() <= 1:
         let one: List[str] = List.new()
-        for i in 0..items.len() as i32: one.push(items[i].clone())
+        for i in 0..items.len(): one.push(items[i].clone())
         return one
-    let mid = items.len() as i32 / 2
+    let mid = items.len() / 2
     let left: List[str] = List.new()
     let right: List[str] = List.new()
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         if i < mid: left.push(items[i].clone()) else: right.push(items[i].clone())
     let a = fs_sorted(&left)
     let b = fs_sorted(&right)
     let out: List[str] = List.new()
     var i = 0
     var j = 0
-    while i < a.len() as i32 or j < b.len() as i32:
-        if j >= b.len() as i32 or (i < a.len() as i32 and not fs_str_less(b[j], a[i])):
+    while i < a.len() or j < b.len():
+        if j >= b.len() or (i < a.len() and not fs_str_less(b[j], a[i])):
             out.push(a[i].clone())
             i = i + 1
         else:
@@ -339,13 +339,13 @@ fn fs_yaml_list(out: &str, key: &str, items: &List[str]) -> str:
     var text = StringBuilder.new()
     text.push_str(out)
     text.push_str("    " ++ key ++ ":")
-    var pad = 17 - key.len() as i32 - 1
+    var pad = 17 - key.len() - 1
     while pad > 0:
         text.push_str(" ")
         pad = pad - 1
     text.push_str("[ ")
     let sorted = fs_sorted(items)
-    for i in 0..sorted.len() as i32:
+    for i in 0..sorted.len():
         if i > 0: text.push_str(",\n                       ")
         text.push_str("'" ++ sorted[i].replace("'", "''") ++ "'")
     text.push_str(" ]\n")
@@ -381,16 +381,16 @@ fn fs_framework_tbd(cache: &DscCache, name: &str) -> str:
     queue.push(install_name)
     var text = StringBuilder.new()
     var next = 0
-    while next < queue.len() as i32:
+    while next < queue.len():
         let current = queue[next].clone()
         next = next + 1
         let library = fs_read_library(cache, current)
         if library.problem.len() > 0:
             return "error: " ++ library.problem
         text.push_str(fs_tbd_document(&library))
-        for r in 0..library.reexports.len() as i32:
+        for r in 0..library.reexports.len():
             var known = false
-            for s in 0..queue.len() as i32:
+            for s in 0..queue.len():
                 if queue[s] == library.reexports[r]: known = true
             if not known: queue.push(library.reexports[r].clone())
     text.push_str("...\n")
@@ -406,7 +406,7 @@ pub fn framework_stubs_write(dir: &str, names: &List[str]) -> str:
     if cache.problem.len() > 0:
         fs_close_cache(&cache)
         return cache.problem.clone()
-    for i in 0..names.len() as i32:
+    for i in 0..names.len():
         let tbd = fs_framework_tbd(&cache, names[i])
         if tbd.starts_with("error: "):
             fs_close_cache(&cache)
@@ -423,8 +423,8 @@ pub fn framework_stubs_write(dir: &str, names: &List[str]) -> str:
 // stub at link time as any other does.
 pub fn framework_names_in_link_args(link_args: &List[str]) -> List[str]:
     let out: List[str] = List.new()
-    for i in 0..link_args.len() as i32:
-        if (link_args[i] == "-framework" or link_args[i] == "-weak_framework") and i + 1 < link_args.len() as i32:
+    for i in 0..link_args.len():
+        if (link_args[i] == "-framework" or link_args[i] == "-weak_framework") and i + 1 < link_args.len():
             out.push(link_args[i + 1].clone())
     out
 
@@ -435,7 +435,7 @@ pub fn with_framework_stubs_main(args: &List[str]) -> i32:
         runtime_eprint("usage: with __framework-stubs <dir> <Framework>...")
         return 2
     let names: List[str] = List.new()
-    for i in 1..args.len() as i32: names.push(args[i].clone())
+    for i in 1..args.len(): names.push(args[i].clone())
     let problem = framework_stubs_write(args[0], &names)
     if problem.len() > 0:
         runtime_eprint("error: framework stubs: " ++ problem)

@@ -141,7 +141,7 @@ pub fn facade_render_shown_names(text: &str) -> str:
         return text.clone()
     let parts = text.split(prefix)
     var out = parts[0].clone()
-    for i in 1..parts.len() as i32:
+    for i in 1..parts.len():
         let at = parts[i].find("__of__")
         out = out ++ (if at >= 0: parts[i].slice(at + 6, parts[i].len()) else: prefix ++ parts[i])
     out
@@ -167,7 +167,7 @@ pub fn facade_render_presentation_aliases(pool: AstPool, intern: InternPool, fac
             continue
         var renames: List[str] = List.new()
         var distinct = true
-        for g in 0..group.len() as i32:
+        for g in 0..group.len():
             let rename = facade_render_item_rename_of(pool, intern, group[g])
             if rename.len() == 0 or renames.contains(rename): distinct = false
             renames.push(rename)
@@ -180,7 +180,7 @@ pub fn facade_render_presentation_aliases(pool: AstPool, intern: InternPool, fac
         for pi in 0..pool.fn_meta_param_count(meta):
             if pi > 0: params = params ++ ", "
             params = params ++ facade_render_param_name(pool, intern, pstart, pi) ++ ": " ++ render_type_expr(pool, intern, pool.fn_param_type(pstart, pi) as NodeId)
-        for g in 1..group.len() as i32:
+        for g in 1..group.len():
             let alias = facade_render_presentation_prefix() ++ renames[g] ++ "__of__" ++ cname
             out = out ++ "@[link_name(\"" ++ cname ++ "\")]\nextern fn " ++ alias ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, decl) ++ "\n"
             pool.set_data0(group[g] as NodeId, intern.intern(alias))
@@ -253,7 +253,7 @@ fn facade_render_hosted_fn_errors(pool: AstPool, intern: InternPool, ci: &List[i
     let repr = facade_render_unalias(pool, intern, repr_text)
     var out = ""
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let li = facade_render_lend_item(pool, intern, ci, items[i])
         if not li.bridged or li.text_view or li.borrow_res != 0 or not facade_render_lend_hosted(pool, intern, &li, resource, repr):
             continue
@@ -263,7 +263,7 @@ fn facade_render_hosted_fn_errors(pool: AstPool, intern: InternPool, ci: &List[i
         let fname: str = intern.resolve(pool.get_data0(li.decl as NodeId))
         out = out ++ facade_render_fn_error_type(pool, intern, li.decl, facade_render_present(pool, intern, ci, resource, fname), facade_render_message_call(pool, intern, ci, resource).len() > 0)
     // A callback operation hosted here (`db.exec(sql, callback, userdata)`).
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let cbi = facade_render_callback_item(pool, intern, ci, items[i])
         if cbi.decl == 0 or not facade_render_callback_hosted(pool, intern, &cbi, resource, repr) or facade_render_fn_oks(pool, intern, cbi.decl).len() == 0:
             continue
@@ -281,9 +281,9 @@ fn facade_render_public(text: &str) -> str:
     var out = ""
     var in_drop = false
     var start = 0
-    while start < text.len() as i32:
+    while start < text.len():
         var end = start
-        while end < text.len() as i32 and text[end] != '\n': end = end + 1
+        while end < text.len() and text[end] != '\n': end = end + 1
         let line = text.slice(start, end)
         if line.starts_with("impl Drop for "): in_drop = true
         else if line.starts_with("impl "): in_drop = false
@@ -292,7 +292,7 @@ fn facade_render_public(text: &str) -> str:
             shown = "pub " ++ line
         else if not in_drop and (line.starts_with("    fn ") or line.starts_with("    mut fn ") or line.starts_with("    move fn ")):
             shown = "    pub " ++ line.slice(4, line.len())
-        out = out ++ shown ++ (if end < text.len() as i32: "\n" else: "")
+        out = out ++ shown ++ (if end < text.len(): "\n" else: "")
         start = end + 1
     out
 
@@ -387,7 +387,7 @@ fn facade_render_handle_callback_type(pool: AstPool, intern: InternPool, text: &
         return text.clone()
     var out = ""
     var changed = false
-    for j in 0..parts.len() as i32:
+    for j in 0..parts.len():
         let handle = facade_render_handle_for(pool, intern, facade_render_unalias(pool, intern, parts[j]))
         if handle.len() > 0: changed = true
         out = out ++ (if j > 0: ", " else: "") ++ (if handle.len() > 0: handle.clone() else: parts[j].clone())
@@ -436,7 +436,7 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32],
     let pinned = in_place and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_MOVABLE)
     var out = ""
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let li = facade_render_lend_item(pool, intern, ci, items[i])
         if not facade_render_lend_hosted(pool, intern, &li, resource, repr):
             continue
@@ -544,7 +544,7 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32],
 fn facade_render_borrowed_type(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32, repr_text: &str, methods: &str) -> str:
     let rname: str = intern.resolve(pool.get_data0(resource as NodeId))
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let item = items[i]
         let cstart = pool.get_data1(item as NodeId)
         for k in 0..pool.get_data2(item as NodeId):
@@ -580,7 +580,7 @@ pub fn facade_render_borrowed_name(name: &str) -> str: "Borrowed" ++ name
 fn facade_render_resources_wrapping(pool: AstPool, intern: InternPool, repr: &str) -> isize:
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
     var n = 0
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let r = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(items[i] as NodeId)) as NodeId))
         if r == repr: n = n + 1
     n
@@ -622,13 +622,13 @@ type FacadeSurface {
 // `rename`, its shortened name when that is unambiguous, else the C name.
 pub fn facade_render_present(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32, cname: &str) -> str:
     let s = facade_render_surface(pool, intern, ci, resource)
-    for i in 0..s.cnames.len() as i32:
+    for i in 0..s.cnames.len():
         if s.cnames[i] != cname:
             continue
         let explicit: bool = s.explicit[i]
         if explicit:
             return s.names[i].clone()
-        for j in 0..s.cnames.len() as i32:
+        for j in 0..s.cnames.len():
             if j != i and s.names[j] == s.names[i]:
                 return cname.clone()
         return s.names[i].clone()
@@ -639,12 +639,12 @@ pub fn facade_render_present(pool: AstPool, intern: InternPool, ci: &List[i32], 
 // resource's Drop" — or "" when its presentation is not ambiguous.
 pub fn facade_render_presentation_clash(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32, cname: &str) -> str:
     let s = facade_render_surface(pool, intern, ci, resource)
-    for i in 0..s.cnames.len() as i32:
+    for i in 0..s.cnames.len():
         let explicit: bool = s.explicit[i]
         if s.cnames[i] != cname or explicit:
             continue
         var others = ""
-        for j in 0..s.cnames.len() as i32:
+        for j in 0..s.cnames.len():
             if j == i or s.names[j] != s.names[i]:
                 continue
             let cn = s.cnames[j]
@@ -658,12 +658,12 @@ pub fn facade_render_presentation_clash(pool: AstPool, intern: InternPool, ci: &
 pub fn facade_render_presented_ops(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32) -> List[str]:
     let s = facade_render_surface(pool, intern, ci, resource)
     let out: List[str] = List.new()
-    for i in 0..s.cnames.len() as i32:
+    for i in 0..s.cnames.len():
         let cn = s.cnames[i]
         if cn.len() == 0:
             continue
         var seen = false
-        for k in 0..out.len() as i32:
+        for k in 0..out.len():
             if out[k] == cn: seen = true
         if not seen:
             out.push(cn.clone())
@@ -673,7 +673,7 @@ pub fn facade_render_presented_ops(pool: AstPool, intern: InternPool, ci: &List[
 pub fn facade_render_renamed_ops(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32) -> List[str]:
     let ops = facade_render_presented_ops(pool, intern, ci, resource)
     let out: List[str] = List.new()
-    for i in 0..ops.len() as i32:
+    for i in 0..ops.len():
         if facade_render_item_rename(pool, intern, ops[i]).len() > 0:
             out.push(ops[i].clone())
     out
@@ -707,7 +707,7 @@ fn facade_render_surface(pool: AstPool, intern: InternPool, ci: &List[i32], reso
             let parent = if decl != 0: facade_render_receiver(pool, intern, decl) else: 0
             if parent > 0:
                 let more = facade_render_prefix_names(pool, intern, parent)
-                for mi in 0..more.len() as i32:
+                for mi in 0..more.len():
                     names.push(more[mi].clone())
         let role = if kind == FACADE_CLAUSE_DESTROYS: "a destroying method" else: "a constructor"
         s = facade_render_surface_add(s, cname, &names, facade_render_item_rename(pool, intern, cname), role)
@@ -715,7 +715,7 @@ fn facade_render_surface(pool: AstPool, intern: InternPool, ci: &List[i32], reso
     if facade_render_is_c_string_ptr(repr):
         s = facade_render_surface_push(s, "", facade_render_text_view_name(), true, "the text view")
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let li = facade_render_lend_item(pool, intern, ci, items[i])
         if not facade_render_lend_hosted(pool, intern, &li, resource, repr):
             continue
@@ -723,7 +723,7 @@ fn facade_render_surface(pool: AstPool, intern: InternPool, ci: &List[i32], reso
         var rename: str = ""
         if li.rename != 0: rename = intern.resolve(li.rename)
         s = facade_render_surface_add(s, cname, &prefixes, rename, "a lend method")
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let cb = facade_render_callback_item(pool, intern, ci, items[i])
         if not facade_render_callback_hosted(pool, intern, &cb, resource, repr):
             continue
@@ -732,7 +732,7 @@ fn facade_render_surface(pool: AstPool, intern: InternPool, ci: &List[i32], reso
         if cb.rename != 0: rename = intern.resolve(cb.rename)
         s = facade_render_surface_add(s, cname, &prefixes, rename, "a callback method")
     let resources = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
-    for ri in 0..resources.len() as i32:
+    for ri in 0..resources.len():
         let other = resources[ri]
         if other == resource:
             continue
@@ -805,7 +805,7 @@ fn facade_render_struct_name(text: &str) -> str:
 // between two operations still fails closed (facade_render_present).
 fn facade_render_shorten(cname: &str, names: &List[str]) -> str:
     var best = ""
-    for i in 0..names.len() as i32:
+    for i in 0..names.len():
         let sname = names[i]
         let snake = ci_compute_snake_prefix(sname)
         var m = ci_strip_snake_prefix(cname, snake)
@@ -815,7 +815,7 @@ fn facade_render_shorten(cname: &str, names: &List[str]) -> str:
             best = m
         // `snake` ends with the `_` that closes the struct name; every
         // earlier `_` closes a library prefix.
-        var end = snake.len() as i32 - 1
+        var end = snake.len() - 1
         while end > 0:
             end = end - 1
             if snake[end] != '_':
@@ -833,7 +833,7 @@ fn facade_render_shorten(cname: &str, names: &List[str]) -> str:
 // The `rename` an fn item states for the C function `cname`, or "".
 fn facade_render_item_rename(pool: AstPool, intern: InternPool, cname: &str) -> str:
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let item = items[i]
         let have: str = intern.resolve(pool.get_data0(item as NodeId))
         if have != cname:
@@ -894,7 +894,7 @@ fn facade_render_receiver_method(pool: AstPool, intern: InternPool, ci: &List[i3
 // facts to that operation and is not a lend method beside its constructor.
 pub fn facade_render_is_resource_op(pool: AstPool, intern: InternPool, cname: &str) -> bool:
     let resources = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
-    for ri in 0..resources.len() as i32:
+    for ri in 0..resources.len():
         let res = resources[ri]
         let extra_start = pool.get_data1(res as NodeId)
         for k in 0..pool.get_data2(res as NodeId):
@@ -1083,7 +1083,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &List[i32], ite
     // resource; nothing is rendered.
     if drop_fn == 0:
         return ("", facade_render_no_error_use())
-    for di in 0..destroyers.len() as i32:
+    for di in 0..destroyers.len():
         if destroyers[di] == 0 or facade_render_repr_arg(pool, intern, destroyers[di], repr_text, "self.repr", pinned).len() == 0:
             return ("", facade_render_no_error_use())
     if drop_fn != 0 and (facade_render_param_count(pool, drop_fn) != 1 or facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", pinned).len() == 0):
@@ -1130,7 +1130,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &List[i32], ite
             out = out ++ "        for facade_i in 0..self.retained_ptrs.len():\n            let facade_free = self.retained_frees[facade_i]\n            facade_free(self.retained_ptrs[facade_i])\n"
     if destroyers.len() > 0 or methods.len() > 0:
         out = out ++ "impl " ++ name ++ ":\n" ++ methods
-        for di in 0..destroyers.len() as i32:
+        for di in 0..destroyers.len():
             let d = destroyers[di]
             let dname = facade_render_present(pool, intern, ci, item, intern.resolve(pool.get_data0(d as NodeId)))
             let (params, args) = facade_render_params(pool, intern, d, 1)
@@ -1148,7 +1148,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &List[i32], ite
     var failed_state = false
     var with_message = true
     if ok_syms.len() > 0:
-        for pi in 0..producers.len() as i32:
+        for pi in 0..producers.len():
             let ret = if producers[pi] != 0 and out_refs[pi] != 0: facade_render_return(pool, intern, producers[pi]) else: ""
             if ret.len() > 0:
                 failed_state = true
@@ -1172,14 +1172,14 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &List[i32], ite
         out = out ++ facade_render_error_type(pool, intern, name, repr_text, status_type, failed_state, failed_state and not dependent, drop_fn, failed_methods, with_message, shared.len() > 0)
     // Borrowed returns of this resource (ruling §26): `Borrowed<R>`.
     out = out ++ facade_render_borrowed_type(pool, intern, ci, item, repr_text, plain_methods)
-    for pi in 0..producers.len() as i32:
+    for pi in 0..producers.len():
         let producer = producers[pi]
         if producer == 0:
             continue
         // The constructor's presented name (§16.2b.11): the C name less the
         // resource's prefix, or the parent's for a resource made from one.
         let pname = facade_render_present(pool, intern, ci, item, intern.resolve(pool.get_data0(producer as NodeId)))
-        let made_deps = facade_render_dep_values(pool, intern, &deps, pi, producer) ++ keep_init
+        let made_deps = facade_render_dep_values(pool, intern, &deps, pi as i32, producer) ++ keep_init
         if out_refs[pi] != 0:
             let slot = facade_render_param_ref(pool, intern, producer, out_refs[pi])
             if slot < 0:
@@ -1271,7 +1271,7 @@ fn facade_render_item_deps(pool: AstPool, intern: InternPool, ci: &List[i32], it
         if kind == FACADE_CLAUSE_FROM:
             producers.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
             out_refs.push(pool.get_extra(ops + 1))
-            last_producer = producers.len() as i32 - 1
+            last_producer = (producers.len() - 1) as i32
         else if kind == FACADE_CLAUSE_BORROWS:
             borrow_refs.push(pool.get_extra(ops))
             borrow_owners.push(last_producer)
@@ -1293,11 +1293,11 @@ fn facade_render_parent_field(pool: AstPool, intern: InternPool, ci: &List[i32],
     if not deps.ok:
         return ""
     var found: i32 = -1
-    for si in 0..deps.slot_res.len() as i32:
+    for si in 0..deps.slot_res.len():
         if intern.resolve(pool.get_data0(deps.slot_res[si] as NodeId)) == parent:
             if found >= 0:
                 return ""
-            found = si
+            found = si as i32
     if found < 0 or deps.slot_optional[found]:
         return ""
     facade_render_slot_field(&deps, found)
@@ -1309,10 +1309,10 @@ fn facade_render_deps(pool: AstPool, intern: InternPool, producers: &List[i32], 
     let decls: List[i32] = List.new()
     let firsts: List[i32] = List.new()
     let skips: List[i32] = List.new()
-    for pi in 0..producers.len() as i32:
+    for pi in 0..producers.len():
         if producers[pi] == 0:
             continue
-        owners.push(pi)
+        owners.push(pi as i32)
         decls.push(producers[pi])
         firsts.push(0)
         skips.push(if out_refs[pi] != 0: facade_render_param_ref(pool, intern, producers[pi], out_refs[pi]) else: -1)
@@ -1327,7 +1327,7 @@ fn facade_render_deps(pool: AstPool, intern: InternPool, producers: &List[i32], 
         if preinit_fn != 0 and facade_render_receives_any(pool, intern, preinit_fn, 0, -1):
             deps.ok = false
             return deps
-    for oi in 0..owners.len() as i32:
+    for oi in 0..owners.len():
         let owner = owners[oi]
         let decl = decls[oi]
         let meta = pool.find_fn_meta(decl as NodeId)
@@ -1346,7 +1346,7 @@ fn facade_render_deps(pool: AstPool, intern: InternPool, producers: &List[i32], 
         if independent:
             continue
         var stated = false
-        for bi in 0..borrow_refs.len() as i32:
+        for bi in 0..borrow_refs.len():
             if borrow_owners[bi] != owner:
                 continue
             stated = true
@@ -1370,17 +1370,17 @@ fn facade_render_deps(pool: AstPool, intern: InternPool, producers: &List[i32], 
                 deps.resources.push(res)
     // Slots: the k-th parent of resource P an owner has fills the k-th slot
     // of P; a slot some owner leaves empty is optional.
-    for di in 0..deps.owners.len() as i32:
+    for di in 0..deps.owners.len():
         var seen = 0
         for dj in 0..di:
             if deps.owners[dj] == deps.owners[di] and deps.resources[dj] == deps.resources[di]:
                 seen = seen + 1
         var slot: i32 = -1
         var k = 0
-        for si in 0..deps.slot_res.len() as i32:
+        for si in 0..deps.slot_res.len():
             if deps.slot_res[si] == deps.resources[di]:
                 if k == seen:
-                    slot = si
+                    slot = si as i32
                     break
                 k = k + 1
         if slot < 0:
@@ -1388,10 +1388,10 @@ fn facade_render_deps(pool: AstPool, intern: InternPool, producers: &List[i32], 
             deps.slot_res.push(deps.resources[di])
             deps.slot_optional.push(false)
         deps.slots.push(slot)
-    for si in 0..deps.slot_res.len() as i32:
-        for oi in 0..owners.len() as i32:
+    for si in 0..deps.slot_res.len():
+        for oi in 0..owners.len():
             var filled = false
-            for di in 0..deps.owners.len() as i32:
+            for di in 0..deps.owners.len():
                 if deps.owners[di] == owners[oi] and deps.slots[di] == si:
                     filled = true
             if not filled:
@@ -1406,11 +1406,11 @@ fn facade_render_slot_field(deps: &FacadeDeps, si: i32) -> str: if deps.slot_res
 // some producer has no parent to put there.
 fn facade_render_dep_fields(pool: AstPool, intern: InternPool, deps: &FacadeDeps) -> str:
     var out = ""
-    for si in 0..deps.slot_res.len() as i32:
+    for si in 0..deps.slot_res.len():
         let pname: str = intern.resolve(pool.get_data0(deps.slot_res[si] as NodeId))
         let optional: bool = deps.slot_optional[si]
         let ty = if optional: "Option[&" ++ pname ++ "]" else: "&" ++ pname
-        out = out ++ facade_render_slot_field(deps, si) ++ ": " ++ ty ++ ", "
+        out = out ++ facade_render_slot_field(deps, si as i32) ++ ": " ++ ty ++ ", "
     out
 
 // `parent: db, ` — what owner `owner` puts in each slot: the parameter that
@@ -1421,14 +1421,14 @@ fn facade_render_dep_values(pool: AstPool, intern: InternPool, deps: &FacadeDeps
     if meta < 0:
         return out
     let start = pool.fn_meta_param_start(meta)
-    for si in 0..deps.slot_res.len() as i32:
+    for si in 0..deps.slot_res.len():
         var value = "None"
-        for di in 0..deps.owners.len() as i32:
+        for di in 0..deps.owners.len():
             if deps.owners[di] == owner and deps.slots[di] == si:
                 let pname = facade_render_param_name(pool, intern, start, deps.params[di])
                 let optional: bool = deps.slot_optional[si]
                 value = if optional: "Some(" ++ pname ++ ")" else: pname
-        out = out ++ facade_render_slot_field(deps, si) ++ ": " ++ value ++ ", "
+        out = out ++ facade_render_slot_field(deps, si as i32) ++ ": " ++ value ++ ", "
     out
 
 // The resource whose representation a parameter of type `ptext` receives:
@@ -1444,7 +1444,7 @@ fn facade_render_received(pool: AstPool, intern: InternPool, ptext: &str) -> i32
     let p = facade_render_unalias(pool, intern, ptext)
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
     var found: i32 = 0
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let res = items[i]
         let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(res as NodeId)) as NodeId))
         if not repr.starts_with("*") and not facade_render_has_clause(pool, res, FACADE_CLAUSE_INIT):
@@ -1570,7 +1570,7 @@ fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: 
 // Amendment 1): any listed constant is success, so failure is none of them.
 fn facade_render_not_ok(intern: InternPool, ok_syms: &List[i32], status: &str) -> str:
     var out = ""
-    for k in 0..ok_syms.len() as i32:
+    for k in 0..ok_syms.len():
         out = out ++ (if k > 0: " and " else: "") ++ status ++ " != " ++ intern.resolve(ok_syms[k])
     out
 
@@ -1750,7 +1750,7 @@ fn facade_render_shared_error_type(pool: AstPool, intern: InternPool, ci: &List[
     if sym == 0: return ""
     var status_type = ""
     var nothing_produced = false
-    for k in 0..uses.len() as i32:
+    for k in 0..uses.len():
         if status_type.len() == 0: status_type = uses[k].status_type.clone()
         if uses[k].nothing_produced: nothing_produced = true
     if status_type.len() == 0:
@@ -1765,7 +1765,7 @@ fn facade_render_shared_error_type(pool: AstPool, intern: InternPool, ci: &List[
     if status_type.len() == 0: return ""
     let message = if facade_render_names_message(pool, facade): ", message: str" else: ""
     var out = "error " ++ intern.resolve(sym) ++ " =\n    | Failed(status: " ++ status_type ++ message ++ ")\n"
-    for k in 0..uses.len() as i32:
+    for k in 0..uses.len():
         if uses[k].failed_with:
             out = out ++ "    | " ++ facade_render_failed_with_name(names[k], true) ++ "(status: " ++ status_type ++ ", resource: " ++ facade_render_failed_name(names[k]) ++ ")\n"
     if nothing_produced:
@@ -1844,7 +1844,7 @@ fn facade_render_find_fn(pool: AstPool, intern: InternPool, ci: &List[i32], sym:
             continue
         let have: str = intern.resolve(pool.get_data0(decl))
         if have == want:
-            if di < ci.len() as i32 and ci[di] != 0:
+            if di < ci.len() and ci[di] != 0:
                 return decl as i32
             if fallback == 0:
                 fallback = decl as i32
@@ -1963,7 +1963,7 @@ type FacadeBridge {
 fn facade_render_fn_item(pool: AstPool, intern: InternPool, decl: i32) -> i32:
     let want: str = intern.resolve(pool.get_data0(decl as NodeId))
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         if intern.resolve(pool.get_data0(items[i] as NodeId)) == want:
             return items[i]
     0
@@ -2152,9 +2152,9 @@ fn facade_render_bridge(pool: AstPool, intern: InternPool, decl: i32, skip: i32,
 fn facade_render_indent(text: &str, indent: &str) -> str:
     var out = ""
     var start = 0
-    while start < text.len() as i32:
+    while start < text.len():
         var end = start
-        while end < text.len() as i32 and text[end] != '\n': end = end + 1
+        while end < text.len() and text[end] != '\n': end = end + 1
         out = out ++ indent ++ text.slice(start, end) ++ "\n"
         start = end + 1
     out
@@ -2197,7 +2197,7 @@ fn facade_render_bridge_body(pool: AstPool, intern: InternPool, decl: i32, b: &F
         let (op_err, empty_message) = facade_render_op_error(pool, intern, decl, presented)
         let op_status = facade_render_fresh("status", facade_render_param_names(pool, intern, decl))
         var failed = ""
-        for k in 0..oks.len() as i32:
+        for k in 0..oks.len():
             if k > 0: failed = failed ++ " and "
             failed = failed ++ op_status ++ " != " ++ intern.resolve(oks[k])
         let checked = indent ++ "let " ++ op_status ++ " = " ++ call ++ "\n" ++ facade_render_failed(op_err, op_status, failed, message_call, facade_render_param_names(pool, intern, decl), indent, empty_message)
@@ -2307,7 +2307,7 @@ fn facade_render_free_ops(pool: AstPool, intern: InternPool, ci: &List[i32], fac
         if not li.bridged and li.variadic == 0 and not li.record_view:
             continue
         var hosted = false
-        for ri in 0..resources.len() as i32:
+        for ri in 0..resources.len():
             let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resources[ri] as NodeId)) as NodeId))
             if facade_render_lend_hosted(pool, intern, &li, resources[ri], repr):
                 hosted = true
@@ -2343,7 +2343,7 @@ fn facade_render_free_ops(pool: AstPool, intern: InternPool, ci: &List[i32], fac
 // Whether a facade block of the compilation declares a resource `name`.
 fn facade_render_resource_named(pool: AstPool, intern: InternPool, name: &str) -> bool:
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         if intern.resolve(pool.get_data0(items[i] as NodeId)) == name:
             return true
     false
@@ -2495,7 +2495,7 @@ pub fn facade_render_param_ref(pool: AstPool, intern: InternPool, decl: i32, ref
     if rk == FACADE_PARAM_REF_INDEX:
         let digits: str = intern.resolve(pool.get_data1(ref_node as NodeId))
         var idx: i32 = 0
-        for i in 0..digits.len() as i32:
+        for i in 0..digits.len():
             idx = idx * 10 + (digits[i] - '0') as i32
         return if idx < count: idx else: -1
     if rk == FACADE_PARAM_REF_NAME:
@@ -2677,7 +2677,7 @@ fn facade_render_index_ref(pool: AstPool, intern: InternPool, ref_node: i32) -> 
         return -1
     let digits: str = intern.resolve(pool.get_data1(ref_node as NodeId))
     var idx: i32 = 0
-    for i in 0..digits.len() as i32:
+    for i in 0..digits.len():
         idx = idx * 10 + (digits[i] - '0') as i32
     idx
 
@@ -2766,7 +2766,7 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &List[i32]
             return cbi
     if not is_callback or (cbi.retained and cbi.consumed):
         return cbi
-    for k in 0..nullable_pis.len() as i32:
+    for k in 0..nullable_pis.len():
         if nullable_pis[k] == cbi.callback: nullable_pi = nullable_pis[k]
     if nullable_pi >= 0:
         if cbi.retained or cbi.consumed:
@@ -2792,7 +2792,7 @@ fn facade_render_callback_hosted(pool: AstPool, intern: InternPool, cbi: &Facade
 // resource carries the retained cells.
 fn facade_render_resource_keeps_userdata(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32, repr: &str) -> bool:
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let cbi = facade_render_callback_item(pool, intern, ci, items[i])
         if cbi.retained and facade_render_callback_hosted(pool, intern, &cbi, resource, repr):
             return true
@@ -2827,7 +2827,7 @@ fn facade_render_callable_parts(raw: &str) -> (str, List[str], str):
     var depth = 0
     var close: i64 = -1
     var i = open
-    while i < raw.len() as i32:
+    while i < raw.len():
         if raw[i] == '(': depth = depth + 1
         else if raw[i] == ')':
             depth = depth - 1
@@ -2842,7 +2842,7 @@ fn facade_render_callable_parts(raw: &str) -> (str, List[str], str):
     var start = 0
     depth = 0
     var k = 0
-    while k < params.len() as i32:
+    while k < params.len():
         if params[k] == '(' or params[k] == '[': depth = depth + 1
         else if params[k] == ')' or params[k] == ']': depth = depth - 1
         else if params[k] == ',' and depth == 0:
@@ -2862,7 +2862,7 @@ fn facade_render_callback_type(pool: AstPool, intern: InternPool, text: &str) ->
         return ""
     var slots = 0
     var out = ""
-    for pi in 0..parts.len() as i32:
+    for pi in 0..parts.len():
         let p = facade_render_unalias(pool, intern, parts[pi])
         var shown = parts[pi].clone()
         if p == "*mut c_void" or p == "*const c_void":
@@ -2911,7 +2911,7 @@ fn facade_render_wrapped_callbacks(pool: AstPool, intern: InternPool, cbi: &Faca
         if head.len() == 0:
             continue
         var hits = 0
-        for j in 0..parts.len() as i32:
+        for j in 0..parts.len():
             if facade_render_unalias(pool, intern, parts[j]) == hrepr: hits = hits + 1
         if hits == 1:
             out.push(pi)
@@ -2919,9 +2919,9 @@ fn facade_render_wrapped_callbacks(pool: AstPool, intern: InternPool, cbi: &Faca
 
 // The argv clause stated for callback `pi`, or -1.
 fn facade_render_argv_of(cbi: &FacadeCallbackItem, pi: i32) -> i32:
-    for k in 0..cbi.argv_cb.len() as i32:
+    for k in 0..cbi.argv_cb.len():
         if cbi.argv_cb[k] == pi:
-            return k
+            return k as i32
     -1
 
 // The presented type of a wrapped callback whose C type is `raw`: each
@@ -2934,7 +2934,7 @@ fn facade_render_wrapped_type(pool: AstPool, intern: InternPool, cbi: &FacadeCal
     let k = facade_render_argv_of(cbi, pi)
     var out = ""
     var n = 0
-    for j in 0..parts.len() as i32:
+    for j in 0..parts.len():
         if k >= 0 and j == cbi.argc_index[k]:
             continue
         var shown = parts[j].clone()
@@ -2965,11 +2965,11 @@ fn facade_render_wrapper(pool: AstPool, intern: InternPool, ci: &List[i32], cbi:
     var names: List[str] = List.new()
     var params = ""
     var h = -1
-    for j in 0..parts.len() as i32:
+    for j in 0..parts.len():
         let a = facade_render_fresh(f"facade_a{j}", taken)
         names.push(a.clone())
         params = params ++ (if j > 0: ", " else: "") ++ a
-        if facade_render_unalias(pool, intern, parts[j]) == hrepr: h = j
+        if facade_render_unalias(pool, intern, parts[j]) == hrepr: h = j as i32
     if h < 0:
         return ""
     let inner = indent ++ "    "
@@ -2987,7 +2987,7 @@ fn facade_render_wrapper(pool: AstPool, intern: InternPool, ci: &List[i32], cbi:
     body = body ++ inner ++ "let " ++ g ++ ": " ++ shown ++ " = unsafe { transmute[" ++ shown ++ "]((*" ++ d ++ ")." ++ f"{slot}" ++ ") }\n"
     var args = ""
     var n = 0
-    for j in 0..parts.len() as i32:
+    for j in 0..parts.len():
         if k >= 0 and j == cbi.argc_index[k]:
             continue
         var arg = names[j].clone()
@@ -3027,7 +3027,7 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &List[i32],
         for i in 0..pool.get_data2(facade as NodeId):
             let item = pool.get_extra(start + i)
             if pool.kind(item as NodeId) == NodeKind.NK_FACADE_FN: items.push(item)
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let cbi = facade_render_callback_item(pool, intern, ci, items[i])
         if cbi.decl == 0:
             continue
@@ -3072,7 +3072,7 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &List[i32],
         var cell_type = "U"
         if wrapped.len() > 0:
             cell_type = "(U"
-            for _ in 0..wrapped.len() as i32: cell_type = cell_type ++ ", *mut c_void"
+            for _ in 0..wrapped.len(): cell_type = cell_type ++ ", *mut c_void"
             cell_type = cell_type ++ ")"
         var wrapped_names: List[str] = List.new()
         var wrapped_raw: List[str] = List.new()
@@ -3174,7 +3174,7 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &List[i32],
             let ud_type = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, cbi.userdata))
             // The program's callbacks ride in the box as code pointers.
             var boxed = ud_name.clone()
-            for wi in 0..wrapped.len() as i32:
+            for wi in 0..wrapped.len():
                 let p = facade_render_fresh(f"facade_p{wrapped[wi]}", taken)
                 body = body ++ indent ++ "let " ++ p ++ ": *mut c_void = unsafe { transmute[*mut c_void](" ++ wrapped_names[wi] ++ ") }\n"
                 boxed = boxed ++ ", " ++ p
@@ -3186,10 +3186,10 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &List[i32],
                 body = body ++ "        self.retained_ptrs.push(" ++ ptr ++ " as *mut c_void)\n        self.retained_frees.push(" ++ free ++ ")\n"
             // Each wrapper, installed only for a callback the program gave:
             // C's null stays null.
-            for wi in 0..wrapped.len() as i32:
+            for wi in 0..wrapped.len():
                 let pi = wrapped[wi]
                 let w = facade_render_fresh(f"facade_w{pi}", taken)
-                let wrapper = facade_render_wrapper(pool, intern, ci, &cbi, pi, wrapped_raw[wi], wrapped_shown[wi], cell_type, wi + 1, w, taken, indent)
+                let wrapper = facade_render_wrapper(pool, intern, ci, &cbi, pi, wrapped_raw[wi], wrapped_shown[wi], cell_type, (wi + 1) as i32, w, taken, indent)
                 // Nothing is rendered rather than a method with no wrapper
                 // (Sema's net names the method that did not render).
                 if wrapper.len() == 0:
@@ -3214,7 +3214,7 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &List[i32],
 // (compiler/LibcFacade.w) describes only declarations of libc's own shape.
 pub fn facade_render_import_shape(pool: AstPool, intern: InternPool, ci: &List[i32], name: &str) -> (bool, str, str):
     for di in 0..pool.decl_count():
-        if di >= ci.len() as i32 or ci[di] == 0:
+        if di >= ci.len() or ci[di] == 0:
             continue
         let decl = pool.get_decl(di)
         let kind = pool.kind(decl)

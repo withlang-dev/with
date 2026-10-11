@@ -60,8 +60,8 @@ pub fn conan_pick_archive(source: &ConanSource, dir: &str, download: fn(&str, &s
     var tried = ""
     for url in source.urls:
         var slash = -1
-        for i in 0..url.len() as i32:
-            if url[i] == '/': slash = i
+        for i in 0..url.len():
+            if url[i] == '/': slash = i as i32
         let name = url.slice(slash + 1, url.len())
         let candidate = dir ++ "/" ++ name
         if download(url, &candidate) != 0:

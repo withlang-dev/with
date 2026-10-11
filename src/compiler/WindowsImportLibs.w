@@ -202,7 +202,7 @@ pub fn with_windows_import_libs_main(args: &List[str]) -> i32:
         runtime_eprint("usage: with __windows-import-libs <dir> <dll-name>...")
         return 2
     let names: List[str] = List.new()
-    for i in 1..args.len() as i32: names.push(args[i].clone())
+    for i in 1..args.len(): names.push(args[i].clone())
     if runtime_mkdir_p(args[0]) != 0:
         runtime_eprint("error: could not create " ++ args[0])
         return 1

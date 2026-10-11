@@ -34,7 +34,7 @@ pub fn tracked_input_insert_unique(paths: List[str], path: &str) -> List[str]:
         return paths
     var out: List[str] = List.new()
     var inserted = false
-    for i in 0..paths.len() as i32:
+    for i in 0..paths.len():
         let existing = paths[i]
         let cmp = tracked_input_str_compare(path, existing)
         if cmp == 0:
@@ -49,7 +49,7 @@ pub fn tracked_input_insert_unique(paths: List[str], path: &str) -> List[str]:
 
 pub fn tracked_input_merge_unique(left: List[str], right: &List[str]) -> List[str]:
     var out = left
-    for i in 0..right.len() as i32:
+    for i in 0..right.len():
         out = tracked_input_insert_unique(move out, right[i])
     out
 
@@ -59,10 +59,10 @@ fn tracked_dirname(path: &str) -> str:
     // instead of the source's directory (#801). Matches the '\'-aware sibling
     // helpers below.
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let b = path[i]
         if b == 47 or b == 92:
-            last_slash = i
+            last_slash = i as i32
     if last_slash < 0:
         return ""
     if last_slash == 0:
@@ -109,8 +109,8 @@ fn tracked_normalize_path(path: &str) -> str:
     let root_parts = runtime_path_root_part_count(path)
     let parts: List[str] = List.new()
     var start = 0
-    for i in 0..(path.len() as i32 + 1):
-        let at_end = i == path.len() as i32
+    for i in 0..(path.len() + 1):
+        let at_end = i == path.len()
         // Split on both '/' and '\' so a '\'-separated Windows path normalizes
         // to the same '/'-form the containment checks expect (#801).
         if at_end or path[i] == 47 or path[i] == 92:
@@ -130,13 +130,13 @@ fn tracked_normalize_path(path: &str) -> str:
                         parts.push(with_str_clone_ref(part))
                 if keep:
                     parts.push(part)
-            start = i + 1
+            start = (i + 1) as i32
     if parts.len() == 0:
         if is_abs:
             return runtime_path_root_prefix(path)
         return "."
     var result = runtime_path_root_prefix(path)
-    for pi in 0..parts.len() as i32:
+    for pi in 0..parts.len():
         if pi > 0:
             result = result ++ "/"
         result = result ++ parts[pi]

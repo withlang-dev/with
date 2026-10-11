@@ -37,7 +37,7 @@ pub fn migrate_set_width_slice(val: i32):
 pub fn ci_migrate_is_width_family_name(name: &str) -> bool:
     if g_migrate_width_slice == 0:
         return false
-    let len = name.len() as i32
+    let len = name.len()
     if len < 3:
         return false
     // Check explicit non-underscore-prefixed width types
@@ -173,7 +173,7 @@ fn ci_migrate_type_render_has_concrete_body(name: &str, rendered: &str) -> bool:
 fn ci_migrate_shared_decl_upgrade_opaque_type(name: &str, rendered: &str):
     let opaque_marker = "type " ++ ci_escape_reserved(name) ++ " = opaque"
     var i = 0
-    while i < g_migrate_shared_decl_buf.len() as i32:
+    while i < g_migrate_shared_decl_buf.len():
         if ci_str_contains(g_migrate_shared_decl_buf[i], opaque_marker):
             let idx = i as i64
             with g_migrate_shared_decl_buf.slot(idx) as mut entry:
@@ -181,7 +181,7 @@ fn ci_migrate_shared_decl_upgrade_opaque_type(name: &str, rendered: &str):
             break
         i = i + 1
     var j = 0
-    while j < g_migrate_shared_decl_records.len() as i32:
+    while j < g_migrate_shared_decl_records.len():
         let rec = g_migrate_shared_decl_records[j]
         if ci_str_contains(rec, "@@DECL|type|" ++ name ++ "\n") and ci_str_contains(rec, opaque_marker):
             let idx = j as i64
@@ -243,7 +243,7 @@ fn ci_migrate_shared_note_output_uses(output: &str):
     if not ci_migrate_shared_defs_active():
         return
     var i = 0
-    let n = output.len() as i32
+    let n = output.len()
     while i < n:
         let ch = output[i]
         if ci_is_ident_char(ch):
@@ -384,13 +384,13 @@ fn ci_migrate_project_imports_for_file(project_active: bool, project: &CiProject
         return ""
     let current_module = project.ensure_module(input_path)
     var imports = ""
-    for si in 0..project.symbols.len() as i32:
+    for si in 0..project.symbols.len():
         let symbol = project.symbols[si]
         if symbol.owner_module < 0 or symbol.owner_module == current_module:
             continue
         if not ci_migrate_pipe_i32_contains(symbol.consumers, current_module):
             continue
-        if symbol.owner_module >= project.module_paths.len() as i32:
+        if symbol.owner_module >= project.module_paths.len():
             continue
         imports = ci_migrate_add_import_once(imports, ci_migrate_source_module_path(project.module_paths[symbol.owner_module]))
     imports
@@ -483,11 +483,11 @@ const CI_MIGRATE_HELPER_LOCALS: [15]str = ["a", "b", "c", "out", "result", "a_hi
 fn ci_migrate_hygienic(text: &str) -> str:
     var out = StringBuilder.new()
     var i = 0
-    while i < text.len() as i32:
+    while i < text.len():
         let ch = text[i]
         if ci_is_ident_start(ch):
             var end = i + 1
-            while end < text.len() as i32 and ci_is_ident_char(text[end]): end += 1
+            while end < text.len() and ci_is_ident_char(text[end]): end += 1
             let word = text.slice(i as i64, end as i64)
             for local in CI_MIGRATE_HELPER_LOCALS:
                 if word == local:
@@ -590,10 +590,10 @@ fn ci_migrate_write_shared_defs(output_dir: &str):
     // Shared declarations collected during migration.
     if g_migrate_shared_decl_buf.len() > 0:
         defs.push_str("\n")
-        for di in 0..g_migrate_shared_decl_buf.len() as i32:
+        for di in 0..g_migrate_shared_decl_buf.len():
             defs.push_str(g_migrate_shared_decl_buf[di])
     var pending_i = 0
-    while pending_i < g_migrate_shared_pending_extern_vars.len() as i32:
+    while pending_i < g_migrate_shared_pending_extern_vars.len():
         let pending = g_migrate_shared_pending_extern_vars[pending_i]
         if ci_find_str(g_migrate_shared_usage_idents, "|" ++ pending.name ++ "|") >= 0:
             defs.push_str(pending.rendered)
@@ -614,10 +614,10 @@ fn ci_migrate_write_shared_fragment(path: &str):
 
 fn ci_migrate_shared_fragment_text() -> str:
     var fragment = StringBuilder.new()
-    for di in 0..g_migrate_shared_decl_records.len() as i32:
+    for di in 0..g_migrate_shared_decl_records.len():
         fragment.push_str(g_migrate_shared_decl_records[di])
     var pending_i = 0
-    while pending_i < g_migrate_shared_pending_extern_vars.len() as i32:
+    while pending_i < g_migrate_shared_pending_extern_vars.len():
         let pending = g_migrate_shared_pending_extern_vars[pending_i]
         fragment.push_str(f"@@PENDING|{pending.kind}|{pending.name}\n{pending.rendered}\n@@END\n")
         pending_i = pending_i + 1
@@ -626,7 +626,7 @@ fn ci_migrate_shared_fragment_text() -> str:
 
 fn ci_migrate_merge_usage_keys(keys: &str):
     var i = 0
-    let n = keys.len() as i32
+    let n = keys.len()
     while i < n:
         while i < n and keys[i] != 124:
             i = i + 1
@@ -642,7 +642,7 @@ fn ci_migrate_merge_usage_keys(keys: &str):
 
 fn ci_migrate_merge_shared_fragment_text(text: &str):
     var pos = 0
-    let n = text.len() as i32
+    let n = text.len()
     while pos < n:
         var line_end = pos
         while line_end < n and text[line_end] != 10:
@@ -676,7 +676,7 @@ fn ci_migrate_merge_shared_fragment_text(text: &str):
 fn ci_migrate_merge_shared_fragment_texts(output_dir: &str, fragments: &List[str]):
     ci_migrate_shared_defs_reset()
     var i = 0
-    while i < fragments.len() as i32:
+    while i < fragments.len():
         ci_migrate_merge_shared_fragment_text(fragments[i])
         i = i + 1
     ci_migrate_write_shared_defs(output_dir)
@@ -956,12 +956,12 @@ pub fn ci_collect_macro_type_aliases(session: i64) -> str:
 
 fn ci_migrate_prepare_include_path(input_path: &str):
     with_cimport_clear_include_paths()
-    var dir_end = input_path.len() as i32 - 1
+    var dir_end = input_path.len() - 1
     while dir_end > 0 and input_path[dir_end] != 47:  // '/'
         dir_end = dir_end - 1
     if dir_end > 0:
         with_cimport_add_include_path(input_path.slice(0, dir_end as i64))
-    for i in 0..g_migrate_include_paths.len() as i32:
+    for i in 0..g_migrate_include_paths.len():
         with_cimport_add_include_path(g_migrate_include_paths[i])
 
 // Portable-baseline migration preamble: undefine host CPU-feature macros so C
@@ -995,7 +995,7 @@ fn ci_migrate_portable_baseline_preamble() -> str:
 fn ci_migrate_source_prefix() -> str:
     let compat_preamble = migrate_host_compat_preamble()
     var prefix = ci_migrate_portable_baseline_preamble() ++ g_migrate_defines ++ compat_preamble
-    for i in 0..g_migrate_forced_includes.len() as i32:
+    for i in 0..g_migrate_forced_includes.len():
         prefix = prefix ++ "#include \"" ++ g_migrate_forced_includes[i] ++ "\"\n"
     prefix
 
@@ -1035,8 +1035,8 @@ impl CiProject:
         if not ci_migrate_location_is_header(location): return -1
         let stem = ci_migrate_location_stem(location)
         if stem.len() == 0: return -1
-        for i in 0..self.module_paths.len() as i32:
-            if ci_migrate_path_stem(ci_migrate_path_basename(self.module_paths[i])) == stem: return i
+        for i in 0..self.module_paths.len():
+            if ci_migrate_path_stem(ci_migrate_path_basename(self.module_paths[i])) == stem: return i as i32
         -1
 
     // Every unit of the migration is a module before any file is scanned,
@@ -1418,7 +1418,7 @@ pub fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
 fn ci_migrate_fs_path(path: &str) -> str: path.replace("\\", "/")
 
 fn ci_migrate_path_basename(path: &str) -> str:
-    var end = path.len() as i32
+    var end = path.len()
     while end > 0 and path[(end - 1)] == '/':
         end = end - 1
     var start = end - 1
@@ -1428,14 +1428,14 @@ fn ci_migrate_path_basename(path: &str) -> str:
 
 // `name.c` -> `name`; a name without a dot is its own stem.
 fn ci_migrate_path_stem(basename: &str) -> str:
-    var end = basename.len() as i32
+    var end = basename.len()
     while end > 0 and basename[(end - 1)] != '.':
         end = end - 1
     if end == 0: basename.clone() else: basename.slice(0, (end - 1) as i64)
 
 // The file of a cursor location (`path:line:col`), "" when absent.
 fn ci_migrate_location_file(location: &str) -> str:
-    var end = location.len() as i32
+    var end = location.len()
     var colons = 0
     while end > 0 and colons < 2:
         end = end - 1
@@ -1506,14 +1506,14 @@ fn ci_migrate_sorted_files(files: &List[str]) -> List[str]:
     var rank = 10
     while rank <= 320:
         var i = 0
-        while i < files.len() as i32:
+        while i < files.len():
             let path = files[i]
             if ci_migrate_pcre2_order_rank(ci_migrate_path_basename(path)) == rank:
                 sorted.push(with_str_clone_ref(path))
             i = i + 1
         rank = rank + 10
     var i = 0
-    while i < files.len() as i32:
+    while i < files.len():
         let path = files[i]
         if ci_migrate_pcre2_order_rank(ci_migrate_path_basename(path)) == 1000:
             sorted.push(with_str_clone_ref(path))
@@ -1543,7 +1543,7 @@ fn ci_migrate_print_progress(file_path: &str, current: isize, total: isize):
     with_flush_stdout()
 
 fn ci_migrate_ensure_parent_dir(path: &str):
-    var dir_end = path.len() as i32 - 1
+    var dir_end = path.len() - 1
     while dir_end > 0 and path[dir_end] != 47:
         dir_end = dir_end - 1
     if dir_end > 0:
@@ -1560,7 +1560,7 @@ fn ci_migrate_sorted_insert(files: &List[str], path: &str) -> List[str]:
     let sorted: List[str] = List.new()
     var inserted = false
     var i = 0
-    while i < files.len() as i32:
+    while i < files.len():
         let existing = files[i]
         if not inserted and ci_str_compare(path, existing) < 0:
             sorted.push(with_str_clone_ref(path))
@@ -1575,7 +1575,7 @@ fn ci_migrate_collect_c_files(input_dir: &str, exclude_basenames: &str) -> List[
     var files: List[str] = List.new()
     let listing = with_fs_list_files(input_dir)
     var pos = 0
-    let n = listing.len() as i32
+    let n = listing.len()
     while pos < n:
         var line_end = pos
         while line_end < n and listing[line_end] != 10:
@@ -1599,8 +1599,8 @@ var g_migrate_fn_nullable_bits: List[str] = List.new()
 var g_migrate_fn_nullable_reasons: List[str] = List.new()
 
 fn ci_migrate_fn_nullable_index(name: &str) -> i32:
-    for i in 0..g_migrate_fn_nullable_names.len() as i32:
-        if g_migrate_fn_nullable_names[i] == name: return i
+    for i in 0..g_migrate_fn_nullable_names.len():
+        if g_migrate_fn_nullable_names[i] == name: return i as i32
     -1
 
 /// D107: 1 when parameter `index` of corpus function `name` is `Option`,
@@ -1610,7 +1610,7 @@ pub fn ci_migrate_fn_param_nullable(name: &str, index: isize) -> i32:
     let i = ci_migrate_fn_nullable_index(name)
     if i < 0: return -1
     let bits = g_migrate_fn_nullable_bits[i]
-    if index < 0 or index >= bits.len() as i32: return -1
+    if index < 0 or index >= bits.len(): return -1
     let c = bits[index]
     if c == '1': 1 else if c == '0': 0 else: -1
 
@@ -1619,7 +1619,7 @@ pub fn ci_migrate_fn_param_reason(name: &str, index: isize) -> str:
     let i = ci_migrate_fn_nullable_index(name)
     if i < 0: return ""
     let parts = g_migrate_fn_nullable_reasons[i].split("|")
-    if index < 0 or index >= parts.len() as i32: return ""
+    if index < 0 or index >= parts.len(): return ""
     parts[index].to_owned()
 
 impl CiProject:
@@ -1683,7 +1683,7 @@ impl CiProject:
     // sinks with no other evidence is Option for every member. The order
     // of units never enters: the result is a function of the evidence.
     mut fn resolve_fn_ptr_nullability():
-        let n = self.symbols.len() as i32
+        let n = self.symbols.len()
         for si in 0..n:
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
             let count = self.symbols[si].param_fn_ptr.len() as i32
@@ -1711,7 +1711,7 @@ impl CiProject:
             changed = false
             for si in 0..n:
                 if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
-                let count = self.symbols[si].param_fn_ptr.len() as i32
+                let count = self.symbols[si].param_fn_ptr.len()
                 for pi in 0..count:
                     if self.symbols[si].param_fn_ptr[pi] == 0 or self.symbols[si].param_nullable[pi] != 0: continue
                     for sink in self.symbols[si].param_sinks[pi].split(";"):
@@ -1725,7 +1725,7 @@ impl CiProject:
                             self.symbols[si].param_reason[pi] = "Option: passed to " ++ kv[0] ++ ", defined outside the corpus"
                             changed = true
                             break
-                        if index < self.symbols[callee].param_nullable.len() as i32 and self.symbols[callee].param_nullable[index] != 0:
+                        if index < self.symbols[callee].param_nullable.len() and self.symbols[callee].param_nullable[index] != 0:
                             self.symbols[si].param_nullable[pi] = 1
                             self.symbols[si].param_reason[pi] = "Option: passed to " ++ kv[0] ++ f" param {index}, which is Option"
                             changed = true
@@ -1734,16 +1734,16 @@ impl CiProject:
         // parameter still non-null whose sink chain reaches itself is one.
         for si in 0..n:
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
-            let count = self.symbols[si].param_fn_ptr.len() as i32
+            let count = self.symbols[si].param_fn_ptr.len()
             for pi in 0..count:
                 if self.symbols[si].param_fn_ptr[pi] == 0 or self.symbols[si].param_nullable[pi] != 0: continue
                 self.sink_seen = HashMap.new()
-                if self.sink_chain_reaches(si, pi, si, pi, 0):
+                if self.sink_chain_reaches(si as i32, pi as i32, si as i32, pi as i32, 0):
                     self.symbols[si].param_nullable[pi] = 1
                     self.symbols[si].param_reason[pi] = "Option: part of a cycle of forwarded parameters"
         for si in 0..n:
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
-            let count = self.symbols[si].param_fn_ptr.len() as i32
+            let count = self.symbols[si].param_fn_ptr.len()
             for pi in 0..count:
                 if self.symbols[si].param_fn_ptr[pi] != 0 and self.symbols[si].param_nullable[pi] == 0:
                     self.symbols[si].param_reason[pi] = if self.symbols[si].param_aborting[pi] != 0: "non-null: the NULL branch aborts (a contract), no NULL callers" else: "non-null: called unconditionally, no NULL callers"
@@ -1764,7 +1764,7 @@ impl CiProject:
             let callee = self.find_symbol(CiProjectSymbolKind.CIPS_FN, kv[0])
             if callee < 0: continue
             let index = parse(kv[1])
-            if index >= self.symbols[callee].param_fn_ptr.len() as i32: continue
+            if index >= self.symbols[callee].param_fn_ptr.len(): continue
             if callee == target_si and index == target_pi: return true
             if self.sink_chain_reaches(callee, index, target_si, target_pi, depth + 1): return true
         false
@@ -1774,11 +1774,11 @@ impl CiProject:
         g_migrate_fn_nullable_names = List.new()
         g_migrate_fn_nullable_bits = List.new()
         g_migrate_fn_nullable_reasons = List.new()
-        for si in 0..self.symbols.len() as i32:
+        for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
             var bits = ""
             var reasons = ""
-            let count = self.symbols[si].param_fn_ptr.len() as i32
+            let count = self.symbols[si].param_fn_ptr.len()
             for pi in 0..count:
                 if pi > 0: reasons = reasons ++ "|"
                 if self.symbols[si].param_fn_ptr[pi] == 0:
@@ -1792,8 +1792,8 @@ impl CiProject:
             g_migrate_fn_nullable_reasons.push(reasons)
 
 fn ci_index_of_name(names: &List[str], name: &str) -> i32:
-    for i in 0..names.len() as i32:
-        if names[i] == name: return i
+    for i in 0..names.len():
+        if names[i] == name: return i as i32
     -1
 
 fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List[str]) -> i32:
@@ -1801,8 +1801,8 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List
     with_fs_mkdir_p(output_dir)
     var migrated = 0
     var i = 0
-    let total = files.len() as i32
-    while i < files.len() as i32:
+    let total = files.len()
+    while i < files.len():
         let file_path = files[i]
         let base = ci_migrate_path_basename(file_path)
         let out_path = ci_migrate_directory_output_path(input_dir, output_dir, file_path)
@@ -1813,7 +1813,7 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List
         var project = CiProject.new()
         project.register_modules(files)
         var scan_i = 0
-        while scan_i < files.len() as i32:
+        while scan_i < files.len():
             if project.migrate_scan_file(files[scan_i]) != 0:
                 eprint(f"migrate: failed while scanning project for {base}")
                 return 1
@@ -1831,7 +1831,7 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List
         fragments.push(ci_migrate_shared_fragment_text())
         i = i + 1
     ci_migrate_merge_shared_fragment_texts(output_dir, fragments)
-    eprint(f"migrate: {migrated}/{files.len() as i32} files translated from {input_dir} -> {output_dir}")
+    eprint(f"migrate: {migrated}/{files.len()} files translated from {input_dir} -> {output_dir}")
     if migrated == 0: 1 else: ci_migrate_apply_writes_clauses()
 
 // Translate a directory of .c files to .w files.
@@ -1853,7 +1853,7 @@ pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_ba
 
     let sorted_files = ci_migrate_sorted_files(files)
     if not ci_migrate_validate_module_paths(input_dir, sorted_files): return 1
-    let files_scanned = sorted_files.len() as i32
+    let files_scanned = sorted_files.len()
     var files_migrated = 0
 
     if ci_migrate_shared_defs_active() and g_migrate_directory_one_basename.len() == 0:
@@ -1862,7 +1862,7 @@ pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_ba
     var project = CiProject.new()
     project.register_modules(&sorted_files)
     var scan_i = 0
-    while scan_i < sorted_files.len() as i32:
+    while scan_i < sorted_files.len():
         if project.migrate_scan_file(sorted_files[scan_i]) != 0:
             return 1
         scan_i = scan_i + 1
@@ -1871,8 +1871,8 @@ pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_ba
     project.export_fn_ptr_nullability(true)
 
     var fi = 0
-    let total_files = sorted_files.len() as i32
-    while fi < sorted_files.len() as i32:
+    let total_files = sorted_files.len()
+    while fi < sorted_files.len():
         let file_path = sorted_files[fi]
         if g_migrate_directory_one_basename.len() > 0 and ci_migrate_path_basename(file_path) != g_migrate_directory_one_basename:
             fi = fi + 1
@@ -1988,7 +1988,7 @@ fn ci_migrate_taken_raw_mut(text: &str, tokens: &TokenList, i: i32) -> bool:
 fn ci_migrate_apply_writes_clauses() -> i32:
     // The exported globals: `pub var` in the output.
     var globals: HashMap[str, i32] = HashMap.new()
-    for pi in 0..g_migrate_writes_paths.len() as i32:
+    for pi in 0..g_migrate_writes_paths.len():
         let text = with_fs_read_file(g_migrate_writes_paths[pi])
         var lexer = Lexer.init(text, 0)
         let tokens = lexer.tokenize()
@@ -1996,12 +1996,12 @@ fn ci_migrate_apply_writes_clauses() -> i32:
             if tokens.get_tag(i) == TokenKind.TK_KW_PUB and tokens.get_tag(i + 1) == TokenKind.TK_KW_VAR and tokens.get_tag(i + 2) == TokenKind.TK_IDENT:
                 globals.insert(ci_migrate_token_text(text, &tokens, i + 2), 1)
     var fn_index: HashMap[str, i32] = HashMap.new()
-    for fi in 0..g_migrate_writes_fn_names.len() as i32:
-        fn_index.insert(with_str_clone_ref(g_migrate_writes_fn_names[fi]), fi)
+    for fi in 0..g_migrate_writes_fn_names.len():
+        fn_index.insert(with_str_clone_ref(g_migrate_writes_fn_names[fi]), fi as i32)
     // Each function's direct writes and corpus callees, "|a|b|" sets.
     var writes: List[str] = List.new()
     var callees: List[str] = List.new()
-    for fi in 0..g_migrate_writes_fn_bodies.len() as i32:
+    for fi in 0..g_migrate_writes_fn_bodies.len():
         let body = g_migrate_writes_fn_bodies[fi]
         var lexer = Lexer.init(body, 0)
         let tokens = lexer.tokenize()
@@ -2024,39 +2024,39 @@ fn ci_migrate_apply_writes_clauses() -> i32:
     var changed = true
     while changed:
         changed = false
-        for fi in 0..writes.len() as i32:
+        for fi in 0..writes.len():
             let calls = callees[fi].split("|")
-            for ci in 0..calls.len() as i32:
+            for ci in 0..calls.len():
                 if calls[ci].len() == 0 or not fn_index.contains(calls[ci]):
                     continue
                 let callee_writes = writes[fn_index.get(calls[ci]).unwrap()].split("|")
-                for wi in 0..callee_writes.len() as i32:
+                for wi in 0..callee_writes.len():
                     let g = callee_writes[wi]
                     if g.len() > 0 and ci_find_str(writes[fi], "|" ++ g ++ "|") < 0:
                         writes[fi] = writes[fi] ++ g ++ "|"
                         changed = true
     // The markers, replaced.
-    for pi in 0..g_migrate_writes_paths.len() as i32:
+    for pi in 0..g_migrate_writes_paths.len():
         let path = g_migrate_writes_paths[pi]
         var text = with_fs_read_file(path)
         if ci_find_str(text, "@@with-writes:") < 0:
             continue
-        for fi in 0..g_migrate_writes_fn_names.len() as i32:
+        for fi in 0..g_migrate_writes_fn_names.len():
             let mark = ci_migrate_writes_mark(g_migrate_writes_fn_names[fi])
             if ci_find_str(text, mark) < 0:
                 continue
             // Sorted by name, so the clause is deterministic.
             let parts = writes[fi].split("|")
             var used: List[bool] = List.new()
-            for wi in 0..parts.len() as i32:
+            for wi in 0..parts.len():
                 used.push(parts[wi].len() == 0)
             var clause = ""
             var printed = 0
             while true:
                 var pick = -1
-                for wi in 0..parts.len() as i32:
+                for wi in 0..parts.len():
                     if not used[wi] and (pick < 0 or ci_str_compare(parts[wi], parts[pick]) < 0):
-                        pick = wi
+                        pick = wi as i32
                 if pick < 0:
                     break
                 used[pick] = true

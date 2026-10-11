@@ -36,7 +36,7 @@ fn col_of(text: &str, offset: i32):
 fn slice(text: &str, a: isize, b: isize): text.slice(a, b)
 
 fn trim(s: &str):
-    let m = s.len() as i32
+    let m = s.len()
     var a = 0
     while a < m and (s[a] as i32) == 32:
         a = a + 1
@@ -49,7 +49,7 @@ fn trim(s: &str):
 // comma segment's identifier, stripped of its optional `: Bound`.
 fn tparam_names(inner: &str):
     var parts: List[str] = List.new()
-    let m = inner.len() as i32
+    let m = inner.len()
     var seg_start = 0
     var depth = 0
     var i = 0
@@ -65,7 +65,7 @@ fn tparam_names(inner: &str):
             while colon < i and (inner[colon] as i32) != 58:
                 colon = colon + 1
             let nm = trim(slice(inner, seg_start, colon))
-            if nm.len() as i32 > 0:
+            if nm.len() > 0:
                 parts.push(nm)
             seg_start = i + 1
         if at_end:
@@ -76,7 +76,7 @@ fn tparam_names(inner: &str):
 // Prefix `pad` to every non-empty line of `text` (blank lines stay blank).
 fn reindent(text: &str, pad: &str):
     var parts: List[str] = List.new()
-    let m = text.len() as i32
+    let m = text.len()
     var line_start = 0
     var i = 0
     while i < m:
@@ -94,7 +94,7 @@ fn reindent(text: &str, pad: &str):
 
 // Count top-level comma-separated segments in the bytes of a `[...]` group text.
 fn count_args(inner: &str) -> isize:
-    let m = inner.len() as i32
+    let m = inner.len()
     if m == 0:
         return 0
     var depth = 0
@@ -121,12 +121,12 @@ type RelocationFacts {
 
 fn local_source_path(path: &str) -> str:
     let embedded = "<embedded-std>/"
-    if path.starts_with(embedded): "lib/" ++ slice(path, embedded.len() as i32, path.len() as i32) else: with_str_clone_ref(path)
+    if path.starts_with(embedded): "lib/" ++ slice(path, embedded.len(), path.len()) else: with_str_clone_ref(path)
 
 fn compiler_relocation_facts(entry: &str) -> RelocationFacts:
     let result = compiler_analyze_file(entry, "select:kind=declaration")
     let facts = RelocationFacts { paths: List.new(), starts: List.new(), ends: List.new(), modes: List.new(), matched: List.new() }
-    for i in 0..result.report.facts.len() as i32:
+    for i in 0..result.report.facts.len():
         let fact = result.report.facts[i]
         if fact.kind != AnalysisFactKind.Declaration: continue
         if fact.flags & (AnalysisDeclarationFlag.TopLevelMethod as i32) == 0: continue
@@ -141,14 +141,14 @@ fn compiler_relocation_facts(entry: &str) -> RelocationFacts:
     facts
 
 fn relocation_fact_at(facts: &RelocationFacts, path: &str, offset: i32) -> i32:
-    for i in 0..facts.starts.len() as i32:
-        if facts.paths[i] == path and offset >= facts.starts[i] and offset < facts.ends[i]: return i
+    for i in 0..facts.starts.len():
+        if facts.paths[i] == path and offset >= facts.starts[i] and offset < facts.ends[i]: return i as i32
     -1
 
 impl RelocationFacts:
     mut fn relocate_file(path: &str, apply: bool, list_methods: bool) -> isize:
         let text = with_fs_read_file(path)
-        let tlen = text.len() as i32
+        let tlen = text.len()
         if tlen == 0:
             return 0
         var lexer = Lexer.init(text, 0)
@@ -286,7 +286,7 @@ impl RelocationFacts:
             var recv_type = slice(text, recv_start, tokens.get_start(q))
             // strip a leading `&` (borrow) and spaces
             var rti = 0
-            let rlen = recv_type.len() as i32
+            let rlen = recv_type.len()
             while rti < rlen and (recv_type[rti] as i32) == 38:   // &
                 rti = rti + 1
             while rti < rlen and (recv_type[rti] as i32) == 32:   // space
@@ -336,7 +336,7 @@ impl RelocationFacts:
             if has_tp:
                 let tp_inner = slice(text, tp_inner_a, tp_inner_b)
                 // target args: inside the target's own `[...]`
-                let tl = target.len() as i32
+                let tl = target.len()
                 var ta = 0
                 while ta < tl and (target[ta] as i32) != 91:  // find [
                     ta = ta + 1
@@ -395,7 +395,7 @@ impl RelocationFacts:
             count = count + 1
             i = j
 
-        for fi in 0..self.matched.len() as i32:
+        for fi in 0..self.matched.len():
             if self.paths[fi] == path and self.matched[fi] == 0:
                 print(f"error: {path}: compiler-selected declaration at byte {self.starts[fi]} was not structurally matched")
                 return -1
@@ -419,18 +419,18 @@ impl RelocationFacts:
         count
 
 fn path_excluded(path: &str, excludes: &List[str]) -> bool:
-    for i in 0..excludes.len() as i32:
+    for i in 0..excludes.len():
         let excluded = excludes[i]
         if path == excluded or path.starts_with(excluded ++ "/"): return true
     false
 
 fn unique_relocation_paths(facts: &RelocationFacts, excludes: &List[str]) -> List[str]:
     let paths: List[str] = List.new()
-    for i in 0..facts.paths.len() as i32:
+    for i in 0..facts.paths.len():
         let path = facts.paths[i]
         if path_excluded(path, excludes): continue
         var seen = false
-        for pi in 0..paths.len() as i32:
+        for pi in 0..paths.len():
             if paths[pi] == path:
                 seen = true
                 break
@@ -439,12 +439,12 @@ fn unique_relocation_paths(facts: &RelocationFacts, excludes: &List[str]) -> Lis
 
 fn count_selected(facts: &RelocationFacts, excludes: &List[str]) -> isize:
     var count = 0
-    for i in 0..facts.paths.len() as i32:
+    for i in 0..facts.paths.len():
         if not path_excluded(facts.paths[i], excludes): count = count + 1
     count
 
 fn verify_all_matched(facts: &RelocationFacts, excludes: &List[str]) -> bool:
-    for i in 0..facts.matched.len() as i32:
+    for i in 0..facts.matched.len():
         if path_excluded(facts.paths[i], excludes): continue
         if facts.matched[i] == 0:
             print(f"error: {facts.paths[i]}: compiler-selected declaration at byte {facts.starts[i]} was not processed")
@@ -453,7 +453,7 @@ fn verify_all_matched(facts: &RelocationFacts, excludes: &List[str]) -> bool:
 
 impl RelocationFacts:
     mut fn reset_matches():
-        for i in 0..self.matched.len() as i32: self.matched[i] = 0
+        for i in 0..self.matched.len(): self.matched[i] = 0
 
 pub fn run_receiver_migration -> i32:
     let argv = args()
@@ -465,7 +465,7 @@ pub fn run_receiver_migration -> i32:
     let excludes: List[str] = List.new()
     var entry = ""
     var arg = 2
-    while arg < argv.len() as i32:
+    while arg < argv.len():
         if argv[arg] == "--apply":
             apply = true
         else if argv[arg] == "--report":
@@ -473,7 +473,7 @@ pub fn run_receiver_migration -> i32:
         else if argv[arg] == "--list":
             list_methods = true
         else if argv[arg] == "--exclude":
-            if arg + 1 >= argv.len() as i32:
+            if arg + 1 >= argv.len():
                 print("error: --exclude requires a file path")
                 exit_code(1)
             arg = arg + 1
@@ -493,7 +493,7 @@ pub fn run_receiver_migration -> i32:
     // Always complete a no-write structural preflight over the whole semantic
     // selection before the first file can be changed.
     var preflight: isize = 0
-    for i in 0..paths.len() as i32:
+    for i in 0..paths.len():
         let changed = facts.relocate_file(paths[i], false, list_methods)
         if changed < 0: exit_code(1)
         preflight = preflight + changed
@@ -502,16 +502,16 @@ pub fn run_receiver_migration -> i32:
         print(f"error: compiler selected {selected} methods but the rewriter matched {preflight}")
         exit_code(1)
     if not apply:
-        print(f"receiver-relocation: selected={selected} matched={preflight} files={paths.len() as i32} mode=report")
+        print(f"receiver-relocation: selected={selected} matched={preflight} files={paths.len()} mode=report")
         return 0
     facts.reset_matches()
     var changed_total: isize = 0
-    for i in 0..paths.len() as i32:
+    for i in 0..paths.len():
         let changed = facts.relocate_file(paths[i], true, false)
         if changed < 0: exit_code(1)
         changed_total = changed_total + changed
     if not verify_all_matched(&facts, &excludes) or changed_total != selected:
         print(f"error: apply phase changed {changed_total} of {selected} selected methods")
         exit_code(1)
-    print(f"receiver-relocation: selected={selected} matched={preflight} changed={changed_total} files={paths.len() as i32} mode=apply")
+    print(f"receiver-relocation: selected={selected} matched={preflight} changed={changed_total} files={paths.len()} mode=apply")
     0

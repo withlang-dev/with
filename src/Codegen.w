@@ -660,7 +660,7 @@ fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: I
     cg.overflow_mode = overflow_mode
     cg.tracked_input_root = with_str_clone_ref(cg.sema.tracked_input_root)
     let tracked_paths: List[str] = List.new()
-    for tpi in 0..cg.sema.tracked_input_paths.len() as i32:
+    for tpi in 0..cg.sema.tracked_input_paths.len():
         tracked_paths.push(with_str_clone_ref(cg.sema.tracked_input_paths[tpi]))
     cg.tracked_input_paths = tracked_paths
     cg.capture_sema_symbol_texts()
@@ -754,7 +754,7 @@ impl Codegen:
         if self.analysis_report.ok(): 0 else: 1
 
     fn analysis_has_call_argument(body_sym: i32, args_id: i32, param_index: i32) -> bool:
-        for i in 0..self.analysis_report.facts.len() as i32:
+        for i in 0..self.analysis_report.facts.len():
             let fact = self.analysis_report.facts[i]
             if fact.stage == AnalysisStage.Codegen and fact.kind == AnalysisFactKind.CodegenArgument and
                fact.body_sym == body_sym and fact.parent == args_id and fact.index == param_index:
@@ -887,7 +887,7 @@ impl Codegen:
         fact
 
     mut fn mode_record(site: i32, agree: bool, fn_sym: i32, subject: i32, detail: str):
-        while self.mode_site_decisions.len() as i32 < MODE_SITE_COUNT:
+        while self.mode_site_decisions.len() < MODE_SITE_COUNT:
             self.mode_site_decisions.push(0)
             self.mode_site_disagree.push(0)
             self.mode_site_first.push("")
@@ -916,7 +916,7 @@ impl Codegen:
     mut fn note_ast_derivation(kind: i32, node: i32):
         if self.analysis_enabled == 0 or self.ast_derivation_depth != 0 or self.ast_verifying != 0:
             return
-        while self.ast_derivation_counts.len() as i32 < AST_DERIVATION_COUNT:
+        while self.ast_derivation_counts.len() < AST_DERIVATION_COUNT:
             self.ast_derivation_counts.push(0)
             self.ast_derivation_first.push("")
         if self.ast_derivation_counts[kind] == 0:
@@ -958,7 +958,7 @@ impl Codegen:
         if self.analysis_enabled == 0:
             return
         for kind in 0..AST_DERIVATION_COUNT:
-            let count = if kind < self.ast_derivation_counts.len() as i32: self.ast_derivation_counts[kind] else: 0
+            let count = if kind < self.ast_derivation_counts.len(): self.ast_derivation_counts[kind] else: 0
             if count > 0:
                 self.analysis_fail(f"ast-derivation: {ast_derivation_name(kind)}: {count} decisions codegen derived from the AST instead of reading {ast_derivation_owner(kind)}; first: {self.ast_derivation_first[kind]}")
             self.analysis_report.note(f"ast-derivation: {ast_derivation_name(kind)} decisions={count}")
@@ -990,7 +990,7 @@ impl Codegen:
                 if reachable[bb] == 0 or body.term_kind(bb) != TermKind.TK_CALL:
                     continue
                 let args_id = body.term_data1(bb)
-                if args_id < 0 or args_id >= body.call_arg_counts.len() as i32:
+                if args_id < 0 or args_id >= body.call_arg_counts.len():
                     self.analysis_fail(f"body {body.fn_sym} bb={bb}: call argument id {args_id} is out of range")
                     continue
                 if body.call_intrinsic(args_id) != MirIntrinsic.NONE:
@@ -1008,14 +1008,14 @@ impl Codegen:
         let mono = body.call_mono_sym(args_id)
         let call_key = (body.fn_sym as i64) * 4294967296 + args_id
         let descriptor = self.analysis_call_abis.get(call_key) ?? (self.fn_abi_symbols.get(self.codegen_sym_for_sema_sym(mono)) ?? -1)
-        let name = if mono != 0: with_str_clone_ref(self.sema.pool_resolve(mono)) else if sig >= 0 and sig < self.sema.sig_names.len() as i32: with_str_clone_ref(self.sema.pool_resolve(self.sema.sig_names[sig])) else: "<unresolved>"
-        let op_kind = if operand >= 0 and operand < body.operand_kinds.len() as i32: body.operand_kinds[operand] else: -1
+        let name = if mono != 0: with_str_clone_ref(self.sema.pool_resolve(mono)) else if sig >= 0 and sig < self.sema.sig_names.len(): with_str_clone_ref(self.sema.pool_resolve(self.sema.sig_names[sig])) else: "<unresolved>"
+        let op_kind = if operand >= 0 and operand < body.operand_kinds.len(): body.operand_kinds[operand] else: -1
         let has_descriptor = descriptor >= 0 and param_index >= 0 and param_index < self.fn_abis[descriptor].arg_count
         let share = if has_descriptor: self.fn_abi_arg(descriptor, param_index).pass == PM_INDIRECT_PLACE else:
             sig >= 0 and param_index >= 0 and param_index < self.sema.sig_get_param_count(sig) and self.sema.sig_param_uses_value_ref_abi(sig, param_index) != 0
         // Extern "C" callees use their recorded C ABI instead of the With
         // ref table. Their indirect-copy requirement is audited below.
-        let sig_sym = if sig >= 0 and sig < self.sema.sig_names.len() as i32: self.sema.sig_names[sig] else: 0
+        let sig_sym = if sig >= 0 and sig < self.sema.sig_names.len(): self.sema.sig_names[sig] else: 0
         let callee_is_extern = sig_sym != 0 and self.sema.extern_fn_names.contains(sig_sym)
         let abi_sym = self.codegen_sym_for_sema_sym(if mono != 0: mono else: sig_sym)
         let named_descriptor = self.fn_abi_symbols.get(abi_sym) ?? -1
@@ -1075,7 +1075,7 @@ impl Codegen:
         fact.body_sym = body.fn_sym
         fact.symbol = fn_sym
         fact.index = param_index
-        fact.type_id = if param_index + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(param_index + 1)] else: 0
+        fact.type_id = if param_index + 1 < body.local_type_ids.len(): body.local_type_ids[(param_index + 1)] else: 0
         fact.effects = if sig >= 0 and param_index < self.sema.sig_get_param_count(sig): self.sema.sig_param_effect(sig, param_index) else: 0
         fact.flags = (strategy as i32) | (if share: 65536 else: 0) | (if ref_table: 131072 else: 0) | (if incoming_ptr: 262144 else: 0)
         fact.name = with_str_clone_ref(name)
@@ -1478,7 +1478,7 @@ impl Codegen:
     // the name Sema recorded for that source text (the table diagnostics use).
     fn debug_source_path(file_id: i32) -> str:
         if file_id != 0:
-            for si in 0..self.sema.source_text_file_ids.len() as i32:
+            for si in 0..self.sema.source_text_file_ids.len():
                 if self.sema.source_text_file_ids[si] == file_id:
                     return with_str_clone_ref(self.sema.source_text_names[si])
         with_str_clone_ref(self.source_file)
@@ -1579,10 +1579,10 @@ impl Codegen:
         let local_count = body.local_names.len() as i32
         var first_spans: List[i32] = List.new()
         for _ in 0..local_count: first_spans.push(0)
-        for si in 0..body.stmt_kinds.len() as i32:
+        for si in 0..body.stmt_kinds.len():
             if body.stmt_kinds[si] != StmtKind.Assign: continue
             let place = body.stmt_d0[si]
-            if place < 0 or place >= body.place_locals.len() as i32 or body.place_proj_counts[place] != 0: continue
+            if place < 0 or place >= body.place_locals.len() or body.place_proj_counts[place] != 0: continue
             let local = body.place_locals[place]
             if local > 0 and local < local_count and first_spans[local] == 0:
                 first_spans[local] = body.stmt_spans[si]
@@ -1606,7 +1606,7 @@ impl Codegen:
             let line = if is_param or span <= 0: fn_line else: self.debug_line_col(span).0
             let ty = self.debug_get_di_type(self.mir_type_to_live_sema_type(body.local_type_ids[li]))
             let variable = if is_param:
-                wl_di_create_parameter_variable(self.di_builder, subprogram, name, li - first_param + 1, self.di_fn_file, line, ty)
+                wl_di_create_parameter_variable(self.di_builder, subprogram, name, (li - first_param + 1) as i32, self.di_fn_file, line, ty)
             else:
                 wl_di_create_auto_variable(self.di_builder, subprogram, name, self.di_fn_file, line, ty)
             let location = wl_di_create_debug_location(self.context, line, 0, subprogram)
@@ -1923,7 +1923,7 @@ impl Codegen:
 
     fn is_method_symbol(sym: i32) -> bool:
         let name = self.intern.resolve(sym)
-        for i in 0..name.len() as i32:
+        for i in 0..name.len():
             if name[i] == 46:  // '.'
                 return true
         false
@@ -1977,7 +1977,7 @@ impl Codegen:
         if base_opt.is_some():
             let base = base_opt.unwrap()
             let slot = base + param_idx
-            if slot >= 0 and slot < self.fn_dyn_param_data.len() as i32:
+            if slot >= 0 and slot < self.fn_dyn_param_data.len():
                 let recorded_trait = self.fn_dyn_param_data[slot]
                 if recorded_trait != 0:
                     if self.trait_map.get(recorded_trait).is_some():
@@ -2691,9 +2691,9 @@ impl Codegen:
         if has_sret != 0 and sret_ty != 0:
             sret_buf = self.create_entry_alloca(sret_ty)
             final_args.push(sret_buf)
-        for i in 0..coerced.len() as i32:
+        for i in 0..coerced.len():
             final_args.push(coerced[i])
-        let call_val = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&final_args), final_args.len() as i32)
+        let call_val = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&final_args), final_args.len())
         var byval_types: List[i64] = List.new()
         let byval_types_opt = self.fn_abi_symbol_byval_attr_types(fn_sym)
         if byval_types_opt.is_some():
@@ -2711,14 +2711,14 @@ impl Codegen:
 
     fn mir_call_context(body: &MirBody, callee_operand: i32) -> str:
         var out = "mir " ++ self.function_symbol_name(body.fn_sym) ++ " -> "
-        if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
+        if callee_operand < 0 or callee_operand >= body.operand_kinds.len():
             return out ++ "<callee?>"
         let ok = body.operand_kinds[callee_operand]
         let od = body.operand_d0[callee_operand]
-        if ok == OperandKind.OK_CONSTANT and od >= 0 and od < body.const_kinds.len() as i32:
+        if ok == OperandKind.OK_CONSTANT and od >= 0 and od < body.const_kinds.len():
             if body.const_kinds[od] == ConstKind.CK_FN:
                 return out ++ self.function_symbol_name(body.const_d0[od])
-        if (ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE) and od >= 0 and od < body.place_locals.len() as i32:
+        if (ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE) and od >= 0 and od < body.place_locals.len():
             return out ++ f"place_{body.place_locals[od]}"
         out ++ "indirect"
 
@@ -2726,11 +2726,11 @@ impl Codegen:
 
     fn find_type_symbol(llvm_ty: i64) -> i32:
         // Search struct types
-        for i in 0..self.struct_llvm_types.len() as i32:
+        for i in 0..self.struct_llvm_types.len():
             if self.struct_llvm_types[i] == llvm_ty:
                 // Find the symbol that maps to this index
                 // We need to iterate the hashmap — just check all entries
-                for j in 0..self.struct_field_counts.len() as i32:
+                for j in 0..self.struct_field_counts.len():
                     // struct_type_map maps sym → index, we want reverse
                     0
                 // Fallback: return 0
@@ -2738,13 +2738,13 @@ impl Codegen:
         0
 
     fn find_struct_index_by_type(llvm_ty: i64) -> i32:
-        for i in 0..self.struct_llvm_types.len() as i32:
+        for i in 0..self.struct_llvm_types.len():
             if self.struct_llvm_types[i] == llvm_ty:
-                return i
+                return i as i32
         -1
 
     fn is_union_struct_index(struct_idx: i32) -> bool:
-        if struct_idx < 0 or struct_idx >= self.struct_index_syms.len() as i32:
+        if struct_idx < 0 or struct_idx >= self.struct_index_syms.len():
             return false
         let name_sym = self.struct_index_syms[struct_idx]
         if name_sym == 0:
@@ -2755,7 +2755,7 @@ impl Codegen:
         self.is_union_struct_index(self.find_struct_index_by_type(llvm_ty))
 
     fn struct_source_field_type(struct_idx: i32, source_fi: i32) -> i64:
-        if struct_idx < 0 or struct_idx >= self.struct_field_counts.len() as i32:
+        if struct_idx < 0 or struct_idx >= self.struct_field_counts.len():
             return 0
         let f_count = self.struct_field_counts[struct_idx]
         if source_fi < 0 or source_fi >= f_count:
@@ -2804,7 +2804,7 @@ impl Codegen:
         self.struct_llvm_field_indices[map_idx]
 
     fn list_contains_i32(values: &List[i32], needle: i32) -> bool:
-        for i in 0..values.len() as i32:
+        for i in 0..values.len():
             if values[i] == needle:
                 return true
         false
@@ -2816,7 +2816,7 @@ impl Codegen:
         visited.push(start_idx)
 
         var qi = 0
-        while qi < queue.len() as i32:
+        while qi < queue.len():
             let cur = queue[qi]
             qi = qi + 1
 
@@ -2840,7 +2840,7 @@ impl Codegen:
         let src = self.source_text
         var line: i32 = 1
         for i in 0..start:
-            if i < src.len() as i32:
+            if i < src.len():
                 if src[i] == 10:
                     line = line + 1
         line
@@ -3068,7 +3068,7 @@ pub fn list_data_i64(v: &List[i64]) -> i64:
 // sink (e.g. record_c_abi_transform) more than once under spec §3.8.
 pub fn list_copy_i64(src: &List[i64]) -> List[i64]:
     let out: List[i64] = List.new()
-    for i in 0..src.len() as i32:
+    for i in 0..src.len():
         out.push(src[i])
     out
 
@@ -3086,14 +3086,14 @@ fn codegen_owned_text(text: &str) -> str:
 impl Codegen:
     mut fn capture_sema_symbol_texts():
         let texts: List[str] = List.new()
-        for i in 0..self.sema.pool.state.symbol_texts.len() as i32:
+        for i in 0..self.sema.pool.state.symbol_texts.len():
             texts.push(codegen_owned_text(self.sema.pool.state.symbol_texts[i]))
         self.sema_symbol_texts = texts
 
     fn sema_symbol_text(sym: i32) -> str:
-        if sym > 0 and sym < self.sema_symbol_texts.len() as i32:
+        if sym > 0 and sym < self.sema_symbol_texts.len():
             return with_str_clone_ref(self.sema_symbol_texts[sym])
-        if sym > 0 and sym < self.sema.pool.state.symbol_texts.len() as i32:
+        if sym > 0 and sym < self.sema.pool.state.symbol_texts.len():
             return with_str_clone_ref(self.sema.pool.state.symbol_texts[sym])
         with_str_clone_ref(self.sema.pool_resolve(sym))
 
@@ -3543,7 +3543,7 @@ impl Codegen:
         let de_opt = self.disc_enum_type_map.get(sym)
         if de_opt.is_some():
             let de_idx = de_opt.unwrap()
-            if de_idx >= 0 and de_idx < self.disc_enum_has_payload.len() as i32:
+            if de_idx >= 0 and de_idx < self.disc_enum_has_payload.len():
                 if self.disc_enum_has_payload[de_idx] == 0:
                     return self.disc_enum_repr_types[de_idx]
         // User-defined struct types
@@ -3686,7 +3686,7 @@ impl Codegen:
 
     // After Pass 0b every registered body is defined; anything else is a bug.
     mut fn verify_type_bodies_defined():
-        for di in 0..self.type_body_state.len() as i32:
+        for di in 0..self.type_body_state.len():
             let state: i32 = self.type_body_state[di]
             if state == TYPE_BODY_PENDING or state == TYPE_BODY_DEFINING:
                 with_eprint("BUG: type '" ++ self.intern.resolve(self.type_body_sym[di]) ++ "' has no body after Pass 0b (#1430)")
@@ -3837,7 +3837,7 @@ impl Codegen:
         self.sema_type_to_llvm(inner_tid)
 
     mut fn generic_enum_payload_llvm_type(payload_tys: &List[i32]) -> i64:
-        let count = payload_tys.len() as i32
+        let count = payload_tys.len()
         if count <= 0:
             return 0
         if count == 1:
@@ -3915,7 +3915,7 @@ impl Codegen:
             var payload_ty: i64 = 0
             if payload_count > 0:
                 let payload_tys = self.sema.resolve_generic_enum_payload_frozen(resolved, base_sym, variant_name, payload_count)
-                if payload_tys.len() as i32 == payload_count:
+                if payload_tys.len() == payload_count:
                     payload_ty = self.generic_enum_payload_llvm_type(&payload_tys)
                 if payload_ty == 0:
                     with_eprint("error: unresolved payload type for generic enum variant '" ++ self.sema_symbol_text(variant_name) ++ "' in '" ++ mono_name ++ "'")
@@ -3948,9 +3948,9 @@ impl Codegen:
         let sema_args: List[i32] = List.new()
         for ti in 0..tp_count:
             var arg_sema: i32 = 0
-            if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
+            if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len():
                 arg_sema = self.mono_struct_tp_flat_sema_types[(tp_flat_start + ti)]
-            if arg_sema == 0 and tp_flat_start + ti < self.mono_struct_tp_flat_types.len() as i32:
+            if arg_sema == 0 and tp_flat_start + ti < self.mono_struct_tp_flat_types.len():
                 let arg_llvm = self.mono_struct_tp_flat_types[(tp_flat_start + ti)]
                 arg_sema = self.llvm_type_to_sema_type(arg_llvm)
             if arg_sema == 0:
@@ -4238,9 +4238,9 @@ impl Codegen:
                     let sema_args: List[i32] = List.new()
                     for ti in 0..tp_count:
                         var arg_sema: i32 = 0
-                        if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
+                        if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len():
                             arg_sema = self.mono_struct_tp_flat_sema_types[(tp_flat_start + ti)]
-                        if arg_sema == 0 and tp_flat_start + ti < self.mono_struct_tp_flat_types.len() as i32:
+                        if arg_sema == 0 and tp_flat_start + ti < self.mono_struct_tp_flat_types.len():
                             let arg_llvm = self.mono_struct_tp_flat_types[(tp_flat_start + ti)]
                             arg_sema = self.llvm_type_to_sema_type(arg_llvm)
                         if arg_sema == 0:
@@ -4589,14 +4589,14 @@ impl Codegen:
     fn codegen_get_type_extra(idx: i32) -> i32:
         if idx >= 0 and idx < self.mir_type_extra_len() as i32:
             return self.mir_type_extra_at(idx)
-        if idx >= 0 and idx < self.sema.type_extra.len() as i32:
+        if idx >= 0 and idx < self.sema.type_extra.len():
             return self.sema.type_extra[idx]
         0
 
     // D69 (§13.4): a generator value is a compiler-generated struct of its gen
     // fn's arguments, declared here because it has no type declaration.
     fn predeclare_generator_state_types():
-        for si in 0..self.sema.sig_names.len() as i32:
+        for si in 0..self.sema.sig_names.len():
             let fn_sym = self.sema.sig_names[si]
             if not self.sema.generator_fn_state_types.contains(fn_sym):
                 continue
@@ -4646,7 +4646,7 @@ impl Codegen:
         wl_struct_set_body(st_type, list_data_i64(&field_types), field_count, 0)
 
     mut fn declare_generator_state_types():
-        for si in 0..self.sema.sig_names.len() as i32:
+        for si in 0..self.sema.sig_names.len():
             let fn_sym: i32 = self.sema.sig_names[si]
             if self.sema.generator_fn_state_types.contains(fn_sym):
                 self.declare_generator_state_type(self.sema.generator_fn_state_types.get(fn_sym).unwrap())
@@ -5145,7 +5145,7 @@ impl Codegen:
         let offsets: List[i64] = List.new()
         var at: i64 = 0
         var align: i64 = 1
-        for i in 0..elem_tys.len() as i32:
+        for i in 0..elem_tys.len():
             let elem_align = self.declared_align_of(elem_tys[i])
             if elem_align > align:
                 align = elem_align
@@ -5161,7 +5161,7 @@ impl Codegen:
     // The element keeps its position, at its offset, occupying nothing.
     fn tuple_member_types(elem_tys: &List[i64]) -> List[i64]:
         let members: List[i64] = List.new()
-        for i in 0..elem_tys.len() as i32:
+        for i in 0..elem_tys.len():
             let elem = elem_tys[i]
             if elem != 0 and wl_get_type_kind(elem) == wl_void_type_kind():
                 members.push(wl_struct_type(self.context, 0, 0, 0))
@@ -5175,8 +5175,8 @@ impl Codegen:
         if self.abi_size_of(ty) != size or self.declared_align_of(ty) != align:
             return false
         let dl = wl_get_module_data_layout(self.llmod)
-        for i in 0..offsets.len() as i32:
-            if wl_offset_of_element(dl, ty, self.tuple_elem_index(ty, i)) != offsets[i]:
+        for i in 0..offsets.len():
+            if wl_offset_of_element(dl, ty, self.tuple_elem_index(ty, i as i32)) != offsets[i]:
                 return false
         true
 
@@ -5452,7 +5452,7 @@ impl Codegen:
         wl_build_load(self.builder, opt_ty, result_alloca)
 
     fn find_disc_enum_sym_by_idx(de_idx: i32) -> i32:
-        if de_idx >= 0 and de_idx < self.disc_enum_name_syms.len() as i32:
+        if de_idx >= 0 and de_idx < self.disc_enum_name_syms.len():
             return self.disc_enum_name_syms[de_idx]
         0
 
@@ -5566,7 +5566,7 @@ impl Codegen:
     // so a compiler with an empty embedded index (stage1) compiles exactly
     // what a compiler with the bundle embedded compiles.
     mut fn add_bundle_prefixes(prefixes: &List[str]):
-        for i in 0..prefixes.len() as i32:
+        for i in 0..prefixes.len():
             let prefix = prefixes[i]
             if not self.bundle_prefixes.contains(prefix):
                 self.bundle_prefixes.push(with_str_clone_ref(prefix))
@@ -5627,7 +5627,7 @@ impl Codegen:
         let end = self.pool.get_end(node)
         if start < 0 or end <= start:
             return ""
-        if end > self.source_text.len() as i32:
+        if end > self.source_text.len():
             return ""
         self.source_text.slice(start as i64, end as i64)
 
@@ -5638,10 +5638,10 @@ impl Codegen:
         if text.len() == 0:
             return ""
         var dot = -1
-        for i in 0..text.len() as i32:
+        for i in 0..text.len():
             if text[i] == 46:
-                dot = i
-        if dot < 0 or dot + 1 >= text.len() as i32:
+                dot = i as i32
+        if dot < 0 or dot + 1 >= text.len():
             return ""
         text.slice((dot + 1) as i64, text.len())
 
@@ -5650,17 +5650,17 @@ impl Codegen:
         if text.len() < 3:
             return ""
         var i = 0
-        while i < text.len() as i32 and text[i] <= 32:
+        while i < text.len() and text[i] <= 32:
             i = i + 1
-        if i + 1 >= text.len() as i32:
+        if i + 1 >= text.len():
             return ""
         if text[i] != 102 or text[(i + 1)] != 110:
             return ""
         i = i + 2
-        while i < text.len() as i32 and text[i] <= 32:
+        while i < text.len() and text[i] <= 32:
             i = i + 1
         let start = i
-        while i < text.len() as i32:
+        while i < text.len():
             let ch = text[i]
             let is_alpha = (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122)
             let is_digit = ch >= 48 and ch <= 57
@@ -5677,21 +5677,21 @@ impl Codegen:
         if text.len() < 4:
             return ""
         var i = 0
-        while i < text.len() as i32 and text[i] <= 32:
+        while i < text.len() and text[i] <= 32:
             i = i + 1
-        if i + 2 >= text.len() as i32:
+        if i + 2 >= text.len():
             return ""
         if text[i] != 108 or text[(i + 1)] != 101 or text[(i + 2)] != 116:
             return ""
         i = i + 3
-        while i < text.len() as i32 and text[i] <= 32:
+        while i < text.len() and text[i] <= 32:
             i = i + 1
-        if i + 2 < text.len() as i32 and text[i] == 109 and text[(i + 1)] == 117 and text[(i + 2)] == 116:
+        if i + 2 < text.len() and text[i] == 109 and text[(i + 1)] == 117 and text[(i + 2)] == 116:
             i = i + 3
-            while i < text.len() as i32 and text[i] <= 32:
+            while i < text.len() and text[i] <= 32:
                 i = i + 1
         let start = i
-        while i < text.len() as i32:
+        while i < text.len():
             let ch = text[i]
             let is_alpha = (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122)
             let is_digit = ch >= 48 and ch <= 57
@@ -6102,7 +6102,7 @@ impl Codegen:
             if incoming.pass == PM_INDIRECT:
                 value = wl_build_load(self.builder, incoming.source_ty, value)
             args.push(self.push_call_arg(target_index, pi, value, if outgoing.pass == PM_INDIRECT_PLACE: value else: 0))
-        let call = wl_build_call(self.builder, target.llvm_ty, fn_val, list_data_i64(&args), args.len() as i32)
+        let call = wl_build_call(self.builder, target.llvm_ty, fn_val, list_data_i64(&args), args.len())
         let target_byval = self.fn_abi_byval_attr_types(target_index)
         self.apply_c_abi_call_attrs(call, has_sret, target.ret.source_ty, target_byval, target.arg_count, 0)
         if target.ret.pass == PM_IGNORE:
@@ -6268,20 +6268,20 @@ impl Codegen:
     // D69 generator producers and `each` bodies, and D61's synthesized `:?`
     // formatters: MIR-only functions whose signature Sema registered.
     mut fn declare_generator_functions():
-        for si in 0..self.sema.sig_names.len() as i32:
+        for si in 0..self.sema.sig_names.len():
             let fn_sym: i32 = self.sema.sig_names[si]
             if not self.sema.generator_mir_only_fns.contains(fn_sym) and not self.sema.debug_fmt_synth_syms.contains(fn_sym):
                 continue
-            self.declare_function_from_sig(fn_sym, si, 1)
+            self.declare_function_from_sig(fn_sym, si as i32, 1)
 
     fn find_sema_sig_for_mir_body_sym(body_sym: i32) -> (i32, i32):
         let body_name = self.function_symbol_name(body_sym)
         if body_name.len() == 0:
             return (0, -1)
-        for si in 0..self.sema.sig_names.len() as i32:
+        for si in 0..self.sema.sig_names.len():
             let sig_sym = self.sema.sig_names[si]
             if self.sema_symbol_text(sig_sym) == body_name:
-                return (sig_sym, si)
+                return (sig_sym, si as i32)
         (0, -1)
 
     fn mir_body_is_generated_function_clause(body_sym: i32) -> bool:
@@ -6320,9 +6320,9 @@ impl Codegen:
             return self.find_decl_index(self.sema.fn_clause_group_clause(group, 0))
         let name = self.function_symbol_name(body_sym)
         var dot = -1
-        for i in 0..name.len() as i32:
+        for i in 0..name.len():
             if name[i] == '.':
-                dot = i
+                dot = i as i32
         if dot <= 0:
             return -1
         let owner_sym = self.intern.intern(name.slice(0, dot as i64))
@@ -6381,7 +6381,7 @@ impl Codegen:
         let name_str = if raw_name.len() > 0: with_str_clone_ref(raw_name) else: self.sema_symbol_text(name_sym)
         if name_str.len() == 0:
             return false
-        for di in 0..name_str.len() as i32:
+        for di in 0..name_str.len():
             if name_str[di] == 46:
                 let owner_sym = self.intern.intern(name_str.slice(0, di as i64))
                 return self.generic_type_decl_node(owner_sym) != 0
@@ -6845,7 +6845,7 @@ impl Codegen:
         if not codegen_c_abi_needs_byval_attr():
             return
         for pi in 0..param_count:
-            if pi >= byval_types.len() as i32:
+            if pi >= byval_types.len():
                 continue
             let byval_ty = byval_types[pi]
             if byval_ty == 0:
@@ -6862,7 +6862,7 @@ impl Codegen:
         if not codegen_c_abi_needs_byval_attr():
             return
         for ai in 0..original_arg_count:
-            if ai >= byval_types.len() as i32:
+            if ai >= byval_types.len():
                 continue
             let byval_ty = byval_types[ai]
             if byval_ty == 0:
@@ -7042,13 +7042,13 @@ impl Codegen:
     fn canonical_extern_name(name: &str) -> str:
         // c_import may suffix C symbols as "name.<n>" — strip the suffix for linking.
         var dot_pos = -1
-        for i in 0..name.len() as i32:
+        for i in 0..name.len():
             if name[i] == 46:
-                dot_pos = i
-        if dot_pos > 0 and dot_pos + 1 < name.len() as i32:
+                dot_pos = i as i32
+        if dot_pos > 0 and dot_pos + 1 < name.len():
             var all_digits = true
             var j = dot_pos + 1
-            while j < name.len() as i32:
+            while j < name.len():
                 let ch = name[j]
                 if ch < 48 or ch > 57:
                     all_digits = false
@@ -8112,7 +8112,7 @@ impl Codegen:
         let runtime_init_ft = wl_global_get_value_type(runtime_init_fn)
         wl_build_call(self.builder, runtime_init_ft, runtime_init_fn, 0, 0)
 
-        for i in 0..self.module_runtime_init_fns.len() as i32:
+        for i in 0..self.module_runtime_init_fns.len():
             let init_fn = self.module_runtime_init_fns[i]
             let init_ty = self.module_runtime_init_types[i]
             let init_global = self.module_runtime_init_globals[i]
@@ -8151,7 +8151,7 @@ impl Codegen:
         self.current_function = wrapper
         self.current_drop_needs_guard = true
         self.mir_set_current_drop_origin(0)
-        var gd = self.module_drop_global_syms.len() as i32
+        var gd = self.module_drop_global_syms.len()
         while gd > 0:
             gd = gd - 1
             let gd_sym = self.module_drop_global_syms[gd]

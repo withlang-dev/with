@@ -46,7 +46,7 @@ fn lock_str_compare(a: &str, b: &str) -> i32:
 
 fn lock_json_escape(value: &str) -> str:
     var out = ""
-    for i in 0..value.len() as i32:
+    for i in 0..value.len():
         let ch = value[i]
         if ch == 34 or ch == 92:
             out = out ++ "\\"
@@ -61,8 +61,8 @@ fn lock_json_string(key: &str, value: &str, comma: bool) -> str:
 fn lock_find_text(text: &str, needle: &str) -> isize:
     if needle.len() == 0:
         return 0
-    let n = text.len() as i32
-    let m = needle.len() as i32
+    let n = text.len()
+    let m = needle.len()
     var i = 0
     while i <= n - m:
         var ok = true
@@ -77,16 +77,16 @@ fn lock_find_text(text: &str, needle: &str) -> isize:
 
 fn lock_json_extract_string(json: &str, key: &str) -> str:
     let needle = "\"" ++ key ++ "\""
-    let json_len = json.len() as i32
+    let json_len = json.len()
     var pos = 0
-    while pos < json_len - needle.len() as i32:
+    while pos < json_len - needle.len():
         var found = true
-        for ni in 0..needle.len() as i32:
+        for ni in 0..needle.len():
             if json[(pos + ni)] != needle[ni]:
                 found = false
                 break
         if found:
-            var vi = pos + needle.len() as i32
+            var vi = pos + needle.len()
             while vi < json_len and json[vi] != 58:
                 vi = vi + 1
             while vi < json_len and json[vi] != 34:
@@ -112,16 +112,16 @@ fn lock_json_extract_string(json: &str, key: &str) -> str:
 fn lock_json_extract_string_array(json: &str, key: &str) -> List[str]:
     let result: List[str] = List.new()
     let needle = "\"" ++ key ++ "\""
-    let json_len = json.len() as i32
+    let json_len = json.len()
     var pos = 0
-    while pos < json_len - needle.len() as i32:
+    while pos < json_len - needle.len():
         var found = true
-        for ni in 0..needle.len() as i32:
+        for ni in 0..needle.len():
             if json[(pos + ni)] != needle[ni]:
                 found = false
                 break
         if found:
-            var ai = pos + needle.len() as i32
+            var ai = pos + needle.len()
             while ai < json_len and json[ai] != 91:
                 ai = ai + 1
             if ai >= json_len:
@@ -152,7 +152,7 @@ fn lock_json_extract_string_array(json: &str, key: &str) -> List[str]:
 
 fn lock_split_nonempty_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()
-    let n = text.len() as i32
+    let n = text.len()
     var start = 0
     var i = 0
     while i <= n:
@@ -173,8 +173,8 @@ fn lock_line_string_value(line: &str, key: &str) -> str:
     let key_pos = lock_find_text(line, needle)
     if key_pos < 0:
         return ""
-    var pos = key_pos + needle.len() as i32
-    let n = line.len() as i32
+    var pos = key_pos + needle.len()
+    let n = line.len()
     while pos < n and line[pos] != 58:
         pos = pos + 1
     while pos < n and line[pos] != 34:
@@ -191,7 +191,7 @@ fn lock_line_entry_name(line: &str) -> str:
     if lock_find_text(line, "\": {") < 0:
         return ""
     var start = 0
-    let n = line.len() as i32
+    let n = line.len()
     while start < n and line[start] != 34:
         start = start + 1
     if start >= n:
@@ -213,7 +213,7 @@ pub fn lock_load(project_root: &str) -> LockFile:
     var lock = lock_empty()
     var current = LockEntry { name: "", source: "", version: "", recipe_rev: "", package_id: "", package_rev: "", sha256: "" }
     let lines = lock_split_nonempty_lines(json)
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         let entry_name = lock_line_entry_name(line)
         if entry_name.len() > 0:
@@ -253,7 +253,7 @@ pub fn lock_load(project_root: &str) -> LockFile:
 pub fn lock_upsert(lock: &LockFile, entry: LockEntry) -> LockFile:
     let out_entries: List[LockEntry] = List.new()
     var inserted = false
-    for i in 0..lock.entries.len() as i32:
+    for i in 0..lock.entries.len():
         let existing = lock.entries[i]
         let cmp = lock_str_compare(entry.name, existing.name)
         if cmp == 0:
@@ -271,7 +271,7 @@ pub fn lock_upsert(lock: &LockFile, entry: LockEntry) -> LockFile:
 
 pub fn lock_remove(lock: &LockFile, name: &str) -> LockFile:
     let out_entries: List[LockEntry] = List.new()
-    for i in 0..lock.entries.len() as i32:
+    for i in 0..lock.entries.len():
         let entry = lock.entries[i]
         if entry.name != name:
             out_entries.push(lock_entry_clone(entry))
@@ -286,7 +286,7 @@ pub fn lock_write(project_root: &str, lock: &LockFile) -> i32:
     var text = "{\n"
     text = text ++ "  " ++ q ++ "version" ++ q ++ ": 1,\n"
     text = text ++ "  " ++ q ++ "deps" ++ q ++ ": {\n"
-    for i in 0..lock.entries.len() as i32:
+    for i in 0..lock.entries.len():
         let entry = lock.entries[i]
         text = text ++ "    " ++ q ++ lock_json_escape(entry.name) ++ q ++ ": {\n"
         text = text ++ lock_json_string("source", entry.source, true)
@@ -297,7 +297,7 @@ pub fn lock_write(project_root: &str, lock: &LockFile) -> i32:
             text = text ++ lock_json_string("package_id", entry.package_id, true)
             text = text ++ lock_json_string("package_rev", entry.package_rev, true)
             text = text ++ lock_json_string("sha256", entry.sha256, false)
-        let suffix = if i + 1 < lock.entries.len() as i32: "," else: ""
+        let suffix = if i + 1 < lock.entries.len(): "," else: ""
         text = text ++ "    }" ++ suffix ++ "\n"
     text = text ++ "  }\n"
     text = text ++ "}\n"
@@ -362,7 +362,7 @@ type LockDepWalk { lock: LockFile, seen: List[str] }
 fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, name: &str, version: &str) -> LockDepWalk:
     let key = name ++ "/" ++ version
     var out = walk
-    for i in 0..out.seen.len() as i32:
+    for i in 0..out.seen.len():
         if out.seen[i] == key:
             return out
     out.seen.push(key)
@@ -373,7 +373,7 @@ fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, 
     out.lock = lock_upsert(move out.lock, entry)
     let meta = runtime_read_file(lock_c_dep_dir(project_root, name, version) ++ "/metadata.json")
     let requirements = lock_json_extract_string_array(meta, "requires")
-    for i in 0..requirements.len() as i32:
+    for i in 0..requirements.len():
         let req = requirements[i]
         let req_name = lock_ref_name(req)
         let req_version = lock_ref_version(req)
@@ -455,7 +455,7 @@ pub fn lock_restore(project_root: &str) -> i32:
     if lock.entries.len() == 0:
         runtime_eprint("error: lock file has no dependencies: .with/lock.json")
         return 1
-    for i in 0..lock.entries.len() as i32:
+    for i in 0..lock.entries.len():
         let entry = lock.entries[i]
         let rc = lock_restore_entry(project_root, entry)
         if rc != 0:

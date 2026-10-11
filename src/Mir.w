@@ -38,7 +38,7 @@ impl MirModule:
     // concrete specialization registers its own sig); a builtin never
     // shadows either.
     mut fn snapshot_sema_callables(sema: &Sema, pool: InternPool):
-        for si in 0..sema.sig_names.len() as i32:
+        for si in 0..sema.sig_names.len():
             let name = sema.pool_resolve(sema.sig_names[si])
             if name.len() > 0:
                 self.sema_callable_syms.insert(pool.intern(name), MirCallableClass.Signature as i32)
@@ -48,12 +48,12 @@ impl MirModule:
             if not self.sema_callable_syms.contains(mir_sym):
                 self.sema_callable_syms.insert(mir_sym, MirCallableClass.Generic as i32)
         let builtins = sema.intrinsic_fn_syms()
-        for bi in 0..builtins.len() as i32:
+        for bi in 0..builtins.len():
             let mir_sym = pool.intern(sema.pool_resolve(builtins[bi]))
             if not self.sema_callable_syms.contains(mir_sym):
                 self.sema_callable_syms.insert(mir_sym, MirCallableClass.Intrinsic as i32)
         let generic_builtins = sema.generic_builtin_syms()
-        for bi in 0..generic_builtins.len() as i32:
+        for bi in 0..generic_builtins.len():
             let mir_sym = pool.intern(sema.pool_resolve(generic_builtins[bi]))
             if not self.sema_callable_syms.contains(mir_sym):
                 self.sema_callable_syms.insert(mir_sym, MirCallableClass.Intrinsic as i32)
@@ -151,7 +151,7 @@ fn MirBody.init(fn_sym: i32, sema: &Sema) -> MirBody:
 
 fn dump_mir_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
     var out = ""
-    out = out ++ f"mir module functions={mir_mod.bodies.len() as i32}\n"
+    out = out ++ f"mir module functions={mir_mod.bodies.len()}\n"
     for i in 0..mir_mod.bodies.len():
         if i > 0:
             out = out ++ "\n"
@@ -163,7 +163,7 @@ fn dump_mir_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
 // concatenation when dumping large MIR corpora.
 
 pub fn print_mir_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema):
-    with_write(f"mir module functions={mir_mod.bodies.len() as i32}\n")
+    with_write(f"mir module functions={mir_mod.bodies.len()}\n")
     for i in 0..mir_mod.bodies.len():
         if i > 0:
             with_write("\n")
@@ -180,9 +180,9 @@ pub fn dump_mir_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
     out = out ++ "fn " ++ fn_name ++ " " ++ lbrace() ++ "\n"
     out = out ++ "  locals:\n"
 
-    let local_total = body.local_type_ids.len() as i32
-    let bb_total = body.bb_stmt_starts.len() as i32
-    let stmt_total = body.stmt_kinds.len() as i32
+    let local_total = body.local_type_ids.len()
+    let bb_total = body.bb_stmt_starts.len()
+    let stmt_total = body.stmt_kinds.len()
     if local_total > 50000 or bb_total > 20000 or stmt_total > 500000:
         out = out ++ f"    <mir dump omitted: body too large locals={local_total} bbs={bb_total} stmts={stmt_total}>\n"
         out = out ++ rbrace() ++ "\n"
@@ -224,7 +224,7 @@ pub fn dump_mir_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
             out = out ++ "    <invalid statement span>\n"
             stmt_count = 0
         else if stmt_start + raw_stmt_count > stmt_total:
-            stmt_count = stmt_total - stmt_start
+            stmt_count = (stmt_total - stmt_start) as i32
             out = out ++ "    <statement span truncated>\n"
         if stmt_count > 2048:
             stmt_count = 2048
@@ -233,7 +233,7 @@ pub fn dump_mir_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
             let stmt_id = stmt_start + si
             out = out ++ "    " ++ mir_stmt_text(body, stmt_id, pool, sema) ++ "\n"
 
-        out = out ++ "    " ++ mir_term_text(body, bb, pool, sema) ++ "\n"
+        out = out ++ "    " ++ mir_term_text(body, bb as i32, pool, sema) ++ "\n"
         out = out ++ "  " ++ rbrace() ++ "\n"
     if bb_total > bb_count:
         out = out ++ f"\n  ... blocks truncated ({bb_total - bb_count} more)\n"
@@ -286,15 +286,15 @@ fn mir_term_text(body: &MirBody, bb: i32, pool: &InternPool, sema: &Sema) -> str
             let start = body.switch_table_starts[d1]
             let raw_count = body.switch_table_counts[d1]
             var count: i32 = raw_count
-            let vals_len = body.switch_table_vals.len() as i32
-            let tgts_len = body.switch_table_targets.len() as i32
+            let vals_len = body.switch_table_vals.len()
+            let tgts_len = body.switch_table_targets.len()
             if start < 0 or raw_count < 0 or start > vals_len or start > tgts_len:
                 count = 0
                 table_text = "<invalid switch table>"
             else:
                 let max_len = if vals_len < tgts_len: vals_len else: tgts_len
                 if start + raw_count > max_len:
-                    count = max_len - start
+                    count = (max_len - start) as i32
             if count > 256:
                 count = 256
             for i in 0..count:
@@ -535,7 +535,7 @@ fn mir_agg_fields_text(body: &MirBody, fields_id: i32, pool: &InternPool, sema: 
 
     let start = body.agg_field_starts[fields_id]
     let raw_count = body.agg_field_counts[fields_id]
-    let ops_len = body.agg_field_operands.len() as i32
+    let ops_len = body.agg_field_operands.len()
     if start < 0 or raw_count < 0 or start > ops_len:
         return "<invalid aggregate fields>"
     let count = if start + raw_count > ops_len: ops_len - start else: raw_count
@@ -558,7 +558,7 @@ fn mir_call_args_text(body: &MirBody, args_id: i32, pool: &InternPool, sema: &Se
 
     let start = body.call_arg_starts[args_id]
     let raw_count = body.call_arg_counts[args_id]
-    let ops_len = body.call_arg_operands.len() as i32
+    let ops_len = body.call_arg_operands.len()
     if start < 0 or raw_count < 0 or start > ops_len:
         return "<invalid call args>"
     let count = if start + raw_count > ops_len: ops_len - start else: raw_count
@@ -583,7 +583,7 @@ fn mir_call_args_text(body: &MirBody, args_id: i32, pool: &InternPool, sema: &Se
 pub fn dump_drop_state_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
     let _ = sema
     var out = StringBuilder.new()
-    out.push_str(f"drop-state module functions={mir_mod.bodies.len() as i32}\n")
+    out.push_str(f"drop-state module functions={mir_mod.bodies.len()}\n")
     for i in 0..mir_mod.bodies.len():
         if i > 0: out.push_str("\n")
         out.push_str(dump_drop_state_body(&mir_mod.bodies[i], pool))
@@ -676,7 +676,7 @@ fn dump_drop_plan_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
 
 pub fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
     var out = StringBuilder.new()
-    out.push_str(f"drop-plan module functions={mir_mod.bodies.len() as i32}\n")
+    out.push_str(f"drop-plan module functions={mir_mod.bodies.len()}\n")
     for i in 0..mir_mod.bodies.len():
         if i > 0: out.push_str("\n")
         out.push_str(dump_drop_plan_body(&mir_mod.bodies[i], pool, sema))
@@ -699,7 +699,7 @@ pub fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema
 pub fn dump_place_map_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
     let _ = sema
     var out = StringBuilder.new()
-    out.push_str(f"place-map module functions={mir_mod.bodies.len() as i32}\n")
+    out.push_str(f"place-map module functions={mir_mod.bodies.len()}\n")
     for i in 0..mir_mod.bodies.len():
         if i > 0: out.push_str("\n")
         out.push_str(dump_place_map_body(mir_mod, &mir_mod.bodies[i], pool))

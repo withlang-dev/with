@@ -105,10 +105,10 @@ fn frontend_new_list_str -> List[str]:
 fn frontend_normalize_source_text(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
     var i = 0
-    while i < text.len() as i32:
+    while i < text.len():
         let ch = text[i]
         if ch == 13:
-            if i + 1 < text.len() as i32 and text[(i + 1)] == 10:
+            if i + 1 < text.len() and text[(i + 1)] == 10:
                 i = i + 1
             out.push_byte(10 as u8)
         else:
@@ -136,8 +136,8 @@ fn frontend_resolve_executable_path(argv0: &str) -> str:
 
     var segment_start = 0
     var i = 0
-    while i <= search_path.len() as i32:
-        let at_end = i == search_path.len() as i32
+    while i <= search_path.len():
+        let at_end = i == search_path.len()
         let ch = if at_end: 58 else: search_path[i]
         if ch == 58:
             let dir = search_path.slice(segment_start as i64, i as i64)
@@ -251,9 +251,9 @@ fn c_import_str_contains(text: &str, needle: &str) -> bool:
     if needle.len() > text.len():
         return false
     var i = 0
-    let limit = text.len() as i32 - needle.len() as i32
+    let limit = text.len() - needle.len()
     while i <= limit:
-        if text.slice(i as i64, (i + needle.len() as i32) as i64) == needle:
+        if text.slice(i as i64, (i + needle.len()) as i64) == needle:
             return true
         i = i + 1
     false
@@ -317,7 +317,7 @@ impl Sema:
         self.global_visible_module_paths = HashMap.new()
         self.module_visibility_cache = HashMap.new()
 
-        for mi in 0..resolved.modules.len() as i32:
+        for mi in 0..resolved.modules.len():
             let mod = resolved.modules[mi]
             let owned_path = frontend_owned_text(mod.path)
             self.module_paths.push(owned_path)
@@ -326,7 +326,7 @@ impl Sema:
             for ii in 0..mod.import_count:
                 let imp = resolved.imports[(mod.import_start + ii)]
                 if imp.namespace.len() > 0 and (imp.target_module >= 0 or imp.module_text.len() == 0):
-                    self.ns_modules.push(mi)
+                    self.ns_modules.push(mi as i32)
                     self.ns_names.push(frontend_owned_text(imp.namespace))
                     self.ns_fulls.push(frontend_owned_text(imp.module_text))
                     self.ns_targets.push(imp.target_module)
@@ -354,8 +354,8 @@ impl Sema:
             // the pcre2 interface through its own `use std.re.*`, and pcre2's
             // three thousand names are not every program's namespace.
             let seen_global: HashMap[i32, i32] = HashMap.new()
-            while global_frontier.len() as i32 > 0:
-                let last = global_frontier.len() as i32 - 1
+            while global_frontier.len() > 0:
+                let last = global_frontier.len() - 1
                 let mid: i32 = global_frontier[last]
                 global_frontier.pop()
                 if seen_global.contains(mid):
@@ -436,7 +436,7 @@ impl Zcu:
                 ordered.push(decl as i32)
                 ordered_paths.push(frontend_owned_text(self.decl_source_path_frontend(i)))
                 ordered_file_ids.push(self.decl_source_file_id_frontend(i))
-                let ci_f = if i < self.decl_is_c_import.len() as i32: self.decl_is_c_import[i] else: 0
+                let ci_f = if i < self.decl_is_c_import.len(): self.decl_is_c_import[i] else: 0
                 ordered_ci.push(ci_f)
                 continue
 
@@ -483,7 +483,7 @@ impl Zcu:
                     // The cached translation depends on every header in its manifest;
                     // track them so incremental builds re-translate on header changes.
                     let hit_dep_paths = c_import_deps_manifest_paths(c_import_fs_cache_deps_manifest(cache_key))
-                    for dpi in 0..hit_dep_paths.len() as i32:
+                    for dpi in 0..hit_dep_paths.len():
                         self.record_frontend_tracked_input(hit_dep_paths[dpi])
                 else:
                     if self.trace_c_import_cache != 0:
@@ -505,7 +505,7 @@ impl Zcu:
                     if libclang_result.len() > 0:
                         synthetic = libclang_result
                         let gen_dep_paths = cimport_deps_sorted_unique_paths(c_import_included_files())
-                        for dpi in 0..gen_dep_paths.len() as i32:
+                        for dpi in 0..gen_dep_paths.len():
                             self.record_frontend_tracked_input(gen_dep_paths[dpi])
                     else:
                         let libclang_error = c_import_last_error()
@@ -616,7 +616,7 @@ impl Zcu:
 
         while out.decl_count() > 0:
             out.state.decls.pop()
-        for oi in 0..ordered.len() as i32:
+        for oi in 0..ordered.len():
             out.add_decl(ordered[oi])
         self.decl_source_paths = ordered_paths
         self.decl_source_file_ids = ordered_file_ids
@@ -641,7 +641,7 @@ impl Zcu:
             if kind == NodeKind.NK_C_FACADE:
                 claimed = self.collect_facade_claims_frontend(out, decl as i32, move claimed)
                 continue
-            if i >= self.decl_is_c_import.len() as i32 or self.decl_is_c_import[i] == 0:
+            if i >= self.decl_is_c_import.len() or self.decl_is_c_import[i] == 0:
                 continue
             if (kind == NodeKind.NK_EXTERN_FN or kind == NodeKind.NK_FN_DECL) and owner < 0:
                 owner = i
@@ -807,7 +807,7 @@ impl Zcu:
             if aliases.len() > 0:
                 let first = out.decl_count()
                 out = self.splice_facade_text_frontend(out, &aliases, "<facade " ++ facade_name ++ " presentations>", i)
-                for k in 0..origins.len() as i32: self.adopt_decl_origin(first + k, origins[k])
+                for k in 0..origins.len(): self.adopt_decl_origin((first + k) as i32, origins[k])
             let text = facade_render_block(out, self.pool, decl as i32, &self.decl_is_c_import)
             if text.len() == 0:
                 continue
@@ -853,7 +853,7 @@ impl Zcu:
         for oi in 0..only_count:
             key = key ++ "|" ++ self.c_import_only_name_frontend(pool, decl, oi)
         key = key ++ "\n#defines:"
-        for di in 0..self.project_config.c_import_defines.len() as i32:
+        for di in 0..self.project_config.c_import_defines.len():
             key = key ++ "|" ++ self.project_config.c_import_defines[di]
         key = key ++ c_import_header_content_fingerprint_line(header_spec)
         key = key ++ frontend_cimport_compiler_fingerprint_line()
@@ -908,7 +908,7 @@ fn cimport_deps_str_compare(a: &str, b: &str) -> i32:
 fn cimport_deps_sorted_unique_paths(files: &str) -> List[str]:
     var out = frontend_new_list_str()
     var pos = 0
-    let total = files.len() as i32
+    let total = files.len()
     while pos < total:
         var line_end = pos
         while line_end < total and files[line_end] != 10:
@@ -916,13 +916,13 @@ fn cimport_deps_sorted_unique_paths(files: &str) -> List[str]:
         if line_end > pos:
             let path = files.slice(pos as i64, line_end as i64)
             var exists = false
-            for i in 0..out.len() as i32:
+            for i in 0..out.len():
                 if out[i] == path:
                     exists = true
             if not exists:
                 var inserted = false
                 let next = frontend_new_list_str()
-                for i in 0..out.len() as i32:
+                for i in 0..out.len():
                     let existing = out[i]
                     if not inserted and cimport_deps_str_compare(path, existing) < 0:
                         next.push(with_str_clone_ref(path))
@@ -943,7 +943,7 @@ let CIMPORT_DEPS_MANIFEST_HEADER: str = "cimport-deps-v1"
 fn c_import_build_deps_manifest(files: &str) -> str:
     var manifest = CIMPORT_DEPS_MANIFEST_HEADER ++ "\n"
     let paths = cimport_deps_sorted_unique_paths(files)
-    for i in 0..paths.len() as i32:
+    for i in 0..paths.len():
         let path = paths[i]
         let text = runtime_read_file(path)
         manifest = manifest ++ f"{text.len()}|{runtime_str_hash(text)}|{path}\n"
@@ -951,7 +951,7 @@ fn c_import_build_deps_manifest(files: &str) -> str:
 
 fn c_import_deps_manifest_entries_valid(manifest: &str) -> bool:
     var pos = 0
-    let total = manifest.len() as i32
+    let total = manifest.len()
     var saw_header = false
     while pos < total:
         var line_end = pos
@@ -988,7 +988,7 @@ fn c_import_deps_manifest_entries_valid(manifest: &str) -> bool:
 fn c_import_deps_manifest_paths(manifest: &str) -> List[str]:
     var out = frontend_new_list_str()
     var pos = 0
-    let total = manifest.len() as i32
+    let total = manifest.len()
     while pos < total:
         var line_end = pos
         while line_end < total and manifest[line_end] != 10:
@@ -997,11 +997,11 @@ fn c_import_deps_manifest_paths(manifest: &str) -> List[str]:
             let line = manifest.slice(pos as i64, line_end as i64)
             var sep2 = -1
             var seen = 0
-            for i in 0..line.len() as i32:
+            for i in 0..line.len():
                 if line[i] == 124:
                     seen = seen + 1
                     if seen == 2:
-                        sep2 = i
+                        sep2 = i as i32
             if sep2 > 0 and (sep2 as i64) + 1 < line.len():
                 out.push(line.slice(sep2 as i64 + 1, line.len()))
         pos = line_end + 1
@@ -1079,7 +1079,7 @@ impl Zcu:
     fn c_import_record_omissions_frontend(synthetic: &str):
         let prefix = "// @with-cimport-omitted|"
         var pos = 0
-        let total = synthetic.len() as i32
+        let total = synthetic.len()
         while pos <= total:
             let line_start = pos
             var line_end = pos
@@ -1090,9 +1090,9 @@ impl Zcu:
                 if c_import_starts_with(line, prefix):
                     let rest = line.slice(prefix.len(), line.len())
                     var sep = -1
-                    for ri in 0..rest.len() as i32:
+                    for ri in 0..rest.len():
                         if rest[ri] == 124:
-                            sep = ri
+                            sep = ri as i32
                             break
                     if sep > 0:
                         let name = rest.slice(0, sep as i64)
@@ -1189,15 +1189,15 @@ impl Zcu:
 fn frontend_is_cimport_support_name(name: &str) -> bool:
     if name.len() == 0:
         return true
-    name.len() as i32 >= 2 and name[0] == 99 and name[1] == 95
+    name.len() >= 2 and name[0] == 99 and name[1] == 95
 
 // True when `dname` is `want` or a `want.member` method of it — so selecting a
 // type keeps its auto-generated methods.
 fn frontend_name_selects(want: &str, dname: &str) -> bool:
     if dname == want:
         return true
-    let wl = want.len() as i32
-    if dname.len() as i32 > wl and dname[wl] == 46:
+    let wl = want.len()
+    if dname.len() > wl and dname[wl] == 46:
         return dname.slice(0, wl as i64) == want
     false
 
@@ -1231,7 +1231,7 @@ impl Zcu:
     mut fn c_import_emit_strict_omissions_frontend(pool: AstPool, decl: i32, synthetic: &str):
         let prefix = "// @with-cimport-omitted|"
         var pos = 0
-        let total = synthetic.len() as i32
+        let total = synthetic.len()
         while pos <= total:
             let line_start = pos
             var line_end = pos
@@ -1242,9 +1242,9 @@ impl Zcu:
                 if c_import_starts_with(line, prefix):
                     let rest = line.slice(prefix.len(), line.len())
                     var sep = -1
-                    for ri in 0..rest.len() as i32:
+                    for ri in 0..rest.len():
                         if rest[ri] == 124:
-                            sep = ri
+                            sep = ri as i32
                             break
                     let name = if sep > 0: rest.slice(0, sep as i64) else: rest
                     if name.len() > 0 and not self.c_import_decl_allows_untranslated_frontend(pool, decl, name):
@@ -1269,7 +1269,7 @@ impl Zcu:
 
     fn c_import_first_unallowed_untranslated_frontend(pool: AstPool, decl: i32, names: &str) -> str:
         var i = 0
-        let total = names.len() as i32
+        let total = names.len()
         while i < total:
             while i < total and names[i] == 124:
                 i = i + 1
@@ -1295,7 +1295,7 @@ impl Zcu:
 
         var line_start = 0
         var i = 0
-        let total = header.len() as i32
+        let total = header.len()
         while i <= total:
             if i == total or header[i] == 10:
                 let raw_line = header.slice(line_start as i64, i as i64)
@@ -1321,7 +1321,7 @@ impl Zcu:
 
         var stmt_start = 0
         var si = 0
-        let body_len = body.len() as i32
+        let body_len = body.len()
         while si <= body_len:
             if si == body_len or body[si] == 59:
                 let stmt = c_import_trim(body.slice(stmt_start as i64, si as i64))
@@ -1437,12 +1437,12 @@ fn c_import_macro_decl(line: &str) -> str:
         return ""
 
     var i = 0
-    while i < rest.len() as i32 and c_import_is_ident_char(rest[i]):
+    while i < rest.len() and c_import_is_ident_char(rest[i]):
         i = i + 1
     if i <= 0:
         return ""
     let name = rest.slice(0, i as i64)
-    if i < rest.len() as i32 and rest[i] == 40:
+    if i < rest.len() and rest[i] == 40:
         return ""
 
     var value = c_import_trim(rest.slice(i as i64, rest.len()))
@@ -1467,7 +1467,7 @@ fn c_import_define_name(line: &str) -> str:
     else:
         return ""
     var i = 0
-    while i < rest.len() as i32 and c_import_is_ident_char(rest[i]):
+    while i < rest.len() and c_import_is_ident_char(rest[i]):
         i = i + 1
     if i <= 0:
         return ""
@@ -1479,9 +1479,9 @@ fn c_import_statement_name(stmt_raw: &str) -> str:
         return ""
 
     var open = -1
-    for i in 0..stmt.len() as i32:
+    for i in 0..stmt.len():
         if stmt[i] == 40:
-            open = i
+            open = i as i32
             break
     if open > 0:
         var ne = open - 1
@@ -1494,7 +1494,7 @@ fn c_import_statement_name(stmt_raw: &str) -> str:
         if ns <= ne:
             return stmt.slice(ns as i64, (ne + 1) as i64)
 
-    var end = stmt.len() as i32 - 1
+    var end = stmt.len() - 1
     while end >= 0 and not c_import_is_ident_char(stmt[end]):
         end = end - 1
     if end < 0:
@@ -1549,7 +1549,7 @@ fn c_import_function_decl(stmt_raw: &str) -> str:
     if params_text.len() > 0 and params_text != "void":
         var seg_start = 0
         var i = 0
-        let plen = params_text.len() as i32
+        let plen = params_text.len()
         while i <= plen:
             if i == plen or params_text[i] == 44:
                 let seg = c_import_trim(params_text.slice(seg_start as i64, i as i64))
@@ -1582,7 +1582,7 @@ fn c_import_param_type(param_raw: &str) -> str:
     if param == "void":
         return ""
 
-    let len = param.len() as i32
+    let len = param.len()
     var end = len - 1
     while end >= 0 and c_import_is_space(param[end]):
         end = end - 1
@@ -1604,7 +1604,7 @@ fn c_import_map_c_type(spec_raw: &str) -> str:
         return "i32"
 
     var star_count = 0
-    for i in 0..spec.len() as i32:
+    for i in 0..spec.len():
         if spec[i] == 42:
             star_count = star_count + 1
 
@@ -1656,7 +1656,7 @@ fn c_import_map_c_type(spec_raw: &str) -> str:
 fn c_import_decode_escapes(raw: &str) -> str:
     var out = StringBuilder.with_capacity(raw.len())
     var i = 0
-    let len = raw.len() as i32
+    let len = raw.len()
     while i < len:
         let ch = raw[i]
         if ch != 92 or i + 1 >= len:
@@ -1684,7 +1684,7 @@ fn c_import_trim_outer_parens(value_raw: &str) -> str:
 
 fn c_import_escape_with_string(value: &str) -> str:
     var out = ""
-    for i in 0..value.len() as i32:
+    for i in 0..value.len():
         let ch = value[i]
         if ch == 92:
             out = out ++ "\\\\"
@@ -1708,14 +1708,14 @@ fn c_import_is_int_literal(text_raw: &str) -> i32:
     var i = 0
     if text[0] == 45 or text[0] == 43:
         i = 1
-    if i >= text.len() as i32:
+    if i >= text.len():
         return 0
 
-    if i + 1 < text.len() as i32 and text[i] == 48 and (text[(i + 1)] == 120 or text[(i + 1)] == 88):
+    if i + 1 < text.len() and text[i] == 48 and (text[(i + 1)] == 120 or text[(i + 1)] == 88):
         i = i + 2
-        if i >= text.len() as i32:
+        if i >= text.len():
             return 0
-        while i < text.len() as i32:
+        while i < text.len():
             let ch = text[i]
             let is_digit = ch >= 48 and ch <= 57
             let is_hex_lo = ch >= 97 and ch <= 102
@@ -1725,7 +1725,7 @@ fn c_import_is_int_literal(text_raw: &str) -> i32:
             i = i + 1
         return 1
 
-    while i < text.len() as i32:
+    while i < text.len():
         let ch = text[i]
         if ch < 48 or ch > 57:
             return 0
@@ -1737,7 +1737,7 @@ fn c_import_is_space(ch: i32) -> bool:
 
 fn c_import_trim(s: &str) -> str:
     var start = 0
-    var end = s.len() as i32
+    var end = s.len()
     while start < end and c_import_is_space(s[start]):
         start = start + 1
     while end > start and c_import_is_space(s[(end - 1)]):
@@ -1813,7 +1813,7 @@ impl Zcu:
         files.push("rt/fiber_runtime.w")
         files.push(with_str_clone_ref(fiber_core))
         files.push("rt/compat_runtime.w")
-        for i in 0..files.len() as i32:
+        for i in 0..files.len():
             let rel = files[i]
             let path = embedded_rt_resolve_path(rel)
             if path.len() == 0:
@@ -1848,12 +1848,12 @@ impl Zcu:
             return AstPool.new()
         if do_profile:
             let read_ns = runtime_clock_nanos() - t_read
-            runtime_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={raw_text.len() as i32}")
+            runtime_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={raw_text.len()}")
 
         let text = frontend_normalize_source_text(raw_text)
         self.set_current_source(source_dir, path, text)
         if zcu_debug_init_enabled() != 0:
-            runtime_eprint(f"[frontend] compile_file:source_ready bytes={text.len() as i32}")
+            runtime_eprint(f"[frontend] compile_file:source_ready bytes={text.len()}")
         let pool = self.compile_source_frontend(text, path, 0)
         if pool.decl_count() == 0 and not self.diagnostics.has_errors():
             runtime_eprint("error: compiler produced an empty module for '" ++ path ++ "'")
@@ -1883,7 +1883,7 @@ impl Zcu:
             return AstPool.new()
         if do_profile:
             let read_ns = runtime_clock_nanos() - t_read
-            runtime_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={raw_text.len() as i32}")
+            runtime_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={raw_text.len()}")
 
         let text = frontend_normalize_source_text(raw_text)
         self.set_current_source(source_dir, path, text)
@@ -1983,7 +1983,7 @@ impl Zcu:
             self.pool = parser.intern
             self.diagnostics = move parser.diags
             self.seed_decl_source_paths(pool, name, file_id)
-        for extra_i in 0..self.extra_source_names.len() as i32:
+        for extra_i in 0..self.extra_source_names.len():
             let extra_name: str = with_str_clone_ref(self.extra_source_names[extra_i])
             let extra_text = frontend_normalize_source_text(self.extra_source_texts[extra_i])
             let extra_file_id: i32 = self.next_file_id
@@ -2025,7 +2025,7 @@ impl Zcu:
         self.set_resolve_snapshot(artifacts.result, name)
         // #930: the resolver numbered imported modules from next_file_id;
         // advance past them so no later registration reuses one of their ids.
-        for mi in 0..self.last_resolved.modules.len() as i32:
+        for mi in 0..self.last_resolved.modules.len():
             let mod_file_id = self.last_resolved.modules[mi].file_id
             if mod_file_id >= self.next_file_id:
                 self.next_file_id = mod_file_id + 1
@@ -2059,7 +2059,7 @@ impl Zcu:
         // (Zcu add_imported_path).
         for message in self.import_conflict_messages():
             self.diagnostics.emit(Diagnostic.err(message, Span { file: 0, start: 0, end: 0 }))
-        if self.pending_iface_paths.len() as i32 > 0:
+        if self.pending_iface_paths.len() > 0:
             let pending_paths = move self.pending_iface_paths
             let pending_texts = move self.pending_iface_texts
             self.pending_iface_paths = frontend_new_list_str()
@@ -2171,7 +2171,7 @@ impl Zcu:
         // A c_import's translation and a rendered `c facade` are the
         // compiler's own text: the rule is for modules people write.
         let generated_files: List[i32] = List.new()
-        for si in 0..self.source_text_names.len() as i32:
+        for si in 0..self.source_text_names.len():
             let text_name = self.source_text_names[si]
             if text_name.starts_with("<c_import ") or text_name.starts_with("<facade ") or text_name.starts_with("<toolchain facade "):
                 generated_files.push(self.source_text_file_ids[si])
@@ -2248,12 +2248,12 @@ impl Zcu:
     // diagnostic rendering, regardless of whether its parse produced any
     // decls or the merge loop ever ran (#661).
     mut fn register_resolved_source_texts():
-        for mi in 0..self.last_resolved.modules.len() as i32:
+        for mi in 0..self.last_resolved.modules.len():
             let mod = self.last_resolved.modules[mi]
             if mod.module_id == 0 or mod.path.len() == 0:
                 continue
             var already = false
-            for si in 0..self.source_text_file_ids.len() as i32:
+            for si in 0..self.source_text_file_ids.len():
                 if self.source_text_file_ids[si] == mod.file_id:
                     already = true
                     break
@@ -2266,7 +2266,7 @@ impl Zcu:
     mut fn merge_resolved_modules_frontend(root_pool: AstPool, root_path: &str) -> AstPool:
         var merged_pool = root_pool
 
-        for mi in 0..self.last_resolved.modules.len() as i32:
+        for mi in 0..self.last_resolved.modules.len():
             let mod = self.last_resolved.modules[mi]
             if mod.module_id == 0:
                 continue
@@ -2317,10 +2317,10 @@ impl Zcu:
         let line_done: List[i32] = List.new()
         let line_counts: List[i32] = List.new()
         var decl_lines = 0
-        for si in 0..paths.len() as i32:
+        for si in 0..paths.len():
             let lines = texts[si].split("\n")
             var li = 0
-            while li < lines.len() as i32:
+            while li < lines.len():
                 if interface_line_kind(lines[li]) == INTERFACE_LINE_SKIP:
                     li = li + 1
                     continue
@@ -2328,13 +2328,13 @@ impl Zcu:
                 // Canonical standalone attributes belong to the following
                 // header. Leave a dangling attribute unclassified: parsing
                 // it must diagnose the malformed interface.
-                while li < lines.len() as i32 and (lines[li].starts_with("@[") and lines[li].ends_with("]") or lines[li].len() == 0 or lines[li].starts_with("//")):
+                while li < lines.len() and (lines[li].starts_with("@[") and lines[li].ends_with("]") or lines[li].len() == 0 or lines[li].starts_with("//")):
                     li = li + 1
-                let header = if li < lines.len() as i32: frontend_owned_text(lines[li]) else: ""
+                let header = if li < lines.len(): frontend_owned_text(lines[li]) else: ""
                 let header_kind = interface_line_kind(header)
                 let kind = if header_kind == INTERFACE_LINE_SKIP: INTERFACE_LINE_ALWAYS else: header_kind
-                if li < lines.len() as i32: li = li + 1
-                while li < lines.len() as i32 and (lines[li].starts_with(" ") or lines[li].starts_with("\t") or lines[li].len() == 0 or lines[li].starts_with("//")):
+                if li < lines.len(): li = li + 1
+                while li < lines.len() and (lines[li].starts_with(" ") or lines[li].starts_with("\t") or lines[li].len() == 0 or lines[li].starts_with("//")):
                     li = li + 1
                 var declaration = StringBuilder.new()
                 var count: i32 = 0
@@ -2343,7 +2343,7 @@ impl Zcu:
                     declaration.push_str("\n")
                     if interface_line_kind(lines[bi]) != INTERFACE_LINE_SKIP:
                         count = count + 1
-                line_section.push(si)
+                line_section.push(si as i32)
                 line_texts.push(declaration.to_str())
                 line_names.push(interface_line_name(header, kind))
                 line_kinds.push(kind)
@@ -2357,8 +2357,8 @@ impl Zcu:
             var chunk = ""
             var chunk_lines = 0
             var chunk_section = -1
-            for li in 0..(line_kinds.len() as i32 + 1):
-                let section = if li < line_kinds.len() as i32: line_section[li] else: -1
+            for li in 0..(line_kinds.len() + 1):
+                let section = if li < line_kinds.len(): line_section[li] else: -1
                 if section != chunk_section:
                     if chunk_lines > 0:
                         out = self.parse_interface_chunk(out, paths[chunk_section], chunk)
@@ -2399,7 +2399,7 @@ impl Zcu:
                 ordered.push(decls[di])
                 ordered_paths.push(frontend_owned_text(self.decl_source_path_frontend(di)))
                 ordered_file_ids.push(self.decl_source_file_id_frontend(di))
-                ordered_ci.push(if di < self.decl_is_c_import.len() as i32: self.decl_is_c_import[di] else: 0)
+                ordered_ci.push(if di < self.decl_is_c_import.len(): self.decl_is_c_import[di] else: 0)
             while out.decl_count() > 0:
                 out.state.decls.pop()
             for oi in 0..total:
@@ -2409,7 +2409,7 @@ impl Zcu:
             self.decl_is_c_import = ordered_ci
         if runtime_getenv("WITH_PROFILE").len() > 0:
             let ns = runtime_clock_nanos() - t_start
-            runtime_eprint(f"[profile] frontend.interface  {ns / 1000000}.{(ns % 1000000) / 1000} ms  sections={paths.len() as i32} lines={parsed_lines} of {decl_lines}")
+            runtime_eprint(f"[profile] frontend.interface  {ns / 1000000}.{(ns % 1000000) / 1000} ms  sections={paths.len()} lines={parsed_lines} of {decl_lines}")
         out
 
     // #1362: an interface fn is its module's, like a source fn (#1350). When
@@ -2464,7 +2464,7 @@ impl Zcu:
                 let decl = pool.get_decl(di) as i32
                 if pool.kind(decl) != NodeKind.NK_LET_DECL or pool.let_decl_is_interface_provided(decl as NodeId):
                     continue
-                let from_c_import = di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[di] != 0
+                let from_c_import = di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0
                 let path = self.decl_source_path_frontend(di)
                 if (pass == 0) != (not from_c_import and path == self.current_source_path):
                     continue
@@ -2498,15 +2498,15 @@ impl Zcu:
             if pool.kind(decl) == NodeKind.NK_EXTERN_FN:
                 extern_names.push(pool.get_data0(decl))
                 extern_paths.push(self.decl_source_path_frontend(di))
-                extern_imports.push(di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[di] != 0)
+                extern_imports.push(di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0)
         for di in 0..pool.decl_count():
             let decl = pool.get_decl(di) as i32
             if not frontend_fn_decl_is_displaceable(pool, self.pool, decl) or frontend_fn_decl_is_method(pool, self.pool, decl):
                 continue
-            let from_import = di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[di] != 0
+            let from_import = di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0
             let name = pool.get_data0(decl)
             let path = self.decl_source_path_frontend(di)
-            for e in 0..extern_names.len() as i32:
+            for e in 0..extern_names.len():
                 // A header's extern also must not overwrite another source
                 // module's ordinary With function (e.g. clock(seconds)).
                 // Keep manual extern-to-With bridge behavior: this separation
@@ -2540,7 +2540,7 @@ impl Zcu:
                     continue
                 if frontend_fn_decl_is_method(pool, self.pool, decl):
                     continue
-                let from_c_import = di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[di] != 0
+                let from_c_import = di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0
                 if (pass == 0) == from_c_import:
                     continue
                 let path = self.decl_source_path_frontend(di)
@@ -2647,12 +2647,12 @@ impl Zcu:
                 ordered.push(decl as i32)
                 ordered_paths.push(frontend_owned_text(self.decl_source_path_frontend(i)))
                 ordered_file_ids.push(self.decl_source_file_id_frontend(i))
-                let ci_flag = if i < self.decl_is_c_import.len() as i32: self.decl_is_c_import[i] else: 0
+                let ci_flag = if i < self.decl_is_c_import.len(): self.decl_is_c_import[i] else: 0
                 ordered_c_import.push(ci_flag)
 
         while out.decl_count() > 0:
             out.state.decls.pop()
-        for oi in 0..ordered.len() as i32:
+        for oi in 0..ordered.len():
             out.add_decl(ordered[oi])
         self.decl_source_paths = ordered_paths
         self.decl_source_file_ids = ordered_file_ids
@@ -2714,7 +2714,7 @@ impl Zcu:
                     prelude_ordered.push(decl as i32)
                     prelude_paths.push(self.decl_source_path_frontend(pi))
                     prelude_file_ids.push(self.decl_source_file_id_frontend(pi))
-                    prelude_c_import.push(if pi < self.decl_is_c_import.len() as i32: self.decl_is_c_import[pi] else: 0)
+                    prelude_c_import.push(if pi < self.decl_is_c_import.len(): self.decl_is_c_import[pi] else: 0)
                     pi = pi + 1
                     continue
                 let pps = merged_pool.get_data0(decl)
@@ -2724,7 +2724,7 @@ impl Zcu:
                         prelude_ordered.push(decl as i32)
                         prelude_paths.push(self.decl_source_path_frontend(pi))
                         prelude_file_ids.push(self.decl_source_file_id_frontend(pi))
-                        prelude_c_import.push(if pi < self.decl_is_c_import.len() as i32: self.decl_is_c_import[pi] else: 0)
+                        prelude_c_import.push(if pi < self.decl_is_c_import.len(): self.decl_is_c_import[pi] else: 0)
                     else:
                         let ppname = self.use_path_name_frontend(merged_pool, pps, ppc)
                         let ppfpath = self.resolve_module_path_frontend(ppname, self.decl_source_dir_frontend(pi))
@@ -2746,7 +2746,7 @@ impl Zcu:
                 root_ordered.push(decl as i32)
                 root_paths.push(self.decl_source_path_frontend(ui))
                 root_file_ids.push(self.decl_source_file_id_frontend(ui))
-                root_c_import.push(if ui < self.decl_is_c_import.len() as i32: self.decl_is_c_import[ui] else: 0)
+                root_c_import.push(if ui < self.decl_is_c_import.len(): self.decl_is_c_import[ui] else: 0)
                 continue
             let ups = merged_pool.get_data0(decl)
             let upc = merged_pool.get_data1(decl)
@@ -2755,7 +2755,7 @@ impl Zcu:
                     root_ordered.push(decl as i32)
                     root_paths.push(self.decl_source_path_frontend(ui))
                     root_file_ids.push(self.decl_source_file_id_frontend(ui))
-                    root_c_import.push(if ui < self.decl_is_c_import.len() as i32: self.decl_is_c_import[ui] else: 0)
+                    root_c_import.push(if ui < self.decl_is_c_import.len(): self.decl_is_c_import[ui] else: 0)
                 else:
                     let upname = self.use_path_name_frontend(merged_pool, ups, upc)
                     let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui))
@@ -2774,7 +2774,7 @@ impl Zcu:
                 user_import_ordered.push(decl as i32)
                 user_import_paths.push(self.decl_source_path_frontend(ui2))
                 user_import_file_ids.push(self.decl_source_file_id_frontend(ui2))
-                user_import_c_import.push(if ui2 < self.decl_is_c_import.len() as i32: self.decl_is_c_import[ui2] else: 0)
+                user_import_c_import.push(if ui2 < self.decl_is_c_import.len(): self.decl_is_c_import[ui2] else: 0)
                 ui2 = ui2 + 1
                 continue
             let ups = merged_pool.get_data0(decl)
@@ -2784,7 +2784,7 @@ impl Zcu:
                     user_import_ordered.push(decl as i32)
                     user_import_paths.push(self.decl_source_path_frontend(ui2))
                     user_import_file_ids.push(self.decl_source_file_id_frontend(ui2))
-                    user_import_c_import.push(if ui2 < self.decl_is_c_import.len() as i32: self.decl_is_c_import[ui2] else: 0)
+                    user_import_c_import.push(if ui2 < self.decl_is_c_import.len(): self.decl_is_c_import[ui2] else: 0)
                 else:
                     let upname = self.use_path_name_frontend(merged_pool, ups, upc)
                     let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui2))
@@ -2809,25 +2809,25 @@ impl Zcu:
 
         // Collect fn names from higher-priority tiers for deduplication.
         var root_fn_names: List[i32] = List.new()
-        for ri in 0..root_ordered.len() as i32:
+        for ri in 0..root_ordered.len():
             let rd = root_ordered[ri]
             let rk = merged_pool.kind(rd)
             if rk == NodeKind.NK_FN_DECL or rk == NodeKind.NK_EXTERN_FN:
                 root_fn_names.push(merged_pool.get_data0(rd))
 
         var user_fn_names: List[i32] = List.new()
-        for ui in 0..user_import_ordered.len() as i32:
+        for ui in 0..user_import_ordered.len():
             let ud = user_import_ordered[ui]
             let uk = merged_pool.kind(ud)
             if uk == NodeKind.NK_FN_DECL or uk == NodeKind.NK_EXTERN_FN:
                 user_fn_names.push(merged_pool.get_data0(ud))
 
         var higher_type_names: List[i32] = List.new()
-        for ri in 0..root_ordered.len() as i32:
+        for ri in 0..root_ordered.len():
             let rd = root_ordered[ri]
             if merged_pool.kind(rd) == NodeKind.NK_TYPE_DECL:
                 higher_type_names.push(merged_pool.get_data0(rd))
-        for ui in 0..user_import_ordered.len() as i32:
+        for ui in 0..user_import_ordered.len():
             let ud = user_import_ordered[ui]
             if merged_pool.kind(ud) == NodeKind.NK_TYPE_DECL:
                 higher_type_names.push(merged_pool.get_data0(ud))
@@ -2841,9 +2841,9 @@ impl Zcu:
         let rebuilt_c_import: List[i32] = List.new()
         // Combine user + root fn names for prelude cross-tier shadowing.
         var higher_fn_names: List[i32] = List.new()
-        for hi in 0..root_fn_names.len() as i32:
+        for hi in 0..root_fn_names.len():
             higher_fn_names.push(root_fn_names[hi])
-        for hi in 0..user_fn_names.len() as i32:
+        for hi in 0..user_fn_names.len():
             higher_fn_names.push(user_fn_names[hi])
         // D30 R2c: runtime DEFINITIONS (bodied fns from <embedded-rt>/) are
         // never decl-dropped by a bodiless extern in a higher tier — the
@@ -2852,15 +2852,15 @@ impl Zcu:
         // still shadow normally. Empty outside the WITH_RT_IN_UNIT lane.
         var embedded_rt_fn_names: List[i32] = List.new()
         var higher_bodied_fn_names: List[i32] = List.new()
-        for oi in 0..prelude_ordered.len() as i32:
+        for oi in 0..prelude_ordered.len():
             let pd = prelude_ordered[oi]
             if merged_pool.kind(pd) == NodeKind.NK_FN_DECL and prelude_paths[oi].starts_with("<embedded-rt>/"):
                 embedded_rt_fn_names.push(merged_pool.get_data0(pd))
-        for ri in 0..root_ordered.len() as i32:
+        for ri in 0..root_ordered.len():
             let rd = root_ordered[ri]
             if merged_pool.kind(rd) == NodeKind.NK_FN_DECL:
                 higher_bodied_fn_names.push(merged_pool.get_data0(rd))
-        for ui in 0..user_import_ordered.len() as i32:
+        for ui in 0..user_import_ordered.len():
             let ud = user_import_ordered[ui]
             if merged_pool.kind(ud) == NodeKind.NK_FN_DECL:
                 higher_bodied_fn_names.push(merged_pool.get_data0(ud))
@@ -2928,12 +2928,12 @@ impl Zcu:
             rebuilt_paths.push(frontend_owned_text(user_import_paths[oi]))
             rebuilt_file_ids.push(user_import_file_ids[oi])
             rebuilt_c_import.push(user_import_c_import[oi])
-        for oi in 0..root_ordered.len() as i32:
+        for oi in 0..root_ordered.len():
             let id = root_ordered[oi]
             let ik = merged_pool.kind(id)
             if ik == NodeKind.NK_EXTERN_FN and frontend_list_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
                 continue
-            if ik == NodeKind.NK_EXTERN_VAR and frontend_extern_var_shadowed_in_tier(root_ordered, merged_pool, self.pool, oi):
+            if ik == NodeKind.NK_EXTERN_VAR and frontend_extern_var_shadowed_in_tier(root_ordered, merged_pool, self.pool, oi as i32):
                 continue
             merged_pool.add_decl(id)
             rebuilt_paths.push(frontend_owned_text(root_paths[oi]))
@@ -2959,7 +2959,7 @@ fn frontend_path_is_std_rc_module(path: &str) -> bool:
     false
 
 fn frontend_name_shadowed_by_extern(tier: &List[i32], pool: AstPool, name: i32) -> bool:
-    for i in 0..tier.len() as i32:
+    for i in 0..tier.len():
         let d = tier[i]
         if pool.kind(d) == NodeKind.NK_EXTERN_FN and pool.get_data0(d) == name:
             return true
@@ -3023,7 +3023,7 @@ fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: AstPool, 
     //   declare `extern fn wl_*` for functions LlvmBridge.w defines.
     // - otherwise, a later decl of the same rank wins
     if current_kind == NodeKind.NK_EXTERN_FN:
-        for j in 0..tier.len() as i32:
+        for j in 0..tier.len():
             if j == idx:
                 continue
             let jd = tier[j]
@@ -3031,14 +3031,14 @@ fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: AstPool, 
                 return FRONTEND_FN_DROP
         return FRONTEND_FN_KEEP
     if displaceable:
-        for j in 0..tier.len() as i32:
+        for j in 0..tier.len():
             let jd = tier[j]
             if j != idx and pool.kind(jd) == NodeKind.NK_EXTERN_FN and pool.get_data0(jd) == iname and paths[idx] != paths[j] and sema_tier_path_is_std_implementation(paths[idx]) != 0:
                 return FRONTEND_FN_DISPLACE
 
     let current_rank = frontend_fn_decl_rank(current_kind)
     var j = idx + 1
-    while j < tier.len() as i32:
+    while j < tier.len():
         let jd = tier[j]
         let jk = pool.kind(jd)
         if (jk == NodeKind.NK_FN_DECL or jk == NodeKind.NK_EXTERN_FN) and pool.get_data0(jd) == iname:
@@ -3114,21 +3114,21 @@ fn frontend_extern_var_matches_decl(pool: AstPool, intern: InternPool, decl: i32
     other_type == decl_type
 
 fn frontend_extern_var_shadowed_by_tier(tier: &List[i32], pool: AstPool, intern: InternPool, decl: i32) -> bool:
-    for i in 0..tier.len() as i32:
+    for i in 0..tier.len():
         if frontend_extern_var_matches_decl(pool, intern, decl, tier[i]):
             return true
     false
 
 fn frontend_extern_var_shadowed_in_tier(tier: &List[i32], pool: AstPool, intern: InternPool, idx: i32) -> bool:
     let decl = tier[idx]
-    for j in 0..tier.len() as i32:
+    for j in 0..tier.len():
         if j == idx:
             continue
         let jd = tier[j]
         if pool.kind(jd) == NodeKind.NK_LET_DECL and frontend_extern_var_matches_decl(pool, intern, decl, jd):
             return true
     var j = idx + 1
-    while j < tier.len() as i32:
+    while j < tier.len():
         let jd = tier[j]
         if pool.kind(jd) == NodeKind.NK_EXTERN_VAR:
             if frontend_extern_var_matches_decl(pool, intern, decl, jd):
@@ -3137,14 +3137,14 @@ fn frontend_extern_var_shadowed_in_tier(tier: &List[i32], pool: AstPool, intern:
     false
 
 fn frontend_list_contains_i32(v: &List[i32], target: i32) -> bool:
-    for i in 0..v.len() as i32:
+    for i in 0..v.len():
         if v[i] == target:
             return true
     false
 
 impl Zcu:
     fn find_module_id_by_path_frontend(path: &str) -> i32:
-        for mi in 0..self.last_resolved.modules.len() as i32:
+        for mi in 0..self.last_resolved.modules.len():
             let mod = self.last_resolved.modules[mi]
             if mod.path == path:
                 return mod.module_id
@@ -3195,7 +3195,7 @@ impl Zcu:
     fn reorder_import_tier_frontend(decls: &List[i32], paths: &List[str], file_ids: &List[i32], ci_flags: &List[i32]) -> ReorderedTier:
         let wanted_paths: HashMap[str, i32] = HashMap.new()
         let first_seen_paths = frontend_new_list_str()
-        for i in 0..paths.len() as i32:
+        for i in 0..paths.len():
             let path = paths[i]
             if path.len() == 0:
                 continue
@@ -3205,7 +3205,7 @@ impl Zcu:
             first_seen_paths.push(frontend_owned_text(path))
 
         let accum = DepOrderAccum.new()
-        for i in 0..first_seen_paths.len() as i32:
+        for i in 0..first_seen_paths.len():
             self.collect_module_dependency_order_frontend(first_seen_paths[i], wanted_paths, accum)
 
         let module_order = accum.state.order
@@ -3213,16 +3213,16 @@ impl Zcu:
         let out_paths = frontend_new_list_str()
         let out_file_ids: List[i32] = List.new()
         let out_c_import: List[i32] = List.new()
-        for oi in 0..module_order.len() as i32:
+        for oi in 0..module_order.len():
             let module_path = module_order[oi]
-            for di in 0..decls.len() as i32:
+            for di in 0..decls.len():
                 if paths[di] != module_path:
                     continue
                 out_decls.push(decls[di])
                 out_paths.push(frontend_owned_text(paths[di]))
                 out_file_ids.push(file_ids[di])
                 out_c_import.push(ci_flags[di])
-        for di in 0..decls.len() as i32:
+        for di in 0..decls.len():
             let path = paths[di]
             if path.len() != 0:
                 continue
@@ -3358,7 +3358,7 @@ impl Zcu:
             var out = target_pool
             let dir = frontend_dirname(path)
             let lines = use_lines.split("\n")
-            for i in 0..lines.len() as i32:
+            for i in 0..lines.len():
                 let line = lines[i]
                 if not line.starts_with("use "):
                     continue

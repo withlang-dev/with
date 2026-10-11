@@ -20,7 +20,7 @@ pub fn wasm_host_js_path(bin_path: &str) -> str:
     bin_path ++ ".js"
 
 fn wasm_host_basename(path: &str) -> str:
-    var i = path.len() as i32
+    var i = path.len()
     while i > 0:
         let ch = path[(i - 1)]
         if ch == 47 or ch == 92:
@@ -395,6 +395,6 @@ fn wasm_host_js_text(wasm_file: &str) -> str:
     l.push("  }")
     l.push("})(typeof globalThis !== 'undefined' ? globalThis : this);")
     var out = ""
-    for i in 0..l.len() as i32:
+    for i in 0..l.len():
         out = out ++ l[i] ++ "\n"
     out

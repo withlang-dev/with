@@ -69,11 +69,11 @@ pub fn DiagnosticStore.init -> DiagnosticStore:
 impl DiagnosticStore:
     pub mut fn emit(diag: Diagnostic): self.items.push(diag)
 
-    pub fn count(): self.items.len() as i32
+    pub fn count(): self.items.len()
 
     pub fn count_by_severity(severity: i32) -> i32:
         var n = 0
-        for i in 0..self.items.len() as i32:
+        for i in 0..self.items.len():
             if self.items[i].severity == severity:
                 n = n + 1
         n

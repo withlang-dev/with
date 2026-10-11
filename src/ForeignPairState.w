@@ -173,12 +173,12 @@ pub fn foreign_pair_flow(blocks: &List[ForeignPairBlock], edges: &List[ForeignPa
     var changed = true
     while changed:
         changed = false
-        for bi in 0..blocks.len() as i32:
+        for bi in 0..blocks.len():
             var incoming = if bi == 0: foreign_pair_on_edge(entry, -1, true) else: ForeignPairState { alternatives: List.new() }
             for ei in 0..edges.len():
                 let edge = &edges[ei]
                 if edge.to != bi: continue
-                assert(edge.from >= 0 and edge.from < blocks.len() as i32)
+                assert(edge.from >= 0 and edge.from < blocks.len())
                 let along_edge = foreign_pair_on_edge(outputs[edge.from], edge.guard, edge.succeeded)
                 incoming = foreign_pair_join(incoming, along_edge)
             let outgoing = foreign_pair_transfer(incoming, blocks[bi])
@@ -186,10 +186,10 @@ pub fn foreign_pair_flow(blocks: &List[ForeignPairBlock], edges: &List[ForeignPa
             inputs[bi] = move incoming
             outputs[bi] = outgoing
     let violations: List[i32] = List.new()
-    for bi in 0..blocks.len() as i32:
+    for bi in 0..blocks.len():
         let block = &blocks[bi]
         if (block.action == FOREIGN_PAIR_INVOKE or block.invokes) and not foreign_pair_can_invoke(inputs[bi]):
-            violations.push(bi)
+            violations.push(bi as i32)
     ForeignPairFlow { inputs: move inputs, violations }
 
 // A row over canonical owned places. References name possible storage
@@ -342,7 +342,7 @@ pub fn foreign_pair_place_flow(starts: &List[i32], counts: &List[i32], steps: &L
     var changed = true
     while changed:
         changed = false
-        for bi in 0..starts.len() as i32:
+        for bi in 0..starts.len():
             var incoming = foreign_pair_places_clone(entry)
             var reached = bi == 0
             for ei in 0..edges.len():
@@ -362,7 +362,7 @@ pub fn foreign_pair_place_flow(starts: &List[i32], counts: &List[i32], steps: &L
             inputs[bi] = move incoming
             outputs[bi] = move outgoing
     let violations: List[i32] = List.new()
-    for bi in 0..starts.len() as i32:
+    for bi in 0..starts.len():
         if not reachable[bi]: continue
         var current = foreign_pair_places_clone(inputs[bi])
         for si in starts[bi]..starts[bi] + counts[bi]:

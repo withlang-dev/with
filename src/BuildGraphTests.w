@@ -25,7 +25,7 @@ pub fn build_graph_test_target_files(root: &str, entry: &str) -> List[str]:
     let pattern = build_graph_path_basename(entry)
     let search_dir = if entry_dir == ".": with_str_clone_ref(root) else: build_graph_resolve_project_path(root, entry_dir)
     let candidates = collect_test_files(search_dir)
-    for ci in 0..candidates.len() as i32:
+    for ci in 0..candidates.len():
         let candidate = candidates[ci]
         let candidate_dir = build_graph_dirname(candidate)
         if candidate_dir != search_dir:
@@ -42,7 +42,7 @@ fn build_graph_test_compiler_arg(arg: &str) -> str:
     ""
 
 pub fn build_graph_test_compiler(root: &str, target: &BuildGraphTarget) -> str:
-    for ai in 0..target.args.len() as i32:
+    for ai in 0..target.args.len():
         let value = build_graph_test_compiler_arg(target.args[ai])
         if value.len() > 0:
             return build_graph_resolve_project_path(root, value)
@@ -50,7 +50,7 @@ pub fn build_graph_test_compiler(root: &str, target: &BuildGraphTarget) -> str:
 
 fn build_graph_append_test_args(argv: &str, target: &BuildGraphTarget) -> str:
     var out = with_str_clone_ref(argv)
-    for ai in 0..target.args.len() as i32:
+    for ai in 0..target.args.len():
         let arg = target.args[ai]
         if build_graph_test_compiler_arg(arg).len() == 0:
             out = build_graph_argv_append(out, arg)
@@ -58,7 +58,7 @@ fn build_graph_append_test_args(argv: &str, target: &BuildGraphTarget) -> str:
 
 fn build_graph_test_parse_jobs(value: &str) -> i32:
     var out: i32 = 0
-    for i in 0..value.len() as i32:
+    for i in 0..value.len():
         let ch = value[i]
         if ch < 48 or ch > 57:
             break
@@ -105,7 +105,7 @@ fn build_graph_eprint_capture_tail(label: &str, path: &str) -> Unit:
     if text[text.len() - 1] == 10:
         text = text.slice(0, text.len() - 1)
     let lines = text.split("\n")
-    let n = lines.len() as i32
+    let n = lines.len()
     var start = n - 40
     if start < 0: start = 0
     let shown = n - start
@@ -177,7 +177,7 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
     var run_files: List[str] = List.new()
     var run_keys: List[str] = List.new()
     var cached_count = 0
-    for i in 0..test_files.len() as i32:
+    for i in 0..test_files.len():
         let test_path = test_files[i]
         let key = build_cache_test_verdict_key(root, target, compiler_fp, argv_shape, test_path)
         if prior.contains(key):
@@ -205,8 +205,8 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
     // moment ANY child exits. Retiring only the oldest held the window behind
     // one slow file: a lane's 43 s test near the front of the alphabet let the
     // other slots drain and idle. Verdicts are a set, so finish order is moot.
-    while finished < run_files.len() as i32:
-        if next < run_files.len() as i32 and live.len() as i32 < jobs_limit:
+    while finished < run_files.len():
+        if next < run_files.len() and live.len() < jobs_limit:
             let test_path = run_files[next]
             let base = build_graph_path_basename(test_path)
             let stdout_path = resolve_join(capture_dir, base ++ ".stdout")
@@ -224,7 +224,7 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
             continue
         var reaped = false
         var li = 0
-        while li < live.len() as i32:
+        while li < live.len():
             let idx = live[li]
             var rc = build_graph_rt_exec_try_wait(active[idx].pid)
             if rc == -2:
@@ -243,11 +243,11 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
                 failed_paths.push(with_str_clone_ref(active[idx].test_path))
                 if first_failure == 0:
                     first_failure = verdict
-            live[li] = live[live.len() as i32 - 1]
+            live[li] = live[live.len() - 1]
             let _ = live.pop()
             finished = finished + 1
             reaped = true
-        if not reaped and live.len() as i32 > 0:
+        if not reaped and live.len() > 0:
             let _ = build_graph_rt_usleep(2000)
 
     // Persist the passing set even when the target is red (compaction:
@@ -255,10 +255,10 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
     // the still-valid cached ones).
     build_cache_write_test_verdicts(root, compiler_fp, target.name, &pass_keys, &pass_paths)
 
-    if failed_paths.len() as i32 > 0:
-        build_graph_rt_eprint(f"error: test target '{target.name}': {failed_paths.len() as i32} of {test_files.len() as i32} files failed ({cached_count} cached, {run_files.len() as i32} ran):")
-        for fi in 0..failed_paths.len() as i32:
+    if failed_paths.len() > 0:
+        build_graph_rt_eprint(f"error: test target '{target.name}': {failed_paths.len()} of {test_files.len()} files failed ({cached_count} cached, {run_files.len()} ran):")
+        for fi in 0..failed_paths.len():
             build_graph_rt_eprint("error:   failed: " ++ failed_paths[fi])
         return first_failure
-    build_graph_rt_eprint(f"test target '{target.name}': {test_files.len() as i32} files ok ({cached_count} cached, {run_files.len() as i32} ran)")
+    build_graph_rt_eprint(f"test target '{target.name}': {test_files.len()} files ok ({cached_count} cached, {run_files.len()} ran)")
     0

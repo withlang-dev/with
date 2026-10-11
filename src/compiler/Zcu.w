@@ -201,7 +201,7 @@ fn Zcu.init -> Zcu:
 
 impl Zcu:
     mut fn add_link_bundle_prefixes(prefixes: &List[str]):
-        for i in 0..prefixes.len() as i32:
+        for i in 0..prefixes.len():
             let prefix = prefixes[i]
             if not self.link_bundle_prefixes.contains(prefix):
                 self.link_bundle_prefixes.push(with_str_clone_ref(prefix))
@@ -223,7 +223,7 @@ impl Zcu:
     // to one import and the loader never parses a file twice.
     fn has_imported_path(path: &str) -> i32:
         let key = resolve_canonical_module_key(path)
-        for i in 0..self.imported_paths.len() as i32:
+        for i in 0..self.imported_paths.len():
             if self.imported_paths[i] == key:
                 return 1
         0
@@ -249,7 +249,7 @@ impl Zcu:
         // the same module) is one module, the way a stage compiler resolves
         // its own std from the tree (Resolve resolve_own_tree_candidate).
         if not identity.starts_with("<embedded-std>/") or key.starts_with("<"): return
-        for i in 0..self.imported_std_identities.len() as i32:
+        for i in 0..self.imported_std_identities.len():
             if self.imported_std_identities[i] == identity:
                 if self.imported_std_files[i] != key:
                     let dotted = bundle_module_dotted_name(identity)
@@ -260,7 +260,7 @@ impl Zcu:
 
     fn import_conflict_messages() -> List[str]:
         var out = zcu_new_list_str()
-        for i in 0..self.import_conflicts.len() as i32:
+        for i in 0..self.import_conflicts.len():
             out.push(zcu_owned_text(self.import_conflicts[i]))
         out
 
@@ -303,12 +303,12 @@ impl Zcu:
         self.decl_is_c_import[decl_index] = self.decl_is_c_import[like]
 
     fn decl_source_path_frontend(decl_index: i32) -> str:
-        if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
+        if decl_index >= 0 and decl_index < self.decl_source_paths.len():
             return with_str_clone_ref(self.decl_source_paths[decl_index])
         self.current_source_path.clone()
 
     fn decl_source_file_id_frontend(decl_index: i32) -> i32:
-        if decl_index >= 0 and decl_index < self.decl_source_file_ids.len() as i32:
+        if decl_index >= 0 and decl_index < self.decl_source_file_ids.len():
             return self.decl_source_file_ids[decl_index]
         0
 
@@ -319,7 +319,7 @@ impl Zcu:
         resolve_dirname(path)
 
     fn c_import_cache_lookup(key: &str) -> str:
-        for i in 0..self.c_import_cache_keys.len() as i32:
+        for i in 0..self.c_import_cache_keys.len():
             if self.c_import_cache_keys[i] == key:
                 return with_str_clone_ref(self.c_import_cache_values[i])
         ""
@@ -344,11 +344,11 @@ impl Zcu:
         self.cli_diag_source_texts.push(with_str_clone_ref(source_text))
 
     fn cli_diag_mapping_index(offset: i32) -> i32:
-        for i in 0..self.cli_diag_gen_starts.len() as i32:
+        for i in 0..self.cli_diag_gen_starts.len():
             let start = self.cli_diag_gen_starts[i]
             let end = self.cli_diag_gen_ends[i]
             if offset >= start and offset <= end:
-                return i
+                return i as i32
         -1
 
     // Borrows: rendering only reads. Consuming it made the caller copy an
@@ -376,7 +376,7 @@ impl Zcu:
         // evidence in the std prelude); resolve each one against its own file.
         let label_paths: List[str] = List.new()
         let label_texts: List[str] = List.new()
-        for li in 0..diag.labels.len() as i32:
+        for li in 0..diag.labels.len():
             let lab_file = diag.labels[li].span.file
             // File 0 is the root source, and is a cross-file label when the
             // primary belongs to an imported module.
@@ -396,13 +396,13 @@ impl Zcu:
         // behind the per-decl tables meant a module whose parse produced
         // zero decls was unfindable, and its errors rendered against the
         // ROOT module's text — phantom carets at root EOF.
-        for si in 0..self.source_text_file_ids.len() as i32:
+        for si in 0..self.source_text_file_ids.len():
             if self.source_text_file_ids[si] == file_id:
                 return Source.from_string(self.source_text_names[si], self.source_texts[si], file_id)
-        for i in 0..self.decl_source_file_ids.len() as i32:
+        for i in 0..self.decl_source_file_ids.len():
             if self.decl_source_file_ids[i] != file_id:
                 continue
-            let path = self.decl_source_path_frontend(i)
+            let path = self.decl_source_path_frontend(i as i32)
             let embedded_rel = embedded_std_rel_path(path)
             let embedded_rt_rel = embedded_rt_rel_path(path)
             let text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel)
@@ -416,20 +416,20 @@ impl Zcu:
         // render_diag_frontend_with).
         var cached_file = -2147483648
         var cached_source = Source.from_string("", "", 0)
-        for i in 0..self.diagnostics.items.len() as i32:
+        for i in 0..self.diagnostics.items.len():
             let diag = &self.diagnostics.items[i]
             if self.cli_diag_mapping_index(diag.primary.start) < 0 and diag.primary.file != cached_file:
                 cached_source = self.source_for_file_id_frontend(diag.primary.file)
                 cached_file = diag.primary.file
             self.render_diag_frontend_with(diag, &cached_source)
-            if i + 1 < self.diagnostics.items.len() as i32:
+            if i + 1 < self.diagnostics.items.len():
                 runtime_eprint("")
 
     fn render_warnings_frontend():
         var printed = 0
         var cached_file = -2147483648
         var cached_source = Source.from_string("", "", 0)
-        for i in 0..self.diagnostics.items.len() as i32:
+        for i in 0..self.diagnostics.items.len():
             let diag = &self.diagnostics.items[i]
             if diag.severity != DiagSeverity.Warning:
                 continue
@@ -518,7 +518,7 @@ impl Zcu:
 
     mut fn sync_from_sema(sema: Sema):
         if zcu_debug_pool_flow_enabled() != 0:
-            runtime_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.state.symbol_texts.len() as i32} sema.pool={sema.pool.state.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
+            runtime_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.state.symbol_texts.len()} sema.pool={sema.pool.state.symbol_texts.len()} sema.ast.decls={sema.ast.decl_count()}")
         self.pool = sema.pool
         var tracked_paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &sema.tracked_input_paths)
@@ -529,11 +529,11 @@ impl Zcu:
         sema.diags = DiagnosticList.init()
         self.last_sema = sema
         if zcu_debug_pool_flow_enabled() != 0:
-            runtime_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.state.symbol_texts.len() as i32} last_sema.pool={self.last_sema.pool.state.symbol_texts.len() as i32} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
+            runtime_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.state.symbol_texts.len()} last_sema.pool={self.last_sema.pool.state.symbol_texts.len()} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
 
     mut fn set_resolve_snapshot(result: &ResolveResult, root_path: &str):
         let modules: List[ResolvedModule] = List.new()
-        for i in 0..result.modules.len() as i32:
+        for i in 0..result.modules.len():
             let m = result.modules[i]
             modules.push(ResolvedModule {
                 module_id: m.module_id,
@@ -545,7 +545,7 @@ impl Zcu:
             })
 
         let imports: List[ResolvedImport] = List.new()
-        for i in 0..result.imports.len() as i32:
+        for i in 0..result.imports.len():
             let imp = result.imports[i]
             imports.push(ResolvedImport {
                 module_id: imp.module_id,
@@ -561,23 +561,23 @@ impl Zcu:
             })
 
         let defs: List[ResolvedDef] = List.new()
-        for i in 0..result.defs.len() as i32:
+        for i in 0..result.defs.len():
             defs.push(result.defs[i])
 
         let scopes: List[ResolvedScope] = List.new()
-        for i in 0..result.scopes.len() as i32:
+        for i in 0..result.scopes.len():
             scopes.push(result.scopes[i])
 
         let bindings: List[ResolvedBinding] = List.new()
-        for i in 0..result.bindings.len() as i32:
+        for i in 0..result.bindings.len():
             bindings.push(result.bindings[i])
 
         let uses: List[ResolvedUse] = List.new()
-        for i in 0..result.uses.len() as i32:
+        for i in 0..result.uses.len():
             uses.push(result.uses[i])
 
         let link_libs: List[i32] = List.new()
-        for i in 0..result.link_libs.len() as i32:
+        for i in 0..result.link_libs.len():
             link_libs.push(result.link_libs[i])
 
         self.last_resolved = ResolveResult {
@@ -610,7 +610,7 @@ impl Zcu:
 
     mut fn capture_last_link_lib_names(new_pool: InternPool, result: &ResolveResult):
         self.reset_last_link_lib_names()
-        for li in 0..result.link_libs.len() as i32:
+        for li in 0..result.link_libs.len():
             let lib_sym = result.link_libs[li]
             if lib_sym <= 0:
                 continue
@@ -641,8 +641,8 @@ fn zcu_package_key(path: &str) -> str:
 // The directory of a path ("" for a bare name, "/" for a file at the root).
 fn zcu_parent_dir(path: &str) -> str:
     var cut = -1
-    for i in 0..path.len() as i32:
-        if path[i] == '/' or path[i] == '\\': cut = i
+    for i in 0..path.len():
+        if path[i] == '/' or path[i] == '\\': cut = i as i32
     if cut < 0: return ""
     if cut == 0: return "/"
     path.slice(0, cut)

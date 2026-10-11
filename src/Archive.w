@@ -32,7 +32,7 @@ fn ar_read_u64_le(data: &str, offset: i64) -> i64:
 
 fn ar_basename(path: &str) -> str:
     var last_sep: i64 = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
             last_sep = i as i64
     if last_sep >= 0:
@@ -124,13 +124,13 @@ fn ar_sort_symbols(items: List[ArSymbol]) -> List[ArSymbol]:
     let result: List[ArSymbol] = List.new()
     while items.len() > 0:
         let item = items.remove(0)
-        var pos = result.len() as i32
-        for j in 0..result.len() as i32:
+        var pos = result.len()
+        for j in 0..result.len():
             if ar_str_compare(item.name, result[j].name) < 0:
                 pos = j
                 break
         let tail: List[ArSymbol] = List.new()
-        while result.len() as i32 > pos:
+        while result.len() > pos:
             tail.push(result.remove(pos as i64))
         result.push(move item)
         while tail.len() > 0:
@@ -289,14 +289,14 @@ fn ar_coff_short_name(data: &str, at: i64) -> str:
 
 fn create_gnu_indexed_archive(output_path: &str, member_names: &List[str], member_data: &List[str], sorted: &List[ArSymbol]) -> i32:
     var string_table = ""
-    for i in 0..sorted.len() as i32:
+    for i in 0..sorted.len():
         string_table = string_table ++ sorted[i].name ++ str_from_byte(0)
     let ranlib_count = sorted.len() as i32
-    let symtab_size = 4 + ranlib_count * 4 + string_table.len() as i32
+    let symtab_size = 4 + ranlib_count * 4 + string_table.len()
 
     var long_name_table = ""
     let long_name_offsets: List[i32] = List.new()
-    for i in 0..member_names.len() as i32:
+    for i in 0..member_names.len():
         let name = member_names[i]
         if ar_gnu_needs_long_name(name):
             long_name_offsets.push(long_name_table.len() as i32)
@@ -308,7 +308,7 @@ fn create_gnu_indexed_archive(output_path: &str, member_names: &List[str], membe
     var offset: i64 = 8 + ar_gnu_member_size(symtab_size as i64)
     if long_name_table.len() > 0:
         offset = offset + ar_gnu_member_size(long_name_table.len())
-    for i in 0..member_names.len() as i32:
+    for i in 0..member_names.len():
         member_offsets.push(offset)
         offset = offset + ar_gnu_member_size(member_data[i].len())
 
@@ -330,7 +330,7 @@ fn create_gnu_indexed_archive(output_path: &str, member_names: &List[str], membe
         if archive.len() % 2 != 0:
             archive = archive ++ "\n"
 
-    for i in 0..member_names.len() as i32:
+    for i in 0..member_names.len():
         let name = member_names[i]
         let data = member_data[i]
         let name_field = ar_gnu_member_name_field(name, long_name_offsets[i])
@@ -357,7 +357,7 @@ pub fn ar_tokenize_response(text: &str, windows_quoting: bool) -> List[str]:
     var started = false
     var quote = 0
     var i = 0
-    let n = text.len() as i32
+    let n = text.len()
     while i < n:
         let ch = text[i] as i32
         if quote != 0:
@@ -397,7 +397,7 @@ pub type ArResponseArgs {
 
 pub fn ar_expand_response_args(args: &List[str], windows_quoting: bool, depth: i32) -> ArResponseArgs:
     let out: List[str] = List.new()
-    for i in 0..args.len() as i32:
+    for i in 0..args.len():
         let arg = args[i]
         if arg.len() < 2 or arg[0] != 64:
             out.push(with_str_clone_ref(arg))
@@ -410,12 +410,12 @@ pub fn ar_expand_response_args(args: &List[str], windows_quoting: bool, depth: i
         let inner = ar_expand_response_args(&ar_tokenize_response(text, windows_quoting), windows_quoting, depth + 1)
         if not inner.ok:
             return ArResponseArgs { ok: false, args: out }
-        for j in 0..inner.args.len() as i32:
+        for j in 0..inner.args.len():
             out.push(with_str_clone_ref(inner.args[j]))
     ArResponseArgs { ok: true, args: out }
 
 pub fn create_static_archive(output_path: &str, member_paths: &List[str]) -> i32:
-    let member_count = member_paths.len() as i32
+    let member_count = member_paths.len()
     let member_names: List[str] = List.new()
     let member_data: List[str] = List.new()
     for i in 0..member_count:
@@ -439,8 +439,8 @@ pub fn create_static_archive(output_path: &str, member_paths: &List[str]) -> i32
             if elf_syms.len() > 0: elf_syms else: coff_syms
         else:
             extract_macho_symbols(data)
-        for si in 0..syms.len() as i32:
-            let sym = ArSymbol { name: with_str_clone_ref(syms[si]), member_index: i }
+        for si in 0..syms.len():
+            let sym = ArSymbol { name: with_str_clone_ref(syms[si]), member_index: i as i32 }
             all_symbols.push(move sym)
     let sorted = ar_sort_symbols(all_symbols)
     if gnu_index:
@@ -448,13 +448,13 @@ pub fn create_static_archive(output_path: &str, member_paths: &List[str]) -> i32
 
     var string_table = ""
     let string_offsets: List[i32] = List.new()
-    for i in 0..sorted.len() as i32:
+    for i in 0..sorted.len():
         string_offsets.push(string_table.len() as i32)
         string_table = string_table ++ sorted[i].name ++ str_from_byte(0)
     while string_table.len() % 8 != 0:
         string_table = string_table ++ str_from_byte(0)
 
-    let ranlib_count = sorted.len() as i32
+    let ranlib_count = sorted.len()
     let ranlib_array_size = ranlib_count * 8
     let symdef_name = "__.SYMDEF SORTED"
     let symdef_content_size = 4 + ranlib_array_size as i64 + 4 + string_table.len()
@@ -465,7 +465,7 @@ pub fn create_static_archive(output_path: &str, member_paths: &List[str]) -> i32
         member_offsets.push(offset)
         offset = offset + ar_member_size(member_names[i], member_data[i].len())
 
-    var ranlib_data = ar_u32_le(ranlib_array_size)
+    var ranlib_data = ar_u32_le(ranlib_array_size as i32)
     for i in 0..ranlib_count:
         let sym = sorted[i]
         ranlib_data = ranlib_data ++ ar_u32_le(string_offsets[i])

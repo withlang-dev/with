@@ -172,7 +172,7 @@ impl Sema:
         let field_tid: i32 = self.type_extra[(te_start + field_index * 3 + 1)]
         let natural = self.type_layout_align_of(field_tid)
         let align_slot = te_start + field_count * 3 + field_index
-        if align_slot >= 0 and align_slot < self.type_extra.len() as i32:
+        if align_slot >= 0 and align_slot < self.type_extra.len():
             let explicit = self.type_extra[align_slot]
             if explicit > 0:
                 return self.type_layout_capped(resolved as i32, explicit as i64)
@@ -387,7 +387,7 @@ impl Sema:
                 var payload_size: i64 = 0
                 var payload_align: i64 = 1
                 for pi in 0..payload_count:
-                    let payload_tid: i32 = if pi < payload_types.len() as i32: payload_types[pi] else: self.type_extra[(pos + 2 + pi)]
+                    let payload_tid: i32 = if pi < payload_types.len(): payload_types[pi] else: self.type_extra[(pos + 2 + pi)]
                     let align = self.type_layout_align_of(payload_tid)
                     payload_align = if align > payload_align: align else: payload_align
                     payload_size = type_layout_align_up(payload_size, align)

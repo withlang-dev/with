@@ -31,8 +31,8 @@ impl Sema:
 fn astpool_clone_deep(src: AstPool) -> AstPool:
     var out = AstPool.new()
 
-    for si in 0..src.state.strings.len() as i32:
-        out.add_string(src.get_string(si))
+    for si in 0..src.state.strings.len():
+        out.add_string(src.get_string(si as i32))
 
     for ei in 0..src.extra_len():
         out.add_extra(src.get_extra(ei))
@@ -57,14 +57,14 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
 
     for di in 0..src.decl_count():
         out.add_decl(src.get_decl(di))
-    for mhi in 0..src.state.module_header_files.len() as i32:
+    for mhi in 0..src.state.module_header_files.len():
         out.record_module_header(src.state.module_header_files[mhi], src.state.module_header_names[mhi])
     out.set_local_decl_count(src.local_decl_count())
 
     out.set_prelude_decl_count(src.prelude_decl_count())
 
     var fn_meta: i32 = 0
-    while fn_meta < src.state.fn_meta.len() as i32:
+    while fn_meta < src.state.fn_meta.len():
         out.add_fn_meta(
             (src.state.fn_meta[fn_meta]) as NodeId,
             src.fn_meta_flags(fn_meta),
@@ -83,7 +83,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         fn_meta = fn_meta + 7
 
     var type_meta: i32 = 0
-    while type_meta < src.state.type_meta.len() as i32:
+    while type_meta < src.state.type_meta.len():
         out.add_type_meta(
             (src.state.type_meta[type_meta]) as NodeId,
             src.type_meta_derive_start(type_meta),
@@ -92,7 +92,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         type_meta = type_meta + 3
 
     var patq = 0
-    while patq < src.state.pattern_qualifiers.len() as i32:
+    while patq < src.state.pattern_qualifiers.len():
         out.add_pattern_qualifier(
             (src.state.pattern_qualifiers[patq]) as NodeId,
             src.state.pattern_qualifiers[(patq + 1)]
@@ -103,7 +103,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         out.add_fn_param_pattern_value(src.fn_param_pattern_value(pi))
 
     var pmeta: i32 = 0
-    while pmeta < src.state.fn_param_pattern_meta.len() as i32:
+    while pmeta < src.state.fn_param_pattern_meta.len():
         out.add_fn_param_pattern_meta(
             (src.state.fn_param_pattern_meta[pmeta]) as NodeId,
             src.fn_param_pattern_meta_start(pmeta),
@@ -112,7 +112,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         pmeta = pmeta + 3
 
     var for_meta: i32 = 0
-    while for_meta < src.state.for_meta.len() as i32:
+    while for_meta < src.state.for_meta.len():
         out.add_for_meta(
             (src.state.for_meta[for_meta]) as NodeId,
             src.for_meta_index_binding(for_meta),
@@ -125,52 +125,52 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         out.add_for_carrier_alt(src.state.for_carrier_alts[carrier_alt], src.state.for_carrier_alts[carrier_alt + 1])
         carrier_alt = carrier_alt + 2
 
-    for pbi in 0..src.state.pattern_binding_pairs.len() as i32:
+    for pbi in 0..src.state.pattern_binding_pairs.len():
         out.mark_pattern_binding_pair(src.state.pattern_binding_pairs[pbi])
 
     var block_meta: i32 = 0
-    while block_meta < src.state.block_meta.len() as i32:
+    while block_meta < src.state.block_meta.len():
         out.add_block_meta(
             (src.state.block_meta[block_meta]) as NodeId,
             src.block_meta_label(block_meta)
         )
         block_meta = block_meta + 2
 
-    for mi in 0..src.state.must_use_type_nodes.len() as i32:
+    for mi in 0..src.state.must_use_type_nodes.len():
         out.mark_must_use_type((src.state.must_use_type_nodes[mi]) as NodeId)
-    for ni in 0..src.state.no_await_guard_type_nodes.len() as i32:
+    for ni in 0..src.state.no_await_guard_type_nodes.len():
         out.mark_no_await_guard_type((src.state.no_await_guard_type_nodes[ni]) as NodeId)
-    for nai in 0..src.state.no_alloc_fn_nodes.len() as i32:
+    for nai in 0..src.state.no_alloc_fn_nodes.len():
         out.mark_no_alloc_fn((src.state.no_alloc_fn_nodes[nai]) as NodeId)
-    for ii in 0..src.state.iter_of_self_fn_nodes.len() as i32:
+    for ii in 0..src.state.iter_of_self_fn_nodes.len():
         out.mark_iter_of_self_fn((src.state.iter_of_self_fn_nodes[ii]) as NodeId)
-    for si in 0..src.state.sealed_trait_nodes.len() as i32:
+    for si in 0..src.state.sealed_trait_nodes.len():
         out.mark_sealed_trait((src.state.sealed_trait_nodes[si]) as NodeId)
-    for ei in 0..src.state.extend_impl_nodes.len() as i32:
+    for ei in 0..src.state.extend_impl_nodes.len():
         out.mark_extend_impl((src.state.extend_impl_nodes[ei]) as NodeId)
-    for gi in 0..src.state.generated_debug_type_syms.len() as i32:
+    for gi in 0..src.state.generated_debug_type_syms.len():
         out.mark_generated_debug_type(src.state.generated_debug_type_syms[gi])
-    for ci in 0..src.state.comptime_decl_nodes.len() as i32:
+    for ci in 0..src.state.comptime_decl_nodes.len():
         out.mark_comptime_decl((src.state.comptime_decl_nodes[ci]) as NodeId)
-    for ki in 0..src.state.const_decl_nodes.len() as i32:
+    for ki in 0..src.state.const_decl_nodes.len():
         out.mark_const_decl((src.state.const_decl_nodes[ki]) as NodeId)
-    for gi in 0..src.state.global_allocator_decl_nodes.len() as i32:
+    for gi in 0..src.state.global_allocator_decl_nodes.len():
         out.mark_global_allocator_decl((src.state.global_allocator_decl_nodes[gi]) as NodeId)
     for hi in 0..src.compiler_hook_count():
         out.mark_compiler_hook_fn(src.compiler_hook_node(hi), src.compiler_hook_phase_at(hi))
-    for mi in 0..src.state.move_closure_nodes.len() as i32:
+    for mi in 0..src.state.move_closure_nodes.len():
         out.mark_move_closure((src.state.move_closure_nodes[mi]) as NodeId)
-    for ni in 0..src.state.non_escaping_closure_nodes.len() as i32:
+    for ni in 0..src.state.non_escaping_closure_nodes.len():
         out.mark_non_escaping_closure((src.state.non_escaping_closure_nodes[ni]) as NodeId)
-    for bi in 0..src.state.by_place_closure_nodes.len() as i32:
+    for bi in 0..src.state.by_place_closure_nodes.len():
         out.mark_by_place_closure((src.state.by_place_closure_nodes[bi]) as NodeId)
     var cri = 0
-    while cri + 1 < src.state.closure_ret_type_nodes.len() as i32:
+    while cri + 1 < src.state.closure_ret_type_nodes.len():
         out.set_closure_ret_type((src.state.closure_ret_type_nodes[cri]) as NodeId, src.state.closure_ret_type_nodes[(cri + 1)])
         cri = cri + 2
 
     var where_meta = 0
-    while where_meta < src.state.where_meta.len() as i32:
+    while where_meta < src.state.where_meta.len():
         out.add_where_meta(
             (src.state.where_meta[where_meta]) as NodeId,
             src.state.where_meta[(where_meta + 1)],
@@ -179,7 +179,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         where_meta = where_meta + 3
 
     var impl_tp = 0
-    while impl_tp < src.state.impl_type_params.len() as i32:
+    while impl_tp < src.state.impl_type_params.len():
         out.add_impl_type_params(
             (src.state.impl_type_params[impl_tp]) as NodeId,
             src.state.impl_type_params[(impl_tp + 1)],
@@ -188,7 +188,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         impl_tp = impl_tp + 3
 
     var impl_target = 0
-    while impl_target < src.state.impl_target_type_nodes.len() as i32:
+    while impl_target < src.state.impl_target_type_nodes.len():
         out.add_impl_target_type_node(
             (src.state.impl_target_type_nodes[impl_target]) as NodeId,
             (src.state.impl_target_type_nodes[(impl_target + 1)]) as NodeId
@@ -196,7 +196,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         impl_target = impl_target + 2
 
     var impl_trait_args = 0
-    while impl_trait_args < src.state.impl_trait_type_args.len() as i32:
+    while impl_trait_args < src.state.impl_trait_type_args.len():
         out.add_impl_trait_type_args(
             (src.state.impl_trait_type_args[impl_trait_args]) as NodeId,
             src.state.impl_trait_type_args[(impl_trait_args + 1)],
@@ -207,7 +207,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
     // A type-parameter bound's arguments (`G: Gen[T]`, #1732), keyed by
     // the extra index copied above.
     var bound_args: i32 = 0
-    while bound_args < src.state.type_bound_args.len() as i32:
+    while bound_args < src.state.type_bound_args.len():
         out.add_type_bound_args(src.state.type_bound_args[bound_args], src.type_bound_arg_nodes(bound_args))
         bound_args = bound_args + 3
 
@@ -326,7 +326,7 @@ impl Sema:
                     return 0
                 arg_nodes.push(arg_node)
             let new_extra = pool.extra_len()
-            for ai in 0..arg_nodes.len() as i32:
+            for ai in 0..arg_nodes.len():
                 pool.add_extra(arg_nodes[ai])
             return pool.add_node(NodeKind.NK_TYPE_GENERIC, start, end, base_sym, new_extra, arg_count) as i32
 
@@ -353,7 +353,7 @@ impl Sema:
                     return 0
                 elem_nodes.push(elem_node)
             let new_extra = pool.extra_len()
-            for ei in 0..elem_nodes.len() as i32:
+            for ei in 0..elem_nodes.len():
                 pool.add_extra(elem_nodes[ei])
             return pool.add_node(NodeKind.NK_TYPE_TUPLE, start, end, new_extra, elem_count, 0) as i32
 
@@ -380,7 +380,7 @@ impl Sema:
                     return 0
                 param_nodes.push(param_node)
             let new_extra = pool.extra_len()
-            for pi in 0..param_nodes.len() as i32:
+            for pi in 0..param_nodes.len():
                 pool.add_extra(param_nodes[pi])
             let ret_node = self.ct_build_type_expr(pool, intern, self.get_type_d2(resolved), node)
             if ret_node == 0:
@@ -398,7 +398,7 @@ impl Sema:
 impl AstPool:
     fn ct_build_call(node: i32, callee: i32, args: &List[i32]) -> i32:
         let extra_start = self.extra_len()
-        for ai in 0..args.len() as i32:
+        for ai in 0..args.len():
             self.add_extra(args[ai])
         self.add_node(NodeKind.NK_CALL, self.get_start(node), self.get_end(node), callee, extra_start, args.len() as i32) as i32
 
@@ -443,7 +443,7 @@ impl Sema:
             args.push(elem_node)
             stmts.push(pool.ct_build_call(node, callee as i32, args))
         let stmt_extra = pool.extra_len()
-        for si in 0..stmts.len() as i32:
+        for si in 0..stmts.len():
             pool.add_extra(stmts[si])
         let tail = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
         pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), stmt_extra, stmts.len() as i32, tail as i32) as i32
@@ -472,7 +472,7 @@ impl Sema:
             args.push(item_node)
             stmts.push(pool.ct_build_call(node, callee as i32, args))
         let stmt_extra = pool.extra_len()
-        for si in 0..stmts.len() as i32:
+        for si in 0..stmts.len():
             pool.add_extra(stmts[si])
         let tail = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
         pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), stmt_extra, stmts.len() as i32, tail as i32) as i32
@@ -538,7 +538,7 @@ impl Sema:
                     return 0
                 elem_nodes.push(elem_node)
             let extra_start = pool.extra_len()
-            for i in 0..elem_nodes.len() as i32:
+            for i in 0..elem_nodes.len():
                 pool.add_extra(elem_nodes[i])
             let out_kind = if value.kind == ComptimeValueKind.CV_ARRAY: NodeKind.NK_ARRAY_LIT else: NodeKind.NK_TUPLE
             return pool.add_node(out_kind, pool.get_start(node), pool.get_end(node), extra_start, value.extra_count, 0) as i32
@@ -800,7 +800,7 @@ impl AstPool:
                 let child = self.ct_clone_tree_with_subst(self.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
                 cloned_items.push(child)
             let new_extra = self.extra_len()
-            for i in 0..cloned_items.len() as i32:
+            for i in 0..cloned_items.len():
                 self.add_extra(cloned_items[i])
             if kind == NodeKind.NK_CALL:
                 let callee = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
@@ -822,7 +822,7 @@ impl AstPool:
                 let stmt = self.ct_clone_tree_with_subst(self.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
                 stmt_nodes.push(stmt)
             let stmt_extra = self.extra_len()
-            for i in 0..stmt_nodes.len() as i32:
+            for i in 0..stmt_nodes.len():
                 self.add_extra(stmt_nodes[i])
             let tail = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
             let cloned = self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), stmt_extra, stmt_count, tail, self.literal_suffix(node))
@@ -890,7 +890,7 @@ impl AstPool:
                 let arm = self.ct_clone_tree_with_subst(self.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
                 arm_nodes.push(arm)
             let new_extra = self.extra_len()
-            for i in 0..arm_nodes.len() as i32:
+            for i in 0..arm_nodes.len():
                 self.add_extra(arm_nodes[i])
             let subject = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), subject, new_extra, arm_count, self.literal_suffix(node))
@@ -911,7 +911,7 @@ impl AstPool:
                 let value = self.ct_clone_tree_with_subst(self.get_extra(base + 1), subst_sym, subst_node, index_sym, index_node)
                 field_extras.push(value)
             let new_extra = self.extra_len()
-            for i in 0..field_extras.len() as i32:
+            for i in 0..field_extras.len():
                 self.add_extra(field_extras[i])
             let source = if kind == NodeKind.NK_RECORD_UPDATE: self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node) else: self.get_data0(node)
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), source, new_extra, field_count, self.literal_suffix(node))
@@ -933,7 +933,7 @@ impl AstPool:
                 let arg = self.ct_clone_tree_with_subst(self.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
                 arg_nodes.push(arg)
             let new_extra = self.extra_len()
-            for i in 0..arg_nodes.len() as i32:
+            for i in 0..arg_nodes.len():
                 self.add_extra(arg_nodes[i])
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), new_extra, arg_count, self.literal_suffix(node))
 
@@ -946,7 +946,7 @@ impl AstPool:
                 arg_nodes.push(arg)
             let new_extra = self.extra_len()
             self.add_extra(arg_count)
-            for i in 0..arg_nodes.len() as i32:
+            for i in 0..arg_nodes.len():
                 self.add_extra(arg_nodes[i])
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), self.get_data1(node), new_extra, self.literal_suffix(node))
 
@@ -963,7 +963,7 @@ impl AstPool:
             self.add_extra(has_args)
             if has_args != 0:
                 self.add_extra(arg_count)
-                for i in 0..arg_nodes.len() as i32:
+                for i in 0..arg_nodes.len():
                     self.add_extra(arg_nodes[i])
             let base = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), base, self.get_data1(node), new_extra, self.literal_suffix(node))
@@ -1046,7 +1046,7 @@ impl AstPool:
                 arm_extras.push(task_expr)
                 arm_extras.push(body)
             let new_extra = self.extra_len()
-            for i in 0..arm_extras.len() as i32:
+            for i in 0..arm_extras.len():
                 self.add_extra(arm_extras[i])
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), new_extra, arm_count, 0, self.literal_suffix(node))
 
@@ -1068,7 +1068,7 @@ impl AstPool:
                     seg_extras.push(self.get_extra(pos + 1))
                     pos = pos + 2
             let new_extra = self.extra_len()
-            for i in 0..seg_extras.len() as i32:
+            for i in 0..seg_extras.len():
                 self.add_extra(seg_extras[i])
             return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), seg_count, new_extra, 0, self.literal_suffix(node))
 
@@ -1128,7 +1128,7 @@ impl Sema:
             let cloned_body = pool.ct_clone_tree_with_subst(template_body, binding, item_node, index_binding, index_node)
             stmt_nodes.push(self.ct_transform_expr(pool, pool, intern, cloned_body))
         let stmt_extra = pool.extra_len()
-        for i in 0..stmt_nodes.len() as i32:
+        for i in 0..stmt_nodes.len():
             pool.add_extra(stmt_nodes[i])
         pool.add_node(NodeKind.NK_BLOCK, pool.get_start(wrapper), pool.get_end(wrapper), stmt_extra, iter_count, 0) as i32
 
@@ -1500,17 +1500,17 @@ impl Sema:
                 pool.state.extra[default_idx] = self.ct_transform_expr(source_ast, pool, intern, field_default)
 
     fn ct_decl_source_path(di: i32) -> str:
-        if di >= 0 and di < self.decl_source_paths.len() as i32:
+        if di >= 0 and di < self.decl_source_paths.len():
             return with_str_clone_ref(self.decl_source_paths[di])
         ""
 
     fn ct_decl_source_file_id(di: i32) -> i32:
-        if di >= 0 and di < self.decl_source_file_ids.len() as i32:
+        if di >= 0 and di < self.decl_source_file_ids.len():
             return self.decl_source_file_ids[di]
         0
 
     fn ct_decl_is_c_import(di: i32) -> i32:
-        if di >= 0 and di < self.decl_is_c_import.len() as i32:
+        if di >= 0 and di < self.decl_is_c_import.len():
             return self.decl_is_c_import[di]
         0
 
@@ -1602,7 +1602,7 @@ impl AstPool:
 
     fn ct_build_block(node: i32, stmts: &List[i32], tail: i32) -> i32:
         let stmt_extra = self.extra_len()
-        for si in 0..stmts.len() as i32:
+        for si in 0..stmts.len():
             self.add_extra(stmts[si])
         self.add_node(NodeKind.NK_BLOCK, self.get_start(node), self.get_end(node), stmt_extra, stmts.len() as i32, tail) as i32
 
@@ -2093,7 +2093,7 @@ impl Sema:
                 continue
             let generated_source = self.ct_eval_user_derive_source(out, intern, decl, derive_sym)
             let generated_decls = self.ct_parse_user_derive_source(out, intern, decl, generated_source)
-            for gi in 0..generated_decls.len() as i32:
+            for gi in 0..generated_decls.len():
                 generated.push(generated_decls[gi])
         generated
 
@@ -2228,7 +2228,7 @@ fn ct_build_variant_bind_pattern(out: AstPool, intern: InternPool, decl: i32, va
 
 fn ct_build_match(out: AstPool, decl: i32, subject: i32, arms: &List[i32]) -> i32:
     let arm_start = out.extra_len()
-    for ai in 0..arms.len() as i32:
+    for ai in 0..arms.len():
         out.add_extra(arms[ai])
     out.add_node(NodeKind.NK_MATCH, out.get_start(decl), out.get_end(decl), subject, arm_start, arms.len() as i32) as i32
 
@@ -2242,7 +2242,7 @@ fn ct_build_method_call(out: AstPool, decl: i32, receiver: i32, method_sym: i32,
 
 fn ct_build_generic_type(out: AstPool, decl: i32, type_sym: i32, args: &List[i32]) -> i32:
     let arg_start = out.extra_len()
-    for ai in 0..args.len() as i32:
+    for ai in 0..args.len():
         out.add_extra(args[ai])
     out.add_node(NodeKind.NK_TYPE_GENERIC, out.get_start(decl), out.get_end(decl), type_sym, arg_start, args.len() as i32) as i32
 
@@ -2263,7 +2263,7 @@ fn ct_build_variant_call(out: AstPool, intern: InternPool, decl: i32, variant_na
 
 fn ct_build_variant_shorthand(out: AstPool, intern: InternPool, decl: i32, variant_name: &str, args: &List[i32]) -> i32:
     let extra_start = out.extra_len()
-    for ai in 0..args.len() as i32:
+    for ai in 0..args.len():
         out.add_extra(args[ai])
     out.add_node(NodeKind.NK_VARIANT_SHORTHAND, out.get_start(decl), out.get_end(decl), intern.intern(variant_name), extra_start, args.len() as i32) as i32
 
@@ -2342,7 +2342,7 @@ impl Sema:
             field_syms.push(field_sym)
             field_values.push(field_default)
         let field_extra = out.extra_len()
-        for fi2 in 0..field_values.len() as i32:
+        for fi2 in 0..field_values.len():
             out.add_extra(field_syms[fi2])
             out.add_extra(field_values[fi2])
         let body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, struct_lit_type, field_extra, field_count)
@@ -2579,15 +2579,15 @@ impl Sema:
         // `:?` must not dispatch back through it.
         if debug_impl.len() > 0:
             out.mark_generated_debug_type(out.get_data0(decl))
-        for i in 0..debug_impl.len() as i32:
+        for i in 0..debug_impl.len():
             generated.push(debug_impl[i])
 
         let display_impl = self.ct_generate_error_format_impl(out, intern, decl, intern.intern("Display"), intern.intern("to_str"), 0, FN_PARAM_FLAG_MOVE_SELF)
-        for i in 0..display_impl.len() as i32:
+        for i in 0..display_impl.len():
             generated.push(display_impl[i])
 
         let error_impl = self.ct_generate_error_format_impl(out, intern, decl, intern.intern("Error"), intern.intern("display"), 0, FN_PARAM_FLAG_REF_SELF)
-        for i in 0..error_impl.len() as i32:
+        for i in 0..error_impl.len():
             generated.push(error_impl[i])
 
         generated
@@ -2706,7 +2706,7 @@ impl Sema:
             arms.push(arm as i32)
             pos = pos + 2 + payload_count
         let arm_start = out.extra_len()
-        for ai in 0..arms.len() as i32:
+        for ai in 0..arms.len():
             out.add_extra(arms[ai])
         let self_ident = out.ct_build_ident(decl, self_sym)
         let subject = out.add_node(NodeKind.NK_UNARY, start, end, UnaryOp.UOP_DEREF, self_ident, 0)
@@ -2812,7 +2812,7 @@ impl Sema:
                 field_values.push(field_value)
 
             let field_extra = out.extra_len()
-            for fi2 in 0..field_values.len() as i32:
+            for fi2 in 0..field_values.len():
                 out.add_extra(field_syms[fi2])
                 out.add_extra(field_values[fi2])
             body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, struct_lit_type, field_extra, field_count) as i32
@@ -2960,7 +2960,7 @@ impl Sema:
             field_syms.push(field_sym)
             field_values.push(value)
         let build_field_extra = out.extra_len()
-        for fi6 in 0..field_values.len() as i32:
+        for fi6 in 0..field_values.len():
             out.add_extra(field_syms[fi6])
             out.add_extra(field_values[fi6])
         let build_lit = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, type_name_sym, build_field_extra, field_count)
@@ -2979,7 +2979,7 @@ impl Sema:
             ctor_fields.push(field_sym)
             ctor_fields.push(out.ct_build_ident(decl, none_sym))
         let ctor_extra = out.extra_len()
-        for ci in 0..ctor_fields.len() as i32:
+        for ci in 0..ctor_fields.len():
             out.add_extra(ctor_fields[ci])
         let ctor_body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, builder_sym, ctor_extra, field_count)
         let builder_ret_type = ct_build_generic_self_type(out, decl, builder_sym, tp_start, tp_count)
@@ -3146,7 +3146,7 @@ impl Sema:
             field_values.push(field_value)
 
         let field_extra = out.extra_len()
-        for fi2 in 0..field_values.len() as i32:
+        for fi2 in 0..field_values.len():
             out.add_extra(field_syms[fi2])
             out.add_extra(field_values[fi2])
         let body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, struct_lit_type, field_extra, field_count)
@@ -3258,7 +3258,7 @@ impl Sema:
         let saved_module_import_selected = sema_clone_str_list(&self.module_import_selected)
         let saved_module_import_offsets = sema_clone_i32_list(&self.module_import_offsets)
         let saved_global_module_paths = ct_new_list_str()
-        for smi in 0..saved_module_paths.len() as i32:
+        for smi in 0..saved_module_paths.len():
             let module_path = saved_module_paths[smi]
             if self.global_visible_module_paths.contains(module_path):
                 saved_global_module_paths.push(sema_owned_text(module_path))
@@ -3309,133 +3309,133 @@ impl Sema:
                 continue
             if self.type_decl_has_derive(decl as i32, copy_trait_sym) != 0:
                 let generated_copy = self.ct_generate_copy_derive(out, intern, decl as i32)
-                for gi in 0..generated_copy.len() as i32:
+                for gi in 0..generated_copy.len():
                     ordered.push(generated_copy[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_copy.len() as i32
+                    generated_local_count = (generated_local_count + generated_copy.len()) as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, default_trait_sym, all_sym) != 0:
                 let generated_defaults = self.ct_generate_default_derive(out, intern, decl as i32)
-                for gi in 0..generated_defaults.len() as i32:
+                for gi in 0..generated_defaults.len():
                     ordered.push(generated_defaults[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_defaults.len() as i32
+                    generated_local_count = (generated_local_count + generated_defaults.len()) as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, eq_trait_sym, all_sym) != 0:
                 let generated_eq = self.ct_generate_eq_derive(out, intern, decl as i32)
-                for gi in 0..generated_eq.len() as i32:
+                for gi in 0..generated_eq.len():
                     ordered.push(generated_eq[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_eq.len() as i32
+                    generated_local_count = (generated_local_count + generated_eq.len()) as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, ord_trait_sym, all_sym) != 0:
                 let generated_ord = self.ct_generate_ord_derive(out, intern, decl as i32)
-                for gi in 0..generated_ord.len() as i32:
+                for gi in 0..generated_ord.len():
                     ordered.push(generated_ord[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_ord.len() as i32
+                    generated_local_count = (generated_local_count + generated_ord.len()) as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, debug_trait_sym, all_sym) != 0:
                 let generated_debug = self.ct_generate_debug_derive(out, intern, decl as i32)
-                for gi in 0..generated_debug.len() as i32:
+                for gi in 0..generated_debug.len():
                     ordered.push(generated_debug[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_debug.len() as i32
+                    generated_local_count = (generated_local_count + generated_debug.len()) as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, display_trait_sym, all_sym) != 0:
                 let generated_display = self.ct_generate_display_derive(out, intern, decl as i32)
-                for gi in 0..generated_display.len() as i32:
+                for gi in 0..generated_display.len():
                     ordered.push(generated_display[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_display.len() as i32
+                    generated_local_count = (generated_local_count + generated_display.len()) as i32
             if type_decl_is_error(out.get_data2(decl)) != 0:
                 let generated_error = self.ct_generate_error_decl_impls(out, intern, decl as i32)
-                for gi in 0..generated_error.len() as i32:
+                for gi in 0..generated_error.len():
                     ordered.push(generated_error[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_error.len() as i32
+                    generated_local_count = (generated_local_count + generated_error.len()) as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, clone_trait_sym, all_sym) != 0:
                 let generated_clone = self.ct_generate_clone_derive(out, intern, decl as i32)
-                for gi in 0..generated_clone.len() as i32:
+                for gi in 0..generated_clone.len():
                     ordered.push(generated_clone[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_clone.len() as i32
+                    generated_local_count = (generated_local_count + generated_clone.len()) as i32
             if self.type_decl_has_derive(decl as i32, builder_trait_sym) != 0:
                 let generated_builder = self.ct_generate_builder_derive(out, intern, decl as i32)
-                for gi in 0..generated_builder.len() as i32:
+                for gi in 0..generated_builder.len():
                     ordered.push(generated_builder[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_builder.len() as i32
+                    generated_local_count = (generated_local_count + generated_builder.len()) as i32
             if self.type_decl_has_derive(decl as i32, soa_trait_sym) != 0:
                 let generated_soa = self.ct_generate_soa_derive(out, intern, decl as i32)
-                for gi in 0..generated_soa.len() as i32:
+                for gi in 0..generated_soa.len():
                     ordered.push(generated_soa[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_soa.len() as i32
+                    generated_local_count = (generated_local_count + generated_soa.len()) as i32
             if self.type_decl_has_derive(decl as i32, serialize_trait_sym) != 0:
                 let generated_serialize = self.ct_generate_serialize_derive(out, intern, decl as i32)
-                for gi in 0..generated_serialize.len() as i32:
+                for gi in 0..generated_serialize.len():
                     ordered.push(generated_serialize[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_serialize.len() as i32
+                    generated_local_count = (generated_local_count + generated_serialize.len()) as i32
             if self.type_decl_has_derive(decl as i32, deserialize_trait_sym) != 0:
                 let generated_deserialize = self.ct_generate_deserialize_derive(out, intern, decl as i32)
-                for gi in 0..generated_deserialize.len() as i32:
+                for gi in 0..generated_deserialize.len():
                     ordered.push(generated_deserialize[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_deserialize.len() as i32
+                    generated_local_count = (generated_local_count + generated_deserialize.len()) as i32
             if self.type_decl_has_derive(decl as i32, component_id_trait_sym) != 0:
                 let generated_component_id = self.ct_generate_component_id_derive(out, intern, decl as i32)
-                for gi in 0..generated_component_id.len() as i32:
+                for gi in 0..generated_component_id.len():
                     ordered.push(generated_component_id[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_component_id.len() as i32
+                    generated_local_count = (generated_local_count + generated_component_id.len()) as i32
             let generated_user_derives = self.ct_generate_user_defined_derives(out, intern, decl as i32)
-            for gi in 0..generated_user_derives.len() as i32:
+            for gi in 0..generated_user_derives.len():
                 ordered.push(generated_user_derives[gi])
                 ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
-                generated_local_count = generated_local_count + generated_user_derives.len() as i32
+                generated_local_count = (generated_local_count + generated_user_derives.len()) as i32
         self.local_file_id = saved_file_id
         while out.decl_count() > 0:
             out.state.decls.pop()
-        for oi in 0..ordered.len() as i32:
+        for oi in 0..ordered.len():
             out.add_decl(ordered[oi])
 
         let local_limit = source_ast.local_decl_count()

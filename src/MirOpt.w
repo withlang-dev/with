@@ -82,12 +82,12 @@ impl MirOptModule:
         return
 
     mut fn add_function(name: &str):
-        let idx = self.functions.len() as i32
+        let idx = self.functions.len()
         self.functions.push(MirOptFunction.init(name))
         idx
 
     mut fn add_type(name: &str):
-        let idx = self.types.len() as i32
+        let idx = self.types.len()
         self.types.push(MirOptTypeDecl.init(name))
         idx
 
@@ -112,9 +112,9 @@ fn optimize(mod: MirOptModule) -> OptSummary:
 
 fn devirtualize(mod: MirOptModule) -> i32:
     var changed = 0
-    for fi in 0..mod.functions.len() as i32:
+    for fi in 0..mod.functions.len():
         let func = mod.functions[fi]
-        for ci in 0..func.calls.len() as i32:
+        for ci in 0..func.calls.len():
             let call = func.calls[ci]
             if call.kind == CallKind.DynDispatch and call.receiver_type_known:
                 // Devirtualize: rewrite to direct call
@@ -124,9 +124,9 @@ fn devirtualize(mod: MirOptModule) -> i32:
 
 fn promote_non_escaping_boxes(mod: MirOptModule) -> i32:
     var changed = 0
-    for fi in 0..mod.functions.len() as i32:
+    for fi in 0..mod.functions.len():
         let func = mod.functions[fi]
-        for ai in 0..func.allocations.len() as i32:
+        for ai in 0..func.allocations.len():
             let alloc = func.allocations[ai]
             if alloc.kind == AllocKind.Box and not alloc.escapes:
                 changed = changed + 1
@@ -134,9 +134,9 @@ fn promote_non_escaping_boxes(mod: MirOptModule) -> i32:
 
 fn eliminate_dead_fields(mod: MirOptModule) -> i32:
     var changed = 0
-    for ti in 0..mod.types.len() as i32:
+    for ti in 0..mod.types.len():
         let ty = mod.types[ti]
-        for fi in 0..ty.fields.len() as i32:
+        for fi in 0..ty.fields.len():
             let field = ty.fields[fi]
             if not field.removed and field.read_count == 0:
                 changed = changed + 1
@@ -144,9 +144,9 @@ fn eliminate_dead_fields(mod: MirOptModule) -> i32:
 
 fn elide_redundant_moves(mod: MirOptModule) -> i32:
     var changed = 0
-    for fi in 0..mod.functions.len() as i32:
+    for fi in 0..mod.functions.len():
         let func = mod.functions[fi]
-        for mi in 0..func.moves.len() as i32:
+        for mi in 0..func.moves.len():
             let mv = func.moves[mi]
             if not mv.elided and mv.source_consumed_immediately:
                 changed = changed + 1

@@ -17,7 +17,7 @@ fn build_graph_target_input_path(root: &str, target: &BuildGraphTarget, index: i
             return ""
         return build_graph_resolve_project_path(root, target.entry)
     let input_index = index - 1
-    if input_index < 0 or input_index >= target.inputs.len() as i32:
+    if input_index < 0 or input_index >= target.inputs.len():
         return ""
     build_graph_resolve_project_path(root, target.inputs[input_index])
 
@@ -66,7 +66,7 @@ pub fn build_graph_compare_files(root: &str, target: &BuildGraphTarget, operatio
 
 pub fn build_graph_run_clean(root: &str, target: &BuildGraphTarget) -> i32:
     var removed = 0
-    for ai in 0..target.args.len() as i32:
+    for ai in 0..target.args.len():
         let rel = target.args[ai]
         if rel.len() == 0 or runtime_path_is_absolute(rel) or rel.contains(".."):
             build_graph_rt_eprint("error: clean target '" ++ target.name ++ "' has unsafe path: " ++ rel)
@@ -88,7 +88,7 @@ pub fn build_graph_run_clean(root: &str, target: &BuildGraphTarget) -> i32:
     0
 
 fn build_graph_response_arg_valid(arg: &str) -> bool:
-    for i in 0..arg.len() as i32:
+    for i in 0..arg.len():
         let ch = arg[i]
         if ch == 10 or ch == 13:
             return false
@@ -96,7 +96,7 @@ fn build_graph_response_arg_valid(arg: &str) -> bool:
 
 fn build_graph_quote_response_arg(arg: &str) -> str:
     var out = "\""
-    for i in 0..arg.len() as i32:
+    for i in 0..arg.len():
         let ch = arg[i]
         if ch == 92 or ch == 34:
             out = out ++ "\\"
@@ -113,7 +113,7 @@ pub fn build_graph_write_response_file(root: &str, target: &BuildGraphTarget) ->
         build_graph_rt_eprint("error: could not create response file directory for target '" ++ target.name ++ "': " ++ output_dir)
         return 1
     var text = ""
-    for ai in 0..target.args.len() as i32:
+    for ai in 0..target.args.len():
         let arg = target.args[ai]
         if not build_graph_response_arg_valid(arg):
             build_graph_rt_eprint("error: generate_response_file target '" ++ target.name ++ "' contains an argument with a newline")
@@ -126,11 +126,11 @@ pub fn build_graph_write_response_file(root: &str, target: &BuildGraphTarget) ->
 
 fn build_graph_append_common_compile_args(root: &str, target: &BuildGraphTarget, argv_blob: &str) -> str:
     var out = with_str_clone_ref(argv_blob)
-    for ii in 0..target.include_paths.len() as i32:
+    for ii in 0..target.include_paths.len():
         out = build_graph_argv_append(out, "-I" ++ build_graph_resolve_project_path(root, target.include_paths[ii]))
-    for di in 0..target.defines.len() as i32:
+    for di in 0..target.defines.len():
         out = build_graph_argv_append(out, "-D" ++ target.defines[di])
-    for ai in 0..target.args.len() as i32:
+    for ai in 0..target.args.len():
         out = build_graph_argv_append(out, target.args[ai])
     out
 
@@ -302,7 +302,7 @@ pub fn build_graph_create_archive(root: &str, target: &BuildGraphTarget) -> i32:
         build_graph_rt_eprint("error: could not create archive output directory for target '" ++ target.name ++ "': " ++ output_dir)
         return 1
     let resolved_inputs: List[str] = List.new()
-    for ii in 0..target.inputs.len() as i32:
+    for ii in 0..target.inputs.len():
         let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
         if build_graph_rt_file_exists(input_path) == 0:
             build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' missing input: " ++ input_path)
@@ -321,7 +321,7 @@ pub fn build_graph_create_archive(root: &str, target: &BuildGraphTarget) -> i32:
 
 fn build_graph_asm_quote_path(path: &str) -> str:
     var out = "\""
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 92 or ch == 34:
             out = out ++ "\\"
@@ -337,7 +337,7 @@ fn build_graph_symbol_name_valid(sym: &str) -> bool:
     let first = sym[0]
     if first >= 48 and first <= 57:
         return false
-    for i in 0..sym.len() as i32:
+    for i in 0..sym.len():
         if not build_graph_symbol_char_ok(sym[i]):
             return false
     true
@@ -402,7 +402,7 @@ pub fn build_graph_embed_object_files(root: &str, target: &BuildGraphTarget) -> 
         asm_text = asm_text ++ ".section .rdata,\"dr\"\n\n"
     else:
         asm_text = asm_text ++ ".section .rodata\n\n"
-    for ii in 0..target.inputs.len() as i32:
+    for ii in 0..target.inputs.len():
         let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
         if build_graph_rt_file_exists(input_path) == 0:
             build_graph_rt_eprint("error: embed_object_files target '" ++ target.name ++ "' missing input: " ++ input_path)
@@ -457,7 +457,7 @@ pub fn build_graph_copy_manifest_files(root: &str, target: &BuildGraphTarget, op
         return 1
     let source_dir = build_graph_resolve_project_path(root, target.entry)
     let output_dir = build_graph_resolve_project_path(root, target.output)
-    for ii in 0..target.inputs.len() as i32:
+    for ii in 0..target.inputs.len():
         let rel = target.inputs[ii]
         if not build_graph_manifest_relative_path_valid(rel):
             build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' has invalid relative input path: " ++ rel)
@@ -488,7 +488,7 @@ pub fn build_graph_promote_tree_if_verified(root: &str, target: &BuildGraphTarge
     let output_dir = build_graph_resolve_project_path(root, target.output)
     var stale_count = 0
     var fresh_count = 0
-    for ii in 0..target.inputs.len() as i32:
+    for ii in 0..target.inputs.len():
         let rel = target.inputs[ii]
         if not build_graph_manifest_relative_path_valid(rel):
             build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' has invalid relative input path: " ++ rel)
@@ -504,7 +504,7 @@ pub fn build_graph_promote_tree_if_verified(root: &str, target: &BuildGraphTarge
             if source_contents.len() == dest_contents.len():
                 var same = true
                 var ci = 0
-                while ci < source_contents.len() as i32:
+                while ci < source_contents.len():
                     if source_contents[ci] != dest_contents[ci]:
                         same = false
                         break
@@ -533,7 +533,7 @@ pub fn build_graph_run_corpus_test(root: &str, target: &BuildGraphTarget) -> i32
     let arg_rc = build_graph_validate_process_args(target)
     if arg_rc != 0:
         return arg_rc
-    for ii in 0..target.inputs.len() as i32:
+    for ii in 0..target.inputs.len():
         let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
         if build_graph_rt_file_exists(input_path) == 0:
             build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ "' missing declared input: " ++ input_path)
@@ -553,12 +553,12 @@ pub fn build_graph_run_corpus_test(root: &str, target: &BuildGraphTarget) -> i32
     else:
         target.entry.clone()
     argv = build_graph_argv_append(argv, runner_path)
-    for ai in 0..target.args.len() as i32:
+    for ai in 0..target.args.len():
         argv = build_graph_argv_append(argv, target.args[ai])
     let timeout_ms: i32 = 300000
     // Compile provenance (#2249): the binary a corpus test ran, in the log.
     var prov_args = ""
-    for pai in 0..target.args.len() as i32: prov_args = prov_args ++ " " ++ target.args[pai]
+    for pai in 0..target.args.len(): prov_args = prov_args ++ " " ++ target.args[pai]
     build_graph_rt_eprint("[compile] " ++ target.name ++ " ran " ++ runner_path ++ prov_args)
     let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
     if rc == 124:
@@ -576,7 +576,7 @@ pub fn build_graph_run_command(root: &str, target: &BuildGraphTarget) -> i32:
     let arg_rc = build_graph_validate_process_args(target)
     if arg_rc != 0:
         return arg_rc
-    for ii in 0..target.inputs.len() as i32:
+    for ii in 0..target.inputs.len():
         let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
         if build_graph_rt_file_exists(input_path) == 0:
             build_graph_rt_eprint("error: command target '" ++ target.name ++ "' missing declared input: " ++ input_path)
@@ -599,12 +599,12 @@ pub fn build_graph_run_command(root: &str, target: &BuildGraphTarget) -> i32:
     else:
         target.entry.clone()
     argv = build_graph_argv_append(argv, runner_path)
-    for ai in 0..target.args.len() as i32:
+    for ai in 0..target.args.len():
         argv = build_graph_argv_append(argv, target.args[ai])
     let timeout_ms: i32 = 300000
     // Compile provenance (#2249): the binary a corpus test ran, in the log.
     var prov_args = ""
-    for pai in 0..target.args.len() as i32: prov_args = prov_args ++ " " ++ target.args[pai]
+    for pai in 0..target.args.len(): prov_args = prov_args ++ " " ++ target.args[pai]
     build_graph_rt_eprint("[compile] " ++ target.name ++ " ran " ++ runner_path ++ prov_args)
     let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
     if rc == 124:
@@ -659,7 +659,7 @@ pub fn build_graph_parse_octal_mode(text: &str) -> i32:
     if text.len() == 0:
         return -1
     var mode: i32 = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         if ch < 48 or ch > 55:
             return -1
