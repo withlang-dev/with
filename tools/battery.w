@@ -248,7 +248,11 @@ assert(write_file(status, f"{head} {cwd}\n") == 0)
 print(f"battery: {head} in {cwd}")
 let ledger = "out/.build-state/battery-times.tsv"
 let flags = if fail_fast: " --fail-fast" else: ""
-var rc = step_live("gate", "WITH=$PWD/src/main src/main build :gate" ++ flags ++ " > out/battery/gate.log 2>&1", "out/battery/gate.log", status)
+// Every phase holds the machine awake (idle and, on AC, system sleep): on
+// 2026-10-11 a battery started inside a maintenance wake ran 45 s per 16 min
+// for three hours before anyone noticed, and only the uat step held a lock.
+let hold = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -i -s " else: ""
+var rc = step_live("gate", "WITH=$PWD/src/main " ++ hold ++ "src/main build :gate" ++ flags ++ " > out/battery/gate.log 2>&1", "out/battery/gate.log", status)
 merge_times(ledger, "out/.build-state/build-times.tsv")
 if rc != 0:
     let failed = red_report("out/battery/gate.log")
@@ -257,14 +261,14 @@ if rc != 0:
 if rc == 0:
     // A scenario that opens a window needs a lit display: on macOS the uat
     // step holds it awake (and wakes it) for as long as it runs.
-    let awake = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -d -u " else: ""
+    let awake = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -d -i -s -u " else: ""
     rc = step_live("uat", "WITH_UAT_WITH=$PWD/out/release/bin/with " ++ awake ++ "out/release/bin/with uat > out/battery/uat.log 2>&1", "out/battery/uat.log", status)
     if rc != 0:
         let failed = uat_failed("out/battery/uat.log")
         print("RED (uat): " ++ failed)
         append(status, "RED (uat): " ++ failed)
 if rc == 0:
-    rc = step_live("battery-checks", "WITH=$PWD/src/main src/main build :battery-checks" ++ flags ++ " > out/battery/checks.log 2>&1", "out/battery/checks.log", status)
+    rc = step_live("battery-checks", "WITH=$PWD/src/main " ++ hold ++ "src/main build :battery-checks" ++ flags ++ " > out/battery/checks.log 2>&1", "out/battery/checks.log", status)
     merge_times(ledger, "out/.build-state/build-times.tsv")
     if rc != 0:
         let failed = red_report("out/battery/checks.log")
