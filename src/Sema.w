@@ -2218,6 +2218,13 @@ pub type Sema {
     // (`for i in 1..9`), a literal-typed local like a `let` (no shadowing,
     // so the name is the key).
     int_local_for_decls: HashMap[i32, i32],
+    // D128 (#2343): a loop or comprehension binding that walks a literal's
+    // binding (`for x in xs`, `[a + b for (a, b) in src]` over `let src =
+    // [(1, 2)]`): the name → that `let`, and the name → its position in the
+    // clause's tuple pattern (-1: the element itself). A demand on the name
+    // is a demand on the literal's element at that position.
+    iter_literal_lets: HashMap[i32, i32],
+    iter_literal_positions: HashMap[i32, i32],
     // D128: per (function, name), the last unannotated `let` of a tuple
     // literal or a pending generic constructor (demand_let_of).
     fn_demand_lets: HashMap[i64, i32],
@@ -3847,6 +3854,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         int_local_rechecks: 0,
         int_local_recheck_names: List.new(),
         int_local_for_decls: HashMap.new(),
+        iter_literal_lets: HashMap.new(),
+        iter_literal_positions: HashMap.new(),
         fn_demand_lets: HashMap.new(),
         label_break_expected: List.new(),
         literal_arm_retype_depth: 0,

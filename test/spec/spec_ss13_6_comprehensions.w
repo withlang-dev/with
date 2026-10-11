@@ -55,7 +55,7 @@ fn test_list_source:
     assert_list_i32(doubled, 4, 8, 12)
 
 fn test_pattern_binding:
-    let src: List[(i32, i32)] = [(1, 2), (3, 4), (5, 6)]
+    let src = [(1, 2), (3, 4), (5, 6)]
     let sums = [a + b for (a, b) in src]
     assert_list_i32(sums, 3, 7, 11)
 

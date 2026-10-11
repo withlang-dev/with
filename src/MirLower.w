@@ -12499,15 +12499,27 @@ impl MirBuilder:
             return -1
         if self.sema.can_auto_ref_arg_frozen(expected_ty, actual_ty) == 0:
             return -1
-        let place = self.lower_expr_place(arg_node)
-        if self.place_type_is_str(place) != 0:
-            self.mark_string_place_copied(place)
+        let span = self.ast.get_start(arg_node)
+        // §4.2.6 (#2336): a narrower integer widens into the pointee, so the
+        // view is of a temporary at the pointee's width, never of the
+        // narrower place (an `&i64` over a four-byte `i32` read -1 as
+        // 4294967295). Sema accepted the widening; this materializes it.
+        let pointee = self.sema.get_type_d0(self.sema.resolve_alias(expected_ty as TypeId))
+        let place = if pointee != 0 and self.sema.numeric_types_differ(pointee, actual_ty):
+            let narrow_value = self.lower_expr(arg_node)
+            let widened = self.lower_value_cast(narrow_value, actual_ty, pointee, span)
+            self.materialize_operand(widened, pointee, span)
         else:
-            self.mark_string_base_fields_may_alias(self.place_base_local(place))
+            let narrow = self.lower_expr_place(arg_node)
+            if self.place_type_is_str(narrow) != 0:
+                self.mark_string_place_copied(narrow)
+            else:
+                self.mark_string_base_fields_may_alias(self.place_base_local(narrow))
+            narrow
         let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, place, 0)
         let temp = self.new_temp(expected_ty)
         let temp_place = self.place_for_local(temp)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, self.ast.get_start(arg_node))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, span)
         self.body.new_operand(OperandKind.OK_COPY, temp_place)
 
     // D22 call arguments consume the same Sema record as every other
