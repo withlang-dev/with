@@ -11,7 +11,7 @@ use std.collections.HashMap
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_alloc(size: i64) -> *mut u8
 
-let FND_INTERN_PAGE_SIZE: i64 = 1048576
+const FND_INTERN_PAGE_SIZE = 1048576
 
 pub type FndInternStringArena {
     pages: List[*mut u8],

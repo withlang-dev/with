@@ -22,7 +22,7 @@ use tally
 // them and sets its result with no `unsafe`.
 type Bonus { points: i32 }
 fn boosted(ctx: Context, args: &[Value], bonus: &Bonus):
-    var sum: i32 = 0
+    var sum = 0
     for i in 0..args.len() as i32: sum = sum + args[i].int()
     ctx.result_int(sum + bonus.points)
 
@@ -67,7 +67,7 @@ fn main:
         Ok(_) => {}
 
     print(f"-- a vendored library: tally {TALLY_VERSION}")
-    let readings: List[i32] = [4, -2, 7, 1]
+    let readings = [4, -2, 7, 1]
     let range = range_of(readings)
     let wide = widened(range, 10)
     print(f"range {range.low}..{range.high}, widened {wide.low}..{wide.high}")

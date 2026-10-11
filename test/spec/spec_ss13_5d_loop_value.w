@@ -10,7 +10,7 @@ fn loop_value_labeled -> i32:
             break 'outer 7
 
 fn loop_value_arithmetic -> i32:
-    let x = loop:
+    let x: i32 = loop:
         break 20
     x + 22
 
