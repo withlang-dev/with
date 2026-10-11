@@ -30,7 +30,7 @@ fn maybe(c: bool, s: &str) -> Option[&str]: if c: Some(s) else: None
 
 fn first_some(o: &Option[&str]) -> str:
     match o:
-        Some(s) => s.clone()
+        Some(s) => s
         None => "none"
 
 fn main:

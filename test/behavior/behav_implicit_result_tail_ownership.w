@@ -2,7 +2,7 @@
 
 type Payload { text: str, numbers: List[i32] }
 
-fn direct(text: &str) -> Result[str, str]: text.clone()
+fn direct(text: &str) -> Result[str, str]: text
 
 fn branch(text: &str, left: bool) -> Result[str, str]:
     if left: text.clone()
