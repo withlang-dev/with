@@ -20,7 +20,7 @@ use MirLower
 use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8
+extern fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8
 extern fn with_fs_read_file(path: &str) -> str
 extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
@@ -480,7 +480,7 @@ impl CCodegen:
     // the view checker pins `self` through it.
     fn mir_body_at(i: i64) -> &MirBody:
         assert(i >= 0 and i < self.mir_mod.bodies.len())
-        unsafe { with_vec_get_ptr(&raw const self.mir_mod.bodies as *mut u8, i) as &MirBody }
+        unsafe { with_vec_get_ptr_es(&raw const self.mir_mod.bodies as *mut u8, i, sizeof[MirBody]()) as &MirBody }
 
 fn cc_is_ident_start(ch: i32) -> i32:
     if ch == 95:
@@ -3337,7 +3337,7 @@ impl CCodegen:
                     if elem_tid == 0:
                         elem_tid = self.list_local_element_tid(body, base_local)
                     let elem_c = if elem_tid != 0: self.c_type(elem_tid, 0) else: "int64_t"
-                    out = "(*((" ++ elem_c ++ "*)with_vec_get_ptr(&(" ++ out ++ f"), (int64_t)(_{pd}))))"
+                    out = "(*((" ++ elem_c ++ "*)with_vec_get_ptr_es(&(" ++ out ++ f"), (int64_t)(_{pd}), sizeof(" ++ elem_c ++ "))))"
                     current_tid = if elem_tid != 0: elem_tid else: self.sema.ty_i64 as i32
                     continue
                 out = f"{out}[_{pd}]"
@@ -4169,6 +4169,22 @@ impl CCodegen:
             if inner != 0 and self.c_type(inner, 0) == "with_vec":
                 return "((with_vec*)(" ++ recv ++ "))"
         "&(" ++ recv ++ ")"
+
+    // D115 Amendment 1: the `sizeof(elem)` a sized List helper takes, from
+    // the receiver's element type (never from the header).
+    mut fn list_recv_elem_sizeof_text(body: &MirBody, args_id: i32) -> str:
+        let recv_operand = self.call_arg_operand(body, args_id, 0)
+        var recv_tid = self.sema.resolve_alias(self.operand_tid(body, recv_operand))
+        let recv_tk = self.sema.get_type_kind(recv_tid)
+        if recv_tk == TypeKind.TY_PTR or recv_tk == TypeKind.TY_REF:
+            recv_tid = self.sema.resolve_alias(self.sema.get_type_d0(recv_tid))
+        var elem_tid = self.list_element_tid(recv_tid as i32)
+        if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+            elem_tid = self.list_local_element_tid(body, self.place_local_id(body, body.operand_d0[recv_operand]))
+        if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+            self.fail("a List helper's receiver has no element type (D115 Amendment 1 sizes every helper call statically)")
+            return "0"
+        "sizeof(" ++ self.c_type(elem_tid, 0) ++ ")"
 
     mut fn atomic_recv_ptr_text(body: &MirBody, args_id: i32) -> str:
         let recv_operand = self.call_arg_operand(body, args_id, 0)
@@ -6811,7 +6827,7 @@ impl CCodegen:
             if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
                 elem_tid = self.sema.ty_i64 as i32
             let elem_ty = self.c_type(elem_tid, 0)
-            var out = "    " ++ cc_lbrace() ++ " " ++ elem_ty ++ " __with_tmp = " ++ elem_text ++ "; with_vec_push(" ++ recv_ptr ++ ", &__with_tmp); " ++ cc_rbrace() ++ "\n"
+            var out = "    " ++ cc_lbrace() ++ " " ++ elem_ty ++ " __with_tmp = " ++ elem_text ++ "; with_vec_push_es(" ++ recv_ptr ++ ", &__with_tmp, sizeof(" ++ elem_ty ++ ")); " ++ cc_rbrace() ++ "\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -6828,11 +6844,12 @@ impl CCodegen:
                 // Copying sizeof(&T) bytes from the element fabricated a pointer
                 // from the element's leading bytes (Option.Some's zero tag became
                 // null) and lost the view entirely.
-                var ref_out = "    " ++ dst ++ " = " ++ self.ref_from_slot_ptr_text("with_vec_get_ptr(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ "))", ret_tid) ++ ";\n"
+                let get_es = self.list_recv_elem_sizeof_text(body, args_id)
+                var ref_out = "    " ++ dst ++ " = " ++ self.ref_from_slot_ptr_text("with_vec_get_ptr_es(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ "), " ++ get_es ++ ")", ret_tid) ++ ";\n"
                 ref_out = ref_out ++ f"    goto bb{next_bb};"
                 return ref_out
             var out = "    memset(&(" ++ dst ++ "), 0, sizeof(" ++ dst ++ "));\n"
-            out = out ++ "    if ((int64_t)(" ++ idx ++ ") >= 0 && (int64_t)(" ++ idx ++ ") < with_vec_len(" ++ recv_ptr ++ ")) " ++ cc_lbrace() ++ " memcpy(&(" ++ dst ++ "), with_vec_get_ptr(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ ")), sizeof(" ++ dst ++ ")); " ++ cc_rbrace() ++ "\n"
+            out = out ++ "    if ((int64_t)(" ++ idx ++ ") >= 0 && (int64_t)(" ++ idx ++ ") < with_vec_len(" ++ recv_ptr ++ ")) " ++ cc_lbrace() ++ " memcpy(&(" ++ dst ++ "), with_vec_get_ptr_es(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ "), " ++ self.list_recv_elem_sizeof_text(body, args_id) ++ "), sizeof(" ++ dst ++ ")); " ++ cc_rbrace() ++ "\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -6862,7 +6879,7 @@ impl CCodegen:
                 return "    abort();"
             let recv_ptr = self.list_recv_ptr_text(body, args_id)
             let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            var out = "    with_vec_remove(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ "));\n"
+            var out = "    with_vec_remove_es(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ "), " ++ self.list_recv_elem_sizeof_text(body, args_id) ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -6880,6 +6897,7 @@ impl CCodegen:
                 self.fail("vec.pop expects one argument")
                 return "    abort();"
             let recv_ptr = self.list_recv_ptr_text(body, args_id)
+            let pop_es = self.list_recv_elem_sizeof_text(body, args_id)
             var out = "    " ++ cc_lbrace() ++ " int64_t __with_n = with_vec_len(" ++ recv_ptr ++ ");\n"
             if has_ret != 0:
                 let dst = self.place_text(body, dest_place)
@@ -6892,15 +6910,15 @@ impl CCodegen:
                         return "    abort();"
                     let payload_tid = self.sema.type_reflection_variant_payload_type_frozen(dst_tid, some_variant, 0)
                     let payload_c = self.c_type(payload_tid, 0)
-                    out = out ++ "        if (__with_n > 0) " ++ cc_lbrace() ++ " " ++ payload_c ++ " __with_v = " ++ self.zero_value_text(payload_tid) ++ "; memcpy(&__with_v, with_vec_get_ptr(" ++ recv_ptr ++ ", __with_n - 1), sizeof(__with_v)); with_vec_remove(" ++ recv_ptr ++ ", __with_n - 1); " ++ dst ++ " = " ++ self.payload_enum_literal(dst_tid, some_variant, "__with_v") ++ "; " ++ cc_rbrace() ++ "\n"
+                    out = out ++ "        if (__with_n > 0) " ++ cc_lbrace() ++ " " ++ payload_c ++ " __with_v = " ++ self.zero_value_text(payload_tid) ++ "; memcpy(&__with_v, with_vec_get_ptr_es(" ++ recv_ptr ++ ", __with_n - 1, " ++ pop_es ++ "), sizeof(__with_v)); with_vec_remove_es(" ++ recv_ptr ++ ", __with_n - 1, " ++ pop_es ++ "); " ++ dst ++ " = " ++ self.payload_enum_literal(dst_tid, some_variant, "__with_v") ++ "; " ++ cc_rbrace() ++ "\n"
                     out = out ++ "        else " ++ cc_lbrace() ++ " " ++ dst ++ " = " ++ self.payload_enum_literal(dst_tid, none_variant, "") ++ "; " ++ cc_rbrace() ++ "\n"
                 else:
                     // Pointer-niche Option: zero is None and the payload itself
                     // is Some. Keep this fallback representation-preserving.
                     out = out ++ "        memset(&(" ++ dst ++ "), 0, sizeof(" ++ dst ++ "));\n"
-                    out = out ++ "        if (__with_n > 0) " ++ cc_lbrace() ++ " memcpy(&(" ++ dst ++ "), with_vec_get_ptr(" ++ recv_ptr ++ ", __with_n - 1), sizeof(" ++ dst ++ ")); with_vec_remove(" ++ recv_ptr ++ ", __with_n - 1); " ++ cc_rbrace() ++ "\n"
+                    out = out ++ "        if (__with_n > 0) " ++ cc_lbrace() ++ " memcpy(&(" ++ dst ++ "), with_vec_get_ptr_es(" ++ recv_ptr ++ ", __with_n - 1, " ++ pop_es ++ "), sizeof(" ++ dst ++ ")); with_vec_remove_es(" ++ recv_ptr ++ ", __with_n - 1, " ++ pop_es ++ "); " ++ cc_rbrace() ++ "\n"
             else:
-                out = out ++ "        if (__with_n > 0) " ++ cc_lbrace() ++ " with_vec_remove(" ++ recv_ptr ++ ", __with_n - 1); " ++ cc_rbrace() ++ "\n"
+                out = out ++ "        if (__with_n > 0) " ++ cc_lbrace() ++ " with_vec_remove_es(" ++ recv_ptr ++ ", __with_n - 1, " ++ pop_es ++ "); " ++ cc_rbrace() ++ "\n"
             out = out ++ "    " ++ cc_rbrace() ++ "\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
@@ -7641,7 +7659,7 @@ impl CCodegen:
             let dst = self.place_text(body, dest_place)
             var out = "    " ++ cc_lbrace() ++ " int64_t __with_n = with_vec_len(" ++ recv_ptr ++ "); int64_t __with_i = 0;"
             out = out ++ " if (__with_i < __with_n) " ++ cc_lbrace()
-            out = out ++ " int64_t __with_elem = 0; memcpy(&__with_elem, with_vec_get_ptr(" ++ recv_ptr ++ ", __with_i), sizeof(int64_t));"
+            out = out ++ " int64_t __with_elem = 0; memcpy(&__with_elem, with_vec_get_ptr_es(" ++ recv_ptr ++ ", __with_i, " ++ self.list_recv_elem_sizeof_text(body, args_id) ++ "), sizeof(int64_t));"
             out = out ++ " " ++ dst ++ " = __with_elem + 1; " ++ cc_rbrace()
             out = out ++ " else " ++ cc_lbrace() ++ " " ++ dst ++ " = 0; " ++ cc_rbrace()
             out = out ++ " " ++ cc_rbrace() ++ "\n"
@@ -7662,7 +7680,7 @@ impl CCodegen:
             let dst = self.place_text(body, dest_place)
             var out = "    " ++ cc_lbrace() ++ " int64_t __with_found = 0; int64_t __with_ci; int64_t __with_cn = with_vec_len(" ++ recv_ptr ++ "); " ++ elem_ty ++ " __with_needle = " ++ elem_text ++ ";"
             out = out ++ " for (__with_ci = 0; __with_ci < __with_cn; __with_ci++) " ++ cc_lbrace()
-            out = out ++ " " ++ elem_ty ++ " __with_cur; memcpy(&__with_cur, with_vec_get_ptr(" ++ recv_ptr ++ ", __with_ci), sizeof(" ++ elem_ty ++ "));"
+            out = out ++ " " ++ elem_ty ++ " __with_cur; memcpy(&__with_cur, with_vec_get_ptr_es(" ++ recv_ptr ++ ", __with_ci, sizeof(" ++ elem_ty ++ ")), sizeof(" ++ elem_ty ++ "));"
             out = out ++ " if (memcmp(&__with_cur, &__with_needle, sizeof(" ++ elem_ty ++ ")) == 0) " ++ cc_lbrace() ++ " __with_found = 1; break; " ++ cc_rbrace()
             out = out ++ " " ++ cc_rbrace()
             if has_ret != 0:
@@ -8249,7 +8267,7 @@ impl CCodegen:
             out = out ++ " " ++ self.c_type(dst_tid, 0) ++ " __with_lit; with_vec_new_out((uint8_t*)&__with_lit, sizeof(" ++ elem_ty ++ "));"
             for i in 0..argc:
                 let elem_text = self.collection_literal_elem_text(body, args_id, i, elem_tid)
-                out = out ++ " " ++ cc_lbrace() ++ " " ++ elem_ty ++ " __with_e = " ++ elem_text ++ "; with_vec_push(&__with_lit, &__with_e); " ++ cc_rbrace()
+                out = out ++ " " ++ cc_lbrace() ++ " " ++ elem_ty ++ " __with_e = " ++ elem_text ++ "; with_vec_push_es(&__with_lit, &__with_e, sizeof(" ++ elem_ty ++ ")); " ++ cc_rbrace()
             out = out ++ " " ++ dst ++ " = __with_lit; " ++ cc_rbrace() ++ "\n"
             return out ++ f"    goto bb{next_bb};"
         let is_set = intrinsic == MirIntrinsic.COLLECTION_LITERAL and base == "HashSet"

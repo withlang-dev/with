@@ -3226,6 +3226,12 @@ pub fn with_getenv_str(name: &str) -> str:
 //
 // List layout: { ptr: *mut u8, len: i64, cap: i64, elem_size: i64 }
 // We access it via pointer casts since we can't import the List type.
+//
+// D115 Amendment 1, step 1: every helper that needs the element size takes
+// it as an argument (`*_es`); the element type is static at every call
+// site, so nothing needs the header's word 3 at run time. The unsuffixed
+// entry points read the field for the code the pinned seed still emits,
+// and go when word 3 becomes `start` (step 2, after a seed is cut).
 
 // Offsets into List struct (each field is 8 bytes):
 // 0: ptr, 8: len, 16: cap, 24: elem_size
@@ -3289,10 +3295,11 @@ fn list_buffer_align(es: i64) -> i64:
 fn list_buffer_alloc(bytes: i64, es: i64) -> *mut u8:
     rt_alloc_aligned_with_origin(bytes, list_buffer_align(es), DBG_ORIGIN_LIST)
 
-fn list_grow(v: *mut u8):
+fn list_grow(v: *mut u8): list_grow_es(v, list_get_elem_size(v))
+
+fn list_grow_es(v: *mut u8, es: i64):
     let old_cap = list_get_cap(v)
     let new_cap = if old_cap < 8: 8 as i64 else: old_cap * 2
-    let es = list_get_elem_size(v)
     let new_ptr = list_buffer_alloc(new_cap * es, es)
     let old_ptr = list_get_ptr_field(v)
     let vlen = list_get_len(v)
@@ -3317,27 +3324,29 @@ pub fn with_vec_append_bytes(v: *mut u8, s: &str) -> Unit:
     let vlen = list_get_len(v)
     var vcap = list_get_cap(v)
     while vcap < vlen + n:
-        list_grow(v)
+        list_grow_es(v, 1)
         vcap = list_get_cap(v)
     let dst = (list_get_ptr_field(v) as i64 + vlen) as *mut u8
     rt_memcpy(dst, str_data(s), n)
     list_set_len(v, vlen + n)
 
-pub fn with_vec_push(v: *mut u8, elem: *const u8):
+pub fn with_vec_push(v: *mut u8, elem: *const u8): with_vec_push_es(v, elem, list_get_elem_size(v))
+
+pub fn with_vec_push_es(v: *mut u8, elem: *const u8, es: i64):
     let vlen = list_get_len(v)
     let vcap = list_get_cap(v)
     if vlen >= vcap:
-        list_grow(v)
-    let es = list_get_elem_size(v)
+        list_grow_es(v, es)
     let dst = (list_get_ptr_field(v) as i64 + vlen * es) as *mut u8
     rt_memcpy(dst, elem, es)
     list_set_len(v, vlen + 1)
 
-pub fn with_vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8:
+pub fn with_vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8: with_vec_get_ptr_es(v, idx, list_get_elem_size(v))
+
+pub fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8:
     let vlen = list_get_len(v)
     if idx < 0 or idx >= vlen:
         with_panic_core(make_str("List index out of bounds" as *const u8, 23), make_str("" as *const u8, 0), 0)
-    let es = list_get_elem_size(v)
     (list_get_ptr_field(v) as i64 + idx * es) as *mut u8
 
 pub fn with_vec_len(v: *mut u8) -> i64:
@@ -3357,14 +3366,18 @@ pub fn with_vec_free_buffer(p: *mut u8, cap: i64, es: i64) -> Unit:
     if p as i64 != 0 and cap > 0 and es > 0:
         rt_free_sized(p, cap * es)
 
-pub fn with_vec_free(v: *mut u8) -> Unit:
-    with_vec_free_buffer(list_get_ptr_field(v), list_get_cap(v), list_get_elem_size(v))
+pub fn with_vec_free(v: *mut u8) -> Unit: with_vec_free_es(v, list_get_elem_size(v))
+
+pub fn with_vec_free_es(v: *mut u8, es: i64) -> Unit:
+    with_vec_free_buffer(list_get_ptr_field(v), list_get_cap(v), es)
     list_set_ptr_field(v, 0 as *mut u8)
     list_set_len(v, 0)
     list_set_cap(v, 0)
 
-pub fn with_vec_free_drop_origin(v: *mut u8, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
-    with_vec_free_buffer_drop_origin(list_get_ptr_field(v), list_get_cap(v), list_get_elem_size(v), drop_origin, drop_origin_len)
+pub fn with_vec_free_drop_origin(v: *mut u8, drop_origin: *const u8, drop_origin_len: i64) -> Unit: with_vec_free_drop_origin_es(v, list_get_elem_size(v), drop_origin, drop_origin_len)
+
+pub fn with_vec_free_drop_origin_es(v: *mut u8, es: i64, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
+    with_vec_free_buffer_drop_origin(list_get_ptr_field(v), list_get_cap(v), es, drop_origin, drop_origin_len)
     list_set_ptr_field(v, 0 as *mut u8)
     list_set_len(v, 0)
     list_set_cap(v, 0)
@@ -3447,37 +3460,37 @@ pub fn with_str_free_drop_origin(s: *mut u8, drop_origin: *const u8, drop_origin
     unsafe *((s as i64 + 8) as *mut i64) = 0
 
 pub fn with_vec_push_i32(v: *mut u8, val: i32):
-    with_vec_push(v, &val as *const u8)
+    with_vec_push_es(v, &val as *const u8, 4)
 
 pub fn with_vec_get_i32(v: *mut u8, idx: i64) -> i32:
-    let p = with_vec_get_ptr(v, idx)
+    let p = with_vec_get_ptr_es(v, idx, 4)
     if p as i64 != 0:
         return unsafe *(p as *const i32)
     0
 
 pub fn with_vec_push_i64(v: *mut u8, val: i64):
-    with_vec_push(v, &val as *const u8)
+    with_vec_push_es(v, &val as *const u8, 8)
 
 pub fn with_vec_get_i64(v: *mut u8, idx: i64) -> i64:
-    let p = with_vec_get_ptr(v, idx)
+    let p = with_vec_get_ptr_es(v, idx, 8)
     if p as i64 != 0:
         return unsafe *(p as *const i64)
     0
 
 pub fn with_vec_push_str(v: *mut u8, val: str):
-    with_vec_push(v, &val as *const u8)
+    with_vec_push_es(v, &val as *const u8, 16)
     // with_vec_push bit-copies raw element bytes. The List now owns this str
     // header, so disarm the by-value local before its scope cleanup runs.
     unsafe *(&raw mut val as *mut str) = make_str("" as *const u8, 0)
 
 pub fn with_vec_get_str(v: *mut u8, idx: i64) -> str:
-    let p = with_vec_get_ptr(v, idx)
+    let p = with_vec_get_ptr_es(v, idx, 16)
     if p as i64 != 0:
         return unsafe *(p as *const str)
     make_str("" as *const u8, 0)
 
 pub fn with_vec_push_bool(v: *mut u8, val: i32):
-    with_vec_push(v, &val as *const u8)
+    with_vec_push_es(v, &val as *const u8, 4)
 
 pub fn with_vec_get_bool(v: *mut u8, idx: i64) -> i32:
     with_vec_get_i32(v, idx)
@@ -3488,20 +3501,19 @@ pub fn with_ptr_get_i32(ptr: *const u8, index: i64) -> i32:
 pub fn with_vec_set_i32(v: *mut u8, idx: i64, val: i32):
     let vlen = list_get_len(v)
     if idx >= 0 and idx < vlen:
-        let es = list_get_elem_size(v)
-        unsafe *((list_get_ptr_field(v) as i64 + idx * es) as *mut i32) = val
+        unsafe *((list_get_ptr_field(v) as i64 + idx * 4) as *mut i32) = val
 
 pub fn with_vec_set_i64(v: *mut u8, idx: i64, val: i64):
     let vlen = list_get_len(v)
     if idx >= 0 and idx < vlen:
-        let es = list_get_elem_size(v)
-        unsafe *((list_get_ptr_field(v) as i64 + idx * es) as *mut i64) = val
+        unsafe *((list_get_ptr_field(v) as i64 + idx * 8) as *mut i64) = val
 
-pub fn with_vec_remove(v: *mut u8, idx: i64):
+pub fn with_vec_remove(v: *mut u8, idx: i64): with_vec_remove_es(v, idx, list_get_elem_size(v))
+
+pub fn with_vec_remove_es(v: *mut u8, idx: i64, es: i64):
     let vlen = list_get_len(v)
     if idx < 0 or idx >= vlen: return
     let base = list_get_ptr_field(v)
-    let es = list_get_elem_size(v)
     var i = idx
     while i < vlen - 1:
         rt_memcpy((base as i64 + i * es) as *mut u8, (base as i64 + (i + 1) * es) as *const u8, es)
@@ -3512,8 +3524,7 @@ pub fn with_vec_pop_i32(v: *mut u8) -> i32:
     let vlen = list_get_len(v)
     if vlen == 0: return 0
     list_set_len(v, vlen - 1)
-    let es = list_get_elem_size(v)
-    unsafe *((list_get_ptr_field(v) as i64 + (vlen - 1) * es) as *const i32)
+    unsafe *((list_get_ptr_field(v) as i64 + (vlen - 1) * 4) as *const i32)
 
 // ── SlotMap operations ────────────────────────────────────────────
 // Header: values, next, generations, len, cap, elem_size (six words),
@@ -4476,7 +4487,7 @@ pub fn with_str_join(parts: *mut u8, sep: &str) -> str:
     var total: i64 = 0
     var i: i64 = 0
     while i < plen:
-        let p = with_vec_get_ptr(parts, i)
+        let p = with_vec_get_ptr_es(parts, i, 16)
         let part_len = unsafe *((p as i64 + 8) as *const i64)
         total = total + part_len
         if i > 0:
@@ -4489,7 +4500,7 @@ pub fn with_str_join(parts: *mut u8, sep: &str) -> str:
         if i > 0 and sep_l > 0:
             rt_memcpy((out as i64 + pos) as *mut u8, sep_p, sep_l)
             pos = pos + sep_l
-        let p = with_vec_get_ptr(parts, i)
+        let p = with_vec_get_ptr_es(parts, i, 16)
         let part_ptr = unsafe *(p as *const *const u8)
         let part_len = unsafe *((p as i64 + 8) as *const i64)
         if part_len > 0:
