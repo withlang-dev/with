@@ -43,7 +43,7 @@ use std.re.pcre2_script_run
 use std.re.pcre2_maketables
 
 extern fn with_arg_count() -> i32
-extern fn with_arg_at(idx: i32) -> str
+extern fn with_arg_at(idx: isize) -> str
 extern fn malloc(size: c_ulong) -> *mut c_void
 extern fn free(ptr: *mut c_void)
 

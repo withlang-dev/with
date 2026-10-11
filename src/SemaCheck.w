@@ -930,6 +930,10 @@ impl Sema:
         var owned_candidate: i32 = 0
         var owned_arm_node: i32 = 0
         var reference_candidate: i32 = 0
+        var reference_arm_node: i32 = 0
+        // D128: view arms whose pointee a later check retypes; this check
+        // treats them as agreeing.
+        let deferred_arms: List[i32] = List.new()
         // Whether every owned arm that reached the join is an untyped literal
         // (`if c: xs[i] else: 0`): beside a view they take its value type.
         var owned_arms_all_literal = true
@@ -979,6 +983,34 @@ impl Sema:
             if self.get_type_kind(resolved) == TypeKind.TY_REF:
                 let prior_reference = reference_candidate
                 reference_candidate = self.merge_contextual_reference_join_types(reference_candidate, arm_ty)
+                if reference_candidate == 0 and prior_reference != 0:
+                    // D128: `&right` of an undecided literal-typed local takes
+                    // the other arm's pointee; the body's next check retypes it.
+                    var deferred_view = false
+                    // The arm itself, or a lazy arm's closure body (`unwrap_or_else(() => &right)`).
+                    // A lazy arm has no node of its own; its origin is the closure body.
+                    let arm_src: i32 = if reach_node > 0: reach_node else: origin_nodes[ai]
+                    var arm_expr = if arm_src > 0 and self.ast.kind(arm_src) == NodeKind.NK_CLOSURE: self.ast.get_data0(arm_src) else: arm_src
+                    if arm_expr > 0 and self.ast.kind(arm_expr) == NodeKind.NK_BLOCK and self.ast.get_data2(arm_expr) != 0: arm_expr = self.ast.get_data2(arm_expr)
+                    let this_view = if arm_expr > 0 and self.ast.kind(arm_expr) == NodeKind.NK_UNARY and self.ast.get_data0(arm_expr) == UnaryOp.UOP_REF: self.ast.get_data1(arm_expr) else: 0
+                    for d in self.literal_binding_lets_in(this_view):
+                        if not self.int_local_decisions.contains(d):
+                            self.int_local_demands.push(d)
+                            self.int_local_demands.push(self.get_type_d0(self.resolve_alias(prior_reference as TypeId)))
+                            self.int_local_demands.push(reach_node)
+                            deferred_view = true
+                    let prior_view = if reference_arm_node > 0 and self.ast.kind(reference_arm_node) == NodeKind.NK_UNARY and self.ast.get_data0(reference_arm_node) == UnaryOp.UOP_REF: self.ast.get_data1(reference_arm_node) else: 0
+                    for d in self.literal_binding_lets_in(prior_view):
+                        if not self.int_local_decisions.contains(d):
+                            self.int_local_demands.push(d)
+                            self.int_local_demands.push(self.get_type_d0(resolved))
+                            self.int_local_demands.push(reference_arm_node)
+                            deferred_view = true
+                    if deferred_view:
+                        reference_candidate = prior_reference
+                        deferred_arms.push(reach_node)
+                        deferred_arms.push(reference_arm_node)
+                if prior_reference == 0 and reference_candidate != 0: reference_arm_node = reach_node
                 if reference_candidate == 0:
                     self.emit_error(join_name ++ " arms view `" ++ self.type_name(prior_reference) ++ "` and `" ++ self.type_name(arm_ty) ++ "`; a reference cannot convert its pointee (§4.2.6), so every arm must view one type", report_node)
                     return 0
@@ -1160,7 +1192,7 @@ impl Sema:
                 else if arm_node > 0 and self.body_can_fall_through(arm_node) == 0:
                     diverging_count = diverging_count + 1
                 else if final_is_ref != 0:
-                    if self.get_type_kind(resolved) != TypeKind.TY_REF or self.types_compatible(final_type as TypeId, arm_ty as TypeId) == 0:
+                    if (self.get_type_kind(resolved) != TypeKind.TY_REF or self.types_compatible(final_type as TypeId, arm_ty as TypeId) == 0) and not deferred_arms.contains(arm_node):
                         self.emit_contextual_join_mismatch(join_name, final_type, arm_ty, report_node, arm_node)
                         return 0
                     arm_kind = D22_JOIN_ARM_VIEW
@@ -15087,7 +15119,7 @@ impl Sema:
             return
         self.literal_demands.push(let_node)
         self.literal_demands.push(decided)
-        self.literal_demands.push(use_node)
+        self.literal_demands.push(if kind == TypeKind.TY_SLICE: -use_node else: use_node)
 
     // A method called on `recv_expr` that exactly one of the collections a
     // literal builds has (`push` demands a `List`). The element type is the
@@ -17839,7 +17871,8 @@ impl Sema:
         if iterable != 0 and self.ast.kind(iterable) == NodeKind.NK_ARRAY_LIT and self.ast.get_data2(iterable) == 0:
             let elems = self.ast.get_data0(iterable)
             for ei in 0..self.ast.get_data1(iterable):
-                if self.expr_is_untyped_literal_arith(self.ast.get_extra(elems + ei)): list_literal = true
+                let elem = self.ast.get_extra(elems + ei)
+                if self.expr_is_untyped_literal_arith(elem) or self.literal_binding_lets_in(elem).len() > 0: list_literal = true
         if list_literal: range_literal = true
         let iter_type = if range_literal and self.int_local_decisions.contains(node):
             let decided_elem = (self.int_local_decisions.get(node).unwrap() / 4294967296) as i32
@@ -26690,7 +26723,9 @@ impl Sema:
         else if kind == NodeKind.NK_IF_EXPR:
             for d in self.literal_binding_lets_in_depth(self.ast.get_data1(node), depth): out.push(d)
             for d in self.literal_binding_lets_in_depth(self.ast.get_data2(node), depth): out.push(d)
-        else if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_NEGATE:
+        else if kind == NodeKind.NK_UNARY and (self.ast.get_data0(node) == UnaryOp.UOP_NEGATE or self.ast.get_data0(node) == UnaryOp.UOP_REF):
+            // A view of the local (`let left_view = &left`) carries a demand on
+            // the value it views to the local.
             return self.literal_binding_lets_in_depth(self.ast.get_data1(node), depth)
         else if kind == NodeKind.NK_BINARY and sema_binary_op_is_arithmetic(self.ast.get_data0(node)):
             for d in self.literal_binding_lets_in_depth(self.ast.get_data1(node), depth): out.push(d)
@@ -32755,6 +32790,21 @@ impl Sema:
             var mc_expected = self.atomic_method_expected_arg_type(mc_order_type, field, ai)
             if mc_expected == 0:
                 mc_expected = self.method_expected_arg_type(obj_type as i32, field, ai)
+                // §4.2.1 rule 8: a lazy default whose body is an untyped literal
+                // (`opt.unwrap_or_else(() => 130)`) is an arm beside the carrier's
+                // payload, viewed or not, and takes its number's type.
+                if mc_expected != 0 and mc_is_closure and self.pool_resolve(field) == "unwrap_or_else":
+                    let lazy_fn = self.resolve_alias(mc_expected as TypeId)
+                    if self.get_type_kind(lazy_fn) == TypeKind.TY_FN and self.get_type_d1(lazy_fn) == 0 and self.get_type_d2(lazy_fn) == 0:
+                        var lazy_body = self.ast.get_data0(mc_arg_node)
+                        if lazy_body > 0 and self.ast.kind(lazy_body) == NodeKind.NK_BLOCK and self.ast.get_data2(lazy_body) != 0: lazy_body = self.ast.get_data2(lazy_body)
+                        let lazy_recv = self.resolve_alias(self.auto_deref_ref_ptr_type(self.resolve_alias(obj_type)) as TypeId)
+                        if lazy_body > 0 and self.expr_is_untyped_literal_arith(lazy_body) and self.get_type_kind(lazy_recv) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(lazy_recv as i32) == self.syms.option:
+                            let lazy_payload = self.resolve_alias(self.get_generic_inst_arg(lazy_recv as i32, 0) as TypeId)
+                            let lazy_value = if self.get_type_kind(lazy_payload) == TypeKind.TY_REF: self.get_type_d0(lazy_payload) else: lazy_payload as i32
+                            if self.is_plain_numeric_type(lazy_value):
+                                let lazy_params: List[i32] = List.new()
+                                mc_expected = self.ensure_fn_type(lazy_params, 0, lazy_value as TypeId) as i32
             if mc_expected == 0 and static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
                 mc_expected = self.static_generic_method_expected_arg_type(obj_type as i32, field, ai)
             if mc_expected == 0 and field == self.syms.spawn_method and ai == 0:
