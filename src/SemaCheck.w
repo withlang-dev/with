@@ -17866,7 +17866,7 @@ impl Sema:
         self.loop_iterable_node = iterable
         // D128: a loop variable over a literal range is a literal-typed local;
         // the body's second check types the range at the variable's decision.
-        var range_literal = iterable != 0 and self.ast.kind(iterable) == NodeKind.NK_RANGE and self.expr_is_untyped_literal_arith(self.ast.get_data0(iterable)) and (self.ast.get_data1(iterable) == 0 or self.expr_is_untyped_literal_arith(self.ast.get_data1(iterable)))
+        var range_literal = iterable != 0 and self.ast.kind(iterable) == NodeKind.NK_RANGE and self.range_bound_is_literal(self.ast.get_data0(iterable)) and (self.ast.get_data1(iterable) == 0 or self.range_bound_is_literal(self.ast.get_data1(iterable)))
         var list_literal = false
         if iterable != 0 and self.ast.kind(iterable) == NodeKind.NK_ARRAY_LIT and self.ast.get_data2(iterable) == 0:
             let elems = self.ast.get_data0(iterable)
@@ -26698,6 +26698,13 @@ impl Sema:
             return 0
         if self.expr_is_untyped_literal_arith(self.ast.get_data1(decl)): decl else: 0
 
+    // A range bound that is an untyped literal or comes from literal-typed
+    // locals (`0..unique`, `1..n + 1`): the loop variable is then literal-typed.
+    fn range_bound_is_literal(bound: i32) -> bool:
+        if bound == 0: return false
+        if self.expr_is_untyped_literal_arith(bound): return true
+        self.literal_binding_lets_in(bound).len() > 0
+
     // D126: the literal-typed locals an expression's value comes from: a
     // bare name, or names combined by arithmetic (`sum + bonus.points`).
     fn literal_binding_lets_in(node: i32) -> List[i32]: self.literal_binding_lets_in_depth(node, 0)
@@ -26709,6 +26716,15 @@ impl Sema:
         if kind == NodeKind.NK_IDENT:
             let decl = self.unannotated_literal_binding(node)
             if decl != 0:
+                if self.ast.kind(decl) == NodeKind.NK_FOR:
+                    // D128: the loop variable's demand lands on the locals its
+                    // range's bounds come from (`for i in 0..unique`).
+                    out.push(decl)
+                    let range = self.ast.get_data1(decl)
+                    if range != 0 and self.ast.kind(range) == NodeKind.NK_RANGE:
+                        for d in self.literal_binding_lets_in_depth(self.ast.get_data0(range), depth + 1): out.push(d)
+                        for d in self.literal_binding_lets_in_depth(self.ast.get_data1(range), depth + 1): out.push(d)
+                    return out
                 if not self.untyped_expr_is_float(self.ast.get_data1(decl)): out.push(decl)
                 return out
             // A local derived from such locals (`let mid = lo + (hi - lo) / 2`)
@@ -26785,13 +26801,17 @@ impl Sema:
         var have = self.resolve_alias(actual as TypeId)
         if self.get_type_kind(want) == TypeKind.TY_REF: want = self.resolve_alias(self.get_type_d0(want) as TypeId)
         if self.get_type_kind(have) == TypeKind.TY_REF: have = self.resolve_alias(self.get_type_d0(have) as TypeId)
-        let int_decl = self.unannotated_literal_binding(inner)
-        if int_decl != 0:
-            if not self.is_plain_numeric_type(want as i32) or self.int_local_decisions.contains(int_decl) or self.untyped_expr_is_float(self.ast.get_data1(int_decl)): return false
-            self.int_local_demands.push(int_decl)
-            self.int_local_demands.push(want as i32)
-            self.int_local_demands.push(arg_node)
-            return true
+        let int_lets = self.literal_binding_lets_in(inner)
+        if int_lets.len() > 0:
+            if not self.is_plain_numeric_type(want as i32): return false
+            var noted = false
+            for int_decl in int_lets:
+                if self.int_local_decisions.contains(int_decl) or self.untyped_expr_is_float(self.ast.get_data1(int_decl)): continue
+                self.int_local_demands.push(int_decl)
+                self.int_local_demands.push(want as i32)
+                self.int_local_demands.push(arg_node)
+                noted = true
+            return noted
         let sym = self.ast.get_data0(inner)
         let pending_decl = self.demand_let_of(sym)
         let pending_value = if pending_decl > 0 and self.ast.kind(pending_decl) == NodeKind.NK_LET_BINDING: self.ast.get_data1(pending_decl) else: 0
