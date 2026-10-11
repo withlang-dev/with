@@ -45,9 +45,9 @@ fn ret_abs(root: &str, path: &str) -> str:
 
 fn ret_dirname(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
-            last_slash = i
+            last_slash = i as i32
     if last_slash < 0:
         return "."
     if last_slash == 0:
@@ -56,16 +56,16 @@ fn ret_dirname(path: &str) -> str:
 
 fn ret_basename(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
-            last_slash = i
+            last_slash = i as i32
     if last_slash < 0:
         return retention_owned_text(path)
     path.slice((last_slash + 1) as i64, path.len())
 
 fn ret_trim(text: &str) -> str:
     var start = 0
-    var end = text.len() as i32
+    var end = text.len()
     while start < end:
         let ch = text[start]
         if ch != 9 and ch != 10 and ch != 13 and ch != 32:
@@ -79,8 +79,8 @@ fn ret_trim(text: &str) -> str:
     text.slice(start as i64, end as i64)
 
 fn ret_first_line(text: &str) -> str:
-    var end = text.len() as i32
-    for i in 0..text.len() as i32:
+    var end = text.len()
+    for i in 0..text.len():
         let ch = text[i]
         if ch == 10 or ch == 13:
             end = i
@@ -90,14 +90,14 @@ fn ret_first_line(text: &str) -> str:
 fn ret_split_lines(text: &str) -> List[str]:
     let out: List[str] = List.new()
     var start = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         if ch == 10 or ch == 13:
             let line = ret_trim(text.slice(start as i64, i as i64))
             if line.len() > 0:
                 out.push(line)
-            start = i + 1
-    if start < text.len() as i32:
+            start = (i + 1) as i32
+    if start < text.len():
         let line = ret_trim(text.slice(start as i64, text.len()))
         if line.len() > 0:
             out.push(line)
@@ -105,7 +105,7 @@ fn ret_split_lines(text: &str) -> List[str]:
 
 fn ret_json_escape(text: &str) -> str:
     var out = ""
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         if ch == 34:
             out = out ++ "\\\""
@@ -123,7 +123,7 @@ fn ret_json_escape(text: &str) -> str:
 
 fn ret_safe_label(text: &str) -> str:
     var out = ""
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
         if keep:
@@ -221,11 +221,11 @@ fn ret_str_compare(a: &str, b: &str) -> i32:
 
 fn ret_sorted_strings(items: List[str]) -> List[str]:
     var sorted: List[str] = List.new()
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let item = items[i]
         var inserted = false
         let next: List[str] = List.new()
-        for j in 0..sorted.len() as i32:
+        for j in 0..sorted.len():
             let existing = sorted[j]
             if not inserted and ret_str_compare(item, existing) < 0:
                 next.push(retention_owned_text(item))
@@ -285,11 +285,11 @@ fn ret_release_version_compare(a: &str, b: &str) -> i32:
 
 fn ret_sorted_release_versions(items: List[str]) -> List[str]:
     var sorted: List[str] = List.new()
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let item = items[i]
         var inserted = false
         let next: List[str] = List.new()
-        for j in 0..sorted.len() as i32:
+        for j in 0..sorted.len():
             let existing = sorted[j]
             if not inserted and ret_release_version_compare(item, existing) < 0:
                 next.push(retention_owned_text(item))
@@ -303,7 +303,7 @@ fn ret_sorted_release_versions(items: List[str]) -> List[str]:
 fn ret_direct_w_files(fs: &ToolFs, dir: &str) -> List[str]:
     let out: List[str] = List.new()
     let files = fs.list_files(dir)
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         if path.ends_with(".w") and ret_dirname(path) == dir:
             out.push(retention_owned_text(path))
@@ -315,7 +315,7 @@ fn ret_sha256_hex_list(ctx: &ActionCtx, label: &str, files: &List[str]) -> List[
     if manifest.len() == 0:
         return out
     let lines = manifest.split("\n")
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if line.len() >= 64:
             out.push(line.slice(0, 64))
@@ -340,14 +340,14 @@ fn ret_expected_test_marker(ctx: &ActionCtx, target_name: &str, entry: &str) -> 
     let comp_files: List[str] = List.new()
     comp_files.push(compiler_path)
     let comp_hexes = ret_sha256_hex_list(ctx, ret_safe_label(target_name) ++ "-marker-compiler", comp_files)
-    if comp_hexes.len() as i32 != 1:
+    if comp_hexes.len() != 1:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not hash test compiler for marker " ++ target_name)
     text = text ++ "compiler-sha256:" ++ comp_hexes[0] ++ "\n"
     let files = ret_direct_w_files(fs, ret_dirname(entry))
     let file_hexes = ret_sha256_hex_list(ctx, ret_safe_label(target_name) ++ "-marker-files", files)
     if file_hexes.len() != files.len():
         ctx.diagnostics().error(ctx.target_name() ++ ": could not hash test files for marker " ++ target_name)
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         text = text ++ "file:" ++ files[i] ++ ":" ++ file_hexes[i] ++ "\n"
     text
 
@@ -393,22 +393,22 @@ fn ret_sha256_files_manifest(ctx: &ActionCtx, label: &str, files: &List[str]) ->
     var batch_names: List[str] = List.new()
     var batch_index = 0
     let root = ctx.project_info().project_root()
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let file = files[i]
         batch.push(ret_abs(root, file))
         batch_names.push(retention_owned_text(file))
-        let last = i + 1 == files.len() as i32
+        let last = i + 1 == files.len()
         // argv is capped at 255 entries by the runtime spawn path — stay under
         // it (tool + slack) while keeping spawns rare.
-        if batch.len() as i32 >= 250 or last:
+        if batch.len() >= 250 or last:
             let args: List[str] = List.new()
             args.push(ret_sha256_tool(root))
-            for bi in 0..batch.len() as i32:
+            for bi in 0..batch.len():
                 args.push(retention_owned_text(batch[bi]))
             let lines = ret_run_lines(ctx, label ++ "-" ++ f"{batch_index}" ++ "-sha256", args, 120000)
             if lines.len() != batch.len():
                 return ""
-            for li in 0..lines.len() as i32:
+            for li in 0..lines.len():
                 let line = lines[li]
                 if line.len() < 64:
                     return ""
@@ -432,7 +432,7 @@ fn ret_build_driver_sources_manifest(ctx: &ActionCtx) -> str:
     let files: List[str] = List.new()
     files.push("build.w")
     let build_files = ret_sorted_strings(fs.list_files("build"))
-    for i in 0..build_files.len() as i32:
+    for i in 0..build_files.len():
         let path = build_files[i]
         if path.ends_with(".w"):
             files.push(retention_owned_text(path))
@@ -546,7 +546,7 @@ fn ret_worktree_is_clean(ctx: &ActionCtx) -> bool:
     args.push("status")
     args.push("--porcelain")
     let lines = ret_run_lines(ctx, "git-status", args, 60000)
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if line.len() == 0: continue
         if ret_status_is_not_input(line): continue
@@ -602,7 +602,7 @@ pub fn ret_source_identity(ctx: &ActionCtx, driver_sha: &str) -> str:
 fn ret_green_store_line(store: &str, identity: &str) -> str:
     if identity.len() == 0: return ""
     let lines = store.split("\n")
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if line.starts_with(identity ++ "\t"): return line.clone()
     ""
@@ -615,7 +615,7 @@ fn ret_compiler_version(ctx: &ActionCtx, compiler_path: &str) -> str:
     ret_run_first_line(ctx, "compiler-version", args, 60000)
 
 fn ret_list_contains(items: &List[str], item: &str) -> bool:
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         if items[i] == item:
             return true
     false
@@ -623,7 +623,7 @@ fn ret_list_contains(items: &List[str], item: &str) -> bool:
 fn ret_add_unique(items: List[str], item: &str) -> List[str]:
     let out: List[str] = List.new()
     var found = item.len() == 0
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let existing = items[i]
         if existing == item:
             found = true
@@ -634,7 +634,7 @@ fn ret_add_unique(items: List[str], item: &str) -> List[str]:
 
 fn ret_manifest_lines_without(manifest: List[str], skip: &str) -> List[str]:
     let out: List[str] = List.new()
-    for i in 0..manifest.len() as i32:
+    for i in 0..manifest.len():
         let item = manifest[i]
         if item != skip:
             out.push(retention_owned_text(item))
@@ -642,7 +642,7 @@ fn ret_manifest_lines_without(manifest: List[str], skip: &str) -> List[str]:
 
 fn ret_join_lines(items: List[str]) -> str:
     var out = ""
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         out = out ++ items[i] ++ "\n"
     out
 
@@ -663,12 +663,12 @@ fn ret_archive_verified_seed(ctx: &ActionCtx, version: &str, commit: &str, sha25
             return ret_fail(ctx, "could not chmod archived seed: " ++ archive)
     var entries = ret_manifest_lines_without(ret_seed_manifest_entries(fs), archive)
     entries.push(archive)
-    while entries.len() as i32 > RET_SEED_KEEP:
+    while entries.len() > RET_SEED_KEEP:
         let remove_path = entries[0]
         if fs.exists(remove_path):
             let _remove_old_seed = fs.remove_file(remove_path)
         let trimmed: List[str] = List.new()
-        for i in 1..entries.len() as i32:
+        for i in 1..entries.len():
             trimmed.push(retention_owned_text(entries[i]))
         entries = trimmed
     if fs.write_text("out/seed-archive/manifest.tsv", ret_join_lines(entries)) != 0:
@@ -748,7 +748,7 @@ fn ret_driver_ancestry_verdict(ctx: &ActionCtx, expected: &str, version: &str) -
     probe.push("p=$PPID; n=0; while [ \"$p\" -gt 1 ] && [ $n -lt 8 ]; do e=$(readlink /proc/$p/exe 2>/dev/null || ps -o comm= -p $p 2>/dev/null); echo \"$e\"; p=$(ps -o ppid= -p $p 2>/dev/null | tr -d ' '); [ -n \"$p\" ] || break; n=$((n+1)); done")
     let ancestors = ret_run_lines(ctx, "driver-ancestry", probe, 30000)
     var seen: List[str] = List.new()
-    for i in 0..ancestors.len() as i32:
+    for i in 0..ancestors.len():
         var exe: str = ancestors[i].clone()
         if exe.len() == 0: continue
         if exe.starts_with("-"): exe = exe.slice(1, exe.len())
@@ -770,7 +770,7 @@ fn ret_driver_ancestry_verdict(ctx: &ActionCtx, expected: &str, version: &str) -
         print("[" ++ ctx.target_name() ++ "] driver identity unverified: no ancestor process resolves to a file (probe: " ++ ret_join(capture_dir, "driver-ancestry.stdout") ++ ")")
         return 0
     var message = "no ancestor process of this action is the pinned seed " ++ version ++ "; the build system is being evaluated by another compiler:"
-    for i in 0..seen.len() as i32: message = message ++ "\n  " ++ seen[i]
+    for i in 0..seen.len(): message = message ++ "\n  " ++ seen[i]
     ret_fail(ctx, ret_pinned_driver_fix(message))
 
 /// `with build :seed-driver` (arg: host seed asset). Fails fast, first in
@@ -785,12 +785,12 @@ pub fn run_seed_driver_action(ctx: ActionCtx) -> i32:
     let drift = seed_lock_workflow_drift(ctx.fs(), lock)
     if drift.len() > 0:
         var message = "these workflow seed pins disagree with seed.lock (" ++ seed_lock_version_for(lock, asset) ++ "); `with run tools/bump_seed_pins.w` rewrites them:"
-        for i in 0..drift.len() as i32: message = message ++ "\n  " ++ drift[i]
+        for i in 0..drift.len(): message = message ++ "\n  " ++ drift[i]
         return ret_fail(ctx, message)
     let sdk_drift = sdk_lock_workflow_drift(ctx.fs(), sdk_lock_read(ctx.fs()))
     if sdk_drift.len() > 0:
         var message = "these workflow LLVM SDK pins disagree with sdk.lock (#1826):"
-        for i in 0..sdk_drift.len() as i32: message = message ++ "\n  " ++ sdk_drift[i]
+        for i in 0..sdk_drift.len(): message = message ++ "\n  " ++ sdk_drift[i]
         return ret_fail(ctx, message)
     print("[seed-driver] the driver is the pinned seed " ++ seed_lock_version_for(lock, asset) ++ "; workflow pins agree with seed.lock and sdk.lock")
     ret_write_output_stamp(ctx)
@@ -863,8 +863,8 @@ pub fn run_fixpoint_compare_units_action(ctx: ActionCtx) -> i32:
     var differing = ""
     let count = if left_lines.len() > right_lines.len(): left_lines.len() else: right_lines.len()
     for i in 0..count as i32:
-        let a = if i < left_lines.len() as i32: left_lines[i].clone() else: ""
-        let b = if i < right_lines.len() as i32: right_lines[i].clone() else: ""
+        let a = if i < left_lines.len(): left_lines[i].clone() else: ""
+        let b = if i < right_lines.len(): right_lines[i].clone() else: ""
         if a.len() == 0 and b.len() == 0: continue
         units = units + 1
         if a != b: differing = differing ++ "\n  stage2: " ++ (if a.len() > 0: a else: "(no such unit)") ++ "\n  stage3: " ++ (if b.len() > 0: b else: "(no such unit)")
@@ -1034,7 +1034,7 @@ pub fn run_require_last_green_action(ctx: ActionCtx) -> i32:
 fn ret_live_targets(args: &List[str]) -> List[str]:
     let live: List[str] = List.new()
     let prefix = "live-target="
-    for i in 0..args.len() as i32:
+    for i in 0..args.len():
         let arg = args[i]
         if arg.starts_with(prefix):
             live.push(arg.slice(prefix.len(), arg.len()))
@@ -1051,7 +1051,7 @@ fn ret_add_stale_state_files(fs: &ToolFs, live_targets: List[str], candidates: L
     if live_targets.len() == 0 or not fs.exists("out/.build-state"):
         return out
     let files = fs.list_files("out/.build-state")
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         let target_name = ret_state_target_name(path)
         if target_name.len() > 0 and not ret_list_contains(live_targets, target_name):
@@ -1061,7 +1061,7 @@ fn ret_add_stale_state_files(fs: &ToolFs, live_targets: List[str], candidates: L
 fn ret_add_old_seed_archives(fs: &ToolFs, candidates: List[str]) -> List[str]:
     var out = candidates
     let entries = ret_seed_manifest_entries(fs)
-    var keep_from = entries.len() as i32 - RET_SEED_KEEP
+    var keep_from = entries.len() - RET_SEED_KEEP
     if keep_from <= 0:
         return out
     for i in 0..keep_from:
@@ -1093,7 +1093,7 @@ fn ret_release_artifact_versions(fs: &ToolFs) -> List[str]:
     if not fs.exists("out/release"):
         return versions
     let files = fs.list_files("out/release")
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let version = ret_release_artifact_version(files[i])
         versions = ret_add_unique(versions, version)
     ret_sorted_release_versions(versions)
@@ -1101,7 +1101,7 @@ fn ret_release_artifact_versions(fs: &ToolFs) -> List[str]:
 fn ret_stale_release_artifact_versions(fs: &ToolFs) -> List[str]:
     let versions = ret_release_artifact_versions(fs)
     let stale: List[str] = List.new()
-    let stale_count = versions.len() as i32 - RET_RELEASE_VERSION_KEEP
+    let stale_count = versions.len() - RET_RELEASE_VERSION_KEEP
     if stale_count <= 0:
         return stale
     for i in 0..stale_count:
@@ -1114,7 +1114,7 @@ fn ret_add_old_release_artifacts(fs: &ToolFs, candidates: List[str]) -> List[str
     if stale_versions.len() == 0 or not fs.exists("out/release"):
         return out
     let files = fs.list_files("out/release")
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         let version = ret_release_artifact_version(path)
         if ret_list_contains(stale_versions, version):
@@ -1132,7 +1132,7 @@ fn ret_small_prune_candidates(ctx: &ActionCtx) -> List[str]:
 fn ret_apply_small_prune(ctx: &ActionCtx, candidates: List[str]) -> i32:
     let fs = ctx.fs()
     var removed = 0
-    for i in 0..candidates.len() as i32:
+    for i in 0..candidates.len():
         let path = candidates[i]
         var rc = 0
         if fs.is_dir(path):
@@ -1149,7 +1149,7 @@ fn ret_immediate_children(fs: &ToolFs, dir: &str) -> List[str]:
     if not fs.exists(dir):
         return out
     let files = fs.list_files(dir)
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         if ret_dirname(path) == dir:
             out.push(retention_owned_text(path))
@@ -1158,7 +1158,7 @@ fn ret_immediate_children(fs: &ToolFs, dir: &str) -> List[str]:
 fn ret_temp_bin_candidates(fs: &ToolFs) -> List[str]:
     let out: List[str] = List.new()
     let files = ret_immediate_children(fs, "out/bin")
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         let base = ret_basename(path)
         if fs.is_dir(path):
@@ -1171,7 +1171,7 @@ fn ret_temp_bin_candidates(fs: &ToolFs) -> List[str]:
 fn ret_temp_archive_candidates(fs: &ToolFs, dir: &str) -> List[str]:
     let out: List[str] = List.new()
     let files = ret_immediate_children(fs, dir)
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         let base = ret_basename(path)
         if not fs.is_dir(path) and base.contains(".o.") and base.ends_with(".a"):
@@ -1181,7 +1181,7 @@ fn ret_temp_archive_candidates(fs: &ToolFs, dir: &str) -> List[str]:
 fn ret_issue61_stale_candidates(fs: &ToolFs) -> List[str]:
     let out: List[str] = List.new()
     let files = ret_immediate_children(fs, "out/test-graph/issue61-regression")
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         if fs.is_dir(path) and ret_basename(path) != "repo":
             out.push(retention_owned_text(path))
@@ -1196,7 +1196,7 @@ fn ret_embedded_compiler_candidates(fs: &ToolFs) -> List[str]:
 
 fn ret_remove_prune_candidates(ctx: &ActionCtx, candidates: &List[str]) -> i32:
     let fs = ctx.fs()
-    for i in 0..candidates.len() as i32:
+    for i in 0..candidates.len():
         let path = candidates[i]
         let rc = if fs.is_dir(path): fs.remove_tree(path) else: fs.remove_file(path)
         if rc != 0:
@@ -1205,7 +1205,7 @@ fn ret_remove_prune_candidates(ctx: &ActionCtx, candidates: &List[str]) -> i32:
 
 fn ret_append_all_prune_candidates(out: List[str], candidates: &List[str]) -> List[str]:
     var combined = out
-    for i in 0..candidates.len() as i32:
+    for i in 0..candidates.len():
         combined = ret_add_unique(combined, candidates[i])
     combined
 
@@ -1234,13 +1234,13 @@ fn ret_apply_large_prune(ctx: &ActionCtx) -> i32:
 fn ret_report_prune(candidates: List[str]):
     print(f"[prune] {candidates.len()} stale state/seed/release artifact(s) would be removed")
     var shown = 0
-    for i in 0..candidates.len() as i32:
+    for i in 0..candidates.len():
         if shown >= 50:
             break
         print("  " ++ candidates[i])
         shown = shown + 1
-    if candidates.len() as i32 > shown:
-        print(f"  ... and {candidates.len() as i32 - shown} more")
+    if candidates.len() > shown:
+        print(f"  ... and {candidates.len() - shown} more")
 
 fn ret_report_large_prune(ctx: &ActionCtx):
     let fs = ctx.fs()
@@ -1262,7 +1262,7 @@ fn ret_report_large_prune(ctx: &ActionCtx):
     examples = ret_append_all_prune_candidates(move examples, embedded)
     examples = ret_sorted_strings(examples)
     var shown = 0
-    for i in 0..examples.len() as i32:
+    for i in 0..examples.len():
         if shown >= 50:
             break
         print("  " ++ examples[i])

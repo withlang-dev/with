@@ -46,7 +46,7 @@ fn split_tabs(line: &str) -> List[str]:
 fn parse_int(text: &str) -> i32:
     var out: i32 = 0
     var any = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let b = text[i] as i32
         if b < 48 or b > 57:
             if any != 0: break
@@ -64,7 +64,7 @@ fn main:
     let root = argv[2]
     let want_class = argv[3]
     var apply = false
-    for i in 4..argv.len() as i32:
+    for i in 4..argv.len():
         if argv[i] == "--apply": apply = true
 
     let out_path = "out/tmp/seam-sites.tsv"

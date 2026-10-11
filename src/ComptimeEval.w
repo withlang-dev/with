@@ -438,7 +438,7 @@ fn comptime_source_loc(text: &str, offset: i32) -> ComptimeSourceLoc:
     var line: i32 = 1
     var col: i32 = 1
     var i = 0
-    while i < offset and i < text.len() as i32:
+    while i < offset and i < text.len():
         if text[i] == 10:
             line = line + 1
             col = 1
@@ -477,7 +477,7 @@ pub fn comptime_decode_string_escapes(text: &str) -> str:
     if text.starts_with(raw_prefix):
         return text.slice(raw_prefix.len(), text.len())
     var out = StringBuilder.with_capacity(text.len())
-    let len = text.len() as i32
+    let len = text.len()
     var i = 0
     while i < len:
         let ch = text[i]
@@ -514,7 +514,7 @@ fn comptime_tool_path_is_project_relative(path: &str) -> bool:
         return false
     if path.contains(".."):
         return false
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 0 or ch == 9 or ch == 10 or ch == 13:
             return false
@@ -522,9 +522,9 @@ fn comptime_tool_path_is_project_relative(path: &str) -> bool:
 
 fn comptime_tool_path_dirname(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
-            last_slash = i
+            last_slash = i as i32
     if last_slash < 0:
         return "."
     if last_slash == 0:
@@ -559,14 +559,14 @@ fn comptime_tool_path_normalize(path: &str) -> str:
     var start = 0
     let is_absolute = runtime_path_is_absolute(path)
     let root_parts = runtime_path_root_part_count(path)
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 47 or ch == 92:
             if i > start:
                 let part = path.slice(start as i64, i as i64)
                 parts = comptime_tool_path_push_part(move parts, part, is_absolute, root_parts)
-            start = i + 1
-    if start < path.len() as i32:
+            start = (i + 1) as i32
+    if start < path.len():
         let part = path.slice(start as i64, path.len() as i64)
         parts = comptime_tool_path_push_part(move parts, part, is_absolute, root_parts)
     if parts.len() == 0:
@@ -574,7 +574,7 @@ fn comptime_tool_path_normalize(path: &str) -> str:
             return runtime_path_root_prefix(path)
         return "."
     var result = runtime_path_root_prefix(path)
-    for i in 0..parts.len() as i32:
+    for i in 0..parts.len():
         if i > 0:
             result = result ++ "/"
         result = result ++ parts[i]
@@ -601,12 +601,12 @@ fn comptime_os_error_message(code: i32) -> str:
 fn comptime_tool_split_nonempty_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()
     var start = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] == 10:
             if i > start:
                 lines.push(text.slice(start as i64, i as i64))
-            start = i + 1
-    if start < text.len() as i32:
+            start = (i + 1) as i32
+    if start < text.len():
         lines.push(text.slice(start as i64, text.len()))
     lines
 
@@ -622,7 +622,7 @@ fn comptime_tar_padded_str(value: &str, width: i64) -> str:
     if value.len() > width:
         return ""
     var out = StringBuilder.with_capacity(width)
-    for i in 0..value.len() as i32:
+    for i in 0..value.len():
         out.push_byte(value[i] as u8)
     var pad = value.len()
     while pad < width:
@@ -657,7 +657,7 @@ fn comptime_tar_octal_nul(value: i64, width: i64) -> str:
     while pad < width:
         out.push_byte(48 as u8)
         pad = pad + 1
-    for i in 0..digits.len() as i32:
+    for i in 0..digits.len():
         out.push_byte(digits[i] as u8)
     out.push_byte(0 as u8)
     out.to_str()
@@ -671,7 +671,7 @@ fn comptime_tar_checksum_field(checksum: i64) -> str:
     while pad < 6:
         out.push_byte(48 as u8)
         pad = pad + 1
-    for i in 0..digits.len() as i32:
+    for i in 0..digits.len():
         out.push_byte(digits[i] as u8)
     out.push_byte(0 as u8)
     out.push_byte(32 as u8)
@@ -679,7 +679,7 @@ fn comptime_tar_checksum_field(checksum: i64) -> str:
 
 fn comptime_tar_sum(data: &str) -> i64:
     var sum: i64 = 0
-    for i in 0..data.len() as i32:
+    for i in 0..data.len():
         sum = sum + data[i] as i64
     sum
 
@@ -722,7 +722,7 @@ fn comptime_tar_link_target_safe(output_dir: &str, output_path: &str, target: &s
         return false
     if target.len() >= 3 and target[1] == 58 and (target[2] == 47 or target[2] == 92):
         return false
-    for i in 0..target.len() as i32:
+    for i in 0..target.len():
         let ch = target[i]
         if ch == 0 or ch == 9 or ch == 10 or ch == 13:
             return false
@@ -845,7 +845,7 @@ fn comptime_tar_header_name(data: &str, offset: i64) -> str:
     prefix ++ "/" ++ name
 
 fn comptime_tar_trim_payload_name(text: &str) -> str:
-    var end = text.len() as i32
+    var end = text.len()
     while end > 0:
         let ch = text[(end - 1)]
         if ch != 0 and ch != 10 and ch != 13:
@@ -868,14 +868,14 @@ fn comptime_pax_parse_decimal(text: &str, start: i32, end: i32) -> i32:
 
 fn comptime_pax_value(text: &str, key: &str) -> str:
     var pos: i32 = 0
-    while pos < text.len() as i32:
+    while pos < text.len():
         var space = pos
-        while space < text.len() as i32 and text[space] != 32:
+        while space < text.len() and text[space] != 32:
             space = space + 1
-        if space >= text.len() as i32:
+        if space >= text.len():
             return ""
         let record_len = comptime_pax_parse_decimal(text, pos, space)
-        if record_len <= 0 or pos + record_len > text.len() as i32:
+        if record_len <= 0 or pos + record_len > text.len():
             return ""
         let record_start = space + 1
         let record_end = pos + record_len
@@ -1070,23 +1070,23 @@ unsafe fn comptime_tar_extract_file_payload(fd: i32, resolved_file: &str, output
 fn comptime_glob_split_by_slash(path: &str) -> List[str]:
     let parts: List[str] = List.new()
     var start = 0
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 47 or ch == 92:
             if i > start:
                 parts.push(path.slice(start as i64, i as i64))
-            start = i + 1
-    if start < path.len() as i32:
+            start = (i + 1) as i32
+    if start < path.len():
         parts.push(path.slice(start as i64, path.len()))
     parts
 
 fn comptime_glob_segment_matches(pattern: &str, name: &str) -> bool:
     var star = -1
-    for i in 0..pattern.len() as i32:
+    for i in 0..pattern.len():
         if pattern[i] == 42:
             if star >= 0:
                 return false
-            star = i
+            star = i as i32
     if star < 0:
         return pattern == name
     let prefix = pattern.slice(0, star as i64)
@@ -1102,17 +1102,17 @@ fn comptime_glob_segment_matches(pattern: &str, name: &str) -> bool:
     true
 
 fn comptime_glob_segments_match(pat_segs: &List[str], pi: i32, file_segs: &List[str], fi: i32) -> bool:
-    if pi >= pat_segs.len() as i32:
-        return fi >= file_segs.len() as i32
+    if pi >= pat_segs.len():
+        return fi >= file_segs.len()
     let seg = pat_segs[pi]
     if seg == "**":
         var k = fi
-        while k <= file_segs.len() as i32:
+        while k <= file_segs.len():
             if comptime_glob_segments_match(pat_segs, pi + 1, file_segs, k):
                 return true
             k = k + 1
         return false
-    if fi >= file_segs.len() as i32:
+    if fi >= file_segs.len():
         return false
     if not comptime_glob_segment_matches(seg, file_segs[fi]):
         return false
@@ -1135,11 +1135,11 @@ fn comptime_glob_str_compare(a: &str, b: &str) -> i32:
 
 fn comptime_glob_sort(items: &List[str]) -> List[str]:
     var sorted: List[str] = List.new()
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let item = items[i]
         var inserted = false
         var out: List[str] = List.new()
-        for j in 0..sorted.len() as i32:
+        for j in 0..sorted.len():
             let existing = sorted[j]
             if not inserted and comptime_glob_str_compare(item, existing) < 0:
                 out.push(with_str_clone_ref(item))
@@ -1209,7 +1209,7 @@ fn comptime_capability_record(kind: i32, package_name: &str, package_version: &s
 
 fn comptime_safe_label(text: &str) -> str:
     var out = ""
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
         if keep:
@@ -1225,7 +1225,7 @@ fn comptime_action_scratch_dir(target_name: &str) -> str:
 
 fn ce_clone_str_list(values: &List[str]) -> List[str]:
     let out: List[str] = List.new()
-    for i in 0..values.len() as i32:
+    for i in 0..values.len():
         out.push(with_str_clone_ref(values[i]))
     out
 
@@ -1255,13 +1255,13 @@ fn ce_clone_capability_record(r: &ComptimeCapabilityRecord) -> ComptimeCapabilit
 
 fn ce_clone_value_list(values: &List[ComptimeValue]) -> List[ComptimeValue]:
     let out: List[ComptimeValue] = List.new()
-    for i in 0..values.len() as i32:
+    for i in 0..values.len():
         out.push(comptime_value_clone(values[i]))
     out
 
 fn ce_clone_link_env_list(values: &List[LinkStageEnvVar]) -> List[LinkStageEnvVar]:
     let out: List[LinkStageEnvVar] = List.new()
-    for i in 0..values.len() as i32:
+    for i in 0..values.len():
         let e = &values[i]
         out.push(LinkStageEnvVar { name: with_str_clone_ref(e.name), value: with_str_clone_ref(e.value) })
     out
@@ -1372,8 +1372,8 @@ fn cpp_put_int(out: &str, v: i32) -> str: out ++ f"{v}\n"
 fn cpp_put_str(out: &str, s: &str) -> str: out ++ f"{s.len()}\n" ++ s ++ "\n"
 
 fn cpp_put_list(out: &str, v: &List[str]) -> str:
-    var acc = out ++ f"{v.len() as i32}\n"
-    for i in 0..v.len() as i32:
+    var acc = out ++ f"{v.len()}\n"
+    for i in 0..v.len():
         acc = cpp_put_str(acc, v[i])
     acc
 
@@ -1568,13 +1568,13 @@ fn comptime_action_outputs(output: &str, extra_outputs: &List[str]) -> List[str]
     let outputs: List[str] = List.new()
     if output.len() > 0:
         outputs.push(with_str_clone_ref(output))
-    for i in 0..extra_outputs.len() as i32:
+    for i in 0..extra_outputs.len():
         outputs.push(with_str_clone_ref(extra_outputs[i]))
     outputs
 
 fn comptime_action_write_scope(output: &str, extra_outputs: &List[str], write_scopes: &List[str], scratch_path: &str) -> List[str]:
     let scopes = comptime_action_outputs(output, extra_outputs)
-    for i in 0..write_scopes.len() as i32:
+    for i in 0..write_scopes.len():
         scopes.push(with_str_clone_ref(write_scopes[i]))
     scopes.push(with_str_clone_ref(scratch_path))
     scopes
@@ -1620,7 +1620,7 @@ impl ComptimeEvaluator:
         comptime_value_share(self.extra_values[index])
 
     fn cleanup_workspace_pending_links():
-        for wi in 0..self.workspace_records.len() as i32:
+        for wi in 0..self.workspace_records.len():
             var record = ce_clone_workspace_record(&self.workspace_records[wi])
             if record.pending_link_active == 0:
                 continue
@@ -1629,17 +1629,17 @@ impl ComptimeEvaluator:
             let _remove_bin = with_fs_remove_file(record.pending_link_bin_path)
             let _remove_dsym = with_fs_remove_tree(record.pending_link_bin_path ++ ".dSYM")
             record.pending_link_active = 0
-            self.store_workspace_record(wi, record)
+            self.store_workspace_record(wi as i32, record)
 
     mut fn check_workspace_intercepts_finished():
         self.cleanup_workspace_pending_links()
         if self.had_error != 0:
             return
-        for wi in 0..self.workspace_records.len() as i32:
+        for wi in 0..self.workspace_records.len():
             let record = ce_clone_workspace_record(&self.workspace_records[wi])
             if record.intercept_active == 0:
                 continue
-            if record.intercept_terminal != 0 and record.message_cursor >= record.messages.len() as i32:
+            if record.intercept_terminal != 0 and record.message_cursor >= record.messages.len():
                 continue
             let reason =
                 if record.intercept_terminal != 0:
@@ -1749,7 +1749,7 @@ impl ComptimeEvaluator:
     fn witness_chain() -> str:
         var chain = ""
         var last = 0
-        for i in 0..self.active_fn_syms.len() as i32:
+        for i in 0..self.active_fn_syms.len():
             let sym: i32 = self.active_fn_syms[i]
             if sym == last: continue   // recursion reads as one frame
             if chain.len() > 0: chain = chain ++ " -> "
@@ -1892,13 +1892,13 @@ impl ComptimeEvaluator:
         if sig_idx < 0:
             return 0
         let ret_type = self.sema.sig_return_type(sig_idx)
-        if tp_syms.len() as i32 == 0:
+        if tp_syms.len() == 0:
             return ret_type
         // Local copies: Sema.substitute_type takes its substitution vectors by
         // value, and the borrowed params must stay usable at the call sites.
         let subst_syms: List[i32] = List.new()
         let subst_tys: List[i32] = List.new()
-        for i in 0..tp_syms.len() as i32:
+        for i in 0..tp_syms.len():
             subst_syms.push(tp_syms[i])
             subst_tys.push(tp_tys[i])
         self.sema.substitute_type(ret_type, subst_syms, subst_tys, tp_syms.len() as i32)
@@ -2070,7 +2070,7 @@ impl ComptimeEvaluator:
             let _ = self.fail(node, "tool capability kind mismatch for " ++ method)
             return -1
         let handle_id = value.data1 as i32
-        if handle_id < 0 or handle_id >= self.capability_records.len() as i32:
+        if handle_id < 0 or handle_id >= self.capability_records.len():
             let _ = self.fail(node, "invalid tool capability handle for " ++ method)
             return -1
         let record = ce_clone_capability_record(&self.capability_records[handle_id])
@@ -2092,10 +2092,10 @@ impl ComptimeEvaluator:
         self.scope_starts.push(self.slot_syms.len() as i32)
 
     fn pop_scope():
-        if self.scope_starts.len() as i32 == 0:
+        if self.scope_starts.len() == 0:
             return
-        let start = self.scope_starts[(self.scope_starts.len() as i32 - 1)]
-        while self.slot_syms.len() as i32 > start:
+        let start = self.scope_starts[(self.scope_starts.len() - 1)]
+        while self.slot_syms.len() > start:
             self.slot_syms.pop()
             self.slot_values.pop()
             self.slot_muts.pop()
@@ -2112,19 +2112,19 @@ impl ComptimeEvaluator:
             slot.set(move value)
 
     fn record_runtime_env_set(name: &str) -> Unit:
-        for i in 0..self.runtime_env_names.len() as i32:
+        for i in 0..self.runtime_env_names.len():
             if self.runtime_env_names[i] == name:
                 return
         self.runtime_env_names.push(with_str_clone_ref(name))
         self.runtime_env_values.push(with_getenv_str(name) ++ "")
 
     fn restore_runtime_env() -> Unit:
-        for i in 0..self.runtime_env_names.len() as i32:
+        for i in 0..self.runtime_env_names.len():
             let _restore = with_setenv_str(self.runtime_env_names[i], self.runtime_env_values[i])
 
 fn comptime_effect_escape(text: &str) -> str:
     var out = ""
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         if ch == 92:
             out = out ++ "\\\\"
@@ -2161,7 +2161,7 @@ impl ComptimeEvaluator:
 
 fn comptime_effect_join_argv_parts(parts: &List[str]) -> str:
     var out = ""
-    for i in 0..parts.len() as i32:
+    for i in 0..parts.len():
         if i > 0:
             out = out ++ " "
         out = out ++ comptime_effect_escape(parts[i])
@@ -2169,10 +2169,10 @@ fn comptime_effect_join_argv_parts(parts: &List[str]) -> str:
 
 fn comptime_process_basename(path: &str) -> str:
     var start = 0
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 47 or ch == 92:
-            start = i + 1
+            start = (i + 1) as i32
     path.slice(start as i64, path.len())
 
 fn comptime_process_requires_network(exe: &str) -> bool:
@@ -2196,7 +2196,7 @@ impl ComptimeEvaluator:
         let exe = parts[0]
         let resolved = comptime_effect_resolve_executable(exe)
         let key = if resolved.len() > 0: resolved.clone() else: with_str_clone_ref(exe)
-        for i in 0..self.tool_identity_paths.len() as i32:
+        for i in 0..self.tool_identity_paths.len():
             if self.tool_identity_paths[i] == key:
                 return with_str_clone_ref(self.tool_identity_values[i])
         if resolved.len() > 0:
@@ -2210,7 +2210,7 @@ impl ComptimeEvaluator:
         identity
 
 fn comptime_effect_contains_slash(text: &str) -> bool:
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] == 47:
             return true
     false
@@ -2225,8 +2225,8 @@ fn comptime_effect_resolve_executable(exe: &str) -> str:
     let path = with_getenv_str("PATH")
     var start = 0
     var i = 0
-    while i <= path.len() as i32:
-        if i == path.len() as i32 or path[i] == 58:
+    while i <= path.len():
+        if i == path.len() or path[i] == 58:
             let dir = path.slice(start as i64, i as i64)
             let candidate = if dir.len() == 0: with_str_clone_ref(exe) else: dir ++ "/" ++ exe
             if with_fs_file_exists(candidate) != 0:
@@ -2418,13 +2418,13 @@ impl ComptimeEvaluator:
 
     fn decl_file_id(decl_node: i32) -> i32:
         let decl_idx = self.find_decl_index(decl_node)
-        if decl_idx >= 0 and decl_idx < self.sema.decl_source_file_ids.len() as i32:
+        if decl_idx >= 0 and decl_idx < self.sema.decl_source_file_ids.len():
             return self.sema.decl_source_file_ids[decl_idx]
         self.sema.local_file_id
 
     fn decl_path(decl_node: i32) -> str:
         let decl_idx = self.find_decl_index(decl_node)
-        if decl_idx >= 0 and decl_idx < self.sema.decl_source_paths.len() as i32:
+        if decl_idx >= 0 and decl_idx < self.sema.decl_source_paths.len():
             let path = self.sema.decl_source_paths[decl_idx]
             if path.len() > 0:
                 return with_str_clone_ref(path)
@@ -2534,7 +2534,7 @@ impl ComptimeEvaluator:
 
     mut fn concat_comptime_string_parts(node: i32, parts: &List[str]) -> ComptimeControl:
         var total: i64 = 0
-        for i in 0..parts.len() as i32:
+        for i in 0..parts.len():
             total = total + parts[i].len()
         if self.reserve_string_bytes(node, total) == 0:
             return comptime_control_error()
@@ -3032,7 +3032,7 @@ impl ComptimeEvaluator:
             payload_values.push(comptime_value_int(self.sema.ty_usize as i32, self.sema.type_layout_struct_field_offset(type_id, fi)))
             payload_values.push(comptime_value_int(self.sema.ty_usize as i32, self.sema.type_layout_size_of(field_tid)))
             payload_values.push(comptime_value_bool(self.sema.type_is_ephemeral_value(field_tid)))
-        for pi in 0..payload_values.len() as i32:
+        for pi in 0..payload_values.len():
             self.extra_values.push(comptime_value_clone(payload_values[pi]))
         comptime_control_value(comptime_value_array(array_tid, arr_start, field_count))
 
@@ -3051,7 +3051,7 @@ impl ComptimeEvaluator:
             payload_values.push(comptime_value_int(self.sema.ty_i64 as i32, self.sema.type_reflection_variant_discriminant(type_id, vi)))
             payload_values.push(comptime_value_bool(if payload_count > 0: 1 else: 0))
             payload_values.push(comptime_value_str(self.variant_payload_name(type_id, vi)))
-        for pi in 0..payload_values.len() as i32:
+        for pi in 0..payload_values.len():
             self.extra_values.push(comptime_value_clone(payload_values[pi]))
         comptime_control_value(comptime_value_array(array_tid, arr_start, variant_count))
 
@@ -3169,7 +3169,7 @@ impl ComptimeEvaluator:
             // which in-place appends never disturb; an aliased tail pusher
             // fails this check after the first append and takes the copy.
             var new_start = recv_value.extra_start
-            if recv_value.extra_start + recv_value.extra_count == self.extra_values.len() as i32:
+            if recv_value.extra_start + recv_value.extra_count == self.extra_values.len():
                 self.extra_values.push(move arg_signal.value)
             else:
                 new_start = self.copy_list_snapshot(recv_value)
@@ -3453,15 +3453,15 @@ fn comptime_str_find(haystack: &str, needle: &str) -> i32:
         return 0
     if haystack.len() < needle.len():
         return -1
-    let last = haystack.len() as i32 - needle.len() as i32
+    let last = haystack.len() - needle.len()
     for i in 0..(last + 1):
         var matched = true
-        for j in 0..needle.len() as i32:
+        for j in 0..needle.len():
             if haystack[(i + j)] != needle[j]:
                 matched = false
                 break
         if matched:
-            return i
+            return i as i32
     -1
 
 impl ComptimeEvaluator:
@@ -3542,7 +3542,7 @@ impl ComptimeEvaluator:
                 return self.fail(node, "str.split() separator must be a string")
             let pieces = text.split(sep_signal.value.text)
             let start = self.extra_values.len() as i32
-            for i in 0..pieces.len() as i32:
+            for i in 0..pieces.len():
                 self.extra_values.push(comptime_value_str(pieces[i]))
             return comptime_control_value(comptime_value_list(self.node_type_or(node, 0), start, pieces.len() as i32))
         if method == "clone" or method == "to_owned":
@@ -3599,7 +3599,7 @@ impl ComptimeEvaluator:
         let tp_count = self.ast.fn_meta_tp_count(meta)
         if tp_count == 0:
             return ComptimeGenericResolvedArgs { ok: 1, tp_syms: out_syms, tp_tys: out_tys }
-        if concrete_sig < 0 or concrete_sig >= self.sema.sig_names.len() as i32:
+        if concrete_sig < 0 or concrete_sig >= self.sema.sig_names.len():
             let _ = self.fail(node, "generic comptime method has no concrete signature")
             return ComptimeGenericResolvedArgs { ok: 0, tp_syms: out_syms, tp_tys: out_tys }
         let mono_sym = self.sema.sig_names[concrete_sig]
@@ -3666,7 +3666,7 @@ impl ComptimeEvaluator:
 
         let call_args: List[ComptimeValue] = List.new()
         call_args.push(comptime_value_clone(recv_value))
-        for ai in 0..arg_values.len() as i32:
+        for ai in 0..arg_values.len():
             call_args.push(comptime_value_clone(arg_values[ai]))
         let call_signal = self.eval_fn_symbol_call_values_with_type_args(fn_sym, call_args, node, type_args.tp_syms, type_args.tp_tys)
         if call_signal.kind != ComptimeControlKind.CTL_VALUE:
@@ -3936,7 +3936,7 @@ impl ComptimeEvaluator:
                 return arg_signal
             values.push(move arg_signal.value)
         let start = self.extra_values.len() as i32
-        for i in 0..values.len() as i32:
+        for i in 0..values.len():
             self.extra_values.push(comptime_value_clone(values[i]))
         comptime_control_value(comptime_value_tuple(0, start, arg_count))
 
@@ -3965,7 +3965,7 @@ impl ComptimeEvaluator:
     fn capability_write_file_allowed(record: &ComptimeCapabilityRecord, path: &str) -> bool:
         if record.write_scoped == 0:
             return true
-        for i in 0..record.write_scope.len() as i32:
+        for i in 0..record.write_scope.len():
             if comptime_tool_path_is_same_or_child(path, record.write_scope[i]):
                 return true
         false
@@ -3973,7 +3973,7 @@ impl ComptimeEvaluator:
     fn capability_mkdir_allowed(record: &ComptimeCapabilityRecord, path: &str) -> bool:
         if record.write_scoped == 0:
             return true
-        for i in 0..record.write_scope.len() as i32:
+        for i in 0..record.write_scope.len():
             let allowed = record.write_scope[i]
             if comptime_tool_path_is_same_or_child(path, allowed) or comptime_tool_path_is_parent_of(path, allowed):
                 return true
@@ -4021,13 +4021,13 @@ impl ComptimeEvaluator:
             let _ = self.fail(node, "string vector result type is unknown")
             return comptime_value_invalid()
         let start = self.extra_values.len() as i32
-        for i in 0..values.len() as i32:
+        for i in 0..values.len():
             self.extra_values.push(comptime_value_str(values[i]))
         comptime_value_list(list_type, start, values.len() as i32)
 
     fn str_list_value_with_type(list_type: i32, values: &List[str]) -> ComptimeValue:
         let start = self.extra_values.len() as i32
-        for i in 0..values.len() as i32:
+        for i in 0..values.len():
             self.extra_values.push(comptime_value_str(values[i]))
         comptime_value_list(list_type, start, values.len() as i32)
 
@@ -4055,7 +4055,7 @@ impl ComptimeEvaluator:
 
     fn list_str_to_argv_from_parts(parts: &List[str], method: &str, node: i32) -> str:
         var out = ""
-        for i in 0..parts.len() as i32:
+        for i in 0..parts.len():
             out = out ++ parts[i] ++ "\0"
         out
 
@@ -4136,7 +4136,7 @@ impl ComptimeEvaluator:
             return -1
         let capability = ce_clone_capability_record(&self.capability_records[handle])
         let workspace_id = capability.workspace_id
-        if workspace_id < 0 or workspace_id >= self.workspace_records.len() as i32:
+        if workspace_id < 0 or workspace_id >= self.workspace_records.len():
             let _ = self.fail(node, "invalid Workspace handle for " ++ method)
             return -1
         workspace_id
@@ -4189,14 +4189,14 @@ impl ComptimeEvaluator:
     fn workspace_path_list_field(root: &str, options: &ComptimeValue, field_name: &str) -> List[str]:
         let raw = self.workspace_str_list_field(options, field_name)
         let out: List[str] = List.new()
-        for i in 0..raw.len() as i32:
+        for i in 0..raw.len():
             out.push(self.workspace_path(root, raw[i]))
         out
 
     fn workspace_exclude_basenames_field(options: &ComptimeValue) -> str:
         let excludes = self.workspace_str_list_field(options, "exclude_basenames")
         var out = ""
-        for i in 0..excludes.len() as i32:
+        for i in 0..excludes.len():
             out = out ++ "|" ++ excludes[i] ++ "|"
         out
 
@@ -4254,7 +4254,7 @@ fn comptime_module_name_for_path(root: &str, path: &str) -> str:
     if rel.ends_with(".w"):
         rel = rel.slice(0, rel.len() - 2)
     var out = ""
-    for i in 0..rel.len() as i32:
+    for i in 0..rel.len():
         let ch = rel[i]
         if ch == 47:
             out = out ++ "."
@@ -4416,7 +4416,7 @@ impl ComptimeEvaluator:
                     return summary
                 summaries.push(summary)
         let start = self.extra_values.len() as i32
-        for i in 0..summaries.len() as i32:
+        for i in 0..summaries.len():
             self.extra_values.push(comptime_value_clone(summaries[i]))
         let decls = comptime_value_list(list_type, start, summaries.len() as i32)
         let payloads: List[ComptimeValue] = List.new()
@@ -4450,7 +4450,7 @@ impl ComptimeEvaluator:
         messages = self.workspace_phase_message_append(move messages, 1, node)
         messages = self.workspace_phase_message_append(move messages, 2, node)
         let typechecked = self.workspace_typechecked_messages(comp, ast_pool, node)
-        for mi in 0..typechecked.len() as i32:
+        for mi in 0..typechecked.len():
             messages.push(comptime_value_clone(typechecked[mi]))
         messages = self.workspace_phase_message_append(move messages, 4, node)
         messages = self.workspace_phase_message_append(move messages, 5, node)
@@ -4475,7 +4475,7 @@ impl ComptimeEvaluator:
             let _ = self.fail(node, "missing enum variant '" ++ enum_name ++ "." ++ variant_name ++ "'")
             return comptime_value_invalid()
         let payload_start = self.extra_values.len() as i32
-        for i in 0..payloads.len() as i32:
+        for i in 0..payloads.len():
             self.extra_values.push(comptime_value_clone(payloads[i]))
         comptime_value_enum(enum_type, variant_sym, payload_start, payloads.len() as i32)
 
@@ -4531,14 +4531,14 @@ impl ComptimeEvaluator:
         if env_type == 0:
             return comptime_value_invalid()
         let items: List[ComptimeValue] = List.new()
-        for i in 0..values.len() as i32:
+        for i in 0..values.len():
             let item = values[i]
             let field_start = self.extra_values.len() as i32
             self.extra_values.push(comptime_value_str(item.name))
             self.extra_values.push(comptime_value_str(item.value))
             items.push(comptime_value_struct(env_type, field_start, 2))
         let list_start = self.extra_values.len() as i32
-        for i in 0..items.len() as i32:
+        for i in 0..items.len():
             self.extra_values.push(comptime_value_clone(items[i]))
         comptime_value_list(list_type, list_start, items.len() as i32)
 
@@ -4595,10 +4595,10 @@ impl ComptimeEvaluator:
         LinkStageCommand { linker, args, cwd, env, inputs, outputs, cleanup_files: List.new() }
 
 fn link_command_outputs_superset(replacement: &LinkStageCommand, original: &LinkStageCommand) -> bool:
-    for oi in 0..original.outputs.len() as i32:
+    for oi in 0..original.outputs.len():
         let output = original.outputs[oi]
         var found = false
-        for ri in 0..replacement.outputs.len() as i32:
+        for ri in 0..replacement.outputs.len():
             if replacement.outputs[ri] == output:
                 found = true
         if not found:
@@ -4638,7 +4638,7 @@ impl ComptimeEvaluator:
 
     mut fn enqueue_workspace_compile_result(record: ComptimeWorkspaceRecord, result: &ComptimeValue, messages: &List[ComptimeValue], node: i32) -> ComptimeWorkspaceRecord:
         var out = record
-        for mi in 0..messages.len() as i32:
+        for mi in 0..messages.len():
             out.messages.push(comptime_value_clone(messages[mi]))
         out = self.enqueue_artifact_messages(move out, result, node)
         if self.had_error != 0:
@@ -4760,11 +4760,11 @@ fn comptime_workspace_output_kind_supported(kind: i32) -> bool:
 
 fn comptime_execute_workspace_migrate_plan(plan: &ComptimeWorkspaceCompilePlan) -> i32:
     migrate_reset_options()
-    for i in 0..plan.migrate_include_paths.len() as i32:
+    for i in 0..plan.migrate_include_paths.len():
         migrate_add_include_path(plan.migrate_include_paths[i])
-    for i in 0..plan.migrate_forced_includes.len() as i32:
+    for i in 0..plan.migrate_forced_includes.len():
         migrate_add_forced_include(plan.migrate_forced_includes[i])
-    for i in 0..plan.migrate_defines.len() as i32:
+    for i in 0..plan.migrate_defines.len():
         migrate_add_define(plan.migrate_defines[i])
     if plan.migrate_no_c_export:
         migrate_set_no_c_export(1)
@@ -4886,7 +4886,7 @@ impl ComptimeEvaluator:
             if output_kind != 0 and output_kind != 5:
                 let _ = self.fail(node, "Workspace.compile source strings currently support binary or check output only")
                 return comptime_workspace_compile_plan_invalid()
-            for si in 0..record.string_names.len() as i32:
+            for si in 0..record.string_names.len():
                 source_paths.push(self.workspace_path(capability.project_root, record.string_names[si]))
                 source_texts.push(with_str_clone_ref(record.string_sources[si]))
             has_strings = 1
@@ -5055,7 +5055,7 @@ impl ComptimeEvaluator:
         if out.string_names.len() > 0:
             let source_paths: List[str] = List.new()
             let source_texts: List[str] = List.new()
-            for si in 0..out.string_names.len() as i32:
+            for si in 0..out.string_names.len():
                 source_paths.push(self.workspace_path(capability.project_root, out.string_names[si]))
                 source_texts.push(with_str_clone_ref(out.string_sources[si]))
             source_name = with_str_clone_ref(source_paths[0])
@@ -5063,11 +5063,11 @@ impl ComptimeEvaluator:
         else:
             let absolute_source = self.workspace_path(capability.project_root, source_path)
             var cfg = project_config_load_for_source(absolute_source)
-            for ii in 0..include_paths.len() as i32:
+            for ii in 0..include_paths.len():
                 cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
-            for di in 0..defines.len() as i32:
+            for di in 0..defines.len():
                 cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
-            for li in 0..link_libs.len() as i32:
+            for li in 0..link_libs.len():
                 cfg.dep_link_libs.push(with_str_clone_ref(link_libs[li]))
             ast_pool = comp.compile_entry_file_with_config(absolute_source, move cfg)
 
@@ -5076,7 +5076,7 @@ impl ComptimeEvaluator:
             let _ = self.fail(node, "Workspace.intercept failed before PRE_LINK")
             return out
         let messages = self.workspace_success_messages(comp, comp.zcu.last_sema.ast, node)
-        for mi in 0..messages.len() as i32:
+        for mi in 0..messages.len():
             out.messages.push(comptime_value_clone(messages[mi]))
         let prelink_phase = self.compiler_message_phase_value(7, node)
         if prelink_phase.kind == ComptimeValueKind.CV_INVALID:
@@ -5703,13 +5703,13 @@ impl ComptimeEvaluator:
                 return comptime_control_error()
             var last_clean_slash = -1
             var has_glob = false
-            for gi in 0..pattern.len() as i32:
+            for gi in 0..pattern.len():
                 let gc = pattern[gi]
                 if gc == 42:
                     has_glob = true
                     break
                 if gc == 47:
-                    last_clean_slash = gi
+                    last_clean_slash = gi as i32
             if not has_glob:
                 return self.fail(node, "glob pattern contains no wildcards: " ++ pattern)
             let glob_base = if last_clean_slash < 0: "." else: pattern.slice(0, last_clean_slash as i64)
@@ -5721,7 +5721,7 @@ impl ComptimeEvaluator:
             let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(resolved_base))
             let pat_segs = comptime_glob_split_by_slash(glob_suffix)
             let results: List[str] = List.new()
-            for gi in 0..raw_files.len() as i32:
+            for gi in 0..raw_files.len():
                 let abs_file = raw_files[gi]
                 let rel_file = self.capability_project_relative_path(record, abs_file)
                 let base_prefix = if glob_base == ".": "" else: glob_base ++ "/"
@@ -5736,7 +5736,7 @@ impl ComptimeEvaluator:
             if list_type == 0:
                 return self.fail(node, "ToolFs.glob result type is unknown")
             let gstart = self.extra_values.len() as i32
-            for gi in 0..sorted.len() as i32:
+            for gi in 0..sorted.len():
                 self.extra_values.push(comptime_value_str(sorted[gi]))
             return comptime_control_value(comptime_value_list(list_type, gstart, sorted.len() as i32))
         if method == "exists" or method == "is_dir" or method == "read_text" or method == "read_text_opt" or method == "read_binary" or method == "list_files" or method == "sha256_file" or method == "mkdir_all" or method == "remove_file" or method == "remove_tree":
@@ -5796,7 +5796,7 @@ impl ComptimeEvaluator:
                 if list_type == 0:
                     return self.fail(node, "ToolFs.list_files result type is unknown")
                 let start = self.extra_values.len() as i32
-                for i in 0..raw_files.len() as i32:
+                for i in 0..raw_files.len():
                     self.extra_values.push(comptime_value_str(self.capability_project_relative_path(record, raw_files[i])))
                 return comptime_control_value(comptime_value_list(list_type, start, raw_files.len() as i32))
             if method == "mkdir_all":
@@ -5839,7 +5839,7 @@ impl ComptimeEvaluator:
             if list_type == 0:
                 return self.fail(node, "ToolFs.host_list_files result type is unknown")
             let start = self.extra_values.len() as i32
-            for i in 0..raw_files.len() as i32:
+            for i in 0..raw_files.len():
                 self.extra_values.push(comptime_value_str(raw_files[i]))
             return comptime_control_value(comptime_value_list(list_type, start, raw_files.len() as i32))
         if method == "write_text" or method == "copy_file" or method == "chmod" or method == "rename" or method == "copy_tree" or method == "symlink":
@@ -6363,7 +6363,7 @@ impl ComptimeEvaluator:
                 return comptime_control_error()
             if record.intercept_active == 0:
                 return self.fail(node, "Workspace.wait_for_message called without active interception")
-            if record.message_cursor >= record.messages.len() as i32 and record.intercept_terminal == 0:
+            if record.message_cursor >= record.messages.len() and record.intercept_terminal == 0:
                 if record.pending_link_active != 0:
                     record = self.finish_intercept_workspace_link(move record, node)
                 else if record.intercept_started == 0:
@@ -6372,7 +6372,7 @@ impl ComptimeEvaluator:
                     return comptime_control_error()
                 self.store_workspace_record(workspace_id, record)
                 record = ce_clone_workspace_record(&self.workspace_records[workspace_id])
-            if record.message_cursor < record.messages.len() as i32:
+            if record.message_cursor < record.messages.len():
                 let message: ComptimeValue = comptime_value_clone(record.messages[record.message_cursor])
                 let phase = self.compiler_message_phase_id(message)
                 if phase >= 0:
@@ -6399,7 +6399,7 @@ impl ComptimeEvaluator:
                 return comptime_control_error()
             if record.intercept_active == 0:
                 return self.fail(node, "Workspace.end_intercept called without active interception")
-            if record.intercept_terminal != 0 and record.message_cursor < record.messages.len() as i32:
+            if record.intercept_terminal != 0 and record.message_cursor < record.messages.len():
                 return self.fail(node, "Workspace.end_intercept called before terminal message was consumed")
             record.intercept_active = 0
             self.store_workspace_record(workspace_id, record)
@@ -6465,7 +6465,7 @@ impl ComptimeEvaluator:
 
     mut fn eval_module_let_decl(decl: i32, use_node: i32) -> ComptimeControl:
         let sym = self.ast.get_data0(decl)
-        for i in 0..self.active_global_syms.len() as i32:
+        for i in 0..self.active_global_syms.len():
             if self.active_global_syms[i] == sym:
                 return self.fail(use_node, "cyclic comptime constant dependency")
         let value_node = self.ast.get_data1(decl)
@@ -6631,7 +6631,7 @@ impl ComptimeEvaluator:
                 field_sym = self.sema.type_reflection_field_name(type_id, fi)
             if self.struct_field_index(type_id, field_sym) < 0:
                 return self.fail(node, "unknown comptime struct field '" ++ self.pool.resolve(field_sym) ++ "' for '" ++ self.sema.type_name(type_id) ++ "'")
-            for pi in 0..init_syms.len() as i32:
+            for pi in 0..init_syms.len():
                 if init_syms[pi] == field_sym:
                     return self.fail(node, "duplicate comptime struct field '" ++ self.pool.resolve(field_sym) ++ "'")
             var field_signal = self.eval_expr(self.ast.get_extra(extra_start + fi * 2 + 1))
@@ -6644,9 +6644,9 @@ impl ComptimeEvaluator:
         for fi in 0..field_total:
             let field_sym = self.sema.type_reflection_field_name(type_id, fi)
             var found = -1
-            for pi in 0..init_syms.len() as i32:
+            for pi in 0..init_syms.len():
                 if init_syms[pi] == field_sym:
-                    found = pi
+                    found = pi as i32
                     break
             if found < 0:
                 return self.fail(node, "missing comptime struct field '" ++ self.pool.resolve(field_sym) ++ "'")
@@ -7071,7 +7071,7 @@ impl ComptimeEvaluator:
         rev.push(cur)
 
         let out: List[i32] = List.new()
-        var i = rev.len() as i32 - 1
+        var i = rev.len() - 1
         while i >= 0:
             out.push(rev[i])
             i = i - 1
@@ -7079,7 +7079,7 @@ impl ComptimeEvaluator:
 
     mut fn eval_concat_chain(node: i32, parts: &List[i32]) -> ComptimeControl:
         let texts: List[str] = List.new()
-        for i in 0..parts.len() as i32:
+        for i in 0..parts.len():
             let signal = self.eval_expr(parts[i])
             if signal.kind != ComptimeControlKind.CTL_VALUE:
                 return signal
@@ -7111,7 +7111,7 @@ impl ComptimeEvaluator:
 
         if op == BinaryOp.OP_CONCAT:
             let parts = self.collect_left_comptime_concat_parts(node)
-            if parts.len() as i32 > 2:
+            if parts.len() > 2:
                 return self.eval_concat_chain(node, parts)
 
         var lhs_signal = self.eval_expr(self.ast.get_data1(node))
@@ -7217,10 +7217,10 @@ impl ComptimeEvaluator:
         var value_signal = self.eval_expr(self.ast.get_data1(node))
         if value_signal.kind != ComptimeControlKind.CTL_VALUE:
             return value_signal
-        let slot_start = self.slot_syms.len() as i32
+        let slot_start = self.slot_syms.len()
         if self.match_pattern(self.ast.get_data0(head), move value_signal.value, node) != 0:
             if self.ast.get_data1(head) % 2 != 0:
-                for i in slot_start..self.slot_muts.len() as i32:
+                for i in slot_start..self.slot_muts.len():
                     self.slot_muts[i] = 1
             return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
         let else_body = self.ast.get_data2(node)
@@ -7239,7 +7239,7 @@ impl ComptimeEvaluator:
 
     // The innermost demanded type, 0 when nothing is demanded.
     fn expected_type() -> i32:
-        if self.expected_types.len() == 0: 0 else: self.expected_types[self.expected_types.len() as i32 - 1]
+        if self.expected_types.len() == 0: 0 else: self.expected_types[self.expected_types.len() - 1]
 
     mut fn eval_let_binding(node: i32) -> ComptimeControl:
         let flags = self.ast.get_data2(node)
@@ -7364,17 +7364,17 @@ impl ComptimeEvaluator:
             self.bind_value(self.ast.get_data0(pat), comptime_value_share(value), 0)
             return self.match_pattern(self.ast.get_data1(pat), value, node)
         if kind == NodeKind.NK_PAT_OR:
-            let start = self.slot_syms.len() as i32
+            let start = self.slot_syms.len()
             let extra_start = self.ast.get_data0(pat)
             let count = self.ast.get_data1(pat)
             for i in 0..count:
-                while self.slot_syms.len() as i32 > start:
+                while self.slot_syms.len() > start:
                     self.slot_syms.pop()
                     self.slot_values.pop()
                     self.slot_muts.pop()
                 if self.match_pattern(self.ast.get_extra(extra_start + i), comptime_value_share(value), node) != 0:
                     return 1
-            while self.slot_syms.len() as i32 > start:
+            while self.slot_syms.len() > start:
                 self.slot_syms.pop()
                 self.slot_values.pop()
                 self.slot_muts.pop()
@@ -7742,7 +7742,7 @@ impl ComptimeEvaluator:
         let saved_subst_tys = move self.sema.generic_subst_type_ids
         self.sema.generic_subst_param_syms = List.new()
         self.sema.generic_subst_type_ids = List.new()
-        for i in 0..tp_syms.len() as i32:
+        for i in 0..tp_syms.len():
             let tp_sym = tp_syms[i]
             snapshot_tp_syms.push(tp_sym)
             if self.sema.named_types.contains(tp_sym):
@@ -7771,7 +7771,7 @@ impl ComptimeEvaluator:
         var owned = move snapshot
         // Last to first: a parameter listed twice was saved twice, and only
         // the first save is the caller's binding.
-        var i = owned.tp_syms.len() as i32 - 1
+        var i = owned.tp_syms.len() - 1
         while i >= 0:
             let tp_sym = owned.tp_syms[i]
             if owned.saved_named_had[i] == 1:
@@ -7977,7 +7977,7 @@ impl ComptimeEvaluator:
     mut fn eval_allowed_runtime_call(fn_sym: i32, arg_values: &List[ComptimeValue], node: i32) -> ComptimeControl:
         let fn_name = self.pool.resolve(fn_sym)
         if fn_name == "with_panic" or fn_name == "with_panic_ref":
-            if arg_values.len() as i32 != 3:
+            if arg_values.len() != 3:
                 return self.fail(node, "panic runtime call takes three arguments")
             let message = arg_values[0]
             let location = arg_values[1]
@@ -7995,7 +7995,7 @@ impl ComptimeEvaluator:
             self.had_error = 1
             return comptime_control_error()
         if fn_name == "with_println_str" or fn_name == "with_print_str" or fn_name == "with_eprint" or fn_name == "with_write" or fn_name == "with_ewrite":
-            if arg_values.len() as i32 != 1:
+            if arg_values.len() != 1:
                 return self.fail(node, fn_name ++ " takes one argument")
             let text = arg_values[0]
             if text.kind != ComptimeValueKind.CV_STR:
@@ -8012,7 +8012,7 @@ impl ComptimeEvaluator:
                 with_ewrite(text.text)
             return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
         if fn_name == "with_println_i32" or fn_name == "with_println_i64":
-            if arg_values.len() as i32 != 1:
+            if arg_values.len() != 1:
                 return self.fail(node, fn_name ++ " takes one argument")
             let value = arg_values[0]
             if comptime_value_is_intlike(value) == 0:
@@ -8023,7 +8023,7 @@ impl ComptimeEvaluator:
                 with_println_i64(comptime_value_intlike(value))
             return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
         if fn_name == "with_println_bool":
-            if arg_values.len() as i32 != 1:
+            if arg_values.len() != 1:
                 return self.fail(node, "with_println_bool takes one argument")
             let value = arg_values[0]
             if value.kind != ComptimeValueKind.CV_BOOL:
@@ -8031,7 +8031,7 @@ impl ComptimeEvaluator:
             with_println_bool(value.data0 != 0)
             return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
         if fn_name == "with_getenv_str":
-            if arg_values.len() as i32 != 1:
+            if arg_values.len() != 1:
                 return self.fail(node, "with_getenv_str takes one argument")
             let name = arg_values[0]
             if name.kind != ComptimeValueKind.CV_STR:
@@ -8040,7 +8040,7 @@ impl ComptimeEvaluator:
                 return self.fail(node, "environment variable '" ++ name.text ++ "' affects build output but is not a declared build input; use ctx.env_input(\"" ++ name.text ++ "\")")
             return comptime_control_value(comptime_value_str(with_getenv_str(name.text)))
         if fn_name == "with_setenv_str":
-            if arg_values.len() as i32 != 2:
+            if arg_values.len() != 2:
                 return self.fail(node, "with_setenv_str takes two arguments")
             let name = arg_values[0]
             let value = arg_values[1]
@@ -8049,21 +8049,21 @@ impl ComptimeEvaluator:
             self.record_runtime_env_set(name.text)
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_setenv_str(name.text, value.text) as i64))
         if fn_name == "with_str_clone_ref" or fn_name == "with_str_clone":
-            if arg_values.len() as i32 != 1:
+            if arg_values.len() != 1:
                 return self.fail(node, fn_name ++ " takes one argument")
             let clone_text = arg_values[0]
             if clone_text.kind != ComptimeValueKind.CV_STR:
                 return self.fail(node, fn_name ++ " argument must be a string")
             return comptime_control_value(comptime_value_str(with_str_clone_ref(clone_text.text)))
         if fn_name == "with_str_len":
-            if arg_values.len() as i32 != 1:
+            if arg_values.len() != 1:
                 return self.fail(node, "with_str_len takes one argument")
             let text = arg_values[0]
             if text.kind != ComptimeValueKind.CV_STR:
                 return self.fail(node, "with_str_len argument must be a string")
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), with_str_len(text.text)))
         if fn_name == "with_str_byte_at":
-            if arg_values.len() as i32 != 2:
+            if arg_values.len() != 2:
                 return self.fail(node, "with_str_byte_at takes two arguments")
             let text = arg_values[0]
             let index = arg_values[1]
@@ -8071,7 +8071,7 @@ impl ComptimeEvaluator:
                 return self.fail(node, "with_str_byte_at expects string and integer arguments")
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_str_byte_at_ref(with_str_clone_ref(text.text), comptime_value_intlike(index))))
         if fn_name == "with_str_slice":
-            if arg_values.len() as i32 != 3:
+            if arg_values.len() != 3:
                 return self.fail(node, "with_str_slice takes three arguments")
             let text = arg_values[0]
             let start = arg_values[1]
@@ -8080,7 +8080,7 @@ impl ComptimeEvaluator:
                 return self.fail(node, "with_str_slice expects string and integer arguments")
             return comptime_control_value(comptime_value_str(with_str_slice_ref(with_str_clone_ref(text.text), comptime_value_intlike(start), comptime_value_intlike(end))))
         if fn_name == "with_str_contains" or fn_name == "with_str_starts_with" or fn_name == "with_str_ends_with":
-            if arg_values.len() as i32 != 2:
+            if arg_values.len() != 2:
                 return self.fail(node, fn_name ++ " takes two arguments")
             let text = arg_values[0]
             let needle = arg_values[1]
@@ -8095,7 +8095,7 @@ impl ComptimeEvaluator:
                     with_str_ends_with_ref(with_str_clone_ref(text.text), with_str_clone_ref(needle.text))
             return comptime_control_value(comptime_value_bool(result))
         if fn_name == "with_sysinfo_os" or fn_name == "with_sysinfo_arch" or fn_name == "with_sysinfo_hostname":
-            if arg_values.len() as i32 != 0:
+            if arg_values.len() != 0:
                 return self.fail(node, "sysinfo runtime call takes no arguments")
             // os/arch reflect the --target selection so comptime platform
             // dispatch bakes target values, never the host's (§18.5).
@@ -8143,7 +8143,7 @@ impl ComptimeEvaluator:
             // ask Sema now, as eval_user_method_value does for methods.
             let arg_types: List[i32] = List.new()
             let arg_nodes: List[i32] = List.new()
-            for i in 0..arg_values.len() as i32:
+            for i in 0..arg_values.len():
                 arg_types.push(self.comptime_value_semantic_type(arg_values[i]))
             let ret_ty = self.sema.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, arg_values.len() as i32, node)
             let checked = self.sema.resolved_call_sigs.get(node)
@@ -8161,7 +8161,7 @@ impl ComptimeEvaluator:
         if fn_name == "parallel":
             return self.eval_parallel_workspaces_call(arg_values, node)
         if fn_name == "str.to_owned":
-            if arg_values.len() as i32 != 1:
+            if arg_values.len() != 1:
                 return self.fail(node, "str.to_owned() takes no arguments")
             let receiver = arg_values[0]
             if receiver.kind != ComptimeValueKind.CV_STR:
@@ -8175,10 +8175,10 @@ impl ComptimeEvaluator:
             if result_type == 0:
                 return self.fail(node, "StringBuilder constructor result type is unknown in comptime")
             if string_builder_constructor == "new":
-                if arg_values.len() as i32 != 0:
+                if arg_values.len() != 0:
                     return self.fail(node, "StringBuilder.new() takes no arguments in comptime")
                 return comptime_control_value(self.empty_string_builder_value(result_type, 0))
-            if arg_values.len() as i32 != 1:
+            if arg_values.len() != 1:
                 return self.fail(node, "StringBuilder.with_capacity() expects exactly one argument in comptime")
             if comptime_value_is_intlike(arg_values[0]) == 0:
                 return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
@@ -8196,19 +8196,19 @@ impl ComptimeEvaluator:
                 if result_type_from_node == 0:
                     return comptime_control_error()
                 if fn_name == "new":
-                    if arg_values.len() as i32 != 0:
+                    if arg_values.len() != 0:
                         return self.fail(node, "StringBuilder.new() takes no arguments in comptime")
                     return comptime_control_value(self.empty_string_builder_value(result_type_from_node, 0))
-                if arg_values.len() as i32 != 1:
+                if arg_values.len() != 1:
                     return self.fail(node, "StringBuilder.with_capacity() expects exactly one argument in comptime")
                 if comptime_value_is_intlike(arg_values[0]) == 0:
                     return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
                 return comptime_control_value(self.empty_string_builder_value(result_type_from_node, comptime_value_intlike(arg_values[0])))
             let ret_type_for_constructor = self.comptime_fn_return_type(fn_sym, tp_syms, tp_tys)
             if self.is_string_builder_type(ret_type_for_constructor) and self.decl_path(fn_node).ends_with("string.w"):
-                if arg_values.len() as i32 == 0:
+                if arg_values.len() == 0:
                     return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor, 0))
-                if arg_values.len() as i32 == 1:
+                if arg_values.len() == 1:
                     if comptime_value_is_intlike(arg_values[0]) == 0:
                         return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
                     return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor, comptime_value_intlike(arg_values[0])))
@@ -8230,19 +8230,19 @@ impl ComptimeEvaluator:
         // declaration (check_comptime_call_restriction over its body); the
         // evaluator only runs bodies and reports what it meets, with the
         // chain.
-        if self.active_fn_syms.len() as i32 >= self.recursion_limit:
+        if self.active_fn_syms.len() >= self.recursion_limit:
             return self.fail(node, "comptime recursion limit exceeded")
 
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
             return self.fail(node, "missing comptime function metadata")
         let tp_count = self.ast.fn_meta_tp_count(meta)
-        let explicit_tp_count = tp_syms.len() as i32
+        let explicit_tp_count = tp_syms.len()
         if explicit_tp_count != tp_count:
             return self.fail(node, f"generic comptime function expects {tp_count} type argument(s), found {explicit_tp_count}")
         let param_start = self.ast.fn_meta_param_start(meta)
         let param_count = self.ast.fn_meta_param_count(meta)
-        let arg_count = arg_values.len() as i32
+        let arg_count = arg_values.len()
         if arg_count > param_count:
             return self.fail(node, "wrong argument count in comptime call")
 
@@ -8351,7 +8351,7 @@ impl ComptimeEvaluator:
         body_signal
 
     mut fn eval_parallel_workspaces_call(arg_values: &List[ComptimeValue], node: i32) -> ComptimeControl:
-        if arg_values.len() as i32 != 1:
+        if arg_values.len() != 1:
             return self.fail(node, "parallel takes one List[Workspace] argument")
         let workspaces = arg_values[0]
         if workspaces.kind != ComptimeValueKind.CV_LIST and workspaces.kind != ComptimeValueKind.CV_ARRAY:
@@ -8388,7 +8388,7 @@ impl ComptimeEvaluator:
             workspace_ids.push(workspace_id)
             intercepted.push(if record.intercept_active != 0: 1 else: 0)
         let native_results: List[ComptimeWorkspaceNativeCompileResult] = List.new()
-        if plans.len() as i32 == 1:
+        if plans.len() == 1:
             native_results.push(comptime_execute_workspace_compile_plan(ce_clone_compile_plan(&plans[0])))
         else:
             // D24 (#729, BDFL ruling 2026-07-26): independent builds never
@@ -8404,7 +8404,7 @@ impl ComptimeEvaluator:
             let pids: List[i32] = List.new()
             let result_paths: List[str] = List.new()
             let err_paths: List[str] = List.new()
-            for i in 0..plans.len() as i32:
+            for i in 0..plans.len():
                 if intercepted[i] != 0:
                     pids.push(-1)
                     result_paths.push("")
@@ -8427,7 +8427,7 @@ impl ComptimeEvaluator:
                 pids.push(pid)
                 result_paths.push(result_path)
                 err_paths.push(err_path)
-            for i in 0..plans.len() as i32:
+            for i in 0..plans.len():
                 if pids[i] < 0:
                     native_results.push(comptime_execute_workspace_compile_plan(ce_clone_compile_plan(&plans[i])))
                     continue
@@ -8449,7 +8449,7 @@ impl ComptimeEvaluator:
                         with_eprint(err_text)
                 native_results.push(child)
         let results: List[ComptimeValue] = List.new()
-        for i in 0..native_results.len() as i32:
+        for i in 0..native_results.len():
             let plan = &plans[i]
             let native = native_results[i]
             if native.rc != 0:
@@ -8478,7 +8478,7 @@ impl ComptimeEvaluator:
             comptime_workspace_native_compile_result_free(native)
             results.push(result)
         let start = self.extra_values.len() as i32
-        for i in 0..results.len() as i32:
+        for i in 0..results.len():
             self.extra_values.push(comptime_value_clone(results[i]))
         comptime_control_value(comptime_value_list(result_type, start, workspaces.extra_count))
 

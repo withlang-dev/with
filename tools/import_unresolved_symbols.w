@@ -84,7 +84,7 @@ fn source_path(path: &str) -> str:
 fn ident_at(path: &str, nr: i32, col: i32) -> str:
     let text = read_file(path) ?? ""
     let lines = text.split("\n")
-    if nr < 1 or nr > lines.len() as i32: return ""
+    if nr < 1 or nr > lines.len(): return ""
     let line = lines[nr - 1]
     var start = (col - 1) as i64
     if start < 0 or start >= line.len(): return ""
@@ -150,13 +150,13 @@ var seen_keys: List[str] = List.new()
 
 let log_lines = (read_file(log_path) ?? "").split("\n")
 var li = 0
-while li < log_lines.len() as i32:
+while li < log_lines.len():
     let line = log_lines[li]
     li = li + 1
     if not line.starts_with("error:"): continue
     // The location is the next ` --> path:line:col`.
     var loc = ""
-    if li < log_lines.len() as i32 and log_lines[li].starts_with(" --> "):
+    if li < log_lines.len() and log_lines[li].starts_with(" --> "):
         loc = log_lines[li].slice(5, log_lines[li].len())
     if loc.len() == 0: continue
     let parts = loc.split(":")

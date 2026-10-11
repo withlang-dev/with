@@ -164,11 +164,11 @@ fn bx_str_less(a: &str, b: &str) -> bool: with_str_cmp_ref(a, b) < 0
 // Insertion-sorted copy (bytewise); the model is small.
 fn bx_sorted_strings(items: &List[str]) -> List[str]:
     var sorted: List[str] = List.new()
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let item = items[i]
         var out: List[str] = List.new()
         var inserted = false
-        for j in 0..sorted.len() as i32:
+        for j in 0..sorted.len():
             let existing = sorted[j]
             if not inserted and bx_str_less(item, existing):
                 out.push(with_str_clone_ref(item))
@@ -232,7 +232,7 @@ impl BundleEmitter:
     // declarations names a type it declares.
     fn needed_imports() -> List[str]:
         var out: List[str] = List.new()
-        for ni in 0..self.named_in_module_syms.len() as i32:
+        for ni in 0..self.named_in_module_syms.len():
             let sym = self.named_in_module_syms[ni]
             if not self.type_decl_paths.contains(sym):
                 continue
@@ -658,7 +658,7 @@ impl BundleEmitter:
             if self.failed:
                 return ""
         var writes_row = ""
-        for wi in 0..declared.len() as i32:
+        for wi in 0..declared.len():
             writes_row = writes_row ++ declared[wi] ++ ";"
         let ret = self.spell(sema, sema.sig_return_type(sig))
         if self.failed:
@@ -673,7 +673,7 @@ impl BundleEmitter:
                 for pi in 0..param_count:
                     if (sema.sig_param_effect(sig, pi) & EFF_ESCAPE_VIEW) != 0:
                         clause = clause ++ (if clause.len() == 0: "from " else: ", ") ++ sema.pool_resolve(ast.fn_param_name(param_start, pi))
-                for gi in 0..derived_globals.len() as i32:
+                for gi in 0..derived_globals.len():
                     clause = clause ++ (if clause.len() == 0: "from " else: ", ") ++ sema.pool_resolve(derived_globals[gi])
                 self.refuse("returns a view of the global `" ++ sema.pool_resolve(derived_globals[0]) ++ "`, an origin its declaration does not state: a bundle interface states every origin of a returned view (§21.1 rule 6, D39); write `" ++ clause ++ "` after the return type")
                 return ""
@@ -702,7 +702,7 @@ impl BundleEmitter:
         var from_row = ""
         if has_from:
             from_text = " " ++ self.written_from_clause(sema, node)
-            for ei in 0..from_entries.len() as i32:
+            for ei in 0..from_entries.len():
                 let entry = from_entries[ei]
                 if entry == FROM_STATIC_ENTRY:
                     from_row = from_row ++ "static;"
@@ -713,7 +713,7 @@ impl BundleEmitter:
                     if entries.len() == 0:
                         self.refuse("`from " ++ sema.pool_resolve(entry) ++ "` names a global outside this bundle that is no bundle export; a returned view's global origin is this bundle's global or an exported one (§21.1 rule 6)")
                         return ""
-                    for xi in 0..entries.len() as i32:
+                    for xi in 0..entries.len():
                         from_row = from_row ++ "global:" ++ entries[xi] ++ ";"
         let is_unsafe = sema.fn_symbol_is_unsafe(fn_sym) != 0
         let must_use = (flags / FnFlags.MUST_USE) % 2 != 0
@@ -763,11 +763,11 @@ impl BundleEmitter:
     mut fn declared_global_writes(sema: &Sema, node: i32) -> List[str]:
         var out: List[str] = List.new()
         let syms = sema.declared_global_write_syms(node)
-        for si in 0..syms.len() as i32:
+        for si in 0..syms.len():
             let entries = self.exported_global_entries(sema, syms[si])
             if entries.len() == 0:
                 self.refuse("`writes " ++ sema.pool_resolve(syms[si]) ++ "` names a global that is no bundle export: only a bundle's exported globals are part of its interface (§21.1 rule 1)")
-            for ei in 0..entries.len() as i32:
+            for ei in 0..entries.len():
                 if not out.contains(entries[ei]):
                     out.push(with_str_clone_ref(entries[ei]))
         bx_sorted_strings(&out)
@@ -805,7 +805,7 @@ impl BundleEmitter:
     fn exported_global_entries(sema: &Sema, sym: i32) -> List[str]:
         let name = with_str_clone_ref(sema.pool_resolve(sym))
         var out: List[str] = List.new()
-        for xi in 0..self.exports.len() as i32:
+        for xi in 0..self.exports.len():
             let export = self.exports[xi]
             if export.kind == BX_GLOBAL and export.name == name:
                 out.push(export.mod_path ++ "#" ++ name)
@@ -816,7 +816,7 @@ impl BundleEmitter:
     // Whether this corpus exports a global named `name` with `pub` (an
     // origin global is printed without it, emit_let).
     fn global_is_pub_export(name: &str) -> bool:
-        for xi in 0..self.exports.len() as i32:
+        for xi in 0..self.exports.len():
             if self.exports[xi].kind == BX_GLOBAL and self.exports[xi].name == name and self.exports[xi].wi.starts_with("pub "):
                 return true
         false
@@ -834,7 +834,7 @@ impl BundleEmitter:
     mut fn check_declared_global_writes(sema: &Sema, sig: i32, declared: &List[str], fn_name: &str, has_clause: bool):
         let written = sema.fn_global_effects(sig, &self.call_index)
         var actual: List[str] = List.new()
-        for wi in 0..written.len() as i32:
+        for wi in 0..written.len():
             let sym = written[wi]
             let name = with_str_clone_ref(sema.pool_resolve(sym))
             let entries = self.exported_global_entries(sema, sym)
@@ -845,7 +845,7 @@ impl BundleEmitter:
                 if not self.corpus_global_names.contains(name):
                     self.warnings.push(self.context ++ ": writes `" ++ name ++ "` (" ++ sema.fn_global_write_chain(sig, sym, &self.call_index) ++ "), a global outside this bundle that is no bundle export: the write contract covers only exported globals (§21.1 rule 1)")
                 continue
-            for ei in 0..entries.len() as i32:
+            for ei in 0..entries.len():
                 if actual.contains(entries[ei]):
                     continue
                 actual.push(with_str_clone_ref(entries[ei]))
@@ -853,7 +853,7 @@ impl BundleEmitter:
                     let fix = if has_clause: "add '" ++ name ++ "' to " ++ fn_name ++ "'s `writes` clause" else: "add 'writes " ++ name ++ "' to " ++ fn_name ++ "'s declaration"
                     let what = if self.origin_global_names.contains(name) and not self.global_is_pub_export(name): "global `" ++ name ++ "`, an origin of an exported function's returned view," else: "exported global `" ++ name ++ "`"
                     self.refuse("writes " ++ what ++ " (" ++ sema.fn_global_write_chain(sig, sym, &self.call_index) ++ ") but its declaration does not say so: a bundle function's global writes are a declared, checked contract, and no clause declares none (§21.1 rules 1 and 6, D39, D79); " ++ fix)
-        for di in 0..declared.len() as i32:
+        for di in 0..declared.len():
             if not actual.contains(declared[di]):
                 self.warnings.push(self.context ++ ": declares a write of `" ++ declared[di] ++ "` its body never makes (a conservative contract: every caller treats it as written)")
 
@@ -921,7 +921,7 @@ impl BundleEmitter:
     // (impl→method association is span-based in Sema; nesting reproduces it).
     mut fn emit_impls_of(sema: &Sema, type_sym: i32, type_name: &str):
         let ast = sema.ast
-        for ii in 0..self.impl_type_syms.len() as i32:
+        for ii in 0..self.impl_type_syms.len():
             if self.impl_type_syms[ii] != type_sym:
                 continue
             let idi = self.impl_decl_indices[ii]
@@ -963,8 +963,8 @@ impl BundleEmitter:
             var body = ""
             var rows = ""
             var method_count = 0
-            for oi in 0..ordered.len() as i32:
-                for mi in 0..method_names.len() as i32:
+            for oi in 0..ordered.len():
+                for mi in 0..method_names.len():
                     if method_names[mi] != ordered[oi]:
                         continue
                     let mdi = method_decls[mi]
@@ -1065,7 +1065,7 @@ impl BundleEmitter:
                 let f_tid = sema.type_extra[(te_start + fi * 3 + 1)]
                 let f_default = sema.type_extra[(te_start + fi * 3 + 2)]
                 let align_slot = te_start + field_count * 3 + fi
-                let f_align: i32 = if align_slot < sema.type_extra.len() as i32: sema.type_extra[align_slot] else: 0
+                let f_align: i32 = if align_slot < sema.type_extra.len(): sema.type_extra[align_slot] else: 0
                 let f_spelling = self.spell(sema, f_tid)
                 if self.failed:
                     return
@@ -1183,8 +1183,8 @@ impl BundleEmitter:
     mut fn walk(sema: &Sema):
         let ast = sema.ast
         let dc = ast.decl_count()
-        if sema.decl_source_paths.len() as i32 != dc:
-            self.refuse_global(f"bundle interface: decl_source_paths has {sema.decl_source_paths.len() as i32} entries for {dc} declarations (Analysis.w invariant)")
+        if sema.decl_source_paths.len() != dc:
+            self.refuse_global(f"bundle interface: decl_source_paths has {sema.decl_source_paths.len()} entries for {dc} declarations (Analysis.w invariant)")
             return
         for di in 0..dc:
             let path = sema.decl_source_paths[di]
@@ -1207,7 +1207,7 @@ impl BundleEmitter:
         // module holding only `use` lines (pcre2's migrated table modules)
         // still needs a section, or a consumer's `use` of it resolves to
         // nothing once the source is not embedded.
-        for mi in 0..sema.module_paths.len() as i32:
+        for mi in 0..sema.module_paths.len():
             let path = sema.module_paths[mi]
             let canonical = codegen_canonical_module_path(path)
             if bundle_corpus_contains(self.corpus, canonical):
@@ -1229,7 +1229,7 @@ impl BundleEmitter:
             if fn_flags % 2 == 0 and sema.impl_node_for_method_decl(decl) == 0:
                 continue
             let origin_entries = sema.declared_view_origin_entries(decl)
-            for oi in 0..origin_entries.len() as i32:
+            for oi in 0..origin_entries.len():
                 if origin_entries[oi] > 0:
                     self.origin_global_names.insert(with_str_clone_ref(sema.pool_resolve(origin_entries[oi])), 1)
         for di in 0..dc:
@@ -1288,7 +1288,7 @@ impl BundleEmitter:
         // the type closure: pub types, then every corpus type a printed
         // declaration named (field, payload, parameter and return types)
         var ti = 0
-        while ti < self.named_type_syms.len() as i32:
+        while ti < self.named_type_syms.len():
             let sym = self.named_type_syms[ti]
             ti = ti + 1
             if not self.type_decl_index.contains(sym):
@@ -1304,8 +1304,8 @@ pub fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &Lis
     em.walk(sema)
     let ordered = bx_sorted_strings(&em.modules)
     var sources: List[str] = List.new()
-    for oi in 0..ordered.len() as i32:
-        for mi in 0..em.modules.len() as i32:
+    for oi in 0..ordered.len():
+        for mi in 0..em.modules.len():
             if em.modules[mi] == ordered[oi]:
                 sources.push(with_str_clone_ref(em.module_sources[mi]))
     let needed_imports = em.needed_imports()
@@ -1326,16 +1326,16 @@ fn bx_module_export_order(model: &BundleInterfaceModel, mod_path: &str) -> List[
     var order: List[i32] = List.new()
     for kind in 0..7:
         var names: List[str] = List.new()
-        for ei in 0..model.exports.len() as i32:
+        for ei in 0..model.exports.len():
             let e = model.exports[ei]
             if e.kind == kind and e.mod_path == mod_path:
                 names.push(with_str_clone_ref(e.name))
         let sorted = bx_sorted_strings(&names)
-        for si in 0..sorted.len() as i32:
+        for si in 0..sorted.len():
             for ei in 0..model.exports.len() as i32:
                 let e = model.exports[ei]
                 if e.kind == kind and e.mod_path == mod_path and e.name == sorted[si] and not order.contains(ei):
-                    order.push(ei)
+                    order.push(ei as i32)
                     break
     order
 
@@ -1344,7 +1344,7 @@ fn bx_module_export_order(model: &BundleInterfaceModel, mod_path: &str) -> List[
 pub fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> BundleInterfaceText:
     var out = StringBuilder.new()
     var errors: List[str] = List.new()
-    for mi in 0..model.modules.len() as i32:
+    for mi in 0..model.modules.len():
         let mod_path = model.modules[mi]
         let source_path = model.module_sources[mi]
         out.push_str("module " ++ mod_path ++ "\n")
@@ -1370,7 +1370,7 @@ pub fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> Bun
             out.push_str("use " ++ import_path ++ "\n")
             line_count = line_count + 1
         let order = bx_module_export_order(model, mod_path)
-        for oi in 0..order.len() as i32:
+        for oi in 0..order.len():
             out.push_str(model.exports[order[oi]].wi)
             line_count = line_count + 1
         if line_count == 0:

@@ -31,10 +31,10 @@ fn sdk_join(left: &str, right: &str) -> str:
 
 fn sdk_dirname(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 47 or ch == 92:
-            last_slash = i
+            last_slash = i as i32
     if last_slash < 0:
         return "."
     if last_slash == 0:
@@ -61,7 +61,7 @@ fn sdk_abs(root: &str, path: &str) -> str:
 
 fn sdk_normalize(path: &str) -> str:
     var out = StringBuilder.with_capacity(path.len())
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 92:
             out.push_byte(47 as u8)
@@ -71,7 +71,7 @@ fn sdk_normalize(path: &str) -> str:
 
 fn sdk_basename(path: &str) -> str:
     var last_slash: i64 = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 47 or ch == 92:
             last_slash = i as i64
@@ -217,7 +217,7 @@ fn sdk_build_linux_zlib(ctx: &ActionCtx, root: &str, cmake: &str, bootstrap_pref
     configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang")))
     configure.push("-DZLIB_BUILD_EXAMPLES=OFF")
     let linux_flags = sdk_linux_toolchain_flags(root, output_prefix, build_dir, a)
-    for i in 0..linux_flags.len() as i32: configure.push(sdk_owned_text(linux_flags[i]))
+    for i in 0..linux_flags.len(): configure.push(sdk_owned_text(linux_flags[i]))
     var rc = sdk_run_capture(ctx, "zlib-configure", configure, 600000)
     if rc != 0: return rc
     // The static library only: the SDK ships no shared zlib.
@@ -273,7 +273,7 @@ fn sdk_str_compare(a: &str, b: &str) -> i32:
 
 fn sdk_add_unique(items: List[str], item: &str) -> List[str]:
     var out = items
-    for i in 0..out.len() as i32:
+    for i in 0..out.len():
         if out[i] == item:
             return out
     out.push(sdk_owned_text(item))
@@ -281,7 +281,7 @@ fn sdk_add_unique(items: List[str], item: &str) -> List[str]:
 
 fn sdk_add_parent_dirs(dirs: List[str], top_dir: &str, rel_path: &str) -> List[str]:
     var out = sdk_add_unique(move dirs, top_dir)
-    for i in 0..rel_path.len() as i32:
+    for i in 0..rel_path.len():
         if rel_path[i] == 47:
             out = sdk_add_unique(move out, top_dir ++ "/" ++ rel_path.slice(0, i as i64))
     out
@@ -303,7 +303,7 @@ fn sdk_check_file(ctx: &ActionCtx, path: &str, label: &str) -> i32:
 
 fn sdk_cache_line(cache: &str, key: &str) -> str:
     let lines = sdk_split_lines(cache)
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if line.starts_with(key):
             return sdk_owned_text(line)
@@ -312,11 +312,11 @@ fn sdk_cache_line(cache: &str, key: &str) -> str:
 fn sdk_split_lines(text: &str) -> List[str]:
     let out: List[str] = List.new()
     var start = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] == 10:
             out.push(text.slice(start as i64, i as i64))
-            start = i + 1
-    if start <= text.len() as i32:
+            start = (i + 1) as i32
+    if start <= text.len():
         out.push(text.slice(start as i64, text.len()))
     out
 
@@ -403,7 +403,7 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
         tools.push("llvm-nm")
         tools.push("llvm-readobj")
         tools.push("llvm-strip")
-        for i in 0..tools.len() as i32:
+        for i in 0..tools.len():
             rc = sdk_check_file(ctx, sdk_required_tool(prefix, tools[i]), tools[i])
             if rc != 0: return rc
     else:
@@ -427,7 +427,7 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
         tools.push("llvm-nm")
         tools.push("llvm-readobj")
         tools.push("llvm-strip")
-        for i in 0..tools.len() as i32:
+        for i in 0..tools.len():
             rc = sdk_check_file(ctx, sdk_required_tool(prefix, tools[i]), tools[i])
             if rc != 0: return rc
     rc = sdk_check_file(ctx, sdk_clang_main_archive(ctx.fs(), prefix), "clang driver archive (with cc)")
@@ -459,7 +459,7 @@ fn sdk_validate_wasm_install(ctx: &ActionCtx, prefix: &str) -> i32:
     components.push("Disassembler")
     components.push("Info")
     components.push("Utils")
-    for i in 0..components.len() as i32:
+    for i in 0..components.len():
         let name = "LLVMWebAssembly" ++ components[i]
         let archive = "lib" ++ name ++ ".a"
         rc = sdk_check_file(ctx, sdk_join(prefix, "lib/" ++ archive), "static WebAssembly backend archive")
@@ -468,7 +468,7 @@ fn sdk_validate_wasm_install(ctx: &ActionCtx, prefix: &str) -> i32:
 
 fn sdk_package_has_builtin_stddef(fs: &ToolFs, prefix: &str) -> bool:
     let files = fs.list_files(sdk_join(prefix, "lib/clang"))
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = sdk_normalize(files[i])
         if path.ends_with("/include/stddef.h"):
             return true
@@ -491,23 +491,23 @@ fn sdk_select_package_files(fs: &ToolFs, prefix: &str, platform: &str) -> List[s
     // LLVM's development headers outside lib/clang are not package inputs.
     var candidates = fs.list_files(sdk_join(prefix, "bin"))
     let libraries = fs.list_files(sdk_join(prefix, "lib"))
-    for i in 0..libraries.len() as i32:
+    for i in 0..libraries.len():
         candidates.push(sdk_owned_text(libraries[i]))
     // linux-x86_64: libc++'s headers (the SDK's own C++ runtime).
     if fs.exists(sdk_join(prefix, "include/c++/v1")):
         let cxx_headers = fs.list_files(sdk_join(prefix, "include/c++/v1"))
-        for i in 0..cxx_headers.len() as i32: candidates.push(sdk_owned_text(cxx_headers[i]))
+        for i in 0..cxx_headers.len(): candidates.push(sdk_owned_text(cxx_headers[i]))
         let site = fs.list_files(sdk_join(prefix, "include/" ++ sdk_linux_triple(sdk_platform_linux_arch(platform))))
-        for i in 0..site.len() as i32: candidates.push(sdk_owned_text(site[i]))
+        for i in 0..site.len(): candidates.push(sdk_owned_text(site[i]))
     let cmake_data = fs.list_files(sdk_join(prefix, "share"))
-    for i in 0..cmake_data.len() as i32:
+    for i in 0..cmake_data.len():
         candidates.push(sdk_owned_text(cmake_data[i]))
     if sdk_platform_is_windows(platform) and fs.is_dir(sdk_join(prefix, "libc")):
         let libc = fs.list_files(sdk_join(prefix, "libc"))
-        for i in 0..libc.len() as i32:
+        for i in 0..libc.len():
             candidates.push(sdk_owned_text(libc[i]))
     let all = sdk_merge_sort_strings(candidates)
-    for i in 0..all.len() as i32:
+    for i in 0..all.len():
         let path = all[i]
         let rel = sdk_rel_path(prefix, path)
         if rel.len() == 0:
@@ -585,7 +585,7 @@ fn sdk_package_tool_selected(rel: &str, platform: &str) -> bool:
         tools.push("bin/llvm-nm")
         tools.push("bin/llvm-readobj")
         tools.push("bin/llvm-strip")
-    for i in 0..tools.len() as i32:
+    for i in 0..tools.len():
         if rel == tools[i]:
             return true
     false
@@ -626,7 +626,7 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
     let fs = ctx.fs()
     let files = sdk_select_package_files(fs, prefix, platform)
     var dirs: List[str] = List.new()
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let rel = sdk_rel_path(prefix, files[i])
         dirs = sdk_add_parent_dirs(move dirs, sdk_base, rel)
     if not sdk_platform_is_windows(platform):
@@ -635,7 +635,7 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
         aliases.push("ld64.lld")
         aliases.push("lld-link")
         aliases.push("wasm-ld")
-        for i in 0..aliases.len() as i32:
+        for i in 0..aliases.len():
             let alias = aliases[i]
             if fs.exists(sdk_join(prefix, "bin/" ++ alias)):
                 dirs = sdk_add_parent_dirs(move dirs, sdk_base, "bin/" ++ alias)
@@ -645,17 +645,17 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
     // Zig source.
     let sysroot_tree = sdk_packaged_sysroot_dir(platform)
     let sysroot_files = if sysroot_tree.len() > 0: sdk_merge_sort_strings(fs.list_files(sysroot_tree)) else: List.new()
-    for i in 0..sysroot_files.len() as i32:
+    for i in 0..sysroot_files.len():
         dirs = sdk_add_parent_dirs(move dirs, sdk_base, "sysroot/" ++ sdk_rel_path(sysroot_tree, sysroot_files[i]))
     dirs = sdk_merge_sort_strings(dirs)
     let entries: List[ArchiveEntry] = List.new()
-    for i in 0..dirs.len() as i32:
+    for i in 0..dirs.len():
         entries.push(archive_dir_entry(sdk_owned_text(dirs[i]), 0o755))
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         let rel = sdk_rel_path(prefix, path)
         entries.push(archive_file_entry(sdk_owned_text(path), sdk_base ++ "/" ++ rel, sdk_file_mode(rel)))
-    for i in 0..sysroot_files.len() as i32:
+    for i in 0..sysroot_files.len():
         let rel = "sysroot/" ++ sdk_rel_path(sysroot_tree, sysroot_files[i])
         entries.push(archive_file_entry(sdk_owned_text(sysroot_files[i]), sdk_base ++ "/" ++ rel, 0o644))
     if not sdk_platform_is_windows(platform):
@@ -664,7 +664,7 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
         aliases.push("ld64.lld")
         aliases.push("lld-link")
         aliases.push("wasm-ld")
-        for i in 0..aliases.len() as i32:
+        for i in 0..aliases.len():
             let alias = aliases[i]
             if fs.exists(sdk_join(prefix, "bin/" ++ alias)):
                 entries.push(archive_symlink_entry("lld", sdk_base ++ "/bin/" ++ alias, 0o777))
@@ -684,7 +684,7 @@ fn sdk_archive_manifest(entries: &List[ArchiveEntry]) -> str:
     // entry (a source-built SDK's 14,000 passed the evaluator's 1 GiB
     // string budget).
     var out = StringBuilder.with_capacity(1 << 20)
-    for i in 0..entries.len() as i32:
+    for i in 0..entries.len():
         out.push_str(entries[i].archive_path)
         out.push_str("\n")
     out.to_str()
@@ -733,11 +733,11 @@ pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
     // The archive is the next build's bootstrap; a package that cannot
     // bootstrap is not an SDK, whatever else it contains.
     let bootstrap = sdk_bootstrap_set(platform)
-    for i in 0..bootstrap.len() as i32:
+    for i in 0..bootstrap.len():
         if not selected.contains(sdk_base ++ "/" ++ bootstrap[i] ++ "\n"):
             return sdk_fail(ctx, "SDK archive cannot bootstrap the next SDK build: missing " ++ bootstrap[i] ++ " (the staged prefix lacks it, or the selection skipped it)")
     let source_libs = ctx.fs().list_files(sdk_join(prefix, "lib/"))
-    for i in 0..source_libs.len() as i32:
+    for i in 0..source_libs.len():
         let rel = sdk_rel_path(prefix, source_libs[i])
         if rel.starts_with("lib/LLVMWebAssembly") or rel.starts_with("lib/libLLVMWebAssembly"):
             if not selected.contains(sdk_base ++ "/" ++ rel ++ "\n"):
@@ -893,7 +893,7 @@ fn sdk_patch_dsymutil_cfbundle(ctx: &ActionCtx, source_dir: &str) -> i32:
     var guards = 0
     var patched = 0
     let pieces = text.split("\n")
-    for i in 0..pieces.len() as i32:
+    for i in 0..pieces.len():
         if i > 0:
             out.push_str("\n")
         if pieces[i] == "#ifdef __APPLE__":
@@ -922,7 +922,7 @@ fn sdk_insert_line_after(ctx: &ActionCtx, path: &str, anchor: &str, line: &str) 
     let pieces = text.split("\n")
     // "a\nb\n" splits to [a, b, ""]: a separator between every two pieces
     // rebuilds the text byte for byte.
-    for i in 0..pieces.len() as i32:
+    for i in 0..pieces.len():
         let current = pieces[i]
         if current == line:
             return 0
@@ -981,7 +981,7 @@ fn sdk_run_capture(ctx: &ActionCtx, label: &str, argv: List[str], timeout_ms: i3
     if argv.len() == 0:
         return sdk_fail(ctx, label ++ ": empty command")
     var spec = process_spec(argv[0].clone()).timeout(timeout_ms)
-    for i in 1..argv.len() as i32:
+    for i in 1..argv.len():
         spec = (move spec).arg(argv[i].clone())
     for name in sdk_scrubbed_env_names():
         spec = (move spec).env_var(name.clone(), "")
@@ -1037,7 +1037,7 @@ pub fn run_sdk_ninja_action(ctx: ActionCtx) -> i32:
         // Visual Studio /MD build) needs msvcp140/vcruntime140 to run.
         let gnu = sdk_windows_gnu_cmake_args(&ctx, bootstrap_prefix, output_prefix, sdk_windows_host_arch(), sdk_join(build_dir, "tools"))
         if not gnu.ok: return 1
-        for i in 0..gnu.items.len() as i32:
+        for i in 0..gnu.items.len():
             configure.push(sdk_owned_text(gnu.items[i]))
     else:
         configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang++")))
@@ -1048,7 +1048,7 @@ pub fn run_sdk_ninja_action(ctx: ActionCtx) -> i32:
     let ninja_arch = if args.len() > 5: sdk_owned_text(args[5]) else: arch()
     if os() == "Linux" and sdk_linux_arch_supported(ninja_arch):
         let linux_flags = sdk_linux_toolchain_flags(root, output_prefix, build_dir, ninja_arch)
-        for i in 0..linux_flags.len() as i32: configure.push(sdk_owned_text(linux_flags[i]))
+        for i in 0..linux_flags.len(): configure.push(sdk_owned_text(linux_flags[i]))
     rc = sdk_run_capture(ctx, "ninja-configure", configure, 300000)
     if rc != 0: return rc
     var build: List[str] = List.new()
@@ -1111,7 +1111,7 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
     if os() == "Windows":
         let gnu = sdk_windows_gnu_cmake_args(&ctx, bootstrap_prefix, output_prefix, sdk_windows_host_arch(), sdk_join(build_dir, "tools"))
         if not gnu.ok: return 1
-        for i in 0..gnu.items.len() as i32:
+        for i in 0..gnu.items.len():
             configure.push(sdk_owned_text(gnu.items[i]))
         configure.push("-DCMAKE_RC_COMPILER=" ++ sdk_abs(root, sdk_tool(output_prefix, "llvm-windres")))
         // llvm-windres preprocesses with clang and no sysroot: the .rc files
@@ -1132,7 +1132,7 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
         // sysroot carries none, and a leftover find must not reach the host.
         for a in ["-DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON", "-DCMAKE_DISABLE_FIND_PACKAGE_Libidn2=ON", "-DCURL_USE_LIBPSL=OFF", "-DCURL_USE_LIBSSH2=OFF", "-DCURL_ZSTD=OFF", "-DCURL_BROTLI=OFF", "-DBUILD_CursesDialog=OFF"]: configure.push(sdk_owned_text(a))
         let linux_flags = sdk_linux_toolchain_flags(root, output_prefix, build_dir, cmake_arch)
-        for i in 0..linux_flags.len() as i32: configure.push(sdk_owned_text(linux_flags[i]))
+        for i in 0..linux_flags.len(): configure.push(sdk_owned_text(linux_flags[i]))
     rc = sdk_run_capture(ctx, "cmake-configure", configure, 600000)
     if rc != 0: return rc
     var build: List[str] = List.new()
@@ -1160,7 +1160,7 @@ fn sdk_llvm_targets_arg(ctx: &ActionCtx, requested: &str) -> str:
 
 fn sdk_targets_include_wasm(targets: &str) -> bool:
     let parts = targets.split(";")
-    for i in 0..parts.len() as i32:
+    for i in 0..parts.len():
         let target = parts[i].trim()
         if target == "WebAssembly" or target == "all":
             return true
@@ -1184,7 +1184,7 @@ pub fn run_sdk_contract_tests_action(ctx: ActionCtx) -> i32:
     platforms.push("linux-aarch64")
     platforms.push("windows-x86_64")
     platforms.push("windows-aarch64")
-    for i in 0..platforms.len() as i32:
+    for i in 0..platforms.len():
         let platform = platforms[i]
         assert(sdk_host_tag_for_platform(platform) != "unsupported")
         if sdk_platform_is_windows(platform):
@@ -1200,7 +1200,7 @@ pub fn run_sdk_contract_tests_action(ctx: ActionCtx) -> i32:
             assert(sdk_package_tool_selected("bin/clang-22", platform))
             assert(not sdk_package_tool_selected("bin/clang-21", platform))
         let bootstrap = sdk_bootstrap_set(platform)
-        for bi in 0..bootstrap.len() as i32:
+        for bi in 0..bootstrap.len():
             let item = bootstrap[bi]
             if item.starts_with("bin/"):
                 assert(sdk_package_tool_selected(item, platform))
@@ -1311,7 +1311,7 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         // assembly is its GNU .S flavor, so no rc.exe or llvm-ml64.
         let gnu = sdk_windows_gnu_cmake_args(&ctx, bootstrap_prefix, output_prefix, sdk_windows_host_arch(), sdk_join(build_dir, "tools"))
         if not gnu.ok: return 1
-        for i in 0..gnu.items.len() as i32:
+        for i in 0..gnu.items.len():
             configure.push(sdk_owned_text(gnu.items[i]))
         configure.push("-DLLVM_HOST_TRIPLE=" ++ sdk_windows_triple(sdk_windows_host_arch()))
         configure.push("-DCLANG_DEFAULT_RTLIB=compiler-rt")
@@ -1345,7 +1345,7 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         if not fs.exists(sdk_join(output_prefix, "lib/" ++ sdk_linux_triple(llvm_arch) ++ "/libc++.a")):
             return sdk_fail(ctx, "the SDK's runtimes are not built: run :sdk-runtimes")
         let linux_flags = sdk_linux_llvm_flags(root, output_prefix, build_dir, llvm_arch, native_tools)
-        for i in 0..linux_flags.len() as i32: configure.push(sdk_owned_text(linux_flags[i]))
+        for i in 0..linux_flags.len(): configure.push(sdk_owned_text(linux_flags[i]))
         // zlib, built here from source, so lld reads the compressed debug
         // sections of the libraries `with get` installs (sdk_build_linux_zlib).
         rc = sdk_build_linux_zlib(&ctx, root, cmake, bootstrap_prefix, tools_prefix, output_prefix, build_dir, llvm_arch, jobs)
@@ -1411,7 +1411,7 @@ fn sdk_archive_dsymutil_main(ctx: &ActionCtx, root: &str, objects_dir: &str, out
     names.push("RelocationMap")
     names.push("Reproducer")
     names.push("SwiftModule")
-    for i in 0..names.len() as i32:
+    for i in 0..names.len():
         let object = objects_dir ++ "/" ++ names[i] ++ ".cpp.o"
         if not ctx.fs().host_exists(object):
             return sdk_fail(ctx, "dsymutil object was not built: " ++ object)
@@ -1449,7 +1449,7 @@ fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, objects_dir: &str, archiv
     names.push("cc1_main")
     names.push("cc1as_main")
     names.push("cc1gen_reproducer_main")
-    for i in 0..names.len() as i32:
+    for i in 0..names.len():
         let object = objects_dir ++ "/" ++ names[i] ++ ext
         if not ctx.fs().host_exists(object):
             return sdk_fail(ctx, "clang driver object was not built: " ++ object)
@@ -1514,7 +1514,7 @@ fn sdk_ensure_clang_main(ctx: &ActionCtx) -> i32:
     names.push("cc1_main")
     names.push("cc1as_main")
     names.push("cc1gen_reproducer_main")
-    for i in 0..names.len() as i32:
+    for i in 0..names.len():
         let source = sdk_join(scratch, names[i] ++ ".cpp")
         let url = "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-" ++ COMPILER_LLVM_VERSION ++ "/clang/tools/driver/" ++ names[i] ++ ".cpp"
         // curl, as `with get` downloads: the HTTPS helper is a With program the
@@ -1604,18 +1604,18 @@ const SDK_LIBCXX_ABILIST_SHA256: str = "15f185e6248890bfd4ddce53740b9437cbe5307b
 fn sdk_merge_sort_strings(items: List[str]) -> List[str]:
     if items.len() <= 1:
         return items
-    let mid = items.len() as i32 / 2
+    let mid = items.len() / 2
     let left: List[str] = List.new()
     let right: List[str] = List.new()
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         if i < mid: left.push(sdk_owned_text(items[i])) else: right.push(sdk_owned_text(items[i]))
     let a = sdk_merge_sort_strings(left)
     let b = sdk_merge_sort_strings(right)
     let out: List[str] = List.new()
     var i = 0
     var j = 0
-    while i < a.len() as i32 or j < b.len() as i32:
-        if j >= b.len() as i32 or (i < a.len() as i32 and sdk_str_compare(a[i], b[j]) <= 0):
+    while i < a.len() or j < b.len():
+        if j >= b.len() or (i < a.len() and sdk_str_compare(a[i], b[j]) <= 0):
             out.push(sdk_owned_text(a[i]))
             i = i + 1
         else:
@@ -1698,7 +1698,7 @@ pub fn sdk_libcxx_tbd_from_abilist(abilist: &str) -> str:
     out.push_str("exports:\n")
     out.push_str("  - targets:         [ arm64-macos, arm64e-macos ]\n")
     out.push_str("    symbols:         [ ")
-    for i in 0..sorted.len() as i32:
+    for i in 0..sorted.len():
         if i > 0:
             out.push_str(",\n                       ")
         out.push_str("'")
@@ -1792,7 +1792,7 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
     contents.push(libsystem.clone())
     rel_paths.push("usr/lib/libc++.tbd")
     contents.push(libcxx_tbd)
-    for i in 0..headers.len() as i32:
+    for i in 0..headers.len():
         let rel = sdk_rel_path(include_root, sdk_normalize(headers[i]))
         if not sdk_sysroot_path_ok(rel):
             return sdk_fail(ctx, "a header path the sysroot pack cannot carry: " ++ headers[i])
@@ -1813,7 +1813,7 @@ fn sdk_darwin_sysroot_from_sdk(ctx: &ActionCtx, sdk_sysroot: &str, pack_path: &s
     fixed.push("SDKSettings.json")
     fixed.push("usr/lib/libSystem.tbd")
     fixed.push("usr/lib/libc++.tbd")
-    for i in 0..fixed.len() as i32:
+    for i in 0..fixed.len():
         let text = fs.read_text(sdk_join(sdk_sysroot, fixed[i]))
         if text.len() == 0:
             return sdk_fail(ctx, "the SDK's sysroot has no " ++ fixed[i] ++ ": " ++ sdk_sysroot)
@@ -1825,7 +1825,7 @@ fn sdk_darwin_sysroot_from_sdk(ctx: &ActionCtx, sdk_sysroot: &str, pack_path: &s
         return sdk_fail(ctx, "the SDK's sysroot has no headers under " ++ include_root)
     // ToolFs lists a directory inside the project by its root-relative path.
     let listed_root = sdk_rel_path(ctx.project_info().project_root(), include_root)
-    for i in 0..headers.len() as i32:
+    for i in 0..headers.len():
         let header = sdk_normalize(headers[i])
         let direct = sdk_rel_path(include_root, header)
         let rel = if direct.len() > 0 or listed_root.len() == 0: direct else: sdk_rel_path(listed_root, header)
@@ -1851,13 +1851,13 @@ fn sdk_write_darwin_sysroot(ctx: &ActionCtx, pack_path: &str, rel_paths: &List[s
     // "F <path> <size>\n<bytes>" per file, "A <path> <target>\n" per alias.
     var pack = StringBuilder.with_capacity(12000000)
     pack.push_str("WITH-SYSROOT 1\n")
-    for i in 0..rel_paths.len() as i32:
+    for i in 0..rel_paths.len():
         let rc = sdk_write_text(ctx, sdk_join(tree, rel_paths[i]), contents[i])
         if rc != 0:
             return rc
         pack.push_str("F " ++ rel_paths[i] ++ " " ++ f"{contents[i].len()}" ++ "\n")
         pack.push_str(contents[i])
-    for i in 0..aliases.len() as i32:
+    for i in 0..aliases.len():
         let rc = sdk_write_text(ctx, sdk_join(tree, aliases[i]), libsystem)
         if rc != 0:
             return rc
@@ -1907,7 +1907,7 @@ pub fn run_corpus_c_model_action(ctx: ActionCtx) -> i32:
     var rc = sdk_write_text(ctx, sdk_join(tree, "SDKSettings.json"), settings)
     if rc != 0:
         return rc
-    for i in 0..headers.len() as i32:
+    for i in 0..headers.len():
         let rel = sdk_rel_path(include_root, sdk_normalize(headers[i]))
         if not sdk_sysroot_path_ok(rel):
             return sdk_fail(ctx, "a header path the C model cannot carry: " ++ headers[i])
@@ -1966,7 +1966,7 @@ type SdkAbiReader { bytes: str, at: i32, ok: bool }
 
 impl SdkAbiReader:
     mut fn byte() -> i32:
-        if self.at >= self.bytes.len() as i32:
+        if self.at >= self.bytes.len():
             self.ok = false
             return 0
         let b = self.bytes[self.at] as i32
@@ -1975,11 +1975,11 @@ impl SdkAbiReader:
 
     mut fn cstr() -> str:
         let start: i32 = self.at
-        while self.at < self.bytes.len() as i32 and self.bytes[self.at] != 0:
+        while self.at < self.bytes.len() and self.bytes[self.at] != 0:
             self.at = self.at + 1
         let out = self.bytes.slice(start as i64, self.at as i64).to_owned()
         self.at = self.at + 1
-        if self.at > self.bytes.len() as i32:
+        if self.at > self.bytes.len():
             self.ok = false
         out
 
@@ -2031,8 +2031,8 @@ pub fn sdk_glibc_stub_sources(abilists: &str, target: &str, major: i32, minor: i
         let mi = r.byte()
         versions.push(SdkGlibcVersion { major: ma, minor: mi, patch: r.byte() })
     var pin = -1
-    for i in 0..versions.len() as i32:
-        if versions[i].major == major and versions[i].minor == minor and versions[i].patch == 0: pin = i
+    for i in 0..versions.len():
+        if versions[i].major == major and versions[i].minor == minor and versions[i].patch == 0: pin = i as i32
     let target_count = r.byte()
     var target_index = -1
     for i in 0..target_count:
@@ -2040,7 +2040,7 @@ pub fn sdk_glibc_stub_sources(abilists: &str, target: &str, major: i32, minor: i
     if not r.ok or pin < 0 or target_index < 0: return out
     let inclusions_at: i32 = r.at
     var map = StringBuilder.new()
-    for i in 0..versions.len() as i32:
+    for i in 0..versions.len():
         map.push_str(sdk_glibc_version_name(&versions[i]) ++ " { };\n")
     out.push(map.to_str())
     let target_bit = (1 as u64) << (target_index as u64)
@@ -2105,7 +2105,7 @@ pub fn sdk_glibc_stub_sources(abilists: &str, target: &str, major: i32, minor: i
                     if seen: continue
                     written.push(c)
                     var object_size = 0
-                    for k in 0..chosen.len() as i32:
+                    for k in 0..chosen.len():
                         if chosen[k] == c: object_size = chosen_sizes[k]
                     let v = &versions[c]
                     let label = sym ++ "_" ++ sdk_glibc_version_suffix(v)
@@ -2152,7 +2152,7 @@ fn sdk_glibc_cc(root: &str, clang: &str, resource_include: &str, zig_libc: &str,
     argv.push(sdk_owned_text(resource_include))
     argv.push(sdk_owned_text(f"-D__GLIBC_MINOR__={SDK_LINUX_GLIBC_MINOR}"))
     let dirs = sdk_glibc_internal_includes(zig_libc, a)
-    for i in 0..dirs.len() as i32:
+    for i in 0..dirs.len():
         argv.push(sdk_owned_text("-I"))
         argv.push(sdk_owned_text(dirs[i]))
     argv
@@ -2370,7 +2370,7 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
     nonshared_link.push(sdk_owned_text("-r"))
     nonshared_link.push(sdk_owned_text("-o"))
     nonshared_link.push(sdk_owned_text(sdk_join(lib_dir, "libc_nonshared.o")))
-    for i in 0..nonshared.len() as i32:
+    for i in 0..nonshared.len():
         let obj = sdk_join(work, f"nonshared{i}.o")
         var cmd = sdk_glibc_cc(root, clang, resource_include, zig_libc, a)
         for flag in ["-std=gnu11", "-fgnu89-inline", "-fmerge-all-constants", "-frounding-math", "-fno-common", "-fmath-errno", "-ftls-model=initial-exec", "-Qunused-arguments", "-fPIC", "-DNO_INITFINI", "-D_LIBC_REENTRANT", "-include"]: cmd.push(sdk_owned_text(flag))
@@ -2405,7 +2405,7 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
         let headers = sdk_merge_sort_strings(fs.list_files(dir))
         if headers.len() == 0:
             return sdk_fail(ctx, "no glibc headers under " ++ dir)
-        for h in 0..headers.len() as i32:
+        for h in 0..headers.len():
             let rel = sdk_rel_path(dir, sdk_normalize(headers[h]))
             if not sdk_sysroot_path_ok(rel):
                 return sdk_fail(ctx, "a header path the sysroot pack cannot carry: " ++ headers[h])
@@ -2431,7 +2431,7 @@ fn sdk_write_linux_sysroot_pack(ctx: &ActionCtx, tree: &str, pack_path: &str) ->
     let files = sdk_merge_sort_strings(fs.list_files(tree))
     var pack = StringBuilder.with_capacity(24000000)
     pack.push_str("WITH-SYSROOT 1\n")
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let rel = sdk_rel_path(tree, sdk_normalize(files[i]))
         let bytes = fs.read_text(files[i])
         pack.push_str("F " ++ rel ++ " " ++ f"{bytes.len()}" ++ "\n")
@@ -2494,7 +2494,7 @@ pub fn run_linux_link_pack_action(ctx: ActionCtx) -> i32:
     var headers = 0
     for inc in ["include/c++/v1", "include/" ++ sdk_linux_triple(a) ++ "/c++/v1"]:
         let files = sdk_merge_sort_strings(fs.list_files(sdk_join(prefix, inc)))
-        for i in 0..files.len() as i32:
+        for i in 0..files.len():
             let rel = "usr/" ++ sdk_rel_path(prefix, sdk_normalize(files[i]))
             if not sdk_sysroot_path_ok(rel):
                 return sdk_fail(ctx, "a libc++ header path the sysroot pack cannot carry: " ++ files[i])
@@ -2697,7 +2697,7 @@ pub fn run_sdk_build_tools_pack_action(ctx: ActionCtx) -> i32:
     let tools: List[str] = List.new()
     tools.push("bin/cmake")
     tools.push("bin/ninja")
-    for i in 0..tools.len() as i32:
+    for i in 0..tools.len():
         let bytes = fs.read_text(sdk_join(prefix, tools[i]))
         if bytes.len() == 0:
             return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no " ++ tools[i] ++ " (sdk-cmake / sdk-ninja build it; the SDK package ships it)")
@@ -2707,7 +2707,7 @@ pub fn run_sdk_build_tools_pack_action(ctx: ActionCtx) -> i32:
     if files.len() == 0:
         return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no CMake modules under " ++ share)
     var count = 0
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let rel = sdk_rel_path(prefix, sdk_normalize(files[i]))
         if rel.len() == 0 or rel.find("/Help/") >= 0:
             continue
@@ -2753,7 +2753,7 @@ pub fn run_windows_sysroot_action(ctx: ActionCtx) -> i32:
     required.push(sdk_join(prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/include/stddef.h"))
     required.push(sdk_join(prefix, "bin/cmake.exe"))
     required.push(sdk_join(prefix, "bin/ninja.exe"))
-    for i in 0..required.len() as i32:
+    for i in 0..required.len():
         if not fs.exists(required[i]):
             return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no " ++ required[i] ++ ": a Windows compiler carries the SDK's C runtime, clang resource directory and build tools (a windows-gnu SDK since #1915 ships them)")
     let roots: List[str] = List.new()
@@ -2763,9 +2763,9 @@ pub fn run_windows_sysroot_action(ctx: ActionCtx) -> i32:
     var rels: List[str] = List.new()
     rels.push("bin/cmake.exe")
     rels.push("bin/ninja.exe")
-    for r in 0..roots.len() as i32:
+    for r in 0..roots.len():
         let files = fs.list_files(sdk_join(prefix, roots[r]))
-        for i in 0..files.len() as i32:
+        for i in 0..files.len():
             let rel = sdk_rel_path(prefix, sdk_normalize(files[i]))
             if rel.len() == 0 or rel.find("/Help/") >= 0:
                 continue
@@ -2774,7 +2774,7 @@ pub fn run_windows_sysroot_action(ctx: ActionCtx) -> i32:
     if sorted.len() < 1000:
         return sdk_fail(ctx, f"only {sorted.len()} files for the Windows toolchain under " ++ prefix)
     let entries: List[ArchiveEntry] = List.new()
-    for i in 0..sorted.len() as i32:
+    for i in 0..sorted.len():
         let mode: i32 = if sorted[i].ends_with(".exe"): 0o755 else: 0o644
         entries.push(archive_file_entry(sdk_join(prefix, sorted[i]), sdk_owned_text(sorted[i]), mode))
     if fs.write_tar_gz(pack_path, entries) != 0:
@@ -2901,13 +2901,13 @@ pub type SdkMakeVar {
 }
 
 fn sdk_make_var_get(vars: &List[SdkMakeVar], name: &str) -> str:
-    for i in 0..vars.len() as i32:
+    for i in 0..vars.len():
         if vars[i].name == name:
             return sdk_owned_text(vars[i].value)
     ""
 
 fn sdk_make_var_has(vars: &List[SdkMakeVar], name: &str) -> bool:
-    for i in 0..vars.len() as i32:
+    for i in 0..vars.len():
         if vars[i].name == name:
             return true
     false
@@ -2915,7 +2915,7 @@ fn sdk_make_var_has(vars: &List[SdkMakeVar], name: &str) -> bool:
 fn sdk_make_var_set(vars: List[SdkMakeVar], name: &str, value: &str, append: bool) -> List[SdkMakeVar]:
     var out: List[SdkMakeVar] = List.new()
     var found = false
-    for i in 0..vars.len() as i32:
+    for i in 0..vars.len():
         if vars[i].name == name:
             found = true
             let joined = if append and vars[i].value.len() > 0: vars[i].value ++ " " ++ value else: sdk_owned_text(value)
@@ -2944,7 +2944,7 @@ fn sdk_make_logical_lines(text: &str) -> List[str]:
     let raw = sdk_split_lines(text)
     var out: List[str] = List.new()
     var pending = ""
-    for i in 0..raw.len() as i32:
+    for i in 0..raw.len():
         var line: str = raw[i].clone()
         if line.ends_with("\r"):
             line = line.slice(0, line.len() - 1)
@@ -2964,7 +2964,7 @@ fn sdk_mingw_parse_makefile(ctx: &ActionCtx, path: &str, reldir: &str, arch_name
     // (a string, not a List[bool]: the build layer also runs in the seed's
     // comptime evaluator).
     var live = ""
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if line.starts_with("\t") or line.starts_with("#"):
             continue
@@ -2991,7 +2991,7 @@ fn sdk_mingw_parse_makefile(ctx: &ActionCtx, path: &str, reldir: &str, arch_name
             continue
         // An assignment: an identifier, then `=` or `+=`.
         var k = 0
-        while k < trimmed.len() as i32 and sdk_is_ident_char(trimmed[k] as i32):
+        while k < trimmed.len() and sdk_is_ident_char(trimmed[k] as i32):
             k = k + 1
         if k == 0:
             continue
@@ -3042,7 +3042,7 @@ fn sdk_make_expand(ctx: &ActionCtx, vars: &List[SdkMakeVar], text: &str, top_src
         return sdk_text_fail()
     var out = ""
     var i = 0
-    let n = text.len() as i32
+    let n = text.len()
     while i < n:
         let ch = text[i] as i32
         if ch == 36 and i + 1 < n and text[i + 1] as i32 == 40:
@@ -3084,7 +3084,7 @@ fn sdk_make_expand(ctx: &ActionCtx, vars: &List[SdkMakeVar], text: &str, top_src
 // pinned seed's comptime evaluator, which has no str.trim.)
 fn sdk_trim(text: &str) -> str:
     var start = 0
-    var end = text.len() as i32
+    var end = text.len()
     while start < end and (text[start] as i32 == 32 or text[start] as i32 == 9 or text[start] as i32 == 13):
         start = start + 1
     while end > start and (text[end - 1] as i32 == 32 or text[end - 1] as i32 == 9 or text[end - 1] as i32 == 13):
@@ -3095,7 +3095,7 @@ fn sdk_trim(text: &str) -> str:
 fn sdk_llvm_major() -> str:
     let version = compiler_llvm_version()
     var end = 0
-    while end < version.len() as i32 and version[end] as i32 != 46:
+    while end < version.len() and version[end] as i32 != 46:
         end = end + 1
     version.slice(0, end as i64)
 
@@ -3105,15 +3105,15 @@ fn sdk_read_or_empty(ctx: &ActionCtx, path: &str) -> str:
 // The index of the last `ch` in `text`, or -1.
 fn sdk_last_index(text: &str, ch: i32) -> isize:
     var at = -1
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] as i32 == ch:
-            at = i
+            at = i as i32
     at
 
 fn sdk_words(text: &str) -> List[str]:
     var out: List[str] = List.new()
     let parts = text.replace("\t", " ").split(" ")
-    for i in 0..parts.len() as i32:
+    for i in 0..parts.len():
         let word = sdk_trim(parts[i])
         if word.len() > 0:
             out.push(sdk_owned_text(word))
@@ -3129,7 +3129,7 @@ fn sdk_mingw_compiled_sources(ctx: &ActionCtx, vars: &List[SdkMakeVar], var_name
         return sdk_list_fail()
     var out: List[str] = List.new()
     let words = sdk_words(expanded.text)
-    for i in 0..words.len() as i32:
+    for i in 0..words.len():
         let w = words[i]
         if w.ends_with(".c") or w.ends_with(".S"):
             out.push(sdk_owned_text(w))
@@ -3145,7 +3145,7 @@ fn sdk_mingw_compiled_sources(ctx: &ActionCtx, vars: &List[SdkMakeVar], var_name
 // does not install: the .idl sources, ChangeLogs, the test cases.
 fn sdk_mingw_header_dest(rel: &str) -> str:
     let parts = rel.split("/")
-    let base = parts[parts.len() as i32 - 1]
+    let base = parts[parts.len() - 1]
     let dot = sdk_last_index(base, 46)
     let ext = if dot >= 0: base.slice((dot + 1) as i64, base.len()) else: ""
     if parts.len() == 2 and parts[0] == "include":
@@ -3183,7 +3183,7 @@ fn sdk_install_mingw_headers(ctx: &ActionCtx, source_dir: &str, include_dir: &st
     let headers = sdk_join(source_dir, "mingw-w64-headers")
     let files = fs.list_files(headers)
     var installed = 0
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let rel = sdk_rel_path(headers, files[i])
         if rel == "crt/_mingw.h.in":
             let text = sdk_mingw_h(fs.read_text(files[i]))
@@ -3241,7 +3241,7 @@ fn sdk_llvm_tool(ctx: &ActionCtx, tools_prefix: &str, tool_dir: &str, name: &str
     if fs.exists(staged):
         return sdk_abs(root, staged)
     let family = sdk_multicall_family(name)
-    for i in 0..family.len() as i32:
+    for i in 0..family.len():
         let sibling = sdk_tool(tools_prefix, family[i])
         if fs.exists(sibling):
             if fs.copy_file(sibling, staged) != 0:
@@ -3284,11 +3284,11 @@ fn sdk_compile_all(ctx: &ActionCtx, clang: &str, crt_dir: &str, sources: &List[s
         return sdk_list_fail()
     var jobs: List[ParJob] = List.new()
     var objects: List[str] = List.new()
-    for i in 0..sources.len() as i32:
+    for i in 0..sources.len():
         let object = sdk_join(obj_dir, sdk_object_name(sources[i]))
         var argv: List[str] = List.new()
         argv.push(sdk_owned_text(clang))
-        for j in 0..flags.len() as i32:
+        for j in 0..flags.len():
             argv.push(sdk_owned_text(flags[j]))
         argv.push("-c")
         argv.push(sdk_abs(root, sdk_join(crt_dir, sources[i])))
@@ -3298,7 +3298,7 @@ fn sdk_compile_all(ctx: &ActionCtx, clang: &str, crt_dir: &str, sources: &List[s
         objects.push(object)
     let rcs = par_run(ctx, &jobs, width)
     var failed = false
-    for i in 0..rcs.len() as i32:
+    for i in 0..rcs.len():
         if rcs[i] != 0:
             failed = true
             let _ = sdk_fail(ctx, f"compiling {sources[i]} failed with exit code {rcs[i]}: " ++ sdk_read_or_empty(ctx, objects[i] ++ ".stderr"))
@@ -3319,7 +3319,7 @@ fn sdk_archive(ctx: &ActionCtx, ar: &str, output: &str, members: &List[str]) -> 
     // The members go through a response file: libmingwex has hundreds, past
     // Windows' 32 KiB command line (and the runner's argv limit, #1916).
     var rsp = ""
-    for i in 0..members.len() as i32:
+    for i in 0..members.len():
         rsp = rsp ++ sdk_abs(root, members[i]) ++ "\n"
     let rsp_path = output ++ ".members.rsp"
     if ctx.fs().write_text(rsp_path, rsp) != 0:
@@ -3375,7 +3375,7 @@ fn sdk_mingw_def(ctx: &ActionCtx, clang: &str, crt_dir: &str, arch_name: &str, n
         return pre
     let lines = sdk_split_lines(fs.read_text(pre))
     var out = ""
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         out = out ++ sdk_strip_stdcall_suffix(lines[i]) ++ "\n"
     let def = sdk_join(work_dir, name ++ ".def")
     if fs.write_text(def, out) != 0:
@@ -3386,13 +3386,13 @@ fn sdk_mingw_def(ctx: &ActionCtx, clang: &str, crt_dir: &str, arch_name: &str, n
 // `Name@12 rest` -> `Name rest`: the first word loses an `@<digits>` tail.
 fn sdk_strip_stdcall_suffix(line: &str) -> str:
     var end = 0
-    while end < line.len() as i32 and line[end] as i32 != 32:
+    while end < line.len() and line[end] as i32 != 32:
         end = end + 1
     let word = line.slice(0, end as i64)
     let at = sdk_last_index(word, 64)
-    if at <= 0 or at == word.len() as i32 - 1:
+    if at <= 0 or at == word.len() - 1:
         return sdk_owned_text(line)
-    for i in (at + 1)..word.len() as i32:
+    for i in (at + 1)..word.len():
         let ch = word[i] as i32
         if ch < 48 or ch > 57:
             return sdk_owned_text(line)
@@ -3422,10 +3422,10 @@ fn sdk_mingw_lib_flags(ctx: &ActionCtx, vars: &List[SdkMakeVar], crt_dir_abs: &s
     if not expanded.ok:
         return sdk_list_fail()
     var flags: List[str] = List.new()
-    for i in 0..base.len() as i32:
+    for i in 0..base.len():
         flags.push(sdk_owned_text(base[i]))
     let words = sdk_words(expanded.text)
-    for i in 0..words.len() as i32:
+    for i in 0..words.len():
         flags.push(sdk_owned_text(words[i]))
     SdkList { ok: true, items: flags }
 
@@ -3435,10 +3435,10 @@ fn sdk_mingw_flags_for(ctx: &ActionCtx, vars: &List[SdkMakeVar], crt_dir_abs: &s
     if not expanded.ok:
         return sdk_list_fail()
     var flags: List[str] = List.new()
-    for i in 0..base.len() as i32:
+    for i in 0..base.len():
         flags.push(sdk_owned_text(base[i]))
     let words = sdk_words(expanded.text)
-    for i in 0..words.len() as i32:
+    for i in 0..words.len():
         flags.push(sdk_owned_text(words[i]))
     SdkList { ok: true, items: flags }
 
@@ -3451,7 +3451,7 @@ fn sdk_mingw_lib_objects(ctx: &ActionCtx, vars: &List[SdkMakeVar], clang: &str, 
         return sdk_list_fail()
     var c_sources: List[str] = List.new()
     var s_sources: List[str] = List.new()
-    for i in 0..all.items.len() as i32:
+    for i in 0..all.items.len():
         let source = sdk_rel_path(crt_abs, all.items[i])
         let rel = if source.len() > 0: source else: sdk_owned_text(all.items[i])
         if rel.ends_with(".S"):
@@ -3465,7 +3465,7 @@ fn sdk_mingw_lib_objects(ctx: &ActionCtx, vars: &List[SdkMakeVar], clang: &str, 
     let c_objs = sdk_compile_all(ctx, clang, crt_dir, &c_sources, &c_flags.items, obj_dir, width)
     if not c_objs.ok:
         return sdk_list_fail()
-    for i in 0..c_objs.items.len() as i32:
+    for i in 0..c_objs.items.len():
         objects.push(sdk_owned_text(c_objs.items[i]))
     if s_sources.len() > 0:
         let s_flags = sdk_mingw_lib_flags(ctx, vars, crt_abs, lib_var, base, true)
@@ -3474,7 +3474,7 @@ fn sdk_mingw_lib_objects(ctx: &ActionCtx, vars: &List[SdkMakeVar], clang: &str, 
         let s_objs = sdk_compile_all(ctx, clang, crt_dir, &s_sources, &s_flags.items, obj_dir, width)
         if not s_objs.ok:
             return sdk_list_fail()
-        for i in 0..s_objs.items.len() as i32:
+        for i in 0..s_objs.items.len():
             objects.push(sdk_owned_text(s_objs.items[i]))
     SdkList { ok: true, items: objects }
 
@@ -3490,7 +3490,7 @@ fn sdk_clang_env_leaks(ctx: &ActionCtx) -> str:
     names.push("CPLUS_INCLUDE_PATH")
     names.push("OBJC_INCLUDE_PATH")
     var set = ""
-    for i in 0..names.len() as i32:
+    for i in 0..names.len():
         if ctx.env_input(names[i]).len() > 0:
             set = set ++ " " ++ names[i]
     set
@@ -3572,7 +3572,7 @@ pub fn run_sdk_windows_libc_action(ctx: ActionCtx) -> i32:
     statics.push("mingw32")
     statics.push("mingwex")
     statics.push("uuid")
-    for i in 0..statics.len() as i32:
+    for i in 0..statics.len():
         let name = statics[i]
         let objs = sdk_mingw_lib_objects(ctx, &vars, clang, crt_dir, p ++ "_lib" ++ name ++ "_a", &base, sdk_join(work, name), width)
         if not objs.ok: return 1
@@ -3588,7 +3588,7 @@ pub fn run_sdk_windows_libc_action(ctx: ActionCtx) -> i32:
     // driver asks for -lmsvcrt.
     let mri = sdk_split_lines(fs.read_text(sdk_join(crt_dir, "lib-common/ucrt.mri")))
     var ucrt_members: List[str] = List.new()
-    for i in 0..mri.len() as i32:
+    for i in 0..mri.len():
         let line = sdk_trim(mri[i])
         if not line.starts_with("ADDLIB "):
             continue
@@ -3599,7 +3599,7 @@ pub fn run_sdk_windows_libc_action(ctx: ActionCtx) -> i32:
         if member == "ucrt_extra":
             let objs = sdk_mingw_lib_objects(ctx, &vars, clang, crt_dir, p ++ "_libucrt_extra_a", &base, sdk_join(work, "ucrt_extra"), width)
             if not objs.ok: return 1
-            for j in 0..objs.items.len() as i32:
+            for j in 0..objs.items.len():
                 ucrt_members.push(sdk_owned_text(objs.items[j]))
             continue
         let def = sdk_mingw_def(ctx, clang, crt_dir, arch_name, member, work)
@@ -3618,7 +3618,7 @@ pub fn run_sdk_windows_libc_action(ctx: ActionCtx) -> i32:
     // puts in the same archive (kernel32's out-of-line intrinsics, ws2_32's
     // in6addr helpers, ...).
     let dlls = sdk_windows_import_libs()
-    for i in 0..dlls.len() as i32:
+    for i in 0..dlls.len():
         let name = dlls[i]
         let def = sdk_mingw_def(ctx, clang, crt_dir, arch_name, name, work)
         if def.len() == 0:
@@ -3632,7 +3632,7 @@ pub fn run_sdk_windows_libc_action(ctx: ActionCtx) -> i32:
         if sdk_make_var_has(&vars, lib_var ++ "_SOURCES"):
             let objs = sdk_mingw_lib_objects(ctx, &vars, clang, crt_dir, lib_var, &base, sdk_join(work, name), width)
             if not objs.ok: return 1
-            for j in 0..objs.items.len() as i32:
+            for j in 0..objs.items.len():
                 members.push(sdk_owned_text(objs.items[j]))
         rc = sdk_archive(ctx, ar, sdk_join(lib_dir, name ++ ".lib"), &members)
         if rc != 0: return rc
@@ -3644,7 +3644,7 @@ pub fn run_sdk_windows_libc_action(ctx: ActionCtx) -> i32:
     notices.push("COPYING.MinGW-w64-runtime/COPYING.MinGW-w64-runtime.txt")
     notices.push("DISCLAIMER")
     notices.push("DISCLAIMER.PD")
-    for i in 0..notices.len() as i32:
+    for i in 0..notices.len():
         let src = sdk_join(source_dir, notices[i])
         if not fs.exists(src):
             return sdk_fail(ctx, "mingw-w64 source has no " ++ notices[i])
@@ -3877,7 +3877,7 @@ pub fn run_sdk_libcxx_action(ctx: ActionCtx) -> i32:
     configure.push("-DCMAKE_BUILD_TYPE=Release")
     configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(tools_prefix, "ninja")))
     configure.push("-DCMAKE_INSTALL_PREFIX=" ++ prefix)
-    for i in 0..common.items.len() as i32:
+    for i in 0..common.items.len():
         configure.push(sdk_owned_text(common.items[i]))
     configure.push("-DCMAKE_C_COMPILER_WORKS=ON")
     configure.push("-DCMAKE_CXX_COMPILER_WORKS=ON")
@@ -3913,7 +3913,7 @@ pub fn run_sdk_libcxx_action(ctx: ActionCtx) -> i32:
     let names: List[str] = List.new()
     names.push("libc++.a")
     names.push("libunwind.a")
-    for i in 0..names.len() as i32:
+    for i in 0..names.len():
         let lib = sdk_join(sdk_windows_libc_lib_dir(output_prefix, arch_name), names[i])
         if not fs.exists(lib):
             return sdk_fail(ctx, "the C++ runtime did not install " ++ lib)

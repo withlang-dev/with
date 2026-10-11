@@ -465,8 +465,8 @@ impl Regex:
                 match captures.get(0):
                     Some(found) => {
                         if found.end == found.start:
-                            if found.end >= text.len() as i32:
-                                unsafe *self.global_pos = text.len() as i32 + 1
+                            if found.end >= text.len():
+                                unsafe *self.global_pos = (text.len() + 1) as i32
                             else:
                                 unsafe *self.global_pos = found.end + 1
                         else:
@@ -494,7 +494,7 @@ impl Regex:
     pub fn find_all(text: &str) -> List[Match]:
         let out: List[Match] = List.new()
         var cursor: i32 = 0
-        while cursor <= text.len() as i32:
+        while cursor <= text.len():
             match self.find_at(text, cursor):
                 Some(found) => {
                     // #747: Match is non-Copy — read the span before the push
@@ -503,7 +503,7 @@ impl Regex:
                     let f_end: i32 = found.end
                     out.push(found)
                     if f_end == f_start:
-                        if f_end >= text.len() as i32:
+                        if f_end >= text.len():
                             break
                         cursor = f_end + 1
                     else:
@@ -515,14 +515,14 @@ impl Regex:
     pub fn captures_all(text: &str) -> List[Captures]:
         let out: List[Captures] = List.new()
         var cursor: i32 = 0
-        while cursor <= text.len() as i32:
+        while cursor <= text.len():
             match self.captures_at(text, cursor):
                 Some(captures) => {
                     match captures.get(0):
                         Some(found) => {
                             out.push(move captures)
                             if found.end == found.start:
-                                if found.end >= text.len() as i32:
+                                if found.end >= text.len():
                                     break
                                 cursor = found.end + 1
                             else:
@@ -605,7 +605,7 @@ impl Regex:
     fn replace_impl(text: &str, repl: &str, replace_all: bool) -> str:
         var out = ""
         var cursor: i32 = 0
-        while cursor <= text.len() as i32:
+        while cursor <= text.len():
             match self.captures_at(text, cursor):
                 Some(captures) => {
                     match captures.get(0):
@@ -615,8 +615,8 @@ impl Regex:
                                 out = out ++ with_str_slice_ref(text, found.end as i64, text.len())
                                 break
                             if found.end == found.start:
-                                if found.end >= text.len() as i32:
-                                    cursor = text.len() as i32 + 1
+                                if found.end >= text.len():
+                                    cursor = (text.len() + 1) as i32
                                 else:
                                     out = out ++ with_str_slice_ref(text, found.start as i64, found.start as i64 + 1)
                                     cursor = found.start + 1
@@ -643,7 +643,7 @@ impl Regex:
     pub fn replace_fn(text: &str, replacement_callback: fn(&Captures) -> str) -> str:
         var out = ""
         var cursor: i32 = 0
-        while cursor <= text.len() as i32:
+        while cursor <= text.len():
             match self.captures_at(text, cursor):
                 Some(captures) => {
                     match captures.get(0):
@@ -660,15 +660,15 @@ impl Regex:
     pub fn replace_all_fn(text: &str, replacement_callback: fn(&Captures) -> str) -> str:
         var out = ""
         var cursor: i32 = 0
-        while cursor <= text.len() as i32:
+        while cursor <= text.len():
             match self.captures_at(text, cursor):
                 Some(captures) => {
                     match captures.get(0):
                         Some(found) => {
                             out = out ++ with_str_slice_ref(text, cursor as i64, found.start as i64) ++ replacement_callback(&captures)
                             if found.end == found.start:
-                                if found.end >= text.len() as i32:
-                                    cursor = text.len() as i32 + 1
+                                if found.end >= text.len():
+                                    cursor = (text.len() + 1) as i32
                                 else:
                                     out = out ++ with_str_slice_ref(text, found.start as i64, found.start as i64 + 1)
                                     cursor = found.start + 1
@@ -692,16 +692,16 @@ impl Regex:
     pub fn splitn(text: &str, n: i32) -> List[str]:
         let out: List[str] = List.new()
         var cursor: i32 = 0
-        while cursor <= text.len() as i32:
-            if n > 0 and out.len() as i32 >= n - 1:
+        while cursor <= text.len():
+            if n > 0 and out.len() >= n - 1:
                 out.push(with_str_slice_ref(text, cursor as i64, text.len()))
                 return out
             match self.find_at(text, cursor):
                 Some(found) => {
                     out.push(with_str_slice_ref(text, cursor as i64, found.start as i64))
                     if found.end == found.start:
-                        if found.end >= text.len() as i32:
-                            cursor = text.len() as i32 + 1
+                        if found.end >= text.len():
+                            cursor = (text.len() + 1) as i32
                         else:
                             cursor = found.start + 1
                     else:
@@ -716,7 +716,7 @@ impl Regex:
 impl Captures:
     pub fn get(index: i32) -> Option[Match]:
         let base = index * 2
-        if base < 0 or base + 1 >= self.spans.len() as i32:
+        if base < 0 or base + 1 >= self.spans.len():
             return None
         let start = self.spans[base]
         let end = self.spans[(base + 1)]

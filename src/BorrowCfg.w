@@ -102,7 +102,7 @@ impl CfgGraph:
 
     fn node_count() -> i32:
         let st = self.state
-        unsafe { st.nodes.len() as i32 }
+        (unsafe { st.nodes.len() }) as i32
 
     fn add_node(kind: i32, span_start: i32, span_end: i32) -> i32:
         let st = self.state
@@ -117,14 +117,14 @@ impl CfgGraph:
     fn out_degree(node_id: i32) -> isize:
         let st = self.state
         var n = 0
-        for i in 0..unsafe { st.edges.len() as i32 }:
+        for i in 0..unsafe { st.edges.len() }:
             if unsafe { st.edges[i] }.from == node_id:
                 n = n + 1
         n
 
     fn has_edge(from: i32, to: i32) -> bool:
         let st = self.state
-        for i in 0..unsafe { st.edges.len() as i32 }:
+        for i in 0..unsafe { st.edges.len() }:
             let e = unsafe { st.edges[i] }
             if e.from == from and e.to == to:
                 return true

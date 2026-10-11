@@ -67,7 +67,7 @@ fn foundation_intern_text_eq(a: &str, b: &str) -> bool:
     if a.len() != b.len():
         return false
     var i = 0
-    while i < a.len() as i32:
+    while i < a.len():
         if a[i] != b[i]:
             return false
         i = i + 1
@@ -96,7 +96,7 @@ pub fn InternPool.intern_str(self: &Self, s: &str) -> Symbol:
         return symbol_from_raw(existing.unwrap())
 
     var raw = 1
-    while raw < st.symbol_texts.len() as i32:
+    while raw < st.symbol_texts.len():
         let existing_text = st.symbol_texts[raw]
         if foundation_intern_text_eq(existing_text, s):
             let owned_key = existing_text.clone()
@@ -114,7 +114,7 @@ pub fn InternPool.resolve_symbol(self: &Self, sym: Symbol) -> &str:
     if not symbol_is_valid(sym):
         return ""
     let raw = symbol_raw(sym)
-    if raw <= 0 or raw >= self.state.symbol_texts.len() as i32:
+    if raw <= 0 or raw >= self.state.symbol_texts.len():
         return ""
     self.state.symbol_texts[raw]
 
@@ -134,7 +134,7 @@ pub fn InternPool.resolve_type(self: &Self, id: TypeId) -> TypeKey:
     if not type_id_is_valid(id):
         return type_key_invalid()
     let raw = type_id_raw(id)
-    if raw <= 0 or raw >= self.state.type_keys.len() as i32:
+    if raw <= 0 or raw >= self.state.type_keys.len():
         return type_key_invalid()
     type_key_clone(self.state.type_keys[raw])
 
@@ -154,15 +154,15 @@ pub fn InternPool.resolve_value(self: &Self, id: ValueId) -> ValueKey:
     if not value_id_is_valid(id):
         return value_key_invalid()
     let raw = value_id_raw(id)
-    if raw <= 0 or raw >= self.state.value_keys.len() as i32:
+    if raw <= 0 or raw >= self.state.value_keys.len():
         return value_key_invalid()
     value_key_clone(self.state.value_keys[raw])
 
 pub fn InternPool.symbol_count(self: &Self) -> i32:
-    (self.state.symbol_texts.len() as i32) - 1
+    (self.state.symbol_texts.len() - 1) as i32
 
 pub fn InternPool.type_count(self: &Self) -> i32:
-    (self.state.type_keys.len() as i32) - 1
+    (self.state.type_keys.len() - 1) as i32
 
 pub fn InternPool.value_count(self: &Self) -> i32:
-    (self.state.value_keys.len() as i32) - 1
+    (self.state.value_keys.len() - 1) as i32

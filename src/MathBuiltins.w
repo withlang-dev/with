@@ -69,8 +69,8 @@ fn math_fn_table() -> List[MathFnRow]:
 /// The row id for `name`, or -1 when `name` is not a math builtin.
 pub fn math_fn_lookup(name: &str) -> i32:
     let t = math_fn_table()
-    for i in 0..t.len() as i32:
-        if t[i].name == name: return i
+    for i in 0..t.len():
+        if t[i].name == name: return i as i32
     -1
 
 /// The number of rows: ids are 0..math_fn_count().

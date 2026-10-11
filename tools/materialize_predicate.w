@@ -15,11 +15,11 @@ if argv.len() < 5:
     exit_code(2)
 
 var separator = -1
-for i in 3..argv.len() as i32:
+for i in 3..argv.len():
     if argv[i] == "--":
         separator = i
         break
-if separator < 0 or separator + 1 >= argv.len() as i32:
+if separator < 0 or separator + 1 >= argv.len():
     print("error: expected '--' followed by a command")
     exit_code(2)
 
@@ -30,7 +30,7 @@ if write_file(materialized, candidate) != 0:
     exit_code(2)
 
 let child: List[str] = List.new()
-for i in separator + 1..argv.len() as i32:
+for i in separator + 1..argv.len():
     let arg = argv[i]
     child.push(if arg == "{file}": materialized.clone() else: arg.clone())
 let status = run(&child)

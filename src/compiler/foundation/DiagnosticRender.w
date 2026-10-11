@@ -29,18 +29,18 @@ pub fn render_diagnostic(diag: &Diagnostic, sm: &SourceMap) -> str:
     out = out ++ render_caret_line(loc.col, span_underline_len(diag.primary))
     out = out ++ "\n"
 
-    for i in 0..diag.labels.len() as i32:
+    for i in 0..diag.labels.len():
         let lab = diag.labels[i]
         let lloc = sm.offset_to_location(lab.span.file, lab.span.start)
         out = out ++ f"  = label @{lloc.line + 1}:{lloc.col + 1} "
         out = out ++ lab.message
         out = out ++ "\n"
 
-    for i in 0..diag.notes.len() as i32:
+    for i in 0..diag.notes.len():
         out = out ++ "  = note: "
         out = out ++ diag.notes[i]
         out = out ++ "\n"
-    for i in 0..diag.helps.len() as i32:
+    for i in 0..diag.helps.len():
         out = out ++ "  = help: "
         out = out ++ diag.helps[i]
         out = out ++ "\n"
@@ -49,9 +49,9 @@ pub fn render_diagnostic(diag: &Diagnostic, sm: &SourceMap) -> str:
 
 pub fn render_all_diagnostics(store: &DiagnosticStore, sm: &SourceMap) -> str:
     var out = ""
-    for i in 0..store.items.len() as i32:
+    for i in 0..store.items.len():
         out = out ++ render_diagnostic(&store.items[i], sm)
-        if i + 1 < store.items.len() as i32:
+        if i + 1 < store.items.len():
             out = out ++ "\n"
     out
 

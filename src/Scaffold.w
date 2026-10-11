@@ -57,7 +57,7 @@ fn validate_scaffold(spec_names: List[str], spec_paths: List[str]) -> i32:
     for ri in 0..required_module_count():
         let req = required_module(ri)
         var count = 0
-        for si in 0..spec_names.len() as i32:
+        for si in 0..spec_names.len():
             if spec_names[si] == req:
                 count = count + 1
         if count == 0:

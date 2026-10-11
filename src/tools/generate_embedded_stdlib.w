@@ -13,10 +13,10 @@ fn contains_delimiter(text: &str, hashes: &str) -> bool:
     if text.len() < needle.len():
         return false
     var i = 0
-    while i <= text.len() as i32 - needle.len() as i32:
+    while i <= text.len() - needle.len():
         var j = 0
         var matched = true
-        while j < needle.len() as i32:
+        while j < needle.len():
             if text[(i + j)] != needle[j]:
                 matched = false
                 break
@@ -35,10 +35,10 @@ fn raw_string_literal(text: &str) -> str:
 fn normalize_embedded_source(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
     var i = 0
-    while i < text.len() as i32:
+    while i < text.len():
         let ch = text[i]
         if ch == 13:
-            if i + 1 < text.len() as i32 and text[(i + 1)] == 10:
+            if i + 1 < text.len() and text[(i + 1)] == 10:
                 i = i + 1
             out.push_byte(10 as u8)
         else:
@@ -69,11 +69,11 @@ fn path_compare(a: &str, b: &str) -> i32:
 
 fn sort_paths(paths: List[str]):
     var sorted: List[str] = List.new()
-    for i in 0..paths.len() as i32:
+    for i in 0..paths.len():
         let path = paths[i]
         var inserted = false
         var next: List[str] = List.new()
-        for j in 0..sorted.len() as i32:
+        for j in 0..sorted.len():
             let existing = sorted[j]
             if not inserted and path_compare(path, existing) < 0:
                 next.push(path)
@@ -89,8 +89,8 @@ fn stdlib_tree_files(dir: &str):
     let excluded = dir ++ "/re/"
     var paths: List[str] = List.new()
     var start = 0
-    for i in 0..listing.len() as i32 + 1:
-        if i == listing.len() as i32 or listing[i] as i32 == 10:
+    for i in 0..listing.len() + 1:
+        if i == listing.len() or listing[i] as i32 == 10:
             if i > start:
                 let path = listing.slice(start as i64, i as i64)
                 if path.ends_with(".w") and not path.starts_with(excluded):
@@ -129,7 +129,7 @@ fn main:
     var listing = StringBuilder.new()
     var i = 0
     var index = 0
-    while i < paths.len() as i32:
+    while i < paths.len():
         let path = paths[i]
         let rel = embedded_rel_path(root, path)
         let source = normalize_embedded_source(with_fs_read_file(path))
@@ -155,7 +155,7 @@ fn main:
 
     i = 0
     index = 0
-    while i < paths.len() as i32:
+    while i < paths.len():
         let path = paths[i]
         let rel = embedded_rel_path(root, path)
         let sym = f"EMBEDDED_STD_{index}"

@@ -101,7 +101,7 @@ pub fn ci_clear_no_methods():
 fn ci_no_methods_for_type(name: &str) -> bool:
     if g_cimport_no_methods_all != 0:
         return true
-    for i in 0..g_cimport_no_methods_types.len() as i32:
+    for i in 0..g_cimport_no_methods_types.len():
         if g_cimport_no_methods_types[i] == name:
             return true
     false
@@ -265,7 +265,7 @@ pub fn ci_prepare_clang_resource_dir():
 
 pub fn ci_set_include_paths(paths: &List[str]):
     with_cimport_clear_include_paths()
-    for i in 0..paths.len() as i32:
+    for i in 0..paths.len():
         with_cimport_add_include_path(paths[i])
 
 pub fn ci_set_windows_target(triple: &str, sysroot: &str):
@@ -283,11 +283,11 @@ pub fn ci_set_sdk_path(path: &str):
 
 fn ci_build_define_prefix(defines: &List[str]) -> str:
     var out = StringBuilder.new()
-    for i in 0..defines.len() as i32:
+    for i in 0..defines.len():
         let define = defines[i]
         if define.len() > 0:
             var rendered: str = with_str_clone_ref(define)
-            for di in 0..define.len() as i32:
+            for di in 0..define.len():
                 if define[di] == 61:
                     rendered = define.slice(0, di as i64) ++ " " ++ define.slice((di + 1) as i64, define.len())
                     break
@@ -334,7 +334,7 @@ fn c_import_omitted_symbols_clear():
 
 fn c_import_omitted_symbols() -> str:
     var out = StringBuilder.new()
-    let count = g_cimport_omitted_symbol_names.len() as i32
+    let count = g_cimport_omitted_symbol_names.len()
     for i in 0..count:
         out.push_str("|")
         out.push_str(g_cimport_omitted_symbol_names[i])
@@ -362,13 +362,13 @@ var g_ci_overflow_helpers_needed: List[str] = List.new()
 
 fn ci_note_overflow_helper_needed(helper: &str, op: &str, ty: &str):
     let entry = helper ++ "|" ++ op ++ "|" ++ ty
-    for i in 0..g_ci_overflow_helpers_needed.len() as i32:
+    for i in 0..g_ci_overflow_helpers_needed.len():
         if g_ci_overflow_helpers_needed[i] == entry: return
     g_ci_overflow_helpers_needed.push(entry)
 
 fn ci_render_overflow_helpers_needed() -> str:
     var out = ""
-    for i in 0..g_ci_overflow_helpers_needed.len() as i32:
+    for i in 0..g_ci_overflow_helpers_needed.len():
         let parts = g_ci_overflow_helpers_needed[i].split("|")
         let helper = parts[0]
         if with_cimport_is_name_emitted(helper) != 0: continue
@@ -394,7 +394,7 @@ fn ci_record_raw_function_name(name: &str):
 
 fn ci_translation_calls_raw_function(translated: &str) -> bool:
     var pos = 0
-    let total = g_cimport_raw_function_names.len() as i32
+    let total = g_cimport_raw_function_names.len()
     while pos < total:
         while pos < total and g_cimport_raw_function_names[pos] == 124:
             pos = pos + 1
@@ -418,7 +418,7 @@ fn ci_direct_call_name(translated: &str) -> str:
     if call_paren <= 0:
         return ""
     let close = ci_find_matching_paren(t, call_paren)
-    if close != t.len() as i32 - 1:
+    if close != t.len() - 1:
         return ""
     t.slice(0, call_paren as i64)
 
@@ -571,7 +571,7 @@ pub fn ci_take_rule_sites() -> str:
 fn ci_record_omitted_symbol_cat(name: &str, location: &str, category: &str, reason: &str):
     if name.len() == 0:
         return
-    for i in 0..g_cimport_omitted_symbol_names.len() as i32:
+    for i in 0..g_cimport_omitted_symbol_names.len():
         if g_cimport_omitted_symbol_names[i] == name:
             return
     g_cimport_omitted_symbol_names.push(with_str_clone_ref(name))
@@ -583,7 +583,7 @@ fn ci_record_omitted_symbol_cat(name: &str, location: &str, category: &str, reas
 // reason chain (§16.2 dependent bindings carry the same reason chain).
 fn ci_omitted_chain_reason(reason: &str) -> str:
     var out = with_str_clone_ref(reason)
-    for i in 0..g_cimport_omitted_symbol_names.len() as i32:
+    for i in 0..g_cimport_omitted_symbol_names.len():
         let dep = g_cimport_omitted_symbol_names[i]
         if dep.len() > 0 and ci_str_contains(reason, dep):
             out = out ++ "; depends on omitted '" ++ dep ++ "': " ++ g_cimport_omitted_symbol_reasons[i]
@@ -593,7 +593,7 @@ fn ci_omitted_chain_reason(reason: &str) -> str:
 fn ci_omitted_symbol_recorded(name: &str) -> bool:
     if name.len() == 0:
         return false
-    for i in 0..g_cimport_omitted_symbol_names.len() as i32:
+    for i in 0..g_cimport_omitted_symbol_names.len():
         if g_cimport_omitted_symbol_names[i] == name:
             return true
     false
@@ -602,7 +602,7 @@ fn ci_omitted_manifest_comments() -> str:
     if g_cimport_omitted_symbol_names.len() == 0:
         return ""
     var out = StringBuilder.new()
-    let count = g_cimport_omitted_symbol_names.len() as i32
+    let count = g_cimport_omitted_symbol_names.len()
     for i in 0..count:
         // Format: |name|location|category|reason
         out.push_str("// @with-cimport-omitted|")
@@ -676,12 +676,12 @@ fn ci_compound_literal_type_name(raw_type: &str) -> str:
 fn ci_find_compound_literal_brace(s: &str) -> isize:
     var paren_depth = 0
     var i = 0
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 34 or c == 39:
             let quote = c
             i = i + 1
-            while i < s.len() as i32:
+            while i < s.len():
                 let inner = s[i]
                 if inner == 92:
                     i = i + 2
@@ -706,12 +706,12 @@ fn ci_compound_literal_type_from_prefix(prefix_raw: &str) -> str:
         return ""
     if ci_starts_with(prefix, "CLITERAL("):
         let close = ci_find_matching_paren(prefix, 8)
-        if close == prefix.len() as i32 - 1:
+        if close == prefix.len() - 1:
             return ci_compound_literal_type_name(prefix.slice(9, close as i64))
         return ""
     if prefix[0] == 40:
         let close = ci_find_matching_paren(prefix, 0)
-        if close == prefix.len() as i32 - 1:
+        if close == prefix.len() - 1:
             return ci_compound_literal_type_name(prefix.slice(1, close as i64))
     ""
 
@@ -721,7 +721,7 @@ fn ci_compound_literal_macro_type(value: &str) -> str:
     if brace <= 0:
         return ""
     let close = ci_find_matching_brace(t, brace)
-    if close != t.len() as i32 - 1:
+    if close != t.len() - 1:
         return ""
     ci_compound_literal_type_from_prefix(t.slice(0, brace as i64))
 
@@ -942,7 +942,7 @@ pub fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx
 // This ensures that fs-cached c_import results don't conflict with subsequent c_imports.
 pub fn ci_mark_cached_names(text: &str):
     var pos = 0
-    let len = text.len() as i32
+    let len = text.len()
     while pos < len:
         // Find start of line
         var line_start = pos
@@ -1215,8 +1215,8 @@ fn ci_render_missing_pointer_opaques(session: i64, count: i32) -> str:
     var out = ""
     var start = 0
     var i = 0
-    while i <= names.len() as i32:
-        if i == names.len() as i32 or names[i] == 124:
+    while i <= names.len():
+        if i == names.len() or names[i] == 124:
             if i > start:
                 let name = names.slice(start as i64, i as i64)
                 if name.len() > 0 and not ci_type_name_is_emitted(name):
@@ -2126,10 +2126,10 @@ pub fn ci_detect_member_functions(session: i64, count: i32, known_structs: &str)
     // known_structs is pipe-delimited: "|Foo||Bar||Baz|"; the first entry wins.
     var struct_prefixes: HashMap[str, str] = HashMap.new()
     var si = 0
-    while si < known_structs.len() as i32:
+    while si < known_structs.len():
         if known_structs[si] == '|':
             var se = si + 1
-            while se < known_structs.len() as i32 and known_structs[se] != '|':
+            while se < known_structs.len() and known_structs[se] != '|':
                 se = se + 1
             if se > si + 1:
                 let sname = known_structs.slice((si + 1) as i64, se as i64)
@@ -2195,7 +2195,7 @@ fn ci_extract_struct_name_from_ptr(ty: &str) -> str:
 // Compute snake_case prefix from a CamelCase struct name.
 // GHashTable → "g_hash_table_", sqlite3 → "sqlite3_", SDL_Window → "sdl_window_"
 pub fn ci_compute_snake_prefix(name: &str) -> str:
-    let len = name.len() as i32
+    let len = name.len()
     if len == 0:
         return ""
     var result = ""
@@ -2245,8 +2245,8 @@ fn ci_char_lower(ch: i32) -> str:
 // Check if fn_name starts with the given snake_case prefix.
 // Returns the method name (suffix after prefix) or "" if no match.
 pub fn ci_strip_snake_prefix(fn_name: &str, prefix: &str) -> str:
-    let plen = prefix.len() as i32
-    let flen = fn_name.len() as i32
+    let plen = prefix.len()
+    let flen = fn_name.len()
     if flen <= plen:
         return ""
     if fn_name.slice(0, plen as i64) == prefix:
@@ -2257,8 +2257,8 @@ pub fn ci_strip_snake_prefix(fn_name: &str, prefix: &str) -> str:
 // "MyStruct_init" with struct "MyStruct" → "init"
 // "mystruct_init" with struct "MyStruct" → "init" (case-insensitive prefix match)
 pub fn ci_strip_struct_prefix(fn_name: &str, struct_name: &str) -> str:
-    let slen = struct_name.len() as i32
-    let flen = fn_name.len() as i32
+    let slen = struct_name.len()
+    let flen = fn_name.len()
     // Need at least prefix + '_' + one char
     if flen <= slen + 1:
         return ""
@@ -3180,12 +3180,12 @@ fn ci_offsetof_text_args(expr: &str) -> List[str]:
     var fn_name = ""
     var args = ""
     var call_paren: i32 = 0
-    while call_paren < t.len() as i32 and t[call_paren] != '(':
+    while call_paren < t.len() and t[call_paren] != '(':
         call_paren = call_paren + 1
-    if call_paren > 0 and call_paren < t.len() as i32:
+    if call_paren > 0 and call_paren < t.len():
         fn_name = ci_trim(t.slice(0, call_paren as i64))
         let close_paren = ci_find_matching_paren(t, call_paren)
-        if close_paren == t.len() as i32 - 1 and t.len() > call_paren as i64 + 1:
+        if close_paren == t.len() - 1 and t.len() > call_paren as i64 + 1:
             args = t.slice(call_paren as i64 + 1, t.len() - 1)
     if fn_name != "offsetof" and fn_name != "__builtin_offsetof":
         return out
@@ -3356,7 +3356,7 @@ fn ci_macro_probe_decl_result(probe_session: i64, decl: i32, name: &str) -> str:
 // the macro leaves a delimiter open and swallows the probes after it.
 fn ci_macro_value_delims_balanced(value: &str) -> bool:
     var depth = 0
-    for i in 0..value.len() as i32:
+    for i in 0..value.len():
         let c = value[i]
         if c == '(' or c == '{' or c == '[': depth = depth + 1
         if c == ')' or c == '}' or c == ']': depth = depth - 1
@@ -3473,8 +3473,8 @@ fn ci_macro_substitute_arguments(session: i64, index: i32, body: &str, args: &Li
         let token = body.slice(pos, end)
         var replacement = token.to_owned()
         if ci_is_ident_start(body[pos]):
-            for pi in 0..args.len() as i32:
-                if token == with_cimport_macro_param_name(session, index, pi):
+            for pi in 0..args.len():
+                if token == with_cimport_macro_param_name(session, index, pi as i32):
                     replacement = args[pi].to_owned()
                     break
         output = output ++ replacement
@@ -3912,7 +3912,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
             // "\\A", ...`) is only meaningful expanded inline inside an array
             // initializer `{ OP_NAME_LIST }`; a standalone `let` for it would be
             // truncated to the first element and ill-typed, so skip it.
-            if ci_split_top_level_items(stripped).len() as i32 > 1:
+            if ci_split_top_level_items(stripped).len() > 1:
                 continue
             let compound_literal_ty = ci_compound_literal_macro_type(stripped)
             let compound_literal_result = if compound_literal_ty.len() > 0: ci_try_translate_compound_literal_macro(type_session, stripped) else: ""
@@ -4201,24 +4201,24 @@ fn ci_parse_rel_expr(s: &str, params: &str, known: &str) -> str:
     var best_len = 0
     var depth = 0
     var i = 0
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 40: depth = depth + 1
         if c == 41: depth = depth - 1
         if depth == 0 and i > 0:
             let prev = s[(i - 1)]
-            if c == 60 and i + 1 < s.len() as i32 and s[(i + 1)] == 61 and prev != 60:  // <=
+            if c == 60 and i + 1 < s.len() and s[(i + 1)] == 61 and prev != 60:  // <=
                 best_pos = i
                 best_len = 2
-            else if c == 62 and i + 1 < s.len() as i32 and s[(i + 1)] == 61 and prev != 62:  // >=
+            else if c == 62 and i + 1 < s.len() and s[(i + 1)] == 61 and prev != 62:  // >=
                 best_pos = i
                 best_len = 2
-            else if c == 60 and (i + 1 >= s.len() as i32 or s[(i + 1)] != 60) and prev != 60 and (i < 1 or prev != 60):  // < but not <<
-                if i + 1 < s.len() as i32 and s[(i + 1)] != 61:
+            else if c == 60 and (i + 1 >= s.len() or s[(i + 1)] != 60) and prev != 60 and (i < 1 or prev != 60):  // < but not <<
+                if i + 1 < s.len() and s[(i + 1)] != 61:
                     best_pos = i
                     best_len = 1
-            else if c == 62 and (i + 1 >= s.len() as i32 or s[(i + 1)] != 62) and prev != 62:  // > but not >>
-                if i + 1 < s.len() as i32 and s[(i + 1)] != 61:
+            else if c == 62 and (i + 1 >= s.len() or s[(i + 1)] != 62) and prev != 62:  // > but not >>
+                if i + 1 < s.len() and s[(i + 1)] != 61:
                     best_pos = i
                     best_len = 1
         i = i + 1
@@ -4257,7 +4257,7 @@ fn ci_parse_add_expr(s: &str, params: &str, known: &str) -> str:
     var best_pos = -1
     var depth = 0
     var i: i32 = 0
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 40: depth = depth + 1
         if c == 41: depth = depth - 1
@@ -4283,7 +4283,7 @@ fn ci_parse_mul_expr(s: &str, params: &str, known: &str) -> str:
     var best_pos = -1
     var depth = 0
     var i: i32 = 0
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 40: depth = depth + 1
         if c == 41: depth = depth - 1
@@ -4531,7 +4531,7 @@ fn ci_find_op_at_depth0(s: &str, op: &str) -> isize:
     let c1 = op[1]
     var depth = 0
     var i = 0
-    while i < s.len() as i32 - 1:
+    while i < s.len() - 1:
         let c = s[i]
         if c == 40: depth = depth + 1
         if c == 41: depth = depth - 1
@@ -4552,13 +4552,13 @@ fn ci_find_op_at_depth0(s: &str, op: &str) -> isize:
 fn ci_find_single_op_at_depth0(s: &str, ch: i32, doubled: i32) -> isize:
     var depth = 0
     var i = 0
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 40: depth = depth + 1
         if c == 41: depth = depth - 1
         if depth == 0 and c == ch:
             // Skip doubled operator (|| or &&)
-            if i + 1 < s.len() as i32 and s[(i + 1)] == doubled:
+            if i + 1 < s.len() and s[(i + 1)] == doubled:
                 i = i + 2
                 continue
             // Skip if preceded by same char (already part of double)
@@ -4573,7 +4573,7 @@ fn ci_find_single_op_at_depth0(s: &str, ch: i32, doubled: i32) -> isize:
 fn ci_find_char_op_at_depth0(s: &str, ch: i32) -> isize:
     var depth = 0
     var i = 0
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 40: depth = depth + 1
         if c == 41: depth = depth - 1
@@ -4585,7 +4585,7 @@ fn ci_find_char_op_at_depth0(s: &str, ch: i32) -> isize:
 // Scan identifier length at start of string. Returns 0 if no ident.
 fn ci_scan_ident(s: &str) -> isize:
     var i = 0
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95 or (i > 0 and c >= 48 and c <= 57):
             i = i + 1
@@ -4646,7 +4646,7 @@ fn ci_translation_is_bool_valued(expr: &str) -> bool:
     var depth = 0
     var in_string = false
     var i: i32 = 0
-    while i < t.len() as i32:
+    while i < t.len():
         let c = t[i]
         if in_string:
             if c == '\\':
@@ -4702,7 +4702,7 @@ fn ci_fold_c_predicate(s: &str, known: &str) -> str:
             return if v: "1" else: "0"
     let rel = ci_find_relational_op(t)
     if rel >= 0:
-        let width = if rel + 1 < t.len() as i32 and t[rel + 1] == '=': 2 else: 1
+        let width = if rel + 1 < t.len() and t[rel + 1] == '=': 2 else: 1
         let lhs = ci_fold_c_predicate(t.slice(0, rel as i64), known)
         let rhs = ci_fold_c_predicate(t.slice((rel + width) as i64, t.len()), known)
         if lhs.len() == 0 or rhs.len() == 0:
@@ -4722,7 +4722,7 @@ fn ci_fold_c_predicate(s: &str, known: &str) -> str:
 fn ci_has_depth0_bitwise_or_ternary(s: &str) -> bool:
     var depth = 0
     var i = 0
-    let n = s.len() as i32
+    let n = s.len()
     while i < n:
         let c = s[i]
         if c == '(':
@@ -4745,7 +4745,7 @@ fn ci_has_depth0_bitwise_or_ternary(s: &str) -> bool:
 fn ci_find_relational_op(s: &str) -> isize:
     var depth = 0
     var i = 0
-    let n = s.len() as i32
+    let n = s.len()
     while i < n:
         let c = s[i]
         if c == '(':
@@ -4775,7 +4775,7 @@ fn ci_is_bool_expr(s: &str) -> bool:
 fn ci_find_matching_bracket(s: &str, start: isize) -> isize:
     var depth = 0
     var i = start
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 91: depth = depth + 1
         if c == 93:
@@ -4790,16 +4790,16 @@ fn ci_find_matching_bracket(s: &str, start: isize) -> isize:
 fn ci_find_call_paren(s: &str) -> i32:
     var i: i32 = 0
     // Skip identifier chars
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or (c >= 48 and c <= 57) or c == 95:
             i = i + 1
         else:
             break
-    if i > 0 and i < s.len() as i32 and s[i] == 40:
+    if i > 0 and i < s.len() and s[i] == 40:
         // Verify closing paren matches at end
         let close = ci_find_matching_paren(s, i)
-        if close == s.len() as i32 - 1:
+        if close == s.len() - 1:
             return i
     -1
 
@@ -4809,7 +4809,7 @@ fn ci_translate_call_args(args: &str, params: &str, known: &str) -> str:
     var depth = 0
     var start = 0
     var i = 0
-    let slen = args.len() as i32
+    let slen = args.len()
     while i <= slen:
         let at_end = i == slen
         var c = 0
@@ -5023,7 +5023,7 @@ fn ci_first_n_args(args: &str, n: i32) -> str:
     var depth = 0
     var count = 0
     var i = 0
-    while i < args.len() as i32:
+    while i < args.len():
         let c = args[i]
         if c == 40: depth = depth + 1
         if c == 41: depth = depth - 1
@@ -5037,7 +5037,7 @@ fn ci_first_n_args(args: &str, n: i32) -> str:
 fn ci_after_first_arg(args: &str) -> str:
     var depth = 0
     var i = 0
-    while i < args.len() as i32:
+    while i < args.len():
         let c = args[i]
         if c == 40: depth = depth + 1
         if c == 41: depth = depth - 1
@@ -5049,7 +5049,7 @@ fn ci_after_first_arg(args: &str) -> str:
 fn ci_extract_first_arg(args: &str) -> str:
     var depth = 0
     var i = 0
-    while i < args.len() as i32:
+    while i < args.len():
         let c = args[i]
         if c == 40: depth = depth + 1
         if c == 41: depth = depth - 1
@@ -5071,7 +5071,7 @@ fn ci_infer_cast_return_type(translated: &str) -> str:
     if t[t.len() - 1] != 41:
         return ""
     // Check for trailing " as TYPE)" pattern
-    var i = t.len() as i32 - 2
+    var i = t.len() - 2
     // Find last " as " in the string
     while i >= 4:
         if t[(i - 3)] == 32 and t[(i - 2)] == 97 and t[(i - 1)] == 115 and t[i] == 32:
@@ -5106,16 +5106,16 @@ fn ci_translation_is_void_statement(translated: &str) -> bool:
 // # followed by a param name (not ##) indicates stringification.
 fn ci_has_stringify(body: &str, params: &str) -> bool:
     var i = 0
-    while i < body.len() as i32 - 1:
+    while i < body.len() - 1:
         if body[i] == 35:  // '#'
             // Skip ## (token paste)
-            if i + 1 < body.len() as i32 and body[(i + 1)] == 35:
+            if i + 1 < body.len() and body[(i + 1)] == 35:
                 i = i + 2
                 continue
             // Check if followed by a parameter name
             let rest = ci_trim(body.slice((i + 1) as i64, body.len()))
             var end = 0
-            while end < rest.len() as i32 and ci_is_ident_char(rest[end]):
+            while end < rest.len() and ci_is_ident_char(rest[end]):
                 end = end + 1
             if end > 0:
                 let tok = rest.slice(0, end as i64)
@@ -5278,8 +5278,8 @@ fn ci_is_large_decimal(s: &str) -> bool:
         if c < 48 or c > 57: return false
         i = i + 1
     // 11+ digits is always > i32 max; <10 digits is always <= i32 max
-    if s.len() as i32 > 10: return true
-    if s.len() as i32 < 10: return false
+    if s.len() > 10: return true
+    if s.len() < 10: return false
     // Exactly 10 digits — compare char by char against "2147483647"
     let threshold = "2147483647"
     i = 0
@@ -5629,7 +5629,7 @@ fn ci_decimal_digit(d: i64) -> str:
 fn ci_trim_float_literal_zeros(raw: &str) -> str:
     if not ci_str_contains(raw, "."):
         return with_str_clone_ref(raw)
-    var end = raw.len() as i32
+    var end = raw.len()
     while end > 0 and raw[(end - 1)] == 48:
         end = end - 1
     if end > 0 and raw[(end - 1)] == 46:
@@ -5777,7 +5777,7 @@ fn ci_eval_const_expr_ctx(s: &str, known: &str) -> str:
 fn ci_find_matching_paren(s: &str, start: isize) -> isize:
     var depth = 0
     var i = start
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 40:
             depth = depth + 1
@@ -5791,12 +5791,12 @@ fn ci_find_matching_paren(s: &str, start: isize) -> isize:
 fn ci_find_matching_brace(s: &str, start: isize) -> isize:
     var depth = 0
     var i = start
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 34 or c == 39:
             let quote = c
             i = i + 1
-            while i < s.len() as i32:
+            while i < s.len():
                 let inner = s[i]
                 if inner == 92:
                     i = i + 2
@@ -5818,7 +5818,7 @@ fn ci_find_matching_brace(s: &str, start: isize) -> isize:
 fn ci_translate_designated_init(s: &str, params: &str, known: &str) -> str:
     var result = ""
     var pos = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while pos < slen:
         // Skip whitespace
         while pos < slen and (s[pos] == 32 or s[pos] == 9):
@@ -5948,8 +5948,8 @@ fn ci_translate_comma_block(s: &str, params: &str, known: &str) -> str:
     var depth = 0
     var start = 0
     var i = 0
-    while i <= s.len() as i32:
-        let at_end = i == s.len() as i32
+    while i <= s.len():
+        let at_end = i == s.len()
         var c = 0
         if not at_end:
             c = s[i]
@@ -5976,7 +5976,7 @@ fn ci_find_last_comma_at_depth0(s: &str) -> isize:
     var depth = 0
     var last_comma = -1
     var i = 0
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 40: depth = depth + 1
         else if c == 41: depth = depth - 1
@@ -5988,7 +5988,7 @@ fn ci_find_last_comma_at_depth0(s: &str) -> isize:
 fn ci_find_ternary(s: &str) -> isize:
     var depth = 0
     var i = 0
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 40:
             depth = depth + 1
@@ -6002,7 +6002,7 @@ fn ci_find_ternary(s: &str) -> isize:
 fn ci_find_ternary_colon(s: &str) -> isize:
     var depth = 0
     var i = 0
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 40:
             depth = depth + 1
@@ -6020,7 +6020,7 @@ fn ci_is_c_ident(s: &str) -> bool:
     if not ((c0 >= 65 and c0 <= 90) or (c0 >= 97 and c0 <= 122) or c0 == 95):
         return false
     var i = 1
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if not ((c >= 65 and c <= 90) or (c >= 97 and c <= 122) or (c >= 48 and c <= 57) or c == 95):
             return false
@@ -6036,15 +6036,15 @@ fn ci_lookup_known(name: &str, known: &str) -> str:
     // (with_str_slice + mmap churn under ci_trans_stmt_via_ir).
     let key = name ++ "="
     var pos: i32 = 0
-    while pos < known.len() as i32:
+    while pos < known.len():
         if ci_str_matches_at(known, pos, key):
-            let val_start = pos + key.len() as i32
+            let val_start = pos + key.len()
             var val_end = val_start
-            while val_end < known.len() as i32 and known[val_end] != 124:
+            while val_end < known.len() and known[val_end] != 124:
                 val_end = val_end + 1
             return known.slice(val_start as i64, val_end as i64)
         // Skip to next |
-        while pos < known.len() as i32 and known[pos] != 124:
+        while pos < known.len() and known[pos] != 124:
             pos = pos + 1
         pos = pos + 1
     let macro_value = ci_lookup_simple_literal_macro_value(name)
@@ -6144,7 +6144,7 @@ fn ci_parse_i64(s: &str) -> i64:
         is_neg = true
         si = 1
     // Check for hex prefix 0x/0X
-    if s.len() as i32 - si >= 2:
+    if s.len() - si >= 2:
         if s[si] == 48:
             let nx = s[si as i64 + 1]
             if nx == 120 or nx == 88:
@@ -6271,7 +6271,7 @@ fn ci_map_c_type_ctx(spelling: &str, known_structs: &str) -> str:
     if ci_str_contains(s, "["):
         var bracket_pos = 0
         var bi = 0
-        while bi < s.len() as i32:
+        while bi < s.len():
             if s[bi] == 91:
                 bracket_pos = bi
                 break
@@ -6617,7 +6617,7 @@ fn ci_stmt_collect_flat_ids(stmts: CiStmtPool, stmt_id: CiStmtId) -> List[i32]:
         while i < count:
             let child = ci_stmt_collect_flat_ids(stmts, (stmts.get_extra(start + i)) as CiStmtId)
             var ci: i32 = 0
-            while ci < child.len() as i32:
+            while ci < child.len():
                 out.push(child[ci])
                 ci = ci + 1
             i = i + 1
@@ -6655,7 +6655,7 @@ impl CiStmtPool:
         var ids: List[i32] = ci_stmt_collect_flat_ids(self.val(), first)
         let ids2 = ci_stmt_collect_flat_ids(self.val(), second)
         var si: i32 = 0
-        while si < ids2.len() as i32:
+        while si < ids2.len():
             ids.push(ids2[si])
             si = si + 1
         self.from_flat_ids(&ids)
@@ -7844,7 +7844,7 @@ impl CiExprPool:
             start = 2
         else:
             start = 1
-        let end = text.len() as i32 - 1
+        let end = text.len() - 1
         let items_start = self.extra_len()
         var item_count: i32 = 0
         var i = start
@@ -8159,7 +8159,7 @@ fn ci_record_field_cache_key(session: i64, ty_key: &str, field_idx: i32) -> str:
 
 fn ci_record_count_cache_lookup(key: &str) -> i32:
     var i = 0
-    while i < g_ci_record_count_cache_keys.len() as i32:
+    while i < g_ci_record_count_cache_keys.len():
         if g_ci_record_count_cache_keys[i] == key:
             return g_ci_record_count_cache_values[i]
         i = i + 1
@@ -8171,7 +8171,7 @@ fn ci_record_count_cache_store(key: &str, value: i32) -> Unit:
 
 fn ci_record_field_cache_lookup_index(key: &str) -> isize:
     var i = 0
-    while i < g_ci_record_field_cache_keys.len() as i32:
+    while i < g_ci_record_field_cache_keys.len():
         if g_ci_record_field_cache_keys[i] == key:
             return i
         i = i + 1
@@ -8290,7 +8290,7 @@ fn ci_init_child_designator_name(session: i64, child: i32) -> str:
     if not ((first >= 65 and first <= 90) or (first >= 97 and first <= 122) or first == 95):
         return ""
     var j = 2
-    while j < src.len() as i32:
+    while j < src.len():
         let c = src[j]
         if not ((c >= 65 and c <= 90) or (c >= 97 and c <= 122) or (c >= 48 and c <= 57) or c == 95):
             break
@@ -8511,7 +8511,7 @@ impl CiExprPool:
                 pair_names.push(self.add_string(ci_struct_field_emitted_name(session, decl_idx, si)))
                 pair_values.push(v)
             si = si + 1
-        if record_is_union and pair_values.len() as i32 > 1:
+        if record_is_union and pair_values.len() > 1:
             if g_ci_bail_message.len() == 0:
                 g_ci_bail_message = "union initializer sets multiple arms in '" ++ ty_str ++ "'"
                 g_ci_bail_location = with_ci_cursor_location(session, cursor)
@@ -9771,9 +9771,9 @@ fn ci_call_name_from_source_text(src: &str) -> str:
     if s.len() == 0:
         return ""
     var i: i32 = 0
-    while i < s.len() as i32 and (ci_is_ident_char(s[i])):
+    while i < s.len() and (ci_is_ident_char(s[i])):
         i = i + 1
-    if i <= 0 or i >= s.len() as i32:
+    if i <= 0 or i >= s.len():
         return ""
     if s[i] != 40:
         return ""
@@ -11084,7 +11084,7 @@ impl CiExprPool:
     fn build_overflow_builtin_call(session: i64, cursor: i32, callee_text: &str, arg_ids: &List[i32], types: CiTypePool) -> CiExprId:
         if arg_ids.len() != 3:
             return self.reject_builtin_call(session, cursor, callee_text, "expected three arguments")
-        let first_arg = with_ci_num_children(session, cursor) - arg_ids.len() as i32
+        let first_arg = with_ci_num_children(session, cursor) - arg_ids.len()
         if first_arg < 0:
             return self.reject_builtin_call(session, cursor, callee_text, "could not locate the argument cursors")
         let lhs_cursor = with_ci_child(session, cursor, first_arg)
@@ -13056,8 +13056,8 @@ fn ci_trans_stmt_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope: Ci
     // (statements x registered names), ~50% of migrate wall time on the
     // emitted compiler C (#747).
     let saved_fn_var_names_len = g_ci_fn_var_names.len()
-    let saved_temp_cursor_len = g_ci_temp_cursors.len() as i32
-    let saved_temp_id_len = g_ci_temp_ids.len() as i32
+    let saved_temp_cursor_len = g_ci_temp_cursors.len()
+    let saved_temp_id_len = g_ci_temp_ids.len()
     let saved_temp_next = g_ci_temp_next
     var types = CiTypePool.new()
     var exprs = CiExprPool.new()
@@ -13067,9 +13067,9 @@ fn ci_trans_stmt_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope: Ci
     if (id as i32) == 0:
         if g_ci_fn_var_names.len() > saved_fn_var_names_len:
             g_ci_fn_var_names = with_str_clone_ref(g_ci_fn_var_names.slice(0, saved_fn_var_names_len))
-        while (g_ci_temp_cursors.len() as i32) > saved_temp_cursor_len:
+        while g_ci_temp_cursors.len() > saved_temp_cursor_len:
             let _ = g_ci_temp_cursors.pop()
-        while (g_ci_temp_ids.len() as i32) > saved_temp_id_len:
+        while g_ci_temp_ids.len() > saved_temp_id_len:
             let _ = g_ci_temp_ids.pop()
         g_ci_temp_next = saved_temp_next
         stmts.deinit()
@@ -13101,7 +13101,7 @@ fn ci_trans_stmt_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope: Ci
 fn ci_location_path(loc: &str) -> str:
     if loc.len() == 0:
         return ""
-    var last_colon = loc.len() as i32 - 1
+    var last_colon = loc.len() - 1
     while last_colon >= 0 and loc[last_colon] != 58:
         last_colon = last_colon - 1
     if last_colon < 0:
@@ -13122,7 +13122,7 @@ fn ci_try_eval_var_init(session: i64, idx: i32) -> str:
 fn ci_initializer_text_has_macro_reference(session: i64, text: &str) -> bool:
     let s = ci_strip_c_comments(text)
     var i = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while i < slen:
         let c = s[i]
         if c == 34 or c == 39:
@@ -13163,7 +13163,7 @@ fn ci_option_fn_init_fixup(text: &str, ty: &str) -> str:
             return with_str_clone_ref(text)
         let items = ci_split_top_level_items(text.slice(1, text.len() - 1))
         var out = "["
-        for i in 0..items.len() as i32:
+        for i in 0..items.len():
             if i > 0: out = out ++ ", "
             out = out ++ ci_coerce_init_value_for_type(ci_trim(items[i]), elem_ty)
         return out ++ "]"
@@ -13213,8 +13213,8 @@ fn ci_offsetof_init_for_type(expr: &str, ty: &str) -> str:
     with_str_clone_ref(expr)
 
 pub fn ci_str_compare(a: &str, b: &str) -> i32:
-    let alen = a.len() as i32
-    let blen = b.len() as i32
+    let alen = a.len()
+    let blen = b.len()
     var i = 0
     while i < alen and i < blen:
         let ac = a[i]
@@ -13555,7 +13555,7 @@ fn ci_scope_type_for_cursor(session: i64, cursor: i32, scope: CiScope) -> str:
 
 fn ci_find_char(s: &str, c: i32) -> isize:
     var i = 0
-    while i < s.len() as i32:
+    while i < s.len():
         if s[i] == c:
             return i
         i = i + 1
@@ -13590,7 +13590,7 @@ fn ci_goto_decl_suffix_from_location(loc: &str, fallback_id: i32) -> str:
     if last_colon > 0:
         let prefix = loc.slice(0, last_colon as i64)
         let prev_colon = ci_find_last_char(prefix, 58)
-        if prev_colon >= 0 and prev_colon + 1 < last_colon and last_colon + 1 < loc.len() as i32:
+        if prev_colon >= 0 and prev_colon + 1 < last_colon and last_colon + 1 < loc.len():
             let line = loc.slice((prev_colon + 1) as i64, last_colon as i64)
             let col = loc.slice((last_colon + 1) as i64, loc.len())
             if line.len() > 0 and col.len() > 0:
@@ -14047,7 +14047,7 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
 
 pub fn ci_trim(s: &str) -> str:
     var start = 0
-    var end = s.len() as i32
+    var end = s.len()
     while start < end and ci_is_space(s[start]):
         start = start + 1
     while end > start and ci_is_space(s[(end - 1)]):
@@ -14090,7 +14090,7 @@ fn ci_str_replace_last_field(field_str: &str, old_name: &str, new_name: &str) ->
     // Find last comma at depth 0
     var last_comma = -1
     var i = 0
-    while i < field_str.len() as i32:
+    while i < field_str.len():
         if field_str[i] == 44:
             last_comma = i
         i = i + 1
@@ -14102,7 +14102,7 @@ fn ci_str_replace_last_field(field_str: &str, old_name: &str, new_name: &str) ->
     let at = ci_find_substr(last_field, old_name ++ ": ")
     if at < 0:
         return with_str_clone_ref(field_str)
-    prefix ++ last_field.slice(0, at as i64) ++ new_name ++ last_field.slice((at + old_name.len() as i32) as i64, last_field.len())
+    prefix ++ last_field.slice(0, at as i64) ++ new_name ++ last_field.slice((at + old_name.len()) as i64, last_field.len())
 
 pub fn ci_str_replace(text: &str, needle: &str, replacement: &str) -> str:
     if needle.len() == 0:
@@ -14140,7 +14140,7 @@ fn ci_indent_block(text: &str, indent: i32) -> str:
     // Collect parts then join: avoids O(n²) string concatenation in the loop
     var parts: List[str] = List.new()
     var start = 0
-    let len = text.len() as i32
+    let len = text.len()
     while start < len:
         var end = start
         while end < len and text[end] != 10:
@@ -14159,7 +14159,7 @@ fn ci_is_blank_macro_ref(value: &str, blank_macros: &str) -> bool:
     if trimmed.len() == 0:
         return true
     var pos = 0
-    let slen = trimmed.len() as i32
+    let slen = trimmed.len()
     var found_any = false
     while pos < slen:
         while pos < slen and (trimmed[pos] == 32 or trimmed[pos] == 9):
@@ -14411,7 +14411,7 @@ fn ci_int_literal_exceeds_i64(digits: &str) -> bool:
     digits.slice(j, digits.len()) > "9223372036854775807"
 
 fn ci_strip_int_suffix(s: &str) -> str:
-    var end = s.len() as i32
+    var end = s.len()
     while end > 0:
         let c = s[(end - 1)]
         if c == 76 or c == 85 or c == 108 or c == 117:
@@ -14425,7 +14425,7 @@ fn ci_strip_parens(s: &str) -> str:
     while result.len() >= 2 and result[0] == 40 and result[result.len() - 1] == 41:
         // Verify the outer parens actually match (not just first/last chars)
         let match_pos = ci_find_matching_paren(result, 0)
-        if match_pos != result.len() as i32 - 1:
+        if match_pos != result.len() - 1:
             break
         result = result.slice(1, result.len() - 1)
     result
@@ -14471,7 +14471,7 @@ fn ci_is_float_literal(s: &str) -> bool:
 
 fn ci_int_type_from_suffix(s: &str) -> str:
     // Detect integer literal suffix to determine C type
-    var end = s.len() as i32
+    var end = s.len()
     // Collect suffix chars (backwards)
     var has_u = false
     var l_count = 0
@@ -14524,7 +14524,7 @@ fn ci_strip_float_suffix(s: &str) -> str:
         return with_cimport_hex_float_to_decimal(s)
     if s.len() > 3 and s[0] == 45 and s[1] == 48 and (s[2] == 120 or s[2] == 88):
         return with_cimport_hex_float_to_decimal(s)
-    var end = s.len() as i32
+    var end = s.len()
     while end > 0:
         let c = s[(end - 1)]
         if c == 102 or c == 70 or c == 108 or c == 76:  // f, F, l, L
@@ -14548,7 +14548,7 @@ fn ci_is_integer_string(s: &str) -> bool:
     if s.len() == 0: return false
     var i = 0
     // Allow hex prefix
-    if s.len() as i32 > 2 and s[0] == 48 and (s[1] == 120 or s[1] == 88):
+    if s.len() > 2 and s[0] == 48 and (s[1] == 120 or s[1] == 88):
         i = 2
     while i as i64 < s.len():
         let c = s[i]
@@ -14605,7 +14605,7 @@ fn ci_char_to_int(s: &str) -> str:
             var value: i64 = 0
             var i = 3
             var digits = 0
-            while i < s.len() as i32 - 1:
+            while i < s.len() - 1:
                 let d = s[i]
                 if not ci_is_hex_digit(d):
                     break
@@ -14619,7 +14619,7 @@ fn ci_char_to_int(s: &str) -> str:
             var value: i64 = 0
             var i = 2
             var digits = 0
-            while i < s.len() as i32 - 1 and digits < 3:
+            while i < s.len() - 1 and digits < 3:
                 let d = s[i]
                 if d < 48 or d > 55:
                     break
@@ -14647,7 +14647,7 @@ fn ci_strip_c_comments(s: &str) -> str:
     var parts: List[str] = List.new()
     var i = 0
     var segment_start = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while i < slen:
         let c = s[i]
         if c == 47 and i + 1 < slen:
@@ -14693,7 +14693,7 @@ fn ci_strip_c_comments(s: &str) -> str:
 
 fn ci_has_c_comment_outside_literal(s: &str) -> bool:
     var i = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while i < slen:
         let c = s[i]
         if c == 34 or c == 39:
@@ -14716,7 +14716,7 @@ fn ci_has_c_comment_outside_literal(s: &str) -> bool:
     false
 
 fn ci_find_string_literal_end(s: &str, start: i32) -> i32:
-    let slen = s.len() as i32
+    let slen = s.len()
     var i = start
     if i + 2 < slen and s[i] == 117 and s[(i + 1)] == 56 and s[(i + 2)] == 34:
         i = i + 2
@@ -14768,7 +14768,7 @@ fn ci_is_concatenated_string(s: &str) -> bool:
 fn ci_concat_is_pure_literals(s: &str) -> bool:
     let t = ci_trim(s)
     var i: i32 = 0
-    let slen = t.len() as i32
+    let slen = t.len()
     var saw = false
     while i < slen:
         while i < slen and ci_is_space(t[i]):
@@ -14793,7 +14793,7 @@ fn ci_byte_to_hex_escape(value: i32) -> str:
 fn ci_quote_evaluated_c_string(s: &str) -> str:
     var result = "\""
     var i = 0
-    while i < s.len() as i32:
+    while i < s.len():
         let c = s[i]
         if c == 34:
             result = result ++ "\\\""
@@ -14839,7 +14839,7 @@ fn ci_render_string_literal_as_byte_array(value: &str, ty: &str) -> str:
     let target_len = ci_array_length_from_type(ty)
     var bytes: List[i32] = List.new()
     var i = 0
-    let slen = value.len() as i32
+    let slen = value.len()
     var saw_literal = false
     while i < slen:
         let c = value[i]
@@ -14911,17 +14911,17 @@ fn ci_render_string_literal_as_byte_array(value: &str, ty: &str) -> str:
         return ""
     bytes.push(0)
     if target_len >= 0:
-        if bytes.len() as i32 > target_len:
-            if bytes.len() as i32 == target_len + 1 and bytes[(bytes.len() - 1)] == 0:
+        if bytes.len() > target_len:
+            if bytes.len() == target_len + 1 and bytes[(bytes.len() - 1)] == 0:
                 let _ = bytes.pop()
             else:
                 return ""
-        while bytes.len() as i32 < target_len:
+        while bytes.len() < target_len:
             bytes.push(0)
     var parts: List[str] = List.new()
     parts.push("[")
     var bi = 0
-    while bi < bytes.len() as i32:
+    while bi < bytes.len():
         if bi > 0:
             parts.push(", ")
         parts.push(ci_byte_array_literal_value(bytes[bi], elem_ty))
@@ -14937,7 +14937,7 @@ fn ci_is_byte_array_type(ty: &str) -> bool:
 // macro DEFINITION sites in a header rather than the use-site expression.
 fn ci_text_has_pp_define_outside_string(s: &str) -> bool:
     var i = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while i < slen:
         let c = s[i]
         if c == 34 or c == 39:
@@ -14967,7 +14967,7 @@ fn ci_text_has_pp_define_outside_string(s: &str) -> bool:
 // trailing `, <length>` off a `STRING_UTFn_RIGHTPAR`-style macro value.
 fn ci_text_before_top_comma(s: &str) -> str:
     var i = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     var depth = 0
     while i < slen:
         let c = s[i]
@@ -14997,7 +14997,7 @@ fn ci_concat_strings(s: &str) -> str:
     // Concatenate adjacent string literals "foo" "bar" -> "foobar"
     var result = "\""
     var i = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while i < slen:
         let c = s[i]
         if c == 34:
@@ -15096,7 +15096,7 @@ fn ci_first_ident(s: &str) -> str:
     if t.len() == 0 or not ci_is_ident_start(t[0] as i32):
         return ""
     var e = 1
-    while e < t.len() as i32 and ci_is_ident_char(t[e] as i32):
+    while e < t.len() and ci_is_ident_char(t[e] as i32):
         e = e + 1
     t.slice(0, e as i64)
 
@@ -15173,7 +15173,7 @@ fn ci_resolve_pp_conditionals(src: &str) -> str:
         let t = ci_trim(line)
         let is_dir = t.len() > 0 and t[0] == 35 and (ci_starts_with(t, "#if") or ci_starts_with(t, "#else") or ci_starts_with(t, "#elif") or ci_starts_with(t, "#endif"))
         if is_dir:
-            let depth = stack.len() as i32
+            let depth = stack.len()
             let top = if depth > 0: ci_pp_dec(stack[(depth - 1)] as i32) else: 0
             let top_eff = (top & 1) == 1
             let top_taken = ((top / 2) & 1) == 1
@@ -15211,7 +15211,7 @@ fn ci_resolve_pp_conditionals(src: &str) -> str:
                     return ""
                 stack = stack.slice(0, (depth - 1) as i64)
         else:
-            let depth = stack.len() as i32
+            let depth = stack.len()
             let active = if depth == 0: true else: (ci_pp_dec(stack[(depth - 1)] as i32) & 1) == 1
             if active:
                 out = out ++ line ++ "\n"
@@ -15380,7 +15380,7 @@ fn ci_is_stringify_macro(session: i64, name: &str, depth: i32) -> bool:
 
 fn ci_string_text_has_stringify_call(session: i64, s: &str) -> bool:
     var i = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while i < slen:
         if ci_is_ident_start(s[i]):
             var end = i + 1
@@ -15399,7 +15399,7 @@ fn ci_string_text_has_stringify_call(session: i64, s: &str) -> bool:
 
 fn ci_string_text_contains_macro_like_ident(s: &str) -> bool:
     var i = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while i < slen:
         // #880: skip the CONTENT of string literals — an all-caps word with an
         // underscore/digit inside a message (e.g. "PCRE2_EXTRA...", "UTF8") is
@@ -15447,7 +15447,7 @@ fn ci_string_text_contains_macro_like_ident(s: &str) -> bool:
 
 fn ci_string_text_mentions_null_escape(s: &str) -> bool:
     var i = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while i + 1 < slen:
         if s[i] != 92:
             i = i + 1
@@ -15480,7 +15480,7 @@ fn ci_string_text_mentions_null_escape(s: &str) -> bool:
 
 fn ci_first_string_literal_token(s: &str) -> str:
     var pos: i32 = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while pos < slen:
         if s[pos] == 34:
             let end = ci_find_string_literal_end(s, pos)
@@ -15491,10 +15491,10 @@ fn ci_first_string_literal_token(s: &str) -> str:
     ""
 
 fn ci_string_sequence_at(s: &str, start: i32) -> str:
-    if start < 0 or start >= s.len() as i32 or s[start] != 34:
+    if start < 0 or start >= s.len() or s[start] != 34:
         return ""
     var pos = start
-    let slen = s.len() as i32
+    let slen = s.len()
     var result = ""
     while pos < slen:
         while pos < slen and ci_is_space(s[pos]):
@@ -15537,7 +15537,7 @@ fn ci_preprocessed_string_sequence_for_cursor(session: i64, cursor: i32, raw_src
 fn ci_expand_stringify_args(session: i64, args: &str) -> str:
     var result = ""
     var pos = 0
-    let alen = args.len() as i32
+    let alen = args.len()
     while pos < alen:
         if ci_is_ident_start(args[pos]):
             var end = pos + 1
@@ -15558,7 +15558,7 @@ fn ci_expand_stringify_args(session: i64, args: &str) -> str:
 // Try to expand a stringify macro call like XSTRING(MAJOR.MINOR DATE)
 // into a string literal. Returns "" if not a stringify macro call.
 fn ci_try_expand_stringify_call(session: i64, s: &str) -> str:
-    let slen = s.len() as i32
+    let slen = s.len()
     // Find the macro name (identifier before '(')
     var ne = 0
     while ne < slen and ci_is_ident_char(s[ne]):
@@ -15622,7 +15622,7 @@ fn ci_expand_string_macro_sequence_depth(session: i64, s: &str, depth: i32) -> s
         return ci_concat_strings(cleaned)
     var segments = ""
     var pos: i32 = 0
-    let slen = cleaned.len() as i32
+    let slen = cleaned.len()
     var found_any = false
     while pos < slen:
         while pos < slen and ci_is_space(cleaned[pos]):
@@ -15674,7 +15674,7 @@ fn ci_is_eq_operator_prefix(c: i32): c == '=' or c == '!' or c == '<' or c == '>
 
 fn ci_extract_var_initializer_text(s: &str) -> str:
     let text = ci_strip_c_comments(s)
-    let slen = text.len() as i32
+    let slen = text.len()
     var paren_depth = 0
     var bracket_depth = 0
     var brace_depth = 0
@@ -15734,7 +15734,7 @@ fn ci_split_top_level_items(s: &str) -> List[str]:
     var brace_depth = 0
     var start = 0
     var i = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while i <= slen:
         let at_end = i == slen
         var c = 0
@@ -15774,7 +15774,7 @@ fn ci_translate_c_initializer_for_type(session: i64, init_src: &str, ty: &str) -
 fn ci_c_initializer_cast_type_is_void_ptr(cast_type: &str) -> bool:
     var compact = ""
     var i = 0
-    while i < cast_type.len() as i32:
+    while i < cast_type.len():
         let c = cast_type[i]
         if not ci_is_space(c):
             compact = compact ++ cast_type.slice(i as i64, (i + 1) as i64)
@@ -15800,7 +15800,7 @@ fn ci_c_initializer_is_identifier(s: &str) -> bool:
     if t.len() == 0 or not ci_is_ident_start(t[0]):
         return false
     var i = 1
-    while i < t.len() as i32:
+    while i < t.len():
         if not ci_is_ident_char(t[i]):
             return false
         i = i + 1
@@ -15919,7 +15919,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
         return ci_coerce_init_value_for_type(translated, ty)
 
     let close_brace = ci_find_matching_brace(trimmed, 0)
-    if close_brace != trimmed.len() as i32 - 1:
+    if close_brace != trimmed.len() - 1:
         return ""
     let inner = ci_trim(trimmed.slice(1, close_brace as i64))
     if inner.len() == 0:
@@ -15945,7 +15945,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
         let items = ci_split_top_level_items(inner)
         var expanded_items: List[str] = List.new()
         var expand_i = 0
-        while expand_i < items.len() as i32:
+        while expand_i < items.len():
             let raw_item = items[expand_i]
             var expanded_any = false
             if ci_c_initializer_is_identifier(raw_item):
@@ -15964,7 +15964,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
         var rendered_parts: List[str] = List.new()
         rendered_parts.push("[")
         var i: i32 = 0
-        while i < expanded_items.len() as i32:
+        while i < expanded_items.len():
             let item = ci_translate_c_initializer_for_cursor_type(session, expanded_items[i], elem_ty, elem_cxtype, ci_init_list_item_cursor(session, init_cursor, i, expanded_items.len()))
             if item.len() == 0:
                 return ""
@@ -15982,7 +15982,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
         field_parts.push(with_str_clone_ref(ty))
         field_parts.push(" { ")
         var i: i32 = 0
-        while i < items.len() as i32:
+        while i < items.len():
             if i >= field_count:
                 return ""
             let field_name = ci_init_list_record_field_name(session, ty, cxtype, i)
@@ -16023,8 +16023,8 @@ fn ci_preprocessed_var_initializer_by_name(var_name: &str) -> str:
     // already expanded).
     if g_migrate_raw_source.len() == 0 or var_name.len() == 0:
         return ""
-    let slen = g_migrate_raw_source.len() as i32
-    let nlen = var_name.len() as i32
+    let slen = g_migrate_raw_source.len()
+    let nlen = var_name.len()
     var i = 0
     while i + nlen <= slen:
         let c = g_migrate_raw_source[i]
@@ -16074,7 +16074,7 @@ fn ci_preprocessed_var_initializer_by_name(var_name: &str) -> str:
                     if ch == 123: brace_depth = brace_depth + 1
                     if ch == 125 and brace_depth > 0: brace_depth = brace_depth - 1
                     if ch == 61 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
-                        eq_pos = pos
+                        eq_pos = pos as i32
                         break
                     pos = pos + 1
                 if eq_pos >= 0:
@@ -16121,7 +16121,7 @@ fn ci_source_line_at(path: &str, line_no: i32) -> str:
         return ""
     var line = 1
     var start = 0
-    let len = text.len() as i32
+    let len = text.len()
     var pos = 0
     while pos <= len:
         if pos == len or text[pos] == 10:
@@ -16146,10 +16146,10 @@ fn ci_string_literal_at_source_location(loc: &str) -> str:
     let line = ci_source_line_at(path, line_no)
     if line.len() == 0:
         return ""
-    let llen = line.len() as i32
+    let llen = line.len()
     var pos = if col_no > 0: col_no - 1 else: 0
     if pos >= llen:
-        pos = llen - 1
+        pos = (llen - 1) as i32
     while pos >= 0:
         if line[pos] == 34:
             var slash_count = 0
@@ -16193,7 +16193,7 @@ fn ci_macro_arg_for_initializer_param(session: i64, var_cursor: i32, param_name:
     if line.len() == 0:
         return ""
     var pos = if col_no > 0: col_no - 1 else: 0
-    let llen = line.len() as i32
+    let llen = line.len()
     while pos < llen and ci_is_space(line[pos]):
         pos = pos + 1
     if pos >= llen or not ci_is_ident_start(line[pos]):
@@ -16233,7 +16233,7 @@ fn ci_macro_arg_for_initializer_param(session: i64, var_cursor: i32, param_name:
         return ""
     let arg_text = line.slice((paren + 1) as i64, close as i64)
     let args = ci_split_top_level_items(arg_text)
-    if param_idx >= args.len() as i32:
+    if param_idx >= args.len():
         return ""
     ci_trim(args[param_idx])
 
@@ -16253,7 +16253,7 @@ fn ci_string_macro_arg_from_expansion(session: i64, cursor: i32) -> str:
     if line.len() == 0:
         return ""
     var pos = if col_no > 0: col_no - 1 else: 0
-    let llen = line.len() as i32
+    let llen = line.len()
     while pos < llen and ci_is_space(line[pos]):
         pos = pos + 1
     if pos >= llen or not ci_is_ident_start(line[pos]):
@@ -16273,7 +16273,7 @@ fn ci_string_macro_arg_from_expansion(session: i64, cursor: i32) -> str:
     var found = ""
     var found_count = 0
     var i = 0
-    while i < args.len() as i32:
+    while i < args.len():
         let arg = ci_trim(args[i])
         if ci_expand_string_macro_sequence(session, arg).len() > 0:
             found = arg
@@ -16397,7 +16397,7 @@ fn ci_var_init_expr_from_decl_source_for_type(session: i64, var_cursor: i32, tar
 
 fn ci_expr_has_unresolved_string_macro(s: &str) -> bool:
     var i = 0
-    let slen = s.len() as i32
+    let slen = s.len()
     while i < slen:
         let c = s[i]
         if c == 34 or c == 39:
@@ -16638,7 +16638,7 @@ pub fn ci_temp_reset():
 
 fn ci_temp_id_for_cursor(cursor: i32) -> i32:
     var i: i32 = 0
-    let n = g_ci_temp_cursors.len() as i32
+    let n = g_ci_temp_cursors.len()
     while i < n:
         if g_ci_temp_cursors[i] == cursor:
             return g_ci_temp_ids[i]
@@ -16880,21 +16880,21 @@ pub fn ci_body_call_evidence(session: i64, cursor: i32, params: &List[str]) -> s
                 let index = ai - 1
                 if ci_cursor_is_null_like(session, arg):
                     out = out ++ f"null:{callee}:{index}\n"
-                for pi in 0..params.len() as i32:
+                for pi in 0..params.len():
                     if ci_cursor_names(session, arg, params[pi]):
                         out = out ++ f"sink:{callee}:{index}:" ++ params[pi] ++ "\n"
                 ai = ai + 1
     if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
         let lhs = with_ci_child(session, cursor, 0)
         let rhs = with_ci_child(session, cursor, 1)
-        for pi in 0..params.len() as i32:
+        for pi in 0..params.len():
             if ci_cursor_names(session, rhs, params[pi]):
                 let l = ci_peel_transparent(session, lhs)
                 if with_ci_cursor_kind(session, l) == CXK_MEMBER_REF:
                     out = out ++ "field:" ++ params[pi] ++ "\n"
                 else if with_ci_cursor_kind(session, l) == CXK_DECL_REF:
                     var is_param = false
-                    for pj in 0..params.len() as i32:
+                    for pj in 0..params.len():
                         if ci_cursor_names(session, l, params[pj]): is_param = true
                     if not is_param: out = out ++ "global:" ++ params[pi] ++ "\n"
     var i = 0
@@ -16977,8 +16977,8 @@ fn ci_subtree_has_labels(session: i64, cursor: i32) -> bool:
     false
 
 pub fn ci_find_substr(haystack: &str, needle: &str) -> isize:
-    let hlen = haystack.len() as i32
-    let nlen = needle.len() as i32
+    let hlen = haystack.len()
+    let nlen = needle.len()
     if nlen > hlen: return -1
     var i = 0
     while i <= hlen - nlen:
@@ -16992,7 +16992,7 @@ pub fn ci_find_substr(haystack: &str, needle: &str) -> isize:
 // into one With function scope.
 fn ci_find_hoisted_var_decl_index(decls: &List[CiHoistedVarDecl], name: &str) -> isize:
     var i = 0
-    while i < decls.len() as i32:
+    while i < decls.len():
         if decls[i].name == name:
             return i
         i = i + 1
@@ -17123,16 +17123,16 @@ impl CiGotoCfgContext:
         self.state.cfg.graph.add_block(with_str_clone_ref(desc))
 
     fn block_has_term(block: i32) -> bool:
-        if block < 0 or block >= self.state.cfg.graph.blocks.len() as i32:
+        if block < 0 or block >= self.state.cfg.graph.blocks.len():
             return true
         let b = self.state.cfg.graph.blocks[block]
         b.term_kind == StackifyTermKind.Br or b.term_kind == StackifyTermKind.CondBr or b.term_kind == StackifyTermKind.Return or b.term_kind == StackifyTermKind.Unreachable or b.term_kind == StackifyTermKind.Select
 
     fn block_has_pred(target: i32) -> bool:
-        if target < 0 or target >= self.state.cfg.graph.blocks.len() as i32:
+        if target < 0 or target >= self.state.cfg.graph.blocks.len():
             return false
         var bi = 0
-        while bi < self.state.cfg.graph.blocks.len() as i32:
+        while bi < self.state.cfg.graph.blocks.len():
             let block = self.state.cfg.graph.blocks[bi]
             var si = 0
             while si < block.succs_count:
@@ -17201,7 +17201,7 @@ impl CiGotoCfgContext:
 
     fn find_label(name: &str) -> isize:
         var i = 0
-        while i < self.state.label_names.len() as i32:
+        while i < self.state.label_names.len():
             if self.state.label_names[i] == name:
                 return i
             i = i + 1
@@ -17656,7 +17656,7 @@ impl CiGotoCfgContext:
     mut fn emit_switch_dispatch(exprs: CiExprPool, subject_id: CiExprId, dispatch_block: i32, after_block: i32, cases: CiGotoSwitchCase, loc: &str):
         if not self.state.ok:
             return
-        let value_count = cases.state.values.len() as i32
+        let value_count = cases.state.values.len()
         if value_count == 0:
             let target = if cases.state.has_default: cases.state.default_block else: after_block
             self.state.current = dispatch_block
@@ -17833,10 +17833,10 @@ impl CiStackEmitContext:
         return
 
     mut fn resolve_frame(depth: i32) -> CiStackEmitFrame:
-        if depth < 0 or depth >= self.frames.len() as i32:
+        if depth < 0 or depth >= self.frames.len():
             self.fail("stackify emitter: branch depth out of range")
             return CiStackEmitFrame {}
-        self.frames[(self.frames.len() as i32 - 1 - depth)]
+        self.frames[(self.frames.len() - 1 - depth)]
 
 impl CiStmtPool:
     fn stack_emit_stmt_block(ids: &List[i32]) -> CiStmtId:
@@ -17974,7 +17974,7 @@ impl CiStmtPool:
     fn native_goto_label_syms(cfg: &CiGotoCfg) -> List[i32]:
         let labels: List[i32] = List.new()
         var block: i32 = 0
-        while block < cfg.graph.blocks.len() as i32:
+        while block < cfg.graph.blocks.len():
             labels.push(self.add_string("__ci_bb_" ++ i64_to_string(block as i64)))
             block = block + 1
         labels
@@ -17991,7 +17991,7 @@ fn ci_native_goto_collect_leaf_ids(cfg: &CiGotoCfg, block: i32) -> List[i32]:
 fn ci_goto_cfg_reachable_blocks(cfg: &CiGotoCfg) -> List[i32]:
     let reachable: List[i32] = List.new()
     let worklist: List[i32] = List.new()
-    let block_count = cfg.graph.blocks.len() as i32
+    let block_count = cfg.graph.blocks.len()
     var i = 0
     while i < block_count:
         reachable.push(0)
@@ -18044,14 +18044,14 @@ impl CiStmtPool:
         self.goto_label(label_sym)
 
     fn native_goto_emit_terminator(cfg: &CiGotoCfg, block: i32, labels: &List[i32], exprs: CiExprPool) -> CiStmtId:
-        if block < 0 or block >= cfg.graph.blocks.len() as i32:
+        if block < 0 or block >= cfg.graph.blocks.len():
             return ci_native_goto_fail("native goto emitter: block out of range")
         let b = cfg.graph.blocks[block]
         if b.term_kind == StackifyTermKind.Br:
             if b.targets_count != 1:
                 return ci_native_goto_fail("native goto emitter: malformed branch terminator")
             let target = cfg.graph.targets[b.targets_start].block
-            if target < 0 or target >= labels.len() as i32:
+            if target < 0 or target >= labels.len():
                 return ci_native_goto_fail("native goto emitter: branch target out of range")
             return self.native_goto_single_goto(labels[target])
 
@@ -18060,7 +18060,7 @@ impl CiStmtPool:
                 return ci_native_goto_fail("native goto emitter: malformed conditional branch")
             let true_target = cfg.graph.targets[b.targets_start].block
             let false_target = cfg.graph.targets[(b.targets_start + 1)].block
-            if true_target < 0 or true_target >= labels.len() as i32 or false_target < 0 or false_target >= labels.len() as i32:
+            if true_target < 0 or true_target >= labels.len() or false_target < 0 or false_target >= labels.len():
                 return ci_native_goto_fail("native goto emitter: conditional target out of range")
             let then_id = self.native_goto_single_goto(labels[true_target])
             let else_id = self.native_goto_single_goto(labels[false_target])
@@ -18110,7 +18110,7 @@ impl CiExprPool:
 impl CiStmtPool:
     fn native_goto_emit_cfg(cfg: &CiGotoCfg, hoisted_stmt_ids: &List[i32], exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
         let labels = self.native_goto_label_syms(cfg)
-        if cfg.graph.entry < 0 or cfg.graph.entry >= labels.len() as i32:
+        if cfg.graph.entry < 0 or cfg.graph.entry >= labels.len():
             return ci_native_goto_fail("native goto emitter: entry block out of range")
         let reachable = ci_goto_cfg_reachable_blocks(cfg)
 
@@ -18146,7 +18146,7 @@ impl CiStmtPool:
         ids.push(self.goto_label(labels[cfg.graph.entry]) as i32)
 
         var block: i32 = 0
-        while block < cfg.graph.blocks.len() as i32:
+        while block < cfg.graph.blocks.len():
             if reachable[block] == 0:
                 block = block + 1
                 continue
@@ -18184,7 +18184,7 @@ impl CiStmtPool:
 impl CiGotoCfgContext:
     mut fn verify_labels():
         var i = 0
-        while i < self.state.label_names.len() as i32 and self.state.ok:
+        while i < self.state.label_names.len() and self.state.ok:
             if self.state.label_defined[i] == 0:
                 self.fail("unresolved goto label '" ++ self.state.label_names[i] ++ "'", "")
             i = i + 1
@@ -18196,7 +18196,7 @@ impl CiStmtPool:
 
         var hoisted_stmt_ids: List[i32] = List.new()
         var hvi: i32 = 0
-        while hvi < hoisted_decls.len() as i32:
+        while hvi < hoisted_decls.len():
             let decl = hoisted_decls[hvi]
             let name_idx = self.add_string(decl.name)
             let ty_id = decl.ty
@@ -18227,7 +18227,7 @@ impl CiStmtPool:
         ctx.lower_compound(session, body_cursor, self.val(), exprs, types, scope)
         if ctx.state.ok and ctx.state.current >= 0:
             let reachable = ci_goto_cfg_reachable_blocks(ctx.state.cfg)
-            if ctx.state.current < reachable.len() as i32 and reachable[ctx.state.current] == 0:
+            if ctx.state.current < reachable.len() and reachable[ctx.state.current] == 0:
                 ctx.unreachable_current()
             else:
                 let ret_ty = ci_scope_get_return_type(scope)
@@ -18264,7 +18264,7 @@ impl CiStmtPool:
             hi = hi + 1
         let body_ids = ci_stmt_collect_flat_ids(self.val(), body_id)
         var bi: i32 = 0
-        while bi < body_ids.len() as i32:
+        while bi < body_ids.len():
             ids.push(body_ids[bi])
             bi = bi + 1
         self.from_flat_ids(&ids)
@@ -18548,7 +18548,7 @@ fn ci_cast_memcmp_args(args: &str) -> str:
 fn ci_find_arg_comma(args: &str, start: i32) -> i32:
     var depth = 0
     var i = start
-    let alen = args.len() as i32
+    let alen = args.len()
     while i < alen:
         let c = args[i]
         if c == 40: depth = depth + 1      // (
@@ -18564,7 +18564,7 @@ fn ci_strip_last_arg(args: &str) -> str:
     var last_comma = -1
     var depth = 0
     var i = 0
-    let alen = args.len() as i32
+    let alen = args.len()
     while i < alen:
         let c = args[i]
         if c == 40: depth = depth + 1      // (
@@ -18581,7 +18581,7 @@ pub fn ci_get_nth_pipe_entry(entries: &str, n: i32) -> str:
     if entries.len() == 0: return ""
     var idx = 0
     var pos = 1  // skip leading |
-    let elen = entries.len() as i32
+    let elen = entries.len()
     while pos < elen:
         var end = pos
         while end < elen and entries[end] != 124:
@@ -18843,7 +18843,7 @@ fn ci_note_filtered_system_symbol_ref_at(session: i64, cursor: i32, name: &str, 
 // Check if a declaration name is from a system header (not the user's code).
 // This filters out the noise from stdlib.h, string.h, ctype.h, etc.
 fn ci_is_wait_status_macro_name(name: &str) -> bool:
-    let len = name.len() as i32
+    let len = name.len()
     if len < 2 or len > 12 or name[0] != 87:
         return false
     for i in 1..len:
@@ -19084,8 +19084,8 @@ fn ci_map_libc_call(callee: &str, args: &str) -> str:
         return ci_migrate_wrap_call_if_needed("with_memcmp", "with_memcmp(" ++ ci_cast_memcmp_args(args) ++ ")")
     if callee == "memchr":
         let first = ci_extract_first_arg(args)
-        let rest_start = first.len() as i32 + 1
-        if rest_start < args.len() as i32:
+        let rest_start = first.len() + 1
+        if rest_start < args.len():
             let rest = ci_trim(args.slice(rest_start as i64, args.len()))
             return "(" ++ ci_migrate_wrap_call_if_needed("memchr", "memchr((" ++ first ++ " as *const c_void), " ++ rest ++ ")") ++ " as *const u8)"
         return "(" ++ ci_migrate_wrap_call_if_needed("memchr", "memchr((" ++ first ++ " as *const c_void))") ++ " as *const u8)"
@@ -19126,12 +19126,12 @@ pub fn ci_count_substring(haystack: &str, needle: &str) -> isize:
         return 0
     var count = 0
     var pos = 0
-    let hlen = haystack.len() as i32
-    let nlen = needle.len() as i32
+    let hlen = haystack.len()
+    let nlen = needle.len()
     while pos <= hlen - nlen:
         if haystack.slice(pos as i64, (pos + nlen) as i64) == needle:
             count = count + 1
-            pos = pos + nlen
+            pos = (pos + nlen) as i32
         else:
             pos = pos + 1
     count

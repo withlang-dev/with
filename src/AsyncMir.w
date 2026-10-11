@@ -63,19 +63,19 @@ impl AsyncMirBody:
         self.suspend_span_ends.push(span_end)
         self.suspend_resume_bbs.push(resume_bb)
         self.suspend_state_from.push(idx)
-        self.suspend_state_to.push(idx + 1)
+        self.suspend_state_to.push((idx + 1) as i32)
         self.suspend_live_locals.push(live_locals)
         self.suspend_storage_dead.push(storage_dead)
         self.suspend_drop_counts.push(drop_count)
 
     mut fn finalize_states():
-        self.state_count = self.suspend_kinds.len() as i32 + 1
+        self.state_count = (self.suspend_kinds.len() + 1) as i32
 
     fn suspend_count() -> i32:
         self.suspend_kinds.len() as i32
 
     fn has_kind(kind: i32) -> bool:
-        for i in 0..self.suspend_kinds.len() as i32:
+        for i in 0..self.suspend_kinds.len():
             if self.suspend_kinds[i] == kind:
                 return true
         false
@@ -101,12 +101,12 @@ impl AsyncMirModule:
 
     fn total_suspend_points() -> isize:
         var total = 0
-        for i in 0..self.bodies.len() as i32:
+        for i in 0..self.bodies.len():
             total = total + self.bodies[i].suspend_count()
         total
 
     fn requires_async_runtime() -> bool:
-        for i in 0..self.bodies.len() as i32:
+        for i in 0..self.bodies.len():
             let body = &self.bodies[i]
             if body.flavor == AsyncBodyKind.Async:
                 return true
@@ -131,7 +131,7 @@ pub fn dump_async_mir_module(mod: &AsyncMirModule, pool: InternPool) -> str:
     out = out ++ f"async-mir module bodies={mod.body_count()}"
     out = out ++ f" suspend_points={mod.total_suspend_points()}\n"
 
-    for bi in 0..mod.bodies.len() as i32:
+    for bi in 0..mod.bodies.len():
         let body = &mod.bodies[bi]
         if bi > 0:
             out = out ++ "\n"

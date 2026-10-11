@@ -109,7 +109,7 @@ pub type TrieValues[V] { nodes: List[i64], children: List[i32] }
 impl[V] TrieValues[V]:
     pub mut fn next() -> Option[&V]:
         while self.nodes.len() > 0:
-            let top = self.nodes.len() as i32 - 1
+            let top = self.nodes.len() - 1
             let node = self.nodes[top] as *mut _TrieNode
             let child: i32 = self.children[top]
             if child < 0:

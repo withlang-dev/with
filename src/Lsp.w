@@ -44,7 +44,7 @@ fn lsp_read_message() -> str:
     with_read_bytes_stdin(content_length)
 
 fn lsp_write_response(json: &str):
-    let len_str = int_to_string(json.len() as i32)
+    let len_str = int_to_string(json.len())
     with_write_stdout("Content-Length: " ++ len_str ++ "\r\n\r\n")
     with_write_stdout(json)
     with_flush_stdout()
@@ -52,7 +52,7 @@ fn lsp_write_response(json: &str):
 fn lsp_parse_int(s: &str) -> i32:
     var result: i32 = 0
     var started = false
-    for i in 0..s.len() as i32:
+    for i in 0..s.len():
         let ch = s[i]
         if ch >= 48 and ch <= 57:
             result = result * 10 + (ch - 48)
@@ -317,9 +317,9 @@ fn json_unescape(s: &str) -> str:
         return with_str_clone_ref(s)
     var out = ""
     var i = 0
-    while i < s.len() as i32:
+    while i < s.len():
         let ch = s[i]
-        if ch == 92 and i + 1 < s.len() as i32:
+        if ch == 92 and i + 1 < s.len():
             let next = s[(i + 1)]
             if next == 110:
                 out = out ++ str_from_byte(10)
@@ -341,7 +341,7 @@ fn json_unescape(s: &str) -> str:
 
 fn json_escape(s: &str) -> str:
     var out = ""
-    for i in 0..s.len() as i32:
+    for i in 0..s.len():
         let ch = s[i]
         if ch == 34:
             out = out ++ "\\\""
@@ -358,8 +358,8 @@ fn json_escape(s: &str) -> str:
     out
 
 fn lsp_find_substr(haystack: &str, needle: &str) -> i32:
-    let h_len = haystack.len() as i32
-    let n_len = needle.len() as i32
+    let h_len = haystack.len()
+    let n_len = needle.len()
     if n_len == 0 or n_len > h_len:
         return -1
     for i in 0..(h_len - n_len + 1):
@@ -369,7 +369,7 @@ fn lsp_find_substr(haystack: &str, needle: &str) -> i32:
                 ok = false
                 break
         if ok:
-            return i
+            return i as i32
     -1
 
 // ── JSON builders (avoid f-string brace complexity) ──────────
@@ -466,7 +466,7 @@ fn LspDocument.new(uri: &str, path: &str, text: &str, version: i32) -> LspDocume
 // Fast-tier: parse-only, no imports, no sema. ~1ms.
 impl LspDocument:
     mut fn ensure_parsed():
-        if self.fast_valid and self.fast_text_len == self.text.len() as i32:
+        if self.fast_valid and self.fast_text_len == self.text.len():
             return
         var lexer = Lexer.init(self.text, 0)
         let tokens = lexer.tokenize()
@@ -481,7 +481,7 @@ impl LspDocument:
 
     // Slow-tier: full compilation with PRELUDE_NONE. ~50-200ms.
     mut fn ensure_analyzed():
-        if self.cache_valid and self.cached_text_len == self.text.len() as i32:
+        if self.cache_valid and self.cached_text_len == self.text.len():
             return
         var comp = Compilation.init()
         comp.set_prelude_mode(2)
@@ -505,7 +505,7 @@ impl LspDocument:
                         self.cached_type_at.insert(start, tname)
         // Build trait-methods-per-type map from sema's impl tables.
         self.cached_trait_methods = HashMap.new()
-        for ii in 0..sema.impl_type_syms.len() as i32:
+        for ii in 0..sema.impl_type_syms.len():
             let type_sym = sema.impl_type_syms[ii]
             let type_name = sema.pool_resolve(type_sym)
             if type_name.len() == 0:
@@ -516,7 +516,7 @@ impl LspDocument:
             let existing = self.cached_trait_methods.get(type_name)
             if existing.is_some():
                 let prior = existing.unwrap()
-                for method_i in 0..prior.len() as i32:
+                for method_i in 0..prior.len():
                     // HashMap.get returns a view. The cache being rebuilt needs
                     // independent strings, and concatenation is the existing
                     // ownership-producing string operation available here.
@@ -527,7 +527,7 @@ impl LspDocument:
                 let trait_opt = sema.trait_lookup.get(trait_sym)
                 if trait_opt.is_some():
                     let tidx = trait_opt.unwrap()
-                    if tidx >= 0 and tidx < sema.trait_method_starts.len() as i32:
+                    if tidx >= 0 and tidx < sema.trait_method_starts.len():
                         let mstart = sema.trait_method_starts[tidx]
                         let mcount = sema.trait_method_counts[tidx]
                         var mi = 0
@@ -560,7 +560,7 @@ impl LspDocument:
         if opt.is_some():
             let prior = opt.unwrap()
             let methods: List[str] = List.new()
-            for method_i in 0..prior.len() as i32:
+            for method_i in 0..prior.len():
                 methods.push("" ++ prior[method_i])
             return methods
         List.new()
@@ -579,9 +579,9 @@ fn LspState.new() -> LspState:
 
 impl LspState:
     fn find_doc(uri: &str) -> i32:
-        for i in 0..self.documents.len() as i32:
+        for i in 0..self.documents.len():
             if (&self.documents[i]).uri == uri:
-                return i
+                return i as i32
         -1
 
     mut fn ensure_doc_parsed(idx: i32):
@@ -593,7 +593,7 @@ impl LspState:
         // real double free; pre-flip it merely leaked). Decide from a VIEW,
         // then replace the slot with an independently built document.
         let parsed_view = &self.documents[idx]
-        if parsed_view.fast_valid and parsed_view.fast_text_len == parsed_view.text.len() as i32:
+        if parsed_view.fast_valid and parsed_view.fast_text_len == parsed_view.text.len():
             return
         var reparsed = LspDocument.new(parsed_view.uri, parsed_view.path, parsed_view.text, parsed_view.version)
         reparsed.ensure_parsed()
@@ -605,7 +605,7 @@ impl LspState:
         if idx < 0:
             return
         let analyzed_view = &self.documents[idx]
-        if analyzed_view.cache_valid and analyzed_view.cached_text_len == analyzed_view.text.len() as i32:
+        if analyzed_view.cache_valid and analyzed_view.cached_text_len == analyzed_view.text.len():
             return
         var reanalyzed = LspDocument.new(analyzed_view.uri, analyzed_view.path, analyzed_view.text, analyzed_view.version)
         reanalyzed.ensure_parsed()
@@ -643,7 +643,7 @@ fn uri_to_path(uri: &str) -> str:
 fn lsp_offset_to_line(text: &str, offset: i32) -> i32:
     var line: i32 = 0
     var i = 0
-    while i < offset and i < text.len() as i32:
+    while i < offset and i < text.len():
         if text[i] == 10:
             line = line + 1
         i = i + 1
@@ -652,7 +652,7 @@ fn lsp_offset_to_line(text: &str, offset: i32) -> i32:
 fn lsp_offset_to_col(text: &str, offset: i32) -> i32:
     var col: i32 = 0
     var i = 0
-    while i < offset and i < text.len() as i32:
+    while i < offset and i < text.len():
         if text[i] == 10:
             col = 0
         else:
@@ -663,9 +663,9 @@ fn lsp_offset_to_col(text: &str, offset: i32) -> i32:
 fn lsp_line_col_to_offset(text: &str, line: i32, col: i32) -> i32:
     var cur_line = 0
     var cur_col = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if cur_line == line and cur_col == col:
-            return i
+            return i as i32
         if text[i] == 10:
             cur_line = cur_line + 1
             cur_col = 0
@@ -702,7 +702,7 @@ impl LspState:
             let sc = lsp_offset_to_col(text, d.primary.start)
             var el = sl
             var ec = sc + 1
-            if d.primary.end > d.primary.start and d.primary.end <= text.len() as i32:
+            if d.primary.end > d.primary.start and d.primary.end <= text.len():
                 el = lsp_offset_to_line(text, d.primary.end)
                 ec = lsp_offset_to_col(text, d.primary.end)
             if not first:
@@ -754,7 +754,7 @@ impl LspState:
                         let ds = slow_pool.get_start(decl)
                         var def_uri = with_str_clone_ref(uri)
                         var def_text = with_str_clone_ref(text)
-                        if di < slow_paths.len() as i32:
+                        if di < slow_paths.len():
                             let decl_path = slow_paths[di]
                             if decl_path.len() > 0 and decl_path != uri_to_path(uri):
                                 def_uri = "file://" ++ decl_path
@@ -765,7 +765,7 @@ impl LspState:
                                     continue
                         let dl = lsp_offset_to_line(def_text, ds)
                         let dc = lsp_offset_to_col(def_text, ds)
-                        let loc = jobj_start() ++ jkv_str("uri", def_uri) ++ "," ++ jkv_raw("range", jrange(dl, dc, dl, dc + name.len() as i32)) ++ jobj_end()
+                        let loc = jobj_start() ++ jkv_str("uri", def_uri) ++ "," ++ jkv_raw("range", jrange(dl, dc, dl, (dc + name.len()) as i32)) ++ jobj_end()
                         lsp_write_response(jrpc_result(id, loc))
                         return
 
@@ -780,7 +780,7 @@ impl LspState:
                     let ds = parsed.pool.get_start(decl)
                     let dl = lsp_offset_to_line(text, ds)
                     let dc = lsp_offset_to_col(text, ds)
-                    let loc = jobj_start() ++ jkv_str("uri", uri) ++ "," ++ jkv_raw("range", jrange(dl, dc, dl, dc + name.len() as i32)) ++ jobj_end()
+                    let loc = jobj_start() ++ jkv_str("uri", uri) ++ "," ++ jkv_raw("range", jrange(dl, dc, dl, (dc + name.len()) as i32)) ++ jobj_end()
                     lsp_write_response(jrpc_result(id, loc))
                     return
 
@@ -814,7 +814,7 @@ fn lsp_extract_doc_comment(text: &str, decl_start: i32) -> str:
             break
     // Reverse the collected lines (they were collected bottom-up)
     var result = ""
-    var i = doc_lines.len() as i32 - 1
+    var i = doc_lines.len() - 1
     while i >= 0:
         if result.len() > 0:
             result = result ++ "\n"
@@ -922,38 +922,38 @@ impl LspState:
             // str methods
             let str_methods = "len,slice,starts_with,ends_with,contains,find,replace,to_upper,to_lower,upper,lower,trim,split,byte_at,repeat"
             var sm_start = 0
-            for smi in 0..str_methods.len() as i32:
-                if str_methods[smi] == 44 or smi == str_methods.len() as i32 - 1:
+            for smi in 0..str_methods.len():
+                if str_methods[smi] == 44 or smi == str_methods.len() - 1:
                     let sm_end = if str_methods[smi] == 44: smi else: smi + 1
                     let m = str_methods.slice(sm_start as i64, sm_end as i64)
                     if not first: items = items ++ ","
                     first = false
                     items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
-                    sm_start = smi + 1
+                    sm_start = (smi + 1) as i32
 
         else if type_name == "List":
             let list_methods = "push,pop,get,len,is_empty,contains,clear"
             var vm_start = 0
-            for vmi in 0..list_methods.len() as i32:
-                if list_methods[vmi] == 44 or vmi == list_methods.len() as i32 - 1:
+            for vmi in 0..list_methods.len():
+                if list_methods[vmi] == 44 or vmi == list_methods.len() - 1:
                     let vm_end = if list_methods[vmi] == 44: vmi else: vmi + 1
                     let m = list_methods.slice(vm_start as i64, vm_end as i64)
                     if not first: items = items ++ ","
                     first = false
                     items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
-                    vm_start = vmi + 1
+                    vm_start = (vmi + 1) as i32
 
         else if type_name == "HashMap":
             let hm_methods = "get,insert,contains,remove,len,is_empty,clear"
             var hm_start = 0
-            for hmi in 0..hm_methods.len() as i32:
-                if hm_methods[hmi] == 44 or hmi == hm_methods.len() as i32 - 1:
+            for hmi in 0..hm_methods.len():
+                if hm_methods[hmi] == 44 or hmi == hm_methods.len() - 1:
                     let hm_end = if hm_methods[hmi] == 44: hmi else: hmi + 1
                     let m = hm_methods.slice(hm_start as i64, hm_end as i64)
                     if not first: items = items ++ ","
                     first = false
                     items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
-                    hm_start = hmi + 1
+                    hm_start = (hmi + 1) as i32
 
         else if type_name.len() > 0:
             // User struct: find fields from type declaration
@@ -1023,7 +1023,7 @@ impl LspState:
             let cidx = self.find_doc(uri)
             if cidx >= 0 and (&self.documents[cidx]).cache_valid:
                 let trait_methods = (&self.documents[cidx]).trait_methods_for_type(type_name)
-                for tmi in 0..trait_methods.len() as i32:
+                for tmi in 0..trait_methods.len():
                     let tmname = trait_methods[tmi]
                     if not first: items = items ++ ","
                     first = false
@@ -1148,7 +1148,7 @@ impl LspState:
         // Context: "use std." / "use test." → module completion (check before dot)
         if lsp_find_substr(line_text, "use std.") >= 0:
             let modules = lsp_list_embedded_modules("std/")
-            for i in 0..modules.len() as i32:
+            for i in 0..modules.len():
                 let m = modules[i]
                 if not first:
                     items = items ++ ","
@@ -1161,7 +1161,7 @@ impl LspState:
         // Context: "use test." → suggest embedded test modules
         if lsp_find_substr(line_text, "use test.") >= 0:
             let test_mods = lsp_list_embedded_modules("test/")
-            for i in 0..test_mods.len() as i32:
+            for i in 0..test_mods.len():
                 let m = test_mods[i]
                 if not first:
                     items = items ++ ","
@@ -1203,15 +1203,15 @@ impl LspState:
         var scope_names: List[str] = List.new()
         if enclosing_fn as i32 != 0:
             let params = lsp_collect_fn_params(parse_pool, parse_intern, enclosing_fn)
-            for pi in 0..params.len() as i32:
+            for pi in 0..params.len():
                 scope_names.push(with_str_clone_ref(params[pi]))
             // Walk body recursively to collect bindings visible at cursor.
             let body = parse_pool.get_data1(enclosing_fn)
             if body != 0:
                 let bindings = lsp_collect_bindings_rec(parse_pool, parse_intern, body, offset)
-                for bi in 0..bindings.len() as i32:
+                for bi in 0..bindings.len():
                     scope_names.push(with_str_clone_ref(bindings[bi]))
-        for si in 0..scope_names.len() as i32:
+        for si in 0..scope_names.len():
             let sname = scope_names[si]
             if not first:
                 items = items ++ ","
@@ -1220,7 +1220,7 @@ impl LspState:
 
         // Keywords
         let keywords = lsp_keywords()
-        for i in 0..keywords.len() as i32:
+        for i in 0..keywords.len():
             let kw = keywords[i]
             if not first:
                 items = items ++ ","
@@ -1266,15 +1266,15 @@ fn lsp_append_csv_items(items: &str, csv: &str, kind: i32, first: bool) -> str:
     var result = with_str_clone_ref(items)
     var f = first
     var start = 0
-    for i in 0..csv.len() as i32:
-        if csv[i] == 44 or i == csv.len() as i32 - 1:
+    for i in 0..csv.len():
+        if csv[i] == 44 or i == csv.len() - 1:
             let end = if csv[i] == 44: i else: i + 1
             let name = csv.slice(start as i64, end as i64)
             if not f:
                 result = result ++ ","
             f = false
             result = result ++ jobj_start() ++ jkv_str("label", name) ++ "," ++ jkv_int("kind", kind) ++ jobj_end()
-            start = i + 1
+            start = (i + 1) as i32
     result
 
 // ── Fast-tier parse + scope collection ───────────────────────
@@ -1373,7 +1373,7 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
         let for_body = pool.get_data2(nid)
         if for_body != 0:
             let inner = lsp_collect_bindings_rec(pool, intern, for_body, offset)
-            for ii in 0..inner.len() as i32:
+            for ii in 0..inner.len():
                 result.push(with_str_clone_ref(inner[ii]))
         return result
 
@@ -1385,11 +1385,11 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
         for i in 0..stmt_count:
             let stmt = pool.get_extra(extra_start + i)
             let inner = lsp_collect_bindings_rec(pool, intern, stmt, offset)
-            for ii in 0..inner.len() as i32:
+            for ii in 0..inner.len():
                 result.push(with_str_clone_ref(inner[ii]))
         if tail != 0:
             let inner = lsp_collect_bindings_rec(pool, intern, tail, offset)
-            for ii in 0..inner.len() as i32:
+            for ii in 0..inner.len():
                 result.push(with_str_clone_ref(inner[ii]))
         return result
 
@@ -1399,11 +1399,11 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
         var result: List[str] = List.new()
         if then_body != 0 and offset >= pool.get_start(then_body as NodeId) and offset <= pool.get_end(then_body as NodeId):
             let inner = lsp_collect_bindings_rec(pool, intern, then_body, offset)
-            for ii in 0..inner.len() as i32:
+            for ii in 0..inner.len():
                 result.push(with_str_clone_ref(inner[ii]))
         if else_body != 0 and offset >= pool.get_start(else_body as NodeId) and offset <= pool.get_end(else_body as NodeId):
             let inner = lsp_collect_bindings_rec(pool, intern, else_body, offset)
-            for ii in 0..inner.len() as i32:
+            for ii in 0..inner.len():
                 result.push(with_str_clone_ref(inner[ii]))
         return result
 
@@ -1449,8 +1449,8 @@ fn lsp_list_embedded_modules(prefix: &str) -> List[str]:
     // Split by newline and filter
     var start = 0
     var i = 0
-    while i <= listing.len() as i32:
-        let at_end = i == listing.len() as i32
+    while i <= listing.len():
+        let at_end = i == listing.len()
         let ch = if at_end: 10 else: listing[i]
         if ch == 10:
             let entry = listing.slice(start as i64, i as i64)
@@ -1589,7 +1589,7 @@ impl LspState:
 
         // Build SignatureHelp response
         var params_json = jarr_start()
-        for pi in 0..param_labels.len() as i32:
+        for pi in 0..param_labels.len():
             if pi > 0:
                 params_json = params_json ++ ","
             params_json = params_json ++ jobj_start() ++ jkv_str("label", param_labels[pi]) ++ jobj_end()
@@ -1623,7 +1623,7 @@ impl LspState:
         let parsed = self.get_parsed(uri, text)
         var is_top_level = false
         var scope_start = 0
-        var scope_end = text.len() as i32
+        var scope_end = text.len()
         for di in 0..parsed.pool.decl_count():
             let decl = parsed.pool.get_decl(di)
             let kind = parsed.pool.kind(decl)
@@ -1681,7 +1681,7 @@ impl LspState:
         let cached_paths = if use_cache: &self.documents[idx].cached_decl_paths else: &empty_paths
         if cached_paths.len() > 0:
             var scanned_paths = uri_to_path(uri) ++ "\n"
-            for di in 0..cached_paths.len() as i32:
+            for di in 0..cached_paths.len():
                 let dpath = cached_paths[di]
                 if dpath.len() == 0:
                     continue
@@ -1773,7 +1773,7 @@ fn lsp_is_valid_ident(name: &str) -> bool:
     let first_ch = name[0]
     if not ((first_ch >= 97 and first_ch <= 122) or (first_ch >= 65 and first_ch <= 90) or first_ch == 95):
         return false
-    for i in 1..name.len() as i32:
+    for i in 1..name.len():
         let ch = name[i]
         if not ((ch >= 97 and ch <= 122) or (ch >= 65 and ch <= 90) or (ch >= 48 and ch <= 57) or ch == 95):
             return false
@@ -1837,7 +1837,7 @@ impl LspState:
         let cached_paths = if use_cache: &self.documents[cidx].cached_decl_paths else: &empty_paths
         if cached_paths.len() > 0:
             var scanned_paths = uri_to_path(uri) ++ "\n"
-            for di in 0..cached_paths.len() as i32:
+            for di in 0..cached_paths.len():
                 let dpath = cached_paths[di]
                 if dpath.len() == 0 or dpath.starts_with("<embedded"):
                     continue

@@ -87,7 +87,7 @@ fn wo_abs(root: &str, path: &str) -> str:
     root ++ "/" ++ path
 
 pub fn wo_arg_value(args: &List[str], prefix: &str) -> str:
-    for i in 0..args.len() as i32:
+    for i in 0..args.len():
         let arg = args[i]
         if arg.starts_with(prefix):
             return wo_owned_text(arg.slice(prefix.len(), arg.len()))
@@ -258,7 +258,7 @@ pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: 
     exts.push("manifest")
     var previous = wo_owned_text(build_name)
     var group = target_new(.Group, wo_group_target_name(plan), "")
-    for ei in 0..exts.len() as i32:
+    for ei in 0..exts.len():
         let ext = exts[ei]
         let install_name = wo_target_stem(plan) ++ "-install-" ++ ext
         var install = target_new(.Install, wo_owned_text(install_name), fs_prefix ++ "." ++ ext).output(store_prefix ++ "." ++ ext)
@@ -274,7 +274,7 @@ pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: 
 pub fn target_with_wo_corpus_inputs(target: Target, ctx: &BuildCtx, plan: &WoBundle) -> Target:
     var out = target
     let corpus_files = compiler_w_files(ctx.fs(), plan.corpus_dir)
-    for fi in 0..corpus_files.len() as i32:
+    for fi in 0..corpus_files.len():
         out = out.input(wo_owned_text(corpus_files[fi]))
     out
 
@@ -331,7 +331,7 @@ pub fn wo_drift_target(ctx: &BuildCtx, plan: &WoBundle, compiler: &str, compiler
     kinds.push("o")
     kinds.push("wi")
     kinds.push("manifest")
-    for ki in 0..kinds.len() as i32:
+    for ki in 0..kinds.len():
         target = target.input(wo_prefix(plan) ++ "." ++ kinds[ki])
     target = target_with_wo_corpus_inputs(move target, ctx, plan)
     target = target.write_scope(wo_owned_text(dir))
@@ -393,7 +393,7 @@ pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
     fields.push("target")
     fields.push("fingerprint")
     fields.push("interface-sha")
-    for fi in 0..fields.len() as i32:
+    for fi in 0..fields.len():
         let field = fields[fi]
         if wo_manifest_field(stored_manifest, field) != wo_manifest_field(scratch_manifest, field):
             return wo_fail(ctx, "declaration drift: manifest `" ++ field ++ "` differs between " ++ stored ++ " and " ++ scratch)
@@ -452,7 +452,7 @@ fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &st
     exts.push("o")
     exts.push("wi")
     exts.push("manifest")
-    for ei in 0..exts.len() as i32:
+    for ei in 0..exts.len():
         let path = store_prefix ++ "." ++ exts[ei]
         if not fs.host_exists(path):
             return "store lacks " ++ path
@@ -529,7 +529,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
         exts.push("o")
         exts.push("wi")
         exts.push("manifest")
-        for ei in 0..exts.len() as i32:
+        for ei in 0..exts.len():
             let ext = exts[ei]
             if fs.write_text(prefix ++ "." ++ ext, fs.host_read_text(store_prefix ++ "." ++ ext)) != 0:
                 return wo_fail(ctx, "could not copy " ++ store_prefix ++ "." ++ ext ++ " into " ++ tree_dir)

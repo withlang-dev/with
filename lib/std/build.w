@@ -500,7 +500,7 @@ fn tool_capability_require(token: &str, name: &str):
 
 fn tool_safe_label(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
         if keep:
@@ -698,7 +698,7 @@ fn tool_path_require_project_relative(path: &str):
 
 fn tool_path_dirname(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
             last_slash = i
     if last_slash < 0:
@@ -713,7 +713,7 @@ fn tool_path_normalize(path: &str) -> str:
     let parts: List[str] = List.new()
     var start = 0
     var is_absolute = path[0] == 47 or path[0] == 92
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 47 or ch == 92:
             if i > start:
@@ -726,7 +726,7 @@ fn tool_path_normalize(path: &str) -> str:
                 else if part != ".":
                     parts.push(part)
             start = i + 1
-    if start < path.len() as i32:
+    if start < path.len():
         let part = path.slice(start as i64, path.len() as i64)
         if part == "..":
             if parts.len() > 0 and parts[parts.len() - 1] != "..":
@@ -742,7 +742,7 @@ fn tool_path_normalize(path: &str) -> str:
     var result = ""
     if is_absolute:
         result = "/"
-    for i in 0..parts.len() as i32:
+    for i in 0..parts.len():
         if i > 0:
             result = result ++ "/"
         result = result ++ parts[i]
@@ -751,19 +751,19 @@ fn tool_path_normalize(path: &str) -> str:
 fn tool_split_by_slash(path: &str) -> List[str]:
     let parts: List[str] = List.new()
     var start = 0
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 47 or ch == 92:
             if i > start:
                 parts.push(path.slice(start as i64, i as i64))
             start = i + 1
-    if start < path.len() as i32:
+    if start < path.len():
         parts.push(path.slice(start as i64, path.len()))
     parts
 
 fn tool_glob_segment_matches(pattern: &str, name: &str) -> bool:
     var star = -1
-    for i in 0..pattern.len() as i32:
+    for i in 0..pattern.len():
         if pattern[i] == 42:
             if star >= 0:
                 return false
@@ -783,17 +783,17 @@ fn tool_glob_segment_matches(pattern: &str, name: &str) -> bool:
     true
 
 fn tool_glob_segments_match(pat_segs: &List[str], pi: i32, file_segs: &List[str], fi: i32) -> bool:
-    if pi >= pat_segs.len() as i32:
-        return fi >= file_segs.len() as i32
+    if pi >= pat_segs.len():
+        return fi >= file_segs.len()
     let seg = pat_segs[pi]
     if seg == "**":
         var k = fi
-        while k <= file_segs.len() as i32:
+        while k <= file_segs.len():
             if tool_glob_segments_match(pat_segs, pi + 1, file_segs, k):
                 return true
             k = k + 1
         return false
-    if fi >= file_segs.len() as i32:
+    if fi >= file_segs.len():
         return false
     if not tool_glob_segment_matches(seg, file_segs[fi]):
         return false
@@ -816,11 +816,11 @@ fn tool_glob_str_compare(a: &str, b: &str) -> i32:
 
 fn tool_glob_sort(items: List[str]) -> List[str]:
     var sorted: List[str] = List.new()
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let item = items[i]
         var inserted = false
         var out: List[str] = List.new()
-        for j in 0..sorted.len() as i32:
+        for j in 0..sorted.len():
             let existing = sorted[j]
             if not inserted and tool_glob_str_compare(item, existing) < 0:
                 out.push(with_str_clone_ref(item))
@@ -856,7 +856,7 @@ fn tool_path_is_parent_of(parent: &str, child: &str) -> bool:
 fn ToolFs.write_file_allowed(self: &Self, path: &str) -> bool:
     if not self.write_scoped:
         return true
-    for i in 0..self.write_scope.len() as i32:
+    for i in 0..self.write_scope.len():
         if tool_path_is_same_or_child(path, self.write_scope[i]):
             return true
     false
@@ -864,7 +864,7 @@ fn ToolFs.write_file_allowed(self: &Self, path: &str) -> bool:
 fn ToolFs.mkdir_allowed(self: &Self, path: &str) -> bool:
     if not self.write_scoped:
         return true
-    for i in 0..self.write_scope.len() as i32:
+    for i in 0..self.write_scope.len():
         let allowed = self.write_scope[i]
         if tool_path_is_same_or_child(path, allowed) or tool_path_is_parent_of(path, allowed):
             return true
@@ -887,12 +887,12 @@ fn ToolFs.require_mkdir_allowed(self: &Self, path: &str):
 fn tool_split_nonempty_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()
     var start = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] == 10:
             if i > start:
                 lines.push(text.slice(start as i64, i as i64))
             start = i + 1
-    if start < text.len() as i32:
+    if start < text.len():
         lines.push(text.slice(start as i64, text.len()))
     lines
 
@@ -1005,7 +1005,7 @@ pub fn ToolFs.read_binary(self: &Self, path: &str) -> List[u8]:
         let err: IoError = .Os(0 - status, resolved)
         panic(site ++ err.message())
     let result: List[u8] = List.new()
-    for i in 0..data.len() as i32:
+    for i in 0..data.len():
         result.push(data[i] as u8)
     result
 
@@ -1014,14 +1014,14 @@ pub fn ToolFs.list_files(self: &Self, path: &str) -> List[str]:
     self.record_read(resolved)
     let raw_files = tool_split_nonempty_lines(with_fs_list_files(resolved))
     let files: List[str] = List.new()
-    for i in 0..raw_files.len() as i32:
+    for i in 0..raw_files.len():
         files.push(self.project_relative_path(raw_files[i]))
     files
 
 pub fn ToolFs.glob(self: &Self, pattern: &str) -> List[str]:
     var last_clean_slash = -1
     var has_glob = false
-    for i in 0..pattern.len() as i32:
+    for i in 0..pattern.len():
         let c = pattern[i]
         if c == 42:
             has_glob = true
@@ -1037,7 +1037,7 @@ pub fn ToolFs.glob(self: &Self, pattern: &str) -> List[str]:
     let pat_segs = tool_split_by_slash(glob_suffix)
     let results: List[str] = List.new()
     let prefix = if base_dir == ".": "" else: base_dir ++ "/"
-    for i in 0..all_files.len() as i32:
+    for i in 0..all_files.len():
         let file = all_files[i]
         let rel = if prefix.len() > 0 and file.starts_with(prefix): file.slice(prefix.len(), file.len()) else: with_str_clone_ref(file)
         let file_segs = tool_split_by_slash(rel)
@@ -1057,7 +1057,7 @@ pub fn ToolFs.write_binary(self: &Self, path: &str, bytes: List[u8]) -> i32:
     if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(path)
     var out = StringBuilder.with_capacity(bytes.len())
-    for i in 0..bytes.len() as i32:
+    for i in 0..bytes.len():
         out.push_byte(bytes[i])
     with_fs_write_file(self.resolve_path(path), out.to_str())
 
@@ -1069,14 +1069,14 @@ fn tool_tar_append_zeroes(out: List[u8], count: i64) -> List[u8]:
     out
 
 fn tool_tar_append_bytes(out: List[u8], bytes: &List[u8]) -> List[u8]:
-    for i in 0..bytes.len() as i32:
+    for i in 0..bytes.len():
         out.push(bytes[i])
     out
 
 fn tool_tar_append_str_padded(out: List[u8], value: &str, width: i64) -> List[u8]:
     if value.len() > width:
         return List.new()
-    for i in 0..value.len() as i32:
+    for i in 0..value.len():
         out.push(value[i] as u8)
     var pad = value.len()
     while pad < width:
@@ -1110,7 +1110,7 @@ fn tool_tar_append_octal_nul(out: List[u8], value: i64, width: i64) -> List[u8]:
     while pad < width:
         out.push(48 as u8)
         pad = pad + 1
-    for i in 0..digits.len() as i32:
+    for i in 0..digits.len():
         out.push(digits[i] as u8)
     out.push(0 as u8)
     out
@@ -1123,7 +1123,7 @@ fn tool_tar_append_checksum(out: List[u8], checksum: i64) -> List[u8]:
     while pad < 6:
         out.push(48 as u8)
         pad = pad + 1
-    for i in 0..digits.len() as i32:
+    for i in 0..digits.len():
         out.push(digits[i] as u8)
     out.push(0 as u8)
     out.push(32 as u8)
@@ -1131,7 +1131,7 @@ fn tool_tar_append_checksum(out: List[u8], checksum: i64) -> List[u8]:
 
 fn tool_tar_sum(bytes: &List[u8]) -> i64:
     var sum: i64 = 0
-    for i in 0..bytes.len() as i32:
+    for i in 0..bytes.len():
         sum = sum + bytes[i] as i64
     sum
 
@@ -1159,7 +1159,7 @@ fn tool_tar_link_target_safe(output_dir: &str, output_path: &str, target: &str) 
         return false
     if target.len() >= 3 and target[1] == 58 and (target[2] == 47 or target[2] == 92):
         return false
-    for i in 0..target.len() as i32:
+    for i in 0..target.len():
         let ch = target[i]
         if ch == 0 or ch == 9 or ch == 10 or ch == 13:
             return false
@@ -1181,7 +1181,7 @@ fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKin
         return List.new()
     var split = -1
     if name.len() > 100:
-        for i in 0..name.len() as i32:
+        for i in 0..name.len():
             if name[i] == 47 and i > 0 and i <= 155 and i + 1 < name.len() and name.len() - i - 1 <= 100:
                 split = i
         if split < 0:
@@ -1224,7 +1224,7 @@ fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKin
 
 fn ToolFs.tar_bytes(self: &Self, entries: &List[ArchiveEntry]) -> List[u8]:
     var out: List[u8] = List.new()
-    for i in 0..entries.len() as i32:
+    for i in 0..entries.len():
         let entry = entries[i]
         if entry.kind == ArchiveEntryKind.Directory:
             let name = tool_tar_entry_name(entry.archive_path, true)
@@ -1269,7 +1269,7 @@ fn tool_gzip_append_u32_le(out: List[u8], value: u32) -> List[u8]:
 
 fn tool_gzip_crc32(bytes: &List[u8]) -> u32:
     var crc = 0xffffffff as u32
-    for i in 0..bytes.len() as i32:
+    for i in 0..bytes.len():
         var c = (crc ^ (bytes[i] as u32)) & (0xff as u32)
         var bit = 0
         while bit < 8:
@@ -1337,7 +1337,7 @@ pub fn ToolFs.write_tar_gz(self: &Self, output_path: &str, entries: &List[Archiv
     var writer = ToolGzipStream { file: move file, state: &raw mut state, buffer: move compressed }
     var buffer = List[u8].with_capacity(65535)
     for _ in 0..65535: buffer.push(0)
-    for i in 0..entries.len() as i32:
+    for i in 0..entries.len():
         let entry = entries[i]
         if entry.kind == ArchiveEntryKind.Directory or entry.kind == ArchiveEntryKind.Symlink:
             let name = tool_tar_entry_name(entry.archive_path, entry.kind == ArchiveEntryKind.Directory)
@@ -1547,7 +1547,7 @@ fn tool_tar_payload_text(bytes: &List[u8], offset: i64, size: i64) -> str:
     out.to_str()
 
 fn tool_tar_trim_payload_name(text: &str) -> str:
-    var end = text.len() as i32
+    var end = text.len()
     while end > 0:
         let ch = text[(end - 1)]
         if ch != 0 and ch != 10 and ch != 13:
@@ -1570,14 +1570,14 @@ fn tool_pax_parse_decimal(text: &str, start: isize, end: isize) -> i32:
 
 fn tool_pax_value(text: &str, key: &str) -> str:
     var pos = 0
-    while pos < text.len() as i32:
+    while pos < text.len():
         var space = pos
-        while space < text.len() as i32 and text[space] != 32:
+        while space < text.len() and text[space] != 32:
             space = space + 1
-        if space >= text.len() as i32:
+        if space >= text.len():
             return ""
         let record_len = tool_pax_parse_decimal(text, pos, space)
-        if record_len <= 0 or pos + record_len > text.len() as i32:
+        if record_len <= 0 or pos + record_len > text.len():
             return ""
         let record_start = space + 1
         let record_end = pos + record_len
@@ -1790,7 +1790,7 @@ pub fn SourceEmitter.generated_source(self: &Self, path: str, contents: str) -> 
 
 fn tool_process_argv(args: &List[str]) -> str:
     var out = StringBuilder.new()
-    for i in 0..args.len() as i32:
+    for i in 0..args.len():
         out.push_str(args[i])
         out.push_byte(0)
     out.to_str()
@@ -1825,7 +1825,7 @@ fn tool_process_apply_env(env: ProcessEnv) -> SavedProcessEnv:
     let driver = tool_process_clear_driver_env()
     let names: List[str] = List.new()
     let values: List[str] = List.new()
-    for i in 0..env.vars.len() as i32:
+    for i in 0..env.vars.len():
         let item = env.vars[i]
         names.push(with_str_clone_ref(item.name))
         values.push(with_getenv_str(item.name) ++ "")
@@ -1835,7 +1835,7 @@ fn tool_process_apply_env(env: ProcessEnv) -> SavedProcessEnv:
 fn tool_process_restore_env(saved: SavedProcessEnv):
     // D32: field vacates need a mutable path — rebind the owned param.
     var owned = saved
-    for i in 0..owned.names.len() as i32:
+    for i in 0..owned.names.len():
         let _restore = with_setenv_str(owned.names[i], owned.values[i])
     tool_process_restore_driver_env(move owned.driver)
 
@@ -1849,7 +1849,7 @@ fn tool_process_restore_env(saved: SavedProcessEnv):
 
 fn tool_effect_escape(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         if ch == 92:
             out.push_str("\\\\")
@@ -1865,14 +1865,14 @@ fn tool_effect_escape(text: &str) -> str:
 
 fn tool_effect_join_argv(parts: &List[str]) -> str:
     var out = StringBuilder.new()
-    for i in 0..parts.len() as i32:
+    for i in 0..parts.len():
         if i > 0:
             out.push_str(" ")
         out.push_str(tool_effect_escape(parts[i]))
     out.to_str()
 
 fn tool_effect_contains_slash(text: &str) -> bool:
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] == 47:
             return true
     false
@@ -1887,8 +1887,8 @@ fn tool_effect_resolve_executable(exe: &str) -> str:
     let path = with_getenv_str("PATH")
     var start = 0
     var i = 0
-    while i <= path.len() as i32:
-        if i == path.len() as i32 or path[i] == 58:
+    while i <= path.len():
+        if i == path.len() or path[i] == 58:
             let dir = path.slice(start as i64, i as i64)
             let candidate = if dir.len() == 0: with_str_clone_ref(exe) else: dir ++ "/" ++ exe
             if with_fs_file_exists(candidate) != 0:
@@ -1920,7 +1920,7 @@ fn tool_effect_record_env(target_name: &str, name: &str):
 
 fn tool_effect_env_text(process_env: &ProcessEnv) -> str:
     var out = StringBuilder.new()
-    for i in 0..process_env.vars.len() as i32:
+    for i in 0..process_env.vars.len():
         let item = process_env.vars[i]
         if i > 0:
             out.push_str(",")
@@ -1950,7 +1950,7 @@ fn tool_compile_provenance(target: &str, parts: &List[str]):
             digest = tool_sha256_text(with_fs_read_file(exe))
             g_compile_provenance_digests.insert(exe.clone(), digest.clone())
     var argv = ""
-    for i in 1..parts.len() as i32: argv = argv ++ " " ++ parts[i]
+    for i in 1..parts.len(): argv = argv ++ " " ++ parts[i]
     print("[compile] " ++ target ++ " ran " ++ digest[0..12] ++ " " ++ exe ++ argv)
 
 fn ProcessRunner.record_process_effect(self: &Self, method: &str, parts: &List[str], cwd: &str, timeout_ms: i32, stdin_path: &str, stdout_path: &str, stderr_path: &str, env_text: &str):
@@ -2083,7 +2083,7 @@ pub fn ProcessRunner.wait(self: &Self, pid: i32, timeout_ms: i32) -> i32:
 
 fn tool_process_basename(path: &str) -> str:
     var start = 0
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 47 or ch == 92:
             start = i + 1
@@ -2108,7 +2108,7 @@ fn ProcessRunner.project_relative_path(self: &Self, path: &str) -> str:
 fn ProcessRunner.write_path_allowed(self: &Self, path: &str) -> bool:
     if not self.write_scoped:
         return true
-    for i in 0..self.write_scope.len() as i32:
+    for i in 0..self.write_scope.len():
         if tool_path_is_same_or_child(path, self.write_scope[i]):
             return true
     false
@@ -2157,7 +2157,7 @@ pub fn ProcessRunner.run_spec(self: &Self, spec: ProcessSpec, stdout_path: &str,
     tool_process_spec_validate(spec, stdout_path, stderr_path)
     let full_args: List[str] = List.new()
     full_args.push(with_str_clone_ref(spec.executable))
-    for i in 0..spec.args.len() as i32:
+    for i in 0..spec.args.len():
         full_args.push(with_str_clone_ref(spec.args[i]))
     let timeout = if spec.timeout_ms > 0: spec.timeout_ms else: 0
     // The spec is this call's to consume: its env transfers to the runner
@@ -2235,7 +2235,7 @@ pub fn ActionCtx.env_input(self: &Self, name: &str) -> str:
 
 fn build_graph_escape(value: &str) -> str:
     var out = StringBuilder.with_capacity(value.len())
-    for i in 0..value.len() as i32:
+    for i in 0..value.len():
         let ch = value[i]
         if ch == 92:
             out.push_str("\\\\")
@@ -2472,7 +2472,7 @@ pub fn Build.extract_tar_gz(move self: Self, name: str, archive: str, output_dir
 
 fn build_path_dirname(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
             last_slash = i
     if last_slash < 0:
@@ -2594,7 +2594,7 @@ fn build_source_cache_dir() -> str:
 
 fn build_fetch_is_sha256(text: &str) -> bool:
     if text.len() != 64: return false
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let c = text[i]
         if not ((c >= '0' and c <= '9') or (c >= 'a' and c <= 'f')): return false
     true
@@ -2668,7 +2668,7 @@ pub fn ActionCtx.fetch_source(self: &Self, sources: &List[str], sha256: &str, ou
         return FetchedSource { rc: 1, report: "could not create " ++ cmd_dir, from_cache: false }
     let part = output ++ ".part"
     var tried = ""
-    for i in 0..sources.len() as i32:
+    for i in 0..sources.len():
         let source = sources[i]
         let _stale = fs.remove_file(part)
         var why = ""
@@ -2694,7 +2694,7 @@ pub fn ActionCtx.fetch_source(self: &Self, sources: &List[str], sha256: &str, ou
             why = "its sha256 is " ++ actual ++ ", not the pin"
         let _bad = fs.remove_file(part)
         tried = tried ++ "  " ++ source ++ ": " ++ why ++ "\n"
-    let count = sources.len() as i32
+    let count = sources.len()
     let plural = if count == 1: "its source" else: f"any of its {count} sources"
     FetchedSource { rc: 1, report: "could not fetch " ++ name ++ " (pinned sha256 " ++ sha256 ++ ") from " ++ plural ++ ":\n" ++ tried, from_cache: false }
 
@@ -2959,8 +2959,8 @@ fn wp_put_int(out: &str, v: i32) -> str: out ++ f"{v}\n"
 fn wp_put_str(out: &str, s: &str) -> str: out ++ f"{s.len()}\n" ++ s ++ "\n"
 
 fn wp_put_list(out: &str, v: &List[str]) -> str:
-    var acc = out ++ f"{v.len() as i32}\n"
-    for i in 0..v.len() as i32:
+    var acc = out ++ f"{v.len()}\n"
+    for i in 0..v.len():
         acc = wp_put_str(acc, v[i])
     acc
 
@@ -3283,7 +3283,7 @@ fn ws_build_plan(state: &WsState, project_root: &str) -> WorkspaceCompilePlan:
         if output_kind != 0 and output_kind != 5:
             with_eprint("error: Workspace.compile source strings currently support binary or check output only\n")
             exit(1)
-        for si in 0..state.string_names.len() as i32:
+        for si in 0..state.string_names.len():
             plan.source_paths.push(ws_path(project_root, state.string_names[si]))
             plan.source_texts.push(with_str_clone_ref(state.string_texts[si]))
         plan.has_strings = 1
@@ -3354,20 +3354,20 @@ fn build_action_outputs(target: &Target) -> List[str]:
     let outputs: List[str] = List.new()
     if target.output.len() > 0:
         outputs.push(with_str_clone_ref(target.output))
-    for i in 0..target.extra_outputs.len() as i32:
+    for i in 0..target.extra_outputs.len():
         outputs.push(with_str_clone_ref(target.extra_outputs[i]))
     outputs
 
 fn build_action_write_scope(target: &Target) -> List[str]:
     let scopes = build_action_outputs(target)
-    for i in 0..target.write_scopes.len() as i32:
+    for i in 0..target.write_scopes.len():
         scopes.push(with_str_clone_ref(target.write_scopes[i]))
     scopes.push(tool_action_scratch_dir(target.name))
     scopes
 
 fn tool_clone_str_list(values: &List[str]) -> List[str]:
     let out: List[str] = List.new()
-    for i in 0..values.len() as i32:
+    for i in 0..values.len():
         out.push(with_str_clone_ref(values[i]))
     out
 
@@ -3386,7 +3386,7 @@ fn build_action_ctx(ctx: &BuildCtx, target: &Target) -> ActionCtx:
     let ctx_outputs = build_action_outputs(target)
     let scratch_path = tool_action_scratch_dir(target.name)
     let action_args: List[str] = List.new()
-    for i in 0..target.args.len() as i32:
+    for i in 0..target.args.len():
         if not target.args[i].starts_with("rss-limit-bytes="):
             action_args.push(with_str_clone_ref(target.args[i]))
     ActionCtx {
@@ -3407,7 +3407,7 @@ fn build_action_ctx(ctx: &BuildCtx, target: &Target) -> ActionCtx:
 
 pub fn Build.__driver_run_action(self: &Self, ctx: BuildCtx, action_name: &str) -> i32:
     tool_capability_require(ctx.token, "ActionCtx")
-    for i in 0..self.targets.len() as i32:
+    for i in 0..self.targets.len():
         let target = &self.targets[i]
         if target.name == action_name:
             if target.kind != .Action:
@@ -3429,7 +3429,7 @@ pub fn Build.__driver_run_action(self: &Self, ctx: BuildCtx, action_name: &str) 
             // match, or the first ctx.fs().write_text(ctx.output(), ...)
             // fails on a missing parent (behav_capability_token_mismatch).
             let outputs = build_action_outputs(target)
-            for oi in 0..outputs.len() as i32:
+            for oi in 0..outputs.len():
                 let out_dir = tool_path_dirname(outputs[oi])
                 if out_dir.len() > 0:
                     let resolved_dir = if ctx.fs.root.len() == 0 or ctx.fs.root == ".":
@@ -3462,14 +3462,14 @@ pub fn Build.emit_graph(self: &Self) -> str:
         out.push_str("default_target\t")
         out.push_str(build_graph_escape(self.default_target))
         out.push_str("\n")
-    for gi in 0..self.generated_sources.len() as i32:
+    for gi in 0..self.generated_sources.len():
         let generated = self.generated_sources[gi]
         out.push_str("generated_source\t")
         out.push_str(build_graph_escape(generated.path))
         out.push_str("\t")
         out.push_str(build_graph_escape(generated.contents))
         out.push_str("\n")
-    for ti in 0..self.targets.len() as i32:
+    for ti in 0..self.targets.len():
         let target = &self.targets[ti]
         out.push_str("target\t")
         out.push_str(f"{target.kind as i32}\t")
@@ -3481,47 +3481,47 @@ pub fn Build.emit_graph(self: &Self) -> str:
         out.push_str(f"{target.optimize_mode as i32}\t")
         out.push_str(build_graph_escape(target.output))
         out.push_str("\n")
-        for li in 0..target.system_libs.len() as i32:
+        for li in 0..target.system_libs.len():
             out.push_str("system_lib\t")
             out.push_str(f"{ti}\t")
             out.push_str(build_graph_escape(target.system_libs[li]))
             out.push_str("\n")
-        for ii in 0..target.include_paths.len() as i32:
+        for ii in 0..target.include_paths.len():
             out.push_str("include_path\t")
             out.push_str(f"{ti}\t")
             out.push_str(build_graph_escape(target.include_paths[ii]))
             out.push_str("\n")
-        for pi in 0..target.library_paths.len() as i32:
+        for pi in 0..target.library_paths.len():
             out.push_str("library_path\t")
             out.push_str(f"{ti}\t")
             out.push_str(build_graph_escape(target.library_paths[pi]))
             out.push_str("\n")
-        for ri in 0..target.rpaths.len() as i32:
+        for ri in 0..target.rpaths.len():
             out.push_str("rpath\t")
             out.push_str(f"{ti}\t")
             out.push_str(build_graph_escape(target.rpaths[ri]))
             out.push_str("\n")
-        for di in 0..target.defines.len() as i32:
+        for di in 0..target.defines.len():
             out.push_str("define\t")
             out.push_str(f"{ti}\t")
             out.push_str(build_graph_escape(target.defines[di]))
             out.push_str("\n")
-        for ini in 0..target.inputs.len() as i32:
+        for ini in 0..target.inputs.len():
             out.push_str("input\t")
             out.push_str(f"{ti}\t")
             out.push_str(build_graph_escape(target.inputs[ini]))
             out.push_str("\n")
-        for outi in 0..target.extra_outputs.len() as i32:
+        for outi in 0..target.extra_outputs.len():
             out.push_str("extra_output\t")
             out.push_str(f"{ti}\t")
             out.push_str(build_graph_escape(target.extra_outputs[outi]))
             out.push_str("\n")
-        for depi in 0..target.deps.len() as i32:
+        for depi in 0..target.deps.len():
             out.push_str("dep\t")
             out.push_str(f"{ti}\t")
             out.push_str(build_graph_escape(target.deps[depi]))
             out.push_str("\n")
-        for ai in 0..target.args.len() as i32:
+        for ai in 0..target.args.len():
             out.push_str("arg\t")
             out.push_str(f"{ti}\t")
             out.push_str(build_graph_escape(target.args[ai]))

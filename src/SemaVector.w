@@ -33,7 +33,7 @@ impl Sema:
         lanes.push(self.ty_u128 as i32)
         lanes.push(self.ty_f32 as i32)
         lanes.push(self.ty_f64 as i32)
-        for li in 0..lanes.len() as i32:
+        for li in 0..lanes.len():
             let lane = lanes[li]
             let bits = self.get_type_d0(lane as TypeId)
             for total in [128i32, 256, 512]:
@@ -448,7 +448,7 @@ impl Sema:
         if name.len() == 0: return -1
         if self.is_mask_type(recv_ty):
             var components = true
-            for mi in 0..name.len() as i32:
+            for mi in 0..name.len():
                 let mc = name[mi]
                 if mc != 'x' and mc != 'y' and mc != 'z' and mc != 'w': components = false
             if components:
@@ -457,7 +457,7 @@ impl Sema:
             return -1
         if not self.is_vector_type(recv_ty): return -1
         var lanes = ""
-        for ci in 0..name.len() as i32:
+        for ci in 0..name.len():
             let c = name[ci]
             let lane = if c == 'x': 0 else if c == 'y': 1 else if c == 'z': 2 else if c == 'w': 3 else: -1
             if lane < 0: return -1
@@ -467,7 +467,7 @@ impl Sema:
         if n > 4:
             self.emit_error(f"`{type_text}` has {n} lanes; the components .x .y .z .w name the lanes of a vector of at most 4 (§4.3d); read lane i with `v[i]`", node)
             return 0
-        for ci in 0..name.len() as i32:
+        for ci in 0..name.len():
             let lane = (lanes[ci] - '0') as i32
             if lane >= n:
                 let comp = name.slice(ci as i64, ci as i64 + 1)

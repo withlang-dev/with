@@ -43,7 +43,7 @@ fn py_tok(kind: i32, text: &str, line: i32): PyTok { kind, text: text.to_owned()
 // their two-letter combinations.
 fn py_is_string_prefix(word: &str) -> bool:
     if word.len() == 0 or word.len() > 2: return false
-    for i in 0..word.len() as i32:
+    for i in 0..word.len():
         let c = word[i]
         if c != 'r' and c != 'b' and c != 'f' and c != 'u' and c != 'R' and c != 'B' and c != 'F' and c != 'U': return false
     true
@@ -53,7 +53,7 @@ fn py_unescape(body: &str, raw: bool) -> str:
     if raw or body.find("\\") < 0: return body.to_owned()
     var out = StringBuilder.with_capacity(body.len())
     var i = 0
-    let n = body.len() as i32
+    let n = body.len()
     var start = 0
     while i < n:
         if body[i] != '\\' or i + 1 >= n:
@@ -87,8 +87,8 @@ fn py_fstring_expr_end(field: &str) -> i32:
         if c == '"' or c == '\'': quote = c
         else if c == '(' or c == '[' or c == '{': depth = depth + 1
         else if c == ')' or c == ']' or c == '}': depth = depth - 1
-        else if depth == 0 and c == ':': return i
-        else if depth == 0 and c == '!' and i + 1 < n and field[i + 1] != '=': return i
+        else if depth == 0 and c == ':': return i as i32
+        else if depth == 0 and c == '!' and i + 1 < n and field[i + 1] != '=': return i as i32
     n
 
 // An f-string as tokens: `fstr[`, then its literal parts as strings and each
@@ -98,7 +98,7 @@ fn py_lex_fstring(body: &str, line: i32, out0: List[PyTok]) -> List[PyTok]:
     out.push(py_tok(PT_OP, "fstr[", line))
     var literal = StringBuilder.new()
     var i = 0
-    let n = body.len() as i32
+    let n = body.len()
     while i < n:
         let c = body[i]
         if c == '{' and i + 1 < n and body[i + 1] == '{':
@@ -135,7 +135,7 @@ fn py_lex(src: &str) -> List[PyTok]:
     var out: List[PyTok] = List.new()
     var indents: List[i32] = List.new()
     indents.push(0)
-    let n = src.len() as i32
+    let n = src.len()
     var i: i32 = 0
     var line: i32 = 1
     var depth = 0
@@ -162,11 +162,11 @@ fn py_lex(src: &str) -> List[PyTok]:
                 continue
             i = j
             at_line_start = false
-            if col > indents[indents.len() as i32 - 1]:
+            if col > indents[indents.len() - 1]:
                 indents.push(col)
                 out.push(py_tok(PT_INDENT, "", line))
             else:
-                while col < indents[indents.len() as i32 - 1]:
+                while col < indents[indents.len() - 1]:
                     let _ = indents.pop()
                     out.push(py_tok(PT_DEDENT, "", line))
             continue
@@ -175,7 +175,7 @@ fn py_lex(src: &str) -> List[PyTok]:
             line = line + 1
             i = i + 1
             if depth == 0:
-                if out.len() > 0 and out[out.len() as i32 - 1].kind != PT_NEWLINE: out.push(py_tok(PT_NEWLINE, "", line - 1))
+                if out.len() > 0 and out[out.len() - 1].kind != PT_NEWLINE: out.push(py_tok(PT_NEWLINE, "", line - 1))
                 at_line_start = true
             continue
         if c == ' ' or c == '\t' or c == '\r':
@@ -237,7 +237,7 @@ fn py_lex(src: &str) -> List[PyTok]:
                 continue
         out.push(py_tok(PT_OP, src.slice(i, i + 1), line))
         i = i + 1
-    if out.len() > 0 and out[out.len() as i32 - 1].kind != PT_NEWLINE: out.push(py_tok(PT_NEWLINE, "", line))
+    if out.len() > 0 and out[out.len() - 1].kind != PT_NEWLINE: out.push(py_tok(PT_NEWLINE, "", line))
     while indents.len() > 1:
         let _ = indents.pop()
         out.push(py_tok(PT_DEDENT, "", line))
@@ -319,7 +319,7 @@ impl PyParser:
     fn is_word(word: &str) -> bool: self.toks[self.at].kind == PT_NAME and self.toks[self.at].text == word
 
     mut fn advance():
-        if self.at < self.toks.len() as i32 - 1: self.at = self.at + 1
+        if self.at < self.toks.len() - 1: self.at = self.at + 1
 
     mut fn accept_op(op: &str) -> bool:
         if not self.is_op(op): return false
@@ -339,7 +339,7 @@ impl PyParser:
 
     mut fn mk(kind: i32, a: i32, b: i32, c: i32, s: &str, kids: List[i32], line: i32) -> i32:
         self.nodes.push(PyNode { kind, a, b, c, s: s.to_owned(), kids, line })
-        self.nodes.len() as i32 - 1
+        (self.nodes.len() - 1) as i32
 
     mut fn leaf(kind: i32, s: &str) -> i32: self.mk(kind, -1, -1, -1, s, List.new(), self.line())
 
@@ -928,18 +928,18 @@ type PyInterp { nodes: List[PyNode], lists: List[PyList], dkeys: List[PyList], d
 pub fn py_version_order(a: &str, b: &str) -> i32:
     let pa = a.split(".")
     let pb = b.split(".")
-    let n = if pa.len() > pb.len(): pa.len() as i32 else: pb.len() as i32
+    let n = if pa.len() > pb.len(): pa.len() else: pb.len()
     for i in 0..n:
-        let x: &str = if i < pa.len() as i32: &pa[i] else: "0"
-        let y: &str = if i < pb.len() as i32: &pb[i] else: "0"
+        let x: &str = if i < pa.len(): &pa[i] else: "0"
+        let y: &str = if i < pb.len(): &pb[i] else: "0"
         var xn = 0
         var yn = 0
         var xd = 0
         var yd = 0
-        while xd < x.len() as i32 and py_is_digit(x[xd]):
+        while xd < x.len() and py_is_digit(x[xd]):
             xn = xn * 10 + (x[xd] - '0') as i32
             xd = xd + 1
-        while yd < y.len() as i32 and py_is_digit(y[yd]):
+        while yd < y.len() and py_is_digit(y[yd]):
             yn = yn * 10 + (y[yd] - '0') as i32
             yd = yd + 1
         if xn != yn: return if xn < yn: -1 else: 1
@@ -951,7 +951,7 @@ pub fn py_version_order(a: &str, b: &str) -> i32:
 fn py_parse_int(text: &str) -> (bool, i64):
     var n: i64 = 0
     if text.len() == 0: return (false, 0)
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if not py_is_digit(text[i]): return (false, 0)
         n = n * 10 + (text[i] - '0') as i64
     (true, n)
@@ -982,11 +982,11 @@ impl PyInterp:
 
     mut fn new_obj(cls: &str) -> i32:
         self.objs.push(PyObj { cls: cls.to_owned(), names: List.new(), vals: List.new() })
-        self.objs.len() as i32 - 1
+        (self.objs.len() - 1) as i32
 
     fn obj_find(obj: i32, name: &str) -> i32:
-        for i in 0..self.objs[obj].names.len() as i32:
-            if self.objs[obj].names[i] == name: return i
+        for i in 0..self.objs[obj].names.len():
+            if self.objs[obj].names[i] == name: return i as i32
         -1
 
     mut fn obj_set(obj: i32, name: &str, value: PyVal):
@@ -1002,7 +1002,7 @@ impl PyInterp:
         if at < 0: return
         var names: List[str] = List.new()
         var vals: List[PyVal] = List.new()
-        for i in 0..self.objs[obj].names.len() as i32:
+        for i in 0..self.objs[obj].names.len():
             if i == at: continue
             names.push(self.objs[obj].names[i].clone())
             vals.push(pv_copy(&self.objs[obj].vals[i]))
@@ -1057,8 +1057,8 @@ impl PyInterp:
         if a.k == V_BOOL or a.k == V_INT: return if a.n == b.n: 1 else: 0
         if a.k == V_STR: return if a.s == b.s: 1 else: 0
         if a.k == V_LIST:
-            let n = self.lists[a.n as i32].items.len() as i32
-            if n != self.lists[b.n as i32].items.len() as i32: return 0
+            let n = self.lists[a.n as i32].items.len()
+            if n != self.lists[b.n as i32].items.len(): return 0
             for i in 0..n:
                 let e = self.equal(&self.lists[a.n as i32].items[i], &self.lists[b.n as i32].items[i])
                 if e != 1: return e
@@ -1082,13 +1082,13 @@ impl PyInterp:
         let container = self.plain(container0)
         if container.k == V_LIST:
             var unknown = false
-            for i in 0..self.lists[container.n as i32].items.len() as i32:
+            for i in 0..self.lists[container.n as i32].items.len():
                 let e = self.equal(&item, &self.lists[container.n as i32].items[i])
                 if e == 1: return 1
                 if e < 0: unknown = true
             return if unknown: -1 else: 0
         if container.k == V_DICT:
-            for i in 0..self.dkeys[container.n as i32].items.len() as i32:
+            for i in 0..self.dkeys[container.n as i32].items.len():
                 if self.equal(&item, &self.dkeys[container.n as i32].items[i]) == 1: return 1
             return if item.k == V_UNKNOWN: -1 else: 0
         if (container.k == V_STR or container.k == V_OPT) and (item.k == V_STR or item.k == V_OPT): return if container.s.contains(item.s): 1 else: 0
@@ -1104,21 +1104,21 @@ impl PyInterp:
     // ── Names ──
 
     fn lookup(name: &str) -> PyVal:
-        let top = self.frame_names.len() as i32 - 1
-        for i in 0..self.frame_names[top].items.len() as i32:
+        let top = self.frame_names.len() - 1
+        for i in 0..self.frame_names[top].items.len():
             if self.frame_names[top].items[i] == name: return pv_copy(&self.frame_vals[top].items[i])
         if top > 0:
-            for i in 0..self.frame_names[0].items.len() as i32:
+            for i in 0..self.frame_names[0].items.len():
                 if self.frame_names[0].items[i] == name: return pv_copy(&self.frame_vals[0].items[i])
-        for i in 0..self.func_names.len() as i32:
+        for i in 0..self.func_names.len():
             if self.func_names[i] == name: return pv(V_FUNC, self.func_nodes[i] as i64, name)
         if name == "conan_version": return pv(V_VER, 0, "2.0")
         // A name the recipe imports: what it is shows when it is used.
         pv(V_NAMED, 0, name)
 
     mut fn bind(name: &str, value: PyVal):
-        let top = self.frame_names.len() as i32 - 1
-        for i in 0..self.frame_names[top].items.len() as i32:
+        let top = self.frame_names.len() - 1
+        for i in 0..self.frame_names[top].items.len():
             if self.frame_names[top].items[i] == name:
                 self.frame_vals[top].items[i] = value
                 return
@@ -1154,15 +1154,15 @@ impl PyInterp:
         if name == "requires" or name == "tool_requires" or name == "build_requires" or name == "test_requires":
             // `self.requires("zlib/1.3")`, unless the class states `requires = …`.
             var stated = false
-            for i in 0..self.attr_names.len() as i32:
+            for i in 0..self.attr_names.len():
                 if self.attr_names[i] == name: stated = true
             if not stated: return self.bound(&pv(V_OBJ, self.self_obj as i64, ""), name)
-        for i in 0..self.method_names.len() as i32:
+        for i in 0..self.method_names.len():
             if self.method_names[i] != name: continue
             let node: i32 = self.method_nodes[i]
             if self.nodes[node].b == 1: return self.call_def(node, List.new(), line)
             return pv(V_FUNC, node as i64, name)
-        for i in 0..self.attr_names.len() as i32:
+        for i in 0..self.attr_names.len():
             if self.attr_names[i] == name: return pv_copy(&self.attr_vals[i])
         if name == "output" or name == "conf" or name == "runenv_info" or name == "buildenv_info" or name == "env_info" or name == "user_info" or name == "conf_info" or name == "info" or name == "cpp" or name == "layouts" or name == "folders" or name == "win_bash" or name == "python_requires": return pv_sink()
         pv_unknown()
@@ -1174,7 +1174,7 @@ impl PyInterp:
             let index = if name == "major": 0 else: if name == "minor": 1 else: if name == "patch": 2 else: -1
             if index < 0: return pv_unknown()
             let parts = target.s.split(".")
-            if index >= parts.len() as i32: return pv(V_VER, 0, "0")
+            if index >= parts.len(): return pv(V_VER, 0, "0")
             return pv(V_VER, 0, parts[index])
         if target.k == V_STR or target.k == V_LIST or target.k == V_DICT or target.k == V_OPT: return self.bound(target, name)
         if target.k != V_OBJ: return pv_unknown()
@@ -1216,7 +1216,7 @@ impl PyInterp:
             if i < 0 or i >= n: return pv_unknown()
             return pv_copy(&self.lists[target.n as i32].items[i as i32])
         if target.k == V_DICT:
-            for i in 0..self.dkeys[target.n as i32].items.len() as i32:
+            for i in 0..self.dkeys[target.n as i32].items.len():
                 if self.equal(index, &self.dkeys[target.n as i32].items[i]) == 1: return pv_copy(&self.dvals[target.n as i32].items[i])
         pv_unknown()
 
@@ -1243,7 +1243,7 @@ impl PyInterp:
                     self.note(line, "a list is extended by something that could not be evaluated")
                     return pv_none()
                 var items: List[PyVal] = List.new()
-                for i in 0..self.lists[arg0.n as i32].items.len() as i32: items.push(pv_copy(&self.lists[arg0.n as i32].items[i]))
+                for i in 0..self.lists[arg0.n as i32].items.len(): items.push(pv_copy(&self.lists[arg0.n as i32].items[i]))
                 for item in items: self.lists[id].items.push(pv_copy(item))
                 return pv_none()
             if name == "insert" and args.len() > 1:
@@ -1259,7 +1259,7 @@ impl PyInterp:
             if name == "remove":
                 var items: List[PyVal] = List.new()
                 var removed = false
-                for i in 0..self.lists[id].items.len() as i32:
+                for i in 0..self.lists[id].items.len():
                     if not removed and self.equal(&arg0, &self.lists[id].items[i]) == 1:
                         removed = true
                         continue
@@ -1268,7 +1268,7 @@ impl PyInterp:
                 return pv_none()
             if name == "copy":
                 var items: List[PyVal] = List.new()
-                for i in 0..self.lists[id].items.len() as i32: items.push(pv_copy(&self.lists[id].items[i]))
+                for i in 0..self.lists[id].items.len(): items.push(pv_copy(&self.lists[id].items[i]))
                 return self.new_list(move items)
             return pv_unknown()
         if receiver.k == V_STR or receiver.k == V_OPT:
@@ -1288,7 +1288,7 @@ impl PyInterp:
                 var out = ""
                 var next = 0
                 var i = 0
-                let n = s.len() as i32
+                let n = s.len()
                 while i < n:
                     if s[i] == '{' and i + 1 < n and s[i + 1] == '{':
                         out = out ++ "{"
@@ -1306,7 +1306,7 @@ impl PyInterp:
                             let (ok, wanted) = py_parse_int(field)
                             if not ok: return pv_unknown()
                             index = wanted as i32
-                        if index >= args.len() as i32: return pv_unknown()
+                        if index >= args.len(): return pv_unknown()
                         let part = self.to_text(&args[index])
                         if part.k != V_STR: return pv_unknown()
                         out = out ++ part.s
@@ -1317,7 +1317,7 @@ impl PyInterp:
                 return pv_str(out)
             if name == "join" and arg0.k == V_LIST:
                 var out = ""
-                for i in 0..self.lists[arg0.n as i32].items.len() as i32:
+                for i in 0..self.lists[arg0.n as i32].items.len():
                     let part = self.to_text(&self.lists[arg0.n as i32].items[i])
                     if part.k != V_STR: return pv_unknown()
                     out = out ++ (if i > 0: s.clone() else: "") ++ part.s
@@ -1326,12 +1326,12 @@ impl PyInterp:
         if receiver.k == V_DICT:
             let id = receiver.n as i32
             if name == "get":
-                for i in 0..self.dkeys[id].items.len() as i32:
+                for i in 0..self.dkeys[id].items.len():
                     if self.equal(&arg0, &self.dkeys[id].items[i]) == 1: return pv_copy(&self.dvals[id].items[i])
                 return if args.len() > 1: pv_copy(&args[1]) else: pv_none()
             if name == "keys" or name == "values" or name == "items":
                 var items: List[PyVal] = List.new()
-                for i in 0..self.dkeys[id].items.len() as i32:
+                for i in 0..self.dkeys[id].items.len():
                     if name == "keys": items.push(pv_copy(&self.dkeys[id].items[i]))
                     else if name == "values": items.push(pv_copy(&self.dvals[id].items[i]))
                     else:
@@ -1405,7 +1405,7 @@ impl PyInterp:
         if name == "any" or name == "all":
             if arg0.k != V_LIST: return pv_unknown()
             var unknown = false
-            for i in 0..self.lists[arg0.n as i32].items.len() as i32:
+            for i in 0..self.lists[arg0.n as i32].items.len():
                 let t = self.truth(&self.lists[arg0.n as i32].items[i])
                 if t < 0: unknown = true
                 else if name == "any" and t == 1: return pv_bool(true)
@@ -1413,7 +1413,7 @@ impl PyInterp:
             return if unknown: pv_unknown() else: pv_bool(name == "all")
         if name == "os.path.join":
             var out = ""
-            for i in 0..args.len() as i32:
+            for i in 0..args.len():
                 let part = self.to_text(&args[i])
                 if part.k != V_STR: return pv_unknown()
                 if part.s.len() == 0: continue
@@ -1421,7 +1421,7 @@ impl PyInterp:
             return pv_str(out)
         if name == "os.path.basename" and arg0.k == V_STR:
             let parts = arg0.s.split("/")
-            return pv_str(parts[parts.len() as i32 - 1])
+            return pv_str(parts[parts.len() - 1])
         if name == "textwrap.dedent": return arg0
         if name == "print" or name == "check_min_cppstd" or name == "check_max_cppstd" or name == "check_min_cstd": return pv_none()
         // PkgConfig, self.dependencies, tools this model does not carry.
@@ -1472,7 +1472,7 @@ impl PyInterp:
         var vals: List[PyVal] = List.new()
         let params = self.nodes[node].a
         var next = 0
-        for pi in 0..self.nodes[params].kids.len() as i32:
+        for pi in 0..self.nodes[params].kids.len():
             let p: i32 = self.nodes[params].kids[pi]
             let pname = self.nodes[p].s.clone()
             if pi == 0 and pname == "self":
@@ -1480,7 +1480,7 @@ impl PyInterp:
                 vals.push(pv(V_OBJ, self.self_obj as i64, ""))
                 continue
             names.push(pname)
-            if next < args.len() as i32:
+            if next < args.len():
                 vals.push(pv_copy(&args[next]))
                 next = next + 1
             else if self.nodes[p].kind == N_KW: vals.push(self.eval(self.nodes[p].a))
@@ -1501,7 +1501,7 @@ impl PyInterp:
         let line = self.nodes[node].line
         let callee = self.eval(self.nodes[node].a)
         var args: List[PyVal] = List.new()
-        for i in 0..self.nodes[node].kids.len() as i32:
+        for i in 0..self.nodes[node].kids.len():
             let arg: i32 = self.nodes[node].kids[i]
             // A keyword argument is passed by position after the others;
             // the functions modeled here take theirs that way.
@@ -1534,24 +1534,24 @@ impl PyInterp:
             return if s == "None": pv_none() else: pv_bool(s == "True")
         if kind == N_FSTR:
             var out = ""
-            for i in 0..self.nodes[node].kids.len() as i32:
+            for i in 0..self.nodes[node].kids.len():
                 let part = self.to_text(&self.eval(self.nodes[node].kids[i]))
                 if part.k != V_STR: return pv_unknown()
                 out = out ++ part.s
             return pv_str(out)
         if kind == N_LIST:
             var items: List[PyVal] = List.new()
-            for i in 0..self.nodes[node].kids.len() as i32: items.push(self.eval(self.nodes[node].kids[i]))
+            for i in 0..self.nodes[node].kids.len(): items.push(self.eval(self.nodes[node].kids[i]))
             return self.new_list(move items)
         if kind == N_DICT:
             let dict = self.new_dict()
             var i = 0
-            while i + 1 < self.nodes[node].kids.len() as i32:
+            while i + 1 < self.nodes[node].kids.len():
                 let key_node: i32 = self.nodes[node].kids[i]
                 if self.nodes[key_node].kind == N_SPREAD:
                     let other = self.eval(self.nodes[key_node].a)
                     if other.k != V_DICT: return pv_unknown()
-                    for j in 0..self.dkeys[other.n as i32].items.len() as i32:
+                    for j in 0..self.dkeys[other.n as i32].items.len():
                         let k = pv_copy(&self.dkeys[other.n as i32].items[j])
                         let v = pv_copy(&self.dvals[other.n as i32].items[j])
                         self.dkeys[dict.n as i32].items.push(k)
@@ -1569,7 +1569,7 @@ impl PyInterp:
             if iter.k != V_LIST: return pv_unknown()
             let dict = self.new_dict()
             var source: List[PyVal] = List.new()
-            for i in 0..self.lists[iter.n as i32].items.len() as i32: source.push(pv_copy(&self.lists[iter.n as i32].items[i]))
+            for i in 0..self.lists[iter.n as i32].items.len(): source.push(pv_copy(&self.lists[iter.n as i32].items[i]))
             for item in source:
                 self.bind_targets(self.nodes[node].kids[0], item)
                 if self.nodes[node].c >= 0:
@@ -1635,8 +1635,8 @@ impl PyInterp:
             if op == "+":
                 if left.k == V_LIST and right.k == V_LIST:
                     var items: List[PyVal] = List.new()
-                    for i in 0..self.lists[left.n as i32].items.len() as i32: items.push(pv_copy(&self.lists[left.n as i32].items[i]))
-                    for i in 0..self.lists[right.n as i32].items.len() as i32: items.push(pv_copy(&self.lists[right.n as i32].items[i]))
+                    for i in 0..self.lists[left.n as i32].items.len(): items.push(pv_copy(&self.lists[left.n as i32].items[i]))
+                    for i in 0..self.lists[right.n as i32].items.len(): items.push(pv_copy(&self.lists[right.n as i32].items[i]))
                     return self.new_list(move items)
                 if left.k == V_INT and right.k == V_INT: return pv(V_INT, left.n + right.n, "")
                 if (left.k == V_STR or left.k == V_OPT) and (right.k == V_STR or right.k == V_OPT): return pv_str(left.s ++ right.s)
@@ -1648,7 +1648,7 @@ impl PyInterp:
             if iter.k != V_LIST: return pv_unknown()
             var items: List[PyVal] = List.new()
             var source: List[PyVal] = List.new()
-            for i in 0..self.lists[iter.n as i32].items.len() as i32: source.push(pv_copy(&self.lists[iter.n as i32].items[i]))
+            for i in 0..self.lists[iter.n as i32].items.len(): source.push(pv_copy(&self.lists[iter.n as i32].items[i]))
             for item in source:
                 self.bind_targets(self.nodes[node].kids[0], item)
                 if self.nodes[node].c >= 0:
@@ -1663,14 +1663,14 @@ impl PyInterp:
 
     // Binds a `for`'s names to one item: the item, or its parts.
     mut fn bind_targets(targets: i32, item: &PyVal):
-        let count = self.nodes[targets].kids.len() as i32
+        let count = self.nodes[targets].kids.len()
         if count == 1:
             let name = self.nodes[self.nodes[targets].kids[0]].s.clone()
             self.bind(name, pv_copy(item))
             return
         for i in 0..count:
             let name = self.nodes[self.nodes[targets].kids[i]].s.clone()
-            if item.k == V_LIST and i < self.lists[item.n as i32].items.len() as i32: self.bind(name, pv_copy(&self.lists[item.n as i32].items[i]))
+            if item.k == V_LIST and i < self.lists[item.n as i32].items.len(): self.bind(name, pv_copy(&self.lists[item.n as i32].items[i]))
             else: self.bind(name, pv_unknown())
 
     mut fn assign(target: i32, value: PyVal, line: i32):
@@ -1680,8 +1680,8 @@ impl PyInterp:
             self.bind(name, value)
             return
         if kind == N_LIST:
-            for i in 0..self.nodes[target].kids.len() as i32:
-                if value.k == V_LIST and i < self.lists[value.n as i32].items.len() as i32: self.assign(self.nodes[target].kids[i], pv_copy(&self.lists[value.n as i32].items[i]), line)
+            for i in 0..self.nodes[target].kids.len():
+                if value.k == V_LIST and i < self.lists[value.n as i32].items.len(): self.assign(self.nodes[target].kids[i], pv_copy(&self.lists[value.n as i32].items[i]), line)
                 else: self.assign(self.nodes[target].kids[i], pv_unknown(), line)
             return
         if kind == N_ATTR:
@@ -1702,7 +1702,7 @@ impl PyInterp:
             let index = self.eval(self.nodes[target].b)
             if owner.k == V_DICT:
                 let id = owner.n as i32
-                for i in 0..self.dkeys[id].items.len() as i32:
+                for i in 0..self.dkeys[id].items.len():
                     if self.equal(&index, &self.dkeys[id].items[i]) == 1:
                         self.dvals[id].items[i] = value
                         return
@@ -1711,7 +1711,7 @@ impl PyInterp:
 
     // Runs a node's statements (its kids); how it ended.
     mut fn exec_block(node: i32) -> i32:
-        for i in 0..self.nodes[node].kids.len() as i32:
+        for i in 0..self.nodes[node].kids.len():
             let flow = self.exec(self.nodes[node].kids[i])
             if flow != PY_NORMAL: return flow
         PY_NORMAL
@@ -1760,7 +1760,7 @@ impl PyInterp:
                 if iter.k != V_SINK: self.note(line, "a 'for' runs over something that could not be evaluated; its body was not run")
                 return PY_NORMAL
             var source: List[PyVal] = List.new()
-            for i in 0..self.lists[iter.n as i32].items.len() as i32: source.push(pv_copy(&self.lists[iter.n as i32].items[i]))
+            for i in 0..self.lists[iter.n as i32].items.len(): source.push(pv_copy(&self.lists[iter.n as i32].items[i]))
             for item in source:
                 self.bind_targets(self.nodes[node].a, item)
                 let flow = self.exec_block(node)
@@ -1804,7 +1804,7 @@ impl PyInterp:
         var out: List[str] = List.new()
         let list = self.cppinfo_attr(obj, name)
         if list.k != V_LIST: return out
-        for i in 0..self.lists[list.n as i32].items.len() as i32:
+        for i in 0..self.lists[list.n as i32].items.len():
             let text = self.to_text(&self.lists[list.n as i32].items[i])
             if text.k == V_STR: out.push(text.s.clone())
             else: self.note(0, "an entry of " ++ (if component.len() > 0: "component '" ++ component ++ "' " else: "") ++ "cpp_info." ++ name ++ " could not be evaluated")
@@ -1815,7 +1815,7 @@ impl PyInterp:
 
     // Runs the recipe method `name` when the recipe defines it.
     mut fn run_method(name: &str) -> bool:
-        for i in 0..self.method_names.len() as i32:
+        for i in 0..self.method_names.len():
             if self.method_names[i] != name: continue
             let _ = self.call_def(self.method_nodes[i], List.new(), self.nodes[self.method_nodes[i]].line)
             return true
@@ -1863,8 +1863,8 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
     ip.frame_vals.push(PyList { items: List.new() })
     for k in class_body:
         let _ = ip.exec(k)
-    let class_frame: i32 = ip.frame_names.len() as i32 - 1
-    for i in 0..ip.frame_names[class_frame].items.len() as i32:
+    let class_frame: i32 = (ip.frame_names.len() - 1) as i32
+    for i in 0..ip.frame_names[class_frame].items.len():
         let name = ip.frame_names[class_frame].items[i].clone()
         let value = pv_copy(&ip.frame_vals[class_frame].items[i])
         ip.attr_names.push(name)
@@ -1905,7 +1905,7 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
         // The declared defaults, then the recipe's own adjustments to them.
         let defaults = ip.self_attr("default_options", 0)
         if defaults.k == V_DICT:
-            for i in 0..ip.dkeys[defaults.n as i32].items.len() as i32:
+            for i in 0..ip.dkeys[defaults.n as i32].items.len():
                 let key = pv_copy(&ip.dkeys[defaults.n as i32].items[i])
                 if key.k != V_STR or key.s.contains(":") or key.s.contains("/"): continue
                 ip.obj_set(options, key.s, pv(V_OPT, 0, py_option_text(&ip.dvals[defaults.n as i32].items[i])))
@@ -1925,7 +1925,7 @@ pub fn recipe_built_options(recipe: &str, env: &RecipeEnv) -> List[str]:
     let at = ip.obj_find(self_obj, "options")
     if at < 0: return out
     let options = ip.objs[self_obj].vals[at].n as i32
-    for i in 0..ip.objs[options].names.len() as i32: out.push(ip.objs[options].names[i] ++ "=" ++ ip.objs[options].vals[i].s)
+    for i in 0..ip.objs[options].names.len(): out.push(ip.objs[options].names[i] ++ "=" ++ ip.objs[options].vals[i].s)
     out
 
 // `package_info`, run: what the package's cpp_info and its components hold.
@@ -1945,10 +1945,10 @@ pub fn recipe_package_info(recipe: &str, env: &RecipeEnv) -> RecipePackageInfo:
         let comps = ip.objs[cpp_info].vals[comps_at].n as i32
         var names: List[str] = List.new()
         var ids: List[i32] = List.new()
-        for i in 0..ip.objs[comps].names.len() as i32:
+        for i in 0..ip.objs[comps].names.len():
             names.push(ip.objs[comps].names[i].clone())
             ids.push(ip.objs[comps].vals[i].n as i32)
-        for i in 0..names.len() as i32: components.push(ip.component(ids[i], names[i]))
+        for i in 0..names.len(): components.push(ip.component(ids[i], names[i]))
     RecipePackageInfo { ok: true, problem: "", notes: move ip.notes, root, components }
 
 // What `requirements` and `build_requirements` ask for: the packages the
@@ -1965,7 +1965,7 @@ pub fn recipe_requirements(recipe: &str, env: &RecipeEnv) -> RecipeRequirements:
     let stated = ip.self_attr("requires", 0)
     if stated.k == V_STR: ip.reqs.push(stated.s.clone())
     if stated.k == V_LIST:
-        for i in 0..ip.lists[stated.n as i32].items.len() as i32:
+        for i in 0..ip.lists[stated.n as i32].items.len():
             let reference = pv_copy(&ip.lists[stated.n as i32].items[i])
             if reference.k == V_STR: ip.reqs.push(reference.s.clone())
     let _r = ip.run_method("requirements")
@@ -1989,14 +1989,14 @@ pub fn recipe_cmake_variables(recipe: &str, env: &RecipeEnv) -> RecipeCMake:
     if ip.problem.len() > 0:
         out.problem = move ip.problem
         return out
-    for ti in 0..ip.toolchains.len() as i32:
+    for ti in 0..ip.toolchains.len():
         let tc: i32 = ip.toolchains[ti]
         for attr in ["variables", "cache_variables"]:
             let at = ip.obj_find(tc, attr)
             if at < 0: continue
             let dict = pv_copy(&ip.objs[tc].vals[at])
             if dict.k != V_DICT: continue
-            for i in 0..ip.dkeys[dict.n as i32].items.len() as i32:
+            for i in 0..ip.dkeys[dict.n as i32].items.len():
                 let key = pv_copy(&ip.dkeys[dict.n as i32].items[i])
                 if key.k != V_STR: continue
                 let value = ip.plain(&ip.dvals[dict.n as i32].items[i])
@@ -2011,8 +2011,8 @@ pub fn recipe_cmake_variables(recipe: &str, env: &RecipeEnv) -> RecipeCMake:
                     out.unknown.push(key.s.clone())
                     continue
                 var slot = -1
-                for k in 0..out.names.len() as i32:
-                    if out.names[k] == key.s: slot = k
+                for k in 0..out.names.len():
+                    if out.names[k] == key.s: slot = k as i32
                 if slot >= 0: out.values[slot] = text
                 else:
                     out.names.push(key.s.clone())

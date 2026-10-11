@@ -139,11 +139,11 @@ impl Diagnostic:
         with_eprint(render_diag_source_line(loc.line, line_text))
         with_eprint(render_diag_marker_line(loc.col, span_underline_len(pstart, pend)))
 
-        for i in 0..self.labels.len() as i32:
+        for i in 0..self.labels.len():
             let lab = &self.labels[i]
             let label_message: str = with_str_clone_ref(lab.message)
             var label_path = ""
-            if i < label_paths.len() as i32:
+            if i < label_paths.len():
                 label_path = with_str_clone_ref(label_paths[i])
             if label_path.len() > 0 and label_path != source_path:
                 let label_source = Source.from_string(label_path, label_texts[i], lab.span.file)
@@ -153,10 +153,10 @@ impl Diagnostic:
                 let lloc = source.offset_to_location(lab.span.start)
                 with_eprint(render_diag_label_line(lloc.line, lloc.col, label_message))
 
-        for i in 0..self.notes.len() as i32:
+        for i in 0..self.notes.len():
             let note: str = with_str_clone_ref(self.notes[i])
             with_eprint(render_diag_note_line(note))
-        for i in 0..self.helps.len() as i32:
+        for i in 0..self.helps.len():
             let help: str = with_str_clone_ref(self.helps[i])
             with_eprint(render_diag_help_line(help))
 
@@ -180,7 +180,7 @@ impl DiagnosticList:
         // diagnostic — the comptime-transform sema and check_module both
         // run declaration collection, and every decl-phase error rendered
         // twice. Same node + same words twice is never signal.
-        for i in 0..self.items.len() as i32:
+        for i in 0..self.items.len():
             let existing = self.items[i]
             if existing.severity == diag.severity and
                existing.primary.file == diag.primary.file and
@@ -197,19 +197,19 @@ impl DiagnosticList:
     // parallel) reports in the program's order.
     mut fn sort_from(start: i32):
         var rest: List[Diagnostic] = List.new()
-        while self.items.len() as i32 > start:
+        while self.items.len() > start:
             rest.push(self.items.remove(start))
         while rest.len() > 0:
             var best = 0
-            for i in 1..rest.len() as i32:
+            for i in 1..rest.len():
                 if diagnostic_sorts_before(&rest[i], &rest[best]):
-                    best = i
+                    best = i as i32
             self.items.push(rest.remove(best))
 
     // Forgets the diagnostics from `count` on: a check whose only purpose
     // was to hear something reports nothing.
     mut fn truncate(count: i32):
-        while self.items.len() as i32 > count:
+        while self.items.len() > count:
             let _ = self.items.remove(count)
 
     fn count() -> i32:
@@ -217,7 +217,7 @@ impl DiagnosticList:
 
     fn count_by_severity(severity: i32) -> isize:
         var n = 0
-        for i in 0..self.items.len() as i32:
+        for i in 0..self.items.len():
             if self.items[i].severity == severity:
                 n = n + 1
         n
@@ -226,14 +226,14 @@ impl DiagnosticList:
         self.count_by_severity(DiagSeverity.Error) > 0
 
     fn render_all(source: &Source):
-        for i in 0..self.items.len() as i32:
+        for i in 0..self.items.len():
             self.items[i].render(source)
-            if i + 1 < self.items.len() as i32:
+            if i + 1 < self.items.len():
                 with_eprint("")
 
     fn render_warnings(source: &Source):
         var printed = 0
-        for i in 0..self.items.len() as i32:
+        for i in 0..self.items.len():
             if self.items[i].severity != DiagSeverity.Warning:
                 continue
             if printed != 0:

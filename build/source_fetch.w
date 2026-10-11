@@ -42,8 +42,8 @@ fn sf_abs(root: &str, path: &str) -> str: if sf_is_abs(path): sf_owned(path) els
 
 fn sf_basename(path: &str) -> str:
     var last = -1
-    for i in 0..path.len() as i32:
-        if path[i] == '/' or path[i] == '\\': last = i
+    for i in 0..path.len():
+        if path[i] == '/' or path[i] == '\\': last = i as i32
     path.slice(last + 1, path.len())
 
 fn sf_exe_suffix() -> str: if os() == "Windows": ".exe" else: ""
@@ -132,7 +132,7 @@ pub fn source_fetch_pinned(ctx: &ActionCtx, scratch: &str, label: &str, sources:
         return SourceFetch { rc: 1, report: "could not compile build/https_fetch.w" }
     let part = output ++ ".part"
     var tried = ""
-    for i in 0..sources.len() as i32:
+    for i in 0..sources.len():
         let source = sources[i]
         let _stale = fs.remove_file(part)
         var why = ""
@@ -151,7 +151,7 @@ pub fn source_fetch_pinned(ctx: &ActionCtx, scratch: &str, label: &str, sources:
             why = "its sha256 is " ++ actual ++ ", not the pin"
         let _bad = fs.remove_file(part)
         tried = tried ++ "  " ++ source ++ ": " ++ why ++ "\n"
-    let count = sources.len() as i32
+    let count = sources.len()
     let plural = if count == 1: "its source" else: f"any of its {count} sources"
     SourceFetch { rc: 1, report: "could not fetch " ++ name ++ " (pinned sha256 " ++ sha256 ++ ") from " ++ plural ++ ":\n" ++ tried }
 
@@ -169,7 +169,7 @@ fn sft_expect(ctx: &ActionCtx, case_name: &str, ok: bool, detail: &str) -> i32:
 
 fn sft_digits(text: &str) -> str:
     var end = 0
-    while end < text.len() as i32 and text[end] >= '0' and text[end] <= '9':
+    while end < text.len() and text[end] >= '0' and text[end] <= '9':
         end = end + 1
     text.slice(0, end)
 

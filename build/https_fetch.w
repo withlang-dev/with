@@ -23,8 +23,8 @@ const ATTEMPTS = 5
 fn host_port(url: &str) -> str:
     if not url.starts_with("https://"): return ""
     let rest = url.slice(8, url.len())
-    var end = rest.len() as i32
-    for i in 0..rest.len() as i32:
+    var end = rest.len()
+    for i in 0..rest.len():
         if rest[i] == '/' or rest[i] == '?' or rest[i] == '#':
             end = i
             break
@@ -34,7 +34,7 @@ fn host_port(url: &str) -> str:
 
 fn port_number(text: &str) -> i32:
     var value: i32 = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] < '0' or text[i] > '9': return -1
         value = value * 10 + (text[i] - '0') as i32
     if text.len() == 0: -1 else: value

@@ -190,7 +190,7 @@ impl StackifyGraph:
         id
 
     pub mut fn add_param(block: i32, value: i32):
-        if block < 0 or block >= self.blocks.len() as i32:
+        if block < 0 or block >= self.blocks.len():
             return
         if self.blocks[block].params_count == 0:
             self.blocks[block].params_start = self.block_params.len() as i32
@@ -223,7 +223,7 @@ impl StackifyGraph:
             i = i + 1
 
     pub mut fn set_br(block: i32, target_block: i32, args: &List[i32]):
-        if block < 0 or block >= self.blocks.len() as i32:
+        if block < 0 or block >= self.blocks.len():
             return
         let target = self.add_target(target_block, args)
         self.blocks[block].term_kind = StackifyTermKind.Br
@@ -234,7 +234,7 @@ impl StackifyGraph:
         self.set_succs(block, block_succs)
 
     pub mut fn set_cond_br(block: i32, cond: i32, true_block: i32, true_args: &List[i32], false_block: i32, false_args: &List[i32]):
-        if block < 0 or block >= self.blocks.len() as i32:
+        if block < 0 or block >= self.blocks.len():
             return
         let first_target = self.targets.len() as i32
         let _ = self.add_target(true_block, true_args)
@@ -249,7 +249,7 @@ impl StackifyGraph:
         self.set_succs(block, block_succs)
 
     pub mut fn set_select(block: i32, selector: i32, target_blocks: &List[i32], default_block: i32):
-        if block < 0 or block >= self.blocks.len() as i32:
+        if block < 0 or block >= self.blocks.len():
             return
         let first_target = self.targets.len() as i32
         var i: i64 = 0
@@ -273,7 +273,7 @@ impl StackifyGraph:
         self.set_succs(block, block_succs)
 
     pub mut fn set_select_targets(block: i32, selector: i32, targets_start: i32, targets_count: i32, default_target: i32):
-        if block < 0 or block >= self.blocks.len() as i32:
+        if block < 0 or block >= self.blocks.len():
             return
         self.blocks[block].term_kind = StackifyTermKind.Select
         self.blocks[block].selector_value = selector
@@ -283,15 +283,15 @@ impl StackifyGraph:
         let block_succs: List[i32] = List.new()
         var i = 0
         while i < targets_count:
-            if targets_start + i >= 0 and targets_start + i < self.targets.len() as i32:
+            if targets_start + i >= 0 and targets_start + i < self.targets.len():
                 block_succs.push(self.targets[(targets_start + i)].block)
             i = i + 1
-        if default_target >= 0 and default_target < self.targets.len() as i32:
+        if default_target >= 0 and default_target < self.targets.len():
             block_succs.push(self.targets[default_target].block)
         self.set_succs(block, block_succs)
 
     pub mut fn set_return(block: i32, values: &List[i32]):
-        if block < 0 or block >= self.blocks.len() as i32:
+        if block < 0 or block >= self.blocks.len():
             return
         self.blocks[block].term_kind = StackifyTermKind.Return
         self.blocks[block].return_values_start = self.return_values.len() as i32
@@ -304,7 +304,7 @@ impl StackifyGraph:
         self.set_succs(block, no_succs)
 
     pub mut fn set_unreachable(block: i32):
-        if block < 0 or block >= self.blocks.len() as i32:
+        if block < 0 or block >= self.blocks.len():
             return
         self.blocks[block].term_kind = StackifyTermKind.Unreachable
         let no_succs: List[i32] = List.new()
@@ -343,7 +343,7 @@ fn stackify_bool_list(count: i32, value: i32) -> List[i32]:
     out
 
 fn stackify_validate_graph(graph: &StackifyGraph) -> str:
-    let n = graph.blocks.len() as i32
+    let n = graph.blocks.len()
     if n <= 0:
         return "stackify: graph has no blocks"
     if graph.entry < 0 or graph.entry >= n:
@@ -362,14 +362,14 @@ fn stackify_validate_graph(graph: &StackifyGraph) -> str:
         var ti = 0
         while ti < block.targets_count:
             let target_index = block.targets_start + ti
-            if target_index < 0 or target_index >= graph.targets.len() as i32:
+            if target_index < 0 or target_index >= graph.targets.len():
                 return "stackify: branch target out of range"
             let target = graph.targets[target_index]
             if target.block < 0 or target.block >= n:
                 return "stackify: branch target block out of range"
             ti = ti + 1
         if block.term_kind == StackifyTermKind.Select:
-            if block.default_target < 0 or block.default_target >= graph.targets.len() as i32:
+            if block.default_target < 0 or block.default_target >= graph.targets.len():
                 return "stackify: select default target out of range"
         b = b + 1
     ""
@@ -385,7 +385,7 @@ type StackifyDfsState {
 
 impl StackifyDfsState:
     mut fn dfs_post(graph: &StackifyGraph, start: i32):
-        if start < 0 or start >= graph.blocks.len() as i32:
+        if start < 0 or start >= graph.blocks.len():
             return
         if self.visited[start] != 0:
             return
@@ -403,7 +403,7 @@ impl StackifyDfsState:
                 // #183: succ must be computed before set_i32 — codegen re-reads idx after mutation
                 let succ = graph.succs[(b.succs_start + idx)]
                 stack_idx[top] = idx + 1
-                if succ >= 0 and succ < graph.blocks.len() as i32 and self.visited[succ] == 0:
+                if succ >= 0 and succ < graph.blocks.len() and self.visited[succ] == 0:
                     self.visited[succ] = 1
                     stack_block.push(succ)
                     stack_idx.push(0)
@@ -474,7 +474,7 @@ fn stackify_compute_idom(graph: &StackifyGraph, post_ord: &List[i32], rpo_pos: &
     var changed = true
     while changed:
         changed = false
-        var ri = post_ord.len() as i32 - 1
+        var ri = post_ord.len() - 1
         while ri >= 0:
             let node = post_ord[ri]
             if node != graph.entry:
@@ -530,15 +530,15 @@ fn stackify_compute_analysis(graph: &StackifyGraph) -> StackifyAnalysis:
     dfs.dfs_post(graph, graph.entry)
     let post_ord = dfs.out
     var rpo_pos = stackify_bool_list(n, stackify_invalid())
-    var ri = post_ord.len() as i32 - 1
+    var ri = post_ord.len() - 1
     while ri >= 0:
         let block: i32 = post_ord[ri]
-        rpo_pos[block] = post_ord.len() as i32 - 1 - ri
+        rpo_pos[block] = (post_ord.len() - 1 - ri) as i32
         ri = ri - 1
     let preds = stackify_compute_preds(graph)
     let idom = stackify_compute_idom(graph, post_ord, rpo_pos, preds)
     let rpo: List[i32] = List.new()
-    var pi = post_ord.len() as i32 - 1
+    var pi = post_ord.len() - 1
     while pi >= 0:
         rpo.push(post_ord[pi])
         pi = pi - 1
@@ -546,7 +546,7 @@ fn stackify_compute_analysis(graph: &StackifyGraph) -> StackifyAnalysis:
     var branched_once = stackify_bool_list(n, 0)
     var merge_nodes = stackify_bool_list(n, 0)
     var bi = 0
-    while bi < rpo.len() as i32:
+    while bi < rpo.len():
         let block: i32 = rpo[bi]
         let b = graph.blocks[block]
         var si = 0
@@ -573,7 +573,7 @@ fn stackify_compute_analysis(graph: &StackifyGraph) -> StackifyAnalysis:
             si = si + 1
         bi = bi + 1
     var sr = 0
-    while sr < rpo.len() as i32:
+    while sr < rpo.len():
         let block: i32 = rpo[sr]
         let b = graph.blocks[block]
         if b.term_kind == StackifyTermKind.Select:
@@ -600,7 +600,7 @@ impl StackifyContext:
         if self.result_starts.len() == 0:
             return
         self.result_items.push(node_id)
-        let top = self.result_counts.len() as i32 - 1
+        let top = self.result_counts.len() - 1
         let new_count = self.result_counts[top] + 1
         self.result_counts[top] = new_count
 
@@ -611,17 +611,17 @@ impl StackifyContext:
     mut fn result_pop_frame() -> i32:
         if self.result_starts.len() == 0:
             return 0
-        let idx = self.result_starts.len() as i32 - 1
+        let idx = self.result_starts.len() - 1
         let start: i32 = self.result_starts[idx]
         let _ = self.result_starts.pop()
         let _ = self.result_counts.pop()
         start
 
     fn result_frame_count(start: i32) -> i32:
-        self.result_items.len() as i32 - start
+        (self.result_items.len() - start) as i32
 
     mut fn result_truncate(start: i32):
-        while self.result_items.len() as i32 > start:
+        while self.result_items.len() > start:
             let _ = self.result_items.pop()
         return
 
@@ -710,7 +710,7 @@ fn stackify_ctrl_label(entry: &StackifyCtrlEntry) -> i32:
 impl StackifyContext:
     fn resolve_target(target: i32) -> i32:
         var depth: i32 = 0
-        var i = self.ctrl_stack.len() as i32 - 1
+        var i = self.ctrl_stack.len() - 1
         while i >= 0:
             if stackify_ctrl_label(self.ctrl_stack[i]) == target:
                 return depth
@@ -734,21 +734,21 @@ impl StackifyContext:
 
     mut fn push_merge_children(block: i32):
         let start = self.merge_items.len() as i32
-        var ri = self.analysis.rpo.len() as i32 - 1
+        var ri = self.analysis.rpo.len() - 1
         while ri >= 0:
             let child: i32 = self.analysis.rpo[ri]
             if self.analysis.idom[child] == block and self.analysis.merge_nodes[child] != 0:
                 self.merge_items.push(child)
             ri = ri - 1
         self.merge_starts.push(start)
-        self.merge_counts.push(self.merge_items.len() as i32 - start)
+        self.merge_counts.push((self.merge_items.len() - start) as i32)
 
     mut fn pop_merge_children():
         if self.merge_starts.len() == 0:
             return
-        let idx = self.merge_starts.len() as i32 - 1
+        let idx = self.merge_starts.len() - 1
         let start = self.merge_starts[idx]
-        while self.merge_items.len() as i32 > start:
+        while self.merge_items.len() > start:
             let _ = self.merge_items.pop()
         let _ = self.merge_starts.pop()
         let _ = self.merge_counts.pop()
@@ -885,7 +885,7 @@ impl StackifyContext:
         self.result_push(id)
 
     mut fn node_within(block: i32, merge_start: i32):
-        let frame_idx = self.merge_starts.len() as i32 - 1
+        let frame_idx = self.merge_starts.len() - 1
         let start = self.merge_starts[frame_idx]
         let count = self.merge_counts[frame_idx]
         let rel = merge_start

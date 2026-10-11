@@ -115,7 +115,7 @@ pub fn codegen_units_assign_from_mir(mir_ptr: i64, unit_count: i32) -> CodegenUn
         pre = pre + 1
     unsafe:
         let m = mir_ptr as *const MirModule
-        for i in 0..(*m).bodies.len() as i32:
+        for i in 0..(*m).bodies.len():
             let sym = (*m).body_fn_syms[i]
             let body = &(*m).bodies[i]
             var cost: i64 = 1
@@ -217,7 +217,7 @@ pub fn codegen_unit_pipeline(unit_count: i32, obj_path: &str, opt_level: i32, do
 impl CodegenUnitPipeline:
     // Unit k's module and context now belong to the pipeline.
     mut fn submit(k: i32, context: i64, llmod: i64):
-        if self.handles.len() as i32 - self.next_join >= self.window:
+        if self.handles.len() - self.next_join >= self.window:
             self.join_oldest()
         unsafe:
             let job_ptr = with_vec_get_ptr(&raw mut self.jobs as *mut u8, k as i64) as *mut CodegenUnitEmitJob
@@ -239,9 +239,9 @@ impl CodegenUnitPipeline:
 
     // Joins every started unit; the first failing unit's code, or 0.
     mut fn finish() -> i32:
-        while self.next_join < self.handles.len() as i32:
+        while self.next_join < self.handles.len():
             self.join_oldest()
-        for k in 0..self.jobs.len() as i32:
+        for k in 0..self.jobs.len():
             if self.jobs[k].rc != 0 and self.rc == 0:
                 self.rc = self.jobs[k].rc
         if self.rc != 0:

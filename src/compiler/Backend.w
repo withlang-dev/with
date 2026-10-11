@@ -44,7 +44,7 @@ impl Zcu:
         let sema_pool: InternPool = self.last_sema.pool
         if sema_ast.decl_count() > 0:
             backend_pool = sema_ast
-        if sema_pool.state.symbol_texts.len() as i32 > 1:
+        if sema_pool.state.symbol_texts.len() > 1:
             backend_intern = sema_pool
         var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, move backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
@@ -58,13 +58,13 @@ impl Zcu:
         cg.module_object_mode = if module_object_mode: 1 else: 0
         if not debug_info:
             cg.debug_info = 0
-        if self.pool.state.symbol_texts.len() as i32 <= 4 or sema_pool.state.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
-            runtime_eprint(f"[backend] zcu.pool symbols={self.pool.state.symbol_texts.len() as i32}")
-            runtime_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.state.symbol_texts.len() as i32}")
-            runtime_eprint(f"[backend] sema.pool symbols={sema_pool.state.symbol_texts.len() as i32}")
+        if self.pool.state.symbol_texts.len() <= 4 or sema_pool.state.symbol_texts.len() <= 4 or backend_debug_pool_flow_enabled() != 0:
+            runtime_eprint(f"[backend] zcu.pool symbols={self.pool.state.symbol_texts.len()}")
+            runtime_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.state.symbol_texts.len()}")
+            runtime_eprint(f"[backend] sema.pool symbols={sema_pool.state.symbol_texts.len()}")
             runtime_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={sema_ast.decl_count()}")
-        if self.pool.state.symbol_texts.len() as i32 <= 4 or sema_pool.state.symbol_texts.len() as i32 <= 4 or cg.intern.state.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
-            runtime_eprint(f"[backend] cg.intern symbols={cg.intern.state.symbol_texts.len() as i32}")
+        if self.pool.state.symbol_texts.len() <= 4 or sema_pool.state.symbol_texts.len() <= 4 or cg.intern.state.symbol_texts.len() <= 4 or backend_debug_pool_flow_enabled() != 0:
+            runtime_eprint(f"[backend] cg.intern symbols={cg.intern.state.symbol_texts.len()}")
         if backend_debug_pool_flow_enabled() != 0:
             runtime_eprint(f"[backend-diag] pool.extra_len={backend_pool.extra_len()} pool.nodes={backend_pool.node_count()}")
             backend_dump_struct_extras(backend_pool, cg.intern)
@@ -119,7 +119,7 @@ impl Zcu:
         let main_sym = self.last_sema.pool_lookup_symbol("main")
         if main_sym != 0:
             var mi = 0
-            while mi < assign.fn_syms.len() as i32:
+            while mi < assign.fn_syms.len():
                 if assign.fn_syms[mi] == main_sym:
                     let main_slot = mi as i64
                     with assign.units.slot(main_slot) as mut unit_slot:
@@ -140,7 +140,7 @@ impl Zcu:
             // D17/#697: per-round take-and-return — each round's Codegen owns
             // the sema and hands it back before deinit or any early return.
             let round_sema_pool = self.last_sema.pool
-            if round_sema_pool.state.symbol_texts.len() as i32 > 1:
+            if round_sema_pool.state.symbol_texts.len() > 1:
                 backend_intern = round_sema_pool
             var cg = Codegen.init_with_opt_and_intern(f"with_module_u{k}", opt_level, move backend_intern, move self.last_sema)
             cg.source_file = with_str_clone_ref(self.current_source_path)
@@ -155,7 +155,7 @@ impl Zcu:
             cg.unit_total = unit_count
             cg.unit_index = k
             var ai: i32 = 0
-            while ai < assign.fn_syms.len() as i32:
+            while ai < assign.fn_syms.len():
                 cg.unit_assign_insert(assign.fn_syms[ai], assign.units[ai], ai)
                 ai = ai + 1
             let unit_symbols_before = cg.intern.state.symbol_texts.len()
@@ -211,7 +211,7 @@ impl Zcu:
         let sema_pool: InternPool = self.last_sema.pool
         if sema_ast.decl_count() > 0:
             backend_pool = sema_ast
-        if sema_pool.state.symbol_texts.len() as i32 > 1:
+        if sema_pool.state.symbol_texts.len() > 1:
             backend_intern = sema_pool
         var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, move backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
@@ -220,13 +220,13 @@ impl Zcu:
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
         cg.add_bundle_prefixes(&self.link_bundle_prefixes)
         cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
-        if self.pool.state.symbol_texts.len() as i32 <= 4 or sema_pool.state.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
-            runtime_eprint(f"[backend] zcu.pool symbols={self.pool.state.symbol_texts.len() as i32}")
-            runtime_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.state.symbol_texts.len() as i32}")
-            runtime_eprint(f"[backend] sema.pool symbols={sema_pool.state.symbol_texts.len() as i32}")
+        if self.pool.state.symbol_texts.len() <= 4 or sema_pool.state.symbol_texts.len() <= 4 or backend_debug_pool_flow_enabled() != 0:
+            runtime_eprint(f"[backend] zcu.pool symbols={self.pool.state.symbol_texts.len()}")
+            runtime_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.state.symbol_texts.len()}")
+            runtime_eprint(f"[backend] sema.pool symbols={sema_pool.state.symbol_texts.len()}")
             runtime_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={sema_ast.decl_count()}")
-        if self.pool.state.symbol_texts.len() as i32 <= 4 or sema_pool.state.symbol_texts.len() as i32 <= 4 or cg.intern.state.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
-            runtime_eprint(f"[backend] cg.intern symbols={cg.intern.state.symbol_texts.len() as i32}")
+        if self.pool.state.symbol_texts.len() <= 4 or sema_pool.state.symbol_texts.len() <= 4 or cg.intern.state.symbol_texts.len() <= 4 or backend_debug_pool_flow_enabled() != 0:
+            runtime_eprint(f"[backend] cg.intern symbols={cg.intern.state.symbol_texts.len()}")
         var backend_mir = move self.last_mir_module
         let result = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)
         var tracked_paths = move self.tracked_input_paths
@@ -256,7 +256,7 @@ impl Zcu:
         // stays owned by its home field, and everything lent to the codegen
         // run is restored after take_sema.
         let use_sema_ast = self.last_sema.ast.decl_count() > 0
-        let use_sema_pool = self.last_sema.pool.state.symbol_texts.len() as i32 > 1
+        let use_sema_pool = self.last_sema.pool.state.symbol_texts.len() > 1
         let backend_intern = if use_sema_pool: move self.last_sema.pool else: move self.pool
         var cg = Codegen.init_with_opt_and_intern("with_analysis", opt_level, move backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)

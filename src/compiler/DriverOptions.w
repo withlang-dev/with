@@ -157,7 +157,7 @@ pub fn driver_clone_str(s: &str) -> str:
 
 pub fn driver_clone_str_list(values: &List[str]) -> List[str]:
     let out: List[str] = List.new()
-    for i in 0..values.len() as i32:
+    for i in 0..values.len():
         out.push(driver_clone_str(values[i]))
     out
 

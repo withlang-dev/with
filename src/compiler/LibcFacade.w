@@ -94,7 +94,7 @@ fn libc_facade_source() -> str:
 "
 
 fn libc_facade_has(names: &List[str], name: &str) -> bool:
-    for i in 0..names.len() as i32:
+    for i in 0..names.len():
         if names[i] == name:
             return true
     false
@@ -123,13 +123,13 @@ pub fn libc_facade_select(pool: AstPool, intern: InternPool, ci: &List[i32], cla
     var domain_names: List[str] = List.new()
     var body = ""
     var i = 1
-    while i < lines.len() as i32:
+    while i < lines.len():
         let header = lines[i].clone()
         i = i + 1
         if header.trim().len() == 0:
             continue
         var clauses: List[str] = List.new()
-        while i < lines.len() as i32 and lines[i].starts_with("        "):
+        while i < lines.len() and lines[i].starts_with("        "):
             clauses.push(lines[i].clone())
             i = i + 1
         let name = libc_facade_operand(header)
@@ -147,7 +147,7 @@ pub fn libc_facade_select(pool: AstPool, intern: InternPool, ci: &List[i32], cla
             var kept = ""
             var producers = 0
             var has_drop = false
-            for ci_ in 0..clauses.len() as i32:
+            for ci_ in 0..clauses.len():
                 let clause = clauses[ci_].clone()
                 let op = libc_facade_operand(clause)
                 let (found, ret, p0) = facade_render_import_shape(pool, intern, ci, op)
@@ -168,23 +168,23 @@ pub fn libc_facade_select(pool: AstPool, intern: InternPool, ci: &List[i32], cla
             if not found:
                 continue
             var ok = true
-            for ci_ in 0..clauses.len() as i32:
+            for ci_ in 0..clauses.len():
                 if clauses[ci_].trim().starts_with("of "):
                     let target = libc_facade_operand(clauses[ci_])
                     var matched = false
-                    for ki in 0..kept_names.len() as i32:
+                    for ki in 0..kept_names.len():
                         if kept_names[ki] == target and kept_reprs[ki] == p0:
                             matched = true
                     if not matched:
                         ok = false
             if ok:
                 body = body ++ header ++ "\n"
-                for ci_ in 0..clauses.len() as i32:
+                for ci_ in 0..clauses.len():
                     body = body ++ clauses[ci_] ++ "\n"
     if body.len() == 0:
         return ""
     var domains = ""
-    for di in 0..domain_lines.len() as i32:
+    for di in 0..domain_lines.len():
         if body.contains(" domain " ++ domain_names[di] ++ "\n"):
             domains = domains ++ domain_lines[di] ++ "\n"
     lines[0] ++ "\n" ++ domains ++ body

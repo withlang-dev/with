@@ -952,7 +952,7 @@ impl AstPool:
     fn add_node(kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
         if self.state.frozen != 0:
             ast_pool_phase_bug("BUG: AstPool.add_node called after freeze")
-        let idx = self.state.kinds.len() as i32
+        let idx = self.state.kinds.len()
         self.state.kinds.push(kind)
         self.state.starts.push(start)
         self.state.ends.push(end)
@@ -1058,7 +1058,7 @@ impl AstPool:
 // so each consumer that converts text to a value drops them here; integer literals
 // have their own normalized digits (`int_literal_digits`).
 pub fn float_literal_value_text(text: &str) -> str:
-    let len = text.len() as i32
+    let len = text.len()
     var i = 0
     while i < len:
         if text[i] == 95:
@@ -1284,7 +1284,7 @@ pub fn exact_int_parse_digits(digits: &str, radix: i32) -> ExactIntValue:
     if radix < 2 or radix > 16:
         return exact_int_invalid()
     var acc = exact_int_value(0, 0)
-    for i in 0..digits.len() as i32:
+    for i in 0..digits.len():
         let digit = exact_int_digit_value(digits[i])
         if digit < 0 or digit >= radix:
             return exact_int_invalid()
@@ -1453,7 +1453,7 @@ impl AstPool:
 
     fn has_type_derives() -> bool:
         var meta: i32 = 0
-        while meta < self.state.type_meta.len() as i32:
+        while meta < self.state.type_meta.len():
             if self.type_meta_derive_count(meta) > 0:
                 return true
             meta = meta + 3
@@ -1532,7 +1532,7 @@ impl AstPool:
     // Drops the declarations added after the first `count` (§17.5: an arm
     // of a module-level target selection that is not taken).
     mut fn truncate_decls(count: i32):
-        while self.state.decls.len() as i32 > count: let _ = self.state.decls.pop()
+        while self.state.decls.len() > count: let _ = self.state.decls.pop()
 
     fn decl_count() -> i32:
         self.state.decls.len() as i32
@@ -1579,7 +1579,7 @@ impl AstPool:
         let index = self.state.default_body_clone_index.get((impl_node as i64) * 4294967296 + body as i64)
         if index.is_some(): self.state.default_body_clones[index.unwrap()] else: body
 
-    fn default_body_clone_count(): self.state.default_body_clones.len() as i32
+    fn default_body_clone_count(): self.state.default_body_clones.len()
     fn default_body_clone_origin(index: i32) -> i32: self.state.default_body_clone_origins[index]
     fn default_body_clone(index: i32) -> i32: self.state.default_body_clones[index]
 
@@ -1852,21 +1852,21 @@ impl AstPool:
             ast_pool_phase_bug("BUG: receiver field-name resolution ran after AstPool.freeze")
         let self_sym = intern.intern("self")
         let generated: HashMap[i32, i32] = HashMap.new()
-        for gi in 0..generated_files.len() as i32:
+        for gi in 0..generated_files.len():
             generated.insert(generated_files[gi], 1)
         let struct_decls: HashMap[i64, i32] = HashMap.new()
         let decl_nodes: HashMap[i32, i32] = HashMap.new()
         for di in 0..self.decl_count():
             let decl = self.get_decl(di)
             decl_nodes.insert(decl as i32, 1)
-            let from_c = (di < decl_is_c_import.len() as i32 and decl_is_c_import[di] != 0) or generated.contains(self.file(decl) as i32)
+            let from_c = (di < decl_is_c_import.len() and decl_is_c_import[di] != 0) or generated.contains(self.file(decl) as i32)
             if self.kind(decl) == NodeKind.NK_TYPE_DECL and not from_c:
                 let sub = type_decl_sub_kind(self.get_data2(decl))
                 if sub == TypeDeclKind.Struct or sub == TypeDeclKind.Union:
                     struct_decls.insert(ast_pair_key(self.file(decl) as i32, self.get_data0(decl)), decl as i32)
         for di in 0..self.decl_count():
             let fn_node = self.get_decl(di)
-            if (di < decl_is_c_import.len() as i32 and decl_is_c_import[di] != 0) or generated.contains(self.file(fn_node) as i32):
+            if (di < decl_is_c_import.len() and decl_is_c_import[di] != 0) or generated.contains(self.file(fn_node) as i32):
                 continue
             let owner = self.own_module_receiver_type(fn_node, self_sym, intern, &struct_decls)
             if owner != 0:
@@ -1883,9 +1883,9 @@ impl AstPool:
             return 0
         let name = intern.resolve(self.get_data0(fn_node)).clone()
         var dot = -1
-        for ci in 0..name.len() as i32:
+        for ci in 0..name.len():
             if name[ci] == '.':
-                dot = ci
+                dot = ci as i32
                 break
         if dot <= 0:
             return 0
@@ -1959,7 +1959,7 @@ impl AstPool:
             for pi in 0..param_count:
                 if self.fn_param_name(param_start, pi) == sym: is_param = true
             var nested = false
-            for ni in 0..nested_starts.len() as i32:
+            for ni in 0..nested_starts.len():
                 if start >= nested_starts[ni] and end <= nested_ends[ni]: nested = true
             if is_param or nested:
                 continue
@@ -1986,7 +1986,7 @@ impl AstPool:
 
     // The last segment of `file`'s `module` header, 0 when it has none.
     fn module_header_name(file: i32) -> i32:
-        for i in 0..self.state.module_header_files.len() as i32:
+        for i in 0..self.state.module_header_files.len():
             if self.state.module_header_files[i] == file: return self.state.module_header_names[i]
         0
 
@@ -2127,7 +2127,7 @@ impl AstPool:
             self.state.generated_debug_type_syms.push(type_sym)
 
     fn is_generated_debug_type(type_sym: i32) -> bool:
-        for i in 0..self.state.generated_debug_type_syms.len() as i32:
+        for i in 0..self.state.generated_debug_type_syms.len():
             if self.state.generated_debug_type_syms[i] == type_sym:
                 return true
         false
@@ -2178,7 +2178,7 @@ impl AstPool:
 
     fn unmark_non_escaping_closure(node: NodeId):
         self.state.non_escaping_closure_set.remove(node as i32)
-        for i in 0..self.state.non_escaping_closure_nodes.len() as i32:
+        for i in 0..self.state.non_escaping_closure_nodes.len():
             if self.state.non_escaping_closure_nodes[i] == node as i32:
                 self.state.non_escaping_closure_nodes.remove(i)
                 return
@@ -2243,7 +2243,7 @@ impl AstPool:
         if opt.is_some():
             return (opt.unwrap()) as NodeId
         var i = 0
-        while i < self.state.impl_target_type_nodes.len() as i32:
+        while i < self.state.impl_target_type_nodes.len():
             if self.state.impl_target_type_nodes[i] == (impl_node as i32):
                 return (self.state.impl_target_type_nodes[(i + 1)]) as NodeId
             i = i + 2

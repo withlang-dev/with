@@ -108,11 +108,11 @@ fn ex_facade_marker() -> str: "// ── verbatim: "
 fn ex_below_marker(text: &str) -> str:
     let marker = ex_facade_marker()
     var start = 0
-    while start < text.len() as i32:
+    while start < text.len():
         var end = start
-        while end < text.len() as i32 and text[end] != '\n': end = end + 1
+        while end < text.len() and text[end] != '\n': end = end + 1
         if text.slice(start, end).starts_with(marker):
-            return if end < text.len() as i32: text.slice(end + 1, text.len()) else: ""
+            return if end < text.len(): text.slice(end + 1, text.len()) else: ""
         start = end + 1
     ""
 

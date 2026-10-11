@@ -82,7 +82,7 @@ fn project_config_clone_str(s: &str) -> str:
 
 fn project_config_clone_str_list(values: &List[str]) -> List[str]:
     let out: List[str] = List.new()
-    for i in 0..values.len() as i32:
+    for i in 0..values.len():
         out.push(project_config_clone_str(values[i]))
     out
 
@@ -158,7 +158,7 @@ pub fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
 
     var line_start = 0
     var i = 0
-    let total = text.len() as i32
+    let total = text.len()
     while i <= total:
         if i == total or text[i] == 10:
             var line = text.slice(line_start as i64, i as i64)
@@ -348,7 +348,7 @@ fn project_config_apply_manual_c_dep_entry(cfg: ProjectConfig, dep_name: &str, k
                 out.manifest_error = "link in [deps.c." ++ dep_name ++ "] must be an array of library names"
         else:
             let libs = project_config_parse_string_array(value)
-            for li in 0..libs.len() as i32:
+            for li in 0..libs.len():
                 out.dep_link_libs.push(with_str_clone_ref(libs[li]))
     else if key == "defines":
         if not project_config_is_string_array_value(value):
@@ -356,14 +356,14 @@ fn project_config_apply_manual_c_dep_entry(cfg: ProjectConfig, dep_name: &str, k
                 out.manifest_error = "defines in [deps.c." ++ dep_name ++ "] must be an array of strings"
         else:
             let defines = project_config_parse_string_array(value)
-            for di in 0..defines.len() as i32:
+            for di in 0..defines.len():
                 out.c_import_defines.push(with_str_clone_ref(defines[di]))
     else if out.manifest_error.len() == 0:
         out.manifest_error = "unknown key '" ++ key ++ "' in [deps.c." ++ dep_name ++ "]; expected include, lib, link, or defines"
     out
 
 fn project_config_strip_quotes(value: &str) -> str:
-    let len = value.len() as i32
+    let len = value.len()
     if len >= 2 and value[0] == 34 and value[(len - 1)] == 34:
         return value.slice(1, (len - 1) as i64)
     with_str_clone_ref(value)
@@ -381,7 +381,7 @@ fn project_config_parse_positive_i64(value: &str) -> i64:
     if text.len() == 0:
         return -1
     var out: i64 = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         if ch < 48 or ch > 57:
             return -1
@@ -395,7 +395,7 @@ fn project_config_parse_nonnegative_i64(value: &str) -> i64:
     if text.len() == 0:
         return -1
     var out: i64 = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         if ch < 48 or ch > 57:
             return -1
@@ -403,7 +403,7 @@ fn project_config_parse_nonnegative_i64(value: &str) -> i64:
     out
 
 fn project_config_list_contains(values: &List[str], needle: &str) -> bool:
-    for i in 0..values.len() as i32:
+    for i in 0..values.len():
         if values[i] == needle:
             return true
     false
@@ -444,37 +444,37 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
         // What c_import reads, and the framework stubs `with get` wrote for
         // this package (#1915, compiler.FrameworkStubs), relative to it.
         let includes = project_config_json_str_array(meta, "include_paths")
-        for i in 0..includes.len() as i32:
+        for i in 0..includes.len():
             out.c_import_include_paths.push(dep_dir ++ "/" ++ includes[i])
         let defines = project_config_json_str_array(meta, "defines")
-        for i in 0..defines.len() as i32:
+        for i in 0..defines.len():
             out.c_import_defines.push(with_str_clone_ref(defines[i]))
         let framework_paths = project_config_json_str_array(meta, "framework_paths")
-        for i in 0..framework_paths.len() as i32:
+        for i in 0..framework_paths.len():
             out.dep_link_args.push("-F" ++ dep_dir ++ "/" ++ framework_paths[i])
     let components = project_config_json_str_array(meta, "components")
     var wanted: List[str] = List.new()
     if components.len() == 0: wanted.push("")
     else if component.len() > 0 and project_config_list_contains(&components, component): wanted.push(component.to_owned())
     else:
-        for i in 0..components.len() as i32: wanted.push(with_str_clone_ref(components[i]))
-    for wi in 0..wanted.len() as i32:
+        for i in 0..components.len(): wanted.push(with_str_clone_ref(components[i]))
+    for wi in 0..wanted.len():
         let key = package_key ++ ":" ++ wanted[wi]
         if project_config_list_contains(&out.dep_loaded, key): continue
         out.dep_loaded.push(key)
         let suffix = if wanted[wi].len() == 0: "" else: ":" ++ wanted[wi]
         let lib_paths = project_config_json_str_array(meta, "lib_paths" ++ suffix)
-        for i in 0..lib_paths.len() as i32:
+        for i in 0..lib_paths.len():
             let path = dep_dir ++ "/" ++ lib_paths[i]
             if not project_config_list_contains(&out.link_search_paths, path): out.link_search_paths.push(path)
         let libs = project_config_json_str_array(meta, "libs" ++ suffix)
-        for i in 0..libs.len() as i32:
+        for i in 0..libs.len():
             if not project_config_list_contains(&out.dep_link_libs, libs[i]): out.dep_link_libs.push(with_str_clone_ref(libs[i]))
         let link_args = project_config_json_str_array(meta, "link_args" ++ suffix)
-        for i in 0..link_args.len() as i32:
+        for i in 0..link_args.len():
             out.dep_link_args.push(with_str_clone_ref(link_args[i]))
         let requires = project_config_json_str_array(meta, "requires" ++ suffix)
-        for i in 0..requires.len() as i32:
+        for i in 0..requires.len():
             let req = requires[i]
             let slash = project_config_find_char(req, 47)
             if slash <= 0:
@@ -492,17 +492,17 @@ pub fn project_config_json_str_array(json: &str, key: &str) -> List[str]:
     // Simple JSON array extractor: find "key": [...] and extract string values.
     var result: List[str] = List.new()
     let needle = "\"" ++ key ++ "\""
-    let json_len = json.len() as i32
+    let json_len = json.len()
     var pos = 0
-    while pos < json_len - needle.len() as i32:
+    while pos < json_len - needle.len():
         var found = true
-        for ni in 0..needle.len() as i32:
+        for ni in 0..needle.len():
             if json[(pos + ni)] != needle[ni]:
                 found = false
                 break
         if found:
             // Find the '[' after the key
-            var ai = pos + needle.len() as i32
+            var ai = pos + needle.len()
             while ai < json_len and json[ai] != 91:
                 ai = ai + 1
             if ai >= json_len:
@@ -599,14 +599,14 @@ fn project_config_value_complete(value: &str) -> bool:
 fn project_config_parse_path_array(value: &str, root_dir: &str) -> List[str]:
     let out: List[str] = List.new()
     let entries = project_config_parse_string_array(value)
-    for i in 0..entries.len() as i32:
+    for i in 0..entries.len():
         out.push(project_config_resolve_path(root_dir, entries[i]))
     out
 
 fn project_config_parse_string_array(value: &str) -> List[str]:
     let out: List[str] = List.new()
     var i = 0
-    let total = value.len() as i32
+    let total = value.len()
     while i < total:
         if value[i] == 34:
             i = i + 1
@@ -643,7 +643,7 @@ fn project_config_is_string_array_value(value: &str) -> bool:
     if text[0] != 91 or text[text.len() as i64 - 1] != 93:
         return false
     var i = 1
-    let total = text.len() as i32
+    let total = text.len()
     var expect_value = true
     while i < total - 1:
         let ch = text[i]
@@ -726,7 +726,7 @@ fn project_config_resolve_header_path(cfg: &ProjectConfig, decl_dir: &str, heade
     if project_config_file_exists(local_candidate):
         return local_candidate
 
-    for i in 0..cfg.c_import_include_paths.len() as i32:
+    for i in 0..cfg.c_import_include_paths.len():
         let include_dir = cfg.c_import_include_paths[i]
         let candidate = resolve_join(include_dir, header_name)
         if project_config_file_exists(candidate):
@@ -771,7 +771,7 @@ pub fn project_config_absolutize_path(path: &str) -> str:
 
 fn project_config_find_char(text: &str, ch: i32) -> isize:
     var i = 0
-    while i < text.len() as i32:
+    while i < text.len():
         if text[i] == ch:
             return i
         i = i + 1
@@ -781,7 +781,7 @@ fn project_config_strip_comment(line: &str) -> str:
     var in_string = 0
     var escaped = 0
     var i = 0
-    while i < line.len() as i32:
+    while i < line.len():
         let ch = line[i]
         if escaped != 0:
             escaped = 0
@@ -799,7 +799,7 @@ fn project_config_strip_comment(line: &str) -> str:
 
 fn project_config_trim(text: &str) -> str:
     var start = 0
-    var end = text.len() as i32
+    var end = text.len()
     while start < end and project_config_is_space(text[start]):
         start = start + 1
     while end > start and project_config_is_space(text[(end - 1)]):
@@ -815,9 +815,9 @@ fn project_config_str_contains(text: &str, needle: &str) -> bool:
     if needle.len() > text.len():
         return false
     var i = 0
-    let limit = text.len() as i32 - needle.len() as i32
+    let limit = text.len() - needle.len()
     while i <= limit:
-        if text.slice(i as i64, (i + needle.len() as i32) as i64) == needle:
+        if text.slice(i as i64, (i + needle.len()) as i64) == needle:
             return true
         i = i + 1
     false

@@ -222,7 +222,7 @@ impl XzLzma:
         let goal = self.out.len() + unpacked
         let pb_mask: i32 = (1 << (self.pb as u32)) - 1
         while self.out.len() < goal and self.problem.len() == 0:
-            let pos_state = (self.out.len() as i32) & pb_mask
+            let pos_state = self.out.len() as i32 & pb_mask
             if self.bit(P_IS_MATCH + (self.state << 4) + pos_state) == 0:
                 self.literal()
                 continue

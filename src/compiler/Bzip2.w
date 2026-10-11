@@ -58,13 +58,13 @@ type BzHuffman {
 fn bz_huffman(lengths: &List[i32]) -> BzHuffman:
     var min_len: i32 = 32
     var max_len: i32 = 0
-    for i in 0..lengths.len() as i32:
+    for i in 0..lengths.len():
         if lengths[i] > max_len: max_len = lengths[i]
         if lengths[i] < min_len: min_len = lengths[i]
     let perm: List[i32] = List.new()
     for len in min_len..max_len + 1:
-        for s in 0..lengths.len() as i32:
-            if lengths[s] == len: perm.push(s)
+        for s in 0..lengths.len():
+            if lengths[s] == len: perm.push(s as i32)
     let limit: List[i64] = List.new()
     let base: List[i64] = List.new()
     for _ in 0..22:
@@ -74,7 +74,7 @@ fn bz_huffman(lengths: &List[i32]) -> BzHuffman:
     var index: i64 = 0
     for len in min_len..max_len + 1:
         var count: i64 = 0
-        for s in 0..lengths.len() as i32:
+        for s in 0..lengths.len():
             if lengths[s] == len: count = count + 1
         // Codes of this length run from `code` to code + count - 1; perm
         // holds their symbols from `index`.
@@ -150,7 +150,7 @@ pub fn bzip2_decompress(data: &str) -> List[str]:
                     let used = bits.bits(16)
                     for j in 0i32..16:
                         if (used >> ((15 - j) as u32)) & 1 == 1: seq_to_unseq.push(i * 16 + j)
-            let in_use = seq_to_unseq.len() as i32
+            let in_use = seq_to_unseq.len()
             if in_use == 0:
                 result.push("")
                 result.push("a bzip2 block uses no symbols")
@@ -209,7 +209,7 @@ pub fn bzip2_decompress(data: &str) -> List[str]:
             var run_weight: i64 = 1
             while true:
                 if group_left == 0:
-                    if group_index >= selectors.len() as i32:
+                    if group_index >= selectors.len():
                         result.push("")
                         result.push("a bzip2 block runs past its selectors")
                         return result

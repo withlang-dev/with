@@ -81,14 +81,14 @@ pub fn run_tools_tests_action(ctx: ActionCtx) -> i32:
         labels.push(label)
     let rcs = par_run(&ctx, &jobs, par_width(&jobs))
     var failures = 0
-    for i in 0..rcs.len() as i32:
+    for i in 0..rcs.len():
         if rcs[i] == 0: continue
         failures += 1
         print(f"tools-tests: {labels[i]} failed with exit code {rcs[i]}")
         let stderr = fs.read_text_opt(jobs[i].stderr).unwrap_or("")
         let detail = tl_error_lines(stderr)
         if detail.len() > 0: print(detail) else: print(stderr)
-    let total = jobs.len() as i32
+    let total = jobs.len()
     if failures > 0:
         ctx.diagnostics().error(f"tools-tests: {failures} of {total} tool(s) failed to compile; a tool tracks the current language like any program (#1335)")
     let _ = fs.write_text(tl_join(out_dir, ".stamp"), f"ok: {total} tools\n")

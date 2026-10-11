@@ -209,7 +209,7 @@ impl MirBuilder:
         let base_place = self.materialize_operand(base, base_ty, span)
         let lane_ty = self.sema.vector_lane_type(base_ty)
         let lanes: List[i32] = List.new()
-        for ci in 0..lanes_text.len() as i32:
+        for ci in 0..lanes_text.len():
             let lane = (lanes_text[ci] - '0') as i32
             let lane_place = self.vector_lane_place(base_place, lane, lane_ty, span)
             lanes.push(self.body.new_operand(OperandKind.OK_COPY, lane_place))

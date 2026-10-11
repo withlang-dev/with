@@ -114,25 +114,25 @@ impl Codegen:
     fn audit_trait_table_contracts():
         if self.analysis_enabled == 0:
             return
-        let trait_count = self.trait_idx_syms.len() as i32
-        let method_count = self.trait_method_names.len() as i32
+        let trait_count = self.trait_idx_syms.len()
+        let method_count = self.trait_method_names.len()
         let trait_tables_parallel =
-            self.trait_vtable_types.len() as i32 == trait_count and
-            self.trait_method_starts.len() as i32 == trait_count and
-            self.trait_method_counts.len() as i32 == trait_count
+            self.trait_vtable_types.len() == trait_count and
+            self.trait_method_starts.len() == trait_count and
+            self.trait_method_counts.len() == trait_count
         if not trait_tables_parallel:
-            self.analysis_fail(f"trait tables are not parallel: symbols={trait_count} vtables={self.trait_vtable_types.len() as i32} starts={self.trait_method_starts.len() as i32} counts={self.trait_method_counts.len() as i32}")
+            self.analysis_fail(f"trait tables are not parallel: symbols={trait_count} vtables={self.trait_vtable_types.len()} starts={self.trait_method_starts.len()} counts={self.trait_method_counts.len()}")
         let method_tables_parallel =
-            self.trait_method_flags.len() as i32 == method_count and
-            self.trait_method_ret_types.len() as i32 == method_count and
-            self.trait_method_param_counts.len() as i32 == method_count and
-            self.trait_method_param_starts.len() as i32 == method_count and
-            self.trait_method_ret_nodes.len() as i32 == method_count and
-            self.trait_method_default_bodies.len() as i32 == method_count
+            self.trait_method_flags.len() == method_count and
+            self.trait_method_ret_types.len() == method_count and
+            self.trait_method_param_counts.len() == method_count and
+            self.trait_method_param_starts.len() == method_count and
+            self.trait_method_ret_nodes.len() == method_count and
+            self.trait_method_default_bodies.len() == method_count
         if not method_tables_parallel:
-            self.analysis_fail(f"trait method tables are not parallel: names={method_count} flags={self.trait_method_flags.len() as i32} ret-types={self.trait_method_ret_types.len() as i32} param-counts={self.trait_method_param_counts.len() as i32} param-starts={self.trait_method_param_starts.len() as i32} ret-nodes={self.trait_method_ret_nodes.len() as i32} defaults={self.trait_method_default_bodies.len() as i32}")
-        if self.trait_map.len() as i32 != trait_count:
-            self.analysis_fail(f"trait map size={self.trait_map.len() as i32} indexed-symbols={trait_count}")
+            self.analysis_fail(f"trait method tables are not parallel: names={method_count} flags={self.trait_method_flags.len()} ret-types={self.trait_method_ret_types.len()} param-counts={self.trait_method_param_counts.len()} param-starts={self.trait_method_param_starts.len()} ret-nodes={self.trait_method_ret_nodes.len()} defaults={self.trait_method_default_bodies.len()}")
+        if self.trait_map.len() != trait_count:
+            self.analysis_fail(f"trait map size={self.trait_map.len()} indexed-symbols={trait_count}")
 
         let mapped: List[(i32, i32)] = List.new()
         for (trait_sym, trait_idx) in self.trait_map: mapped.push((trait_sym, trait_idx))
@@ -184,9 +184,9 @@ impl Codegen:
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: row range start={collected_start} count={collected_count} rows={method_count}")
             else if method_tables_parallel and collected_count == ast_method_count:
                 for method_idx in 0..ast_method_count:
-                    self.audit_trait_method_row(trait_name, trait_node, trait_idx, collected_start, method_idx)
+                    self.audit_trait_method_row(trait_name, trait_node, trait_idx as i32, collected_start, method_idx)
             var fact = AnalysisFact.new(AnalysisStage.Codegen, AnalysisFactKind.Invariant)
-            fact.id = trait_idx
+            fact.id = trait_idx as i32
             fact.parent = trait_node
             fact.node = trait_node
             fact.symbol = trait_sym
@@ -345,15 +345,15 @@ impl Codegen:
             return 0
         let rev_syms: List[i32] = List.new()
         var di = decl_idx - 1
-        while di >= 0 and rev_syms.len() as i32 < method_count:
+        while di >= 0 and rev_syms.len() < method_count:
             let decl = self.pool.get_decl(di)
             if self.pool.kind(decl) == NodeKind.NK_FN_DECL:
                 rev_syms.push(self.pool.get_data0(decl))
             di = di - 1
-        if rev_syms.len() as i32 != method_count:
+        if rev_syms.len() != method_count:
             return 0
         let rev_idx = method_count - 1 - slot
-        if rev_idx < 0 or rev_idx >= rev_syms.len() as i32:
+        if rev_idx < 0 or rev_idx >= rev_syms.len():
             return 0
         rev_syms[rev_idx]
 
@@ -761,7 +761,7 @@ impl Codegen:
             self.mir_bb_values.push(dtm_llbb)
 
         // Branch from entry to first MIR BB
-        if self.mir_bb_values.len() as i32 > 0:
+        if self.mir_bb_values.len() > 0:
             wl_build_br(self.builder, self.mir_bb_values[0])
         else:
             // Unreachable: dtm_builder came from MirBuilder.init above, which
@@ -772,7 +772,7 @@ impl Codegen:
         // (#2006), never a `ret 0`; the terminator goes where the builder
         // stands, after a statement that ends in a block of its own.
         for dtm_bb in 0..dtm_body.block_count():
-            if dtm_bb < 0 or dtm_bb >= self.mir_bb_values.len() as i32:
+            if dtm_bb < 0 or dtm_bb >= self.mir_bb_values.len():
                 continue
             wl_position_at_end(self.builder, self.mir_bb_values[dtm_bb])
             let _ = self.mir_emit_block_or_report(dtm_body, dtm_bb, mangled, body_node)
@@ -1109,7 +1109,7 @@ impl Codegen:
     // glue, run on the value the fat pointer's data word addresses.
     mut fn define_dyn_drop_thunks():
         var ti = 0
-        while ti < self.dyn_drop_thunks.len() as i32:
+        while ti < self.dyn_drop_thunks.len():
             let thunk: i64 = self.dyn_drop_thunks[ti]
             let sema_ty: i32 = self.dyn_drop_thunk_types[ti]
             ti = ti + 1
@@ -1183,7 +1183,7 @@ impl Codegen:
         false
 
     fn decl_source_path(decl_index: i32) -> str:
-        if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
+        if decl_index >= 0 and decl_index < self.decl_source_paths.len():
             let path = self.decl_source_paths[decl_index]
             if path.len() > 0:
                 return with_str_clone_ref(path)
@@ -1384,7 +1384,7 @@ impl Codegen:
         // heap data, and its read-only page would fault on the drop's
         // zeroing write. Callers enforce the writability condition.
         if tid == 0 or self.sema.type_needs_drop_frozen(tid) == 0: return
-        for i in 0..self.module_drop_global_syms.len() as i32:
+        for i in 0..self.module_drop_global_syms.len():
             if self.module_drop_global_syms[i] == name_sym: return
         self.module_drop_global_syms.push(name_sym)
         self.module_drop_global_tids.push(tid)
@@ -1571,7 +1571,7 @@ impl Codegen:
             self.mir_bb_values.push(llbb)
 
         let init_label = f"initializer of {self.intern.resolve(name_sym)}"
-        if self.mir_bb_values.len() as i32 > 0:
+        if self.mir_bb_values.len() > 0:
             wl_build_br(self.builder, self.mir_bb_values[0])
         else:
             // Unreachable: init_builder came from MirBuilder.init above,
@@ -1580,7 +1580,7 @@ impl Codegen:
 
         // A failure is a reported BUG (#2006), never a `ret null`.
         for bb in 0..init_body.block_count():
-            if bb < 0 or bb >= self.mir_bb_values.len() as i32:
+            if bb < 0 or bb >= self.mir_bb_values.len():
                 continue
             wl_position_at_end(self.builder, self.mir_bb_values[bb])
             let _ = self.mir_emit_block_or_report(init_body, bb, init_label, value_node)
@@ -1629,7 +1629,7 @@ impl Codegen:
         function
 
     mut fn emit_module_runtime_init_helpers() -> Unit:
-        for i in 0..self.module_runtime_init_syms.len() as i32:
+        for i in 0..self.module_runtime_init_syms.len():
             let name_sym: i32 = self.module_runtime_init_syms[i]
             let value_node: i32 = self.module_runtime_init_nodes[i]
             let result_tid: i32 = self.module_runtime_init_type_ids[i]
@@ -2092,7 +2092,7 @@ impl Codegen:
         if kind == NodeKind.NK_IDENT:
             let sym = self.pool.get_data0(node)
             // Linear search for known constant
-            for ci in 0..self.const_int_syms.len() as i32:
+            for ci in 0..self.const_int_syms.len():
                 if self.const_int_syms[ci] == sym:
                     return const_int_ok(self.const_int_vals[ci])
             return const_int_fail()
@@ -2208,7 +2208,7 @@ impl Codegen:
             if self.pool.kind(float_node) != NodeKind.NK_FLOAT_LIT:
                 return 0
             let str_idx = self.pool.get_data0(float_node)
-            if str_idx < 0 or str_idx >= self.pool.state.strings.len() as i32:
+            if str_idx < 0 or str_idx >= self.pool.state.strings.len():
                 return 0
             var float_text = float_literal_value_text(self.pool.get_string(str_idx))
             if float_negate:
@@ -2426,7 +2426,7 @@ impl Codegen:
         if self.pool.kind(float_node) == NodeKind.NK_FLOAT_LIT:
             let str_idx = self.pool.get_data0(float_node)
             var value_text = "0.0"
-            if str_idx >= 0 and str_idx < self.pool.state.strings.len() as i32:
+            if str_idx >= 0 and str_idx < self.pool.state.strings.len():
                 let float_text = self.pool.get_string(str_idx)
                 if float_text.len() > 0:
                     value_text = float_literal_value_text(float_text)

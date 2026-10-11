@@ -76,7 +76,7 @@ fn compilation_debug_pool_flow_enabled() -> i32:
 fn compilation_debug_pool_flow(label: &str, pool: InternPool, typed_pool: AstPool, sema: &Sema):
     if compilation_debug_pool_flow_enabled() == 0:
         return
-    runtime_eprint(f"[comp] {label} pool.symbols={pool.state.symbol_texts.len() as i32} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.state.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
+    runtime_eprint(f"[comp] {label} pool.symbols={pool.state.symbol_texts.len()} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.state.symbol_texts.len()} sema.ast.decls={sema.ast.decl_count()}")
 
 fn compilation_ensure_output_dir(path: &str) -> bool:
     if path.len() == 0:
@@ -200,7 +200,7 @@ fn compilation_bool_digit(value: bool) -> str:
 
 fn compilation_join_strings(values: &List[str], separator: &str) -> str:
     var out = ""
-    for i in 0..values.len() as i32:
+    for i in 0..values.len():
         if i > 0:
             out = out ++ separator
         out = out ++ values[i]
@@ -208,7 +208,7 @@ fn compilation_join_strings(values: &List[str], separator: &str) -> str:
 
 fn compilation_escape_with_string(value: &str) -> str:
     var out = ""
-    for i in 0..value.len() as i32:
+    for i in 0..value.len():
         let ch = value[i]
         if ch == 92:
             out = out ++ "\\\\"
@@ -228,7 +228,7 @@ fn compilation_split_escaped_fields(line: &str) -> List[str]:
     let fields: List[str] = List.new()
     var cur = ""
     var escaped = false
-    for i in 0..line.len() as i32:
+    for i in 0..line.len():
         let ch = line[i]
         if escaped:
             if ch == 110:
@@ -253,12 +253,12 @@ fn compilation_split_escaped_fields(line: &str) -> List[str]:
 fn compilation_split_nonempty_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()
     var start = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] == 10:
             if i > start:
                 lines.push(text.slice(start as i64, i as i64))
-            start = i + 1
-    if start < text.len() as i32:
+            start = (i + 1) as i32
+    if start < text.len():
         lines.push(text.slice(start as i64, text.len()))
     lines
 
@@ -269,7 +269,7 @@ fn compilation_parse_i32(text: &str) -> i32:
         sign = -1
         i = 1
     var value: i32 = 0
-    while i < text.len() as i32:
+    while i < text.len():
         let ch = text[i]
         if ch < 48 or ch > 57:
             break
@@ -296,7 +296,7 @@ fn compilation_module_import_name(root: &str, path: &str) -> str:
     if rel.ends_with(".w"):
         rel = rel.slice(0, rel.len() - 2)
     var out = ""
-    for i in 0..rel.len() as i32:
+    for i in 0..rel.len():
         let ch = rel[i]
         if ch == 47:
             out = out ++ "."
@@ -471,21 +471,21 @@ impl Compilation:
     fn bundle_model(what: &str) -> BundleInterfaceModel:
         let sema = &self.zcu.last_sema
         let model = bundle_interface_build(sema, self.bundle_corpus, &self.zcu.last_bundle_unlowered_globals)
-        for wi in 0..model.warnings.len() as i32:
+        for wi in 0..model.warnings.len():
             runtime_eprint("warning: bundle interface: " ++ model.warnings[wi])
         var omitted_fns = 0
         var omitted_globals = 0
-        for oi in 0..model.omitted.len() as i32:
+        for oi in 0..model.omitted.len():
             if model.omitted[oi].ends_with("\tgeneric-fn"): omitted_fns = omitted_fns + 1
             else: omitted_globals = omitted_globals + 1
         if omitted_fns > 0:
             runtime_eprint(f"warning: bundle interface: {omitted_fns} generic function(s) not exported at Level 0 (corpus-internal; each is named in the .wi and in the manifest's `omitted` lines)")
         if omitted_globals > 0:
             runtime_eprint(f"warning: bundle interface: {omitted_globals} global(s) without a compile-time initializer not exported at Level 0 (corpus-internal, undefined in the object; each is named in the .wi and in the manifest's `omitted` lines)")
-        for ei in 0..model.errors.len() as i32:
+        for ei in 0..model.errors.len():
             runtime_eprint("error: bundle interface: " ++ model.errors[ei])
         if not model.ok:
-            runtime_eprint(f"error: {what}: {model.errors.len() as i32} declaration(s) have no exact interface spelling (listed above); nothing written")
+            runtime_eprint(f"error: {what}: {model.errors.len()} declaration(s) have no exact interface spelling (listed above); nothing written")
         model
 
     // D39: write the exported-declaration fingerprint of the corpus modules
@@ -526,7 +526,7 @@ impl Compilation:
         taken_zcu.interface_eager = true
         self.zcu = taken_zcu
         var root_text = "// bundle interface root for " ++ wi_path ++ "\n"
-        for si in 0..sections.len() as i32:
+        for si in 0..sections.len():
             let dotted = bundle_module_dotted_name(sections[si])
             if dotted.len() == 0:
                 runtime_eprint("error: " ++ wi_path ++ ": section path '" ++ sections[si] ++ "' is not under <embedded-std>/")
@@ -556,7 +556,7 @@ impl Compilation:
         self.link_bundles_loaded = true
         if not self.register_embedded_bundle_interfaces():
             return false
-        for bi in 0..self.link_bundles.len() as i32:
+        for bi in 0..self.link_bundles.len():
             let prefix_path = self.link_bundles[bi]
             let obj_path = prefix_path ++ ".o"
             let manifest_path = prefix_path ++ ".manifest"
@@ -638,7 +638,7 @@ impl Compilation:
 
     fn manifest_lies_under_bundle_corpus(manifest: &str) -> bool:
         let paths = bundle_manifest_paths(manifest)
-        for pi in 0..paths.len() as i32:
+        for pi in 0..paths.len():
             if bundle_corpus_contains(self.bundle_corpus, paths[pi]):
                 return true
         false
@@ -718,7 +718,7 @@ impl Compilation:
 
     fn apply_cli_diag_mappings(taken_zcu: Zcu) -> Zcu:
         taken_zcu.clear_cli_diag_mappings()
-        for i in 0..self.cli_diag_gen_starts.len() as i32:
+        for i in 0..self.cli_diag_gen_starts.len():
             taken_zcu.add_cli_diag_mapping(
                 self.cli_diag_gen_starts[i],
                 self.cli_diag_gen_ends[i],
@@ -790,7 +790,7 @@ impl Compilation:
             else if kind == NodeKind.NK_TYPE_DECL:
                 type_count = type_count + 1
 
-        var out = f"project_info modules={taken_zcu.last_resolved.modules.len() as i32} functions={function_count} types={type_count}\n"
+        var out = f"project_info modules={taken_zcu.last_resolved.modules.len()} functions={function_count} types={type_count}\n"
         let cfg = &taken_zcu.project_config
         out = out ++ "config root=" ++ cfg.root_dir ++ "\n"
         out = out ++ "config package=" ++ cfg.package_name ++ " version=" ++ cfg.package_version ++ "\n"
@@ -811,7 +811,7 @@ impl Compilation:
         out = out ++ f"config runtime_fiber_worker_count={cfg.runtime_fiber_worker_count}\n"
         out = out ++ f"config copy_warn_threshold={cfg.copy_warn_threshold}\n"
         out = out ++ "config lint_partial_statement_match=" ++ if cfg.lint_partial_statement_match: "true\n" else: "false\n"
-        for mi in 0..taken_zcu.last_resolved.modules.len() as i32:
+        for mi in 0..taken_zcu.last_resolved.modules.len():
             let mod = taken_zcu.last_resolved.modules[mi]
             out = out ++ f"module path={mod.path} file={mod.file_id} decls={mod.decl_count}\n"
 
@@ -845,7 +845,7 @@ impl Compilation:
         let taken_zcu = &self.zcu
         var out = "fn __with_compiler_hook_project_info() -> ProjectInfo:\n"
         out = out ++ "    var project = ProjectInfo.new()\n"
-        for mi in 0..taken_zcu.last_resolved.modules.len() as i32:
+        for mi in 0..taken_zcu.last_resolved.modules.len():
             let mod = taken_zcu.last_resolved.modules[mi]
             let module_name = compilation_module_import_name(taken_zcu.project_config.root_dir, mod.path)
             out = out ++ "    project = project.add_module(ModuleInfo.new(\"" ++ compilation_escape_with_string(module_name) ++ "\", \"" ++ compilation_escape_with_string(mod.path) ++ "\"))\n"
@@ -953,7 +953,7 @@ impl Compilation:
         var emitted = 0
         var taken_zcu = move self.zcu
         let lines = compilation_split_nonempty_lines(diag_text)
-        for li in 0..lines.len() as i32:
+        for li in 0..lines.len():
             let fields = compilation_split_escaped_fields(lines[li])
             if fields.len() != 5:
                 continue
@@ -1092,7 +1092,7 @@ fn compilation_cleanup_build_products(obj_path: &str, bin_path: &str):
 fn compilation_defines_main(zcu: &Zcu) -> bool:
     let main_sym = zcu.last_sema.pool_lookup_symbol("main")
     if main_sym == 0: return false
-    for i in 0..zcu.last_mir_module.body_fn_syms.len() as i32:
+    for i in 0..zcu.last_mir_module.body_fn_syms.len():
         if zcu.last_mir_module.body_fn_syms[i] == main_sym: return true
     false
 
@@ -1178,7 +1178,7 @@ impl Compilation:
         taken_zcu.set_current_source(source_dir, source_path, source_text)
         let extra_names: List[str] = List.new()
         let extra_texts: List[str] = List.new()
-        for i in 1..source_paths.len() as i32:
+        for i in 1..source_paths.len():
             extra_names.push(with_str_clone_ref(source_paths[i]))
             extra_texts.push(with_str_clone_ref(source_texts[i]))
         taken_zcu.set_extra_sources(move extra_names, move extra_texts)
@@ -1201,11 +1201,11 @@ impl Compilation:
 
     mut fn check_file_with_build_settings(source_path: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str]) -> bool:
         var cfg = self.project_config_for_source(source_path)
-        for ii in 0..include_paths.len() as i32:
+        for ii in 0..include_paths.len():
             cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
-        for di in 0..defines.len() as i32:
+        for di in 0..defines.len():
             cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
-        for li in 0..link_libs.len() as i32:
+        for li in 0..link_libs.len():
             cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
         let pool = self.compile_file_with_config(source_path, move cfg)
         self.check_pool(pool, source_path)
@@ -1252,9 +1252,9 @@ impl Compilation:
         compilation_debug_init("build_binary_to_path:linking")
         // Merge direct and dependency link libraries from project config.
         var all_link_libs = move self.zcu.last_link_lib_names
-        for lli in 0..self.zcu.project_config.link_libs.len() as i32:
+        for lli in 0..self.zcu.project_config.link_libs.len():
             all_link_libs.push(with_str_clone_ref(self.zcu.project_config.link_libs[lli]))
-        for dli in 0..self.zcu.project_config.dep_link_libs.len() as i32:
+        for dli in 0..self.zcu.project_config.dep_link_libs.len():
             all_link_libs.push(with_str_clone_ref(self.zcu.project_config.dep_link_libs[dli]))
         var _sp_dla = move self.zcu.project_config.dep_link_args
         let rpath_args = link_stage_rpath_driver_args(self.zcu.project_config.link_rpaths, target_spec_os())
@@ -1264,7 +1264,7 @@ impl Compilation:
         // D38: `--link-object` objects (a stage link's .wo bundles) join the
         // link exactly as codegen units do — full linker inputs, probed for
         // undefined symbols like any other unit.
-        for loi in 0..self.link_objects.len() as i32:
+        for loi in 0..self.link_objects.len():
             unit_objects.push(with_str_clone_ref(self.link_objects[loi]))
         // D30 R2c: this compile emitted the runtime in-unit iff the lane is
         // on AND the frontend actually parsed the rt prefix (prelude on).
@@ -1412,7 +1412,7 @@ impl Compilation:
     // manifest's `interface-sha`), "" on refusal.
     fn write_bundle_interface(model: &BundleInterfaceModel) -> str:
         let rendered = bundle_interface_render(&self.zcu.last_sema, model)
-        for ei in 0..rendered.errors.len() as i32:
+        for ei in 0..rendered.errors.len():
             runtime_eprint("error: " ++ rendered.errors[ei])
         if rendered.errors.len() > 0:
             return ""
@@ -1442,10 +1442,10 @@ impl Compilation:
             text = text ++ "interface-sha " ++ interface_sha ++ "\n"
         // D39 Level 0: declarations the boundary cannot carry, one
         // `omitted <module> <name> <why>` line each (the .wi names them too)
-        for oi in 0..omitted.len() as i32:
+        for oi in 0..omitted.len():
             text = text ++ "omitted " ++ omitted[oi].replace("\t", " ") ++ "\n"
         let seen: List[str] = List.new()
-        for pi in 0..self.zcu.decl_source_paths.len() as i32:
+        for pi in 0..self.zcu.decl_source_paths.len():
             let path = self.zcu.decl_source_paths[pi]
             if path.len() == 0:
                 continue
@@ -1471,11 +1471,11 @@ impl Compilation:
             return ""
 
         var cfg = self.project_config_for_source(source_path)
-        for ii in 0..include_paths.len() as i32:
+        for ii in 0..include_paths.len():
             cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
-        for di in 0..defines.len() as i32:
+        for di in 0..defines.len():
             cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
-        for li in 0..link_libs.len() as i32:
+        for li in 0..link_libs.len():
             cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
         let pool = self.compile_file_with_config(source_path, move cfg)
         if pool.decl_count() == 0:
@@ -1526,11 +1526,11 @@ impl Compilation:
         compilation_remove_dsym_best_effort(bin_path)
 
         var cfg = self.project_config_for_source(source_path)
-        for ii in 0..include_paths.len() as i32:
+        for ii in 0..include_paths.len():
             cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
-        for di in 0..defines.len() as i32:
+        for di in 0..defines.len():
             cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
-        for li in 0..link_libs.len() as i32:
+        for li in 0..link_libs.len():
             cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
         let pool = self.compile_entry_file_with_config(source_path, move cfg)
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
@@ -1562,11 +1562,11 @@ impl Compilation:
         compilation_remove_dsym_best_effort(bin_path)
 
         var cfg = self.project_config_for_source(source_path)
-        for ii in 0..include_paths.len() as i32:
+        for ii in 0..include_paths.len():
             cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
-        for di in 0..defines.len() as i32:
+        for di in 0..defines.len():
             cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
-        for li in 0..link_libs.len() as i32:
+        for li in 0..link_libs.len():
             cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
         let pool = self.compile_source_text_with_config(source_path, source_text, move cfg)
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
@@ -1626,7 +1626,7 @@ impl Compilation:
             return ""
 
         var emit_intern = self.zcu.pool
-        if self.zcu.last_sema.pool.state.symbol_texts.len() as i32 > 1:
+        if self.zcu.last_sema.pool.state.symbol_texts.len() > 1:
             emit_intern = self.zcu.last_sema.pool
         let emitted = c_emit_module(move self.zcu.last_mir_module, typed_pool, emit_intern, move self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text, self.zcu.project_config.overflow_mode)
         if emitted.ok == 0:
@@ -1946,7 +1946,7 @@ impl Compilation:
 
     fn tracked_input_paths() -> List[str]:
         var out: List[str] = List.new()
-        for i in 0..self.zcu.tracked_input_paths.len() as i32:
+        for i in 0..self.zcu.tracked_input_paths.len():
             out.push(with_str_clone_ref(self.zcu.tracked_input_paths[i]))
         out
 
@@ -2021,7 +2021,7 @@ impl Compilation:
         // codegen is the first phase that must be semantically immutable.
         sema.preregister_mir_types()
         if do_profile:
-            profile_emit("sema", t_sema, f"types={sema.type_kinds.len() as i32}")
+            profile_emit("sema", t_sema, f"types={sema.type_kinds.len()}")
         compilation_debug_pool_flow("run_mir_lower:after_check", self.zcu.pool, active_pool, sema)
 
         // Check for sema errors before lowering
@@ -2047,7 +2047,7 @@ impl Compilation:
         if tailrec_syms.len() > 0:
             let tailrec_violations = mir_mod.verify_tailrec_contracts(&sema, active_pool, tailrec_syms)
             if tailrec_violations.len() > 0:
-                for vi in 0..tailrec_violations.len() as i32:
+                for vi in 0..tailrec_violations.len():
                     let violation = tailrec_violations[vi]
                     let start = active_pool.get_start(violation.node)
                     let end_raw = active_pool.get_end(violation.node)
@@ -2080,14 +2080,14 @@ impl Compilation:
         // D66 (#1652, §16.2b.9): a resource's callback pair is proven
         // compatible along every path here, on the lowered CFG.
         let pair_report = check_foreign_pairs(mir_mod, active_pool, &sema)
-        for fi in 0..pair_report.findings.len() as i32:
+        for fi in 0..pair_report.findings.len():
             let finding = &pair_report.findings[fi]
             var pair_diag = Diagnostic.err(finding.message.clone(), compilation_mir_span_range(self.zcu, active_pool, finding.fn_sym, finding.start, finding.end))
             if finding.note.len() > 0: pair_diag.add_note(finding.note.clone())
             if finding.help.len() > 0: pair_diag.add_help(finding.help.clone())
             sema.diags.emit(move pair_diag)
         if pair_report.findings.len() > 0 and pairs_dump_enabled():
-            runtime_eprint(f"pair-flow findings={pair_report.findings.len() as i32} diagnostics={sema.diags.count()}")
+            runtime_eprint(f"pair-flow findings={pair_report.findings.len()} diagnostics={sema.diags.count()}")
         if sema.diags.has_errors():
             self.zcu.diagnostics = move sema.diags
             self.zcu.sync_from_sema(move sema)

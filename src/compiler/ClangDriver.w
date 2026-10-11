@@ -206,7 +206,7 @@ pub fn with_cc_main() -> i32:
         for a in ["--start-no-unused-arguments", "-stdlib=libc++", "--end-no-unused-arguments"]: args.push(a.to_owned())
     unsafe:
         let argv = with_alloc((args.len() + 1) * 8) as *mut *mut u8
-        for i in 0..args.len() as i32:
+        for i in 0..args.len():
             *((argv as i64 + i as i64 * 8) as *mut *mut u8) = cc_c_string(args[i])
         *((argv as i64 + args.len() * 8) as *mut *mut u8) = 0 as *mut u8
         let ctx = ClangToolContext { path: cc_c_string(with_arg_at(0)), prepend_arg: cc_c_string("cc"), needs_prepend_arg: true }

@@ -48,7 +48,7 @@ fn resolution_line(source: &str, offset: i32) -> i32:
     line
 
 fn resolution_column(source: &str, offset: i32) -> i32:
-    var start: i32 = if offset - 1 < source.len(): offset - 1 else: source.len() as i32 - 1
+    var start: i32 = if offset - 1 < source.len(): offset - 1 else: (source.len() - 1) as i32
     while start >= 0 and source[start] != '\n':
         start = start - 1
     offset - start
@@ -68,7 +68,7 @@ fn resolution_site(sema: &Sema, pool: &InternPool, body: &MirBody, fallback_path
     if found.is_none():
         return ResolutionSite { path: with_str_clone_ref(fallback_path), source: with_str_clone_ref(fallback_source) }
     let path = with_str_clone_ref(found.unwrap())
-    for i in 0..sema.source_text_names.len() as i32:
+    for i in 0..sema.source_text_names.len():
         if sema.source_text_names[i] == path:
             return ResolutionSite { path, source: with_str_clone_ref(sema.source_texts[i]) }
     ResolutionSite { path, source: with_str_clone_ref(fallback_source) }
@@ -139,7 +139,7 @@ fn resolution_sema_answer(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, b
         if sig >= 0:
             answer.kind = CalleeResolutionKind.Signature
             answer.sig = sig
-            answer.param_count = if sig < sema.sig_variadic.len() as i32 and sema.sig_variadic[sig] != 0: -1 else: sema.sig_get_param_count(sig)
+            answer.param_count = if sig < sema.sig_variadic.len() and sema.sig_variadic[sig] != 0: -1 else: sema.sig_get_param_count(sig)
             return answer
         if sema.generic_fn_node_for_symbol(sema_sym) != 0:
             answer.kind = CalleeResolutionKind.Generic
@@ -172,7 +172,7 @@ fn resolution_violation(report: &AnalysisReport, sema: &Sema, site: &ResolutionS
 // Rule 1–4: every MIR call terminator against Sema's answer for its node.
 fn resolution_audit_calls(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
         let fn_name = with_str_clone_ref(pool.resolve(body.fn_sym))
@@ -194,8 +194,8 @@ fn resolution_audit_calls(report: &AnalysisReport, sema: &Sema, mir_mod: &MirMod
 // sort yet; this is the analyzer's own and stays here.
 fn resolution_sorted_by_key(keys: &List[i64]):
     var order: List[i32] = List.new()
-    let n = keys.len() as i32
-    for i in 0..n: order.push(i)
+    let n = keys.len()
+    for i in 0..n: order.push(i as i32)
     // Empty and singleton inputs have no heap parent (n / 2 - 1 is -1).
     if n < 2: return order
     // sift(root, heap_size): every pass is the same loop.
@@ -248,10 +248,10 @@ fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mo
     let span_bodies: List[i32] = List.new()
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = &mir_mod.bodies[bi]
-        for ci in 0..body.call_ast_nodes.len() as i32:
+        for ci in 0..body.call_ast_nodes.len():
             let node = body.call_ast_nodes[ci]
             if node > 0: lowered_nodes.insert(node, bi)
-        for ei in 0..body.elided_call_nodes.len() as i32:
+        for ei in 0..body.elided_call_nodes.len():
             elided_nodes.insert(body.elided_call_nodes[ei], bi)
         if body.lowering_failed != 0: continue
         let sema_sym = resolution_sema_sym(sema, pool, body.fn_sym)
@@ -270,7 +270,7 @@ fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mo
     // span can still contain the node.
     let prefix_max_end: List[i64] = List.new()
     var running: i64 = -1
-    for i in 0..order.len() as i32:
+    for i in 0..order.len():
         let e = span_end_keys[order[i]]
         if e > running: running = e
         prefix_max_end.push(running)
@@ -297,10 +297,10 @@ fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mo
         let node_end_key = resolution_span_key(file, sema.ast.get_end(node))
         // Last span starting at or before the node.
         var lo: i32 = 0
-        var hi = order.len() as i32
+        var hi = order.len()
         while lo < hi:
             let mid = (lo + hi) / 2
-            if span_keys[order[mid]] <= node_key: lo = mid + 1
+            if span_keys[order[mid]] <= node_key: lo = (mid + 1) as i32
             else: hi = mid
         var i = lo - 1
         var enclosing = -1
@@ -314,7 +314,7 @@ fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mo
         let body = &mir_mod.bodies[enclosing]
         let site = resolution_site(sema, pool, body, source_path, source_text)
         let sig = sema.resolved_call_sigs.get(node).unwrap()
-        let callee = if sig >= 0 and sig < sema.sig_names.len() as i32: with_str_clone_ref(sema.pool_resolve(sema.sig_names[sig])) else: "<unresolved>"
+        let callee = if sig >= 0 and sig < sema.sig_names.len(): with_str_clone_ref(sema.pool_resolve(sema.sig_names[sig])) else: "<unresolved>"
         let fn_name = with_str_clone_ref(pool.resolve(body.fn_sym))
         resolution_violation(report, sema, &site, body, -1, node, fn_name, "Sema resolved this call node to `" ++ callee ++ f"` (signature {sig}) inside a lowered body, MIR lowered no call carrying the node (D65: a call Sema accepted has exactly one MIR call fact)")
     report.note(f"resolution-audit: drop-impl-calls-materialized-as-drops={drop_calls} calls-mir-states-elided={elided}")
@@ -356,15 +356,15 @@ fn resolution_audit_field_places(report: &AnalysisReport, sema: &Sema, mir_mod: 
     var decls = 0
     var unrecorded = 0
     var in_specializations = 0
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
         let site = resolution_site(sema, pool, body, source_path, source_text)
-        for fi in 0..body.field_place_nodes.len() as i32:
+        for fi in 0..body.field_place_nodes.len():
             let node = body.field_place_nodes[fi]
             let place = body.field_place_places[fi]
             let base = body.field_place_bases[fi]
-            if node <= 0 or node >= sema.ast.node_count() or place < 0 or place >= body.place_locals.len() as i32: continue
+            if node <= 0 or node >= sema.ast.node_count() or place < 0 or place >= body.place_locals.len(): continue
             checked = checked + 1
             if body.instance_sym != 0: in_specializations = in_specializations + 1
             let fn_name = with_str_clone_ref(pool.resolve(body.fn_sym))
@@ -386,7 +386,7 @@ fn resolution_audit_field_places(report: &AnalysisReport, sema: &Sema, mir_mod: 
             // A positional owner (a tuple, a payload) records no owner: in a
             // specialization its base is judged through the field's type.
             let sema_base = if inst_owner > 0: resolution_peeled(sema, inst_owner) else if body.instance_sym != 0: 0 else: resolution_peeled(sema, resolution_field_base_type(sema, sema.ast.get_data0(node)))
-            let mir_base = if base >= 0 and base < body.place_sema_types.len() as i32: resolution_peeled(sema, body.place_sema_types[base]) else: 0
+            let mir_base = if base >= 0 and base < body.place_sema_types.len(): resolution_peeled(sema, body.place_sema_types[base]) else: 0
             let verdict = mir_field_place_verdict(kind, proj_field, sema.ast.get_data1(node), if mir_ty > 0: sema.resolve_alias(mir_ty as TypeId) as i32 else: 0, if sema_ty > 0: sema.resolve_alias(sema_ty as TypeId) as i32 else: 0, mir_base, sema_base)
             if verdict.len() > 0:
                 report.fail(f"resolution: {fn_name} at {resolution_where(sema, &site, node)}: {verdict} (field `{pool.resolve(sema.ast.get_data1(node))}`, MIR {sema.type_name(mir_ty)}, Sema {sema.type_name(sema_ty)})")
@@ -410,11 +410,11 @@ fn resolution_audit_let_bindings(report: &AnalysisReport, sema: &Sema, mir_mod: 
     var checked = 0
     var aliases = 0
     var views = 0
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
         let site = resolution_site(sema, pool, body, source_path, source_text)
-        for li in 0..body.let_binding_nodes.len() as i32:
+        for li in 0..body.let_binding_nodes.len():
             let node = body.let_binding_nodes[li]
             if node <= 0 or node >= sema.ast.node_count(): continue
             if (sema.typed_binding_muts.get(node) ?? 0) != 0: continue
@@ -440,15 +440,15 @@ fn resolution_audit_let_bindings(report: &AnalysisReport, sema: &Sema, mir_mod: 
 fn resolution_audit_index_places(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     var in_specializations = 0
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
         let site = resolution_site(sema, pool, body, source_path, source_text)
-        for ii in 0..body.index_place_nodes.len() as i32:
+        for ii in 0..body.index_place_nodes.len():
             let node = body.index_place_nodes[ii]
             let place = body.index_place_places[ii]
             let base = body.index_place_bases[ii]
-            if node <= 0 or node >= sema.ast.node_count() or place < 0 or place >= body.place_locals.len() as i32: continue
+            if node <= 0 or node >= sema.ast.node_count() or place < 0 or place >= body.place_locals.len(): continue
             checked = checked + 1
             if body.instance_sym != 0: in_specializations = in_specializations + 1
             let count = body.place_proj_counts[place]
@@ -461,7 +461,7 @@ fn resolution_audit_index_places(report: &AnalysisReport, sema: &Sema, mir_mod: 
             let mir_ty_raw = body.place_sema_types[place]
             let mir_ty = if mir_ty_raw > 0: sema.resolve_alias(mir_ty_raw as TypeId) as i32 else: 0
             let sema_base = resolution_peeled(sema, sema.index_base_in_body(body.instance_sym, node))
-            let mir_base = if base >= 0 and base < body.place_sema_types.len() as i32: resolution_peeled(sema, body.place_sema_types[base]) else: 0
+            let mir_base = if base >= 0 and base < body.place_sema_types.len(): resolution_peeled(sema, body.place_sema_types[base]) else: 0
             let verdict = mir_index_place_verdict(kind, mir_ty, sema_ty, sema_ty, mir_base, sema_base)
             if verdict.len() > 0:
                 report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: {verdict} (MIR {sema.type_name(mir_ty)}, Sema {sema.type_name(sema_ty)})")
@@ -474,13 +474,13 @@ fn resolution_audit_index_places(report: &AnalysisReport, sema: &Sema, mir_mod: 
 fn resolution_audit_view_origins(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     var with_origins = 0
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
         let site = resolution_site(sema, pool, body, source_path, source_text)
-        for li in 0..body.let_binding_nodes.len() as i32:
+        for li in 0..body.let_binding_nodes.len():
             let place = body.let_binding_places[li]
-            if place < 0 or place >= body.place_locals.len() as i32: continue
+            if place < 0 or place >= body.place_locals.len(): continue
             let node = body.let_binding_nodes[li]
             if node <= 0 or node >= sema.ast.node_count(): continue
             checked = checked + 1
@@ -488,7 +488,7 @@ fn resolution_audit_view_origins(report: &AnalysisReport, sema: &Sema, mir_mod: 
             let origins = sema.expr_view_dep_count(value)
             if origins > 0: with_origins = with_origins + 1
             let local = body.place_locals[place]
-            let root_sym = if local >= 0 and local < body.local_names.len() as i32: body.local_names[local] else: 0
+            let root_sym = if local >= 0 and local < body.local_names.len(): body.local_names[local] else: 0
             let root_text = if root_sym != 0: with_str_clone_ref(pool.resolve(root_sym)) else: ""
             var in_origins = false
             for oi in 0..origins:
@@ -504,10 +504,10 @@ fn resolution_audit_view_origins(report: &AnalysisReport, sema: &Sema, mir_mod: 
 // captures Sema recorded (D62/D63: the capture record is Sema's).
 fn resolution_audit_captures(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
-        for ci in 0..body.const_kinds.len() as i32:
+        for ci in 0..body.const_kinds.len():
             if body.const_kinds[ci] != ConstKind.CK_CLOSURE: continue
             let node = body.const_d0[ci]
             if node <= 0 or node >= sema.ast.node_count() or sema.ast.kind(node) != NodeKind.NK_CLOSURE: continue
@@ -517,13 +517,13 @@ fn resolution_audit_captures(report: &AnalysisReport, sema: &Sema, mir_mod: &Mir
             let site = resolution_site(sema, pool, body, source_path, source_text)
             let sema_count = sema.closure_capture_summary_count(node)
             var mir_count = 0
-            for k in 0..child.anonymous_capture_kinds.len() as i32:
+            for k in 0..child.anonymous_capture_kinds.len():
                 if child.anonymous_capture_kinds[k] != MIR_CAPTURE_PROTOCOL: mir_count = mir_count + 1
             if mir_count != sema_count:
                 report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: the closure has {mir_count} captures in MIR, {sema_count} in Sema's capture record")
                 continue
             for k in 0..sema_count:
-                if k >= child.anonymous_capture_kinds.len() as i32: break
+                if k >= child.anonymous_capture_kinds.len(): break
                 checked = checked + 1
                 let verdict = mir_capture_verdict(child.anonymous_capture_kinds[k], sema.closure_capture_by_place(node, k))
                 if verdict.len() > 0:
@@ -537,29 +537,29 @@ fn resolution_audit_call_effects(report: &AnalysisReport, sema: &Sema, mir_mod: 
     var checked = 0
     var judged = 0
     var judged_borrows = 0
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
         let site = resolution_site(sema, pool, body, source_path, source_text)
         for bb in 0..body.block_count():
             if body.term_kind(bb) != TermKind.TK_CALL: continue
             let call_id = body.term_data1(bb)
-            if call_id < 0 or call_id >= body.call_arg_starts.len() as i32: continue
+            if call_id < 0 or call_id >= body.call_arg_starts.len(): continue
             if body.call_intrinsic(call_id) != MirIntrinsic.NONE: continue
             let sig = body.call_sig_index(call_id)
-            if sig < 0 or sig >= sema.sig_names.len() as i32: continue
+            if sig < 0 or sig >= sema.sig_names.len(): continue
             let argc = body.call_arg_counts[call_id]
             if argc != sema.sig_get_param_count(sig): continue
             let callee = sema.sig_names[sig]
             for ai in 0..argc:
                 let op = body.call_arg_operands[(body.call_arg_starts[call_id] + ai)]
-                if op < 0 or op >= body.operand_kinds.len() as i32: continue
+                if op < 0 or op >= body.operand_kinds.len(): continue
                 let kind = body.operand_kinds[op]
                 if kind != OperandKind.OK_MOVE and kind != OperandKind.OK_COPY: continue
                 let place = body.operand_d0[op]
-                if place < 0 or place >= body.place_locals.len() as i32: continue
+                if place < 0 or place >= body.place_locals.len(): continue
                 let local = body.place_locals[place]
-                let named = local >= 0 and local < body.local_names.len() as i32 and body.local_names[local] != 0
+                let named = local >= 0 and local < body.local_names.len() and body.local_names[local] != 0
                 let param_ty = sema.sig_param_type(sig, ai)
                 let owned = param_ty > 0 and sema.is_copy_frozen(param_ty as TypeId) == 0
                 let place_ty = body.place_sema_types[place]
@@ -586,14 +586,14 @@ fn resolution_audit_callee_kinds(report: &AnalysisReport, sema: &Sema, mir_mod: 
     var method_intrinsics = 0
     var method_calls = 0
     var method_calls_unrecorded = 0
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
         let site = resolution_site(sema, pool, body, source_path, source_text)
         for bb in 0..body.block_count():
             if body.term_kind(bb) != TermKind.TK_CALL: continue
             let call_id = body.term_data1(bb)
-            if call_id < 0 or call_id >= body.call_arg_starts.len() as i32: continue
+            if call_id < 0 or call_id >= body.call_arg_starts.len(): continue
             let node = body.call_ast_node(call_id)
             if node <= 0 or node >= sema.ast.node_count() or sema.ast.kind(node) != NodeKind.NK_CALL: continue
             let callee = sema.ast.get_data0(node)
@@ -650,19 +650,19 @@ fn resolution_source_call(sema: &Sema, node: i32) -> i32:
 // Whether some call in `body` hands the value in `place`'s local to
 // `conv` (a Sema symbol) as its first argument.
 fn resolution_converted(sema: &Sema, pool: &InternPool, body: &MirBody, place: i32, conv: i32) -> bool:
-    if place < 0 or place >= body.place_locals.len() as i32: return false
+    if place < 0 or place >= body.place_locals.len(): return false
     let local = body.place_locals[place]
     for bb in 0..body.block_count():
         if body.term_kind(bb) != TermKind.TK_CALL: continue
         if resolution_sema_sym(sema, pool, mir_call_const_fn_sym(body, body.term_data0(bb))) != conv: continue
         let call_id = body.term_data1(bb)
-        if call_id < 0 or call_id >= body.call_arg_starts.len() as i32 or body.call_arg_counts[call_id] < 1: continue
+        if call_id < 0 or call_id >= body.call_arg_starts.len() or body.call_arg_counts[call_id] < 1: continue
         let op = body.call_arg_operands[body.call_arg_starts[call_id]]
-        if op < 0 or op >= body.operand_kinds.len() as i32: continue
+        if op < 0 or op >= body.operand_kinds.len(): continue
         let ok = body.operand_kinds[op]
         if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE: continue
         let arg_place = body.operand_d0[op]
-        if arg_place >= 0 and arg_place < body.place_locals.len() as i32 and body.place_locals[arg_place] == local: return true
+        if arg_place >= 0 and arg_place < body.place_locals.len() and body.place_locals[arg_place] == local: return true
     false
 
 // D65 phase 5 (#2043): facade rendering is ordinary calls plus effects, and
@@ -682,7 +682,7 @@ fn resolution_audit_resolved_calls(report: &AnalysisReport, sema: &Sema, mir_mod
     var redirected = 0
     var methods = 0
     var conversions = 0
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
         var site_ready = false
@@ -690,7 +690,7 @@ fn resolution_audit_resolved_calls(report: &AnalysisReport, sema: &Sema, mir_mod
         for bb in 0..body.block_count():
             if body.term_kind(bb) != TermKind.TK_CALL: continue
             let call_id = body.term_data1(bb)
-            if call_id < 0 or call_id >= body.call_arg_starts.len() as i32: continue
+            if call_id < 0 or call_id >= body.call_arg_starts.len(): continue
             let node = body.call_ast_node(call_id)
             let call = resolution_source_call(sema, node)
             if call == 0: continue
@@ -733,11 +733,11 @@ fn resolution_audit_resolved_calls(report: &AnalysisReport, sema: &Sema, mir_mod
 fn resolution_audit_expr_operands(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     var disagree = 0
-    for bi in 0..mir_mod.bodies.len() as i32:
+    for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
         let site = resolution_site(sema, pool, body, source_path, source_text)
-        for oi in 0..body.expr_operand_nodes.len() as i32:
+        for oi in 0..body.expr_operand_nodes.len():
             let node = body.expr_operand_nodes[oi]
             let sema_raw = body.expr_operand_sema_types[oi]
             let mir_raw = body.expr_operand_mir_types[oi]

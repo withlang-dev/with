@@ -83,7 +83,7 @@ for line in diags.split("\n"):
         if path.len() > 0:
             gate_count = gate_count + 1
             var seen = false
-            for pi in 0..pair_paths.len() as i32:
+            for pi in 0..pair_paths.len():
                 if pair_paths[pi] == path and pair_lines[pi] == pending_use:
                     seen = true
                     break
@@ -92,15 +92,15 @@ for line in diags.split("\n"):
                 pair_lines.push(pending_use)
         pending_use = ""
 
-print(f"insert-std-uses: {gate_count} gate diagnostics, {pair_paths.len() as i32} distinct (file, use) pairs")
+print(f"insert-std-uses: {gate_count} gate diagnostics, {pair_paths.len()} distinct (file, use) pairs")
 var done_paths: List[str] = List.new()
-for fi in 0..pair_paths.len() as i32:
+for fi in 0..pair_paths.len():
     let path = pair_paths[fi]
     if list_contains(&done_paths, path):
         continue
     done_paths.push(path.clone())
     var block = ""
-    for li in 0..pair_paths.len() as i32:
+    for li in 0..pair_paths.len():
         if pair_paths[li] == path:
             block = block ++ pair_lines[li] ++ "\n"
     if not apply:

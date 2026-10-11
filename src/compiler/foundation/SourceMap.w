@@ -48,7 +48,7 @@ impl SourceMap:
         if not file_id_is_valid(file_id):
             return false
         let raw = file_id_raw(file_id)
-        raw >= 0 and raw < self.sources.len() as i32
+        raw >= 0 and raw < self.sources.len()
 
     // A view, not a copy: Source owns Drop buffers (text, line offsets), and
     // an element copy would share them with the stored entry (double free).

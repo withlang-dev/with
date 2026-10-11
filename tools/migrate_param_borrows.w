@@ -120,14 +120,14 @@ fn main -> i32:
                 k = k + 1
             i = k
         if offsets.len() == 0: continue
-        total = total + offsets.len() as i32
+        total = total + offsets.len()
         if not apply:
             for oi in 0..offsets.len():
                 print(path ++ ": " ++ labels[oi])
             continue
         // Apply back-to-front so earlier offsets stay valid.
         var out = owned_text(text)
-        var oi = offsets.len() as i32 - 1
+        var oi = offsets.len() - 1
         while oi >= 0:
             let at = offsets[oi] as i64
             out = out.slice(0, at) ++ "&" ++ out.slice(at, out.len())
@@ -135,6 +135,6 @@ fn main -> i32:
         if write_file(path, out) != 0:
             eprint("migrate-param-borrows: cannot write " ++ path)
             return 1
-        print(f"{path}: {offsets.len() as i32} params borrowed")
+        print(f"{path}: {offsets.len()} params borrowed")
     print(f"total: {total}")
     0

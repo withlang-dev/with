@@ -55,8 +55,8 @@ fn ht_link_records() -> List[str]:
     names.push("llvm_link.rsp")
     names.push("llvm_ld")
     names.push("llvm_cc")
-    for d in 0..dirs.len() as i32:
-        for n in 0..names.len() as i32:
+    for d in 0..dirs.len():
+        for n in 0..names.len():
             out.push(dirs[d] ++ "/" ++ names[n])
     out
 
@@ -64,7 +64,7 @@ fn ht_link_records() -> List[str]:
 // where str.trim is not available.
 fn ht_trim(s: &str) -> str:
     var start = 0
-    var end = s.len() as i32
+    var end = s.len()
     while start < end and (s[start] == ' ' or s[start] == '\t' or s[start] == '\r'):
         start = start + 1
     while end > start and (s[end - 1] == ' ' or s[end - 1] == '\t' or s[end - 1] == '\r'):
@@ -81,7 +81,7 @@ fn ht_unquote(token: &str) -> str:
 // letters lowered (the file system folds case).
 fn ht_fold_path(path: &str) -> str:
     var out = ""
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == '\\':
             out = out ++ "/"
@@ -96,7 +96,7 @@ fn ht_fold_path(path: &str) -> str:
 // option (`/libpath:C:/x`, `-LC:/x`, `-Wl,C:/x`) — folded, or "".
 fn ht_windows_path(token: &str) -> str:
     var i = 1
-    while i + 1 < token.len() as i32:
+    while i + 1 < token.len():
         if token[i] == ':' and (token[i + 1] == '/' or token[i + 1] == '\\'):
             let letter = token[i - 1]
             let is_letter = (letter >= 'A' and letter <= 'Z') or (letter >= 'a' and letter <= 'z')
@@ -116,7 +116,7 @@ fn ht_record_problems(path: &str, text: &str, root: &str, sdk: &str) -> List[str
         if token.len() == 0:
             continue
         var flagged = false
-        for m in 0..markers.len() as i32:
+        for m in 0..markers.len():
             if not flagged and token.find(markers[m]) >= 0:
                 problems.push(path ++ ": names the host toolchain (" ++ markers[m] ++ "): " ++ token)
                 flagged = true
@@ -179,7 +179,7 @@ fn ht_sandboxed(profile: &str, home: &str, command: List[str]) -> List[str]:
             argv.push(kv.to_owned())
             argv.push(if kv == "HOME": home.to_owned() else if kv == "PATH": "/nonexistent" else: home ++ "/tmp")
         argv.push("--")
-        for i in 0..command.len() as i32:
+        for i in 0..command.len():
             argv.push(command[i].clone())
         return argv
     argv.push("/usr/bin/sandbox-exec")
@@ -190,7 +190,7 @@ fn ht_sandboxed(profile: &str, home: &str, command: List[str]) -> List[str]:
     argv.push("HOME=" ++ home)
     argv.push("PATH=/nonexistent")
     argv.push("TMPDIR=" ++ home ++ "/tmp")
-    for i in 0..command.len() as i32:
+    for i in 0..command.len():
         argv.push(command[i].clone())
     argv
 
@@ -306,7 +306,7 @@ fn ht_windows_builds(ctx: &ActionCtx, root: &str, compiler: &str) -> List[str]:
         fixtures.push("test/host_toolchain/windows_dll_project/src/main.w")
         sources.push(project)
         names.push("windows_dll_program")
-    for i in 0..fixtures.len() as i32:
+    for i in 0..fixtures.len():
         let source = fixtures[i]
         let name = names[i].clone()
         let binary = ht_join(root, ht_join(scratch, name ++ ".exe"))
@@ -342,12 +342,12 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
     var problems: List[str] = List.new()
     let records = ht_link_records()
     var read = 0
-    for r in 0..records.len() as i32:
+    for r in 0..records.len():
         if not fs.exists(records[r]):
             continue
         read = read + 1
         let found = ht_record_problems(records[r], fs.read_text(records[r]), root, sdk)
-        for f in 0..found.len() as i32:
+        for f in 0..found.len():
             problems.push(found[f].clone())
     if read == 0:
         problems.push("no link records under out/: build the compiler first")
@@ -355,7 +355,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
     let linux = os() == "Linux" and (arch() == "x86_64" or arch() == "aarch64")
     if os() == "Windows":
         let lines = ht_windows_builds(ctx, root, ht_join(root, inputs[0]))
-        for l in 0..lines.len() as i32:
+        for l in 0..lines.len():
             if lines[l].starts_with("problem: "):
                 problems.push(lines[l].slice(9, lines[l].len()))
             else:
@@ -443,7 +443,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
                 problems.push(cc_source ++ f": the program exited {cc_ran.rc} printing:\n" ++ cc_ran.stdout ++ cc_ran.stderr ++ "expected:\n" ++ cc_expected)
             else:
                 verdict = verdict ++ cc_source ++ ": `with cc` built it and it ran with no host toolchain\n"
-        for i in 0..fixtures.len() as i32:
+        for i in 0..fixtures.len():
             let source = fixtures[i]
             let name = names[i].clone()
             let binary = ht_join(root, ht_join(scratch, name))
@@ -467,7 +467,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
             verdict = verdict ++ source ++ ": built and ran with no host toolchain\n"
     if problems.len() > 0:
         var message = f"{problems.len()} problem(s):"
-        for i in 0..problems.len() as i32:
+        for i in 0..problems.len():
             message = message ++ "\n  " ++ problems[i]
         return ht_fail(ctx, message)
     if fs.write_text(output, verdict) != 0:

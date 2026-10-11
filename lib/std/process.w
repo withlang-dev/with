@@ -58,7 +58,7 @@ pub fn set_env(name: &str, value: &str) -> i32:
 
 fn argv_blob(items: &List[str]) -> str:
     var out = ""
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         out = out ++ items[i] ++ "\0"
     out
 
@@ -131,7 +131,7 @@ pub fn command(program: str) -> Command:
 impl Command:
     pub fn arg(arg: str) -> Command:
         var argv: List[str] = List.new()
-        for i in 0..self.args.len() as i32:
+        for i in 0..self.args.len():
             argv.push(with_str_clone_ref(self.args[i]))
         argv.push(arg)
         Command { args: argv }

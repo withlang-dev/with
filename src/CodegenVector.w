@@ -80,7 +80,7 @@ impl Codegen:
             return 0
         let fn_val = wl_get_intrinsic_decl(self.llmod, id, list_data_i64(overloads), overloads.len() as i32)
         let fn_ty = wl_intrinsic_get_type(self.context, id, list_data_i64(overloads), overloads.len() as i32)
-        wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(args), args.len() as i32)
+        wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(args), args.len())
 
     // Whether any lane of a `<N x i1>` is set, as an i1.
     mut fn cg_any_lane(bits: i64) -> i64:

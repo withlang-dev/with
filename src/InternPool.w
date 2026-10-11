@@ -131,7 +131,7 @@ impl InternPool:
         id
 
     fn resolve_symbol(sym: Symbol) -> &str:
-        if sym <= 0 or sym >= self.state.symbol_texts.len() as i32:
+        if sym <= 0 or sym >= self.state.symbol_texts.len():
             return ""
         self.state.symbol_texts[sym]
 
@@ -149,7 +149,7 @@ impl InternPool:
 
     fn resolve_type(id: TypeId) -> TypeKey:
         let st = self.state
-        if id <= 0 or id >= st.type_keys.len() as i32:
+        if id <= 0 or id >= st.type_keys.len():
             return type_key_invalid()
         type_key_clone(st.type_keys[id])
 
@@ -167,18 +167,18 @@ impl InternPool:
 
     fn resolve_value(id: ValueId) -> ValueKey:
         let st = self.state
-        if id <= 0 or id >= st.value_keys.len() as i32:
+        if id <= 0 or id >= st.value_keys.len():
             return value_key_invalid()
         value_key_clone(st.value_keys[id])
 
     fn symbol_count() -> i32:
-        (self.state.symbol_texts.len() as i32) - 1
+        (self.state.symbol_texts.len() - 1) as i32
 
     fn type_count() -> i32:
-        (self.state.type_keys.len() as i32) - 1
+        (self.state.type_keys.len() - 1) as i32
 
     fn value_count() -> i32:
-        (self.state.value_keys.len() as i32) - 1
+        (self.state.value_keys.len() - 1) as i32
 
     // Legacy compatibility entrypoints used throughout current parser/sema/codegen.
     fn intern(s: &str) -> Symbol:

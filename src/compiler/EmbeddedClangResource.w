@@ -23,9 +23,9 @@ extern fn with_str_hash(s: &str) -> u64
 
 fn ecr_dirname(path: &str) -> str:
     var last = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
-            last = i
+            last = i as i32
     if last <= 0:
         return ""
     path.slice(0, last as i64)
@@ -57,8 +57,8 @@ pub fn ensure_clang_resource_dir() -> str:
     // embedded contents, creating parent directories as needed.
     var start = 0
     var i = 0
-    while i <= listing.len() as i32:
-        let at_end = i == listing.len() as i32
+    while i <= listing.len():
+        let at_end = i == listing.len()
         if at_end or listing[i] == 10:
             if i > start:
                 let rel = listing.slice(start as i64, i as i64)

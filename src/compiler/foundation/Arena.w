@@ -36,7 +36,7 @@ impl Arena:
         while self.slots.len() > 1:
             self.slots.pop()
 
-    pub fn len(): self.slots.len() as i32
+    pub fn len(): self.slots.len()
 
     pub mut fn alloc_i32(value: i32) -> ArenaId:
         let id = arena_id_from_raw(self.slots.len() as i32)
@@ -60,7 +60,7 @@ impl Arena:
         if not arena_id_is_valid(id):
             return false
         let raw = arena_id_raw(id)
-        raw > 0 and raw < self.slots.len() as i32
+        raw > 0 and raw < self.slots.len()
 
     pub fn kind(id: ArenaId) -> i32:
         if not self.contains(id):

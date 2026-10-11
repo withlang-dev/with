@@ -78,8 +78,8 @@ pub fn lower_async_module(mir_mod: &MirModule, ast: AstPool, pool: InternPool, s
 
 impl AsyncLower:
     mut fn run():
-        for bi in 0..self.mir_mod.bodies.len() as i32:
-            self.lower_body(bi)
+        for bi in 0..self.mir_mod.bodies.len():
+            self.lower_body(bi as i32)
 
     mut fn lower_body(body_index: i32):
         let body_fn_sym = (&self.mir_mod.bodies[body_index]).fn_sym
@@ -374,7 +374,7 @@ fn async_snapshot_for_span(body: &MirBody, span_start: i32) -> AsyncSnapshot:
     var storage_dead: i32 = 0
     var drop_count: i32 = 0
 
-    for bb in 0..body.bb_stmt_starts.len() as i32:
+    for bb in 0..body.bb_stmt_starts.len():
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
@@ -404,11 +404,11 @@ fn async_snapshot_for_span(body: &MirBody, span_start: i32) -> AsyncSnapshot:
     }
 
 fn async_resume_bb_for_span(body: &MirBody, span_start: i32) -> i32:
-    for bb in 0..body.bb_stmt_starts.len() as i32:
+    for bb in 0..body.bb_stmt_starts.len():
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
             let stmt_id = stmt_start + si
             if body.stmt_spans[stmt_id] == span_start:
-                return bb
+                return bb as i32
     -1

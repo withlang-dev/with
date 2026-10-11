@@ -58,8 +58,8 @@ fn lld_flavor_from_option(name: &str) -> str:
 
 // A GNU-flavor link with `-m <x>pe` is MinGW's, as lld decides.
 fn lld_gnu_is_mingw(args: &List[str]) -> bool:
-    for i in 0..args.len() as i32:
-        let emulation = if args[i] == "-m" and i + 1 < args.len() as i32: args[i + 1].clone() else if args[i].starts_with("-m") and args[i] != "-m": args[i].slice(2, args[i].len()) else: ""
+    for i in 0..args.len():
+        let emulation = if args[i] == "-m" and i + 1 < args.len(): args[i + 1].clone() else if args[i].starts_with("-m") and args[i] != "-m": args[i].slice(2, args[i].len()) else: ""
         if emulation.ends_with("pe") or emulation.ends_with("pep"):
             return true
     false
@@ -80,7 +80,7 @@ pub fn lld_link(flavor: &str, args: &List[str]) -> i32:
         return 127
     unsafe:
         let argv = with_alloc((args.len() + 1) * 8) as *mut *mut u8
-        for i in 0..args.len() as i32:
+        for i in 0..args.len():
             *((argv as i64 + i as i64 * 8) as *mut *mut u8) = ld_c_string(args[i])
         *((argv as i64 + args.len() * 8) as *mut *mut u8) = 0 as *mut u8
         let lld_args = LldArgs { data: argv as *const *mut u8, len: args.len() }
@@ -114,7 +114,7 @@ pub fn with_ld_main() -> i32:
         flavor = "mingw"
     let args: List[str] = List.new()
     args.push(lld_tool_name(flavor))
-    for i in 0..rest.len() as i32: args.push(rest[i].clone())
+    for i in 0..rest.len(): args.push(rest[i].clone())
     lld_link(flavor, &args)
 
 // This executable, to run `with __ld` as a child: argv[0] when it names a
@@ -134,9 +134,9 @@ pub fn with_self_exe() -> str:
 // flavor that name selects; "" for any other name.
 pub fn lld_flavor_for_tool_name(argv0: &str) -> str:
     var start = 0
-    for i in 0..argv0.len() as i32:
+    for i in 0..argv0.len():
         if argv0[i] == '/' or argv0[i] == '\\':
-            start = i + 1
+            start = (i + 1) as i32
     let base = argv0.slice(start, argv0.len())
     if base == "ld64.lld": "macho" else if base == "ld.lld" or base == "ld.lld.exe": "elf" else if base == "lld-link" or base == "lld-link.exe": "coff" else if base == "wasm-ld": "wasm" else: ""
 

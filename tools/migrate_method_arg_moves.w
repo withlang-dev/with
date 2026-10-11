@@ -21,14 +21,14 @@ fn slice(text: &str, start: isize, end: isize): text.slice(start, end)
 
 fn source_path(path: &str) -> str:
     let embedded = "<embedded-std>/"
-    if path.starts_with(embedded): "lib/" ++ slice(path, embedded.len() as i32, path.len() as i32) else: path.clone()
+    if path.starts_with(embedded): "lib/" ++ slice(path, embedded.len(), path.len()) else: path.clone()
 
 fn collect_sites(entry: &str) -> List[OwnershipSite]:
     let result = compiler_analyze_file(entry, "select:kind=diagnostic")
     let sites: List[OwnershipSite] = List.new()
     let message = "this parameter takes ownership of a non-Copy value"
     var unrelated = 0
-    for i in 0..result.report.facts.len() as i32:
+    for i in 0..result.report.facts.len():
         let fact = result.report.facts[i]
         if fact.kind != AnalysisFactKind.Diagnostic or fact.flags != AnalysisDiagnosticSeverity.Error as i32:
             continue
@@ -40,7 +40,7 @@ fn collect_sites(entry: &str) -> List[OwnershipSite]:
             print("migrate-method-arg-moves: ownership diagnostic lacks a source span")
             exit_code(1)
         let path = source_path(fact.path)
-        for si in 0..sites.len() as i32:
+        for si in 0..sites.len():
             let old = sites[si]
             if old.path == path and old.offset == fact.start:
                 print(f"migrate-method-arg-moves: duplicate compiler fact {path}:{fact.start}")
@@ -147,7 +147,7 @@ fn migrate_file(path: &str, sites: &List[OwnershipSite], apply: bool, liveness_t
     let tokens = lexer.tokenize()
     let offsets: List[i32] = List.new()
     let labels: List[str] = List.new()
-    for i in 0..sites.len() as i32:
+    for i in 0..sites.len():
         let site = sites[i]
         if site.path != path: continue
         if liveness_tsv.len() > 0:
@@ -172,7 +172,7 @@ fn migrate_file(path: &str, sites: &List[OwnershipSite], apply: bool, liveness_t
         labels.push(slice(text, tokens.get_start(token), tokens.get_end(token)))
 
     var i = 1
-    while i < offsets.len() as i32:
+    while i < offsets.len():
         var j = i
         while j > 0 and offsets[(j - 1)] > offsets[j]:
             let old_offset: i32 = offsets[(j - 1)]
@@ -184,17 +184,17 @@ fn migrate_file(path: &str, sites: &List[OwnershipSite], apply: bool, liveness_t
             j = j - 1
         i = i + 1
 
-    for oi in 0..offsets.len() as i32:
+    for oi in 0..offsets.len():
         print(f"{path}\t{offsets[oi]}\t{labels[oi]}")
     if not apply or offsets.len() == 0: return offsets.len() as i32
     let chunks: List[str] = List.new()
     var cursor = 0
-    for oi in 0..offsets.len() as i32:
+    for oi in 0..offsets.len():
         let offset = offsets[oi]
         chunks.push(slice(text, cursor, offset))
         chunks.push("move ")
         cursor = offset
-    chunks.push(slice(text, cursor, text.len() as i32))
+    chunks.push(slice(text, cursor, text.len()))
     if write_file(path, chunks.join("")) != 0:
         print("migrate-method-arg-moves: failed to write " ++ path)
         exit_code(1)
@@ -210,7 +210,7 @@ fn main:
     var liveness_path = ""
     var entry = ""
     var ai = 1
-    while ai < argv.len() as i32:
+    while ai < argv.len():
         let arg = argv[ai]
         if arg == "--apply":
             apply = true
@@ -218,7 +218,7 @@ fn main:
             compute_liveness = true
         else: if arg == "--liveness":
             ai = ai + 1
-            if ai >= argv.len() as i32:
+            if ai >= argv.len():
                 print("migrate-method-arg-moves: --liveness requires a path")
                 exit_code(1)
             liveness_path = argv[ai].clone()
@@ -244,13 +244,13 @@ fn main:
             exit_code(1)
     let sites = if entry == "--from-tsv": collect_sites_from_tsv(liveness_tsv) else: collect_sites(entry)
     let files: List[str] = List.new()
-    for i in 0..sites.len() as i32:
+    for i in 0..sites.len():
         let path = sites[i].path
         var seen = false
-        for fi in 0..files.len() as i32:
+        for fi in 0..files.len():
             if files[fi] == path: seen = true
         if not seen: files.push(path.clone())
     var total = 0
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         total = total + migrate_file(files[i], &sites, apply, liveness_tsv)
-    print(f"migrate-method-arg-moves: files={files.len() as i32} sites={total} mode=" ++ if apply: "apply" else: "dry-run")
+    print(f"migrate-method-arg-moves: files={files.len()} sites={total} mode=" ++ if apply: "apply" else: "dry-run")

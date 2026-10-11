@@ -226,12 +226,12 @@ impl AnalysisReport:
     fn ok(): self.violations.len() == 0
 
     fn merge(other: &AnalysisReport):
-        for i in 0..other.facts.len() as i32:
+        for i in 0..other.facts.len():
             let fact = other.facts[i]
             self.facts.push(fact.owned_copy())
-        for i in 0..other.violations.len() as i32:
+        for i in 0..other.violations.len():
             self.violations.push(with_str_clone_ref(copy other.violations[i]))
-        for i in 0..other.notes.len() as i32:
+        for i in 0..other.notes.len():
             self.notes.push(with_str_clone_ref(copy other.notes[i]))
 
 fn analysis_stage_name(stage: AnalysisStage) -> str:
@@ -278,8 +278,8 @@ fn analysis_kind_name(kind: AnalysisFactKind) -> str:
 pub fn analysis_slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
 
 pub fn analysis_find_from(text: &str, needle: &str, start: i32) -> i32:
-    let n = text.len() as i32
-    let m = needle.len() as i32
+    let n = text.len()
+    let m = needle.len()
     if m == 0:
         return start
     var i = start
@@ -300,7 +300,7 @@ pub fn analysis_parse_i32(text: &str) -> i32:
         sign = -1
         i = 1
     var value: i32 = 0
-    while i < text.len() as i32:
+    while i < text.len():
         let ch = text[i] as i32
         if ch < 48 or ch > 57: return 0
         value = value * 10 + ch - 48
@@ -310,7 +310,7 @@ pub fn analysis_parse_i32(text: &str) -> i32:
 fn analysis_escape(text: &str) -> str:
     let parts: List[str] = List.new()
     var start: i32 = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let c = text[i] as i32
         var replacement = ""
         if c == 92: replacement = "\\\\"
@@ -319,10 +319,10 @@ fn analysis_escape(text: &str) -> str:
         else if c == 13: replacement = "\\r"
         if replacement.len() > 0:
             if i > start:
-                parts.push(analysis_slice(text, start, i))
+                parts.push(analysis_slice(text, start, i as i32))
             parts.push(replacement)
-            start = i + 1
-    if start < text.len() as i32:
+            start = (i + 1) as i32
+    if start < text.len():
         parts.push(analysis_slice(text, start, text.len() as i32))
     parts.join("")
 
@@ -381,7 +381,7 @@ pub fn analysis_fact_matches(fact: &AnalysisFact, query: &str) -> bool:
         return true
     var start: i32 = 0
     var i: i32 = 0
-    let n = query.len() as i32
+    let n = query.len()
     while i <= n:
         if i == n or query[i] as i32 == 44:
             if i > start:
@@ -404,7 +404,7 @@ impl AnalysisReport:
     fn render_facts(query: &str) -> str:
         let lines: List[str] = List.new()
         lines.push("analysis-facts\tv2\tstage\tkind\tid\tparent\tnode\tbody\tsymbol\towner\tindex\ttype\teffects\tflags\tsource-file\tstart\tend\tline\tcolumn\tpath\tname\tdetail\n")
-        for i in 0..self.facts.len() as i32:
+        for i in 0..self.facts.len():
             let fact = self.facts[i]
             if analysis_fact_matches(fact, query):
                 lines.push(fact.render_tsv())
@@ -413,7 +413,7 @@ impl AnalysisReport:
 
     fn count_matching(query: &str) -> isize:
         var count = 0
-        for i in 0..self.facts.len() as i32:
+        for i in 0..self.facts.len():
             let fact = self.facts[i]
             if analysis_fact_matches(fact, query):
                 count = count + 1
@@ -440,21 +440,21 @@ impl AnalysisReport:
         for i in 0..8: stage_counts.push(0)
         for i in 0..28: kind_counts.push(0)
         var total = 0
-        for i in 0..self.facts.len() as i32:
+        for i in 0..self.facts.len():
             let fact = self.facts[i]
             if not analysis_fact_matches(fact, query): continue
             total = total + 1
             stage_counts[fact.stage] = stage_counts[fact.stage] + 1
             kind_counts[fact.kind] = kind_counts[fact.kind] + 1
         lines.push(f"facts\t{total}\n")
-        for i in 0..stages.len() as i32:
+        for i in 0..stages.len():
             let stage = stages[i]
             let count = stage_counts[stage]
             if count > 0:
                 lines.push("stage\t")
                 lines.push(analysis_stage_name(stage))
                 lines.push(f"\t{count}\n")
-        for i in 0..kinds.len() as i32:
+        for i in 0..kinds.len():
             let kind = kinds[i]
             let count = kind_counts[kind]
             if count > 0:
@@ -466,7 +466,7 @@ impl AnalysisReport:
     fn render_matrix(query: &str) -> str:
         let lines: List[str] = List.new()
         lines.push("analysis-matrix\tv2\tstage\tkind\tname\towner\tindex\ttype\teffects\tflags\tsource-file\tstart\tend\tdetail\n")
-        for i in 0..self.facts.len() as i32:
+        for i in 0..self.facts.len():
             let fact = self.facts[i]
             if not analysis_fact_matches(fact, query):
                 continue
@@ -483,15 +483,15 @@ impl AnalysisReport:
 
     fn render_verdict(label: &str) -> str:
         let lines: List[str] = List.new()
-        for i in 0..self.notes.len() as i32:
+        for i in 0..self.notes.len():
             lines.push("note: ")
             lines.push(with_str_clone_ref(self.notes[i]))
             lines.push("\n")
-        for i in 0..self.violations.len() as i32:
+        for i in 0..self.violations.len():
             lines.push("violation: ")
             lines.push(with_str_clone_ref(self.violations[i]))
             lines.push("\n")
         lines.push(with_str_clone_ref(label))
-        lines.push(f": facts={self.facts.len() as i32} violations={self.violations.len() as i32}")
+        lines.push(f": facts={self.facts.len()} violations={self.violations.len()}")
         lines.push(if self.ok(): " ok\n" else: " FAILED\n")
         lines.join("")

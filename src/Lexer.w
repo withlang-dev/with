@@ -115,7 +115,7 @@ impl Lexer:
         self.skip_whitespace()
 
         let src = self.source
-        let slen = src.len() as i32
+        let slen = src.len()
 
         self.token_start = self.pos
 
@@ -438,7 +438,7 @@ impl Lexer:
 
     mut fn skip_whitespace():
         let src = self.source
-        let slen = src.len() as i32
+        let slen = src.len()
         while self.pos < slen:
             let ch = src[(self.pos)]
             if not (ch == CharCode.Space or ch == CharCode.Tab or ch == CharCode.Cr):
@@ -447,7 +447,7 @@ impl Lexer:
 
     mut fn lex_string() -> i32:
         let src = self.source
-        let slen = src.len() as i32
+        let slen = src.len()
         self.pos = self.pos + 1  // skip opening "
 
         // Check for triple-quoted multi-line string: """..."""
@@ -622,7 +622,7 @@ fn lex_raw_string_end(src: &str, pos: i32) -> i32:
 impl Lexer:
     mut fn lex_ident() -> i32:
         let src = self.source
-        let slen = src.len() as i32
+        let slen = src.len()
         let start = self.token_start
         while self.pos < slen and is_ident_continue(src[(self.pos)]):
             self.pos = self.pos + 1
@@ -754,7 +754,7 @@ impl Lexer:
 
     mut fn lex_capture_ident() -> i32:
         let src = self.source
-        let slen = src.len() as i32
+        let slen = src.len()
         self.pos = self.pos + 1
         if self.pos >= slen:
             return TokenKind.TK_INVALID
@@ -768,7 +768,7 @@ impl Lexer:
 
     mut fn lex_regex() -> i32:
         let src = self.source
-        let slen = src.len() as i32
+        let slen = src.len()
         self.pos = self.pos + 1  // skip opening /
         var in_class = 0
         while self.pos < slen:
@@ -798,14 +798,14 @@ impl Lexer:
 
     mut fn lex_dot_ident() -> i32:
         let src = self.source
-        let slen = src.len() as i32
+        let slen = src.len()
         while self.pos < slen and is_ident_continue(src[(self.pos)]):
             self.pos = self.pos + 1
         TokenKind.TK_DOT_IDENT
 
     mut fn lex_byte_char_prefixed() -> i32:
         let src = self.source
-        let slen = src.len() as i32
+        let slen = src.len()
         if self.pos >= slen or src[(self.pos)] != CharCode.Squote:
             return -1
         self.pos = self.pos + 1  // skip opening '

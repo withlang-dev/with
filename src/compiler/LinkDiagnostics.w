@@ -15,7 +15,7 @@ pub fn link_missing_libraries(diagnostics: &str) -> List[str]:
             let tail = parts[1]
             var end = if tail.len() > 0 and tail[0] == 58: 1 else: 0
             let start = end
-            while end < tail.len() as i32 and link_diagnostic_name_byte(tail[end]): end += 1
+            while end < tail.len() and link_diagnostic_name_byte(tail[end]): end += 1
             if end == start: continue
             let name = tail.slice(0, end as i64)
             var seen = false

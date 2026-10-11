@@ -45,7 +45,7 @@ var build_cache_prerun_inputs: HashMap[str, str] = HashMap.new()
 pub fn build_cache_snapshot_inputs(root: &str, target: &BuildGraphTarget):
     let input_paths = build_cache_collect_input_paths(root, target)
     var lines = ""
-    for idx in 0..input_paths.len() as i32:
+    for idx in 0..input_paths.len():
         let path = input_paths[idx]
         lines = lines ++ path ++ ":" ++ build_cache_fingerprint_file(path) ++ "\n"
     build_cache_prerun_inputs.insert(with_str_clone_ref(target.name), lines)
@@ -58,7 +58,7 @@ fn build_cache_input_moved_during_run(root: &str, target: &BuildGraphTarget) -> 
         return ""
     let before = with_str_clone_ref(snapshot.unwrap())
     let input_paths = build_cache_collect_input_paths(root, target)
-    for idx in 0..input_paths.len() as i32:
+    for idx in 0..input_paths.len():
         let path = input_paths[idx]
         let entry = path ++ ":" ++ build_cache_fingerprint_file(path) ++ "\n"
         if not before.contains(entry):
@@ -154,7 +154,7 @@ fn build_cache_fingerprint_directory(path: &str, mode: i32) -> str:
     let listing = build_graph_rt_list_files(path)
     let files = build_cache_sorted_strings(build_cache_split_lines(listing))
     var combined = "dir\nmode:" ++ f"{mode & 0o777}" ++ "\n"
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let file = files[i]
         combined = combined ++ build_cache_project_relative(path, file) ++ ":" ++ build_cache_fingerprint_file(file) ++ "\n"
     build_cache_sha256_text(combined)
@@ -183,7 +183,7 @@ pub fn build_cache_fingerprint_file(path: &str) -> str:
     fp
 
 fn build_cache_str_contains_byte(text: &str, target: i32) -> bool:
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] == target:
             return true
     false
@@ -202,8 +202,8 @@ fn build_cache_resolve_executable_path(argv0: &str) -> str:
 
     var segment_start = 0
     var i = 0
-    while i <= search_path.len() as i32:
-        let at_end = i == search_path.len() as i32
+    while i <= search_path.len():
+        let at_end = i == search_path.len()
         let ch = if at_end: 58 else: search_path[i]
         if ch == 58:
             let dir = search_path.slice(segment_start as i64, i as i64)
@@ -289,18 +289,18 @@ fn build_cache_producer_fingerprint(target: &BuildGraphTarget) -> str:
     build_cache_current_compiler_fingerprint()
 
 fn build_cache_target_names_compiler(target: &BuildGraphTarget) -> bool:
-    for i in 0..target.args.len() as i32:
+    for i in 0..target.args.len():
         if target.args[i].starts_with("compiler="): return true
     false
 
 fn build_cache_target_has_arg(target: &BuildGraphTarget, needle: &str) -> bool:
-    for i in 0..target.args.len() as i32:
+    for i in 0..target.args.len():
         if target.args[i] == needle:
             return true
     false
 
 fn build_cache_target_compiler_path(root: &str, target: &BuildGraphTarget) -> str:
-    for i in 0..target.args.len() as i32:
+    for i in 0..target.args.len():
         let arg = target.args[i]
         if arg.starts_with("compiler="):
             let path = arg.slice(9, arg.len())
@@ -313,7 +313,7 @@ fn build_cache_is_stage_target(target: &BuildGraphTarget) -> bool:
     if target.kind != 23:
         return false
     var has_compiler = false
-    for i in 0..target.args.len() as i32:
+    for i in 0..target.args.len():
         let arg = target.args[i]
         if arg == "--no-prelude":
             return false
@@ -328,7 +328,7 @@ fn build_cache_list_w_files(root: &str, dir: &str) -> List[str]:
         return List.new()
     let all_files = build_cache_split_lines(listing)
     let w_files: List[str] = List.new()
-    for i in 0..all_files.len() as i32:
+    for i in 0..all_files.len():
         let path = all_files[i]
         if path.ends_with(".w"):
             w_files.push(with_str_clone_ref(path))
@@ -336,7 +336,7 @@ fn build_cache_list_w_files(root: &str, dir: &str) -> List[str]:
 
 fn build_cache_split_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()
-    let text_len = text.len() as i32
+    let text_len = text.len()
     var start = 0
     var i = 0
     while i <= text_len:
@@ -370,11 +370,11 @@ fn build_cache_str_compare(a: &str, b: &str) -> i32:
 
 fn build_cache_sorted_strings(items: &List[str]) -> List[str]:
     var sorted: List[str] = List.new()
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         let item = items[i]
         var inserted = false
         var out: List[str] = List.new()
-        for j in 0..sorted.len() as i32:
+        for j in 0..sorted.len():
             let existing = sorted[j]
             if not inserted and build_cache_str_compare(item, existing) < 0:
                 out.push(with_str_clone_ref(item))
@@ -387,15 +387,15 @@ fn build_cache_sorted_strings(items: &List[str]) -> List[str]:
 
 fn build_cache_sorted_unique_strings(items: &List[str]) -> List[str]:
     var sorted: List[str] = List.new()
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         sorted = tracked_input_insert_unique(move sorted, items[i])
     sorted
 
 fn build_cache_last_colon(text: &str) -> isize:
     var last = -1
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] == 58:
-            last = i
+            last = i as i32
     last
 
 fn build_cache_dep_path(root: &str, stored_path: &str) -> str:
@@ -426,14 +426,14 @@ fn build_cache_effect_env_state_line(effect_line: &str) -> str:
 fn build_cache_effects_text(effects: &List[str]) -> str:
     let sorted = build_cache_sorted_unique_strings(effects)
     var out = ""
-    for i in 0..sorted.len() as i32:
+    for i in 0..sorted.len():
         out = out ++ sorted[i] ++ "\n"
     out
 
 pub fn build_cache_hash_directory_w_files(root: &str, dir: &str) -> str:
     let files = build_cache_list_w_files(root, dir)
     var combined = ""
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let path = files[i]
         combined = combined ++ build_cache_project_relative(root, path) ++ ":" ++ build_cache_fingerprint_file(path) ++ "\n"
     build_cache_sha256_text(combined)
@@ -451,11 +451,11 @@ fn build_cache_action_source_disk_path(root: &str, path: &str) -> str:
 
 fn build_cache_hash_action_sources(root: &str, paths: &List[str]) -> str:
     let unsorted: List[str] = List.new()
-    for i in 0..paths.len() as i32:
+    for i in 0..paths.len():
         unsorted.push(with_str_clone_ref(paths[i]))
     let sorted = build_graph_sorted_strings(unsorted)
     var combined = ""
-    for i in 0..sorted.len() as i32:
+    for i in 0..sorted.len():
         let p = sorted[i]
         let disk = build_cache_action_source_disk_path(root, p)
         // #1899: the module closure names files absolutely; the key names
@@ -492,17 +492,17 @@ fn build_cache_test_success_manifest(root: &str, target: &BuildGraphTarget, test
     text = text ++ "output:" ++ target.output ++ "\n"
     text = text ++ f"opt:{target.optimize_mode}\n"
     text = text ++ f"target-kind:{target.target_kind}\n"
-    for i in 0..target.args.len() as i32:
+    for i in 0..target.args.len():
         text = text ++ "arg:" ++ target.args[i] ++ "\n"
-    for i in 0..target.defines.len() as i32:
+    for i in 0..target.defines.len():
         text = text ++ "define:" ++ target.defines[i] ++ "\n"
-    for i in 0..target.include_paths.len() as i32:
+    for i in 0..target.include_paths.len():
         text = text ++ "include:" ++ target.include_paths[i] ++ "\n"
-    for i in 0..target.system_libs.len() as i32:
+    for i in 0..target.system_libs.len():
         text = text ++ "lib:" ++ target.system_libs[i] ++ "\n"
-    for i in 0..target.library_paths.len() as i32:
+    for i in 0..target.library_paths.len():
         text = text ++ "library-path:" ++ target.library_paths[i] ++ "\n"
-    for i in 0..target.rpaths.len() as i32:
+    for i in 0..target.rpaths.len():
         text = text ++ "rpath:" ++ target.rpaths[i] ++ "\n"
     let compiler_rel = build_cache_project_relative(root, test_compiler)
     if compiler_rel.len() > 0:
@@ -512,10 +512,10 @@ fn build_cache_test_success_manifest(root: &str, target: &BuildGraphTarget, test
         text = text ++ "compiler:\n"
         text = text ++ "compiler-sha256:\n"
     let rel_files: List[str] = List.new()
-    for i in 0..test_files.len() as i32:
+    for i in 0..test_files.len():
         rel_files.push(build_cache_project_relative(root, test_files[i]))
     let sorted = build_cache_sorted_strings(rel_files)
-    for i in 0..sorted.len() as i32:
+    for i in 0..sorted.len():
         let path = sorted[i]
         text = text ++ "file:" ++ path ++ ":" ++ build_cache_sha256_file_content(build_cache_dep_path(root, path)) ++ "\n"
     text
@@ -582,17 +582,17 @@ fn build_cache_test_env_sig_text() -> str:
 
 fn build_cache_test_target_sig_text(target: &BuildGraphTarget) -> str:
     var sig = f"opt:{target.optimize_mode}\n"
-    for i in 0..target.args.len() as i32:
+    for i in 0..target.args.len():
         sig = sig ++ "arg:" ++ target.args[i] ++ "\n"
-    for i in 0..target.defines.len() as i32:
+    for i in 0..target.defines.len():
         sig = sig ++ "define:" ++ target.defines[i] ++ "\n"
-    for i in 0..target.include_paths.len() as i32:
+    for i in 0..target.include_paths.len():
         sig = sig ++ "include:" ++ target.include_paths[i] ++ "\n"
-    for i in 0..target.system_libs.len() as i32:
+    for i in 0..target.system_libs.len():
         sig = sig ++ "lib:" ++ target.system_libs[i] ++ "\n"
-    for i in 0..target.library_paths.len() as i32:
+    for i in 0..target.library_paths.len():
         sig = sig ++ "library-path:" ++ target.library_paths[i] ++ "\n"
-    for i in 0..target.rpaths.len() as i32:
+    for i in 0..target.rpaths.len():
         sig = sig ++ "rpath:" ++ target.rpaths[i] ++ "\n"
     sig ++ build_cache_test_env_sig_text()
 
@@ -622,7 +622,7 @@ fn build_cache_tree_fingerprint(root: &str, dir: &str, w_only: bool) -> str:
     if memoized.is_some(): return with_str_clone_ref(memoized.unwrap())
     let files = build_cache_sorted_strings(build_cache_split_lines(build_graph_rt_list_files(root ++ "/" ++ dir)))
     var combined = ""
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let file = files[i]
         if w_only and not file.ends_with(".w"): continue
         combined = combined ++ build_cache_project_relative(root, file) ++ ":" ++ build_cache_fingerprint_file(file) ++ "\n"
@@ -634,8 +634,8 @@ fn build_cache_tree_fingerprint(root: &str, dir: &str, w_only: bool) -> str:
 fn build_cache_test_surface_text(root: &str, test_path: &str) -> str:
     let rel = build_cache_project_relative(root, test_path)
     var slash = -1
-    for i in 0..rel.len() as i32:
-        if rel[i] == '/': slash = i
+    for i in 0..rel.len():
+        if rel[i] == '/': slash = i as i32
     let dir = if slash > 0: rel.slice(0, slash as i64) else: "."
     "dir:" ++ dir ++ ":" ++ build_cache_tree_fingerprint(root, dir, false) ++ "\nsrc:" ++ build_cache_tree_fingerprint(root, "src", true) ++ "\nlib:" ++ build_cache_tree_fingerprint(root, "lib", true) ++ "\n"
 
@@ -654,15 +654,15 @@ pub fn build_cache_load_test_verdicts(root: &str, compiler_fp: &str, target_name
     let text = build_graph_rt_read_file(path)
     var line_start = 0
     var i = 0
-    while i <= text.len() as i32:
-        if i == text.len() as i32 or text[i] == 10:
+    while i <= text.len():
+        if i == text.len() or text[i] == 10:
             let line = text.slice(line_start as i64, i as i64)
             if line.starts_with("pass:"):
                 let rest = line.slice(5, line.len())
                 var colon = -1
-                for ci in 0..rest.len() as i32:
+                for ci in 0..rest.len():
                     if rest[ci] == 58:
-                        colon = ci
+                        colon = ci as i32
                         break
                 let key = if colon >= 0: rest.slice(0, colon as i64) else: rest
                 if key.len() > 0:
@@ -678,7 +678,7 @@ pub fn build_cache_write_test_verdicts(root: &str, compiler_fp: &str, target_nam
     let path = build_cache_test_verdicts_path(root, compiler_fp, target_name)
     let _mkdir = build_graph_rt_mkdir_p(build_cache_test_verdict_store(root) ++ "/" ++ compiler_fp)
     var text = "v2\n"
-    for i in 0..keys.len() as i32:
+    for i in 0..keys.len():
         text = text ++ "pass:" ++ keys[i] ++ ":" ++ rel_paths[i] ++ "\n"
     let tmp = path ++ f".tmp.{build_graph_rt_getpid()}"
     if build_graph_rt_write_file(tmp, text) != 0: return
@@ -698,21 +698,21 @@ fn build_cache_signature_parts(target: &BuildGraphTarget, root: &str) -> List[Bu
     shape = shape ++ f":{target.optimize_mode}:{target.target_kind}"
     if target.rss_limit_bytes > 0:
         shape = shape ++ f":rss-limit-bytes={target.rss_limit_bytes}"
-    for i in 0..target.args.len() as i32:
+    for i in 0..target.args.len():
         shape = shape ++ ":" ++ target.args[i]
-    for i in 0..target.defines.len() as i32:
+    for i in 0..target.defines.len():
         shape = shape ++ ":D:" ++ target.defines[i]
-    for i in 0..target.include_paths.len() as i32:
+    for i in 0..target.include_paths.len():
         shape = shape ++ ":I:" ++ target.include_paths[i]
-    for i in 0..target.system_libs.len() as i32:
+    for i in 0..target.system_libs.len():
         shape = shape ++ ":L:" ++ target.system_libs[i]
-    for i in 0..target.library_paths.len() as i32:
+    for i in 0..target.library_paths.len():
         shape = shape ++ ":library-path:" ++ target.library_paths[i]
-    for i in 0..target.rpaths.len() as i32:
+    for i in 0..target.rpaths.len():
         shape = shape ++ ":rpath:" ++ target.rpaths[i]
     // The declared environment shapes what the target builds (#2016: an
     // in-process compile's WITH_FILE_PREFIX_MAP), so it keys it.
-    for i in 0..target.env.len() as i32:
+    for i in 0..target.env.len():
         shape = shape ++ ":env:" ++ target.env[i]
     parts.push(BuildCacheSigPart { name: "target", text: shape })
     // The manifest changes compilation even when build.w returns the same
@@ -771,7 +771,7 @@ fn build_cache_collect_input_paths(root: &str, target: &BuildGraphTarget) -> Lis
     var paths: List[str] = List.new()
     if target.entry.len() > 0:
         paths.push(root ++ "/" ++ target.entry)
-    for i in 0..target.inputs.len() as i32:
+    for i in 0..target.inputs.len():
         let input = target.inputs[i]
         if input.len() > 0:
             paths.push(root ++ "/" ++ input)
@@ -784,7 +784,7 @@ fn build_cache_collect_output_paths(root: &str, target: &BuildGraphTarget) -> Li
     var paths: List[str] = List.new()
     if target.output.len() > 0:
         paths.push(build_cache_output_path(root, target.output))
-    for i in 0..target.extra_outputs.len() as i32:
+    for i in 0..target.extra_outputs.len():
         let extra = target.extra_outputs[i]
         if extra.len() > 0:
             paths.push(build_cache_output_path(root, extra))
@@ -799,7 +799,7 @@ pub fn build_cache_cutoff_digest(root: &str, target: &BuildGraphTarget) -> str:
     build_cache_forget_fingerprints()
     var text = ""
     let paths = build_cache_collect_output_paths(root, target)
-    for i in 0..paths.len() as i32:
+    for i in 0..paths.len():
         let path = paths[i]
         if build_cache_project_relative(root, path).starts_with("out/command/"): continue
         if build_graph_rt_file_exists(path) == 0: return ""
@@ -846,7 +846,7 @@ pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_r
     var saw_v2 = false
     var line_start = 0
     var i = 0
-    while i < state_text.len() as i32:
+    while i < state_text.len():
         let byte = state_text[i]
         if byte == 10:
             let line = state_text.slice(line_start as i64, i as i64)
@@ -866,7 +866,7 @@ pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_r
                 output_hashes.push(line.slice(4, line.len()))
             line_start = i + 1
         i = i + 1
-    if line_start < state_text.len() as i32:
+    if line_start < state_text.len():
         let line = state_text.slice(line_start as i64, state_text.len())
         if line == "v2":
             saw_v2 = true
@@ -889,14 +889,14 @@ pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_r
     let input_paths = build_cache_collect_input_paths(root, target)
     if input_paths.len() != input_hashes.len():
         return "stale: input set changed"
-    for idx in 0..input_paths.len() as i32:
+    for idx in 0..input_paths.len():
         let path = input_paths[idx]
         let current_hash = build_cache_fingerprint_file(path)
         let stored = input_hashes[idx]
         let expected_entry = path ++ ":" ++ current_hash
         if stored != expected_entry:
             return "stale: input changed: " ++ build_cache_project_relative(root, path)
-    for idx in 0..dep_hashes.len() as i32:
+    for idx in 0..dep_hashes.len():
         let stored = dep_hashes[idx]
         let split = build_cache_last_colon(stored)
         if split < 0:
@@ -907,7 +907,7 @@ pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_r
         let expected_entry = stored_path ++ ":" ++ current_hash
         if stored != expected_entry:
             return "stale: discovered dependency changed: " ++ stored_path
-    for idx in 0..env_hashes.len() as i32:
+    for idx in 0..env_hashes.len():
         let stored = env_hashes[idx]
         let split = build_cache_last_colon(stored)
         if split < 0:
@@ -926,7 +926,7 @@ pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_r
     let output_paths = build_cache_collect_output_paths(root, target)
     if output_paths.len() != output_hashes.len():
         return "stale: output set changed"
-    for idx in 0..output_paths.len() as i32:
+    for idx in 0..output_paths.len():
         let path = output_paths[idx]
         if build_graph_rt_file_exists(path) == 0:
             return "stale: output missing: " ++ build_cache_project_relative(root, path)
@@ -961,7 +961,7 @@ pub fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps
     if build_cache_target_uses_current_compiler(target):
         content = content ++ "compiler:" ++ build_cache_current_compiler_fingerprint() ++ "\n"
     let input_paths = build_cache_collect_input_paths(root, target)
-    for idx in 0..input_paths.len() as i32:
+    for idx in 0..input_paths.len():
         let path = input_paths[idx]
         let hash = build_cache_fingerprint_file(path)
         content = content ++ "in:" ++ path ++ ":" ++ hash ++ "\n"
@@ -971,7 +971,7 @@ pub fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps
     // only while that path is as it was.
     var deps = build_cache_sorted_unique_strings(discovered_deps)
     var other_effects: List[str] = List.new()
-    for idx in 0..effects.len() as i32:
+    for idx in 0..effects.len():
         let effect = effects[idx]
         if effect.starts_with("read\t"):
             let read = effect.slice(5, effect.len())
@@ -979,7 +979,7 @@ pub fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps
         else:
             other_effects.push(effect.clone())
     let dep_paths = build_cache_sorted_unique_strings(&deps)
-    for idx in 0..dep_paths.len() as i32:
+    for idx in 0..dep_paths.len():
         let path = dep_paths[idx]
         let hash = build_cache_fingerprint_file(path)
         let rel_path = build_cache_project_relative(root, path)
@@ -990,14 +990,14 @@ pub fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps
         let _write_effects = build_graph_rt_write_file(effects_path, effects_text)
         content = content ++ "effects:" ++ build_cache_sha256_text(effects_text) ++ "\n"
         let sorted_effects = build_cache_sorted_unique_strings(&other_effects)
-        for idx in 0..sorted_effects.len() as i32:
+        for idx in 0..sorted_effects.len():
             let env_line = build_cache_effect_env_state_line(sorted_effects[idx])
             if env_line.len() > 0:
                 content = content ++ env_line ++ "\n"
     else:
         let _remove_effects = build_graph_rt_remove_file(build_cache_effects_path(root, target.name))
     let output_paths = build_cache_collect_output_paths(root, target)
-    for idx in 0..output_paths.len() as i32:
+    for idx in 0..output_paths.len():
         let path = output_paths[idx]
         let hash = build_cache_fingerprint_file(path)
         content = content ++ "out:" ++ path ++ ":" ++ hash ++ "\n"
@@ -1057,10 +1057,10 @@ fn build_cache_store_eligible(target: &BuildGraphTarget) -> bool:
     // The always-run targets are never fresh, so an entry would never verify.
     if build_cache_freshness_always_runs(target): return false
     if not build_cache_store_path_is_under_out(target.output): return false
-    for i in 0..target.extra_outputs.len() as i32:
+    for i in 0..target.extra_outputs.len():
         let extra = target.extra_outputs[i]
         if extra.len() > 0 and not build_cache_store_path_is_under_out(extra): return false
-    for i in 0..target.write_scopes.len() as i32:
+    for i in 0..target.write_scopes.len():
         if not build_cache_store_path_is_under_out(target.write_scopes[i]): return false
     true
 
@@ -1072,7 +1072,7 @@ fn build_cache_store_tree_has_symlink(path: &str) -> bool:
     if (mode & BUILD_CACHE_S_IFMT) == BUILD_CACHE_S_IFLNK: return true
     if (mode & BUILD_CACHE_S_IFMT) != BUILD_CACHE_S_IFDIR: return false
     let files = build_cache_split_lines(build_graph_rt_list_files(path))
-    for i in 0..files.len() as i32:
+    for i in 0..files.len():
         let child_mode = build_graph_rt_file_mode(files[i])
         if child_mode >= 0 and (child_mode & BUILD_CACHE_S_IFMT) == BUILD_CACHE_S_IFLNK: return true
     false
@@ -1093,7 +1093,7 @@ fn build_cache_store_key(root: &str, target: &BuildGraphTarget) -> str:
     if compiler_path.len() > 0:
         text = text ++ "compiler:" ++ build_cache_compiler_binary_fingerprint(compiler_path) ++ "\n"
     let inputs = build_cache_collect_input_paths(root, target)
-    for i in 0..inputs.len() as i32:
+    for i in 0..inputs.len():
         text = text ++ "in:" ++ build_cache_project_relative(root, inputs[i]) ++ ":" ++ build_cache_fingerprint_file(inputs[i]) ++ "\n"
     build_cache_sha256_text(text)
 
@@ -1121,14 +1121,14 @@ fn build_cache_store_localize(root: &str, text: &str) -> str: text.replace("<roo
 fn build_cache_store_output_rel_paths(target: &BuildGraphTarget) -> List[str]:
     var rels: List[str] = List.new()
     rels.push(with_str_clone_ref(target.output))
-    for i in 0..target.extra_outputs.len() as i32:
+    for i in 0..target.extra_outputs.len():
         if target.extra_outputs[i].len() > 0: rels.push(with_str_clone_ref(target.extra_outputs[i]))
     rels
 
 fn build_cache_store_dirname(path: &str) -> str:
     var last = -1
-    for i in 0..path.len() as i32:
-        if path[i] == '/': last = i
+    for i in 0..path.len():
+        if path[i] == '/': last = i as i32
     if last <= 0: "." else: path.slice(0, last as i64)
 
 fn build_cache_store_is_name_byte(b: u8) -> bool:
@@ -1140,8 +1140,8 @@ fn build_cache_store_is_name_byte(b: u8) -> bool:
 // for a seed-input.json that recorded such a driver path.
 fn build_cache_store_text_names_root(text: &str, root: &str) -> bool:
     if root.len() == 0 or not text.contains(root): return false
-    let n = text.len() as i32
-    let m = root.len() as i32
+    let n = text.len()
+    let m = root.len()
     var i = 0
     while i + m <= n:
         if text[i] == root[0] and text.slice(i as i64, (i + m) as i64) == root:
@@ -1152,7 +1152,7 @@ fn build_cache_store_text_names_root(text: &str, root: &str) -> bool:
 // The first output file (outside the out/command/ capture logs) whose bytes
 // name this worktree's root, or "".
 fn build_cache_store_names_root(root: &str, rels: &List[str]) -> str:
-    for i in 0..rels.len() as i32:
+    for i in 0..rels.len():
         let rel = rels[i]
         if rel.starts_with("out/command/"): continue
         let path = root ++ "/" ++ rel
@@ -1160,7 +1160,7 @@ fn build_cache_store_names_root(root: &str, rels: &List[str]) -> str:
         if mode < 0: continue
         if (mode & BUILD_CACHE_S_IFMT) == BUILD_CACHE_S_IFDIR:
             let files = build_cache_split_lines(build_graph_rt_list_files(path))
-            for fi in 0..files.len() as i32:
+            for fi in 0..files.len():
                 if build_cache_store_text_names_root(build_graph_rt_read_file(files[fi]), root):
                     return build_cache_project_relative(root, files[fi])
         else if build_cache_store_text_names_root(build_graph_rt_read_file(path), root):
@@ -1178,7 +1178,7 @@ pub fn build_cache_store_publish(root: &str, target: &BuildGraphTarget, state_te
         build_cache_store_touch(entry)
         return
     let rels = build_cache_store_output_rel_paths(target)
-    for i in 0..rels.len() as i32:
+    for i in 0..rels.len():
         if build_cache_store_tree_has_symlink(root ++ "/" ++ rels[i]): return
     let named = build_cache_store_names_root(root, &rels)
     if named.len() > 0:
@@ -1188,7 +1188,7 @@ pub fn build_cache_store_publish(root: &str, target: &BuildGraphTarget, state_te
     let _rm = build_graph_rt_remove_tree(tmp)
     if build_graph_rt_mkdir_p(tmp ++ "/outputs") != 0: return
     var ok = true
-    for i in 0..rels.len() as i32:
+    for i in 0..rels.len():
         let rel = rels[i]
         if build_graph_rt_mkdir_p(tmp ++ "/outputs/" ++ build_cache_store_dirname(rel)) != 0 or build_graph_rt_copy_tree(root ++ "/" ++ rel, tmp ++ "/outputs/" ++ rel) != 0:
             ok = false
@@ -1215,22 +1215,22 @@ fn build_cache_store_prune(dir: &str):
     let entries = build_cache_split_lines(build_graph_rt_list_files(dir))
     var names: List[str] = List.new()
     var stamps: List[i64] = List.new()
-    for i in 0..entries.len() as i32:
+    for i in 0..entries.len():
         let path = entries[i]
         if not path.ends_with("/used"): continue
         let entry = build_cache_store_dirname(path)
         if build_cache_project_relative(dir, entry).contains("/"): continue
         names.push(entry.clone())
         stamps.push(build_cache_parse_i64(build_graph_rt_read_file(path)))
-    if names.len() as i32 <= keep: return
+    if names.len() <= keep: return
     // Drop the oldest until `keep` remain; a few entries, so the quadratic
     // selection is nothing.
-    var remaining = names.len() as i32
+    var remaining = names.len()
     while remaining > keep:
         var oldest = -1
-        for i in 0..names.len() as i32:
+        for i in 0..names.len():
             if names[i].len() == 0: continue
-            if oldest < 0 or stamps[i] < stamps[oldest]: oldest = i
+            if oldest < 0 or stamps[i] < stamps[oldest]: oldest = i as i32
         if oldest < 0: break
         let _rm = build_graph_rt_remove_tree(names[oldest])
         names[oldest] = ""
@@ -1238,7 +1238,7 @@ fn build_cache_store_prune(dir: &str):
 
 fn build_cache_parse_i64(text: &str) -> i64:
     var value: i64 = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let c = text[i]
         if c < '0' or c > '9': break
         value = value * 10 + (c - '0') as i64
@@ -1247,7 +1247,7 @@ fn build_cache_parse_i64(text: &str) -> i64:
 fn build_cache_parse_i32(text: &str, fallback: i32) -> i32:
     var seen = false
     var value: i32 = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let c = text[i]
         if c < '0' or c > '9': break
         seen = true
@@ -1263,12 +1263,12 @@ fn build_cache_store_repin_effects(state_text: &str, hash: &str) -> str:
     out
 
 fn build_cache_forget_restored_fingerprints(root: &str, rels: &List[str]):
-    for i in 0..rels.len() as i32:
+    for i in 0..rels.len():
         let path = root ++ "/" ++ rels[i]
         build_cache_fp_memo.remove(path.clone())
         if build_graph_rt_is_dir(path) != 0:
             let files = build_cache_split_lines(build_graph_rt_list_files(path))
-            for fi in 0..files.len() as i32:
+            for fi in 0..files.len():
                 build_cache_fp_memo.remove(files[fi].clone())
     build_cache_tree_fp_memo = HashMap.new()
 
@@ -1330,7 +1330,7 @@ pub fn build_cache_store_restore(root: &str, target: &BuildGraphTarget) -> bool:
         build_graph_rt_eprint("[cache] " ++ target.name ++ ": build store entry " ++ key.slice(0, 12) ++ " does not apply (" ++ mismatch ++ "); running it")
         return false
     let rels = build_cache_store_output_rel_paths(target)
-    for i in 0..rels.len() as i32:
+    for i in 0..rels.len():
         let rel = rels[i]
         let dest = root ++ "/" ++ rel
         let _rm = build_graph_rt_remove_tree(dest)
@@ -1392,7 +1392,7 @@ pub fn build_cache_print_effects(root: &str, graph: &BuildGraph, target_filter: 
                 build_graph_rt_write("  effects: none\n")
             else:
                 build_graph_rt_write(build_effects)
-    for ti in 0..graph.targets.len() as i32:
+    for ti in 0..graph.targets.len():
         let target = &graph.targets[ti]
         if target_filter.len() > 0 and target.name != target_filter:
             continue
@@ -1441,7 +1441,7 @@ fn build_cache_graph_env_fingerprint(root: &str) -> str:
         return "noenv"
     let lines = build_graph_rt_read_file(path).split("\n")
     var reads = ""
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let line = lines[i]
         if not line.starts_with("env\t"):
             continue
@@ -1456,7 +1456,7 @@ fn bcg_put_str(out: &str, s: &str) -> str:
 
 fn bcg_put_list(out: &str, items: &List[str]) -> str:
     var acc = out ++ f"l{items.len()}\n"
-    for i in 0..items.len() as i32:
+    for i in 0..items.len():
         acc = bcg_put_str(acc, items[i])
     acc
 
@@ -1470,7 +1470,7 @@ pub fn build_cache_graph_write(root: &str, key: &str, graph: &BuildGraph) -> Uni
     out = bcg_put_str(out, graph.default_target)
     out = bcg_put_str(out, graph.raw_text)
     out = out ++ f"t{graph.targets.len()}\n"
-    for i in 0..graph.targets.len() as i32:
+    for i in 0..graph.targets.len():
         let t = &graph.targets[i]
         out = out ++ f"i {t.kind} {t.target_kind} {t.optimize_mode} {t.action_fn} {t.timeout_ms} {t.network} {t.parallel} {t.rss_limit_bytes}\n"
         out = bcg_put_str(out, t.name)
@@ -1490,7 +1490,7 @@ pub fn build_cache_graph_write(root: &str, key: &str, graph: &BuildGraph) -> Uni
         out = bcg_put_list(out, &t.env)
         out = bcg_put_list(out, &t.action_source_paths)
     out = out ++ f"g{graph.generated_sources.len()}\n"
-    for i in 0..graph.generated_sources.len() as i32:
+    for i in 0..graph.generated_sources.len():
         let g = graph.generated_sources[i]
         out = bcg_put_str(out, g.path)
         out = bcg_put_str(out, g.contents)

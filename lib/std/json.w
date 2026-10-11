@@ -492,13 +492,13 @@ fn json_hex_value(ch: i32) -> i32:
 fn json_unescape_string(value: str) -> str:
     var out = ""
     var i = 0
-    while i < value.len() as i32:
+    while i < value.len():
         let ch = value[i] as i32
         if ch != 92:
             out = out ++ value.slice(i as i64, (i + 1) as i64)
         else:
             i = i + 1
-            if i >= value.len() as i32:
+            if i >= value.len():
                 json_panic("invalid JSON string escape")
             let esc = value[i] as i32
             if esc == 34:
@@ -518,7 +518,7 @@ fn json_unescape_string(value: str) -> str:
             else if esc == 116:
                 out = out ++ "\t"
             else if esc == 117:
-                if i + 4 >= value.len() as i32:
+                if i + 4 >= value.len():
                     json_panic("invalid JSON unicode escape")
                 let h0 = json_hex_value(value[(i + 1)] as i32)
                 let h1 = json_hex_value(value[(i + 2)] as i32)

@@ -70,15 +70,15 @@ fn stdout_mismatch(expected: &List[str], stdout: &str) -> str:
     var actual: List[str] = List.new()
     for line in stdout.split("\n"): actual.push(line.clone())
     // print ends every line: the text after the last newline is empty.
-    if actual.len() > 0 and actual[actual.len() as i32 - 1].len() == 0: let _ = actual.pop()
+    if actual.len() > 0 and actual[actual.len() - 1].len() == 0: let _ = actual.pop()
     let n = if expected.len() < actual.len(): expected.len() else: actual.len()
     for k in 0..n as i32:
         if expected[k] != actual[k]:
             return f"stdout line {k + 1}: expected '" ++ expected[k] ++ "', got '" ++ actual[k] ++ "'"
     if actual.len() < expected.len():
-        return f"stdout has {actual.len()} line(s), expected {expected.len()}; first missing: '" ++ expected[actual.len() as i32] ++ "'"
+        return f"stdout has {actual.len()} line(s), expected {expected.len()}; first missing: '" ++ expected[actual.len()] ++ "'"
     if actual.len() > expected.len():
-        return f"stdout has {actual.len()} line(s), expected {expected.len()}; first unlisted: '" ++ actual[expected.len() as i32] ++ "'"
+        return f"stdout has {actual.len()} line(s), expected {expected.len()}; first unlisted: '" ++ actual[expected.len()] ++ "'"
     ""
 
 fn main:
@@ -122,7 +122,7 @@ fn main:
     //     failure report (DOUBLE FREE / first_drop=) may abort
     if mode == "check":
         var failed = 0
-        for i in 3..a.len() as i32:
+        for i in 3..a.len():
             let fx = a[i]
             let source = read_file(fx) ?? ""
             let want = line_after_prefix(source, "expect-debug-alloc:")

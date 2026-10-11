@@ -18,9 +18,9 @@ fn seed_join(left: &str, right: &str) -> str:
 
 fn seed_dirname(path: &str) -> str:
     var last_slash = -1
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         if path[i] == 47:
-            last_slash = i
+            last_slash = i as i32
     if last_slash < 0:
         return "."
     if last_slash == 0:
@@ -38,12 +38,12 @@ fn seed_fail(ctx: &ActionCtx, message: &str) -> i32:
 fn seed_split_nonempty_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()
     var start = 0
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] == 10:
             if i > start:
                 lines.push(text.slice(start as i64, i as i64))
-            start = i + 1
-    if start < text.len() as i32:
+            start = (i + 1) as i32
+    if start < text.len():
         lines.push(text.slice(start as i64, text.len()))
     lines
 
@@ -51,32 +51,32 @@ fn seed_json_line_value(line: &str, key: &str) -> str:
     let needle = "\"" ++ key ++ "\""
     var pos = -1
     var i = 0
-    while i <= line.len() as i32 - needle.len() as i32:
-        if line.slice(i as i64, (i + needle.len() as i32) as i64) == needle:
-            pos = i + needle.len() as i32
+    while i <= line.len() - needle.len():
+        if line.slice(i as i64, (i + needle.len()) as i64) == needle:
+            pos = (i + needle.len()) as i32
             break
         i = i + 1
     if pos < 0:
         return ""
-    while pos < line.len() as i32:
+    while pos < line.len():
         let ch = line[pos]
         if ch != 32 and ch != 9:
             break
         pos = pos + 1
-    if pos >= line.len() as i32 or line[pos] != 58:
+    if pos >= line.len() or line[pos] != 58:
         return ""
     pos = pos + 1
-    while pos < line.len() as i32:
+    while pos < line.len():
         let ch = line[pos]
         if ch != 32 and ch != 9:
             break
         pos = pos + 1
-    if pos >= line.len() as i32 or line[pos] != 34:
+    if pos >= line.len() or line[pos] != 34:
         return ""
     let start = pos + 1
     var end = start
     var escaped = false
-    while end < line.len() as i32:
+    while end < line.len():
         let ch = line[end]
         if escaped:
             escaped = false
@@ -156,7 +156,7 @@ fn seed_release_from_api(ctx: &ActionCtx, repo: &str, asset_name: &str) -> SeedR
         if releases.len() < 2:
             if seed_is_empty_json_array(body): break
             return SeedReleaseLookup { tag: "", why: "the response to " ++ url ++ " is not a release list (kept at " ++ body_path ++ ")" }
-        for ri in 1..releases.len() as i32:
+        for ri in 1..releases.len():
             scanned = scanned + 1
             let release = releases[ri]
             if release.contains(quoted_asset):
@@ -169,7 +169,7 @@ fn seed_release_from_api(ctx: &ActionCtx, repo: &str, asset_name: &str) -> SeedR
 
 fn seed_is_empty_json_array(text: &str) -> bool:
     var inner = ""
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         let ch = text[i]
         if not seed_is_space(ch): inner = inner ++ text.slice(i as i64, (i + 1) as i64)
     inner == "[]"
@@ -182,10 +182,10 @@ fn seed_is_hex(ch: i32) -> bool:
 
 fn seed_parse_sha256_sidecar(text: &str) -> str:
     var start = 0
-    while start < text.len() as i32 and seed_is_space(text[start]):
+    while start < text.len() and seed_is_space(text[start]):
         start = start + 1
     var end = start
-    while end < text.len() as i32 and not seed_is_space(text[end]):
+    while end < text.len() and not seed_is_space(text[end]):
         if not seed_is_hex(text[end]):
             return ""
         end = end + 1

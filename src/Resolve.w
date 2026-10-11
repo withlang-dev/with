@@ -186,10 +186,10 @@ type ResolveState {
 fn resolve_normalize_source_text(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
     var i = 0
-    while i < text.len() as i32:
+    while i < text.len():
         let ch = text[i]
         if ch == 13:
-            if i + 1 < text.len() as i32 and text[(i + 1)] == 10:
+            if i + 1 < text.len() and text[(i + 1)] == 10:
                 i = i + 1
             out.push_byte(10 as u8)
         else:
@@ -215,7 +215,7 @@ pub fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root
     let root_module = state.reserve_module(root_path, root_dir, root_file_id)
 
     var work: i32 = 0
-    while work < state.module_paths.len() as i32:
+    while work < state.module_paths.len():
         if state.module_processed[work] != 0:
             work = work + 1
             continue
@@ -270,7 +270,7 @@ pub fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root
 pub fn resolve_interface_use_lines(text: &str) -> str:
     var out = ""
     let lines = text.split("\n")
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         if lines[i].starts_with("use "):
             out = out ++ lines[i] ++ "\n"
     out
@@ -341,9 +341,9 @@ impl ResolveState:
 
     fn build_module_table() -> List[ResolvedModule]:
         var out: List[ResolvedModule] = List.new()
-        for mid in 0..self.module_paths.len() as i32:
+        for mid in 0..self.module_paths.len():
             out.push(ResolvedModule {
-                module_id: mid,
+                module_id: mid as i32,
                 file_id: self.module_file_ids[mid],
                 path: resolve_owned_text(self.module_paths[mid]),
                 import_start: self.module_import_starts[mid],
@@ -485,7 +485,7 @@ impl ResolveState:
 
         // Pass 2: register function parameter defs/bindings.
         let walk_bodies = module_id == 0
-        for fi in 0..pending_fn_nodes.len() as i32:
+        for fi in 0..pending_fn_nodes.len():
             let fn_node = pending_fn_nodes[fi]
             let fn_def = pending_fn_defs[fi]
             self.resolve_fn_body(ast_pool, module_id, module_scope, fn_node, fn_def, walk_bodies)
@@ -1100,7 +1100,7 @@ impl ResolveState:
             if found.is_some():
                 return found.unwrap()
 
-            if sid >= self.result.scopes.len() as i32:
+            if sid >= self.result.scopes.len():
                 return -1
             let scope = self.result.scopes[sid]
             sid = scope.parent_scope
@@ -1127,7 +1127,7 @@ impl ResolveState:
         self.module_scope_ids[module_id] = module_scope
         var import_index: i32 = 0
         let lines = text.split("\n")
-        for i in 0..lines.len() as i32:
+        for i in 0..lines.len():
             let line = lines[i]
             if not line.starts_with("use "):
                 continue
@@ -1199,9 +1199,9 @@ impl ResolveState:
         let has_root_fallback = module_dir != self.root_source_dir
         let rel_primary = dotted.replace(".", "/") ++ ".w"
         var last_dot = -1
-        for i in 0..dotted.len() as i32:
+        for i in 0..dotted.len():
             if dotted[i] == '.':
-                last_dot = i
+                last_dot = i as i32
         let rel_fallback = if last_dot > 0: dotted.slice(0, last_dot).replace(".", "/") ++ ".w" else: ""
         if rel_primary.starts_with("std/"):
             let embedded_primary = embedded_std_resolve_path(rel_primary)
@@ -1346,8 +1346,8 @@ pub fn resolve_own_tree_candidate(rel_path: &str) -> str:
 // (`use std.math`) imports the whole module.
 fn resolve_dotted_selection(dotted: &str, resolved_path: &str) -> str:
     var last_dot = -1
-    for i in 0..dotted.len() as i32:
-        if dotted[i] == '.': last_dot = i
+    for i in 0..dotted.len():
+        if dotted[i] == '.': last_dot = i as i32
     if last_dot <= 0 or resolved_path.len() == 0 or resolved_path.replace("\\", "/").ends_with(dotted.replace(".", "/") ++ ".w"):
         return ""
     dotted.slice(last_dot + 1, dotted.len())
@@ -1357,8 +1357,8 @@ fn resolve_is_prelude_path(dotted: &str) -> bool:
 
 fn resolve_last_segment(dotted: &str) -> str:
     var start = 0
-    for i in 0..dotted.len() as i32:
-        if dotted[i] == '.': start = i + 1
+    for i in 0..dotted.len():
+        if dotted[i] == '.': start = (i + 1) as i32
     dotted.slice(start, dotted.len())
 
 // D70 (§18.2): a header's namespace is its file name without `.h`
@@ -1366,19 +1366,19 @@ fn resolve_last_segment(dotted: &str) -> str:
 // name that is no identifier, has none.
 fn resolve_header_namespace(header: &str) -> str:
     var start = 0
-    var end = header.len() as i32
-    for i in 0..header.len() as i32:
+    var end = header.len()
+    for i in 0..header.len():
         let c = header[i]
         // Inline C text (`"#include <foo.h>\n..."`) is no file name.
         if c == '\n' or c == ' ' or c == '\t' or c == '#' or c == ';':
             return ""
-        if c == '/' or c == '\\' or c == '<': start = i + 1
+        if c == '/' or c == '\\' or c == '<': start = (i + 1) as i32
     if end > start and header[end - 1] == '>': end = end - 1
     let file = header.slice(start, end)
     if not file.ends_with(".h") or file.len() <= 2:
         return ""
     let name = file.slice(0, file.len() - 2)
-    for i in 0..name.len() as i32:
+    for i in 0..name.len():
         let c = name[i]
         let ok = (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or c == '_' or (i > 0 and c >= '0' and c <= '9')
         if not ok:
@@ -1401,9 +1401,9 @@ pub fn resolve_internal_import_refusal(importer: &str, target: &str, dotted: &st
     let target_norm = resolve_normalize_path(target)
     let segments = target_norm.split("/")
     var cut = -1
-    for k in 0..segments.len() as i32:
+    for k in 0..segments.len():
         let seg = segments[k]
-        if seg == "internal" or (k == segments.len() as i32 - 1 and seg == "internal.w"): cut = k
+        if seg == "internal" or (k == segments.len() - 1 and seg == "internal.w"): cut = k as i32
     if cut < 0: return ""
     // The standard library is one tree whichever spelling names it.
     if target_std and resolve_path_is_std(importer): return ""
@@ -1488,18 +1488,18 @@ pub fn resolve_normalize_path(path: &str) -> str:
 
     var out = ""
     var i = 0
-    while i < path.len() as i32:
+    while i < path.len():
         let ch = path[i]
         if ch == 92:
             out = out ++ "/"
             i = i + 1
             continue
 
-        if ch == 47 and i + 1 < path.len() as i32 and path[(i + 1)] == 47:
+        if ch == 47 and i + 1 < path.len() and path[(i + 1)] == 47:
             i = i + 1
             continue
 
-        if ch == 47 and i + 2 < path.len() as i32 and path[(i + 1)] == 46 and path[(i + 2)] == 47:
+        if ch == 47 and i + 2 < path.len() and path[(i + 1)] == 46 and path[(i + 2)] == 47:
             i = i + 2
             continue
 
@@ -1529,8 +1529,8 @@ pub fn resolve_canonical_module_key(path: &str) -> str:
     let is_abs = runtime_path_is_absolute(p)
     let root_parts = runtime_path_root_part_count(p)
     var start = 0
-    for i in 0..(p.len() as i32 + 1):
-        let at_end = i == p.len() as i32
+    for i in 0..(p.len() + 1):
+        let at_end = i == p.len()
         if at_end or p[i] == 47 or p[i] == 92:
             if i > start:
                 // Flat decision (no inner chain ending in else-if): the seed
@@ -1548,9 +1548,9 @@ pub fn resolve_canonical_module_key(path: &str) -> str:
                         parts.push(with_str_clone_ref(part))
                 if keep:
                     parts.push(part)
-            start = i + 1
+            start = (i + 1) as i32
     var out = runtime_path_root_prefix(p)
-    for pi in 0..parts.len() as i32:
+    for pi in 0..parts.len():
         if pi > 0:
             out = out ++ "/"
         out = out ++ parts[pi]
@@ -1624,9 +1624,9 @@ fn resolved_scope_kind_name(kind: i32) -> str:
     "unknown"
 
 fn print_resolved(result: &ResolveResult, pool: InternPool, root_path: &str):
-    with_write(f"resolved root={root_path} modules={result.modules.len() as i32} defs={result.defs.len() as i32}\n")
+    with_write(f"resolved root={root_path} modules={result.modules.len()} defs={result.defs.len()}\n")
 
-    for mi in 0..result.modules.len() as i32:
+    for mi in 0..result.modules.len():
         let m = result.modules[mi]
         with_write(f"module[{m.module_id}] file={m.file_id} path={m.path} imports={m.import_count} decls={m.decl_count}\n")
 
@@ -1637,24 +1637,24 @@ fn print_resolved(result: &ResolveResult, pool: InternPool, root_path: &str):
             else:
                 with_write(f"import[{m.module_id}:{ii}] kind=c_import header=\"{imp.path_text}\" target={imp.target_module}\n")
 
-    for di in 0..result.defs.len() as i32:
+    for di in 0..result.defs.len():
         let d = result.defs[di]
         let name = if d.name_sym > 0: with_str_clone_ref(pool.resolve(d.name_sym)) else: ""
         with_write(f"def[{d.def_id}] module={d.module_id} parent={d.parent_def} kind={resolved_def_kind_name(d.kind)} name={name} span={d.span_start}..{d.span_end}\n")
 
-    for bi in 0..result.bindings.len() as i32:
+    for bi in 0..result.bindings.len():
         let b = result.bindings[bi]
         let sym = pool.resolve(b.symbol)
         with_write(f"bind[{b.scope_id}:{sym}] def={b.def_id}\n")
 
-    for ui in 0..result.uses.len() as i32:
+    for ui in 0..result.uses.len():
         let u = result.uses[ui]
         let sym = pool.resolve(u.symbol)
         with_write(f"use[{ui}] module={u.module_id} node={u.node_id} sym={sym} def={u.def_id} span={u.span_start}..{u.span_end}\n")
 
     if result.link_libs.len() > 0:
         var line = "link_libs="
-        for li in 0..result.link_libs.len() as i32:
+        for li in 0..result.link_libs.len():
             if li > 0:
                 line = line ++ ","
             line = line ++ pool.resolve(result.link_libs[li])
@@ -1662,9 +1662,9 @@ fn print_resolved(result: &ResolveResult, pool: InternPool, root_path: &str):
 
 pub fn dump_resolved(result: &ResolveResult, pool: InternPool, root_path: &str) -> str:
     var out = ""
-    out = out ++ f"resolved root={root_path} modules={result.modules.len() as i32} defs={result.defs.len() as i32}\n"
+    out = out ++ f"resolved root={root_path} modules={result.modules.len()} defs={result.defs.len()}\n"
 
-    for mi in 0..result.modules.len() as i32:
+    for mi in 0..result.modules.len():
         let m = result.modules[mi]
         out = out ++ f"module[{m.module_id}] file={m.file_id} path={m.path} imports={m.import_count} decls={m.decl_count}\n"
 
@@ -1675,24 +1675,24 @@ pub fn dump_resolved(result: &ResolveResult, pool: InternPool, root_path: &str) 
             else:
                 out = out ++ f"import[{m.module_id}:{ii}] kind=c_import header=\"{imp.path_text}\" target={imp.target_module}\n"
 
-    for di in 0..result.defs.len() as i32:
+    for di in 0..result.defs.len():
         let d = result.defs[di]
         let name = if d.name_sym > 0: with_str_clone_ref(pool.resolve(d.name_sym)) else: ""
         out = out ++ f"def[{d.def_id}] module={d.module_id} parent={d.parent_def} kind={resolved_def_kind_name(d.kind)} name={name} span={d.span_start}..{d.span_end}\n"
 
-    for bi in 0..result.bindings.len() as i32:
+    for bi in 0..result.bindings.len():
         let b = result.bindings[bi]
         let sym = pool.resolve(b.symbol)
         out = out ++ f"bind[{b.scope_id}:{sym}] def={b.def_id}\n"
 
-    for ui in 0..result.uses.len() as i32:
+    for ui in 0..result.uses.len():
         let u = result.uses[ui]
         let sym = pool.resolve(u.symbol)
         out = out ++ f"use[{ui}] module={u.module_id} node={u.node_id} sym={sym} def={u.def_id} span={u.span_start}..{u.span_end}\n"
 
     if result.link_libs.len() > 0:
         out = out ++ "link_libs="
-        for li in 0..result.link_libs.len() as i32:
+        for li in 0..result.link_libs.len():
             if li > 0:
                 out = out ++ ","
             out = out ++ pool.resolve(result.link_libs[li])

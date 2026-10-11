@@ -184,7 +184,7 @@ impl CiTypePool:
         let st = self.state
         if st.frozen != 0:
             ci_ir_phase_bug("BUG: CiTypePool.add called after freeze")
-        let id = st.kinds.len() as i32
+        let id = st.kinds.len()
         st.kinds.push(kind)
         st.data0.push(d0)
         st.data1.push(d1)
@@ -408,7 +408,7 @@ impl CiExprPool:
         let st = self.state
         if st.frozen != 0:
             ci_ir_phase_bug("BUG: CiExprPool.add called after freeze")
-        let id = st.kinds.len() as i32
+        let id = st.kinds.len()
         st.kinds.push(kind)
         st.data0.push(d0)
         st.data1.push(d1)
@@ -590,7 +590,7 @@ impl CiStmtPool:
         let st = self.state
         if st.frozen != 0:
             ci_ir_phase_bug("BUG: CiStmtPool.add called after freeze")
-        let id = st.kinds.len() as i32
+        let id = st.kinds.len()
         st.kinds.push(kind)
         st.data0.push(d0)
         st.data1.push(d1)
@@ -791,7 +791,7 @@ impl CiDeclPool:
         let st = self.state
         if st.frozen != 0:
             ci_ir_phase_bug("BUG: CiDeclPool.add called after freeze")
-        let id = st.kinds.len() as i32
+        let id = st.kinds.len()
         st.kinds.push(kind)
         st.data0.push(d0)
         st.data1.push(d1)
@@ -967,8 +967,8 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
 fn ci_pipe_i32_contains(items: &str, want: i32) -> bool:
     let needle = "|" ++ i64_to_string(want as i64) ++ "|"
     var i = 0
-    let ilen = items.len() as i32
-    let nlen = needle.len() as i32
+    let ilen = items.len()
+    let nlen = needle.len()
     while i <= ilen - nlen:
         if items.slice(i as i64, (i + nlen) as i64) == needle:
             return true
@@ -985,13 +985,13 @@ impl CiProjectSymbol:
 
     // D107: size every per-parameter vector to at least `n` entries.
     mut fn grow_params(n: i32):
-        while self.param_fn_ptr.len() as i32 < n: self.param_fn_ptr.push(0)
-        while self.param_tested.len() as i32 < n: self.param_tested.push(0)
-        while self.param_aborting.len() as i32 < n: self.param_aborting.push(0)
-        while self.param_null_caller.len() as i32 < n: self.param_null_caller.push("")
-        while self.param_sinks.len() as i32 < n: self.param_sinks.push("")
-        while self.param_nullable.len() as i32 < n: self.param_nullable.push(0)
-        while self.param_reason.len() as i32 < n: self.param_reason.push("")
+        while self.param_fn_ptr.len() < n: self.param_fn_ptr.push(0)
+        while self.param_tested.len() < n: self.param_tested.push(0)
+        while self.param_aborting.len() < n: self.param_aborting.push(0)
+        while self.param_null_caller.len() < n: self.param_null_caller.push("")
+        while self.param_sinks.len() < n: self.param_sinks.push("")
+        while self.param_nullable.len() < n: self.param_nullable.push(0)
+        while self.param_reason.len() < n: self.param_reason.push("")
 
     fn owned_copy() -> CiProjectSymbol:
         CiProjectSymbol {
@@ -1047,7 +1047,7 @@ fn CiProject.new -> CiProject:
 impl CiProject:
     fn ensure_module(path: &str) -> i32:
         var i: i32 = 0
-        while i < self.module_paths.len() as i32:
+        while i < self.module_paths.len():
             if self.module_paths[i] == path:
                 return i
             i = i + 1
@@ -1070,10 +1070,10 @@ impl CiProject:
         id
 
     fn owner_module_path(symbol_id: i32) -> str:
-        if symbol_id < 0 or symbol_id >= self.symbols.len() as i32:
+        if symbol_id < 0 or symbol_id >= self.symbols.len():
             return ""
         let owner_module = self.symbols[symbol_id].owner_module
-        if owner_module < 0 or owner_module >= self.module_paths.len() as i32:
+        if owner_module < 0 or owner_module >= self.module_paths.len():
             return ""
         with_str_clone_ref(self.module_paths[owner_module])
 

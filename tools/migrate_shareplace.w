@@ -55,20 +55,20 @@ type CollectResult {
 fn collect_targets(entry: &str) -> CollectResult:
     let result = compiler_analyze_file(entry, "facts")
     var receiver_sigs: List[i32] = List.new()
-    for i in 0..result.report.facts.len() as i32:
+    for i in 0..result.report.facts.len():
         let fact = &result.report.facts[i]
         if fact.kind == AnalysisFactKind.Receiver:
             receiver_sigs.push(fact.parent)
     var targets: List[ShareTarget] = List.new()
     var decls: List[DeclSpan] = List.new()
-    for i in 0..result.report.facts.len() as i32:
+    for i in 0..result.report.facts.len():
         let fact = &result.report.facts[i]
         if fact.kind == AnalysisFactKind.Declaration:
             var decl_path = owned_text(fact.path)
             if decl_path.starts_with("<embedded-std>/std/"):
                 decl_path = "lib/std/" ++ decl_path.slice(19, decl_path.len() as i64)
             decls.push(DeclSpan { path: move decl_path, name: owned_text(fact.name), start: fact.start, end: fact.end })
-    for i in 0..result.report.facts.len() as i32:
+    for i in 0..result.report.facts.len():
         let fact = &result.report.facts[i]
         if fact.kind != AnalysisFactKind.Parameter: continue
         if fact.stage != AnalysisStage.Sema: continue
@@ -99,8 +99,8 @@ fn collect_targets(entry: &str) -> CollectResult:
     CollectResult { targets, decls }
 
 fn find_dollar(name: &str) -> i32:
-    for i in 0..name.len() as i32:
-        if name[i] as i32 == 36: return i
+    for i in 0..name.len():
+        if name[i] as i32 == 36: return i as i32
     -1
 
 fn base_name(name: &str) -> str:
@@ -110,9 +110,9 @@ fn base_name(name: &str) -> str:
     owned_text(name)
 
 fn decl_for(decls: &List[DeclSpan], path: &str, name: &str) -> i32:
-    for i in 0..decls.len() as i32:
+    for i in 0..decls.len():
         let d = &decls[i]
-        if d.path == path and d.name == name: return i
+        if d.path == path and d.name == name: return i as i32
     -1
 
 fn main:
@@ -121,18 +121,18 @@ fn main:
         print("usage: with run tools/migrate_shareplace.w <entry.w> [--apply]")
         exit_code(1)
     let entry = argv[1]
-    let apply = argv.len() as i32 >= 3 and argv[2] == "--apply"
+    let apply = argv.len() >= 3 and argv[2] == "--apply"
     let collected = collect_targets(entry)
     let targets = collected.targets
     let decls = collected.decls
-    print(f"targets: {targets.len() as i32} share-place free parameters")
+    print(f"targets: {targets.len()} share-place free parameters")
 
     // (path, insert-offset) edits, deduped across specializations.
     var edit_paths: List[str] = List.new()
     var edit_offsets: List[i32] = List.new()
     var failures = 0
     var fi = 0
-    while fi < targets.len() as i32:
+    while fi < targets.len():
         let t = &targets[fi]
         fi = fi + 1
         let name = base_name(t.fn_name)
@@ -237,7 +237,7 @@ fn main:
         let off = tokens.get_start(q)
 
         var dup = false
-        for e in 0..edit_paths.len() as i32:
+        for e in 0..edit_paths.len():
             if edit_paths[e] == t.path and edit_offsets[e] == off: dup = true
         if dup: continue
         print(f"target: {t.path}:{name} parameter {t.sig_index}")
@@ -250,7 +250,7 @@ fn main:
 
     // Apply per file, edits sorted ascending.
     var files: List[str] = List.new()
-    for e in 0..edit_paths.len() as i32:
+    for e in 0..edit_paths.len():
         let p = edit_paths[e]
         var seen = false
         for f in files:
@@ -259,7 +259,7 @@ fn main:
     var total = 0
     for f in files:
         var offs: List[i32] = List.new()
-        for e in 0..edit_paths.len() as i32:
+        for e in 0..edit_paths.len():
             if edit_paths[e] == f: offs.push(edit_offsets[e])
         var sorted: List[i32] = List.new()
         while sorted.len() < offs.len():
@@ -283,6 +283,6 @@ fn main:
             if rc != 0:
                 print(f"error: write failed for {f}")
                 exit_code(1)
-        print(f"{f}: {offs.len() as i32} parameters")
-        total = total + offs.len() as i32
+        print(f"{f}: {offs.len()} parameters")
+        total = total + offs.len()
     print(f"total: {total} parameters " ++ (if apply: "annotated" else: "to annotate (dry run)"))

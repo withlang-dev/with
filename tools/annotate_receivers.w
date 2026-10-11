@@ -46,7 +46,7 @@ fn column_for_offset(text: &str, offset: i32) -> i32:
 fn exact_mode(facts: &ReceiverModeFacts, line: i32, column: i32) -> str:
     var nearest = -1
     var nearest_column = -1
-    for i in 0..facts.lines.len() as i32:
+    for i in 0..facts.lines.len():
         if facts.lines[i] == line and facts.columns[i] == column:
             return facts.modes[i].clone()
         // AST declaration spans start at modifiers (`pub`, `unsafe`, `async`),
@@ -66,7 +66,7 @@ fn compiler_receiver_modes(path: &str) -> ReceiverModeFacts:
         modes: List.new(),
         unproven: 0,
     }
-    for i in 0..result.report.facts.len() as i32:
+    for i in 0..result.report.facts.len():
         let fact = result.report.facts[i]
         if fact.kind != AnalysisFactKind.Declaration or fact.path != path:
             continue
@@ -89,7 +89,7 @@ fn compiler_receiver_modes(path: &str) -> ReceiverModeFacts:
 
 fn annotate_file(path: &str, exact_facts: &ReceiverModeFacts) -> i32:
     let text = unsafe { with_fs_read_file(path) }
-    let tlen = text.len() as i32
+    let tlen = text.len()
     if tlen == 0:
         return 0
     var lexer = Lexer.init(text, 0)
@@ -192,7 +192,7 @@ fn annotate_file(path: &str, exact_facts: &ReceiverModeFacts) -> i32:
         count = count + 1
         i = q + 1
 
-    let m = starts.len() as i32
+    let m = starts.len()
     if count != candidates:
         print(f"error: {path}: token audit found {candidates} mode-less receivers but compiler contracts proved {count}; file left unchanged")
         return -1
@@ -255,7 +255,7 @@ fn file_has_mode_less_receiver(path: &str) -> bool:
     false
 
 fn path_excluded(path: &str, excludes: &List[str]) -> bool:
-    for i in 0..excludes.len() as i32:
+    for i in 0..excludes.len():
         if path == excludes[i]:
             return true
     false
@@ -279,8 +279,8 @@ fn annotate_integrated_path(path: &str, excludes: &List[str]) -> i32:
     var changed: i32 = 0
     var failures = 0
     var start = 0
-    for i in 0..listing.len() as i32 + 1:
-        if i != listing.len() as i32 and listing[i] as i32 != 10:
+    for i in 0..listing.len() + 1:
+        if i != listing.len() and listing[i] as i32 != 10:
             continue
         if i > start:
             let file = slice(listing, start, i)
@@ -304,9 +304,9 @@ fn main:
     let excludes: List[str] = List.new()
     let paths: List[str] = List.new()
     var arg = 1
-    while arg < argv.len() as i32:
+    while arg < argv.len():
         if argv[arg] == "--exclude":
-            if arg + 1 >= argv.len() as i32:
+            if arg + 1 >= argv.len():
                 print("error: --exclude requires a file path")
                 exit_code(1)
             arg = arg + 1
@@ -319,7 +319,7 @@ fn main:
         exit_code(1)
     var total = 0
     var failures = 0
-    for i in 0..paths.len() as i32:
+    for i in 0..paths.len():
         let changed = annotate_integrated_path(paths[i], &excludes)
         if changed < 0: failures = failures + 1
         else: total = total + changed

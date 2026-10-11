@@ -10,10 +10,10 @@ fn zlib_index_of(text: &str, needle: &str) -> i32:
     if needle.len() > text.len():
         return -1
     var i: i32 = 0
-    while i <= text.len() as i32 - needle.len() as i32:
+    while i <= text.len() - needle.len():
         var j: i32 = 0
         var matched = true
-        while j < needle.len() as i32:
+        while j < needle.len():
             if text[(i + j)] != needle[j]:
                 matched = false
                 break

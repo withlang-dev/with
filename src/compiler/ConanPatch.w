@@ -24,24 +24,24 @@ fn cp_hunk_old_start(line: &str) -> i32:
     var n: i32 = 0
     var i = dash as i32 + 1
     var digits = 0
-    while i < line.len() as i32 and line[i] >= '0' and line[i] <= '9':
+    while i < line.len() and line[i] >= '0' and line[i] <= '9':
         n = n * 10 + (line[i] as i32 - '0' as i32)
         digits = digits + 1
         i = i + 1
     if digits == 0: -1 else: n
 
 fn cp_matches_at(file: &List[str], at: i32, old: &List[str]) -> bool:
-    if at < 0 or at + old.len() as i32 > file.len() as i32: return false
-    for i in 0..old.len() as i32:
+    if at < 0 or at + old.len() > file.len(): return false
+    for i in 0..old.len():
         if file[at + i] != old[i]: return false
     true
 
 // Where `old` sits in `file`, preferring `want` and then the nearest line; -1 if nowhere.
 fn cp_locate(file: &List[str], want: i32, old: &List[str]) -> i32:
     if cp_matches_at(file, want, old): return want
-    for distance in 1..file.len() as i32 + 1:
-        if cp_matches_at(file, want - distance, old): return want - distance
-        if cp_matches_at(file, want + distance, old): return want + distance
+    for distance in 1..file.len() + 1:
+        if cp_matches_at(file, (want - distance) as i32, old): return (want - distance) as i32
+        if cp_matches_at(file, (want + distance) as i32, old): return (want + distance) as i32
     -1
 
 type CpHunk { old_start: i32, old: List[str], new: List[str] }
@@ -58,15 +58,15 @@ fn cp_patched_text(path: &str, creates: bool, original: &str, hunks: &List[CpHun
     if file.len() > 0 and file[file.len() - 1].len() == 0:
         let _last = file.pop()
     var shift: i32 = 0
-    for hi in 0..hunks.len() as i32:
+    for hi in 0..hunks.len():
         let want: i32 = hunks[hi].old_start - 1 + shift
         let at = if hunks[hi].old.len() == 0: (if want < 0: 0 else: want) else: cp_locate(&file, want, &hunks[hi].old)
         if at < 0: return ("", f"hunk {hi + 1} of the patch does not apply to " ++ path)
         let rebuilt: List[str] = List.new()
         for i in 0..at: rebuilt.push(file[i].clone())
         for line in hunks[hi].new: rebuilt.push(line.to_owned())
-        for i in at + hunks[hi].old.len() as i32..file.len() as i32: rebuilt.push(file[i].clone())
-        shift = shift + (at - want) + hunks[hi].new.len() as i32 - hunks[hi].old.len() as i32
+        for i in at + hunks[hi].old.len()..file.len(): rebuilt.push(file[i].clone())
+        shift = (shift + (at - want) + hunks[hi].new.len() - hunks[hi].old.len()) as i32
         file = rebuilt
     var text = file.join("\n")
     if ends_with_newline and file.len() > 0: text = text ++ "\n"
@@ -80,10 +80,10 @@ pub fn conan_apply_patch(patch: &str, root: &str, read: fn(&str) -> str, write: 
     var hunks: List[CpHunk] = List.new()
     var in_hunk = false
     var i = 0
-    while i <= lines.len() as i32:
-        let at_end = i == lines.len() as i32
+    while i <= lines.len():
+        let at_end = i == lines.len()
         let line = if at_end: "" else: lines[i].clone()
-        let file_header = not at_end and line.starts_with("--- ") and i + 1 < lines.len() as i32 and lines[i + 1].starts_with("+++ ")
+        let file_header = not at_end and line.starts_with("--- ") and i + 1 < lines.len() and lines[i + 1].starts_with("+++ ")
         if at_end or file_header:
             if path.len() > 0 and hunks.len() > 0:
                 let full = root ++ "/" ++ path
@@ -105,11 +105,11 @@ pub fn conan_apply_patch(patch: &str, root: &str, read: fn(&str) -> str, write: 
             hunks.push(CpHunk { old_start: start, old: List.new(), new: List.new() })
             in_hunk = true
         else if in_hunk and hunks.len() > 0 and not line.starts_with("\\"):
-            let last = hunks.len() as i32 - 1
+            let last = hunks.len() - 1
             if line.starts_with("+"): hunks[last].new.push(line.slice(1, line.len()).to_owned())
             else if line.starts_with("-"): hunks[last].old.push(line.slice(1, line.len()).to_owned())
             // The patch text's own final newline leaves one empty piece: not a context line.
-            else if line.len() == 0 and i == lines.len() as i32 - 1: in_hunk = false
+            else if line.len() == 0 and i == lines.len() - 1: in_hunk = false
             else if line.starts_with(" ") or line.len() == 0:
                 let body = if line.len() == 0: "" else: line.slice(1, line.len())
                 hunks[last].old.push(body.to_owned())

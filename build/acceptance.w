@@ -24,8 +24,8 @@ fn acc_fail(ctx: &ActionCtx, message: &str) -> i32:
 
 fn acc_basename(path: &str) -> str:
     var start = 0
-    for i in 0..path.len() as i32:
-        if path[i] == '/': start = i + 1
+    for i in 0..path.len():
+        if path[i] == '/': start = (i + 1) as i32
     path.slice(start as i64, path.len())
 
 fn acc_abs(ctx: &ActionCtx, path: &str) -> str:
@@ -67,7 +67,7 @@ pub fn run_d_acceptance_corpus_action(ctx: ActionCtx) -> i32:
     var pass = 0
     while true:
         var jobs: List[ParJob] = List.new()
-        for i in 0..files.len() as i32:
+        for i in 0..files.len():
             var argv: List[str] = List.new()
             argv.push(compiler.clone())
             argv.push("check")
@@ -76,7 +76,7 @@ pub fn run_d_acceptance_corpus_action(ctx: ActionCtx) -> i32:
         let _rcs = par_run(&ctx, &jobs, par_width(&jobs))
         var diagnostics = ""
         var gated = 0
-        for i in 0..files.len() as i32:
+        for i in 0..files.len():
             let err = fs.read_text(work ++ f"/{i}.stderr")
             if err.contains(ACC_GATE_MARK):
                 gated = gated + 1

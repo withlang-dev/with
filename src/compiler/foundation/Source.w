@@ -37,7 +37,7 @@ pub fn Source.offset_to_location(self: &Self, offset: i32) -> SourceLocation:
         return SourceLocation { line: 0, col: 0 }
 
     var clamped = offset
-    if clamped > self.text.len() as i32:
+    if clamped > self.text.len():
         clamped = self.text.len() as i32
 
     var lo = 0
@@ -57,12 +57,12 @@ pub fn Source.offset_to_location(self: &Self, offset: i32) -> SourceLocation:
     }
 
 pub fn Source.line_text(self: &Self, line: i32) -> str:
-    if line < 0 or line >= self.line_offsets.len() as i32:
+    if line < 0 or line >= self.line_offsets.len():
         return ""
 
     let start = self.line_offsets[line]
-    var end = self.text.len() as i32
-    if line + 1 < self.line_offsets.len() as i32:
+    var end = self.text.len()
+    if line + 1 < self.line_offsets.len():
         end = self.line_offsets[(line + 1)]
 
     let slice = self.text.slice(start as i64, end as i64)

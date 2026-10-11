@@ -108,7 +108,7 @@ impl Codegen:
         let resolved = self.mir_resolve_alias_at(sema_ty)
         var tk = self.mir_type_kind_at(resolved)
         if tk == 0 and resolved >= self.mir_type_kinds_len() as i32 and resolved > 0:
-            if resolved < self.sema.type_kinds.len() as i32:
+            if resolved < self.sema.type_kinds.len():
                 return resolved
             return 0
         if tk == TypeKind.TY_INT:
@@ -520,7 +520,7 @@ impl Codegen:
         false
 
     fn mir_mark_memory_local_for_place(body: &MirBody, place_id: i32):
-        if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        if place_id < 0 or place_id >= body.place_locals.len():
             return
         let local_id = body.place_locals[place_id]
         if local_id >= 0:
@@ -610,7 +610,7 @@ fn MirValueScan.new(local_count: i32) -> MirValueScan:
 impl MirValueScan:
     fn local_limit() -> i32:
         let st = self.state
-        unsafe { st.blockers.len() as i32 }
+        (unsafe { st.blockers.len() }) as i32
 
     fn block_local(local_id: i32):
         let st = self.state
@@ -653,7 +653,7 @@ impl MirValueScan:
 impl Codegen:
     fn mir_place_direct_local(body: &MirBody, place_id: i32) -> i32:
         let _ = self
-        if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        if place_id < 0 or place_id >= body.place_locals.len():
             return -1
         if body.place_proj_counts[place_id] != 0:
             return -1
@@ -700,7 +700,7 @@ impl Codegen:
             self.mir_add_successor(body, stack, visited, d1)
             return
         if kind == TermKind.TK_SWITCH_INT:
-            if d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
+            if d1 >= 0 and d1 < body.switch_table_starts.len():
                 let start = body.switch_table_starts[d1]
                 let count = body.switch_table_counts[d1]
                 for ti in 0..count:
@@ -765,13 +765,13 @@ impl Codegen:
         scan.set_read_count(local_id, count + 1)
 
     fn mir_scan_operand_for_value_local(body: &MirBody, operand_id: i32, use_bb: i32, use_order: i32, scan: MirValueScan):
-        if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        if operand_id < 0 or operand_id >= body.operand_kinds.len():
             return
         let kind = body.operand_kinds[operand_id]
         if kind != OperandKind.OK_COPY and kind != OperandKind.OK_MOVE:
             return
         let place_id = body.operand_d0[operand_id]
-        if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        if place_id < 0 or place_id >= body.place_locals.len():
             return
         let local_id = body.place_locals[place_id]
         if body.place_proj_counts[place_id] != 0:
@@ -781,7 +781,7 @@ impl Codegen:
         self.mir_record_value_local_read(body, local_id, use_bb, use_order, scan)
 
     fn mir_scan_call_args_for_value_local(body: &MirBody, args_id: i32, use_bb: i32, use_order: i32, scan: MirValueScan):
-        if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
+        if args_id < 0 or args_id >= body.call_arg_starts.len():
             return
         let start = body.call_arg_starts[args_id]
         let count = body.call_arg_counts[args_id]
@@ -789,18 +789,18 @@ impl Codegen:
             self.mir_scan_operand_for_value_local(body, body.call_arg_operands[(start + ai)], use_bb, use_order, scan)
 
     fn mir_call_has_generic_ref_self_param0(body: &MirBody, callee_operand: i32, args_id: i32) -> bool:
-        if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
+        if args_id < 0 or args_id >= body.call_arg_starts.len():
             return false
         if body.call_intrinsic(args_id) != MirIntrinsic.GENERIC_CALL:
             return false
         if body.call_arg_counts[args_id] <= 0:
             return false
-        if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
+        if callee_operand < 0 or callee_operand >= body.operand_kinds.len():
             return false
         if body.operand_kinds[callee_operand] != OperandKind.OK_CONSTANT:
             return false
         let const_id = body.operand_d0[callee_operand]
-        if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+        if const_id < 0 or const_id >= body.const_kinds.len():
             return false
         if body.const_kinds[const_id] != ConstKind.CK_FN:
             return false
@@ -819,20 +819,20 @@ impl Codegen:
             return
         let start = body.call_arg_starts[args_id]
         let recv_operand = body.call_arg_operands[start]
-        if recv_operand < 0 or recv_operand >= body.operand_kinds.len() as i32:
+        if recv_operand < 0 or recv_operand >= body.operand_kinds.len():
             return
         let kind = body.operand_kinds[recv_operand]
         if kind != OperandKind.OK_COPY and kind != OperandKind.OK_MOVE:
             return
         let recv_place = body.operand_d0[recv_operand]
         self.mir_mark_memory_local_for_place(body, recv_place)
-        if recv_place >= 0 and recv_place < body.place_locals.len() as i32:
+        if recv_place >= 0 and recv_place < body.place_locals.len():
             let recv_local = body.place_locals[recv_place]
             if recv_local >= 0 and recv_local < scan.local_limit():
                 scan.block_local(recv_local)
 
     fn mir_scan_aggregate_for_value_local(body: &MirBody, field_id: i32, use_bb: i32, use_order: i32, scan: MirValueScan):
-        if field_id < 0 or field_id >= body.agg_field_starts.len() as i32:
+        if field_id < 0 or field_id >= body.agg_field_starts.len():
             return
         let start = body.agg_field_starts[field_id]
         let count = body.agg_field_counts[field_id]
@@ -840,7 +840,7 @@ impl Codegen:
             self.mir_scan_operand_for_value_local(body, body.agg_field_operands[(start + fi)], use_bb, use_order, scan)
 
     fn mir_scan_rvalue_for_value_local(body: &MirBody, rval_id: i32, use_bb: i32, use_order: i32, scan: MirValueScan):
-        if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        if rval_id < 0 or rval_id >= body.rval_kinds.len():
             return
         let kind = body.rval_kinds[rval_id]
         let d0 = body.rval_d0[rval_id]
@@ -861,12 +861,12 @@ impl Codegen:
                 let cast_target = self.mir_resolve_alias_at(d1)
                 let cast_target_kind = self.mir_type_kind_at(cast_target)
                 if cast_target_kind == TypeKind.TY_PTR or cast_target_kind == TypeKind.TY_REF:
-                    if d0 >= 0 and d0 < body.operand_kinds.len() as i32:
+                    if d0 >= 0 and d0 < body.operand_kinds.len():
                         let cast_operand_kind = body.operand_kinds[d0]
                         if cast_operand_kind == OperandKind.OK_COPY or cast_operand_kind == OperandKind.OK_MOVE:
                             let cast_place = body.operand_d0[d0]
                             self.mir_mark_memory_local_for_place(body, cast_place)
-                            if cast_place >= 0 and cast_place < body.place_locals.len() as i32:
+                            if cast_place >= 0 and cast_place < body.place_locals.len():
                                 let cast_local = body.place_locals[cast_place]
                                 if cast_local >= 0 and cast_local < scan.local_limit():
                                     scan.block_local(cast_local)
@@ -884,7 +884,7 @@ impl Codegen:
             return
         if kind == RvalueKind.RK_REF or kind == RvalueKind.RK_ADDR_OF or kind == RvalueKind.RK_DISCRIMINANT or kind == RvalueKind.RK_LEN:
             self.mir_mark_memory_local_for_place(body, d0)
-            let local_id = if d0 >= 0 and d0 < body.place_locals.len() as i32: body.place_locals[d0] else: -1
+            let local_id = if d0 >= 0 and d0 < body.place_locals.len(): body.place_locals[d0] else: -1
             if local_id >= 0 and local_id < scan.local_limit():
                 scan.block_local(local_id)
 
@@ -902,18 +902,18 @@ impl Codegen:
         if local_count > 0:
             scan.block_local(0)
 
-        for pi in 0..body.place_locals.len() as i32:
+        for pi in 0..body.place_locals.len():
             if body.place_proj_counts[pi] > 0:
-                self.mir_mark_memory_local_for_place(body, pi)
+                self.mir_mark_memory_local_for_place(body, pi as i32)
                 let local_id = body.place_locals[pi]
                 if local_id >= 0 and local_id < local_count:
                     scan.block_local(local_id)
-        for ri in 0..body.rval_kinds.len() as i32:
+        for ri in 0..body.rval_kinds.len():
             let rk = body.rval_kinds[ri]
             if rk == RvalueKind.RK_REF or rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN:
                 self.mir_mark_memory_local_for_place(body, body.rval_d0[ri])
                 let place_id = body.rval_d0[ri]
-                if place_id >= 0 and place_id < body.place_locals.len() as i32:
+                if place_id >= 0 and place_id < body.place_locals.len():
                     let local_id = body.place_locals[place_id]
                     if local_id >= 0 and local_id < local_count:
                         scan.block_local(local_id)
@@ -937,11 +937,11 @@ impl Codegen:
                     if d0 >= 0 and d0 < local_count:
                         scan.block_local(d0)
                         self.mir_memory_locals.insert(d0, 1)
-        for oi in 0..body.operand_kinds.len() as i32:
+        for oi in 0..body.operand_kinds.len():
             let ok = body.operand_kinds[oi]
             if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
                 let place_id = body.operand_d0[oi]
-                if place_id >= 0 and place_id < body.place_locals.len() as i32 and body.place_proj_counts[place_id] > 0:
+                if place_id >= 0 and place_id < body.place_locals.len() and body.place_proj_counts[place_id] > 0:
                     self.mir_mark_memory_local_for_place(body, place_id)
                     let local_id = body.place_locals[place_id]
                     if local_id >= 0 and local_id < local_count:
@@ -959,13 +959,13 @@ impl Codegen:
                 self.mir_scan_call_args_for_value_local(body, d1, bb2, term_order, scan)
                 self.mir_mark_generic_ref_self_receiver_memory(body, d0, d1, scan)
                 self.mir_mark_memory_local_for_place(body, d2)
-                if d2 >= 0 and d2 < body.place_locals.len() as i32:
+                if d2 >= 0 and d2 < body.place_locals.len():
                     let dst_local = body.place_locals[d2]
                     if dst_local >= 0 and dst_local < local_count:
                         scan.block_local(dst_local)
             else if tk == TermKind.TK_DROP_AND_GOTO:
                 self.mir_mark_memory_local_for_place(body, d0)
-                if d0 >= 0 and d0 < body.place_locals.len() as i32:
+                if d0 >= 0 and d0 < body.place_locals.len():
                     let drop_local = body.place_locals[d0]
                     if drop_local >= 0 and drop_local < local_count:
                         scan.block_local(drop_local)
@@ -1018,7 +1018,7 @@ impl Codegen:
         let known = self.mir_local_types.get(local_id)
         if known.is_some():
             return known.unwrap() as i64
-        if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        if local_id < 0 or local_id >= body.local_type_ids.len():
             return 0
         let sema_ty = body.local_type_ids[local_id]
         if sema_ty <= 0:
@@ -1029,7 +1029,7 @@ impl Codegen:
         llvm_ty
 
     mut fn mir_try_init_const_local(body: &MirBody, local_id: i32, ptr: i64, llvm_ty: i64) -> bool:
-        if local_id < 0 or local_id >= body.local_names.len() as i32:
+        if local_id < 0 or local_id >= body.local_names.len():
             return false
         let sym = body.local_names[local_id]
         if sym == 0 or body.local_is_global[local_id] == 0:
@@ -1187,19 +1187,19 @@ impl Codegen:
     mut fn audit_codegen_place_types(body: &MirBody):
         if self.analysis_enabled == 0 or self.analysis_query != "audit":
             return
-        for place_id in 0..body.place_locals.len() as i32:
+        for place_id in 0..body.place_locals.len():
             if body.place_proj_counts[place_id] == 0:
                 continue
             let sema_ty = body.place_sema_types[place_id]
             if sema_ty <= 0:
                 continue
             let want = self.mir_sema_type_to_llvm(sema_ty)
-            let got = self.mir_place_projected_type(body, place_id)
+            let got = self.mir_place_projected_type(body, place_id as i32)
             if want == 0 or want == got:
                 continue
             let name = with_str_clone_ref(self.sema.pool_resolve(body.fn_sym))
             let base_local = body.place_locals[place_id]
-            let base_sema = if base_local >= 0 and base_local < body.local_type_ids.len() as i32: body.local_type_ids[base_local] else: 0
+            let base_sema = if base_local >= 0 and base_local < body.local_type_ids.len(): body.local_type_ids[base_local] else: 0
             var projs = ""
             let p_start = body.place_proj_starts[place_id]
             for pi in 0..body.place_proj_counts[place_id]:
@@ -1220,7 +1220,7 @@ impl Codegen:
             self.analysis_fail(f"place {place_id} in {name}: projection lowers to LLVM type {got_text} but its MIR type {sema_ty} ({self.sema.type_name(sema_ty)}) lowers to {want_text}; {detail}")
 
     mut fn mir_place_projected_type(body: &MirBody, place_id: i32) -> i64:
-        if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        if place_id < 0 or place_id >= body.place_locals.len():
             return 0
         let base_local = body.place_locals[place_id]
         let p_count = body.place_proj_counts[place_id]
@@ -1231,9 +1231,9 @@ impl Codegen:
         let cur_ty_opt = self.mir_local_types.get(base_local)
         if cur_ty_opt.is_some():
             cur_ty = cur_ty_opt.unwrap() as i64
-        if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
+        if base_local >= 0 and base_local < body.local_type_ids.len():
             cur_sema_ty = body.local_type_ids[base_local]
-        if cur_ty == 0 and base_local >= 0 and base_local < body.local_type_ids.len() as i32:
+        if cur_ty == 0 and base_local >= 0 and base_local < body.local_type_ids.len():
             if cur_sema_ty > 0:
                 cur_ty = self.mir_sema_type_to_llvm(cur_sema_ty)
         if cur_ty == 0:
@@ -1251,7 +1251,7 @@ impl Codegen:
                         if pointee_ty != 0:
                             cur_sema_ty = pointee_sema
                             cur_ty = pointee_ty
-                    if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
+                    if base_local >= 0 and base_local < body.local_type_ids.len():
                         let sema_ty = body.local_type_ids[base_local]
                         if sema_ty > 0:
                             let type_name_sym = self.mir_type_cg_name_at(sema_ty)
@@ -1376,7 +1376,7 @@ impl Codegen:
                     if dc_et_opt.is_some():
                         let dc_idx = dc_et_opt.unwrap()
                         let dc_v_start = self.enum_variant_starts[dc_idx]
-                        if pd >= 0 and dc_v_start + pd < self.enum_variant_payloads.len() as i32:
+                        if pd >= 0 and dc_v_start + pd < self.enum_variant_payloads.len():
                             let payload_ty = self.enum_variant_payloads[(dc_v_start + pd)]
                             if payload_ty != 0:
                                 cur_ty = payload_ty
@@ -1397,7 +1397,7 @@ impl Codegen:
         cur_ty
 
     mut fn mir_place_ptr(body: &MirBody, place_id: i32, create_base: bool, create_type: i64) -> i64:
-        if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        if place_id < 0 or place_id >= body.place_locals.len():
             return 0
 
         let base_local = body.place_locals[place_id]
@@ -1410,7 +1410,7 @@ impl Codegen:
             // #2219: a global's storage is bound by mir_bind_global_locals or
             // nothing; a fresh alloca here was a zeroed local standing in for
             // a global the object never defined (a bundle consumer read 0).
-            if base_local >= 0 and base_local < body.local_is_global.len() as i32 and body.local_is_global[base_local] != 0:
+            if base_local >= 0 and base_local < body.local_is_global.len() and body.local_is_global[base_local] != 0:
                 return 0
             if create_base:
                 cur_ptr = self.mir_get_or_create_local_ptr(base_local, create_type)
@@ -1430,11 +1430,11 @@ impl Codegen:
         let cur_ty_opt = self.mir_local_types.get(base_local)
         if cur_ty_opt.is_some():
             cur_ty = cur_ty_opt.unwrap() as i64
-        if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
+        if base_local >= 0 and base_local < body.local_type_ids.len():
             cur_sema_ty = body.local_type_ids[base_local]
         // Resolve the base storage type via sema snapshot if LLVM type is not yet known.
         // For pointer globals this must remain ptr; field projection code resolves the pointee.
-        if cur_ty == 0 and base_local >= 0 and base_local < body.local_type_ids.len() as i32:
+        if cur_ty == 0 and base_local >= 0 and base_local < body.local_type_ids.len():
             if cur_sema_ty > 0:
                 cur_ty = self.mir_sema_type_to_llvm(cur_sema_ty)
                 if cur_ty != 0:
@@ -1457,7 +1457,7 @@ impl Codegen:
                             cur_sema_ty = pointee_sema
                             cur_ty = pointee_ty
                     // Resolve the pointee struct type via sema snapshot
-                    if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
+                    if base_local >= 0 and base_local < body.local_type_ids.len():
                         let sema_ty = body.local_type_ids[base_local]
                         if sema_ty > 0:
                             let type_name_sym = self.mir_type_cg_name_at(sema_ty)
@@ -1689,7 +1689,7 @@ impl Codegen:
                         let dc_idx = dc_et_opt.unwrap()
                         let dc_v_start = self.enum_variant_starts[dc_idx]
                         var dc_payload_ty: i64 = 0
-                        if pd >= 0 and dc_v_start + pd < self.enum_variant_payloads.len() as i32:
+                        if pd >= 0 and dc_v_start + pd < self.enum_variant_payloads.len():
                             dc_payload_ty = self.enum_variant_payloads[(dc_v_start + pd)]
                         if wl_count_struct_elem_types(cur_ty) > 1:
                             cur_ptr = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, 1)
@@ -1728,12 +1728,12 @@ impl Codegen:
 
     mut fn mir_const_value(body: &MirBody, const_id: i32, expected_ty: i64) -> i64:
         var materialize_ty = expected_ty
-        if materialize_ty == 0 and const_id >= 0 and const_id < body.const_types.len() as i32:
+        if materialize_ty == 0 and const_id >= 0 and const_id < body.const_types.len():
             let const_sema_ty = body.const_types[const_id]
             if const_sema_ty > 0:
                 materialize_ty = self.mir_sema_type_to_llvm(const_sema_ty)
         let fallback_ty = if materialize_ty != 0: materialize_ty else: wl_i32_type(self.context)
-        if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+        if const_id < 0 or const_id >= body.const_kinds.len():
             return self.mir_bug_undef(f"MIR constant id {const_id} is out of range", fallback_ty)
 
         let ck = body.const_kinds[const_id]
@@ -1778,7 +1778,7 @@ impl Codegen:
 
         if ck == ConstKind.CK_STR:
             let text = self.str_const_text(cd)
-            let const_sema_ty = if const_id >= 0 and const_id < body.const_types.len() as i32: body.const_types[const_id] else: 0
+            let const_sema_ty = if const_id >= 0 and const_id < body.const_types.len(): body.const_types[const_id] else: 0
             // A `&str` constant is the literal's own `{ptr, len}` (#1810).
             if self.mir_sema_type_is_ref_to_str(const_sema_ty) != 0 and not self.sema.type_layout_is_str_view(const_sema_ty):
                 return self.gen_string_literal_ref(text)
@@ -1808,7 +1808,7 @@ impl Codegen:
                 float_ty = wl_f64_type(self.context)
             // ConstKind.CK_FLOAT d0 is an AstPool string table index (from Parser.add_string).
             // The literal's own text goes to LLVM, which rounds it once into float_ty.
-            if cd >= 0 and cd < self.pool.state.strings.len() as i32:
+            if cd >= 0 and cd < self.pool.state.strings.len():
                 let float_text = self.pool.get_string(cd)
                 if float_text.len() > 0:
                     return wl_const_real_of_string(float_ty, float_literal_value_text(float_text))
@@ -1821,7 +1821,7 @@ impl Codegen:
 
         if ck == ConstKind.CK_REGEX_LIT:
             var regex_ty: i64 = 0
-            if const_id >= 0 and const_id < body.const_types.len() as i32:
+            if const_id >= 0 and const_id < body.const_types.len():
                 let regex_sema_ty = body.const_types[const_id]
                 if regex_sema_ty > 0:
                     regex_ty = self.mir_sema_type_to_llvm(regex_sema_ty)
@@ -1966,13 +1966,13 @@ impl Codegen:
 
     mut fn mir_eval_operand_raw(body: &MirBody, operand_id: i32, expected_ty: i64) -> i64:
         let fallback_ty = if expected_ty != 0: expected_ty else: wl_i32_type(self.context)
-        if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        if operand_id < 0 or operand_id >= body.operand_kinds.len():
             return self.mir_bug_undef(f"MIR operand id {operand_id} is out of range", fallback_ty)
 
         let ok = body.operand_kinds[operand_id]
         let od = body.operand_d0[operand_id]
         if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
-            if od < 0 or od >= body.place_locals.len() as i32:
+            if od < 0 or od >= body.place_locals.len():
                 return self.mir_bug_undef(f"operand {operand_id} names place {od}, out of range", fallback_ty)
             let local_id = body.place_locals[od]
             if body.place_proj_counts[od] == 0:
@@ -1988,7 +1988,7 @@ impl Codegen:
                     return value
             var ptr = self.mir_place_ptr(body, od, false, 0)
             // Lazy-create alloca using sema type when local not yet allocated
-            if ptr == 0 and local_id >= 0 and local_id < body.local_type_ids.len() as i32:
+            if ptr == 0 and local_id >= 0 and local_id < body.local_type_ids.len():
                 let sema_ty_id = body.local_type_ids[local_id]
                 if sema_ty_id > 0:
                     let sema_llvm_ty = self.mir_sema_type_to_llvm(sema_ty_id)
@@ -2006,7 +2006,7 @@ impl Codegen:
                 if ptr_ty_opt.is_some():
                     ptr_ty = ptr_ty_opt.unwrap() as i64
             // Fall back to sema type resolution when LLVM type not yet known
-            if ptr_ty == 0 and local_id >= 0 and local_id < body.local_type_ids.len() as i32:
+            if ptr_ty == 0 and local_id >= 0 and local_id < body.local_type_ids.len():
                 let sema_ty = body.local_type_ids[local_id]
                 if sema_ty > 0:
                     ptr_ty = self.mir_sema_type_to_llvm(sema_ty)
@@ -2084,7 +2084,7 @@ impl Codegen:
         self.mir_bug_undef(f"MIR operand {operand_id} of kind {ok} has no lowering", fallback_ty)
 
     mut fn mir_operand_is_unsigned(body: &MirBody, operand_id: i32) -> bool:
-        if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        if operand_id < 0 or operand_id >= body.operand_kinds.len():
             return false
         let sema_ty = self.mir_operand_sema_type(body, operand_id)
         self.mir_sema_type_is_unsigned(sema_ty)
@@ -2156,7 +2156,7 @@ impl Codegen:
     fn mir_param_slot_holds_address(body: &MirBody, fn_sym: i32, pi: i32) -> bool:
         if not self.fn_abi_param_by_address(fn_sym, pi):
             return false
-        let local_sema_ty = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0
+        let local_sema_ty = if pi + 1 < body.local_type_ids.len(): body.local_type_ids[(pi + 1)] else: 0
         local_sema_ty > 0 and not self.mir_sema_type_is_raw_pointer_or_ref(local_sema_ty)
 
     fn mir_sema_type_is_raw_pointer(sema_ty: i32) -> bool:
@@ -2165,10 +2165,10 @@ impl Codegen:
     // MIR's category of an operand: a function item (`const fn`), whose
     // value is its code pointer.
     fn mir_operand_is_fn_item(body: &MirBody, operand_id: i32) -> bool:
-        if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32 or body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
+        if operand_id < 0 or operand_id >= body.operand_kinds.len() or body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
             return false
         let const_id = body.operand_d0[operand_id]
-        const_id >= 0 and const_id < body.const_kinds.len() as i32 and body.const_kinds[const_id] == ConstKind.CK_FN
+        const_id >= 0 and const_id < body.const_kinds.len() and body.const_kinds[const_id] == ConstKind.CK_FN
 
     fn mir_sema_type_is_raw_pointer_or_ref(sema_ty: i32) -> bool:
         if sema_ty <= 0: return false
@@ -2264,7 +2264,7 @@ impl Codegen:
         self.fn_method_owner_cg_sym(self.current_function_name_sym)
 
     fn mir_current_owner_projected_nominal_sym(body: &MirBody, place_id: i32) -> i32:
-        if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        if place_id < 0 or place_id >= body.place_locals.len():
             return 0
         let p_count = body.place_proj_counts[place_id]
         if p_count <= 0:
@@ -3777,7 +3777,7 @@ impl Codegen:
 
     mut fn mir_str_concat_n(body: &MirBody, args_id: i32, move_first: i32) -> i64:
         let str_ty = self.resolve_named_type(self.intern.intern("str"))
-        if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
+        if args_id < 0 or args_id >= body.call_arg_starts.len():
             with_eprint("error: invalid MIR str_concat_n argument table")
             self.had_error = 1
             return wl_get_undef(str_ty)
@@ -4535,7 +4535,7 @@ impl Codegen:
                 wl_build_store(self.builder, result, dst_ptr)
             self.mir_local_types.insert(dst_local, dst_ty)
 
-        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
             let next_val = self.mir_bb_values[next_bb]
             wl_build_br(self.builder, next_val)
         true
@@ -4563,7 +4563,7 @@ impl Codegen:
         let call_args: List[i64] = List.new()
         call_args.push(args[0])
         let _ = wl_build_call(self.builder, ft, func, list_data_i64(&call_args), 1)
-        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
             wl_build_br(self.builder, self.mir_bb_values[next_bb])
         true
 
@@ -4774,13 +4774,13 @@ impl Codegen:
             return 0
         let enum_idx = et_opt.unwrap()
         let v_start = self.enum_variant_starts[enum_idx]
-        if v_start + variant_idx < 0 or v_start + variant_idx >= self.enum_variant_payloads.len() as i32:
+        if v_start + variant_idx < 0 or v_start + variant_idx >= self.enum_variant_payloads.len():
             return 0
         self.enum_variant_payloads[(v_start + variant_idx)]
 
     mut fn mir_eval_rvalue(body: &MirBody, rval_id: i32, dest_ty: i64, dest_sema_ty: i32) -> i64:
         let fallback_ty = if dest_ty != 0: dest_ty else: wl_i32_type(self.context)
-        if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        if rval_id < 0 or rval_id >= body.rval_kinds.len():
             return self.mir_bug_undef(f"MIR rvalue id {rval_id} is out of range", fallback_ty)
 
         let rk = body.rval_kinds[rval_id]
@@ -4910,7 +4910,7 @@ impl Codegen:
             let ptr = self.mir_place_ptr(body, d0, false, 0)
             if ptr == 0:
                 return self.mir_bug_undef(f"discriminant rvalue {rval_id}: place {d0} has no address", wl_i32_type(self.context))
-            if d0 < 0 or d0 >= body.place_locals.len() as i32:
+            if d0 < 0 or d0 >= body.place_locals.len():
                 return self.mir_bug_undef(f"discriminant rvalue {rval_id}: place {d0} out of range", wl_i32_type(self.context))
             var place_ty = self.mir_place_projected_type(body, d0)
             if place_ty == 0:
@@ -4935,12 +4935,12 @@ impl Codegen:
 
         if rk == RvalueKind.RK_AGGREGATE:
             // §4.3d: a vector's lanes, in order.
-            if dest_sema_ty > 0 and self.cg_sema_is_vector_or_mask(dest_sema_ty) and d1 >= 0 and d1 < body.agg_field_starts.len() as i32:
+            if dest_sema_ty > 0 and self.cg_sema_is_vector_or_mask(dest_sema_ty) and d1 >= 0 and d1 < body.agg_field_starts.len():
                 let agg_list_ty = self.mir_sema_type_to_llvm(dest_sema_ty)
                 return self.mir_build_vector_aggregate(body, body.agg_field_starts[d1], body.agg_field_counts[d1], agg_list_ty)
             // d1 = fields_id — index into agg_field_starts/counts/operands
             let agg_fields_id = d1
-            if agg_fields_id >= 0 and agg_fields_id < body.agg_field_starts.len() as i32:
+            if agg_fields_id >= 0 and agg_fields_id < body.agg_field_starts.len():
                 let agg_start = body.agg_field_starts[agg_fields_id]
                 let agg_count = body.agg_field_counts[agg_fields_id]
                 var struct_ty = dest_ty
@@ -5074,7 +5074,7 @@ impl Codegen:
                     for i in 0..agg_count:
                         let op_id = body.agg_field_operands[(agg_start + i)]
                         var fi = i
-                        if (agg_start + i) < body.agg_field_name_syms.len() as i32:
+                        if (agg_start + i) < body.agg_field_name_syms.len():
                             let name_sym = body.agg_field_name_syms[(agg_start + i)]
                             if name_sym != 0:
                                 let resolved_fi = self.mir_field_index_decided(struct_ty, name_sym, dest_sema_ty, -1, body.fn_sym, i)
@@ -5110,7 +5110,7 @@ impl Codegen:
                     let op_id = body.agg_field_operands[(agg_start + i)]
                     // Resolve field index from name sym if available
                     var fi = i
-                    if (agg_start + i) < body.agg_field_name_syms.len() as i32:
+                    if (agg_start + i) < body.agg_field_name_syms.len():
                         let name_sym = body.agg_field_name_syms[(agg_start + i)]
                         if name_sym != 0:
                             let resolved_fi = self.mir_field_index_decided(struct_ty, name_sym, dest_sema_ty, -1, body.fn_sym, i)
@@ -5284,7 +5284,7 @@ impl Codegen:
             let ptr = self.mir_place_ptr(body, d0, false, 0)
             if ptr == 0:
                 return wl_const_int(wl_i64_type(self.context), 0, 0)
-            if d0 < 0 or d0 >= body.place_locals.len() as i32:
+            if d0 < 0 or d0 >= body.place_locals.len():
                 return wl_const_int(wl_i64_type(self.context), 0, 0)
             let local_id = body.place_locals[d0]
             // #1587: the place's PROJECTED type — `len(_2.*)` on a `&str`
@@ -6129,7 +6129,7 @@ impl Codegen:
         let free_ty = wl_function_type(void_ty, list_data_i64(&params), params.len() as i32, 0)
         if free_fn == 0:
             free_fn = wl_add_function(self.llmod, name, free_ty)
-        let _ = wl_build_call(self.builder, free_ty, free_fn, list_data_i64(&args), args.len() as i32)
+        let _ = wl_build_call(self.builder, free_ty, free_fn, list_data_i64(&args), args.len())
         // Blank the header as the runtime did: a freed List reads as empty.
         wl_build_store(self.builder, wl_const_null(ptr_ty), ptr)
         wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), self.mir_list_header_word_ptr(ptr, 8))
@@ -6974,7 +6974,7 @@ impl Codegen:
         true
 
     mut fn mir_emit_drop_place_current_origin(body: &MirBody, place_id: i32) -> bool:
-        if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        if place_id < 0 or place_id >= body.place_locals.len():
             return false
         let drop_sema_ty = self.mir_place_sema_type(body, place_id)
         if self.mir_emit_box_drop_place(body, place_id, drop_sema_ty):
@@ -7032,29 +7032,29 @@ impl Codegen:
     // True if rvalue `rval_id` is `RK_USE` of a `CK_ZERO_SIZED` constant (the
     // reset-on-move / default zero value).
     fn mir_rvalue_is_zero_const(body: &MirBody, rval_id: i32) -> bool:
-        if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        if rval_id < 0 or rval_id >= body.rval_kinds.len():
             return false
         if body.rval_kinds[rval_id] != RvalueKind.RK_USE:
             return false
         let op = body.rval_d0[rval_id]
-        if op < 0 or op >= body.operand_kinds.len() as i32:
+        if op < 0 or op >= body.operand_kinds.len():
             return false
         if body.operand_kinds[op] != OperandKind.OK_CONSTANT:
             return false
         let cid = body.operand_d0[op]
-        if cid < 0 or cid >= body.const_kinds.len() as i32:
+        if cid < 0 or cid >= body.const_kinds.len():
             return false
         body.const_kinds[cid] == ConstKind.CK_ZERO_SIZED
 
     mut fn mir_emit_stmt(body: &MirBody, stmt_id: i32) -> bool:
-        if stmt_id < 0 or stmt_id >= body.stmt_kinds.len() as i32:
+        if stmt_id < 0 or stmt_id >= body.stmt_kinds.len():
             return false
         let sk = body.stmt_kinds[stmt_id]
         let d0 = body.stmt_d0[stmt_id]
         let d1 = body.stmt_d1[stmt_id]
 
         if sk == StmtKind.Assign:
-            if d0 < 0 or d0 >= body.place_locals.len() as i32:
+            if d0 < 0 or d0 >= body.place_locals.len():
                 return false
             let dst_local = body.place_locals[d0]
             // D127 (§3.1): a constant whose view is taken is an immutable
@@ -7098,7 +7098,7 @@ impl Codegen:
             if dst_ptr != 0 and dst_ty != 0 and wl_get_type_kind(dst_ty) == wl_struct_type_kind() and self.mir_rvalue_is_zero_const(body, d1):
                 self.emit_memset_zero(dst_ptr, wl_abi_size_of(wl_get_module_data_layout(self.llmod), dst_ty))
                 return true
-            if d1 >= 0 and d1 < body.rval_kinds.len() as i32 and body.rval_kinds[d1] == RvalueKind.RK_ARRAY_FILL:
+            if d1 >= 0 and d1 < body.rval_kinds.len() and body.rval_kinds[d1] == RvalueKind.RK_ARRAY_FILL:
                 let af_operand = body.rval_d0[d1]
                 let af_count = body.rval_d1[d1]
                 var af_arr_ty = dst_ty
@@ -7134,9 +7134,9 @@ impl Codegen:
                             let af_gep = wl_build_gep(self.builder, af_arr_ty, dst_ptr, list_data_i64(&af_indices), 2)
                             wl_build_store(self.builder, af_coerced, af_gep)
                         return true
-            if d1 >= 0 and d1 < body.rval_kinds.len() as i32 and body.rval_kinds[d1] == RvalueKind.RK_USE:
+            if d1 >= 0 and d1 < body.rval_kinds.len() and body.rval_kinds[d1] == RvalueKind.RK_USE:
                 let use_op_id = body.rval_d0[d1]
-                if use_op_id >= 0 and use_op_id < body.operand_kinds.len() as i32:
+                if use_op_id >= 0 and use_op_id < body.operand_kinds.len():
                     let use_ok = body.operand_kinds[use_op_id]
                     if use_ok == OperandKind.OK_COPY or use_ok == OperandKind.OK_MOVE:
                         let use_place = body.operand_d0[use_op_id]
@@ -7177,7 +7177,7 @@ impl Codegen:
                     var ssa_value = value
                     if wl_type_of(value) != ssa_ty:
                         var ssa_src_unsigned = false
-                        let ssa_rv_kind = if d1 >= 0 and d1 < body.rval_kinds.len() as i32: body.rval_kinds[d1] else: -1
+                        let ssa_rv_kind = if d1 >= 0 and d1 < body.rval_kinds.len(): body.rval_kinds[d1] else: -1
                         if ssa_rv_kind == RvalueKind.RK_REF:
                             let ssa_ref_place = body.rval_d1[d1]
                             let ssa_dyn_ref = self.mir_build_dyn_trait_value_from_ref_place(body, ssa_ref_place, value, ssa_ty, dst_sema_ty)
@@ -7211,7 +7211,7 @@ impl Codegen:
             var coerced = value
             if wl_type_of(value) != final_ty:
                 var src_unsigned = false
-                let rv_kind = if d1 >= 0 and d1 < body.rval_kinds.len() as i32: body.rval_kinds[d1] else: -1
+                let rv_kind = if d1 >= 0 and d1 < body.rval_kinds.len(): body.rval_kinds[d1] else: -1
                 if rv_kind == RvalueKind.RK_REF:
                     let ref_place = body.rval_d1[d1]
                     let dyn_ref = self.mir_build_dyn_trait_value_from_ref_place(body, ref_place, value, final_ty, dst_sema_ty)
@@ -7298,7 +7298,7 @@ impl Codegen:
             self.mir_set_current_drop_origin(d1)
             // Stage 4 (§2.5.2): a local never recorded as moved can never be the
             // reset sentinel, so drop it unconditionally; otherwise keep the guard.
-            if d0 >= 0 and d0 < body.place_locals.len() as i32:
+            if d0 >= 0 and d0 < body.place_locals.len():
                 let drop_local = body.place_locals[d0]
                 self.current_drop_needs_guard = body.local_ever_moved(drop_local)
             let ok = self.mir_emit_drop_place_current_origin(body, d0)
@@ -7325,7 +7325,7 @@ impl Codegen:
         self.sema.get_generic_inst_arg(resolved, 0)
 
     fn mir_default_unreachable_bb_value() -> i64:
-        if self.mir_default_unreachable_bbs.len() as i32 > 0:
+        if self.mir_default_unreachable_bbs.len() > 0:
             return self.mir_default_unreachable_bbs[0]
         let bb = wl_append_bb(self.context, self.current_function, "mir.default.unreachable")
         self.mir_default_unreachable_bbs.push(bb)
@@ -7336,13 +7336,13 @@ impl Codegen:
     // specialization emitter skipped it, so a generic body reading its
     // module's `global var` read an unbound stack slot (#1743).
     mut fn mir_bind_global_locals(body: &MirBody):
-        for gli in 0..body.local_names.len() as i32:
+        for gli in 0..body.local_names.len():
             let gl_name = body.local_names[gli]
             if gl_name != 0 and body.local_is_global[gli] != 0:
                 let gl_mc = self.module_constants.get(gl_name)
                 if gl_mc.is_some():
                     let global_value: i64 = gl_mc.unwrap()
-                    self.mir_local_ptrs.insert(gli, global_value)
+                    self.mir_local_ptrs.insert(gli as i32, global_value)
                 else if self.unlowered_global_reasons.contains(gl_name):
                     // #2219: a bundle-owned global whose initializer did not
                     // fold has no storage in the object and no initializer
@@ -7362,7 +7362,7 @@ impl Codegen:
     // is done. The const-initializer and default-method emitters skipped it,
     // so an `or`/`if` in a module `let` failed LLVM verification (#1483).
     fn mir_terminate_default_unreachable():
-        if self.mir_default_unreachable_bbs.len() as i32 > 0:
+        if self.mir_default_unreachable_bbs.len() > 0:
             let ubb = self.mir_default_unreachable_bbs[0]
             if wl_get_bb_terminator(ubb) == 0:
                 wl_position_at_end(self.builder, ubb)
@@ -7377,11 +7377,11 @@ impl Codegen:
     // it once decided, with the local's name (`self`) and the LLVM shape of
     // its Sema type.
     mut fn mir_try_place_ptr_for_ref(body: &MirBody, operand_id: i32) -> i64:
-        if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        if operand_id < 0 or operand_id >= body.operand_kinds.len():
             return 0
         let ok = body.operand_kinds[operand_id]
         let od = body.operand_d0[operand_id]
-        if (ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE) or od < 0 or od >= body.place_locals.len() as i32:
+        if (ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE) or od < 0 or od >= body.place_locals.len():
             return 0
         let local_id = body.place_locals[od]
         let p_count = body.place_proj_counts[od]
@@ -7417,11 +7417,11 @@ impl Codegen:
     // local's address (T**). Casts still want the loaded value, so this is applied
     // only at the receiver-passing sites, not in mir_try_place_ptr_for_ref.
     mut fn mir_operand_place_addr(body: &MirBody, operand_id: i32) -> i64:
-        if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        if operand_id < 0 or operand_id >= body.operand_kinds.len():
             return 0
         let ok = body.operand_kinds[operand_id]
         let od = body.operand_d0[operand_id]
-        if (ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE) and od >= 0 and od < body.place_locals.len() as i32:
+        if (ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE) and od >= 0 and od < body.place_locals.len():
             return self.mir_place_ptr(body, od, false, 0)
         0
 
@@ -7525,10 +7525,10 @@ impl Codegen:
     // Whether a COPY/MOVE operand of an unprojected local names a local whose
     // storage holds a pointer value (so a ref marshal loads that pointer).
     mut fn mir_operand_local_holds_pointer(body: &MirBody, operand_id: i32) -> bool:
-        if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32: return false
+        if operand_id < 0 or operand_id >= body.operand_kinds.len(): return false
         let ok = body.operand_kinds[operand_id]
         let od = body.operand_d0[operand_id]
-        if (ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE) or od < 0 or od >= body.place_locals.len() as i32: return false
+        if (ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE) or od < 0 or od >= body.place_locals.len(): return false
         if body.place_proj_counts[od] != 0: return false
         let local_id = body.place_locals[od]
         let local_ty: i64 = self.mir_local_types.get(local_id) ?? 0
@@ -7545,7 +7545,7 @@ impl Codegen:
     fn mir_local_slot_holds_pointer(body: &MirBody, local_id: i32) -> bool:
         if self.mir_indirect_value_local_types.contains(local_id) or self.mir_ref_capture_local_types.contains(local_id):
             return true
-        let sema_ty = if local_id >= 0 and local_id < body.local_type_ids.len() as i32: body.local_type_ids[local_id] else: 0
+        let sema_ty = if local_id >= 0 and local_id < body.local_type_ids.len(): body.local_type_ids[local_id] else: 0
         sema_ty > 0 and (self.sema.type_layout_is_single_address(sema_ty) or self.sema.type_layout_option_is_nullable(sema_ty))
 
     // Evaluating wrapper for call paths that have not pre-computed the value.
@@ -7604,12 +7604,12 @@ impl Codegen:
     // loads through; this covers the projection-free case for RK_REF and
     // RK_ADDR_OF.
     mut fn mir_ref_through_indirect_base(body: &MirBody, place_id: i32, ptr: i64) -> i64:
-        if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        if place_id < 0 or place_id >= body.place_locals.len():
             return ptr
         if body.place_proj_counts[place_id] != 0:
             return ptr
         let local_id = body.place_locals[place_id]
-        if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        if local_id < 0 or local_id >= body.local_type_ids.len():
             return ptr
         let sema_ty = body.local_type_ids[local_id]
         if sema_ty <= 0:
@@ -7663,10 +7663,10 @@ impl Codegen:
     // Whether a call operand is a string literal. One with an interior NUL is
     // not reported as one: it takes the lending path, which refuses it loudly.
     fn mir_operand_str_literal(body: &MirBody, operand_id: i32) -> StrLiteralOperand:
-        if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32 or body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
+        if operand_id < 0 or operand_id >= body.operand_kinds.len() or body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
             return StrLiteralOperand { found: false, text: "" }
         let const_id = body.operand_d0[operand_id]
-        if const_id < 0 or const_id >= body.const_kinds.len() as i32 or body.const_kinds[const_id] != ConstKind.CK_STR:
+        if const_id < 0 or const_id >= body.const_kinds.len() or body.const_kinds[const_id] != ConstKind.CK_STR:
             return StrLiteralOperand { found: false, text: "" }
         let text = self.str_const_text(body.const_d0[const_id])
         for i in 0..text.len():
@@ -7697,7 +7697,7 @@ impl Codegen:
         if free_fn == 0:
             return
         let free_ty = wl_global_get_value_type(free_fn)
-        for i in 0..ptrs.len() as i32:
+        for i in 0..ptrs.len():
             let args: List[i64] = List.new()
             args.push(ptrs[i])
             wl_build_call(self.builder, free_ty, free_fn, list_data_i64(&args), 1)
@@ -7778,7 +7778,7 @@ impl Codegen:
             if ptr != 0:
                 let local_id0 = body.place_locals[od]
                 let p_count0 = body.place_proj_counts[od]
-                if p_count0 == 0 and local_id0 >= 0 and local_id0 < body.local_type_ids.len() as i32:
+                if p_count0 == 0 and local_id0 >= 0 and local_id0 < body.local_type_ids.len():
                     let indirect_ptr = self.mir_indirect_value_local_ptr(local_id0, ptr)
                     if indirect_ptr != 0:
                         return indirect_ptr
@@ -7792,7 +7792,7 @@ impl Codegen:
                 return ptr
             // Lazy-create alloca
             let local_id = body.place_locals[od]
-            if local_id >= 0 and local_id < body.local_type_ids.len() as i32:
+            if local_id >= 0 and local_id < body.local_type_ids.len():
                 let sema_ty = body.local_type_ids[local_id]
                 if sema_ty > 0:
                     let llvm_ty = self.mir_sema_type_to_llvm(sema_ty)
@@ -8032,10 +8032,10 @@ impl Codegen:
         self.type_fallback()
 
     fn mir_intrinsic_dest_sema_type(body: &MirBody, dest_place: i32) -> i32:
-        if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
+        if dest_place < 0 or dest_place >= body.place_locals.len():
             return 0
         let local_id = body.place_locals[dest_place]
-        if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        if local_id < 0 or local_id >= body.local_type_ids.len():
             return 0
         body.local_type_ids[local_id]
 
@@ -8465,7 +8465,7 @@ impl Codegen:
                 let payload_count = self.sema.type_extra[(pos + 1)]
                 if vi == variant_idx:
                     let payload_types = self.sema.resolve_generic_enum_payload_frozen(resolved, base_sym, variant_name, payload_count)
-                    if field_idx < payload_types.len() as i32:
+                    if field_idx < payload_types.len():
                         let payload_ty = payload_types[field_idx]
                         if payload_ty != 0:
                             return payload_ty
@@ -8506,7 +8506,7 @@ impl Codegen:
                     field_text = self.sema_symbol_text(field_token)
                 var valid_index = if field_text.len() > 0: 1 else: 0
                 tuple_idx = 0
-                for vi in 0..field_text.len() as i32:
+                for vi in 0..field_text.len():
                     let ch = field_text[vi]
                     if ch >= 48 and ch <= 57:
                         tuple_idx = tuple_idx * 10 + (ch - 48) as i32
@@ -8544,33 +8544,33 @@ impl Codegen:
         let ok = body.operand_kinds[operand_id]
         let od = body.operand_d0[operand_id]
         if ok == OperandKind.OK_CONSTANT:
-            if od >= 0 and od < body.const_types.len() as i32:
+            if od >= 0 and od < body.const_types.len():
                 return body.const_types[od]
             return 0
         if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
             return 0
-        if od < 0 or od >= body.place_locals.len() as i32:
+        if od < 0 or od >= body.place_locals.len():
             return 0
         self.mir_place_sema_type(body, od)
 
     mut fn mir_place_sema_type(body: &MirBody, place_id: i32) -> i32:
-        if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        if place_id < 0 or place_id >= body.place_locals.len():
             return 0
         let local_id = body.place_locals[place_id]
-        if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        if local_id < 0 or local_id >= body.local_type_ids.len():
             return 0
         let p_count = body.place_proj_counts[place_id]
         let local_ty = body.local_type_ids[local_id]
         if p_count <= 0:
             if local_ty > 0:
                 return local_ty
-            if place_id < body.place_sema_types.len() as i32:
+            if place_id < body.place_sema_types.len():
                 let stored = body.place_sema_types[place_id]
                 if stored > 0:
                     return stored
             return 0
         // Projected places can carry a more precise cached sema type.
-        if place_id < body.place_sema_types.len() as i32:
+        if place_id < body.place_sema_types.len():
             let stored = body.place_sema_types[place_id]
             if stored > 0:
                 return stored
@@ -8609,7 +8609,7 @@ impl Codegen:
 
     mut fn mir_dest_llvm_type(body: &MirBody, dest_place: i32) -> i64:
         // Get the LLVM type for a destination place from its sema type.
-        if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
+        if dest_place < 0 or dest_place >= body.place_locals.len():
             return 0
         let sema_ty = self.mir_place_sema_type(body, dest_place)
         if sema_ty <= 0:
@@ -8779,7 +8779,7 @@ impl Codegen:
             return enum_sym.unwrap()
         if not self.mono_struct_tp_counts.contains(mono_sym):
             let tp_flat_start = self.mono_struct_tp_flat_syms.len() as i32
-            for pi in 0..pending_syms.len() as i32:
+            for pi in 0..pending_syms.len():
                 self.mono_struct_tp_flat_syms.push(pending_syms[pi])
                 self.mono_struct_tp_flat_types.push(pending_types[pi])
                 self.mono_struct_tp_flat_sema_types.push(pending_sema_types[pi])
@@ -9024,10 +9024,10 @@ impl Codegen:
     fn current_method_suffix() -> str:
         let name = self.intern.resolve(self.current_function_name_sym)
         var dot = -1
-        for i in 0..name.len() as i32:
+        for i in 0..name.len():
             if name[i] == 46:
-                dot = i
-        if dot >= 0 and dot + 1 < name.len() as i32:
+                dot = i as i32
+        if dot >= 0 and dot + 1 < name.len():
             return name.slice((dot + 1) as i64, name.len())
         ""
 
@@ -9037,7 +9037,7 @@ impl Codegen:
         let method_name = self.current_method_suffix()
         if method_name.len() == 0:
             return 0
-        for ti in 0..self.trait_idx_syms.len() as i32:
+        for ti in 0..self.trait_idx_syms.len():
             let trait_sym = self.trait_idx_syms[ti]
             let key = codegen_hash_type_trait_key(type_sym, trait_sym)
             if not self.vtable_globals.get(key).is_some():
@@ -9061,7 +9061,7 @@ impl Codegen:
         if not owner_idx_opt.is_some():
             return 0
         let owner_idx = owner_idx_opt.unwrap()
-        if owner_idx < 0 or owner_idx >= self.struct_field_counts.len() as i32:
+        if owner_idx < 0 or owner_idx >= self.struct_field_counts.len():
             return 0
         let field_sym = self.intern.intern(field_name)
         let start = self.struct_field_starts[owner_idx]
@@ -9084,7 +9084,7 @@ impl Codegen:
     mut fn mir_emit_dyn_call_error(msg: &str, next_bb: i32) -> bool:
         with_eprint(msg)
         self.had_error = 1
-        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
             wl_build_br(self.builder, self.mir_bb_values[next_bb])
         true
 
@@ -9092,7 +9092,7 @@ impl Codegen:
         let co_k = body.operand_kinds[callee_operand]
         let co_d = body.operand_d0[callee_operand]
         var method_sym: i32 = 0
-        if co_k == OperandKind.OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
+        if co_k == OperandKind.OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len():
             if body.const_kinds[co_d] == ConstKind.CK_FN:
                 let raw_method_sym = body.const_d0[co_d]
                 let method_text = self.sema_symbol_text(raw_method_sym)
@@ -9155,7 +9155,7 @@ impl Codegen:
         let call_args: List[i64] = List.new()
         var sret_dst: i64 = 0
         if has_sret:
-            if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
+            if dest_place < 0 or dest_place >= body.place_locals.len():
                 return self.mir_emit_dyn_call_error("error: dyn trait sret call has no destination", next_bb)
             var sret_dst_ty = self.mir_dest_llvm_type(body, dest_place)
             if sret_dst_ty == 0:
@@ -9171,15 +9171,15 @@ impl Codegen:
             let op_id = body.call_arg_operands[(arg_start + ai)]
             var expected_ty: i64 = 0
             let pidx = ai + sret_off
-            if pidx < param_types.len() as i32:
+            if pidx < param_types.len():
                 expected_ty = param_types[pidx]
             let val = self.mir_eval_call_operand(body, op_id, expected_ty, "dyn trait method", ai - 1)
             call_args.push(val)
             ai = ai + 1
 
-        let result = wl_build_call(self.builder, fn_ty, fn_ptr, list_data_i64(&call_args), call_args.len() as i32)
+        let result = wl_build_call(self.builder, fn_ty, fn_ptr, list_data_i64(&call_args), call_args.len())
         if not has_sret and ret_ty != wl_void_type(self.context):
-            if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
+            if dest_place < 0 or dest_place >= body.place_locals.len():
                 return self.mir_emit_dyn_call_error("error: dyn trait call has no destination for non-void return", next_bb)
             var dst_ty = self.mir_dest_llvm_type(body, dest_place)
             if dst_ty == 0:
@@ -9190,7 +9190,7 @@ impl Codegen:
             let stored = self.enforce_coerced_type(result, dst_ty, "return type mismatch at dyn trait call site")
             wl_build_store(self.builder, stored, dst_ptr)
 
-        if next_bb < 0 or next_bb >= self.mir_bb_values.len() as i32:
+        if next_bb < 0 or next_bb >= self.mir_bb_values.len():
             return false
         wl_build_br(self.builder, self.mir_bb_values[next_bb])
         true
@@ -9329,7 +9329,7 @@ impl Codegen:
     fn trait_decl_has_method_named(trait_sym: i32, method_name: &str) -> bool:
         if trait_sym == 0 or method_name.len() == 0:
             return false
-        for ti in 0..self.trait_idx_syms.len() as i32:
+        for ti in 0..self.trait_idx_syms.len():
             if not self.codegen_symbols_match(self.trait_idx_syms[ti], trait_sym):
                 continue
             let method_start = self.trait_method_starts[ti]
@@ -9367,7 +9367,7 @@ impl Codegen:
                 continue
             let fn_text = self.codegen_symbol_text(self.pool.get_data0(decl))
             var bare = with_str_clone_ref(fn_text)
-            for dot_i in 0..fn_text.len() as i32:
+            for dot_i in 0..fn_text.len():
                 if fn_text[dot_i] == 46:
                     bare = fn_text.slice((dot_i + 1) as i64, fn_text.len() as i64)
                     break
@@ -9418,16 +9418,16 @@ impl Codegen:
             f = wl_add_function(self.llmod, name, ft)
         let ft = wl_global_get_value_type(f)
         let count = wl_count_param_types(ft)
-        var ok = count == args.len() as i32 and count == param_tys.len() as i32 and wl_get_return_type(ft) == ret_ty
+        var ok = count == args.len() and count == param_tys.len() and wl_get_return_type(ft) == ret_ty
         if ok:
-            for i in 0..args.len() as i32:
-                if wl_type_of(args[i]) != param_tys[i] or wl_get_fn_param_type(ft, i) != param_tys[i]:
+            for i in 0..args.len():
+                if wl_type_of(args[i]) != param_tys[i] or wl_get_fn_param_type(ft, i as i32) != param_tys[i]:
                     ok = false
         if not ok:
             with_eprint(f"error: BUG: call of runtime `{name}` does not match its declaration (params={count}, args={args.len()}) in {self.intern.resolve(self.current_function_name_sym)}")
             self.had_error = 1
             return wl_get_undef(if ret_ty == wl_void_type(self.context): wl_i32_type(self.context) else: ret_ty)
-        wl_build_call(self.builder, ft, f, list_data_i64(args), args.len() as i32)
+        wl_build_call(self.builder, ft, f, list_data_i64(args), args.len())
 
     mut fn mir_emit_free_channel_builtin(body: &MirBody, builtin: CallBuiltin, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
         let i64_ty = wl_i64_type(self.context)
@@ -9478,7 +9478,7 @@ impl Codegen:
                 let dest_ptr = self.mir_place_ptr(body, dest_place, true, result_ty)
                 if dest_ptr != 0:
                     wl_build_store(self.builder, result, dest_ptr)
-        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
             wl_build_br(self.builder, self.mir_bb_values[next_bb])
 
     fn mir_build_listrange_value(data_i64: i64, offset_i64: i64, len_i64: i64, range_ty: i64) -> i64:
@@ -11903,7 +11903,7 @@ impl Codegen:
                         asm_ret_ty = wl_struct_type(self.context, list_data_i64(&asm_out_tys), asm_out_count, 0)
                 let asm_fn_ty = wl_function_type(asm_ret_ty, list_data_i64(&asm_param_tys), asm_param_tys.len() as i32, 0)
                 let asm_val = wl_get_inline_asm(asm_fn_ty, asm_tmpl, asm_constr, if asm_is_volatile: 1 else: 0, 0)
-                let asm_call_result = wl_build_call(self.builder, asm_fn_ty, asm_val, list_data_i64(&asm_input_vals), asm_input_vals.len() as i32)
+                let asm_call_result = wl_build_call(self.builder, asm_fn_ty, asm_val, list_data_i64(&asm_input_vals), asm_input_vals.len())
                 if asm_has_output:
                     result = asm_call_result
             // Store the output (if any) into the destination place and branch.
@@ -11918,7 +11918,7 @@ impl Codegen:
                     let dest_ptr = self.mir_place_ptr(body, dest_place, true, result_ty)
                     if dest_ptr != 0:
                         wl_build_store(self.builder, result, dest_ptr)
-            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                 wl_build_br(self.builder, self.mir_bb_values[next_bb])
             return true
 
@@ -11930,7 +11930,7 @@ impl Codegen:
                     let dest_ptr = self.mir_place_ptr(body, dest_place, true, result_ty)
                     if dest_ptr != 0:
                         wl_build_store(self.builder, result, dest_ptr)
-            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                 wl_build_br(self.builder, self.mir_bb_values[next_bb])
             return true
 
@@ -11983,15 +11983,15 @@ impl Codegen:
                 wl_position_at_end(self.builder, await_load_bb)
             // Load result from buffer unless MIR marked this await as cleanup-only.
             var ignore_result = false
-            if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+            if dest_place >= 0 and dest_place < body.place_locals.len():
                 let dst_local = body.place_locals[dest_place]
-                if dst_local >= 0 and dst_local < body.local_type_ids.len() as i32:
+                if dst_local >= 0 and dst_local < body.local_type_ids.len():
                     let dst_sema_ty = body.local_type_ids[dst_local]
                     let dst_resolved = self.mir_resolve_alias_at(dst_sema_ty)
                     if dst_resolved > 0 and self.mir_type_kind_at(dst_resolved) == TypeKind.TY_VOID:
                         ignore_result = true
             // Load result from buffer, free buffer, store to dest
-            if not ignore_result and dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+            if not ignore_result and dest_place >= 0 and dest_place < body.place_locals.len():
                 // #1305: the awaited value is the Task's own type argument
                 // (Sema's Task[T] / ScopedTask[T] on the awaited operand) —
                 // never a side table keyed by a local id, the last spawn's
@@ -12035,7 +12035,7 @@ impl Codegen:
             if await_after_cancel_bb != 0:
                 wl_build_br(self.builder, await_after_cancel_bb)
                 wl_position_at_end(self.builder, await_after_cancel_bb)
-            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                 wl_build_br(self.builder, self.mir_bb_values[next_bb])
             return true
 
@@ -12089,14 +12089,14 @@ impl Codegen:
 
             // Load winner index and store to dest
             let winner_idx = wl_build_load(self.builder, i32_ty, winner_alloca)
-            if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+            if dest_place >= 0 and dest_place < body.place_locals.len():
                 let dst_local = body.place_locals[dest_place]
                 let dst_alloca = self.create_entry_alloca(i32_ty)
                 wl_build_store(self.builder, winner_idx, dst_alloca)
                 self.mir_local_ptrs.insert(dst_local, dst_alloca)
                 self.mir_local_types.insert(dst_local, i32_ty)
 
-            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                 wl_build_br(self.builder, self.mir_bb_values[next_bb])
             return true
 
@@ -12124,7 +12124,7 @@ impl Codegen:
             ca.push(fid)
             result = wl_build_call(self.builder, cft, cancel_fn, list_data_i64(&ca), 1)
 
-            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                 wl_build_br(self.builder, self.mir_bb_values[next_bb])
             return true
 
@@ -12155,7 +12155,7 @@ impl Codegen:
             da.push(rbuf)
             result = wl_build_call(self.builder, dft2, detach_fn, list_data_i64(&da), 2)
 
-            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                 wl_build_br(self.builder, self.mir_bb_values[next_bb])
             return true
 
@@ -12509,7 +12509,7 @@ impl Codegen:
             if upd_is_fat != 0:
                 upd_call_args.push(upd_ctx_ptr)
             upd_call_args.push(upd_current)
-            let upd_updated_raw = wl_build_call(self.builder, upd_call_ty, upd_fn_ptr, list_data_i64(&upd_call_args), upd_call_args.len() as i32)
+            let upd_updated_raw = wl_build_call(self.builder, upd_call_ty, upd_fn_ptr, list_data_i64(&upd_call_args), upd_call_args.len())
             let upd_updated = if wl_type_of(upd_updated_raw) != upd_val_ty: self.coerce_value_to_type(upd_updated_raw, upd_val_ty) else: upd_updated_raw
             wl_build_store(self.builder, upd_updated, upd_val_alloca)
             // D110: update observes its key; an absent key goes in as the map's copy.
@@ -13140,7 +13140,7 @@ impl Codegen:
             // Dest is the Option[T] instantiation recorded by sema.
             var recv_opt_ty = wl_i32_type(self.context)
             var recv_opt_sema: i32 = 0
-            if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+            if dest_place >= 0 and dest_place < body.place_locals.len():
                 let dst_local = body.place_locals[dest_place]
                 let dst_sema_ty = body.local_type_ids[dst_local]
                 let dst_ll = self.mir_sema_type_to_llvm(dst_sema_ty)
@@ -15783,9 +15783,9 @@ impl Codegen:
         wl_build_call(self.builder, gtft2, gc_track_fn, list_data_i64(&gta), 3)
         if dest_place >= 0 and gc_arg_val != 0:
             var gc_dst_ty: i64 = 0
-            if dest_place < body.place_locals.len() as i32:
+            if dest_place < body.place_locals.len():
                 let gc_dst_local = body.place_locals[dest_place]
-                if gc_dst_local >= 0 and gc_dst_local < body.local_type_ids.len() as i32:
+                if gc_dst_local >= 0 and gc_dst_local < body.local_type_ids.len():
                     gc_dst_ty = self.mir_sema_type_to_llvm(body.local_type_ids[gc_dst_local])
             if gc_dst_ty == 0:
                 gc_dst_ty = gc_task_ty
@@ -15795,7 +15795,7 @@ impl Codegen:
             let gc_dst_ptr = self.mir_place_ptr(body, dest_place, true, gc_dst_ty)
             if gc_dst_ptr != 0:
                 wl_build_store(self.builder, gc_scoped_val, gc_dst_ptr)
-        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
             wl_build_br(self.builder, self.mir_bb_values[next_bb])
         true
 
@@ -15859,7 +15859,7 @@ impl Codegen:
                 var gc0_callee_sym: i32 = 0
                 let gc0_co_k = body.operand_kinds[callee_operand]
                 let gc0_co_d = body.operand_d0[callee_operand]
-                if gc0_co_k == OperandKind.OK_CONSTANT and gc0_co_d >= 0 and gc0_co_d < body.const_kinds.len() as i32:
+                if gc0_co_k == OperandKind.OK_CONSTANT and gc0_co_d >= 0 and gc0_co_d < body.const_kinds.len():
                     if body.const_kinds[gc0_co_d] == ConstKind.CK_FN:
                         gc0_callee_sym = body.const_d0[gc0_co_d]
                 if gc0_callee_sym > 0:
@@ -15879,7 +15879,7 @@ impl Codegen:
                                 wl_build_store(self.builder, gc0_result, gc0_alloca)
                                 self.mir_local_ptrs.insert(gc0_local, gc0_alloca)
                                 self.mir_local_types.insert(gc0_local, gc0_ret_ty)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                             wl_build_br(self.builder, self.mir_bb_values[next_bb])
                         return true
                 with_eprint("error: unresolved MIR generic call for '" ++ self.codegen_symbol_text(gc0_callee_sym) ++ "'")
@@ -15890,7 +15890,7 @@ impl Codegen:
                 let gc_co_k = body.operand_kinds[callee_operand]
                 let gc_co_d = body.operand_d0[callee_operand]
                 var gc_callee_sym: i32 = 0
-                if gc_co_k == OperandKind.OK_CONSTANT and gc_co_d >= 0 and gc_co_d < body.const_kinds.len() as i32:
+                if gc_co_k == OperandKind.OK_CONSTANT and gc_co_d >= 0 and gc_co_d < body.const_kinds.len():
                     gc_callee_sym = body.const_d0[gc_co_d]
                 // Which builtin a call is is Sema's record (#2043); the AST
                 // spelling of the callee never decides it.
@@ -15923,9 +15923,9 @@ impl Codegen:
                                 try_result = self.monomorphize_struct_method_core(owner_sym, "branch", decl.unwrap(), recv_val, recv_ptr, 0, wl_type_of(recv_val), 0, 0, gc_node, body.call_sig_index(args_id), body.call_mono_sym(args_id), no_args)
                         else if gc_callee_sym == try_from_break_sym:
                             var carrier_sema = self.mir_place_sema_type(body, dest_place)
-                            if carrier_sema == 0 and dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+                            if carrier_sema == 0 and dest_place >= 0 and dest_place < body.place_locals.len():
                                 let local_id = body.place_locals[dest_place]
-                                if local_id >= 0 and local_id < body.local_type_ids.len() as i32:
+                                if local_id >= 0 and local_id < body.local_type_ids.len():
                                     carrier_sema = body.local_type_ids[local_id]
                             let owner_sym2 = self.ensure_generic_method_owner_sym(carrier_sema)
                             let decl2 = self.lookup_generic_struct_method_decl(gc_callee_sym)
@@ -15939,7 +15939,7 @@ impl Codegen:
                                 wl_build_store(self.builder, try_result, try_alloca)
                                 self.mir_local_ptrs.insert(try_local, try_alloca)
                                 self.mir_local_types.insert(try_local, wl_type_of(try_result))
-                            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                 wl_build_br(self.builder, self.mir_bb_values[next_bb])
                             return true
 
@@ -15963,13 +15963,13 @@ impl Codegen:
                         let gc_atomic_dst = self.mir_place_ptr(body, dest_place, true, gc_atomic_ty)
                         if gc_atomic_dst != 0:
                             wl_build_store(self.builder, gc_atomic_result, gc_atomic_dst)
-                        else if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+                        else if dest_place >= 0 and dest_place < body.place_locals.len():
                             let gc_atomic_local = body.place_locals[dest_place]
                             let gc_atomic_alloca = self.create_entry_alloca(gc_atomic_ty)
                             wl_build_store(self.builder, gc_atomic_result, gc_atomic_alloca)
                             self.mir_local_ptrs.insert(gc_atomic_local, gc_atomic_alloca)
                             self.mir_local_types.insert(gc_atomic_local, gc_atomic_ty)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                             wl_build_br(self.builder, self.mir_bb_values[next_bb])
                         return true
 
@@ -15979,7 +15979,7 @@ impl Codegen:
                 // monomorphizer before the free generic-function path.
                 var gc_struct_method_name_is_qualified = false
                 let gc_struct_method_name = self.codegen_symbol_text(gc_callee_sym)
-                for gc_struct_method_name_i in 0..gc_struct_method_name.len() as i32:
+                for gc_struct_method_name_i in 0..gc_struct_method_name.len():
                     if gc_struct_method_name[gc_struct_method_name_i] == 46:
                         gc_struct_method_name_is_qualified = true
                         break
@@ -15994,7 +15994,7 @@ impl Codegen:
                         if gc_owner_sm != 0:
                             var gc_method_name_sm = ""
                             let gc_method_text_sm = self.codegen_symbol_text(gc_callee_sym)
-                            for gc_mn_i in 0..gc_method_text_sm.len() as i32:
+                            for gc_mn_i in 0..gc_method_text_sm.len():
                                 if gc_method_text_sm[gc_mn_i] == 46:
                                     gc_method_name_sm = gc_method_text_sm.slice((gc_mn_i + 1) as i64, gc_method_text_sm.len() as i64)
                                     break
@@ -16020,7 +16020,7 @@ impl Codegen:
                                         wl_build_store(self.builder, gc_result_sm, gc_alloca_sm)
                                         self.mir_local_ptrs.insert(gc_local_sm, gc_alloca_sm)
                                         self.mir_local_types.insert(gc_local_sm, gc_ret_ty_sm)
-                                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                     wl_build_br(self.builder, self.mir_bb_values[next_bb])
                                 return true
 
@@ -16086,7 +16086,7 @@ impl Codegen:
                         if gc_fn_meta >= 0:
                             gc_ra_param_start = self.pool.fn_meta_param_start(gc_fn_meta)
                             let gc_method_text = self.codegen_symbol_text(gc_callee_sym)
-                            for gc_dot_i in 0..gc_method_text.len() as i32:
+                            for gc_dot_i in 0..gc_method_text.len():
                                 if gc_method_text[gc_dot_i] == 46:
                                     let gc_owner_name = gc_method_text.slice(0, gc_dot_i as i64)
                                     gc_ra_owner_sym = self.sema.pool_lookup_symbol(gc_owner_name)
@@ -16128,7 +16128,7 @@ impl Codegen:
                                 wl_build_store(self.builder, gc_result, gc_alloca)
                                 self.mir_local_ptrs.insert(gc_local, gc_alloca)
                                 self.mir_local_types.insert(gc_local, gc_ret_ty)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                             let gc_next_val = self.mir_bb_values[next_bb]
                             wl_build_br(self.builder, gc_next_val)
                         return true
@@ -16162,7 +16162,7 @@ impl Codegen:
                     if gc_synth_owner_sym != 0:
                         let gc_synth_callee_name = self.intern.resolve(gc_callee_sym)
                         var gc_synth_method_name = with_str_clone_ref(gc_synth_callee_name)
-                        for gc_synth_di in 0..gc_synth_callee_name.len() as i32:
+                        for gc_synth_di in 0..gc_synth_callee_name.len():
                             if gc_synth_callee_name[gc_synth_di] == 46:
                                 gc_synth_method_name = gc_synth_callee_name.slice((gc_synth_di + 1) as i64, gc_synth_callee_name.len() as i64)
                         let gc_synth_pre_args = self.mir_eval_call_arg_range(body, args_id, 1, gc_synth_mir_count - 1, 1)
@@ -16176,7 +16176,7 @@ impl Codegen:
                                 wl_build_store(self.builder, gc_synth_result, gc_synth_alloca)
                                 self.mir_local_ptrs.insert(gc_synth_local, gc_synth_alloca)
                                 self.mir_local_types.insert(gc_synth_local, gc_synth_ret_ty)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                             wl_build_br(self.builder, self.mir_bb_values[next_bb])
                         return true
 
@@ -16196,7 +16196,7 @@ impl Codegen:
                                 wl_build_store(self.builder, gc_result, gc_alloca)
                                 self.mir_local_ptrs.insert(gc_local, gc_alloca)
                                 self.mir_local_types.insert(gc_local, gc_ret_ty)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                             let gc_next_val = self.mir_bb_values[next_bb]
                             wl_build_br(self.builder, gc_next_val)
                         return true
@@ -16208,7 +16208,7 @@ impl Codegen:
                             wl_build_store(self.builder, kh_result, kh_alloca)
                             self.mir_local_ptrs.insert(kh_local, kh_alloca)
                             self.mir_local_types.insert(kh_local, wl_type_of(kh_result))
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                             wl_build_br(self.builder, self.mir_bb_values[next_bb])
                         return true
                     if gc_builtin == CallBuiltin.Transmute:
@@ -16221,7 +16221,7 @@ impl Codegen:
                                 wl_build_store(self.builder, gc_result, gc_alloca)
                                 self.mir_local_ptrs.insert(gc_local, gc_alloca)
                                 self.mir_local_types.insert(gc_local, gc_ret_ty)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                             let gc_next_val = self.mir_bb_values[next_bb]
                             wl_build_br(self.builder, gc_next_val)
                         return true
@@ -16236,7 +16236,7 @@ impl Codegen:
                                 wl_build_store(self.builder, gc_result, gc_alloca)
                                 self.mir_local_ptrs.insert(gc_local, gc_alloca)
                                 self.mir_local_types.insert(gc_local, gc_ret_ty)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                             let gc_next_val = self.mir_bb_values[next_bb]
                             wl_build_br(self.builder, gc_next_val)
                         return true
@@ -16250,7 +16250,7 @@ impl Codegen:
                                 wl_build_store(self.builder, gc_result, gc_alloca)
                                 self.mir_local_ptrs.insert(gc_local, gc_alloca)
                                 self.mir_local_types.insert(gc_local, gc_ret_ty)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                             let gc_next_val = self.mir_bb_values[next_bb]
                             wl_build_br(self.builder, gc_next_val)
                         return true
@@ -16264,7 +16264,7 @@ impl Codegen:
                                 wl_build_store(self.builder, gc_result, gc_alloca)
                                 self.mir_local_ptrs.insert(gc_local, gc_alloca)
                                 self.mir_local_types.insert(gc_local, gc_ret_ty)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                             let gc_next_val = self.mir_bb_values[next_bb]
                             wl_build_br(self.builder, gc_next_val)
                         return true
@@ -16346,7 +16346,7 @@ impl Codegen:
                             wl_build_store(self.builder, chan_tuple_val, chan_alloca)
                             self.mir_local_ptrs.insert(chan_local, chan_alloca)
                             self.mir_local_types.insert(chan_local, chan_tuple_ty)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                             wl_build_br(self.builder, self.mir_bb_values[next_bb])
                         return true
 
@@ -16390,7 +16390,7 @@ impl Codegen:
                                     wl_build_store(self.builder, gc_static_result, gc_static_alloca)
                                     self.mir_local_ptrs.insert(gc_static_local, gc_static_alloca)
                                     self.mir_local_types.insert(gc_static_local, gc_static_ret_ty)
-                            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                 let gc_static_next_val = self.mir_bb_values[next_bb]
                                 wl_build_br(self.builder, gc_static_next_val)
                             return true
@@ -16437,9 +16437,9 @@ impl Codegen:
                                 gc_static_args.push(self.marshal_mir_call_arg(body, args_id, gc_static_op, gc_static_ai, gc_static_val))
                                 gc_static_arg_tys.push(wl_type_of(gc_static_val))
                             var gc_static_mono_sym: i32 = 0
-                            if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+                            if dest_place >= 0 and dest_place < body.place_locals.len():
                                 let gc_static_local_id = body.place_locals[dest_place]
-                                if gc_static_local_id >= 0 and gc_static_local_id < body.local_type_ids.len() as i32:
+                                if gc_static_local_id >= 0 and gc_static_local_id < body.local_type_ids.len():
                                     gc_static_mono_sym = self.mir_struct_sym_from_sema_type(body.local_type_ids[gc_static_local_id])
                             var gc_static_llvm_ty = self.mir_dest_llvm_type(body, dest_place)
                             var gc_static_call_type = self.ast_static_type_expr(gc_node)
@@ -16463,7 +16463,7 @@ impl Codegen:
                                         wl_build_store(self.builder, gc_static_result, gc_static_alloca)
                                         self.mir_local_ptrs.insert(gc_static_local, gc_static_alloca)
                                         self.mir_local_types.insert(gc_static_local, gc_static_ret_ty)
-                                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                     let gc_static_next_val = self.mir_bb_values[next_bb]
                                     wl_build_br(self.builder, gc_static_next_val)
                                 return true
@@ -16538,7 +16538,7 @@ impl Codegen:
                                         wl_build_store(self.builder, gc_result, gc_alloca)
                                         self.mir_local_ptrs.insert(gc_local, gc_alloca)
                                         self.mir_local_types.insert(gc_local, gc_ret_ty)
-                                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                     let gc_next_val = self.mir_bb_values[next_bb]
                                     wl_build_br(self.builder, gc_next_val)
                                 return true
@@ -16565,7 +16565,7 @@ impl Codegen:
                                         wl_build_store(self.builder, gc_result, gc_alloca)
                                         self.mir_local_ptrs.insert(gc_local, gc_alloca)
                                         self.mir_local_types.insert(gc_local, gc_ret_ty)
-                                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                     let gc_next_val = self.mir_bb_values[next_bb]
                                     wl_build_br(self.builder, gc_next_val)
                                 return true
@@ -16589,7 +16589,7 @@ impl Codegen:
                                 else:
                                     gc_direct_args.push(gc_recv_val)
                                 let gc_direct_tail = self.mir_eval_call_arg_range(body, args_id, 1, gc_direct_method_arg_count, 1)
-                                for gc_direct_ai in 0..gc_direct_tail.len() as i32:
+                                for gc_direct_ai in 0..gc_direct_tail.len():
                                     gc_direct_args.push(gc_direct_tail[gc_direct_ai])
                                 let gc_direct_result = self.build_call_fn_value(gc_direct_fn_sym, gc_direct_fn_value, gc_direct_fn_type, gc_direct_call_args_start, 1, gc_direct_args, gc_direct_method_arg_count + 1, "method " ++ gc_direct_qualified, gc_node)
                                 if dest_place >= 0 and gc_direct_result != 0:
@@ -16600,7 +16600,7 @@ impl Codegen:
                                         wl_build_store(self.builder, gc_direct_result, gc_direct_alloca)
                                         self.mir_local_ptrs.insert(gc_direct_local, gc_direct_alloca)
                                         self.mir_local_types.insert(gc_direct_local, gc_direct_ret_ty)
-                                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                     let gc_direct_next_val = self.mir_bb_values[next_bb]
                                     wl_build_br(self.builder, gc_direct_next_val)
                                 return true
@@ -16630,7 +16630,7 @@ impl Codegen:
                                         wl_build_store(self.builder, gc_result, gc_alloca)
                                         self.mir_local_ptrs.insert(gc_local, gc_alloca)
                                         self.mir_local_types.insert(gc_local, gc_ret_ty)
-                                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                     let gc_next_val = self.mir_bb_values[next_bb]
                                     wl_build_br(self.builder, gc_next_val)
                                 return true
@@ -16668,7 +16668,7 @@ impl Codegen:
                                     wl_build_store(self.builder, gc_result, gc_alloca)
                                     self.mir_local_ptrs.insert(gc_local, gc_alloca)
                                     self.mir_local_types.insert(gc_local, gc_ret_ty)
-                            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                 let gc_next_val = self.mir_bb_values[next_bb]
                                 wl_build_br(self.builder, gc_next_val)
                             return true
@@ -16714,7 +16714,7 @@ impl Codegen:
                                         wl_build_store(self.builder, gc_fb_result, gc_fb_alloca)
                                         self.mir_local_ptrs.insert(gc_fb_local, gc_fb_alloca)
                                         self.mir_local_types.insert(gc_fb_local, gc_fb_ret_ty)
-                                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                     let gc_fb_next_val = self.mir_bb_values[next_bb]
                                     wl_build_br(self.builder, gc_fb_next_val)
                                 return true
@@ -16726,7 +16726,7 @@ impl Codegen:
                                 gc_fb_fn_sym = gc_fb_inst_sym
                     // Search all traits for a method with this name
                     if gc_fb_fn_sym == 0:
-                        for gc_fb_ti in 0..self.trait_idx_syms.len() as i32:
+                        for gc_fb_ti in 0..self.trait_idx_syms.len():
                             let gc_fb_t_sym = self.trait_idx_syms[gc_fb_ti]
                             let gc_fb_m_start = self.trait_method_starts[gc_fb_ti]
                             let gc_fb_m_count = self.trait_method_counts[gc_fb_ti]
@@ -16756,7 +16756,7 @@ impl Codegen:
                                     wl_build_store(self.builder, gc_result, gc_alloca)
                                     self.mir_local_ptrs.insert(gc_local, gc_alloca)
                                     self.mir_local_types.insert(gc_local, gc_ret_ty)
-                            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                 let gc_next_val = self.mir_bb_values[next_bb]
                                 wl_build_br(self.builder, gc_next_val)
                             return true
@@ -16800,7 +16800,7 @@ impl Codegen:
                                                 wl_build_store(self.builder, gc_cur_result, gc_cur_alloca)
                                                 self.mir_local_ptrs.insert(gc_cur_local, gc_cur_alloca)
                                                 self.mir_local_types.insert(gc_cur_local, gc_cur_ret_ty)
-                                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                             wl_build_br(self.builder, self.mir_bb_values[next_bb])
                                         return true
 
@@ -16856,9 +16856,9 @@ impl Codegen:
 
                         if dest_place >= 0:
                             var sjh_ty: i64 = 0
-                            if dest_place < body.place_locals.len() as i32:
+                            if dest_place < body.place_locals.len():
                                 let sjh_local = body.place_locals[dest_place]
-                                if sjh_local >= 0 and sjh_local < body.local_type_ids.len() as i32:
+                                if sjh_local >= 0 and sjh_local < body.local_type_ids.len():
                                     sjh_ty = self.mir_sema_type_to_llvm(body.local_type_ids[sjh_local])
                             if sjh_ty == 0:
                                 let sjh_fields: List[i64] = List.new()
@@ -16873,13 +16873,13 @@ impl Codegen:
                             let sjh_dst_ptr = self.mir_place_ptr(body, dest_place, false, sjh_ty)
                             if sjh_dst_ptr != 0:
                                 wl_build_store(self.builder, sjh_val, sjh_dst_ptr)
-                            else if dest_place < body.place_locals.len() as i32:
+                            else if dest_place < body.place_locals.len():
                                 let sjh_local = body.place_locals[dest_place]
                                 let sjh_alloca = self.create_entry_alloca(sjh_ty)
                                 wl_build_store(self.builder, sjh_val, sjh_alloca)
                                 self.mir_local_ptrs.insert(sjh_local, sjh_alloca)
                                 self.mir_local_types.insert(sjh_local, sjh_ty)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                             wl_build_br(self.builder, self.mir_bb_values[next_bb])
                         return true
 
@@ -16917,13 +16917,13 @@ impl Codegen:
                                 let join_dst_ptr = self.mir_place_ptr(body, dest_place, false, wl_i32_type(self.context))
                                 if join_dst_ptr != 0:
                                     wl_build_store(self.builder, join_result, join_dst_ptr)
-                                else if dest_place < body.place_locals.len() as i32:
+                                else if dest_place < body.place_locals.len():
                                     let join_local = body.place_locals[dest_place]
                                     let join_result_alloca = self.create_entry_alloca(wl_i32_type(self.context))
                                     wl_build_store(self.builder, join_result, join_result_alloca)
                                     self.mir_local_ptrs.insert(join_local, join_result_alloca)
                                     self.mir_local_types.insert(join_local, wl_i32_type(self.context))
-                            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                                 wl_build_br(self.builder, self.mir_bb_values[next_bb])
                             return true
 
@@ -16977,7 +16977,7 @@ impl Codegen:
                     with_eprint(f"FATAL: unhandled MirIntrinsic.GENERIC_CALL sym={gc_name} node_kind={self.pool.kind(gc_node)} recv_ty={fatal_recv_ty} recv_kind={if fatal_recv != 0: self.pool.kind(fatal_recv) else: -1} arg_count={fatal_mir_count}")
                     self.had_error = 1
                     return false
-                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                     let gc_next_val = self.mir_bb_values[next_bb]
                     wl_build_br(self.builder, gc_next_val)
                 return true
@@ -16989,7 +16989,7 @@ impl Codegen:
             let co_k = body.operand_kinds[callee_operand]
             let co_d = body.operand_d0[callee_operand]
             var dbg_name = "?"
-            if co_k == OperandKind.OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
+            if co_k == OperandKind.OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len():
                 if body.const_kinds[co_d] == ConstKind.CK_FN:
                     let raw_sym = body.const_d0[co_d]
                     dbg_name = self.sema_symbol_text(raw_sym)
@@ -17033,7 +17033,7 @@ impl Codegen:
 
         var arg_start = 0
         var arg_count: i32 = 0
-        if args_id >= 0 and args_id < body.call_arg_starts.len() as i32:
+        if args_id >= 0 and args_id < body.call_arg_starts.len():
             arg_start = body.call_arg_starts[args_id]
             arg_count = body.call_arg_counts[args_id]
 
@@ -17048,10 +17048,10 @@ impl Codegen:
         // (whose own ABI has no context parameter: the argument counts
         // disagreed).
         var callee_is_callable_value = false
-        if callee_operand >= 0 and callee_operand < body.operand_kinds.len() as i32:
+        if callee_operand >= 0 and callee_operand < body.operand_kinds.len():
             let co_k = body.operand_kinds[callee_operand]
             let co_d = body.operand_d0[callee_operand]
-            if co_k == OperandKind.OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
+            if co_k == OperandKind.OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len():
                 if body.const_kinds[co_d] == ConstKind.CK_FN:
                     let raw_sym = body.const_d0[co_d]
                     callee_raw_fn_sym = raw_sym
@@ -17080,13 +17080,13 @@ impl Codegen:
         let unproto_sig = if callee_raw_fn_sym != 0: self.sema.get_sig(callee_raw_fn_sym) else: -1
         let c_promoted = self.sema.c_promoted_arg_types(body.call_ast_node(args_id))
         if unproto_sig >= 0 and self.sema.sig_is_unprototyped(unproto_sig):
-            if c_promoted.len() as i32 != arg_count:
+            if c_promoted.len() != arg_count:
                 with_eprint(f"error: call to unprototyped '{self.sema.pool_resolve(callee_raw_fn_sym)}' has {arg_count} argument(s) but Sema recorded {c_promoted.len()} promoted type(s): {call_context}")
                 self.had_error = 1
                 return false
             let promoted_sources: List[i64] = List.new()
             let promoted_places: List[i32] = List.new()
-            for pi in 0..c_promoted.len() as i32:
+            for pi in 0..c_promoted.len():
                 promoted_sources.push(self.sema_type_to_llvm(c_promoted[pi]))
                 promoted_places.push(0)
             call_abi = self.compute_fn_abi(self.fn_abis[call_abi].ret.source_ty, promoted_sources, promoted_places, FN_ABI_C, 0)
@@ -17134,7 +17134,7 @@ impl Codegen:
             if abi_param_offset < param_count:
                 expected_ty = param_types[abi_param_offset]
             var expected_sema_ty: i32 = 0
-            if ai < c_promoted.len() as i32 and c_promoted[ai] != 0:
+            if ai < c_promoted.len() and c_promoted[ai] != 0:
                 expected_sema_ty = c_promoted[ai]
                 if ai >= abi.arg_count:
                     expected_ty = self.sema_type_to_llvm(c_promoted[ai])
@@ -17229,10 +17229,10 @@ impl Codegen:
             args.push(arg_val)
 
         let actual_callee = if is_indirect: fn_ptr_val else: callee
-        let actual_arg_count = args.len() as i32
+        let actual_arg_count = args.len()
         if self.debug_mir_codegen_enabled():
             with_eprint(f"[mir-call] building call arg_count={actual_arg_count} ft_params={wl_count_param_types(call_ft)}")
-            for di in 0..args.len() as i32:
+            for di in 0..args.len():
                 let a = args[di]
                 with_eprint(f"[mir-call]   arg[{di}] ty_kind={wl_get_type_kind(wl_type_of(a))}")
         let va_intrinsic_result = self.try_emit_llvm_va_intrinsic(callee_fn_sym, args, next_bb)
@@ -17275,22 +17275,22 @@ impl Codegen:
 
         // Handle sret: load result from the sret buffer instead of using call_val
         if abi_has_sret != 0 and abi_sret_buf != 0 and abi_sret_ty != 0:
-            if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+            if dest_place >= 0 and dest_place < body.place_locals.len():
                 let dst_local = body.place_locals[dest_place]
                 self.mir_local_ptrs.insert(dst_local, abi_sret_buf)
                 self.mir_local_types.insert(dst_local, abi_sret_ty)
-            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            if next_bb >= 0 and next_bb < self.mir_bb_values.len():
                 let nv = self.mir_bb_values[next_bb]
                 wl_build_br(self.builder, nv)
             return true
 
         let ret_ty = wl_get_return_type(call_ft)
         if ret_ty != wl_void_type(self.context):
-            if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
+            if dest_place < 0 or dest_place >= body.place_locals.len():
                 return false
             let dst_local = body.place_locals[dest_place]
             var call_dst_sema_ty: i32 = 0
-            if dst_local >= 0 and dst_local < body.local_type_ids.len() as i32:
+            if dst_local >= 0 and dst_local < body.local_type_ids.len():
                 call_dst_sema_ty = body.local_type_ids[dst_local]
             // Resolve destination type before creating the place alloca.
             // The sema type may differ from the C return type (e.g. void* → str).
@@ -17321,14 +17321,14 @@ impl Codegen:
             let stored = self.enforce_coerced_type(raw_ret, dst_ty, "return type mismatch at call site")
             wl_build_store(self.builder, stored, dst_ptr)
 
-        if next_bb < 0 or next_bb >= self.mir_bb_values.len() as i32:
+        if next_bb < 0 or next_bb >= self.mir_bb_values.len():
             return false
         let next_val = self.mir_bb_values[next_bb]
         wl_build_br(self.builder, next_val)
         true
 
     mut fn mir_emit_term(body: &MirBody, bb: i32) -> bool:
-        if bb < 0 or bb >= body.bb_term_kinds.len() as i32:
+        if bb < 0 or bb >= body.bb_term_kinds.len():
             return false
         let tk = body.bb_term_kinds[bb]
         let d0 = body.bb_term_d0[bb]
@@ -17339,7 +17339,7 @@ impl Codegen:
             with_eprint(f"[mir-term] bb={bb} tk={tk}")
 
         if tk == TermKind.TK_GOTO:
-            if d0 < 0 or d0 >= self.mir_bb_values.len() as i32:
+            if d0 < 0 or d0 >= self.mir_bb_values.len():
                 return false
             let target_bb = self.mir_bb_values[d0]
             wl_build_br(self.builder, target_bb)
@@ -17413,11 +17413,11 @@ impl Codegen:
             let cond = self.mir_eval_operand(body, d0, 0)
             var default_bb = self.mir_default_unreachable_bb_value()
             if d2 >= 0:
-                if d2 >= 0 and d2 < self.mir_bb_values.len() as i32:
+                if d2 >= 0 and d2 < self.mir_bb_values.len():
                     default_bb = self.mir_bb_values[d2]
             var case_start = 0
             var case_count: i32 = 0
-            if d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
+            if d1 >= 0 and d1 < body.switch_table_starts.len():
                 case_start = body.switch_table_starts[d1]
                 case_count = body.switch_table_counts[d1]
             // For i1 conditions with exactly 1 case, emit br i1 instead of switch i1.
@@ -17425,7 +17425,7 @@ impl Codegen:
             let cond_ty = wl_type_of(cond)
             if wl_get_int_type_width(cond_ty) == 1 and case_count == 1:
                 let target_bb = body.switch_table_targets[case_start]
-                if target_bb >= 0 and target_bb < self.mir_bb_values.len() as i32:
+                if target_bb >= 0 and target_bb < self.mir_bb_values.len():
                     let case_target = self.mir_bb_values[target_bb]
                     let val: i64 = body.switch_table_vals[case_start]
                     if val != 0:
@@ -17439,7 +17439,7 @@ impl Codegen:
                 int_ty = cond_ty
             for ci in 0..case_count:
                 let target_bb = body.switch_table_targets[(case_start + ci)]
-                if target_bb >= 0 and target_bb < self.mir_bb_values.len() as i32:
+                if target_bb >= 0 and target_bb < self.mir_bb_values.len():
                     let val: i64 = body.switch_table_vals[(case_start + ci)]
                     let case_target = self.mir_bb_values[target_bb]
                     wl_add_case(sw, wl_const_int(int_ty, val, 1), case_target)
@@ -17447,7 +17447,7 @@ impl Codegen:
 
         if tk == TermKind.TK_CALL:
             // Check if this is a mutual tail call (marked by mutual TCO pass)
-            for mti in 0..body.mutual_tail_bbs.len() as i32:
+            for mti in 0..body.mutual_tail_bbs.len():
                 if body.mutual_tail_bbs[mti] == bb:
                     self.mir_emit_mutual_tail_call = 1
                     break
@@ -17458,7 +17458,7 @@ impl Codegen:
         if tk == TermKind.TK_DROP_AND_GOTO:
             if not self.mir_emit_drop_place_current_origin(body, d0):
                 return false
-            if d1 < 0 or d1 >= self.mir_bb_values.len() as i32:
+            if d1 < 0 or d1 >= self.mir_bb_values.len():
                 return false
             let target_bb = self.mir_bb_values[d1]
             wl_build_br(self.builder, target_bb)
@@ -17694,7 +17694,7 @@ impl Codegen:
                 if has_ast_params != 0:
                     self.pool.fn_param_name(param_start, pi)
                 else:
-                    if pi + 1 < body.local_names.len() as i32: body.local_names[(pi + 1)] else: self.intern.intern(f"__param_{pi}")
+                    if pi + 1 < body.local_names.len(): body.local_names[(pi + 1)] else: self.intern.intern(f"__param_{pi}")
             let p_type_node =
                 if has_ast_params != 0:
                     self.pool.fn_param_type(param_start, pi)
@@ -17708,14 +17708,14 @@ impl Codegen:
             let sema_share = body_sig >= 0 and pi < self.sema.sig_get_param_count(body_sig) and self.sema.sig_param_uses_value_ref_abi(body_sig, pi) != 0
             let place_param_fact = (sema_share or self.is_ref_param(name_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF)
             if self.mode_decide(MODE_SITE_PARAM_PLACE_ALIAS, place_param_fact, (sema_share or self.is_ref_param(name_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF) and wl_get_type_kind(param_type) == wl_pointer_type_kind(), body.fn_sym, pi):
-                var value_ref_ty = self.mir_sema_type_to_llvm(if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0)
+                var value_ref_ty = self.mir_sema_type_to_llvm(if pi + 1 < body.local_type_ids.len(): body.local_type_ids[(pi + 1)] else: 0)
                 if value_ref_ty == 0 and body_sig >= 0 and pi < self.sema.sig_get_param_count(body_sig):
                     // #2043: Sema's signature types a parameter its MIR local does not.
                     let sig_fact = self.mir_sema_type_to_llvm(self.sema.sig_param_type(body_sig, pi))
                     value_ref_ty = self.verify_ast_type(MODE_SITE_BODY_TYPE_NODE, sig_fact, p_type_node, body.fn_sym, pi)
                 if value_ref_ty != 0 and wl_get_type_kind(value_ref_ty) != wl_pointer_type_kind():
                     self.record_local(p_name, param_val, value_ref_ty, 1)
-                    self.record_local_sema_type(p_name, if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0)
+                    self.record_local_sema_type(p_name, if pi + 1 < body.local_type_ids.len(): body.local_type_ids[(pi + 1)] else: 0)
                     self.mir_local_ptrs.insert(pi + 1, param_val)
                     self.mir_local_types.insert(pi + 1, value_ref_ty)
                     if p_name == self.sym_self and method_owner_sym != 0:
@@ -17723,13 +17723,13 @@ impl Codegen:
                     self.record_codegen_param_binding(body, name_sym, pi, AnalysisMarshalStrategy.CalleePlaceAlias, param_val, param_val)
                     continue
             if pi < fn_direct_types.len() and fn_direct_types[pi] != 0:
-                if pi < fn_direct_types.len() as i32 and fn_direct_types[pi] != 0:
+                if pi < fn_direct_types.len() and fn_direct_types[pi] != 0:
                     param_type = fn_direct_types[pi]
                 let direct_alloca = self.create_entry_alloca(param_type)
                 let unpacked = self.c_abi_unpack_direct_value(param_val, param_type)
                 wl_build_store(self.builder, unpacked, direct_alloca)
                 self.record_local(p_name, direct_alloca, param_type, 1)
-                var p_sema_ty_direct = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0
+                var p_sema_ty_direct = if pi + 1 < body.local_type_ids.len(): body.local_type_ids[(pi + 1)] else: 0
                 let p_direct_is_impl_trait = p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.pool.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL
                 if p_type_node != 0 and not p_direct_is_impl_trait:
                     let resolved_p_sema_direct = self.sema.resolve_type_expr_frozen(p_type_node)
@@ -17752,13 +17752,13 @@ impl Codegen:
                 self.record_codegen_param_binding(body, name_sym, pi, AnalysisMarshalStrategy.CalleeDirectValue, param_val, direct_alloca)
                 continue
             if pi < fn_byval_types.len() and fn_byval_types[pi] != 0:
-                if pi < fn_byval_types.len() as i32 and fn_byval_types[pi] != 0:
+                if pi < fn_byval_types.len() and fn_byval_types[pi] != 0:
                     param_type = fn_byval_types[pi]
                 let byval_alloca = self.create_entry_alloca(param_type)
                 let loaded = wl_build_load(self.builder, param_type, param_val)
                 wl_build_store(self.builder, loaded, byval_alloca)
                 self.record_local(p_name, byval_alloca, param_type, 1)
-                var p_sema_ty = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0
+                var p_sema_ty = if pi + 1 < body.local_type_ids.len(): body.local_type_ids[(pi + 1)] else: 0
                 let p_byval_is_impl_trait = p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.pool.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL
                 if p_type_node != 0 and not p_byval_is_impl_trait:
                     let resolved_p_sema = self.sema.resolve_type_expr_frozen(p_type_node)
@@ -17780,7 +17780,7 @@ impl Codegen:
                         self.check_self_owner_recorded(method_owner_sym, p_name, p_sym)
                 self.record_codegen_param_binding(body, name_sym, pi, AnalysisMarshalStrategy.CalleeOwnedCopy, param_val, byval_alloca)
                 continue
-            var p_sema_ty2 = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0
+            var p_sema_ty2 = if pi + 1 < body.local_type_ids.len(): body.local_type_ids[(pi + 1)] else: 0
             let p_plain_is_impl_trait = p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.pool.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL
             if p_type_node != 0 and not p_plain_is_impl_trait:
                 let resolved_p_sema2 = self.sema.resolve_type_expr_frozen(p_type_node)
@@ -17800,7 +17800,7 @@ impl Codegen:
             self.record_codegen_param_binding(body, name_sym, pi, AnalysisMarshalStrategy.CalleeDirectValue, param_val, plain_storage)
             // FnAbi decides whether the parameter arrives as an address (D6,
             // D65): then the slot holds the address of the value.
-            if pi + 1 < body.local_type_ids.len() as i32 and body.local_type_ids[(pi + 1)] > 0:
+            if pi + 1 < body.local_type_ids.len() and body.local_type_ids[(pi + 1)] > 0:
                 let semantic_ty = self.mir_sema_type_to_llvm(body.local_type_ids[(pi + 1)])
                 if semantic_ty != 0 and self.mode_decide(MODE_SITE_PARAM_BY_ADDRESS, self.mir_param_slot_holds_address(body, name_sym, pi), wl_get_type_kind(param_type) == wl_pointer_type_kind() and wl_get_type_kind(semantic_ty) != wl_pointer_type_kind(), body.fn_sym, pi):
                     self.mir_indirect_value_local_types.insert(pi + 1, semantic_ty)
@@ -17820,7 +17820,7 @@ impl Codegen:
                         if method_owner_sym != self.sym_str:
                             self.record_local_pointee_struct(p_name, method_owner_sym)
                             var owner_ty: i64 = 0
-                            if pi + 1 < body.local_type_ids.len() as i32:
+                            if pi + 1 < body.local_type_ids.len():
                                 let local_sema_ty = body.local_type_ids[(pi + 1)]
                                 if local_sema_ty > 0:
                                     owner_ty = self.mir_sema_type_to_llvm(local_sema_ty)
@@ -17836,7 +17836,7 @@ impl Codegen:
                         if method_owner_sym != self.sym_str:
                             self.record_local_pointee_struct(p_name, method_owner_sym)
                             var owner_ty: i64 = 0
-                            if pi + 1 < body.local_type_ids.len() as i32:
+                            if pi + 1 < body.local_type_ids.len():
                                 let local_sema_ty = body.local_type_ids[(pi + 1)]
                                 if local_sema_ty > 0:
                                     owner_ty = self.mir_sema_type_to_llvm(local_sema_ty)
@@ -17857,7 +17857,7 @@ impl Codegen:
             let llbb = wl_append_bb(self.context, function, bb_name)
             self.mir_bb_values.push(llbb)
 
-        if self.mir_bb_values.len() as i32 > 0:
+        if self.mir_bb_values.len() > 0:
             wl_build_br(self.builder, self.mir_bb_values[0])
         else:
             // Unreachable: every body is built by MirBuilder.init, which
@@ -17867,7 +17867,7 @@ impl Codegen:
         let reachable_bbs = self.mir_reachable_blocks(body)
         let saved_fn_scope: i64 = self.di_current_scope
         for bb in 0..body.block_count():
-            if bb < 0 or bb >= self.mir_bb_values.len() as i32:
+            if bb < 0 or bb >= self.mir_bb_values.len():
                 continue
             let llbb = self.mir_bb_values[bb]
             if self.debug_mir_codegen_enabled():
@@ -17890,13 +17890,13 @@ impl Codegen:
                     var stmt_rk = -1
                     var stmt_r0 = -1
                     var stmt_r1 = -1
-                    if stmt_d1 >= 0 and stmt_d1 < body.rval_kinds.len() as i32:
+                    if stmt_d1 >= 0 and stmt_d1 < body.rval_kinds.len():
                         stmt_rk = body.rval_kinds[stmt_d1]
                         stmt_r0 = body.rval_d0[stmt_d1]
                         stmt_r1 = body.rval_d1[stmt_d1]
                     var stmt_pl = -1
                     var stmt_pc = -1
-                    if stmt_d0 >= 0 and stmt_d0 < body.place_locals.len() as i32:
+                    if stmt_d0 >= 0 and stmt_d0 < body.place_locals.len():
                         stmt_pl = body.place_locals[stmt_d0]
                         stmt_pc = body.place_proj_counts[stmt_d0]
                     with_eprint(f"[mir-stmt] fn={name_str} bb={bb} stmt={stmt_id} kind={stmt_kind} d0={stmt_d0} d1={stmt_d1} place_local={stmt_pl} proj_count={stmt_pc} rval_kind={stmt_rk} rval_d0={stmt_r0} rval_d1={stmt_r1}")
@@ -18136,7 +18136,7 @@ impl Codegen:
             let p_name =
                 if meta >= 0:
                     self.pool.fn_param_name(param_start, pi)
-                else if pi + 1 < body.local_names.len() as i32:
+                else if pi + 1 < body.local_names.len():
                     body.local_names[(pi + 1)]
                 else:
                     0
@@ -18153,14 +18153,14 @@ impl Codegen:
             let sema_share = body_sig >= 0 and pi < self.sema.sig_get_param_count(body_sig) and self.sema.sig_param_uses_value_ref_abi(body_sig, pi) != 0
             let place_param_fact = (sema_share or self.is_ref_param(mono_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF)
             if self.mode_decide(MODE_SITE_PARAM_PLACE_ALIAS, place_param_fact, (sema_share or self.is_ref_param(mono_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF) and wl_get_type_kind(param_type) == wl_pointer_type_kind(), body.fn_sym, pi):
-                var value_ref_ty = self.mir_sema_type_to_llvm(if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0)
+                var value_ref_ty = self.mir_sema_type_to_llvm(if pi + 1 < body.local_type_ids.len(): body.local_type_ids[(pi + 1)] else: 0)
                 if value_ref_ty == 0 and body_sig >= 0 and pi < self.sema.sig_get_param_count(body_sig):
                     // #2043: Sema's signature types a parameter its MIR local does not.
                     let sig_fact = self.mir_sema_type_to_llvm(self.sema.sig_param_type(body_sig, pi))
                     value_ref_ty = self.verify_ast_type(MODE_SITE_BODY_TYPE_NODE, sig_fact, p_type_node, body.fn_sym, pi)
                 if value_ref_ty != 0 and wl_get_type_kind(value_ref_ty) != wl_pointer_type_kind():
                     self.record_local(p_name, param_val, value_ref_ty, 1)
-                    self.record_local_sema_type(p_name, if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0)
+                    self.record_local_sema_type(p_name, if pi + 1 < body.local_type_ids.len(): body.local_type_ids[(pi + 1)] else: 0)
                     self.mir_local_ptrs.insert(pi + 1, param_val)
                     self.mir_local_types.insert(pi + 1, value_ref_ty)
                     if p_name == self.sym_self and method_owner_sym != 0:
@@ -18168,13 +18168,13 @@ impl Codegen:
                     self.record_codegen_param_binding(body, mono_sym, pi, AnalysisMarshalStrategy.CalleePlaceAlias, param_val, param_val)
                     continue
             if pi < fn_direct_types.len() and fn_direct_types[pi] != 0:
-                if pi < fn_direct_types.len() as i32 and fn_direct_types[pi] != 0:
+                if pi < fn_direct_types.len() and fn_direct_types[pi] != 0:
                     param_type = fn_direct_types[pi]
                 let direct_alloca = self.create_entry_alloca(param_type)
                 let unpacked = self.c_abi_unpack_direct_value(param_val, param_type)
                 wl_build_store(self.builder, unpacked, direct_alloca)
                 self.record_local(p_name, direct_alloca, param_type, 1)
-                var p_sema_ty_direct = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0
+                var p_sema_ty_direct = if pi + 1 < body.local_type_ids.len(): body.local_type_ids[(pi + 1)] else: 0
                 if p_sema_ty_direct == 0 and p_type_node != 0:
                     let resolved_p_sema_direct = self.sema.resolve_type_expr_frozen(p_type_node)
                     if resolved_p_sema_direct != 0:
@@ -18196,13 +18196,13 @@ impl Codegen:
                 self.record_codegen_param_binding(body, mono_sym, pi, AnalysisMarshalStrategy.CalleeDirectValue, param_val, direct_alloca)
                 continue
             if pi < fn_byval_types.len() and fn_byval_types[pi] != 0:
-                if pi < fn_byval_types.len() as i32 and fn_byval_types[pi] != 0:
+                if pi < fn_byval_types.len() and fn_byval_types[pi] != 0:
                     param_type = fn_byval_types[pi]
                 let byval_alloca = self.create_entry_alloca(param_type)
                 let loaded = wl_build_load(self.builder, param_type, param_val)
                 wl_build_store(self.builder, loaded, byval_alloca)
                 self.record_local(p_name, byval_alloca, param_type, 1)
-                var p_sema_ty = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0
+                var p_sema_ty = if pi + 1 < body.local_type_ids.len(): body.local_type_ids[(pi + 1)] else: 0
                 if p_sema_ty == 0 and p_type_node != 0:
                     let resolved_p_sema = self.sema.resolve_type_expr_frozen(p_type_node)
                     if resolved_p_sema != 0:
@@ -18223,7 +18223,7 @@ impl Codegen:
                         self.check_self_owner_recorded(method_owner_sym, p_name, p_sym)
                 self.record_codegen_param_binding(body, mono_sym, pi, AnalysisMarshalStrategy.CalleeOwnedCopy, param_val, byval_alloca)
                 continue
-            var p_sema_ty2 = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0
+            var p_sema_ty2 = if pi + 1 < body.local_type_ids.len(): body.local_type_ids[(pi + 1)] else: 0
             if p_sema_ty2 == 0 and p_type_node != 0:
                 let resolved_p_sema2 = self.sema.resolve_type_expr_frozen(p_type_node)
                 if resolved_p_sema2 != 0:
@@ -18242,7 +18242,7 @@ impl Codegen:
             self.record_codegen_param_binding(body, mono_sym, pi, AnalysisMarshalStrategy.CalleeDirectValue, param_val, plain_storage)
             // FnAbi decides whether the parameter arrives as an address (D6,
             // D65): then the slot holds the address of the value.
-            if pi + 1 < body.local_type_ids.len() as i32 and body.local_type_ids[(pi + 1)] > 0:
+            if pi + 1 < body.local_type_ids.len() and body.local_type_ids[(pi + 1)] > 0:
                 let semantic_ty = self.mir_sema_type_to_llvm(body.local_type_ids[(pi + 1)])
                 if semantic_ty != 0 and self.mode_decide(MODE_SITE_PARAM_BY_ADDRESS, self.mir_param_slot_holds_address(body, mono_sym, pi), wl_get_type_kind(param_type) == wl_pointer_type_kind() and wl_get_type_kind(semantic_ty) != wl_pointer_type_kind(), body.fn_sym, pi):
                     self.mir_indirect_value_local_types.insert(pi + 1, semantic_ty)
@@ -18262,7 +18262,7 @@ impl Codegen:
                         if method_owner_sym != self.sym_str:
                             self.record_local_pointee_struct(p_name, method_owner_sym)
                             var owner_ty: i64 = 0
-                            if pi + 1 < body.local_type_ids.len() as i32:
+                            if pi + 1 < body.local_type_ids.len():
                                 let local_sema_ty = body.local_type_ids[(pi + 1)]
                                 if local_sema_ty > 0:
                                     owner_ty = self.mir_sema_type_to_llvm(local_sema_ty)
@@ -18278,7 +18278,7 @@ impl Codegen:
                         if method_owner_sym != self.sym_str:
                             self.record_local_pointee_struct(p_name, method_owner_sym)
                             var owner_ty: i64 = 0
-                            if pi + 1 < body.local_type_ids.len() as i32:
+                            if pi + 1 < body.local_type_ids.len():
                                 let local_sema_ty = body.local_type_ids[(pi + 1)]
                                 if local_sema_ty > 0:
                                     owner_ty = self.mir_sema_type_to_llvm(local_sema_ty)
@@ -18299,7 +18299,7 @@ impl Codegen:
             let llbb = wl_append_bb(self.context, function, bb_name)
             self.mir_bb_values.push(llbb)
 
-        if self.mir_bb_values.len() as i32 > 0:
+        if self.mir_bb_values.len() > 0:
             wl_build_br(self.builder, self.mir_bb_values[0])
         else:
             // Unreachable: see gen_function_mir (MirBuilder.init makes the
@@ -18309,7 +18309,7 @@ impl Codegen:
         let reachable_bbs = self.mir_reachable_blocks(body)
         let mono_fn_scope: i64 = self.di_current_scope
         for bb in 0..body.block_count():
-            if bb < 0 or bb >= self.mir_bb_values.len() as i32:
+            if bb < 0 or bb >= self.mir_bb_values.len():
                 continue
             let llbb = self.mir_bb_values[bb]
             wl_position_at_end(self.builder, llbb)
@@ -18387,11 +18387,11 @@ impl Codegen:
             wl_position_at_end(self.builder, saved_bb)
 
     fn find_struct_type_by_llvm(llvm_ty: i64) -> i32:
-        for i in 0..self.struct_llvm_types.len() as i32:
+        for i in 0..self.struct_llvm_types.len():
             if self.struct_llvm_types[i] == llvm_ty:
-                if i < self.struct_index_syms.len() as i32:
+                if i < self.struct_index_syms.len():
                     return self.struct_index_syms[i]
-                return self.reverse_struct_lookup(i)
+                return self.reverse_struct_lookup(i as i32)
         0
 
     fn find_nominal_type_by_llvm(llvm_ty: i64) -> i32:
@@ -18465,7 +18465,7 @@ impl Codegen:
 
     fn find_binding_type(syms: &List[i32], tys: &List[i64], sym: i32) -> i64:
         let want = self.codegen_symbol_text(sym)
-        for i in 0..syms.len() as i32:
+        for i in 0..syms.len():
             let stored = syms[i]
             if stored == sym or (want.len() > 0 and self.codegen_symbol_text(stored) == want):
                 return tys[i]
@@ -18484,9 +18484,9 @@ impl Codegen:
         a_text.len() > 0 and a_text == self.codegen_symbol_text(b)
 
     fn codegen_binding_index(syms: &List[i32], sym: i32) -> i32:
-        for i in 0..syms.len() as i32:
+        for i in 0..syms.len():
             if self.codegen_symbols_match(syms[i], sym):
-                return i
+                return i as i32
         -1
 
     fn fn_decl_semantic_text_at(decl: i32, decl_index: i32) -> str:
@@ -18581,7 +18581,7 @@ impl Codegen:
                 if call_base == owner_sym:
                     let call_arg_count = self.sema.get_generic_inst_arg_count(call_resolved)
                     for ai in 0..call_arg_count:
-                        if ai >= tp_syms.len() as i32:
+                        if ai >= tp_syms.len():
                             break
                         let arg_tid = self.sema.get_generic_inst_arg(call_resolved, ai)
                         var arg_llvm = self.sema_type_to_llvm(arg_tid)
@@ -18589,7 +18589,7 @@ impl Codegen:
                             arg_llvm = self.type_fallback()
                         let tp_sym = tp_syms[ai]
                         var already_bound = false
-                        for bi in 0..bind_syms.len() as i32:
+                        for bi in 0..bind_syms.len():
                             if bind_syms[bi] == tp_sym:
                                 already_bound = true
                                 break
@@ -18603,7 +18603,7 @@ impl Codegen:
             let owner_args_start = self.pool.get_data1(owner_expr_node)
             let owner_arg_count = self.pool.get_data2(owner_expr_node)
             for ai in 0..owner_arg_count:
-                if ai >= tp_syms.len() as i32:
+                if ai >= tp_syms.len():
                     break
                 let arg_node = self.pool.get_extra(owner_args_start + ai)
                 let arg_sema_ty = self.ast_static_type_expr(arg_node)
@@ -18612,7 +18612,7 @@ impl Codegen:
                     arg_llvm = self.type_fallback()
                 let tp_sym = tp_syms[ai]
                 var already_bound = false
-                for bi in 0..bind_syms.len() as i32:
+                for bi in 0..bind_syms.len():
                     if bind_syms[bi] == tp_sym:
                         already_bound = true
                         break
@@ -18625,7 +18625,7 @@ impl Codegen:
         let param_start = self.pool.fn_meta_param_start(meta)
         let param_count = self.pool.fn_meta_param_count(meta)
         for pi in 0..param_count:
-            if pi >= arg_tys.len() as i32:
+            if pi >= arg_tys.len():
                 break
             let p_type_node = self.pool.fn_param_type(param_start, pi)
             if p_type_node == 0:
@@ -18640,7 +18640,7 @@ impl Codegen:
                 let arg_sema = self.sema_type_of_node(arg_node)
                 var canonical_tp_sym: i32 = 0
                 let want_text = self.intern.resolve(p_sym)
-                for ti in 0..tp_syms.len() as i32:
+                for ti in 0..tp_syms.len():
                     let candidate = tp_syms[ti]
                     if candidate == p_sym:
                         canonical_tp_sym = candidate
@@ -18650,7 +18650,7 @@ impl Codegen:
                         break
                 if canonical_tp_sym != 0:
                     var already_bound = false
-                    for bi in 0..bind_syms.len() as i32:
+                    for bi in 0..bind_syms.len():
                         if bind_syms[bi] == canonical_tp_sym:
                             already_bound = true
                             break
@@ -18677,7 +18677,7 @@ impl Codegen:
                         let inner_sema = self.sema.get_generic_inst_arg(arg_sema_tid, gi)
                         var canonical_inner_sym: i32 = 0
                         let inner_text = self.intern.resolve(inner_sym)
-                        for ti in 0..tp_syms.len() as i32:
+                        for ti in 0..tp_syms.len():
                             let candidate = tp_syms[ti]
                             if candidate == inner_sym:
                                 canonical_inner_sym = candidate
@@ -18687,7 +18687,7 @@ impl Codegen:
                                 break
                         if canonical_inner_sym != 0:
                             var already_bound = false
-                            for bi in 0..bind_syms.len() as i32:
+                            for bi in 0..bind_syms.len():
                                 if bind_syms[bi] == canonical_inner_sym:
                                     already_bound = true
                                     break
@@ -18696,16 +18696,16 @@ impl Codegen:
                                 bind_tys.push(inner_llvm)
                                 bind_sema_tys.push(inner_sema)
 
-        for ti in 0..tp_syms.len() as i32:
+        for ti in 0..tp_syms.len():
             if self.find_binding_type(bind_syms, bind_tys, tp_syms[ti]) == 0:
                 return 0
 
         // #1647 (D65): the owner is the instance Sema created for the bound
         // arguments, laid out from Sema's record.
         let inst_args: List[i32] = List.new()
-        for ti in 0..tp_syms.len() as i32:
+        for ti in 0..tp_syms.len():
             var arg_sema: i32 = 0
-            for bi in 0..bind_syms.len() as i32:
+            for bi in 0..bind_syms.len():
                 if bind_syms[bi] == tp_syms[ti]:
                     arg_sema = bind_sema_tys[bi]
                     break
@@ -18839,7 +18839,7 @@ impl Codegen:
 
     mut fn gen_enum_variant_call_val(enum_owner_sym: i32, variant_sym: i32, args: &List[i64], arg_count: i32) -> i64:
         let variant_name = self.intern.resolve(variant_sym)
-        for ei in 0..self.enum_llvm_types.len() as i32:
+        for ei in 0..self.enum_llvm_types.len():
             let enum_ty: i64 = self.enum_llvm_types[ei]
             let enum_sym_opt = self.enum_by_llvm.get(enum_ty)
             if enum_owner_sym > 0:
@@ -18926,8 +18926,8 @@ impl Codegen:
         let offsets: List[i64] = List.new()
         var at: i64 = 0
         var align: i64 = 1
-        for ci in 0..cap_types.len() as i32:
-            let place = ci < by_place.len() as i32 and by_place[ci] != 0
+        for ci in 0..cap_types.len():
+            let place = ci < by_place.len() and by_place[ci] != 0
             let elem_size = if place: ptr_bytes else: self.sema.type_layout_size_of_frozen(cap_sema_types[ci])
             let elem_align = if place: ptr_bytes else: self.sema.type_layout_align_of_frozen(cap_sema_types[ci])
             if elem_align > align:
@@ -19014,10 +19014,10 @@ impl Codegen:
         wl_position_at_end(self.builder, entry)
         let cell = wl_get_param(drop_fn, 0)
         let env_ptr = self.tuple_elem_ptr(cell_ty, cell, 2)
-        for ci in 0..cap_sema_types.len() as i32:
+        for ci in 0..cap_sema_types.len():
             let cap_sema_ty = cap_sema_types[ci]
             if cap_sema_ty > 0 and self.sema.type_needs_drop_frozen(cap_sema_ty) != 0:
-                let slot = self.tuple_elem_ptr(cap_struct_type, env_ptr, ci)
+                let slot = self.tuple_elem_ptr(cap_struct_type, env_ptr, ci as i32)
                 self.mir_emit_drop_ptr_for_sema_type(slot, cap_llvm_types[ci], cap_sema_ty)
         self.mir_emit_with_free_ptr(cell)
         let _ = wl_build_ret_void(self.builder)
@@ -19055,7 +19055,7 @@ impl Codegen:
             // place, so its value is that address: the capture is a slot
             // holding it, as for any reference local. Its place is not the
             // address itself — the closure read the receiver's bytes as one.
-            let sema_ty = if local_id < parent.local_type_ids.len() as i32: parent.local_type_ids[local_id] else: 0
+            let sema_ty = if local_id < parent.local_type_ids.len(): parent.local_type_ids[local_id] else: 0
             if self.mir_sema_type_is_raw_pointer_or_ref(sema_ty):
                 let holder = self.create_entry_alloca(wl_ptr_type(self.context))
                 wl_build_store(self.builder, address, holder)
@@ -19109,7 +19109,7 @@ impl Codegen:
             // the closure's spelling is verification. A protocol capture MIR
             // adds after Sema's (a gen-loop's flag, return slot, producer) is
             // MIR's own, by place.
-            let protocol = ci < closure_body.anonymous_capture_kinds.len() as i32 and closure_body.anonymous_capture_kinds[ci] == MIR_CAPTURE_PROTOCOL
+            let protocol = ci < closure_body.anonymous_capture_kinds.len() and closure_body.anonymous_capture_kinds[ci] == MIR_CAPTURE_PROTOCOL
             let by_place = protocol or self.sema.closure_capture_by_place(node, ci)
             let by_ref: i32 = if self.mode_decide(MODE_SITE_CAPTURE_BY_PLACE, by_place, self.pool.is_move_closure(node) == 0, self.current_function_name_sym, node): 1 else: 0
             capture_ref_modes.push(by_ref)
@@ -19281,7 +19281,7 @@ impl Codegen:
                 let alloca = self.create_entry_alloca(param_ty)
                 wl_build_store(self.builder, param_val, alloca)
                 self.record_local(p_name, alloca, param_ty, 1)
-            if i < closure_param_sema_types.len() as i32:
+            if i < closure_param_sema_types.len():
                 self.record_local_sema_type(p_name, closure_param_sema_types[i])
         // ── MIR-based closure body compilation ──────────────────────
         // Save outer MIR state (gen_closure is called from within MIR codegen)
@@ -19366,7 +19366,7 @@ impl Codegen:
 
         // Branch from entry to first MIR BB
         let closure_name = f"closure in {self.intern.resolve(parent.fn_sym)}"
-        if self.mir_bb_values.len() as i32 > 0:
+        if self.mir_bb_values.len() > 0:
             wl_build_br(self.builder, self.mir_bb_values[0])
         else:
             // Unreachable: a closure's body is lowered by MirBuilder.init,
@@ -19376,7 +19376,7 @@ impl Codegen:
         // Emit MIR statements and terminators
         let closure_scope: i64 = self.di_current_scope
         for cl_bb in 0..closure_body.block_count():
-            if cl_bb < 0 or cl_bb >= self.mir_bb_values.len() as i32:
+            if cl_bb < 0 or cl_bb >= self.mir_bb_values.len():
                 continue
             let cl_llbb = self.mir_bb_values[cl_bb]
             wl_position_at_end(self.builder, cl_llbb)
@@ -19697,7 +19697,7 @@ impl Codegen:
         if kind == NodeKind.NK_IDENT:
             let sym = self.pool.get_data0(node)
             if self.local_allocas.get(sym).is_some():
-                for ci in 0..self.async_block_captures.len() as i32:
+                for ci in 0..self.async_block_captures.len():
                     if self.async_block_captures[ci] == sym:
                         return
                 self.async_block_captures.push(sym)
@@ -19785,7 +19785,7 @@ impl Codegen:
         // and exhausted tens of GiB while constant-folding embedded source
         // literals in a migrated compiler.
         var out = StringBuilder.with_capacity(text.len())
-        let len = text.len() as i32
+        let len = text.len()
         var i = 0
         while i < len:
             let ch = text[i]
@@ -19910,7 +19910,7 @@ impl Codegen:
         var line = 1
         var col = 1
         var i = 0
-        while i < span_start and i < source_text.len() as i32:
+        while i < span_start and i < source_text.len():
             if source_text[i] == 10:
                 line = line + 1
                 col = 1
@@ -20054,7 +20054,7 @@ impl Codegen:
         else:
             for i in 0..param_count:
                 params.push(i64_ty)
-        if params.len() as i32 != param_count:
+        if params.len() != param_count:
             sema_phase_bug(f"BUG: runtime helper '{name}' declared with {param_count} parameters; its prototype has {params.len()}")
         wl_function_type(ret_ty, list_data_i64(&params), params.len() as i32, 0)
 
@@ -20245,7 +20245,7 @@ impl Codegen:
         self.type_binding_types = fresh_tys
         self.type_bindings_len = 0
         let dtm_debug = with_getenv_str("WITH_DEBUG_DTM").len() > 0
-        for si in 0..self.sema.concrete_specialization_syms.len() as i32:
+        for si in 0..self.sema.concrete_specialization_syms.len():
             if self.sema.concrete_specialization_syms[si] != fn_sym:
                 continue
             let start: i32 = self.sema.concrete_specialization_subst_starts[si]
@@ -20421,7 +20421,7 @@ impl Codegen:
         let env_ptr = wl_build_call(self.builder, alloc_ft, alloc_fn, list_data_i64(&alloc_args), 1)
 
         for ai in 0..arg_count:
-            let field_ptr = wl_build_struct_gep(self.builder, args_struct_ty, env_ptr, ai)
+            let field_ptr = wl_build_struct_gep(self.builder, args_struct_ty, env_ptr, ai as i32)
             wl_build_store(self.builder, args[ai], field_ptr)
 
         let result_size = if ret_ty != void_ty: wl_abi_size_of(wl_get_module_data_layout(self.llmod), ret_ty) else: 0
@@ -20502,7 +20502,7 @@ impl Codegen:
 
         // 3. Store args into heap struct
         for ai in 0..arg_count:
-            let field_ptr = wl_build_struct_gep(self.builder, args_struct_ty, env_ptr, ai)
+            let field_ptr = wl_build_struct_gep(self.builder, args_struct_ty, env_ptr, ai as i32)
             wl_build_store(self.builder, args[ai], field_ptr)
 
         // 4. Heap-allocate result buffer
@@ -20545,7 +20545,7 @@ impl Codegen:
         let fiber_id = wl_build_call(self.builder, spawn_ft, spawn_fn, list_data_i64(&spawn_args), 5)
 
         // 7. Construct Task { fiber_id, result_buf }
-        if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+        if dest_place >= 0 and dest_place < body.place_locals.len():
             let dst_local = body.place_locals[dest_place]
             // Task = { i32, ptr }
             let task_fields: List[i64] = List.new()
@@ -20560,7 +20560,7 @@ impl Codegen:
             self.mir_local_ptrs.insert(dst_local, task_alloca)
             self.mir_local_types.insert(dst_local, task_ty)
 
-        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len():
             wl_build_br(self.builder, self.mir_bb_values[next_bb])
         true
 
@@ -20575,7 +20575,7 @@ impl Codegen:
         let actual_ret_opt = self.async_fn_ret_types.get(fn_sym)
         if actual_ret_opt.is_some():
             ret_ty = actual_ret_opt.unwrap() as i64
-        let param_count = arg_types.len() as i32
+        let param_count = arg_types.len()
 
         // Trampoline signature: Unit(i8* env, i8* result_buf)
         let tramp_params: List[i64] = List.new()
@@ -20599,7 +20599,7 @@ impl Codegen:
         // Unpack args from env struct
         let call_args: List[i64] = List.new()
         for pi in 0..param_count:
-            let field_ptr = wl_build_struct_gep(self.builder, args_struct_ty, env_arg, pi)
+            let field_ptr = wl_build_struct_gep(self.builder, args_struct_ty, env_arg, pi as i32)
             let param_ty = arg_types[pi]
             let val = wl_build_load(self.builder, param_ty, field_ptr)
             call_args.push(val)

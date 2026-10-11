@@ -798,7 +798,7 @@ fn find_sub(s: &str, sub: &str) -> i64:
 fn last_int_line(s: str) -> str:
     // Last non-empty stdout line = the printed drop sum.
     let lines = s.split("\n")
-    var i = lines.len() as i32 - 1
+    var i = lines.len() - 1
     while i >= 0:
         let l = lines[i]
         if l.len() > 0:
@@ -863,7 +863,7 @@ fn main:
     // the host's cores, refilled the moment any child exits. Run one after
     // another they took 263 s; the table below is printed in cell order.
     let sides = if baseline.len() > 0: 2 else: 1
-    let total = cells.len() as i32 * sides
+    let total = cells.len() * sides
     var verdicts: List[str] = List.new()
     for _ in 0..total: verdicts.push("")
     var pids: List[i32] = List.new()
@@ -873,7 +873,7 @@ fn main:
     var next: i32 = 0
     var finished = 0
     while finished < total:
-        if next < total and live.len() as i32 < width:
+        if next < total and live.len() < width:
             let cell = next / sides
             let on_baseline = next % sides == 1
             pids.push(if on_baseline: start_cell(&baseline, &baseline_dir, cell, cells[cell].source) else: start_cell(candidate, &candidate_dir, cell, cells[cell].source))
@@ -883,7 +883,7 @@ fn main:
             continue
         var reaped = false
         var li = 0
-        while li < live.len() as i32:
+        while li < live.len():
             let job = live[li]
             var rc = if pids[job] <= 0: 127 else: try_wait(pids[job])
             if rc == -2:
@@ -894,16 +894,16 @@ fn main:
                 rc = wait_or_kill(pids[job], 1)
             let cell = job / sides
             verdicts[job] = if job % sides == 1: classify_cell(&baseline_dir, cell, rc, cells[cell].expect_sum, cells[cell].expect_clean) else: classify_cell(&candidate_dir, cell, rc, cells[cell].expect_sum, cells[cell].expect_clean)
-            live[li] = live[live.len() as i32 - 1]
+            live[li] = live[live.len() - 1]
             let _ = live.pop()
             finished = finished + 1
             reaped = true
-        if not reaped and live.len() as i32 > 0:
+        if not reaped and live.len() > 0:
             nap_us(2000)
     var failures = 0
     var regressions = 0
     print("cell\tcandidate" ++ (if baseline.len() > 0: "\tbaseline\tclass" else: ""))
-    for i in 0..cells.len() as i32:
+    for i in 0..cells.len():
         let c = cells[i]
         let cv = verdicts[i * sides].clone()
         var row = c.name ++ "\t" ++ cv

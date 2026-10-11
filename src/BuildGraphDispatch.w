@@ -27,7 +27,7 @@ type BuildGraphOutputOwners {
 impl BuildGraphOutputOwners:
     // The owner already declaring `path`, or "" when it is new.
     fn owner_of(path: &str) -> str:
-        for i in 0..self.paths.len() as i32:
+        for i in 0..self.paths.len():
             if self.paths[i] == path: return with_str_clone_ref(self.owners[i])
         ""
 
@@ -49,10 +49,10 @@ impl BuildGraphOutputOwners:
 pub fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path: &str) -> i32:
     var seen = BuildGraphOutputOwners { paths: List.new(), owners: List.new() }
     var shared = 0
-    for gi in 0..graph.generated_sources.len() as i32:
+    for gi in 0..graph.generated_sources.len():
         let generated = graph.generated_sources[gi]
         shared = shared + seen.claim(resolve_join(root, generated.path), "generated source '" ++ generated.path ++ "'")
-    for ti in 0..graph.targets.len() as i32:
+    for ti in 0..graph.targets.len():
         let target = &graph.targets[ti]
         var path = ""
         if target.kind == 0:
@@ -69,12 +69,12 @@ pub fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path:
             path = build_graph_resolve_project_path(root, target.output)
         let owner = "target '" ++ target.name ++ "'"
         shared = shared + seen.claim(path, owner)
-        for oi in 0..target.extra_outputs.len() as i32:
+        for oi in 0..target.extra_outputs.len():
             shared = shared + seen.claim(build_graph_resolve_project_path(root, target.extra_outputs[oi]), owner)
     if shared > 0: 1 else: 0
 
 pub fn build_graph_write_generated_sources(root: &str, graph: &BuildGraph) -> i32:
-    for gi in 0..graph.generated_sources.len() as i32:
+    for gi in 0..graph.generated_sources.len():
         let generated = graph.generated_sources[gi]
         if not build_graph_generated_path_valid(generated.path):
             build_graph_rt_eprint("error: invalid build.w generated source path: " ++ generated.path)
@@ -90,7 +90,7 @@ pub fn build_graph_write_generated_sources(root: &str, graph: &BuildGraph) -> i3
     0
 
 fn build_graph_target_completed(completed: &List[str], name: &str) -> bool:
-    for i in 0..completed.len() as i32:
+    for i in 0..completed.len():
         if completed[i] == name:
             return true
     false
@@ -99,7 +99,7 @@ fn build_graph_verify_completed_deps(target: &BuildGraphTarget, completed: &List
     if require_deps and target.deps.len() == 0:
         build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires verification dependencies")
         return 1
-    for di in 0..target.deps.len() as i32:
+    for di in 0..target.deps.len():
         let dep = target.deps[di]
         if not build_graph_target_completed(completed, dep):
             build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' dependency has not completed: " ++ dep)

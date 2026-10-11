@@ -373,7 +373,7 @@ fn main:
         exit_code(2)
     let candidate = argv[1]
     // BOOTSTRAP INTERIM: materialize the argv view out of the ""-join (#762).
-    let baseline = if argv.len() as i32 >= 3: argv[2] ++ "" else: ""
+    let baseline = if argv.len() >= 3: argv[2] ++ "" else: ""
     // Per process: two batteries at once shared one cell directory (#2004).
     let dir = f"/tmp/move-audit-cells-{pid()}"
     let _ = mkdirs(dir)
@@ -394,7 +394,7 @@ fn main:
                 regressions = regressions + 1
             row = row ++ "\t" ++ bv ++ (if bv != cv: " (DIFF)" else: "")
         print(row)
-    print(f"move-audit: {cells.len() as i32} cells, {failures} vs-expected FAIL, {regressions} candidate-vs-baseline DIFF")
+    print(f"move-audit: {cells.len()} cells, {failures} vs-expected FAIL, {regressions} candidate-vs-baseline DIFF")
     if failures > 0:
         exit_code(1)
     exit_code(0)

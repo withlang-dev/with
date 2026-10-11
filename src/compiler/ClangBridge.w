@@ -1276,7 +1276,7 @@ unsafe fn translate_vector_type(s: *mut CImportSession, canonical: CXType) -> *m
     let total = n * bytes * 8
     let text = if total == 128 or total == 256 or total == 512: f"{lane}x{n}" else: f"Vector[{n}, {lane}]"
     var buf: [64]u8 = [0 as u8; 64]
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         buf[i] = text[i]
     session_strdup(s, &buf as *const [64]u8 as *const u8)
 
@@ -3430,14 +3430,14 @@ fn macro_source_is_define_line(source: &str) -> bool:
     // Recognize it so the raw source line — which preserves token adjacency,
     // unlike libclang's space-inserting spelling reconstruction — is used.
     var i = 0
-    while i < source.len() as i32 and (source[i] == 32 or source[i] == 9):
+    while i < source.len() and (source[i] == 32 or source[i] == 9):
         i = i + 1
-    if i >= source.len() as i32 or source.byte_at(i as i64) != 35:
+    if i >= source.len() or source.byte_at(i as i64) != 35:
         return false
     i = i + 1
-    while i < source.len() as i32 and (source.byte_at(i as i64) == 32 or source.byte_at(i as i64) == 9):
+    while i < source.len() and (source.byte_at(i as i64) == 32 or source.byte_at(i as i64) == 9):
         i = i + 1
-    i + 6 <= source.len() as i32 and source.slice(i as i64, (i + 6) as i64) == "define"
+    i + 6 <= source.len() and source.slice(i as i64, (i + 6) as i64) == "define"
 
 unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *const u8, loc_ptr: *const u8, origin_flags: i32):
     if line_ptr as i64 == 0:
@@ -3625,11 +3625,11 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
         let _ = rt_write(fd, "\n\0" as *const u8, 1)
 
         var pos: i32 = 0
-        while pos < macro_names.len() as i32:
-            while pos < macro_names.len() as i32 and macro_names[pos] == 124:
+        while pos < macro_names.len():
+            while pos < macro_names.len() and macro_names[pos] == 124:
                 pos = pos + 1
             let start = pos
-            while pos < macro_names.len() as i32 and macro_names[pos] != 124:
+            while pos < macro_names.len() and macro_names[pos] != 124:
                 pos = pos + 1
             if pos > start:
                 let name = macro_names.slice(start as i64, pos as i64)
@@ -3723,7 +3723,7 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str, cxx:
 // The probe file is the header, a newline, then one probe per line.
 pub fn with_cimport_macro_probe_first_line(header_code: &str) -> i32:
     var lines: i32 = 2
-    for i in 0..header_code.len() as i32:
+    for i in 0..header_code.len():
         if header_code[i] == '\n': lines = lines + 1
     lines
 

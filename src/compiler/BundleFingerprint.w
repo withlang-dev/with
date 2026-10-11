@@ -20,11 +20,11 @@ extern fn with_str_cmp_ref(a: &str, b: &str) -> i32
 
 fn bf_sorted_lines(lines: &List[str]) -> List[str]:
     var sorted: List[str] = List.new()
-    for i in 0..lines.len() as i32:
+    for i in 0..lines.len():
         let item = lines[i]
         var out: List[str] = List.new()
         var inserted = false
-        for j in 0..sorted.len() as i32:
+        for j in 0..sorted.len():
             let existing = sorted[j]
             if not inserted and with_str_cmp_ref(item, existing) < 0:
                 out.push(with_str_clone_ref(item))
@@ -40,9 +40,9 @@ fn bf_sorted_lines(lines: &List[str]) -> List[str]:
 // contract) and every export's row(s), one per line, sorted.
 pub fn bundle_fingerprint_text(model: &BundleInterfaceModel) -> str:
     var lines: List[str] = List.new()
-    for mi in 0..model.modules.len() as i32:
+    for mi in 0..model.modules.len():
         lines.push("module\t" ++ model.modules[mi])
-    for ei in 0..model.exports.len() as i32:
+    for ei in 0..model.exports.len():
         let rows = model.exports[ei].row
         var start: i64 = 0
         while start < rows.len():
@@ -54,7 +54,7 @@ pub fn bundle_fingerprint_text(model: &BundleInterfaceModel) -> str:
             start = end + 1
     let sorted = bf_sorted_lines(&lines)
     var out = "bundle-fingerprint\tv1\ttarget:" ++ target_spec_resolved_name() ++ "\tcorpus:" ++ model.corpus ++ "\n"
-    for li in 0..sorted.len() as i32:
+    for li in 0..sorted.len():
         out = out ++ sorted[li] ++ "\n"
     out
 

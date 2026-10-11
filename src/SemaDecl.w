@@ -225,7 +225,7 @@ impl Sema:
                 continue
             let at = self.ast.get_start(decl)
             var in_block = false
-            for bi in 0..block_files.len() as i32:
+            for bi in 0..block_files.len():
                 if block_files[bi] == file and at >= block_starts[bi] and at < block_ends[bi]:
                     in_block = true
             if in_block:
@@ -319,10 +319,10 @@ impl Sema:
     // as a phase bug, never a silent miss. Every whole-module pass and the
     // per-declaration codegen loops ask decl_is_lazy_skipped.
     fn decl_is_lazy_skipped(di: i32) -> bool:
-        di >= 0 and di < self.decl_is_iface.len() as i32 and self.decl_is_iface[di] != 0 and self.decl_iface_demanded[di] == 0
+        di >= 0 and di < self.decl_is_iface.len() and self.decl_is_iface[di] != 0 and self.decl_iface_demanded[di] == 0
 
     fn decl_is_interface(di: i32) -> bool:
-        di >= 0 and di < self.decl_is_iface.len() as i32 and self.decl_is_iface[di] != 0
+        di >= 0 and di < self.decl_is_iface.len() and self.decl_is_iface[di] != 0
 
     mut fn prepare_interface_demand():
         let decl_count = self.ast.decl_count()
@@ -343,7 +343,7 @@ impl Sema:
         var last_flag: i32 = 0
         for di in 0..decl_count:
             var flag: i32 = 0
-            if di < self.decl_source_paths.len() as i32:
+            if di < self.decl_source_paths.len():
                 let path = self.decl_source_paths[di]
                 if path == last_path:
                     flag = last_flag
@@ -362,7 +362,7 @@ impl Sema:
                     source_type_names.insert(self.ast.get_data0(source_decl), 1)
             if flag != 0:
                 iface_count = iface_count + 1
-                if di < self.decl_source_file_ids.len() as i32:
+                if di < self.decl_source_file_ids.len():
                     iface_files.insert(self.decl_source_file_ids[di], 1)
         if iface_count == 0 or eager:
             return
@@ -794,7 +794,7 @@ impl Sema:
         -1
 
     fn decl_index_source_path(di: i32) -> str:
-        if di < 0 or di >= self.decl_source_paths.len() as i32:
+        if di < 0 or di >= self.decl_source_paths.len():
             return ""
         with_str_clone_ref(self.decl_source_paths[di])
 
@@ -807,15 +807,15 @@ impl Sema:
         // generated impl's span can "contain" an unrelated root fn and adopt
         // it as a method, erasing its signature). Different origin classes
         // never share a source file.
-        let a_ci = if a < self.decl_is_c_import.len() as i32: self.decl_is_c_import[a] else: 0
-        let b_ci = if b < self.decl_is_c_import.len() as i32: self.decl_is_c_import[b] else: 0
+        let a_ci = if a < self.decl_is_c_import.len(): self.decl_is_c_import[a] else: 0
+        let b_ci = if b < self.decl_is_c_import.len(): self.decl_is_c_import[b] else: 0
         if a_ci != b_ci:
             return 0
-        if a < self.decl_source_file_ids.len() as i32 and b < self.decl_source_file_ids.len() as i32:
+        if a < self.decl_source_file_ids.len() and b < self.decl_source_file_ids.len():
             if self.decl_source_file_ids[a] == self.decl_source_file_ids[b]:
                 return 1
             return 0
-        if a < self.decl_source_paths.len() as i32 and b < self.decl_source_paths.len() as i32:
+        if a < self.decl_source_paths.len() and b < self.decl_source_paths.len():
             if self.decl_source_paths[a] == self.decl_source_paths[b]:
                 return 1
             return 0
@@ -833,17 +833,17 @@ impl Sema:
         var prev_path_sym = -1
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) == NodeKind.NK_C_IMPORT and di < self.decl_source_paths.len() as i32:
+            if self.ast.kind(decl) == NodeKind.NK_C_IMPORT and di < self.decl_source_paths.len():
                 let mp_direct = self.pool_intern(self.decl_source_paths[di])
                 self.ci_modules.insert(mp_direct, 1)
                 has_ci = 1
-            if di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[di] != 0:
+            if di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0:
                 has_ci = 1
                 // Record which module owns this c_import declaration
-                if di < self.decl_source_paths.len() as i32:
+                if di < self.decl_source_paths.len():
                     let mp = self.pool_intern(self.decl_source_paths[di])
                     self.ci_modules.insert(mp, 1)
-            if di < self.decl_source_paths.len() as i32:
+            if di < self.decl_source_paths.len():
                 let ps = self.pool_intern(self.decl_source_paths[di])
                 if ps != prev_path_sym:
                     module_count = module_count + 1
@@ -855,7 +855,7 @@ impl Sema:
             self.scoping_active = 1
         // Always record c_import-origin symbols (needed for auto-coercion).
         for di in 0..self.ast.decl_count():
-            if di >= self.decl_is_c_import.len() as i32:
+            if di >= self.decl_is_c_import.len():
                 break
             if self.decl_is_c_import[di] == 0:
                 continue
@@ -903,7 +903,7 @@ impl Sema:
         // in a non-c_import context. User declarations override c_import scoping.
         var di: i32 = 0
         while di < self.ast.decl_count():
-            if di < self.decl_is_c_import.len() as i32:
+            if di < self.decl_is_c_import.len():
                 if self.decl_is_c_import[di] != 0:
                     di = di + 1
                     continue
@@ -949,7 +949,7 @@ impl Sema:
 // literal (`\x01raw\x01` prefix) holds its bytes as written; any other spells
 // one as `\0`, `\x00` or `\u{0}`.
 pub fn sema_string_literal_has_nul(raw: &str) -> bool:
-    let n = raw.len() as i32
+    let n = raw.len()
     let is_raw = n >= 5 and raw[0] == 1 and raw[1] == 'r' and raw[2] == 'a' and raw[3] == 'w' and raw[4] == 1
     var i = if is_raw: 5 else: 0
     while i < n:
@@ -1269,7 +1269,7 @@ impl Sema:
                         disc_ok = false
                     disc_value = next.value
                 // Check for duplicate discriminant values
-                for prev in 0..disc_vals.len() as i32:
+                for prev in 0..disc_vals.len():
                     if disc_ok and disc_vals[prev] == disc_value:
                         self.emit_error(f"duplicate discriminant value {disc_text(disc_value, repr_signed)}", node)
                 // §4.4a (#1003): an explicit discriminant fits the repr it is
@@ -1561,9 +1561,9 @@ impl Sema:
             let tp_start = self.type_decl_tp_start(decl)
             let tp_count = self.type_decl_tp_count(decl)
             for value_node in self.type_decl_value_type_nodes(decl):
-                let before = self.cycle_dep_syms.len() as i32
+                let before = self.cycle_dep_syms.len()
                 self.collect_value_type_deps(value_node)
-                let after = self.cycle_dep_syms.len() as i32
+                let after = self.cycle_dep_syms.len()
                 for di2 in before..after:
                     let to_sym: i32 = self.cycle_dep_syms[di2]
                     // A generic's own parameter is not the type that happens
@@ -1603,7 +1603,7 @@ impl Sema:
                     // First visit: mark gray.
                     color.insert(cur, 1)
                     // Push neighbors.
-                    for ei in 0..edge_from.len() as i32:
+                    for ei in 0..edge_from.len():
                         if edge_from[ei] != cur:
                             continue
                         let neighbor = edge_to[ei]
@@ -1642,14 +1642,14 @@ impl Sema:
         // Reverse to get forward order: cycle_start → ... → cycle_end
         var fwd_syms: List[i32] = List.new()
         var fwd_edges: List[i32] = List.new()
-        for i in 0..path_syms.len() as i32:
-            fwd_syms.push(path_syms[(path_syms.len() as i32 - 1 - i)])
-        for i in 0..path_edges.len() as i32:
-            fwd_edges.push(path_edges[(path_edges.len() as i32 - 1 - i)])
+        for i in 0..path_syms.len():
+            fwd_syms.push(path_syms[(path_syms.len() - 1 - i)])
+        for i in 0..path_edges.len():
+            fwd_edges.push(path_edges[(path_edges.len() - 1 - i)])
         // Add closing edge: cycle_end → cycle_start
         fwd_edges.push(closing_edge_node)
 
-        let loop_len = fwd_syms.len() as i32
+        let loop_len = fwd_syms.len()
 
         // Build diagnostic with primary span at first type decl.
         let first_sym = fwd_syms[0]
@@ -2118,7 +2118,7 @@ impl Sema:
                         let inst_target_kind = self.ast.kind(inst_target)
                         if inst_target_kind == NodeKind.NK_INDEX or inst_target_kind == NodeKind.NK_TYPE_GENERIC:
                             concrete_inst_impl_method = true
-            for cfi in 0..fn_name_str.len() as i32:
+            for cfi in 0..fn_name_str.len():
                 if fn_name_str[cfi] == 46:
                     let cf_owner = fn_name_str.slice(0, cfi as i64)
                     let cf_owner_sym = self.pool_intern(cf_owner)
@@ -2177,7 +2177,7 @@ impl Sema:
                 self.emit_error("`once` marks a callable parameter (`f: once fn(A) -> R`, §12.4); `" ++ self.type_name(p_tid as i32) ++ "` is not callable", p_type_node)
             // Check for duplicate implicit parameter types (spec §F6)
             if fn_param_is_implicit(p_flags) != 0:
-                for prev in 0..implicit_type_ids.len() as i32:
+                for prev in 0..implicit_type_ids.len():
                     if implicit_type_ids[prev] == p_tid as i32:
                         self.emit_error("function has multiple implicit parameters of the same type", p_type_node)
                 implicit_type_ids.push(p_tid as i32)
@@ -2364,9 +2364,9 @@ impl Sema:
         self.register_top_level_global_decl(name, tid, is_mut, node, GLOBAL_VALUE_DECL_EXTERN)
 
 pub fn sema_str_find_char(text: &str, needle: i32) -> i32:
-    for i in 0..text.len() as i32:
+    for i in 0..text.len():
         if text[i] == needle:
-            return i
+            return i as i32
     return -1
 
 impl Sema:
@@ -2391,7 +2391,7 @@ impl Sema:
         let dot = sema_str_find_char(parsed, 46)
         if dot < 0:
             return parsed_fn_sym
-        if dot + 1 >= parsed.len() as i32:
+        if dot + 1 >= parsed.len():
             return 0
         self.pool_lookup_symbol(parsed.slice((dot + 1) as i64, parsed.len()))
 
@@ -2436,24 +2436,24 @@ impl Sema:
 
 fn sema_extension_path_hash(path: &str) -> i64:
     var h: i64 = 17
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         h = (h * 131 + path[i] as i64) % 2147483647
     h
 
 impl Sema:
     fn decl_source_path_for_node(node: i32) -> str:
         let di = self.find_decl_index(node)
-        if di >= 0 and di < self.decl_source_paths.len() as i32:
+        if di >= 0 and di < self.decl_source_paths.len():
             return with_str_clone_ref(self.decl_source_paths[di])
         self.current_module_path.clone()
 
     fn decl_source_path_for_index(decl_index: i32) -> str:
-        if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
+        if decl_index >= 0 and decl_index < self.decl_source_paths.len():
             return with_str_clone_ref(self.decl_source_paths[decl_index])
         self.current_module_path.clone()
 
     fn decl_source_file_id_for_index(decl_index: i32) -> i32:
-        if decl_index >= 0 and decl_index < self.decl_source_file_ids.len() as i32:
+        if decl_index >= 0 and decl_index < self.decl_source_file_ids.len():
             return self.decl_source_file_ids[decl_index]
         0
 
@@ -2497,7 +2497,7 @@ impl Sema:
             // coherence: "candidates: w.label, w.label, w.label"). Keyed by
             // source PATH: fn syms differ across passes for the same decl.
             let reg_path = sema_owned_text(self.decl_source_path_for_index(decl_index))
-            for ei in 0..self.extension_method_owner_syms.len() as i32:
+            for ei in 0..self.extension_method_owner_syms.len():
                 if self.extension_method_owner_syms[ei] == owner_sym and self.extension_method_syms[ei] == method_sym and self.extension_method_paths[ei] == reg_path:
                     // Refresh the row so later passes' fn/sig win (they are
                     // the finalized ones).
@@ -2535,7 +2535,7 @@ impl Sema:
             return ""
         let node = self.type_decl_nodes.get(type_sym).unwrap()
         let di = self.find_decl_index(node)
-        if di >= 0 and di < self.decl_source_paths.len() as i32:
+        if di >= 0 and di < self.decl_source_paths.len():
             return with_str_clone_ref(self.decl_source_paths[di])
         ""
 
@@ -2544,7 +2544,7 @@ impl Sema:
             return 0
         let node = self.type_decl_nodes.get(type_sym).unwrap()
         let di = self.find_decl_index(node)
-        if di >= 0 and di < self.decl_source_file_ids.len() as i32:
+        if di >= 0 and di < self.decl_source_file_ids.len():
             return self.decl_source_file_ids[di]
         0
 
@@ -2831,7 +2831,7 @@ impl Sema:
 
     // Check if a new direct impl overlaps with any existing blanket impl
     mut fn check_direct_overlap(type_name: i32, trait_sym: i32, node: i32):
-        for bi in 0..self.blanket_trait_syms.len() as i32:
+        for bi in 0..self.blanket_trait_syms.len():
             if self.blanket_trait_syms[bi] != trait_sym:
                 continue
             // If the blanket targets a specific type (e.g. impl[T] Trait for List[T]),
@@ -2854,7 +2854,7 @@ impl Sema:
 
     // Check if a new blanket impl overlaps with any existing direct impl
     mut fn check_blanket_overlap(trait_sym: i32, bound_start: i32, bound_count: i32, target_base: i32, node: i32):
-        for ti in 0..self.impl_type_syms.len() as i32:
+        for ti in 0..self.impl_type_syms.len():
             let t_sym = self.impl_type_syms[ti]
             // If the blanket targets a specific type, only check that type.
             if target_base != 0 and target_base != t_sym:
@@ -2893,7 +2893,7 @@ impl Sema:
         // declaration is spliced into the importing module, so its source path
         // is the user's file; decl_is_c_import is what says where it came from.
         let decl_index = self.find_decl_index(node)
-        if decl_index >= 0 and decl_index < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[decl_index] != 0:
+        if decl_index >= 0 and decl_index < self.decl_is_c_import.len() and self.decl_is_c_import[decl_index] != 0:
             return
         let threshold: i64 = self.copy_warn_threshold
         if threshold <= 0 or type_tid <= 0:
@@ -3016,7 +3016,7 @@ impl Sema:
                 // Validate associated type bounds
                 for ati in 0..at_count:
                     let at_global_idx = at_start + ati
-                    if at_global_idx < self.trait_assoc_bound_starts.len() as i32:
+                    if at_global_idx < self.trait_assoc_bound_starts.len():
                         let ab_start: i32 = self.trait_assoc_bound_starts[at_global_idx]
                         let ab_count: i32 = self.trait_assoc_bound_counts[at_global_idx]
                         if ab_count > 0:
@@ -3767,10 +3767,10 @@ impl Sema:
                     // Already handled standard widths above
                     if width != 8 and width != 16 and width != 32 and width != 64 and width != 128:
                         // Search pre-registered sub-byte types
-                        for ti in 0..self.type_kinds.len() as i32:
+                        for ti in 0..self.type_kinds.len():
                             if self.type_kinds[ti] == TypeKind.TY_INT:
                                 if self.type_d0[ti] == width and self.type_d1[ti] == is_signed:
-                                    return ti
+                                    return ti as i32
         0
 
     // Return the unsigned counterpart of a signed integer type (i32→u32, etc.).
@@ -3783,10 +3783,10 @@ impl Sema:
         if is_signed == 0: return tid  // already unsigned
         let width = self.get_type_d0(resolved)
         // Search for unsigned type with same width
-        for ti in 0..self.type_kinds.len() as i32:
+        for ti in 0..self.type_kinds.len():
             if self.type_kinds[ti] == TypeKind.TY_INT:
                 if self.type_d0[ti] == width and self.type_d1[ti] == 0 and self.type_d2[ti] == 0:
-                    return ti
+                    return ti as i32
         tid  // fallback: return original
 
     // Resolve the Order enum type for Atomic[T] method argument type propagation.

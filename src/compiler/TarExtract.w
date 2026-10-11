@@ -66,8 +66,8 @@ fn te_safe(name: &str) -> bool:
 
 fn te_dirname(path: &str) -> str:
     var last = -1
-    for i in 0..path.len() as i32:
-        if path[i] == '/': last = i
+    for i in 0..path.len():
+        if path[i] == '/': last = i as i32
     if last <= 0: "" else: path.slice(0, last)
 
 // Unpacks the tar image `data` into `dest`, dropping the first `strip`
