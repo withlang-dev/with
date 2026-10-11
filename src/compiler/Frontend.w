@@ -59,11 +59,11 @@ fn frontend_owned_text(text: &str) -> str:
 // comment, blank), a named declaration, an impl (named by its target), a
 // function (its bare method name answers too), or one the classifier
 // cannot name — always parsed.
-let INTERFACE_LINE_SKIP = 0
-let INTERFACE_LINE_DECL = 1
-let INTERFACE_LINE_IMPL = 2
-let INTERFACE_LINE_FN = 3
-let INTERFACE_LINE_ALWAYS = 4
+const INTERFACE_LINE_SKIP = 0
+const INTERFACE_LINE_DECL = 1
+const INTERFACE_LINE_IMPL = 2
+const INTERFACE_LINE_FN = 3
+const INTERFACE_LINE_ALWAYS = 4
 
 fn interface_line_kind(line: &str) -> i32:
     if line.len() == 0 or line.starts_with("//") or line.starts_with("use ") or line.starts_with("module "):
@@ -188,7 +188,7 @@ impl Zcu:
         self.tracked_input_paths = tracked_input_insert_unique(move paths, path)
 
 fn count_non_use_decls_frontend(pool: AstPool) -> i32:
-    var count = 0
+    var count: i32 = 0
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_USE_DECL:
@@ -322,7 +322,7 @@ impl Sema:
             let owned_path = frontend_owned_text(mod.path)
             self.module_paths.push(owned_path)
             self.module_import_starts.push(self.module_import_targets.len() as i32)
-            var visible_count = 0
+            var visible_count: i32 = 0
             for ii in 0..mod.import_count:
                 let imp = resolved.imports[(mod.import_start + ii)]
                 if imp.namespace.len() > 0 and (imp.target_module >= 0 or imp.module_text.len() == 0):
@@ -634,7 +634,7 @@ impl Zcu:
     mut fn inject_toolchain_facades_frontend(pool: AstPool) -> AstPool:
         var out = self.project_owned_annotations_frontend(pool)
         var claimed = frontend_new_list_str()
-        var owner = -1
+        var owner: i32 = -1
         for i in 0..out.decl_count():
             let decl = out.get_decl(i)
             let kind = out.kind(decl)
@@ -1775,7 +1775,7 @@ impl Zcu:
                 merged_pool = self.parse_imported_file_frontend(fpath, merged_pool)
             else if fpath.len() == 0:
                 self.emit_missing_import_frontend(merged_pool, first)
-        var pi = 1
+        var pi: i32 = 1
         while pi < merged_pool.decl_count():
             let decl = merged_pool.get_decl(pi)
             if merged_pool.kind(decl) == NodeKind.NK_USE_DECL:
@@ -2336,7 +2336,7 @@ impl Zcu:
                 while li < lines.len() as i32 and (lines[li].starts_with(" ") or lines[li].starts_with("\t") or lines[li].len() == 0 or lines[li].starts_with("//")):
                     li = li + 1
                 var declaration = StringBuilder.new()
-                var count = 0
+                var count: i32 = 0
                 for bi in start..li:
                     declaration.push_str(lines[bi])
                     declaration.push_str("\n")
@@ -2982,9 +2982,9 @@ fn frontend_fn_decl_is_generic(pool: AstPool, decl: i32) -> bool:
     let meta = pool.find_fn_meta(decl as NodeId)
     meta >= 0 and pool.fn_meta_tp_count(meta) > 0
 
-let FRONTEND_FN_KEEP = 0
-let FRONTEND_FN_DROP = 1
-let FRONTEND_FN_DISPLACE = 2
+const FRONTEND_FN_KEEP = 0
+const FRONTEND_FN_DROP = 1
+const FRONTEND_FN_DISPLACE = 2
 
 // The flat merge's verdict for one fn decl of a lower-precedence tier. A
 // same-name decl of higher precedence takes the short name. When that decl

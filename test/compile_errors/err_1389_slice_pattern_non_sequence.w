@@ -1,4 +1,4 @@
-//! expect-error: a slice pattern requires an array, slice or List subject, found 'i32'
+//! expect-error: a slice pattern requires an array, slice or List subject, found 'isize'
 
 // #1389 (§9.7): a slice pattern matches a sequence. Against anything else
 // its bindings used to be left untyped and MIR lowering failed later.

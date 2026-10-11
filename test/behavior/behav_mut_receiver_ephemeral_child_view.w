@@ -14,7 +14,7 @@ impl Builder:
         c
     mut fn finish(c: Builder): self.n = self.n + c.n + *c.src
 fn main:
-    let x = 1
+    let x: i32 = 1
     var b = Builder { src: &x, n: 0 }
     var c = b.child()
     c.n = 2

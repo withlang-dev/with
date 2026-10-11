@@ -1,7 +1,7 @@
 use compiler.Compilation
 
 extern fn with_arg_count() -> i32
-extern fn with_arg_at(idx: i32) -> str
+extern fn with_arg_at(idx: isize) -> str
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_write(s: &str) -> Unit
 extern fn exit(code: i32) -> Unit

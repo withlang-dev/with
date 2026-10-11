@@ -46,5 +46,5 @@ fn main:
     print(f"{apply_ptr(code, 12)} {raw != null}")
     print(f"{13 |> double}")
     let o: Option[i32] = Some(14)
-    let shown = Some(15).inspect(show)
+    let shown = Some(15i32).inspect(show)
     print(f"{o.map(double):?} {shown.filter(nonneg):?}")

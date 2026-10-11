@@ -222,7 +222,7 @@ impl CiTypePool:
     fn get_d2(id: CiTypeId) -> i32:
         self.state.data2[(id as i32)]
 
-    fn get_extra(idx: i32) -> i32:
+    fn get_extra(idx: isize) -> i32:
         self.state.extra[idx]
 
     fn get_string(idx: i32) -> &str:
@@ -466,7 +466,7 @@ impl CiExprPool:
             i = i + 1
         st.types = out
 
-    fn get_extra(idx: i32) -> i32:
+    fn get_extra(idx: isize) -> i32:
         self.state.extra[idx]
 
     fn get_string(idx: i32) -> &str:
@@ -638,7 +638,7 @@ impl CiStmtPool:
     fn get_flags(id: CiStmtId) -> i32:
         self.state.flags[(id as i32)]
 
-    fn get_extra(idx: i32) -> i32:
+    fn get_extra(idx: isize) -> i32:
         self.state.extra[idx]
 
     fn get_string(idx: i32) -> &str:
@@ -834,7 +834,7 @@ impl CiDeclPool:
     fn get_flags(id: CiDeclId) -> i32:
         self.state.flags[(id as i32)]
 
-    fn get_extra(idx: i32) -> i32:
+    fn get_extra(idx: isize) -> i32:
         self.state.extra[idx]
 
     fn get_string(idx: i32) -> &str:
@@ -1046,7 +1046,7 @@ fn CiProject.new -> CiProject:
 
 impl CiProject:
     fn ensure_module(path: &str) -> i32:
-        var i = 0
+        var i: i32 = 0
         while i < self.module_paths.len() as i32:
             if self.module_paths[i] == path:
                 return i
@@ -1077,4 +1077,4 @@ impl CiProject:
             return ""
         with_str_clone_ref(self.module_paths[owner_module])
 
-let _ci_ir_eof_guard = 0
+const _ci_ir_eof_guard = 0

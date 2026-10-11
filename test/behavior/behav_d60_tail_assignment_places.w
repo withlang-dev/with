@@ -43,7 +43,7 @@ var go: Option[i32] = None
 var gp: Pt = Pt { x: 0, y: 0 }
 
 fn local_i32 -> i32:
-    var n = 40
+    var n: i32 = 40
     n += 2
 fn local_bool -> bool:
     var b = false
@@ -73,7 +73,7 @@ fn array_element -> i32:
 unsafe fn deref(p: *mut i32) -> i32: *p = 77
 fn widened -> i64: gi += 1
 fn grouped -> i32:
-    var n = 3
+    var n: i32 = 3
     (n += 1)
 
 fn main:

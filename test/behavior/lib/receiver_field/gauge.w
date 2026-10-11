@@ -4,7 +4,7 @@
 
 use std.math
 
-let scale = 3
+let scale: i32 = 3
 
 pub fn limit -> i32: 10
 
@@ -47,5 +47,5 @@ impl Gauge:
 
 // A local shadowing this module's function: the self-name still reaches it.
 pub fn local_shadow -> i32:
-    let limit = 1
+    let limit: i32 = 1
     limit + gauge.limit()

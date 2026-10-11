@@ -11,7 +11,7 @@
 // is expected (exposed by #1772's fn-type check). Under a declared non-Unit
 // return the same tail is the body's value, a read of the place (D60).
 
-var COUNT = 0
+var COUNT: i32 = 0
 
 fn bump:
     unsafe:

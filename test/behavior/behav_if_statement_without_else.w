@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 fn statement_if(flag: bool) -> i32:
-    var x = 0
+    var x: i32 = 0
     if flag:
         x = 7
     x

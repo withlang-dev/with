@@ -32,7 +32,7 @@ gen fn names(count: i32) -> str:
         i += 1
 
 gen fn labels(count: i32) -> str:
-    var i = 0
+    var i: i32 = 0
     while i < count:
         yield label(i) ++ "-" ++ label(i + 1)
         i += 1

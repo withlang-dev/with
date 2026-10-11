@@ -50,8 +50,8 @@ fn step(t: Tally, n: c_int, s: &Scale):
     local.set(Some(t))
 
 fn main:
-    let x = 5
-    let six = 6
+    let x: i32 = 5
+    let six: i32 = 6
     let m: Mutex[Option[&i32]] = Mutex.new(None)
     m.set(Some(&x))
     with m.enter() as held:
@@ -65,7 +65,7 @@ fn main:
         match held:
             Some(r) => print(f"guard swap: {r}")
             None => print("none")
-    let seven = 7
+    let seven: i32 = 7
     let p = Pair { value: &seven, slot: Mutex.new(None) }
     remember_own(p)
     with p.slot.enter() as held:

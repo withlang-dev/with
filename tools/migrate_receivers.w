@@ -30,7 +30,7 @@ extern fn with_fs_read_file(path: &str) -> str
 extern fn with_fs_list_files(path: &str) -> str
 extern fn with_fs_write_file(path: &str, data: &str) -> i32
 
-fn slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
+fn slice(text: &str, start: isize, end: isize): text.slice(start, end)
 
 type ReceiverDeclFacts {
     starts: List[i32],
@@ -192,7 +192,7 @@ fn migrate_file(path: &str) -> i32:
     // Edits are ascending (fn_pos < del_start; methods top-to-bottom): apply L→R.
     var result = ""
     var prev = 0
-    var methods = 0
+    var methods: i32 = 0
     for e in 0..m:
         let s = starts[e]
         let en = ends[e]
@@ -217,7 +217,7 @@ fn migrate_path(path: &str, excludes: &List[str]) -> i32:
         if changed > 0: print(f"migrated {path}: {changed} receiver methods")
         return changed
     let listing = unsafe { with_fs_list_files(path) }
-    var total = 0
+    var total: i32 = 0
     var start = 0
     for i in 0..listing.len() as i32 + 1:
         if i != listing.len() as i32 and listing[i] as i32 != 10: continue

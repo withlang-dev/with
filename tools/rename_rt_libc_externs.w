@@ -11,7 +11,7 @@ use std.fs
 use Lexer
 use Token
 
-fn slice(text: &str, a: i32, b: i32): text.slice(a as i64, b as i64)
+fn slice(text: &str, a: isize, b: isize): text.slice(a, b)
 
 fn is_bare(name: &str) -> bool:
     not (name.starts_with("rt_") or name.starts_with("with_") or name.starts_with("wl_"))
@@ -90,7 +90,7 @@ fn process(path: &str) -> i32:
     0
 
 let argv = args()
-var rc = 0
+var rc: i32 = 0
 for ai in 1..argv.len() as i32:
     if process(argv[ai]) != 0:
         rc = 1

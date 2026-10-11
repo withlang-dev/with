@@ -8,7 +8,7 @@ type Digits { first: i32 }
 fn Digits.make(a: i32, b: i32, c: i32 = 3) -> i32: a * 100 + b * 10 + c
 fn Digits.combine(self: &Self, b: i32, c: i32 = 3) -> i32: self.first * 100 + b * 10 + c
 
-var calls = 0
+var calls: i32 = 0
 fn next -> i32:
     calls += 1
     calls

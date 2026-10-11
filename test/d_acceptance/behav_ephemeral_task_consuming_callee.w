@@ -10,7 +10,7 @@ fn forward_to_consumer(task: Task[i32]) -> i32:
     consume_task(task)
 
 fn main:
-    let value = 41
+    let value: i32 = 41
     let first = process(&value)
     assert(consume_task(first) == 42)
 

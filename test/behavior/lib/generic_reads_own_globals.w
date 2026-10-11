@@ -3,7 +3,7 @@
 pub let K: i32 = 5
 let HIDDEN: i32 = 30
 const LIMIT: i32 = 700
-global var hits = 4000
+global var hits: i32 = 4000
 
 pub fn g[T](a: T) -> i32: K + HIDDEN + LIMIT
 

@@ -53,7 +53,7 @@ fn main:
     for n in nested:
         ntext = ntext ++ f" {n / 10}{n % 10}"
     print(ntext)
-    let mixed = [a * 10 + b for a in 0..3 for b in upto(a + 1)]
+    let mixed = [a * 10 + b for a in 0i32..3 for b in upto(a + 1)]
     print(f"range after gen{join(&mixed)}")
     let set: BTreeSet[i32] = [x % 4 for x in upto(10)]
     print(f"set {set.len()}")
@@ -69,8 +69,8 @@ fn main:
     print(f"labels {ltext}")
     let some = [v for Some(v) in maybe(4)]
     print(f"some{join(&some)}")
-    let base = 100
-    let bump = 7
+    let base: i32 = 100
+    let bump: i32 = 7
     let offset = [base + bump + x for x in upto(3)]
     print(f"offset{join(&offset)}")
     let g = upto(6)

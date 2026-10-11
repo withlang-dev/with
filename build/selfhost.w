@@ -3705,7 +3705,7 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases:
         jobs.push(par_job(argv, bs_capture_path(root, c.dir, "emit", "stdout"), bs_capture_path(root, c.dir, "emit", "stderr"), c.emit_timeout_ms))
     let rcs = par_run(ctx, &jobs, par_width(&jobs))
 
-    var failed = 0
+    var failed: i32 = 0
     var report = ""
     var cc_jobs: List[ParJob] = List.new()
     var cc_case: List[i32] = List.new()
@@ -4163,7 +4163,7 @@ fn bs_file_forbids(ctx: &ActionCtx, path: &str, needle: &str, label: &str) -> i3
         return bs_fail(ctx, "missing file for " ++ label ++ ": " ++ path)
     bs_assert_not_contains(ctx, ctx.fs().read_text(path), needle, label)
 
-fn bs_index_of(text: &str, needle: &str) -> i32:
+fn bs_index_of(text: &str, needle: &str) -> isize:
     if needle.len() == 0:
         return 0
     if needle.len() > text.len():
@@ -4182,14 +4182,14 @@ fn bs_index_of(text: &str, needle: &str) -> i32:
 fn bs_count_occurrences(text: &str, needle: &str) -> i32:
     if needle.len() == 0:
         return 0
-    var count = 0
-    var offset = 0
-    while offset < text.len() as i32:
+    var count: i32 = 0
+    var offset: isize = 0
+    while offset < text.len():
         let found = bs_index_of(text.slice(offset as i64, text.len()), needle)
         if found < 0:
             break
         count = count + 1
-        offset = offset + found + needle.len() as i32
+        offset = offset + found + needle.len()
     count
 
 fn bs_migrate_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
@@ -8937,7 +8937,7 @@ fn bs_manifest_field(manifest: &str, key: &str) -> str:
         if line.starts_with(key ++ " "):
             let rest = line.slice(key.len() + 1, line.len())
             let sp = bs_index_of(rest, " ")
-            return selfhost_owned_text(rest.slice(0, if sp < 0: rest.len() else: sp as i64))
+            return selfhost_owned_text(rest.slice(0, if sp < 0: rest.len() else: sp))
     ""
 
 fn bs_assert_manifest_field(ctx: &ActionCtx, manifest: &str, key: &str, expected: &str) -> i32:

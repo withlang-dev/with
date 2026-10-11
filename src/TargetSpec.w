@@ -44,6 +44,12 @@ pub fn target_spec_is_wasm() -> bool:
 pub fn target_spec_ptr_bytes() -> i64:
     if target_spec_active == 7: 4 else: 8
 
+// D114: bytes in `isize`/`usize`, the target's size width (C's size_t and
+// ptrdiff_t). It equals the pointer width on every target today and is kept
+// apart from it, as C keeps size_t apart from uintptr_t.
+pub fn target_spec_size_bytes() -> i64:
+    if target_spec_active == 7: 4 else: 8
+
 // Host kind in the shared 0-8 numbering. Mirrors
 // build_graph_host_target_kind (BuildGraphKinds.w); kept extern-only
 // here so TargetSpec stays import-free for early pipeline stages.

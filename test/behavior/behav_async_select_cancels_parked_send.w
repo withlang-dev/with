@@ -19,7 +19,7 @@ async fn now -> i32: 1
 async fn race(tx: &Sender[i32]) -> i32:
     let a = stuck(tx)
     let b = now()
-    var fired = 0
+    var fired: i32 = 0
     select await:
         _ = a => fired = 1
         x = b => fired = x + 1

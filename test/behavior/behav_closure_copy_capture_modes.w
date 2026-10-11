@@ -29,7 +29,7 @@ fn main:
 
     var values: List[i32] = List.new()
     values.push(1)
-    var offset = 4
+    var offset: i32 = 4
     let mixed_result = call_value(() =>
         values.push(offset)
         offset = offset + 10

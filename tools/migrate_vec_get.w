@@ -14,7 +14,7 @@ use Token
 
 type GetSite { path: str, start: i32, end: i32 }
 
-fn slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
+fn slice(text: &str, start: isize, end: isize): text.slice(start, end)
 
 fn source_path(path: &str) -> str:
     let embedded = "<embedded-std>/"
@@ -23,7 +23,7 @@ fn source_path(path: &str) -> str:
 let message = "error: List has no 'get': element access is spelled 'xs[i]' (§ Element access, D71)"
 
 fn parse_i32(s: &str) -> i32:
-    var out = 0
+    var out: i32 = 0
     for i in 0..s.len() as i32:
         let ch = s[i]
         if ch < 48 or ch > 57: return out
@@ -46,7 +46,7 @@ fn line_col_offset(text: &str, want_line: i32, want_col: i32) -> i32:
     -1
 
 fn count_carets(line: &str) -> i32:
-    var n = 0
+    var n: i32 = 0
     for i in 0..line.len() as i32:
         if line[i] == '^': n = n + 1
     n

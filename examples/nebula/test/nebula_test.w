@@ -61,7 +61,7 @@ fn config_with_port(base: ServerConfig, port: i32) -> ServerConfig: { base with 
 // --- Packet extraction helpers ---
 
 fn count_nonempty_lines(lines: [5]i32, count: i32) -> i32:
-    var result = 0
+    var result: i32 = 0
     for i in 0..count:
         if lines[i] > 0:
             result = result + 1
@@ -70,7 +70,7 @@ fn count_nonempty_lines(lines: [5]i32, count: i32) -> i32:
 // --- CSV field parsing helper ---
 
 fn parse_field_count(field_lens: [4]i32, total: i32) -> i32:
-    var valid = 0
+    var valid: i32 = 0
     for i in 0..total:
         if field_lens[i] > 0:
             valid = valid + 1
@@ -95,9 +95,9 @@ type SessionStats {
 }
 
 fn aggregate_stats(counts: [3]i32, packets: [3]i32, bytes: [3]i32) -> SessionStats:
-    var total_p = 0
-    var total_b = 0
-    var active = 0
+    var total_p: i32 = 0
+    var total_b: i32 = 0
+    var active: i32 = 0
     for i in 0..3:
         if counts[i] > 0:
             active = active + 1

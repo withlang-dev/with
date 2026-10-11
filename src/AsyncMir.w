@@ -99,7 +99,7 @@ impl AsyncMirModule:
     fn body_count() -> i32:
         self.bodies.len() as i32
 
-    fn total_suspend_points() -> i32:
+    fn total_suspend_points() -> isize:
         var total = 0
         for i in 0..self.bodies.len() as i32:
             total = total + self.bodies[i].suspend_count()

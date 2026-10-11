@@ -7,14 +7,14 @@ use std.collections.HashMap
 fn tally(n: i32) -> i32:
     var m: HashMap[i32, i32] = HashMap.new()
     for i in 0..n: m.insert(i, i * i)
-    var s = 0
+    var s: i32 = 0
     for (k, v) in m: s = s + v
     s
 
 fn pairs() -> i32:
     var v: List[(i32, i32)] = List.new()
     v.push((1, 2))
-    var s = 0
+    var s: i32 = 0
     for (a, b) in v: s = s + a + b
     s
 

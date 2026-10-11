@@ -6,8 +6,8 @@
 // behavior beyond the order: matching, is_some/is_none and unwrap still see
 // the same variants.
 let a: Option[i32] = None
-let b = Some(1)
-let c = Some(2)
+let b: Option[i32] = Some(1)
+let c: Option[i32] = Some(2)
 print(f"{a < b} {c < b} {b < c}")
 
 fn show(o: Option[i32]):

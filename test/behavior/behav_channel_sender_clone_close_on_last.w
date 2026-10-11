@@ -12,7 +12,7 @@ async fn producer(id: i32, tx: Sender[i32]) -> i32:
     id
 
 async fn consumer(rx: Receiver[i32]) -> i32:
-    var sum = 0
+    var sum: i32 = 0
     var count = 0
     for msg in rx:
         sum = sum + msg

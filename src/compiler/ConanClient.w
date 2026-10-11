@@ -207,7 +207,7 @@ fn conan_find_char(text: &str, ch: i32) -> i32:
             return i
     -1
 
-fn conan_find_text(text: &str, needle: &str) -> i32:
+fn conan_find_text(text: &str, needle: &str) -> isize:
     if needle.len() == 0:
         return 0
     let n = text.len() as i32
@@ -416,7 +416,7 @@ fn conan_version_bump(base: &str, caret: bool) -> str:
     out ++ f"{n + 1}"
 
 fn conan_parse_leading_int(text: &str) -> (bool, i32):
-    var n = 0
+    var n: i32 = 0
     var any = false
     for i in 0..text.len() as i32:
         if text[i] < '0' or text[i] > '9': break

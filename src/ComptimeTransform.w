@@ -63,7 +63,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
 
     out.set_prelude_decl_count(src.prelude_decl_count())
 
-    var fn_meta = 0
+    var fn_meta: i32 = 0
     while fn_meta < src.state.fn_meta.len() as i32:
         out.add_fn_meta(
             (src.state.fn_meta[fn_meta]) as NodeId,
@@ -82,7 +82,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
                 out.set_fn_param_default(param_start, pi, default_node)
         fn_meta = fn_meta + 7
 
-    var type_meta = 0
+    var type_meta: i32 = 0
     while type_meta < src.state.type_meta.len() as i32:
         out.add_type_meta(
             (src.state.type_meta[type_meta]) as NodeId,
@@ -102,7 +102,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
     for pi in 0..src.fn_param_patterns_len():
         out.add_fn_param_pattern_value(src.fn_param_pattern_value(pi))
 
-    var pmeta = 0
+    var pmeta: i32 = 0
     while pmeta < src.state.fn_param_pattern_meta.len() as i32:
         out.add_fn_param_pattern_meta(
             (src.state.fn_param_pattern_meta[pmeta]) as NodeId,
@@ -111,7 +111,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         )
         pmeta = pmeta + 3
 
-    var for_meta = 0
+    var for_meta: i32 = 0
     while for_meta < src.state.for_meta.len() as i32:
         out.add_for_meta(
             (src.state.for_meta[for_meta]) as NodeId,
@@ -128,7 +128,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
     for pbi in 0..src.state.pattern_binding_pairs.len() as i32:
         out.mark_pattern_binding_pair(src.state.pattern_binding_pairs[pbi])
 
-    var block_meta = 0
+    var block_meta: i32 = 0
     while block_meta < src.state.block_meta.len() as i32:
         out.add_block_meta(
             (src.state.block_meta[block_meta]) as NodeId,
@@ -206,7 +206,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
 
     // A type-parameter bound's arguments (`G: Gen[T]`, #1732), keyed by
     // the extra index copied above.
-    var bound_args = 0
+    var bound_args: i32 = 0
     while bound_args < src.state.type_bound_args.len() as i32:
         out.add_type_bound_args(src.state.type_bound_args[bound_args], src.type_bound_arg_nodes(bound_args))
         bound_args = bound_args + 3
@@ -1120,7 +1120,7 @@ impl Sema:
             if item_node == 0:
                 self.ct_emit_error(source_ast, inner, "failed to materialize comptime for item")
                 return wrapper
-            var index_node = 0
+            var index_node: i32 = 0
             if index_binding != 0:
                 let index_value = comptime_value_int(self.ty_i64 as i32, i as i64)
                 let empty_values: List[ComptimeValue] = List.new()
@@ -3282,7 +3282,7 @@ impl Sema:
         let ordered_file_ids: List[i32] = List.new()
         let ordered_ci: List[i32] = List.new()
         let base_decl_count = out.decl_count()
-        var generated_local_count = 0
+        var generated_local_count: i32 = 0
         // A derive diagnostic is rendered against the declaring file, not
         // whichever file the pre-sema last checked (it pointed a module's
         // derive error at a `use` line of the importer).

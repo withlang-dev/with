@@ -24,7 +24,7 @@ type Bag { a: D, b: D, c: D, d: D, tag: i32 }
 
 fn churn(k: i32) -> i32:
     var bag = Bag { a: D { id: 1 }, b: D { id: 2 }, c: D { id: 3 }, d: D { id: 4 }, tag: 10 }
-    var acc = 0
+    var acc: i32 = 0
     if k > 0:
         if k > 1:
             let x = move bag.a

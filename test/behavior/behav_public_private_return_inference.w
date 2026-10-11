@@ -20,5 +20,5 @@ fn main:
         assert(result.stdout.trim() == "same")
         p7_write(dir, "src/main.w", mixed.replace("$VIS", visibility))
         let rejected = p7_run_with_compiler(compiler, p7_repo_root(), label ++ "-mixed", "check\0" ++ p7_join(dir, "src/main.w") ++ "\0")
-        p7_assert_failure_contains(rejected, "cannot infer return type: if arms have types i32 and str", label)
+        p7_assert_failure_contains(rejected, "cannot infer return type: if arms have types isize and str", label)
     print("ok")

@@ -40,7 +40,7 @@ fn on_n(n: c_int, sink: &fn(i32) -> Unit) -> c_int:
 fn run_twice(h: &Handle) -> c_int: h.run() + h.run()
 
 fn callback_first() -> i32:
-    var total = 0
+    var total: i32 = 0
     let sink = n => total = total + n
     var h = Handle.new().unwrap()
     if h.set(OPT_CB, on_n) != H_OK: return -1
@@ -52,7 +52,7 @@ fn callback_first() -> i32:
     total
 
 fn userdata_first() -> i32:
-    var total = 0
+    var total: i32 = 0
     let sink = n => total = total + n
     var h = Handle.new().unwrap()
     if h.set(OPT_UD, sink) != H_OK: return -1

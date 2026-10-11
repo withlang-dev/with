@@ -7,7 +7,7 @@
 // where `[]T` is expected and the List stays valid. A str's bytes slice the
 // same way through as_bytes().
 fn total(xs: []i32) -> i32:
-    var t = 0
+    var t: i32 = 0
     for x in xs: t = t + x
     t
 fn main:

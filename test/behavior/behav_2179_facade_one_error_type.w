@@ -19,7 +19,7 @@ use c_import("sqlite3.h", link: "sqlite3")
 fn total(db: &Database) -> Result[i32, SqliteError]:
     db.exec("CREATE TABLE t(v INTEGER); INSERT INTO t VALUES (40), (2);")?
     let stmt = db.prepare("SELECT v FROM t")?
-    var sum = 0
+    var sum: i32 = 0
     while stmt.step()? == SQLITE_ROW: sum += stmt.column_int(0)
     sum
 

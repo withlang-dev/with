@@ -24,7 +24,7 @@ fn process_item(item: WorkItem, worker_id: i32) -> ProcessedItem:
     }
 
 fn count_positive(a: i32, b: i32, c: i32, d: i32, e: i32) -> i32:
-    var n = 0
+    var n: i32 = 0
     if a > 0:
         n = n + 1
     if b > 0:

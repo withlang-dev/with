@@ -5,7 +5,7 @@
 // ordinary return move transfers the sole owner to the caller, which drops the
 // element and buffer exactly once.
 
-var COUNT = 0
+var COUNT: i32 = 0
 
 type W { tag: i32 }
 impl Drop for W:

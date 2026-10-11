@@ -1,5 +1,5 @@
 fn main:
-    var xs = List.new()
+    var xs: List[i32] = List.new()
     xs.push(1)
 
     let last = xs.len() - 1

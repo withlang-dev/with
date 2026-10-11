@@ -3,5 +3,5 @@
 use std.rc.Rc
 use std.builtins.print_i32
 fn main:
-    let r = Rc.new(99)
+    let r = Rc.new(99i32)
     print_i32(*r.as_ref())

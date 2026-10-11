@@ -40,7 +40,7 @@ fn retry() -> str:
     return out
 
 fn nested() -> i32:
-    var found = 0
+    var found: i32 = 0
     for a in upto(5):
         for b in upto(5):
             if a * 10 + b == 21:

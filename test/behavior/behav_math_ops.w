@@ -83,7 +83,7 @@ fn test_combined_ops:
     assert(result == 60)
 
 fn power(base: i32, exp: i32) -> i32:
-    var result = 1
+    var result: i32 = 1
     var i = 0
     while i < exp:
         result = result * base

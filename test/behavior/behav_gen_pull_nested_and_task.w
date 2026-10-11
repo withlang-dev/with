@@ -19,7 +19,7 @@ gen fn scaled(n: i32) -> i32:
 
 async fn sum_pulled(n: i32) -> i32:
     var p = units(n).pull()
-    var total = 0
+    var total: i32 = 0
     while true:
         match p.next():
             Some(u) => total += u * 11

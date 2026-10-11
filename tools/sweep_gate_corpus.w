@@ -15,7 +15,7 @@ fn sh(cmd: &str) -> i32:
     run(&argv)
 
 fn gate_count(diag_path: &str) -> i32:
-    var count = 0
+    var count: i32 = 0
     let text = read_file(diag_path).unwrap_or("".clone())
     for line in text.split("\n"):
         if line.contains("requires an explicit import"): count = count + 1

@@ -56,7 +56,7 @@ impl Drop for AppData:
 // sets the result with no `unsafe`.
 fn shout(ctx: Context, args: &[Value], app: &AppData):
     print(f"shout called: {args.len()} argument(s), application data {app.id} {app.name}")
-    var sum = 0
+    var sum: i32 = 0
     for i in 0..args.len() as i32:
         sum = sum + args[i].int()
     ctx.result_int(sum * app.scale)

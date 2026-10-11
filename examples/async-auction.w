@@ -44,7 +44,7 @@ type AuctionResult { winner_id: i32, winning_bid: i32, total_bids: i32 }
 
 async fn bidder(id: i32, base_price: i32, tx: Sender[Bid]) -> i32:
     defer: cleanup_count.fetch_add(1, .SeqCst)
-    for round in 0..3:
+    for round in 0i32..3:
         let amount = base_price + round * id * 7
         tx.send(Bid { bidder_id: id, amount })
         bids_submitted.fetch_add(1, .SeqCst)

@@ -22,26 +22,26 @@ comptime fn test_if_chain() -> i32:
         3
 
 comptime fn test_for_sum() -> i32:
-    var sum = 0
-    for i in 0..5:
+    var sum: i32 = 0
+    for i in 0i32..5:
         sum = sum + i
     sum
 
 comptime fn test_for_nested() -> i32:
-    var total = 0
+    var total: i32 = 0
     for i in 0..3:
         for j in 0..3:
             total = total + 1
     total
 
 comptime fn test_while_basic() -> i32:
-    var n = 0
+    var n: i32 = 0
     while n < 10:
         n = n + 1
     n
 
 comptime fn test_while_break() -> i32:
-    var n = 0
+    var n: i32 = 0
     while true:
         n = n + 1
         if n == 7:
@@ -49,7 +49,7 @@ comptime fn test_while_break() -> i32:
     n
 
 comptime fn test_for_break() -> i32:
-    var result = 0
+    var result: i32 = 0
     for i in 0..100:
         if i == 5:
             break
@@ -57,8 +57,8 @@ comptime fn test_for_break() -> i32:
     result
 
 comptime fn test_for_continue() -> i32:
-    var sum = 0
-    for i in 0..10:
+    var sum: i32 = 0
+    for i in 0i32..10:
         if i % 2 == 0:
             continue
         sum = sum + i

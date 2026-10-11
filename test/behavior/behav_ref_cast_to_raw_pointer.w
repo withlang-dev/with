@@ -27,7 +27,7 @@ fn pointer_of(r: &*mut u8) -> *mut u8: r as *mut u8
 fn widened(r: &i32) -> i64: r as i64
 
 fn main:
-    let x = 42
+    let x: i32 = 42
     let p = addr(x)
     print(f"addr: {unsafe { *p }}")
     print(f"i32 address: {p as usize == (&raw const x) as usize}")

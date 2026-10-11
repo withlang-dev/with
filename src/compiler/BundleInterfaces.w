@@ -85,7 +85,7 @@ fn bundle_interfaces_register_section(path: &str, text: &str):
 
 // Register every `module <path>` section of an interface file. Returns the
 // section count so a file with none is a loud error at the caller.
-pub fn bundle_interfaces_register_wi(wi_text: &str) -> i32:
+pub fn bundle_interfaces_register_wi(wi_text: &str) -> isize:
     var count = 0
     var section_path = ""
     var section_start: i64 = 0

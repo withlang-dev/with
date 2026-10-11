@@ -73,7 +73,7 @@ fn normalized(dump: str) -> str:
     kept.join("\n")
 
 fn indent_of(line: &str) -> i32:
-    var n = 0
+    var n: i32 = 0
     while n < line.len() as i32 and line[n] == ' ': n += 1
     n
 
@@ -142,9 +142,9 @@ fn blocks_of(path: &str, text: &str) -> List[Source]:
     var out: List[Source] = List.new()
     var inside = false
     var audited = false
-    var start = 0
+    var start: i32 = 0
     var body: List[str] = List.new()
-    var number = 0
+    var number: i32 = 0
     for line in text.split("\n"):
         number += 1
         if line.starts_with("```"):
@@ -168,7 +168,7 @@ fn audit(compiler: &str, source: &Source, dir: &str, fix_path: &str) -> i32:
         return -1
     var lines: List[str] = List.new()
     for line in source.text.split("\n"): lines.push(line.clone())
-    var findings = 0
+    var findings: i32 = 0
     for candidate in candidates(&lines):
         write_file(path, with_line(&lines, candidate.line, candidate.replacement))
         let Some(after) = dump_of(compiler, path, dir) else:

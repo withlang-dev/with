@@ -47,7 +47,7 @@ fn main:
     let b = i32x4(1, 2, 3, 4)
     print(f"arith {lanes4(a + b)} | {lanes4(a - b)} | {lanes4(a * b)} | {lanes4(a / b)} | {lanes4(i32x4(1, 2, 3, 4) % i32x4(2, 2, 2, 2))}")
 
-    let s = 3
+    let s: i32 = 3
     let z: i32x4 = 0
     let seven: i32x4 = 7
     print(f"broadcast {lanes4(b * 2)} | {lanes4(b * s)} | {lanes4(seven)} | {lanes4(z)}")

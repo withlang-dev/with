@@ -4,7 +4,7 @@ async fn work(n: i32) -> i32:
     n + 1
 
 async fn main:
-    var i = 0
+    var i: i32 = 0
     while i < 2048:
         let t = work(i)
         assert(t.await == i + 1)

@@ -8,7 +8,7 @@
 // `writes`; `add_to_total` a comma list; `Log.note` a method's clause.
 var writes = 0
 var TOTAL = 0
-var NOTES = 0
+var NOTES: i32 = 0
 
 type Log { writes: i32 }
 

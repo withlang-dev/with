@@ -20,8 +20,8 @@ impl Tag for Mixed[i32]:
         self.value + self.k
 
 fn main:
-    let b = Box { value: 7 }
+    let b: Box[i32] = Box { value: 7 }
     assert(b.tag() == 7)
-    let m = Mixed { value: 4, k: 7 }
+    let m: Mixed[i32] = Mixed { value: 4, k: 7 }
     assert(m.tag() == 11)
     print("ok")

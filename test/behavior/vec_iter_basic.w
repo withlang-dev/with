@@ -19,7 +19,7 @@ fn list_iter(v: List[i32]) -> ListIter_i32:
     ListIter_i32{ data_ptr: v.as_ptr() as i64, len: v.len(), idx: 0 }
 
 fn iter_sum(iter: ListIter_i32) -> i32:
-    var total = 0
+    var total: i32 = 0
     var done = false
     while not done:
         let item = iter.next()

@@ -53,6 +53,6 @@ fn main:
     let dups: List[?i32] = [Some(1), None, Some(1), Some(3)]
     let set: HashSet[i32] = [v for Some(v) in dups]
     print(f"{m.len()} {set.len()}")
-    let rs: List[i32] = [x for 3 in 0..5 for x in 0..2]
+    let rs: List[i32] = [x for 3 in 0..5 for x in 0i32..2]
     print(f"{rs.len()} {rs[1]}")
     print(f"{[a + b for (a, b) in ts].len()} {[a + b for (a, b) in ts][1]}")

@@ -13,7 +13,7 @@
 // prelude's generic `print` and for a program's own generic alike.
 
 fn big(n: i32) -> i32:
-    var acc = 0
+    var acc: i32 = 0
     for i in 0..n:
         acc = acc + i * 3
         if acc % 7 == 0: acc = acc - 1

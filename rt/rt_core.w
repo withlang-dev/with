@@ -644,7 +644,7 @@ var slab_remaining: i64 = 0
 // (#1081: a compiler-sized run under WITH_ALLOC_NO_REUSE=1 got there).
 var rt_slab_range_base: i64 = 0
 var rt_slab_range_cap: i64 = 0
-var rt_slab_range_count: i32 = 0
+var rt_slab_range_count: isize = 0
 // Page-keyed slab index: every 4 KiB page of every slab maps to its slab's
 // start, in an open-addressing table (key word, start word) of power-of-two
 // capacity, mmap-backed and rebuilt at half load. rt_payload_start_is_owned
@@ -720,21 +720,21 @@ fn rt_owned_slab_start(header: i64) -> i64:
 
 var rt_large_range_base: i64 = 0
 var rt_large_range_cap: i64 = 0
-var rt_large_range_count: i32 = 0
+var rt_large_range_count: isize = 0
 
-fn rt_range_start(base: i64, i: i32) -> i64:
+fn rt_range_start(base: i64, i: isize) -> i64:
     unsafe *((base + (i as i64) * 8) as *const i64)
 
-fn rt_range_end(base: i64, cap: i64, i: i32) -> i64:
+fn rt_range_end(base: i64, cap: i64, i: isize) -> i64:
     unsafe *((base + (cap + i as i64) * 8) as *const i64)
 
-fn rt_range_store(base: i64, cap: i64, i: i32, start: i64, end: i64):
+fn rt_range_store(base: i64, cap: i64, i: isize, start: i64, end: i64):
     unsafe *((base + (i as i64) * 8) as *mut i64) = start
     unsafe *((base + (cap + i as i64) * 8) as *mut i64) = end
 
 // Doubles a table (first call: RT_ALLOC_RANGE_CAP entries). Returns the new
 // base and writes the new capacity through `cap_out`.
-fn rt_range_table_grow(base: i64, cap: i64, count: i32, cap_out: *mut i64) -> i64:
+fn rt_range_table_grow(base: i64, cap: i64, count: isize, cap_out: *mut i64) -> i64:
     let new_cap = if cap == 0: RT_ALLOC_RANGE_CAP as i64 else: cap * 2
     let p = rt_mmap(new_cap * 16)
     if p as i64 == 0:
@@ -782,7 +782,7 @@ fn rt_record_large_range(start: i64, size: i64):
 fn rt_forget_large_range(start: i64):
     // Binary-search the sorted starts, then shift to close the gap — a swap
     // remove would break the order the lookup depends on.
-    var lo: i32 = 0
+    var lo: isize = 0
     var hi = rt_large_range_count - 1
     while lo <= hi:
         let mid = (lo + hi) / 2
@@ -925,7 +925,7 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
             return 1
     // Large ranges are kept sorted by start; each region's start is unique,
     // so an exact-match binary search replaces the former linear scan.
-    var llo = 0
+    var llo: isize = 0
     var lhi = rt_large_range_count - 1
     while llo <= lhi:
         let lmid = (llo + lhi) / 2
@@ -1713,9 +1713,9 @@ fn rt_alloc_aligned_with_origin(size: i64, align: i64, origin: i64) -> *mut u8:
     p as *mut u8
 
 fn rt_addr_in_large_range(addr: i64) -> bool:
-    var lo = 0
+    var lo: isize = 0
     var hi = rt_large_range_count - 1
-    var found = -1
+    var found: isize = -1
     while lo <= hi:
         let mid = (lo + hi) / 2
         if rt_range_start(rt_large_range_base, mid) <= addr:
@@ -1946,12 +1946,12 @@ var cstr_lend_free: [40]i64
 var cstr_lend_slab_at: i64
 var cstr_lend_slab_left: i64
 
-fn cstr_lend_class_size(class: i32) -> i64:
+fn cstr_lend_class_size(class: isize) -> i64:
     var size: i64 = 64
     for _ in 0..class: size = size * 2
     size
 
-fn cstr_lend_class_for(need: i64) -> i32:
+fn cstr_lend_class_for(need: i64) -> isize:
     var class = 0
     var size: i64 = 64
     while size < need and class < CSTR_LEND_CLASSES - 1:
@@ -2664,8 +2664,8 @@ fn rt_fmt_f64_spec_buf(val: f64, flags: i64, width: i32, precision: i32, mode: i
 pub fn with_fmt_str_spec_ref(val: &str, flags: i64, width: i32, precision: i32) -> str:
     var sp = str_data(val)
     var slen = str_length(val)
-    if precision >= 0 and precision as i64 < slen:
-        slen = precision as i64
+    if precision >= 0 and precision < slen:
+        slen = precision
     if width > 0 and slen < width as i64:
         let fill_char = ((flags >> 8) & 255) as i32
         let align_mode = ((flags >> 16) & 3) as i32
@@ -3203,7 +3203,7 @@ pub fn with_parse_float_ref(s: &str) -> f64:
 pub fn with_arg_count() -> i32:
     saved_argc
 
-pub fn with_arg_at(idx: i32) -> str:
+pub fn with_arg_at(idx: isize) -> str:
     if idx < 0 or idx >= saved_argc or saved_argv_raw == 0:
         return make_str("" as *const u8, 0)
     let s = unsafe *((saved_argv_raw + idx as i64 * 8) as *const *const u8)
@@ -3519,14 +3519,14 @@ pub fn with_vec_pop_i32(v: *mut u8) -> i32:
 // Header: values, next, generations, len, cap, elem_size (six words),
 // followed by the u32 FIFO head and tail. Each next entry is either a free
 // slot index, SM_FREE_END, or SM_OCCUPIED. Retired slots are not enqueued.
-let SM_OFF_NEXT = 8
-let SM_OFF_GENS = 16
-let SM_OFF_LEN = 24
-let SM_OFF_CAP = 32
-let SM_OFF_ESZ = 40
-let SM_OFF_HEAD = 48
-let SM_OFF_TAIL = 52
-let SM_SIZE = 56
+const SM_OFF_NEXT = 8
+const SM_OFF_GENS = 16
+const SM_OFF_LEN = 24
+const SM_OFF_CAP = 32
+const SM_OFF_ESZ = 40
+const SM_OFF_HEAD = 48
+const SM_OFF_TAIL = 52
+const SM_SIZE = 56
 let SM_OCCUPIED: u32 = 4294967294
 let SM_FREE_END: u32 = 4294967295
 let SM_MAX_GENERATION: u32 = 4294967295
@@ -3551,7 +3551,7 @@ fn sm_set_tail(m: i64, v: u32): unsafe *((m + SM_OFF_TAIL) as *mut u32) = v
 
 fn sm_next_at(m: i64, idx: i64): unsafe *((sm_next(m) as i64 + idx * 4) as *const u32)
 fn sm_set_next_at(m: i64, idx: i64, val: u32): unsafe *((sm_next(m) as i64 + idx * 4) as *mut u32) = val
-fn sm_occ_at(m: i64, idx: i64): if sm_next_at(m, idx) == SM_OCCUPIED: 1 else: 0
+fn sm_occ_at(m: i64, idx: i64) -> i32: if sm_next_at(m, idx) == SM_OCCUPIED: 1 else: 0
 fn sm_generation_at(m: i64, idx: i64): unsafe *((sm_gens(m) as i64 + idx * 4) as *const u32)
 fn sm_set_generation_at(m: i64, idx: i64, val: u32): unsafe *((sm_gens(m) as i64 + idx * 4) as *mut u32) = val
 fn sm_value_ptr_at(m: i64, idx: i64): (sm_values(m) as i64 + idx * sm_elem_size(m)) as *mut u8
@@ -3594,7 +3594,7 @@ fn sm_write_handle(out: *mut u8, idx: u32, generation_value: u32):
     unsafe *(out as *mut u32) = idx
     unsafe *((out as i64 + 4) as *mut u32) = generation_value
 
-fn sm_valid(m: i64, index: u32, generation: u32):
+fn sm_valid(m: i64, index: u32, generation: u32) -> i32:
     if m == 0 or index >= sm_cap(m): return 0
     if sm_occ_at(m, index) == 0: return 0
     if sm_generation_at(m, index) != generation: return 0
@@ -4251,13 +4251,13 @@ pub fn with_fs_write_file(path: &str, data: &str) -> i32:
 
 pub fn with_fs_file_exists(path: &str) -> i32:
     let cpath = str_to_cstr(path)
-    let rc = if rt_access(cpath, 0) != 0: 0 else: 1
+    let rc: i32 = if rt_access(cpath, 0) != 0: 0 else: 1
     cstr_free(cpath)
     rc
 
 pub fn with_fs_is_dir(path: &str) -> i32:
     let cpath = str_to_cstr(path)
-    let rc = if fs_path_is_dir_c(cpath): 1 else: 0
+    let rc: i32 = if fs_path_is_dir_c(cpath): 1 else: 0
     cstr_free(cpath)
     rc
 
@@ -4645,7 +4645,7 @@ pub fn with_clzl(n: i64) -> i32:
     if n == 0: return 64
     var x = n as u64
     var count: i32 = 0
-    if (x & (0xFFFFFFFF as u64 << 32)) == 0:
+    if (x & (0xFFFFFFFFu64 << 32)) == 0:
         count = count + 32
         x = x << 32
     if (x & (0xFFFF as u64 << 48)) == 0:
@@ -4800,7 +4800,7 @@ fn scope_entries_ptr(handle: i64) -> *mut *mut u8:
     (handle + 8) as *mut *mut u8
 
 pub fn with_scope_create() -> i64:
-    let cap = 16
+    let cap: i32 = 16
     let entry_size = 16
     let ptr = rt_alloc(16)
     if ptr as i64 == 0:
@@ -4928,7 +4928,7 @@ pub fn with_scope_destroy(handle: i64):
 // Thread entry layout: [handle: i64, joined: i32, result: i32]
 
 pub fn with_thread_scope_create() -> i64:
-    let cap = 16
+    let cap: i32 = 16
     let entry_size = 16
     let ptr = rt_alloc(16)
     if ptr as i64 == 0:

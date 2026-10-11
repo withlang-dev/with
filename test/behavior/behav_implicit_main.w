@@ -1,7 +1,7 @@
 //! expect-stdout: 7
 
 use std.builtins.int_to_string
-let x = 3
+let x: i32 = 3
 
 print(int_to_string(double(x) + 1))
 

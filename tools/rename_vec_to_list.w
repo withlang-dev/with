@@ -103,7 +103,7 @@ if apply_text:
     exit_code(0)
 
 fn line_of(text: &str, at: i32) -> i32:
-    var line = 1
+    var line: i32 = 1
     for i in 0..at:
         if text[i] == '\n': line += 1
     line

@@ -20,7 +20,7 @@ fn describe(kind: i32, at: i32) -> F:
 
 fn records() -> List[F]:
     var out: List[F] = List.new()
-    for i in 0..2:
+    for i in 0i32..2:
         out.push(describe(i + 1, 100 * (i + 1)))
     out
 

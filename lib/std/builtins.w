@@ -143,6 +143,14 @@ impl ToString for u64:
     fn to_string() -> str:
         with_fmt_u64(*self)
 
+impl ToString for isize:
+    fn to_string() -> str:
+        with_i64_to_str(*self as i64)
+
+impl ToString for usize:
+    fn to_string() -> str:
+        with_fmt_u64(*self as u64)
+
 impl ToString for bool:
     fn to_string() -> str:
         with_bool_to_str(*self)

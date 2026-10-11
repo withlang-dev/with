@@ -1451,7 +1451,7 @@ impl Codegen:
         else:
             wl_add_module_flag_int(self.llmod, "Dwarf Version", 5)
 
-        let is_opt = 0
+        let is_opt: i32 = 0
         self.di_compile_unit = wl_di_create_compile_unit(
             self.di_builder, self.di_file, "with", is_opt, 5, wl_dwarf_lang_with())
 
@@ -2838,7 +2838,7 @@ impl Codegen:
         let start = self.pool.get_start(node)
         if start <= 0: return 1
         let src = self.source_text
-        var line = 1
+        var line: i32 = 1
         for i in 0..start:
             if i < src.len() as i32:
                 if src[i] == 10:
@@ -2995,7 +2995,7 @@ impl Codegen:
                     return wl_const_int(i1_ty, 1, 0)
                 return wl_const_int(i1_ty, 0, 0)
             var result = wl_const_int(i1_ty, 1, 0)
-            var fi = 0
+            var fi: i32 = 0
             while fi < field_count:
                 let lf = self.tuple_elem_extract(lhs, fi)
                 let rf = self.tuple_elem_extract(rhs, fi)
@@ -3015,7 +3015,7 @@ impl Codegen:
                 return wl_const_int(i1_ty, 0, 0)
             let elem_ty = wl_get_element_type(lhs_ty)
             var result = wl_const_int(i1_ty, 1, 0)
-            var ai = 0
+            var ai: i32 = 0
             while ai < elem_count:
                 let lf = wl_build_extract_value(self.builder, lhs, ai)
                 let rf = wl_build_extract_value(self.builder, rhs, ai)
@@ -3803,7 +3803,7 @@ impl Codegen:
                 if inner_ty > 0:
                     if op == UnaryOp.UOP_REF:
                         return self.sema.find_exact_type(TypeKind.TY_REF, inner_ty, 0, 0) as i32
-                    let is_mut = if op == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
+                    let is_mut: i32 = if op == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
                     return self.sema.find_exact_type(TypeKind.TY_PTR, inner_ty, is_mut, 0) as i32
         // Literal types
         if nk == NodeKind.NK_STRING_LIT:
@@ -3947,7 +3947,7 @@ impl Codegen:
         let tp_count = tp_count_opt.unwrap()
         let sema_args: List[i32] = List.new()
         for ti in 0..tp_count:
-            var arg_sema = 0
+            var arg_sema: i32 = 0
             if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
                 arg_sema = self.mono_struct_tp_flat_sema_types[(tp_flat_start + ti)]
             if arg_sema == 0 and tp_flat_start + ti < self.mono_struct_tp_flat_types.len() as i32:
@@ -4237,7 +4237,7 @@ impl Codegen:
                     let tp_count = tp_count_opt.unwrap()
                     let sema_args: List[i32] = List.new()
                     for ti in 0..tp_count:
-                        var arg_sema = 0
+                        var arg_sema: i32 = 0
                         if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
                             arg_sema = self.mono_struct_tp_flat_sema_types[(tp_flat_start + ti)]
                         if arg_sema == 0 and tp_flat_start + ti < self.mono_struct_tp_flat_types.len() as i32:
@@ -4940,7 +4940,7 @@ impl Codegen:
                     let pad_size = max_align - remainder
                     padded_types.push(wl_array_type(wl_i8_type(self.context), pad_size))
 
-            let packed_flag = if use_packed: 1 else: 0
+            let packed_flag: i32 = if use_packed: 1 else: 0
             wl_struct_set_body(st_type, list_data_i64(&padded_types), padded_types.len() as i32, packed_flag)
             if max_align > self.abi_align_of(st_type):
                 self.struct_declared_align.insert(st_type, max_align)
@@ -5105,7 +5105,7 @@ impl Codegen:
         let body: List[i64] = List.new()
         let positions: List[i32] = List.new()
         var at: i64 = 0
-        var packed = 0
+        var packed: i32 = 0
         for i in 0..n:
             let elem = elem_tys[i]
             let off = offsets[i]
@@ -5344,7 +5344,7 @@ impl Codegen:
         // reference sees (the repr integer, or the tagged struct), so it is
         // registered with the rows below before any payload is resolved: a
         // payload's resolution can define another enum on demand (#1430).
-        var any_has_payload = 0
+        var any_has_payload: i32 = 0
         var scan = extra_start + 2
         for vi in 0..variant_count:
             let scan_count = self.pool.get_extra(scan + 2)
@@ -5559,7 +5559,7 @@ impl Codegen:
         self.module_object_mode != 0 or self.path_is_bundle_provided(source_path)
 
     fn module_link_name_for_path(source_path: &str, base_name: &str) -> str:
-        let mode = if self.path_uses_module_link_names(source_path): 1 else: 0
+        let mode: i32 = if self.path_uses_module_link_names(source_path): 1 else: 0
         fn_abi_module_link_name(mode, source_path, base_name)
 
     // D39: the prefixes of `--link-bundle` manifests join the embedded ones,
@@ -6091,7 +6091,7 @@ impl Codegen:
         wl_position_at_end(self.builder, wl_append_bb(self.context, function, "entry"))
         let args: List[i64] = List.new()
         var result_buf: i64 = 0
-        let has_sret = if target.ret.pass == PM_INDIRECT: 1 else: 0
+        let has_sret: i32 = if target.ret.pass == PM_INDIRECT: 1 else: 0
         if has_sret != 0:
             result_buf = self.create_entry_alloca(target.ret.source_ty)
             args.push(result_buf)
@@ -6120,7 +6120,7 @@ impl Codegen:
         fat = wl_build_insert_value(self.builder, fat, function, 0)
         wl_build_insert_value(self.builder, fat, wl_const_null(wl_ptr_type(self.context)), 1)
 
-    fn fn_abi_arg(abi: i32, pi: i32) -> ArgAbi: self.fn_abi_args[self.fn_abis[abi].arg_start + pi]
+    fn fn_abi_arg(abi: i32, pi: isize) -> ArgAbi: self.fn_abi_args[self.fn_abis[abi].arg_start + pi]
 
     // FnAbi's answer for whether parameter `pi` of `fn_sym` arrives as an
     // address — PM_INDIRECT (a copy the caller made), PM_INDIRECT_PLACE (the
@@ -6136,7 +6136,7 @@ impl Codegen:
     // Both MIR operands and synthesized/thunk values arrive here after their
     // semantic adjustments. Only this routine turns an ArgAbi into a value,
     // a pointer to a copy, or a pointer to the caller's place.
-    mut fn push_call_arg(abi: i32, pi: i32, value: i64, place: i64) -> i64:
+    mut fn push_call_arg(abi: i32, pi: isize, value: i64, place: i64) -> i64:
         let arg = self.fn_abi_arg(abi, pi)
         self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.DirectValue
         if arg.owned_place and place != 0:
@@ -6224,7 +6224,7 @@ impl Codegen:
         for pi in 0..param_count: places.push(self.sig_abi_param_flags(sig_idx, pi))
         let abi_index = self.compute_fn_abi(ret_ty, param_types, places, fn_abi_definition_convention(false, self.sema.sig_is_variadic(sig_idx) != 0), self.sema.sig_is_variadic(sig_idx))
         let abi = self.fn_abis[abi_index]
-        let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let has_sret: i32 = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let sret_ty: i64 = abi.ret.source_ty
         let fn_type: i64 = abi.llvm_ty
         // #839: reuse only a same-typed entry. A mismatched occupant (e.g. a
@@ -6583,7 +6583,7 @@ impl Codegen:
             return -1
         let kind = wl_get_type_kind(ty)
         if kind == wl_float_type_kind() or kind == wl_double_type_kind():
-            let scalar_kind = if kind == wl_float_type_kind(): 1 else: 2
+            let scalar_kind: i32 = if kind == wl_float_type_kind(): 1 else: 2
             if state == 0:
                 return scalar_kind * 16 + 1
             let prev_kind = state / 16
@@ -6665,7 +6665,7 @@ impl Codegen:
         let is_sse = kind == wl_float_type_kind() or kind == wl_double_type_kind()
         if not is_sse and kind != wl_integer_type_kind() and kind != wl_pointer_type_kind(): return -1
         if self.abi_size_of(ty) > 8 or offset >= 16: return -1
-        let bit = if is_sse: 2 else: 1
+        let bit: i32 = if is_sse: 2 else: 1
         classes | (if offset >= 8: bit * 4 else: bit)
 
     // The scalar one eightbyte travels as. Two floats sharing an SSE
@@ -6689,7 +6689,7 @@ impl Codegen:
     fn c_abi_sysv_register_cost(abi_ty: i64) -> i32:
         let kind = wl_get_type_kind(abi_ty)
         if kind == wl_struct_type_kind():
-            var cost = 0
+            var cost: i32 = 0
             for fi in 0..wl_count_struct_elem_types(abi_ty):
                 cost = cost + self.c_abi_sysv_register_cost(wl_struct_get_type_at(abi_ty, fi))
             return cost

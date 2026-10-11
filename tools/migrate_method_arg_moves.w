@@ -17,7 +17,7 @@ type OwnershipSite {
     offset: i32,
 }
 
-fn slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
+fn slice(text: &str, start: isize, end: isize): text.slice(start, end)
 
 fn source_path(path: &str) -> str:
     let embedded = "<embedded-std>/"

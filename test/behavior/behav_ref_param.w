@@ -7,8 +7,8 @@ fn sum_coords(x: &i32, y: &i32) -> i32:
     return *x + *y
 
 fn main:
-    let n = 42
-    let m = 8
+    let n: i32 = 42
+    let m: i32 = 8
     let v = read_i32(&n)
     assert(v == 42)
     assert(n == 42)   // original unchanged

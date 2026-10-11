@@ -294,12 +294,12 @@ pub fn analysis_find_from(text: &str, needle: &str, start: i32) -> i32:
 
 pub fn analysis_parse_i32(text: &str) -> i32:
     if text.len() == 0: return 0
-    var sign = 1
+    var sign: i32 = 1
     var i = 0
     if text[0] == 45:
         sign = -1
         i = 1
-    var value = 0
+    var value: i32 = 0
     while i < text.len() as i32:
         let ch = text[i] as i32
         if ch < 48 or ch > 57: return 0
@@ -309,7 +309,7 @@ pub fn analysis_parse_i32(text: &str) -> i32:
 
 fn analysis_escape(text: &str) -> str:
     let parts: List[str] = List.new()
-    var start = 0
+    var start: i32 = 0
     for i in 0..text.len() as i32:
         let c = text[i] as i32
         var replacement = ""
@@ -351,7 +351,7 @@ fn analysis_fact_field(fact: &AnalysisFact, field: &str) -> str:
 
 fn analysis_term_matches(fact: &AnalysisFact, term: &str) -> bool:
     var op = analysis_find_from(term, "&=", 0)
-    var op_len = 2
+    var op_len: i32 = 2
     var mode = 3
     if op < 0:
         op = analysis_find_from(term, "!=", 0)
@@ -379,8 +379,8 @@ fn analysis_term_matches(fact: &AnalysisFact, term: &str) -> bool:
 pub fn analysis_fact_matches(fact: &AnalysisFact, query: &str) -> bool:
     if query.len() == 0 or query == "all":
         return true
-    var start = 0
-    var i = 0
+    var start: i32 = 0
+    var i: i32 = 0
     let n = query.len() as i32
     while i <= n:
         if i == n or query[i] as i32 == 44:
@@ -411,7 +411,7 @@ impl AnalysisReport:
                 lines.push("\n")
         lines.join("")
 
-    fn count_matching(query: &str) -> i32:
+    fn count_matching(query: &str) -> isize:
         var count = 0
         for i in 0..self.facts.len() as i32:
             let fact = self.facts[i]

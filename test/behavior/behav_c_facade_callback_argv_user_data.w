@@ -78,7 +78,7 @@ impl Drop for Scale:
     move fn drop(): print(f"scale {self.label} destroyed")
 
 fn step(t: Tally, args: &[Arg], s: &Scale):
-    var sum = 0
+    var sum: i32 = 0
     for i in 0..args.len() as i32:
         sum = sum + args[i].get()
     print(f"step: {args.len()} argument(s), sum {sum}, scale {s.k} ({s.label})")

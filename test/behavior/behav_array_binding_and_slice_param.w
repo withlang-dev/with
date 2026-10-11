@@ -7,7 +7,7 @@ fn sumlen(arr: []i32) -> i32:
     arr.len() as i32
 
 fn main:
-    let xs = [10, 20, 30, 40]
+    let xs: List[i32] = [10, 20, 30, 40]
     assert(xs.len() as i32 == 4)
     assert(sumlen(xs) == 4)
     print("ok")

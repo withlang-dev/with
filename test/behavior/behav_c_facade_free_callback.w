@@ -37,7 +37,7 @@ fn main:
     // An ordinary closure carries a mutable capture safely through typed
     // userdata. The shared userdata is the callable, not a mutable List.
     var seen: List[i32] = List.new()
-    let sink = value => { seen.push(value); 0 }
+    let sink: fn(i32) -> i32 = value => { seen.push(value); 0 }
     assert(apply(collect, sink, 7) == 0)
     assert(apply(collect, sink, 9) == 0)
     assert(seen.len() == 2 and seen[0] == 7 and seen[1] == 9)

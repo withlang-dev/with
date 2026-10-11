@@ -42,7 +42,7 @@ fn aes_sbox(i: i32) -> u8:
     ]
     sbox[i]
 
-fn aes_rcon(i: i32) -> u8:
+fn aes_rcon(i: isize) -> u8:
     let rc = [0x01 as u8, 0x02 as u8, 0x04 as u8, 0x08 as u8, 0x10 as u8,
               0x20 as u8, 0x40 as u8, 0x80 as u8, 0x1b as u8, 0x36 as u8]
     rc[i]
@@ -77,7 +77,7 @@ unsafe fn Aes128.new(key: *const u8) -> Aes128:
     ctx
 
 // Block cipher operations
-unsafe fn aes_add_round_key(s: *mut u8, rk: *const u8, off: i32):
+unsafe fn aes_add_round_key(s: *mut u8, rk: *const u8, off: isize):
     for i in 0..16:
         *(s + i as u64) = *(s + i as u64) ^ *(rk + (off + i) as u64)
 

@@ -68,7 +68,7 @@ fn main:
     s.push("xx")
     s.push("cd")
     print(names(s))
-    let nums = [9, 2, 7, 5]
+    let nums: List[i32] = [9, 2, 7, 5]
     print(f"{slice_head(nums[2..4])} {slice_head(nums[0..0])} {slice_head(nums[0..1])}")
     var many: List[i32] = List.new()
     many.push(1)

@@ -189,7 +189,7 @@ impl PairsBody:
         "this value"
 
     fn resource_name(sema: &Sema, key: i32) -> str:
-        var ri = -1
+        var ri: i32 = -1
         if key >= 0 and key < self.width():
             ri = self.key_resource[key]
             if ri < 0 and self.is_ref(key) and self.ref_origin[key] >= 0: ri = self.key_resource[self.ref_origin[key]]
@@ -316,7 +316,7 @@ impl PairsBody:
                 continue
             let lhs = body.rval_d1[rv]
             let rhs = body.rval_d2[rv]
-            var guard = -1
+            var guard: i32 = -1
             var value: i64 = -1
             let (rknown, rvalue) = pairs_operand_const(body, rhs)
             let (lknown, lvalue) = pairs_operand_const(body, lhs)
@@ -479,7 +479,7 @@ impl PairsBody:
         else if kind == TermKind.TK_DROP_AND_GOTO:
             self.edges.push(ForeignPairEdge { from: bb, to: d1, guard: -1, succeeded: true })
         else if kind == TermKind.TK_SWITCH_INT:
-            var guard = -1
+            var guard: i32 = -1
             var is_eq = true
             let cond = self.key_of(pairs_operand_place(body, d0))
             if cond >= 0 and self.cond_guard[cond] >= 0:
@@ -528,7 +528,7 @@ fn pairs_site_span(ast: AstPool, body: &MirBody, pb: &PairsBody, site: PairsStep
                 let s = ast.get_start(node)
                 let e = ast.get_end(node)
                 if e > s: return (s, e)
-    var start = 0
+    var start: i32 = 0
     if site.stmt >= 0 and site.stmt < body.stmt_spans.len() as i32:
         start = body.stmt_spans[site.stmt]
     else if site.bb >= 0 and site.bb < body.bb_term_spans.len() as i32:

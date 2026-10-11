@@ -40,7 +40,7 @@ fn user_enum(n: i32) -> Slot[i32]:
     s
 
 fn main:
-    var xs = List.new()
+    var xs: List[i32] = List.new()
     xs.push(1)
     xs.push(5)
     match best_of(&xs):

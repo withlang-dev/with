@@ -134,7 +134,7 @@ impl Zcu:
         // and metadata codegen attached, which no disassembly shows.
         let keep_bitcode = runtime_getenv("WITH_KEEP_BITCODE").len() > 0
         var pipeline = codegen_unit_pipeline(unit_count, output_path, opt_level, do_profile, emit_window)
-        var k = 0
+        var k: i32 = 0
         while k < unit_count:
             var backend_intern = self.pool
             // D17/#697: per-round take-and-return — each round's Codegen owns
@@ -154,7 +154,7 @@ impl Zcu:
                 cg.debug_info = 0
             cg.unit_total = unit_count
             cg.unit_index = k
-            var ai = 0
+            var ai: i32 = 0
             while ai < assign.fn_syms.len() as i32:
                 cg.unit_assign_insert(assign.fn_syms[ai], assign.units[ai], ai)
                 ai = ai + 1
@@ -314,7 +314,7 @@ fn backend_dump_struct_extras(pool: AstPool, intern: InternPool):
         if ok == 1 and (name == "Codegen" or name == "ContextError"):
             runtime_eprint(f"[sd] OK {name} d={decl as i32} es={es} fc={fc}")
 
-let _backend_eof_guard = 0
+const _backend_eof_guard = 0
 
 // The failure line with codegen's reason, when it gave one (#2199: the
 // detail was recorded and never printed).

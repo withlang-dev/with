@@ -15,13 +15,13 @@ impl Drop for Tag:
 
 fn ints():
     var index = HashIndex[i32, i32].new()
-    for i in 0..1000: assert(index.insert(i, i * 10).is_none())
+    for i in 0i32..1000: assert(index.insert(i, i * 10).is_none())
     assert(index.len() == 1000)
-    for i in 0..1000: assert(*index.get(&i).unwrap() == i * 10)
+    for i in 0i32..1000: assert(*index.get(&i).unwrap() == i * 10)
     assert(index.get(&1000).is_none())
     assert(index.insert(7, 700).unwrap() == 70)
     assert(index.len() == 1000 and *index.get(&7).unwrap() == 700)
-    for i in 0..500: assert(index.remove(&i).unwrap() == (if i == 7: 700 else: i * 10))
+    for i in 0i32..500: assert(index.remove(&i).unwrap() == (if i == 7: 700 else: i * 10))
     assert(index.remove(&0).is_none())
     assert(index.len() == 500 and not index.contains(&3) and index.contains(&999))
     var cursor = index.iter()
@@ -47,7 +47,7 @@ fn strings():
 
 unsafe fn drops(slot: *mut i32):
     var index = HashIndex[i32, Tag].new()
-    for i in 1..9: assert(index.insert(i, Tag { id: i * 100, slot }).is_none())
+    for i in 1i32..9: assert(index.insert(i, Tag { id: i * 100, slot }).is_none())
     // Replacing transfers the old value out; dropping it here counts 100.
     let replaced = index.insert(1, Tag { id: 1000, slot }).unwrap()
     assert(replaced.id == 100)

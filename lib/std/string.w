@@ -69,8 +69,8 @@ impl StringBuilder:
         return
 
     /// Number of bytes appended so far.
-    pub fn len() -> i64:
-        self.bytes.len
+    pub fn len() -> isize:
+        self.bytes.len()
 
     /// True when no bytes have been appended.
     pub fn is_empty() -> bool:
@@ -98,8 +98,8 @@ pub fn view_eq(a: &str, b: &str) -> bool:
 
 /// C string byte length, excluding the trailing NUL.
 impl CStr:
-    pub fn len() -> i64:
-        self.len
+    pub fn len() -> isize:
+        self.len as isize  // the builtin header field is i64 until headers take the size width (D114)
 
     /// Raw pointer to the NUL-terminated bytes this `CStr` borrows.
     pub fn ptr() -> *const i8: self.ptr

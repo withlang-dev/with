@@ -177,7 +177,7 @@ fn scheduler_ctx_ptr(worker: i32) -> *mut u8:
 
 fn current_worker_index() -> i32:
     let tid = rt_libc_pthread_self()
-    var i = 0
+    var i: i32 = 0
     while i < active_worker_count:
         if worker_thread_ids[i] == tid:
             return i
@@ -484,8 +484,8 @@ fn dequeue_for_worker(worker: i32) -> i64:
     0
 
 fn total_queued_fibers() -> i32:
-    var total = 0
-    var i = 0
+    var total: i32 = 0
+    var i: i32 = 0
     while i < active_worker_count:
         total = total + worker_queue_count(i)
         i = i + 1
@@ -756,7 +756,7 @@ pub fn with_runtime_core_init():
     free_fiber_slot_count = MAX_FIBERS
     panicked_fiber_head = 0
     panicked_fiber_count = 0
-    var i = 0
+    var i: i32 = 0
     while i < MAX_FIBERS:
         store_i64_index(fibers_by_slot_base(), i, 0)
         store_u32_index(fiber_slot_generations_base(), i, 0 as u32)
@@ -1061,7 +1061,7 @@ pub unsafe fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg
     0
 
 fn running_worker_for_fiber(f: i64) -> i32:
-    var i = 0
+    var i: i32 = 0
     while i < active_worker_count:
         if worker_current_fibers[i] == f:
             return i
@@ -1152,7 +1152,7 @@ pub fn with_runtime_core_shutdown():
         wi = wi + 1
 
     scheduler_lock()
-    var i = 0
+    var i: i32 = 0
     while i < MAX_FIBERS:
         let f = load_i64_index(fibers_by_slot_base(), i)
         if f != 0:

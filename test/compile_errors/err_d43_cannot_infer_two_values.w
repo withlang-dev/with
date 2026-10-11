@@ -1,4 +1,4 @@
-//! expect-check-fail: cannot infer return type: if arms have types i32 and str
+//! expect-check-fail: cannot infer return type: if arms have types isize and str
 
 // D43: two different values are an error with or without a demand.
 

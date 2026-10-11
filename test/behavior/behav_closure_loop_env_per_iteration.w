@@ -38,7 +38,7 @@ fn main:
         print(f"{fs[k]()} {gs[k]()}")
 
     var hs: List[fn() -> i32] = List.new()
-    for i in 0..3:
+    for i in 0i32..3:
         let p = Pt { x: i, y: i + 1 }
         hs.push(move () => p.x + p.y)
     print(f"{hs[0]()} {hs[1]()} {hs[2]()}")

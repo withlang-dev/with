@@ -185,7 +185,7 @@ impl BuildGraphMaterializer:
             build_graph_rt_eprint("[graph] action closure MISS (no source path) for '" ++ self.sema.pool_resolve(action_sym) ++ "'")
             return empty
         let defining = found.unwrap()
-        var start_module = -1
+        var start_module: i32 = -1
         for mi in 0..self.sema.module_paths.len() as i32:
             if self.sema.module_paths[mi] == defining:
                 start_module = mi

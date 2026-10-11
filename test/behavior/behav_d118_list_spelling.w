@@ -7,7 +7,7 @@
 type Bag { items: List[str] }
 
 fn total(xs: &List[i32]) -> i32:
-    var t = 0
+    var t: i32 = 0
     for x in xs: t = t + x
     t
 

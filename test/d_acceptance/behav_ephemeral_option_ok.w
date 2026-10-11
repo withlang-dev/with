@@ -3,7 +3,7 @@
 // allowed — only heap containers are banned.
 type View ephemeral { p: &i32 }
 fn main:
-    let x = 5
+    let x: i32 = 5
     let o: Option[View] = .Some(View { p: &x })
     match o:
         .Some(v) => print_i32(*v.p)

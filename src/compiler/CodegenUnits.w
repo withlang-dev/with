@@ -122,9 +122,9 @@ pub fn codegen_units_assign_from_mir(mir_ptr: i64, unit_count: i32) -> CodegenUn
             for b in 0..body.block_count():
                 cost = cost + body.bb_stmt_counts[b] as i64
             total_cost = total_cost + cost
-            var best = 0
+            var best: i32 = 0
             var best_load = bin_loads[0]
-            var k = 1
+            var k: i32 = 1
             while k < unit_count:
                 if bin_loads[k] < best_load:
                     best = k
@@ -250,7 +250,7 @@ impl CodegenUnitPipeline:
 
 pub fn codegen_unit_extra_objects(obj_path: &str, unit_count: i32) -> List[str]:
     let extras: List[str] = List.new()
-    var k = 1
+    var k: i32 = 1
     while k < unit_count:
         extras.push(codegen_unit_object_path(obj_path, k))
         k = k + 1

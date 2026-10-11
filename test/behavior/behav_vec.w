@@ -19,7 +19,7 @@ fn test_list_empty:
 
 fn test_list_large:
     var v = List[i32].new()
-    for i in 0..100:
+    for i in 0i32..100:
         v.push(i)
     assert(v.len() == 100)
     assert(v[0] == 0)

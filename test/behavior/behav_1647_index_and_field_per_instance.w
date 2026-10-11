@@ -23,7 +23,7 @@ fn joined[T](xs: &List[T], f: fn(&T) -> str) -> str:
     out
 
 fn count_of[T](xs: &List[T]) -> i32:
-    var n = 0
+    var n: i32 = 0
     for i in 0..xs.len() as i32:
         let _ = &xs[i]
         n += 1

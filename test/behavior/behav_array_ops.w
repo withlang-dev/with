@@ -38,7 +38,7 @@ fn test_single_element_array:
 
 fn test_array_fill_pattern:
     var arr: [i32; 5] = [0; 5]
-    var i = 0
+    var i: i32 = 0
     while i < 5:
         arr[i] = (i + 1) * 10
         i = i + 1
@@ -47,7 +47,7 @@ fn test_array_fill_pattern:
     assert(arr[4] == 50)
 
 fn sum_array(arr: [i32; 4]) -> i32:
-    var total = 0
+    var total: i32 = 0
     for v in arr:
         total = total + v
     total
@@ -73,7 +73,7 @@ fn test_array_find:
     assert(found)
 
 fn test_array_max:
-    let arr = [3, 1, 4, 1, 5, 9, 2, 6]
+    let arr: List[i32] = [3, 1, 4, 1, 5, 9, 2, 6]
     var max_val: i32 = arr[0]
     for v in arr:
         if v > max_val:
@@ -81,7 +81,7 @@ fn test_array_max:
     assert(max_val == 9)
 
 fn test_array_min:
-    let arr = [3, 1, 4, 1, 5, 9, 2, 6]
+    let arr: List[i32] = [3, 1, 4, 1, 5, 9, 2, 6]
     var min_val: i32 = arr[0]
     for v in arr:
         if v < min_val:
@@ -97,9 +97,9 @@ fn test_array_all_positive:
     assert(all_pos)
 
 fn test_array_reverse_copy:
-    let src = [1, 2, 3, 4, 5]
+    let src: List[i32] = [1, 2, 3, 4, 5]
     var dst: [i32; 5] = [0; 5]
-    var i = 0
+    var i: i32 = 0
     while i < 5:
         dst[4 - i] = src[i]
         i = i + 1

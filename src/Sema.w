@@ -863,12 +863,19 @@ pub type Sema {
     // binding at the type decided (literal_decisions; its layout is
     // literal_decisions_from_demands's).
     literal_demands: List[i32],
-    // Every literal binding checked so far, as (function signature, name,
-    // `let`) triples: a return is judged after the body's scopes have
-    // closed, and a generic callee's body is checked in the middle of its
-    // caller's.
-    fn_literal_lets: List[i32],
+    // The latest literal binding of each name in each function, keyed
+    // function signature * 2^32 + name: a return is judged after the body's
+    // scopes have closed, and a generic callee's body is checked in the
+    // middle of its caller's.
+    fn_literal_lets: HashMap[i64, i32],
+    // D114: per (function, name), the one unannotated `let` whose integer
+    // literal chose its type, or -1 once the name is bound twice; names it
+    // in a narrowing error after the binding's scope has closed (a tail).
+    fn_int_literal_lets: HashMap[i64, i32],
     literal_decisions: List[i32],
+    // literal_decisions by `let`: the offset of each binding's entry, built
+    // at the first lookup (one walk, not one per binding).
+    literal_decision_at: HashMap[i32, i32],
     // The number of types when the first such binding was reached: the two
     // checks are the same check up to there, so a type below this mark has
     // one id in both, and a type above it is rebuilt from its structure.
@@ -1623,6 +1630,9 @@ pub type Sema {
     // binds a non-Copy value by value, or a Drop type is taken apart). Every
     // other by-value place subject is observed in place by MirLower.
     consuming_pattern_subjects: HashMap[i32, i32],
+    // §4.2.6: where a narrowed integer is going (" (argument 2 of `get_tag`)"),
+    // appended to the narrowing diagnostic; "" when not known.
+    narrowing_target_note: str,
     // D115 (§9.7): slice pattern nodes that take an owned subject apart by
     // value; every other slice pattern observes its subject. The rest
     // binding's type, keyed by the same node.
@@ -2065,6 +2075,10 @@ pub type Sema {
     infer_tail_node: i32,
     infer_tail_is_closure: i32,
     infer_tail_join: i32,
+    // §4.2.1: the type an unannotated function's untyped literal `return`
+    // values are checked again at once its return type is inferred; 0 when
+    // body_return_type_info only reads.
+    literal_return_retype: i32,
     // §9.1 / D43: the block that is a function's or closure's own body. Only
     // its tail, never an arm block's, is discarded when it is an assignment.
     body_tail_block: i32,
@@ -2183,6 +2197,9 @@ pub type Sema {
     // than as a standalone value. `2147483648` is not a valid i32, but
     // `-2147483648` is exactly i32::MIN.
     in_negated_literal_context: i32,
+    // §4.2.1 rule 8: a join re-checking its literal arms (an `if` arm's
+    // condition was checked in a scope that is now closed).
+    literal_arm_retype_depth: i32,
     // Active lexical unsafe blocks: 0 unused, 1 definite unsafe operation,
     // 2 a global read whose need depends on completed mutation facts.
     unsafe_scope_used: List[i32],
@@ -3143,9 +3160,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         field_demand_uses: List.new(),
         field_decisions: List.new(),
         literal_demands: List.new(),
-        fn_literal_lets: List.new(),
+        fn_literal_lets: HashMap.new(),
+        fn_int_literal_lets: HashMap.new(),
         literal_watermark: 0,
         literal_decisions: List.new(),
+        literal_decision_at: sema_new_map_i32_i32(),
         field_last_use: HashMap.new(),
         effect_prov: HashMap.new(),
         effect_note_origin_node: 0,
@@ -3569,6 +3588,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         autoderef_step_tys: List.new(),
         pattern_value_syms: sema_new_map_i32_i32(),
         consuming_pattern_subjects: sema_new_map_i32_i32(),
+        narrowing_target_note: "",
         owned_slice_patterns: sema_new_map_i32_i32(),
         slice_rest_types: sema_new_map_i32_i32(),
         pattern_list_removal: 0,
@@ -3744,6 +3764,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         infer_tail_node: 0,
         infer_tail_is_closure: 0,
         infer_tail_join: 0,
+        literal_return_retype: 0,
         body_tail_block: 0,
         body_tail_holder: 0,
         body_tail_discards: true,
@@ -3791,6 +3812,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         in_unsafe: 0,
         in_bitwise_literal_context: 0,
         in_negated_literal_context: 0,
+        literal_arm_retype_depth: 0,
         unsafe_scope_used: List.new(),
         unsafe_scope_nodes: List.new(),
         unsafe_global_scope_reads: List.new(),
@@ -3925,7 +3947,7 @@ impl Sema:
         if paren <= 0:
             return
         let fn_name = text.slice(0, paren as i64)
-        var idx = 0
+        var idx: i32 = 0
         var got = 0
         var j = paren + 1
         while j < n:
@@ -4005,9 +4027,12 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.ty_never = s.add_type(TypeKind.TY_NEVER, 0, 0, 0)
     s.ty_str = s.add_type(TypeKind.TY_STR, 0, 0, 0)
     s.ty_str_view = s.add_type(TypeKind.TY_REF, s.ty_str, 0, 0)
-    // Pointer-width integers: d2=1 marks them as usize/isize (64-bit on arm64)
-    s.ty_usize = s.add_type(TypeKind.TY_INT, 64, 0, 1)
-    s.ty_isize = s.add_type(TypeKind.TY_INT, 64, 1, 1)
+    // D114: usize/isize have the target's size width (d2=1 marks them), 32
+    // bits on wasm32, so widening and narrowing (§4.2.6) and literal range
+    // checks are the target's.
+    let size_bits = (target_spec_size_bytes() * 8) as i32
+    s.ty_usize = s.add_type(TypeKind.TY_INT, size_bits, 0, 1)
+    s.ty_isize = s.add_type(TypeKind.TY_INT, size_bits, 1, 1)
     s.ty_c_va_list = s.add_type(TypeKind.TY_VA_LIST, 0, 0, 0)
     s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_i8, 0, 0)
     let cstr_field_names: List[str] = List.new()
@@ -4030,7 +4055,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.ephemeral_types.insert(s.pool_intern("ListRange"), 1)
 
     // Sub-byte and non-standard integer widths for bitpacked structs.
-    for w in 1..8:
+    for w in 1i32..8:
         s.add_type(TypeKind.TY_INT, w, 0, 0)  // u1-u7
         s.add_type(TypeKind.TY_INT, w, 1, 0)  // i1-i7
     s.add_type(TypeKind.TY_INT, 12, 0, 0)  // u12
@@ -4212,12 +4237,12 @@ impl Sema:
         if self.scope_lookup(sym) >= 0:
             return sym
         let head: i32 = self.displaced_fn_index.get(sym).unwrap()
-        var chosen = 0
+        var chosen: i32 = 0
         // #1882: a c_import's displaced definition carries its importer's
         // path, but it is the importer's IMPORT (tier 3), not its own
         // declaration (tier 2): the module's own `fn twice` outranks the
         // header's `twice`, which its namespace still names (D70).
-        var own_import = 0
+        var own_import: i32 = 0
         var i = head
         while i >= 0 and chosen == 0:
             if self.displaced_fn_paths[i] == self.current_module_path:
@@ -4337,7 +4362,7 @@ impl Sema:
     // last. -1 when no explicit import provides the name.
     fn last_import_provider(sym: i32, cands: &List[i32], paths: &List[str], pubs: &List[i32]) -> i32:
         let name: str = with_str_clone_ref(self.pool_resolve(sym))
-        var best = -1
+        var best: i32 = -1
         var best_pos = -1
         for ci in 0..cands.len() as i32:
             let pos = self.import_position_of(cands[ci], paths[ci], pubs[ci], name)
@@ -4376,7 +4401,7 @@ impl Sema:
         let to: i32 = target.unwrap()
         if from < 0 or from >= self.module_import_starts.len() as i32:
             return -1
-        var best = -1
+        var best: i32 = -1
         let start = self.module_import_starts[from]
         for ei in 0..self.module_import_counts[from]:
             let idx = start + ei
@@ -5090,9 +5115,9 @@ impl Sema:
 
     fn lookup_named_type_filtered(sym: i32, gated: i32) -> i32:
         let named_tid = if self.named_types.contains(sym): self.named_types.get(sym).unwrap() else: 0
-        var global_tid = 0
-        var saw_recorded = 0
-        var saw_named_tid = 0
+        var global_tid: i32 = 0
+        var saw_recorded: i32 = 0
+        var saw_named_tid: i32 = 0
         // The scoped tier first (#1967): `Self` and a generic type parameter
         // are inserted into named_types directly, with no module candidate,
         // and are lexically closer than any module's declaration — a visible
@@ -5619,7 +5644,7 @@ impl Sema:
         let source_len = if source_index == 0: self.source_text.len() as i32 else: self.source_texts[(source_index - 1)].len() as i32
         if clamped > source_len:
             clamped = source_len
-        var lo = 0
+        var lo: i32 = 0
         var hi = offsets.len() as i32
         while lo < hi:
             let mid = lo + (hi - lo) / 2
@@ -5722,7 +5747,7 @@ impl Sema:
 
     fn index_exact_type(tid: i32, kind: i32, d0: i32, d1: i32, d2: i32):
         let key = sema_exact_type_hash(kind, d0, d1, d2)
-        var head = -1
+        var head: i32 = -1
         if self.exact_type_cache_heads.contains(key):
             head = self.exact_type_cache_heads.get(key).unwrap()
         var existing = head
@@ -6438,7 +6463,7 @@ impl Sema:
         // user module's `type PullCore { .. }` beside std.task's private
         // `PullCore[G]`) must not pick a non-generic namesake.
         let base_sym = self.get_type_d0(resolved)
-        var generic_only = 0
+        var generic_only: i32 = 0
         var i = self.named_type_candidate_head(base_sym)
         while i >= 0:
             let candidate_tid = self.resolve_alias(self.named_type_candidate_tids[i] as TypeId) as i32
@@ -6478,7 +6503,7 @@ impl Sema:
             return 0
         self.get_type_d2(tid)
 
-    fn get_generic_inst_arg(tid: i32, index: i32) -> i32:
+    fn get_generic_inst_arg(tid: i32, index: isize) -> i32:
         if self.get_type_kind(tid as TypeId) != TypeKind.TY_GENERIC_INST:
             return 0
         let extra_start = self.get_type_d1(tid)
@@ -6617,9 +6642,12 @@ impl Sema:
         exact_int_fits_unsigned_bits(mag, bits)
 
     mut fn numeric_literal_expected_type(node: i32) -> i32:
-        if self.has_expected_type == 0 or self.expected_expr_type == 0:
+        // One reading of a literal's context, shared with literal expressions
+        // (an Option or Result payload, a `&N` auto-reference; §4.2.1).
+        let context = self.untyped_literal_context_type()
+        if context == 0:
             return 0
-        let expected = self.numeric_operand_type(self.expected_expr_type as i32)
+        let expected = self.numeric_operand_type(context as i32)
         if not self.is_numeric_type(expected):
             return 0
         if self.in_bitwise_literal_context != 0:
@@ -6747,7 +6775,7 @@ impl Sema:
             let d0_text = self.pool_resolve_symbol(d0)
             if d0_text.len() == 0:
                 return tid
-            var found = 0
+            var found: i32 = 0
             var found_count = 0
             for si2 in 0..count:
                 let subst_sym2 = subst_syms[si2]
@@ -6914,15 +6942,20 @@ impl Sema:
     // four-byte place, and a `&u32` as `&i32` rereads the bits with the other
     // sign. The numeric pointees of two references must have one layout.
     fn ref_numeric_pointees_differ(exp_r: i32, act_r: i32) -> i32:
-        let ep = self.resolve_alias(self.get_type_d0(exp_r) as TypeId)
-        let ap = self.resolve_alias(self.get_type_d0(act_r) as TypeId)
+        if self.numeric_types_differ(self.get_type_d0(exp_r), self.get_type_d0(act_r)): 1 else: 0
+
+    // Two numeric types of different layouts (width, sign, int beside float).
+    // A non-numeric type on either side is not this question.
+    fn numeric_types_differ(a: i32, b: i32) -> bool:
+        let ep = self.resolve_alias(a as TypeId)
+        let ap = self.resolve_alias(b as TypeId)
         let ek = self.get_type_kind(ep)
         let ak = self.get_type_kind(ap)
         if ek == TypeKind.TY_INT and ak == TypeKind.TY_INT:
-            return if self.get_type_d0(ep) != self.get_type_d0(ap) or self.get_type_d1(ep) != self.get_type_d1(ap): 1 else: 0
+            return self.get_type_d0(ep) != self.get_type_d0(ap) or self.get_type_d1(ep) != self.get_type_d1(ap)
         if ek == TypeKind.TY_FLOAT and ak == TypeKind.TY_FLOAT:
-            return if self.get_type_d0(ep) != self.get_type_d0(ap): 1 else: 0
-        if (ek == TypeKind.TY_INT and ak == TypeKind.TY_FLOAT) or (ek == TypeKind.TY_FLOAT and ak == TypeKind.TY_INT): 1 else: 0
+            return self.get_type_d0(ep) != self.get_type_d0(ap)
+        (ek == TypeKind.TY_INT and ak == TypeKind.TY_FLOAT) or (ek == TypeKind.TY_FLOAT and ak == TypeKind.TY_INT)
 
     mut fn pointer_pointees_compatible(exp_r: i32, act_r: i32) -> i32:
         let exp_mut = self.get_type_d1(exp_r)
@@ -6941,7 +6974,7 @@ impl Sema:
 
     mut fn emit_pending_generic_binding_error(sym: i32):
         let binding_name: str = with_str_clone_ref(self.pool_resolve(sym))
-        var node = 0
+        var node: i32 = 0
         if self.pending_generic_binding_decl.contains(sym):
             node = self.pending_generic_binding_decl.get(sym).unwrap()
         else if self.pending_generic_binding_call.contains(sym):
@@ -7795,7 +7828,7 @@ impl Sema:
         let trace_move = runtime_getenv("WITH_TRACE_MOVE").len() > 0
         if trace_move:
             with_eprint(f"[trace-move] continue back-edge: frame={frame_idx} bindings={boundary}")
-        var i = 0
+        var i: i32 = 0
         while i < boundary:
             let entry_state = if off >= 0 and (off + i) < self.loop_entry_flat.len() as i32: self.loop_entry_flat[(off + i)] else: VarState.LIVE
             let cur_state = if i < self.bind_states.len() as i32: self.bind_states[i] else: VarState.LIVE
@@ -7826,7 +7859,7 @@ impl Sema:
         if trace_move:
             with_eprint(f"[trace-move] loop finalize: body_diverges={body_diverges} bindings={entry_count}")
         if body_diverges == 0:
-            var i = 0
+            var i: i32 = 0
             while i < entry_count:
                 // Scoped to needs-drop values (like the conditional-move feature): a
                 // moved-out POD List is a non-destructive copy today (#607), and the
@@ -8205,7 +8238,7 @@ impl Sema:
         if self.needs_drop_visit.contains(resolved as i32):
             return 0
         self.needs_drop_visit.insert(resolved as i32)
-        var result = 0
+        var result: i32 = 0
         if tk == TypeKind.TY_TUPLE:
             let te_start = self.get_type_d0(resolved)
             let elem_count = self.get_type_d1(resolved)
@@ -8224,7 +8257,7 @@ impl Sema:
                     break
             if result == 0:
                 let variant_count = self.type_reflection_variant_count(resolved as i32)
-                var vidx = 0
+                var vidx: i32 = 0
                 while vidx < variant_count and result == 0:
                     let payload_count = self.type_reflection_variant_payload_count(resolved as i32, vidx)
                     for pi in 0..payload_count:
@@ -8433,7 +8466,7 @@ impl Sema:
         if self.needs_drop_visit.contains(resolved as i32):
             return 0
         self.needs_drop_visit.insert(resolved as i32)
-        var result = 0
+        var result: i32 = 0
         if tk == TypeKind.TY_GENERIC_INST:
             for ai in 0..self.get_generic_inst_arg_count(resolved as i32):
                 if self.type_owns_user_drop(self.get_generic_inst_arg(resolved as i32, ai)) != 0:
@@ -8453,7 +8486,7 @@ impl Sema:
                 if self.type_owns_user_drop(fty) != 0:
                     result = 1
                     break
-            var vidx = 0
+            var vidx: i32 = 0
             while vidx < self.type_reflection_variant_count(resolved as i32) and result == 0:
                 for pi in 0..self.type_reflection_variant_payload_count(resolved as i32, vidx):
                     let pty = self.type_reflection_variant_payload_type(resolved as i32, vidx, pi)
@@ -8473,7 +8506,7 @@ impl Sema:
         if self.needs_drop_visit.contains(resolved as i32):
             return 0
         self.needs_drop_visit.insert(resolved as i32)
-        var result = 0
+        var result: i32 = 0
         let tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_GENERIC_INST:
             let arg_count = self.get_generic_inst_arg_count(resolved as i32)
@@ -8499,7 +8532,7 @@ impl Sema:
                     break
             if result == 0:
                 let variant_count = self.type_reflection_variant_count(resolved as i32)
-                var vidx = 0
+                var vidx: i32 = 0
                 while vidx < variant_count and result == 0:
                     let payload_count = self.type_reflection_variant_payload_count(resolved as i32, vidx)
                     for pi in 0..payload_count:
@@ -9187,7 +9220,7 @@ impl Sema:
             changed = 0
             guard = guard + 1
             var i = 0
-            var edge_index = 0
+            var edge_index: i32 = 0
             while i + 3 < n:
                 let caller_sig: i32 = self.effect_flow_edges[i]
                 let caller_pi: i32 = self.effect_flow_edges[(i + 1)]
@@ -9235,7 +9268,7 @@ impl Sema:
         self.drop_owner_for_fn_symbol(self.sig_names[sig]) != 0
 
     fn receiver_required_effect_for_decl(node: i32) -> i32:
-        var required = 0
+        var required: i32 = 0
         for si in 0..self.sig_names.len() as i32:
             if self.receiver_decl_node_for_sig(si) == node and self.sig_get_param_count(si) > 0:
                 required = required | (self.sig_param_effect(si, 0) & EFF_DECLARED_MASK)
@@ -9303,7 +9336,7 @@ pub fn receiver_required_mode_text(eff: i32) -> str:
     "read"
 
 impl Sema:
-    fn receiver_contract_error_count() -> i32:
+    fn receiver_contract_error_count() -> isize:
         var errors = 0
         for si in 0..self.sig_receiver_modes.len() as i32:
             let declared = self.sig_receiver_mode(si)
@@ -9469,7 +9502,7 @@ impl Sema:
                     if sema_pair_hi(entry) == self.binding_use_epoch:
                         last = sema_pair_lo(entry)
                 if last != 0:
-                    let verdict = if last > site_seq: 2 else: 1
+                    let verdict: i32 = if last > site_seq: 2 else: 1
                     self.consume_call_sites[(i + 8)] = verdict
             i = i + 9
 
@@ -9650,7 +9683,7 @@ impl Sema:
     fn sig_return_type(idx: i32) -> i32:
         self.sig_ret_types[idx]
 
-    fn sig_param_type(idx: i32, param_i: i32) -> i32:
+    fn sig_param_type(idx: i32, param_i: isize) -> i32:
         let start = self.sig_param_starts[idx]
         self.sig_params[(start + param_i)]
 
@@ -9896,7 +9929,7 @@ fn sema_levenshtein(a: &str, b: &str, max: i32) -> i32:
         var cur: List[i32] = List.new()
         cur.push(i)
         for j in 1..bl + 1:
-            let cost = if a[(i - 1)] == b[(j - 1)]: 0 else: 1
+            let cost: i32 = if a[(i - 1)] == b[(j - 1)]: 0 else: 1
             let del = prev[j] + 1
             let ins = cur[(j - 1)] + 1
             let sub = prev[(j - 1)] + cost
@@ -9912,7 +9945,7 @@ fn sema_levenshtein(a: &str, b: &str, max: i32) -> i32:
 impl Sema:
     fn suggest_name(target: &str, node: i32) -> str:
         if target.len() == 0: return ""
-        let max_dist = if target.len() as i32 <= 3: 1 else: 2
+        let max_dist: i32 = if target.len() as i32 <= 3: 1 else: 2
         var best_name = ""
         var best_dist = max_dist + 1
         // Search scope bindings
@@ -9939,7 +9972,7 @@ impl Sema:
     fn suggest_type_name(target: &str, node: i32) -> str:
         if target.len() == 0 or sema_str_has_data(target) == 0:
             return ""
-        let max_dist = if target.len() as i32 <= 3: 1 else: 2
+        let max_dist: i32 = if target.len() as i32 <= 3: 1 else: 2
         var best_name = ""
         var best_dist = max_dist + 1
         // Search named types by scanning type table
@@ -10037,8 +10070,10 @@ impl Sema:
         if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_GENERIC_INST:
             if self.generic_inst_accepts_unit_enum_value(act_r, exp_r) != 0:
                 return 1
+        // A range's bounds and a generic instance's arguments are part of
+        // its layout: their numeric types match exactly (#1368).
         if exp_k == TypeKind.TY_RANGE and act_k == TypeKind.TY_RANGE:
-            if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
+            if self.get_type_d1(exp_r) != self.get_type_d1(act_r) or self.numeric_types_differ(self.get_type_d0(exp_r), self.get_type_d0(act_r)):
                 return 0
             return self.types_compatible_fast(self.get_type_d0(exp_r), self.get_type_d0(act_r))
         // TypeKind.TY_GENERIC_INST: compatible if same base and all args compatible
@@ -10053,12 +10088,12 @@ impl Sema:
                         if self.get_type_kind(box_exp_arg_r) == TypeKind.TY_TRAIT_OBJ:
                             if self.type_implements_trait(box_act_arg, self.get_type_d0(box_exp_arg_r)) != 0:
                                 return 1
-                    var gi_all_match = 1
+                    var gi_all_match: i32 = 1
                     for gi_i in 0..gi_ac:
                         let gi_exp_arg = self.get_generic_inst_arg(exp_r, gi_i)
                         let gi_act_arg = self.get_generic_inst_arg(act_r, gi_i)
                         if gi_exp_arg != self.ty_void and gi_act_arg != self.ty_void:
-                            if self.types_compatible_fast(gi_exp_arg, gi_act_arg) == 0:
+                            if self.numeric_types_differ(gi_exp_arg, gi_act_arg) or self.types_compatible_fast(gi_exp_arg, gi_act_arg) == 0:
                                 gi_all_match = 0
                     return gi_all_match
             return 0
@@ -10100,6 +10135,11 @@ impl Sema:
         if exp_k == TypeKind.TY_SLICE and act_k == TypeKind.TY_SLICE:
             if self.get_type_d1(exp_r) != 0 and self.get_type_d1(act_r) == 0:
                 return 0
+            // A slice views its elements in place, as a reference views its
+            // pointee: an `[]i64` accepted as `[]i32` read half of each
+            // element (§4.2.6 converts values, never a view's elements).
+            if self.ref_numeric_pointees_differ(exp_r, act_r) != 0:
+                return 0
             return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
         if exp_k == TypeKind.TY_ARRAY and act_k == TypeKind.TY_ARRAY:
             if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
@@ -10134,14 +10174,26 @@ impl Sema:
                                 return 1
                     var gi_all_ok = 1
                     for gi_i in 0..gi_ec:
+                        // A type argument is part of the layout: an
+                        // aggregate's elements do not convert (#1368), so
+                        // `Box[isize]` is not a `Box[i32]` (an impl for one
+                        // read the other's fields at the wrong offsets).
+                        if self.numeric_types_differ(self.get_generic_inst_arg(exp_r, gi_i), self.get_generic_inst_arg(act_r, gi_i)):
+                            gi_all_ok = 0
+                            break
                         if self.types_compatible(self.get_generic_inst_arg(exp_r, gi_i), self.get_generic_inst_arg(act_r, gi_i)) == 0:
                             gi_all_ok = 0
                             break
                     if gi_all_ok != 0:
                         return 1
-        // Auto-referencing: T → &T
+        // Auto-referencing: T → &T. A narrower argument widens into the
+        // pointee (§4.2.6; #2336 materializes it); a wider one or another
+        // sign would be an implicit narrowing, which no position makes.
         if exp_k == TypeKind.TY_REF:
             if self.get_type_d1(exp_r) == 0:
+                let auto_pointee = self.get_type_d0(exp_r)
+                if self.numeric_types_differ(auto_pointee, act_r as i32) and self.implicit_numeric_join(auto_pointee as TypeId, act_r) != self.resolve_alias(auto_pointee as TypeId):
+                    return 0
                 if self.types_compatible(self.get_type_d0(exp_r), act_r) != 0:
                     return 1
         0
@@ -10313,7 +10365,7 @@ impl Sema:
                         if self.get_type_kind(box_exp_arg_r) == TypeKind.TY_TRAIT_OBJ:
                             if self.type_implements_trait_frozen(box_act_arg, self.get_type_d0(box_exp_arg_r)) != 0:
                                 return 1
-                    var gi_all_match = 1
+                    var gi_all_match: i32 = 1
                     for gi_i in 0..gi_ac:
                         let gi_exp_arg = self.get_generic_inst_arg(exp_r, gi_i)
                         let gi_act_arg = self.get_generic_inst_arg(act_r, gi_i)
@@ -10572,7 +10624,7 @@ impl Sema:
                 return 0
             self.copy_visit_stack.insert(resolved as i32)
 
-            var out = 1
+            var out: i32 = 1
             if tk == TypeKind.TY_ARRAY:
                 out = self.is_copy(self.get_type_d0(resolved))
             else if tk == TypeKind.TY_TUPLE:

@@ -6,7 +6,7 @@
 // no receiver-returning aliases or intermediate owners; `v` drops both elements
 // and the List buffer exactly once.
 
-var COUNT = 0
+var COUNT: i32 = 0
 
 type W { tag: i32 }
 impl Drop for W:

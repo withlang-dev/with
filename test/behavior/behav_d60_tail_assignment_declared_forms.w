@@ -32,7 +32,7 @@ fn keep[T](x: T) -> T:
     y = y
 
 fn brace -> i32 {
-    var n = 1
+    var n: i32 = 1
     n += 1
 }
 

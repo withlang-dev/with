@@ -13,7 +13,7 @@ type Big { @[align(128)] n: i64 }
 type Named { @[align(64)] s: str, k: i64 }
 
 fn count_aligned_al(v: &List[Al]) -> i32:
-    var ok = 0
+    var ok: i32 = 0
     for i in 0..v.len() as i32:
         if (&raw const v[i].b as i64) % 32 == 0: ok += 1
     ok

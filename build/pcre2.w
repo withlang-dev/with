@@ -110,7 +110,7 @@ fn pcre2_normalize_heap_output(text: &str) -> str:
     while line_count > 0 and lines[(line_count - 1)].len() == 0:
         line_count = line_count - 1
     var out = ""
-    var frame_count = 0
+    var frame_count: i32 = 0
     var i = 0
     while i < line_count:
         let line = lines[i]

@@ -30,7 +30,7 @@ c facade dir_probe:
         lend
 
 fn count(d: &CDir) -> i32:
-    var n = 0
+    var n: i32 = 0
     while d.readdir() != null:
         n = n + 1
     n

@@ -7,7 +7,7 @@
 fn fib(n: i32) -> i32: if n < 2: n else: fib(n - 1) + fib(n - 2)
 fn square(x: i32) -> i32: x * x
 fn sum_to(n: i32) -> i32:
-    var total = 0
+    var total: i32 = 0
     for i in 1..n + 1: total += square(i)
     total
 

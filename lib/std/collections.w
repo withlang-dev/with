@@ -56,7 +56,7 @@ pub fn BTreeMap.new[K, V]() -> BTreeMap[K, V]:
     BTreeMap { entries: List.new() }
 
 impl[K: Ord, V] BTreeMap[K, V]:
-    pub fn len() -> i64:
+    pub fn len() -> isize:
         self.entries.len()
 
 impl[K, V] BTreeMap[K, V]:
@@ -192,9 +192,9 @@ fn debug_entry_order(keys: &List[str], values: &List[str]) -> List[i64]:
     for i in 0..n:
         order.push(i)
         scratch.push(i)
-    var width: i64 = 1
+    var width: isize = 1
     while width < n:
-        var lo: i64 = 0
+        var lo: isize = 0
         while lo < n:
             let mid = if lo + width < n: lo + width else: n
             let hi = if lo + 2 * width < n: lo + 2 * width else: n
@@ -217,7 +217,7 @@ pub fn BTreeSet.new[T]() -> BTreeSet[T]:
     BTreeSet { values: List.new() }
 
 impl[T: Ord] BTreeSet[T]:
-    pub fn len() -> i64:
+    pub fn len() -> isize:
         self.values.len()
 
 impl[T] BTreeSet[T]:
@@ -645,7 +645,7 @@ pub type DropWhileIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool, dropping:
 pub type ZipIter[A, B, T, U] ephemeral { left: A, right: B }
 
 /// Lazy iterator adapter produced by `.enumerate()`.
-pub type EnumerateIter[I, T] ephemeral { iter: I, idx: i64 }
+pub type EnumerateIter[I, T] ephemeral { iter: I, idx: isize }
 
 /// Lazy iterator adapter produced by `.chain(other)`.
 pub type ChainIter[A, B, T] ephemeral { left: A, right: B, use_right: bool }
@@ -694,8 +694,8 @@ impl[I, T] Iter[T] for DropWhileIter[I, T]:
 impl[A, B, T, U] Iter[(T, U)] for ZipIter[A, B, T, U]:
     mut fn next() -> Option[(T, U)]: self.next()
 
-impl[I, T] Iter[(i64, T)] for EnumerateIter[I, T]:
-    mut fn next() -> Option[(i64, T)]: self.next()
+impl[I, T] Iter[(isize, T)] for EnumerateIter[I, T]:
+    mut fn next() -> Option[(isize, T)]: self.next()
 
 impl[A, B, T] Iter[T] for ChainIter[A, B, T]:
     mut fn next() -> Option[T]: self.next()

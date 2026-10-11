@@ -75,7 +75,7 @@ fn by_ref_u8(k: &KU8) -> i32:
         .Top => 4
 
 fn stmt_u8(k: KU8) -> i32:
-    var out = 0
+    var out: i32 = 0
     match k:
         .Red => out = 100
         .Blue => out = 200
@@ -133,7 +133,7 @@ fn by_ref_i8(k: &KI8) -> i32:
         .Top => 4
 
 fn stmt_i8(k: KI8) -> i32:
-    var out = 0
+    var out: i32 = 0
     match k:
         .Red => out = 100
         .Blue => out = 200
@@ -191,7 +191,7 @@ fn by_ref_u16(k: &KU16) -> i32:
         .Top => 4
 
 fn stmt_u16(k: KU16) -> i32:
-    var out = 0
+    var out: i32 = 0
     match k:
         .Red => out = 100
         .Blue => out = 200
@@ -249,7 +249,7 @@ fn by_ref_i16(k: &KI16) -> i32:
         .Top => 4
 
 fn stmt_i16(k: KI16) -> i32:
-    var out = 0
+    var out: i32 = 0
     match k:
         .Red => out = 100
         .Blue => out = 200
@@ -307,7 +307,7 @@ fn by_ref_u32(k: &KU32) -> i32:
         .Top => 4
 
 fn stmt_u32(k: KU32) -> i32:
-    var out = 0
+    var out: i32 = 0
     match k:
         .Red => out = 100
         .Blue => out = 200
@@ -365,7 +365,7 @@ fn by_ref_i32(k: &KI32) -> i32:
         .Top => 4
 
 fn stmt_i32(k: KI32) -> i32:
-    var out = 0
+    var out: i32 = 0
     match k:
         .Red => out = 100
         .Blue => out = 200
@@ -423,7 +423,7 @@ fn by_ref_u64(k: &KU64) -> i32:
         .Top => 4
 
 fn stmt_u64(k: KU64) -> i32:
-    var out = 0
+    var out: i32 = 0
     match k:
         .Red => out = 100
         .Blue => out = 200
@@ -481,7 +481,7 @@ fn by_ref_i64(k: &KI64) -> i32:
         .Top => 4
 
 fn stmt_i64(k: KI64) -> i32:
-    var out = 0
+    var out: i32 = 0
     match k:
         .Red => out = 100
         .Blue => out = 200

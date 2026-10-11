@@ -4,7 +4,7 @@
 // so `xs` drops its element and buffer exactly once locally. The trailing work
 // in `main` would expose premature or duplicate cleanup via heap corruption.
 
-var COUNT = 0
+var COUNT: i32 = 0
 
 type W { tag: i32 }
 impl Drop for W:

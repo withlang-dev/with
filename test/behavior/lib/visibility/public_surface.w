@@ -7,7 +7,7 @@ type PrivateType {
 
 const PRIVATE_CONST = 2
 
-global PRIVATE_GLOBAL = 3
+global PRIVATE_GLOBAL: i32 = 3
 
 pub type PublicType {
     value: i32,

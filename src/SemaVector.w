@@ -36,12 +36,12 @@ impl Sema:
         for li in 0..lanes.len() as i32:
             let lane = lanes[li]
             let bits = self.get_type_d0(lane as TypeId)
-            for total in [128, 256, 512]:
+            for total in [128i32, 256, 512]:
                 let n = total / bits
                 let tid = self.vector_type(lane, n)
                 self.register_prim(self.type_name(lane) ++ f"x{n}", tid)
-        for w in [8, 16, 32, 64, 128]:
-            for total in [128, 256, 512]:
+        for w in [8i32, 16, 32, 64, 128]:
+            for total in [128i32, 256, 512]:
                 let n = total / w
                 self.register_prim(f"m{w}x{n}", self.mask_type(w, n))
 
@@ -358,8 +358,8 @@ impl Sema:
         // other operand or from the context; two scalars with no vector
         // context have no one meaning and are refused.
         var vec_ty = if self.has_expected_type != 0 and self.is_vector_type(self.expected_expr_type as i32): self.expected_expr_type as i32 else: 0
-        var a_ty = 0
-        var b_ty = 0
+        var a_ty: i32 = 0
+        var b_ty: i32 = 0
         if vec_ty == 0 and not self.expr_is_untyped_literal_arith(a_node):
             let a_exact = self.check_expr_value_context(a_node) as i32
             a_ty = self.vector_value_type(a_node, a_exact)
@@ -406,7 +406,7 @@ impl Sema:
         if not self.is_vector_or_mask_type(recv_ty): return -1
         let name = self.pool_resolve_symbol(field).clone()
         let type_text = self.type_name(recv_ty)
-        var op = 0
+        var op: i32 = 0
         if self.is_mask_type(recv_ty):
             if name == "select": return self.check_vector_select(node, recv_ty, self.ast.get_data1(node), arg_count)
             if name == "all": op = VectorOp.ALL as i32

@@ -11,7 +11,7 @@ use race_shadowed_global
 async fn work() -> i32: 1
 
 fn bump() -> i32:
-    var counter = 5
+    var counter: i32 = 5
     counter += 1
     counter
 

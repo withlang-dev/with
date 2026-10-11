@@ -75,10 +75,10 @@ fn main:
     t1 += 1
     print(f"{t0} {t1} {t.0} {t.1}")
 
-    var (n, s) = (5, "hello")
+    var (n, s): (i32, str) = (5, "hello")
     n.bump()
     s.behead()
-    var (m, (k, u)) = (1, (2, "xyz"))
+    var (m, (k, u)): (i32, (i32, str)) = (1, (2, "xyz"))
     m.bump()
     k.bump()
     u.behead()

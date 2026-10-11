@@ -65,7 +65,7 @@ fn clear_bit(val: i32, bit: u32) -> i32:
     val & ~(1 << bit)
 
 fn test_bit_set_clear:
-    var x = 0
+    var x: i32 = 0
     x = set_bit(x, 0)
     assert(x == 1)
     x = set_bit(x, 3)

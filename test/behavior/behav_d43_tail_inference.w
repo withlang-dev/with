@@ -97,10 +97,10 @@ fn partial_match(e: Event):
         Key => seen = 5
 
 fn main:
-    let a: i32 = pick(true)
-    let b: i32 = pick_block(true)
-    let c: i32 = pick_match(false)
-    let d: i32 = pick_match_block(false)
+    let a: isize = pick(true)
+    let b: isize = pick_block(true)
+    let c: isize = pick_match(false)
+    let d: isize = pick_match_block(false)
     assert(a == 1 and b == 1 and c == 2 and d == 2)
     assert(pick_block(false) == 2)
     assert(sign(-4) == -1 and sign(0) == 0 and sign(9) == 1)

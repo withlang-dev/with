@@ -237,13 +237,13 @@ fn ret_sorted_strings(items: List[str]) -> List[str]:
     sorted
 
 fn ret_release_version_component(version: &str, part: i32) -> i32:
-    var start = 0
+    var start: isize = 0
     if version.starts_with("v"):
         start = 1
     var current = 0
     while current < part:
-        var dot = -1
-        for i in start..version.len() as i32:
+        var dot: isize = -1
+        for i in start..version.len():
             if version[i] == 46:
                 dot = i
                 break
@@ -251,14 +251,14 @@ fn ret_release_version_component(version: &str, part: i32) -> i32:
             return -1
         start = dot + 1
         current = current + 1
-    var end = version.len() as i32
-    for i in start..version.len() as i32:
+    var end = version.len()
+    for i in start..version.len():
         if version[i] == 46:
             end = i
             break
     if end <= start:
         return -1
-    var value = 0
+    var value: i32 = 0
     for i in start..end:
         let ch = version[i]
         if ch < 48 or ch > 57:

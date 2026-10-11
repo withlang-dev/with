@@ -275,7 +275,7 @@ impl Codegen:
         let ptr_ty = wl_ptr_type(self.context)
         let param_types: List[i64] = List.new()
         param_types.push(ptr_ty)
-        var pi = 1
+        var pi: i32 = 1
         while pi < param_count:
             let p_type_node = self.pool.fn_param_type(param_start, pi)
             if codegen_type_node_mentions_self(self.pool, self.sym_Self, p_type_node) != 0:
@@ -394,7 +394,7 @@ impl Codegen:
         let dyn_ret_ty = wl_get_return_type(dyn_ft)
         let dyn_param_count = wl_count_param_types(dyn_ft)
         let has_sret = dyn_ret_ty == wl_void_type(self.context) and dyn_param_count == orig_param_count + 1
-        let base = if has_sret: 1 else: 0
+        let base: i32 = if has_sret: 1 else: 0
         // For the sret and async paths dyn_ft is authoritative (win64 aggregate
         // sret lowering / the reconstructed Task type). For a plain sync by-value
         // return the IMPL fn's actual monomorphized return is authoritative:
@@ -409,7 +409,7 @@ impl Codegen:
         if has_sret:
             wrapper_param_types.push(ptr_ty)
         wrapper_param_types.push(ptr_ty)
-        var pi = 1
+        var pi: i32 = 1
         while pi < orig_param_count:
             let pval = wl_get_param(method_fn, pi)
             wrapper_param_types.push(wl_type_of(pval))
@@ -558,7 +558,7 @@ impl Codegen:
         let final_ret_ty = self.sema_type_to_llvm(self.sema.sig_return_type(sig_idx))
         let abi_index = self.compute_fn_abi(final_ret_ty, param_types, param_flags, FN_ABI_WITH, 0)
         let abi: FnAbi = self.fn_abis[abi_index]
-        let param_offset = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let param_offset: i32 = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let fn_ty = abi.llvm_ty
         if fn_ty == 0 or wl_get_type_kind(fn_ty) != wl_function_type_kind():
             return
@@ -871,7 +871,7 @@ impl Codegen:
             let trait_method_idx = method_start + mi
             let param_start = self.trait_method_param_starts[trait_method_idx]
             let param_count = self.trait_method_param_counts[trait_method_idx]
-            let consumes_self =
+            let consumes_self: i32 =
                 if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
                 else: 0
             // The impl's method is the one Sema registered for this impl's
@@ -978,7 +978,7 @@ impl Codegen:
             let trait_method_idx = method_start + mi
             let param_start = self.trait_method_param_starts[trait_method_idx]
             let param_count = self.trait_method_param_counts[trait_method_idx]
-            let consumes_self =
+            let consumes_self: i32 =
                 if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
                 else: 0
             let method_name = self.intern.resolve(method_sym).clone()
@@ -1032,14 +1032,14 @@ impl Codegen:
             let trait_method_idx = method_start + mi
             let param_start = self.trait_method_param_starts[trait_method_idx]
             let param_count = self.trait_method_param_counts[trait_method_idx]
-            let consumes_self =
+            let consumes_self: i32 =
                 if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
                 else: 0
             let method_text: str = with_str_clone_ref(self.intern.resolve(method_sym))
             let row = self.sema.dyn_impl_method_row(concrete_sema_ty, trait_text, method_text)
             var fv: i64 = 0
             var ft: i64 = 0
-            var wrapper_fn_sym = 0
+            var wrapper_fn_sym: i32 = 0
             if row >= 0:
                 let cmf = self.ensure_concrete_mir_function(0, self.sema.dyn_impl_row_sig(row), self.sema.dyn_impl_row_mono_sym(row), 0, "dyn trait method " ++ type_name ++ "." ++ method_text)
                 fv = cmf.value

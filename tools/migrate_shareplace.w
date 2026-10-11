@@ -263,7 +263,7 @@ fn main:
             if edit_paths[e] == f: offs.push(edit_offsets[e])
         var sorted: List[i32] = List.new()
         while sorted.len() < offs.len():
-            var best = 2147483647
+            var best: i32 = 2147483647
             for o in offs:
                 var used = false
                 for s in sorted:

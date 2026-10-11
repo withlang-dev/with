@@ -34,7 +34,7 @@ fn main:
     var xs: List[i32] = List.new()
     xs.push(1)
     var ys: List[i32] = List.new()
-    for i in 0..3: ys.push(i)
+    for i in 0i32..3: ys.push(i)
     let v = if c: ys else: List.new()
     print(f"{v.len()} {xs.len()}")
 

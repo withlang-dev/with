@@ -45,7 +45,7 @@ impl[T: Ord] BinaryHeap[T]:
             let right = unsafe { &(*(b as *const Slot[T])).value }
             if left < right: -1 else if left > right: 1 else: 0
 
-    pub fn len() -> i32: unsafe { binary_heap_num_entries(self.heap) } as i32
+    pub fn len() -> isize: unsafe { binary_heap_num_entries(self.heap) } as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     pub mut fn push(value: T) -> Unit:

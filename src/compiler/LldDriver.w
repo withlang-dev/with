@@ -18,7 +18,7 @@ use compiler.Runtime
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_arg_count() -> i32
-extern fn with_arg_at(idx: i32) -> str
+extern fn with_arg_at(idx: isize) -> str
 
 // llvm::ArrayRef<const char *>: a pointer and a count, passed by value.
 type LldArgs { data: *const *mut u8, len: i64 }

@@ -23,7 +23,7 @@ fn main:
     var b64: [64]u32 = [0 as u32; 64]
     for i in 0..64: b64[i] = i as u32
     let c64 = b64
-    var bad = 0
+    var bad: i32 = 0
     for i in 0..64:
         if c64[i] != i as u32: bad = bad + 1
     check("u32", 64, bad)
@@ -77,7 +77,7 @@ fn main:
     check("u8", 100, bad)
 
     var p: [100]Pair = [Pair { a: 0, b: 0 }; 100]
-    for i in 0..100: p[i] = Pair { a: i, b: i * 2 }
+    for i in 0i32..100: p[i] = Pair { a: i, b: i * 2 }
     let pc = p
     bad = 0
     for i in 0..100:

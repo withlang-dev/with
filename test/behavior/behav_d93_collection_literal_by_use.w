@@ -44,7 +44,7 @@ fn main:
     let wide = [1, 3000000000]
     print(widest(wide))
     // A slice demand views the List; nothing is demanded.
-    let pair = [4, 5]
+    let pair: List[i32] = [4, 5]
     print(first_two(pair))
     // A typed place.
     let ys = [7, 8, 9]

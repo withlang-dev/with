@@ -4,8 +4,8 @@
 // unannotated local must not drop the function's implicit tail-expression
 // value. The global's type was left unresolved, propagated to the local, and
 // the tail was dropped as a type mismatch (returned the default).
-var GV = 7
-let GL = 10
+var GV: i32 = 7
+let GL: i32 = 10
 
 fn from_var() -> i32:
     let mid = GV

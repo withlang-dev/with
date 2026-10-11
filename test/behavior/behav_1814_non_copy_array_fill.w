@@ -15,8 +15,8 @@
 // a double free under the debug allocator). Run it with `--debug-alloc`:
 // leak count 0, no double free.
 
-global var MADE = 0
-global var DROPPED = 0
+global var MADE: i32 = 0
+global var DROPPED: i32 = 0
 
 type Tok:
     id: i32

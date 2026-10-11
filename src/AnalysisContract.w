@@ -53,7 +53,7 @@ fn contract_site(sema: &Sema, decl: i32, source_path: &str, source_text: &str) -
     }
 
 fn contract_line(source: &str, offset: i32) -> i32:
-    var line = 1
+    var line: i32 = 1
     let stop = if offset < source.len() as i32: offset else: source.len() as i32
     for i in 0..stop:
         if source[i] == '\n': line = line + 1
@@ -266,7 +266,7 @@ fn contract_collect_resource(report: &AnalysisReport, sema: &Sema, ri: i32, sour
             continue
         for k in 0..parents.len() as i32:
             let pi = parents[k]
-            var clause = 0
+            var clause: i32 = 0
             for bi in 0..r.borrows.len() as i32:
                 if r.borrows_owner[bi] == o and r.borrows[bi] == pi: clause = r.borrows_nodes[bi]
             let prov = if clause != 0: contract_clause_at(sema, &site, clause) else: "default:unknown independence is dependency (§16.2b.6)"
@@ -520,7 +520,7 @@ fn contract_collect_domain(report: &AnalysisReport, sema: &Sema, di: i32, source
     // A domain's block is the facade it was declared in; find that block's
     // declaration through a resource or item of the same facade, else the
     // main file.
-    var decl = -1
+    var decl: i32 = -1
     for ri in 0..sema.facade_resources.len() as i32:
         if sema.facade_resources[ri].facade == d.facade: decl = sema.facade_resources[ri].decl
     for ci in 0..sema.foreign_contracts.len() as i32:
@@ -730,7 +730,7 @@ pub fn analysis_audit_contract(report: &AnalysisReport, sema: &Sema, source_path
         let raw = e.sig == sema.get_sig(e.fn_sym)
         let fname = sema.safe_symbol_text(e.fn_sym)
         let form = if raw: f"the C call '{fname}'" else: f"the rendered call of '{fname}'"
-        for pi in 0..31:
+        for pi in 0i32..31:
             if (e.touch_params & sema_param_origin_bit(pi)) == 0:
                 continue
             if pi >= count:

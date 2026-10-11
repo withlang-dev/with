@@ -11,7 +11,7 @@ fn keep(handle: Handle) -> Handle:
 
 fn choose(flag: i32, handle: Handle) -> i32:
     var next = handle
-    var seen = 0
+    var seen: i32 = 0
     if flag == 1:
         seen = 10
     else if flag == 2:

@@ -12,7 +12,7 @@
 // field receiver here. Consuming `for w in xs` is intentionally NOT exercised (#607).
 
 use std.builtins.print_i32
-var DROPS = 0
+var DROPS: i32 = 0
 
 type W { tag: i32 }
 impl Drop for W:
@@ -31,7 +31,7 @@ fn mk(a: i32, b: i32, c: i32) -> List[W]:
 // `for w in &xs` over a local: read fields through &W; xs still usable afterwards.
 fn local_amp() -> i32:
     let xs: List[W] = mk(1, 2, 3)
-    var s = 0
+    var s: i32 = 0
     for w in &xs:
         s = s + w.tag
     s + (xs.len() as i32)            // over-fire guard: borrow didn't consume xs
@@ -40,7 +40,7 @@ fn local_amp() -> i32:
 // if lowered as a header copy); reads fields, h.items still usable afterwards.
 fn field_amp() -> i32:
     let h = H { items: mk(10, 20, 30) }
-    var s = 0
+    var s: i32 = 0
     for w in &h.items:
         s = s + w.tag
     s + (h.items.len() as i32)
@@ -48,7 +48,7 @@ fn field_amp() -> i32:
 // The explicit `.iter_ref()` form on a field receiver (was a crash before #607 fix).
 fn field_iter_ref() -> i32:
     let h = H { items: mk(100, 200, 300) }
-    var s = 0
+    var s: i32 = 0
     for w in h.items.iter_ref():
         s = s + w.tag
     s
@@ -58,7 +58,7 @@ fn pod_iter() -> i32:
     let ns: List[i32] = List.new()
     ns.push(4)
     ns.push(5)
-    var s = 0
+    var s: i32 = 0
     for n in ns:
         s = s + n
     s

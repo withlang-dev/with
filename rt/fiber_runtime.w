@@ -58,7 +58,7 @@ fn select_next_u32() -> u32:
     select_rng_state
 
 fn fiber_report_unhandled_panics() -> i32:
-    var had_unhandled = 0
+    var had_unhandled: i32 = 0
     while true:
         var fiber_id: i32 = 0
         var panic_msg: *const u8 = 0 as *const u8
@@ -129,7 +129,7 @@ fn fiber_take_detached_completed(fiber_id: i32, result_buf: *mut u8) -> i32:
         rt_libc_exit(134)
     1
 
-fn fiber_remove_detached_at(index: i32):
+fn fiber_remove_detached_at(index: isize):
     if index < 0 or index >= detached_fiber_count:
         return
     detached_fiber_count = detached_fiber_count - 1
@@ -161,9 +161,9 @@ fn fiber_clear_detached_buffers():
     detached_fiber_count = 0
 
 unsafe fn fiber_select_ready_index(fiber_ids: *const i32, count: i32, biased: i32) -> i32:
-    var chosen = -1
+    var chosen: i32 = -1
     var ready_seen = 0
-    var i = 0
+    var i: i32 = 0
     while i < count:
         let fid = *((fiber_ids as i64 + i as i64 * 4) as *const i32)
         if with_runtime_fiber_is_completed(fid) != 0:

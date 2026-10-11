@@ -18,7 +18,7 @@ type N { tag: Tag, next: List[N] }
 fn node(id: i32, kids: List[N]) -> N: N { tag: Tag { id: id }, next: kids }
 
 fn count(t: &N) -> i32:
-    var total = 1
+    var total: i32 = 1
     for k in t.next:
         total = total + count(k)
     total
@@ -26,7 +26,7 @@ fn count(t: &N) -> i32:
 fn main:
     let empty: List[N] = List.new()
     var leaves: List[N] = List.new()
-    for i in 0..4:
+    for i in 0i32..4:
         leaves.push(node(10 + i, List.new()))
     var mid: List[N] = List.new()
     mid.push(node(2, leaves))

@@ -27,5 +27,5 @@ fn main:
     print(made().n)
     let h = Holder { slot: empty(4) }
     print(h.slot.n)
-    let (first, rest): (i32, List[str]) = paired(5)
+    let (first, rest): (i32, List[str]) = paired(5i32)
     print(f"{first} {rest.len() + 7}")

@@ -12,7 +12,7 @@ fn exercise(method: &str, kind: &str, strict: bool):
     let label = f"binary_read_{method}_{kind}_{strict}"
     let root = p7_prepare_case(label, "binaryread")
     var bytes = StringBuilder.new()
-    for byte in [0, 1, 10, 13, 26, 127, 128, 255]: bytes.push_char(byte)
+    for byte in [0i32, 1, 10, 13, 26, 127, 128, 255]: bytes.push_char(byte)
     let payload = if kind == "empty": "" else: bytes.to_str()
     if kind == "binary" or kind == "empty": p7_write(root, "input.bin", payload)
     if kind == "directory": assert(mkdir_p(root ++ "/input.bin") == 0)

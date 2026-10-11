@@ -295,7 +295,7 @@ fn push_range(dst: List[str], src: &List[str], from: i32, to: i32) -> List[str]:
     out
 
 fn rfind_byte(text: &str, c: i32) -> i32:
-    var last = -1
+    var last: i32 = -1
     for i in 0..text.len() as i32:
         if text[i] == c: last = i
     last
@@ -321,7 +321,7 @@ fn split_spec:
     let n = lines.len() as i32
 
     // Front matter: everything before `# Part I`.
-    var part_start = -1
+    var part_start: i32 = -1
     for i in 0..n:
         if lines[i].starts_with("# Part I "):
             part_start = i
@@ -336,7 +336,7 @@ fn split_spec:
     // Walk the parts and chapters.
     var i = part_start
     var fence = false
-    var chapter_start = -1
+    var chapter_start: i32 = -1
     var chapter_id_now = ""
     var pending_part = ""
     while i <= n:
@@ -430,7 +430,7 @@ fn link_target(line: &str) -> str:
 fn reassemble_spec -> List[str]:
     let readme = read_lines("docs/spec/README.md")
     var out: List[str] = List.new()
-    var toc = -1
+    var toc: i32 = -1
     for i in 0..readme.len() as i32:
         if readme[i] == "## Table of Contents":
             toc = i
@@ -503,7 +503,7 @@ fn split_decisions:
     let lines = read_lines("docs/decisions.md")
     let n = lines.len() as i32
     var readme: List[str] = List.new()
-    var first = -1
+    var first: i32 = -1
     var fence = false
     for i in 0..n:
         if is_fence(lines[i]): fence = not fence
@@ -545,7 +545,7 @@ fn split_decisions:
 fn reassemble_decisions -> List[str]:
     let readme = read_lines("docs/meetings/README.md")
     var out: List[str] = List.new()
-    var idx = -1
+    var idx: i32 = -1
     for i in 0..readme.len() as i32:
         if readme[i] == "## Decisions":
             idx = i

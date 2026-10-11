@@ -114,7 +114,7 @@ impl CfgGraph:
         let st = self.state
         unsafe { st.edges.push(CfgEdge { from, to }) }
 
-    fn out_degree(node_id: i32) -> i32:
+    fn out_degree(node_id: i32) -> isize:
         let st = self.state
         var n = 0
         for i in 0..unsafe { st.edges.len() as i32 }:
@@ -193,8 +193,8 @@ fn build_block(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     if stmt_count == 0 and tail == 0:
         return graph.add_node(CfgNodeKind.Expr, start, end)
 
-    var prev = -1
-    var first = -1
+    var prev: i32 = -1
+    var first: i32 = -1
     for i in 0..stmt_count:
         let stmt_node = pool.get_extra(extra_start + i)
         let curr = build_expr(graph, pool, stmt_node)

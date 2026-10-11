@@ -8,5 +8,5 @@ extend Holder:
     pub fn add(ptr: i32) -> i32: self.v + ptr
 
 pub fn local_too -> i32:
-    let ptr = 40
+    let ptr: i32 = 40
     ptr + 2

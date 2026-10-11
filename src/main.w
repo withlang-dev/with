@@ -61,7 +61,7 @@ use std.string.StringBuilder
 
 extern fn with_arg_count() -> i32
 extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_arg_at(idx: i32) -> str
+extern fn with_arg_at(idx: isize) -> str
 extern fn with_fs_write_file(path: &str, data: &str) -> i32
 extern fn with_fs_mkdir_p(path: &str) -> i32
 extern fn with_fs_read_file(path: &str) -> str
@@ -628,11 +628,11 @@ fn cli_rewrite_semicolons(code: &str) -> str:
 // newline that ends the last one (0 when it opens with anything else). Read
 // from the code's tokens, so a `use` inside a string or a name like `user`
 // is never one, and a braced import list may span lines.
-fn cli_leading_use_len(code: &str) -> i32:
+fn cli_leading_use_len(code: &str) -> isize:
     var lexer = Lexer.init(code, 0)
     let tokens = lexer.tokenize()
     var end = 0
-    var i = 0
+    var i: i32 = 0
     while i < tokens.len():
         let tag = tokens.get_tag(i)
         if tag == TokenKind.TK_NEWLINE:
@@ -662,7 +662,7 @@ fn cli_leading_use_len(code: &str) -> i32:
 
 // `code` with its first `n` bytes blanked to spaces, newlines kept: the same
 // length, lines and columns.
-fn cli_blank_prefix(code: &str, n: i32) -> str:
+fn cli_blank_prefix(code: &str, n: isize) -> str:
     if n <= 0: return with_str_clone_ref(code)
     var out = StringBuilder.with_capacity(code.len())
     for i in 0..n:
@@ -785,7 +785,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     // body's (#2015): they are hoisted above the loop, and blanked to spaces
     // in the body so every byte after them keeps its line and column.
     var rewritten_parts: List[str] = List.new()
-    var use_lens: List[i32] = List.new()
+    var use_lens: List[isize] = List.new()
     for i in 0..one.code_parts.len():
         let rewritten = cli_rewrite_semicolons(one.code_parts[i])
         let use_len = cli_leading_use_len(rewritten)
@@ -1386,7 +1386,7 @@ fn single_run_reruns(rc: i32) -> List[str]:
 
 // ── Deep debug commands ─────────────────────────────────────────
 
-fn cli_double_dash_index(argc: i32) -> i32:
+fn cli_double_dash_index(argc: i32) -> isize:
     var i = 2
     while i < argc:
         if with_arg_at(i) == "--":
@@ -1456,7 +1456,7 @@ fn reduce_join_lines(lines: &List[str], skip_idx: i32) -> str:
 // while <name> still fails in the stage the original failed in (build vs
 // run) and, with --contains, with the same text.
 type ReducePredicate {
-    dashdash: i32,
+    dashdash: isize,
     contains: str,
     exit_mode: i32,
     exit_want: i32,
@@ -1608,7 +1608,7 @@ fn run_reduce_command(argc: i32) -> i32:
     var changed = true
     while changed:
         changed = false
-        var i = 0
+        var i: i32 = 0
         while i < lines.len() as i32:
             let candidate = reduce_join_lines(&lines, i)
             if with_fs_write_file(candidate_path, candidate) != 0:
@@ -1644,7 +1644,7 @@ fn fixpoint_arg(argc: i32, index: i32, fallback: &str) -> str:
             return v
     with_str_clone_ref(fallback)
 
-fn fixpoint_byte_at(text: &str, idx: i32) -> i32:
+fn fixpoint_byte_at(text: &str, idx: isize) -> i32:
     if idx < 0 or idx >= text.len() as i32:
         return -1
     text[idx]
@@ -2077,7 +2077,7 @@ fn run_build_action_worker_process(target: &BuildGraphTarget, options: &BuildCom
     rc
 
 fn build_pool_parse_jobs(value: &str) -> i32:
-    var out = 0
+    var out: i32 = 0
     for i in 0..value.len() as i32:
         let ch = value[i]
         if ch < 48 or ch > 57:
@@ -2172,7 +2172,7 @@ impl PoolState:
     fn live_len(): self.names.len() as i32 - self.oldest
 
     // Children still running: spawned and not yet reaped by a sweep.
-    fn running_len() -> i32:
+    fn running_len() -> isize:
         var n = 0
         for i in self.oldest..self.names.len() as i32:
             if self.done[i] == 0: n += 1
@@ -2395,7 +2395,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     // build(ctx) with live ToolFs effects; re-running them here would repeat
     // non-idempotent comptime filesystem mutations (e.g. extract_tar's symlink
     // -> EEXIST). Re-evaluate only to rebuild the declarative graph.
-    let suppress_side_effects = if build_action_worker_env_enabled() or build_test_worker_env_enabled(): 1 else: 0
+    let suppress_side_effects: i32 = if build_action_worker_env_enabled() or build_test_worker_env_enabled(): 1 else: 0
     var eval_result = unsafe { comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root, if options.strict_effects: 1 else: 0, suppress_side_effects) }
     if eval_result.error_msg.len() > 0:
         graph.ok = false
@@ -2622,7 +2622,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     // Declaration order stays the program order — the pool only overlaps runs
     // of consecutive marked targets; any other execution drains it first.
     var pool = PoolState.new()
-    var pool_failed_rc = 0
+    var pool_failed_rc: i32 = 0
     let pool_width = build_pool_width()
     // #921: the native runner is ensured lazily at the first eligible
     // Action target so non-action invocations never pay its compile.
@@ -2875,7 +2875,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 with_eprint("survey: skipping evidence target '" ++ target.name ++ "' (earlier failures)")
                 continue
             if not build_action_worker_env_enabled():
-                var worker_rc = 0
+                var worker_rc: i32 = 0
                 if build_runner_target_eligible(target, options, runner_path, &runner_fallback):
                     let effects_path = build_runner_effects_path(root, target.name)
                     let raw_rc = run_build_action_runner_process(runner_path, target, effects_path)
@@ -3178,7 +3178,7 @@ fn repo_lock_parse_pid(owner: &str) -> i32:
         end = end + 1
     if end == start:
         return -1
-    var pid = 0
+    var pid: i32 = 0
     for i in start..end:
         pid = pid * 10 + (owner[i] as i32 - 48)
     pid
@@ -4079,12 +4079,12 @@ fn maybe_synthesize_test_source(target: &str) -> str:
     synthesize_test_main_source(text, discovery.test_names)
 
 fn test_parse_i32(text: &str) -> i32:
-    var sign = 1
+    var sign: i32 = 1
     var i = 0
     if text.len() > 0 and text[0] == 45:
         sign = -1
         i = 1
-    var value = 0
+    var value: i32 = 0
     while i < text.len() as i32:
         let ch = text[i]
         if ch < 48 or ch > 57:
@@ -4169,9 +4169,9 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
     let only_on_prefix = "//! only-on: "
     let known_issue_prefix = "//! known-issue: "
     var unknown_line = ""
-    var unknown_line_no = 0
+    var unknown_line_no: i32 = 0
     var start = 0
-    var i = 0
+    var i: i32 = 0
     while i <= text_len:
         var ch = 10
         if i < text_len:
@@ -4305,7 +4305,7 @@ fn test_directives_present(d: &TestDirectives) -> bool:
     d.expect_stdout.len() > 0 or d.expect_stdout_contains.len() > 0 or d.expect_stderr.len() > 0 or d.has_expect_exit or d.expect_check_stdout.len() > 0 or d.expect_check_stdout_not.len() > 0 or d.expect_check_fail.len() > 0 or d.expect_check_fail_not.len() > 0 or d.expect_build_fail.len() > 0 or d.expect_build_stderr.len() > 0 or d.check_only or d.extra_args.len() > 0 or d.env_pairs.len() > 0 or d.known_issue.len() > 0
 
 fn nr_of_offset(text: &str, offset: i32) -> i32:
-    var n = 1
+    var n: i32 = 1
     for k in 0..offset:
         if text[k] == 10: n = n + 1
     n
@@ -4639,7 +4639,7 @@ fn test_output_lines(text: &str) -> List[str]:
         start = end + 1
     lines
 
-fn test_line_count(lines: &List[str], wanted: &str) -> i32:
+fn test_line_count(lines: &List[str], wanted: &str) -> isize:
     var n = 0
     for i in 0..lines.len() as i32:
         if lines[i] == wanted: n = n + 1
@@ -4651,7 +4651,7 @@ fn test_line_containing(lines: &List[str], fragment: &str) -> str:
     ""
 
 // The number of leading lines the two agree on.
-fn test_lines_agree(expected: &List[str], actual: &List[str]) -> i32:
+fn test_lines_agree(expected: &List[str], actual: &List[str]) -> isize:
     var k = 0
     while k < expected.len() as i32 and k < actual.len() as i32 and expected[k] == actual[k]: k = k + 1
     k
@@ -4680,11 +4680,11 @@ fn test_stdout_mismatch(expected: &List[str], actual: &List[str], stdout: &str) 
     if not test_lines_in_order(expected, actual): return "the expected lines print in a different order"
     "stdout has lines the expectations do not list"
 
-fn stdout_line_at(lines: &List[str], k: i32):
+fn stdout_line_at(lines: &List[str], k: isize):
     if k < lines.len() as i32: "`" ++ lines[k] ++ "`" else: "no more lines"
 
 // A window of `lines` from just before line `k`, numbered from 1.
-fn test_eprint_lines(label: &str, lines: &List[str], k: i32):
+fn test_eprint_lines(label: &str, lines: &List[str], k: isize):
     let total = lines.len() as i32
     with_eprint(f" = {label} ({total} lines):")
     var from = k - 3
@@ -4858,7 +4858,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
                 return 0
             print_test_summary(target, 0, 1, run_quiet)
             return 1
-        var passed = 0
+        var passed: i32 = 0
         let failed_tests: List[str] = List.new()
         var run_quiet = quiet
         if verbose:
@@ -5273,7 +5273,7 @@ fn doc_field(line: &str, key: &str) -> str:
     ""
 
 fn doc_parse_span_start(span: &str) -> i32:
-    var value = 0
+    var value: i32 = 0
     var i = 0
     while i < span.len() as i32:
         let ch = span[i]
@@ -5592,7 +5592,7 @@ fn run_fmt_command(argc: i32) -> i32:
         return 1
     let prefer_brace = cli_has_flag(argc, "--prefer-brace")
     let prefer_colon = cli_has_flag(argc, "--prefer-colon")
-    var fmt_style = 0
+    var fmt_style: i32 = 0
     if prefer_brace: fmt_style = 2
     if prefer_colon: fmt_style = 1
     var files: List[str] = List.new()
@@ -6028,7 +6028,7 @@ fn print_help_attributes:
 // ── Package management commands ─────────────────────────────────
 
 fn cli_parse_small_int(s: &str) -> i32:
-    var result = 0
+    var result: i32 = 0
     var i = 0
     let len = s.len() as i32
     while i < len:

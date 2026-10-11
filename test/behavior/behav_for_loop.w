@@ -74,7 +74,7 @@ fn test_for_accumulate_product:
     assert(product == 24)
 
 fn test_for_find_max:
-    let arr = [3, 7, 2, 9, 4]
+    let arr: List[i32] = [3, 7, 2, 9, 4]
     var max_val: i32 = arr[0]
     for v in arr:
         if v > max_val:

@@ -23,7 +23,7 @@ fn http_empty_response(status: i32) -> HttpResponse:
 fn http_parse_url(url: &str) -> HttpUrl:
     var host: str = ""
     var path: str = "/"
-    let port = 443
+    let port: i32 = 443
     if not url.starts_with("https://"):
         return HttpUrl { host, path, port }
 
@@ -47,7 +47,7 @@ fn http_build_get(host: &str, path: &str) -> str:
         "Accept: */*\r\n" ++
         "Connection: close\r\n\r\n"
 
-fn http_find_header_end(data: &str) -> i32:
+fn http_find_header_end(data: &str) -> isize:
     let len = data.len() as i32
     var i = 0
     while i < len - 3:
@@ -123,7 +123,7 @@ fn http_is_chunked(headers: &str) -> bool:
 
 fn http_decode_chunked(data: &str) -> str:
     var result = StringBuilder.new()
-    let dlen = data.len() as i32
+    let dlen = data.len()
     var pos = 0
     while pos < dlen:
         var chunk_size = 0

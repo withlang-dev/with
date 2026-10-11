@@ -34,7 +34,7 @@ fn run_reduce(bindings: &Bindings):
     let out_view = binding_view(bindings, "out").unwrap()
     let a_ptr = a_view.memory as *mut i32
     let out_ptr = out_view.memory as *mut i32
-    var sum = 0
+    var sum: i32 = 0
     var i: Size = 0usize
     let count = view_elem_count(a_view)
     while i < count:

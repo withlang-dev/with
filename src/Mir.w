@@ -350,7 +350,7 @@ fn mir_place_text_named(body: &MirBody, place_id: i32, pool: &InternPool, sema: 
         let pd = body.proj_d0[(p_start + i)]
         if pk == ProjKind.PK_FIELD:
             var rendered = ""
-            var next_ty = 0
+            var next_ty: i32 = 0
             if cur_ty != 0:
                 let resolved = sema.resolve_alias(cur_ty as TypeId)
                 let fcount = sema.type_reflection_field_count(resolved as i32)

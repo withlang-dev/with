@@ -9,18 +9,18 @@ use pre_d_build_runner
 
 fn ranges_text -> str:
     "fn count(r: Range[i32]) -> i32:\n" ++
-        "    var n = 0\n" ++
+        "    var n: i32 = 0\n" ++
         "    for _ in r:\n" ++
         "        n += 1\n" ++
         "    n\n" ++
         "fn count_inclusive(r: RangeInclusive[i32]) -> i32:\n" ++
-        "    var n = 0\n" ++
+        "    var n: i32 = 0\n" ++
         "    for _ in r:\n" ++
         "        n += 1\n" ++
         "    n\n" ++
         "fn main:\n" ++
-        "    let half = 2..7\n" ++
-        "    let closed = 2..=7\n" ++
+        "    let half: Range[i32] = 2..7\n" ++
+        "    let closed: RangeInclusive[i32] = 2..=7\n" ++
         "    assert(count(half) == 5)\n" ++
         "    assert(count_inclusive(closed) == 6)\n" ++
         "    assert(4 in half and not (7 in half) and 7 in closed)\n" ++

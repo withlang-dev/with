@@ -20,33 +20,33 @@ fn first(xs: &List[i32]) -> Option[&i32]: if xs.len() == 0: None else: Some(&xs[
 fn main:
     var seen = [0, 0]
     if true:
-        let n = 7
+        let n: i32 = 7
         let r = &n
         seen[0] = *r
         seen[1] = *r + 1
     print(f"array: {seen[0]} {seen[1]}")
     var got: List[i32] = List.new()
     if true:
-        let n = 7
+        let n: i32 = 7
         let r = &n
         got.push(*r)
     print(f"vec: {got[0]}")
     var a = Acc { last: 0, total: 0 }
     if true:
-        let n = 7
+        let n: i32 = 7
         let r = &n
         a.last = *r
         a.total = a.total + *r
     print(f"field: {a.last} {a.total}")
     var b = Bag { xs: List.new() }
     if true:
-        let n = 7
+        let n: i32 = 7
         let r = &n
         b.xs.push(*r)
     print(f"nested: {b.xs[0]}")
     var c = Bag { xs: List.new() }
     if true:
-        let n = 7
+        let n: i32 = 7
         c.add(&n)
     print(f"mut fn: {c.xs[0]}")
     var picked = [0]

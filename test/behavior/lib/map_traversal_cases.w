@@ -18,13 +18,13 @@ fn names() -> HashMap[str, str]:
     m
 
 fn total_len(m: &HashMap[str, str]) -> i32:
-    var n = 0
+    var n: i32 = 0
     for (k, v) in m:
         n += k.len() as i32 + v.len() as i32
     n
 
 fn count_long_values(m: &HashMap[str, str]) -> i32:
-    var n = 0
+    var n: i32 = 0
     for (k, v) in m:
         if v.len() < 4: continue
         n += 1
@@ -65,7 +65,7 @@ fn main:
 
     // Copy-class key and value bind by value.
     var squares: HashMap[i32, i32] = HashMap.new()
-    for i in 1..5: squares.insert(i, i * i)
+    for i in 1i32..5: squares.insert(i, i * i)
     var sum = 0
     for (k, v) in squares:
         assert(v == k * k)

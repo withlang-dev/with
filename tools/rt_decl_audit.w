@@ -24,7 +24,7 @@ fn ends_return_type(tag: i32) -> bool:
     tag == TokenKind.TK_COLON or tag == TokenKind.TK_NEWLINE or tag == TokenKind.TK_EOF
 
 fn line_of(text: &str, off: i32) -> i32:
-    var n = 1
+    var n: i32 = 1
     var i = 0
     while i < off:
         if text[i] == 10: n = n + 1

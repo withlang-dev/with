@@ -73,7 +73,7 @@ impl Sema:
             out = out ++ f"  join[{index}].arm[{ai}] role={d22_join_arm_role_name(arm_role)} kind={d22_join_arm_kind_name(arm_kind)} node={arm_node} origin-node={origin_node} exact={self.type_name(arm_ty)}\n"
         out
 
-    fn call_param_name(fn_sym: i32, param_i: i32) -> str:
+    fn call_param_name(fn_sym: i32, param_i: isize) -> str:
         if fn_sym <= 0 or param_i < 0:
             return ""
         if not self.fn_decl_nodes.contains(fn_sym):
@@ -119,7 +119,7 @@ impl Sema:
                     return 1
         0
 
-    mut fn emit_argument_type_mismatch(call_name: &str, fn_sym: i32, arg_index: i32, param_i: i32, expected_ty: i32, actual_ty: i32, arg_node: i32):
+    mut fn emit_argument_type_mismatch(call_name: &str, fn_sym: i32, arg_index: isize, param_i: isize, expected_ty: i32, actual_ty: i32, arg_node: i32):
         // D93: a parameter demands its collection of a literal's binding.
         self.note_literal_demand(arg_node, expected_ty, arg_node)
         if self.suppress_errors != 0:
@@ -214,7 +214,7 @@ impl Sema:
     fn node_line(node: i32) -> i32:
         let text = self.source_text_view_for_file_id(self.ast.file(node as NodeId) as i32)
         let start = self.ast.get_start(node)
-        var line = 1
+        var line: i32 = 1
         for i in 0..start:
             if i < text.len() as i32 and text[i] == '\n': line += 1
         line
@@ -272,6 +272,16 @@ impl Sema:
         if help.len() > 0:
             diag.add_help(help)
         self.diags.emit(move diag)
+
+    // An error that also points at a second place: where the fact it rests
+    // on came from.
+    mut fn emit_error_with_label(msg: &str, node: i32, label_node: i32, label: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
+        if self.suppress_errors != 0:
+            return
+        var diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
+        diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
+        diag.add_label(self.diagnostic_node_span(label_node), label)
+        self.diags.emit(diag)
 
     mut fn emit_warning(msg: &str, node: i32, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         var diag = Diagnostic.warn(facade_render_shown_names(msg), self.diagnostic_node_span(node))
@@ -458,7 +468,7 @@ impl Sema:
 
     // The adjustments in the program's own sources, without the embedded
     // stdlib's: what a fixture pins, unmoved by an edit to std.
-    fn contextual_copy_adjustments_outside_std() -> i32:
+    fn contextual_copy_adjustments_outside_std() -> isize:
         var paths: HashMap[i32, str] = HashMap.new()
         for di in 0..self.decl_source_file_ids.len():
             let file_id = self.decl_source_file_ids[di]
@@ -515,8 +525,8 @@ impl Sema:
                     out.push_str(fn_name)
                     out.push_str("(")
                     let meta = self.ast.find_fn_meta(decl)
-                    var param_start = 0
-                    var meta_param_count = 0
+                    var param_start: i32 = 0
+                    var meta_param_count: i32 = 0
                     if meta >= 0:
                         param_start = self.ast.fn_meta_param_start(meta)
                         meta_param_count = self.ast.fn_meta_param_count(meta)
@@ -553,8 +563,8 @@ impl Sema:
                     out.push_str(ext_name)
                     out.push_str("(")
                     let meta = self.ast.find_fn_meta(decl)
-                    var param_start = 0
-                    var meta_param_count = 0
+                    var param_start: i32 = 0
+                    var meta_param_count: i32 = 0
                     if meta >= 0:
                         param_start = self.ast.fn_meta_param_start(meta)
                         meta_param_count = self.ast.fn_meta_param_count(meta)
@@ -693,8 +703,8 @@ impl Sema:
                     with_write(fn_name)
                     with_write("(")
                     let meta = self.ast.find_fn_meta(decl)
-                    var param_start = 0
-                    var meta_param_count = 0
+                    var param_start: i32 = 0
+                    var meta_param_count: i32 = 0
                     if meta >= 0:
                         param_start = self.ast.fn_meta_param_start(meta)
                         meta_param_count = self.ast.fn_meta_param_count(meta)
@@ -729,8 +739,8 @@ impl Sema:
                     with_write(ext_name)
                     with_write("(")
                     let meta = self.ast.find_fn_meta(decl)
-                    var param_start = 0
-                    var meta_param_count = 0
+                    var param_start: i32 = 0
+                    var meta_param_count: i32 = 0
                     if meta >= 0:
                         param_start = self.ast.fn_meta_param_start(meta)
                         meta_param_count = self.ast.fn_meta_param_count(meta)

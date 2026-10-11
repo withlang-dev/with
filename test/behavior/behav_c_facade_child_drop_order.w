@@ -88,7 +88,7 @@ fn main:
     log_reset(l)
     if true:
         let db = Database.new(l, 4).unwrap()
-        for i in 1..4:
+        for i in 1i32..4:
             let s = Statement.new(db, 40 + i).unwrap()
             if i == 3:
                 break
@@ -98,7 +98,7 @@ fn main:
     if true:
         let db = Database.new(l, 5).unwrap()
         var all: List[Statement] = List.new()
-        for i in 1..4:
+        for i in 1i32..4:
             all.push(Statement.new(db, 50 + i).unwrap())
         let _ = all.len()
     print(f"vec: {witness(l)}")

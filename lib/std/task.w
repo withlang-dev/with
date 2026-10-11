@@ -33,11 +33,11 @@ fn task_wait_for_progress():
     if with_runtime_has_fibers() != 0:
         with_runtime_run_one_step()
 
-fn task_first_completed[T](pending: &List[Task[T]], finished: &List[i32]) -> i32:
+fn task_first_completed[T](pending: &List[Task[T]], finished: &List[i32]) -> isize:
     var winner = -1
     var winner_sequence: i64 = 0
     var i = 0
-    while i < pending.len() as i32:
+    while i < pending.len():
         if finished[i] == 0:
             let sequence = with_runtime_fiber_completion_sequence(pending[i].fiber_id)
             if sequence > 0 and (winner < 0 or sequence < winner_sequence):

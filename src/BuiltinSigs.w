@@ -135,11 +135,11 @@ pub fn builtin_sig_table() -> List[BuiltinSigRow]:
 // The byte range of parameter `index`'s declared type in `params`, as
 // (start, end); (-1, -1) when there is no such parameter. Parameters split
 // at the top-level commas.
-fn builtin_param_type_span(params: &str, index: i32) -> (i32, i32):
+fn builtin_param_type_span(params: &str, index: isize) -> (isize, isize):
     var depth = 0
     var param = 0
-    var start = -1
-    var i = 0
+    var start: i32 = -1
+    var i: i32 = 0
     while i < params.len():
         let c = params.byte_at(i)
         if c == '(' or c == '[': depth = depth + 1
@@ -157,7 +157,7 @@ fn builtin_param_type_span(params: &str, index: i32) -> (i32, i32):
 // (taken as one of the receiver's type parameters `T`, `K`, `V`), `t` taken.
 pub fn builtin_param_modes(params: &str) -> str:
     var modes = ""
-    var index = 0
+    var index: i32 = 0
     while true:
         let (start, end) = builtin_param_type_span(params, index)
         if start < 0:

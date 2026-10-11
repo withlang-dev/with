@@ -30,12 +30,12 @@ fn entries_outlive_map() -> List[(str, str)]:
     m.iter() |> map(e => (e.0.clone(), e.1.clone())) |> collect[List]()
 
 fn borrowed_keys(m: &HashMap[str, str]) -> i32:
-    var n = 0
+    var n: i32 = 0
     for k in m.keys(): n += k.len() as i32
     n
 
 fn total(xs: &List[str]) -> i32:
-    var n = 0
+    var n: i32 = 0
     for x in xs: n += x.len() as i32
     n
 
@@ -67,7 +67,7 @@ fn main:
 
     // A Copy element materializes under an owned demand (§3.8).
     var squares: HashMap[i32, i32] = HashMap.new()
-    for i in 1..4: squares.insert(i, i * i)
+    for i in 1i32..4: squares.insert(i, i * i)
     var key_sum = 0
     for k in squares.keys(): key_sum += k
     var value_sum = 0

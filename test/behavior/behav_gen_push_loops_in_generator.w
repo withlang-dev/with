@@ -36,7 +36,7 @@ fn main:
     for _ in evens(&nums):
         count += 1
     print(count)
-    let arr = [1, 2, 3, 4]
+    let arr: List[i32] = [1, 2, 3, 4]
     var twice = 0
     for d in doubled(&arr[1..3]):
         twice += d

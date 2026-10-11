@@ -7,7 +7,7 @@ fn a_macro_is_a_constant:
 
 @[test]
 fn a_struct_crosses_by_value_both_ways:
-    let values = [4, -2, 7, 1]
+    let values: List[i32] = [4, -2, 7, 1]
     let range = range_of(values)
     assert(range.low == -2 and range.high == 7)
     let wide = widened(range, 10)
@@ -17,13 +17,13 @@ fn a_struct_crosses_by_value_both_ways:
 
 @[test]
 fn c_calls_a_with_function_once_per_value:
-    let values = [3, 1, 2]
+    let values: List[i32] = [3, 1, 2]
     let seen = visited(values)
     assert(seen.len() == 3 and seen[0] == 3 and seen[1] == 1 and seen[2] == 2)
 
 @[test]
 fn c_calls_an_exported_with_function:
-    let values = [4, -2, 7, 1]
+    let values: List[i32] = [4, -2, 7, 1]
     // score() squares, and scores a negative as 0: 16 + 0 + 49 + 1.
     assert(total(values) == 66)
 
@@ -35,6 +35,6 @@ fn an_empty_slice_reaches_c_as_null_and_zero:
 @[test]
 fn a_c_global_is_readable:
     let before = calls()
-    let values = [1]
+    let values: List[i32] = [1]
     total(values)
     assert(calls() == before + 1)

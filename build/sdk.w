@@ -1958,7 +1958,7 @@ const SDK_GLIBC_LIB_SOVERS: [8]i32 = [6, 6, 2, 2, 0, 2, 1, 1]
 // The dynamic linker's file name (its soname and the ABI's path basename).
 pub fn sdk_linux_dynamic_linker(a: &str) -> str: if a == "aarch64": "ld-linux-aarch64.so.1" else: "ld-linux-x86-64.so.2"
 
-pub fn sdk_glibc_lib_file(index: i32, a: &str) -> str:
+pub fn sdk_glibc_lib_file(index: isize, a: &str) -> str:
     if SDK_GLIBC_LIB_NAMES[index] == "ld": return sdk_linux_dynamic_linker(a)
     f"lib{SDK_GLIBC_LIB_NAMES[index]}.so.{SDK_GLIBC_LIB_SOVERS[index]}"
 
@@ -2161,7 +2161,7 @@ fn sdk_glibc_cc(root: &str, clang: &str, resource_include: &str, zig_libc: &str,
 fn sdk_glibc_header_arch(a: &str) -> str: if a == "aarch64": "aarch64" else: "x86"
 
 // The public glibc headers, most specific first.
-fn sdk_glibc_header_dir(index: i32, a: &str) -> str:
+fn sdk_glibc_header_dir(index: isize, a: &str) -> str:
     if index == 0: return sdk_glibc_header_arch(a) ++ "-linux-gnu"
     if index == 1: return "generic-glibc"
     if index == 2: return sdk_glibc_header_arch(a) ++ "-linux-any"
@@ -2775,7 +2775,7 @@ pub fn run_windows_sysroot_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, f"only {sorted.len()} files for the Windows toolchain under " ++ prefix)
     let entries: List[ArchiveEntry] = List.new()
     for i in 0..sorted.len() as i32:
-        let mode = if sorted[i].ends_with(".exe"): 0o755 else: 0o644
+        let mode: i32 = if sorted[i].ends_with(".exe"): 0o755 else: 0o644
         entries.push(archive_file_entry(sdk_join(prefix, sorted[i]), sdk_owned_text(sorted[i]), mode))
     if fs.write_tar_gz(pack_path, entries) != 0:
         return sdk_fail(ctx, "could not write " ++ pack_path)
@@ -3103,7 +3103,7 @@ fn sdk_read_or_empty(ctx: &ActionCtx, path: &str) -> str:
     if ctx.fs().exists(path): ctx.fs().read_text(path) else: ""
 
 // The index of the last `ch` in `text`, or -1.
-fn sdk_last_index(text: &str, ch: i32) -> i32:
+fn sdk_last_index(text: &str, ch: i32) -> isize:
     var at = -1
     for i in 0..text.len() as i32:
         if text[i] as i32 == ch:
@@ -3534,7 +3534,7 @@ pub fn run_sdk_windows_libc_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, "could not create the Windows libc directories under " ++ libc_root)
     var rc = sdk_install_mingw_headers(ctx, source_dir, include_dir)
     if rc != 0: return rc
-    let width = 16
+    let width: i32 = 16
     let base = sdk_mingw_toolchain_flags(root, tools_prefix, include_dir, arch_name)
     var empty: List[SdkMakeVar] = List.new()
     let vars = sdk_mingw_parse_makefile(ctx, sdk_join(crt_dir, "Makefile.am"), ".", arch_name, move empty)

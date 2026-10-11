@@ -12,10 +12,10 @@ fn rank_of(entry: ImportedEntry) -> i32:
 
 fn local_from_if(ok: bool) -> LocalBox:
     if ok:
-        let value = 12
+        let value: i32 = 12
         LocalBox { value, label: "yes" }
     else:
-        let value = 13
+        let value: i32 = 13
         LocalBox { value, label: "no" }
 
 fn imported_from_if(ok: bool) -> ImportedEntry:

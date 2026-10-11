@@ -1359,7 +1359,7 @@ pub fn ToolFs.write_tar_gz(self: &Self, output_path: &str, entries: &List[Archiv
             if block.len() == 0 or not writer.append(block, block.len()): return 1
             var remaining = size
             while remaining > 0:
-                let count = if remaining > buffer.len(): buffer.len() else: remaining
+                let count = if remaining > buffer.len(): buffer.len() as i64 else: remaining
                 let got = fread(&raw mut buffer[0] as *mut c_void, 1, count as u64, input.handle)
                 if got == 0: return 1
                 if not writer.append(buffer, got as i64): return 1
@@ -1555,10 +1555,10 @@ fn tool_tar_trim_payload_name(text: &str) -> str:
         end = end - 1
     text.slice(0, end as i64)
 
-fn tool_pax_parse_decimal(text: &str, start: i32, end: i32) -> i32:
+fn tool_pax_parse_decimal(text: &str, start: isize, end: isize) -> i32:
     if start >= end:
         return -1
-    var value = 0
+    var value: i32 = 0
     var i = start
     while i < end:
         let ch = text[i]
@@ -1693,7 +1693,7 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
                 return tool_tar_extract_fail("could not open file entry: " ++ output_path)
             var remaining = size
             while remaining > 0:
-                let chunk = if remaining > buffer.len(): buffer.len() else: remaining
+                let chunk = if remaining > buffer.len(): buffer.len() as i64 else: remaining
                 if not tool_archive_read(input, &raw mut buffer[0], chunk):
                     return tool_tar_extract_fail("truncated file entry: " ++ output_path)
                 if not tool_archive_write(output, buffer, 0, chunk):
@@ -2503,9 +2503,9 @@ fn build_https_fetch_source() -> str:
     "use std.net\n" ++
     "use std.process\n" ++
     "use std.time\n\n" ++
-    "let ATTEMPTS = 5\n\n" ++
+    "const ATTEMPTS = 5\n\n" ++
     "fn number(text: &str) -> i32:\n" ++
-    "    var value = 0\n" ++
+    "    var value: i32 = 0\n" ++
     "    for i in 0..text.len() as i32:\n" ++
     "        if text[i] < '0' or text[i] > '9': return -1\n" ++
     "        value = value * 10 + (text[i] - '0') as i32\n" ++
@@ -2544,7 +2544,7 @@ fn build_https_fetch_source() -> str:
     "            print(f\"no connection to {host}:{port} (waited at most {connect_ms / 1000} s)\")\n" ++
     "            return 3\n" ++
     "        let _ = socket_close(fd)\n" ++
-    "    for attempt in 1..ATTEMPTS + 1:\n" ++
+    "    for attempt in 1i32..ATTEMPTS + 1:\n" ++
     "        if https_download_timeout(url.clone(), output.clone(), connect_ms, idle_ms) == 0: return 0\n" ++
     "        if attempt < ATTEMPTS:\n" ++
     "            print(f\"HTTPS download failed (attempt {attempt} of {ATTEMPTS}), retrying: \" ++ url)\n" ++
@@ -3009,8 +3009,8 @@ type WpCursor { text: str, pos: i64, ok: i32 }
 
 fn wp_parse_i32(s: &str, default_value: i32) -> i32:
     if s.len() == 0: return default_value
-    var v = 0
-    var sign = 1
+    var v: i32 = 0
+    var sign: i32 = 1
     var i: i64 = 0
     if s[0] == 45:
         sign = -1
@@ -3206,7 +3206,7 @@ fn ws_alloc_id(name: &str) -> i32:
     let _mk = with_fs_mkdir_p(root)
     let counter_path = root ++ "/next-id.txt"
     let text = with_fs_read_file(counter_path)
-    var id = 0
+    var id: i32 = 0
     if text.len() > 0:
         var i: i64 = 0
         while i < text.len():

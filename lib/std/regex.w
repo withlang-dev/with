@@ -728,8 +728,8 @@ impl Captures:
             end: end,
         })
 
-    pub fn len() -> i32:
-        (self.spans.len() as i32) / 2
+    pub fn len() -> isize:
+        self.spans.len() / 2
 
     pub fn by_name(name: &str) -> Option[Match]:
         let number = unsafe { regex_group_index(self.regex_ptr, name) }

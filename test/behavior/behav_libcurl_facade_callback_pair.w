@@ -23,7 +23,7 @@ fn on_data(ptr: *mut c_char, size: u64, nmemb: u64, sink: &fn(i32) -> Unit) -> u
 
 // The number of bytes libcurl handed the write callback, or -1.
 fn fetch(path: &str) -> i32:
-    var total = 0
+    var total: i32 = 0
     let sink = n => total = total + n
     let made = Easy.new()
     if made.is_none(): return -1

@@ -5,5 +5,5 @@
 use std.box.Box
 use std.builtins.print_i32
 fn main:
-    let b = Box.new(42)
+    let b = Box.new(42i32)
     print_i32(*b.as_ref())

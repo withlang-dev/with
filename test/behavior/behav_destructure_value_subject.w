@@ -42,7 +42,7 @@ fn first_some(b: i32) -> i32:
     v
 
 fn main:
-    let b = 3
+    let b: i32 = 3
     let (a1, b1) = if b > 0: lc(b) else: (1, 0)
     print(f"1 {a1} {b1}")
     let (a2, b2) = if b < 0: (1, 0) else: lc(b)
@@ -80,7 +80,7 @@ fn main:
     print(f"14 {a14}")
     let (a15, b15) = if b > 0: (lc(b).1, 0) else: (1, 0)
     print(f"15 {a15} {b15}")
-    let (s16, n16) = if b > 0: owned(2) else: ("n" ++ "o", 0)
+    let (s16, n16) = if b > 0: owned(2) else: ("n" ++ "o", 0i32)
     print(f"16 {s16} {n16}")
     let (a17, b17) = if b > 0:
         lc(b)

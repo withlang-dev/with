@@ -31,7 +31,7 @@ impl Counter:
     mut fn reset_to(n: i32):
         count = n
     fn total -> i32:
-        var sum = 0
+        var sum: i32 = 0
         for x in items: sum += x
         sum + count
     mut fn add(x: i32):

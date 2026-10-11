@@ -8,7 +8,7 @@ use std.collections
 
 fn count_all[C: Iterable[i32]](c: &C) -> i32:
     var walker = c.iter()
-    var n = 0
+    var n: i32 = 0
     while true:
         let nx = walker.next()
         if not nx.is_some():
