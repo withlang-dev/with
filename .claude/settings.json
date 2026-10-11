@@ -4,5 +4,18 @@
     "pr": "",
     "sessionUrl": false
   },
-  "includeCoAuthoredBy": false
+  "includeCoAuthoredBy": false,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "with run \"$CLAUDE_PROJECT_DIR\"/tools/hooks/battery_guard.w"
+          }
+        ]
+      }
+    ]
+  }
 }
