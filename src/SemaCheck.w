@@ -440,25 +440,35 @@ impl Sema:
     // `&*mut u8` view supplying an owned `*mut u8`, D22 §6.1) — a `&T` view
     // never decays to `*T` because compat(*T, T) fails below.
     mut fn can_contextually_copy_ref(expected: i32, actual: i32) -> i32:
+        if self.contextual_copy_value_type(expected, actual) != 0: 1 else: 0
+
+    // D22 §6.2: the Copy value an owned demand `expected` reads through the
+    // shared view `actual` — its pointee, or, for a view of a view (`&&str`
+    // in a `match` on `&Option[&str]`), the pointee's pointee (D111). 0 when
+    // the demand is not met by such a copy.
+    mut fn contextual_copy_value_type(expected: i32, actual: i32) -> i32:
         if expected == 0 or actual == 0:
             return 0
         let expected_resolved = self.resolve_alias(expected as TypeId)
         let expected_kind = self.get_type_kind(expected_resolved)
         if expected_kind == TypeKind.TY_REF:
             return 0
-        let actual_resolved = self.resolve_alias(actual as TypeId)
-        if self.get_type_kind(actual_resolved) != TypeKind.TY_REF or self.get_type_d1(actual_resolved) != 0:
-            return 0
-        let pointee = self.get_type_d0(actual_resolved)
-        if pointee == 0 or self.is_copy(pointee as TypeId) == 0:
-            return 0
-        if expected_kind == TypeKind.TY_PTR:
+        var view = self.resolve_alias(actual as TypeId)
+        for _ in 0..2:
+            if self.get_type_kind(view) != TypeKind.TY_REF or self.get_type_d1(view) != 0:
+                return 0
+            let pointee = self.get_type_d0(view)
+            if pointee == 0 or self.is_copy(pointee as TypeId) == 0:
+                return 0
             // A pointer-typed demand is a strict pointee match: `&*mut u8`
             // supplies `*mut u8`. builtin_arg_type_compatible's arithmetic
             // promotion must not apply (`&f64 as *const f64` is an address
             // cast, not a materialization).
-            return if self.types_compatible(expected as TypeId, pointee as TypeId) != 0: 1 else: 0
-        self.builtin_arg_type_compatible(expected, pointee)
+            let met = if expected_kind == TypeKind.TY_PTR: self.types_compatible(expected as TypeId, pointee as TypeId) != 0 else: self.builtin_arg_type_compatible(expected, pointee) != 0
+            if met:
+                return pointee
+            view = self.resolve_alias(pointee as TypeId)
+        0
 
     // Whether casting the shared reference `ref_ty` (`&T`) to `cast_ty` is the
     // reference relabeled as a raw pointer to the same pointee (`*const T` or
@@ -599,12 +609,12 @@ impl Sema:
             if tail == 0:
                 return 0
             return self.record_contextual_copy_adjustment(tail, expected, actual)
-        if self.can_contextually_copy_ref(expected, actual) == 0:
+        // The value read: one dereference, or two through a view of a view.
+        let pointee = self.contextual_copy_value_type(expected, actual)
+        if pointee == 0:
             return 0
         let context_sig = self.current_fn_sig_idx
         let context_key = sema_pair_key(context_sig, source_node)
-        let actual_resolved = self.resolve_alias(actual as TypeId)
-        let pointee = self.get_type_d0(actual_resolved)
         var post_copy_type: i32 = 0
         if self.resolve_alias(expected as TypeId) != self.resolve_alias(pointee as TypeId):
             post_copy_type = expected
@@ -866,8 +876,35 @@ impl Sema:
     // expressions eligible for Stage 2 adjustments. Synthetic carrier payloads
     // and lazy closure results use node 0 plus an origin node and role; later MIR
     // consumes that classification without pretending either is an AST value.
-    mut fn resolve_contextual_join(expected: i32, arm_nodes: &List[i32], origin_nodes: &List[i32], arm_types: &List[i32], arm_roles: &List[i32], report_node: i32, join_name: &str) -> i32:
+    // §4.9: when `report_node` is the final expression of the function's own
+    // body, the return is Result[T, E], and no arm is itself a Result, the
+    // join's value is the payload `Ok` wraps: T. Otherwise `expected`.
+    fn tail_join_ok_payload(expected: i32, report_node: i32, arm_types: &List[i32]) -> i32:
+        if self.body_tail_block == 0 or self.closure_body_depth != 0 or self.current_fn_sig_idx < 0:
+            return expected
+        let tail = if self.ast.kind(self.body_tail_block) == NodeKind.NK_BLOCK: self.ast.get_data2(self.body_tail_block) else: self.body_tail_block
+        if tail != report_node:
+            return expected
+        // The tail is often checked with no expected type; the declared
+        // return is the function's own.
+        let declared = if expected != 0: expected else: self.sig_return_type(self.current_fn_sig_idx)
+        if declared == 0:
+            return expected
+        let er = self.resolve_alias(declared as TypeId)
+        if self.get_type_kind(er) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(er) != self.syms.result or self.get_generic_inst_arg_count(er) != 2:
+            return expected
+        for ai in 0..arm_types.len():
+            let arm = self.resolve_alias(arm_types[ai] as TypeId)
+            if arm_types[ai] == 0 or (self.get_type_kind(arm) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(arm) == self.syms.result):
+                return expected
+        self.get_generic_inst_arg(er, 0)
+
+    mut fn resolve_contextual_join(expected_in: i32, arm_nodes: &List[i32], origin_nodes: &List[i32], arm_types: &List[i32], arm_roles: &List[i32], report_node: i32, join_name: &str) -> i32:
         let arm_count = arm_types.len() as i32
+        // §4.9: the function's final expression under a Result[T, E] return,
+        // with no arm a Result, is the payload Ok wraps; its arms meet T
+        // (D111: a `&str` arm is copied to the `str`).
+        let expected = self.tail_join_ok_payload(expected_in, report_node, arm_types)
         if arm_nodes.len() as i32 != arm_count or origin_nodes.len() as i32 != arm_count or arm_roles.len() as i32 != arm_count:
             self.emit_error("internal error: malformed contextual join inputs", report_node)
             return 0
@@ -4646,7 +4683,9 @@ impl Sema:
             let tail_block = if self.ast.kind(source_body) == NodeKind.NK_BLOCK: self.ast.get_data2(source_body) else: source_body
             self.reject_implicit_numeric_narrowing(if tail_block != 0: tail_block else: body, self.implicit_ok_payload_demand(body_expected_ret as i32, body_ty as i32), body_ty as i32)
         if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
-            if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0 and body_materializes_copy == 0:
+            // §4.9 / D111: the tail may be a Copy view of the Ok payload.
+            let tail_copies = self.can_contextually_copy_ref(self.tail_ok_payload(body_expected_ret as i32, body_ty as i32), body_ty as i32) != 0
+            if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0 and body_materializes_copy == 0 and not tail_copies:
                 self.emit_error("return type mismatch", body)
         if not has_ret_annotation:
             // §14.4: calling an `async fn` returns a `Task[T]` handle; the body
@@ -4691,7 +4730,14 @@ impl Sema:
                             let ok_type = self.get_generic_inst_arg(ret_resolved, 0)
                             if self.types_compatible(ok_type, body_ty) != 0 or self.arithmetic_result_type(ok_type, body_ty) != 0:
                                 ok_wrapped = true
-                    if not ok_wrapped:
+                            else:
+                                // D111 / D22 §6.2: a Copy view (`&str`) meets the owned
+                                // payload by a copy, as it meets a plain `-> str`.
+                                let tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
+                                ok_wrapped = self.record_contextual_copy_adjustment(tail, ok_type, body_ty as i32) != 0
+                    if ok_wrapped:
+                        self.implicit_ok_tail_sigs.insert(sig_idx, 1)
+                    else:
                         self.emit_return_mismatch("return type mismatch", body, body_expected_ret as i32)
 
         // @[tailrec] enforcement: verify all recursive calls are in tail position
@@ -9142,6 +9188,18 @@ impl Sema:
         let leaf_eff = self.weaken_projection_owning_effects(node, effect)
         self.note_place_effect(node, leaf_eff)
 
+    // §4.9: the type a final-expression value of type `actual` meets under the
+    // return `expected`: the Ok payload when `expected` is Result[T, E] and
+    // the value is not itself a Result, else `expected`.
+    fn tail_ok_payload(expected: i32, actual: i32) -> i32:
+        let er = self.resolve_alias(expected as TypeId)
+        if self.get_type_kind(er) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(er) != self.syms.result or self.get_generic_inst_arg_count(er) != 2:
+            return expected
+        let ar = self.resolve_alias(actual as TypeId)
+        if self.get_type_kind(ar) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(ar) == self.syms.result:
+            return expected
+        self.get_generic_inst_arg(er, 0)
+
     mut fn check_body_explicit_value_results(node: i32, value_path: i32, expected: i32, msg: &str) -> i32:
         if node == 0:
             return 1
@@ -9199,7 +9257,10 @@ impl Sema:
             if actual != 0 and actual != self.ty_void and actual != self.ty_never:
                 if self.expr_mutates_any_current_binding(node) != 0:
                     return 1
-                if self.return_value_type_compatible(expected, actual) == 0 and self.record_contextual_copy_adjustment(node, expected, actual) == 0:
+                // §4.9: a final-expression leaf that is not a Result is the
+                // payload Ok wraps; a Copy view meets it by a copy (D111). An
+                // early `return` is the NK_RETURN branch, never wrapped.
+                if self.return_value_type_compatible(expected, actual) == 0 and self.record_contextual_copy_adjustment(node, self.tail_ok_payload(expected, actual), actual) == 0:
                     // D93: a return demands its collection of a literal's binding.
                     self.note_literal_demand(node, expected, node)
                     self.emit_error(msg, node)
@@ -30204,6 +30265,41 @@ impl Sema:
         if method_name == "from_fn": return true
         false
 
+    // The owned collection type demanded of the collect call `node`: its
+    // expected type, or, as the function's final expression (the call or
+    // the pipeline ending in it), the declared return. 0 if none.
+    fn collect_demanded_type(node: i32) -> i32:
+        if self.has_expected_type != 0 and self.expected_expr_type != 0:
+            return self.expected_expr_type as i32
+        if self.body_tail_block == 0 or self.closure_body_depth != 0 or self.current_fn_sig_idx < 0:
+            return 0
+        let tail = if self.ast.kind(self.body_tail_block) == NodeKind.NK_BLOCK: self.ast.get_data2(self.body_tail_block) else: self.body_tail_block
+        let is_tail = tail == node or (tail > 0 and self.ast.kind(tail) == NodeKind.NK_PIPELINE and (self.ast.get_data0(tail) == node or self.ast.get_data1(tail) == node))
+        if is_tail: self.sig_return_type(self.current_fn_sig_idx) else: 0
+
+    // D111 / D22 §6.2: a collect whose demanded `base[T]` owns the values the
+    // iterator views (`&str` items into `List[str]`) copies each element; it
+    // is recorded for codegen and the demanded type returned. 0 otherwise.
+    mut fn collect_copy_target(base_sym: i32, iter_elem_ty: i32, node: i32) -> i32:
+        let demanded = self.collect_demanded_type(node)
+        if demanded == 0:
+            return 0
+        let dr = self.resolve_alias(demanded as TypeId)
+        if self.get_type_kind(dr) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(dr) != base_sym or self.get_generic_inst_arg_count(dr) != 1:
+            return 0
+        let owned = self.get_generic_inst_arg(dr, 0)
+        if self.contextual_copy_value_type(owned, iter_elem_ty) == 0:
+            return 0
+        self.collect_copy_elements.insert(node, owned)
+        demanded
+
+    // An explicit `collect[List[str]]()` over `&str` items copies each one.
+    mut fn collect_copies_elements(owned: i32, iter_elem_ty: i32, node: i32) -> bool:
+        if self.contextual_copy_value_type(owned, iter_elem_ty) == 0:
+            return false
+        self.collect_copy_elements.insert(node, owned)
+        true
+
     mut fn collect_target_type_from_type_node(type_node: i32, iter_elem_ty: i32, node: i32) -> i32:
         if type_node == 0:
             self.emit_error("collect[C]() requires a collection target type", node)
@@ -30218,9 +30314,13 @@ impl Sema:
                 ""
         if target_name == "List":
             if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
+                let list_copy = self.collect_copy_target(self.syms.list, iter_elem_ty, node)
+                if list_copy != 0: return list_copy
                 return self.ensure_list_type_for(iter_elem_ty)
         if target_name == "HashSet":
             if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
+                let set_copy = self.collect_copy_target(self.syms.hashset, iter_elem_ty, node)
+                if set_copy != 0: return set_copy
                 let hs_args: List[i32] = List.new()
                 hs_args.push(iter_elem_ty)
                 return self.ensure_generic_inst_type(self.syms.hashset, hs_args, 1) as i32
@@ -30280,20 +30380,23 @@ impl Sema:
         if base_sym == self.syms.list:
             let elem_ty = self.get_generic_inst_arg(target_resolved as i32, 0)
             if self.types_compatible(elem_ty as TypeId, iter_elem_ty as TypeId) == 0:
-                self.emit_error("collect[List[T]] element type does not match iterator element type", node)
-                return 0
+                if not self.collect_copies_elements(elem_ty, iter_elem_ty, node):
+                    self.emit_error("collect[List[T]] element type does not match iterator element type", node)
+                    return 0
             return target_ty
         if base_sym == self.syms.hashset:
             let elem_ty2 = self.get_generic_inst_arg(target_resolved as i32, 0)
             if self.types_compatible(elem_ty2 as TypeId, iter_elem_ty as TypeId) == 0:
-                self.emit_error("collect[HashSet[T]] element type does not match iterator element type", node)
-                return 0
+                if not self.collect_copies_elements(elem_ty2, iter_elem_ty, node):
+                    self.emit_error("collect[HashSet[T]] element type does not match iterator element type", node)
+                    return 0
             return target_ty
         if base_sym == self.syms.btreeset:
             let elem_ty_b = self.get_generic_inst_arg(target_resolved as i32, 0)
             if self.types_compatible(elem_ty_b as TypeId, iter_elem_ty as TypeId) == 0:
-                self.emit_error("collect[BTreeSet[T]] element type does not match iterator element type", node)
-                return 0
+                if not self.collect_copies_elements(elem_ty_b, iter_elem_ty, node):
+                    self.emit_error("collect[BTreeSet[T]] element type does not match iterator element type", node)
+                    return 0
             let ord_trait_b = self.pool_lookup_symbol("Ord")
             if ord_trait_b != 0 and self.type_implements_trait(elem_ty_b, ord_trait_b) == 0:
                 self.emit_error("collect[BTreeSet[T]] element type must implement Ord", node)
