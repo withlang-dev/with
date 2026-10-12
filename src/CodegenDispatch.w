@@ -10205,7 +10205,7 @@ impl Codegen:
             get_args.push(recv_ptr)
             get_args.push(wl_const_int(i64_ty, 0, 0))
             get_args.push(tf_es)
-            let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, list_data_i64(&get_args), 3)
+            let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, list_data_i64(get_args), 3)
             result = wl_build_load(self.builder, elem_ty, raw_ptr)
             let tf_params: List[i64] = List.new()
             tf_params.push(ptr_ty)

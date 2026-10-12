@@ -3462,6 +3462,8 @@ pub fn with_vec_free_drop_origin_es(v: *mut u8, es: i64, drop_origin: *const u8,
 pub fn with_vec_free_buffer_drop_origin(p: *mut u8, cap: i64, es: i64, drop_origin: *const u8, drop_origin_len: i64) -> Unit: with_vec_free_buffer_drop_origin_at(p, cap, es, 0, drop_origin, drop_origin_len)
 
 pub fn with_vec_free_buffer_drop_origin_at(p0: *mut u8, cap0: i64, es: i64, start: i64, drop_origin: *const u8, drop_origin_len: i64):
+    // An empty header (ptr 0) frees nothing whatever its other words say.
+    if p0 as i64 == 0: return
     let p = (p0 as i64 - start * es) as *mut u8
     let cap = cap0 + start
     if p as i64 != 0 and cap > 0 and es > 0:

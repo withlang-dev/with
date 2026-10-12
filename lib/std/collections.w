@@ -18,7 +18,7 @@ pub type List[T]  {
     start: i64,
 }
 
-extern fn with_vec_shrink_to_fit_es(v: *mut u8, es: i64) -> Unit
+extern fn with_vec_shrink_to_fit_es(v: *mut u8, es: i64)
 
 impl[T] List[T]:
     /// §9.7: a small remainder keeps the whole original buffer alive;
