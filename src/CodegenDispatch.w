@@ -722,6 +722,64 @@ impl Codegen:
             self.mir_push_successors(body, cur, stack, &visited)
         visited
 
+    // The successors of a block, in terminator order.
+    fn mir_block_successors(body: &MirBody, bb: i32) -> List[i32]:
+        let _ = self
+        var out: List[i32] = List.new()
+        if bb < 0 or bb >= body.block_count():
+            return out
+        let kind = body.term_kind(bb)
+        let d0 = body.term_data0(bb)
+        let d1 = body.term_data1(bb)
+        let d2 = body.term_data2(bb)
+        let d3 = body.term_data3(bb)
+        if kind == TermKind.TK_GOTO: out.push(d0)
+        else if kind == TermKind.TK_CALL: out.push(d3)
+        else if kind == TermKind.TK_DROP_AND_GOTO: out.push(d1)
+        else if kind == TermKind.TK_SWITCH_INT:
+            if d1 >= 0 and d1 < body.switch_table_starts.len():
+                let start = body.switch_table_starts[d1]
+                let count = body.switch_table_counts[d1]
+                for ti in 0..count: out.push(body.switch_table_targets[(start + ti)])
+            out.push(d2)
+        out
+
+    // The order blocks are emitted in: reverse postorder over the reachable
+    // blocks from the entry, then the unreachable ones by number. A value
+    // local (an SSA value, no slot) is read from the value its definition
+    // produced, so the defining block must be emitted before every block
+    // the definition dominates; block numbers do not promise that (a
+    // labeled block allocates its blocks before the statements that precede
+    // its body create theirs: `'bb { xs[1] = … }` after `var xs = [0; 6]`
+    // read the literal's local in a lower-numbered block than the one that
+    // defined it, and codegen could not lower the store), reverse postorder
+    // does.
+    fn mir_emit_order(body: &MirBody) -> List[i32]:
+        let count = body.block_count()
+        var state = self.mir_i32_list_fill(count, 0)
+        var postorder: List[i32] = List.new()
+        var stack: List[i32] = List.new()
+        if count > 0: stack.push(0)
+        while stack.len() > 0:
+            let cur: i32 = stack[stack.len() - 1]
+            if state[cur] == 0:
+                state[cur] = 1
+                for succ in self.mir_block_successors(body, cur):
+                    if succ >= 0 and succ < count and state[succ] == 0: stack.push(succ)
+            else:
+                stack.pop()
+                if state[cur] == 1:
+                    state[cur] = 2
+                    postorder.push(cur)
+        var order: List[i32] = List.new()
+        var i = postorder.len()
+        while i > 0:
+            i -= 1
+            order.push(postorder[i])
+        for bb in 0..count:
+            if state[bb] != 2: order.push(bb)
+        order
+
     fn mir_reaches_block_avoiding(body: &MirBody, target_bb: i32, avoid_bb: i32) -> bool:
         if target_bb < 0 or target_bb >= body.block_count():
             return false
@@ -18072,7 +18130,7 @@ impl Codegen:
 
         let reachable_bbs = self.mir_reachable_blocks(body)
         let saved_fn_scope: i64 = self.di_current_scope
-        for bb in 0..body.block_count():
+        for bb in self.mir_emit_order(body):
             if bb < 0 or bb >= self.mir_bb_values.len():
                 continue
             let llbb = self.mir_bb_values[bb]
@@ -18514,7 +18572,7 @@ impl Codegen:
 
         let reachable_bbs = self.mir_reachable_blocks(body)
         let mono_fn_scope: i64 = self.di_current_scope
-        for bb in 0..body.block_count():
+        for bb in self.mir_emit_order(body):
             if bb < 0 or bb >= self.mir_bb_values.len():
                 continue
             let llbb = self.mir_bb_values[bb]
