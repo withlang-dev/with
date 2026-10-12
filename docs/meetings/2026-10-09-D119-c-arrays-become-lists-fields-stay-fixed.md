@@ -122,3 +122,28 @@ formatted). `len()` is the outer dimension, not the element count.
 array-length-generics brief decides. Not ruled here: `a[i, j]` as
 `a[i][j]` through `MultiIndex`, and whether the retired `[N]T` becomes an
 error with a fix-it.
+
+## Step 3 landed (2026-10-12): the migrator's List rule, benchmarked
+
+The migrator emits a `List` for every local, hoisted local and file-scope
+array whose element has a zero spelling (`[0; 256]`, `[null; 20]`,
+`[rec.zeroed(); 8]`); struct and union fields stay `[T; N]`; a migrated
+module that names `List` imports `std.collections`. `tools/corpus_bench.w`
+built each corpus's upstream harness three ways (the C reference with the
+host clang at -O2; the promoted modules, `before`; the fresh migration,
+`after`) and timed the same workload, the median of 5 runs, on the release
+host with nothing else running:
+
+| corpus | workload | C (s) | With before (s) | With after (s) | before/C | after/C | after/before |
+|---|---|---|---|---|---|---|---|
+| zlib | minigzip compress 32 MiB | 0.717 | 0.787 | 0.803 | 1.10 | 1.12 | 1.02 |
+| zlib | minigzip decompress | 0.064 | 0.067 | 0.067 | 1.05 | 1.04 | 0.99 |
+| pcre2 | pcre2test testinput1 | 0.019 | 0.024 | 0.024 | 1.25 | 1.23 | 0.98 |
+| pcre2 | pcre2test testinput4 | 0.009 | 0.008 | 0.009 | 0.95 | 0.97 | 1.02 |
+| tommyds | check | 2.774 | 3.487 | 3.561 | 1.26 | 1.28 | 1.02 |
+| c-algorithms | 17 test programs | 0.202 | 0.374 | 0.370 | 1.85 | 1.84 | 0.99 |
+
+The switch costs nothing measurable (after/before within ±2%, the noise of
+5 runs): the guaranteed lowering (§4.3c) keeps every never-grown fill in
+the frame and every constant table in static data. The With-to-C ratios
+are the corpora's standing cost, unchanged by this step.

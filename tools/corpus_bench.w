@@ -276,11 +276,10 @@ fn bench_tommyds(root: &str, compiler: &str, before_dir: &str, after_dir: &str, 
     if not file_exists(reference ++ "/check.c"): fail("no tommyds reference tree at " ++ reference ++ " (run `with build :tommyds-prepare-reference`)")
     let work = root ++ "/out/corpus_bench/tommyds"
     reset_dir(work)
-    var c_args: List[str] = ["-I" ++ reference, reference ++ "/check.c"]
-    for path in entries(reference ++ "/tommyds"):
-        if path.ends_with(".c"): c_args.push(path)
+    // tommy.c is the amalgamation of every unit; compiling the units beside
+    // it defines each symbol twice.
     let c_bin = work ++ "/c_bin"
-    cc(work, &c_args, c_bin)
+    cc(work, &["-I" ++ reference, reference ++ "/check.c", reference ++ "/tommyds/tommy.c"], c_bin)
     let (before, after) = build_with_pair(compiler, work, "std/tommyds", before_dir, after_dir, "check_.w", &["-O1"])
     var row = Row { corpus: "tommyds", workload: "check", c: 0.0, before: 0.0, after: 0.0 }
     for (label, bin) in [("c", c_bin), ("before", before), ("after", after)]:
@@ -357,7 +356,10 @@ var rows: List[Row] = List.new()
 for name in corpora:
     let promoted = if name == "zlib": "lib/std/zl" else if name == "pcre2": "lib/std/re" else: "lib/std/" ++ name
     let before_dir = root ++ "/" ++ arg_value(&argv, "--before", promoted)
-    let after_dir = if after_mode == "none": "" else if after_mode.len() > 0: root ++ "/" ++ after_mode else: root ++ "/out/" ++ name ++ "_migrated"
+    // c-algorithms' fresh test programs are migrated whole, each under
+    // out/c_algorithms_tests_migrated/tests/<name> (build/c_algorithms.w).
+    let fresh_default = if name == "c_algorithms": "c_algorithms_tests_migrated" else: name ++ "_migrated"
+    let after_dir = if after_mode == "none": "" else if after_mode.len() > 0: root ++ "/" ++ after_mode else: root ++ "/out/" ++ fresh_default
     let after = if after_dir.len() > 0 and file_exists(after_dir): after_dir else: ""
     if after_dir.len() > 0 and after.len() == 0: eprint("corpus_bench: no fresh migration at " ++ after_dir ++ ", measuring C and before only")
     let measured = if name == "zlib": bench_zlib(root, compiler, before_dir, after, runs)
