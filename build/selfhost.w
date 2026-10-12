@@ -4375,7 +4375,7 @@ fn bs_check_migrate_compound_array_whole_values(ctx: &ActionCtx, compiler_path: 
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "pub fn whole_pair_array", "compound_array_whole_values")
     if rc != 0: return rc
-    bs_file_contains(ctx, out_w, "var flat_pairs: List[pair] = [pair { x: 1, y: 2 }, pair { x: 3, y: 4 }]", "compound_array_flattened_fields")
+    bs_file_contains(ctx, out_w, "let flat_pairs: List[pair] = [pair { x: 1, y: 2 }, pair { x: 3, y: 4 }]", "compound_array_flattened_fields")
 
 fn bs_check_migrate_host_header_compat(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
