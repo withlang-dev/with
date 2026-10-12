@@ -17825,6 +17825,12 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
             else if rk == RvalueKind.RK_SLICE: suspend_place_root_local(out, out.rval_d0[ri])
             else: -1
         if reached > 0 and reached < local_count: written[reached] = 1
+        // A borrow of the elements cast to a raw pointer (`&xs[0] as *mut T`,
+        // the address a C call fills): the frame keeps the elements, since
+        // a constant table would be written in place.
+        if rk == RvalueKind.RK_CAST and sema.get_type_kind(sema.resolve_alias(out.rval_d1[ri] as TypeId)) == TypeKind.TY_PTR:
+            let src = suspend_direct_place_local(out, out.operand_d0[out.rval_d0[ri]])
+            if src > 0 and src < local_count and ref_root[src] >= 0: written[ref_root[src]] = 1
         let local = if rk == RvalueKind.RK_REF and out.rval_d0[ri] == BorrowKind.EXCLUSIVE as i32: suspend_direct_place_local(out, out.rval_d1[ri])
             else if rk == RvalueKind.RK_ADDR_OF: suspend_place_root_local(out, out.rval_d0[ri])
             else: -1
