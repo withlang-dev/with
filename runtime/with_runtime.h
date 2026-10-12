@@ -59,22 +59,21 @@ with_str with_str_from_byte(int32_t b);
 with_str str_from_byte(int32_t b);
 
 // ── Vec type ───────────────────────────────────────────────────────
-// Generic dynamic array. Element type is erased; elem_size tracks layout.
+// Generic dynamic array. Element type is erased; every helper takes the
+// element size. `start` is the elements before `ptr` in the allocation.
 
 typedef struct {
     void *ptr;
     int64_t len;
     int64_t cap;
-    int64_t elem_size;
+    int64_t start;
 } with_vec;
 
 with_vec with_vec_new(int64_t elem_size);
 void with_str_split_vec_ref(with_vec *out, with_str s, with_str delim);
 void with_vec_new_out(uint8_t *out, int64_t elem_size);
 void with_vec_new_with_capacity_out(with_vec *out, int64_t elem_size, int64_t cap);
-void with_vec_push(with_vec *v, const void *elem);
 void with_vec_append_bytes(uint8_t *v, with_str s);
-void *with_vec_get_ptr(with_vec *v, int64_t index);
 // D115 Amendment 1 step 1: sized helpers; the element size is static at
 // every call. D116: `++` and `++=`.
 void with_vec_push_es(with_vec *v, const void *elem, int64_t elem_size);
@@ -83,6 +82,10 @@ void with_vec_remove_es(with_vec *v, int64_t index, int64_t elem_size);
 void with_vec_extend_bits_es(uint8_t *v, const uint8_t *src, int64_t n, int64_t elem_size);
 void with_vec_extend_str(uint8_t *v, const uint8_t *src, int64_t n);
 void with_vec_take_into_es(uint8_t *v, uint8_t *src, int64_t elem_size);
+void with_vec_take_front_es(uint8_t *v, int64_t elem_size);
+void with_vec_restore_front_es(uint8_t *v, const uint8_t *elem, int64_t elem_size);
+void with_vec_shrink_to_fit_es(uint8_t *v, int64_t elem_size);
+void with_vec_free_buffer_at(void *p, int64_t cap, int64_t elem_size, int64_t start);
 int64_t with_vec_len(with_vec *v);
 void with_vec_clear(with_vec *v);
 
@@ -97,7 +100,6 @@ void with_vec_push_bool(with_vec *v, bool val);
 bool with_vec_get_bool(with_vec *v, int64_t index);
 void with_vec_set_i32(with_vec *v, int64_t index, int32_t val);
 void with_vec_set_i64(with_vec *v, int64_t index, int64_t val);
-void with_vec_remove(with_vec *v, int64_t index);
 with_str with_vec_str_join(with_vec *v, with_str sep);
 void *with_slotmap_new(int64_t elem_size);
 void with_slotmap_insert_out(void *map, const void *val, void *out_handle);

@@ -1106,12 +1106,12 @@ impl Codegen:
                     return fi
 
         // List types are created dynamically and not registered in the struct field
-        // registry. Resolve their field names by layout: {ptr, len, cap, elem_size}.
+        // registry. Resolve their field names by layout: {ptr, len, cap, start}.
         if self.list_is_list.contains(agg_ty):
             if normalized_field == self.sym_ptr: return 0
             if normalized_field == self.sym_len: return 1
             if normalized_field == self.sym_cap: return 2
-            if normalized_field == self.sym_elem_size: return 3
+            if normalized_field == self.sym_start: return 3
 
         // Fall back to direct numeric index (for tuple fields, match bindings)
         if field_token >= 0 and ((is_union and field_token < source_field_count) or ((not is_union) and field_token < elem_count)):
@@ -6212,7 +6212,7 @@ impl Codegen:
             sema_phase_bug("BUG: a List element has no storage type (D115 Amendment 1)")
         self.abi_size_of(storage)
 
-    // The header word at `offset`, loaded inline ({ptr, len, cap, elem_size}).
+    // The header word at `offset`, loaded inline ({ptr, len, cap, start}).
     fn mir_list_header_word_ptr(ptr: i64, offset: i64) -> i64:
         let indices: List[i64] = List.new()
         indices.push(wl_const_int(wl_i64_type(self.context), offset, 0))
@@ -6229,20 +6229,24 @@ impl Codegen:
         let void_ty = wl_void_type(self.context)
         let buffer = wl_build_load(self.builder, ptr_ty, ptr)
         let cap = wl_build_load(self.builder, i64_ty, self.mir_list_header_word_ptr(ptr, 16))
-        // D115 Amendment 1: the element size is static at the drop, as at
-        // every other helper call; the header's word 3 is not read.
+        // D115 Amendment 1: the element size is static at the drop; word 3 is
+        // `start`, the elements before `ptr` in the allocation the free
+        // releases.
         let elem_size = wl_const_int(i64_ty, elem_size_bytes, 0)
+        let start = wl_build_load(self.builder, i64_ty, self.mir_list_header_word_ptr(ptr, 24))
         let params: List[i64] = List.new()
         params.push(ptr_ty)
+        params.push(i64_ty)
         params.push(i64_ty)
         params.push(i64_ty)
         let args: List[i64] = List.new()
         args.push(buffer)
         args.push(cap)
         args.push(elem_size)
-        var name = "with_vec_free_buffer"
+        args.push(start)
+        var name = "with_vec_free_buffer_at"
         if self.mir_drop_origin_active():
-            name = "with_vec_free_buffer_drop_origin"
+            name = "with_vec_free_buffer_drop_origin_at"
             params.push(ptr_ty)
             params.push(i64_ty)
             args.push(self.current_drop_origin_ptr)
@@ -6256,6 +6260,7 @@ impl Codegen:
         wl_build_store(self.builder, wl_const_null(ptr_ty), ptr)
         wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), self.mir_list_header_word_ptr(ptr, 8))
         wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), self.mir_list_header_word_ptr(ptr, 16))
+        wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), self.mir_list_header_word_ptr(ptr, 24))
 
     // #691/D18 (§2.5.1, supersedes the A5 narrow form): drop a List value at
     // scope exit. Every List frees its buffer — ownership is a property of the
@@ -10186,6 +10191,30 @@ impl Codegen:
             args.push(recv_ptr)
             result = wl_build_call(self.builder, clear_ty, clear_fn, list_data_i64(&args), 1)
 
+        else if intrinsic == MirIntrinsic.LIST_TAKE_FRONT:
+            // D115 Amendment 1: read the head, then advance the header (O(1)).
+            let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+            let tf_es = wl_const_int(i64_ty, self.mir_list_recv_elem_size(body, args_id), 0)
+            let arg_start_tf = body.call_arg_starts[args_id]
+            var elem_ty = self.mir_list_elem_type(body, body.call_arg_operands[arg_start_tf])
+            if elem_ty == 0:
+                sema_phase_bug("BUG: the head of an owned List has no element type (D115 Amendment 1)")
+            let get_fn = self.ensure_list_runtime_fn("with_vec_get_ptr_es", ptr_ty, 3)
+            let get_ty = self.get_list_fn_type("with_vec_get_ptr_es", ptr_ty, 3)
+            let get_args: List[i64] = List.new()
+            get_args.push(recv_ptr)
+            get_args.push(wl_const_int(i64_ty, 0, 0))
+            get_args.push(tf_es)
+            let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, list_data_i64(&get_args), 3)
+            result = wl_build_load(self.builder, elem_ty, raw_ptr)
+            let tf_params: List[i64] = List.new()
+            tf_params.push(ptr_ty)
+            tf_params.push(i64_ty)
+            let tf_args: List[i64] = List.new()
+            tf_args.push(recv_ptr)
+            tf_args.push(tf_es)
+            let _ = self.mir_list_helper_call("with_vec_take_front_es", tf_params, tf_args)
+
         else if intrinsic == MirIntrinsic.LIST_CONCAT or intrinsic == MirIntrinsic.LIST_EXTEND:
             let cat = self.mir_emit_list_concat(body, args_id, dest_place, intrinsic)
             if cat != 0: result = cat
@@ -12419,7 +12448,8 @@ impl Codegen:
                 header = wl_build_insert_value(self.builder, header, buf, 0)
                 header = wl_build_insert_value(self.builder, header, wl_const_int(i64_ty, arg_count as i64, 0), 1)
                 header = wl_build_insert_value(self.builder, header, wl_const_int(i64_ty, 0, 0), 2)
-                header = wl_build_insert_value(self.builder, header, wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0), 3)
+                // D115 Amendment 1: word 3 is `start`, 0 for a fresh header.
+                header = wl_build_insert_value(self.builder, header, wl_const_int(i64_ty, 0, 0), 3)
                 self.mir_finish_intrinsic_call(body, dest_place, next_bb, header)
                 return true
             let out_ptr = self.create_entry_alloca(list_ty)

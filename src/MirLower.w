@@ -11237,8 +11237,8 @@ impl MirBuilder:
                     out.push(scrutinee_place)
                 t = t - 1
         for i in 0..head:
-            let front_op = self.int_const_operand(0, self.sema.ty_i64)
-            let bound = self.take_list_element(self.ast.get_extra(sp_extra + 1 + i), scrutinee_place, front_op, elem_ty, span)
+            // Amendment 1: the head comes off in O(1) (the header advances).
+            let bound = self.take_list_front(self.ast.get_extra(sp_extra + 1 + i), scrutinee_place, elem_ty, span)
             if bound >= 0:
                 out.push(bound)
                 out.push(scrutinee_place)
@@ -11256,6 +11256,25 @@ impl MirBuilder:
             out.push(rest_local)
             out.push(scrutinee_place)
         out
+
+    // The head element of an owned List into its binding, O(1) (D115
+    // Amendment 1: LIST_TAKE_FRONT advances the header). -1 for `_`.
+    mut fn take_list_front(sym: i32, list_place: i32, elem_ty: i32, span: i32) -> i32:
+        let local_id = self.body.new_local(elem_ty, if sym != 0: self.pattern_bind_mut else: 0, sym, 1)
+        if sym != 0:
+            self.bind_local(sym, local_id)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, span)
+        if self.type_needs_value_drop(elem_ty) != 0:
+            self.schedule_drop(local_id, DropKind.DK_VALUE)
+        let args: List[i32] = [self.body.new_operand(OperandKind.OK_COPY, list_place)]
+        let args_id = self.body.new_call_args(args)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_TAKE_FRONT)
+        let after_bb = self.new_block()
+        let unit = self.unit_operand()
+        let local_place = self.place_for_local(local_id)
+        self.terminate(TermKind.TK_CALL, unit, args_id, local_place, after_bb)
+        self.switch_to(after_bb)
+        if sym != 0: local_id else: -1
 
     // One element removed from an owned List at `idx_op` into its binding (a
     // name), or into an anonymous local that drops at scope exit (`_`).

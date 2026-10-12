@@ -27,9 +27,8 @@ use SemaTypes
 use std.collections.HashMap
 
 extern fn exit(code: i32) -> Unit
-extern fn with_vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8
+extern fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8
 extern fn with_fs_read_file(path: &str) -> str
-extern fn with_vec_free(v: *mut u8) -> Unit
 extern fn with_hashmap_free(map: *mut u8) -> Unit
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_getenv_str(name: &str) -> str
@@ -227,7 +226,7 @@ pub type Codegen {
     sym_ptr: i32,
     sym_len: i32,
     sym_cap: i32,
-    sym_elem_size: i32,
+    sym_start: i32,
     sym_new: i32,
 
     // Local variables: sym → alloca/type/flags
@@ -717,7 +716,7 @@ fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: I
     cg.sym_ptr = cg.intern.intern("ptr")
     cg.sym_len = cg.intern.intern("len")
     cg.sym_cap = cg.intern.intern("cap")
-    cg.sym_elem_size = cg.intern.intern("elem_size")
+    cg.sym_start = cg.intern.intern("start")
     cg.sym_new = cg.intern.intern("new")
     cg
 
@@ -1146,7 +1145,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         sym_nameof: 0, sym_type_name: 0, sym_embed_file: 0,
         sym_channel: 0, sym_send: 0, sym_recv: 0, sym_close: 0,
         sym_from_int: 0,
-        sym_ptr: 0, sym_len: 0, sym_cap: 0, sym_elem_size: 0,
+        sym_ptr: 0, sym_len: 0, sym_cap: 0, sym_start: 0,
         sym_new: 0,
         local_allocas: HashMap.new(),
         local_types: HashMap.new(),
@@ -1852,7 +1851,7 @@ impl Codegen:
         let mir = self.mir_ptr as *const MirModule
         let body_count = unsafe { (*mir).bodies.len() }
         assert(i >= 0 and i < body_count)
-        unsafe { with_vec_get_ptr(&raw const (*mir).bodies as *mut u8, i) as &MirBody }
+        unsafe { with_vec_get_ptr_es(&raw const (*mir).bodies as *mut u8, i, sizeof[MirBody]()) as &MirBody }
     fn mir_fn_syms_len() -> i64: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms.len() }
     fn mir_fn_sym_at(i: i64) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms[i] }
     fn mir_find_body_idx(sym: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).find_body(sym) }

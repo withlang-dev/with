@@ -133,6 +133,10 @@ pub enum MirIntrinsic: i32:
     // `a ++= b` extends the receiver (arg 0) by the sequence in arg 1.
     LIST_CONCAT
     LIST_EXTEND
+    // D115 Amendment 1: the head of an owned List, taken in O(1) by
+    // advancing the header (the pattern `[h, ..t]`); the call's result is
+    // the element.
+    LIST_TAKE_FRONT
     MAP_NEW
     MAP_INSERT
     MAP_GET

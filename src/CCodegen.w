@@ -90,6 +90,7 @@ enum CcBuiltin: i32:
     LIST_POP
     LIST_CONCAT
     LIST_EXTEND
+    LIST_TAKE_FRONT
     STR_LEN
     STR_BYTE_AT
     STR_SLICE
@@ -200,6 +201,7 @@ fn cc_builtin_uses_list_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.LIST_CLEAR: return true
     if kind == CcBuiltin.LIST_POP: return true
     if kind == CcBuiltin.LIST_EXTEND: return true
+    if kind == CcBuiltin.LIST_TAKE_FRONT: return true
     if kind == CcBuiltin.LIST_ITER: return true
     if kind == CcBuiltin.LIST_MAP: return true
     if kind == CcBuiltin.LIST_FILTER: return true
@@ -2393,7 +2395,7 @@ impl CCodegen:
         if self.generic_inst_base_name(resolved) != "List":
             return 0
         let field_name = cc_intern_resolve(self.intern, field_sym)
-        if field_name == "len" or field_name == "cap" or field_name == "elem_size":
+        if field_name == "len" or field_name == "cap" or field_name == "start":
             return self.sema.ty_i64 as i32
         if field_name != "ptr":
             return 0
@@ -6655,6 +6657,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.LIST_PUSH: return CcBuiltin.LIST_PUSH
     if intrinsic == MirIntrinsic.LIST_CONCAT: return CcBuiltin.LIST_CONCAT
     if intrinsic == MirIntrinsic.LIST_EXTEND: return CcBuiltin.LIST_EXTEND
+    if intrinsic == MirIntrinsic.LIST_TAKE_FRONT: return CcBuiltin.LIST_TAKE_FRONT
     if intrinsic == MirIntrinsic.LIST_GET: return CcBuiltin.LIST_GET
     if intrinsic == MirIntrinsic.LIST_GET_REF: return CcBuiltin.LIST_GET
     if intrinsic == MirIntrinsic.LIST_LEN: return CcBuiltin.LIST_LEN
@@ -6807,7 +6810,7 @@ impl CCodegen:
             var out = ""
             if has_ret != 0:
                 let elem_size = self.list_new_elem_size_text(body, dest_place)
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (with_vec)" ++ cc_lbrace() ++ " .ptr = NULL, .len = 0, .cap = 0, .elem_size = " ++ elem_size ++ " " ++ cc_rbrace() ++ ";\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (with_vec)" ++ cc_lbrace() ++ " .ptr = NULL, .len = 0, .cap = 0, .start = 0 " ++ cc_rbrace() ++ ";\n"
             else:
                 out = out ++ "    (void)0;\n"
             out = out ++ f"    goto bb{next_bb};"
@@ -6958,6 +6961,16 @@ impl CCodegen:
 
         if kind == CcBuiltin.LIST_CONCAT or kind == CcBuiltin.LIST_EXTEND:
             return self.emit_list_concat(body, args_id, dest_place, kind, has_ret, next_bb)
+
+        if kind == CcBuiltin.LIST_TAKE_FRONT:
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
+            let tf_es = self.list_recv_elem_sizeof_text(body, args_id)
+            var out = "    " ++ cc_lbrace()
+            if has_ret != 0:
+                let dst = self.place_text(body, dest_place)
+                out = out ++ " memcpy(&(" ++ dst ++ "), with_vec_get_ptr_es(" ++ recv_ptr ++ ", 0, " ++ tf_es ++ "), sizeof(" ++ dst ++ "));"
+            out = out ++ " with_vec_take_front_es((uint8_t*)" ++ recv_ptr ++ ", " ++ tf_es ++ "); " ++ cc_rbrace() ++ "\n"
+            return out ++ f"    goto bb{next_bb};"
 
         if kind == CcBuiltin.LIST_POP:
             if argc < 1:
