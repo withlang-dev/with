@@ -22538,6 +22538,28 @@ impl Sema:
         0
 
     // D115 (§9.7): whether a slice pattern's subject is owned. A reference
+    // D117 (§9.5): a method receiver is owned by its syntax: a temporary,
+    // or a place spelled `move`; a place, or a reference, is observed.
+    fn receiver_owned_by_syntax(expr0: i32, recv_ty: i32) -> bool:
+        if recv_ty != 0 and self.get_type_kind(self.resolve_alias(recv_ty as TypeId)) == TypeKind.TY_REF:
+            return false
+        var expr = expr0
+        while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
+            expr = self.ast.get_data0(expr)
+        if expr == 0: return false
+        if self.ast.kind(expr) == NodeKind.NK_MOVE_ARG: return true
+        self.place_root_sym(expr) == 0
+
+    // Whether the receiver's type declares a method of this exact name, by
+    // the owner mapping the method-call checker itself resolves through.
+    fn type_has_method_named(recv_ty: i32, method_sym: i32) -> bool:
+        let owner = self.method_owner_symbol_for_type(recv_ty)
+        if owner != 0 and self.lookup_method_sig(owner, method_sym) >= 0: return true
+        // A generic owner's methods (`impl[T] List[T]`) live in the generic table.
+        let base = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_ty as TypeId))
+        if self.get_type_kind(base) != TypeKind.TY_GENERIC_INST: return false
+        self.lookup_generic_method_fn(self.get_generic_inst_base(base as i32), method_sym) != 0
+
     // observes; a by-value subject is owned when the expression is a
     // temporary or a place moved with `move`, and observed when it names a
     // place. A pattern with no subject expression (a parameter, a loop
@@ -32628,6 +32650,16 @@ impl Sema:
             let wants_by_value = wanted != 0 and self.get_type_kind(wanted as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(wanted) == self.syms.listiter
             if not wants_by_value and list_ty != 0 and self.std_generic_of(list_ty) == StdGeneric.List and not self.copy_is_bits(self.get_generic_inst_arg(list_ty, 0)):
                 field = self.syms.iter_ref
+        // D117 (§9.5): where a name has an observing and an owned form, a
+        // call on an owned receiver (a temporary, or a place spelled `move`)
+        // selects the `move fn`; a call on a place selects the `fn`. Read from
+        // the syntax, as the slice pattern reads its subject, never from a
+        // later use. A receiver that is a reference is a place.
+        if self.method_twin_names.contains(field) and self.static_receiver_type_is_known(expr) == 0:
+            if known_recv_ty == 0: known_recv_ty = self.check_expr(expr) as i32
+            let owned_twin: i32 = self.method_twin_names.get(field) ?? 0
+            if owned_twin != 0 and self.receiver_owned_by_syntax(expr, known_recv_ty) and self.type_has_method_named(known_recv_ty, owned_twin):
+                field = owned_twin
         let ret = self.check_method_call_parts_inner(expr, field, extra_start, arg_count, node, known_recv_ty)
         // §15.3: `next()` advances the iterator, so it needs a place. The
         // view iterator's `next` is a builtin with no declaration to carry

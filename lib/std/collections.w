@@ -25,6 +25,28 @@ impl[T] List[T]:
     /// `shrink_to_fit` releases the prefix and the spare capacity.
     pub mut fn shrink_to_fit(): with_vec_shrink_to_fit_es((&raw mut self) as *mut u8, sizeof[T]())
 
+    /// D117 (§9.5, §13.3): the expression forms of `[first, ..rest]`. On a
+    /// place `first()` and `last()` observe (`Option[&T]`: "is there a first
+    /// element?" has a normal answer of no) and `rest()` views; on an owned
+    /// receiver (a temporary, `(move xs)`) they take: the element, or the
+    /// remainder sharing the buffer (O(1)). The two forms of a name are one
+    /// operation, differing only in the ownership of the result.
+    pub fn first() -> Option[&T]: if self.len() == 0: None else: Some(&self[0])
+    pub move fn first() -> Option[T]:
+        match move self:
+            [h, ..rest] => Some(h)
+            [] => None
+    pub fn last() -> Option[&T]: if self.len() == 0: None else: Some(&self[self.len() - 1])
+    pub move fn last() -> Option[T]:
+        match move self:
+            [..init, l] => Some(l)
+            [] => None
+    pub fn rest() -> []T: if self.len() == 0: self[0..0] else: self[1..self.len()]
+    pub move fn rest() -> List[T]:
+        match move self:
+            [_, ..t] => t
+            [] => List.new()
+
 /// Clone for List[T]: produces a deep copy by cloning each element.
 impl[T: Clone] Clone for List[T]:
     fn clone() -> Self:

@@ -1947,6 +1947,14 @@ impl Sema:
 
     mut fn collect_fn_decl(node: i32, is_local: i32, decl_index: i32):
         let parsed_fn_name = self.ast.get_data0(node)
+        // D117 (§9.5): a `move fn` twin's symbol texts (`Owner.name$move`,
+        // `name$move`) enter Sema's pool here; the parser's pool alone held
+        // them, and the method symbol rebuild below looks them up.
+        let parsed_text: str = self.pool_resolve(parsed_fn_name)
+        if parsed_text.ends_with("$move"):
+            let _ = self.pool_intern(parsed_text)
+            let twin_dot = parsed_text.rfind(".")
+            let _ = self.pool_intern(parsed_text[twin_dot + 1..parsed_text.len()])
         let method_owner_sym = self.method_decl_owner_symbol(node, parsed_fn_name)
         let method_base_sym = self.method_decl_base_symbol(node, parsed_fn_name)
         var fn_name = method_base_sym
@@ -1981,6 +1989,14 @@ impl Sema:
         // its signature for the visibility-gated lookups and never
         // displaces it — a displaced source body would be skipped as
         // shadowed and its function left declared without a body.
+        // D117 (§9.5): `Owner.name$move` is the owned twin of `Owner.name`;
+        // a call's receiver syntax selects it (check_method_call_parts_body).
+        let twin_text: str = self.pool_resolve(fn_name)
+        if twin_text.ends_with("$move"):
+            let dot = twin_text.rfind(".")
+            let short = twin_text[dot + 1..twin_text.len() - 5]
+            self.method_twin_names.insert(self.pool_intern(short), self.pool_intern(short ++ "$move"))
+            self.set_pretty_symbol(fn_name, twin_text[0..twin_text.len() - 5])
         let interface_yields = self.ast.fn_decl_body_is_interface(node) and self.fn_decl_nodes.contains(fn_name) and not self.ast.fn_decl_body_is_interface(self.fn_decl_nodes.get(fn_name).unwrap())
         if self.fn_decl_nodes.contains(fn_name) and not interface_yields:
             let existing_node: i32 = self.fn_decl_nodes.get(fn_name).unwrap()
