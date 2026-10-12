@@ -11292,6 +11292,20 @@ impl MirBuilder:
             if bound >= 0:
                 out.push(bound)
                 out.push(scrutinee_place)
+        // #2351: what the pattern leaves in the subject (a bare `..`, or
+        // nothing after `[]`) is dropped with the subject, and an owned
+        // subject the match consumed is dropped by nobody else: it moves into
+        // a statement temporary that dies at the statement's end (§2.4: after
+        // a match arm's body, right after a `let … else`). The move is
+        // logged, so a failed guard puts it back (#2289).
+        if rest_sym == 0:
+            let left_ty = self.place_local_type(scrutinee_place)
+            let left_local = self.new_temp(left_ty)
+            self.pending_move_temp_locals.push(left_local)
+            let left_op = self.body.new_operand(OperandKind.OK_MOVE, scrutinee_place)
+            let left_place = self.place_for_local(left_local)
+            self.bind_pattern_value(left_place, left_op, span)
+            return out
         if rest_sym != 0:
             let rest_ty = self.slice_rest_type(pat_node)
             if rest_ty == 0:
