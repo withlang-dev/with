@@ -22,7 +22,7 @@ pub fn sum(arr: List[i32]) -> i32:
 
 /// Apply a function to each element, returning a new List of results.
 pub fn map(arr: List[str], f: fn(str) -> i32) -> List[i32]:
-    let result: List[i32] = List{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    let result: List[i32] = List{ ptr: 0, len: 0, cap: 0, start: 0 }
     with_vec_new_out((&raw mut result) as *mut u8, 4)
     var i: i64 = 0
     let n = with_vec_len((&raw mut arr) as *mut u8)
@@ -35,7 +35,7 @@ pub fn map(arr: List[str], f: fn(str) -> i32) -> List[i32]:
 
 /// Keep only elements where `pred` returns true.
 pub fn filter(arr: List[i32], pred: fn(i32) -> bool) -> List[i32]:
-    let result: List[i32] = List{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    let result: List[i32] = List{ ptr: 0, len: 0, cap: 0, start: 0 }
     with_vec_new_out((&raw mut result) as *mut u8, 4)
     var i: i64 = 0
     let n = with_vec_len((&raw mut arr) as *mut u8)

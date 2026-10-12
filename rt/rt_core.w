@@ -3224,17 +3224,19 @@ pub fn with_getenv_str(name: &str) -> str:
 
 // ── List operations ─────────────────────────────────────────────────
 //
-// List layout: { ptr: *mut u8, len: i64, cap: i64, elem_size: i64 }
+// List layout: { ptr: *mut u8, len: i64, cap: i64, start: i64 }
 // We access it via pointer casts since we can't import the List type.
 //
-// D115 Amendment 1, step 1: every helper that needs the element size takes
-// it as an argument (`*_es`); the element type is static at every call
-// site, so nothing needs the header's word 3 at run time. The unsuffixed
-// entry points read the field for the code the pinned seed still emits,
-// and go when word 3 becomes `start` (step 2, after a seed is cut).
+// D115 Amendment 1 (§9.7): `ptr` is the first live element, `len` the live
+// count, `cap` the live capacity from `ptr`, and `start` the elements before
+// `ptr` in the same allocation. Taking the head of an owned List advances
+// `ptr` and `start` (O(1), `with_vec_take_front_es`); the allocation is
+// `ptr - start * es` of `(cap + start) * es` bytes, which grow and free read.
+// A zeroed header is a valid empty List. Every helper takes the element
+// size (`*_es`): the element type is static at every call site.
 
 // Offsets into List struct (each field is 8 bytes):
-// 0: ptr, 8: len, 16: cap, 24: elem_size
+// 0: ptr, 8: len, 16: cap, 24: start
 
 fn list_get_ptr_field(v: *mut u8) -> *mut u8:
     unsafe *(v as *const *mut u8)
@@ -3254,24 +3256,32 @@ fn list_get_cap(v: *mut u8) -> i64:
 fn list_set_cap(v: *mut u8, n: i64):
     unsafe *((v as i64 + 16) as *mut i64) = n
 
-fn list_get_elem_size(v: *mut u8) -> i64:
+fn list_get_start(v: *mut u8) -> i64:
     unsafe *((v as i64 + 24) as *const i64)
 
-fn list_set_elem_size(v: *mut u8, n: i64):
+fn list_set_start(v: *mut u8, n: i64):
     unsafe *((v as i64 + 24) as *mut i64) = n
 
+// The allocation a List's buffer lives in: its base and its byte size.
+fn list_alloc_base(v: *mut u8, es: i64) -> *mut u8:
+    (list_get_ptr_field(v) as i64 - list_get_start(v) * es) as *mut u8
+
+fn list_alloc_bytes(v: *mut u8, es: i64) -> i64: (list_get_cap(v) + list_get_start(v)) * es
+
+// `elem_size` is the element size every caller still passes; the header no
+// longer stores it (D115 Amendment 1).
 pub fn with_vec_new_out(out: *mut u8, elem_size: i64):
     list_set_ptr_field(out, 0 as *mut u8)
     list_set_len(out, 0)
     list_set_cap(out, 0)
-    list_set_elem_size(out, elem_size)
+    list_set_start(out, 0)
 
 pub fn with_vec_new(elem_size: i64) -> (*mut u8, i64, i64, i64):
     // Return a tuple that matches List layout
-    (0 as *mut u8, 0 as i64, 0 as i64, elem_size)
+    (0 as *mut u8, 0 as i64, 0 as i64, 0 as i64)
 
 pub fn with_vec_new_with_capacity_out(out: *mut u8, elem_size: i64, cap: i64):
-    list_set_elem_size(out, elem_size)
+    list_set_start(out, 0)
     list_set_len(out, 0)
     list_set_cap(out, cap)
     if cap > 0:
@@ -3295,8 +3305,8 @@ fn list_buffer_align(es: i64) -> i64:
 fn list_buffer_alloc(bytes: i64, es: i64) -> *mut u8:
     rt_alloc_aligned_with_origin(bytes, list_buffer_align(es), DBG_ORIGIN_LIST)
 
-fn list_grow(v: *mut u8): list_grow_es(v, list_get_elem_size(v))
-
+// Growing an offset List reallocates: the live elements move to the front
+// of the new buffer and the prefix is released with the old one.
 fn list_grow_es(v: *mut u8, es: i64):
     let old_cap = list_get_cap(v)
     let new_cap = if old_cap < 8: 8 as i64 else: old_cap * 2
@@ -3305,10 +3315,59 @@ fn list_grow_es(v: *mut u8, es: i64):
     let vlen = list_get_len(v)
     if old_ptr as i64 != 0 and vlen > 0:
         rt_memcpy(new_ptr, old_ptr as *const u8, vlen * es)
-    if old_ptr as i64 != 0 and old_cap > 0:
-        rt_free_sized(old_ptr, old_cap * es)
+    if old_ptr as i64 != 0 and list_alloc_bytes(v, es) > 0:
+        rt_free_sized(list_alloc_base(v, es), list_alloc_bytes(v, es))
     list_set_ptr_field(v, new_ptr)
     list_set_cap(v, new_cap)
+    list_set_start(v, 0)
+
+// D115 Amendment 1: the head of an owned List comes off in O(1): `ptr` and
+// `start` advance, `len` and `cap` fall. The element's bytes are the
+// caller's to read first (with_vec_get_ptr_es at 0).
+pub fn with_vec_take_front_es(v: *mut u8, es: i64):
+    let vlen = list_get_len(v)
+    if vlen <= 0:
+        with_panic_core(make_str("List index out of bounds" as *const u8, 23), make_str("" as *const u8, 0), 0)
+    list_set_ptr_field(v, (list_get_ptr_field(v) as i64 + es) as *mut u8)
+    list_set_start(v, list_get_start(v) + 1)
+    list_set_len(v, vlen - 1)
+    list_set_cap(v, list_get_cap(v) - 1)
+
+// The head put back (#2289): into the prefix when there is one, else an
+// insert at the front.
+pub fn with_vec_restore_front_es(v: *mut u8, elem: *const u8, es: i64):
+    if list_get_start(v) > 0:
+        list_set_ptr_field(v, (list_get_ptr_field(v) as i64 - es) as *mut u8)
+        list_set_start(v, list_get_start(v) - 1)
+        list_set_len(v, list_get_len(v) + 1)
+        list_set_cap(v, list_get_cap(v) + 1)
+        rt_memcpy(list_get_ptr_field(v), elem, es)
+        return
+    let vlen = list_get_len(v)
+    if vlen >= list_get_cap(v):
+        list_grow_es(v, es)
+    let base = list_get_ptr_field(v)
+    var i = vlen
+    while i > 0:
+        rt_memcpy((base as i64 + i * es) as *mut u8, (base as i64 + (i - 1) * es) as *const u8, es)
+        i = i - 1
+    rt_memcpy(base, elem, es)
+    list_set_len(v, vlen + 1)
+
+// §9.7: a small remainder keeps the whole original buffer alive;
+// `shrink_to_fit` releases the prefix and the spare capacity.
+pub fn with_vec_shrink_to_fit_es(v: *mut u8, es: i64):
+    let vlen = list_get_len(v)
+    if list_get_start(v) == 0 and list_get_cap(v) == vlen: return
+    var new_ptr = 0 as *mut u8
+    if vlen > 0:
+        new_ptr = list_buffer_alloc(vlen * es, es)
+        rt_memcpy(new_ptr, list_get_ptr_field(v) as *const u8, vlen * es)
+    if list_get_ptr_field(v) as i64 != 0 and list_alloc_bytes(v, es) > 0:
+        rt_free_sized(list_alloc_base(v, es), list_alloc_bytes(v, es))
+    list_set_ptr_field(v, new_ptr)
+    list_set_cap(v, vlen)
+    list_set_start(v, 0)
 
 // #919 (D34-C interim): bulk byte append for StringBuilder — the old
 // per-byte push was one bounds-checked call per byte (and several
@@ -3319,8 +3378,6 @@ pub fn with_vec_append_bytes(v: *mut u8, s: &str) -> Unit:
     let n = str_length(s)
     if n <= 0:
         return
-    if list_get_elem_size(v) != 1:
-        with_panic_core(make_str("with_vec_append_bytes requires a byte vector" as *const u8, 44), make_str("" as *const u8, 0), 0)
     let vlen = list_get_len(v)
     var vcap = list_get_cap(v)
     while vcap < vlen + n:
@@ -3329,8 +3386,6 @@ pub fn with_vec_append_bytes(v: *mut u8, s: &str) -> Unit:
     let dst = (list_get_ptr_field(v) as i64 + vlen) as *mut u8
     rt_memcpy(dst, str_data(s), n)
     list_set_len(v, vlen + n)
-
-pub fn with_vec_push(v: *mut u8, elem: *const u8): with_vec_push_es(v, elem, list_get_elem_size(v))
 
 pub fn with_vec_push_es(v: *mut u8, elem: *const u8, es: i64):
     let vlen = list_get_len(v)
@@ -3361,12 +3416,7 @@ pub fn with_vec_extend_str(v: *mut u8, src: *const u8, n: i64):
 
 pub fn with_vec_take_into_es(v: *mut u8, src: *mut u8, es: i64):
     with_vec_extend_bits_es(v, list_get_ptr_field(src) as *const u8, list_get_len(src), es)
-    with_vec_free_buffer(list_get_ptr_field(src), list_get_cap(src), es)
-    list_set_ptr_field(src, 0 as *mut u8)
-    list_set_len(src, 0)
-    list_set_cap(src, 0)
-
-pub fn with_vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8: with_vec_get_ptr_es(v, idx, list_get_elem_size(v))
+    with_vec_free_es(src, es)
 
 pub fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8:
     let vlen = list_get_len(v)
@@ -3387,27 +3437,35 @@ pub fn with_vec_clear(v: *mut u8):
 // never has its address taken by a call: LLVM can promote the whole struct
 // to registers, as it does for the same program in C or Rust (the ECS
 // benchmark reloaded five headers after every store before this).
-pub fn with_vec_free_buffer(p: *mut u8, cap: i64, es: i64) -> Unit:
-    if p as i64 != 0 and cap > 0 and es > 0:
-        rt_free_sized(p, cap * es)
+// The buffer freed from the header's words by value (codegen's drop glue
+// reads them inline): `p` is the first live element, `start` the elements
+// before it in the allocation.
+pub fn with_vec_free_buffer_at(p: *mut u8, cap: i64, es: i64, start: i64):
+    if p as i64 != 0 and cap + start > 0 and es > 0:
+        rt_free_sized((p as i64 - start * es) as *mut u8, (cap + start) * es)
 
-pub fn with_vec_free(v: *mut u8) -> Unit: with_vec_free_es(v, list_get_elem_size(v))
+pub fn with_vec_free_buffer(p: *mut u8, cap: i64, es: i64) -> Unit: with_vec_free_buffer_at(p, cap, es, 0)
 
 pub fn with_vec_free_es(v: *mut u8, es: i64):
-    with_vec_free_buffer(list_get_ptr_field(v), list_get_cap(v), es)
+    with_vec_free_buffer_at(list_get_ptr_field(v), list_get_cap(v), es, list_get_start(v))
     list_set_ptr_field(v, 0 as *mut u8)
     list_set_len(v, 0)
     list_set_cap(v, 0)
-
-pub fn with_vec_free_drop_origin(v: *mut u8, drop_origin: *const u8, drop_origin_len: i64) -> Unit: with_vec_free_drop_origin_es(v, list_get_elem_size(v), drop_origin, drop_origin_len)
+    list_set_start(v, 0)
 
 pub fn with_vec_free_drop_origin_es(v: *mut u8, es: i64, drop_origin: *const u8, drop_origin_len: i64):
-    with_vec_free_buffer_drop_origin(list_get_ptr_field(v), list_get_cap(v), es, drop_origin, drop_origin_len)
+    with_vec_free_buffer_drop_origin_at(list_get_ptr_field(v), list_get_cap(v), es, list_get_start(v), drop_origin, drop_origin_len)
     list_set_ptr_field(v, 0 as *mut u8)
     list_set_len(v, 0)
     list_set_cap(v, 0)
 
-pub fn with_vec_free_buffer_drop_origin(p: *mut u8, cap: i64, es: i64, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
+pub fn with_vec_free_buffer_drop_origin(p: *mut u8, cap: i64, es: i64, drop_origin: *const u8, drop_origin_len: i64) -> Unit: with_vec_free_buffer_drop_origin_at(p, cap, es, 0, drop_origin, drop_origin_len)
+
+pub fn with_vec_free_buffer_drop_origin_at(p0: *mut u8, cap0: i64, es: i64, start: i64, drop_origin: *const u8, drop_origin_len: i64):
+    // An empty header (ptr 0) frees nothing whatever its other words say.
+    if p0 as i64 == 0: return
+    let p = (p0 as i64 - start * es) as *mut u8
+    let cap = cap0 + start
     if p as i64 != 0 and cap > 0 and es > 0:
         // A header whose cap*elem_size overflows is not a List anymore: the
         // memory was freed and reused under us (the lsp-use-std hunt read
@@ -3532,8 +3590,6 @@ pub fn with_vec_set_i64(v: *mut u8, idx: i64, val: i64):
     let vlen = list_get_len(v)
     if idx >= 0 and idx < vlen:
         unsafe *((list_get_ptr_field(v) as i64 + idx * 8) as *mut i64) = val
-
-pub fn with_vec_remove(v: *mut u8, idx: i64): with_vec_remove_es(v, idx, list_get_elem_size(v))
 
 pub fn with_vec_remove_es(v: *mut u8, idx: i64, es: i64):
     let vlen = list_get_len(v)

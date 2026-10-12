@@ -26,7 +26,7 @@ use std.string.parse
 use MirCore
 
 extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8
+extern fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8
 @[effect(fn_ptr: escape_value, ctx: escape_value)]
 extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
 extern fn with_thread_join(handle: i64) -> i32
@@ -220,7 +220,7 @@ impl CodegenUnitPipeline:
         if self.handles.len() - self.next_join >= self.window:
             self.join_oldest()
         unsafe:
-            let job_ptr = with_vec_get_ptr(&raw mut self.jobs as *mut u8, k as i64) as *mut CodegenUnitEmitJob
+            let job_ptr = with_vec_get_ptr_es(&raw mut self.jobs as *mut u8, k as i64, sizeof[CodegenUnitEmitJob]()) as *mut CodegenUnitEmitJob
             (*job_ptr).context = context
             (*job_ptr).llmod = llmod
             // A one-unit window is a small host: no unit emits while the

@@ -26,7 +26,7 @@ use std.collections.HashMap
 // lowering, rather than escaping through verbatim raw-string nodes.
 
 extern fn with_eprint(s: &str) -> Unit
-extern fn with_vec_free(v: *mut u8)
+extern fn with_vec_free_es(v: *mut u8, es: i64)
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
@@ -112,9 +112,9 @@ pub fn ci_array_text(elem: &str, count: &str) -> str:
     if semi > 0: "[" ++ elem.slice(1, semi).trim() ++ "; " ++ count ++ ", " ++ elem.slice(semi + 1, close).trim() ++ "]"
     else: "[" ++ elem ++ "; " ++ count ++ "]"
 
-fn ci_ir_free_list_i32(v: &List[i32]): with_vec_free(v as *const List[i32] as *mut u8)
+fn ci_ir_free_list_i32(v: &List[i32]): with_vec_free_es(v as *const List[i32] as *mut u8, sizeof[i32]())
 
-fn ci_ir_free_list_str(v: &List[str]): with_vec_free(v as *const List[str] as *mut u8)
+fn ci_ir_free_list_str(v: &List[str]): with_vec_free_es(v as *const List[str] as *mut u8, sizeof[str]())
 
 // ── CiType ────────────────────────────────────────────────────
 

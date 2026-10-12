@@ -13,8 +13,17 @@ pub type List[T]  {
     ptr: *const T,
     len: i64,
     cap: i64,
-    elem_size: i64,
+    // D115 Amendment 1: the elements before `ptr` in the allocation (the
+    // head of an owned List comes off by advancing `ptr`, O(1)).
+    start: i64,
 }
+
+extern fn with_vec_shrink_to_fit_es(v: *mut u8, es: i64)
+
+impl[T] List[T]:
+    /// §9.7: a small remainder keeps the whole original buffer alive;
+    /// `shrink_to_fit` releases the prefix and the spare capacity.
+    pub mut fn shrink_to_fit(): with_vec_shrink_to_fit_es((&raw mut self) as *mut u8, sizeof[T]())
 
 /// Clone for List[T]: produces a deep copy by cloning each element.
 impl[T: Clone] Clone for List[T]:

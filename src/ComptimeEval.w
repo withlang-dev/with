@@ -104,7 +104,7 @@ extern fn with_str_slice_ref(s: &str, start: i64, end: i64) -> str
 extern fn with_str_contains_ref(haystack: &str, needle: &str) -> i32
 extern fn with_str_concat_ref(a: &str, b: &str) -> str
 extern fn with_str_concat_n(parts: *const str, count: i64) -> str
-extern fn with_vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8
+extern fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8
 extern fn with_str_from_byte(byte: i32) -> str
 extern fn with_str_starts_with_ref(s: &str, prefix: &str) -> i32
 extern fn with_str_ends_with_ref(s: &str, suffix: &str) -> i32
@@ -2540,7 +2540,7 @@ impl ComptimeEvaluator:
             return comptime_control_error()
         // List's fields are std's (D100): the runtime hands back the first
         // element's address, bounds-checked.
-        let parts_ptr = if parts.len() == 0: 0 as *const str else: with_vec_get_ptr(parts as *const List[str] as *mut u8, 0) as *const str
+        let parts_ptr = if parts.len() == 0: 0 as *const str else: with_vec_get_ptr_es(parts as *const List[str] as *mut u8, 0, sizeof[str]()) as *const str
         comptime_control_value(comptime_value_str(with_str_concat_n(parts_ptr, parts.len())))
 
     mut fn is_string_builder_type(type_id: i32) -> bool:

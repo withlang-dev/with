@@ -406,7 +406,7 @@ pub fn string_to_int(s: &str) -> i64:
 
 /// Split text into lines. Returns a List of strings, one per line.
 pub fn lines(s: &str) -> List[str]:
-    var out: List[str] = List{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    var out: List[str] = List{ ptr: 0, len: 0, cap: 0, start: 0 }
     with_lines_out_ref((&raw mut out) as *mut u8, s)
     out
 

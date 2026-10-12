@@ -39,7 +39,7 @@ pub fn pid -> i32:
 /// Get command-line arguments as a List of strings.
 pub fn args -> List[str]:
     let n = with_arg_count()
-    let out: List[str] = List{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    let out: List[str] = List{ ptr: 0, len: 0, cap: 0, start: 0 }
     with_vec_new_out((&raw mut out) as *mut u8, 16)
     var i = 0
     while i < n:
