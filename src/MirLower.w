@@ -7501,7 +7501,7 @@ impl MirBuilder:
         // Sema's contextual copy (D22, D111) lowered the view tail as a lazy
         // read through it, `copy+retain view.*`: a projected place, never a
         // plain local, of the owned Copy type with drop glue.
-        if mir_place_plain_local(&self.body, place) >= 0: return result
+        if mir_place_plain_local(self.body, place) >= 0: return result
         let read_ty = self.operand_type(result)
         if read_ty == 0 or self.sema.is_copy_frozen(read_ty as TypeId) == 0 or self.sema.type_needs_drop_frozen(read_ty) == 0: return result
         // Only where the owned value is demanded: a `&str` tail of a `&str`

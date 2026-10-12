@@ -1330,9 +1330,9 @@ impl Codegen:
         // List.new() is { null, 0, 0, 0 }: word 3 is `start` (D115
         // Amendment 1 step 2), not the element size it once held.
         fields.push(wl_const_int(i64_ty, 0, 0))
-        let init = wl_const_named_struct(list_llvm, list_data_i64(&fields), 4)
+        let init = wl_const_named_struct(list_llvm, list_data_i64(fields), 4)
 
-        let _ = self.record_module_binding_global(name_sym, list_llvm, init, is_mut)
+        self.record_module_binding_global(name_sym, list_llvm, init, is_mut)
         true
 
     // §4.3c (D119): a global List literal whose elements are constants of a
@@ -1369,7 +1369,7 @@ impl Codegen:
             if elem_val == 0:
                 return false
             elems.push(elem_val)
-        let data = wl_const_array(elem_llvm, list_data_i64(&elems), count)
+        let data = wl_const_array(elem_llvm, list_data_i64(elems), count)
         let elems_gv = wl_add_global(self.llmod, wl_array_type(elem_llvm, count), self.current_decl_module_link_name(self.intern.resolve(name_sym)) ++ ".elems")
         wl_set_initializer(elems_gv, data)
         if is_mut == 0:
@@ -1382,8 +1382,8 @@ impl Codegen:
         fields.push(wl_const_int(i64_ty, count, 0))
         fields.push(wl_const_int(i64_ty, 0, 0))
         fields.push(wl_const_int(i64_ty, 0, 0))
-        let init = wl_const_named_struct(list_llvm, list_data_i64(&fields), 4)
-        let _ = self.record_module_binding_global(name_sym, list_llvm, init, is_mut)
+        let init = wl_const_named_struct(list_llvm, list_data_i64(fields), 4)
+        self.record_module_binding_global(name_sym, list_llvm, init, is_mut)
         true
 
     fn finalize_module_binding_global(gv: i64, is_mut: i32):
