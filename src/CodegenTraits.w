@@ -1372,8 +1372,9 @@ impl Codegen:
         let data = wl_const_array(elem_llvm, list_data_i64(elems), count)
         let elems_gv = wl_add_global(self.llmod, wl_array_type(elem_llvm, count), self.current_decl_module_link_name(self.intern.resolve(name_sym)) ++ ".elems")
         wl_set_initializer(elems_gv, data)
-        if is_mut == 0:
-            wl_set_global_constant(elems_gv, 1)
+        // §9.1c: a stable binding's elements may still be written in place,
+        // so the elements are writable static data even when the binding
+        // cannot be rebound (is_mut == 0) — never an LLVM constant.
         wl_set_linkage(elems_gv, wl_private_linkage())
         self.module_list_elems.insert(name_sym, elems_gv)
         let i64_ty = wl_i64_type(self.context)
@@ -1387,13 +1388,14 @@ impl Codegen:
         true
 
     fn finalize_module_binding_global(gv: i64, is_mut: i32):
+        // §9.1c: stable (is_mut == 0) forbids rebinding, not interior
+        // mutation — field and index writes and `mut self` calls still
+        // land here, so a binding's storage is never an LLVM constant.
+        // Stability only buys internal linkage outside an object build.
         if self.module_object_mode != 0:
-            if is_mut == 0:
-                wl_set_global_constant(gv, 1)
             wl_set_linkage(gv, 0)
             return
         if is_mut == 0:
-            wl_set_global_constant(gv, 1)
             wl_set_linkage(gv, wl_internal_linkage())
             return
         wl_set_linkage(gv, 0)
@@ -1406,8 +1408,8 @@ impl Codegen:
                 existing
             else:
                 wl_add_global(self.llmod, global_ty, name_str)
-        if is_mut == 0:
-            wl_set_global_constant(gv, 1)
+        // Not an LLVM constant even for a stable binding (§9.1c: its owner
+        // module may mutate it in place; see finalize_module_binding_global).
         wl_set_linkage(gv, 0)
         self.module_constants.insert(name_sym, gv)
         gv
@@ -2326,7 +2328,10 @@ impl Codegen:
             let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
             if global_ty == 0:
                 return
-            if is_mut != 0:
+            // §9.1c: a stable binding defined here has writable storage and
+            // can come to own heap data in place, so it registers its exit
+            // drop like a `var` (an imported symbol's owner drops it).
+            if is_mut != 0 or not self.current_decl_is_imported_module_symbol():
                 self.register_module_global_drop(name_sym, resolved_binding_ty)
             let _ = self.record_module_binding_global(name_sym, global_ty, self.build_default_value(global_ty), is_mut)
             return
@@ -2344,7 +2349,7 @@ impl Codegen:
             else:
                 0
         var const_binding_ty = if resolved_binding_ty != 0: resolved_binding_ty else: inferred_value_ty
-        if is_mut != 0:
+        if is_mut != 0 or not self.current_decl_is_imported_module_symbol():
             self.register_module_global_drop(name_sym, const_binding_ty)
         if const_binding_ty == 0 and self.pool.kind(value_node) == NodeKind.NK_STRUCT_LIT:
             let lit_sym = self.pool.get_data0(value_node)

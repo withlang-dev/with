@@ -4304,7 +4304,7 @@ fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_
     // D102: a function in a C record's function-pointer slot is `Some` of it.
     rc = bs_file_contains(ctx, out_w, "var g: outer = outer { in_: inner { cb: Some(add1), data: null }, limit: 7 }", "global_init_list")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, out_w, "var table: List[config_s]", "global_init_list")
+    rc = bs_file_contains(ctx, out_w, "let table: List[config_s]", "global_init_list")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "values: (&raw const static_values[0] as *const c_int)", "global_init_list")
     if rc != 0: return rc
@@ -4316,12 +4316,13 @@ fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_
     let ir = bs_migrate_expect_success(ctx, compiler_path, case_dir, "ir-global-init-list", ir_args)
     if ir.rc != 0: return ir.rc
     // D119: a global table is a List laid out as static data: its elements
-    // in a constant beside it, the header a constant pointing at them, and a
-    // pointer into the table in another global's initializer folds to the
-    // elements (never the header).
-    rc = bs_assert_contains(ctx, ir.stdout, "@static_tree.elems = private constant [2 x %tree_entry] [%tree_entry { %code_len { i16 12 }, %code_len { i16 8 } }, %tree_entry { %code_len { i16 140 }, %code_len { i16 9 } }]", "global_init_list_union_ir")
+    // beside it, the header pointing at them, and a pointer into the table
+    // in another global's initializer folds to the elements (never the
+    // header). The storage is writable, not an LLVM constant: a stable
+    // binding's elements may still be written in place (§9.1c).
+    rc = bs_assert_contains(ctx, ir.stdout, "@static_tree.elems = private global [2 x %tree_entry] [%tree_entry { %code_len { i16 12 }, %code_len { i16 8 } }, %tree_entry { %code_len { i16 140 }, %code_len { i16 9 } }]", "global_init_list_union_ir")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, ir.stdout, "@static_tree = internal constant %__with.List.tree_entry { ptr @static_tree.elems, i64 2, i64 0, i64 0 }", "global_init_list_static_header")
+    rc = bs_assert_contains(ctx, ir.stdout, "@static_tree = internal global %__with.List.tree_entry { ptr @static_tree.elems, i64 2, i64 0, i64 0 }", "global_init_list_static_header")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, ir.stdout, "@desc = global %desc_s { ptr @static_values.elems, ptr @mutable_values.elems, i32 3 }", "global_init_list_pointer_into_table")
     if rc != 0: return rc
@@ -4540,7 +4541,7 @@ fn bs_check_migrate_d119_arrays(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let grid: List[[c_int; 2]] = [[1, 2], [3, 4]]", "D119 arrays: a 2-D table is a List of rows")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "var scratch: List[u8] = [0; 8]", "D119 arrays: a tentative definition is a zero fill of the length")
+    rc = bs_assert_contains(ctx, out_text, "let scratch: List[u8] = [0; 8]", "D119 arrays: a tentative definition is a zero fill of the length, a stable binding (C cannot assign an array)")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "table.len()", "D119 arrays: sizeof ratio is len()")
     if rc != 0: return rc

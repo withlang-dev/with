@@ -2519,7 +2519,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
                 let is_threadlocal = with_cimport_var_is_threadlocal(session, idx)
                 let safe_name = ci_escape_reserved(name)
                 let tl_attr = if is_threadlocal != 0: "@[threadlocal]\n" else: ""
-                if is_const != 0:
+                if is_const != 0 or ci_starts_with(resolved_type, "List["):
                     let rendered = tl_attr ++ "extern let " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
                     let _ = ci_migrate_shared_ownerless_extern_add("extern_let", safe_name, rendered)
                 else:
@@ -2532,6 +2532,12 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
         return ""
 
     let is_const = with_cimport_var_is_const(session, idx)
+    // D119: C cannot assign an array, so a file-scope array that declares
+    // a `List` is a stable binding (§9.1c) whether or not C spells it
+    // const — never rebound, its elements still writable. A `var` List
+    // global would also be droppable mutable storage, which a bundle
+    // cannot export (D39 Level 0).
+    let stable_binding = is_const != 0 or ci_starts_with(resolved_type, "List[")
     let is_threadlocal = with_cimport_var_is_threadlocal(session, idx)
     let safe_name = ci_escape_reserved(name)
     let tl_attr = if is_threadlocal != 0: "@[threadlocal]\n" else: ""
@@ -2552,14 +2558,14 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
                 let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
                 ci_migrate_set_error("migrate: untranslatable global initializer for " ++ name ++ if loc.len() > 0: " at " ++ loc else: "")
                 return ""
-            if is_const != 0:
+            if stable_binding:
                 rendered = tl_attr ++ "let " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ init_val ++ "\n"
             else:
                 rendered = tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ init_val ++ "\n"
         else:
             // Tentative definitions own storage in C and are zero-initialized.
             let default_val = if declares_list: ci_array_list_fill_text(session, array_type) else: ci_default_for_type(resolved_type)
-            if is_const != 0:
+            if stable_binding:
                 if default_val.len() == 0:
                     let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
                     ci_migrate_set_error("migrate: no default initializer for tentative const global " ++ name ++ if loc.len() > 0: " at " ++ loc else: "")
@@ -2569,7 +2575,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
                 rendered = tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ default_val ++ "\n"
             else:
                 rendered = tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
-        let kind = if is_const != 0: "let" else: "var"
+        let kind = if stable_binding: "let" else: "var"
         if not is_static:
             if ci_migrate_shared_decl_add(kind, safe_name, rendered):
                 return ""
@@ -2581,7 +2587,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
         if owner_path.len() > 0:
             return ""
         shared_ownerless_extern = true
-    if is_const != 0:
+    if stable_binding:
         let rendered = tl_attr ++ "extern let " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
         if shared_ownerless_extern:
             if ci_migrate_shared_ownerless_extern_add("extern_let", safe_name, rendered):
