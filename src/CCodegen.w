@@ -9282,7 +9282,7 @@ impl CCodegen:
                 var elem_acc = acc
                 let arg_count = self.sema.get_generic_inst_arg_count(resolved as i32)
                 for ai in 0..arg_count:
-                    elem_acc = self.collect_struct_types_from_tid(move elem_acc, self.sema.get_generic_inst_arg(resolved as i32, ai))
+                    elem_acc = self.collect_struct_types_from_tid(elem_acc, self.sema.get_generic_inst_arg(resolved as i32, ai))
                 return elem_acc
             if self.generic_inst_is_declared_struct(resolved as i32):
                 let cname = self.struct_c_name(resolved as i32)
