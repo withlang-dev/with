@@ -1541,6 +1541,8 @@ pub type Sema {
     // Operator method calls: NK_BINARY node -> resolved function symbol, plus
     // node -> 1 when the right operand is the receiver.
     operator_method_calls: HashMap[i32, i32],
+    // D117: method names that have an owned twin (`name` → `name$move`).
+    method_twin_names: HashMap[i32, i32],
     // D116 (§15.4.9): each `++` over two sequences, node → the element
     // type of the List[T] it builds. MirLower lowers it as LIST_CONCAT, or
     // LIST_EXTEND when it is the value assigned back to its left operand.
@@ -3543,6 +3545,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         pipeline_call_return_types: sema_new_map_i32_i32(),
         pipeline_carrier_kinds: sema_new_map_i32_i32(),
         operator_method_calls: sema_new_map_i32_i32(),
+        method_twin_names: sema_new_map_i32_i32(),
         concat_sequence_nodes: sema_new_map_i32_i32(),
         operator_method_reversed: sema_new_map_i32_i32(),
         operator_method_derived: sema_new_map_i32_i32(),

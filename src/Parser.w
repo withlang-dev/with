@@ -3798,6 +3798,10 @@ impl Parser:
         var impl_assoc_types: List[i32] = List.new()
         let extra_start = self.pool.extra_len()
         var method_count: i32 = 0
+        // D117 (§9.5): the names this body declared and their receiver modes;
+        // a `move fn` twin of a declared `fn` is its own function `name$move`.
+        let impl_seen_names: List[i32] = List.new()
+        let impl_seen_modes: List[i32] = List.new()
 
         while self.peek() == TokenKind.TK_AT or self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_UNSAFE or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_GEN or self.peek() == TokenKind.TK_KW_MUT or self.peek() == TokenKind.TK_KW_MOVE or self.peek() == TokenKind.TK_KW_TYPE or (impl_braced and self.peek() == TokenKind.TK_R_BRACE):
             if impl_braced and self.peek() == TokenKind.TK_R_BRACE:
@@ -3863,10 +3867,16 @@ impl Parser:
             if method_name_sym == 0:
                 break
 
-            // Mangle as Type.method
+            // Mangle as Type.method; a `move fn` twin of a declared `fn` as
+            // Type.method$move (D117, §9.5; Sema reads the twin from the name).
             let type_str = self.intern.resolve(type_name)
             let method_str = self.intern.resolve(method_name_sym)
-            let mangled = self.intern.intern(type_str ++ "." ++ method_str)
+            var twin_suffix = ""
+            for si in 0..impl_seen_names.len():
+                if impl_seen_names[si] == method_name_sym and m_recv_mode == 3 and impl_seen_modes[si] != 3: twin_suffix = "$move"
+            impl_seen_names.push(method_name_sym)
+            impl_seen_modes.push(m_recv_mode)
+            let mangled = self.intern.intern(type_str ++ "." ++ method_str ++ twin_suffix)
 
             let m_tp_start = self.pool.extra_len()
             let m_tp_count = self.parse_type_params()
