@@ -8,9 +8,14 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20261009-local-2-1140e66035cc
-with-darwin-aarch64=946f9e4fb693167ac5ffe4f3e0962a556acd701e228e3fdac295795400b60e96
-# darwin-aarch64, linux-x86_64 and windows-x86_64 are cut from main 1140e660
+version=nightly-20261011-local-2-e4861e1d6997
+with-darwin-aarch64=c1d8cee1ea946266190d6994645b7499d3ed6fffcc298c5bc2c3cd2af6178228
+# darwin-aarch64, linux-x86_64 and windows-x86_64 are cut from main e4861e1d
+# (2026-10-11), each on its own host (studio128, eric-5090, win10) from a
+# stage2 == stage3 fixpoint: the first seeds whose runtime has the sized List
+# helpers (`with_vec_*_es`, D115 Amendment 1 step 1) and `++` (D116), which
+# the Vec header's step 2 (word 3 = `start`) needs.
+# Before them, darwin-aarch64, linux-x86_64 and windows-x86_64 were cut from main 1140e660
 # (2026-10-09), each on its own host from a stage2 == stage3 fixpoint: the
 # first seeds that reject `Vec` (D118 step d) and own a str read through a
 # view (#2307).
@@ -37,7 +42,7 @@ with-darwin-aarch64=946f9e4fb693167ac5ffe4f3e0962a556acd701e228e3fdac295795400b6
 # libc++ and lld: a fresh clone in a bare ubuntu:24.04 (git, curl, bubblewrap)
 # runs :deps and build with no LLVM_PREFIX to a stage2 == stage3 fixpoint over
 # all 16 units, and its release compiler is this binary byte for byte.
-with-linux-x86_64=93dfe21b080975fedfbb29afdd893e95ad7cba8b073dd866d85d26e8d91aa9be
+with-linux-x86_64=ea0fe5dfeb4f8fb1029e8f739d90528ab1e061f37e066402681d3f921a3302b8
 with-linux-aarch64.version=nightly-20261003-local-2-b78ceca2d3c5
 with-linux-aarch64=c5b434ce739a0ef2a8beddf09abd30f1f501aa2b9227b07a0b16bdf65f8f2898
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
@@ -50,6 +55,6 @@ with-linux-aarch64=c5b434ce739a0ef2a8beddf09abd30f1f501aa2b9227b07a0b16bdf65f8f2
 # v0.15.2.1: cross-built from ea377276 (v0.15.2.1 + the #1089 embed-slot
 # fix), an intermediate seed the native windows-aarch64 lane bootstraps and
 # verifies.
-with-windows-x86_64.exe=cb10cc80d45dd0a222f835ff341628a795719319063a471805d658bf026ae584
+with-windows-x86_64.exe=1e9a34e140676d669ac56fdb49075bda1cfc7f5cff91f24558e8b7e51653fe44
 with-windows-aarch64.exe.version=v0.15.2.1
 with-windows-aarch64.exe=bb3b17c64ad057ddc852a5ee6a61a4e4a224780447013699d490e6f726893c73
