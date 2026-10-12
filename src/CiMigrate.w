@@ -328,6 +328,19 @@ fn ci_migrate_insert_option_use(output: &str) -> str:
     else:
         "use std.option\n\n" ++ output
 
+// D119: a migrated module names `List` for its local and file-scope arrays;
+// a corpus module has no prelude, so it imports it as std's own modules do.
+fn ci_migrate_insert_collections_use(output: &str) -> str:
+    if ci_find_str(output, "List[") < 0:
+        return with_str_clone_ref(output)
+    if ci_find_str(output, "\nuse std.collections\n") >= 0 or ci_starts_with(output, "use std.collections\n"):
+        return with_str_clone_ref(output)
+    let header_end = ci_find_str(output, "\n\n")
+    if header_end >= 0:
+        output.slice(0, header_end as i64) ++ "\nuse std.collections" ++ output.slice(header_end as i64, output.len())
+    else:
+        "use std.collections\n\n" ++ output
+
 fn ci_migrate_shared_module_prefix() -> str:
     if g_migrate_shared_defs_prefix.ends_with(".defs"):
         return g_migrate_shared_defs_prefix.slice(0, g_migrate_shared_defs_prefix.len() - 5)
@@ -600,7 +613,7 @@ fn ci_migrate_write_shared_defs(output_dir: &str):
             defs.push_str("\n")
         pending_i = pending_i + 1
     let defs_path = output_dir ++ "/defs.w"
-    let rc = with_fs_write_file(defs_path, ci_migrate_insert_option_use(ci_migrate_publicize_shared_defs(ci_migrate_normalize_output(defs.to_str()))))
+    let rc = with_fs_write_file(defs_path, ci_migrate_insert_collections_use(ci_migrate_insert_option_use(ci_migrate_publicize_shared_defs(ci_migrate_normalize_output(defs.to_str())))))
     if rc != 0:
         eprint("migrate: failed to write shared defs: " ++ defs_path)
     else:
@@ -1369,6 +1382,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     var output = output_parts.join("")
     output = ci_migrate_insert_libc_use(output)
     output = ci_migrate_insert_option_use(output)
+    output = ci_migrate_insert_collections_use(output)
 
     ci_migrate_shared_note_output_uses(output)
     output = ci_migrate_publicize_types(ci_migrate_normalize_output(output))

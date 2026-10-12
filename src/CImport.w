@@ -2802,8 +2802,8 @@ pub fn ci_default_for_type(ty: &str) -> str:
 /// D119 (with-migrate-spec.md "Arrays"): the fill that gives a C array the
 /// program never initialized its length as a `List`: `[0; 256]` for
 /// `[c_char; 256]`, `[null; 2]` for pointers, `[0; 4, 4]` for `[c_int; 4, 4]`,
-/// `[rec {}; 8]` for a record the migration lays out (every field carries
-/// its default). "" when the element has no zero spelling: that array stays
+/// `[rec.zeroed(); 8]` for a record the migration lays out (every field
+/// zero-valid, D101). "" when the element has no zero spelling: that array stays
 /// `[T; N]`.
 pub fn ci_array_list_fill_text(session: i64, ty: &str) -> str:
     if ty.len() == 0 or ty[0] != '[': return ""
@@ -2813,7 +2813,9 @@ pub fn ci_array_list_fill_text(session: i64, ty: &str) -> str:
     while base.len() > 0 and base[0] == '[': base = ci_array_text_elem(base)
     if base.len() == 0: return ""
     var zero = ci_default_for_type(base)
-    if zero.len() == 0 and ci_init_list_record_field_count(session, base, -1) > 0: zero = base ++ " {}"
+    // A record is its `{0}` (D101: `T.zeroed()`, when every field is
+    // zero-valid); one that is not has no fill, and its array stays `[T; N]`.
+    if zero.len() == 0 and ci_init_list_record_field_count(session, base, -1) > 0 and ci_record_zero_invalid_field(session, base, -1).len() == 0: zero = base ++ ".zeroed()"
     if zero.len() == 0: return ""
     "[" ++ zero ++ "; " ++ dims ++ "]"
 
