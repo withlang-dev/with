@@ -15,7 +15,7 @@
 // :<stem>-prepare-reference`, or any migrate target); the `after` tree from
 // `with build :<stem>-migrate`. Workloads: zlib compresses and decompresses
 // a 32 MiB text with minigzip; pcre2 runs pcre2test over testinput1 and
-// testinput2; tommyds runs upstream's check; c-algorithms runs its test
+// testinput4; tommyds runs upstream's check; c-algorithms runs its test
 // programs. Results print as a table and land in out/corpus_bench/results.md.
 use std.fs
 use std.process
@@ -256,7 +256,7 @@ fn bench_pcre2(root: &str, compiler: &str, before_dir: &str, after_dir: &str, ru
     let c_bin = work ++ "/c_bin"
     cc(work, &objects, c_bin)
     let (before, after) = build_with_pair(compiler, work, "std/re", before_dir, after_dir, "pcre2test.w", &List.new())
-    for input in ["testinput1", "testinput2"]:
+    for input in ["testinput1", "testinput4"]:
         var row = Row { corpus: "pcre2", workload: "pcre2test " ++ input, c: 0.0, before: 0.0, after: 0.0 }
         let data = reference ++ "/testdata/" ++ input
         for (label, bin) in [("c", c_bin), ("before", before), ("after", after)]:
