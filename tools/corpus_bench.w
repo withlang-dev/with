@@ -23,13 +23,13 @@ use std.time
 
 fn arg_value(argv: &List[str], flag: &str, default: &str) -> str:
     for i in 0..argv.len():
-        if argv[i] == flag and i + 1 < argv.len(): return argv[i + 1].clone()
-    default.clone()
+        if argv[i] == flag and i + 1 < argv.len(): return argv[i + 1]
+    default
 
 fn arg_values(argv: &List[str], flag: &str) -> List[str]:
     var out: List[str] = List.new()
     for i in 0..argv.len():
-        if argv[i] == flag and i + 1 < argv.len(): out.push(argv[i + 1].clone())
+        if argv[i] == flag and i + 1 < argv.len(): out.push(argv[i + 1])
     out
 
 fn seconds(ns: i64): ns as f64 / 1000000000.0
@@ -44,8 +44,8 @@ fn parse_count(text: &str, default: i32) -> i32:
         n = n * 10 + (c - '0') as i32
     if n < 1: default else: n
 
-fn median(values: &List[f64]) -> f64:
-    var sorted: List[f64] = values.clone()
+fn median(values: List[f64]) -> f64:
+    var sorted = values
     let n = sorted.len()
     for i in 0..n:
         var least = i
@@ -75,12 +75,12 @@ fn entries(dir: &str) -> List[str]:
     for line in list_files_text(dir).split("\n"):
         let name = line.trim()
         if name.len() == 0: continue
-        out.push(if name.contains("/"): name.clone() else: dir ++ "/" ++ name)
+        out.push(if name.contains("/"): name else: dir ++ "/" ++ name)
     out
 
 fn basename(path: &str) -> str:
     let parts = path.split("/")
-    parts[parts.len() - 1].clone()
+    parts[parts.len() - 1]
 
 fn copy_w_files(src_dir: &str, dst_dir: &str):
     ensure_dir(dst_dir)
@@ -101,9 +101,9 @@ fn run_in(cwd: &str, argv: &List[str], log: &str) -> str:
 
 fn cc(cwd: &str, args: &List[str], output: &str):
     var argv: List[str] = ["/usr/bin/clang", "-O2", "-w"]
-    for a in args: argv.push(a.clone())
+    for a in args: argv.push(a)
     argv.push("-o")
-    argv.push(output.clone())
+    argv.push(output)
     let failure = run_in(cwd, &argv, output ++ ".build")
     if failure.len() > 0: fail("C build of " ++ output ++ " failed: " ++ failure)
 
@@ -111,10 +111,10 @@ fn cc(cwd: &str, args: &List[str], output: &str):
 /// modules at lib/std/<rel> under a scratch tree, read from source
 /// (`--bundle-corpus`), the prelude off.
 fn with_build(compiler: &str, tree: &str, harness: &str, corpus_rel: &str, extra: &List[str], output: &str):
-    var argv: List[str] = [compiler.clone(), "build", harness.clone(), "--bundle-corpus", corpus_rel.clone(), "--no-prelude"]
-    for a in extra: argv.push(a.clone())
+    var argv: List[str] = [compiler, "build", harness, "--bundle-corpus", corpus_rel, "--no-prelude"]
+    for a in extra: argv.push(a)
     argv.push("-o")
-    argv.push(output.clone())
+    argv.push(output)
     let failure = run_in(tree, &argv, output ++ ".build")
     if failure.len() > 0: fail("With build of " ++ harness ++ " failed: " ++ failure)
 
@@ -129,7 +129,7 @@ fn time_runs(cwd: &str, argv: &List[str], log: &str, runs: i32) -> f64:
             let stderr = (read_file(log ++ ".stderr") ?? "").trim()
             fail(f"run {r} of " ++ argv[0] ++ f" exited {finished.code}: " ++ stderr.slice(0, if stderr.len() < 400: stderr.len() else: 400))
         walls.push(wall)
-    median(&walls)
+    median(walls)
 
 type Row {
     corpus: str,
@@ -183,7 +183,7 @@ fn zlib_text() -> str:
         var words: List[str] = List.new()
         for k in 0..12:
             state = (state * 1103515245 + 12345) % 2147483648
-            words.push(vocabulary[(state / 65536) % vocabulary.len()].clone())
+            words.push(vocabulary[(state / 65536) % vocabulary.len()])
             if k % 4 == 3: words.push(f"{state % 1000}")
         let line = words.join(" ")
         size += line.len() + 1
@@ -209,13 +209,13 @@ fn bench_zlib(root: &str, compiler: &str, before_dir: &str, after_dir: &str, run
     if write_file(input, zlib_text()) != 0: fail("cannot write " ++ input)
     var compress = Row { corpus: "zlib", workload: "minigzip compress 32 MiB", c: 0.0, before: 0.0, after: 0.0 }
     var decompress = Row { corpus: "zlib", workload: "minigzip decompress", c: 0.0, before: 0.0, after: 0.0 }
-    for (label, bin) in [("c", c_bin.clone()), ("before", before.clone()), ("after", after.clone())]:
+    for (label, bin) in [("c", c_bin), ("before", before), ("after", after)]:
         if bin.len() == 0: continue
         let gz = work ++ "/" ++ label ++ ".gz"
         // `-c` writes the compressed stream to stdout, captured as the .gz.
-        let c_wall = time_runs(work, &[bin.clone(), "-c", input.clone()], gz.slice(0, gz.len() - 3), runs)
+        let c_wall = time_runs(work, &[bin, "-c", input], gz.slice(0, gz.len() - 3), runs)
         if copy_tree(gz.slice(0, gz.len() - 3) ++ ".stdout", gz) != 0: fail("cannot keep " ++ gz)
-        let d_wall = time_runs(work, &[bin.clone(), "-d", "-c", gz.clone()], work ++ "/" ++ label ++ "_decompress", runs)
+        let d_wall = time_runs(work, &[bin, "-d", "-c", gz], work ++ "/" ++ label ++ "_decompress", runs)
         if label == "c":
             compress.c = c_wall
             decompress.c = d_wall
@@ -240,14 +240,13 @@ fn bench_pcre2(root: &str, compiler: &str, before_dir: &str, after_dir: &str, ru
     reset_dir(work)
     // The library at width 8 (pcre2posix included) in one object, pcre2test
     // without a width (it defines its own, as upstream's Makefile builds it).
-    var lib_args: List[str] = ["-c", "-I" ++ src, "-DHAVE_CONFIG_H", "-DPCRE2_CODE_UNIT_WIDTH=8"]
     var objects: List[str] = List.new()
     for path in entries(src):
         let name = basename(path)
         if not name.ends_with(".c") or not name.starts_with("pcre2"): continue
         if name == "pcre2test.c" or name == "pcre2_jit_test.c" or name == "pcre2posix_test.c" or name == "pcre2_dftables.c" or name == "pcre2_fuzzsupport.c" or name == "pcre2grep.c" or name == "pcre2demo.c": continue
-        var unit_args = lib_args.clone()
-        unit_args.push(path.clone())
+        var unit_args: List[str] = ["-c", "-I" ++ src, "-DHAVE_CONFIG_H", "-DPCRE2_CODE_UNIT_WIDTH=8"]
+        unit_args.push(path)
         let object = work ++ "/" ++ name.slice(0, name.len() - 2) ++ ".o"
         cc(work, &unit_args, object)
         objects.push(object)
@@ -260,9 +259,9 @@ fn bench_pcre2(root: &str, compiler: &str, before_dir: &str, after_dir: &str, ru
     for input in ["testinput1", "testinput2"]:
         var row = Row { corpus: "pcre2", workload: "pcre2test " ++ input, c: 0.0, before: 0.0, after: 0.0 }
         let data = reference ++ "/testdata/" ++ input
-        for (label, bin) in [("c", c_bin.clone()), ("before", before.clone()), ("after", after.clone())]:
+        for (label, bin) in [("c", c_bin), ("before", before), ("after", after)]:
             if bin.len() == 0: continue
-            let wall = time_runs(work, &[bin.clone(), "-q", data.clone(), work ++ "/" ++ label ++ "_" ++ input ++ ".out"], work ++ "/" ++ label ++ "_" ++ input, runs)
+            let wall = time_runs(work, &[bin, "-q", data, work ++ "/" ++ label ++ "_" ++ input ++ ".out"], work ++ "/" ++ label ++ "_" ++ input, runs)
             if label == "c": row.c = wall
             else if label == "before": row.before = wall
             else: row.after = wall
@@ -279,14 +278,14 @@ fn bench_tommyds(root: &str, compiler: &str, before_dir: &str, after_dir: &str, 
     reset_dir(work)
     var c_args: List[str] = ["-I" ++ reference, reference ++ "/check.c"]
     for path in entries(reference ++ "/tommyds"):
-        if path.ends_with(".c"): c_args.push(path.clone())
+        if path.ends_with(".c"): c_args.push(path)
     let c_bin = work ++ "/c_bin"
     cc(work, &c_args, c_bin)
     let (before, after) = build_with_pair(compiler, work, "std/tommyds", before_dir, after_dir, "check_.w", &["-O1"])
     var row = Row { corpus: "tommyds", workload: "check", c: 0.0, before: 0.0, after: 0.0 }
-    for (label, bin) in [("c", c_bin.clone()), ("before", before.clone()), ("after", after.clone())]:
+    for (label, bin) in [("c", c_bin), ("before", before), ("after", after)]:
         if bin.len() == 0: continue
-        let wall = time_runs(work, &[bin.clone()], work ++ "/" ++ label ++ "_check", runs)
+        let wall = time_runs(work, &[bin], work ++ "/" ++ label ++ "_check", runs)
         if label == "c": row.c = wall
         else if label == "before": row.before = wall
         else: row.after = wall
@@ -314,15 +313,15 @@ fn bench_c_algorithms(root: &str, compiler: &str, before_dir: &str, after_dir: &
         ensure_dir(program)
         var c_args: List[str] = ["-x", "c", "-DALLOC_TESTING", "-I" ++ reference ++ "/src", "-I" ++ reference ++ "/test"]
         for path in entries(reference ++ "/src"):
-            if path.ends_with(".c"): c_args.push(path.clone())
+            if path.ends_with(".c"): c_args.push(path)
         c_args.push(reference ++ "/test/alloc-testing.c")
         c_args.push(reference ++ "/test/framework.c")
         c_args.push(reference ++ "/test/test-" ++ name ++ (if name == "cpp": ".cpp" else: ".c"))
         let c_bin = program ++ "/c_bin"
         cc(program, &c_args, c_bin)
-        row.c += time_runs(program, &[c_bin.clone()], program ++ "/c_run", runs)
+        row.c += time_runs(program, &[c_bin], program ++ "/c_run", runs)
         let module_name = "test_" ++ name.replace("-", "_") ++ ".w"
-        for (label, source) in [("before", before_dir.clone()), ("after", after_dir.clone())]:
+        for (label, source) in [("before", before_dir), ("after", after_dir)]:
             if source.len() == 0: continue
             let tree = program ++ "/" ++ label
             reset_dir(tree ++ "/" ++ package_dir)
@@ -332,9 +331,9 @@ fn bench_c_algorithms(root: &str, compiler: &str, before_dir: &str, after_dir: &
             else:
                 copy_w_files(source ++ "/tests/" ++ name, tree ++ "/" ++ package_dir)
             let bin = program ++ "/" ++ label ++ "_bin"
-            let failure = run_in(tree, &[compiler.clone(), "build", "--no-prelude", "-O1", package_dir ++ "/" ++ module_name, "-o", bin.clone()], bin ++ ".build")
+            let failure = run_in(tree, &[compiler, "build", "--no-prelude", "-O1", package_dir ++ "/" ++ module_name, "-o", bin], bin ++ ".build")
             if failure.len() > 0: fail("With build of test-" ++ name ++ " (" ++ label ++ ") failed: " ++ failure)
-            let wall = time_runs(program, &[bin.clone()], program ++ "/" ++ label ++ "_run", runs)
+            let wall = time_runs(program, &[bin], program ++ "/" ++ label ++ "_run", runs)
             if label == "before": row.before += wall
             else: row.after += wall
     rows.push(row)
