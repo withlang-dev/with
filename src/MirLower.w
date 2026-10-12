@@ -4743,6 +4743,24 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_COPY, place)
         self.body.new_operand(OperandKind.OK_MOVE, place)
 
+    // The operand's innermost `&str`: a `&&str` (and deeper) is read through
+    // one view per level, each a copy of the deref place.
+    mut fn peel_str_views(operand: i32) -> i32:
+        var cur = operand
+        while true:
+            let kind: i32 = self.body.operand_kinds[cur]
+            if kind != OperandKind.OK_COPY and kind != OperandKind.OK_MOVE: return cur
+            let ty = self.operand_type(cur)
+            if ty == 0: return cur
+            let resolved = self.sema.resolve_alias(ty as TypeId)
+            if self.sema.get_type_kind(resolved) != TypeKind.TY_REF: return cur
+            let inner = self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId)
+            if self.sema.get_type_kind(inner) != TypeKind.TY_REF: return cur
+            let place: i32 = self.body.operand_d0[cur]
+            let deref = self.new_deref_place(place)
+            cur = self.body.new_operand(OperandKind.OK_COPY, deref)
+        cur
+
     fn str_concat_part_is_explicit_move(node: i32) -> i32:
         if node == 0:
             return 0
@@ -4757,7 +4775,11 @@ impl MirBuilder:
         // D111: a concat part only reads its bytes.
         let saved_observing = self.observing_str_read
         self.observing_str_read = node
-        let lowered = self.lower_expr(node)
+        // A str read through a view of a view (`&&str`, a tuple-pattern
+        // binding over a `&str`) is read through each view: the concat
+        // reads a `str` or a `&str`, never a view's address.
+        let raw = self.lower_expr(node)
+        let lowered = self.peel_str_views(raw)
         self.observing_str_read = saved_observing
         if self.body.operand_kinds[lowered] != OperandKind.OK_MOVE:
             return lowered
@@ -7466,6 +7488,31 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, read_place, read_rv, self.ast.get_start(tail_expr))
         self.body.new_operand(OperandKind.OK_COPY, read_place)
 
+    // D111: a view tail (`out.trim()`, a `&str` into a local of this block)
+    // where the block's demand is the owned value copies it out, with its
+    // hold, BEFORE the block's scope-exit drops. Left lazy, the consumer's
+    // copy ran after `drop(out)` and read the freed buffer (NULs where the
+    // text was, for any `out` that had grown past its literal).
+    mut fn materialize_tail_view_for_owned_demand(result: i32, tail_expr: i32) -> i32:
+        let kind: i32 = self.body.operand_kinds[result]
+        if kind != OperandKind.OK_COPY and kind != OperandKind.OK_MOVE: return result
+        if kind != OperandKind.OK_COPY: return result
+        let place: i32 = self.body.operand_d0[result]
+        // Sema's contextual copy (D22, D111) lowered the view tail as a lazy
+        // read through it, `copy+retain view.*`: a projected place, never a
+        // plain local, of the owned Copy type with drop glue.
+        if mir_place_plain_local(&self.body, place) >= 0: return result
+        let read_ty = self.operand_type(result)
+        if read_ty == 0 or self.sema.is_copy_frozen(read_ty as TypeId) == 0 or self.sema.type_needs_drop_frozen(read_ty) == 0: return result
+        // The copy is one more holder (D111): it retains here, where it is
+        // read, not where the consumer would have read it after the drops.
+        self.retain_consumed_copy(result)
+        let owned_tmp = self.new_temp(read_ty)
+        let owned_place = self.place_for_local(owned_tmp)
+        let owned_rv = self.body.new_rvalue(RvalueKind.RK_USE, result, 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, owned_place, owned_rv, self.ast.get_start(tail_expr))
+        self.body.new_operand(OperandKind.OK_MOVE, owned_place)
+
     // D69 (§13.4): `yield e` calls the consumer's body with `e` — a plain T
     // moves in, a view is borrowed for the call. When the body answers false
     // the consumer has stopped: the generator leaves right here as if by
@@ -7621,6 +7668,7 @@ impl MirBuilder:
                     result = self.tail_local_moves_out(result, tail_expr)
                 result = self.materialize_tail_field_move(result, tail_expr)
                 result = self.materialize_tail_read_of_dropped_local(result, tail_expr)
+                result = self.materialize_tail_view_for_owned_demand(result, tail_expr)
             else:
                 let tail_frame = self.push_stmt_temp_frame()
                 result = self.lower_expr_discard(tail_expr)
