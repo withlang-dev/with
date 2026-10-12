@@ -28,6 +28,7 @@ use std.re.pcre2_string_utils
 use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
+use std.collections
 
 pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong, __param_options: c_uint, __param_buffptr: *mut *mut u8, __param_bufflenptr: *mut c_ulong, __param_ccontext: *mut pcre2_real_convert_context_8) -> c_int writes _pcre2_default_convert_context_8 {
     var __local_pattern = __param_pattern
@@ -35,9 +36,9 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
     var __local_ccontext = __param_ccontext
     var __local_rc: c_int
 
-    var __local_null_str: [u8; 1] = [205]
+    var __local_null_str: List[u8] = [205]
 
-    var __local_dummy_buffer: [u8; 100]
+    var __local_dummy_buffer: List[u8] = [0; 100]
 
     var __local_use_buffer: *mut u8 = ((&raw const __local_dummy_buffer[0] as *mut u8))
 

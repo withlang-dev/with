@@ -28,14 +28,15 @@ use std.re.pcre2_string_utils
 use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
+use std.collections
 
 pub unsafe fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __param_utf: c_int) -> c_int {
     var __local_ptr = __param_ptr
     var __local_require_state: c_uint = ((0 as c_uint))
 
-    var __local_require_map: [c_uint; 6]
+    var __local_require_map: List[c_uint] = [0; 6]
 
-    var __local_map: [c_uint; 6]
+    var __local_map: List[c_uint] = [0; 6]
 
     var __local_require_digitset: c_uint = ((0 as c_uint))
 

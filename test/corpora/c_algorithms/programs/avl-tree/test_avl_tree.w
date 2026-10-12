@@ -6,6 +6,7 @@ use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.libc
 use std.option
+use std.collections
 
 pub unsafe fn find_subtree_height(__param_node: *mut _AVLTreeNode) -> c_int {
     var __local_left_subtree: *mut _AVLTreeNode
@@ -304,7 +305,7 @@ pub fn test_avl_tree_child() writes allocation_limit {
 
     var __local_right: *mut _AVLTreeNode
 
-    var __local_values: [c_int; 3] = [1, 2, 3]
+    var __local_values: List[c_int] = [1, 2, 3]
 
     var __local_p: *mut c_int
 
@@ -570,9 +571,9 @@ pub fn test_avl_tree_remove() writes allocation_limit, counter, test_array {
 pub fn test_avl_tree_to_array() writes allocation_limit, counter {
     var __local_tree: *mut _AVLTree
 
-    var __local_entries: [c_int; 10] = [89, 23, 42, 4, 16, 15, 8, 99, 50, 30]
+    var __local_entries: List[c_int] = [89, 23, 42, 4, 16, 15, 8, 99, 50, 30]
 
-    var __local_sorted: [c_int; 10] = [4, 8, 15, 16, 23, 30, 42, 50, 89, 99]
+    var __local_sorted: List[c_int] = [4, 8, 15, 16, 23, 30, 42, 50, 89, 99]
 
     var __local_num_entries: c_uint = ((10 as c_uint))
 
@@ -641,4 +642,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [Option[extern "C" fn() -> Unit]; 9] = [Some(test_avl_tree_new), Some(test_avl_tree_free), Some(test_avl_tree_child), Some(test_avl_tree_insert_lookup), Some(test_avl_tree_lookup), Some(test_avl_tree_remove), Some(test_avl_tree_to_array), Some(test_out_of_memory), null]
+var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_avl_tree_new), Some(test_avl_tree_free), Some(test_avl_tree_child), Some(test_avl_tree_insert_lookup), Some(test_avl_tree_lookup), Some(test_avl_tree_remove), Some(test_avl_tree_to_array), Some(test_out_of_memory), null]

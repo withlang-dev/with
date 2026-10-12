@@ -1,6 +1,7 @@
 // Migrated from C
 use std.c_algorithms.defs
 use std.option
+use std.collections
 
 pub fn binomial_heap_new(__param_heap_type: i32, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _BinomialHeap {
     var __local_new_heap: *mut _BinomialHeap
@@ -298,7 +299,7 @@ unsafe fn binomial_heap_merge(__param_heap: *mut _BinomialHeap, __param_other: *
 
     var __local_new_roots_length: c_uint
 
-    var __local_vals: [*mut _BinomialTree; 3]
+    var __local_vals: List[*mut _BinomialTree] = [null; 3]
 
     var __local_num_vals: c_int
 

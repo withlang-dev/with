@@ -1,6 +1,7 @@
 // Migrated from C
 use std.c_algorithms.defs
 use std.option
+use std.collections
 
 pub fn hash_table_new(__param_hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_uint], __param_equal_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _HashTable {
     var __local_hash_table: *mut _HashTable
@@ -404,6 +405,6 @@ unsafe fn hash_table_enlarge(__param_hash_table: *mut _HashTable) -> c_int {
 
 }
 
-let hash_table_primes: [c_uint; 24] = [193, 389, 769, 1543, 3079, 6151, 12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739, 6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189, 805306457, 1610612741]
+let hash_table_primes: List[c_uint] = [193, 389, 769, 1543, 3079, 6151, 12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739, 6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189, 805306457, 1610612741]
 let hash_table_num_primes: c_uint = 24
 let hash_table_null_value: *mut c_void = null

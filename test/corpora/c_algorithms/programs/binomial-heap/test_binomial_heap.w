@@ -6,6 +6,7 @@ use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.libc
 use std.option
+use std.collections
 
 pub fn test_binomial_heap_new_free() -> Unit writes allocation_limit {
     var __local_heap: *mut _BinomialHeap
@@ -335,4 +336,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [Option[extern "C" fn() -> Unit]; 7] = [Some(test_binomial_heap_new_free), Some(test_binomial_heap_insert), Some(test_min_heap), Some(test_max_heap), Some(test_insert_out_of_memory), Some(test_pop_out_of_memory), null]
+var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_binomial_heap_new_free), Some(test_binomial_heap_insert), Some(test_min_heap), Some(test_max_heap), Some(test_insert_out_of_memory), Some(test_pop_out_of_memory), null]

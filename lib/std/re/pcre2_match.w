@@ -29,6 +29,7 @@ use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
 use std.libc
+use std.collections
 
 pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8) -> c_int writes _pcre2_default_match_context_8 {
     var __local_subject = __param_subject
@@ -65,7 +66,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     var __local_req_cu2__goto_6986_13: u8 = 0
 
-    var __local_null_str__goto_6988_13: [u8; 1]
+    var __local_null_str__goto_6988_13: List[u8] = [0; 1]
 
     var __local_original_subject__goto_6989_12: *const u8 = null
 
@@ -48566,6 +48567,6 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
 }
 
-let rep_min: [c_uint; 11] = [0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0]
-let rep_max: [c_uint; 11] = [4294967295u32, 4294967295u32, 4294967295u32, 4294967295u32, 1, 1, 0, 0, 4294967295u32, 4294967295u32, 1]
-let rep_typ: [c_uint; 12] = [1, 0, 1, 0, 1, 0, 1, 0, 2, 2, 2, 2]
+let rep_min: List[c_uint] = [0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0]
+let rep_max: List[c_uint] = [4294967295u32, 4294967295u32, 4294967295u32, 4294967295u32, 1, 1, 0, 0, 4294967295u32, 4294967295u32, 1]
+let rep_typ: List[c_uint] = [1, 0, 1, 0, 1, 0, 1, 0, 2, 2, 2, 2]

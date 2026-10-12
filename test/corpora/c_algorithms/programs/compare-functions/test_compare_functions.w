@@ -7,6 +7,7 @@ use std.calg_testing.compare_string
 use std.calg_testing.framework
 use std.libc
 use std.option
+use std.collections
 
 pub fn test_int_compare() -> Unit {
     var __local_a: c_int = ((4 as c_int))
@@ -57,7 +58,7 @@ pub fn test_int_equal() -> Unit {
 }
 
 pub fn test_pointer_compare() -> Unit {
-    var __local_array: [c_int; 5]
+    var __local_array: List[c_int] = [0; 5]
 
     if (((if not ((if unsafe { pointer_compare((((&raw const __local_array[0] as *const c_int) as *mut c_int) as *mut c_void), (((&raw const __local_array[4] as *const c_int) as *mut c_int) as *mut c_void)) } < 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_pointer_compare".ptr, c"test-compare-functions.c".ptr, (69 as c_int), c"pointer_compare(&array[0], &array[4]) < 0".ptr)
@@ -100,11 +101,11 @@ pub fn test_pointer_equal() -> Unit {
 }
 
 pub fn test_string_compare() -> Unit {
-    var __local_test1: [c_char; 6] = [65, 112, 112, 108, 101, 0]
+    var __local_test1: List[c_char] = [65, 112, 112, 108, 101, 0]
 
-    var __local_test2: [c_char; 7] = [79, 114, 97, 110, 103, 101, 0]
+    var __local_test2: List[c_char] = [79, 114, 97, 110, 103, 101, 0]
 
-    var __local_test3: [c_char; 6] = [65, 112, 112, 108, 101, 0]
+    var __local_test3: List[c_char] = [65, 112, 112, 108, 101, 0]
 
     if (((if not ((if unsafe { string_compare((&__local_test1[0] as *mut c_char), (&__local_test2[0] as *mut c_char)) } < 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_string_compare".ptr, c"test-compare-functions.c".ptr, (97 as c_int), c"string_compare(test1, test2) < 0".ptr)
@@ -127,15 +128,15 @@ pub fn test_string_compare() -> Unit {
 }
 
 pub fn test_string_equal() -> Unit {
-    var __local_test1: [c_char; 22] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 103, 0]
+    var __local_test1: List[c_char] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 103, 0]
 
-    var __local_test2: [c_char; 23] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 103, 32, 0]
+    var __local_test2: List[c_char] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 103, 32, 0]
 
-    var __local_test3: [c_char; 21] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 0]
+    var __local_test3: List[c_char] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 0]
 
-    var __local_test4: [c_char; 22] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 71, 0]
+    var __local_test4: List[c_char] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 71, 0]
 
-    var __local_test5: [c_char; 22] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 103, 0]
+    var __local_test5: List[c_char] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 103, 0]
 
     if (((if not ((if unsafe { string_equal((&__local_test1[0] as *mut c_char), (&__local_test5[0] as *mut c_char)) } != 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_string_equal".ptr, c"test-compare-functions.c".ptr, (115 as c_int), c"string_equal(test1, test5) != 0".ptr)
@@ -164,17 +165,17 @@ pub fn test_string_equal() -> Unit {
 }
 
 pub fn test_string_nocase_compare() -> Unit {
-    var __local_test1: [c_char; 6] = [65, 112, 112, 108, 101, 0]
+    var __local_test1: List[c_char] = [65, 112, 112, 108, 101, 0]
 
-    var __local_test2: [c_char; 7] = [79, 114, 97, 110, 103, 101, 0]
+    var __local_test2: List[c_char] = [79, 114, 97, 110, 103, 101, 0]
 
-    var __local_test3: [c_char; 6] = [65, 112, 112, 108, 101, 0]
+    var __local_test3: List[c_char] = [65, 112, 112, 108, 101, 0]
 
-    var __local_test4: [c_char; 6] = [65, 108, 112, 104, 97, 0]
+    var __local_test4: List[c_char] = [65, 108, 112, 104, 97, 0]
 
-    var __local_test5: [c_char; 6] = [98, 114, 97, 118, 111, 0]
+    var __local_test5: List[c_char] = [98, 114, 97, 118, 111, 0]
 
-    var __local_test6: [c_char; 8] = [67, 104, 97, 114, 108, 105, 101, 0]
+    var __local_test6: List[c_char] = [67, 104, 97, 114, 108, 105, 101, 0]
 
     if (((if not ((if unsafe { string_nocase_compare((&__local_test1[0] as *mut c_char), (&__local_test2[0] as *mut c_char)) } < 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_string_nocase_compare".ptr, c"test-compare-functions.c".ptr, (136 as c_int), c"string_nocase_compare(test1, test2) < 0".ptr)
@@ -209,15 +210,15 @@ pub fn test_string_nocase_compare() -> Unit {
 }
 
 pub fn test_string_nocase_equal() -> Unit {
-    var __local_test1: [c_char; 22] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 103, 0]
+    var __local_test1: List[c_char] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 103, 0]
 
-    var __local_test2: [c_char; 23] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 103, 32, 0]
+    var __local_test2: List[c_char] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 103, 32, 0]
 
-    var __local_test3: [c_char; 21] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 0]
+    var __local_test3: List[c_char] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 0]
 
-    var __local_test4: [c_char; 22] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 71, 0]
+    var __local_test4: List[c_char] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 71, 0]
 
-    var __local_test5: [c_char; 22] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 103, 0]
+    var __local_test5: List[c_char] = [116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 115, 116, 114, 105, 110, 103, 0]
 
     if (((if not ((if unsafe { string_nocase_equal((&__local_test1[0] as *mut c_char), (&__local_test5[0] as *mut c_char)) } != 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_string_nocase_equal".ptr, c"test-compare-functions.c".ptr, (158 as c_int), c"string_nocase_equal(test1, test5) != 0".ptr)
@@ -252,4 +253,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [Option[extern "C" fn() -> Unit]; 9] = [Some(test_int_compare), Some(test_int_equal), Some(test_pointer_compare), Some(test_pointer_equal), Some(test_string_compare), Some(test_string_equal), Some(test_string_nocase_compare), Some(test_string_nocase_equal), null]
+var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_int_compare), Some(test_int_equal), Some(test_pointer_compare), Some(test_pointer_equal), Some(test_string_compare), Some(test_string_equal), Some(test_string_nocase_compare), Some(test_string_nocase_equal), null]

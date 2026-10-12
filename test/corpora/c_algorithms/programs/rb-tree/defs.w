@@ -1,5 +1,6 @@
 // std.calg_testing.defs — shared definitions for migrated PCRE2
 use std.option
+use std.collections
 
 pub fn is_alpha(__with_c: i32) -> bool {
     (__with_c >= 65 and __with_c <= 90) or (__with_c >= 97 and __with_c <= 122)
@@ -522,7 +523,7 @@ pub type _SortedArray { pub data: *mut *mut c_void = null, pub length: c_uint = 
 impl Copy for _SortedArray
 
 pub let SORTED_ARRAY_NULL: *mut c_void = null
-pub var test_array: [c_int; 1000] = [0 as c_int; 1000]
+pub var test_array: List[c_int] = [0; 1000]
 
 pub let NUM_TEST_VALUES: c_int = 1000
 pub type Trie = _Trie

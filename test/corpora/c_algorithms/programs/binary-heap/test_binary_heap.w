@@ -6,6 +6,7 @@ use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.libc
 use std.option
+use std.collections
 
 pub fn test_binary_heap_new_free() -> Unit writes allocation_limit {
     var __local_heap: *mut _BinaryHeap
@@ -188,7 +189,7 @@ pub fn test_out_of_memory() writes allocation_limit {
 
     var __local_value: *mut c_int
 
-    var __local_values: [c_int; 16] = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+    var __local_values: List[c_int] = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
 
     var __local_i: c_int
 
@@ -272,4 +273,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [Option[extern "C" fn() -> Unit]; 6] = [Some(test_binary_heap_new_free), Some(test_binary_heap_insert), Some(test_min_heap), Some(test_max_heap), Some(test_out_of_memory), null]
+var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_binary_heap_new_free), Some(test_binary_heap_insert), Some(test_min_heap), Some(test_max_heap), Some(test_out_of_memory), null]

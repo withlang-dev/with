@@ -6,6 +6,7 @@ use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.libc
 use std.option
+use std.collections
 
 pub fn generate_arraylist() -> *mut _ArrayList writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_arraylist: *mut _ArrayList
@@ -737,7 +738,7 @@ pub fn test_arraylist_remove() writes allocation_limit, variable1, variable2, va
 }
 
 pub fn test_arraylist_index_of() writes allocation_limit {
-    var __local_entries: [c_int; 10] = [89, 4, 23, 42, 16, 15, 8, 99, 50, 30]
+    var __local_entries: List[c_int] = [89, 4, 23, 42, 16, 15, 8, 99, 50, 30]
 
     var __local_num_entries: c_int
 
@@ -839,9 +840,9 @@ pub fn test_arraylist_clear() writes allocation_limit, variable1, variable2, var
 pub fn test_arraylist_sort() writes allocation_limit {
     var __local_arraylist: *mut _ArrayList
 
-    var __local_entries: [c_int; 13] = [89, 4, 23, 42, 4, 16, 15, 4, 8, 99, 50, 30, 4]
+    var __local_entries: List[c_int] = [89, 4, 23, 42, 4, 16, 15, 4, 8, 99, 50, 30, 4]
 
-    var __local_sorted: [c_int; 13] = [4, 4, 4, 4, 8, 15, 16, 23, 30, 42, 50, 89, 99]
+    var __local_sorted: List[c_int] = [4, 4, 4, 4, 8, 15, 16, 23, 30, 42, 50, 89, 99]
 
     var __local_num_entries: c_uint = ((13 as c_uint))
 
@@ -930,4 +931,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [Option[extern "C" fn() -> Unit]; 10] = [Some(test_arraylist_new_free), Some(test_arraylist_append), Some(test_arraylist_prepend), Some(test_arraylist_insert), Some(test_arraylist_remove), Some(test_arraylist_remove_range), Some(test_arraylist_index_of), Some(test_arraylist_clear), Some(test_arraylist_sort), null]
+var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_arraylist_new_free), Some(test_arraylist_append), Some(test_arraylist_prepend), Some(test_arraylist_insert), Some(test_arraylist_remove), Some(test_arraylist_remove_range), Some(test_arraylist_index_of), Some(test_arraylist_clear), Some(test_arraylist_sort), null]

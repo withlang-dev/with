@@ -2,6 +2,7 @@
 use std.tommyds.defs
 use std.tommyds.tommyhash
 use std.tommyds.tommylist
+use std.collections
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
     return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
@@ -343,7 +344,7 @@ unsafe fn hashlin_grow_step(__param_hashlin: *mut tommy_hashlin_struct) {
         var __local_split_target: c_ulonglong = ((((2 as c_ulonglong) *% ((*__param_hashlin).count as c_ulonglong)) as c_ulonglong))
 
         while ((if (((*__param_hashlin).split as c_ulonglong) +% ((*__param_hashlin).low_max as c_ulonglong)) < __local_split_target: 1 else: 0) != 0) {
-            var __local_split: [*mut *mut tommy_node_struct; 2]
+            var __local_split: List[*mut *mut tommy_node_struct] = [null; 2]
 
             var __local_j: *mut tommy_node_struct
 
@@ -420,7 +421,7 @@ unsafe fn hashlin_shrink_step(__param_hashlin: *mut tommy_hashlin_struct) {
         var __local_split_target: c_ulonglong = ((((8 as c_ulonglong) *% ((*__param_hashlin).count as c_ulonglong)) as c_ulonglong))
 
         while ((if (((*__param_hashlin).split as c_ulonglong) +% ((*__param_hashlin).low_max as c_ulonglong)) > __local_split_target: 1 else: 0) != 0) {
-            var __local_split: [*mut *mut tommy_node_struct; 2]
+            var __local_split: List[*mut *mut tommy_node_struct] = [null; 2]
 
             ((*__param_hashlin).split = ((*__param_hashlin).split -% 1))
 

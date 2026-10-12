@@ -6,6 +6,7 @@ use std.calg_testing.framework
 use std.calg_testing.slist
 use std.libc
 use std.option
+use std.collections
 
 pub fn generate_list() -> *mut _SListEntry writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_list: *mut _SListEntry = ((null as *mut _SListEntry))
@@ -449,7 +450,7 @@ pub fn test_slist_remove_entry() writes allocation_limit, variable1, variable2, 
 }
 
 pub fn test_slist_remove_data() writes allocation_limit {
-    var __local_entries: [c_int; 13] = [89, 4, 23, 42, 4, 16, 15, 4, 8, 99, 50, 30, 4]
+    var __local_entries: List[c_int] = [89, 4, 23, 42, 4, 16, 15, 4, 8, 99, 50, 30, 4]
 
     var __local_num_entries: c_uint = ((13 as c_uint))
 
@@ -537,9 +538,9 @@ pub fn test_slist_remove_data() writes allocation_limit {
 pub fn test_slist_sort() -> Unit writes allocation_limit {
     var __local_list: *mut _SListEntry
 
-    var __local_entries: [c_int; 13] = [89, 4, 23, 42, 4, 16, 15, 4, 8, 99, 50, 30, 4]
+    var __local_entries: List[c_int] = [89, 4, 23, 42, 4, 16, 15, 4, 8, 99, 50, 30, 4]
 
-    var __local_sorted: [c_int; 13] = [4, 4, 4, 4, 8, 15, 16, 23, 30, 42, 50, 89, 99]
+    var __local_sorted: List[c_int] = [4, 4, 4, 4, 8, 15, 16, 23, 30, 42, 50, 89, 99]
 
     var __local_num_entries: c_uint = ((13 as c_uint))
 
@@ -600,7 +601,7 @@ pub fn test_slist_sort() -> Unit writes allocation_limit {
 }
 
 pub fn test_slist_find_data() writes allocation_limit {
-    var __local_entries: [c_int; 10] = [89, 23, 42, 16, 15, 4, 8, 99, 50, 30]
+    var __local_entries: List[c_int] = [89, 23, 42, 16, 15, 4, 8, 99, 50, 30]
 
     var __local_num_entries: c_int = ((10 as c_int))
 
@@ -834,7 +835,7 @@ pub fn test_slist_iterate_bad_remove() writes allocation_limit {
 
     var __local_iter: _SListIterator
 
-    var __local_values: [c_int; 49]
+    var __local_values: List[c_int] = [0; 49]
 
     var __local_i: c_int
 
@@ -884,4 +885,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [Option[extern "C" fn() -> Unit]; 15] = [Some(test_slist_append), Some(test_slist_prepend), Some(test_slist_free), Some(test_slist_next), Some(test_slist_nth_entry), Some(test_slist_nth_data), Some(test_slist_length), Some(test_slist_remove_entry), Some(test_slist_remove_data), Some(test_slist_sort), Some(test_slist_find_data), Some(test_slist_to_array), Some(test_slist_iterate), Some(test_slist_iterate_bad_remove), null]
+var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_slist_append), Some(test_slist_prepend), Some(test_slist_free), Some(test_slist_next), Some(test_slist_nth_entry), Some(test_slist_nth_data), Some(test_slist_length), Some(test_slist_remove_entry), Some(test_slist_remove_data), Some(test_slist_sort), Some(test_slist_find_data), Some(test_slist_to_array), Some(test_slist_iterate), Some(test_slist_iterate_bad_remove), null]
