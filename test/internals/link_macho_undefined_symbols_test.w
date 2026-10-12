@@ -21,7 +21,7 @@ fn main:
     assert(has_line(undef, "_malloc"))
     assert(has_line(undef, "_free"))
     assert(not has_line(undef, "_main"))
-    let not_macho = runtime_getenv("TMPDIR") ++ f"/with-not-macho-{runtime_getpid()}.txt"
+    let not_macho = runtime_temp_dir() ++ f"/with-not-macho-{runtime_getpid()}.txt"
     assert(runtime_write_file(not_macho, "not an object file\n") == 0)
     assert(link_stage_macho_undefined_symbols(not_macho) == "<probe-failed>")
     let _ = runtime_remove_file(not_macho)

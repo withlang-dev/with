@@ -24,9 +24,7 @@ fn archive(member: &str):
     "!<arch>\n" ++ ar_header("/", symtab.len()) ++ symtab ++ "\n" ++ ar_header("x.o/", member.len()) ++ member
 
 fn main:
-    var base = env("TMPDIR")
-    if base.len() == 0: base = "/tmp"
-    let root = base ++ f"/with-host-libs-{pid()}"
+    let root = runtime_temp_dir() ++ f"/with-host-libs-{pid()}"
     let _clean = runtime_remove_tree(root)
     assert(runtime_mkdir_p(root ++ "/a") == 0)
     assert(runtime_mkdir_p(root ++ "/b") == 0)

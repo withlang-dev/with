@@ -232,9 +232,7 @@ fn build_cache_is_hex_digest(text: &str) -> bool:
 // What `path version --self-id` prints: its self-id, or "" when it has none
 // (an unstamped binary, or a compiler older than the slot).
 fn build_cache_binary_self_id(path: &str) -> str:
-    let tmp = build_graph_rt_getenv("TMPDIR")
-    let dir = if tmp.len() > 0: tmp else: "/tmp"
-    let base = dir ++ f"/with-self-id-{build_graph_rt_getpid()}"
+    let base = runtime_temp_dir() ++ f"/with-self-id-{build_graph_rt_getpid()}"
     var argv = build_graph_argv_append("", path)
     argv = build_graph_argv_append(argv, "version")
     argv = build_graph_argv_append(argv, "--self-id")

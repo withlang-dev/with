@@ -23,7 +23,7 @@ fn main:
     assert(has_symbol(undef, "malloc"))
     assert(has_symbol(undef, "free"))
     assert(not has_symbol(undef, "main"))
-    let not_elf = runtime_getenv("TMPDIR") ++ f"/with-not-elf-{runtime_getpid()}.txt"
+    let not_elf = runtime_temp_dir() ++ f"/with-not-elf-{runtime_getpid()}.txt"
     assert(runtime_write_file(not_elf, "not an object file\n") == 0)
     assert(link_stage_elf_undefined_symbols(not_elf) == "<not-elf>")
     let _ = runtime_remove_file(not_elf)

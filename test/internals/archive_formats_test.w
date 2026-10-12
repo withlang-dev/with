@@ -15,7 +15,7 @@ fn numbers() -> str:
     out
 
 fn main:
-    let tmp = runtime_getenv("TMPDIR") ++ f"/with-archive-formats-{runtime_getpid()}"
+    let tmp = runtime_temp_dir() ++ f"/with-archive-formats-{runtime_getpid()}"
     let _clean = runtime_remove_tree(tmp)
     let expected = numbers()
     for name in ["pkg-1.0.tar.xz", "pkg-1.0.tar.bz2", "pkg-1.0.zip"]:

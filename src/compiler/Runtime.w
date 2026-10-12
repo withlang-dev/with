@@ -110,6 +110,20 @@ pub fn runtime_getenv(name: &str) -> str:
 pub fn runtime_setenv(name: &str, value: &str) -> i32:
     with_setenv_str(name, value)
 
+/// The directory for scratch files, without a trailing slash: TMP, then
+/// TEMP on Windows ("" when neither is set); elsewhere TMPDIR, else /tmp.
+/// TMPDIR is a macOS login's, not a Linux one's: a path built from it
+/// alone was `/with-…` at the filesystem root under ssh on Linux.
+pub fn runtime_temp_dir() -> str:
+    var dir = if runtime_sysinfo_os() == "Windows":
+        let tmp = runtime_getenv("TMP")
+        if tmp.len() > 0: tmp else: runtime_getenv("TEMP")
+    else:
+        let tmp = runtime_getenv("TMPDIR")
+        if tmp.len() > 0: tmp else: "/tmp"
+    while dir.len() > 1 and (dir.ends_with("/") or dir.ends_with("\\")): dir = dir.slice(0, dir.len() - 1)
+    dir
+
 pub fn runtime_clock_nanos() -> i64:
     with_clock_nanos()
 

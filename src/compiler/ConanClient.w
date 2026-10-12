@@ -34,16 +34,8 @@ pub type ConanLibraryScan {
     libs: List[str],
 }
 
-fn conan_temp_root() -> str:
-    if runtime_sysinfo_os() == "Windows":
-        let tmp = runtime_getenv("TMP")
-        if tmp.len() > 0: return tmp
-        return runtime_getenv("TEMP")
-    let tmp = runtime_getenv("TMPDIR")
-    if tmp.len() > 0: tmp else: "/tmp"
-
 fn conan_scratch_dir() -> str:
-    let base = conan_temp_root()
+    let base = runtime_temp_dir()
     if base.len() == 0:
         runtime_eprint("error: no temporary directory configured for Conan downloads (set TMP or TEMP)")
         return ""
