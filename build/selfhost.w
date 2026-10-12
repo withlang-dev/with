@@ -4304,7 +4304,7 @@ fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_
     // D102: a function in a C record's function-pointer slot is `Some` of it.
     rc = bs_file_contains(ctx, out_w, "var g: outer = outer { in_: inner { cb: Some(add1), data: null }, limit: 7 }", "global_init_list")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, out_w, "var table: [config_s; 10]", "global_init_list")
+    rc = bs_file_contains(ctx, out_w, "var table: List[config_s]", "global_init_list")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "values: (&raw const static_values[0] as *const c_int)", "global_init_list")
     if rc != 0: return rc
@@ -4315,7 +4315,15 @@ fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_
     ir_args |> push(bs_abs(root, out_w))
     let ir = bs_migrate_expect_success(ctx, compiler_path, case_dir, "ir-global-init-list", ir_args)
     if ir.rc != 0: return ir.rc
-    rc = bs_assert_contains(ctx, ir.stdout, "@static_tree = internal constant [2 x %tree_entry] [%tree_entry { %code_len { i16 12 }, %code_len { i16 8 } }, %tree_entry { %code_len { i16 140 }, %code_len { i16 9 } }]", "global_init_list_union_ir")
+    // D119: a global table is a List laid out as static data: its elements
+    // in a constant beside it, the header a constant pointing at them, and a
+    // pointer into the table in another global's initializer folds to the
+    // elements (never the header).
+    rc = bs_assert_contains(ctx, ir.stdout, "@static_tree.elems = private constant [2 x %tree_entry] [%tree_entry { %code_len { i16 12 }, %code_len { i16 8 } }, %tree_entry { %code_len { i16 140 }, %code_len { i16 9 } }]", "global_init_list_union_ir")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, ir.stdout, "@static_tree = internal constant %__with.List.tree_entry { ptr @static_tree.elems, i64 2, i64 0, i64 0 }", "global_init_list_static_header")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, ir.stdout, "@desc = global %desc_s { ptr @static_values.elems, ptr @mutable_values.elems, i32 3 }", "global_init_list_pointer_into_table")
     if rc != 0: return rc
     0
 
@@ -4366,7 +4374,7 @@ fn bs_check_migrate_compound_array_whole_values(ctx: &ActionCtx, compiler_path: 
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "pub fn whole_pair_array", "compound_array_whole_values")
     if rc != 0: return rc
-    bs_file_contains(ctx, out_w, "var flat_pairs: [pair; 2] = [pair { x: 1, y: 2 }, pair { x: 3, y: 4 }]", "compound_array_flattened_fields")
+    bs_file_contains(ctx, out_w, "var flat_pairs: List[pair] = [pair { x: 1, y: 2 }, pair { x: 3, y: 4 }]", "compound_array_flattened_fields")
 
 fn bs_check_migrate_host_header_compat(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()

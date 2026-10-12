@@ -364,6 +364,9 @@ pub type Codegen {
 
     // Module constants: sym → LLVM global
     module_constants: HashMap[i32, i64],
+    // §4.3c (D119): a List global laid out as static data: sym → the LLVM
+    // global holding its elements (`&raw const t[0]` in an initializer folds to it)
+    module_list_elems: HashMap[i32, i64],
     // Module constants that require runtime reconstruction before user main.
     module_runtime_init_syms: List[i32],
     module_runtime_init_nodes: List[i32],
@@ -1227,6 +1230,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         mono_types: HashMap.new(),
         type_aliases: HashMap.new(),
         module_constants: HashMap.new(),
+        module_list_elems: HashMap.new(),
         module_runtime_init_syms: List.new(),
         module_runtime_init_nodes: List.new(),
         module_runtime_init_type_ids: List.new(),
