@@ -1086,7 +1086,7 @@ impl CiProject:
                     i = i + 1
                     continue
 
-                let owner_type = ci_migrate_var_owner_type(session, i)
+                let owner_type = ci_migrate_var_declared_type(session, ci_migrate_var_owner_type(session, i))
                 if owner_type.len() == 0 or ci_starts_with(owner_type, "__UNSUPPORTED:"):
                     eprint("migrate: unsupported global owner type for " ++ name ++ " in " ++ input_path)
                     with_cimport_dispose(session)
@@ -2444,6 +2444,17 @@ fn ci_migrate_var_owner_type(session: i64, idx: i32) -> str:
                         actual_type = init_type
     ci_unsafe_fn_ptr_type(actual_type)
 
+/// D119 (with-migrate-spec.md "Arrays"): the type a global array defined by
+/// migrated C declares, `List[T]` for `[T; N]` (`List[[T; N]]` for rows);
+/// any other type is itself. Only a definition the migration owns declares
+/// a `List`: an extern whose owner stays C keeps the array, which is what
+/// the symbol's bytes are. The element must have a zero spelling (the
+/// tentative definition's fill), as for a local.
+fn ci_migrate_var_declared_type(session: i64, owner_type: &str) -> str:
+    let list_text = ci_array_list_text(owner_type)
+    if list_text.len() == 0 or ci_array_list_fill_text(session, owner_type).len() == 0: return with_str_clone_ref(owner_type)
+    list_text
+
 fn ci_migrate_var_resolved_type(session: i64, idx: i32, count: i32, primary_path: &str, project_active: bool, project: &CiProject) -> str:
     let name = with_cimport_decl_name(session, idx)
     if with_cimport_var_storage_class(session, idx) != CX_SC_STATIC:
@@ -2452,7 +2463,7 @@ fn ci_migrate_var_resolved_type(session: i64, idx: i32, count: i32, primary_path
             return shared_type
     let best = ci_migrate_find_best_var_decl(session, count, name, primary_path)
     if best >= 0 and ci_migrate_var_definition_kind(session, best) != CI_VAR_DECL_ONLY:
-        let owner_type = ci_migrate_var_owner_type(session, best)
+        let owner_type = ci_migrate_var_declared_type(session, ci_migrate_var_owner_type(session, best))
         if owner_type.len() > 0:
             return owner_type
     let decl_type = with_cimport_var_type_translated(session, idx)
@@ -2516,8 +2527,13 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
 
     if emits_definition:
         var rendered = ""
+        // D119: a global array declares a `List`; its initializer is still
+        // evaluated as the array's (padded to the length, the elements typed
+        // by the demand), and a tentative definition is the zero fill.
+        let declares_list = ci_starts_with(resolved_type, "List[")
+        let array_type = if declares_list: ci_migrate_var_owner_type(session, idx) else: with_str_clone_ref(resolved_type)
         if definition_kind == CI_VAR_FULL_DEF:
-            let init_val = ci_try_eval_var_init_for_type(session, idx, resolved_type)
+            let init_val = ci_try_eval_var_init_for_type(session, idx, array_type)
             if init_val.len() == 0:
                 let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
                 ci_migrate_set_error("migrate: untranslatable global initializer for " ++ name ++ if loc.len() > 0: " at " ++ loc else: "")
@@ -2528,7 +2544,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
                 rendered = tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ init_val ++ "\n"
         else:
             // Tentative definitions own storage in C and are zero-initialized.
-            let default_val = ci_default_for_type(resolved_type)
+            let default_val = if declares_list: ci_array_list_fill_text(session, array_type) else: ci_default_for_type(resolved_type)
             if is_const != 0:
                 if default_val.len() == 0:
                     let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""

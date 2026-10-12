@@ -840,6 +840,11 @@ pub fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_
     if kind == CiExprKind.CIE_SIZEOF_EXPR:
         return "<ci:unimpl:SIZEOF_EXPR>"
 
+    // D119: the zero fill that gives a C array its length as a `List`
+    // (`[0; 256]`), spelled by the lowering.
+    if kind == CiExprKind.CIE_FILL:
+        return with_str_clone_ref(exprs.get_string(exprs.get_d0(id)))
+
     // Initializers
     if kind == CiExprKind.CIE_INIT_LIST:
         let start = exprs.get_d0(id)

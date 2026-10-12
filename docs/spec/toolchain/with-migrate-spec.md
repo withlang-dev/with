@@ -371,7 +371,12 @@ the C program can do with it:
 The first rule depends on the guaranteed no-heap lowering of §4.3c: the
 migrator emits a `List` for local and file-scope arrays only once that
 lowering holds, and each corpus is benchmarked against its C before and
-after the switch. Until then they stay `[T; N]`.
+after the switch. The lowering held on 2026-10-12
+(`test/debug_alloc/da_d119_literal_no_heap.w`), and the migrator emits the
+`List` since then: `tools/corpus_bench.w` is the benchmark, and its before
+and after numbers are recorded with D119 in the decision log. An array
+whose element has no zero spelling (a record the migration does not lay
+out) stays `[T; N]`, since an uninitialized C buffer of it has no fill.
 
 ---
 

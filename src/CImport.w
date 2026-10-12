@@ -2799,6 +2799,24 @@ pub fn ci_default_for_type(ty: &str) -> str:
     // Unknown types (struct/union/opaque) — no safe default
     ""
 
+/// D119 (with-migrate-spec.md "Arrays"): the fill that gives a C array the
+/// program never initialized its length as a `List`: `[0; 256]` for
+/// `[c_char; 256]`, `[null; 2]` for pointers, `[0; 4, 4]` for `[c_int; 4, 4]`,
+/// `[rec {}; 8]` for a record the migration lays out (every field carries
+/// its default). "" when the element has no zero spelling: that array stays
+/// `[T; N]`.
+pub fn ci_array_list_fill_text(session: i64, ty: &str) -> str:
+    if ty.len() == 0 or ty[0] != '[': return ""
+    let dims = ci_array_text_dims(ty)
+    if dims.len() == 0 or ci_array_text_count(ty).len() == 0: return ""
+    var base = ci_array_text_elem(ty)
+    while base.len() > 0 and base[0] == '[': base = ci_array_text_elem(base)
+    if base.len() == 0: return ""
+    var zero = ci_default_for_type(base)
+    if zero.len() == 0 and ci_init_list_record_field_count(session, base, -1) > 0: zero = base ++ " {}"
+    if zero.len() == 0: return ""
+    "[" ++ zero ++ "; " ++ dims ++ "]"
+
 // ── Enum translation ────────────────────────────────────────
 
 fn ci_int_type_is_unsigned(ty: &str) -> bool: ci_starts_with(ty, "c_u") or ci_starts_with(ty, "u")
@@ -6807,6 +6825,10 @@ impl CiExprPool:
             return self.bool_lit(1, 0 as CiTypeId)
         if default_text == "null":
             return self.null_ptr(0 as CiTypeId)
+        // D119: a hoisted `List` local's zero fill (`[0; 64]`).
+        if default_text[0] == '[':
+            let fill_idx = self.add_string(default_text)
+            return self.add(CiExprKind.CIE_FILL, fill_idx, 0, 0, 0 as CiTypeId)
         0 as CiExprId
 
 fn ci_subtree_has_break_for_current_switch(session: i64, cursor: i32) -> bool:
@@ -13837,6 +13859,24 @@ impl CiStmtPool:
                             stmt_id: 0 as CiStmtId,
                         }
                     init_id = coerced_init
+                // D119 (with-migrate-spec.md "Arrays"): a C local array is a
+                // `List` of its length. The declaration says `List[T]`
+                // (`List[[T; N]]` for a row), the initializer stays the
+                // array's (the demand types its elements, §4.3c), and an
+                // array C left uninitialized is a zero fill of the length.
+                // A hoisted local is declared by ci_collect_var_decls with
+                // its fill and assigned here. Without a zero spelling for
+                // the element the array stays `[T; N]`.
+                var decl_ty_id = vty_id
+                if types.kind(vty_id) == CiTypeKind.CT_ARRAY:
+                    let array_text = ci_print_type(types, vty_id)
+                    let list_text = ci_array_list_text(array_text)
+                    let fill = ci_array_list_fill_text(session, array_text)
+                    if list_text.len() > 0 and fill.len() > 0:
+                        decl_ty_id = types.named_type_from_text(list_text)
+                        if (init_id as i32) == 0 and not hoisted:
+                            let fill_idx = exprs.add_string(fill)
+                            init_id = exprs.add(CiExprKind.CIE_FILL, fill_idx, 0, 0, vty_id)
                 let name_idx = self.add_string(storage_name)
                 if hoisted:
                     // Emit `storage_name = init` as a CIS_ASSIGN.
@@ -13848,10 +13888,10 @@ impl CiStmtPool:
                 else:
                     if (init_setup_id as i32) == 0:
                         // Non-hoisted simple init: CIS_VAR_DECL with is_mut=1.
-                        let decl_id = self.var_decl(name_idx, vty_id, init_id, 1)
+                        let decl_id = self.var_decl(name_idx, decl_ty_id, init_id, 1)
                         child_stmt_ids.push(decl_id as i32)
                     else:
-                        let decl_id = self.var_decl(name_idx, vty_id, 0 as CiExprId, 1)
+                        let decl_id = self.var_decl(name_idx, decl_ty_id, 0 as CiExprId, 1)
                         let lhs_idx = exprs.add_string(storage_name)
                         let lhs_id = exprs.ident(lhs_idx, vty_id)
                         let assign_id = self.assign(lhs_id, init_id)
@@ -17015,8 +17055,17 @@ fn ci_collect_var_decls(session: i64, cursor: i32, decls_in: List[CiHoistedVarDe
                 if (vty_id as i32) != 0 and with_ci_type_is_fn_pointer(session, vty):
                     vty_id = ci_nullable_fn_type(types, vty_id)
                     vty_str = ci_print_type(types, vty_id)
+                var default_text = ci_default_for_type(vty_str)
+                // D119: a hoisted local array is a `List` of its length too,
+                // declared with its zero fill and assigned where C wrote it.
+                if (vty_id as i32) != 0 and types.kind(vty_id) == CiTypeKind.CT_ARRAY:
+                    let list_text = ci_array_list_text(vty_str)
+                    let fill = ci_array_list_fill_text(session, vty_str)
+                    if list_text.len() > 0 and fill.len() > 0:
+                        vty_id = types.named_type_from_text(list_text)
+                        default_text = fill
                 if ci_find_hoisted_var_decl_index(decls, vname) < 0:
-                    decls.push(CiHoistedVarDecl { name: vname, ty: vty_id, default_text: ci_default_for_type(vty_str) })
+                    decls.push(CiHoistedVarDecl { name: vname, ty: vty_id, default_text: default_text })
             i = i + 1
     let nc = with_ci_num_children(session, cursor)
     var ci = 0

@@ -4521,26 +4521,40 @@ fn bs_check_migrate_d119_arrays(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "arrays.c")
     let out_w = bs_join(case_dir, "arrays.w")
-    let c_text = "#include <stdio.h>\nstatic const unsigned int table[4] = {1, 2, 3, 4294967295u};\nstatic const int grid[2][2] = {{1, 2}, {3, 4}};\nstatic const unsigned char wide[2] = {7, 300};\nstatic const unsigned long big[1] = {5000000000ul};\nint main(void) {\n    unsigned long n = sizeof(table) / sizeof(table[0]);\n    printf(\"%lu %u %d %u %lu\\n\", n, table[3], grid[1][0], (unsigned)wide[1], big[0]);\n    return 0;\n}\n"
+    let c_text = "#include <stdio.h>\n#include <string.h>\nstatic const unsigned int table[4] = {1, 2, 3, 4294967295u};\nstatic const int grid[2][2] = {{1, 2}, {3, 4}};\nstatic const unsigned char wide[2] = {7, 300};\nstatic const unsigned long big[1] = {5000000000ul};\nstatic unsigned char scratch[8];\ntypedef struct { unsigned char tag[4]; int rows[2][3]; } rec;\nint main(void) {\n    unsigned long n = sizeof(table) / sizeof(table[0]);\n    char buf[16];\n    int local[4] = {5, 6, 7, 8};\n    int grid2[2][3];\n    rec r;\n    memset(buf, 0, sizeof buf);\n    snprintf(buf, sizeof buf, \"%d\", local[2]);\n    grid2[1][2] = local[3];\n    r.tag[1] = 9;\n    r.rows[1][2] = 4;\n    scratch[3] = (unsigned char)grid[1][1];\n    printf(\"%lu %u %d %u %lu %s %d %d %d %d\\n\", n, table[3], grid[1][0], (unsigned)wide[1], big[0], buf, grid2[1][2], r.tag[1], r.rows[1][2], scratch[3]);\n    return 0;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate D119 arrays")
     if rc != 0: return rc
     let args = ["migrate", bs_abs(root, src), "--no-c-export", "-o", bs_abs(root, out_w)]
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-d119-arrays", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "let table: [c_uint; 4] = [1, 2, 3, ", "D119 arrays: [T; N] with bare literals")
+    rc = bs_assert_contains(ctx, out_text, "let table: List[c_uint] = [1, 2, 3, ", "D119 arrays: a file-scope table is a List with bare literals")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let grid: [c_int; 2, 2] = [[1, 2], [3, 4]]", "D119 arrays: nested")
+    rc = bs_assert_contains(ctx, out_text, "let grid: List[[c_int; 2]] = [[1, 2], [3, 4]]", "D119 arrays: a 2-D table is a List of rows")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "var scratch: List[u8] = [0; 8]", "D119 arrays: a tentative definition is a zero fill of the length")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "table.len()", "D119 arrays: sizeof ratio is len()")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let wide: [u8; 2] = [7, 44]", "D119 arrays: clang folds the converted value")
+    rc = bs_assert_contains(ctx, out_text, "let wide: List[u8] = [7, 44]", "D119 arrays: clang folds the converted value")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "(5000000000 as c_ulong)", "D119 arrays: a value the element type cannot hold on every target keeps its cast")
     if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, ": List[c_char] = [0; 16]", "D119 arrays: an uninitialized local buffer is a zero fill of the length")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, ": List[c_int] = [5, 6, 7, 8]", "D119 arrays: an initialized local table is a List")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, ": List[[c_int; 3]] = [0; 2, 3]", "D119 arrays: a 2-D local is a List of rows, filled in index order")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "tag: [u8; 4]", "D119 arrays: a struct field stays a fixed array")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "rows: [c_int; 2, 3]", "D119 arrays: a 2-D struct field stays a fixed array")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, ": [c_char; 16]", "D119 arrays: no local keeps the fixed-array spelling")
+    if rc != 0: return rc
     let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-d119-arrays", ["run", bs_abs(root, out_w)])
     if run.rc != 0: return run.rc
-    bs_assert_contains(ctx, run.stdout, "4 4294967295 3 44 5000000000", "D119 arrays: values survive")
+    bs_assert_contains(ctx, run.stdout, "4 4294967295 3 44 5000000000 7 8 9 4 4", "D119 arrays: values survive")
 
 fn bs_check_migrate_offsetof(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -4650,9 +4664,10 @@ fn bs_check_migrate_cross_file_global_owner_arrays(ctx: &ActionCtx, compiler_pat
     if result.rc != 0: return result.rc
     let owner_w = bs_join(generated_dir, "owner.w")
     let user_w = bs_join(generated_dir, "user.w")
-    rc = bs_file_contains(ctx, owner_w, "let issue121_table: [u8; 3]", "cross_file_global_owner_arrays owner")
+    // D119: the owner's table is a List, and the user declares the same type.
+    rc = bs_file_contains(ctx, owner_w, "let issue121_table: List[u8] = [7, 9, 11]", "cross_file_global_owner_arrays owner")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, user_w, "extern let issue121_table: [u8; 3]", "cross_file_global_owner_arrays user")
+    rc = bs_file_contains(ctx, user_w, "extern let issue121_table: List[u8]", "cross_file_global_owner_arrays user")
     if rc != 0: return rc
     rc = bs_file_forbids(ctx, owner_w, "issue121_table: *", "cross_file_global_owner_arrays owner")
     if rc != 0: return rc

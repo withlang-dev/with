@@ -112,6 +112,14 @@ pub fn ci_array_text(elem: &str, count: &str) -> str:
     if semi > 0: "[" ++ elem.slice(1, semi).trim() ++ "; " ++ count ++ ", " ++ elem.slice(semi + 1, close).trim() ++ "]"
     else: "[" ++ elem ++ "; " ++ count ++ "]"
 
+/// D119 (with-migrate-spec.md "Arrays"): the `List` a C local or file-scope
+/// array declares: `[T; N]` is `List[T]`, `[T; M, N]` is `List[[T; N]]` (its
+/// rows stay inline values); "" for a slice or a non-array.
+pub fn ci_array_list_text(ty: &str) -> str:
+    let elem = ci_array_text_elem(ty)
+    if elem.len() == 0 or ci_array_text_count(ty).len() == 0: return ""
+    "List[" ++ elem ++ "]"
+
 fn ci_ir_free_list_i32(v: &List[i32]): with_vec_free_es(v as *const List[i32] as *mut u8, sizeof[i32]())
 
 fn ci_ir_free_list_str(v: &List[str]): with_vec_free_es(v as *const List[str] as *mut u8, sizeof[str]())
@@ -314,6 +322,7 @@ pub enum CiExprKind: i32:
     // Initializers
     CIE_INIT_LIST = 70         // d0 = extra_start, d1 = count
     CIE_DESIGNATED_INIT = 71   // d0 = extra_start (alt [field_sym_idx, expr_id]), d1 = field_count
+    CIE_FILL = 72              // d0 = string_idx of the fill literal (`[0; 256]`, D119)
 
     // Safety boundary
     CIE_UNSAFE = 80            // d0 = inner expr
