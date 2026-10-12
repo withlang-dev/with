@@ -1952,9 +1952,9 @@ impl Sema:
         // them, and the method symbol rebuild below looks them up.
         let parsed_text: str = self.pool_resolve(parsed_fn_name)
         if parsed_text.ends_with("$move"):
-            let _ = self.pool_intern(parsed_text)
+            self.pool_intern(parsed_text)
             let twin_dot = parsed_text.rfind(".")
-            let _ = self.pool_intern(parsed_text[twin_dot + 1..parsed_text.len()])
+            self.pool_intern(parsed_text[twin_dot + 1..parsed_text.len()])
         let method_owner_sym = self.method_decl_owner_symbol(node, parsed_fn_name)
         let method_base_sym = self.method_decl_base_symbol(node, parsed_fn_name)
         var fn_name = method_base_sym
