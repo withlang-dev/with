@@ -91,6 +91,7 @@ enum CcBuiltin: i32:
     LIST_CONCAT
     LIST_EXTEND
     LIST_TAKE_FRONT
+    LIST_RESTORE_FRONT
     STR_LEN
     STR_BYTE_AT
     STR_SLICE
@@ -202,6 +203,7 @@ fn cc_builtin_uses_list_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.LIST_POP: return true
     if kind == CcBuiltin.LIST_EXTEND: return true
     if kind == CcBuiltin.LIST_TAKE_FRONT: return true
+    if kind == CcBuiltin.LIST_RESTORE_FRONT: return true
     if kind == CcBuiltin.LIST_ITER: return true
     if kind == CcBuiltin.LIST_MAP: return true
     if kind == CcBuiltin.LIST_FILTER: return true
@@ -6658,6 +6660,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.LIST_CONCAT: return CcBuiltin.LIST_CONCAT
     if intrinsic == MirIntrinsic.LIST_EXTEND: return CcBuiltin.LIST_EXTEND
     if intrinsic == MirIntrinsic.LIST_TAKE_FRONT: return CcBuiltin.LIST_TAKE_FRONT
+    if intrinsic == MirIntrinsic.LIST_RESTORE_FRONT: return CcBuiltin.LIST_RESTORE_FRONT
     if intrinsic == MirIntrinsic.LIST_GET: return CcBuiltin.LIST_GET
     if intrinsic == MirIntrinsic.LIST_GET_REF: return CcBuiltin.LIST_GET
     if intrinsic == MirIntrinsic.LIST_LEN: return CcBuiltin.LIST_LEN
@@ -6961,6 +6964,13 @@ impl CCodegen:
 
         if kind == CcBuiltin.LIST_CONCAT or kind == CcBuiltin.LIST_EXTEND:
             return self.emit_list_concat(body, args_id, dest_place, kind, has_ret, next_bb)
+
+        if kind == CcBuiltin.LIST_RESTORE_FRONT:
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
+            let rf_es = self.list_recv_elem_sizeof_text(body, args_id)
+            let elem_text = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+            var out = "    " ++ cc_lbrace() ++ " with_vec_restore_front_es((uint8_t*)" ++ recv_ptr ++ ", (const uint8_t*)&(" ++ elem_text ++ "), " ++ rf_es ++ "); " ++ cc_rbrace() ++ "\n"
+            return out ++ f"    goto bb{next_bb};"
 
         if kind == CcBuiltin.LIST_TAKE_FRONT:
             let recv_ptr = self.list_recv_ptr_text(body, args_id)

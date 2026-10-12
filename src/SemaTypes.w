@@ -137,6 +137,8 @@ pub enum MirIntrinsic: i32:
     // advancing the header (the pattern `[h, ..t]`); the call's result is
     // the element.
     LIST_TAKE_FRONT
+    // #2289: a head put back on a failed guard (arg 1 is the element).
+    LIST_RESTORE_FRONT
     MAP_NEW
     MAP_INSERT
     MAP_GET

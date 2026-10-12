@@ -179,6 +179,13 @@ pub type MirBuilder = ephemeral {
     // Pairs (binding local, subject place) of every value a pattern binding
     // moved out of its subject, in order (bind_pattern_value).
     pattern_move_log: List[i32],
+    // #2289: the elements a slice pattern took out of an owned List, newest
+    // last: (binding place, List place, 1 for a head, 0 for a tail). A failed
+    // guard puts a head back through the prefix (restore_front) and a tail
+    // back into the capacity it left (push).
+    pattern_take_log: List[i32],
+    // (move-log mark, take-log mark) pairs, one per arm whose pattern runs.
+    take_log_marks: List[i32],
     with_cleanup_guard_locals: List[i32],
     with_cleanup_payload_locals: List[i32],
     with_cleanup_method_syms: List[i32],
@@ -329,6 +336,8 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         never_call_node: 0,
         pattern_bind_mut: 0,
         pattern_move_log: List.new(),
+        pattern_take_log: List.new(),
+        take_log_marks: List.new(),
         with_cleanup_guard_locals: List.new(),
         with_cleanup_payload_locals: List.new(),
         with_cleanup_method_syms: List.new(),
@@ -10970,6 +10979,47 @@ impl MirBuilder:
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, bind_place, blank_rv, 0)
             self.body.mark_local_ever_moved(self.body.place_locals[bind_place])
             i = i - 2
+        // The remainder is back in the subject (a `..rest` moved it out);
+        // now the elements taken out of the subject go back into it.
+        self.restore_pattern_takes(start)
+
+    // #2289 (D115 Amendment 1): the List elements taken since the move log
+    // was at `start` go back, newest first: a head through the prefix the
+    // take left (`with_vec_restore_front_es`), a tail by `push`. The binding
+    // is blanked so its scheduled drop frees nothing.
+    mut fn restore_pattern_takes(move_log_start: i32):
+        // The take log is cut at the same arm boundary as the move log: both
+        // are recorded per arm and truncated together (take_log_mark).
+        let start = self.take_log_mark_for(move_log_start)
+        var i = self.pattern_take_log.len() - 3
+        while i >= start:
+            let bind_place: i32 = self.pattern_take_log[i]
+            let list_place: i32 = self.pattern_take_log[i + 1]
+            let is_head: i32 = self.pattern_take_log[i + 2]
+            let args: List[i32] = [self.body.new_operand(OperandKind.OK_COPY, list_place), self.body.new_operand(OperandKind.OK_MOVE, bind_place)]
+            let args_id = self.body.new_call_args(args)
+            self.body.set_call_intrinsic(args_id, if is_head != 0: MirIntrinsic.LIST_RESTORE_FRONT else: MirIntrinsic.LIST_PUSH)
+            let unit_local = self.new_temp(self.sema.ty_void)
+            let unit_place = self.place_for_local(unit_local)
+            let after_bb = self.new_block()
+            let unit = self.unit_operand()
+            self.terminate(TermKind.TK_CALL, unit, args_id, unit_place, after_bb)
+            self.switch_to(after_bb)
+            let zop = self.body.gen_zero_operand(self.place_local_type(bind_place))
+            let blank_rv = self.body.new_rvalue(RvalueKind.RK_USE, zop, 0, 0)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, bind_place, blank_rv, 0)
+            self.body.mark_local_ever_moved(self.body.place_locals[bind_place])
+            i = i - 3
+        while self.pattern_take_log.len() > start: self.pattern_take_log.pop()
+
+    // The take log's length when the move log had `move_log_start` entries:
+    // each arm records its move-log mark; the take log is marked alongside.
+    fn take_log_mark_for(move_log_start: i32) -> i32:
+        var k = self.take_log_marks.len() - 2
+        while k >= 0:
+            if self.take_log_marks[k] == move_log_start: return self.take_log_marks[k + 1]
+            k = k - 2
+        0
 
     // Slice patterns over a sequence observed in place (§9.7, #1389): 1 for a
     // slice, 2 for a List, 0 for anything else (an array is decided at
@@ -11274,6 +11324,9 @@ impl MirBuilder:
         let local_place = self.place_for_local(local_id)
         self.terminate(TermKind.TK_CALL, unit, args_id, local_place, after_bb)
         self.switch_to(after_bb)
+        self.pattern_take_log.push(local_place)
+        self.pattern_take_log.push(list_place)
+        self.pattern_take_log.push(1)
         if sym != 0: local_id else: -1
 
     // One element removed from an owned List at `idx_op` into its binding (a
@@ -11294,6 +11347,9 @@ impl MirBuilder:
         let local_place = self.place_for_local(local_id)
         self.terminate(TermKind.TK_CALL, unit, args_id, local_place, after_bb)
         self.switch_to(after_bb)
+        self.pattern_take_log.push(local_place)
+        self.pattern_take_log.push(list_place)
+        self.pattern_take_log.push(0)
         if sym != 0: local_id else: -1
 
     // The `..` of a tuple pattern (§9.7, #1366) over subject elements
@@ -11760,6 +11816,8 @@ impl MirBuilder:
             // different arm was taken (memory corruption for Drop-typed payloads).
             self.push_scope()
             let move_log_start = self.pattern_move_log.len() as i32
+            self.take_log_marks.push(move_log_start)
+            self.take_log_marks.push(self.pattern_take_log.len() as i32)
             let _ = self.lower_pattern(pat_node, scrutinee_place)
             self.pattern_subject_observed = saved_observed
             self.field_move_in_branch = self.field_move_in_branch + 1

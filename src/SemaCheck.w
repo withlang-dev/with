@@ -20708,10 +20708,9 @@ impl Sema:
             self.pattern_list_removal = 0
             self.check_pattern(pat, subject_type as i32)
             self.pattern_subject_node = 0
-            // A failed guard puts the arm's bindings back into the subject;
-            // an element removed from an owned List has no way back yet (#2289).
-            if guard != 0 and self.pattern_list_removal != 0:
-                self.emit_error("a match guard cannot follow a pattern that takes elements out of an owned List yet (#2289)", self.pattern_list_removal)
+            // A failed guard puts the arm's bindings back into the subject, an
+            // element taken out of an owned List included (#2289: MIR's
+            // restore_pattern_takes; D115 Amendment 1 gives a head its way back).
             self.record_pattern_view_bindings(pat, subject)
             // #1302: marked per arm, before its body, from the shared entry
             // state — an arm that consumes the subject and reassigns it

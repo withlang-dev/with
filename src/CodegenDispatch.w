@@ -10215,6 +10215,21 @@ impl Codegen:
             tf_args.push(tf_es)
             let _ = self.mir_list_helper_call("with_vec_take_front_es", tf_params, tf_args)
 
+        else if intrinsic == MirIntrinsic.LIST_RESTORE_FRONT:
+            // #2289: the head goes back through the prefix its take left.
+            let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+            let rf_es = wl_const_int(i64_ty, self.mir_list_recv_elem_size(body, args_id), 0)
+            let elem_ptr = self.mir_intrinsic_arg_ptr(body, args_id, 1)
+            let rf_params: List[i64] = List.new()
+            rf_params.push(ptr_ty)
+            rf_params.push(ptr_ty)
+            rf_params.push(i64_ty)
+            let rf_args: List[i64] = List.new()
+            rf_args.push(recv_ptr)
+            rf_args.push(elem_ptr)
+            rf_args.push(rf_es)
+            let _ = self.mir_list_helper_call("with_vec_restore_front_es", rf_params, rf_args)
+
         else if intrinsic == MirIntrinsic.LIST_CONCAT or intrinsic == MirIntrinsic.LIST_EXTEND:
             let cat = self.mir_emit_list_concat(body, args_id, dest_place, intrinsic)
             if cat != 0: result = cat
