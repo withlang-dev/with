@@ -16807,7 +16807,15 @@ fn ci_call_is_abort(session: i64, cursor: i32) -> bool:
     let callee = with_ci_cursor_spelling(session, cursor)
     callee == "abort" or callee == "exit" or callee == "_exit" or callee == "_Exit" or callee == "quick_exit" or callee == "__builtin_trap" or callee == "__builtin_unreachable" or callee == "__assert_rtn" or callee == "__assert_fail" or callee == "__assert" or callee == "__assert_func" or callee == "_assert" or callee == "__assert2" or callee == "__wassert" or callee == "_wassert"
 
+// `sizeof`, `_Alignof` and the other CXK_UNARY_EXPR operators read their
+// operand's type, never its value: nothing under one runs, so nothing under
+// one is evidence. glibc's `assert(e)` is `((void) sizeof ((e) ? 1 : 0),
+// ({ if (e) ; else __assert_fail (...); }))`, and the `?:` under its sizeof
+// read as a NULL test whose NULL branch continues.
+fn ci_unevaluated(session: i64, cursor: i32): with_ci_cursor_kind(session, cursor) == CXK_UNARY_EXPR
+
 fn ci_subtree_aborts(session: i64, cursor: i32) -> bool:
+    if ci_unevaluated(session, cursor): return false
     if ci_call_is_abort(session, cursor): return true
     let nc = with_ci_num_children(session, cursor)
     var i = 0
@@ -16854,6 +16862,7 @@ fn ci_condition_null_sense(session: i64, cursor: i32, name: &str) -> i32:
 // `if`/`?:` are the tests; an `if` without `else` whose truth means
 // non-NULL continues past it, which is a handled NULL.
 pub fn ci_body_null_test_evidence(session: i64, cursor: i32, name: &str) -> i32:
+    if ci_unevaluated(session, cursor): return 0
     var verdict: i32 = 0
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
@@ -16882,6 +16891,7 @@ pub fn ci_body_null_test_evidence(session: i64, cursor: i32, name: &str) -> i32:
 //   `global:<param>`               parameter assigned to something not a parameter
 // `params` are the enclosing definition's parameter names.
 pub fn ci_body_call_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
+    if ci_unevaluated(session, cursor): return ""
     var out = ""
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
