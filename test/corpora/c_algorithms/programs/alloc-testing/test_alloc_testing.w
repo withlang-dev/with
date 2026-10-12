@@ -473,4 +473,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_malloc_free), Some(test_realloc), Some(test_calloc), Some(test_strdup), Some(test_limits), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_malloc_free), Some(test_realloc), Some(test_calloc), Some(test_strdup), Some(test_limits), null]

@@ -253,4 +253,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_int_compare), Some(test_int_equal), Some(test_pointer_compare), Some(test_pointer_equal), Some(test_string_compare), Some(test_string_equal), Some(test_string_nocase_compare), Some(test_string_nocase_equal), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_int_compare), Some(test_int_equal), Some(test_pointer_compare), Some(test_pointer_equal), Some(test_string_compare), Some(test_string_equal), Some(test_string_nocase_compare), Some(test_string_nocase_equal), null]

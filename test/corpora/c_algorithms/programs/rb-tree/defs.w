@@ -523,7 +523,7 @@ pub type _SortedArray { pub data: *mut *mut c_void = null, pub length: c_uint = 
 impl Copy for _SortedArray
 
 pub let SORTED_ARRAY_NULL: *mut c_void = null
-pub var test_array: List[c_int] = [0; 1000]
+pub let test_array: List[c_int] = [0; 1000]
 
 pub let NUM_TEST_VALUES: c_int = 1000
 pub type Trie = _Trie

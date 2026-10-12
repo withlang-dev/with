@@ -569,4 +569,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_queue_new_free), Some(test_queue_push_head), Some(test_queue_pop_head), Some(test_queue_peek_head), Some(test_queue_push_tail), Some(test_queue_pop_tail), Some(test_queue_peek_tail), Some(test_queue_is_empty), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_queue_new_free), Some(test_queue_push_head), Some(test_queue_pop_head), Some(test_queue_peek_head), Some(test_queue_push_tail), Some(test_queue_pop_tail), Some(test_queue_peek_tail), Some(test_queue_is_empty), null]

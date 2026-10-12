@@ -45,7 +45,7 @@ pub unsafe fn validate_tree(__param_tree: *mut _RBTree) {
     return
 }
 
-pub fn create_tree() -> *mut _RBTree writes allocation_limit, test_array {
+pub fn create_tree() -> *mut _RBTree writes allocation_limit {
     var __local_tree: *mut _RBTree
 
     var __local_i: c_int
@@ -106,7 +106,7 @@ pub fn test_rb_tree_new() -> Unit writes allocation_limit {
 
 }
 
-pub fn test_rb_tree_insert_lookup() writes allocation_limit, test_array {
+pub fn test_rb_tree_insert_lookup() writes allocation_limit {
     var __local_tree: *mut _RBTree
 
     var __local_node: *mut _RBTreeNode
@@ -271,7 +271,7 @@ pub fn test_rb_tree_child() writes allocation_limit {
 
 }
 
-pub fn test_out_of_memory() writes allocation_limit, test_array {
+pub fn test_out_of_memory() writes allocation_limit {
     var __local_tree: *mut _RBTree
 
     var __local_node: *mut _RBTreeNode
@@ -305,7 +305,7 @@ pub fn test_out_of_memory() writes allocation_limit, test_array {
 
 }
 
-pub fn test_rb_tree_free() writes allocation_limit, test_array {
+pub fn test_rb_tree_free() writes allocation_limit {
     var __local_tree: *mut _RBTree
 
     (__local_tree = rb_tree_new(Some(int_compare)))
@@ -318,7 +318,7 @@ pub fn test_rb_tree_free() writes allocation_limit, test_array {
 
 }
 
-pub fn test_rb_tree_lookup() writes allocation_limit, test_array {
+pub fn test_rb_tree_lookup() writes allocation_limit {
     var __local_tree: *mut _RBTree
 
     var __local_i: c_int
@@ -378,7 +378,7 @@ pub fn test_rb_tree_lookup() writes allocation_limit, test_array {
 
 }
 
-pub fn test_rb_tree_remove() writes allocation_limit, test_array {
+pub fn test_rb_tree_remove() writes allocation_limit {
     var __local_tree: *mut _RBTree
 
     var __local_i: c_int
@@ -543,4 +543,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_rb_tree_new), Some(test_rb_tree_free), Some(test_rb_tree_child), Some(test_rb_tree_insert_lookup), Some(test_rb_tree_lookup), Some(test_out_of_memory), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_rb_tree_new), Some(test_rb_tree_free), Some(test_rb_tree_child), Some(test_rb_tree_insert_lookup), Some(test_rb_tree_lookup), Some(test_out_of_memory), null]

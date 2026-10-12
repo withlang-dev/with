@@ -48,7 +48,7 @@ pub fn test_binary_heap_new_free() -> Unit writes allocation_limit {
 
 }
 
-pub fn test_binary_heap_insert() writes allocation_limit, test_array {
+pub fn test_binary_heap_insert() writes allocation_limit {
     var __local_heap: *mut _BinaryHeap
 
     var __local_i: c_int
@@ -82,7 +82,7 @@ pub fn test_binary_heap_insert() writes allocation_limit, test_array {
 
 }
 
-pub fn test_min_heap() writes allocation_limit, test_array {
+pub fn test_min_heap() writes allocation_limit {
     var __local_heap: *mut _BinaryHeap
 
     var __local_val: *mut c_int
@@ -139,7 +139,7 @@ pub fn test_min_heap() writes allocation_limit, test_array {
 
 }
 
-pub fn test_max_heap() writes allocation_limit, test_array {
+pub fn test_max_heap() writes allocation_limit {
     var __local_heap: *mut _BinaryHeap
 
     var __local_val: *mut c_int
@@ -273,4 +273,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_binary_heap_new_free), Some(test_binary_heap_insert), Some(test_min_heap), Some(test_max_heap), Some(test_out_of_memory), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_binary_heap_new_free), Some(test_binary_heap_insert), Some(test_min_heap), Some(test_max_heap), Some(test_out_of_memory), null]

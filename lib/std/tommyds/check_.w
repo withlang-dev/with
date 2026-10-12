@@ -2161,7 +2161,7 @@ pub fn main() -> c_int writes SEED, compare_counter {
 
 }
 
-var the_cache: List[u8] = [0; 16777216]
+let the_cache: List[u8] = [0; 16777216]
 var the_str: *const i8 = null
 var the_start: c_ulonglong = 0
 var the_count: c_uint = 0

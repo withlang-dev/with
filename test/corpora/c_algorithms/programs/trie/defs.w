@@ -531,17 +531,17 @@ pub type Trie = _Trie
 
 pub type TrieValue = *mut c_void
 
-pub var test_array: List[c_int] = [0; 10000]
+pub let test_array: List[c_int] = [0; 10000]
 
-pub var test_strings: List[[c_char; 10]] = [0; 10000, 10]
+pub let test_strings: List[[c_char; 10]] = [0; 10000, 10]
 
-pub var bin_key: List[u8] = [97, 98, 99, 0, 1, 2, 255]
+pub let bin_key: List[u8] = [97, 98, 99, 0, 1, 2, 255]
 
-pub var bin_key2: List[u8] = [97, 98, 99, 0, 1, 2, 255, 0]
+pub let bin_key2: List[u8] = [97, 98, 99, 0, 1, 2, 255, 0]
 
-pub var bin_key3: List[u8] = [97, 98, 99]
+pub let bin_key3: List[u8] = [97, 98, 99]
 
-pub var bin_key4: List[u8] = [122, 0, 122, 122]
+pub let bin_key4: List[u8] = [122, 0, 122, 122]
 
 pub let TRIE_NULL: *mut c_void = null
 pub let NUM_TEST_VALUES: c_int = 10000

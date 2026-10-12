@@ -312,4 +312,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_compare_int), Some(test_compare_pointer), Some(test_compare_string), Some(test_hash_int), Some(test_hash_pointer), Some(test_hash_string), Some(test_arraylist), Some(test_avl_tree), Some(test_binary_heap), Some(test_binomial_heap), Some(test_bloom_filter), Some(test_hash_table), Some(test_list), Some(test_queue), Some(test_set), Some(test_slist), Some(test_trie), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_compare_int), Some(test_compare_pointer), Some(test_compare_string), Some(test_hash_int), Some(test_hash_pointer), Some(test_hash_string), Some(test_arraylist), Some(test_avl_tree), Some(test_binary_heap), Some(test_binomial_heap), Some(test_bloom_filter), Some(test_hash_table), Some(test_list), Some(test_queue), Some(test_set), Some(test_slist), Some(test_trie), null]

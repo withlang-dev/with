@@ -7,7 +7,7 @@ use std.libc
 use std.option
 use std.collections
 
-pub fn generate_trie() -> *mut _Trie writes allocation_limit, test_array {
+pub fn generate_trie() -> *mut _Trie writes allocation_limit {
     var __local_trie: *mut _Trie
 
     var __local_i: c_int
@@ -118,7 +118,7 @@ pub fn test_trie_new_free() -> Unit writes allocation_limit {
 
 }
 
-pub fn test_trie_insert() writes allocation_limit, test_array {
+pub fn test_trie_insert() writes allocation_limit {
     var __local_trie: *mut _Trie
 
     var __local_entries: c_uint
@@ -181,7 +181,7 @@ pub fn test_trie_insert() writes allocation_limit, test_array {
 
 }
 
-pub fn test_trie_lookup() writes allocation_limit, test_array {
+pub fn test_trie_lookup() writes allocation_limit {
     var __local_trie: *mut _Trie
 
     var __local_buf: List[c_char] = [0; 10]
@@ -227,7 +227,7 @@ pub fn test_trie_lookup() writes allocation_limit, test_array {
 
 }
 
-pub fn test_trie_remove() writes allocation_limit, test_array {
+pub fn test_trie_remove() writes allocation_limit {
     var __local_trie: *mut _Trie
 
     var __local_buf: List[c_char] = [0; 10]
@@ -287,7 +287,7 @@ pub fn test_trie_remove() writes allocation_limit, test_array {
 
 }
 
-pub fn test_trie_replace() writes allocation_limit, test_array {
+pub fn test_trie_replace() writes allocation_limit {
     var __local_trie: *mut _Trie
 
     var __local_val: *mut c_int
@@ -592,4 +592,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_trie_new_free), Some(test_trie_insert), Some(test_trie_lookup), Some(test_trie_remove), Some(test_trie_replace), Some(test_trie_insert_empty), Some(test_trie_free_long), Some(test_trie_negative_keys), Some(test_trie_insert_binary), Some(test_trie_insert_out_of_memory), Some(test_trie_remove_binary), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_trie_new_free), Some(test_trie_insert), Some(test_trie_lookup), Some(test_trie_remove), Some(test_trie_replace), Some(test_trie_insert_empty), Some(test_trie_free_long), Some(test_trie_negative_keys), Some(test_trie_insert_binary), Some(test_trie_insert_out_of_memory), Some(test_trie_remove_binary), null]

@@ -831,4 +831,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_set_new_free), Some(test_set_insert), Some(test_set_query), Some(test_set_remove), Some(test_set_intersection), Some(test_set_union), Some(test_set_iterating), Some(test_set_iterating_remove), Some(test_set_to_array), Some(test_set_free_function), Some(test_set_out_of_memory), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_set_new_free), Some(test_set_insert), Some(test_set_query), Some(test_set_remove), Some(test_set_intersection), Some(test_set_union), Some(test_set_iterating), Some(test_set_iterating_remove), Some(test_set_to_array), Some(test_set_free_function), Some(test_set_out_of_memory), null]

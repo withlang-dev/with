@@ -885,4 +885,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_slist_append), Some(test_slist_prepend), Some(test_slist_free), Some(test_slist_next), Some(test_slist_nth_entry), Some(test_slist_nth_data), Some(test_slist_length), Some(test_slist_remove_entry), Some(test_slist_remove_data), Some(test_slist_sort), Some(test_slist_find_data), Some(test_slist_to_array), Some(test_slist_iterate), Some(test_slist_iterate_bad_remove), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_slist_append), Some(test_slist_prepend), Some(test_slist_free), Some(test_slist_next), Some(test_slist_nth_entry), Some(test_slist_nth_data), Some(test_slist_length), Some(test_slist_remove_entry), Some(test_slist_remove_data), Some(test_slist_sort), Some(test_slist_find_data), Some(test_slist_to_array), Some(test_slist_iterate), Some(test_slist_iterate_bad_remove), null]

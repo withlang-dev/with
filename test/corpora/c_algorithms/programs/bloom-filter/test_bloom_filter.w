@@ -303,4 +303,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_bloom_filter_new_free), Some(test_bloom_filter_insert_query), Some(test_bloom_filter_read_load), Some(test_bloom_filter_intersection), Some(test_bloom_filter_union), Some(test_bloom_filter_mismatch), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_bloom_filter_new_free), Some(test_bloom_filter_insert_query), Some(test_bloom_filter_read_load), Some(test_bloom_filter_intersection), Some(test_bloom_filter_union), Some(test_bloom_filter_mismatch), null]

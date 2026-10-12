@@ -623,4 +623,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_hash_table_new_free), Some(test_hash_table_insert_lookup), Some(test_hash_table_remove), Some(test_hash_table_iterating), Some(test_hash_table_iterating_remove), Some(test_hash_table_free_functions), Some(test_hash_table_out_of_memory), Some(test_hash_iterator_key_pair), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_hash_table_new_free), Some(test_hash_table_insert_lookup), Some(test_hash_table_remove), Some(test_hash_table_iterating), Some(test_hash_table_iterating_remove), Some(test_hash_table_free_functions), Some(test_hash_table_out_of_memory), Some(test_hash_iterator_key_pair), null]
