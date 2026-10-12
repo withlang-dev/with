@@ -1068,7 +1068,13 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
     if kind == CXType_Half or kind == CXType_Float16: return session_strdup(s, "f16\0" as *const u8)
     if kind == CXType_Float: return session_strdup(s, "f32\0" as *const u8)
     if kind == CXType_Double: return session_strdup(s, "f64\0" as *const u8)
-    if kind == CXType_LongDouble: return session_strdup(s, "c_longdouble\0" as *const u8)
+    // #2176: `c_longdouble` is f64 where `long double` is a double (8 bytes:
+    // Apple arm64, Windows; CImport ci_c_type_aliases). Elsewhere it is x87
+    // extended or binary128, which With has no float for, so whatever needs
+    // it is omitted with this reason (wcstold, strtold reached from glibc).
+    if kind == CXType_LongDouble:
+        if clang_Type_getSizeOf(shape) == 8: return session_strdup(s, "c_longdouble\0" as *const u8)
+        return session_strdup(s, "__UNSUPPORTED:long double is wider than a double on this target, and With has no float for it (§16.1)\0" as *const u8)
     if kind == CXType_Float128: return session_strdup(s, "f128\0" as *const u8)
 
     if kind == CXType_Pointer:

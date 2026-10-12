@@ -1947,11 +1947,13 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
         let si_param_count = with_cimport_fn_param_count(session, idx)
         var si_params = ""
         var si_raw = false
+        var si_unsupported = ""
         for spi in 0..si_param_count:
             if spi > 0:
                 si_params = si_params ++ ", "
             let spname = with_cimport_fn_param_name(session, idx, spi)
             let sptype = ci_migrated_param_type(session, idx, spi)
+            if si_unsupported.len() == 0 and ci_starts_with(sptype, "__UNSUPPORTED:"): si_unsupported = sptype.slice(14, sptype.len())
             if ci_cimport_param_type_requires_raw_abi(sptype):
                 si_raw = true
             let actual_pname = ci_param_signature_name(ci_escape_reserved(spname), spi)
@@ -1964,6 +1966,13 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
         let si_ret = with_cimport_fn_return_type_translated(session, idx)
         if ci_cimport_type_is_raw_abi(si_ret):
             si_raw = true
+        if si_unsupported.len() == 0 and ci_starts_with(si_ret, "__UNSUPPORTED:"): si_unsupported = si_ret.slice(14, si_ret.len())
+        // A signature type With cannot spell (#2176's long double, a VLA)
+        // omits the function, as it does an extern's: no body is translated
+        // for a signature that cannot be printed.
+        if si_unsupported.len() > 0:
+            ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), if storage == CX_SC_STATIC: "inexpressible" else: "raw-modelable", ci_omitted_chain_reason("untranslatable: " ++ si_unsupported))
+            return ""
         // A body over a record imported opaque (winnt.h's FORCEINLINE
         // TpInitializeCallbackEnviron writes `_TP_CALLBACK_ENVIRON_V3`,
         // which holds a bitfield record) cannot be expressed: With has no
@@ -3870,6 +3879,11 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                 let let_line = "let " ++ safe_name ++ ": c_int = " ++ char_val
                 if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                     output = output ++ let_line ++ "\n"
+        else if ci_is_float_literal(stripped) and ci_float_type_from_suffix(stripped) == "c_longdouble" and not ci_c_long_double_representable(with_cimport_target_triple()):
+            // #2176: an `L` literal is a long double, which this target has
+            // no With float for (the alias is not emitted); omit it as a
+            // function needing the type is omitted.
+            ci_record_omitted_symbol_cat(name, "", "inexpressible", "long double literal: long double is wider than a double on this target, and With has no float for it (§16.1)")
         else if ci_is_float_literal(stripped):
             let safe_name = ci_escape_reserved(name)
             let float_ty = ci_float_type_from_suffix(stripped)
