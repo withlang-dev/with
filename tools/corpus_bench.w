@@ -342,8 +342,12 @@ fn bench_c_algorithms(root: &str, compiler: &str, before_dir: &str, after_dir: &
 // ── main ─────────────────────────────────────────────────────────────
 
 let argv = args()
-let root = arg_value(&argv, "--root", ".")
-let compiler = arg_value(&argv, "--with", "with")
+// Builds and runs happen in work directories, so the root and a relative
+// compiler path are made absolute first.
+let root_arg = arg_value(&argv, "--root", ".")
+let root = if root_arg == ".": env("PWD") else: root_arg
+let compiler_arg = arg_value(&argv, "--with", "with")
+let compiler = if compiler_arg.contains("/") and not compiler_arg.starts_with("/"): root ++ "/" ++ compiler_arg else: compiler_arg
 let runs = parse_count(arg_value(&argv, "-n", "5"), 5)
 let after_mode = arg_value(&argv, "--after", "")
 var corpora = arg_values(&argv, "--corpus")
