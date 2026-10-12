@@ -7504,6 +7504,9 @@ impl MirBuilder:
         if mir_place_plain_local(&self.body, place) >= 0: return result
         let read_ty = self.operand_type(result)
         if read_ty == 0 or self.sema.is_copy_frozen(read_ty as TypeId) == 0 or self.sema.type_needs_drop_frozen(read_ty) == 0: return result
+        // Only where the owned value is demanded: a `&str` tail of a `&str`
+        // function (`self.scratch_path`) stays the borrow it is.
+        if self.expected_type == 0 or self.sema.resolve_alias(self.expected_type as TypeId) != self.sema.resolve_alias(read_ty as TypeId): return result
         // The copy is one more holder (D111): it retains here, where it is
         // read, not where the consumer would have read it after the drops.
         self.retain_consumed_copy(result)
