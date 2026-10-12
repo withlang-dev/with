@@ -15,6 +15,7 @@ use std.zl.crc32
 use std.zl.ioapi
 use std.zl.unzip
 use std.libc
+use std.collections
 
 pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __param_fileOutTmp: *const i8, __param_nRecovered: *mut c_ulong, __param_bytesRecovered: *mut c_ulong) -> c_int {
     var __local_err: c_int = ((0 as c_int))
@@ -42,11 +43,11 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
 
         var __local_totalBytes: c_ulong = ((0 as c_ulong))
 
-        var __local_header: [c_char; 30]
+        var __local_header: List[c_char] = [0; 30]
 
-        var __local_filename: [c_char; 1024]
+        var __local_filename: List[c_char] = [0; 1024]
 
-        var __local_extra: [c_char; 1024]
+        var __local_extra: List[c_char] = [0; 1024]
 
         var __local_offset: c_int = ((0 as c_int))
 
@@ -198,7 +199,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
                 }
 
 
-                var __local_central: [c_char; 46]
+                var __local_central: List[c_char] = [0; 46]
 
                 var __local_comment: *mut c_char = (("" as *mut c_char))
 
@@ -812,7 +813,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
 
         var __local_entriesZip: c_int = __local_entries
 
-        var __local_end: [c_char; 22]
+        var __local_end: List[c_char] = [0; 22]
 
         var __local_comment_1: *mut c_char = (("" as *mut c_char))
 
@@ -1106,7 +1107,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
             if ((if __local_fpOutCD != null: 1 else: 0) != 0) {
                 var __local_nRead: c_int
 
-                var __local_buffer: [c_char; 8192]
+                var __local_buffer: List[c_char] = [0; 8192]
 
                 while true {
                     (__local_nRead = ((fread((&__local_buffer[0] as *mut c_char), (1 as c_ulong), ((8192 * (sizeof[c_char]() as usize)) as c_ulong), __local_fpOutCD) as c_int)))

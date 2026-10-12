@@ -4,6 +4,7 @@ use std.calg_testing.alloc_testing
 use std.calg_testing.framework
 use std.libc
 use std.option
+use std.collections
 
 fn test_malloc_free() {
     var __local_block: *mut c_void
@@ -472,4 +473,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [Option[extern "C" fn() -> Unit]; 6] = [Some(test_malloc_free), Some(test_realloc), Some(test_calloc), Some(test_strdup), Some(test_limits), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_malloc_free), Some(test_realloc), Some(test_calloc), Some(test_strdup), Some(test_limits), null]

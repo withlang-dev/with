@@ -11,11 +11,12 @@ use std.calg_testing.hash_string
 use std.calg_testing.set
 use std.libc
 use std.option
+use std.collections
 
 pub fn generate_set() -> *mut _Set writes allocation_limit {
     var __local_set: *mut _Set
 
-    var __local_buf: [c_char; 10]
+    var __local_buf: List[c_char] = [0; 10]
 
     var __local_i: c_uint
 
@@ -115,9 +116,9 @@ pub fn test_set_new_free() -> Unit writes allocation_limit {
 pub fn test_set_insert() writes allocation_limit {
     var __local_set: *mut _Set
 
-    var __local_numbers1: [c_int; 6] = [1, 2, 3, 4, 5, 6]
+    var __local_numbers1: List[c_int] = [1, 2, 3, 4, 5, 6]
 
-    var __local_numbers2: [c_int; 6] = [5, 6, 7, 8, 9, 10]
+    var __local_numbers2: List[c_int] = [5, 6, 7, 8, 9, 10]
 
     var __local_i: c_int
 
@@ -158,7 +159,7 @@ pub fn test_set_insert() writes allocation_limit {
 pub fn test_set_query() writes allocation_limit {
     var __local_set: *mut _Set
 
-    var __local_buf: [c_char; 10]
+    var __local_buf: List[c_char] = [0; 10]
 
     var __local_i: c_int
 
@@ -200,7 +201,7 @@ pub fn test_set_query() writes allocation_limit {
 pub fn test_set_remove() writes allocation_limit {
     var __local_set: *mut _Set
 
-    var __local_buf: [c_char; 10]
+    var __local_buf: List[c_char] = [0; 10]
 
     var __local_i: c_int
 
@@ -304,11 +305,11 @@ pub fn test_set_remove() writes allocation_limit {
 }
 
 pub fn test_set_union() writes allocation_limit {
-    var __local_numbers1: [c_int; 7] = [1, 2, 3, 4, 5, 6, 7]
+    var __local_numbers1: List[c_int] = [1, 2, 3, 4, 5, 6, 7]
 
-    var __local_numbers2: [c_int; 7] = [5, 6, 7, 8, 9, 10, 11]
+    var __local_numbers2: List[c_int] = [5, 6, 7, 8, 9, 10, 11]
 
-    var __local_result: [c_int; 11] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    var __local_result: List[c_int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
     var __local_i: c_int
 
@@ -418,11 +419,11 @@ pub fn test_set_union() writes allocation_limit {
 }
 
 pub fn test_set_intersection() writes allocation_limit {
-    var __local_numbers1: [c_int; 7] = [1, 2, 3, 4, 5, 6, 7]
+    var __local_numbers1: List[c_int] = [1, 2, 3, 4, 5, 6, 7]
 
-    var __local_numbers2: [c_int; 7] = [5, 6, 7, 8, 9, 10, 11]
+    var __local_numbers2: List[c_int] = [5, 6, 7, 8, 9, 10, 11]
 
-    var __local_result: [c_int; 3] = [5, 6, 7]
+    var __local_result: List[c_int] = [5, 6, 7]
 
     var __local_i: c_int
 
@@ -518,7 +519,7 @@ pub fn test_set_intersection() writes allocation_limit {
 pub fn test_set_to_array() writes allocation_limit {
     var __local_set: *mut _Set
 
-    var __local_values: [c_int; 100]
+    var __local_values: List[c_int] = [0; 100]
 
     var __local_array: *mut *mut c_int
 
@@ -750,7 +751,7 @@ pub fn test_set_free_function() -> Unit writes allocated_values, allocation_limi
 pub fn test_set_out_of_memory() writes allocation_limit {
     var __local_set: *mut _Set
 
-    var __local_values: [c_int; 66]
+    var __local_values: List[c_int] = [0; 66]
 
     var __local_i: c_uint
 
@@ -830,4 +831,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [Option[extern "C" fn() -> Unit]; 12] = [Some(test_set_new_free), Some(test_set_insert), Some(test_set_query), Some(test_set_remove), Some(test_set_intersection), Some(test_set_union), Some(test_set_iterating), Some(test_set_iterating_remove), Some(test_set_to_array), Some(test_set_free_function), Some(test_set_out_of_memory), null]
+let tests: List[Option[extern "C" fn() -> Unit]] = [Some(test_set_new_free), Some(test_set_insert), Some(test_set_query), Some(test_set_remove), Some(test_set_intersection), Some(test_set_union), Some(test_set_iterating), Some(test_set_iterating_remove), Some(test_set_to_array), Some(test_set_free_function), Some(test_set_out_of_memory), null]

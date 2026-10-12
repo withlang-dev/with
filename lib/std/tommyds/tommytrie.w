@@ -3,6 +3,7 @@ use std.tommyds.defs
 use std.tommyds.tommyalloc
 use std.tommyds.tommylist
 use std.libc
+use std.collections
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
     return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
@@ -397,7 +398,7 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
 
     var __local_ptr__goto_174_8: *mut c_void = null
 
-    var __local_let_back__goto_175_20: [*mut *mut tommy_node_struct; 10]
+    var __local_let_back__goto_175_20: List[*mut *mut tommy_node_struct] = [null; 10]
 
     var __local_level__goto_176_15: c_uint = 0
 

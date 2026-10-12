@@ -16,6 +16,7 @@ use std.re.pcre2_jit_compile
 use std.re.pcre2_error
 use std.re.pcre2_maketables
 use std.libc
+use std.collections
 
 pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const i8, __param_cflags: c_int) -> c_int writes _pcre2_default_compile_context_8 {
     var __local_erroffset: c_ulong
@@ -263,7 +264,7 @@ pub unsafe fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const
 pub unsafe fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_t, __param_errbuf: *mut i8, __param_errbuf_size: c_ulong) -> c_ulong {
     var __local_message: *const c_char
 
-    var __local_offset_buf: [c_char; 23]
+    var __local_offset_buf: List[c_char] = [0; 23]
 
     var __local_snprintf_rc: c_int
 
@@ -370,6 +371,6 @@ pub unsafe fn pcre2_regfree(__param_preg: *mut regex_t) {
 
 }
 
-let eint1: [c_int; 24] = [0, REG_EESCAPE, REG_EESCAPE, REG_EESCAPE, REG_BADBR, REG_BADBR, REG_EBRACK, REG_ECTYPE, REG_ERANGE, REG_BADRPT, REG_ASSERT, REG_BADPAT, REG_BADPAT, REG_BADPAT, REG_EPAREN, REG_ESUBREG, REG_INVARG, REG_INVARG, REG_EPAREN, REG_ESIZE, REG_ESIZE, REG_ESPACE, REG_EPAREN, REG_ASSERT]
-let eint2: [c_int; 16] = [30, REG_ECTYPE, 32, REG_INVARG, 37, REG_EESCAPE, 56, REG_INVARG, 92, REG_INVARG, 98, REG_EESCAPE, 99, REG_EESCAPE, 102, REG_EESCAPE]
-let pstring: [*const i8; 18] = [(("" as *mut c_char) as *const c_char), (("internal error" as *mut c_char) as *const c_char), (("invalid repeat counts in {}" as *mut c_char) as *const c_char), (("pattern error" as *mut c_char) as *const c_char), (("? * + invalid" as *mut c_char) as *const c_char), (("unbalanced {}" as *mut c_char) as *const c_char), (("unbalanced []" as *mut c_char) as *const c_char), (("collation error - not relevant" as *mut c_char) as *const c_char), (("bad class" as *mut c_char) as *const c_char), (("bad escape sequence" as *mut c_char) as *const c_char), (("empty expression" as *mut c_char) as *const c_char), (("unbalanced ()" as *mut c_char) as *const c_char), (("bad range inside []" as *mut c_char) as *const c_char), (("expression too big" as *mut c_char) as *const c_char), (("failed to get memory" as *mut c_char) as *const c_char), (("bad back reference" as *mut c_char) as *const c_char), (("bad argument" as *mut c_char) as *const c_char), (("match failed" as *mut c_char) as *const c_char)]
+let eint1: List[c_int] = [0, REG_EESCAPE, REG_EESCAPE, REG_EESCAPE, REG_BADBR, REG_BADBR, REG_EBRACK, REG_ECTYPE, REG_ERANGE, REG_BADRPT, REG_ASSERT, REG_BADPAT, REG_BADPAT, REG_BADPAT, REG_EPAREN, REG_ESUBREG, REG_INVARG, REG_INVARG, REG_EPAREN, REG_ESIZE, REG_ESIZE, REG_ESPACE, REG_EPAREN, REG_ASSERT]
+let eint2: List[c_int] = [30, REG_ECTYPE, 32, REG_INVARG, 37, REG_EESCAPE, 56, REG_INVARG, 92, REG_INVARG, 98, REG_EESCAPE, 99, REG_EESCAPE, 102, REG_EESCAPE]
+let pstring: List[*const i8] = [(("" as *mut c_char) as *const c_char), (("internal error" as *mut c_char) as *const c_char), (("invalid repeat counts in {}" as *mut c_char) as *const c_char), (("pattern error" as *mut c_char) as *const c_char), (("? * + invalid" as *mut c_char) as *const c_char), (("unbalanced {}" as *mut c_char) as *const c_char), (("unbalanced []" as *mut c_char) as *const c_char), (("collation error - not relevant" as *mut c_char) as *const c_char), (("bad class" as *mut c_char) as *const c_char), (("bad escape sequence" as *mut c_char) as *const c_char), (("empty expression" as *mut c_char) as *const c_char), (("unbalanced ()" as *mut c_char) as *const c_char), (("bad range inside []" as *mut c_char) as *const c_char), (("expression too big" as *mut c_char) as *const c_char), (("failed to get memory" as *mut c_char) as *const c_char), (("bad back reference" as *mut c_char) as *const c_char), (("bad argument" as *mut c_char) as *const c_char), (("match failed" as *mut c_char) as *const c_char)]

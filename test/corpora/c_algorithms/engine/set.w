@@ -2,6 +2,7 @@
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
 use std.option
+use std.collections
 
 pub fn set_new(__param_hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_uint], __param_equal_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _Set writes allocation_limit {
     var __local_new_set: *mut _Set
@@ -476,6 +477,6 @@ unsafe fn set_enlarge(__param_set: *mut _Set) -> c_int {
 
 }
 
-let set_primes: [c_uint; 24] = [193, 389, 769, 1543, 3079, 6151, 12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739, 6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189, 805306457, 1610612741]
+let set_primes: List[c_uint] = [193, 389, 769, 1543, 3079, 6151, 12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739, 6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189, 805306457, 1610612741]
 let set_num_primes: c_uint = 24
 let set_null_value: *mut c_void = null

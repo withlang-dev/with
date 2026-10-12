@@ -14,6 +14,7 @@ use std.zl.crc32
 use std.zl.inftrees
 use std.zl.inffast
 use std.option
+use std.collections
 
 pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_int {
     var __local_state__goto_475_31: *mut inflate_state = null
@@ -46,9 +47,9 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
     var __local_ret__goto_487_9: c_int = 0
 
-    var __local_hbuf__goto_489_19: [u8; 4]
+    var __local_hbuf__goto_489_19: List[u8] = [0; 4]
 
-    var __local_order__goto_491_33: [c_ushort; 19]
+    var __local_order__goto_491_33: List[c_ushort] = [0; 19]
 
     var __ci_expr_logic_2: c_int = 0
 
@@ -4753,7 +4754,7 @@ pub unsafe fn inflateSync(__param_strm: *mut z_stream_s) -> c_int {
     var __local_out: c_ulong
 
 
-    var __local_buf: [u8; 4]
+    var __local_buf: List[u8] = [0; 4]
 
     var __local_state: *mut inflate_state
 

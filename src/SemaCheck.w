@@ -14240,7 +14240,12 @@ impl Sema:
             let sequence = self.sequence_concat_result(node, lhs_node, rhs_node, lhs as i32, rhs as i32)
             if sequence < 0:
                 return 0
+            // The type is recorded like the checked operators' (D65): MIR
+            // reads it rather than re-deriving it from the operands, which
+            // lost a `str` read through a view of a view (`&&str ++ "x"`,
+            // a tuple-pattern binding over a `&str`) and typed it Unit.
             if sequence != 0:
+                self.typed_expr_types.insert(node, sequence)
                 return sequence
             let lhs_resolved = self.resolve_alias(lhs)
             let rhs_resolved = self.resolve_alias(rhs)
@@ -14250,6 +14255,7 @@ impl Sema:
                 self.emit_error("left operand of ++ must be str", lhs_node)
             if rhs_resolved != self.ty_str and (rhs_k == TypeKind.TY_INT or rhs_k == TypeKind.TY_FLOAT or rhs_k == TypeKind.TY_BOOL or rhs_k == TypeKind.TY_STRUCT or rhs_k == TypeKind.TY_ENUM or rhs_k == TypeKind.TY_ARRAY or rhs_k == TypeKind.TY_TUPLE or rhs_k == TypeKind.TY_GENERIC_INST):
                 self.emit_error("right operand of ++ must be str", rhs_node)
+            self.typed_expr_types.insert(node, self.ty_str as i32)
             return self.ty_str as i32
 
         0

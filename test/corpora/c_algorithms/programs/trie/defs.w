@@ -1,5 +1,6 @@
 // std.calg_testing.defs — shared definitions for migrated PCRE2
 use std.option
+use std.collections
 
 pub fn is_alpha(__with_c: i32) -> bool {
     (__with_c >= 65 and __with_c <= 90) or (__with_c >= 97 and __with_c <= 122)
@@ -530,17 +531,17 @@ pub type Trie = _Trie
 
 pub type TrieValue = *mut c_void
 
-pub var test_array: [c_int; 10000] = [0 as c_int; 10000]
+pub let test_array: List[c_int] = [0; 10000]
 
-pub var test_strings: [c_char; 10000, 10] = [0 as c_char; 10000, 10]
+pub let test_strings: List[[c_char; 10]] = [0; 10000, 10]
 
-pub var bin_key: [u8; 7] = [97, 98, 99, 0, 1, 2, 255]
+pub let bin_key: List[u8] = [97, 98, 99, 0, 1, 2, 255]
 
-pub var bin_key2: [u8; 8] = [97, 98, 99, 0, 1, 2, 255, 0]
+pub let bin_key2: List[u8] = [97, 98, 99, 0, 1, 2, 255, 0]
 
-pub var bin_key3: [u8; 3] = [97, 98, 99]
+pub let bin_key3: List[u8] = [97, 98, 99]
 
-pub var bin_key4: [u8; 4] = [122, 0, 122, 122]
+pub let bin_key4: List[u8] = [122, 0, 122, 122]
 
 pub let TRIE_NULL: *mut c_void = null
 pub let NUM_TEST_VALUES: c_int = 10000

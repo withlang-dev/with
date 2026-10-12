@@ -12,6 +12,7 @@ use std.zl.gzclose
 use std.zl.adler32
 use std.zl.crc32
 use std.libc
+use std.collections
 
 pub unsafe fn gzread(__param_file: *mut gzFile_s, __param_buf: *mut c_void, __param_len: c_uint) -> c_int {
     var __local_len = __param_len
@@ -271,7 +272,7 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
 }
 
 pub unsafe fn gzgetc(__param_file: *mut gzFile_s) -> c_int {
-    var __local_buf: [u8; 1]
+    var __local_buf: List[u8] = [0; 1]
 
     var __local_state: *mut gz_state
 

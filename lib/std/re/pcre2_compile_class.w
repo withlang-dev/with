@@ -30,6 +30,7 @@ use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
 use std.re.pcre2_compile_cgroup
+use std.collections
 
 pub unsafe fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __param_negated: c_int, __param_classbits: *mut u8) {
     var __local_classbits = __param_classbits
@@ -2641,7 +2642,7 @@ unsafe fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __para
 
     var __local_list: *const c_uint
 
-    var __local_tmp: [c_uint; 3]
+    var __local_tmp: List[c_uint] = [0; 3]
 
     var __local_result: c_ulong = ((2 as c_ulong))
 
@@ -4783,4 +4784,4 @@ unsafe fn compile_class_binary_loose(__param_context: *mut eclass_context, __par
 
 }
 
-let char_list_starts: [c_uint; 3] = [65536, 32768, 256]
+let char_list_starts: List[c_uint] = [65536, 32768, 256]

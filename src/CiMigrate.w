@@ -328,6 +328,19 @@ fn ci_migrate_insert_option_use(output: &str) -> str:
     else:
         "use std.option\n\n" ++ output
 
+// D119: a migrated module names `List` for its local and file-scope arrays;
+// a corpus module has no prelude, so it imports it as std's own modules do.
+fn ci_migrate_insert_collections_use(output: &str) -> str:
+    if ci_find_str(output, "List[") < 0:
+        return with_str_clone_ref(output)
+    if ci_find_str(output, "\nuse std.collections\n") >= 0 or ci_starts_with(output, "use std.collections\n"):
+        return with_str_clone_ref(output)
+    let header_end = ci_find_str(output, "\n\n")
+    if header_end >= 0:
+        output.slice(0, header_end as i64) ++ "\nuse std.collections" ++ output.slice(header_end as i64, output.len())
+    else:
+        "use std.collections\n\n" ++ output
+
 fn ci_migrate_shared_module_prefix() -> str:
     if g_migrate_shared_defs_prefix.ends_with(".defs"):
         return g_migrate_shared_defs_prefix.slice(0, g_migrate_shared_defs_prefix.len() - 5)
@@ -600,7 +613,7 @@ fn ci_migrate_write_shared_defs(output_dir: &str):
             defs.push_str("\n")
         pending_i = pending_i + 1
     let defs_path = output_dir ++ "/defs.w"
-    let rc = with_fs_write_file(defs_path, ci_migrate_insert_option_use(ci_migrate_publicize_shared_defs(ci_migrate_normalize_output(defs.to_str()))))
+    let rc = with_fs_write_file(defs_path, ci_migrate_insert_collections_use(ci_migrate_insert_option_use(ci_migrate_publicize_shared_defs(ci_migrate_normalize_output(defs.to_str())))))
     if rc != 0:
         eprint("migrate: failed to write shared defs: " ++ defs_path)
     else:
@@ -1086,7 +1099,7 @@ impl CiProject:
                     i = i + 1
                     continue
 
-                let owner_type = ci_migrate_var_owner_type(session, i)
+                let owner_type = ci_migrate_var_declared_type(session, ci_migrate_var_owner_type(session, i))
                 if owner_type.len() == 0 or ci_starts_with(owner_type, "__UNSUPPORTED:"):
                     eprint("migrate: unsupported global owner type for " ++ name ++ " in " ++ input_path)
                     with_cimport_dispose(session)
@@ -1369,6 +1382,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     var output = output_parts.join("")
     output = ci_migrate_insert_libc_use(output)
     output = ci_migrate_insert_option_use(output)
+    output = ci_migrate_insert_collections_use(output)
 
     ci_migrate_shared_note_output_uses(output)
     output = ci_migrate_publicize_types(ci_migrate_normalize_output(output))
@@ -2444,6 +2458,17 @@ fn ci_migrate_var_owner_type(session: i64, idx: i32) -> str:
                         actual_type = init_type
     ci_unsafe_fn_ptr_type(actual_type)
 
+/// D119 (with-migrate-spec.md "Arrays"): the type a global array defined by
+/// migrated C declares, `List[T]` for `[T; N]` (`List[[T; N]]` for rows);
+/// any other type is itself. Only a definition the migration owns declares
+/// a `List`: an extern whose owner stays C keeps the array, which is what
+/// the symbol's bytes are. The element must have a zero spelling (the
+/// tentative definition's fill), as for a local.
+fn ci_migrate_var_declared_type(session: i64, owner_type: &str) -> str:
+    let list_text = ci_array_list_text(owner_type)
+    if list_text.len() == 0 or ci_array_list_fill_text(session, owner_type).len() == 0: return with_str_clone_ref(owner_type)
+    list_text
+
 fn ci_migrate_var_resolved_type(session: i64, idx: i32, count: i32, primary_path: &str, project_active: bool, project: &CiProject) -> str:
     let name = with_cimport_decl_name(session, idx)
     if with_cimport_var_storage_class(session, idx) != CX_SC_STATIC:
@@ -2452,7 +2477,7 @@ fn ci_migrate_var_resolved_type(session: i64, idx: i32, count: i32, primary_path
             return shared_type
     let best = ci_migrate_find_best_var_decl(session, count, name, primary_path)
     if best >= 0 and ci_migrate_var_definition_kind(session, best) != CI_VAR_DECL_ONLY:
-        let owner_type = ci_migrate_var_owner_type(session, best)
+        let owner_type = ci_migrate_var_declared_type(session, ci_migrate_var_owner_type(session, best))
         if owner_type.len() > 0:
             return owner_type
     let decl_type = with_cimport_var_type_translated(session, idx)
@@ -2494,7 +2519,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
                 let is_threadlocal = with_cimport_var_is_threadlocal(session, idx)
                 let safe_name = ci_escape_reserved(name)
                 let tl_attr = if is_threadlocal != 0: "@[threadlocal]\n" else: ""
-                if is_const != 0:
+                if is_const != 0 or ci_starts_with(resolved_type, "List["):
                     let rendered = tl_attr ++ "extern let " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
                     let _ = ci_migrate_shared_ownerless_extern_add("extern_let", safe_name, rendered)
                 else:
@@ -2507,6 +2532,12 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
         return ""
 
     let is_const = with_cimport_var_is_const(session, idx)
+    // D119: C cannot assign an array, so a file-scope array that declares
+    // a `List` is a stable binding (§9.1c) whether or not C spells it
+    // const — never rebound, its elements still writable. A `var` List
+    // global would also be droppable mutable storage, which a bundle
+    // cannot export (D39 Level 0).
+    let stable_binding = is_const != 0 or ci_starts_with(resolved_type, "List[")
     let is_threadlocal = with_cimport_var_is_threadlocal(session, idx)
     let safe_name = ci_escape_reserved(name)
     let tl_attr = if is_threadlocal != 0: "@[threadlocal]\n" else: ""
@@ -2516,20 +2547,25 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
 
     if emits_definition:
         var rendered = ""
+        // D119: a global array declares a `List`; its initializer is still
+        // evaluated as the array's (padded to the length, the elements typed
+        // by the demand), and a tentative definition is the zero fill.
+        let declares_list = ci_starts_with(resolved_type, "List[")
+        let array_type = if declares_list: ci_migrate_var_owner_type(session, idx) else: with_str_clone_ref(resolved_type)
         if definition_kind == CI_VAR_FULL_DEF:
-            let init_val = ci_try_eval_var_init_for_type(session, idx, resolved_type)
+            let init_val = ci_try_eval_var_init_for_type(session, idx, array_type)
             if init_val.len() == 0:
                 let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
                 ci_migrate_set_error("migrate: untranslatable global initializer for " ++ name ++ if loc.len() > 0: " at " ++ loc else: "")
                 return ""
-            if is_const != 0:
+            if stable_binding:
                 rendered = tl_attr ++ "let " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ init_val ++ "\n"
             else:
                 rendered = tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ init_val ++ "\n"
         else:
             // Tentative definitions own storage in C and are zero-initialized.
-            let default_val = ci_default_for_type(resolved_type)
-            if is_const != 0:
+            let default_val = if declares_list: ci_array_list_fill_text(session, array_type) else: ci_default_for_type(resolved_type)
+            if stable_binding:
                 if default_val.len() == 0:
                     let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
                     ci_migrate_set_error("migrate: no default initializer for tentative const global " ++ name ++ if loc.len() > 0: " at " ++ loc else: "")
@@ -2539,7 +2575,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
                 rendered = tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ default_val ++ "\n"
             else:
                 rendered = tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
-        let kind = if is_const != 0: "let" else: "var"
+        let kind = if stable_binding: "let" else: "var"
         if not is_static:
             if ci_migrate_shared_decl_add(kind, safe_name, rendered):
                 return ""
@@ -2551,7 +2587,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
         if owner_path.len() > 0:
             return ""
         shared_ownerless_extern = true
-    if is_const != 0:
+    if stable_binding:
         let rendered = tl_attr ++ "extern let " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
         if shared_ownerless_extern:
             if ci_migrate_shared_ownerless_extern_add("extern_let", safe_name, rendered):

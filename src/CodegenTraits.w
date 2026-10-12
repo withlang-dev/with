@@ -1327,21 +1327,75 @@ impl Codegen:
         fields.push(wl_const_null(wl_ptr_type(self.context)))
         fields.push(wl_const_int(i64_ty, 0, 0))
         fields.push(wl_const_int(i64_ty, 0, 0))
-        // List.new() is logically { null, 0, 0, sizeof(T) } for globals.
-        fields.push(wl_const_int(i64_ty, self.abi_size_of(elem_llvm), 0))
-        let init = wl_const_named_struct(list_llvm, list_data_i64(&fields), 4)
+        // List.new() is { null, 0, 0, 0 }: word 3 is `start` (D115
+        // Amendment 1 step 2), not the element size it once held.
+        fields.push(wl_const_int(i64_ty, 0, 0))
+        let init = wl_const_named_struct(list_llvm, list_data_i64(fields), 4)
 
-        let _ = self.record_module_binding_global(name_sym, list_llvm, init, is_mut)
+        self.record_module_binding_global(name_sym, list_llvm, init, is_mut)
+        true
+
+    // §4.3c (D119): a global List literal whose elements are constants of a
+    // Copy type with no drop (the fills and tables the migrator writes for C's
+    // file-scope arrays) is static data: the elements in a global beside the
+    // binding (`<name>.elems`, read-only when the binding is), and the header
+    // the constant `{ptr elems, len, cap 0, start 0}` — capacity 0, as a frame
+    // literal's, so the header owns no buffer and a growth copies out rather
+    // than frees. `&raw const table[0]` in another global's initializer folds
+    // to the elements (module_list_elems). Before, every such table was
+    // rebuilt by an init function at startup, on the heap, and the pointer
+    // folded to the header.
+    mut fn emit_const_list_global(name_sym: i32, list_tid: i32, value_node: i32, is_mut: i32) -> bool:
+        if list_tid <= 0 or self.current_decl_is_imported_module_symbol():
+            return false
+        let resolved = self.sema.resolve_alias(list_tid as TypeId)
+        if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST or self.sema.get_type_d0(resolved) != self.sym_list or self.sema.get_type_d2(resolved) != 1:
+            return false
+        let lit = self.unwrap_const_expr_node(value_node)
+        if lit == 0 or self.pool.kind(lit) != NodeKind.NK_ARRAY_LIT or self.pool.get_data2(lit) != 0:
+            return false
+        let elem_tid = self.sema.get_generic_inst_arg(resolved as i32, 0)
+        if self.sema.is_copy_frozen(elem_tid as TypeId) == 0 or self.sema.type_needs_drop_frozen(elem_tid) != 0:
+            return false
+        let elem_llvm = self.sema_type_to_llvm(elem_tid)
+        let list_llvm = self.sema_type_to_llvm(resolved)
+        if elem_llvm == 0 or list_llvm == 0:
+            return false
+        let extra_start = self.pool.get_data0(lit)
+        let count = self.pool.get_data1(lit)
+        let elems: List[i64] = List.new()
+        for i in 0..count:
+            let elem_val = self.try_eval_const_llvm(self.pool.get_extra(extra_start + i), elem_tid as i32)
+            if elem_val == 0:
+                return false
+            elems.push(elem_val)
+        let data = wl_const_array(elem_llvm, list_data_i64(elems), count)
+        let elems_gv = wl_add_global(self.llmod, wl_array_type(elem_llvm, count), self.current_decl_module_link_name(self.intern.resolve(name_sym)) ++ ".elems")
+        wl_set_initializer(elems_gv, data)
+        // §9.1c: a stable binding's elements may still be written in place,
+        // so the elements are writable static data even when the binding
+        // cannot be rebound (is_mut == 0) — never an LLVM constant.
+        wl_set_linkage(elems_gv, wl_private_linkage())
+        self.module_list_elems.insert(name_sym, elems_gv)
+        let i64_ty = wl_i64_type(self.context)
+        let fields: List[i64] = List.new()
+        fields.push(elems_gv)
+        fields.push(wl_const_int(i64_ty, count, 0))
+        fields.push(wl_const_int(i64_ty, 0, 0))
+        fields.push(wl_const_int(i64_ty, 0, 0))
+        let init = wl_const_named_struct(list_llvm, list_data_i64(fields), 4)
+        self.record_module_binding_global(name_sym, list_llvm, init, is_mut)
         true
 
     fn finalize_module_binding_global(gv: i64, is_mut: i32):
+        // §9.1c: stable (is_mut == 0) forbids rebinding, not interior
+        // mutation — field and index writes and `mut self` calls still
+        // land here, so a binding's storage is never an LLVM constant.
+        // Stability only buys internal linkage outside an object build.
         if self.module_object_mode != 0:
-            if is_mut == 0:
-                wl_set_global_constant(gv, 1)
             wl_set_linkage(gv, 0)
             return
         if is_mut == 0:
-            wl_set_global_constant(gv, 1)
             wl_set_linkage(gv, wl_internal_linkage())
             return
         wl_set_linkage(gv, 0)
@@ -1354,8 +1408,8 @@ impl Codegen:
                 existing
             else:
                 wl_add_global(self.llmod, global_ty, name_str)
-        if is_mut == 0:
-            wl_set_global_constant(gv, 1)
+        // Not an LLVM constant even for a stable binding (§9.1c: its owner
+        // module may mutate it in place; see finalize_module_binding_global).
         wl_set_linkage(gv, 0)
         self.module_constants.insert(name_sym, gv)
         gv
@@ -1889,6 +1943,11 @@ impl Codegen:
                         return 0
                     if base != 0 and self.pool.kind(base) == NodeKind.NK_IDENT:
                         let base_sym = self.pool.get_data0(base)
+                        // D119: `&raw const table[0]` of a List laid out as
+                        // static data is its elements, never its header.
+                        let elems = self.module_list_elems.get(base_sym)
+                        if elems.is_some():
+                            return self.coerce_const_value_to_type(elems.unwrap() as i64, ptr_ty)
                         let gv = self.module_constants.get(base_sym)
                         if gv.is_some():
                             return self.coerce_const_value_to_type(gv.unwrap() as i64, ptr_ty)
@@ -2269,7 +2328,10 @@ impl Codegen:
             let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
             if global_ty == 0:
                 return
-            if is_mut != 0:
+            // §9.1c: a stable binding defined here has writable storage and
+            // can come to own heap data in place, so it registers its exit
+            // drop like a `var` (an imported symbol's owner drops it).
+            if is_mut != 0 or not self.current_decl_is_imported_module_symbol():
                 self.register_module_global_drop(name_sym, resolved_binding_ty)
             let _ = self.record_module_binding_global(name_sym, global_ty, self.build_default_value(global_ty), is_mut)
             return
@@ -2287,7 +2349,7 @@ impl Codegen:
             else:
                 0
         var const_binding_ty = if resolved_binding_ty != 0: resolved_binding_ty else: inferred_value_ty
-        if is_mut != 0:
+        if is_mut != 0 or not self.current_decl_is_imported_module_symbol():
             self.register_module_global_drop(name_sym, const_binding_ty)
         if const_binding_ty == 0 and self.pool.kind(value_node) == NodeKind.NK_STRUCT_LIT:
             let lit_sym = self.pool.get_data0(value_node)
@@ -2406,6 +2468,8 @@ impl Codegen:
         if list_tid > 0:
             if self.emit_list_new_global(name_sym, list_tid, is_mut):
                 return
+        if const_binding_ty != 0 and self.emit_const_list_global(name_sym, const_binding_ty as i32, value_node, is_mut):
+            return
 
         let array_tid =
             if const_binding_ty != 0:

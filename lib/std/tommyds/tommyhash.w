@@ -1,5 +1,6 @@
 // Migrated from C
 use std.tommyds.defs
+use std.collections
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
     return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
@@ -520,7 +521,7 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: c_uint, __param_void_key: *con
     var __local_c: c_uint
 
 
-    var __local_m: [c_uint; 3] = [255, 65280, 16711680]
+    var __local_m: List[c_uint] = [255, 65280, 16711680]
 
     (__local_c = ((((3735928559 as c_uint) +% (__param_init_val as c_uint)) as c_uint)))
 
