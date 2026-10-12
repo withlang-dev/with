@@ -20057,6 +20057,11 @@ impl Sema:
                 self.mark_moved_if_consumed(elem)
 
         let elem_type = self.resolve_contextual_join(expected_elem, &elem_nodes, &elem_origins, &elem_types, &elem_roles, node, "sequence literal")
+        // #2348: the demanded element and the elements' own type must agree;
+        // a literal typed as the demanded collection regardless held a str
+        // where `List[i32]` was declared.
+        if expected_elem != 0 and elem_type != 0 and self.types_compatible(expected_elem, elem_type) == 0 and self.arithmetic_result_type(expected_elem, elem_type) == 0:
+            self.emit_error(f"sequence literal element is `{self.type_name(elem_type)}` where `{self.type_name(expected_elem)}` is demanded (§4.3c)", node)
         // A fill builds an array or a List (§4.3a); a set of N copies of one
         // value is one element, never what was written.
         if fill_count_node != 0 and target_base != 0 and target_base != self.syms.list:
