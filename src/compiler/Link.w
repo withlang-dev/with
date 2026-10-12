@@ -1815,11 +1815,13 @@ fn link_stage_undefined_symbols_need_compat_runtime(undef: &str) -> i32:
         return 1
     0
 
-fn link_stage_compiler_runtime_dir() -> str:
-    let argv0 = runtime_arg_at(0)
-    if argv0.len() == 0:
-        return "runtime"
-    link_stage_dirname(argv0) ++ "/runtime"
+// The compiler's own directory: argv[0] is a bare `with` when it runs from
+// PATH, whose dirname is the cwd, not where the compiler lives.
+fn link_stage_compiler_dir() -> str:
+    let exe = with_self_exe()
+    if exe.len() > 0: link_stage_dirname(exe) else: "."
+
+fn link_stage_compiler_runtime_dir(): link_stage_compiler_dir() ++ "/runtime"
 
 // D30, #1815: a link takes runtime and bridge objects of this compiler's
 // generation only (compiler.AbiStamp). Anything else is #761's corruption
@@ -1837,8 +1839,7 @@ fn link_stage_resolve_runtime_root() -> str:
         if not link_stage_named_runtime_root_is_this_generation(explicit):
             return ""
         return explicit
-    let argv0 = runtime_arg_at(0)
-    let compiler_dir = if argv0.len() > 0: link_stage_dirname(argv0) else: "."
+    let compiler_dir = link_stage_compiler_dir()
     let platform_object = link_stage_host_platform_runtime_object()
     let candidates: List[str] = List.new()
     candidates.push(link_stage_artifact_root() ++ "/lib")
