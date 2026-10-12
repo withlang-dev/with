@@ -34,6 +34,16 @@ pub fn build_graph_object_output_path(root: &str, target: &BuildGraphTarget, out
         return build_graph_resolve_project_path(root, target.output)
     resolve_join(resolve_join(root, "out/obj"), target.name ++ ".o")
 
+/// The file a target produces: its declared output, or its kind's default
+/// (an executable's out/bin/<name>). The one answer the runner, `with run`,
+/// the output-ownership check and the cache all read.
+pub fn build_graph_target_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: i32) -> str:
+    if target.kind == 0: return build_graph_output_path(root, target, output_path, target_count)
+    if target.kind == 1 or target.kind == 4: return build_graph_library_output_path(root, target, output_path, target_count)
+    if target.kind == 3: return build_graph_object_output_path(root, target, output_path, target_count)
+    if target.kind == 8: return build_graph_expand_install_path(root, target.output)
+    if target.output.len() > 0: build_graph_resolve_project_path(root, target.output) else: ""
+
 pub fn build_graph_resolve_project_path(root: &str, path: &str) -> str:
     if runtime_path_is_absolute(path):
         return with_str_clone_ref(path)

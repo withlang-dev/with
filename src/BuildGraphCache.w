@@ -782,8 +782,10 @@ fn build_cache_output_path(root: &str, output: &str) -> str:
 
 fn build_cache_collect_output_paths(root: &str, target: &BuildGraphTarget) -> List[str]:
     var paths: List[str] = List.new()
-    if target.output.len() > 0:
-        paths.push(build_cache_output_path(root, target.output))
+    // An executable declares no output and still makes one (out/bin/<name>):
+    // a missing binary must make it stale, or `with run` finds no program.
+    let primary = if target.output.len() > 0: build_cache_output_path(root, target.output) else: build_graph_target_output_path(root, target, "", 0)
+    if primary.len() > 0: paths.push(primary)
     for i in 0..target.extra_outputs.len():
         let extra = target.extra_outputs[i]
         if extra.len() > 0:

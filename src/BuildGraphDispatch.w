@@ -54,19 +54,7 @@ pub fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path:
         shared = shared + seen.claim(resolve_join(root, generated.path), "generated source '" ++ generated.path ++ "'")
     for ti in 0..graph.targets.len():
         let target = &graph.targets[ti]
-        var path = ""
-        if target.kind == 0:
-            path = build_graph_output_path(root, target, output_path, graph.targets.len() as i32)
-        else if target.kind == 1:
-            path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)
-        else if target.kind == 3:
-            path = build_graph_object_output_path(root, target, output_path, graph.targets.len() as i32)
-        else if target.kind == 4:
-            path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)
-        else if target.kind == 8:
-            path = build_graph_expand_install_path(root, target.output)
-        else if target.output.len() > 0:
-            path = build_graph_resolve_project_path(root, target.output)
+        let path = build_graph_target_output_path(root, target, output_path, graph.targets.len() as i32)
         let owner = "target '" ++ target.name ++ "'"
         shared = shared + seen.claim(path, owner)
         for oi in 0..target.extra_outputs.len():
