@@ -58,10 +58,10 @@ a With value type, not as a contract With makes with another language.
   a `repr` lower to that integer.
 - **Tuples** lay out as structs of their elements.
 - **Generic instantiations** lay out as the instantiated struct/enum.
-- **SIMD vectors and masks** (spec §4.3d): `Vector[N, T]` is LLVM
+- **SIMD vectors and masks** (spec §4.3d): `Vector[T, N]` is LLVM
   `<N x T>`; `Mask[N, W]` is `<N x iW>`, each lane all ones (true) or zero
   (false). Size is `N × size(T)` (a mask: `N × W/8`) rounded up to a power
-  of two, so `Vector[3, f32]` is 16 bytes. Alignment is the target's for
+  of two, so `Vector[f32, 3]` is 16 bytes. Alignment is the target's for
   that shape, as clang lays out `vector_size` / `ext_vector_type`: the size
   on x86_64 and WebAssembly, and at most 16 bytes on AArch64
   (`TypeLayout.type_layout_vector_bytes`, `type_layout_vector_align`). A

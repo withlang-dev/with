@@ -118,10 +118,15 @@ a compile-time constant. On a `List[[T; 3]]` the same method … returning
 form is what generics produce; only the flat form is printed or
 formatted). `len()` is the outer dimension, not the element count.
 
-**Open.** Whether `Vector[N, T]` and `[T; N]` should agree on order: the
-array-length-generics brief decides. Not ruled here: `a[i, j]` as
-`a[i][j]` through `MultiIndex`, and whether the retired `[N]T` becomes an
-error with a fix-it.
+**Open, since ruled (2026-10-12).** Whether `Vector[N, T]` and `[T; N]`
+should agree on order: Eric ruled they agree, element first —
+`Vector[T, N]`, the aliases unchanged, the rename one mechanical pass —
+on the array-length-generics brief (#2311). Spec §4.3d carries the new
+spelling from that ruling; the rename and the length-generics stage are
+the implementation, non-compliant until they land. `Mask[N, W]` was not
+named in the ruling and keeps its order until ruled. Not ruled here:
+`a[i, j]` as `a[i][j]` through `MultiIndex`, and whether the retired
+`[N]T` becomes an error with a fix-it.
 
 ## Step 3 landed (2026-10-12): the migrator's List rule, benchmarked
 
