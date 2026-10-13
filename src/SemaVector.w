@@ -1,7 +1,7 @@
 // SemaVector — §4.3d SIMD vector types (D78, #1874): the facts Sema owns
-// about `Vector[N, T]` and `Mask[N, W]`.
+// about `Vector[T, N]` and `Mask[N, W]`.
 //
-// `Vector[N, T]` is TypeKind.TY_VECTOR (d0 = lane type, d1 = N); `Mask[N, W]`
+// `Vector[T, N]` is TypeKind.TY_VECTOR (d0 = lane type, d1 = N); `Mask[N, W]`
 // is TypeKind.TY_MASK (d0 = W, d1 = N). The one-token aliases (`f32x4`,
 // `m32x4`, …) are registered names for those same types, for the native
 // widths (N × width ∈ 128, 256, 512 bits); a diagnostic prints the alias
@@ -142,7 +142,7 @@ impl Sema:
         false
 
     // §4.3d: the compile-time integer a generic lane count `N` is bound to
-    // (`fn dot[N](a: Vector[N, f32])`), as a generic substitution.
+    // (`fn dot[N](a: Vector[f32, N])`), as a generic substitution.
     fn const_int_type(value: i32) -> i32: self.ensure_exact_type(TypeKind.TY_CONST_INT, value, 0, 0) as i32
 
     fn const_int_value(tid: i32) -> i32:
@@ -179,13 +179,13 @@ impl Sema:
         let pointer_width = self.get_type_d2(self.resolve_alias(lane as TypeId)) != 0
         if not pointer_width and vector_native_total_bits(self.vector_lane_bits(lane) * n):
             return lane_name ++ f"x{n}"
-        f"Vector[{n}, {lane_name}]"
+        f"Vector[{lane_name}, {n}]"
 
     fn is_vector_symbol(sym: i32) -> bool: self.lookup_named_type_visible(sym) == 0 and self.pool_resolve_symbol(sym) == "Vector"
 
     fn is_mask_symbol(sym: i32) -> bool: self.lookup_named_type_visible(sym) == 0 and self.pool_resolve_symbol(sym) == "Mask"
 
-    // The lane count argument of `Vector[N, T]` / `Mask[N, W]`: a
+    // The lane count argument of `Vector[T, N]` / `Mask[N, W]`: a
     // compile-time integer constant ≥ 1, or -1 after a diagnostic.
     mut fn vector_count_arg(node: i32, what: &str) -> i32:
         self.vector_count_arg_with(node, what, self.vector_count_subst(node))
@@ -203,8 +203,14 @@ impl Sema:
             return -1
         value as i32
 
-    // `Vector[N, T]` from its two argument nodes; `lane` is the resolved T.
+    // `Vector[T, N]` from its count node and lane; `lane` is the resolved T.
     mut fn vector_type_from_args(count_node: i32, lane: i32, lane_node: i32, count_subst: i32) -> i32:
+        // D119 Amendment 1 retired `Vector[N, T]`: an integer literal in the
+        // lane position is that spelling (a lane type is never a literal),
+        // so say what to write instead of calling the type a bad lane count.
+        if self.int_literal_i64_value(lane_node).ok != 0:
+            self.emit_error("`Vector[T, N]` writes the element first and its count second, like `[T; N]` (§4.3d, D119 Amendment 1): the first argument is the lane type", lane_node)
+            return 0
         let n = self.vector_count_arg_with(count_node, "Vector", count_subst)
         if n < 0 or lane == 0: return 0
         if not self.vector_lane_type_is_valid(lane):
@@ -223,32 +229,36 @@ impl Sema:
         self.mask_type(w.value as i32, n)
 
     // A resolved `Vector[...]`/`Mask[...]` type expression with argument
-    // nodes `a0` and `a1`; `resolve_lane` resolves a type argument.
+    // nodes `a0` and `a1` in source order. D119 Amendment 1: Vector writes
+    // its element first (`Vector[T, N]`, like `[T; N]`); Mask keeps its
+    // count first (`Mask[N, W]`).
     mut fn resolve_vector_generic(base_sym: i32, arg_count: i32, a0: i32, a1: i32, node: i32) -> i32:
         let name = self.pool_resolve_symbol(base_sym).clone()
         if arg_count != 2:
-            self.emit_error(f"{name} takes two arguments: `{name}[N, " ++ (if name == "Vector": "T" else: "W") ++ "]` (§4.3d)", node)
+            self.emit_error(f"{name} takes two arguments: " ++ (if name == "Vector": "`Vector[T, N]`" else: "`Mask[N, W]`") ++ " (§4.3d)", node)
             return 0
         if name == "Mask": return self.mask_type_from_args(a0, a1)
-        let lane = self.resolve_type_level_arg_expr(a1)
-        self.vector_type_from_args(a0, lane, a1, self.vector_count_subst(a0))
+        let lane = self.resolve_type_level_arg_expr(a0)
+        self.vector_type_from_args(a1, lane, a0, self.vector_count_subst(a1))
 
     // The frozen twin: every Vector/Mask type a MIR-era consumer names was
     // registered while checking.
     fn resolve_vector_generic_frozen(base_sym: i32, a0: i32, a1: i32) -> i32:
-        let n = self.vector_count_node_value(a0, self.vector_count_subst(a0))
-        if n < 1: return 0
         if self.pool_resolve_symbol(base_sym) == "Mask":
+            let n = self.vector_count_node_value(a0, self.vector_count_subst(a0))
+            if n < 1: return 0
             let w = self.int_literal_i64_value(a1)
             if w.ok == 0: return 0
             return self.find_exact_type(TypeKind.TY_MASK, w.value as i32, n as i32, 0) as i32
-        let lane = self.resolve_type_level_arg_expr_frozen(a1)
+        let n = self.vector_count_node_value(a1, self.vector_count_subst(a1))
+        if n < 1: return 0
+        let lane = self.resolve_type_level_arg_expr_frozen(a0)
         self.find_exact_type(TypeKind.TY_VECTOR, lane, n as i32, 0) as i32
 
     // ── Expressions ─────────────────────────────────────────────────
 
     // The Vector or Mask type an expression names when it is used as a
-    // constructor (`f32x4`, `Vector[4, f32]`), or 0. A binding of the same
+    // constructor (`f32x4`, `Vector[f32, 4]`), or 0. A binding of the same
     // name is a value, not the type.
     mut fn vector_type_named_by(node: i32) -> i32:
         if node <= 0: return 0

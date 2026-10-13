@@ -14,7 +14,7 @@
 //! expect-stdout: floats 0 failures
 //! expect-stdout: calls 6 8 10 12 | 2 4 6 8 10 12 14 16 | 3 5 7
 
-// §4.3d (D78, #1874): SIMD vectors. `Vector[N, T]` and its one-token
+// §4.3d (D78, #1874): SIMD vectors. `Vector[T, N]` and its one-token
 // aliases name the same type; lanes are read and written with `v[i]`;
 // operators are lane-wise; a comparison yields a Mask; a scalar broadcasts
 // only where one meaning is forced.
@@ -27,14 +27,14 @@ fn add4(a: f32x4, b: f32x4) -> f32x4: a + b
 
 fn double8(a: i32x8) -> i32x8: a * 2
 
-fn add3(a: Vector[3, i32], b: Vector[3, i32]) -> Vector[3, i32]: a + b
+fn add3(a: Vector[i32, 3], b: Vector[i32, 3]) -> Vector[i32, 3]: a + b
 
 fn near(a: f32, b: f32) -> bool: (a - b).abs() < 0.0001f32
 
 fn main:
     let v = i32x4(1, 2, 3, 4)
     show4("lanes", v)
-    let g = Vector[4, i32](5, 6, 7, 8)
+    let g = Vector[i32, 4](5, 6, 7, 8)
     show4("generic", g)
 
     var w = v
@@ -87,7 +87,7 @@ fn main:
     print(f"cast {lanes4(fi)} | {lanes4(narrow)}")
     let _ = back
 
-    print(f"layout {size_of[Vector[3, f32]]()} {align_of[Vector[3, f32]]()} {size_of[f32x8]()} {size_of[m32x4]()} {align_of[i8x16]()} {size_of[Vector[5, f64]]()}")
+    print(f"layout {size_of[Vector[f32, 3]]()} {align_of[Vector[f32, 3]]()} {size_of[f32x8]()} {size_of[m32x4]()} {align_of[i8x16]()} {size_of[Vector[f64, 5]]()}")
 
     var fails = 0
     let fa = f32x4(1, 2, 3, 4)
@@ -110,5 +110,5 @@ fn main:
     print(f"floats {fails} failures")
 
     let d = double8(i32x8(1, 2, 3, 4, 5, 6, 7, 8))
-    let t = add3(Vector[3, i32](1, 2, 3), Vector[3, i32](2, 3, 4))
+    let t = add3(Vector[i32, 3](1, 2, 3), Vector[i32, 3](2, 3, 4))
     print(f"calls {lanes4(i32x4(1, 2, 3, 4) + i32x4(5, 6, 7, 8))} | {d[0]} {d[1]} {d[2]} {d[3]} {d[4]} {d[5]} {d[6]} {d[7]} | {t[0]} {t[1]} {t[2]}")

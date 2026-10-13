@@ -2201,10 +2201,18 @@ impl Sema:
             let fn_kind = if kind == NodeKind.NK_TYPE_EXTERN_FN: TypeKind.TY_EXTERN_FN else: TypeKind.TY_FN
             return self.find_fn_type_of_kind_u(fn_kind, &param_types, param_count, ret, self.fn_type_node_flags(node))
         if kind == NodeKind.NK_TYPE_ARRAY:
-            // A length Sema never evaluated has no type (array_type_len).
-            if self.ast.get_data2(node) != 0: return 0
+            // A length Sema never evaluated has no type (array_type_len). A
+            // generic length keeps its expression in d2 (D119 Amendment 1):
+            // the frozen reader binds it from the substitution in scope, as
+            // the frozen Vector count does.
+            var size = self.ast.get_data1(node)
+            let len_node = self.ast.get_data2(node)
+            if len_node != 0:
+                let generic_len = self.array_len_generic_value(len_node, 0)
+                if generic_len < 0: return 0
+                size = generic_len as i32
             let elem = self.resolve_type_expr_frozen(self.ast.get_data0(node))
-            return self.find_exact_type(TypeKind.TY_ARRAY, elem as i32, self.ast.get_data1(node), 0)
+            return self.find_exact_type(TypeKind.TY_ARRAY, elem as i32, size, 0)
         if kind == NodeKind.NK_TYPE_SLICE:
             let elem2 = self.resolve_type_expr_frozen(self.ast.get_data0(node))
             return self.find_exact_type(TypeKind.TY_SLICE, elem2 as i32, self.ast.get_data1(node), 0)
@@ -12520,17 +12528,36 @@ impl Sema:
             for ei in 0..elem_count:
                 elems.push(self.resolve_type_node_with_subst(self.ast.get_extra(extra_start + ei), self_ty, subst_names, subst_types))
             return self.ensure_tuple_type(elems, elem_count) as i32
+        if kind == NodeKind.NK_TYPE_ARRAY:
+            // D119 Amendment 1 (#2311): the element resolves under the
+            // substitution, and a generic length binds from it (the explicit
+            // list first, then the generic-subst stack, as the Vector count
+            // below does); any other length is array_type_len's.
+            let arr_elem = self.resolve_type_node_with_subst(self.ast.get_data0(type_node), self_ty, subst_names, subst_types)
+            let arr_len_node = self.ast.get_data2(type_node)
+            if arr_len_node == 0:
+                return self.ensure_exact_type(TypeKind.TY_ARRAY, arr_elem, self.ast.get_data1(type_node), 0) as i32
+            let arr_len_kind = self.ast.kind(arr_len_node)
+            let arr_list_subst = if arr_len_kind == NodeKind.NK_TYPE_NAMED or arr_len_kind == NodeKind.NK_IDENT: self.subst_list_lookup(subst_names, subst_types, self.ast.get_data0(arr_len_node)) else: 0
+            let arr_generic_len = self.array_len_generic_value(arr_len_node, arr_list_subst)
+            if arr_generic_len >= 0:
+                if arr_generic_len > 2147483647:
+                    self.emit_error(f"`[T; N]`: the length {arr_generic_len} is out of range (§4.3a)", arr_len_node)
+                    return 0
+                self.ast.set_data1(type_node as NodeId, arr_generic_len as i32)
+                return self.ensure_exact_type(TypeKind.TY_ARRAY, arr_elem, arr_generic_len as i32, 0) as i32
+            return self.ensure_exact_type(TypeKind.TY_ARRAY, arr_elem, self.array_type_len(type_node), 0) as i32
         if kind == NodeKind.NK_TYPE_GENERIC and (self.is_vector_symbol(self.ast.get_data0(type_node)) or self.is_mask_symbol(self.ast.get_data0(type_node))) and self.ast.get_data2(type_node) == 2:
             let vs_start = self.ast.get_data1(type_node)
             let vs_a0 = self.ast.get_extra(vs_start)
             let vs_a1 = self.ast.get_extra(vs_start + 1)
             if self.is_mask_symbol(self.ast.get_data0(type_node)):
                 return self.mask_type_from_args(vs_a0, vs_a1)
-            let vs_lane = self.resolve_type_node_with_subst(vs_a1, self_ty, subst_names, subst_types)
-            let vs_count_kind = self.ast.kind(vs_a0)
-            let vs_list_subst = if vs_count_kind == NodeKind.NK_TYPE_NAMED or vs_count_kind == NodeKind.NK_IDENT: self.subst_list_lookup(subst_names, subst_types, self.ast.get_data0(vs_a0)) else: 0
-            let vs_count_subst = if vs_list_subst != 0: vs_list_subst else: self.vector_count_subst(vs_a0)
-            return self.vector_type_from_args(vs_a0, vs_lane, vs_a1, vs_count_subst)
+            let vs_lane = self.resolve_type_node_with_subst(vs_a0, self_ty, subst_names, subst_types)
+            let vs_count_kind = self.ast.kind(vs_a1)
+            let vs_list_subst = if vs_count_kind == NodeKind.NK_TYPE_NAMED or vs_count_kind == NodeKind.NK_IDENT: self.subst_list_lookup(subst_names, subst_types, self.ast.get_data0(vs_a1)) else: 0
+            let vs_count_subst = if vs_list_subst != 0: vs_list_subst else: self.vector_count_subst(vs_a1)
+            return self.vector_type_from_args(vs_a1, vs_lane, vs_a0, vs_count_subst)
         if kind == NodeKind.NK_TYPE_GENERIC:
             let base_sym = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
             let extra_start2 = self.ast.get_data1(type_node)
@@ -12574,18 +12601,38 @@ impl Sema:
             for ei in 0..elem_count:
                 elems.push(self.resolve_type_node_with_subst_frozen(self.ast.get_extra(extra_start + ei), self_ty, subst_names, subst_types))
             return self.find_tuple_type(elems, elem_count) as i32
+        if kind == NodeKind.NK_TYPE_ARRAY:
+            // The frozen twin of the mutable resolver's array case: a generic
+            // length binds from the substitution; an unevaluated length has
+            // no type here.
+            let arr_elem = self.resolve_type_node_with_subst_frozen(self.ast.get_data0(type_node), self_ty, subst_names, subst_types)
+            let arr_len_node = self.ast.get_data2(type_node)
+            if arr_len_node == 0:
+                return self.find_exact_type(TypeKind.TY_ARRAY, arr_elem, self.ast.get_data1(type_node), 0) as i32
+            let arr_len_kind = self.ast.kind(arr_len_node)
+            let arr_list_subst = if arr_len_kind == NodeKind.NK_TYPE_NAMED or arr_len_kind == NodeKind.NK_IDENT: self.subst_list_lookup(subst_names, subst_types, self.ast.get_data0(arr_len_node)) else: 0
+            let arr_generic_len = self.array_len_generic_value(arr_len_node, arr_list_subst)
+            if arr_generic_len < 0:
+                return 0
+            return self.find_exact_type(TypeKind.TY_ARRAY, arr_elem, arr_generic_len as i32, 0) as i32
         if kind == NodeKind.NK_TYPE_GENERIC and (self.is_vector_symbol(self.ast.get_data0(type_node)) or self.is_mask_symbol(self.ast.get_data0(type_node))) and self.ast.get_data2(type_node) == 2:
             let vs_start = self.ast.get_data1(type_node)
-            let vs_a0 = self.ast.get_extra(vs_start)
-            let vs_count_kind = self.ast.kind(vs_a0)
-            let vs_list_subst = if vs_count_kind == NodeKind.NK_TYPE_NAMED or vs_count_kind == NodeKind.NK_IDENT: self.subst_list_lookup(subst_names, subst_types, self.ast.get_data0(vs_a0)) else: 0
-            let vs_count = self.vector_count_node_value(vs_a0, if vs_list_subst != 0: vs_list_subst else: self.vector_count_subst(vs_a0))
+            if self.is_mask_symbol(self.ast.get_data0(type_node)):
+                let vs_m0 = self.ast.get_extra(vs_start)
+                let vs_mkind = self.ast.kind(vs_m0)
+                let vs_msubst = if vs_mkind == NodeKind.NK_TYPE_NAMED or vs_mkind == NodeKind.NK_IDENT: self.subst_list_lookup(subst_names, subst_types, self.ast.get_data0(vs_m0)) else: 0
+                let vs_mcount = self.vector_count_node_value(vs_m0, if vs_msubst != 0: vs_msubst else: self.vector_count_subst(vs_m0))
+                if vs_mcount < 1:
+                    return 0
+                let vs_w = self.int_literal_i64_value(self.ast.get_extra(vs_start + 1))
+                return self.find_exact_type(TypeKind.TY_MASK, vs_w.value as i32, vs_mcount as i32, 0) as i32
+            let vs_a1 = self.ast.get_extra(vs_start + 1)
+            let vs_count_kind = self.ast.kind(vs_a1)
+            let vs_list_subst = if vs_count_kind == NodeKind.NK_TYPE_NAMED or vs_count_kind == NodeKind.NK_IDENT: self.subst_list_lookup(subst_names, subst_types, self.ast.get_data0(vs_a1)) else: 0
+            let vs_count = self.vector_count_node_value(vs_a1, if vs_list_subst != 0: vs_list_subst else: self.vector_count_subst(vs_a1))
             if vs_count < 1:
                 return 0
-            if self.is_mask_symbol(self.ast.get_data0(type_node)):
-                let vs_w = self.int_literal_i64_value(self.ast.get_extra(vs_start + 1))
-                return self.find_exact_type(TypeKind.TY_MASK, vs_w.value as i32, vs_count as i32, 0) as i32
-            let vs_lane = self.resolve_type_node_with_subst_frozen(self.ast.get_extra(vs_start + 1), self_ty, subst_names, subst_types)
+            let vs_lane = self.resolve_type_node_with_subst_frozen(self.ast.get_extra(vs_start), self_ty, subst_names, subst_types)
             return self.find_exact_type(TypeKind.TY_VECTOR, vs_lane, vs_count as i32, 0) as i32
         if kind == NodeKind.NK_TYPE_GENERIC:
             let base_sym = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
@@ -19951,13 +19998,43 @@ impl Sema:
             return self.const_global_syms.contains(sym)
         false
 
+    // D119 Amendment 1 (#2311): an array length that is a bare generic
+    // parameter name bound to a compile-time integer — the mechanism
+    // `Vector[T, N]`'s lane count uses (§4.3d), one substitution read. -1
+    // when the length is anything else (a literal lives in the node's d1; a
+    // constant expression is evaluated below). `subst` is an explicit
+    // substitution type for the name, or 0 to read the generic-subst stack.
+    fn array_len_generic_value(len_node: i32, subst: i32) -> i64:
+        let kind = self.ast.kind(len_node)
+        if kind != NodeKind.NK_TYPE_NAMED and kind != NodeKind.NK_IDENT: return -1
+        self.vector_count_node_value(len_node, if subst != 0: subst else: self.vector_count_subst(len_node))
+
     // §4.3a (#2121): the length of `[T; N]`. A literal N is the node's d1. A
     // constant expression N (a `const`, arithmetic over consts) is evaluated
     // once, here, and written into d1, so every later reader of the node
-    // (the frozen resolver, codegen, the renderer) sees a plain length.
+    // (the frozen resolver, codegen, the renderer) sees a plain length. A
+    // generic N (D119 Amendment 1) is bound per instantiation, so its node
+    // keeps the length expression in d2: each instantiation writes its own
+    // bound value into d1 and re-reads d2 for the next.
     mut fn array_type_len(node: i32) -> i32:
         let len_node = self.ast.get_data2(node)
         if len_node == 0:
+            return self.ast.get_data1(node)
+        let generic_len = self.array_len_generic_value(len_node, 0)
+        if generic_len >= 0:
+            if generic_len > 2147483647:
+                self.emit_error(f"`[T; N]`: the length {generic_len} is out of range (§4.3a)", len_node)
+                return 0
+            self.ast.set_data1(node as NodeId, generic_len as i32)
+            return generic_len as i32
+        // A generic length resolved while its parameter carries a non-integer
+        // substitution — a template probe, or inference's cascade-suppression
+        // value after "cannot infer" already reported the call. The probe
+        // gets the last bound length and the node's d2 survives: clearing it
+        // here (the constant path below) would corrupt the length for every
+        // later instantiation of the same declaration ([i32; 0] in notes).
+        let len_kind = self.ast.kind(len_node)
+        if (len_kind == NodeKind.NK_TYPE_NAMED or len_kind == NodeKind.NK_IDENT) and self.lookup_generic_subst(self.ast.get_data0(len_node)) != 0:
             return self.ast.get_data1(node)
         var len: i32 = 0
         if not self.expr_is_const_expr(len_node):
@@ -19975,6 +20052,17 @@ impl Sema:
         len
 
     mut fn array_fill_count(node: i32, count_node: i32) -> i32:
+        // D119 Amendment 1 (#2311): `[value; N]` with N a bound generic
+        // length parameter, e.g. transpose's `[0; C, R]` result. Read before
+        // checking the node as an expression: a generic length's type is its
+        // compile-time integer, not an integer value's.
+        let generic_count = self.array_len_generic_value(count_node, 0)
+        if generic_count >= 0:
+            if generic_count > 2147483647:
+                self.emit_error(f"`[value; N]`: the count {generic_count} is out of range (§4.3a)", count_node)
+                return -1
+            self.array_fill_counts.insert(node, generic_count as i32)
+            return generic_count as i32
         let count_ty = self.check_expr(count_node)
         if count_ty == 0:
             return -1
@@ -25576,7 +25664,7 @@ impl Sema:
         // §18.2: `builtins.sin(x)` is the intrinsic whatever else `sin` names.
         if self.builtins_intrinsic_nodes.contains(callee) and self.generic_builtin_callee_name(callee).len() == 0:
             return self.check_builtins_intrinsic_call(node, self.ast.get_data0(callee), extra_start, arg_count)
-        // §4.3d: `f32x4(...)`, `m32x4(...)`, `Vector[N, T](...)`,
+        // §4.3d: `f32x4(...)`, `m32x4(...)`, `Vector[T, N](...)`,
         // `f32x4.splat(s)`, `from_bits`.
         let vector_call = self.check_vector_call(node, callee, extra_start, arg_count)
         if vector_call >= 0:
@@ -28287,6 +28375,21 @@ impl Sema:
             let inner_node = self.ast.get_data0(type_node)
             let resolved = self.resolve_alias(arg_tid)
             if self.get_type_kind(resolved) == TypeKind.TY_ARRAY:
+                // D119 Amendment 1 (#2311): `[T; N]` binds a generic N from
+                // the argument's length, as `Vector[T, N]` binds its lane
+                // count (§4.3d). A multidimensional `[T; d1, d2]` is nested
+                // array nodes, so the element recursion binds each inner
+                // length the same way (`[T; N, N]`, `[T; R, C]`).
+                let len_node = self.ast.get_data2(type_node)
+                if len_node != 0:
+                    let len_kind = self.ast.kind(len_node)
+                    if (len_kind == NodeKind.NK_TYPE_NAMED or len_kind == NodeKind.NK_IDENT) and self.type_param_exists(tp_start, tp_count, self.ast.get_data0(len_node)) != 0:
+                        let len_ty = self.const_int_type(self.get_type_d1(resolved))
+                        let bound_before = self.lookup_generic_subst(self.ast.get_data0(len_node))
+                        if bound_before != 0 and bound_before != len_ty:
+                            self.emit_error(f"cannot infer one length for '{self.pool_resolve(self.ast.get_data0(len_node))}': saw {self.const_int_value(bound_before)} and {self.get_type_d1(resolved)} (§4.3a)", err_node)
+                            return
+                        self.put_generic_subst(self.ast.get_data0(len_node), len_ty, err_node)
                 self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
             return
 
@@ -28330,11 +28433,11 @@ impl Sema:
         if kind == NodeKind.NK_TYPE_GENERIC:
             let base_sym = self.ast.get_data0(type_node)
             let resolved = self.resolve_alias(arg_tid)
-            // §4.3d: `Vector[N, T]` binds T from the argument's lane type
+            // §4.3d: `Vector[T, N]` binds T from the argument's lane type
             // and a generic N from its lane count.
             if self.is_vector_symbol(base_sym) and self.ast.get_data2(type_node) == 2:
                 if self.get_type_kind(resolved) == TypeKind.TY_VECTOR:
-                    let count_node = self.ast.get_extra(self.ast.get_data1(type_node))
+                    let count_node = self.ast.get_extra(self.ast.get_data1(type_node) + 1)
                     let count_kind = self.ast.kind(count_node)
                     if (count_kind == NodeKind.NK_TYPE_NAMED or count_kind == NodeKind.NK_IDENT) and self.type_param_exists(tp_start, tp_count, self.ast.get_data0(count_node)) != 0:
                         let count_ty = self.const_int_type(self.get_type_d1(resolved))
@@ -28343,7 +28446,7 @@ impl Sema:
                             self.emit_error(f"cannot infer one lane count for '{self.pool_resolve(self.ast.get_data0(count_node))}': saw {self.const_int_value(bound_before)} and {self.get_type_d1(resolved)} (§4.3d)", err_node)
                             return
                         self.put_generic_subst(self.ast.get_data0(count_node), count_ty, err_node)
-                    self.bind_type_params_from_type_expr(self.ast.get_extra(self.ast.get_data1(type_node) + 1), self.get_type_d0(resolved), tp_start, tp_count, err_node)
+                    self.bind_type_params_from_type_expr(self.ast.get_extra(self.ast.get_data1(type_node)), self.get_type_d0(resolved), tp_start, tp_count, err_node)
                 return
             if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
                 return

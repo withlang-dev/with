@@ -3408,17 +3408,19 @@ impl Sema:
             return
 
         if kind == NodeKind.NK_TYPE_GENERIC and (self.is_vector_symbol(self.ast.get_data0(node)) or self.is_mask_symbol(self.ast.get_data0(node))) and self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, self.ast.get_data0(node)) == 0:
-            // §4.3d: `Vector[N, T]` / `Mask[N, W]` — N (and W) a compile-time
-            // integer; T may be a type parameter.
+            // §4.3d: `Vector[T, N]` / `Mask[N, W]` — N (and W) a compile-time
+            // integer; T may be a type parameter. Vector's count is its second
+            // argument (D119 Amendment 1); Mask's is its first.
             let list_extra = self.ast.get_data1(node)
-            if self.ast.get_data2(node) >= 1:
-                let count_node = self.ast.get_extra(list_extra)
+            let is_vector = self.is_vector_symbol(self.ast.get_data0(node))
+            if self.ast.get_data2(node) == 2 or (self.ast.get_data2(node) >= 1 and not is_vector):
+                let count_node = self.ast.get_extra(if is_vector: list_extra + 1 else: list_extra)
                 let count_kind = self.ast.kind(count_node)
                 let count_is_param = (count_kind == NodeKind.NK_TYPE_NAMED or count_kind == NodeKind.NK_IDENT) and self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, self.ast.get_data0(count_node)) != 0
                 if self.int_literal_i64_value(count_node).ok == 0 and not count_is_param:
-                    self.emit_error("a vector's lane count must be a compile-time integer constant or a generic parameter (`fn dot[N](a: Vector[N, f32])`, §4.3d)", count_node)
-            if self.ast.get_data2(node) == 2 and self.is_vector_symbol(self.ast.get_data0(node)):
-                self.validate_type_expr_with_impl_type_params(self.ast.get_extra(list_extra + 1), tp_start, tp_count, impl_node)
+                    self.emit_error("a vector's lane count must be a compile-time integer constant or a generic parameter (`fn dot[N](a: Vector[f32, N])`, §4.3d)", count_node)
+            if self.ast.get_data2(node) == 2 and is_vector:
+                self.validate_type_expr_with_impl_type_params(self.ast.get_extra(list_extra), tp_start, tp_count, impl_node)
             return
 
         if kind == NodeKind.NK_TYPE_GENERIC:
@@ -3678,8 +3680,22 @@ impl Sema:
                 if self.type_expr_mentions_type_param(self.ast.get_extra(extra_start + ai), tp_sym) != 0:
                     return 1
             return 0
-        if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_ARRAY:
+        if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_SLICE:
             return self.type_expr_mentions_type_param(self.ast.get_data0(type_node), tp_sym)
+        if kind == NodeKind.NK_TYPE_ARRAY:
+            if self.type_expr_mentions_type_param(self.ast.get_data0(type_node), tp_sym) != 0:
+                return 1
+            // D119 Amendment 1 (#2311): a generic length (`[T; N]`) is a
+            // mention of N. Without this the walk called `[i32; N]` fixed by
+            // the signature alone, and the expected-type probe resolved it
+            // with N unbound — erroring and consuming the length node before
+            // call inference could bind N from the argument.
+            let len_node = self.ast.get_data2(type_node)
+            if len_node != 0:
+                let len_kind = self.ast.kind(len_node)
+                if (len_kind == NodeKind.NK_TYPE_NAMED or len_kind == NodeKind.NK_IDENT) and self.ast.get_data0(len_node) == tp_sym:
+                    return 1
+            return 0
         if kind == NodeKind.NK_TYPE_TUPLE:
             let extra_start = self.ast.get_data0(type_node)
             let elem_count = self.ast.get_data1(type_node)

@@ -39,7 +39,7 @@ fn main:
     let positive = (0.0 < f).select(a, i32x4.splat(0))
     print(f"left {scaled[0]} {scaled[1]} {scaled[2]} {scaled[3]} | {masked[0]} {masked[1]} {masked[2]} | {shifted[0]} {shifted[1]} | {positive[0]} {positive[1]} {positive[2]} {positive[3]}")
 
-    let x = Vector[2, i128](1, 5)
-    let y = Vector[2, i128](1, 2)
+    let x = Vector[i128, 2](1, 5)
+    let y = Vector[i128, 2](1, 2)
     let e: m128x2 = x == y
     print(f"m128 {e[0]} {e[1]}")

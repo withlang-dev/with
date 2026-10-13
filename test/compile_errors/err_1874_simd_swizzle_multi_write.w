@@ -7,4 +7,4 @@ fn main:
     v.xy = f32x2_of(v)
     print(f"{v[0]}")
 
-fn f32x2_of(v: f32x4) -> Vector[2, f32]: v.zw
+fn f32x2_of(v: f32x4) -> Vector[f32, 2]: v.zw

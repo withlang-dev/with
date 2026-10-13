@@ -1229,7 +1229,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         if sz <= 4: return session_strdup(s, "Complex32\0" as *const u8)
         return session_strdup(s, "Complex64\0" as *const u8)
 
-    // §16.1 (D78): a `vector_size` / `ext_vector_type` type is `Vector[N, T]`,
+    // §16.1 (D78): a `vector_size` / `ext_vector_type` type is `Vector[T, N]`,
     // printed as the alias the typedef already says (`__m128` → `f32x4`,
     // `__m128i` → `i64x2`) for the native widths.
     if kind == CXType_Vector or kind == CXType_ExtVector:
@@ -1265,7 +1265,7 @@ fn c_vector_lane_name(kind: i32, bytes: i64) -> str:
     (if signed: "i" else: "u") ++ f"{bytes * 8}"
 
 // §16.1 (D78): the With spelling of a C vector type: the alias for the
-// native widths (N × width ∈ 128, 256, 512 bits), else `Vector[N, T]`.
+// native widths (N × width ∈ 128, 256, 512 bits), else `Vector[T, N]`.
 unsafe fn translate_vector_type(s: *mut CImportSession, canonical: CXType) -> *mut u8:
     let n = clang_getNumElements(canonical)
     let elem = clang_getCanonicalType(clang_getElementType(canonical))
@@ -1274,7 +1274,7 @@ unsafe fn translate_vector_type(s: *mut CImportSession, canonical: CXType) -> *m
     if lane.len() == 0 or n < 1:
         return session_strdup(s, "__UNSUPPORTED:vector of a lane type With has no vector of (§4.3d: integer or float lanes of 8 to 64 bits)\0" as *const u8)
     let total = n * bytes * 8
-    let text = if total == 128 or total == 256 or total == 512: f"{lane}x{n}" else: f"Vector[{n}, {lane}]"
+    let text = if total == 128 or total == 256 or total == 512: f"{lane}x{n}" else: f"Vector[{lane}, {n}]"
     var buf: [64]u8 = [0 as u8; 64]
     for i in 0..text.len():
         buf[i] = text[i]

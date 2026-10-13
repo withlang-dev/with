@@ -60,7 +60,7 @@ pub fn type_layout_enum_shape(tag_size: i64, tag_align: i64, payload_size: i64, 
 // §4.3d (D78): a vector or mask of `n` lanes of `lane_bits` each occupies
 // N × size(T) rounded up to a power of two — LLVM's `<N x T>` allocation and
 // clang's `vector_size` / `ext_vector_type(N)` on every supported target
-// (`Vector[3, f32]` is 16 bytes, 16-aligned).
+// (`Vector[f32, 3]` is 16 bytes, 16-aligned).
 pub fn type_layout_vector_bytes(n: i32, lane_bits: i32) -> i64:
     let raw = n as i64 * type_layout_int_bytes(lane_bits)
     var size: i64 = 1

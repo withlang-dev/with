@@ -2,9 +2,9 @@
 
 // #1995: the same for a record field, through an array.
 
-type P { tag: i32, lanes: [Vector[4, f32]; 2] }
+type P { tag: i32, lanes: [Vector[f32, 4]; 2] }
 
 fn main:
-    let a = P { tag: 1, lanes: [Vector[4, f32].splat(1), Vector[4, f32].splat(2)] }
-    let b = P { tag: 1, lanes: [Vector[4, f32].splat(1), Vector[4, f32].splat(2)] }
+    let a = P { tag: 1, lanes: [Vector[f32, 4].splat(1), Vector[f32, 4].splat(2)] }
+    let b = P { tag: 1, lanes: [Vector[f32, 4].splat(1), Vector[f32, 4].splat(2)] }
     print(f"{a != b}")

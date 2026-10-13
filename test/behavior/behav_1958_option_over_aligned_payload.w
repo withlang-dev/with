@@ -21,12 +21,12 @@
 // 'Option[Al]' is emitted as 40 bytes aligned 8, but TypeLayout lays it out
 // as 48 bytes aligned 16`). The rows print the model's size/align, then
 // LLVM's (recovered from `(i8, T)` as in behav_layout_model_matches_llvm);
-// the V8 row prints only the verdict, since `Vector[8, f32]`'s alignment is
+// the V8 row prints only the verdict, since `Vector[f32, 8]`'s alignment is
 // the target's (32 on x86_64, 16 on AArch64).
 
 type Al { a: i8, @[align(32)] b: i64 }
-type V4 = Vector[4, f32]
-type V8 = Vector[8, f32]
+type V4 = Vector[f32, 4]
+type V8 = Vector[f32, 8]
 type OAl = Option[Al]
 type OOAl = Option[Option[Al]]
 type OV4 = Option[V4]

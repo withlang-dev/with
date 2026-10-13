@@ -4,6 +4,6 @@
 // `m as m8x4` converts the width.
 fn main:
     let a = i32x4(1, 2, 3, 4) > 2
-    let b = Vector[4, i8](1, 2, 3, 4) > 2
+    let b = Vector[i8, 4](1, 2, 3, 4) > 2
     let c = a & b
     print(f"{c.any()}")

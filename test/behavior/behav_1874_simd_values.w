@@ -4,13 +4,13 @@
 
 // §4.3d (D78, #1874): a vector is an ordinary Copy value — in a List, an
 // array, a struct field, an Option, a global — with compound assignment,
-// and a generic function may take `Vector[4, T]` for any lane type.
+// and a generic function may take `Vector[T, 4]` for any lane type.
 type P { tag: i32, v: f32x4 }
 
 let G = i32x4(1, 2, 3, 4)
 var H: i32x4 = 3
 
-fn sum[T](v: Vector[4, T]) -> T: v.reduce_add()
+fn sum[T](v: Vector[T, 4]) -> T: v.reduce_add()
 
 fn main:
     var v = i32x4(1, 2, 3, 4)
