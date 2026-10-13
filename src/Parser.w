@@ -3799,9 +3799,12 @@ impl Parser:
         let extra_start = self.pool.extra_len()
         var method_count: i32 = 0
         // D117 (§9.5): the names this body declared and their receiver modes;
-        // a `move fn` twin of a declared `fn` is its own function `name$move`.
+        // a `move fn` twin of a declared `fn` is its own function `name$move`,
+        // in either declaration order (impl_seen_nodes lets the later plain
+        // twin rename an earlier `move fn`).
         let impl_seen_names: List[i32] = List.new()
         let impl_seen_modes: List[i32] = List.new()
+        let impl_seen_nodes: List[i32] = List.new()
 
         while self.peek() == TokenKind.TK_AT or self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_UNSAFE or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_GEN or self.peek() == TokenKind.TK_KW_MUT or self.peek() == TokenKind.TK_KW_MOVE or self.peek() == TokenKind.TK_KW_TYPE or (impl_braced and self.peek() == TokenKind.TK_R_BRACE):
             if impl_braced and self.peek() == TokenKind.TK_R_BRACE:
@@ -3872,10 +3875,18 @@ impl Parser:
             let type_str = self.intern.resolve(type_name)
             let method_str = self.intern.resolve(method_name_sym)
             var twin_suffix = ""
+            var rename_prev = -1
             for si in 0..impl_seen_names.len():
                 if impl_seen_names[si] == method_name_sym and m_recv_mode == 3 and impl_seen_modes[si] != 3: twin_suffix = "$move"
+                if impl_seen_names[si] == method_name_sym and m_recv_mode != 3 and impl_seen_modes[si] == 3: rename_prev = si
+            if rename_prev >= 0 and impl_seen_nodes[rename_prev] != 0:
+                let prev_node = impl_seen_nodes[rename_prev]
+                let move_sym = self.intern.intern(type_str ++ "." ++ method_str ++ "$move")
+                self.pool.set_data0(prev_node as NodeId, move_sym)
             impl_seen_names.push(method_name_sym)
             impl_seen_modes.push(m_recv_mode)
+            impl_seen_nodes.push(0)
+            let seen_idx = impl_seen_nodes.len() - 1
             let mangled = self.intern.intern(type_str ++ "." ++ method_str ++ twin_suffix)
 
             let m_tp_start = self.pool.extra_len()
@@ -3952,6 +3963,7 @@ impl Parser:
                 self.pool.mark_iter_of_self_fn(fn_node)
                 self.pending_iter_of_self = 0
             self.pool.add_decl(fn_node)
+            impl_seen_nodes[seen_idx] = fn_node as i32
             method_count = method_count + 1
             self.skip_member_separators(form)
 

@@ -6461,6 +6461,198 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_COPY, out_place)
         self.body.new_operand(OperandKind.OK_MOVE, out_place)
 
+    // D117 (§13.3): first()/last()/rest() on a fixed array or slice. Sema
+    // declared the result by receiver mode; the mode is read back from that
+    // result type here — Option[&T] observes, Option[T] takes (an array
+    // element moves out, a slice element copies out), [T; N-1] is an owned
+    // array's rest(), []T a view rest(). Element moves and drops follow the
+    // slice-pattern take protocol (lower_slice_pattern_take_array): every
+    // element of an owned array leaves into the result or a discard drop,
+    // then the carrier's own drop is retired.
+    mut fn lower_seq_method(lowering: MethodLowering, self_expr: i32, node: i32) -> i32:
+        let span = self.ast.get_start(node)
+        let result_ty = self.expr_type(node)
+        var recv_ty = self.expr_type(self_expr)
+        if recv_ty == 0 or recv_ty == self.sema.ty_void:
+            recv_ty = self.type_receiver_type(self_expr)
+        if result_ty == 0 or recv_ty == 0:
+            self.mark_unsupported()
+            return self.unit_operand()
+        var base_ty = self.sema.resolve_alias(recv_ty as TypeId) as i32
+        var through_ref = false
+        if self.sema.get_type_kind(base_ty) == TypeKind.TY_REF:
+            through_ref = true
+            base_ty = self.sema.resolve_alias(self.sema.get_type_d0(base_ty) as TypeId) as i32
+        let base_kind = self.sema.get_type_kind(base_ty)
+        let elem_ty = self.sema.get_type_d0(base_ty)
+        if elem_ty == 0 or (base_kind != TypeKind.TY_ARRAY and base_kind != TypeKind.TY_SLICE):
+            self.mark_unsupported()
+            return self.unit_operand()
+        let result_kind = self.sema.get_type_kind(self.sema.resolve_alias(result_ty as TypeId))
+        let result_local = self.new_temp(result_ty)
+        let result_place = self.place_for_local(result_local)
+        let finish = self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
+        if lowering == MethodLowering.SeqRest and result_kind == TypeKind.TY_ARRAY:
+            // Owned fixed array: elements 1.. move into the [T; N-1] result,
+            // element 0 is discarded (dropped like `_` in a pattern).
+            let recv_place = self.lower_owned_receiver_place(self_expr, recv_ty)
+            let n = self.sema.get_type_d1(base_ty)
+            if n <= 1:
+                let zop = self.body.gen_zero_operand(result_ty)
+                self.assign_operand_to_place(result_place, zop, span)
+            else:
+                let moves = self.type_needs_value_drop(elem_ty) != 0
+                let fields: List[i32] = List.new()
+                let names: List[i32] = List.new()
+                for j in 1..n:
+                    let src = self.body.new_field_place(recv_place, j, elem_ty)
+                    let op = self.body.new_operand(if moves: OperandKind.OK_MOVE else: OperandKind.OK_COPY, src)
+                    fields.push(op)
+                    names.push(0)
+                let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, self.body.new_agg_fields(fields, names), 0)
+                self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, rv, span)
+            if n >= 1:
+                self.seq_drop_discarded(self.body.new_field_place(recv_place, 0, elem_ty), elem_ty, span)
+            self.retire_decomposed_carrier(recv_place)
+            return finish
+
+        if lowering == MethodLowering.SeqRest:
+            // A view of everything after the first element.
+            var base_place = self.lower_expr_place(self_expr)
+            if through_ref:
+                base_place = self.new_deref_place(base_place)
+            if base_kind == TypeKind.TY_ARRAY:
+                let n = self.sema.get_type_d1(base_ty)
+                let start_op = self.int_const_operand(if n > 0: 1 else: 0, self.sema.ty_i64)
+                let slice_rv = self.body.new_rvalue(RvalueKind.RK_SLICE, base_place, start_op, self.int_const_operand(n, self.sema.ty_i64))
+                self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, slice_rv, span)
+                return finish
+            let len_local = self.new_temp(self.sema.ty_i64)
+            let len_place = self.place_for_local(len_local)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, self.body.new_rvalue(RvalueKind.RK_LEN, base_place, 0, 0), span)
+            let rest_some_bb = self.new_block()
+            let rest_none_bb = self.new_block()
+            let rest_join_bb = self.new_block()
+            let empty_op = self.seq_len_is_zero_operand(len_place, span)
+            let rest_vals: List[i64] = List.new()
+            rest_vals.push(1)
+            let rest_targets: List[i32] = List.new()
+            rest_targets.push(rest_none_bb as i32)
+            self.terminate(TermKind.TK_SWITCH_INT, empty_op, self.body.new_switch_table(rest_vals, rest_targets), rest_some_bb, 0)
+            self.switch_to(rest_some_bb)
+            let some_rv = self.body.new_rvalue(RvalueKind.RK_SLICE, base_place, self.int_const_operand(1, self.sema.ty_i64), self.body.new_operand(OperandKind.OK_COPY, len_place))
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, some_rv, span)
+            self.terminate(TermKind.TK_GOTO, rest_join_bb, 0, 0, 0)
+            self.switch_to(rest_none_bb)
+            let none_rv = self.body.new_rvalue(RvalueKind.RK_SLICE, base_place, self.int_const_operand(0, self.sema.ty_i64), self.int_const_operand(0, self.sema.ty_i64))
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, none_rv, span)
+            self.terminate(TermKind.TK_GOTO, rest_join_bb, 0, 0, 0)
+            self.switch_to(rest_join_bb)
+            return finish
+
+        // first() / last(): the payload's type (a reference or the element)
+        // is the mode Sema declared.
+        let payload_ty = self.sema.get_generic_inst_arg(result_ty, 0)
+        let observing = payload_ty != 0 and self.sema.get_type_kind(self.sema.resolve_alias(payload_ty as TypeId)) == TypeKind.TY_REF
+        let none_fields: List[i32] = List.new()
+        let none_names: List[i32] = List.new()
+        let none_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, self.body.new_agg_fields(none_fields, none_names), self.sema.enum_variant_index_for_type(result_ty, self.sema.syms.none))
+        if base_kind == TypeKind.TY_ARRAY:
+            let n = self.sema.get_type_d1(base_ty)
+            if observing:
+                if n == 0:
+                    self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, none_rv, span)
+                    return finish
+                var recv_place = self.lower_expr_place(self_expr)
+                if through_ref:
+                    recv_place = self.new_deref_place(recv_place)
+                let at = if lowering == MethodLowering.SeqFirst: 0 else: n - 1
+                let elem_place = self.body.new_field_place(recv_place, at, elem_ty)
+                let ref_op = self.seq_ref_operand(elem_place, payload_ty, span)
+                return self.seq_some_operand(result_place, result_ty, ref_op, finish, span)
+            let recv_place = self.lower_owned_receiver_place(self_expr, recv_ty)
+            if n == 0:
+                self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, none_rv, span)
+                self.retire_decomposed_carrier(recv_place)
+                return finish
+            let at = if lowering == MethodLowering.SeqFirst: 0 else: n - 1
+            let payload_op = self.body.new_operand(self.pattern_whole_read_kind(elem_ty), self.body.new_field_place(recv_place, at, elem_ty))
+            let out_op = self.seq_some_operand(result_place, result_ty, payload_op, finish, span)
+            for j in 0..n:
+                if j != at:
+                    self.seq_drop_discarded(self.body.new_field_place(recv_place, j, elem_ty), elem_ty, span)
+            self.retire_decomposed_carrier(recv_place)
+            return out_op
+
+        // A slice: the length is runtime, so first/last branch on it.
+        var slice_place = self.lower_expr_place(self_expr)
+        if through_ref:
+            slice_place = self.new_deref_place(slice_place)
+        let len_local = self.new_temp(self.sema.ty_i64)
+        let len_place = self.place_for_local(len_local)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, self.body.new_rvalue(RvalueKind.RK_LEN, slice_place, 0, 0), span)
+        let some_bb = self.new_block()
+        let none_bb = self.new_block()
+        let join_bb = self.new_block()
+        let empty_op = self.seq_len_is_zero_operand(len_place, span)
+        let vals: List[i64] = List.new()
+        vals.push(1)
+        let targets: List[i32] = List.new()
+        targets.push(none_bb as i32)
+        self.terminate(TermKind.TK_SWITCH_INT, empty_op, self.body.new_switch_table(vals, targets), some_bb, 0)
+        self.switch_to(none_bb)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, none_rv, span)
+        self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+        self.switch_to(some_bb)
+        let idx_local = self.new_temp(self.sema.ty_i64)
+        let idx_place = self.place_for_local(idx_local)
+        if lowering == MethodLowering.SeqFirst:
+            let zero_op = self.int_const_operand(0, self.sema.ty_i64)
+            self.assign_operand_to_place(idx_place, zero_op, span)
+        else:
+            let sub_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_SUB, self.body.new_operand(OperandKind.OK_COPY, len_place), self.int_const_operand(1, self.sema.ty_i64))
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, idx_place, sub_rv, span)
+        let elem_place = self.body.new_index_place(slice_place, idx_local, elem_ty)
+        let payload_op = if observing: self.seq_ref_operand(elem_place, payload_ty, span) else: self.body.new_operand(OperandKind.OK_COPY, elem_place)
+        let some_op = self.seq_some_operand(result_place, result_ty, payload_op, finish, span)
+        self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+        self.switch_to(join_bb)
+        self.forget_string_flow_facts()
+        some_op
+
+    // An owned array element the take leaves behind drops at the take, as
+    // the elements a slice pattern discards do — not at scope exit.
+    mut fn seq_drop_discarded(elem_place: i32, elem_ty: i32, span: i32):
+        if self.type_needs_value_drop(elem_ty) != 0:
+            self.emit_drop_stmt(elem_place, "seq-discard", span)
+
+    // `len == 0` as an i64 0/1 operand in a fresh temp.
+    mut fn seq_len_is_zero_operand(len_place: i32, span: i32) -> i32:
+        let cmp_local = self.new_temp(self.sema.ty_i64)
+        let cmp_place = self.place_for_local(cmp_local)
+        let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_EQ, self.body.new_operand(OperandKind.OK_COPY, len_place), self.int_const_operand(0, self.sema.ty_i64))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span)
+        self.body.new_operand(OperandKind.OK_COPY, cmp_place)
+
+    // A reference to `elem_place` materialized as an operand of type `ref_ty`.
+    mut fn seq_ref_operand(elem_place: i32, ref_ty: i32, span: i32) -> i32:
+        let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, elem_place, 0)
+        let ref_local = self.new_temp(ref_ty)
+        let ref_place = self.place_for_local(ref_local)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, ref_place, ref_rv, span)
+        self.body.new_operand(OperandKind.OK_COPY, ref_place)
+
+    // Assign `Some(payload_op)` into `result_place`; returns `finish`.
+    mut fn seq_some_operand(result_place: i32, result_ty: i32, payload_op: i32, finish: i32, span: i32) -> i32:
+        let fields: List[i32] = List.new()
+        fields.push(payload_op)
+        let names: List[i32] = List.new()
+        names.push(0)
+        let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, self.body.new_agg_fields(fields, names), self.sema.enum_variant_index_for_type(result_ty, self.sema.syms.some))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, rv, span)
+        finish
+
     mut fn lower_btree_new(node: i32, fallback_ty: i32) -> i32:
         var target_ty = self.expr_type(node)
         var storage_ty = self.btree_storage_list_type(target_ty)
@@ -13276,6 +13468,9 @@ impl MirBuilder:
 
         if lowering == MethodLowering.BTreeNew:
             return self.lower_btree_new(node, recv_type)
+
+        if lowering == MethodLowering.SeqFirst or lowering == MethodLowering.SeqLast or lowering == MethodLowering.SeqRest:
+            return self.lower_seq_method(lowering, self_expr, node)
 
         if lowering == MethodLowering.UnwrapOr:
             return self.lower_unwrap_or_method(self_expr, arg_start, arg_count, node)
