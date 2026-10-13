@@ -7,7 +7,7 @@
 //! expect-stdout: bytes 16
 
 // §16.1 (D78, #1874): a `vector_size` or `ext_vector_type` type imports as
-// `Vector[N, T]` — the alias for the native widths — with C's layout
+// `Vector[T, N]` — the alias for the native widths — with C's layout
 // (including a record holding a vector over 16 bytes, whose alignment is
 // the target's), and a C function that takes or returns one is callable.
 use c_import("behav_1874_simd_c_import.h")
@@ -17,7 +17,7 @@ fn main:
     print(f"wide {size_of[with_wide]() == WITH_WIDE_SIZE} {align_of[with_wide]() == WITH_WIDE_ALIGN}")
     let v: f32x4 = with_v4f_scale(f32x4(1, 2, 3, 4), 2.0f32)
     print(f"scale {v[0] as i32} {v[1] as i32} {v[2] as i32} {v[3] as i32}")
-    let a: Vector[3, f32] = with_v3f_add(Vector[3, f32](1, 2, 3), Vector[3, f32](4, 5, 6))
+    let a: Vector[f32, 3] = with_v3f_add(Vector[f32, 3](1, 2, 3), Vector[f32, 3](4, 5, 6))
     print(f"add {a[0] as i32} {a[1] as i32} {a[2] as i32}")
     print(f"sum {with_v2ll_sum(i64x2(40, 2))}")
     let w = with_wide { tag: 1, wide: f32x8(0, 1, 2, 3, 4, 5, 6, 7), tail: 11 }

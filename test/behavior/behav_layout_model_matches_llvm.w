@@ -107,7 +107,7 @@ type Big { v: i128 }
 // record, §16.4) or below it (a SIMD vector, §4.3d); Option takes §2's
 // body like every enum.
 type Al32 { a: i8, @[align(32)] b: i64 }
-type V4 = Vector[4, f32]
+type V4 = Vector[f32, 4]
 enum E0 { A | B }
 enum E8 { A(v: i8) | B }
 enum E64 { A(v: i64) | B }
@@ -148,8 +148,8 @@ type TResAl32I8 = Result[Al32, i8]
 type TGenAl32 = Gen[Al32]
 // #1964: a tuple places each element at the model's alignment for it, not
 // LLVM's (an `@[align(N)]` record's packed body is LLVM-aligned 1; a
-// `Vector[8, f32]` is LLVM-aligned 32 where §4.3d caps AArch64 at 16).
-type V8 = Vector[8, f32]
+// `Vector[f32, 8]` is LLVM-aligned 32 where §4.3d caps AArch64 at 16).
+type V8 = Vector[f32, 8]
 type TTupAl32 = (i8, Al32)
 type TTupAl32Rev = (Al32, i8)
 type TTupTupAl32 = (i8, TTupAl32)

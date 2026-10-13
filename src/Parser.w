@@ -9216,7 +9216,7 @@ impl Parser:
                 if self.peek() != TokenKind.TK_R_BRACKET:
                     while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
                         // A length argument is a value, not a type:
-                        // `FixedString[N]`, and §4.3d's `Vector[4, f32]` /
+                        // `FixedString[N]`, and §4.3d's `Vector[f32, 4]` /
                         // `Mask[4, 32]`.
                         let arg = if self.intern.resolve(sym) == "FixedString" or self.peek() == TokenKind.TK_INT_LIT:
                             self.parse_expr()

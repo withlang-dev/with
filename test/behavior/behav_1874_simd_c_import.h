@@ -1,7 +1,7 @@
 #ifndef BEHAV_1874_SIMD_C_IMPORT_H
 #define BEHAV_1874_SIMD_C_IMPORT_H
 
-// §16.1 (D78, #1874): C vector types import as Vector[N, T] and print as
+// §16.1 (D78, #1874): C vector types import as Vector[T, N] and print as
 // the alias for the native widths.
 typedef float with_v4f __attribute__((vector_size(16)));
 typedef long long with_v2ll __attribute__((vector_size(16)));

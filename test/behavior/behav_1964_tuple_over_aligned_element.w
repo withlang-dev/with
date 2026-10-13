@@ -24,7 +24,7 @@
 // #1964: a tuple places each element where TypeLayout says — at the model's
 // alignment for it — not where LLVM's literal struct of the element types
 // would. An `@[align(N)]` record's LLVM body is packed (LLVM alignment 1,
-// §16.4) and `Vector[8, f32]` is LLVM-aligned 32 where §4.3d caps AArch64 at
+// §16.4) and `Vector[f32, 8]` is LLVM-aligned 32 where §4.3d caps AArch64 at
 // 16, so before the fix `(i8, Al)` was emitted as 72 bytes aligned 8 against
 // the model's 96/32, and `(i8, V8)` as 64/32 against 48/16. The rows print
 // the model's size/align and LLVM's (alignment recovered from `(i8, T)`, as
@@ -34,8 +34,8 @@
 // moves such tuples through every path that indexes a tuple's elements.
 
 type Al { a: i8, @[align(32)] b: i64 }
-type V4 = Vector[4, f32]
-type V8 = Vector[8, f32]
+type V4 = Vector[f32, 4]
+type V8 = Vector[f32, 8]
 type TAl = (i8, Al)
 type TAlStr = (Al, str)
 type TV4 = (i8, V4)

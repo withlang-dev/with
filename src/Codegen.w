@@ -5084,7 +5084,7 @@ impl Codegen:
     // types is the body when it already measures exactly that — every tuple
     // whose elements LLVM aligns as the model does. Otherwise (an
     // `@[align(N)]` record's packed body is LLVM-aligned 1, §16.4; a
-    // `Vector[8, f32]` is LLVM-aligned past §4.3d's cap) the body is a named
+    // `Vector[f32, 8]` is LLVM-aligned past §4.3d's cap) the body is a named
     // struct with `[n x i8]` padding before each element that needs it and
     // after the last, packed when an element's LLVM alignment does not divide
     // its offset or exceeds the tuple's, the model's alignment recorded in

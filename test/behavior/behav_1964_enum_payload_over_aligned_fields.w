@@ -8,12 +8,12 @@
 // struct (with-abi.md §2) — each field at the model's alignment for it, the
 // same placement a tuple takes. The payload's LLVM body was the literal
 // struct of the field types, so an `@[align(N)]` record (LLVM-aligned 1,
-// §16.4) or a `Vector[8, f32]` (LLVM-aligned 32 where §4.3d caps AArch64 at
+// §16.4) or a `Vector[f32, 8]` (LLVM-aligned 32 where §4.3d caps AArch64 at
 // 16) landed at LLVM's offset: `F.A(4, V8.splat(5))` wrote a 64-byte
 // payload into a 48-byte area and read `4 0 0` back.
 
 type Al { a: i8, @[align(32)] b: i64 }
-type V8 = Vector[8, f32]
+type V8 = Vector[f32, 8]
 
 enum E { A(k: i8, al: Al) | B }
 enum F { A(k: i8, v: V8) | B }

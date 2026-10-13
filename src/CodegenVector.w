@@ -1,7 +1,7 @@
 // CodegenVector — LLVM lowering of §4.3d SIMD vectors (D78, #1874).
 //
 // Sema decided each fact and MIR placed it (SemaVector.w, MirVector.w);
-// this decides how: a Vector[N, T] is LLVM `<N x T>`, a Mask[N, W] is
+// this decides how: a Vector[T, N] is LLVM `<N x T>`, a Mask[N, W] is
 // `<N x iW>` holding all-ones or zero per lane (what `m.select` and the
 // hardware compare produce). Integer lanes follow §4.2 per lane: checked
 // arithmetic panics when any lane overflows, unless the build's overflow

@@ -4,5 +4,5 @@
 // for a scalar (§4.2.6); `as` spells it.
 fn main:
     let wide = i32x4(1, 2, 3, 4)
-    let narrow: Vector[4, i16] = wide
+    let narrow: Vector[i16, 4] = wide
     print(f"{narrow[0]}")

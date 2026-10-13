@@ -6,7 +6,7 @@
 // reading among two, which §4.3d refuses to pick for a mask (`m == n`).
 // Before, Sema accepted it and codegen emitted `icmp eq <8 x float>`.
 
-type V8 = Vector[8, f32]
+type V8 = Vector[f32, 8]
 
 fn main:
     let w: (i8, V8) = (1, V8.splat(1))

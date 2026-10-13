@@ -1,6 +1,6 @@
 //! expect-stdout: 7 3 16 32
 // §16.1 (D78, #1874; retires #1872's omission): a C vector typedef imports
-// as `Vector[N, T]` (here the alias `i32x4`), a record holding one keeps
+// as `Vector[T, N]` (here the alias `i32x4`), a record holding one keeps
 // its fields and C's layout, and the rest of the header imports with it.
 // MSVC's <intrin.h> (reached from SDL3 on Windows) declares vector
 // typedefs such as AMX's `_tile1024i`.
