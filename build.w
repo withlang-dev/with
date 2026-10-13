@@ -3623,6 +3623,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2 = stage2.dep("stage1-runtime")
     // stage1's compile of the compiler, unit by unit (see fixpoint-compare).
     stage2 = stage2.arg("unit-digests=" ++ FIXPOINT_STAGE2_UNITS).extra_output(FIXPOINT_STAGE2_UNITS)
+    // stage2's image is the release (the `build` target stamps it): it is the
+    // first compile of the compiler by a compiler with this tree's codegen,
+    // and stage3 differs from it only in __LINKEDIT and the UUID (measured:
+    // __TEXT and __DATA byte-identical). stage3 is built for fixpoint-compare
+    // alone, beside the tests instead of in front of them.
+    stage2 = stage2.arg("keep-unstamped=" ++ stage_compiler_bin("with-stage2") ++ ".unstamped").extra_output(stage_compiler_bin("with-stage2") ++ ".unstamped")
     out = out.add_target(stage2)
 
     var stage3 = target_new(.Action, "stage3", "").output(stage_compiler_bin("with-stage3"))
@@ -4069,12 +4075,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_rt_windows_aarch64 = cross_rt_windows_aarch64.dep("cross-winarm-llvm-link-metadata")
     out = out.add_target(cross_rt_windows_aarch64)
 
-    // The compiler links to an UNSTAMPED intermediate whose inputs (out/gen/main.w
-    // + src) are commit-independent, so it caches across commits (#650). A cheap
-    // downstream `build` Action patches the version into the final binary. When
-    // commit identity is the only change, this expensive compile stays cached.
-    var compiler = target_new(.Action, "link-compiler", "").output(release_compiler_bin("with") ++ ".unstamped")
-    compiler = target_with_dsym(move compiler, &ctx, release_compiler_bin("with") ++ ".unstamped")
+    // stage3: stage2 compiles the compiler once more, for fixpoint-compare only
+    // (its units against stage2's). Nothing else depends on it, so it builds
+    // beside the tests; the release is stage2's image (see stage2 above).
+    var compiler = target_new(.Action, "link-compiler", "").output(stage_compiler_bin("with-stage3") ++ ".unstamped")
+    compiler = target_with_dsym(move compiler, &ctx, stage_compiler_bin("with-stage3") ++ ".unstamped")
     compiler.action = run_with_compiler_build_action
     compiler = compiler.compiler(stage_compiler_bin("with-stage2"))
     compiler = compiler.input("out/gen/main.w")
@@ -4084,7 +4089,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler = compiler.arg("unit-digests=" ++ FIXPOINT_STAGE3_UNITS).extra_output(build_owned_text(FIXPOINT_STAGE3_UNITS))
     compiler = compiler.extra_output("out/command/link-compiler")
     compiler = compiler.timeout(1800000)
-    compiler = compiler.write_scope("out/release/bin")
+    compiler = compiler.write_scope("out/stage/bin")
     compiler = compiler.dep("compiler-main-source")
     compiler = compiler.dep("llvm-link-metadata")
     compiler = compiler.dep("embedded-objects-object")
@@ -4103,7 +4108,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // commit changes — a millisecond patch, never a recompile.
     var stamp = target_new(.Action, "build", "").output(release_compiler_bin("with"))
     stamp.action = run_patch_version_action
-    stamp = stamp.input(release_compiler_bin("with") ++ ".unstamped")
+    stamp = stamp.input(stage_compiler_bin("with-stage2") ++ ".unstamped")
     // The ABI stamp is sha256 of this record; a re-record must re-stamp.
     stamp = stamp.input("docs/with-abi.sha256")
     // A stale record would stamp this compiler with an ABI key its sources
@@ -4111,15 +4116,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     // leaving it for :test to find an hour later (#1716's ninth battery).
     stamp = stamp.dep("abi-hash-check")
     // #1815: the generation stamps — the tree's sources, and the .producer
-    // of the runtime the release embeds (out/lib).
-    stamp = stamp.arg("runtime-producer=out/lib/.producer")
-    stamp = stamp.input("out/lib/.producer")
+    // of the runtime the release embeds: stage2's, which stage1 compiled.
+    stamp = stamp.arg("runtime-producer=out/bootstrap/lib/.producer")
+    stamp = stamp.input("out/bootstrap/lib/.producer")
     stamp = stamp.dep("runtime-producer")
     stamp = target_with_generation_inputs(move stamp, ctx)
     stamp = target_with_version_inputs(move stamp, ctx)
     stamp = stamp.extra_output("out/command/build")
     stamp = stamp.write_scope("out/release/bin")
-    stamp = stamp.dep("link-compiler")
+    stamp = stamp.dep("stage2")
     // #1157: publishing each bundle into the store happens here, behind the
     // millisecond stamp, instead of upstream of every stage compile.
     for pi in 0..corpus_plans.len():

@@ -593,7 +593,7 @@ fn comp_arg_value(args: &List[str], prefix: &str) -> str:
     ""
 
 fn comp_arg_allowed_for_compiler(arg: &str):
-    not arg.starts_with("compiler=") and not arg.starts_with("overflow=") and not arg.starts_with("embedded-object=") and not arg.starts_with("rss-limit-bytes=") and not arg.starts_with("runtime-root=") and not arg.starts_with("runtime-producer=")
+    not arg.starts_with("compiler=") and not arg.starts_with("overflow=") and not arg.starts_with("embedded-object=") and not arg.starts_with("rss-limit-bytes=") and not arg.starts_with("runtime-root=") and not arg.starts_with("runtime-producer=") and not arg.starts_with("keep-unstamped=")
 
 // Wall-clock budget for one compiler build/ir step. Cold CI hosts can take
 // more than 10 minutes for stage1; emulated hosts (e.g. an x86_64 bootstrap
@@ -3146,7 +3146,19 @@ pub fn run_with_compiler_build_action(ctx: ActionCtx) -> i32:
         // version and ABI stamps exactly as the release binary does, so the
         // stage whose stamp equals a bundle key's abi-sha can build that
         // bundle and its manifest.
-        let stamp_rc = comp_stamp_compiler_binary(ctx, tmp_output, output_path)
+        // `keep-unstamped=<path>`: the unstamped image survives, for a later
+        // stamp of the same compile (stage2's image is the release, stamped by
+        // the commit-tracking `build` target; see build.w). It moves before
+        // stamping: the stamp writes through `<output>.tmp`, the very name the
+        // link used, and would overwrite it.
+        let keep = comp_arg_value(ctx.args(), "keep-unstamped=")
+        var unstamped = tmp_output
+        if keep.len() > 0:
+            let _remove_kept = comp_remove_file_if_exists(fs, keep)
+            if fs.rename(tmp_output, keep) != 0:
+                return comp_fail(ctx, "could not keep the unstamped image at: " ++ keep)
+            unstamped = keep
+        let stamp_rc = comp_stamp_compiler_binary(ctx, unstamped, output_path)
         if stamp_rc != 0:
             let _cleanup_tmp_bin_stamp = comp_remove_file_if_exists(fs, tmp_output)
             let _cleanup_tmp_dsym_stamp = comp_remove_tree_if_exists(fs, tmp_output ++ ".dSYM")
