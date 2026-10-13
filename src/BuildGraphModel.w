@@ -543,7 +543,7 @@ pub fn build_graph_filter_single_target(graph: &BuildGraph, target_name: &str) -
         out.ok = false
         out.error_msg = "build.w did not declare target '" ++ target_name ++ "'"
         return out
-    out.targets.push(build_graph_target_deep_copy(&graph.targets[index]))
+    out.targets.push(build_graph_target_deep_copy(graph.targets[index]))
     out.raw_text = build_graph_emit(out)
     out
 

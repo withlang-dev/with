@@ -3475,7 +3475,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 // copy an empty default_target (#782 class).
                 selected_names.push(with_str_clone_ref(graph.default_target))
             let selected_target_name = selected_names.join("+")
-            let selected_graph = if graph_options.no_deps: build_graph_filter_single_targets(&graph, &selected_names) else: build_graph_filter_targets(&graph, &selected_names)
+            let selected_graph = if graph_options.no_deps: build_graph_filter_single_targets(&graph, selected_names) else: build_graph_filter_targets(&graph, selected_names)
             if not selected_graph.ok:
                 with_eprint("error: " ++ selected_graph.error_msg)
                 return 1
@@ -3495,7 +3495,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 return 1
             // #1835: what --no-deps skipped is what the target's full closure
             // holds beyond itself; only a skipped root prepare is refused.
-            let skipped_root_prepare = graph_options.no_deps and build_graph_find_target_index_by_name(&build_graph_filter_targets(&graph, &selected_names), BUILD_RUNNER_ROOT_PREPARE) >= 0
+            let skipped_root_prepare = graph_options.no_deps and build_graph_find_target_index_by_name(&build_graph_filter_targets(&graph, selected_names), BUILD_RUNNER_ROOT_PREPARE) >= 0
             let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, actual_options, graph_options.survey, skipped_root_prepare) }
             repo_lock_release()
             link_stage_cleanup_current_process_temp_archives()
