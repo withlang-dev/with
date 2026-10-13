@@ -30765,6 +30765,50 @@ impl Sema:
         args.push(ref_ty)
         self.ensure_generic_inst_type(self.syms.option, args, 1) as i32
 
+    // D117 (§13.3): the declared result of `first()`/`last()`/`rest()` on a
+    // fixed array or slice receiver, or 0 when this call is not one. A place
+    // observes — `Option[&T]`, a `[]T` view for rest(); an owned receiver
+    // (receiver_owned_by_syntax) takes — `Option[T]`, `[T; N-1]` for an
+    // array's rest() (an empty array's rest is the empty array). A slice
+    // owns no elements, so its owned first()/last() copy the element out
+    // and require `T: Copy`, as any other owned demand on a view does.
+    mut fn seq_method_result_type(node: i32, expr: i32, recv_type: i32, field: i32, arg_count: i32) -> i32:
+        if recv_type == 0:
+            return 0
+        let resolved = self.resolve_alias(recv_type as TypeId)
+        let kind = self.get_type_kind(resolved)
+        if kind != TypeKind.TY_ARRAY and kind != TypeKind.TY_SLICE:
+            return 0
+        let name: str = self.pool_resolve(field)
+        if name != "first" and name != "last" and name != "rest":
+            return 0
+        if arg_count != 0:
+            self.emit_error(f"`{name}` takes no arguments, found {arg_count}", node)
+            return 0
+        let elem_ty = self.get_type_d0(resolved)
+        if elem_ty == 0:
+            return 0
+        let owned = self.receiver_owned_by_syntax(expr, recv_type)
+        var result = 0
+        if name == "rest":
+            if owned and kind == TypeKind.TY_ARRAY:
+                let n = self.get_type_d1(resolved)
+                result = self.ensure_exact_type(TypeKind.TY_ARRAY, elem_ty, if n > 0: n - 1 else: 0, 0) as i32
+            else:
+                result = self.ensure_exact_type(TypeKind.TY_SLICE, elem_ty, 0, 0) as i32
+                self.record_builtin_receiver_view_origins(node, expr)
+        else if owned:
+            if kind == TypeKind.TY_SLICE and self.is_copy(elem_ty) == 0:
+                self.emit_error(f"`{name}()` on an owned slice copies the element out; `{self.type_name(elem_ty)}` is not Copy — observe it through a place, or move from the collection that owns it", node)
+                return 0
+            result = self.ensure_option_type_for(elem_ty)
+        else:
+            result = self.ensure_option_ref_type_for(elem_ty)
+            self.record_builtin_receiver_view_origins(node, expr)
+        if result != 0:
+            self.typed_expr_types.insert(node, result)
+        result
+
     fn ensure_option_type_for(elem_ty: i32) -> i32:
         let found = self.find_generic_inst(self.syms.option, elem_ty)
         if found != 0:
@@ -33106,6 +33150,14 @@ impl Sema:
             if name == "unwrap_or_else": return MethodLowering.UnwrapOrElse
         if intrinsic == MirIntrinsic.NONE and name == "is_empty" and arg_count == 0 and self.builtin_method_intrinsic(recv, "len") != MirIntrinsic.NONE:
             return MethodLowering.IsEmptyViaLen
+        // D117: first/last/rest on a fixed array or slice (recv is after
+        // auto-deref). List and str keep their declared/intrinsic paths.
+        if arg_count == 0 and recv != 0:
+            let recv_kind = self.get_type_kind(self.resolve_alias(recv as TypeId))
+            if recv_kind == TypeKind.TY_ARRAY or recv_kind == TypeKind.TY_SLICE:
+                if name == "first": return MethodLowering.SeqFirst
+                if name == "last": return MethodLowering.SeqLast
+                if name == "rest": return MethodLowering.SeqRest
         MethodLowering.None
 
     // The type a static receiver expression names (a local of the same
@@ -34675,6 +34727,13 @@ impl Sema:
                 self.propagate_method_call_param_effects(node, sig_idx, 0, 0, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                 self.note_sig_call_global_effects(node, sig_idx, 0, 0, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                 return self.sig_return_type(sig_idx)
+
+        // D117: first()/last()/rest() on a fixed array or slice. The result
+        // is declared by receiver mode (§13.3), exactly as the List twins
+        // declare theirs; MirLower expands the recorded lowering kind.
+        let seq_ret = self.seq_method_result_type(node, expr, recv_type as i32, field, mc_resolved_arg_count)
+        if seq_ret != 0:
+            return seq_ret
 
         let builtin_recv_type = if field == self.syms.unwrap or field == self.syms.is_some or field == self.syms.is_none:
             obj_type as i32

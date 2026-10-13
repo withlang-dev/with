@@ -461,6 +461,12 @@ pub enum MethodLowering: i32:
     // `is_empty()` on a receiver with a `len` intrinsic and no `is_empty`
     // one (#1010); the call's intrinsic record is that `len`.
     IsEmptyViaLen
+    // D117 (§13.3): `first()`/`last()`/`rest()` on a fixed array or slice —
+    // no `impl` can be written on those spellings, so Sema declares the
+    // result by receiver mode and MirLower expands from ordinary ops.
+    SeqFirst
+    SeqLast
+    SeqRest
 
 impl Copy for MethodLowering
 
