@@ -7,8 +7,8 @@
 //! expect-stdout: ["a1", "b2"]
 //! expect-stdout: a b
 // D44 (#2183, #2184, #2185): traversal observes. keys(), values() and iter()
-// are concrete ephemeral iterators of views; an owned collection is cloned
-// where it is wanted; `for` and a comprehension clause over a map or a set
+// are concrete ephemeral iterators of views; an owned collection copies the
+// views where it is wanted (D111); `for` and a comprehension clause over a map or a set
 // step its iter(). D96: a HashMap or HashSet walks in insertion order.
 use std.collections
 
@@ -16,9 +16,9 @@ var m: HashMap[str, i32] = HashMap.new()
 m.insert("alpha".to_owned(), 1)
 m.insert("beta".to_owned(), 2)
 
-let names = m.keys() |> map(it.clone()) |> collect[List]()
+let names = m.keys() |> collect[List]()
 print(names.join(" "))
-let counts = m.values() |> map(it.clone()) |> collect[List]()
+let counts = m.values() |> collect[List]()
 print(f"{counts:?}")
 let entries = m.iter() |> map(e => f"{e.0}={e.1}") |> collect[List]()
 print(entries.join(" "))

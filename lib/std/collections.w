@@ -759,3 +759,16 @@ pub fn iter_collect[T, I: Iter[T]](iter: I) -> List[T]:
             Some(x) => out.push(x)
     out
 
+/// `it.collect[List]()` over an iterator of views (D111/D22 §6.2): the List
+/// stores the values, so each `&T` element meets the store by a copy — the
+/// compiler dispatches a view-element collect here rather than to
+/// `iter_collect` building a `List[&T]` no spelling can name.
+pub fn iter_collect_views[T, I: Iter[&T]](iter: I) -> List[T]:
+    var i = iter
+    var out: List[T] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.push(x)
+    out
+

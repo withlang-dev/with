@@ -24060,7 +24060,28 @@ impl Sema:
     // check_generic_pipeline_call types `recv |> stage(args)`. The
     // receiver is an ordinary by-value argument (receiver_arg_call_nodes).
     mut fn check_user_iter_method(node: i32, expr: i32, recv_type: i32, field: i32, extra_start: i32, arg_count: i32) -> i32:
-        let fn_sym = self.pool_lookup_symbol("iter_" ++ self.pool_resolve(field))
+        // D111 (#2271): `collect` over an iterator of views stores the
+        // values (D22 §6.2): a `&T` element with `T: Copy` meets the
+        // List's owned-element store by a copy, which is std's
+        // iter_collect_views — dispatch there, never to an iter_collect
+        // instance building the unspellable `List[&T]`. A view of a
+        // non-Copy value has no implicit copy to store; say so here
+        // instead of inside std's push.
+        var fn_name: str = "iter_" ++ self.pool_resolve(field)
+        if field == self.syms.collect:
+            var cv_elem = self.iterator_element_type(recv_type)
+            if cv_elem == 0:
+                cv_elem = self.user_iter_element_type(recv_type)
+            if cv_elem != 0:
+                let cv_resolved = self.resolve_alias(cv_elem as TypeId)
+                if self.get_type_kind(cv_resolved) == TypeKind.TY_REF and self.get_type_d1(cv_resolved) == 0:
+                    let cv_pointee = self.get_type_d0(cv_resolved)
+                    if cv_pointee != 0 and self.get_type_kind(self.resolve_alias(cv_pointee)) != TypeKind.TY_REF:
+                        if self.is_copy(cv_pointee) == 0:
+                            self.emit_error(f"`collect[List]()` over views of `{self.type_name(cv_pointee)}` cannot copy them into the List (D22 §6.2 copies a Copy view): spell the copy, `map(it.clone())`", node)
+                            return 0
+                        fn_name = "iter_collect_views"
+        let fn_sym = self.pool_lookup_symbol(fn_name)
         var arg_types: List[i32] = List.new()
         let arg_nodes: List[i32] = List.new()
         let deferred: List[i32] = List.new()
@@ -25275,6 +25296,46 @@ impl Sema:
         if called_body == -1:
             called_body = self.callable_type_body(fn_tid)
         self.note_call_global_effects(node, called_body, param_offset, 0, false, global_args, global_by_place)
+        // D39/D122 (#2271): a call through a callable value has no body to
+        // summarize, so its fn type's declared origin decides: a result
+        // that is or holds a view originates from the callable value itself
+        // (its captures) and from every view-bearing argument — the elision
+        // a declared fn's summary would state. Recording nothing made the
+        // element of `Mapped.next()` (`Some((self.f)(x))`) a view of the
+        // loop-local `x`, and Rule 6 refused every `collect` over a mapped
+        // view iterator. A literal closure keeps its exact capture summary
+        // below; this is the value case.
+        if closure_node == 0:
+            let cv_ret = self.get_type_d2(fn_tid)
+            if cv_ret > 0 and (self.get_type_kind(self.resolve_alias(cv_ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(cv_ret) != 0):
+                var cv_mask = self.compute_expr_view_origin_mask(callee_expr)
+                // The callable's result views what its captures view (their
+                // pointees), as an argument view does — the environment's
+                // own storage is not what a returned reference points into.
+                var cv_storage = self.arg_viewed_storage_origin_mask(callee_expr, false)
+                var cv_deps: List[i32] = List.new()
+                cv_deps = self.collect_expr_view_deps(callee_expr, cv_deps)
+                for cv_ai in 0..global_args.len():
+                    let cv_param_ty = self.fn_type_param_type(fn_tid, (cv_ai as i32) + param_offset)
+                    if cv_param_ty == 0 or (self.param_type_is_by_value(cv_param_ty) != 0 and self.type_is_ephemeral_value(cv_param_ty) == 0):
+                        continue
+                    let cv_arg: i32 = global_args[cv_ai]
+                    if cv_arg <= 0:
+                        continue
+                    cv_mask = cv_mask | self.compute_expr_view_origin_mask(cv_arg)
+                    // Through a reference argument the result views the
+                    // pointee (what the argument views); through an
+                    // ephemeral value it may view the value's own storage.
+                    cv_storage = cv_storage | (if self.get_type_kind(self.resolve_alias(cv_param_ty as TypeId)) == TypeKind.TY_REF: self.arg_viewed_storage_origin_mask(cv_arg, false) else: self.arg_storage_origin_mask(cv_arg, false))
+                    let cv_before = cv_deps.len()
+                    cv_deps = self.collect_expr_view_deps(cv_arg, cv_deps)
+                    if cv_deps.len() == cv_before or self.expr_type_is_value(cv_arg):
+                        let cv_root = self.place_root_sym(cv_arg)
+                        if cv_root != 0:
+                            cv_deps = self.push_unique_i32(cv_deps, cv_root)
+                if cv_mask != 0 or cv_deps.len() > 0:
+                    self.set_expr_view_deps(node, cv_mask, cv_deps)
+                    self.set_expr_view_storage_mask(node, cv_storage)
 
         if closure_node > 0:
             let capture_count = self.closure_capture_summary_count(closure_node)
@@ -30592,6 +30653,33 @@ impl Sema:
     fn is_iterator_type(tid: i32) -> bool:
         self.iterator_owner_symbol(tid) != 0
 
+    // The element type of a user type's `Iter[T]` impl, resolved the way
+    // bound inference resolves it (bind_type_params_from_trait_args);
+    // iterator_element_type covers only the compiler's iterator types.
+    // 0 when the type has no such impl. (#2271 collect dispatch.)
+    mut fn user_iter_element_type(recv_type: i32) -> i32:
+        let iter_sym = self.pool_lookup_symbol("Iter")
+        if iter_sym <= 0 or recv_type == 0:
+            return 0
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
+                continue
+            if self.ast.get_data2(decl) != iter_sym:
+                continue
+            let target_match = self.impl_target_match(decl, recv_type)
+            if target_match.ok == 0:
+                continue
+            let impl_args_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
+            if impl_args_idx < 0:
+                continue
+            let impl_arg_start: i32 = self.ast.state.impl_trait_type_args[(impl_args_idx + 1)]
+            let impl_arg_count = self.ast.state.impl_trait_type_args[(impl_args_idx + 2)]
+            if impl_arg_count < 1:
+                continue
+            return self.resolve_impl_trait_arg_for_source(decl, recv_type, self.ast.get_extra(impl_arg_start), target_match.subst_names, target_match.subst_types)
+        0
+
     fn iterator_element_type(tid: i32) -> i32:
         if tid == 0:
             return 0
@@ -31131,6 +31219,20 @@ impl Sema:
             if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
                 let list_copy = self.collect_copy_target(self.syms.list, iter_elem_ty, node)
                 if list_copy != 0: return list_copy
+                // #2271: even undemanded, collecting views stores the values
+                // (D22 §6.2): `List[&T]` is no spelling a result can own, so
+                // a Copy view's element copies in, as the user-adapter
+                // dispatch to iter_collect_views does. A non-Copy view has
+                // no implicit copy to store.
+                let elem_resolved = self.resolve_alias(iter_elem_ty as TypeId)
+                if self.get_type_kind(elem_resolved) == TypeKind.TY_REF and self.get_type_d1(elem_resolved) == 0:
+                    let pointee = self.get_type_d0(elem_resolved)
+                    if pointee != 0 and self.get_type_kind(self.resolve_alias(pointee)) != TypeKind.TY_REF:
+                        if self.is_copy(pointee) == 0:
+                            self.emit_error(f"`collect[List]()` over views of `{self.type_name(pointee)}` cannot copy them into the List (D22 §6.2 copies a Copy view): spell the copy, `map(it.clone())`", node)
+                            return 0
+                        self.collect_copy_elements.insert(node, pointee)
+                        return self.ensure_list_type_for(pointee)
                 return self.ensure_list_type_for(iter_elem_ty)
         if target_name == "HashSet":
             if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
@@ -32831,6 +32933,19 @@ impl Sema:
             let builtin = self.method_call_builtin(expr, field, ret)
             if builtin != CallBuiltin.None:
                 self.call_builtins.insert(node, builtin as i32)
+        // D22/D39: no intrinsic may become an origin erasure boundary. A
+        // builtin result that is or holds a view (the declared_view_origin
+        // test: a reference, or an ephemeral value like Option[&T] or an
+        // iterator) elides to its receiver, exactly as a declared fn's
+        // does, when the resolving path recorded no origins of its own —
+        // MappedIter.next()'s element views what the adapter views, or
+        // every `collect` over it reads as a view of the loop-local element
+        // binding and Rule 6 refuses it (#2271).
+        if ret != 0 and self.static_receiver_type_is_known(expr) == 0 and self.expr_view_dep_count(node) == 0 and self.expr_view_origin_mask(node) == 0:
+            let intrinsic_recv: i32 = self.typed_expr_types.get(expr) ?? known_recv_ty
+            if intrinsic_recv != 0 and self.builtin_method_intrinsic(intrinsic_recv, self.pool_resolve(field)) != MirIntrinsic.NONE:
+                if self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(ret) != 0:
+                    self.record_builtin_receiver_view_origins(node, expr)
         let constructed = self.record_method_lowering(expr, field, arg_count, node, ret, known_recv_ty)
         if constructed != 0: constructed else: ret
 

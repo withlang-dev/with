@@ -11,7 +11,7 @@ fn main:
     assert(set.len() == 2)
     let map = names.iter() |> map(n => (n.clone(), n.to_upper())) |> collect[HashMap[str, str]]()
     assert(map.len() == 2)
-    let sorted = names.iter() |> map(n => n.clone()) |> collect[BTreeSet[str]]()
+    let sorted = names.iter() |> collect[BTreeSet[str]]()
     assert(sorted.len() == 2)
     let ordered = names.iter() |> map(n => (n.clone(), n.to_upper())) |> collect[BTreeMap[str, str]]()
     assert(ordered.len() == 2)

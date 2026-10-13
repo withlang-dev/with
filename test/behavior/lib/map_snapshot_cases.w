@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
-// D44 / §2.3 (#1158): traversal observes and an owned collection is cloned
-// where it is wanted. The snapshots once byte-copied their elements, so the
+// D44 / §2.3 (#1158): traversal observes and an owned collection copies the
+// views where it is wanted (D111). The snapshots once byte-copied their elements, so the
 // List and the map owned the same string buffers: a plain run passed while
 // WITH_DEBUG_ALLOC_SCRIBBLE=1 showed the map corrupted, and the compiler's
 // own `.keys()` call double-freed while building the OpenSSL project. An
@@ -19,11 +19,11 @@ fn names() -> HashMap[str, str]:
 
 fn keys_outlive_map() -> List[str]:
     let m = names()
-    m.keys() |> map(it.clone()) |> collect[List]()
+    m.keys() |> collect[List]()
 
 fn values_outlive_map() -> List[str]:
     let m = names()
-    m.values() |> map(it.clone()) |> collect[List]()
+    m.values() |> collect[List]()
 
 fn entries_outlive_map() -> List[(str, str)]:
     let m = names()
