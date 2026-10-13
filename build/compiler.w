@@ -3152,12 +3152,12 @@ pub fn run_with_compiler_build_action(ctx: ActionCtx) -> i32:
         // stamping: the stamp writes through `<output>.tmp`, the very name the
         // link used, and would overwrite it.
         let keep = comp_arg_value(ctx.args(), "keep-unstamped=")
-        var unstamped = tmp_output.clone()
+        var unstamped = tmp_output
         if keep.len() > 0:
             let _remove_kept = comp_remove_file_if_exists(fs, keep)
             if fs.rename(tmp_output, keep) != 0:
                 return comp_fail(ctx, "could not keep the unstamped image at: " ++ keep)
-            unstamped = keep.clone()
+            unstamped = keep
         let stamp_rc = comp_stamp_compiler_binary(ctx, unstamped, output_path)
         if stamp_rc != 0:
             let _cleanup_tmp_bin_stamp = comp_remove_file_if_exists(fs, tmp_output)
