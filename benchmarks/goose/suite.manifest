@@ -1,0 +1,17 @@
+# name|smoke|small|medium|large|C++ variants (variant:tier)|Rust files|Goose files
+sum|1000|1000000|16000000|128000000|0:idiomatic,1:expert|sum|sum
+push|1000|1000000|16000000|64000000|0:idiomatic,1:expert,2:idiomatic|push|push
+strlist|1000|200000|2000000|8000000|0:idiomatic,1:expert,2:expert|strlist_owned,strlist_borrowed|strlist
+records|1000|500000|4000000|16000000|0:idiomatic,1:idiomatic,2:expert|records|records_var,records_fixed
+tree|8|16|20|24|0:idiomatic,1:idiomatic,2:expert|tree_box,tree_arena|tree
+interp|8|16|20|24|0:idiomatic,1:expert,2:expert|interp_box,interp_arena|interp
+graph|100|100000|500000|2000000|0:idiomatic,1:expert,2:expert|graph_nested,graph_csr,graph_arena|graph,graph_csr
+words|1000|500000|4000000|16000000|0:idiomatic,1:idiomatic,2:expert|words_hashmap,words_open|words,words_dictionary
+particles|100|100000|1000000|4000000|0:expert,2:idiomatic,1:expert|particles,particles_scalar|particles,particles_scalar
+sexp|100|20000|100000|300000|0:idiomatic,1:expert|sexp_box,sexp_arena|sexp
+lru|1000|2000000|8000000|32000000|0:idiomatic,1:expert|lru_hashmap,lru_open|lru
+scene|4|12|14|16|0:idiomatic,1:expert|scene_box,scene_arena|scene
+calc|1000|100000|400000|1600000|0:idiomatic,1:expert|calc_box,calc_arena|calc
+bintrees|6|15|17|19|0:idiomatic,1:expert|bintrees_box,bintrees_arena|bintrees
+respond|1000|100000|400000|1600000|0:idiomatic,1:expert|respond_dto,respond_stream|respond,respond_stream
+blur|16|1024|2048|8192|0:idiomatic,1:expert|blur_index,blur_windows|blur,blur_rows
