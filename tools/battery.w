@@ -263,11 +263,10 @@ let flags = if fail_fast: " --fail-fast" else: ""
 // 2026-10-11 a battery started inside a maintenance wake ran 45 s per 16 min
 // for three hours before anyone noticed, and only the uat step held a lock.
 let hold = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -i -s " else: ""
-// The battery also holds ITSELF awake for its whole run, driver included:
-// callers no longer wrap the invocation in caffeinate or a keep-awake hold,
-// and a forgotten wrapper can no longer leave a battery asleep at 0% CPU.
-if file_exists("/usr/bin/caffeinate") and env("WITH_BATTERY_CAFFEINATED").len() == 0:
-    let _ = spawn_os(() => sh(f"WITH_BATTERY_CAFFEINATED=1 /usr/bin/caffeinate -i -s -w {pid()} >/dev/null 2>&1"))
+// No caller-side wrapper is needed or wanted: every phase below already
+// runs under its own caffeinate hold, and the driver between phases only
+// merges times and writes status (seconds). Wrapping the invocation in
+// caffeinate or a keep-awake lease adds a second, redundant hold.
 var rc = 0
 let gate_rc = step_live("gate", "WITH=$PWD/src/main " ++ hold ++ "src/main build :gate" ++ flags ++ " > out/battery/gate.log 2>&1", "out/battery/gate.log", status)
 merge_times(ledger, "out/.build-state/build-times.tsv")

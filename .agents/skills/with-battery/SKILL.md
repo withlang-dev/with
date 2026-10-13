@@ -52,8 +52,9 @@ round or an hour when missed.
 ## Running the battery
 
 - Clean committed tree; `with run tools/battery.w > out/battery-runN.log
-  2>&1` with an `rc=$?` line appended. The battery holds its own
-  wakefulness assertion and a machine-wide slot.
+  2>&1` with an `rc=$?` line appended. Every phase already runs under
+  its own caffeinate hold and the battery takes a machine-wide slot —
+  do not wrap the invocation in caffeinate or a keep-awake lease.
 - Watch it with **one persistent monitor** (no 30-minute ceiling) on the
   terminal `rc=` line of the run log, printing `out/battery/status.txt`.
   Stop duplicate monitors. Do not poll: phases on the release host ran
