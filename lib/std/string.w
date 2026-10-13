@@ -414,3 +414,39 @@ pub fn lines(s: &str) -> List[str]:
 pub fn parse(s: &str) -> i32:
     let n = string_to_int(s)
     n as i32
+
+// The magnitude of the decimal integer at `s[start..]`, digits until the
+// first non-digit — string_to_int's rule at 128 bits (#914). The checked
+// arithmetic panics past u128's range, as it does at 64 bits.
+fn parse_u128_magnitude(s: &str, start: i64) -> u128:
+    var result: u128 = 0
+    var i = start
+    while i < s.len():
+        let c = s[i]
+        if c < 48 or c > 57: break
+        result = result * 10 + (c - 48) as u128
+        i = i + 1
+    result
+
+/// Parse a string as an i128 integer. Returns 0 on invalid input, like
+/// string_to_int; a magnitude outside i128's range panics.
+pub fn parse_i128(s: &str) -> i128:
+    if s.len() == 0: return 0
+    var start: i64 = 0
+    var neg = false
+    if s[0] == 45:
+        neg = true
+        start = 1
+    else if s[0] == 43:
+        start = 1
+    let mag = parse_u128_magnitude(s, start)
+    let limit: u128 = if neg: 170141183460469231731687303715884105728 else: 170141183460469231731687303715884105727
+    if mag > limit:
+        panic("parse_i128: value out of range for i128")
+    if neg and mag == limit: -170141183460469231731687303715884105728 else if neg: 0 - (mag as i128) else: mag as i128
+
+/// Parse a string as a u128 integer. Returns 0 on invalid input, like
+/// string_to_int; a magnitude outside u128's range panics.
+pub fn parse_u128(s: &str) -> u128:
+    if s.len() == 0: return 0
+    parse_u128_magnitude(s, if s[0] == 43: 1 else: 0)
