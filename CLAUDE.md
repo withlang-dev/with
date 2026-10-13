@@ -754,6 +754,15 @@ Every agent works at the iterate tier plus the gate. An agent:
 
 - runs `with build :dev` and `with test`/`with run` on the tests it wrote or
   touched, and shows each new test FAILING before its fix;
+- in a staging worktree, uses absolute paths for every file it reads or
+  edits: relative tool paths resolve to the main checkout, so a relative
+  read silently returns main's file while the agent believes it is reading
+  the branch's (verify once per session on a file the branch changed);
+- after a migrator spelling change, sweeps every textual expectation of the
+  old spelling across the tree (never a head-truncated search) and runs
+  `src/main build :c-migrator-basic-tests --no-deps` before the battery; new
+  code in `src/` also gets `with run tools/ceremony_census.w --diff HEAD`
+  at the iterate tier, so ceremony is caught at the desk, not in the gate;
 - never runs `tools/battery.w`, `:test`, a corpus target (`:behavior-tests`,
   `:native-*`, `:internals-tests`, …) or `:move-audit` on its own: the
   coordinator runs those once per stack;

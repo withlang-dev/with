@@ -1,6 +1,6 @@
 // The seed-driven battery as one command.
 //
-//   with run tools/battery.w [--fail-fast]
+//   with run tools/battery.w [--fail-fast] [--survey]
 //
 // Run it from a worktree's root with the pinned seed at src/main (`with build
 // :seed` once per seed.lock bump). It
@@ -21,6 +21,13 @@
 //      as ONE survey invocation, so a red reports every failing target at
 //      once instead of one per battery. `--fail-fast` stops it at the first
 //      red target instead (the repair loop).
+// `--survey` keeps the phase order but not the phase barrier: a red gate
+// (or UAT) is recorded and the later phases still run — UAT when the gate
+// left a release compiler, checks always (its own survey skips whatever
+// depends on a failed build target) — so one battery reports independent
+// failures across phases instead of discovering them one battery apart.
+// The verdict is still RED if any phase was red; the gate remains the
+// merge signal, it just stops hiding the rest of the evidence.
 // The build steps report live: while the child runs, its log is polled once a
 // second and every newly failed target lands in status.txt as `RED: <target>`
 // the moment it appears, so a red known at minute 1 is read at minute 1.
@@ -219,13 +226,17 @@ fn merge_times(ledger: &str, times: &str):
     let _ = remove_file("out/.build-state/build-graph.cache")
 
 var fail_fast = false
+var survey = false
 for arg in args():
     if arg == "--fail-fast": fail_fast = true
+    else if arg == "--survey": survey = true
     else if arg == "--help" or arg == "-h":
-        print("usage: with run tools/battery.w [--fail-fast]")
+        print("usage: with run tools/battery.w [--fail-fast] [--survey]")
         print("  runs `src/main build :gate`, `with uat`, then `src/main build :battery-checks`, reporting")
         print("  each failed target live in out/battery/status.txt as `RED: <target>`;")
-        print("  --fail-fast stops the checks at the first red target (the repair loop).")
+        print("  --fail-fast stops the checks at the first red target (the repair loop);")
+        print("  --survey runs every phase even after a red one, so independent failures")
+        print("  across phases are reported by one battery instead of one per battery.")
         exit_code(0)
 assert(mkdir_p("out/battery") == 0)
 if not file_exists("src/main"):
@@ -252,25 +263,41 @@ let flags = if fail_fast: " --fail-fast" else: ""
 // 2026-10-11 a battery started inside a maintenance wake ran 45 s per 16 min
 // for three hours before anyone noticed, and only the uat step held a lock.
 let hold = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -i -s " else: ""
-var rc = step_live("gate", "WITH=$PWD/src/main " ++ hold ++ "src/main build :gate" ++ flags ++ " > out/battery/gate.log 2>&1", "out/battery/gate.log", status)
+// No caller-side wrapper is needed or wanted: every phase below already
+// runs under its own caffeinate hold, and the driver between phases only
+// merges times and writes status (seconds). Wrapping the invocation in
+// caffeinate or a keep-awake lease adds a second, redundant hold.
+var rc = 0
+let gate_rc = step_live("gate", "WITH=$PWD/src/main " ++ hold ++ "src/main build :gate" ++ flags ++ " > out/battery/gate.log 2>&1", "out/battery/gate.log", status)
 merge_times(ledger, "out/.build-state/build-times.tsv")
-if rc != 0:
+if gate_rc != 0:
+    rc = gate_rc
     let failed = red_report("out/battery/gate.log")
     print("RED (gate): " ++ failed)
     append(status, "RED (gate): " ++ failed)
-if rc == 0:
-    // A scenario that opens a window needs a lit display: on macOS the uat
-    // step holds it awake (and wakes it) for as long as it runs.
-    let awake = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -d -i -s -u " else: ""
-    rc = step_live("uat", "WITH_UAT_WITH=$PWD/out/release/bin/with " ++ awake ++ "out/release/bin/with uat > out/battery/uat.log 2>&1", "out/battery/uat.log", status)
-    if rc != 0:
-        let failed = uat_failed("out/battery/uat.log")
-        print("RED (uat): " ++ failed)
-        append(status, "RED (uat): " ++ failed)
-if rc == 0:
-    rc = step_live("battery-checks", "WITH=$PWD/src/main " ++ hold ++ "src/main build :battery-checks" ++ flags ++ " > out/battery/checks.log 2>&1", "out/battery/checks.log", status)
+// Without --survey a red phase stops the battery (the phase barrier); with
+// it, later phases still run and report their own reds. UAT additionally
+// needs the release compiler the gate builds: in survey mode a red gate
+// that left none records the skip instead of running a stale binary.
+if rc == 0 or survey:
+    if file_exists("out/release/bin/with"):
+        // A scenario that opens a window needs a lit display: on macOS the uat
+        // step holds it awake (and wakes it) for as long as it runs.
+        let awake = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -d -i -s -u " else: ""
+        let uat_rc = step_live("uat", "WITH_UAT_WITH=$PWD/out/release/bin/with " ++ awake ++ "out/release/bin/with uat > out/battery/uat.log 2>&1", "out/battery/uat.log", status)
+        if uat_rc != 0:
+            if rc == 0: rc = uat_rc
+            let failed = uat_failed("out/battery/uat.log")
+            print("RED (uat): " ++ failed)
+            append(status, "RED (uat): " ++ failed)
+    else:
+        print("battery: uat skipped (no out/release/bin/with from the gate)")
+        append(status, "uat skipped: no release compiler")
+if rc == 0 or survey:
+    let checks_rc = step_live("battery-checks", "WITH=$PWD/src/main " ++ hold ++ "src/main build :battery-checks" ++ flags ++ " > out/battery/checks.log 2>&1", "out/battery/checks.log", status)
     merge_times(ledger, "out/.build-state/build-times.tsv")
-    if rc != 0:
+    if checks_rc != 0:
+        if rc == 0: rc = checks_rc
         let failed = red_report("out/battery/checks.log")
         print("failed: " ++ failed)
         append(status, "failed: " ++ failed)

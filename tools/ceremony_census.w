@@ -29,6 +29,9 @@
 //   with run tools/ceremony_census.w                   # check against the bar
 //   with run tools/ceremony_census.w --record-bar FILE # write this tree's counts as a bar
 //   with run tools/ceremony_census.w --sites PATTERN   # list one typed pattern's sites
+//   with run tools/ceremony_census.w --diff REV        # iterate tier: lexical counts of the
+//                                                      # files changed vs REV, worktree vs REV;
+//                                                      # typed patterns need the full run
 //   --compiler PATH                                    # default out/release/bin/with
 
 use std.fs
@@ -59,20 +62,63 @@ fn under_any(path: &str, dirs: &List[str]) -> bool:
         if path.starts_with(dir): return true
     false
 
-fn tracked_files() -> List[str]:
-    let argv = ["git", "ls-files"]
-    let done = run_to_files_in(".", argv, "out/ceremony-ls.txt", "out/ceremony-ls.err")
-    if done.code != 0:
-        eprint("ceremony-census: git ls-files failed")
-        exit_code(2)
-    let listing = (read_file("out/ceremony-ls.txt") ?? "").split("\n")
+fn corpus_dirs(listing: &List[str]) -> List[str]:
     var generated: List[str] = List.new()
     for path in listing:
         if path.ends_with("/corpus.stamp"): generated.push(path.slice(0, path.len() - "corpus.stamp".len()))
+    generated
+
+fn git_listing(args: &List[str], out_name: &str) -> List[str]:
+    let done = run_to_files_in(".", args, f"out/ceremony-{out_name}.txt", f"out/ceremony-{out_name}.err")
+    if done.code != 0:
+        eprint("ceremony-census: git listing failed")
+        exit_code(2)
+    (read_file(f"out/ceremony-{out_name}.txt") ?? "").split("\n")
+
+fn tracked_files() -> List[str]:
+    let listing = git_listing(&["git", "ls-files"], "ls")
+    let generated = corpus_dirs(&listing)
     var files: List[str] = List.new()
     for path in listing:
         if counted(path) and not under_any(path, generated): files.push(path)
     files
+
+// The counted files a change touches: modified against `rev`, plus new
+// untracked ones. Used by --diff, the iterate-tier shape.
+fn changed_counted_files(rev: &str) -> List[str]:
+    var argv: List[str] = List.new()
+    argv.push("git")
+    argv.push("ls-files")
+    let listing = git_listing(&argv, "ls")
+    let generated = corpus_dirs(&listing)
+    var files: List[str] = List.new()
+    var diff_argv: List[str] = List.new()
+    diff_argv.push("git")
+    diff_argv.push("diff")
+    diff_argv.push("--name-only")
+    let rev_arg: str = rev
+    diff_argv.push(rev_arg)
+    diff_argv.push("--")
+    for path in git_listing(&diff_argv, "diff"):
+        if counted(path) and not under_any(path, generated) and not files.contains(path): files.push(path)
+    var new_argv: List[str] = List.new()
+    new_argv.push("git")
+    new_argv.push("ls-files")
+    new_argv.push("--others")
+    new_argv.push("--exclude-standard")
+    for path in git_listing(&new_argv, "new"):
+        if counted(path) and not under_any(path, generated) and not files.contains(path): files.push(path)
+    files
+
+// The text of `path` at `rev`, "" when it did not exist there.
+fn text_at_rev(rev: &str, path: &str) -> str:
+    var argv: List[str] = List.new()
+    argv.push("git")
+    argv.push("show")
+    argv.push(f"{rev}:{path}")
+    let done = run_to_files_in(".", &argv, "out/ceremony-show.txt", "out/ceremony-show.err")
+    if done.code != 0: return ""
+    read_file("out/ceremony-show.txt") ?? ""
 
 type Census { counts: BTreeMap[str, i64] }
 
@@ -82,12 +128,14 @@ impl Census:
         self.counts.insert(key, now + 1)
 
     mut fn count_lexical(path: &str):
-        let text = read_file(path) ?? ""
-        let area = area_of(path)
-        var lexer = Lexer.init(text, 0)
+        self.count_lexical_text(read_file(path) ?? "", area_of(path))
+
+    mut fn count_lexical_text(text: &str, area: &str):
+        let source: str = text
+        var lexer = Lexer.init(source, 0)
         let tokens = lexer.tokenize()
         let n = tokens.len()
-        let word = (i) => if i >= 0 and i < n: text.slice(tokens.get_start(i), tokens.get_end(i)) else: ""
+        let word = (i) => if i >= 0 and i < n: source.slice(tokens.get_start(i), tokens.get_end(i)) else: ""
         for i in 0..n:
             let tag = tokens.get_tag(i)
             if tag == TokenKind.TK_DOT and i + 3 < n and tokens.get_tag(i + 2) == TokenKind.TK_L_PAREN and tokens.get_tag(i + 3) == TokenKind.TK_R_PAREN:
@@ -136,6 +184,7 @@ fn main:
     let argv = args()
     var record_bar_to = ""
     var sites_of = ""
+    var diff_rev = ""
     var compiler = "out/release/bin/with"
     var i = 1
     while i < argv.len():
@@ -145,6 +194,9 @@ fn main:
         else if argv[i] == "--sites" and i + 1 < argv.len():
             i = i + 1
             sites_of = argv[i]
+        else if argv[i] == "--diff" and i + 1 < argv.len():
+            i = i + 1
+            diff_rev = argv[i]
         else if argv[i] == "--compiler" and i + 1 < argv.len():
             i = i + 1
             compiler = argv[i]
@@ -152,6 +204,24 @@ fn main:
             eprint(f"ceremony-census: unknown argument `{argv[i]}`")
             exit_code(2)
         i = i + 1
+    if diff_rev.len() > 0:
+        var before = Census { counts: BTreeMap.new() }
+        var after = Census { counts: BTreeMap.new() }
+        let files = changed_counted_files(diff_rev)
+        for path in files:
+            before.count_lexical_text(text_at_rev(diff_rev, path), area_of(path))
+            after.count_lexical(path)
+        var rose = 0
+        for (key, now) in after.counts:
+            let was = before.counts.get(key) ?? 0
+            if now > was:
+                rose = rose + 1
+                eprint(f"ceremony-census: {key.replace("\t", " in ")} rose {was} -> {now} in the files changed vs {diff_rev}; remove the new ceremony (typed patterns are covered by the full run)")
+            else if now < was:
+                print(f"ceremony-census: {key.replace("\t", " in ")} fell {was} -> {now} in the files changed vs {diff_rev}")
+        if rose > 0: exit_code(1)
+        print(f"ceremony-census: diff ok ({files.len()} counted files changed vs {diff_rev}; lexical patterns only)")
+        return
     let typed = typed_sites(compiler)
     if sites_of.len() > 0:
         for line in typed.split("\n"):
