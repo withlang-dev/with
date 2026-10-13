@@ -153,6 +153,23 @@ fn builtin_param_type_span(params: &str, index: isize) -> (isize, isize):
         i = i + 1
     if param == index and start >= 0: (start, i) else: (-1, -1)
 
+// How many of `params` a call must supply: every parameter except a
+// trailing run of `Ordering` parameters, which an Atomic method's caller
+// may omit (§14.17.1, #1861; MirLower materializes each omitted one as
+// SeqCst). Sema refuses a call outside required..=total (#2358).
+pub fn builtin_required_param_count(params: &str) -> i32:
+    var total: i32 = 0
+    while true:
+        let (start, _) = builtin_param_type_span(params, total)
+        if start < 0: break
+        total = total + 1
+    var required = total
+    while required > 0:
+        let (start, end) = builtin_param_type_span(params, required - 1)
+        if params.slice(start, end) != "Ordering": return required
+        required = required - 1
+    required
+
 // Each parameter's mode as one letter: `o` observed (`&T`), `s` stored
 // (taken as one of the receiver's type parameters `T`, `K`, `V`), `t` taken.
 pub fn builtin_param_modes(params: &str) -> str:

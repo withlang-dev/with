@@ -1689,6 +1689,10 @@ pub type Sema {
     // the row each checked builtin call resolved to (call node -> row).
     builtin_sig_index: HashMap[(i32, i32), i32],
     builtin_sig_modes: List[str],
+    // Per row, how many arguments a call must supply (BuiltinSigs'
+    // builtin_required_param_count); -1 for the synthetic float-math row,
+    // whose arity MathBuiltins declares per name (#2358).
+    builtin_sig_required: List[i32],
     builtin_sig_owner_alias: HashMap[i32, i32],
     builtin_call_sigs: HashMap[i32, i32],
     // D109: each `offsetof[T](field)` call's field index in T's declaration,
@@ -3650,6 +3654,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         call_builtins: sema_new_map_i32_i32(),
         builtin_sig_index: HashMap.new(),
         builtin_sig_modes: sema_new_list_str(),
+        builtin_sig_required: sema_new_list_i32(),
         builtin_sig_owner_alias: sema_new_map_i32_i32(),
         builtin_call_sigs: sema_new_map_i32_i32(),
         offsetof_field_indices: sema_new_map_i32_i32(),

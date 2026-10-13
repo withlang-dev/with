@@ -7855,9 +7855,11 @@ impl Sema:
         for row in builtin_sig_table():
             self.builtin_sig_index.insert((self.pool_intern(row.owner), self.pool_intern(row.method)), row_index)
             self.builtin_sig_modes.push(builtin_param_modes(row.params))
+            self.builtin_sig_required.push(builtin_required_param_count(row.params))
             row_index = row_index + 1
         self.builtin_sig_index.insert((self.pool_intern("float"), 0), row_index)
         self.builtin_sig_modes.push("tttt")
+        self.builtin_sig_required.push(-1)
         let iter = self.pool_intern("Iter")
         for name in "ListIter ListIterRef MappedIter FilterIter FilterMapIter TakeIter DropIter TakeWhileIter DropWhileIter ZipIter EnumerateIter ChainIter ZipWithIter StepByIter FlatMapIter".split(" "):
             self.builtin_sig_owner_alias.insert(self.pool_intern(name), iter)
@@ -7909,6 +7911,38 @@ impl Sema:
     // of the receiver's type parameters.
     fn builtin_row_stored(row: i32, i: i32) -> bool:
         row >= 0 and i >= 0 and i < self.builtin_sig_modes[row].len() and self.builtin_sig_modes[row].byte_at(i) == 's'
+
+    // #2358: a builtin call's argument count against the signature its row
+    // declares (required..=total; the gap is an Atomic method's omittable
+    // trailing Ordering, §14.17.1). Before this check an extra argument
+    // reached MIR lowering and aborted it ("BUG: builtin method ... no
+    // declared signature"), and a missing one compiled silently — MirLower
+    // lowered whatever operands it was given, so `a.store()` stored the
+    // SeqCst constant it materializes for an omitted Ordering. A builtin
+    // with no row takes no arguments (BuiltinSigs: a builtin called with
+    // arguments must resolve to a row); a float math method's receiver is
+    // its first operand, so it takes arity-1 arguments (the free form's
+    // check counts the receiver instead).
+    mut fn check_builtin_call_arity(node: i32, row: i32, recv_type: i32, field: i32, arg_count: i32):
+        let name: str = self.pool_resolve(field)
+        let math_id = math_fn_lookup(name)
+        if math_id >= 0 and self.get_type_kind(self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))) == TypeKind.TY_FLOAT:
+            let wants = math_fn_arity(math_id) - 1
+            if arg_count != wants:
+                self.emit_error(f"`{name}` expects {wants} argument(s), found {arg_count}", node)
+            return
+        if row >= 0:
+            let required: i32 = self.builtin_sig_required[row]
+            if required < 0:
+                return
+            let total = self.builtin_sig_modes[row].len()
+            if arg_count > total:
+                self.emit_error(if required < total: f"`{name}` expects at most {total} argument(s), found {arg_count}" else: f"`{name}` expects {total} argument(s), found {arg_count}", node)
+            else if arg_count < required:
+                self.emit_error(if required < total: f"`{name}` expects at least {required} argument(s), found {arg_count}" else: f"`{name}` expects {total} argument(s), found {arg_count}", node)
+            return
+        if arg_count > 0 and self.builtin_method_intrinsic(recv_type, name) != MirIntrinsic.NONE:
+            self.emit_error(f"`{name}` takes no arguments, found {arg_count}", node)
 
     fn builtin_method_intrinsic(recv_type: i32, method_name: &str) -> MirIntrinsic:
         if recv_type == 0 or method_name.len() == 0:
@@ -33091,6 +33125,10 @@ impl Sema:
         // D110: the builtin's declared signature, resolved once for this call;
         // the argument checks below and MIR lowering read the row.
         let mc_sig_row = self.record_builtin_call_sig(node, obj_type as i32, field)
+        // #2358: the resolved count is what MIR lowering will lower, so a
+        // count outside the row's signature is refused here, at the call.
+        if not mc_is_static_enum_variant:
+            self.check_builtin_call_arity(node, mc_sig_row, obj_type as i32, field, mc_resolved_arg_count)
         for ai in 0..mc_resolved_arg_count:
             let mc_arg_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
             if mc_arg_node == 0:
