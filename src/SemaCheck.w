@@ -107,6 +107,9 @@ type SemaLexicalEnv {
     pending_generic_binding_base: HashMap[i32, i32],
     pending_generic_binding_call: HashMap[i32, i32],
     pending_generic_binding_decl: HashMap[i32, i32],
+    pending_soft_use_syms: List[i32],
+    pending_soft_use_nodes: List[i32],
+    pending_soft_debug_nodes: List[i32],
 }
 
 type SemaTraitImplMethodContract {
@@ -6467,6 +6470,9 @@ impl Sema:
             pending_generic_binding_base: move self.pending_generic_binding_base,
             pending_generic_binding_call: move self.pending_generic_binding_call,
             pending_generic_binding_decl: move self.pending_generic_binding_decl,
+            pending_soft_use_syms: move self.pending_soft_use_syms,
+            pending_soft_use_nodes: move self.pending_soft_use_nodes,
+            pending_soft_debug_nodes: move self.pending_soft_debug_nodes,
         }
         self.bind_names = List.new()
         self.bind_types = List.new()
@@ -6487,6 +6493,9 @@ impl Sema:
         self.pending_generic_binding_base = HashMap.new()
         self.pending_generic_binding_call = HashMap.new()
         self.pending_generic_binding_decl = HashMap.new()
+        self.pending_soft_use_syms = List.new()
+        self.pending_soft_use_nodes = List.new()
+        self.pending_soft_debug_nodes = List.new()
         let module_scope_len = if caller.scope_starts.len() > 1: caller.scope_starts[1] else: caller.bind_names.len()
         for gi in 0..module_scope_len:
             let gsym = caller.bind_names[gi]
@@ -6529,6 +6538,9 @@ impl Sema:
         self.pending_generic_binding_base = move env.pending_generic_binding_base
         self.pending_generic_binding_call = move env.pending_generic_binding_call
         self.pending_generic_binding_decl = move env.pending_generic_binding_decl
+        self.pending_soft_use_syms = move env.pending_soft_use_syms
+        self.pending_soft_use_nodes = move env.pending_soft_use_nodes
+        self.pending_soft_debug_nodes = move env.pending_soft_debug_nodes
 
     mut fn check_fn_body_concrete(fn_node: i32, tp_syms: &List[i32], tp_sema_tys: &List[i32], mono_sym: i32, param_concrete_tys: &List[i32]) -> i32:
         let fn_name = self.ast.get_data0(fn_node)
@@ -11630,6 +11642,8 @@ impl Sema:
                 let pending_tid = self.settle_pending_generic_binding_from_expected(sym, self.expected_expr_type as i32, node)
                 if pending_tid != 0:
                     final_tid = pending_tid
+            if final_tid == tid and sym != self.assign_target_revive_sym:
+                self.note_pending_soft_use(sym, node)
             self.typed_expr_types.insert(node, final_tid)
             return final_tid
 
@@ -12136,7 +12150,8 @@ impl Sema:
         // ? → any type: every component the value holds is registered with
         // its own formatter (D61).
         if mode == 63 and expr_ty != 0:
-            let _entry = self.ensure_debug_formatter(expr_ty, expr_node)
+            if self.note_pending_soft_debug_use(expr_node) == 0:
+                let _entry = self.ensure_debug_formatter(expr_ty, expr_node)
         // Field/type compatibility (format-design.md §4.2)
         // precision → floats and strings only
         if precision >= 0:
@@ -12159,6 +12174,11 @@ impl Sema:
     // the programmer spells `:?`. An enum payload with no default display
     // of its own shows its Debug form, D61's one formatter, registered here.
     mut fn check_display_interpolant(tid: i32, node: i32):
+        // A pending soft binding is a generic enum once settled, and an
+        // enum always has a default display; its payload formatters are
+        // registered at settlement.
+        if self.note_pending_soft_debug_use(node) != 0:
+            return
         let resolved = self.resolve_alias(tid as TypeId) as i32
         let kind = self.get_type_kind(resolved as TypeId)
         if kind == TypeKind.TY_REF:
@@ -30280,6 +30300,211 @@ impl Sema:
             return 1
         0
 
+    // #1856 (§4.2.1): an unsuffixed numeric literal is soft: it does not
+    // fix a generic enum type parameter; a later demanding use does, and
+    // the literal is rechecked at that type.
+    fn is_soft_numeric_literal(node: i32) -> i32:
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT:
+            return if self.literal_suffix_type(self.ast.literal_suffix(node)) == 0: 1 else: 0
+        if kind == NodeKind.NK_GROUPED:
+            return self.is_soft_numeric_literal(self.ast.get_data0(node))
+        if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_NEGATE:
+            return self.is_soft_numeric_literal(self.ast.get_data1(node))
+        0
+
+    // The type-parameter index payload `payload_index` of `variant_sym`
+    // fixes, or -1 when the payload type is not a bare type parameter.
+    fn pending_enum_payload_param_index(base_sym: i32, variant_sym: i32, payload_index: i32) -> i32:
+        if not self.type_decl_nodes.contains(base_sym):
+            return -1
+        let td_node: i32 = self.type_decl_nodes.get(base_sym).unwrap()
+        let tp_count = self.type_decl_tp_count(td_node)
+        if tp_count <= 0:
+            return -1
+        let tp_start = self.type_decl_tp_start(td_node)
+        let extra_start = self.ast.get_data1(td_node)
+        let td_sub_kind = type_decl_sub_kind(self.ast.get_data2(td_node))
+        if not type_decl_is_enum(td_sub_kind):
+            return -1
+        let count_index = enum_decl_count_index(td_sub_kind, extra_start)
+        let variant_count = self.ast.get_extra(count_index)
+        var pos = count_index + 1
+        for _ in 0..variant_count:
+            let name_sym = self.ast.get_extra(pos)
+            pos = pos + enum_decl_variant_head(td_sub_kind)
+            let payload_count = self.ast.get_extra(pos)
+            pos = pos + 1
+            if name_sym == variant_sym:
+                if payload_index < 0 or payload_index >= payload_count:
+                    return -1
+                let pt_node = self.ast.get_extra(pos + payload_index)
+                if pt_node == 0 or self.ast.kind(pt_node) != NodeKind.NK_TYPE_NAMED:
+                    return -1
+                return self.generic_type_param_index(tp_start, tp_count, self.ast.get_data0(pt_node))
+            pos = pos + payload_count
+        -1
+
+    // Flat triples (type-param index, argument node, soft flag) for the
+    // payload arguments of the variant call `call_node`.
+    fn pending_enum_payload_sources(call_node: i32, base_sym: i32, variant_sym: i32) -> List[i32]:
+        let out: List[i32] = List.new()
+        if self.ast.kind(call_node) != NodeKind.NK_CALL:
+            return out
+        let arg_count = self.ast.get_data2(call_node)
+        for ai in 0..arg_count:
+            let ti = self.pending_enum_payload_param_index(base_sym, variant_sym, ai)
+            if ti < 0:
+                continue
+            let arg = self.ast.get_extra(self.ast.get_data1(call_node) + ai)
+            out.push(ti)
+            out.push(arg)
+            out.push(self.is_soft_numeric_literal(arg))
+        out
+
+    // The generic enum base behind a variant call's checked type, or 0.
+    fn pending_enum_base_of(val_type: i32) -> i32:
+        let resolved = self.resolve_alias(val_type as TypeId) as i32
+        var base = 0
+        if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+            base = self.get_generic_inst_base(resolved)
+        else if self.get_type_kind(resolved) == TypeKind.TY_ENUM:
+            base = self.get_type_d0(resolved)
+        if base == 0 or not self.type_decl_nodes.contains(base):
+            return 0
+        let td_node: i32 = self.type_decl_nodes.get(base).unwrap()
+        if self.type_decl_tp_count(td_node) <= 0:
+            return 0
+        if not type_decl_is_enum(type_decl_sub_kind(self.ast.get_data2(td_node))):
+            return 0
+        base
+
+    // Settlement of a soft-literal variant binding at `concrete`: every
+    // hard payload must already agree with it, and each soft literal is
+    // rechecked at the settling type, so an out-of-range value errors at
+    // the literal.
+    mut fn pending_soft_settle_ok(call_node: i32, base_sym: i32, concrete: i32) -> i32:
+        if call_node == 0 or self.ast.kind(call_node) != NodeKind.NK_CALL:
+            return 1
+        let callee = self.ast.get_data0(call_node)
+        if self.ast.kind(callee) != NodeKind.NK_IDENT:
+            return 1
+        let variant_sym = self.ast.get_data0(callee)
+        if not self.variant_type_ids.contains(variant_sym):
+            return 1
+        let sources = self.pending_enum_payload_sources(call_node, base_sym, variant_sym)
+        var si = 0
+        while si + 2 < sources.len():
+            let want = self.get_generic_inst_arg(concrete, sources[si])
+            if want == 0:
+                return 0
+            if sources[si + 2] != 0:
+                let saved_expected_ty: i32 = self.expected_expr_type
+                let saved_has_expected: i32 = self.has_expected_type
+                self.has_expected_type = 0
+                self.check_expr_with_expected(sources[si + 1], want as TypeId)
+                self.expected_expr_type = saved_expected_ty
+                self.has_expected_type = saved_has_expected
+            else:
+                let fixed = if self.typed_expr_types.contains(sources[si + 1]): self.typed_expr_types.get(sources[si + 1]).unwrap() else: 0
+                if fixed != 0 and self.types_compatible(fixed as TypeId, want as TypeId) == 0:
+                    return 0
+            si = si + 3
+        1
+
+    fn is_pending_soft_binding(sym: i32) -> i32:
+        if not self.pending_generic_binding_base.contains(sym):
+            return 0
+        let call_node = if self.pending_generic_binding_call.contains(sym): self.pending_generic_binding_call.get(sym).unwrap() else: 0
+        if call_node == 0 or self.ast.kind(call_node) != NodeKind.NK_CALL:
+            return 0
+        let callee = self.ast.get_data0(call_node)
+        if self.ast.kind(callee) != NodeKind.NK_IDENT:
+            return 0
+        if self.variant_type_ids.contains(self.ast.get_data0(callee)): 1 else: 0
+
+    // Record a formatting use of a pending soft binding; 1 when the
+    // caller must defer formatter registration to settlement — the
+    // pre-settle type is a generic template no formatter can be built
+    // for.
+    mut fn note_pending_soft_debug_use(node: i32) -> i32:
+        if self.ast.kind(node) != NodeKind.NK_IDENT:
+            return 0
+        if self.is_pending_soft_binding(self.ast.get_data0(node)) == 0:
+            return 0
+        self.pending_soft_debug_nodes.push(node)
+        1
+
+    mut fn retype_pending_soft_uses(sym: i32, concrete: i32):
+        let kept_syms: List[i32] = List.new()
+        let kept_nodes: List[i32] = List.new()
+        let settled_nodes: List[i32] = List.new()
+        for i in 0..self.pending_soft_use_syms.len():
+            if self.pending_soft_use_syms[i] == sym:
+                self.typed_expr_types.insert(self.pending_soft_use_nodes[i], concrete)
+                settled_nodes.push(self.pending_soft_use_nodes[i])
+            else:
+                kept_syms.push(self.pending_soft_use_syms[i])
+                kept_nodes.push(self.pending_soft_use_nodes[i])
+        self.pending_soft_use_syms = kept_syms
+        self.pending_soft_use_nodes = kept_nodes
+        let kept_debug: List[i32] = List.new()
+        for i in 0..self.pending_soft_debug_nodes.len():
+            let dnode: i32 = self.pending_soft_debug_nodes[i]
+            if settled_nodes.contains(dnode):
+                let _entry = self.ensure_debug_formatter(concrete, dnode)
+                self.register_display_payload_formatters(concrete, dnode, 0)
+            else:
+                kept_debug.push(dnode)
+        self.pending_soft_debug_nodes = kept_debug
+
+    // A use of a pending soft-literal binding that did not settle it:
+    // record the use so a later settlement retypes it. A binding no use
+    // settles completes at its defaults at scope exit.
+    mut fn note_pending_soft_use(sym: i32, node: i32):
+        if self.is_pending_soft_binding(sym) == 0:
+            return
+        self.pending_soft_use_syms.push(sym)
+        self.pending_soft_use_nodes.push(node)
+
+    // Scope exit for a pending soft-literal binding no use settled, when
+    // every parameter is fixed by a hard or soft payload: the soft
+    // parameters take their literals' default types (§4.2.1).
+    mut fn complete_pending_soft_binding(sym: i32) -> i32:
+        if not self.pending_generic_binding_base.contains(sym):
+            return 0
+        let base_sym = self.pending_generic_binding_base.get(sym).unwrap()
+        let call_node = if self.pending_generic_binding_call.contains(sym): self.pending_generic_binding_call.get(sym).unwrap() else: 0
+        if call_node == 0 or self.ast.kind(call_node) != NodeKind.NK_CALL:
+            return 0
+        let callee = self.ast.get_data0(call_node)
+        if self.ast.kind(callee) != NodeKind.NK_IDENT:
+            return 0
+        let variant_sym = self.ast.get_data0(callee)
+        if not self.variant_type_ids.contains(variant_sym):
+            return 0
+        let td_node: i32 = self.type_decl_nodes.get(base_sym).unwrap()
+        let tp_count = self.type_decl_tp_count(td_node)
+        let args: List[i32] = List.new()
+        for _ in 0..tp_count:
+            args.push(0)
+        let sources = self.pending_enum_payload_sources(call_node, base_sym, variant_sym)
+        var si = 0
+        while si + 2 < sources.len():
+            let arg_node = sources[si + 1]
+            let arg_ty = if self.typed_expr_types.contains(arg_node): self.typed_expr_types.get(arg_node).unwrap() else: 0
+            if arg_ty == 0:
+                return 0
+            args[sources[si]] = arg_ty
+            si = si + 3
+        for ai in 0..tp_count:
+            if args[ai] == 0:
+                return 0
+        let inst = self.ensure_generic_inst_type(base_sym, args, tp_count) as i32
+        if inst == 0:
+            return 0
+        self.settle_pending_generic_binding(sym, inst, 0)
+
     fn pending_generic_constructor_base(value: i32, val_type: i32) -> i32:
         if value == 0:
             return 0
@@ -30302,6 +30527,20 @@ impl Sema:
         if self.ast.kind(value) != NodeKind.NK_CALL:
             return 0
         let callee = self.ast.get_data0(value)
+        // #1856 (§4.2.1): a variant call whose payload fixes a parameter
+        // only through a soft literal is pending until a demanding use.
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            let variant_sym = self.ast.get_data0(callee)
+            if self.variant_type_ids.contains(variant_sym):
+                let vbase = self.pending_enum_base_of(val_type)
+                if vbase != 0:
+                    let sources = self.pending_enum_payload_sources(value, vbase, variant_sym)
+                    var si = 0
+                    while si + 2 < sources.len():
+                        if sources[si + 2] != 0:
+                            return vbase
+                        si = si + 3
+                return 0
         if self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS:
             return 0
         let field = self.ast.get_data1(callee)
@@ -30400,6 +30639,8 @@ impl Sema:
         if self.get_generic_inst_base(concrete as i32) != base_sym:
             return 0
         let call_node = if self.pending_generic_binding_call.contains(sym): self.pending_generic_binding_call.get(sym).unwrap() else: 0
+        if self.pending_soft_settle_ok(call_node, base_sym, concrete as i32) == 0:
+            return 0
         for bi in 0..self.bind_names.len():
             let other_sym: i32 = self.bind_names[bi]
             if not self.pending_generic_binding_base.contains(other_sym):
@@ -30422,6 +30663,7 @@ impl Sema:
             self.typed_expr_types.insert(call_node, concrete as i32)
         if expr_node != 0:
             self.typed_expr_types.insert(expr_node, concrete as i32)
+        self.retype_pending_soft_uses(sym, concrete as i32)
         self.scope_update_type(sym, concrete as i32)
         concrete as i32
 

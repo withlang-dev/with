@@ -1376,6 +1376,13 @@ pub type Sema {
     pending_generic_binding_base: HashMap[i32, i32],
     pending_generic_binding_call: HashMap[i32, i32],
     pending_generic_binding_decl: HashMap[i32, i32],
+    // #1856 (§4.2.1): uses of a pending soft-literal enum binding made
+    // before it settles; settlement retypes them.
+    pending_soft_use_syms: List[i32],
+    pending_soft_use_nodes: List[i32],
+    // Recorded uses that format the binding (`:?` or bare display):
+    // settlement registers the concrete type's formatters (D61).
+    pending_soft_debug_nodes: List[i32],
     async_scope_names: List[i32],
     sync_scope_names: List[i32],
     label_syms: List[i32],
@@ -3455,6 +3462,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         pending_generic_binding_base: sema_new_map_i32_i32(),
         pending_generic_binding_call: sema_new_map_i32_i32(),
         pending_generic_binding_decl: sema_new_map_i32_i32(),
+        pending_soft_use_syms: List.new(),
+        pending_soft_use_nodes: List.new(),
+        pending_soft_debug_nodes: List.new(),
         async_scope_names: List.new(),
         sync_scope_names: List.new(),
         label_syms: List.new(),
@@ -7063,7 +7073,8 @@ impl Sema:
                         already_reported = 1
                 if already_reported == 0:
                     reported_pending_calls.push(report_key)
-                    self.emit_pending_generic_binding_error(removed_sym)
+                    if self.complete_pending_soft_binding(removed_sym) == 0:
+                        self.emit_pending_generic_binding_error(removed_sym)
                 self.pending_generic_binding_base.remove(removed_sym)
                 self.pending_generic_binding_call.remove(removed_sym)
                 self.pending_generic_binding_decl.remove(removed_sym)
