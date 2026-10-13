@@ -69,7 +69,11 @@ pub type BuildCommandOptions {
 }
 
 pub type BuildGraphCommandOptions {
+    // The first `:target` selector ("" when none): pseudo-target dispatch
+    // (install-user, effects) and labels still speak of one. The graph
+    // itself is selected by selected_targets, every selector in order.
     selected_target: str,
+    selected_targets: List[str],
     graph_only: bool,
     dry_run: bool,
     no_deps: bool,
@@ -194,6 +198,7 @@ pub fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOp
 pub fn build_graph_command_options_default -> BuildGraphCommandOptions:
     BuildGraphCommandOptions {
         selected_target: "",
+        selected_targets: List.new(),
         graph_only: false,
         dry_run: false,
         no_deps: false,
@@ -392,6 +397,20 @@ fn driver_build_target_arg(argc: i32) -> str:
         i = i + 1
     ""
 
+// Every `:target` selector, in command-line order, duplicates dropped.
+// Taking only the first silently discarded the rest, so
+// `build :zlib-promote :pcre2-promote` promoted zlib and said nothing.
+fn driver_build_target_args(argc: i32) -> List[str]:
+    var out: List[str] = List.new()
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if driver_is_build_target_selector(arg):
+            let name = with_str_slice_ref(arg, 1, with_str_len(arg))
+            if not out.contains(name): out.push(name)
+        i = i + 1
+    out
+
 fn driver_build_opt_level(argc: i32) -> i32:
     var level: i32 = 1
     var i = 2
@@ -548,6 +567,7 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
         }
 
     graph.selected_target = driver_build_target_arg(argc)
+    graph.selected_targets = driver_build_target_args(argc)
     graph.graph_only = driver_has_flag(argc, "--graph")
     graph.dry_run = driver_has_flag(argc, "--dry-run")
     graph.no_deps = driver_has_flag(argc, "--no-deps")

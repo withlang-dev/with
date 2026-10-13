@@ -3143,6 +3143,7 @@ fn run_graph_target_command(target_name: &str) -> i32:
     let build_options = build_command_options_default()
     var graph_options = build_graph_command_options_default()
     graph_options.selected_target = with_str_clone_ref(target_name)
+    graph_options.selected_targets.push(with_str_clone_ref(target_name))
     run_build_command(move build_options, graph_options)
 
 // Returns the INDEX, not a copy: returning the element bit-copied its
@@ -3452,7 +3453,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
             // system — the battery already proved everything and last-green
             // already recorded the verified sha. Verify against the manifest
             // and copy; no graph evaluation.
-            if graph_options.selected_target == "install-user":
+            if graph_options.selected_target == "install-user" and graph_options.selected_targets.len() <= 1:
                 return cli_fast_install_blessed(root, graph_options.selected_target)
             var load_result = load_build_graph_from_build_w(root, &cfg, &actual_options)
             let graph = load_result.graph
@@ -3461,20 +3462,28 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 return 1
             if build_graph_validate_outputs(root, graph, "") != 0:
                 return 1
-            if graph_options.selected_target == "effects":
+            if graph_options.selected_target == "effects" and graph_options.selected_targets.len() <= 1:
                 return build_cache_print_effects(root, graph, "")
-            var selected_target_name = graph_options.selected_target.clone()
-            if selected_target_name.len() == 0 and graph.default_target.len() > 0:
+            // Every `:target` selector names a root (`build :a :b` builds
+            // both closures in one graph); none falls back to the default.
+            var selected_names: List[str] = List.new()
+            for si in 0..graph_options.selected_targets.len():
+                selected_names.push(with_str_clone_ref(graph_options.selected_targets[si]))
+            if selected_names.len() == 0 and graph.default_target.len() > 0:
                 // Clone: a bare field read on an assignment RHS moves the str
                 // out of graph (blank-on-move), and the filter below would
                 // copy an empty default_target (#782 class).
-                selected_target_name = with_str_clone_ref(graph.default_target)
-            let selected_graph = if graph_options.no_deps: build_graph_filter_single_target(&graph, selected_target_name) else: build_graph_filter_target(&graph, selected_target_name)
+                selected_names.push(with_str_clone_ref(graph.default_target))
+            let selected_target_name = selected_names.join("+")
+            let selected_graph = if graph_options.no_deps: build_graph_filter_single_targets(&graph, &selected_names) else: build_graph_filter_targets(&graph, &selected_names)
             if not selected_graph.ok:
                 with_eprint("error: " ++ selected_graph.error_msg)
                 return 1
             if graph_options.no_deps:
-                if selected_graph.targets.len() == 0 or (selected_graph.targets[0].kind != 23 and selected_graph.targets[0].kind != 2):
+                var bad_kind = selected_graph.targets.len() == 0
+                for ti in 0..selected_graph.targets.len():
+                    if selected_graph.targets[ti].kind != 23 and selected_graph.targets[ti].kind != 2: bad_kind = true
+                if bad_kind:
                     with_eprint("error: --no-deps is only supported for build.w action and test targets")
                     return 1
             if graph_options.explain_target.len() > 0:
@@ -3486,7 +3495,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 return 1
             // #1835: what --no-deps skipped is what the target's full closure
             // holds beyond itself; only a skipped root prepare is refused.
-            let skipped_root_prepare = graph_options.no_deps and build_graph_find_target_index_by_name(&build_graph_filter_target(&graph, selected_target_name), BUILD_RUNNER_ROOT_PREPARE) >= 0
+            let skipped_root_prepare = graph_options.no_deps and build_graph_find_target_index_by_name(&build_graph_filter_targets(&graph, &selected_names), BUILD_RUNNER_ROOT_PREPARE) >= 0
             let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, actual_options, graph_options.survey, skipped_root_prepare) }
             repo_lock_release()
             link_stage_cleanup_current_process_temp_archives()

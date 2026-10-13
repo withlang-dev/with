@@ -489,6 +489,13 @@ pub fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
     out
 
 pub fn build_graph_filter_target(graph: &BuildGraph, target_name: &str) -> BuildGraph:
+    var names: List[str] = List.new()
+    if target_name.len() > 0: names.push(with_str_clone_ref(target_name))
+    build_graph_filter_targets(graph, &names)
+
+// The graph restricted to the closures of every named root (`build :a
+// :b`); no roots means the whole graph, as one empty name did before.
+pub fn build_graph_filter_targets(graph: &BuildGraph, target_names: &List[str]) -> BuildGraph:
     var out = empty_build_graph()
     out.ok = graph.ok
     out.error_msg = with_str_clone_ref(graph.error_msg)
@@ -499,12 +506,12 @@ pub fn build_graph_filter_target(graph: &BuildGraph, target_name: &str) -> Build
     for gi in 0..graph.generated_sources.len():
         let bgm_gen = &graph.generated_sources[gi]
         out.generated_sources.push(BuildGraphGeneratedSource { path: with_str_clone_ref(bgm_gen.path), contents: with_str_clone_ref(bgm_gen.contents) })
-    if target_name.len() == 0:
+    if target_names.len() == 0:
         for ti_all in 0..graph.targets.len():
             out.targets.push(build_graph_target_deep_copy(&graph.targets[ti_all]))
         out.raw_text = build_graph_emit(out)
         return out
-    var selected = build_graph_select_target_closure(graph, target_name)
+    var selected = build_graph_select_targets_closure(graph, target_names)
     if not selected.ok:
         out.ok = false
         out.error_msg = move selected.error_msg
@@ -537,6 +544,32 @@ pub fn build_graph_filter_single_target(graph: &BuildGraph, target_name: &str) -
         out.error_msg = "build.w did not declare target '" ++ target_name ++ "'"
         return out
     out.targets.push(build_graph_target_deep_copy(&graph.targets[index]))
+    out.raw_text = build_graph_emit(out)
+    out
+
+// --no-deps over several roots: each named target alone, no dependencies.
+pub fn build_graph_filter_single_targets(graph: &BuildGraph, target_names: &List[str]) -> BuildGraph:
+    var out = empty_build_graph()
+    out.ok = graph.ok
+    out.error_msg = with_str_clone_ref(graph.error_msg)
+    out.raw_text = with_str_clone_ref(graph.raw_text)
+    out.package_name = with_str_clone_ref(graph.package_name)
+    out.package_version = with_str_clone_ref(graph.package_version)
+    out.default_target = with_str_clone_ref(graph.default_target)
+    for gi in 0..graph.generated_sources.len():
+        let bgm_gen = &graph.generated_sources[gi]
+        out.generated_sources.push(BuildGraphGeneratedSource { path: with_str_clone_ref(bgm_gen.path), contents: with_str_clone_ref(bgm_gen.contents) })
+    if target_names.len() == 0:
+        out.ok = false
+        out.error_msg = "--no-deps requires an explicit build.w target"
+        return out
+    for ni in 0..target_names.len():
+        let index = build_graph_find_target_index(graph, target_names[ni])
+        if index < 0:
+            out.ok = false
+            out.error_msg = "build.w did not declare target '" ++ target_names[ni] ++ "'"
+            return out
+        out.targets.push(build_graph_target_deep_copy(&graph.targets[index]))
     out.raw_text = build_graph_emit(out)
     out
 
@@ -615,3 +648,13 @@ fn build_graph_selected_targets_add(selected: BuildGraphSelectedTargets, graph: 
 fn build_graph_select_target_closure(graph: &BuildGraph, target_name: &str) -> BuildGraphSelectedTargets:
     var selected = build_graph_selected_targets_new()
     build_graph_selected_targets_add(move selected, graph, target_name)
+
+// The closure of several roots at once (`build :a :b`): each root's
+// closure is added to one selection, so shared dependencies appear once.
+fn build_graph_select_targets_closure(graph: &BuildGraph, target_names: &List[str]) -> BuildGraphSelectedTargets:
+    var selected = build_graph_selected_targets_new()
+    var out = selected
+    for ni in 0..target_names.len():
+        out = build_graph_selected_targets_add(out, graph, target_names[ni])
+        if not out.ok: return out
+    out
