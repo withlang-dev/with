@@ -344,6 +344,12 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     // A cross compiler carries no wasm32 runtime yet (#2131: empty slots).
     out = add_empty_wasm32_runtime_blob_targets(move out, p ++ "empty-", dir)
     cross_embedded = target_with_empty_wasm32_runtime_blobs(move cross_embedded, p ++ "empty-", dir)
+    // The bundle index names the wasm32 bundle slots in every compiler
+    // (#2390): empty here, as in the bootstrap embedding.
+    for pi in 0..plans.len():
+        let slot = plans[pi].name ++ "_wasm32"
+        out = add_empty_wo_blob_targets(move out, p, dir, slot)
+        cross_embedded = target_with_empty_wo_blobs(move cross_embedded, p, dir, slot)
     out = add_empty_darwin_sysroot_blob_target(move out, p, dir)
     // #1915 (D81): the target's sysroot, compiler-rt and libc++ (a pack the
     // cross compiler embeds, and an unpacked copy the cross links read) and
@@ -3951,6 +3957,12 @@ pub fn build(ctx: BuildCtx) -> Build:
         cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, corpus_plans_windows_x86_64[pi])
     out = add_empty_wasm32_runtime_blob_targets(move out, "cross-win-empty-", cross_windows_dir())
     cross_win_embedded = target_with_empty_wasm32_runtime_blobs(move cross_win_embedded, "cross-win-empty-", cross_windows_dir())
+    // The bundle index names the wasm32 bundle slots in every compiler
+    // (#2390): empty here, as in the bootstrap embedding.
+    for pi in 0..corpus_plans_windows_x86_64.len():
+        let slot = corpus_plans_windows_x86_64[pi].name ++ "_wasm32"
+        out = add_empty_wo_blob_targets(move out, "cross-win-", cross_windows_dir(), slot)
+        cross_win_embedded = target_with_empty_wo_blobs(move cross_win_embedded, "cross-win-", cross_windows_dir(), slot)
     out = add_empty_darwin_sysroot_blob_target(move out, "cross-win-", cross_windows_dir())
     cross_win_embedded = target_with_empty_darwin_sysroot_blob(move cross_win_embedded, "cross-win-", cross_windows_dir())
     let cross_win_embedded_obj = embedded_objects_object("cross-win-embedded-objects-object", &cross_win_embedded, cross_windows_triple())
@@ -4032,6 +4044,12 @@ pub fn build(ctx: BuildCtx) -> Build:
         cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, corpus_plans_windows_aarch64[pi])
     out = add_empty_wasm32_runtime_blob_targets(move out, "cross-winarm-empty-", cross_windows_aarch64_dir())
     cross_winarm_embedded = target_with_empty_wasm32_runtime_blobs(move cross_winarm_embedded, "cross-winarm-empty-", cross_windows_aarch64_dir())
+    // The bundle index names the wasm32 bundle slots in every compiler
+    // (#2390): empty here, as in the bootstrap embedding.
+    for pi in 0..corpus_plans_windows_aarch64.len():
+        let slot = corpus_plans_windows_aarch64[pi].name ++ "_wasm32"
+        out = add_empty_wo_blob_targets(move out, "cross-winarm-", cross_windows_aarch64_dir(), slot)
+        cross_winarm_embedded = target_with_empty_wo_blobs(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir(), slot)
     out = add_empty_darwin_sysroot_blob_target(move out, "cross-winarm-", cross_windows_aarch64_dir())
     cross_winarm_embedded = target_with_empty_darwin_sysroot_blob(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir())
     let cross_winarm_embedded_obj = embedded_objects_object("cross-winarm-embedded-objects-object", &cross_winarm_embedded, cross_windows_aarch64_triple())

@@ -1,3 +1,4 @@
 # A grant for a ceremony count above the bar (tools/ceremony_census.w):
 # pattern<TAB>area<TAB>bar it was made against<TAB>new ceiling<TAB>why
 clone-call	build	169	176	D112 corpus code: the pinned seed predates D111, so a str read from a borrowed Corpus record or a &str passed where build-layer APIs take str is cloned (each removal was refused by the seed); the post-D111-seed build/ sweep removes them
+move-arg	build	163	169	#2390: the empty wo-wasm32 slots thread Build/Target through the existing consuming helpers (add_empty_wo_blob_targets/target_with_empty_wo_blobs) at three cross embedded sites; each move spells the builder-pattern ownership transfer those signatures declare, as every neighboring call does
