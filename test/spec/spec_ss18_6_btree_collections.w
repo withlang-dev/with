@@ -21,7 +21,7 @@ fn test_btreemap_operations:
     assert(keys[1] == "b")
     assert(keys[2] == "c")
 
-    let values = map.values() |> map(it.clone()) |> collect[List]()
+    let values = map.values() |> collect[List]()
     assert(values == [1, 20, 3])
 
     let entries = map.iter() |> map(e => f"{e.0}={e.1}") |> collect[List]()

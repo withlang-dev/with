@@ -12,7 +12,7 @@ fn test_hashmap_values:
     map.insert("beta", 2)
     map.insert("alpha", 3)
 
-    let values = map.values() |> map(it.clone()) |> collect[List]()
+    let values = map.values() |> collect[List]()
     assert(values == [3, 2])
 
 fn test_hashmap_iter:
