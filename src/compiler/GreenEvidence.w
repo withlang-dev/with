@@ -33,15 +33,27 @@ fn green_first_line(text: &str) -> str:
 /// build measures software, not documents (Eric, 2026-09-21): the top-level
 /// entry named `docs` and every top-level `*.md` (CLAUDE.md, README.md, …)
 /// are left out, the specification included — a docs-only commit keeps the
-/// identity of the tree whose battery passed. build/retention.w applies the
-/// same rule; the two must agree byte for byte.
-pub fn green_identity_inputs(top_level: &str) -> str:
+/// identity of the tree whose battery passed. `benchmarks/goose` is
+/// documentation only too (Eric, 2026-10-13): benchmarks-check measures
+/// benchmarks/workloads/ and benchmarks/run.w, never goose, so the
+/// benchmarks tree enters through its own listing (`bench_level`, `git
+/// ls-tree HEAD:benchmarks`) with the goose entry left out.
+/// build/retention.w applies the same rule; the two must agree byte for
+/// byte.
+pub fn green_identity_inputs(top_level: &str, bench_level: &str) -> str:
     var kept = ""
     for line in top_level.split("\n"):
         if line.len() == 0: continue
         let tab = line.find("\t")
         let path = if tab >= 0: line.slice(tab + 1, line.len()) else: line.clone()
         if path == "docs" or path.ends_with(".md"): continue
+        if path == "benchmarks":
+            for bench_line in bench_level.split("\n"):
+                if bench_line.len() == 0: continue
+                let bench_tab = bench_line.find("\t")
+                if bench_tab >= 0 and bench_line.slice(bench_tab + 1, bench_line.len()) == "goose": continue
+                kept = kept ++ bench_line ++ "\n"
+            continue
         kept = kept ++ line ++ "\n"
     kept
 
@@ -53,23 +65,29 @@ fn green_inputs_identity(root: &str) -> str:
     top_args.push("HEAD")
     let top_level = green_git_output(root, &top_args, "ls-tree")
     if top_level.len() == 0: return ""
+    let bench_args: List[str] = List.new()
+    bench_args.push("ls-tree")
+    bench_args.push("HEAD:benchmarks")
+    let bench_level = green_git_output(root, bench_args, "ls-tree-benchmarks")
+    if top_level.contains("\tbenchmarks\n") and bench_level.len() == 0: return ""
     let listing = green_join(green_join(root, "out/command/install-gate"), "green-inputs.txt")
-    if runtime_write_file(listing, green_identity_inputs(top_level)) != 0: return ""
+    if runtime_write_file(listing, green_identity_inputs(top_level, bench_level)) != 0: return ""
     let hash_args: List[str] = List.new()
     hash_args.push("hash-object")
     hash_args.push(listing)
     green_first_line(green_git_output(root, &hash_args, "hash-object"))
 
 /// A `git status --porcelain` line that names no build input: a document —
-/// `docs/` and top-level `*.md` are outside the identity
-/// (green_identity_inputs), so one that is untracked, modified or deleted
-/// cannot dirty it (a modified docs/handoff.md refused main's install
-/// 2026-10-04) — or a user's own untracked program under examples/. A
+/// `docs/`, `benchmarks/goose/` and top-level `*.md` are outside the
+/// identity (green_identity_inputs), so one that is untracked, modified or
+/// deleted cannot dirty it (a modified docs/handoff.md refused main's
+/// install 2026-10-04; an untracked benchmarks/goose/ refused its reseed
+/// 2026-10-13) — or a user's own untracked program under examples/. A
 /// rename is judged an input: its line names two paths.
 pub fn green_status_is_not_input(status_line: &str) -> bool:
     if status_line.len() < 4 or status_line.contains(" -> "): return false
     let path = status_line.slice(3, status_line.len())
-    if path.starts_with("docs/") or (path.ends_with(".md") and not path.contains("/")): return true
+    if path.starts_with("docs/") or path == "benchmarks/goose" or path.starts_with("benchmarks/goose/") or (path.ends_with(".md") and not path.contains("/")): return true
     status_line.starts_with("?? ") and path.starts_with("examples/")
 
 // Every build input is as committed, and nothing untracked could be one.
