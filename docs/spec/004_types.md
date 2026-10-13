@@ -862,7 +862,7 @@ let x = fixed[1][2]
 The nested spelling names the same type and stays legal, since generics
 produce it (`[Row; 2]` with `Row = [f32; 3]`); the compiler prints the
 flat form and the formatter writes it. Array lengths are generic
-parameters, by the mechanism `Vector[N, T]` uses (§4.3d); this lands as
+parameters, by the mechanism `Vector[T, N]` uses (§4.3d); this lands as
 its own stage:
 
 ```
@@ -1220,14 +1220,17 @@ These methods are generated unconditionally for all enums — no
 
 ### 4.3d Vector Types
 
-`Vector[N, T]` is a SIMD vector: `N` lanes of `T`, computed lane-wise.
+`Vector[T, N]` is a SIMD vector: `N` lanes of `T`, computed lane-wise.
+The element comes first, then its count, as in every array spelling
+(§4.3a); the previous spelling `Vector[N, T]` is retired (D119
+Amendment 1, ruled 2026-10-12).
 `N ≥ 1` is a compile-time constant and `T` is a primitive integer or
 floating type (§4.1). `Mask[N, W]` is `N` lanes of a lane-wide boolean
 `W` bits wide (`W` ∈ 8, 16, 32, 64, 128); a lane-wise comparison of
-`Vector[N, T]` yields `Mask[N, width(T)]`, which is what `m.select(a, b)`
+`Vector[T, N]` yields `Mask[N, width(T)]`, which is what `m.select(a, b)`
 and the hardware take.
 
-**Aliases.** `f32x4`, `i32x8`, `u8x16`, … name `Vector[N, T]`, and
+**Aliases.** `f32x4`, `i32x8`, `u8x16`, … name `Vector[T, N]`, and
 `m32x4`, `m8x16`, … name `Mask[N, W]`, for the native widths
 (`N × width(T)` ∈ 128, 256, 512 bits). An alias is presentation: it
 denotes the same type, it is what `c_import` prints for a C vector type
@@ -1235,22 +1238,22 @@ denotes the same type, it is what `c_import` prints for a C vector type
 parameterized form:
 
 ```
-fn dot[N](a: Vector[N, f32], b: Vector[N, f32]) -> f32:
+fn dot[N](a: Vector[f32, N], b: Vector[f32, N]) -> f32:
     (a * b).reduce_add()
 
-let v = f32x4(1, 2, 3, 4)       // f32x4 is Vector[4, f32]
+let v = f32x4(1, 2, 3, 4)       // f32x4 is Vector[f32, 4]
 ```
 
 **Layout.** A vector has the target's representation for that shape,
 recorded in the ABI document (`docs/spec/abi/with-abi.md`). On every
 supported target `N × size(T)` rounds up to a power of two, so a
-non-power-of-two `N` is legal in the generic (`Vector[3, f32]` is 16
+non-power-of-two `N` is legal in the generic (`Vector[f32, 3]` is 16
 bytes and 16-aligned, as clang's `ext_vector_type(3)` is) but has no
 alias. A shape the target has no register for is still a value; the
 compiler lowers it. `Vector` and `Mask` are `Copy`.
 
 **Construction and splat.** `f32x4(1, 2, 3, 4)` and
-`Vector[4, f32](1, 2, 3, 4)` take exactly `N` values of `T`. A scalar
+`Vector[f32, 4](1, 2, 3, 4)` take exactly `N` values of `T`. A scalar
 broadcasts to every lane in the two places that have one meaning:
 
 - a literal in a vector context: `let v: f32x4 = 0`;
@@ -1266,7 +1269,7 @@ mistake (a vector was meant) would silently become a broadcast.
 rules: a constant index is checked at compile time, a runtime index
 panics out of range). For `N ≤ 4` the components are `.x .y .z .w`, and
 a swizzle names lanes in any order and count: `v.xy`, `v.wzyx`, `v.xxxx`
-yield `Vector[len, T]`. This is clang's `ext_vector_type` swizzle
+yield `Vector[T, len]`. This is clang's `ext_vector_type` swizzle
 (Clang Language Extensions, "Vectors and Extended Vectors"), which that
 half of the C world already writes; it is not an invention.
 
@@ -1298,7 +1301,7 @@ width holds the same lane booleans, which is why `W` reaches 128 for
 **Casts.** `v as i32x4` converts lane-wise, under §4.2.6 for each lane
 (an implicit narrowing is refused as it is for a scalar). `v.bits()`
 reinterprets the bytes as the unsigned integer vector of the same lane
-width (`f32x4.bits(): u32x4`) and `Vector[N, T].from_bits(u)` reverses
+width (`f32x4.bits(): u32x4`) and `Vector[T, N].from_bits(u)` reverses
 it: a change of representation is a default, a change of meaning is
 spelled (§2).
 
