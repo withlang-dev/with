@@ -530,13 +530,13 @@ pub fn ret_green_store_path() -> str:
     dir ++ "/green.tsv"
 
 /// A `git status --porcelain` line that names no build input: a document
-/// (`docs/`, a top-level `*.md`) in any state, or a user's own untracked
-/// program under examples/. Mirrors
+/// (`docs/`, `benchmarks/goose/`, a top-level `*.md`) in any state, or a
+/// user's own untracked program under examples/. Mirrors
 /// GreenEvidence.green_status_is_not_input; the two must agree.
 fn ret_status_is_not_input(status_line: &str) -> bool:
     if status_line.len() < 4 or status_line.contains(" -> "): return false
     let path = status_line.slice(3, status_line.len())
-    if path.starts_with("docs/") or (path.ends_with(".md") and not path.contains("/")): return true
+    if path.starts_with("docs/") or path == "benchmarks/goose" or path.starts_with("benchmarks/goose/") or (path.ends_with(".md") and not path.contains("/")): return true
     status_line.starts_with("?? ") and path.starts_with("examples/")
 
 /// Every build input is as committed, and nothing untracked could be one.
@@ -559,15 +559,25 @@ fn ret_worktree_is_clean(ctx: &ActionCtx) -> bool:
 // top-level `git ls-tree HEAD` without the `docs` entry and without top-level
 // `*.md` files. The build measures software, not documents (Eric,
 // 2026-09-21), so the specification is not an input either; a docs-only
-// commit keeps the identity of the tree whose battery passed. Mirrors
-// GreenEvidence.green_identity_inputs byte for byte.
-fn ret_green_identity_inputs(top_level: &str) -> str:
+// commit keeps the identity of the tree whose battery passed.
+// `benchmarks/goose` is documentation only too (Eric, 2026-10-13), so the
+// benchmarks tree enters through `git ls-tree HEAD:benchmarks` with the
+// goose entry left out. Mirrors GreenEvidence.green_identity_inputs byte
+// for byte.
+fn ret_green_identity_inputs(top_level: &str, bench_level: &str) -> str:
     var kept = ""
     for line in top_level.split("\n"):
         if line.len() == 0: continue
         let tab = line.find("\t")
         let path = if tab >= 0: line.slice(tab + 1, line.len()) else: line.clone()
         if path == "docs" or path.ends_with(".md"): continue
+        if path == "benchmarks":
+            for bench_line in bench_level.split("\n"):
+                if bench_line.len() == 0: continue
+                let bench_tab = bench_line.find("\t")
+                if bench_tab >= 0 and bench_line.slice(bench_tab + 1, bench_line.len()) == "goose": continue
+                kept = kept ++ bench_line ++ "\n"
+            continue
         kept = kept ++ line ++ "\n"
     kept
 
@@ -588,8 +598,14 @@ pub fn ret_source_identity(ctx: &ActionCtx, driver_sha: &str) -> str:
     top_args.push("HEAD")
     let top_level = ret_run_all(ctx, "git-ls-tree", top_args, 30000)
     if top_level.len() == 0: return ""
+    let bench_args: List[str] = List.new()
+    bench_args.push("git")
+    bench_args.push("ls-tree")
+    bench_args.push("HEAD:benchmarks")
+    let bench_level = ret_run_all(ctx, "git-ls-tree-benchmarks", bench_args, 30000)
+    if top_level.contains("\tbenchmarks\n") and bench_level.len() == 0: return ""
     let listing = ret_join(ret_join("out/command", ctx.target_name()), "green-inputs.txt")
-    if ctx.fs().write_text(listing, ret_green_identity_inputs(top_level)) != 0: return ""
+    if ctx.fs().write_text(listing, ret_green_identity_inputs(top_level, bench_level)) != 0: return ""
     let hash_args: List[str] = List.new()
     hash_args.push("git")
     hash_args.push("hash-object")
