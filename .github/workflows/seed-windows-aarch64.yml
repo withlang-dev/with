@@ -54,13 +54,16 @@ jobs:
       WITH_SEED_VERSION: nightly-20261011-local-2-e4861e1d6997
       WITH_SEED_ASSET: with-linux-x86_64
       WITH_SEED_SHA256: ea0fe5dfeb4f8fb1029e8f739d90528ab1e061f37e066402681d3f921a3302b8
-      # Native x86_64 host LLVM SDK (drives the host bootstrap link).
+      # Native x86_64 host LLVM SDK (drives the host bootstrap link). The
+      # canonical sdk.lock pin, as selfhost-linux CI fetches it: the v0.15.1
+      # .tar.zst SDK predates the sysroot-carrying layout and has no
+      # bin/clang or ld.lld for build/sdk.w's linux-sysroot (run 38381940413).
       WITH_SDK_REPO: withlang-dev/with
-      WITH_SDK_VERSION: v0.15.1
-      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.zst
+      WITH_SDK_VERSION: nightly-sdk-20261004-c4ddb7ddbef2
+      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
       # windows-aarch64 TARGET LLVM SDK — statically linked into the cross
       # compiler. Published to this repo by the `sdk-llvm windows-aarch64`
-      # workflow. Extracts to .deps/llvm-22.1.6-windows-aarch64-msvc/ (the
+      # workflow. Extracts to src-tree/.deps/llvm-22.1.6-windows-aarch64-msvc/ (the
       # top-level dir inside the tarball already matches build.w's expected
       # prefix — no rename).
       CROSS_SDK_TAG: sdk-windows-aarch64
@@ -73,7 +76,11 @@ jobs:
       # Published seed asset.
       SEED_RELEASE_TAG: seed-windows-aarch64
       SEED_ASSET: with-windows-aarch64.exe
-      LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-linux-x86_64
+      # The SDKs and xwin libdirs live under src-tree/.deps: the build's
+      # ToolFs refuses paths outside the project root (sdk-build-tools-pack
+      # reading $LLVM_PREFIX/bin/cmake failed so in run 38381940413), and a
+      # symlinked .deps still resolves outside it.
+      LLVM_PREFIX: ${{ github.workspace }}/src-tree/.deps/llvm-22.1.6-linux-x86_64
       # The build runs in working-directory: src-tree and writes ./out there, so
       # the compiler's link stage must resolve its runtime root to that same
       # tree (out/lib/cross/windows_aarch64/*.o). Point WITH_OUT_DIR at the real
@@ -148,13 +155,14 @@ jobs:
           mkdir -p /tmp/xwin-bin
           tar -xzf /tmp/xwin.tar.gz -C /tmp/xwin-bin --strip-components=1
           test -x /tmp/xwin-bin/xwin || { echo "xwin binary missing after extract"; ls -la /tmp/xwin-bin; exit 1; }
+          mkdir -p "$GITHUB_WORKSPACE/src-tree/.deps"
           /tmp/xwin-bin/xwin --accept-license --arch aarch64 \
-            splat --output "$GITHUB_WORKSPACE/.deps/winsdk-arm64"
-          crt="$GITHUB_WORKSPACE/.deps/winsdk-arm64/crt/lib/aarch64"
-          ucrt="$GITHUB_WORKSPACE/.deps/winsdk-arm64/sdk/lib/ucrt/aarch64"
-          um="$GITHUB_WORKSPACE/.deps/winsdk-arm64/sdk/lib/um/aarch64"
+            splat --output "$GITHUB_WORKSPACE/src-tree/.deps/winsdk-arm64"
+          crt="$GITHUB_WORKSPACE/src-tree/.deps/winsdk-arm64/crt/lib/aarch64"
+          ucrt="$GITHUB_WORKSPACE/src-tree/.deps/winsdk-arm64/sdk/lib/ucrt/aarch64"
+          um="$GITHUB_WORKSPACE/src-tree/.deps/winsdk-arm64/sdk/lib/um/aarch64"
           for d in "$crt" "$ucrt" "$um"; do
-            test -d "$d" || { echo "xwin did not produce $d"; find "$GITHUB_WORKSPACE/.deps/winsdk-arm64" -maxdepth 3 -type d | head -40; exit 1; }
+            test -d "$d" || { echo "xwin did not produce $d"; find "$GITHUB_WORKSPACE/src-tree/.deps/winsdk-arm64" -maxdepth 3 -type d | head -40; exit 1; }
           done
           # The compiler resolves the arm64 Windows libdirs from these env vars
           # (build/emit_c.w windows-aarch64 block). Export for later steps.
@@ -168,25 +176,28 @@ jobs:
       - name: Fetch host x86_64 LLVM SDK
         run: |
           set -euo pipefail
-          mkdir -p .deps
-          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/host-sdk.tar.zst \
+          mkdir -p src-tree/.deps
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/host-sdk.tar.gz \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
-          zstd -d -c /tmp/host-sdk.tar.zst | tar -x -C .deps
-          test -x "$LLVM_PREFIX/bin/lld" || { echo "host SDK lld missing"; ls -la .deps; exit 1; }
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/host-sdk.tar.gz.sha256 \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET.sha256"
+          printf '%s  %s\n' "$(cut -d' ' -f1 /tmp/host-sdk.tar.gz.sha256)" /tmp/host-sdk.tar.gz | sha256sum -c -
+          tar -xzf /tmp/host-sdk.tar.gz -C src-tree/.deps
+          test -x "$LLVM_PREFIX/bin/lld" || { echo "host SDK lld missing"; ls -la src-tree/.deps; exit 1; }
           test -f "$LLVM_PREFIX/lib/libclang.a" || { echo "host SDK libclang.a missing"; exit 1; }
 
       - name: Fetch target windows-aarch64 LLVM SDK
         run: |
           set -euo pipefail
-          mkdir -p .deps
+          mkdir -p src-tree/.deps
           curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/cross-sdk.tar.gz \
             "https://github.com/$GITHUB_REPOSITORY/releases/download/$CROSS_SDK_TAG/$CROSS_SDK_ASSET"
           # Verify against the pinned sha first, then the sidecar if present.
           got="$(sha256sum /tmp/cross-sdk.tar.gz | awk '{print $1}')"
           test "$got" = "$CROSS_SDK_SHA256" \
             || { echo "cross SDK sha256 mismatch: want=$CROSS_SDK_SHA256 got=$got"; exit 1; }
-          tar -xzf /tmp/cross-sdk.tar.gz -C .deps
-          cross_prefix=".deps/llvm-${LLVM_VER}-windows-aarch64-msvc"
+          tar -xzf /tmp/cross-sdk.tar.gz -C src-tree/.deps
+          cross_prefix="src-tree/.deps/llvm-${LLVM_VER}-windows-aarch64-msvc"
           test -f "$cross_prefix/lib/libclang.lib" \
             || { echo "cross SDK libclang.lib missing at $cross_prefix"; ls -la "$cross_prefix/lib" 2>/dev/null | head; exit 1; }
 
@@ -228,9 +239,6 @@ jobs:
           set -euo pipefail
           export PATH="$GITHUB_WORKSPACE/.link-shim:$LLVM_PREFIX/bin:$PATH"
           export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/.link-shim:${LD_LIBRARY_PATH:-}"
-          # Symlink the fetched .deps into the source tree so relative .deps paths
-          # (host + cross SDK, xwin libdirs) resolve from the build CWD.
-          ln -sfn "$GITHUB_WORKSPACE/.deps" .deps
           "$WITH" build
           test -x out/release/bin/with || { echo "native release compiler not produced"; exit 1; }
           out/release/bin/with version
