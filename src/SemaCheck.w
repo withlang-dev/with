@@ -10739,6 +10739,8 @@ impl Sema:
             let cast_null = cast_src_null != 0 and self.ast.kind(cast_src_null) == NodeKind.NK_NULL_LIT and self.type_allows_null_literal(cast_tid) != 0
             let constant_ty = if cast_null: 0 as TypeId else: self.cast_constant_operand_type(src_node)
             let src_tid = self.check_expr_with_expected(src_node, if cast_null: cast_tid else: constant_ty)
+            if cast_tid != 0:
+                self.warn_wrapping_constant_cast(node, src_node, cast_tid as i32)
             // D65 (§12): a function cast to a pointer or an integer
             // (`coro_main as *const u8`) is its code address, not its callable.
             if cast_tid != 0 and self.get_type_kind(self.resolve_alias(cast_tid)) != TypeKind.TY_FN:
@@ -14438,6 +14440,40 @@ impl Sema:
             return
         var diag = Diagnostic.warn("prefer 'x not in y' over 'not (x in y)'", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
         diag.set_code("prefer-not-in")
+        self.diags.emit(move diag)
+
+    // D124 (#2329): under rule A a cast wraps (`300 as u8` is 44) — for a
+    // nonnegative constant that is almost always a typo, so warn. A
+    // negative constant cast to an unsigned type is the `-1` idiom and
+    // stays silent; migrator output is exempt (the corpora live outside
+    // user lint sources, and test/corpora is checked explicitly).
+    mut fn warn_wrapping_constant_cast(node: i32, src_node: i32, cast_tid: i32):
+        if sema_path_is_user_lint_source(self.current_module_path) == 0:
+            return
+        if self.current_module_path.contains("test/corpora/") or self.current_module_path.contains("test\\corpora\\"):
+            return
+        let resolved = self.resolve_alias(cast_tid as TypeId)
+        if self.get_type_kind(resolved) != TypeKind.TY_INT:
+            return
+        let width = self.get_type_d0(resolved)
+        if width >= 64:
+            return
+        let inner = self.unwrap_lint_grouped_expr(src_node)
+        if inner == 0 or self.ast.kind(inner) != NodeKind.NK_INT_LIT:
+            return
+        let lit = self.ast.int_literal_fast_i64(inner as NodeId)
+        if lit.ok == 0 or lit.value < 0:
+            return
+        let signed = self.get_type_d1(resolved) != 0
+        let bound: i64 = if signed: (1 as i64) << ((width - 1) as u32) else: (1 as i64) << (width as u32)
+        let max = bound - 1
+        if lit.value <= max:
+            return
+        var wrapped = lit.value & (((1 as i64) << (width as u32)) - 1)
+        if signed and wrapped >= bound:
+            wrapped = wrapped - bound * 2
+        var diag = Diagnostic.warn(f"constant {lit.value} wraps in cast to {self.type_name(cast_tid)}: out of range (maximum {max}), yields {wrapped}", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+        diag.set_code("wrapping-constant-cast")
         self.diags.emit(move diag)
 
     mut fn check_unary(node: i32) -> i32:
