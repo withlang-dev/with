@@ -3456,7 +3456,7 @@ impl Codegen:
         if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_SAT:
             let sat_width = wl_get_int_type_width(wider_ty)
             let sat_prefix = if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_SAT: if is_unsigned: "llvm.uadd.sat.i" else: "llvm.sadd.sat.i" else if is_unsigned: "llvm.usub.sat.i" else: "llvm.ssub.sat.i"
-            let sat_fn_name = if sat_width == 8: sat_prefix ++ "8" else if sat_width == 16: sat_prefix ++ "16" else if sat_width == 32: sat_prefix ++ "32" else: sat_prefix ++ "64"
+            let sat_fn_name = f"{sat_prefix}{sat_width}"
             let sat_sym = self.intern.intern(sat_fn_name)
             let sat_fv = self.fn_values.get(sat_sym)
             let sat_ft = self.fn_fn_types.get(sat_sym)
@@ -3478,19 +3478,21 @@ impl Codegen:
             return wl_build_call(self.builder, sat_fnt, sat_func, list_data_i64(&sat_args), 2)
 
         // Widening multiply + clamp: multiply in 2x width, clamp to [MIN, MAX], truncate.
+        // The widened type and the clamp bounds are width-generic (an i128
+        // multiply widens to i256), as in the vector path — Overflow's i64
+        // helpers stop at 64 bits.
         let ms_width = wl_get_int_type_width(wider_ty)
-        let ms_dbl_width = ms_width * 2
-        let ms_dbl_ty = if ms_dbl_width == 16: wl_i16_type(self.context) else if ms_dbl_width == 32: wl_i32_type(self.context) else if ms_dbl_width == 64: wl_i64_type(self.context) else: wl_i128_type(self.context)
+        let ms_dbl_ty = wl_int_type_n(self.context, ms_width * 2)
         let ms_wide_l = if is_unsigned: wl_build_zext(self.builder, l, ms_dbl_ty) else: wl_build_sext(self.builder, l, ms_dbl_ty)
         let ms_wide_r = if is_unsigned: wl_build_zext(self.builder, r, ms_dbl_ty) else: wl_build_sext(self.builder, r, ms_dbl_ty)
         let ms_wide_result = wl_build_mul(self.builder, ms_wide_l, ms_wide_r)
         if is_unsigned:
-            let ms_max_val = wl_const_int(ms_dbl_ty, int_unsigned_max(ms_width), 0)
+            let ms_max_val = self.cg_int_unsigned_max(ms_dbl_ty, ms_width)
             let ms_overflow = wl_build_icmp(self.builder, wl_int_ugt(), ms_wide_result, ms_max_val)
             let ms_clamped = wl_build_select(self.builder, ms_overflow, ms_max_val, ms_wide_result)
             return wl_build_trunc(self.builder, ms_clamped, wider_ty)
-        let ms_max_val = wl_const_int(ms_dbl_ty, int_signed_max(ms_width), 0)
-        let ms_min_val = wl_const_int(ms_dbl_ty, int_signed_min(ms_width), 1)
+        let ms_max_val = self.cg_int_signed_max(ms_dbl_ty, ms_width)
+        let ms_min_val = self.cg_int_signed_min(ms_dbl_ty, ms_width)
         let ms_too_big = wl_build_icmp(self.builder, wl_int_sgt(), ms_wide_result, ms_max_val)
         let ms_too_small = wl_build_icmp(self.builder, wl_int_slt(), ms_wide_result, ms_min_val)
         let ms_clamped_hi = wl_build_select(self.builder, ms_too_big, ms_max_val, ms_wide_result)
