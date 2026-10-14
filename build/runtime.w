@@ -23,29 +23,14 @@ pub fn run_write_empty_file_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not write: " ++ output)
     0
 
-pub fn prepare_bootstrap_link_root(ctx: &ActionCtx) -> Unit:
-    // Old seed compilers may prefer out/lib before out/bootstrap-lib. Remove
-    // stale unversioned runtime probes so stage1 selects the freshly generated
-    // bootstrap runtime instead of yesterday's out/lib objects.
-    let fs = ctx.fs()
-    let stale_runtime_objects: List[str] = List.new()
-    stale_runtime_objects.push("out/lib/cimport_stubs.o")
-    stale_runtime_objects.push("out/lib/rt_core.o")
-    stale_runtime_objects.push("out/lib/rt_darwin_aarch64.o")
-    stale_runtime_objects.push("out/lib/rt_linux_x86_64.o")
-    stale_runtime_objects.push("out/lib/rt_windows_x86_64.o")
-    stale_runtime_objects.push("out/lib/compat_runtime.o")
-    stale_runtime_objects.push("out/lib/panic_runtime.o")
-    stale_runtime_objects.push("out/lib/channel_runtime.o")
-    stale_runtime_objects.push("out/lib/fiber_runtime.o")
-    stale_runtime_objects.push("out/lib/fiber.o")
-    stale_runtime_objects.push("out/lib/fiber_asm.o")
-    stale_runtime_objects.push("out/lib/fiber_stubs.o")
-    for i in 0..stale_runtime_objects.len():
-        let _remove_stale = fs.remove_file(stale_runtime_objects[i])
-
+// The runner's link root, out/bootstrap-lib, is ready (its dep). Until
+// 2026-10-14 this also deleted out/lib's runtime objects, so that a seed older
+// than #1815 would not link stage1 against them; every seed now refuses
+// another generation's root (src/compiler/Link.w), stage1 names its root
+// (runtime-root=), and the deletion only stranded the tree's own runtime:
+// a stage1 rebuilt by a nested build emptied out/lib under the lanes linking
+// through it.
 pub fn run_prepare_bootstrap_link_root_action(ctx: ActionCtx) -> i32:
-    prepare_bootstrap_link_root(ctx)
     let fs = ctx.fs()
     let output = ctx.output()
     if fs.mkdir_all(br_dirname(output)) != 0:

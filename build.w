@@ -3830,8 +3830,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("fiber-runtime-object", stage_compiler_bin("with-stage2"), "rt/fiber_runtime.w", "out/lib/fiber_runtime.o", "-O1", "stage2"))
     out = out.add_target(with_object_target("fiber-core-object", stage_compiler_bin("with-stage2"), host_runtime.fiber_core_source, "out/lib/fiber.o", "-O1", "stage2"))
 
-    // stage1 (and prepare-bootstrap-link-root before it) recreate out/lib:
-    // an object written into it is written after them.
     var fiber_asm = target_new(.CompileAsmObject, "fiber-asm-object", host_runtime.fiber_asm_source.clone()).output("out/lib/fiber_asm.o")
     fiber_asm = fiber_asm.dep("stage1")
     out = out.add_target(fiber_asm)
