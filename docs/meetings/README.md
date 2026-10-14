@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D130 — `--emit-c` emits what the program reaches; `--emit-all` emits everything (delegated)](2026-10-14-D130-emit-c-emits-what-the-program-reaches.md)
 - [D129 — `str.find(needle, from = 0)`: the start offset is a default parameter of a `std.string` method, not a compiler intrinsic (delegated)](2026-10-13-D129-str-find-from-is-a-std-method.md)
 - [D128 — A local its literal typed takes the type its demanding uses agree on (§4.2.1); the UAT contract is never annotated to make a rule pass](2026-10-10-D128-a-literal-typed-local-takes-the-type-its-uses-agree-on.md)
 - [D127 — A view of a constant (`&-1`) is a view of an immutable static at the demanded type, static lifetime; a mutable view of a constant is an error](2026-10-09-D127-a-view-of-a-constant-is-static.md)

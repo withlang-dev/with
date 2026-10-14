@@ -1256,7 +1256,7 @@ fn comp_spec_cli_commands(spec: &str) -> List[str]:
 
 fn comp_spec_cli_flags():
     var flags: List[str] = List.new()
-    let defaults = "--release --target --emit-c --emit-obj --overflow --no-std --strict-effects --debug-alloc --trace-alloc --dump-drop-state -O0 -O1 -O2 -O3 --open -e -n -p --fail-fast --abi-sha --self-id"
+    let defaults = "--release --target --emit-c --emit-all --emit-obj --overflow --no-std --strict-effects --debug-alloc --trace-alloc --dump-drop-state -O0 -O1 -O2 -O3 --open -e -n -p --fail-fast --abi-sha --self-id"
     comp_add_words(move flags, defaults)
 
 fn comp_impl_commands(fs: &ToolFs) -> List[str]:

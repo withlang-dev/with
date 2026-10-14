@@ -20,7 +20,8 @@ with -e <code> | -n <code> | -p <code>      # one-liners (§18.5b)
 ```
 
 Additional flags: `--emit-c` (C source backend, used for
-bootstrapping new platforms), `--emit-obj`, `--overflow=<mode>`
+bootstrapping new platforms; it emits the functions and globals the
+program reaches, and with `--emit-all` every one), `--emit-obj`, `--overflow=<mode>`
 (§4.2.3), `--no-std` (§18.7), `--strict-effects` (§17.1b),
 `--debug-alloc` (run under the native debug allocator),
 `--trace-alloc` (trace allocation requests to standard error while running programs or tests),
