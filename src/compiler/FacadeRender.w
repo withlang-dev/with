@@ -1205,8 +1205,8 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &List[i32], ite
             out = out ++ ctor ++ facade_render_receiver_method(pool, intern, ci, item, producer, slot, pname, result)
             continue
         let bridge = facade_render_bridge(pool, intern, producer, 0, -1, "")
-        let params = bridge.params.clone()
-        let args = bridge.args.clone()
+        let params = bridge.params
+        let args = bridge.args
         // D122 (§16.2b.8): a paired buffer's pointer and count are the
         // bridge's prologue locals, made before the call.
         let pro = facade_render_indent(bridge.prologue, "    ")
@@ -1654,8 +1654,8 @@ fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, rep
     let taken = facade_render_param_names(pool, intern, producer)
     let slot_var = facade_render_fresh("slot", taken)
     let bridge = facade_render_bridge(pool, intern, producer, 0, slot, "&raw mut " ++ slot_var)
-    let params = bridge.params.clone()
-    let args = bridge.args.clone()
+    let params = bridge.params
+    let args = bridge.args
     let call = facade_render_call(pool, intern, producer, args)
     let made = name ++ " { " ++ deps ++ "repr: " ++ slot_var ++ ", live: true }"
     let head = "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ")"
@@ -2345,7 +2345,7 @@ fn facade_render_free_ops(pool: AstPool, intern: InternPool, ci: &List[i32], fac
                 hosted = true
         let views = facade_render_record_view_names(pool, intern, 0)
         for vi in 0..views.len():
-            if facade_render_lend_hosted_by_record(pool, intern, &li, views[vi]):
+            if facade_render_lend_hosted_by_record(pool, intern, li, views[vi]):
                 hosted = true
         if hosted:
             continue
@@ -3304,7 +3304,7 @@ pub fn facade_render_record_view_names(pool: AstPool, intern: InternPool, facade
                 continue
             if facade_render_resources_wrapping(pool, intern, "*mut " ++ name) > 0:
                 continue
-            out.push(name.clone())
+            out.push(name)
     out
 
 // The fn items of one facade block of `kind`.
@@ -3340,8 +3340,8 @@ pub fn facade_render_record_host(pool: AstPool, intern: InternPool, ci: &List[i3
     let li = facade_render_lend_item(pool, intern, ci, item)
     let names = facade_render_record_view_names(pool, intern, 0)
     for i in 0..names.len():
-        if facade_render_lend_hosted_by_record(pool, intern, &li, names[i]):
-            return names[i].clone()
+        if facade_render_lend_hosted_by_record(pool, intern, li, names[i]):
+            return names[i]
     ""
 
 // The presented name of `cname` on the record view `rname`: the item's
@@ -3353,7 +3353,7 @@ pub fn facade_render_present_record(pool: AstPool, intern: InternPool, rname: &s
         return renamed
     let names: List[str] = List.new()
     names.push(rname.to_owned())
-    let short = facade_render_shorten(cname, &names)
+    let short = facade_render_shorten(cname, names)
     if short.len() > 0: short else: cname.to_owned()
 
 // The methods of the record view `rname`, rendered inside `impl <rname>:`.
@@ -3362,7 +3362,7 @@ pub fn facade_render_record_view_methods(pool: AstPool, intern: InternPool, ci: 
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
     for i in 0..items.len():
         let li = facade_render_lend_item(pool, intern, ci, items[i])
-        if not facade_render_lend_hosted_by_record(pool, intern, &li, rname):
+        if not facade_render_lend_hosted_by_record(pool, intern, li, rname):
             continue
         // A borrowed resource or a variadic contract through a record view
         // is not ruled; Sema names it (verify_facade_record_host).
@@ -3378,10 +3378,10 @@ pub fn facade_render_record_view_methods(pool: AstPool, intern: InternPool, ci: 
         let bridge = facade_render_bridge(pool, intern, decl, 1, -1, "")
         if not bridge.ok:
             continue
-        let params = bridge.params.clone()
-        let args = bridge.args.clone()
+        let params = bridge.params
+        let args = bridge.args
         let pro = facade_render_indent(bridge.prologue, "        ")
-        let call_args = if args.len() > 0: repr_arg ++ ", " ++ args else: repr_arg.clone()
+        let call_args = if args.len() > 0: repr_arg ++ ", " ++ args else: repr_arg
         let head = "    fn "
         if li.text_view:
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
@@ -3397,7 +3397,7 @@ pub fn facade_render_record_view_methods(pool: AstPool, intern: InternPool, ci: 
         if li.text_free != 0:
             out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, "        ", pro)
             continue
-        let (ret, body) = facade_render_bridge_body(pool, intern, decl, &bridge, facade_render_call(pool, intern, decl, call_args), mname, "        ", "")
+        let (ret, body) = facade_render_bridge_body(pool, intern, decl, bridge, facade_render_call(pool, intern, decl, call_args), mname, "        ", "")
         out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ pro ++ body
     out
 

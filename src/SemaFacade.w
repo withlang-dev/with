@@ -3984,7 +3984,7 @@ impl Sema:
                     let host: str = self.pool_resolve(rhost)
                     let htext = host ++ "." ++ facade_render_present_record(self.ast, self.pool, host, self.pool_resolve(fn_sym))
                     if self.sig_text_index.contains(htext):
-                        self.facade_add_call_effect(self.sig_text_index.get(htext).unwrap(), fn_sym, ci, self.facade_presented_touch_mask(fn_sym, ci), &domains, borrow, -1)
+                        self.facade_add_call_effect(self.sig_text_index.get(htext).unwrap(), fn_sym, ci, self.facade_presented_touch_mask(fn_sym, ci), domains, borrow, -1)
                 continue
             // An in-place producer (`init z_init(self)`) is rendered as the
             // constructor `R.init(rest…)`, whose signature the constructor
