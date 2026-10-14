@@ -5074,7 +5074,7 @@ impl CReach:
             if not is_digit(text[i - 1] as i32) or i - start < 4: continue
             let id = text.slice(start, i)
             if not id.contains("__"): continue
-            let body: i32 = self.by_name.get(&id) ?? -1
+            let body: i32 = self.by_name.get(id) ?? -1
             if body >= 0: self.mark(body)
 
     // Whether `body` is marked and not yet emitted; marks it emitted.
@@ -11345,14 +11345,14 @@ impl CCodegen:
                 continue
             if decls[i].len() == 0: continue
             if self.emit_all or fn_sym == main_sym or not self.fn_c_name_is_internal(fn_sym): reach.mark(i as i32) else: reach.name(self.fn_c_name(fn_sym), i as i32)
-        reach.scan(&struct_defs)
-        reach.scan(&closure_decls)
+        reach.scan(struct_defs)
+        reach.scan(closure_decls)
         var closure_texts: List[str] = List.new()
         for ci in 0..self.closure_syms.len():
             if self.check_interrupted() != 0:
                 return ""
             closure_texts.push(self.emit_closure_body(ci as i32))
-            reach.scan(&closure_texts[ci])
+            reach.scan(closure_texts[ci])
         var body_texts: List[str] = List.new()
         for _ in 0..self.mir_mod.bodies.len(): body_texts.push("")
         var thunk_defs = ""
@@ -11365,18 +11365,18 @@ impl CCodegen:
                     return ""
                 let body = self.mir_body_at(i as i64)
                 body_texts[i] = self.emit_fn_body(body)
-                reach.scan(&body_texts[i])
+                reach.scan(body_texts[i])
                 grew = true
             for gi in 0..global_defs.len():
                 if not reach.take((body_count + gi) as i32): continue
-                reach.scan(&global_defs[gi].text)
-                let init: i32 = init_of_global.get(&global_defs[gi].sym) ?? -1
+                reach.scan(global_defs[gi].text)
+                let init: i32 = init_of_global.get(global_defs[gi].sym) ?? -1
                 if init >= 0: reach.mark(init)
                 grew = true
             // Emitting bodies discovers the fat fn-value thunks, which name
             // their targets.
             thunk_defs = self.emit_fat_thunk_defs()
-            reach.scan(&thunk_defs)
+            reach.scan(thunk_defs)
             if reach.pending(): grew = true
         if self.had_error != 0:
             return ""
@@ -11384,7 +11384,7 @@ impl CCodegen:
         for i in 0..body_count:
             let fn_sym = self.mir_body_at(i as i64).fn_sym
             if self.global_init_target(fn_sym) != 0 and not reach.emitted(i as i32): skipped_inits.push(fn_sym)
-        let main_wrapper = self.emit_main_wrapper(&skipped_inits)
+        let main_wrapper = self.emit_main_wrapper(skipped_inits)
         if self.had_error != 0:
             return ""
 
