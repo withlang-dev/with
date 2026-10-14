@@ -496,6 +496,14 @@ impl Zcu:
                     let nm_types = frontend_new_list_str()
                     for nmi in 0..c_import_no_methods_count(nm_packed):
                         nm_types.push(frontend_owned_text(self.pool.resolve(out.get_extra(nm_base + nmi))))
+                    // D122 (§16.2b.6): a record a facade borrows as a view is
+                    // presented by the facade's `impl T` (FacadeRender.w
+                    // facade_render_record_view_methods); §16.2a sugar on it
+                    // would be a second method of each name. The cache key
+                    // (c_import_cache_key_frontend) carries the same names.
+                    let view_types = facade_render_record_view_names(out, self.pool, 0)
+                    for vi in 0..view_types.len():
+                        nm_types.push(frontend_owned_text(view_types[vi]))
                     ci_set_no_methods(c_import_no_methods_all(nm_packed), move nm_types)
                     let libclang_result = process_c_import_with_defines(libclang_header_spec, self.project_config.c_import_defines, self.c_import_is_cxx_frontend(out, decl))
                     ci_clear_no_methods()
@@ -845,6 +853,10 @@ impl Zcu:
         for ni in 0..nm_count:
             let nm_sym = pool.get_extra(link_start + link_count + allow_count + ni)
             key = key ++ "|" ++ self.pool.resolve(nm_sym)
+        // D122: the record views the facades borrow take no §16.2a sugar.
+        let view_types = facade_render_record_view_names(pool, self.pool, 0)
+        for vi in 0..view_types.len():
+            key = key ++ "|view:" ++ view_types[vi]
         // §16.2 selective/strict imports must not share cached output with a
         // permissive whole import of the same header.
         let strict_flag = if self.c_import_is_strict_frontend(pool, decl): 1 else: 0

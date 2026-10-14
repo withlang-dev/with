@@ -1407,6 +1407,14 @@ impl Sema:
                     if from < 0:
                         return c
                     let origin = self.facade_param_receives(fn_sym, from)
+                    // D122 (§16.2b.6): a borrow through a borrow. Param N
+                    // receives a record view (`xmlNode *` where `xmlNode` is
+                    // itself borrowed), so the result views what the view
+                    // views: one node type, always borrowed from the document.
+                    if origin.len() == 0 and self.facade_param_receives_record(fn_sym, from) != 0:
+                        c.returns_borrow_from = from
+                        c.returns_borrow_record = res
+                        return c
                     if origin.len() != 1:
                         let shown = self.facade_param_display(fn_sym, sig, from)
                         let why = if origin.len() == 0: "receives no modeled resource" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
@@ -2948,9 +2956,16 @@ impl Sema:
         let resource_op = self.facade_fn_is_resource_op(fn_sym)
         let contract_item = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_consumes.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0
         let callback_item = self.facade_contract_is_callback_item(ci)
-        if has_pairs and (resource_op or (contract_item and not callback_item)):
-            let what = if resource_op: "a resource's own operation (its producer, initializer, drop or destroyer)" else: "a callback, retention or consumption contract"
-            self.emit_error(f"fn '{fname}': a buffer pairing describes a lend or a free operation, and '{fname}' is {what}; a slice in that rendering is not modeled (§16.2b.8)", node)
+        // D122 (§16.2b.8): a producer's buffer-plus-length input
+        // (xmlReadMemory's buffer and size) is paired like a lend's; the
+        // constructor renders it through the same bridge
+        // (FacadeRender.w facade_render_bridge with the out slot). An
+        // initializer, drop or destroyer takes only what the resource
+        // passes it.
+        let own_lifecycle = resource_op and self.facade_fn_is_destroyer_or_init(fn_sym)
+        if has_pairs and (own_lifecycle or (contract_item and not callback_item)):
+            let what = if own_lifecycle: "a resource's own lifecycle operation (its initializer, drop or destroyer)" else: "a callback, retention or consumption contract"
+            self.emit_error(f"fn '{fname}': a buffer pairing describes a lend, a free operation or a producer, and '{fname}' is {what}; a slice in that rendering is not modeled (§16.2b.8)", node)
             return
         for pi in 0..self.sig_get_param_count(sig):
             if self.facade_contract_pairs(ci, pi) and self.facade_contract_models_param(ci, pi):
@@ -3000,7 +3015,7 @@ impl Sema:
             // A parameter that receives a modeled resource is reached through
             // the resource — the receiver, or a borrow `&P` (a shape a borrow
             // cannot present is verify_facade_dependency_shape's error).
-            if self.facade_param_receives(fn_sym, pi).len() > 0:
+            if self.facade_param_receives(fn_sym, pi).len() > 0 or self.facade_param_receives_record(fn_sym, pi) != 0:
                 continue
             // A by-value token's receiver by address (#1669): the `of` host.
             if pi == 0 and self.facade_by_value_of_host(fn_sym) >= 0:
@@ -3662,6 +3677,24 @@ impl Sema:
         let hosted = recv0.len() == 1 and self.foreign_contracts[ci].destroys == 0 and self.foreign_contracts[ci].consumes.len() == 0 and self.foreign_contracts[ci].retains.len() == 0
         if self.diags.has_errors():
             return
+        // D122 (§16.2b.6): hosted on a record view — the method on `&T`
+        // exists, returns Option[&T2], and its result views self, so a
+        // child borrowed through a node is borrowed from the node's origin.
+        let rhost = if hosted: 0 else: self.facade_record_host(fn_sym)
+        if rhost != 0:
+            let host: str = self.pool_resolve(rhost)
+            let mtext = host ++ "." ++ facade_render_present_record(self.ast, self.pool, host, fname)
+            let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
+            if msig < 0:
+                self.emit_error(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{mtext}' was rendered on the record view — a compiler defect (§16.2b.6)", node)
+                return
+            if not self.facade_sig_returns_record_view(msig, rn):
+                let rt: str = self.type_name(self.sig_return_type(msig))
+                self.emit_error(f"fn '{fname}': 'returns borrow {rn}' was rendered as '{mtext}' returning {rt}, not Option[&{rn}] — a compiler defect (§16.2b.6)", node)
+                return
+            if from >= 0:
+                self.facade_declare_view_of_param(msig, 0)
+            return
         if not hosted:
             if recv0.len() > 1:
                 return
@@ -3903,6 +3936,14 @@ impl Sema:
             // remaining parameters through buffer/fixed clauses.
             let recv0 = self.facade_method_host(fn_sym)
             if recv0.len() != 1:
+                // D122: a method of a record view keeps self at 0 as a
+                // resource's lend method does.
+                let rhost = self.facade_record_host(fn_sym)
+                if rhost != 0:
+                    let host: str = self.pool_resolve(rhost)
+                    let htext = host ++ "." ++ facade_render_present_record(self.ast, self.pool, host, self.pool_resolve(fn_sym))
+                    if self.sig_text_index.contains(htext):
+                        self.facade_add_call_effect(self.sig_text_index.get(htext).unwrap(), fn_sym, ci, self.facade_presented_touch_mask(fn_sym, ci), &domains, borrow, -1)
                 continue
             // An in-place producer (`init z_init(self)`) is rendered as the
             // constructor `R.init(rest…)`, whose signature the constructor
@@ -3971,7 +4012,8 @@ impl Sema:
             return 0
         var mask: i32 = 0
         for pi in first..self.sig_get_param_count(sig):
-            if self.facade_param_receives(fn_sym, pi).len() != 1:
+            // D122: a record view's operation is an operation on its origin.
+            if self.facade_param_receives(fn_sym, pi).len() != 1 and self.facade_param_receives_record(fn_sym, pi) == 0:
                 continue
             var preserved = false
             if ci >= 0:
@@ -4230,7 +4272,7 @@ impl Sema:
                 let pty = self.resolve_alias(ptid as TypeId)
                 if self.get_type_kind(pty) != TypeKind.TY_PTR:
                     continue
-                if self.facade_param_receives(fn_sym, pi).len() > 0 or self.ci_type_is_const_c_string_input(ptid) != 0 or self.facade_param_is_callable(sig, pi):
+                if self.facade_param_receives(fn_sym, pi).len() > 0 or self.facade_param_receives_record(fn_sym, pi) != 0 or self.ci_type_is_const_c_string_input(ptid) != 0 or self.facade_param_is_callable(sig, pi):
                     continue
                 // A paired buffer, its length or a fixed argument (D64) is
                 // the rendering's: the slice, or the literal.
@@ -5241,3 +5283,43 @@ pub fn facade_owns_resource_name(ctor: &str) -> str:
             out = out ++ c
         upper = false
     out
+
+// ── record-view hosts (D122, spec §16.2b.6) ──────────────────────────────
+impl Sema:
+    // The imported record whose pointer parameter `pi` of `fn_sym` takes,
+    // when that record is a view type — one a `returns borrow T` clause
+    // names and no resource wraps a pointer to — or 0. A parameter that
+    // receives a resource is that resource's (facade_param_receives).
+    fn facade_param_receives_record(fn_sym: i32, pi: i32) -> i32:
+        let sig = self.get_sig(fn_sym)
+        if sig < 0 or pi < 0 or pi >= self.sig_get_param_count(sig):
+            return 0
+        if self.facade_param_receives(fn_sym, pi).len() > 0:
+            return 0
+        let ci = self.facade_contract_for(fn_sym)
+        if ci >= 0:
+            for k in 0..self.foreign_contracts[ci].buffer_ptr.len():
+                if self.foreign_contracts[ci].buffer_ptr[k] == pi: return 0
+        let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
+        if self.get_type_kind(p) != TypeKind.TY_PTR:
+            return 0
+        let pointee = self.resolve_alias(self.get_type_d0(p) as TypeId)
+        if self.get_type_kind(pointee) != TypeKind.TY_STRUCT:
+            return 0
+        let pname = self.safe_symbol_text(self.get_type_name(pointee))
+        let views = facade_render_record_view_names(self.ast, self.pool, 0)
+        for i in 0..views.len():
+            if views[i] != pname:
+                continue
+            let record_sym = self.pool_lookup_symbol(pname)
+            if record_sym != 0 and self.facade_imported_record_type(record_sym) != 0:
+                return record_sym
+        0
+
+    // The record view an fn item's operation is a method of (its first
+    // parameter takes the view's pointer and no resource hosts it), or 0.
+    fn facade_record_host(fn_sym: i32) -> i32:
+        let ci = self.facade_contract_for(fn_sym)
+        if ci < 0 or self.facade_method_host(fn_sym).len() == 1:
+            return 0
+        self.facade_param_receives_record(fn_sym, 0)
