@@ -6291,7 +6291,8 @@ fn bs_force_comptime_evaluator(ctx: &ActionCtx, case_dir: &str) -> i32:
 // must say the actions evaluate at comptime.
 fn bs_build_w_in_evaluator(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
     let env = process_env().set("WITH_BUILD_RUNNER_DIR", bs_abs(ctx.project_info().project_root(), bs_join(case_dir, ".runners")))
-    let result = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, label, args, 120000, case_dir, &env)
+    // A hang guard (#2371): the battery runs this beside every other lane.
+    let result = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, label, args, 600000, case_dir, &env)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": build.w selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     else if bs_assert_contains(ctx, result.stderr, "actions evaluate in the driver's comptime evaluator", label ++ "_said_evaluator") != 0:
