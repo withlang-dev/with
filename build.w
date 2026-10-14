@@ -2125,11 +2125,11 @@ fn run_battery_uat_action(ctx: ActionCtx) -> i32:
     let root = ctx.project_info().project_root()
     let compiler = build_project_abs(root, inputs[0])
     var argv: List[str] = List.new()
-    argv.push(compiler.clone())
+    argv.push(compiler)
     argv.push("uat")
     let stdout_path = build_project_abs(root, build_project_join(out_dir, "uat.stdout"))
     let stderr_path = build_project_abs(root, build_project_join(out_dir, "uat.stderr"))
-    let result = ctx.process_runner().run_capture_with_env(argv, stdout_path, stderr_path, 1800000, process_env().set("WITH_UAT_WITH", compiler.clone()))
+    let result = ctx.process_runner().run_capture_with_env(argv, stdout_path, stderr_path, 1800000, process_env().set("WITH_UAT_WITH", compiler))
     print(result.stdout)
     if result.rc != 0:
         ctx.diagnostics().error(f"battery-uat: `with uat` exited {result.rc}; report " ++ stdout_path ++ "\n" ++ result.stderr)
