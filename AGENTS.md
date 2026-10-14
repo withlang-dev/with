@@ -404,8 +404,9 @@ on the previous commit — never with `git stash`; use `git worktree` or a clone
 retires this object-boundary design.** Destination: the runtime compiles
 in-unit like the embedded stdlib; rt objects survive only as a
 (compiler-version, target)-keyed cache whose hits are byte-identical to the
-in-unit result. A runtime object built by a different compiler generation must
-never be linked — that mixed-world link is #761's corruption class. Until then:
+in-unit result. A runtime object that is not the linking compiler's own (its
+generation's, or byte for byte what it embeds, D132) must never be linked —
+that mixed-world link is #761's corruption class. Until then:
 
 ```
 rt_core.o    (With)  = core runtime. All runtime functions live here.
