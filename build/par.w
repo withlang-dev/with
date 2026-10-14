@@ -42,6 +42,12 @@ fn par_slot_acquire(dir: &str, slots: i32) -> i32:
         if symlink(f"{pid()}", dir ++ f"/slot-{k}") == 0: return k
     -1
 
+// This lane is on the critical path (the driver lists it in the
+// jobserver's `critical` file): its children take no slots.
+fn par_lane_critical(dir: &str) -> bool:
+    let lane = env("WITH_BUILD_LANE")
+    dir.len() > 0 and lane.len() > 0 and ("\n" ++ (read_file(dir ++ "/critical") ?? "")).contains("\n" ++ lane ++ "\n")
+
 fn par_slot_release(dir: &str, slot: i32):
     if dir.len() > 0 and slot >= 0: remove_file(dir ++ f"/slot-{slot}")
 
@@ -60,9 +66,11 @@ pub fn par_run(ctx: &ActionCtx, jobs: &List[ParJob], width: i32) -> List[i32]:
     var oldest = 0
     while oldest < total:
         if next < total and next - oldest < limit:
-            // The first child alive runs in the lane's own slot.
-            let slot = if next == oldest: -1 else: par_slot_acquire(js_dir, js_slots)
-            if next == oldest or slot >= 0:
+            // The first child alive runs in the lane's own slot; a lane on the
+            // critical path takes none.
+            let free = next == oldest or par_lane_critical(js_dir)
+            let slot = if free: -1 else: par_slot_acquire(js_dir, js_slots)
+            if free or slot >= 0:
                 let job = &jobs[next]
                 pids.push(ctx.process_runner().spawn_capture(job.argv, job.stdout, job.stderr))
                 slots.push(slot)

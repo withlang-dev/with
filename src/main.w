@@ -2132,17 +2132,39 @@ fn build_graph_pick_ready(graph: &BuildGraph, remaining: &List[i32], pool: &Pool
 // the battery's wall is made of never waits behind the flood of test lanes.
 fn build_graph_on_critical_path(own: i64, longest: i64): own * 10 >= longest * 9
 
+// What is left of running lane `pi`'s path in ms: its remaining path at
+// spawn less the time it has run.
+fn build_graph_lane_left(graph: &BuildGraph, pool: &PoolState, priority: &List[i64], pi: isize, now: i64) -> i64:
+    let lane_ti = build_graph_find_target_index_by_name(graph, pool.names[pi])
+    if lane_ti < 0: return 0
+    let left = priority[lane_ti] - (now - pool.t0s[pi]) / 1000000
+    if left < 0: 0 else: left
+
 // The longest remaining path among the targets not started and the lanes
 // still running.
 fn build_graph_longest_remaining(graph: &BuildGraph, remaining: &List[i32], pool: &PoolState, priority: &List[i64]) -> i64:
     var longest: i64 = 0
     for ri in 0..remaining.len():
         if priority[remaining[ri]] > longest: longest = priority[remaining[ri]]
+    let now = with_clock_nanos()
     for pi in pool.oldest as isize..pool.names.len():
         if pool.retired[pi] != 0 or pool.done[pi] != 0: continue
-        let lane_ti = build_graph_find_target_index_by_name(graph, pool.names[pi])
-        if lane_ti >= 0 and priority[lane_ti] > longest: longest = priority[lane_ti]
+        let left = build_graph_lane_left(graph, pool, priority, pi, now)
+        if left > longest: longest = left
     longest
+
+// The running lanes on the critical path, one name per line: the jobserver's
+// `critical` file, read by a lane's own windows (par_run, the test runner),
+// which widen without slots while their lane is listed. A flat budget
+// starved the battery's long pole (2026-10-14: emit-c-smoke, one child at a
+// time behind 18 slot-holding lanes, 498 s).
+fn build_graph_critical_lanes(graph: &BuildGraph, pool: &PoolState, priority: &List[i64], longest: i64) -> str:
+    var out = ""
+    let now = with_clock_nanos()
+    for pi in pool.oldest as isize..pool.names.len():
+        if pool.retired[pi] != 0 or pool.done[pi] != 0: continue
+        if build_graph_on_critical_path(build_graph_lane_left(graph, pool, priority, pi, now), longest): out = out ++ pool.names[pi] ++ "\n"
+    out
 
 // Each target's remaining path in ms: its measured time plus the longest
 // remaining path among the targets that depend on it — what is left to run
@@ -2358,7 +2380,7 @@ impl PoolState:
                 return true
         false
 
-    mut fn push(name: str, pid: i32, t0: i64, out_path: str, err_path: str, timeout_ms: i32, ran_via_runner: i32, effects_path: str, slot: i32) -> Unit:
+    mut fn push(name: str, pid: i32, t0: i64, out_path: str, err_path: str, timeout_ms: i32, ran_via_runner: i32, effects_path: str, slot: i32):
         self.slots.push(slot)
         self.names.push(name)
         self.pids.push(pid)
@@ -2373,7 +2395,6 @@ impl PoolState:
         self.done_ats.push(0)
         self.done_rsss.push(0)
         self.retired.push(0)
-        return
 
     // One nonblocking pass over the live entries: reap and timestamp any
     // child that has exited, in-order or not.
@@ -2815,6 +2836,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     let js_slots = build_graph_test_parse_jobs(with_getenv_str("WITH_BUILD_JOBSERVER_SLOTS"))
     let use_js = js_dir.len() > 0 and js_slots > 0
     var held_slot: i32 = -1
+    var critical_written = ""
     // #921: the native runner is ensured lazily at the first eligible
     // Action target so non-action invocations never pay its compile.
     var runner_checked = false
@@ -2876,6 +2898,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         let runner_gate = if bootstrap_root_scheduled and not completed_targets.contains(bootstrap_root_target): bootstrap_root_target else: ""
         if use_js and held_slot < 0: held_slot = build_graph_jobserver_acquire(js_dir, js_slots)
         let longest = build_graph_longest_remaining(graph, remaining, pool, priority)
+        if use_js:
+            let critical = build_graph_critical_lanes(graph, pool, priority, longest)
+            if critical != critical_written:
+                build_graph_rt_write_file(js_dir ++ "/critical", critical)
+                critical_written = critical
         let pick = build_graph_pick_ready(graph, remaining, pool, pool_width, times_top_level, runner_gate, runner_upstream, priority, not use_js or held_slot >= 0, longest)
         if pick < 0 and use_js and held_slot < 0 and build_graph_pick_ready(graph, remaining, pool, pool_width, times_top_level, runner_gate, runner_upstream, priority, true, longest) >= 0:
             // A lane is ready and only a slot is missing: a test process
@@ -3101,7 +3128,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             let background = priority[ti] * 2 < longest
             let lane_slot = held_slot
             held_slot = -1
+            with_setenv_str("WITH_BUILD_LANE", target.name)
             let pid = if via_runner: build_pool_spawn_runner(runner_path, target, effects_path, worker_stdout, worker_stderr, background) else: build_pool_spawn(target, options, worker_stdout, worker_stderr, pool.running_len(), background)
+            with_setenv_str("WITH_BUILD_LANE", "")
             if pid <= 0:
                 with_eprint("error: could not spawn worker for build.w target '" ++ target.name ++ "'")
                 while pool.has_live():

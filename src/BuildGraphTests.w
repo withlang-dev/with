@@ -80,6 +80,12 @@ fn build_graph_jobserver_acquire(dir: &str, slots: i32) -> i32:
         if with_fs_symlink(me, dir ++ f"/slot-{k}") == 0: return k
     -1
 
+// This process's lane is on the critical path: the driver lists it in the
+// jobserver's `critical` file, and its windows then take no slots.
+fn build_graph_jobserver_lane_critical(dir: &str) -> bool:
+    let lane = build_graph_rt_getenv("WITH_BUILD_LANE")
+    lane.len() > 0 and ("\n" ++ build_graph_rt_read_file(dir ++ "/critical")).contains("\n" ++ lane ++ "\n")
+
 fn build_graph_jobserver_release(dir: &str, slot: i32):
     if slot >= 0: build_graph_rt_remove_file(dir ++ f"/slot-{slot}")
 
@@ -230,7 +236,7 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
     while finished < run_files.len():
         var slot: i32 = -1
         var may_start = next < run_files.len() and live.len() < jobs_limit
-        if may_start and use_js and live.len() > 0:
+        if may_start and use_js and live.len() > 0 and not build_graph_jobserver_lane_critical(js_dir):
             slot = build_graph_jobserver_acquire(js_dir, js_slots)
             may_start = slot >= 0
         if may_start:
