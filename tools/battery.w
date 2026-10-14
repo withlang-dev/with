@@ -299,7 +299,7 @@ if run_after_gate:
         // step holds it awake (and wakes it) for as long as it runs.
         let awake = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -d -i -s -u " else: ""
         assert(set_env("WITH_BATTERY_UAT_CMD", "WITH_UAT_WITH=$PWD/out/release/bin/with " ++ awake ++ "out/release/bin/with uat > out/battery/uat.log 2>&1") == 0)
-        let _ = join(&uat_thread)
+        join(&uat_thread)
         uat_thread = spawn_os(uat_worker)
         uat_started = true
     else:
@@ -327,7 +327,7 @@ if uat_started:
 // its lanes by the machine's last battery (build_graph_priorities).
 let green_dir = if env("WITH_GREEN_DIR").len() > 0: env("WITH_GREEN_DIR") else: env("HOME") ++ "/.local/with-green"
 if file_exists(ledger) and file_exists(green_dir):
-    let _ = write_file(green_dir ++ "/battery-times.tsv", read_file(ledger) ?? "")
+    write_file(green_dir ++ "/battery-times.tsv", read_file(ledger) ?? "")
 let verdict = if rc == 0: "GREEN" else: "RED"
 append(status, verdict ++ "\nBATTERY_DONE")
 let _ = remove_file(slot)
