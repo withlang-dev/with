@@ -978,6 +978,13 @@ impl CCodegen:
             return f"__with_main__{fn_sym}"
         f"{id}__{fn_sym}"
 
+    // Whether fn_c_name gives `fn_sym` its mangled, program-internal name.
+    fn fn_c_name_is_internal(fn_sym: i32) -> bool:
+        if fn_sym == 0 or self.fn_c_export_name(fn_sym).len() > 0:
+            return false
+        let id = cc_sanitize_ident(cc_intern_resolve(self.intern, fn_sym))
+        not (self.fn_decl_is_public(fn_sym) != 0 and cc_is_public_abi_name(id) != 0)
+
     fn global_c_name(sym: i32) -> str:
         if sym == 0:
             return "__with_global_0"
@@ -10168,7 +10175,15 @@ impl CCodegen:
         let out_param = self.array_out_param(ret_tid, true, false)
         if out_param.len() > 0:
             params = if params.len() > 0: out_param ++ ", " ++ params else: out_param
-        self.return_decl(ret_tid, fn_name ++ "(" ++ params ++ ")")
+        let decl = self.return_decl(ret_tid, fn_name ++ "(" ++ params ++ ")")
+        // A function under its mangled name is the program's own: nothing
+        // outside this translation unit can name it, so it is `static`, and
+        // clang neither generates nor optimizes one nothing calls. Every
+        // emitted program carries the whole standard library (pcre2
+        // included, about 24 MB of C), and with external linkage each was
+        // compiled in full at -O1. An export name or a public runtime-ABI
+        // name (cc_is_public_abi_name) keeps external linkage.
+        if self.fn_c_name_is_internal(fn_sym): "static " ++ decl else: decl
 
     mut fn prepare_c_type_instantiations():
         for i in 0..self.mir_mod.bodies.len():
