@@ -2213,7 +2213,7 @@ fn build_pool_width() -> i32:
 // Spawn an allow_parallel action target's worker without blocking; the env
 // dance mirrors run_build_test_worker_process (single-threaded driver, so
 // set-then-spawn-then-restore is race-free). Returns the child pid.
-fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, stdout_path: &str, stderr_path: &str, running: isize) -> i32:
+fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, stdout_path: &str, stderr_path: &str, running: isize, background: bool) -> i32:
     let old_worker = with_getenv_str("WITH_BUILD_ACTION_WORKER")
     let old_force = with_getenv_str("WITH_BUILD_ACTION_FORCE")
     let _set_worker = with_setenv_str("WITH_BUILD_ACTION_WORKER", target.name)
@@ -2233,7 +2233,7 @@ fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, st
         if inner < 2:
             inner = 2
         let _set_jobs = with_setenv_str("WITH_BUILD_TEST_JOBS", f"{inner}")
-    let pid = build_graph_rt_exec_argv_capture_spawn(build_target_worker_argv(target, options), stdout_path, stderr_path)
+    let pid = build_graph_rt_exec_argv_capture_spawn(build_pool_nice_prefix(background) ++ build_target_worker_argv(target, options), stdout_path, stderr_path)
     if target.kind == 2 and old_test_jobs.len() == 0:
         let _restore_jobs = with_setenv_str("WITH_BUILD_TEST_JOBS", old_test_jobs)
     let _restore_worker = with_setenv_str("WITH_BUILD_ACTION_WORKER", old_worker)
@@ -2244,13 +2244,22 @@ fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, st
 // but the child is the compiled build runner, addressed by
 // WITH_BUILD_ACTION_NAME (std.build's driver seam) instead of the
 // evaluator worker env.
-fn build_pool_spawn_runner(runner_path: &str, target: &BuildGraphTarget, effects_path: &str, stdout_path: &str, stderr_path: &str) -> i32:
+// A lane off the critical path runs under `nice 10`, so the kernel gives
+// the lanes everything else waits on the CPU first. selfcheck, on the
+// critical path, ran 231 s beside the flood of test lanes that start with
+// it (45 s alone). The lane's children inherit the priority. "" where no
+// `nice` exists (Windows).
+fn build_pool_nice_prefix(background: bool) -> str:
+    if not background or build_graph_rt_file_exists("/usr/bin/nice") == 0: return ""
+    build_graph_argv_append(build_graph_argv_append(build_graph_argv_append("", "/usr/bin/nice"), "-n"), "10")
+
+fn build_pool_spawn_runner(runner_path: &str, target: &BuildGraphTarget, effects_path: &str, stdout_path: &str, stderr_path: &str, background: bool) -> i32:
     let old_name = with_getenv_str("WITH_BUILD_ACTION_NAME")
     let old_effects = with_getenv_str("WITH_BUILD_EFFECTS_OUT")
     let _sn = with_setenv_str("WITH_BUILD_ACTION_NAME", target.name)
     let _se = with_setenv_str("WITH_BUILD_EFFECTS_OUT", effects_path)
     build_runner_reset_effects(effects_path)
-    let pid = build_graph_rt_exec_argv_capture_spawn(build_graph_argv_append("", runner_path), stdout_path, stderr_path)
+    let pid = build_graph_rt_exec_argv_capture_spawn(build_pool_nice_prefix(background) ++ build_graph_argv_append("", runner_path), stdout_path, stderr_path)
     let _rn = with_setenv_str("WITH_BUILD_ACTION_NAME", old_name)
     let _re = with_setenv_str("WITH_BUILD_EFFECTS_OUT", old_effects)
     pid
@@ -3050,7 +3059,15 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             let spawn_t0 = with_clock_nanos()
             let via_runner = build_runner_target_eligible(target, options, runner_path, &runner_fallback)
             let effects_path = if via_runner: build_runner_effects_path(root, target.name) else: "" ++ ""
-            let pid = if via_runner: build_pool_spawn_runner(runner_path, target, effects_path, worker_stdout, worker_stderr) else: build_pool_spawn(target, options, worker_stdout, worker_stderr, pool.running_len())
+            var longest: i64 = priority[ti]
+            for ri in 0..remaining.len():
+                if priority[remaining[ri]] > longest: longest = priority[remaining[ri]]
+            for pi in pool.oldest as isize..pool.names.len():
+                if pool.retired[pi] != 0 or pool.done[pi] != 0: continue
+                let lane_ti = build_graph_find_target_index_by_name(graph, pool.names[pi])
+                if lane_ti >= 0 and priority[lane_ti] > longest: longest = priority[lane_ti]
+            let background = priority[ti] * 2 < longest
+            let pid = if via_runner: build_pool_spawn_runner(runner_path, target, effects_path, worker_stdout, worker_stderr, background) else: build_pool_spawn(target, options, worker_stdout, worker_stderr, pool.running_len(), background)
             if pid <= 0:
                 with_eprint("error: could not spawn worker for build.w target '" ++ target.name ++ "'")
                 while pool.has_live():
