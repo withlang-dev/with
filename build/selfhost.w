@@ -7599,7 +7599,7 @@ fn bs_check_build_w_graph_v2(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     let non_action = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-no-deps-non-action", no_deps_args, 120000, case_dir)
     if non_action.rc == 0:
         ctx.diagnostics().error("error: build_w_no_deps_non_action unexpectedly succeeded")
-    rc = bs_assert_contains(ctx, non_action.stderr, "--no-deps is only supported for build.w action and test targets", "build_w_no_deps_non_action")
+    rc = bs_assert_contains(ctx, non_action.stderr, "--no-deps is only supported for build.w action, test and corpus-test targets", "build_w_no_deps_non_action")
     if rc != 0: return rc
     let deps = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-graph-deps", bs_blob_to_args(bs_argv_append(bs_argv_append(bs_argv_append("", "build"), ":toolchain"), "--graph")))
     if deps.rc != 0: return deps.rc
