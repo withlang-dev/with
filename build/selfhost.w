@@ -404,6 +404,50 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "a WITH_RUNTIME_ROOT of another compiler generation linked (exit 0): the D30 check stayed silent")
     if not refused.stderr.contains("would mix compiler generations"):
         return bs_fail(ctx, "a WITH_RUNTIME_ROOT of another compiler generation failed without saying why: " ++ refused.stderr)
+
+    // A root of another generation whose objects are byte for byte the ones
+    // the compiler embeds is its runtime, and links; one object that differs
+    // and it is refused again.
+    let same_bytes_root = bs_join(output_dir, "same-bytes-root")
+    if fs.mkdir_all(same_bytes_root) != 0 or fs.write_text(bs_join(same_bytes_root, ".producer"), "foreign:runtime-generation-regression\n") != 0:
+        return bs_fail(ctx, "could not write " ++ same_bytes_root ++ "/.producer")
+    let lib_files = fs.list_files("out/lib")
+    for lf in lib_files:
+        let name = lf.slice("out/lib/".len(), lf.len())
+        if name.contains("/") or not name.ends_with(".o") or name.starts_with("embedded_objects") or name.ends_with("_bridge.o"): continue
+        if fs.copy_file(lf, bs_join(same_bytes_root, name)) != 0:
+            return bs_fail(ctx, "could not copy " ++ lf ++ " into " ++ same_bytes_root)
+    let same_bytes_bin = bs_join(output_dir, "same-bytes")
+    var same_bytes_args: List[str] = List.new()
+    same_bytes_args |> push(bs_abs(root, compiler))
+    same_bytes_args |> push("build")
+    same_bytes_args |> push(bs_abs(root, source_path))
+    same_bytes_args |> push("-o")
+    same_bytes_args |> push(bs_abs(root, same_bytes_bin))
+    let same_bytes_env = process_env().set("WITH_RUNTIME_ROOT", bs_abs(root, same_bytes_root))
+    let same_bytes = ctx.process_runner().run_capture_with_env(same_bytes_args, bs_abs(root, bs_join(output_dir, "same-bytes.stdout")), bs_abs(root, bs_join(output_dir, "same-bytes.stderr")), 300000, same_bytes_env)
+    if same_bytes.rc != 0:
+        return bs_fail(ctx, f"a root of another generation holding this compiler's own runtime objects was refused (exit {same_bytes.rc}): " ++ same_bytes.stderr)
+    var same_bytes_run: List[str] = List.new()
+    same_bytes_run |> push(bs_abs(root, same_bytes_bin))
+    let ran_same = ctx.process_runner().run_capture(same_bytes_run, bs_abs(root, bs_join(output_dir, "same-bytes-run.stdout")), bs_abs(root, bs_join(output_dir, "same-bytes-run.stderr")), 60000)
+    if ran_same.rc != 0 or bs_trim_trailing_line_endings(ran_same.stdout) != "hello":
+        return bs_fail(ctx, f"the program linked through the same-bytes root exited {ran_same.rc} printing '" ++ ran_same.stdout ++ "'")
+    if fs.copy_file("out/lib/cimport_stubs.o", bs_join(same_bytes_root, "rt_core.o")) != 0:
+        return bs_fail(ctx, "could not overwrite " ++ same_bytes_root ++ "/rt_core.o")
+    let differs_bin = bs_join(output_dir, "differs")
+    var differs_args: List[str] = List.new()
+    differs_args |> push(bs_abs(root, compiler))
+    differs_args |> push("build")
+    differs_args |> push(bs_abs(root, source_path))
+    differs_args |> push("-o")
+    differs_args |> push(bs_abs(root, differs_bin))
+    let differs_env = process_env().set("WITH_RUNTIME_ROOT", bs_abs(root, same_bytes_root))
+    let differs = ctx.process_runner().run_capture_with_env(differs_args, bs_abs(root, bs_join(output_dir, "differs.stdout")), bs_abs(root, bs_join(output_dir, "differs.stderr")), 300000, differs_env)
+    if differs.rc == 0 or fs.exists(differs_bin):
+        return bs_fail(ctx, "a root of another generation whose rt_core.o is not this compiler's linked (exit 0)")
+    if not differs.stderr.contains("would mix compiler generations"):
+        return bs_fail(ctx, "a root of another generation whose rt_core.o is not this compiler's failed without saying why: " ++ differs.stderr)
     0
 
 fn bs_run_cli_expect_success(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
@@ -3973,6 +4017,10 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     let prelude_dir = bs_join(output_dir, "prelude_runtime")
     var prelude = ec_case("prelude runtime", prelude_dir, bs_join(prelude_dir, "prelude_runtime.w"))
     if bs_write_fixture(ctx, prelude.src, "fn main:\n    print(\"hello\")\n", "emit-c prelude runtime source") != 0: return 1
+    // --emit-all: every function and global of the standard library (pcre2
+    // included) as C, reached or not, so the C backend is proven over all of
+    // std here; the other cases emit only what their program reaches.
+    prelude.emit_flags.push("--emit-all")
     prelude.emit_timeout_ms = 600000
     prelude.expect_stdout = "hello"
     cases.push(prelude)
@@ -4003,6 +4051,14 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     if bs_write_fixture(ctx, intrinsics.src, bs_emit_c_generic_intrinsics_source(), "emit-c generic intrinsics source") != 0: return 1
     intrinsics.forbid_in_c = "generic_call: should be resolved"
     cases.push(intrinsics)
+
+    // A function nothing calls is not emitted: C emission writes what the
+    // program reaches (CCodegen emit_module), not all of std.
+    let unreached_dir = bs_join(output_dir, "unreached_function")
+    var unreached = ec_case("unreached function", unreached_dir, bs_join(unreached_dir, "unreached_function.w"))
+    if bs_write_fixture(ctx, unreached.src, "fn emit_c_unreached_marker(n: i32): n + 1\n\nfn main:\n    print(\"ok\")\n", "emit-c unreached function source") != 0: return 1
+    unreached.forbid_in_c = "emit_c_unreached_marker"
+    cases.push(unreached)
 
     var fixtures = 0
     for path in fs.list_files("test/emit_c"):

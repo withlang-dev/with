@@ -172,16 +172,20 @@ other):
 with build :seed
 export WITH=$PWD/src/main
 src/main build
-src/main build :fixpoint
+src/main build :release-checks
 src/main build :test
 src/main build :test-green
 src/main build :last-green
 ```
 
+`:release-checks` (D131) is the seed-cut and release tier the PR battery does
+not run: the fixpoint, the Sema regression rebuilds, the C migrator tests,
+the corpora migrated afresh and tested, and wo-drift.
+
 `:test` runs the full suite and records current test evidence. `:test-green`
 is a fast evidence check/recorder for that completed test run; it is not a
-substitute for running `:test`. `:last-green` consumes the current fixpoint and
-test evidence, records the seed that started the stage chain in
+substitute for running `:test`. `:last-green` consumes the current test evidence
+(and records the fixpoint evidence when this compiler has it), records the seed that started the stage chain in
 `out/.build-state/seed-input.json`, writes the verified compiler manifest to
 `out/.build-state/last-green.json`, and archives the verified `out/bin/with`
 under `out/seed-archive/`. The archive keeps the five most recent verified

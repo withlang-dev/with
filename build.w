@@ -1013,7 +1013,7 @@ fn gate_fixed_targets() -> List[str]:
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
     var fixed: List[str] = List.new()
-    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-integrity-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-integrity-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
     fixed
 
 fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
@@ -3830,8 +3830,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("fiber-runtime-object", stage_compiler_bin("with-stage2"), "rt/fiber_runtime.w", "out/lib/fiber_runtime.o", "-O1", "stage2"))
     out = out.add_target(with_object_target("fiber-core-object", stage_compiler_bin("with-stage2"), host_runtime.fiber_core_source, "out/lib/fiber.o", "-O1", "stage2"))
 
-    // stage1 (and prepare-bootstrap-link-root before it) recreate out/lib:
-    // an object written into it is written after them.
     var fiber_asm = target_new(.CompileAsmObject, "fiber-asm-object", host_runtime.fiber_asm_source.clone()).output("out/lib/fiber_asm.o")
     fiber_asm = fiber_asm.dep("stage1")
     out = out.add_target(fiber_asm)
@@ -4397,26 +4395,26 @@ pub fn build(ctx: BuildCtx) -> Build:
     var native_compile_error_tests = target_new(.Test, "native-compile-error-tests", "test/compile_errors/*.w")
     native_compile_error_tests = native_compile_error_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_compile_error_tests = native_compile_error_tests.dep("build")
-    native_compile_error_tests = native_compile_error_tests.dep("selfcheck")
+    // The native suites run the release compiler (`build`) and read
+    // nothing selfcheck makes: an ordering edge on selfcheck put it and
+    // each suite in series on the battery's critical path (selfcheck 231 s
+    // under load, then internals-tests 118 s). selfcheck still gates.
     out = out.add_target(native_compile_error_tests)
 
     var native_codegen_tests = target_new(.Test, "native-codegen-tests", "test/codegen/*.w")
     native_codegen_tests = native_codegen_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_codegen_tests = native_codegen_tests.dep("build")
-    native_codegen_tests = native_codegen_tests.dep("selfcheck")
     out = out.add_target(native_codegen_tests)
 
     var native_spec_tests = target_new(.Test, "native-spec-tests", "test/spec/*.w")
     native_spec_tests = native_spec_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_spec_tests = native_spec_tests.dep("build")
-    native_spec_tests = native_spec_tests.dep("selfcheck")
     out = out.add_target(native_spec_tests)
 
     var comptime_diff_tests = target_new(.Test, "comptime-diff-tests", "test/comptime_diff/*.w")
     comptime_diff_tests = comptime_diff_tests.allow_parallel()
     comptime_diff_tests = comptime_diff_tests.arg("compiler=" ++ release_compiler_bin("with"))
     comptime_diff_tests = comptime_diff_tests.dep("build")
-    comptime_diff_tests = comptime_diff_tests.dep("selfcheck")
     out = out.add_target(comptime_diff_tests)
 
     // The wasm32 lane (docs/proposals/wasm-target.md): each fixture is compiled for
@@ -4434,28 +4432,24 @@ pub fn build(ctx: BuildCtx) -> Build:
     var native_phase_tests = target_new(.Test, "native-phase-tests", "test/phase/*.w")
     native_phase_tests = native_phase_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_phase_tests = native_phase_tests.dep("build")
-    native_phase_tests = native_phase_tests.dep("selfcheck")
     out = out.add_target(native_phase_tests)
 
     var internals_tests = target_new(.Test, "internals-tests", "test/internals/*.w")
     internals_tests = internals_tests.allow_parallel()
     internals_tests = internals_tests.arg("compiler=" ++ release_compiler_bin("with"))
     internals_tests = internals_tests.dep("build")
-    internals_tests = internals_tests.dep("selfcheck")
     out = out.add_target(internals_tests)
 
     var lexer_tests = target_new(.Test, "lexer-tests", "test/lexer/*.w")
     lexer_tests = lexer_tests.allow_parallel()
     lexer_tests = lexer_tests.arg("compiler=" ++ release_compiler_bin("with"))
     lexer_tests = lexer_tests.dep("build")
-    lexer_tests = lexer_tests.dep("selfcheck")
     out = out.add_target(lexer_tests)
 
     var parser_tests = target_new(.Test, "parser-tests", "test/parser/*.w")
     parser_tests = parser_tests.allow_parallel()
     parser_tests = parser_tests.arg("compiler=" ++ release_compiler_bin("with"))
     parser_tests = parser_tests.dep("build")
-    parser_tests = parser_tests.dep("selfcheck")
     out = out.add_target(parser_tests)
 
     var cli_selfhost_smoke_tests = target_new(.Action, "cli-selfhost-smoke-tests", "").output("out/test-graph/cli-selfhost-smoke-tests")
@@ -4762,9 +4756,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
-    tests = tests.dep("c-migrator-tests")
-    tests = tests.dep("issue61-regression")
-    tests = tests.dep("invariance-check")
     tests = tests.dep("embedded-runtime-regression")
     tests = tests.dep("runtime-generation-regression")
     tests = tests.dep("emit-c-smoke")
@@ -4774,13 +4765,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     // runs 32 concurrent compiles under a 120 s budget each.
     tests = tests.dep("cli-selfhost-parallel-tests")
     tests = tests.dep("stdlib-complexity")
-    tests = tests.dep("wo-drift")
-    // The corpora lane (docs/proposals/stdlib_sourcing_plan.md): every migrated
-    // container corpus runs its upstream test programs under With.
-    tests = corpora_test_deps(move tests)
-    // D112: a migrator change is gated on every corpus migrated afresh and
-    // tested; nothing is promoted.
-    tests = tests.dep("corpus-migrator-gate")
     tests = tests.dep("spec-inventory-check")
     tests = tests.dep("libc-surface-check")
     tests = tests.dep("runtime-domain-audit")
@@ -4834,7 +4818,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     // evidence (test-green, then last-green) is recorded after what it blesses.
     var battery_checks = target_new(.Group, "battery-checks", "")
     battery_checks = battery_checks.dep("seed-driver")
-    battery_checks = battery_checks.dep("fixpoint")
     battery_checks = battery_checks.dep("test-with-audits")
     battery_checks = battery_checks.dep("user-programs-safe")
     battery_checks = battery_checks.dep("no-host-toolchain")
@@ -4852,6 +4835,28 @@ pub fn build(ctx: BuildCtx) -> Build:
     battery = battery.dep("battery-uat")
     battery = battery.dep("battery-checks")
     out = out.add_target(battery)
+
+    // D131 (Eric, 2026-10-14): validation is scoped to what each tier must
+    // prove. A fix: `with check`, `:dev` and the tests it touches. A PR (the
+    // battery above): main stays correct and buildable. A seed cut or a
+    // release (this group, beside the battery): the toolchain reproduces
+    // itself (fixpoint), the past Sema regressions stay fixed under every
+    // perturbation (issue61, the invariance rebuilds), and the migrator and
+    // every migrated corpus agree (migrate afresh, test, drift).
+    var release_checks = target_new(.Group, "release-checks", "")
+    release_checks = release_checks.dep("seed-driver")
+    release_checks = release_checks.dep("fixpoint")
+    release_checks = release_checks.dep("issue61-regression")
+    release_checks = release_checks.dep("invariance-check")
+    release_checks = release_checks.dep("c-migrator-tests")
+    release_checks = release_checks.dep("wo-drift")
+    // The corpora lane (docs/proposals/stdlib_sourcing_plan.md): every migrated
+    // container corpus runs its upstream test programs under With.
+    release_checks = corpora_test_deps(move release_checks)
+    // D112: a migrator change is gated on every corpus migrated afresh and
+    // tested; nothing is promoted.
+    release_checks = release_checks.dep("corpus-migrator-gate")
+    out = out.add_target(release_checks)
 
     var require_last_green = target_new(.Action, "require-last-green", "").output("out/command/require-last-green/ok")
     require_last_green.action = run_require_last_green_action
@@ -4881,6 +4886,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     release_uat = release_uat.write_scope("out/release-uat").write_scope("out/uat")
     release_uat = release_uat.allow_network()
     release_uat = release_uat.dep("require-last-green")
+    // D131: a release runs the seed-cut tier the battery no longer does.
+    release_uat = release_uat.dep("release-checks")
     release_uat = release_uat.dep("user-programs-safe")
     release_uat = release_uat_platform_asset_dep(move release_uat)
     out = out.add_target(release_uat)

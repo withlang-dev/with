@@ -13,9 +13,11 @@
 //      (`battery-uat`: `with uat` over uat/*.uat with the release compiler
 //      the run built — a fresh project, `with get` of each C library, the
 //      program a user writes over it; a scenario whose requirement the host
-//      lacks is skipped and says so), and the survey (fixpoint, the drop and
-//      move audits, every test target, user-programs-safe, the green
-//      evidence), scheduled together by readiness and remaining path. The
+//      lacks is skipped and says so), and the survey (the drop and move
+//      audits, every PR test target, user-programs-safe, the green
+//      evidence; the fixpoint, the Sema regression rebuilds and the corpora
+//      are the seed cut's and the release's: `:release-checks`, D131),
+//      scheduled together by readiness and remaining path. The
 //      phases ran one after another and each waited for its slowest lane
 //      (2026-10-14: 75 min). A red is `RED: <target>` the moment it lands and
 //      the run continues, so one battery reports every failure;

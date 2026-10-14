@@ -65,6 +65,30 @@ fn build_graph_test_parse_jobs(value: &str) -> i32:
         out = out * 10 + (ch - 48)
     out
 
+extern fn with_fs_symlink(target: &str, link_path: &str) -> i32
+
+// The machine-wide test-process budget the top-level driver hands its lanes
+// (WITH_BUILD_JOBSERVER, a directory; WITH_BUILD_JOBSERVER_SLOTS, its
+// size). A lane always runs one test; each further one holds a slot — an
+// exclusive symlink in the directory — until it is reaped. A lane started
+// into a full pool takes the slots the others free as they finish, so a long
+// suite no longer runs two files at a time to the end of the battery
+// (2026-10-14: behavior-tests, 300 s at a window of 2).
+fn build_graph_jobserver_acquire(dir: &str, slots: i32) -> i32:
+    let me = f"{build_graph_rt_getpid()}"
+    for k in 0..slots:
+        if with_fs_symlink(me, dir ++ f"/slot-{k}") == 0: return k
+    -1
+
+// This process's lane is on the critical path: the driver lists it in the
+// jobserver's `critical` file, and its windows then take no slots.
+fn build_graph_jobserver_lane_critical(dir: &str) -> bool:
+    let lane = build_graph_rt_getenv("WITH_BUILD_LANE")
+    lane.len() > 0 and ("\n" ++ build_graph_rt_read_file(dir ++ "/critical")).contains("\n" ++ lane ++ "\n")
+
+fn build_graph_jobserver_release(dir: &str, slot: i32):
+    if slot >= 0: build_graph_rt_remove_file(dir ++ f"/slot-{slot}")
+
 fn build_graph_test_jobs -> i32:
     let raw = build_graph_rt_getenv("WITH_BUILD_TEST_JOBS")
     let parsed = build_graph_test_parse_jobs(raw)
@@ -191,7 +215,11 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
     // Run every non-cached file; report every failure; never abort the
     // sweep on the first one (fail-fast over alphabetically ordered files
     // is how ten gate chains each surfaced exactly one bug).
-    let jobs_limit = build_graph_test_jobs()
+    let js_dir = build_graph_rt_getenv("WITH_BUILD_JOBSERVER")
+    let js_slots = build_graph_test_parse_jobs(build_graph_rt_getenv("WITH_BUILD_JOBSERVER_SLOTS"))
+    let use_js = js_dir.len() > 0 and js_slots > 0
+    let jobs_limit = if use_js: 32 else: build_graph_test_jobs()
+    let slot_of: List[i32] = List.new()
     var failed_paths: List[str] = List.new()
     var first_failure: i32 = 0
     var next: i32 = 0
@@ -206,7 +234,12 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
     // one slow file: a lane's 43 s test near the front of the alphabet let the
     // other slots drain and idle. Verdicts are a set, so finish order is moot.
     while finished < run_files.len():
-        if next < run_files.len() and live.len() < jobs_limit:
+        var slot: i32 = -1
+        var may_start = next < run_files.len() and live.len() < jobs_limit
+        if may_start and use_js and live.len() > 0 and not build_graph_jobserver_lane_critical(js_dir):
+            slot = build_graph_jobserver_acquire(js_dir, js_slots)
+            may_start = slot >= 0
+        if may_start:
             let test_path = run_files[next]
             let base = build_graph_path_basename(test_path)
             let stdout_path = resolve_join(capture_dir, base ++ ".stdout")
@@ -219,6 +252,7 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
             active.push(build_graph_external_test_job_new(test_path, stdout_path, stderr_path, pid))
             active_keys.push(with_str_clone_ref(run_keys[next]))
             started_ns.push(build_graph_rt_clock_nanos())
+            slot_of.push(slot)
             live.push(next)
             next = next + 1
             continue
@@ -234,6 +268,7 @@ pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, co
                     li = li + 1
                     continue
                 rc = build_graph_rt_exec_wait(active[idx].pid, 1)
+            build_graph_jobserver_release(js_dir, slot_of[idx])
             if echo: build_graph_rt_write(build_graph_rt_read_file(active[idx].stdout_path))
             let verdict = build_graph_finish_external_test_job(target, active[idx], rc)
             if verdict == 0:

@@ -29,6 +29,9 @@ pub type BuildCommandOptions {
     source_path: str,
     output_path: str,
     output_kind: BuildOutputKind,
+    // --emit-all: C emission writes every function and global, reached or
+    // not (the emit-c lane's whole-std coverage case).
+    emit_all: bool,
     opt_level: i32,
     debug_info: bool,
     no_std: bool,
@@ -129,6 +132,7 @@ pub fn build_command_options_default -> BuildCommandOptions:
         source_path: "",
         output_path: "",
         output_kind: BuildOutputKind.Binary,
+        emit_all: false,
         opt_level: 1,
         debug_info: true,
         no_std: false,
@@ -170,6 +174,7 @@ pub fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOp
         source_path: driver_clone_str(base.source_path),
         output_path: driver_clone_str(base.output_path),
         output_kind: base.output_kind,
+        emit_all: base.emit_all,
         opt_level: base.opt_level,
         debug_info: base.debug_info,
         no_std: base.no_std,
@@ -529,6 +534,14 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
         return BuildCommandParseResult {
             ok: false,
             error_msg: "--emit-c and --emit-obj are mutually exclusive",
+            build,
+            graph,
+        }
+    build.emit_all = driver_has_flag(argc, "--emit-all")
+    if build.emit_all and not emit_c:
+        return BuildCommandParseResult {
+            ok: false,
+            error_msg: "--emit-all applies to --emit-c",
             build,
             graph,
         }

@@ -1,49 +1,37 @@
 # Contributing to With
 
+The rules agents and maintainers work by are in [CLAUDE.md](CLAUDE.md)
+(identical to AGENTS.md); this page is the process. The mission is
+[docs/mission.md](docs/mission.md); the specification,
+[docs/spec/README.md](docs/spec/README.md), leads the implementation.
+
 ---
 
 ## Building
 
 ### Prerequisites
 
-- macOS ARM64 (primary development platform)
-- LLVM installed at `/usr/local/llvm` (override with `LLVM_PREFIX` env var)
+- macOS arm64 is the release host; Linux x86-64 and Windows x86-64 build the
+  same way.
+- No system LLVM. The toolchain builds its own static LLVM/Clang/lld SDK
+  (`tools/build-static-llvm.sh`, under `.deps/`); the release binary embeds it.
+- A `with` compiler. The repo is 100% With: every tool and script is a `.w`
+  file (`with run tools/x.w`).
 
-### Clone and Build
+### The seed
 
-```bash
-git clone https://github.com/QuixiAI/with.git
-cd with
-with build
+`src/main` is the seed: the compiler pinned in `seed.lock`, fetched from the
+release asset by `with build :seed`. It drives every validation build, exactly
+as CI would; the installed `with` drives only the iterate tier.
+
+```sh
+with build :seed                 # once per seed.lock bump
+export WITH=$PWD/src/main
+src/main build                   # seed -> stage1 -> stage2 -> release
 ```
 
-If you don't have `with` on PATH, first install a published compiler binary:
-
-```bash
-scripts/install.sh
-```
-
-Then `with build` compiles the full compiler. The release compiler output is
-`out/release/bin/with`; intermediate stage compilers live under `out/stage/bin/`.
-
-### Verify It Works
-
-```bash
-echo 'fn main: println("Hello, World!")' > /tmp/hello.w
-./out/stage/bin/with-stage2 build /tmp/hello.w
-/tmp/hello
-```
-
-If you see `Hello, World!`, you're ready.
-
-### Run the Test Suite
-
-```bash
-with build :test
-```
-
-All tests should pass. If any fail on a clean checkout, open an
-issue — that's a bug in main, not in your setup.
+The release compiler is `out/release/bin/with`; the stages are
+`out/bootstrap/bin/with-stage1` and `out/stage/bin/with-stage2`.
 
 ---
 
@@ -141,28 +129,80 @@ made ambient by the prelude, not compiler builtins.
 
 ## Making Changes
 
-### Workflow
+### Validation is scoped to its tier (D131)
 
-1. Make your change.
-2. Rebuild: `with build`
-3. Run tests: `with build :test`
-4. If you changed the compiler, verify fixpoint (see below).
-5. Open a PR.
+Each tier runs only what it must prove.
 
-### Verifying Fixpoint
+| Tier | Must prove | Run |
+|---|---|---|
+| A fix | it does what it says and breaks nothing nearby | `with check src/main.w`, `with build :dev`, the tests for what you touched |
+| A PR | main stays correct and buildable | `with run tools/battery.w` (the battery), once per stack |
+| A seed cut or a release | the toolchain reproduces itself; the migrator and the corpora agree | `src/main build :release-checks` |
 
-If your change touches the compiler itself (anything in `src/`),
-verify the compiler still reproduces itself:
+**A fix.** Write the test first and watch it fail, then fix the root cause
+(the exact line, found with the route in
+[docs/spec/toolchain/deep-debugging-tools.md](docs/spec/toolchain/deep-debugging-tools.md)).
+Iterate with `with check` and `with build :dev` (stage1) and run the tests you
+wrote or touched with `out/bootstrap/bin/with-stage1 test <files>`. New code in
+`src/` also runs `with run tools/ceremony_census.w --diff HEAD`. Before calling
+a layer done, run `src/main build :gate`.
 
-```bash
-with build :fixpoint
+**A PR.** Work landing together goes on one `gh stack`; one battery blesses
+the whole stack on its top commit:
+
+```sh
+with run tools/battery.w
 ```
 
-This builds stage3 from stage2 and checks they are byte-identical.
+It refuses a dirty tree and runs one graph: the gate, the acceptance scenarios
+(`uat/*.uat`) and the survey (the language suites, the drop and move audits,
+every PR test target, the green evidence), scheduled by readiness on every
+core. A red is written to `out/battery/status.txt` as it lands. Fix every red
+on the stack, then run the battery once more. A green battery publishes the
+green for those sources (D49): after the squash-merge, main needs no second
+battery. A docs-only PR needs only `spec-inventory-check`.
 
-If fixpoint breaks, your change introduced nondeterminism. Common
-causes: hash map iteration order, pointer values in output,
-timestamps, or uninitialized memory read as data.
+No migration runs for a fix or a PR. The C migrator and the migrated corpora
+(`lib/std/re`, `zl`, `c_algorithms`, `tommyds`) change only when a human runs
+them: `src/main build :c-migrator-tests` or a corpus lane after a migrator or
+corpus change, and `:release-checks` before every seed cut and release.
+
+**A seed cut or a release.** `src/main build :release-checks` runs what the
+battery does not: the fixpoint (stage2 compiles the compiler into stage3, and
+the two are byte-identical), the Sema regression rebuilds (issue61, the
+invariance perturbations), the C migrator tests, every corpus migrated afresh
+and tested, and wo-drift. A seed is cut, and a release made, only from a tree
+whose `:release-checks` is green; `release-uat` depends on it. Then follow
+[docs/spec/toolchain/with-release-runbook.md](docs/spec/toolchain/with-release-runbook.md).
+A newer seed lands as its own PR: bump `seed.lock`, `with run
+tools/bump_seed_pins.w`, `with build :seed`.
+
+### Pull requests
+
+- Every change reaches `main` through a PR; dependent PRs are a `gh stack`
+  (`gh stack link --base main <bottom> ... <top>`), never hand-chained bases.
+- A PR is a draft until its battery is green and posted on it.
+- Merge the stack in order: `gh stack merge <top-pr> --yes --squash`.
+- Every PR must build from the pinned seed. A change that needs a newer seed
+  cuts and pins one first.
+- One logical change per commit, authored by the human who drove the work
+  (Eric: `Eric Hartford <eric@quixi.ai>`); no AI author or co-author lines.
+- Never `git stash`; use `git worktree`.
+
+### Decisions and the spec
+
+Only Eric writes or blesses normative spec text. A question that needs a
+ruling goes to him as a brief: what the reference languages do, what the spec
+says, the mission fit, and a committed prediction (CLAUDE.md, "Do the thing").
+A reversible question outside C interop, ownership and safety with a
+prediction of 75% or more is delegated (D98): implement it, spec words
+included, and record it in [docs/meetings/README.md](docs/meetings/README.md).
+Every non-obvious decision is recorded there with its reasoning.
+
+### Filing bugs
+
+A bug found on the way that is outside the change is filed with its spec
+reference, a minimal repro, expected and actual output, and any workaround.
 
 ### What Gets Tested
 
@@ -197,7 +237,7 @@ directory:
 echo '//! expect-stdout: 42
 fn main:
     let x = 42
-    println("{x}")' > test/cases/my_feature.w
+    println("{x}")' > test/behavior/my_feature.w
 ```
 
 For a bug fix, add a regression test that reproduces the bug:
@@ -208,21 +248,8 @@ echo '//! expect-stdout: ok
 fn main:
     // This used to crash in the resolver
     let x = some_edge_case()
-    println("ok")' > test/cases/issue_123_resolver_crash.w
+    println("ok")' > test/behavior/issue_123_resolver_crash.w
 ```
-
-### Compiler Changes vs Library Changes
-
-**Compiler changes** (anything in `src/`): require fixpoint
-verification. The compiler compiles itself, so a bug in your
-change can prevent the compiler from building.
-
-**Library changes** (`lib/std/`): don't require fixpoint. They're
-compiled by the compiler, not part of it. Just run the test suite.
-
-**Runtime changes** (`runtime/`): require a full rebuild and all
-tests. The runtime is linked into every binary the compiler
-produces.
 
 ---
 
