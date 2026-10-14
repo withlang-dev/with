@@ -7,7 +7,8 @@
 //   1. refuses a dirty tree: a battery blesses committed sources (D49);
 //   2. takes one of two machine-wide battery slots, so a third battery cannot
 //      start by accident (a slot whose owner died is reclaimed);
-//   3. runs ONE `src/main build :gate :battery-uat :battery-checks`: the
+//   3. runs ONE `src/main build :battery` (the gate, battery-uat and
+//      battery-checks under one group target): the
 //      release build and the gate's targets, the acceptance scenarios
 //      (`battery-uat`: `with uat` over uat/*.uat with the release compiler
 //      the run built — a fresh project, `with get` of each C library, the
@@ -266,7 +267,7 @@ var rc = 0
 // A scenario that opens a window needs a lit display: the run holds the
 // display awake for its whole wall.
 let awake = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -d -i -s -u " else: ""
-let run_rc = step_live("battery", "WITH=$PWD/src/main " ++ awake ++ "src/main build :gate :battery-uat :battery-checks" ++ flags ++ " > out/battery/battery.log 2>&1", "out/battery/battery.log", status)
+let run_rc = step_live("battery", "WITH=$PWD/src/main " ++ awake ++ "src/main build :battery" ++ flags ++ " > out/battery/battery.log 2>&1", "out/battery/battery.log", status)
 merge_times(ledger, "out/.build-state/build-times.tsv")
 if file_exists("out/battery-uat/uat.stdout"):
     write_file("out/battery/uat.log", read_file("out/battery-uat/uat.stdout") ?? "")

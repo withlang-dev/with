@@ -4844,6 +4844,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     battery_checks = battery_checks.dep("last-green")
     out = out.add_target(battery_checks)
 
+    // The battery's one graph run (tools/battery.w): the gate, the uat
+    // scenarios and the survey under one name, so a driver that builds only
+    // the first of several `:target` selectors (#2330) still runs all three.
+    var battery = target_new(.Group, "battery", "")
+    battery = battery.dep("gate")
+    battery = battery.dep("battery-uat")
+    battery = battery.dep("battery-checks")
+    out = out.add_target(battery)
+
     var require_last_green = target_new(.Action, "require-last-green", "").output("out/command/require-last-green/ok")
     require_last_green.action = run_require_last_green_action
     require_last_green = require_last_green.input(host_bin("out/bin/with-sha256"))
