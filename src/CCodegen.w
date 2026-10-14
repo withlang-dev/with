@@ -345,6 +345,12 @@ type CCodegen {
     local_downcast_option_cache: HashMap[i64, i32],
     local_effective_cache: HashMap[i64, i32],
     local_ref_target_cache: HashMap[i64, i32],
+    // Each local's direct assignments, in block and statement order: CSR
+    // over the body `assign_index_sym` (ensure_assign_index).
+    assign_index_sym: i32,
+    assign_index_len: isize,
+    assign_starts: List[i32],
+    assign_stmts: List[i32],
     local_value_use_cache: HashMap[i64, i32],
     place_kind_cache: HashMap[i64, i32],
     callee_hint_cache: HashMap[i32, i32],
@@ -438,6 +444,10 @@ pub fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema:
         local_downcast_option_cache: HashMap.new(),
         local_effective_cache: HashMap.new(),
         local_ref_target_cache: HashMap.new(),
+        assign_index_sym: -1,
+        assign_index_len: -1,
+        assign_starts: List.new(),
+        assign_stmts: List.new(),
         local_value_use_cache: HashMap.new(),
         place_kind_cache: HashMap.new(),
         callee_hint_cache: HashMap.new(),
@@ -5005,6 +5015,14 @@ impl CCodegen:
         if self.field_cache_lookup(struct_tid, field_sym) != -1234567:
             return
         self.field_cache_store(struct_tid, field_sym, self.sema.resolve_alias(tid))
+
+// The local statement `stmt_id` assigns as a whole, or -1.
+fn cc_direct_assign_local(body: &MirBody, stmt_id: i32) -> i32:
+    if body.stmt_kinds[stmt_id] != StmtKind.Assign: return -1
+    let dst = body.stmt_d0[stmt_id]
+    if dst < 0 or dst >= body.place_locals.len() or body.place_proj_counts[dst] != 0: return -1
+    let local = body.place_locals[dst]
+    if local < 0 or local >= body.local_count(): -1 else: local
 
 fn cc_body_local_cache_key(body_fn_sym: i32, local_id: i32) -> i64:
     (body_fn_sym as i64) + ((local_id as i64) * 4294967296)
@@ -10209,6 +10227,31 @@ impl CCodegen:
     mut fn local_receives_ref(body: &MirBody, local_id: i32) -> bool:
         self.local_ref_target_tid(body, local_id) != 0
 
+    // Index `body`'s direct assignments by destination local, once per body.
+    mut fn ensure_assign_index(body: &MirBody):
+        if self.assign_index_sym == body.fn_sym and self.assign_index_len == body.stmt_kinds.len(): return
+        let n = body.local_count()
+        var starts = cc_zero_i32_list(n + 1)
+        for bb in 0..body.block_count():
+            let start = body.bb_stmt_starts[bb]
+            for si in 0..body.bb_stmt_counts[bb]:
+                let local = cc_direct_assign_local(body, start + si)
+                if local >= 0: starts[local + 1] += 1
+        for k in 0..n: starts[k + 1] += starts[k]
+        var fill = starts.clone()
+        var stmts = cc_zero_i32_list(starts[n])
+        for bb in 0..body.block_count():
+            let start = body.bb_stmt_starts[bb]
+            for si in 0..body.bb_stmt_counts[bb]:
+                let local = cc_direct_assign_local(body, start + si)
+                if local < 0: continue
+                stmts[fill[local]] = start + si
+                fill[local] += 1
+        self.assign_starts = starts
+        self.assign_stmts = stmts
+        self.assign_index_sym = body.fn_sym
+        self.assign_index_len = body.stmt_kinds.len()
+
     mut fn local_ref_target_tid(body: &MirBody, local_id: i32) -> i32:
         if local_id < 0:
             return 0
@@ -10221,61 +10264,58 @@ impl CCodegen:
             return value
         self.local_ref_target_cache.insert(cache_key, -1)
         var out: i32 = 0
-        for bb in 0..body.block_count():
-            let start = body.bb_stmt_starts[bb]
-            let count = body.bb_stmt_counts[bb]
-            for si in 0..count:
-                let stmt_id = start + si
-                if body.stmt_kinds[stmt_id] != StmtKind.Assign:
+        // Only this local's own assignments: a scan of every statement per
+        // local was quadratic in the body (2026-10-14: 63% of emitting a
+        // one-line program's C, every program carrying all of std).
+        self.ensure_assign_index(body)
+        if local_id >= body.local_count(): return 0
+        for ai in self.assign_starts[local_id]..self.assign_starts[local_id + 1]:
+            let stmt_id = self.assign_stmts[ai]
+            let rval_id = body.stmt_d1[stmt_id]
+            if rval_id < 0 or rval_id >= body.rval_kinds.len():
+                continue
+            let rk = body.rval_kinds[rval_id]
+            var src_place: i32 = -1
+            if rk == RvalueKind.RK_REF:
+                // A `&str` view is the str's {ptr, len}, not a pointer
+                // to the place it was read from (#1810).
+                if self.ref_rvalue_is_str_view(body, rval_id):
                     continue
-                let dst_place = body.stmt_d0[stmt_id]
-                if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                src_place = body.rval_d1[rval_id]
+            else if rk == RvalueKind.RK_ADDR_OF:
+                src_place = body.rval_d0[rval_id]
+            else if rk == RvalueKind.RK_USE:
+                let src_operand = body.rval_d0[rval_id]
+                if src_operand < 0 or src_operand >= body.operand_kinds.len():
                     continue
-                let rval_id = body.stmt_d1[stmt_id]
-                if rval_id < 0 or rval_id >= body.rval_kinds.len():
+                let ok = body.operand_kinds[src_operand]
+                if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
                     continue
-                let rk = body.rval_kinds[rval_id]
-                var src_place: i32 = -1
-                if rk == RvalueKind.RK_REF:
-                    // A `&str` view is the str's {ptr, len}, not a pointer
-                    // to the place it was read from (#1810).
-                    if self.ref_rvalue_is_str_view(body, rval_id):
-                        continue
-                    src_place = body.rval_d1[rval_id]
-                else if rk == RvalueKind.RK_ADDR_OF:
-                    src_place = body.rval_d0[rval_id]
-                else if rk == RvalueKind.RK_USE:
-                    let src_operand = body.rval_d0[rval_id]
-                    if src_operand < 0 or src_operand >= body.operand_kinds.len():
-                        continue
-                    let ok = body.operand_kinds[src_operand]
-                    if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
-                        continue
-                    let copied_place = body.operand_d0[src_operand]
-                    let copied_local = self.place_local_id(body, copied_place)
-                    if copied_local == local_id:
-                        continue
-                    if self.place_is_direct_local(body, copied_place, copied_local) == 0:
-                        continue
-                    let copied_tid = self.local_ref_target_tid(body, copied_local)
-                    if copied_tid == 0 or self.is_void_tid(copied_tid) != 0:
-                        continue
-                    if out == 0:
-                        out = copied_tid
-                    else if self.strict_type_match(out, copied_tid) == 0:
-                        self.local_ref_target_cache.insert(cache_key, -1)
-                        return 0
+                let copied_place = body.operand_d0[src_operand]
+                let copied_local = self.place_local_id(body, copied_place)
+                if copied_local == local_id:
                     continue
-                else:
+                if self.place_is_direct_local(body, copied_place, copied_local) == 0:
                     continue
-                let src_tid = self.place_ref_target_tid(body, src_place)
-                if src_tid == 0 or self.is_void_tid(src_tid) != 0:
+                let copied_tid = self.local_ref_target_tid(body, copied_local)
+                if copied_tid == 0 or self.is_void_tid(copied_tid) != 0:
                     continue
                 if out == 0:
-                    out = src_tid
-                else if self.strict_type_match(out, src_tid) == 0:
+                    out = copied_tid
+                else if self.strict_type_match(out, copied_tid) == 0:
                     self.local_ref_target_cache.insert(cache_key, -1)
                     return 0
+                continue
+            else:
+                continue
+            let src_tid = self.place_ref_target_tid(body, src_place)
+            if src_tid == 0 or self.is_void_tid(src_tid) != 0:
+                continue
+            if out == 0:
+                out = src_tid
+            else if self.strict_type_match(out, src_tid) == 0:
+                self.local_ref_target_cache.insert(cache_key, -1)
+                return 0
         if out == 0:
             self.local_ref_target_cache.insert(cache_key, -1)
         else:
