@@ -2886,6 +2886,10 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 build_graph_rt_usleep(10000)
             continue
         if pick < 0:
+            // Nothing can start: the slot held ahead goes back, so the
+            // lanes' own tests can widen into it.
+            build_graph_jobserver_release(js_dir, held_slot)
+            held_slot = -1
             if not pool.has_live():
                 with_eprint("error: build.w targets wait on one another: none of the remaining targets is ready (a dependency cycle)")
                 return 1
