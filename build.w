@@ -4397,26 +4397,26 @@ pub fn build(ctx: BuildCtx) -> Build:
     var native_compile_error_tests = target_new(.Test, "native-compile-error-tests", "test/compile_errors/*.w")
     native_compile_error_tests = native_compile_error_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_compile_error_tests = native_compile_error_tests.dep("build")
-    native_compile_error_tests = native_compile_error_tests.dep("selfcheck")
+    // The native suites run the release compiler (`build`) and read
+    // nothing selfcheck makes: an ordering edge on selfcheck put it and
+    // each suite in series on the battery's critical path (selfcheck 231 s
+    // under load, then internals-tests 118 s). selfcheck still gates.
     out = out.add_target(native_compile_error_tests)
 
     var native_codegen_tests = target_new(.Test, "native-codegen-tests", "test/codegen/*.w")
     native_codegen_tests = native_codegen_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_codegen_tests = native_codegen_tests.dep("build")
-    native_codegen_tests = native_codegen_tests.dep("selfcheck")
     out = out.add_target(native_codegen_tests)
 
     var native_spec_tests = target_new(.Test, "native-spec-tests", "test/spec/*.w")
     native_spec_tests = native_spec_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_spec_tests = native_spec_tests.dep("build")
-    native_spec_tests = native_spec_tests.dep("selfcheck")
     out = out.add_target(native_spec_tests)
 
     var comptime_diff_tests = target_new(.Test, "comptime-diff-tests", "test/comptime_diff/*.w")
     comptime_diff_tests = comptime_diff_tests.allow_parallel()
     comptime_diff_tests = comptime_diff_tests.arg("compiler=" ++ release_compiler_bin("with"))
     comptime_diff_tests = comptime_diff_tests.dep("build")
-    comptime_diff_tests = comptime_diff_tests.dep("selfcheck")
     out = out.add_target(comptime_diff_tests)
 
     // The wasm32 lane (docs/proposals/wasm-target.md): each fixture is compiled for
@@ -4434,28 +4434,24 @@ pub fn build(ctx: BuildCtx) -> Build:
     var native_phase_tests = target_new(.Test, "native-phase-tests", "test/phase/*.w")
     native_phase_tests = native_phase_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_phase_tests = native_phase_tests.dep("build")
-    native_phase_tests = native_phase_tests.dep("selfcheck")
     out = out.add_target(native_phase_tests)
 
     var internals_tests = target_new(.Test, "internals-tests", "test/internals/*.w")
     internals_tests = internals_tests.allow_parallel()
     internals_tests = internals_tests.arg("compiler=" ++ release_compiler_bin("with"))
     internals_tests = internals_tests.dep("build")
-    internals_tests = internals_tests.dep("selfcheck")
     out = out.add_target(internals_tests)
 
     var lexer_tests = target_new(.Test, "lexer-tests", "test/lexer/*.w")
     lexer_tests = lexer_tests.allow_parallel()
     lexer_tests = lexer_tests.arg("compiler=" ++ release_compiler_bin("with"))
     lexer_tests = lexer_tests.dep("build")
-    lexer_tests = lexer_tests.dep("selfcheck")
     out = out.add_target(lexer_tests)
 
     var parser_tests = target_new(.Test, "parser-tests", "test/parser/*.w")
     parser_tests = parser_tests.allow_parallel()
     parser_tests = parser_tests.arg("compiler=" ++ release_compiler_bin("with"))
     parser_tests = parser_tests.dep("build")
-    parser_tests = parser_tests.dep("selfcheck")
     out = out.add_target(parser_tests)
 
     var cli_selfhost_smoke_tests = target_new(.Action, "cli-selfhost-smoke-tests", "").output("out/test-graph/cli-selfhost-smoke-tests")
