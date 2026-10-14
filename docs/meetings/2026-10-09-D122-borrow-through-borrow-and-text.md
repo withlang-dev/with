@@ -57,3 +57,18 @@ first libxml2 program that edits a tree.
 
 **What would reopen it.** A C API where a node borrowed through another
 node outlives the document it came from (an origin that is not transitive).
+
+**Implementation (2026-10-13, #2404).** Gap 1: an imported record a
+`returns borrow T` clause names and no resource wraps is a view type; its
+operations render as methods of `T` on the `&T` view, a `returns borrow T2
+from param 0` through a view yields `Option[&T2]` viewing self, an
+operation through a view touches the view's origin, and the translator
+emits no §16.2a sugar on a view type. Gap 3: a producer takes a paired
+buffer through the constructor's bridge. Gap 2: `text param N` takes a
+`str` (copied NUL-terminated for the call); `text return, owned, freed by
+F` presents `Option[List[u8]]`, the bytes copied out and `F` called on the
+same path — unknown encoding is bytes (§16.2b.2).
+
+**Open, its own brief:** the spelling that declares a text return UTF-8
+(the ruling's "proved or declared UTF-8"), after which such a return
+presents as `Option[str]`; until then the caller converts the bytes.

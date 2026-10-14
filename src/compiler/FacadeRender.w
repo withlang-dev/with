@@ -526,6 +526,9 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32],
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
             out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ bname ++ "]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(" ++ bname ++ " { origin: " ++ origin ++ ", repr: " ++ handle ++ " })\n"
             continue
+        if li.text_free != 0:
+            out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, "        ", pro)
+            continue
         let (ret, body) = facade_render_bridge_body(pool, intern, decl, &bridge, facade_render_call(pool, intern, decl, call_args), mname, "        ", if failed_only: "" else: facade_render_message_call(pool, intern, ci, resource))
         out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ pro ++ body
     out
@@ -930,10 +933,11 @@ type FacadeLendItem {
     bridged: bool,           // states a buffer pairing, a fixed argument or an `ok` (D64)
     variadic: i32,           // the `variadic param … selected by …` clause (D66 §16.2b.5), or 0
     record_view: bool,       // `returns borrow T from …` for an imported record T (D66 §16.2b.6): borrow_res is T
+    text_free: i32,          // `text return, owned, freed by F` (D122 §16.2b.8): F's symbol, or 0
 }
 
 fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &List[i32], item: i32) -> FacadeLendItem:
-    var li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false }
+    var li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false, text_free: 0 }
     let cstart = pool.get_data1(item as NodeId)
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(cstart + k)
@@ -959,6 +963,8 @@ fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &List[i32], it
             if render_type_expr(pool, intern, pool.get_extra(ops) as NodeId) == "CStr": li.text_view = true
             else: li.lends = false
         else if kind == FACADE_CLAUSE_VALID_ON_FAILED: li.valid_on_failed = true
+        // D122 (§16.2b.8): the returned text is new, owned, released with F.
+        else if kind == FACADE_CLAUSE_TEXT_RETURN: li.text_free = pool.get_extra(ops)
         // A buffer pairing, a fixed argument and the status contract of a
         // copied-back length (D64) describe the lend's presented call
         // (facade_render_bridge); they make nothing stronger than a lend.
@@ -2103,6 +2109,17 @@ fn facade_render_bridge_param(pool: AstPool, intern: InternPool, decl: i32, pi: 
             b.cap_of = bname.clone()
             b.cap_unit = unit.clone()
         return b
+    // D122 (§16.2b.8): `text param N` — input text of any C character
+    // type takes a `str`, copied to a NUL-terminated temporary for the
+    // call; an interior NUL is refused as §16.3c refuses it for `const
+    // char *`, since C would read it as the end.
+    if facade_render_param_is_text(pool, intern, decl, pi):
+        let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
+        let local = facade_render_fresh(pname ++ "_text", taken)
+        b.prologue = "let " ++ local ++ " = " ++ pname ++ ".to_cstring().expect(\"" ++ fname ++ ": the text has an interior NUL byte, which C would read as its end (§16.3c)\")\n"
+        b.params = pname ++ ": &str"
+        b.args = "(" ++ local ++ ".as_cstr().ptr() as " ++ ptype ++ ")"
+        return b
     var shown = if ptype == "*const i8" or ptype == "*const c_char": "&str" else: ptype.clone()
     var arg = pname.clone()
     let res = facade_render_received(pool, intern, ptype)
@@ -2319,7 +2336,7 @@ fn facade_render_free_ops(pool: AstPool, intern: InternPool, ci: &List[i32], fac
         let li = facade_render_lend_item(pool, intern, ci, item)
         if not li.lends or li.decl == 0 or li.text_view or (li.borrow_res != 0 and not li.record_view):
             continue
-        if not li.bridged and li.variadic == 0 and not li.record_view:
+        if not li.bridged and li.variadic == 0 and not li.record_view and li.text_free == 0:
             continue
         var hosted = false
         for ri in 0..resources.len():
@@ -2351,6 +2368,10 @@ fn facade_render_free_ops(pool: AstPool, intern: InternPool, ci: &List[i32], fac
                 continue
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
             out = out ++ "fn " ++ base ++ "(" ++ bridge.params ++ ") -> Option[" ++ view ++ "]:\n" ++ facade_render_indent(bridge.prologue, "    ") ++ "    let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, bridge.args) ++ "\n    if " ++ handle ++ " == null: None else: Some(unsafe { " ++ handle ++ " as " ++ view ++ " })\n"
+            continue
+        if li.text_free != 0:
+            let rendered_text = if li.rename != 0: presented else: facade_render_bridge_name(cname)
+            out = out ++ "fn " ++ rendered_text ++ "(" ++ bridge.params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, bridge.args), li.text_free, "    ", facade_render_indent(bridge.prologue, "    "))
             continue
         if facade_render_fn_oks(pool, intern, decl).len() > 0:
             out = out ++ facade_render_fn_error_type(pool, intern, decl, presented, false)
@@ -2804,7 +2825,7 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &List[i32]
 fn facade_render_callback_hosted(pool: AstPool, intern: InternPool, cbi: &FacadeCallbackItem, resource: i32, repr: &str) -> bool:
     if cbi.decl == 0:
         return false
-    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false }
+    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false, text_free: 0 }
     facade_render_lend_hosted(pool, intern, &li, resource, repr)
 
 // Whether some callback method of `resource` retains userdata: the
@@ -3373,6 +3394,57 @@ pub fn facade_render_record_view_methods(pool: AstPool, intern: InternPool, ci: 
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
             out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ view ++ "]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(unsafe { " ++ handle ++ " as " ++ view ++ " })\n"
             continue
+        if li.text_free != 0:
+            out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, "        ", pro)
+            continue
         let (ret, body) = facade_render_bridge_body(pool, intern, decl, &bridge, facade_render_call(pool, intern, decl, call_args), mname, "        ", "")
         out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ pro ++ body
+    out
+
+// ── text parameters and owned text returns (D122, spec §16.2b.8) ────────
+
+// Whether `text param N` names parameter `pi` of the declaration, in its
+// fn item: input text of any C character type, taking a `str`.
+fn facade_render_param_is_text(pool: AstPool, intern: InternPool, decl: i32, pi: i32) -> bool:
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0:
+        return false
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_TEXT_PARAM:
+            continue
+        if facade_render_param_ref(pool, intern, decl, pool.get_extra(pool.get_data1(clause as NodeId))) == pi:
+            return true
+    false
+
+// `text return, owned, freed by F`: the result type and body of a
+// rendering whose C call is `call`. The returned pointer is new text the
+// caller owns: its bytes are copied out (unknown encoding is bytes,
+// §16.2b.2 — `Option[List[u8]]` until a return is proved or declared
+// UTF-8), F releases the pointer on the same path, NULL is None.
+fn facade_render_text_return(pool: AstPool, intern: InternPool, ci: &List[i32], decl: i32, call: &str, free_sym: i32, indent: &str, prologue: &str) -> str:
+    let taken = facade_render_param_names(pool, intern, decl)
+    let repr = facade_render_fresh("repr", taken)
+    let text = facade_render_fresh("text", taken)
+    let at = facade_render_fresh("at", taken)
+    let byte = facade_render_fresh("byte", taken)
+    let fdecl = facade_render_find_fn(pool, intern, ci, free_sym)
+    if fdecl == 0:
+        return ""
+    let fmeta = pool.find_fn_meta(fdecl as NodeId)
+    let ftype = render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(fmeta), 0) as NodeId)
+    let release = facade_render_call(pool, intern, fdecl, repr ++ " as " ++ ftype)
+    var out = " -> Option[List[u8]]:\n" ++ prologue
+    out = out ++ indent ++ "let " ++ repr ++ " = " ++ call ++ "\n"
+    out = out ++ indent ++ "if " ++ repr ++ " == null: return None\n"
+    out = out ++ indent ++ "var " ++ text ++ ": List[u8] = List.new()\n"
+    out = out ++ indent ++ "var " ++ at ++ ": i64 = 0\n"
+    out = out ++ indent ++ "while true:\n"
+    out = out ++ indent ++ "    let " ++ byte ++ " = unsafe { *((" ++ repr ++ " as i64 + " ++ at ++ ") as *const u8) }\n"
+    out = out ++ indent ++ "    if " ++ byte ++ " == 0: break\n"
+    out = out ++ indent ++ "    " ++ text ++ ".push(" ++ byte ++ ")\n"
+    out = out ++ indent ++ "    " ++ at ++ " = " ++ at ++ " + 1\n"
+    out = out ++ indent ++ release ++ "\n"
+    out = out ++ indent ++ "Some(" ++ text ++ ")\n"
     out

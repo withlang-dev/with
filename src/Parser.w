@@ -5064,6 +5064,40 @@ impl Parser:
                 self.emit_error("expected 'valid on failed' (§16.2b.4)")
                 return 0
             self.advance()
+        else if word == "text":
+            // D122 (§16.2b.8): `text param N` — a character pointer of any C
+            // character type is input text C reads to its NUL and does not
+            // keep, so it takes a str; `text return, owned, freed by F` — the
+            // returned character pointer is new text the caller owns,
+            // released with F.
+            if self.current_ident_is("param"):
+                kind = FACADE_CLAUSE_TEXT_PARAM
+                let r = self.parse_facade_param_ref()
+                if r == 0: return 0
+                ops.push(r)
+            else if self.current_text() == "return":
+                self.advance()
+                kind = FACADE_CLAUSE_TEXT_RETURN
+                if self.expect(TokenKind.TK_COMMA) == 0: return 0
+                if not self.current_ident_is("owned"):
+                    self.emit_error("a text return is written 'text return, owned, freed by <fn>' (§16.2b.8)")
+                    return 0
+                self.advance()
+                if self.expect(TokenKind.TK_COMMA) == 0: return 0
+                if not self.current_ident_is("freed"):
+                    self.emit_error("a text return is written 'text return, owned, freed by <fn>' (§16.2b.8)")
+                    return 0
+                self.advance()
+                if not self.current_ident_is("by"):
+                    self.emit_error("a text return is written 'text return, owned, freed by <fn>' (§16.2b.8)")
+                    return 0
+                self.advance()
+                let f = self.expect_ident()
+                if f == 0: return 0
+                ops.push(f)
+            else:
+                self.emit_error("expected 'text param <ref>' or 'text return, owned, freed by <fn>' (§16.2b.8)")
+                return 0
         else if word == "nullable":
             // `nullable param N` (§16.2b.8: where the header does not
             // establish nullability, the facade must): the parameter

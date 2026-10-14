@@ -1044,7 +1044,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1374,7 +1374,7 @@ impl Sema:
                     if from < 0:
                         return c
                     let origin = self.facade_param_receives(fn_sym, from)
-                    if origin.len() != 1 and self.ci_type_is_const_c_string_input(self.sig_param_type(sig, from)) == 0:
+                    if origin.len() != 1 and self.ci_type_is_const_c_string_input(self.sig_param_type(sig, from)) == 0 and not self.facade_param_is_text(fn_sym, from):
                         let shown = self.facade_param_display(fn_sym, sig, from)
                         let why = if origin.len() == 0: "receives no modeled resource and is not a C string" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
                         self.emit_error(f"fn '{fname}': 'returns borrow CStr from param {from}' names {shown}, which {why}; a borrowed CStr is a view of the resource or the C string its origin parameter receives, or of a domain ('from domain <name>') — With does not invent an origin (§16.2b.7)", clause)
@@ -1500,6 +1500,45 @@ impl Sema:
             // mark is verified once every resource is known
             // (verify_facade_failed_state_items).
             c.valid_on_failed = 1
+            return c
+        if kind == FACADE_CLAUSE_TEXT_PARAM:
+            // D122 (§16.2b.8): `text param N` — input text C reads to its
+            // NUL and does not keep; a str passes as it does for `const
+            // char *` (the bridge copies it to a NUL-terminated temporary).
+            let pi = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+            if pi < 0:
+                return c
+            if not self.facade_type_is_char_pointer(self.sig_param_type(sig, pi)):
+                let shown = self.facade_param_display(fn_sym, sig, pi)
+                self.emit_error(f"fn '{fname}': text {shown}: not a pointer to a C character type; 'text param' describes a `char *`, `unsigned char *` or `signed char *` input (§16.2b.8)", clause)
+                return c
+            for k in 0..c.text_params.len():
+                if c.text_params[k] == pi:
+                    self.emit_error(f"fn '{fname}': 'text param {pi}' is stated twice (§16.2b.8)", clause)
+                    return c
+            c.text_params.push(pi)
+            return c
+        if kind == FACADE_CLAUSE_TEXT_RETURN:
+            // D122 (§16.2b.8): `text return, owned, freed by F` — the
+            // returned character pointer is new text the caller owns; the
+            // rendering copies it and calls F. Unknown encoding is bytes
+            // (§16.2b.2): the caller receives owned bytes until a return is
+            // proved or declared UTF-8.
+            let ret = self.sig_return_type(sig)
+            if not self.facade_type_is_char_pointer(ret):
+                let rt: str = self.type_name(ret)
+                self.emit_error(f"fn '{fname}' returns {rt}, not a pointer to a C character type; 'text return' describes new text C hands back (§16.2b.8)", clause)
+                return c
+            let free_sym = self.facade_fn_symbol_named(self.pool_resolve(self.ast.get_extra(ops)))
+            let fsig = if free_sym != 0: self.get_sig(free_sym) else: -1
+            if fsig < 0 or self.sig_get_param_count(fsig) != 1 or self.get_type_kind(self.resolve_alias(self.sig_param_type(fsig, 0) as TypeId)) != TypeKind.TY_PTR:
+                let named: str = self.pool_resolve(self.ast.get_extra(ops))
+                self.emit_error(f"fn '{fname}': 'freed by {named}' names no imported function taking one pointer, the text to release (§16.2b.8)", clause)
+                return c
+            if c.text_return_free != 0:
+                self.emit_error(f"fn '{fname}': 'text return' is stated twice (§16.2b.8)", clause)
+                return c
+            c.text_return_free = free_sym
             return c
         if kind == FACADE_CLAUSE_NULLABLE:
             // `nullable param N` (ruling §43, spec §16.2b.8: "where safe
@@ -2384,6 +2423,8 @@ pub fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_CALLBACK_USERDATA: return "callback … userdata"
     if kind == FACADE_CLAUSE_VALID_ON_FAILED: return "valid on failed"
     if kind == FACADE_CLAUSE_NULLABLE: return "nullable"
+    if kind == FACADE_CLAUSE_TEXT_PARAM: return "text param"
+    if kind == FACADE_CLAUSE_TEXT_RETURN: return "text return"
     if kind == FACADE_CLAUSE_BUFFER: return "buffer"
     if kind == FACADE_CLAUSE_FIXED: return "param … fixed"
     if kind == FACADE_CLAUSE_VARIADIC: return "variadic param … selected by param …"
@@ -2517,7 +2558,7 @@ impl Sema:
             if ci >= 0 and self.facade_contract_pairs(ci, pi):
                 continue
             let pty = self.sig_param_type(sig, pi)
-            if self.ci_type_requires_raw_contract(pty) != 0 and self.ci_type_is_const_c_string_input(pty) == 0 and not self.facade_covers_param(fn_sym, pi):
+            if self.ci_type_requires_raw_contract(pty) != 0 and self.ci_type_is_const_c_string_input(pty) == 0 and not self.facade_param_is_text(fn_sym, pi) and not self.facade_covers_param(fn_sym, pi):
                 return true
         false
 
@@ -3010,7 +3051,7 @@ impl Sema:
             if pi == out_param or self.facade_contract_pairs(ci, pi) or self.facade_contract_models_param(ci, pi) or self.facade_contract_nullable_param(ci, pi):
                 continue
             let pty = self.sig_param_type(sig, pi)
-            if self.ci_type_requires_raw_contract(pty) == 0 or self.ci_type_is_const_c_string_input(pty) != 0:
+            if self.ci_type_requires_raw_contract(pty) == 0 or self.ci_type_is_const_c_string_input(pty) != 0 or self.facade_param_is_text(fn_sym, pi):
                 continue
             // A parameter that receives a modeled resource is reached through
             // the resource — the receiver, or a borrow `&P` (a shape a borrow
@@ -4272,7 +4313,7 @@ impl Sema:
                 let pty = self.resolve_alias(ptid as TypeId)
                 if self.get_type_kind(pty) != TypeKind.TY_PTR:
                     continue
-                if self.facade_param_receives(fn_sym, pi).len() > 0 or self.facade_param_receives_record(fn_sym, pi) != 0 or self.ci_type_is_const_c_string_input(ptid) != 0 or self.facade_param_is_callable(sig, pi):
+                if self.facade_param_receives(fn_sym, pi).len() > 0 or self.facade_param_receives_record(fn_sym, pi) != 0 or self.ci_type_is_const_c_string_input(ptid) != 0 or self.facade_param_is_text(fn_sym, pi) or self.facade_param_is_callable(sig, pi):
                     continue
                 // A paired buffer, its length or a fixed argument (D64) is
                 // the rendering's: the slice, or the literal.
@@ -5323,3 +5364,39 @@ impl Sema:
         if ci < 0 or self.facade_method_host(fn_sym).len() == 1:
             return 0
         self.facade_param_receives_record(fn_sym, 0)
+
+// ── text parameters and owned text returns (D122, spec §16.2b.8) ────────
+impl Sema:
+    // Whether `text param N` names `pi`: input text of any C character
+    // type, which takes a str (the bridge copies it NUL-terminated).
+    fn facade_param_is_text(fn_sym: i32, pi: i32) -> bool:
+        let ci = self.facade_contract_for(fn_sym)
+        if ci < 0:
+            return false
+        for k in 0..self.foreign_contracts[ci].text_params.len():
+            if self.foreign_contracts[ci].text_params[k] == pi: return true
+        false
+
+    // A pointer to a C character type: `char`, `unsigned char` or `signed
+    // char` (`i8` or `u8` after aliases), any constness.
+    fn facade_type_is_char_pointer(tid: i32) -> bool:
+        if tid == 0:
+            return false
+        let resolved = self.resolve_alias(tid as TypeId)
+        if self.get_type_kind(resolved) != TypeKind.TY_PTR:
+            return false
+        let pointee = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+        pointee == self.ty_i8 or pointee == self.ty_u8
+
+    // The symbol of the imported or declared function named `name`, or 0:
+    // a facade clause's name and the translation's may be two symbols for
+    // one text (facade_imported_record_type draws the same line).
+    fn facade_fn_symbol_named(name: &str) -> i32:
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            let kind = self.ast.kind(decl)
+            if kind != NodeKind.NK_FN_DECL and kind != NodeKind.NK_EXTERN_FN:
+                continue
+            if self.safe_symbol_text(self.ast.get_data0(decl)) == name:
+                return self.ast.get_data0(decl)
+        0
