@@ -2111,7 +2111,7 @@ fn build_graph_pick_ready(graph: &BuildGraph, remaining: &List[i32], pool: &Pool
                 ready = false
                 break
             for j in 0..remaining.len():
-                if j != k and (&graph.targets[remaining[j]]).name == dep:
+                if j != k and graph.targets[remaining[j]].name == dep:
                     ready = false
                     break
             if not ready: break
@@ -2317,21 +2317,21 @@ impl PoolState:
     // retire, and expiry kills the child (with_exec_wait's timeout path).
     // The first lane (in spawn order) that has finished and is not yet
     // retired, or -1.
-    mut fn next_done() -> i32:
+    mut fn next_done() -> isize:
         self.sweep()
-        for i in self.oldest..self.names.len() as i32:
+        for i in self.oldest as isize..self.names.len():
             if self.retired[i] == 0 and self.done[i] != 0: return i
         -1
 
     // Block until some lane finishes (enforcing each lane's budget as
     // wait_for_slot does) and return it.
-    mut fn wait_any_done() -> i32:
+    mut fn wait_any_done() -> isize:
         while true:
             let d = self.next_done()
             if d >= 0: return d
             build_graph_rt_usleep(10000)
             let now = with_clock_nanos()
-            for i in self.oldest..self.names.len() as i32:
+            for i in self.oldest as isize..self.names.len():
                 if self.retired[i] != 0 or self.done[i] != 0 or now - self.t0s[i] < self.timeouts[i] as i64 * 1000000: continue
                 self.done_rcs[i] = build_graph_rt_exec_wait(self.pids[i], 1)
                 self.done[i] = 1
@@ -2342,7 +2342,7 @@ impl PoolState:
     mut fn retire_oldest() -> PoolRetireResult: self.retire_at(self.oldest)
 
     // Retire lane `at`: wait for it, replay its output, report its wall.
-    mut fn retire_at(at: i32) -> PoolRetireResult:
+    mut fn retire_at(at: isize) -> PoolRetireResult:
         let idx = at as i64
         self.sweep()
         if self.done[idx] == 0:
@@ -2358,7 +2358,7 @@ impl PoolState:
                 build_graph_rt_usleep(10000)
                 self.sweep()
         self.retired[idx] = 1
-        while self.oldest < self.names.len() as i32 and self.retired[self.oldest] != 0:
+        while self.oldest < self.names.len() and self.retired[self.oldest] != 0:
             self.oldest = self.oldest + 1
         let name = self.names[idx]
         let rc = self.done_rcs[idx]
@@ -2768,12 +2768,12 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         var finished = pool.next_done()
         while finished >= 0:
             var done_lane = pool.retire_at(finished)
-            let done_rc = build_pool_finalize_retire(root, graph, options, &done_lane)
+            let done_rc = build_pool_finalize_retire(root, graph, options, done_lane)
             timed_names.push(with_str_clone_ref(done_lane.name))
             timed_ns.push(done_lane.spent)
             timed_rss.push(done_lane.maxrss)
             if done_rc == 0:
-                completed_targets.push(move done_lane.name)
+                completed_targets.push(done_lane.name)
             else:
                 if survey:
                     survey_failed.push(with_str_clone_ref(done_lane.name))
@@ -2783,10 +2783,10 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         if not survey and pool_failed_rc != 0:
             while pool.has_live():
                 var drain = pool.retire_oldest()
-                let _drain_rc = build_pool_finalize_retire(root, graph, options, &drain)
+                let _drain_rc = build_pool_finalize_retire(root, graph, options, drain)
             return pool_failed_rc
         let runner_gate = if bootstrap_root_scheduled and not completed_targets.contains(bootstrap_root_target): bootstrap_root_target else: ""
-        let pick = build_graph_pick_ready(graph, &remaining, &pool, pool_width, times_top_level, runner_gate, &runner_upstream)
+        let pick = build_graph_pick_ready(graph, remaining, pool, pool_width, times_top_level, runner_gate, runner_upstream)
         if pick < 0:
             if not pool.has_live():
                 with_eprint("error: build.w targets wait on one another: none of the remaining targets is ready (a dependency cycle)")
@@ -2794,12 +2794,12 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             // Nothing is ready until a lane finishes: retire the first to.
             let first_done = pool.wait_any_done()
             var waited = pool.retire_at(first_done)
-            let waited_rc = build_pool_finalize_retire(root, graph, options, &waited)
+            let waited_rc = build_pool_finalize_retire(root, graph, options, waited)
             timed_names.push(with_str_clone_ref(waited.name))
             timed_ns.push(waited.spent)
             timed_rss.push(waited.maxrss)
             if waited_rc == 0:
-                completed_targets.push(move waited.name)
+                completed_targets.push(waited.name)
             else:
                 if survey:
                     survey_failed.push(with_str_clone_ref(waited.name))
