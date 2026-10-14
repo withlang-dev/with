@@ -2085,16 +2085,75 @@ fn build_pool_parse_jobs(value: &str) -> i32:
         out = out * 10 + (ch - 48)
     out
 
+// The next target to run, as an index into `remaining` (declaration
+// order), or -1 when none is ready. A target is ready when no dependency
+// is still pending in `remaining` or in flight in the pool (a dependency
+// that failed has finished: the survey skips its dependents when they
+// run). A poolable target — an allow_parallel Action or Test lane — is
+// picked first while the pool has a free lane, so the lanes fill before
+// the driver blocks on an in-process target; else the first ready serial
+// target.
+// `runner_gate` names the native runner's link-root prepare target while
+// it has not completed: no Action runs before it (#921: the runner is
+// ensured lazily at the first Action once the root is prepared; an Action
+// picked earlier falls back to the comptime evaluator).
+fn build_graph_pick_ready(graph: &BuildGraph, remaining: &List[i32], pool: &PoolState, width: i32, top_level: bool, runner_gate: &str, runner_upstream: &List[str]) -> i32:
+    var first_serial: i32 = -1
+    let room = pool.running_len() < width
+    for k in 0..remaining.len():
+        let t = &graph.targets[remaining[k]]
+        var ready = true
+        if t.kind == 23 and runner_gate.len() > 0 and t.name != runner_gate and not runner_upstream.contains(t.name):
+            ready = false
+        for di in 0..t.deps.len():
+            let dep = t.deps[di]
+            if pool.dep_inflight(dep):
+                ready = false
+                break
+            for j in 0..remaining.len():
+                if j != k and (&graph.targets[remaining[j]]).name == dep:
+                    ready = false
+                    break
+            if not ready: break
+        if not ready:
+            continue
+        let poolable = (t.kind == 23 or t.kind == 2) and t.parallel != 0 and top_level
+        if poolable:
+            if room: return k as i32
+            continue
+        if first_serial < 0: first_serial = k as i32
+    first_serial
+
+// Every target `name` depends on, transitively, by name.
+fn build_graph_transitive_deps(graph: &BuildGraph, name: &str) -> List[str]:
+    var out: List[str] = List.new()
+    var frontier: List[str] = List.new()
+    frontier.push(name.to_owned())
+    while frontier.len() > 0:
+        let cur = frontier.pop().unwrap()
+        for ti in 0..graph.targets.len():
+            let t = &graph.targets[ti]
+            if t.name != cur: continue
+            for di in 0..t.deps.len():
+                let dep = t.deps[di]
+                if out.contains(dep): continue
+                out.push(dep.to_owned())
+                frontier.push(dep.to_owned())
+    out
+
 // Concurrency width for allow_parallel action workers (#680 stage B).
 fn build_pool_width() -> i32:
     let parsed = build_pool_parse_jobs(with_getenv_str("WITH_BUILD_JOBS"))
     if parsed > 0:
         if parsed > 32: return 32
         return parsed
+    // The pool is as wide as the machine: a lane divides its inner test
+    // window by the width (build_pool_spawn), so lanes multiply across
+    // cores rather than into oversubscription.
     let cores = build_graph_rt_cpu_cores()
     if cores < 2:
         return 1
-    if cores / 2 > 16: 16 else: cores / 2
+    if cores > 32: 32 else: cores
 
 // Spawn an allow_parallel action target's worker without blocking; the env
 // dance mirrors run_build_test_worker_process (single-threaded driver, so
@@ -2645,7 +2704,43 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     var bootstrap_root_scheduled = false
     for bi in 0..graph.targets.len():
         if (&graph.targets[bi]).name == bootstrap_root_target: bootstrap_root_scheduled = true
-    for ti in 0..graph.targets.len():
+    // Readiness scheduling: the next target is the first in declaration
+    // order whose dependencies are finished and none in flight — a poolable
+    // one while the pool has a free lane, else a serial one, which runs
+    // in-process beside the lanes. Walking the list in order instead let
+    // every serial target drain the pool first, so a battery's eighty
+    // targets ran one after another on an eighteen-core machine (the gate:
+    // 713 s of target time in 719 s of wall).
+    var remaining: List[i32] = List.new()
+    for ri in 0..graph.targets.len(): remaining.push(ri as i32)
+    // The targets upstream of the runner's prepare target run before it
+    // whatever their kind; every other Action waits for it.
+    let runner_upstream = if bootstrap_root_scheduled: build_graph_transitive_deps(graph, bootstrap_root_target) else: List.new()
+    while remaining.len() > 0:
+        let runner_gate = if bootstrap_root_scheduled and not completed_targets.contains(bootstrap_root_target): bootstrap_root_target else: ""
+        let pick = build_graph_pick_ready(graph, &remaining, &pool, pool_width, times_top_level, runner_gate, &runner_upstream)
+        if pick < 0:
+            if not pool.has_live():
+                with_eprint("error: build.w targets wait on one another: none of the remaining targets is ready (a dependency cycle)")
+                return 1
+            // Nothing is ready until a lane finishes: retire the oldest.
+            var waited = pool.retire_oldest()
+            let waited_rc = build_pool_finalize_retire(root, graph, options, &waited)
+            timed_names.push(with_str_clone_ref(waited.name))
+            timed_ns.push(waited.spent)
+            timed_rss.push(waited.maxrss)
+            if waited_rc == 0:
+                completed_targets.push(move waited.name)
+            else:
+                if survey:
+                    survey_failed.push(with_str_clone_ref(waited.name))
+                if not survey and pool_failed_rc == 0:
+                    pool_failed_rc = waited_rc
+            if not survey and pool_failed_rc != 0:
+                return pool_failed_rc
+            continue
+        let ti: i32 = remaining[pick]
+        let _picked = remaining.remove(pick)
         let target = &graph.targets[ti]
         if timing_name.len() > 0:
             let spent = with_clock_nanos() - timing_t0
@@ -2795,22 +2890,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         // width (see build_pool_spawn) so lanes multiply across cores, not
         // into oversubscription.
         let will_pool = (target.kind == 23 or target.kind == 2) and target.parallel != 0 and times_top_level
-        if not will_pool and pool.has_live():
-            while pool.has_live():
-                var retire = pool.retire_oldest()
-                let final_rc = build_pool_finalize_retire(root, graph, options, &retire)
-                timed_names.push(with_str_clone_ref(retire.name))
-                timed_ns.push(retire.spent)
-                timed_rss.push(retire.maxrss)
-                if final_rc == 0:
-                    completed_targets.push(move retire.name)
-                else:
-                    if survey:
-                        survey_failed.push(with_str_clone_ref(retire.name))
-                    if not survey and pool_failed_rc == 0:
-                        pool_failed_rc = final_rc
-            if pool_failed_rc != 0:
-                return pool_failed_rc
+        // A serial target runs beside the lanes (its dependencies are
+        // finished, build_graph_pick_ready); a lane's failure stops a
+        // non-survey run before the next target starts.
+        if not will_pool and not survey and pool_failed_rc != 0:
+            return pool_failed_rc
         if will_pool:
             pool.wait_for_slot(pool_width)
             // Retire, in order, every finished lane at the head: its output
