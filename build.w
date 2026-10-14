@@ -907,7 +907,10 @@ fn target_with_compiler_source_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
     // #679/#1665: only compiler self-compiles inherit this regression budget.
     // Use the wire spelling until the pinned seed includes Target.rss_limit.
-    out = out.arg("rss-limit-bytes=1073741824")
+    // 2 GiB (2026-10-14): the 1 GiB budget went unenforced from #702 on (a
+    // serial self-compile ran in a worker, and the driver measured its own
+    // RSS delta, about 0); measured per lane it is 1.46-1.54 GB. #2407.
+    out = out.arg("rss-limit-bytes=2147483648")
     let roots: List[str] = List.new()
     roots.push("src")
     roots.push("rt")
