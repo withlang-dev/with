@@ -2772,6 +2772,15 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     var pool = PoolState.new()
     var pool_failed_rc: i32 = 0
     let pool_width = build_pool_width()
+    // The test-process budget every lane's runner shares (BuildGraphTests.w
+    // build_graph_jobserver_acquire): one slot per core, set up once by the
+    // top-level driver and inherited by its lanes.
+    if times_top_level:
+        let js_dir = resolve_join(root, "out/.build-state/jobserver")
+        build_graph_rt_remove_tree(js_dir)
+        if build_graph_rt_mkdir_p(js_dir) == 0:
+            with_setenv_str("WITH_BUILD_JOBSERVER", js_dir)
+            with_setenv_str("WITH_BUILD_JOBSERVER_SLOTS", f"{build_graph_rt_cpu_cores()}")
     // #921: the native runner is ensured lazily at the first eligible
     // Action target so non-action invocations never pay its compile.
     var runner_checked = false
