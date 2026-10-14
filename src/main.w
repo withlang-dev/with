@@ -2097,8 +2097,9 @@ fn build_pool_parse_jobs(value: &str) -> i32:
 // it has not completed: no Action runs before it (#921: the runner is
 // ensured lazily at the first Action once the root is prepared; an Action
 // picked earlier falls back to the comptime evaluator).
-fn build_graph_pick_ready(graph: &BuildGraph, remaining: &List[i32], pool: &PoolState, width: i32, top_level: bool, runner_gate: &str, runner_upstream: &List[str]) -> i32:
+fn build_graph_pick_ready(graph: &BuildGraph, remaining: &List[i32], pool: &PoolState, width: i32, top_level: bool, runner_gate: &str, runner_upstream: &List[str], priority: &List[i64]) -> i32:
     var first_serial: i32 = -1
+    var best_lane: i32 = -1
     let room = pool.running_len() < width
     for k in 0..remaining.len():
         let t = &graph.targets[remaining[k]]
@@ -2119,10 +2120,53 @@ fn build_graph_pick_ready(graph: &BuildGraph, remaining: &List[i32], pool: &Pool
             continue
         let poolable = build_graph_target_poolable(t, top_level)
         if poolable:
-            if room: return k as i32
+            // The ready lane with the longest remaining path starts first
+            // (ties keep declaration order): a long target declared late
+            // no longer starts behind every short one and ends the run.
+            if room and (best_lane < 0 or priority[remaining[k]] > priority[remaining[best_lane]]): best_lane = k as i32
             continue
         if first_serial < 0: first_serial = k as i32
-    first_serial
+    if best_lane >= 0: best_lane else: first_serial
+
+// Each target's remaining path in ms: its measured time plus the longest
+// remaining path among the targets that depend on it — what is left to run
+// once it starts, on a machine wide enough. Measured times come from the
+// battery's ledger (this tree's, else the machine's last battery in the
+// green store); a target never measured counts 0.
+fn build_graph_priorities(root: &str, graph: &BuildGraph) -> List[i64]:
+    var ledger = with_fs_read_file(resolve_join(root, "out/.build-state/battery-times.tsv"))
+    if ledger.len() == 0:
+        let green = with_getenv_str("WITH_GREEN_DIR")
+        ledger = with_fs_read_file((if green.len() > 0: green else: with_getenv_str("HOME") ++ "/.local/with-green") ++ "/battery-times.tsv")
+    var own: List[i64] = List.new()
+    for ti in 0..graph.targets.len(): own.push(build_graph_ledger_ms(ledger, graph.targets[ti].name))
+    var prio: List[i64] = List.new()
+    for ti in 0..own.len(): prio.push(own[ti])
+    var changed = true
+    while changed:
+        changed = false
+        for ti in 0..graph.targets.len():
+            for di in 0..graph.targets[ti].deps.len():
+                let dep = build_graph_find_target_index_by_name(graph, graph.targets[ti].deps[di])
+                if dep < 0: continue
+                let through = own[dep] + prio[ti]
+                if through > prio[dep]:
+                    prio[dep] = through
+                    changed = true
+    prio
+
+// A target's seconds in a ledger (`name<TAB>12.3s<TAB>…` lines) as ms, or 0.
+fn build_graph_ledger_ms(ledger: &str, name: &str) -> i64:
+    let at = ("\n" ++ ledger).index_of("\n" ++ name ++ "\t")
+    if at < 0: return 0
+    let rest = ledger.slice(at + name.len() + 1, ledger.len())
+    let end = rest.index_of("s\t")
+    if end <= 0: return 0
+    let secs = rest.slice(0, end)
+    let dot = secs.index_of(".")
+    let whole = if dot < 0: secs else: secs.slice(0, dot)
+    let tenth = if dot < 0 or dot + 1 >= secs.len(): "0" else: secs.slice(dot + 1, dot + 2)
+    build_pool_parse_jobs(whole) as i64 * 1000 + build_pool_parse_jobs(tenth) as i64 * 100
 
 // A target runs as a worker lane beside the others when the driver is the
 // top-level one and the target is a Test, RunCorpusTest or Action: each is
@@ -2761,6 +2805,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     // The targets upstream of the runner's prepare target run before it
     // whatever their kind; every other Action waits for it.
     let runner_upstream = if bootstrap_root_scheduled: build_graph_transitive_deps(graph, bootstrap_root_target) else: List.new()
+    let priority = build_graph_priorities(root, graph)
     while remaining.len() > 0:
         // Every finished lane is retired before the next pick, so the
         // targets that wait on it are ready now, not when FIFO order
@@ -2786,7 +2831,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 let _drain_rc = build_pool_finalize_retire(root, graph, options, drain)
             return pool_failed_rc
         let runner_gate = if bootstrap_root_scheduled and not completed_targets.contains(bootstrap_root_target): bootstrap_root_target else: ""
-        let pick = build_graph_pick_ready(graph, remaining, pool, pool_width, times_top_level, runner_gate, runner_upstream)
+        let pick = build_graph_pick_ready(graph, remaining, pool, pool_width, times_top_level, runner_gate, runner_upstream, priority)
         if pick < 0:
             if not pool.has_live():
                 with_eprint("error: build.w targets wait on one another: none of the remaining targets is ready (a dependency cycle)")

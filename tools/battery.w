@@ -158,6 +158,16 @@ fn uat_failed(log: &str) -> str:
 fn live_cmd -> str: env("WITH_BATTERY_LIVE_CMD")
 fn live_done -> str: env("WITH_BATTERY_LIVE_DONE")
 
+// The uat phase runs on its own thread beside battery-checks: both need
+// only the release compiler the gate built, and uat used to hold the survey
+// back by its whole wall.
+fn live_worker_noop -> i32: 0
+
+fn uat_worker -> i32:
+    let rc = sh(env("WITH_BATTERY_UAT_CMD"))
+    assert(write_file("out/battery/uat.done", f"{rc}\n") == 0)
+    rc
+
 fn live_worker -> i32:
     let rc = sh(live_cmd())
     assert(write_file(live_done(), f"{rc}\n") == 0)
@@ -279,21 +289,23 @@ if gate_rc != 0:
 // it, later phases still run and report their own reds. UAT additionally
 // needs the release compiler the gate builds: in survey mode a red gate
 // that left none records the skip instead of running a stale binary.
-if rc == 0 or survey:
+let run_after_gate = rc == 0 or survey
+var uat_started = false
+var uat_thread = spawn_os(live_worker_noop)
+let uat_t0 = now()
+if run_after_gate:
     if file_exists("out/release/bin/with"):
         // A scenario that opens a window needs a lit display: on macOS the uat
         // step holds it awake (and wakes it) for as long as it runs.
         let awake = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -d -i -s -u " else: ""
-        let uat_rc = step_live("uat", "WITH_UAT_WITH=$PWD/out/release/bin/with " ++ awake ++ "out/release/bin/with uat > out/battery/uat.log 2>&1", "out/battery/uat.log", status)
-        if uat_rc != 0:
-            if rc == 0: rc = uat_rc
-            let failed = uat_failed("out/battery/uat.log")
-            print("RED (uat): " ++ failed)
-            append(status, "RED (uat): " ++ failed)
+        assert(set_env("WITH_BATTERY_UAT_CMD", "WITH_UAT_WITH=$PWD/out/release/bin/with " ++ awake ++ "out/release/bin/with uat > out/battery/uat.log 2>&1") == 0)
+        let _ = join(&uat_thread)
+        uat_thread = spawn_os(uat_worker)
+        uat_started = true
     else:
         print("battery: uat skipped (no out/release/bin/with from the gate)")
         append(status, "uat skipped: no release compiler")
-if rc == 0 or survey:
+if run_after_gate:
     let checks_rc = step_live("battery-checks", "WITH=$PWD/src/main " ++ hold ++ "src/main build :battery-checks" ++ flags ++ " > out/battery/checks.log 2>&1", "out/battery/checks.log", status)
     merge_times(ledger, "out/.build-state/build-times.tsv")
     if checks_rc != 0:
@@ -301,6 +313,21 @@ if rc == 0 or survey:
         let failed = red_report("out/battery/checks.log")
         print("failed: " ++ failed)
         append(status, "failed: " ++ failed)
+let uat_rc = join(&uat_thread)
+if uat_started:
+    let line = f"uat rc={uat_rc} wall={now() - uat_t0}s"
+    print(line)
+    append(status, line)
+    if uat_rc != 0:
+        if rc == 0: rc = uat_rc
+        let failed = uat_failed("out/battery/uat.log")
+        print("RED (uat): " ++ failed)
+        append(status, "RED (uat): " ++ failed)
+// The ledger goes to the green store too: a fresh worktree's driver orders
+// its lanes by the machine's last battery (build_graph_priorities).
+let green_dir = if env("WITH_GREEN_DIR").len() > 0: env("WITH_GREEN_DIR") else: env("HOME") ++ "/.local/with-green"
+if file_exists(ledger) and file_exists(green_dir):
+    let _ = write_file(green_dir ++ "/battery-times.tsv", read_file(ledger) ?? "")
 let verdict = if rc == 0: "GREEN" else: "RED"
 append(status, verdict ++ "\nBATTERY_DONE")
 let _ = remove_file(slot)
