@@ -2117,12 +2117,23 @@ fn build_graph_pick_ready(graph: &BuildGraph, remaining: &List[i32], pool: &Pool
             if not ready: break
         if not ready:
             continue
-        let poolable = (t.kind == 23 or t.kind == 2) and t.parallel != 0 and top_level
+        let poolable = build_graph_target_poolable(t, top_level)
         if poolable:
             if room: return k as i32
             continue
         if first_serial < 0: first_serial = k as i32
     first_serial
+
+// A target runs as a worker lane beside the others when the driver is the
+// top-level one and the target is a Test, RunCorpusTest or Action: each is
+// run by a `with build :name --no-deps` child, and the graph orders it.
+// Draining the lanes before every target not marked allow_parallel ran a
+// battery's targets one after another on an eighteen-core machine. The
+// evidence targets stay in the driver: they read the run's own failures.
+fn build_graph_target_poolable(t: &BuildGraphTarget, top_level: bool) -> bool:
+    if not top_level: return false
+    if t.name == "test-green" or t.name == "last-green" or t.name == "last-green-record": return false
+    t.kind == 23 or t.kind == 2 or t.kind == 19
 
 // Every target `name` depends on, transitively, by name.
 fn build_graph_transitive_deps(graph: &BuildGraph, name: &str) -> List[str]:
@@ -2158,7 +2169,7 @@ fn build_pool_width() -> i32:
 // Spawn an allow_parallel action target's worker without blocking; the env
 // dance mirrors run_build_test_worker_process (single-threaded driver, so
 // set-then-spawn-then-restore is race-free). Returns the child pid.
-fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, stdout_path: &str, stderr_path: &str) -> i32:
+fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, stdout_path: &str, stderr_path: &str, running: isize) -> i32:
     let old_worker = with_getenv_str("WITH_BUILD_ACTION_WORKER")
     let old_force = with_getenv_str("WITH_BUILD_ACTION_FORCE")
     let _set_worker = with_setenv_str("WITH_BUILD_ACTION_WORKER", target.name)
@@ -2171,7 +2182,10 @@ fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, st
     let old_test_jobs = with_getenv_str("WITH_BUILD_TEST_JOBS")
     if target.kind == 2 and old_test_jobs.len() == 0:
         let cores = build_graph_rt_cpu_cores()
-        var inner = if build_pool_width() > 0: cores / build_pool_width() else: cores
+        // The cores divided among the lanes running when this one starts
+        // (itself included): the first lanes of a phase take a wide window,
+        // and a lane started into a full pool takes the minimum.
+        var inner = cores / (running + 1) as i32
         if inner < 2:
             inner = 2
         let _set_jobs = with_setenv_str("WITH_BUILD_TEST_JOBS", f"{inner}")
@@ -2219,11 +2233,12 @@ type PoolState {
     done_rcs: List[i32],
     done_ats: List[i64],
     done_rsss: List[i64],
+    retired: List[i32],
     oldest: i32,
 }
 
 fn PoolState.new() -> Self:
-    PoolState { names: List.new(), pids: List.new(), t0s: List.new(), outs: List.new(), errs: List.new(), timeouts: List.new(), via_runner: List.new(), effects_paths: List.new(), done: List.new(), done_rcs: List.new(), done_ats: List.new(), done_rsss: List.new(), oldest: 0 }
+    PoolState { names: List.new(), pids: List.new(), t0s: List.new(), outs: List.new(), errs: List.new(), timeouts: List.new(), via_runner: List.new(), effects_paths: List.new(), done: List.new(), done_rcs: List.new(), done_ats: List.new(), done_rsss: List.new(), retired: List.new(), oldest: 0 }
 
 impl PoolState:
     fn has_live(): self.oldest < self.names.len()
@@ -2261,7 +2276,7 @@ impl PoolState:
 
     fn dep_inflight(dep_name: &str) -> bool:
         for pi in self.oldest..self.names.len() as i32:
-            if self.names[pi] == dep_name:
+            if self.retired[pi] == 0 and self.names[pi] == dep_name:
                 return true
         false
 
@@ -2278,6 +2293,7 @@ impl PoolState:
         self.done_rcs.push(0)
         self.done_ats.push(0)
         self.done_rsss.push(0)
+        self.retired.push(0)
         return
 
     // One nonblocking pass over the live entries: reap and timestamp any
@@ -2299,8 +2315,35 @@ impl PoolState:
     // wait), replay its captured output, and report its true wall/rss.
     // Timeout semantics match the old blocking wait: the budget runs from
     // retire, and expiry kills the child (with_exec_wait's timeout path).
-    mut fn retire_oldest() -> PoolRetireResult:
-        let idx = self.oldest as i64
+    // The first lane (in spawn order) that has finished and is not yet
+    // retired, or -1.
+    mut fn next_done() -> i32:
+        self.sweep()
+        for i in self.oldest..self.names.len() as i32:
+            if self.retired[i] == 0 and self.done[i] != 0: return i
+        -1
+
+    // Block until some lane finishes (enforcing each lane's budget as
+    // wait_for_slot does) and return it.
+    mut fn wait_any_done() -> i32:
+        while true:
+            let d = self.next_done()
+            if d >= 0: return d
+            build_graph_rt_usleep(10000)
+            let now = with_clock_nanos()
+            for i in self.oldest..self.names.len() as i32:
+                if self.retired[i] != 0 or self.done[i] != 0 or now - self.t0s[i] < self.timeouts[i] as i64 * 1000000: continue
+                self.done_rcs[i] = build_graph_rt_exec_wait(self.pids[i], 1)
+                self.done[i] = 1
+                self.done_ats[i] = with_clock_nanos()
+                self.done_rsss[i] = build_graph_rt_child_maxrss()
+        -1
+
+    mut fn retire_oldest() -> PoolRetireResult: self.retire_at(self.oldest)
+
+    // Retire lane `at`: wait for it, replay its output, report its wall.
+    mut fn retire_at(at: i32) -> PoolRetireResult:
+        let idx = at as i64
         self.sweep()
         if self.done[idx] == 0:
             let deadline = with_clock_nanos() + self.timeouts[idx] as i64 * 1000000
@@ -2314,7 +2357,9 @@ impl PoolState:
                     break
                 build_graph_rt_usleep(10000)
                 self.sweep()
-        self.oldest = self.oldest + 1
+        self.retired[idx] = 1
+        while self.oldest < self.names.len() as i32 and self.retired[self.oldest] != 0:
+            self.oldest = self.oldest + 1
         let name = self.names[idx]
         let rc = self.done_rcs[idx]
         let spent = self.done_ats[idx] - self.t0s[idx]
@@ -2432,7 +2477,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
         var cache_admitted = worker_name.len() == 0
         if not cache_admitted:
             let wi = build_graph_find_target_index_by_name(&cached, worker_name)
-            cache_admitted = wi >= 0 and (&cached.targets[wi]).kind == 2
+            cache_admitted = wi >= 0 and (&cached.targets[wi]).kind != 23
         if cache_admitted:
             return BuildGraphLoadResult { graph: cached, sema: Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new()) }
     var graph = empty_build_graph()
@@ -2717,14 +2762,38 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     // whatever their kind; every other Action waits for it.
     let runner_upstream = if bootstrap_root_scheduled: build_graph_transitive_deps(graph, bootstrap_root_target) else: List.new()
     while remaining.len() > 0:
+        // Every finished lane is retired before the next pick, so the
+        // targets that wait on it are ready now, not when FIFO order
+        // reaches it.
+        var finished = pool.next_done()
+        while finished >= 0:
+            var done_lane = pool.retire_at(finished)
+            let done_rc = build_pool_finalize_retire(root, graph, options, &done_lane)
+            timed_names.push(with_str_clone_ref(done_lane.name))
+            timed_ns.push(done_lane.spent)
+            timed_rss.push(done_lane.maxrss)
+            if done_rc == 0:
+                completed_targets.push(move done_lane.name)
+            else:
+                if survey:
+                    survey_failed.push(with_str_clone_ref(done_lane.name))
+                if not survey and pool_failed_rc == 0:
+                    pool_failed_rc = done_rc
+            finished = pool.next_done()
+        if not survey and pool_failed_rc != 0:
+            while pool.has_live():
+                var drain = pool.retire_oldest()
+                let _drain_rc = build_pool_finalize_retire(root, graph, options, &drain)
+            return pool_failed_rc
         let runner_gate = if bootstrap_root_scheduled and not completed_targets.contains(bootstrap_root_target): bootstrap_root_target else: ""
         let pick = build_graph_pick_ready(graph, &remaining, &pool, pool_width, times_top_level, runner_gate, &runner_upstream)
         if pick < 0:
             if not pool.has_live():
                 with_eprint("error: build.w targets wait on one another: none of the remaining targets is ready (a dependency cycle)")
                 return 1
-            // Nothing is ready until a lane finishes: retire the oldest.
-            var waited = pool.retire_oldest()
+            // Nothing is ready until a lane finishes: retire the first to.
+            let first_done = pool.wait_any_done()
+            var waited = pool.retire_at(first_done)
             let waited_rc = build_pool_finalize_retire(root, graph, options, &waited)
             timed_names.push(with_str_clone_ref(waited.name))
             timed_ns.push(waited.spent)
@@ -2889,7 +2958,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         // pooled Test child divides the inner sliding window by the pool
         // width (see build_pool_spawn) so lanes multiply across cores, not
         // into oversubscription.
-        let will_pool = (target.kind == 23 or target.kind == 2) and target.parallel != 0 and times_top_level
+        let will_pool = build_graph_target_poolable(target, times_top_level)
         // A serial target runs beside the lanes (its dependencies are
         // finished, build_graph_pick_ready); a lane's failure stops a
         // non-survey run before the next target starts.
@@ -2927,7 +2996,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             let spawn_t0 = with_clock_nanos()
             let via_runner = build_runner_target_eligible(target, options, runner_path, &runner_fallback)
             let effects_path = if via_runner: build_runner_effects_path(root, target.name) else: "" ++ ""
-            let pid = if via_runner: build_pool_spawn_runner(runner_path, target, effects_path, worker_stdout, worker_stderr) else: build_pool_spawn(target, options, worker_stdout, worker_stderr)
+            let pid = if via_runner: build_pool_spawn_runner(runner_path, target, effects_path, worker_stdout, worker_stderr) else: build_pool_spawn(target, options, worker_stdout, worker_stderr, pool.running_len())
             if pid <= 0:
                 with_eprint("error: could not spawn worker for build.w target '" ++ target.name ++ "'")
                 while pool.has_live():
