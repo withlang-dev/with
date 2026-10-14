@@ -3793,7 +3793,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     for ei in 0..empty_syms.len():
         let esym = empty_syms[ei]
         if esym != host_runtime.platform_symbol:
-            out = out.add_target(empty_file_target(empty_platform_blob_target("empty-", esym), empty_platform_blob_path("out/lib", esym)))
+            out = out.add_target(empty_file_target(empty_platform_blob_target("empty-", esym), empty_platform_blob_path("out/lib", esym)).dep("stage1"))
     out = out.add_target(with_object_target("cimport-stubs-object", stage_compiler_bin("with-stage2"), "rt/cimport_stubs.w", "out/lib/cimport_stubs.o", "-O1", "stage2"))
     var compat_runtime_obj = with_object_target("compat-runtime-object", stage_compiler_bin("with-stage2"), "out/gen/compat_runtime.w", "out/lib/compat_runtime.o", "-O1", "stage2")
     compat_runtime_obj = compat_runtime_obj.dep("compat-runtime-source")
@@ -3804,7 +3804,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("fiber-runtime-object", stage_compiler_bin("with-stage2"), "rt/fiber_runtime.w", "out/lib/fiber_runtime.o", "-O1", "stage2"))
     out = out.add_target(with_object_target("fiber-core-object", stage_compiler_bin("with-stage2"), host_runtime.fiber_core_source, "out/lib/fiber.o", "-O1", "stage2"))
 
+    // stage1 (and prepare-bootstrap-link-root before it) recreate out/lib:
+    // an object written into it is written after them.
     var fiber_asm = target_new(.CompileAsmObject, "fiber-asm-object", host_runtime.fiber_asm_source.clone()).output("out/lib/fiber_asm.o")
+    fiber_asm = fiber_asm.dep("stage1")
     out = out.add_target(fiber_asm)
 
     var embedded_objects = target_new(.EmbedObjectFiles, "embedded-objects-asm", "").output("out/lib/embedded_objects.s")

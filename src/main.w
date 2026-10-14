@@ -3635,9 +3635,9 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
             if graph_options.no_deps:
                 var bad_kind = selected_graph.targets.len() == 0
                 for ti in 0..selected_graph.targets.len():
-                    if selected_graph.targets[ti].kind != 23 and selected_graph.targets[ti].kind != 2: bad_kind = true
+                    if selected_graph.targets[ti].kind != 23 and selected_graph.targets[ti].kind != 2 and selected_graph.targets[ti].kind != 19: bad_kind = true
                 if bad_kind:
-                    with_eprint("error: --no-deps is only supported for build.w action and test targets")
+                    with_eprint("error: --no-deps is only supported for build.w action, test and corpus-test targets")
                     return 1
             if graph_options.explain_target.len() > 0:
                 return explain_build_target(root, &graph, graph_options.explain_target)
