@@ -492,12 +492,8 @@ fn ret_test_green_fingerprint(ctx: &ActionCtx) -> str:
     if combined.len() == 0: return ""
     combined = ret_append_state_file(ctx, combined, "cli-selfhost-parallel-tests")
     if combined.len() == 0: return ""
-    combined = ret_append_state_file(ctx, combined, "c-migrator-basic-tests")
-    if combined.len() == 0: return ""
-    combined = ret_append_state_file(ctx, combined, "c-migrator-core-tests")
-    if combined.len() == 0: return ""
-    combined = ret_append_state_file(ctx, combined, "issue61-regression")
-    if combined.len() == 0: return ""
+    // D131: the C migrator tests and issue61 are release-tier evidence; the
+    // PR tier's green names only what the battery ran.
     combined = ret_append_state_file(ctx, combined, "embedded-runtime-regression")
     if combined.len() == 0: return ""
     combined = ret_append_state_file(ctx, combined, "emit-c-smoke")
