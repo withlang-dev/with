@@ -1013,7 +1013,7 @@ fn gate_fixed_targets() -> List[str]:
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
     var fixed: List[str] = List.new()
-    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-integrity-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-integrity-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
     fixed
 
 fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
@@ -4758,9 +4758,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
-    tests = tests.dep("c-migrator-tests")
-    tests = tests.dep("issue61-regression")
-    tests = tests.dep("invariance-check")
     tests = tests.dep("embedded-runtime-regression")
     tests = tests.dep("runtime-generation-regression")
     tests = tests.dep("emit-c-smoke")
@@ -4770,13 +4767,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     // runs 32 concurrent compiles under a 120 s budget each.
     tests = tests.dep("cli-selfhost-parallel-tests")
     tests = tests.dep("stdlib-complexity")
-    tests = tests.dep("wo-drift")
-    // The corpora lane (docs/proposals/stdlib_sourcing_plan.md): every migrated
-    // container corpus runs its upstream test programs under With.
-    tests = corpora_test_deps(move tests)
-    // D112: a migrator change is gated on every corpus migrated afresh and
-    // tested; nothing is promoted.
-    tests = tests.dep("corpus-migrator-gate")
     tests = tests.dep("spec-inventory-check")
     tests = tests.dep("libc-surface-check")
     tests = tests.dep("runtime-domain-audit")
@@ -4830,7 +4820,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     // evidence (test-green, then last-green) is recorded after what it blesses.
     var battery_checks = target_new(.Group, "battery-checks", "")
     battery_checks = battery_checks.dep("seed-driver")
-    battery_checks = battery_checks.dep("fixpoint")
     battery_checks = battery_checks.dep("test-with-audits")
     battery_checks = battery_checks.dep("user-programs-safe")
     battery_checks = battery_checks.dep("no-host-toolchain")
@@ -4848,6 +4837,28 @@ pub fn build(ctx: BuildCtx) -> Build:
     battery = battery.dep("battery-uat")
     battery = battery.dep("battery-checks")
     out = out.add_target(battery)
+
+    // D131 (Eric, 2026-10-14): validation is scoped to what each tier must
+    // prove. A fix: `with check`, `:dev` and the tests it touches. A PR (the
+    // battery above): main stays correct and buildable. A seed cut or a
+    // release (this group, beside the battery): the toolchain reproduces
+    // itself (fixpoint), the past Sema regressions stay fixed under every
+    // perturbation (issue61, the invariance rebuilds), and the migrator and
+    // every migrated corpus agree (migrate afresh, test, drift).
+    var release_checks = target_new(.Group, "release-checks", "")
+    release_checks = release_checks.dep("seed-driver")
+    release_checks = release_checks.dep("fixpoint")
+    release_checks = release_checks.dep("issue61-regression")
+    release_checks = release_checks.dep("invariance-check")
+    release_checks = release_checks.dep("c-migrator-tests")
+    release_checks = release_checks.dep("wo-drift")
+    // The corpora lane (docs/proposals/stdlib_sourcing_plan.md): every migrated
+    // container corpus runs its upstream test programs under With.
+    release_checks = corpora_test_deps(move release_checks)
+    // D112: a migrator change is gated on every corpus migrated afresh and
+    // tested; nothing is promoted.
+    release_checks = release_checks.dep("corpus-migrator-gate")
+    out = out.add_target(release_checks)
 
     var require_last_green = target_new(.Action, "require-last-green", "").output("out/command/require-last-green/ok")
     require_last_green.action = run_require_last_green_action
@@ -4877,6 +4888,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     release_uat = release_uat.write_scope("out/release-uat").write_scope("out/uat")
     release_uat = release_uat.allow_network()
     release_uat = release_uat.dep("require-last-green")
+    // D131: a release runs the seed-cut tier the battery no longer does.
+    release_uat = release_uat.dep("release-checks")
     release_uat = release_uat.dep("user-programs-safe")
     release_uat = release_uat_platform_asset_dep(move release_uat)
     out = out.add_target(release_uat)

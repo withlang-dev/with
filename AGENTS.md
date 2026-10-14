@@ -556,9 +556,9 @@ never by the installed compiler:
 with build :seed                      # once per seed.lock bump
 export WITH=$PWD/src/main
 src/main build
-src/main build :fixpoint
 src/main build :test                  # seed-driver first, test-green last
 src/main build :last-green
+src/main build :release-checks        # seed cut or release only (D131)
 src/main build :install-user          # the fresh compiler to ~/.local/bin/with
 ```
 
@@ -713,7 +713,12 @@ committed under the identity of the human who ran the agent. Never add an AI
 assistant, model, tool or vendor as author, co-author, trailer or credit; no
 `Co-Authored-By` for AI assistance.
 
-### Rebuild and verify (tiered — decisions.md D14, D19)
+### Rebuild and verify (tiered — decisions.md D14, D19, D131)
+
+Each tier runs only what it must prove (D131, Eric 2026-10-14): a fix, that
+it does what it says and breaks nothing nearby; a PR, that main stays correct
+and buildable; a seed cut or a release, that the toolchain reproduces itself
+and the migrated corpora agree with the migrator.
 
 **Iterate tier — the only per-change requirement.** `with check src/main.w`
 and/or `with build :dev`, plus the targeted tests for what you touched. Never
@@ -737,11 +742,19 @@ It refuses a dirty tree, holds one of two machine-wide battery slots, runs
 `src/main build :gate` under the pinned seed (a red gate stops it: `RED
 (gate): <targets>`), then `with uat` with the release compiler the gate built
 (`uat/*.uat`; `RED (uat): <scenarios>`), then `src/main build
-:battery-checks` (fixpoint, the drop and move audits, every test target,
+:battery-checks` (the drop and move audits, every PR test target,
 user-programs-safe, green evidence) as ONE survey, writing `RED: <target>` to
 `out/battery/status.txt` as each fails — read the status file, not the log's
 end. `--fail-fast` stops at the first red. Logs land in `out/battery/`. Then
 `:install-user` once.
+
+**Seed-cut and release tier.** `src/main build :release-checks`: the fixpoint
+(stage2 == stage3), the Sema regression rebuilds (issue61, the invariance
+perturbations), the C migrator tests, every corpus migrated afresh and tested
+(`corpus-migrator-gate`, the corpora lanes) and wo-drift. A seed is cut, and a
+release made, only from a tree whose `:release-checks` is green; `release-uat`
+depends on it. A nondeterminism or corpus break that lands on main surfaces
+here and is fixed before the cut.
 
 **A red battery:** fix every reported failure on the stack with iterate-tier
 evidence, then run the battery once more. Never add new work to a red stack.
@@ -975,8 +988,9 @@ There is **no `NK_VAR_DECL`**: mutable variables use the mut flag on
 ## Success Checklist
 
 A change is acceptable only if, driven by the pinned seed
-(`WITH=$PWD/src/main`): `src/main build`, `src/main build :fixpoint`,
-`src/main build :test`, `src/main build :test-green` all pass. If any fails,
+(`WITH=$PWD/src/main`): `src/main build`, `src/main build :test`,
+`src/main build :test-green` all pass (the battery), and before a seed cut or
+a release, `src/main build :release-checks`. If any fails,
 continue debugging until it passes.
 
 ---

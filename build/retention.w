@@ -954,15 +954,15 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
     if ret_require_test_green(ctx, compiler_sha, driver_sha) != 0:
         return 1
     // D19: read the fixpoint tier's recorded evidence; never re-hash (or
-    // rebuild) the objects here. Stale evidence fails loudly instead.
+    // rebuild) the objects here. D131: the fixpoint is the seed cut's and the
+    // release's (`:release-checks`), not a PR's, so a green records it when
+    // this compiler has it and records none otherwise; a malformed or stale
+    // record is never copied.
     let fixpoint_evidence = if fs.exists("out/.build-state/fixpoint-evidence.json"): fs.read_text("out/.build-state/fixpoint-evidence.json") else: ""
-    if fixpoint_evidence.len() == 0:
-        return ret_fail(ctx, "missing fixpoint evidence; run `with build :fixpoint`")
-    if ret_json_field(fixpoint_evidence, "compiler_sha256") != compiler_sha:
-        return ret_fail(ctx, "fixpoint evidence was recorded for a different compiler; run `with build :fixpoint`")
-    let stage2_sha = ret_json_field(fixpoint_evidence, "stage2_fixpoint_sha256")
-    let stage3_sha = ret_json_field(fixpoint_evidence, "stage3_fixpoint_sha256")
-    if stage2_sha.len() == 0 or stage3_sha.len() == 0:
+    let fixpoint_ours = fixpoint_evidence.len() > 0 and ret_json_field(fixpoint_evidence, "compiler_sha256") == compiler_sha
+    let stage2_sha = if fixpoint_ours: ret_json_field(fixpoint_evidence, "stage2_fixpoint_sha256") else: ""
+    let stage3_sha = if fixpoint_ours: ret_json_field(fixpoint_evidence, "stage3_fixpoint_sha256") else: ""
+    if fixpoint_ours and (stage2_sha.len() == 0 or stage3_sha.len() == 0):
         return ret_fail(ctx, "fixpoint evidence is malformed; run `with build :fixpoint`")
     let commit = ret_git_commit(ctx)
     let commit_label = if commit.len() > 0: commit else: "unknown"
