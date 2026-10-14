@@ -2,8 +2,8 @@
 
 ### 4.1 Primitive Types
 
-Signed integers: `i8`, `i16`, `i32`, `i64`
-Unsigned integers: `u8`, `u16`, `u32`, `u64`
+Signed integers: `i8`, `i16`, `i32`, `i64`, `i128`
+Unsigned integers: `u8`, `u16`, `u32`, `u64`, `u128`
 Size integers: `usize`, `isize`: the target's size width, C's `size_t`/`ptrdiff_t`,
 wide enough for any length or offset into memory. They are not defined as
 pointer-sized; an integer that holds a pointer is a separate FFI type if one
