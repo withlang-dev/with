@@ -222,13 +222,27 @@ impl str:
             sb.push_byte(self[i] as u8)
         sb.to_str()
 
+    /// The byte index of the first occurrence of `needle` at or after
+    /// `from`, or -1 (#2377, D129): `s.find(x, first + 1)` finds the next
+    /// one. `from` past `len()` finds nothing; a negative `from` is out of
+    /// range (D71); an empty needle is found at `from`.
+    pub fn find(needle: &str, from: isize = 0) -> isize:
+        if from > self.len(): return -1
+        let at = self[from..self.len()].index_of(needle)
+        if at < 0: -1 else: from + at
+
     /// The byte index of the last occurrence of `needle`, or -1 (#2206):
     /// `find` from the other end. An empty needle is found at `len()`.
+    /// Bytes are compared: a view cut inside a multibyte character panics.
     pub fn rfind(needle: &str) -> i64:
-        let n = needle.len()
-        var at = self.len() - n
+        let hay = self.as_bytes()
+        let pat = needle.as_bytes()
+        let n = pat.len()
+        var at = hay.len() - n
         while at >= 0:
-            if self[at..self.len()].starts_with(needle): return at
+            var j = 0
+            while j < n and hay[at + j] == pat[j]: j += 1
+            if j == n: return at
             at -= 1
         -1
 

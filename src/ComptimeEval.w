@@ -3504,7 +3504,7 @@ impl ComptimeEvaluator:
             if start < 0 or end < start or end > text.len():
                 return self.fail(node, "str.slice() bounds out of range in comptime")
             return comptime_control_value(comptime_value_str(text.slice(start, end)))
-        if method == "contains" or method == "starts_with" or method == "ends_with" or method == "find":
+        if method == "contains" or method == "starts_with" or method == "ends_with":
             if arg_count != 1:
                 return self.fail(node, "str." ++ method ++ "() expects exactly one argument")
             let needle_signal = self.eval_expr(self.ast.get_extra(extra_start))
@@ -3519,7 +3519,6 @@ impl ComptimeEvaluator:
                 return comptime_control_value(comptime_value_bool(if text.starts_with(needle): 1 else: 0))
             if method == "ends_with":
                 return comptime_control_value(comptime_value_bool(if text.ends_with(needle): 1 else: 0))
-            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), comptime_str_find(text, needle) as i64))
         if method == "replace":
             if arg_count != 2:
                 return self.fail(node, "str.replace() expects exactly two arguments")

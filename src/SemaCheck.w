@@ -7978,7 +7978,9 @@ impl Sema:
             if method_name == "contains": return MirIntrinsic.STR_CONTAINS
             if method_name == "starts_with": return MirIntrinsic.STR_STARTS_WITH
             if method_name == "ends_with": return MirIntrinsic.STR_ENDS_WITH
-            if method_name == "find": return MirIntrinsic.STR_FIND
+            // `find` is std.string's `find(needle, from = 0)` (#2377, D129);
+            // STR_FIND serves only the pinned seed's lowering of the
+            // compiler's own calls and retires with the next seed bump.
             if method_name == "split": return MirIntrinsic.STR_SPLIT
             if method_name == "to_upper" or method_name == "upper": return MirIntrinsic.STR_TO_UPPER
             if method_name == "to_lower" or method_name == "lower": return MirIntrinsic.STR_TO_LOWER
@@ -31875,7 +31877,7 @@ impl Sema:
                 return self.ty_i32 as i32
             if field == self.syms.contains or field == self.syms.starts_with or field == self.syms.ends_with:
                 return self.ty_bool as i32
-            if method_name == "find" or method_name == "index_of":
+            if method_name == "index_of":
                 return self.ty_isize as i32
             if field == self.syms.to_lower or field == self.syms.to_upper or field == self.syms.lower or field == self.syms.upper or field == self.syms.replace or field == self.syms.slice or method_name == "repeat":
                 return self.ty_str as i32
