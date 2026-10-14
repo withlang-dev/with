@@ -2097,7 +2097,7 @@ fn build_pool_parse_jobs(value: &str) -> i32:
 // it has not completed: no Action runs before it (#921: the runner is
 // ensured lazily at the first Action once the root is prepared; an Action
 // picked earlier falls back to the comptime evaluator).
-fn build_graph_pick_ready(graph: &BuildGraph, remaining: &List[i32], pool: &PoolState, width: i32, top_level: bool, runner_gate: &str, runner_upstream: &List[str], priority: &List[i64]) -> i32:
+fn build_graph_pick_ready(graph: &BuildGraph, remaining: &List[i32], pool: &PoolState, width: i32, top_level: bool, runner_gate: &str, runner_upstream: &List[str], priority: &List[i64], slot_free: bool, longest: i64) -> i32:
     var first_serial: i32 = -1
     var best_lane: i32 = -1
     let room = pool.running_len() < width
@@ -2123,10 +2123,26 @@ fn build_graph_pick_ready(graph: &BuildGraph, remaining: &List[i32], pool: &Pool
             // The ready lane with the longest remaining path starts first
             // (ties keep declaration order): a long target declared late
             // no longer starts behind every short one and ends the run.
-            if room and (best_lane < 0 or priority[remaining[k]] > priority[remaining[best_lane]]): best_lane = k as i32
+            if room and (slot_free or build_graph_on_critical_path(priority[remaining[k]], longest)) and (best_lane < 0 or priority[remaining[k]] > priority[remaining[best_lane]]): best_lane = k as i32
             continue
         if first_serial < 0: first_serial = k as i32
     if best_lane >= 0: best_lane else: first_serial
+
+// A lane on the critical path starts without a jobserver slot, so the chain
+// the battery's wall is made of never waits behind the flood of test lanes.
+fn build_graph_on_critical_path(own: i64, longest: i64): own * 10 >= longest * 9
+
+// The longest remaining path among the targets not started and the lanes
+// still running.
+fn build_graph_longest_remaining(graph: &BuildGraph, remaining: &List[i32], pool: &PoolState, priority: &List[i64]) -> i64:
+    var longest: i64 = 0
+    for ri in 0..remaining.len():
+        if priority[remaining[ri]] > longest: longest = priority[remaining[ri]]
+    for pi in pool.oldest as isize..pool.names.len():
+        if pool.retired[pi] != 0 or pool.done[pi] != 0: continue
+        let lane_ti = build_graph_find_target_index_by_name(graph, pool.names[pi])
+        if lane_ti >= 0 and priority[lane_ti] > longest: longest = priority[lane_ti]
+    longest
 
 // Each target's remaining path in ms: its measured time plus the longest
 // remaining path among the targets that depend on it — what is left to run
@@ -2287,11 +2303,13 @@ type PoolState {
     done_ats: List[i64],
     done_rsss: List[i64],
     retired: List[i32],
+    // The jobserver slot the lane started in, or -1; freed when it exits.
+    slots: List[i32],
     oldest: i32,
 }
 
 fn PoolState.new() -> Self:
-    PoolState { names: List.new(), pids: List.new(), t0s: List.new(), outs: List.new(), errs: List.new(), timeouts: List.new(), via_runner: List.new(), effects_paths: List.new(), done: List.new(), done_rcs: List.new(), done_ats: List.new(), done_rsss: List.new(), retired: List.new(), oldest: 0 }
+    PoolState { names: List.new(), pids: List.new(), t0s: List.new(), outs: List.new(), errs: List.new(), timeouts: List.new(), via_runner: List.new(), effects_paths: List.new(), done: List.new(), done_rcs: List.new(), done_ats: List.new(), done_rsss: List.new(), retired: List.new(), slots: List.new(), oldest: 0 }
 
 impl PoolState:
     fn has_live(): self.oldest < self.names.len()
@@ -2306,6 +2324,16 @@ impl PoolState:
         n
 
     fn head_done(): self.has_live() and self.done[self.oldest] != 0
+
+    // Lane `i` has exited with `rc`: timestamp it and free its slot.
+    mut fn finish(i: isize, rc: i32):
+        self.done[i] = 1
+        self.done_rcs[i] = rc
+        self.done_ats[i] = with_clock_nanos()
+        self.done_rsss[i] = build_graph_rt_child_maxrss()
+        if self.slots[i] >= 0:
+            build_graph_jobserver_release(with_getenv_str("WITH_BUILD_JOBSERVER"), self.slots[i])
+            self.slots[i] = -1
 
     // Admission counts running children, not unretired ones: a lane that
     // finishes behind a slower, older sibling frees its slot at once instead
@@ -2322,10 +2350,7 @@ impl PoolState:
             let now = with_clock_nanos()
             for i in self.oldest..self.names.len() as i32:
                 if self.done[i] != 0 or now - self.t0s[i] < self.timeouts[i] as i64 * 1000000: continue
-                self.done_rcs[i] = build_graph_rt_exec_wait(self.pids[i], 1)
-                self.done[i] = 1
-                self.done_ats[i] = with_clock_nanos()
-                self.done_rsss[i] = build_graph_rt_child_maxrss()
+                self.finish(i, build_graph_rt_exec_wait(self.pids[i], 1))
 
     fn dep_inflight(dep_name: &str) -> bool:
         for pi in self.oldest..self.names.len() as i32:
@@ -2333,7 +2358,8 @@ impl PoolState:
                 return true
         false
 
-    mut fn push(name: str, pid: i32, t0: i64, out_path: str, err_path: str, timeout_ms: i32, ran_via_runner: i32, effects_path: str) -> Unit:
+    mut fn push(name: str, pid: i32, t0: i64, out_path: str, err_path: str, timeout_ms: i32, ran_via_runner: i32, effects_path: str, slot: i32) -> Unit:
+        self.slots.push(slot)
         self.names.push(name)
         self.pids.push(pid)
         self.t0s.push(t0)
@@ -2358,10 +2384,7 @@ impl PoolState:
             let rc = build_graph_rt_exec_try_wait(self.pids[i])
             if rc == -2:
                 continue
-            self.done[i] = 1
-            self.done_rcs[i] = rc
-            self.done_ats[i] = with_clock_nanos()
-            self.done_rsss[i] = build_graph_rt_child_maxrss()
+            self.finish(i, rc)
         return
 
     // Block until the oldest worker is done (sweeping siblings while we
@@ -2386,10 +2409,7 @@ impl PoolState:
             let now = with_clock_nanos()
             for i in self.oldest as isize..self.names.len():
                 if self.retired[i] != 0 or self.done[i] != 0 or now - self.t0s[i] < self.timeouts[i] as i64 * 1000000: continue
-                self.done_rcs[i] = build_graph_rt_exec_wait(self.pids[i], 1)
-                self.done[i] = 1
-                self.done_ats[i] = with_clock_nanos()
-                self.done_rsss[i] = build_graph_rt_child_maxrss()
+                self.finish(i, build_graph_rt_exec_wait(self.pids[i], 1))
         -1
 
     mut fn retire_oldest() -> PoolRetireResult: self.retire_at(self.oldest)
@@ -2402,11 +2422,7 @@ impl PoolState:
             let deadline = with_clock_nanos() + self.timeouts[idx] as i64 * 1000000
             while self.done[idx] == 0:
                 if with_clock_nanos() >= deadline:
-                    let killed_rc = build_graph_rt_exec_wait(self.pids[idx], 1)
-                    self.done[idx] = 1
-                    self.done_rcs[idx] = killed_rc
-                    self.done_ats[idx] = with_clock_nanos()
-                    self.done_rsss[idx] = build_graph_rt_child_maxrss()
+                    self.finish(at, build_graph_rt_exec_wait(self.pids[idx], 1))
                     break
                 build_graph_rt_usleep(10000)
                 self.sweep()
@@ -2790,6 +2806,15 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         if build_graph_rt_mkdir_p(js_dir) == 0:
             with_setenv_str("WITH_BUILD_JOBSERVER", js_dir)
             with_setenv_str("WITH_BUILD_JOBSERVER_SLOTS", f"{build_graph_rt_cpu_cores()}")
+    // The driver takes a slot for every lane it starts (one slot per core
+    // for lanes and the tests they add, 2026-10-14: a lane's own test ran
+    // outside the budget, so 18 lanes plus 18 extra tests ran at once and
+    // the critical compile of stage3 took 275 s against 71 s alone). It
+    // holds one slot ahead in `held_slot`.
+    let js_dir = if times_top_level: with_getenv_str("WITH_BUILD_JOBSERVER") else: "" ++ ""
+    let js_slots = build_graph_test_parse_jobs(with_getenv_str("WITH_BUILD_JOBSERVER_SLOTS"))
+    let use_js = js_dir.len() > 0 and js_slots > 0
+    var held_slot: i32 = -1
     // #921: the native runner is ensured lazily at the first eligible
     // Action target so non-action invocations never pay its compile.
     var runner_checked = false
@@ -2849,7 +2874,17 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 let _drain_rc = build_pool_finalize_retire(root, graph, options, drain)
             return pool_failed_rc
         let runner_gate = if bootstrap_root_scheduled and not completed_targets.contains(bootstrap_root_target): bootstrap_root_target else: ""
-        let pick = build_graph_pick_ready(graph, remaining, pool, pool_width, times_top_level, runner_gate, runner_upstream, priority)
+        if use_js and held_slot < 0: held_slot = build_graph_jobserver_acquire(js_dir, js_slots)
+        let longest = build_graph_longest_remaining(graph, remaining, pool, priority)
+        let pick = build_graph_pick_ready(graph, remaining, pool, pool_width, times_top_level, runner_gate, runner_upstream, priority, not use_js or held_slot >= 0, longest)
+        if pick < 0 and use_js and held_slot < 0 and build_graph_pick_ready(graph, remaining, pool, pool_width, times_top_level, runner_gate, runner_upstream, priority, true, longest) >= 0:
+            // A lane is ready and only a slot is missing: a test process
+            // anywhere frees one, or a lane finishes.
+            while pool.next_done() < 0:
+                held_slot = build_graph_jobserver_acquire(js_dir, js_slots)
+                if held_slot >= 0: break
+                build_graph_rt_usleep(10000)
+            continue
         if pick < 0:
             if not pool.has_live():
                 with_eprint("error: build.w targets wait on one another: none of the remaining targets is ready (a dependency cycle)")
@@ -3059,14 +3094,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             let spawn_t0 = with_clock_nanos()
             let via_runner = build_runner_target_eligible(target, options, runner_path, &runner_fallback)
             let effects_path = if via_runner: build_runner_effects_path(root, target.name) else: "" ++ ""
-            var longest: i64 = priority[ti]
-            for ri in 0..remaining.len():
-                if priority[remaining[ri]] > longest: longest = priority[remaining[ri]]
-            for pi in pool.oldest as isize..pool.names.len():
-                if pool.retired[pi] != 0 or pool.done[pi] != 0: continue
-                let lane_ti = build_graph_find_target_index_by_name(graph, pool.names[pi])
-                if lane_ti >= 0 and priority[lane_ti] > longest: longest = priority[lane_ti]
             let background = priority[ti] * 2 < longest
+            let lane_slot = held_slot
+            held_slot = -1
             let pid = if via_runner: build_pool_spawn_runner(runner_path, target, effects_path, worker_stdout, worker_stderr, background) else: build_pool_spawn(target, options, worker_stdout, worker_stderr, pool.running_len(), background)
             if pid <= 0:
                 with_eprint("error: could not spawn worker for build.w target '" ++ target.name ++ "'")
@@ -3079,7 +3109,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     if drain_rc == 0:
                         completed_targets.push(move drain.name)
                 return 1
-            pool.push(with_str_clone_ref(target.name), pid, spawn_t0, worker_stdout, worker_stderr, if target.timeout_ms > 0: target.timeout_ms else: 1200000, if via_runner: 1 else: 0, effects_path)
+            pool.push(with_str_clone_ref(target.name), pid, spawn_t0, worker_stdout, worker_stderr, if target.timeout_ms > 0: target.timeout_ms else: 1200000, if via_runner: 1 else: 0, effects_path, lane_slot)
             continue
         if times_top_level:
             // #747: the timing label is retained across the iteration while
