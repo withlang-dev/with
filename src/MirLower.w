@@ -6941,7 +6941,25 @@ impl MirBuilder:
             // (`let old = *p; drop(old)`). Safe places (bindings, `&mut`
             // derefs, fields) keep drop-before-overwrite.
             if self.assign_target_is_raw_pointer_store(place_expr) == 0 and alias_took_old_value == 0:
+                // #2366: the new value is made before the old one is freed.
+                // A copy read through a projection (`s = s.trim()` stores
+                // `copy+retain view.*`, a `&str` into the destination's own
+                // buffer; `u = v` with `v` a view of `u`; a field of a
+                // record the destination owns) is taken into a temp here,
+                // with its hold, and the temp moves into the place after
+                // the drop. Before, the drop ran first and the store read
+                // the freed buffer (five NULs where `alpha` had been).
+                var stored = rhs
+                if rhs >= 0 and rhs < self.body.operand_kinds.len() and self.body.operand_kinds[rhs] == OperandKind.OK_COPY:
+                    let rhs_place: i32 = self.body.operand_d0[rhs]
+                    if rhs_place >= 0 and rhs_place < self.body.place_proj_counts.len() and self.body.place_proj_counts[rhs_place] != 0:
+                        let made_tmp = self.new_temp(dest_ty)
+                        let made_place = self.place_for_local(made_tmp)
+                        self.assign_operand_to_place(made_place, rhs, self.ast.get_start(place_expr))
+                        stored = self.body.new_operand(OperandKind.OK_MOVE, made_place)
                 self.emit_drop_place_respecting_moved_fields(place, dest_ty)
+                self.assign_operand_to_place(place, stored, self.ast.get_start(place_expr))
+                return stored
         self.assign_operand_to_place(place, rhs, self.ast.get_start(place_expr))
         rhs
 

@@ -28,7 +28,6 @@ pub fn builtin_sig_table() -> List[BuiltinSigRow]:
     t.push(sig("str", "contains", "needle: &str"))
     t.push(sig("str", "starts_with", "prefix: &str"))
     t.push(sig("str", "ends_with", "suffix: &str"))
-    t.push(sig("str", "find", "needle: &str"))
     t.push(sig("str", "index_of", "needle: &str"))
     t.push(sig("str", "split", "sep: &str"))
     t.push(sig("str", "replace", "from: &str, to: &str"))
