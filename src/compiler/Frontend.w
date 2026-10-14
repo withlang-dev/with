@@ -2223,7 +2223,7 @@ impl Zcu:
         // fields do: the check above heard the demands, and this one has
         // every such binding at the type decided. A program with no demand
         // is checked once.
-        if sema.literal_demands.len() > 0:
+        if sema.literal_demands.len() > 0 and sema.literal_demands_change_types():
             let literal_decisions = sema.literal_decisions_from_demands()
             self.diagnostics = move sema.diags
             self.diagnostics.truncate(reported_before_check)

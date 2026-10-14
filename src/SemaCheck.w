@@ -39072,3 +39072,22 @@ impl Sema:
 // their method names.
 fn sema_iter_adapter_name(name: &str) -> bool:
     name == "zip" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "drop" or name == "take_while" or name == "drop_while" or name == "enumerate" or name == "chain" or name == "step_by" or name == "collect" or name == "fold" or name == "count" or name == "for_each" or name == "any" or name == "all" or name == "none" or name == "find" or name == "position"
+
+impl Sema:
+    // D93's second check exists to retype a literal's binding at the type
+    // its uses demanded. When every demand names the type the binding
+    // already has, that check would reproduce this one exactly, so the
+    // frontend skips it (the compiler's own source paid a second
+    // whole-program Sema, about half of every compile, for demands that
+    // all agreed). Two demands that disagree differ from the binding in
+    // at least one, so the second check still reports them.
+    pub fn literal_demands_change_types() -> bool:
+        var i = 0
+        while i + 2 < self.literal_demands.len():
+            let let_node: i32 = self.literal_demands[i]
+            let want: i32 = self.literal_demands[i + 1]
+            i = i + 3
+            let bound: i32 = self.typed_binding_types.get(let_node) ?? 0
+            if bound == 0 or self.resolve_alias(want as TypeId) != self.resolve_alias(bound as TypeId):
+                return true
+        false
