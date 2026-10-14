@@ -2,6 +2,7 @@ module build.c_algorithms
 
 use std.build
 use build.corpus
+use build.par
 use build.wo
 
 // fragglet/c-algorithms, ISC (its COPYING ships beside the migration).
@@ -97,18 +98,37 @@ pub fn run_calg_migrate_tests_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let reference = ctx.inputs()[0]
     let output = ctx.output()
-    let source = corpus_scratch(ctx) ++ "/source"
     let generated = corpus_scratch(ctx) ++ "/generated"
-    if corpus_reset_dir(ctx, source) != 0 or corpus_reset_dir(ctx, generated) != 0: return 1
-    if calg_copy_engine_sources(ctx, reference, source) != 0: return 1
+    if corpus_reset_dir(ctx, generated) != 0: return 1
+    // Each program migrates from a staging directory of its own (the engine
+    // sources and its one test file), so the 17 migrations run together: one
+    // after another they were the battery's longest lane (330 s under load).
+    // The migrated text names no staging path.
+    let migrator = corpus_migrator_arg(ctx)
+    var jobs: List[ParJob] = List.new()
+    var labels: List[str] = List.new()
     for name in calg_tests():
+        let source = corpus_scratch(ctx) ++ "/source-" ++ name
+        if corpus_reset_dir(ctx, source) != 0: return 1
+        if calg_copy_engine_sources(ctx, reference, source) != 0: return 1
         let basename = "test-" ++ name ++ ".c"
         let upstream = "test-" ++ name ++ (if name == "cpp": ".cpp" else: ".c")
         if corpus_copy(ctx, reference ++ "/test/" ++ upstream, source ++ "/" ++ basename) != 0: return 1
         let test_output = generated ++ "/tests/" ++ name
         if fs.mkdir_all(test_output) != 0: return 1
-        if corpus_run_migration(ctx, "c-algorithms-test-" ++ name, calg_tests_options(source, test_output)) != 0: return 1
-        if fs.remove_file(source ++ "/" ++ basename) != 0: return corpus_fail(ctx, "cannot remove staged test " ++ basename)
+        let label = "c-algorithms-test-" ++ name
+        // Without a migrator binary the migration runs in this process (the
+        // comptime evaluator), one at a time as before.
+        if migrator.len() == 0:
+            if corpus_run_migration(ctx, label, calg_tests_options(source, test_output)) != 0: return 1
+            continue
+        let stdout = corpus_abs(&ctx, corpus_scratch(ctx) ++ "/" ++ label ++ ".stdout")
+        let stderr = corpus_abs(&ctx, corpus_scratch(ctx) ++ "/" ++ label ++ ".stderr")
+        jobs.push(par_job(corpus_migrate_argv(&ctx, migrator, &calg_tests_options(source, test_output)), stdout, stderr, 1200000))
+        labels.push(label)
+    let rcs = par_run(&ctx, &jobs, par_width(&jobs))
+    for i in 0..rcs.len():
+        if rcs[i] != 0: return corpus_fail(ctx, labels[i] ++ f": `migrate` exited {rcs[i]}; see " ++ jobs[i].stderr)
     if fs.write_text(generated ++ "/UPSTREAM", CALG_REVISION ++ "\nsha256=" ++ CALG_SHA256 ++ "\nconfiguration=ALLOC_TESTING\n") != 0: return 1
     if fs.exists(output) and fs.remove_tree(output) != 0: return corpus_fail(ctx, "cannot replace " ++ output)
     if fs.rename(generated, output) != 0: return corpus_fail(ctx, "cannot publish " ++ output)
