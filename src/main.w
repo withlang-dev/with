@@ -2819,14 +2819,19 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     var pool_failed_rc: i32 = 0
     let pool_width = build_pool_width()
     // The test-process budget every lane's runner shares (BuildGraphTests.w
-    // build_graph_jobserver_acquire): one slot per core, set up once by the
-    // top-level driver and inherited by its lanes.
-    if times_top_level:
+    // build_graph_jobserver_acquire): one slot per core unless the caller set
+    // WITH_BUILD_JOBSERVER_SLOTS, set up once by the outermost driver and
+    // inherited by its lanes. A driver a lane starts joins its budget: it
+    // never recreates the directory under the running lanes' slots.
+    var owns_js = false
+    if times_top_level and with_getenv_str("WITH_BUILD_JOBSERVER").len() == 0:
         let js_dir = resolve_join(root, "out/.build-state/jobserver")
         build_graph_rt_remove_tree(js_dir)
         if build_graph_rt_mkdir_p(js_dir) == 0:
             with_setenv_str("WITH_BUILD_JOBSERVER", js_dir)
-            with_setenv_str("WITH_BUILD_JOBSERVER_SLOTS", f"{build_graph_rt_cpu_cores()}")
+            owns_js = true
+            if build_graph_test_parse_jobs(with_getenv_str("WITH_BUILD_JOBSERVER_SLOTS")) <= 0:
+                with_setenv_str("WITH_BUILD_JOBSERVER_SLOTS", f"{build_graph_rt_cpu_cores()}")
     // The driver takes a slot for every lane it starts (one slot per core
     // for lanes and the tests they add, 2026-10-14: a lane's own test ran
     // outside the budget, so 18 lanes plus 18 extra tests ran at once and
@@ -2898,7 +2903,8 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         let runner_gate = if bootstrap_root_scheduled and not completed_targets.contains(bootstrap_root_target): bootstrap_root_target else: ""
         if use_js and held_slot < 0: held_slot = build_graph_jobserver_acquire(js_dir, js_slots)
         let longest = build_graph_longest_remaining(graph, remaining, pool, priority)
-        if use_js:
+        // Only the driver that made the jobserver names the critical lanes.
+        if use_js and owns_js:
             let critical = build_graph_critical_lanes(graph, pool, priority, longest)
             if critical != critical_written:
                 build_graph_rt_write_file(js_dir ++ "/critical", critical)
