@@ -143,6 +143,14 @@ impl ToString for u64:
     fn to_string() -> str:
         with_fmt_u64(*self)
 
+impl ToString for i128:
+    fn to_string() -> str:
+        f"{*self}"
+
+impl ToString for u128:
+    fn to_string() -> str:
+        f"{*self}"
+
 impl ToString for isize:
     fn to_string() -> str:
         with_i64_to_str(*self as i64)

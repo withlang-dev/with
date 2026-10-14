@@ -224,12 +224,14 @@ impl Clone for i8:   fn clone(): *self
 impl Clone for i16:  fn clone(): *self
 impl Clone for i32:  fn clone(): *self
 impl Clone for i64:  fn clone(): *self
+impl Clone for i128: fn clone(): *self
 impl Clone for isize: fn clone(): *self
 impl Clone for usize: fn clone(): *self
 impl Clone for u8:   fn clone(): *self
 impl Clone for u16:  fn clone(): *self
 impl Clone for u32:  fn clone(): *self
 impl Clone for u64:  fn clone(): *self
+impl Clone for u128: fn clone(): *self
 impl Clone for f32:  fn clone(): *self
 impl Clone for f64:  fn clone(): *self
 impl Clone for bool: fn clone(): *self
@@ -246,6 +248,10 @@ impl Eq for isize: fn eq(other: &isize) -> bool: *self == *other
 impl Eq for usize: fn eq(other: &usize) -> bool: *self == *other
 impl Default for isize: fn default() -> isize: 0
 impl Default for usize: fn default() -> usize: 0
+impl Eq for i128: fn eq(other: &i128) -> bool: *self == *other
+impl Eq for u128: fn eq(other: &u128) -> bool: *self == *other
+impl Default for i128: fn default() -> i128: 0
+impl Default for u128: fn default() -> u128: 0
 
 impl Ord for isize:
     fn cmp(other: &isize) -> i32:
@@ -267,6 +273,18 @@ impl Ord for i32:
 
 impl Ord for i64:
     fn cmp(other: &i64) -> i32:
+        if *self < *other: return -1
+        if *self > *other: return 1
+        0
+
+impl Ord for i128:
+    fn cmp(other: &i128) -> i32:
+        if *self < *other: return -1
+        if *self > *other: return 1
+        0
+
+impl Ord for u128:
+    fn cmp(other: &u128) -> i32:
         if *self < *other: return -1
         if *self > *other: return 1
         0
@@ -331,6 +349,8 @@ impl Debug for i16:  fn debug_str() -> str: f"{*self}"
 impl Debug for u16:  fn debug_str() -> str: f"{*self}"
 impl Debug for u32:  fn debug_str() -> str: f"{*self}"
 impl Debug for u64:  fn debug_str() -> str: f"{*self}"
+impl Debug for i128: fn debug_str() -> str: f"{*self}"
+impl Debug for u128: fn debug_str() -> str: f"{*self}"
 impl Debug for isize: fn debug_str() -> str: f"{*self}"
 impl Debug for usize: fn debug_str() -> str: f"{*self}"
 impl Debug for f32:  fn debug_str() -> str: f"{*self}"
@@ -344,10 +364,12 @@ impl Display for i8:   fn to_str(): f"{*self}"
 impl Display for i16:  fn to_str(): f"{*self}"
 impl Display for i32:  fn to_str(): f"{*self}"
 impl Display for i64:  fn to_str(): f"{*self}"
+impl Display for i128: fn to_str(): f"{*self}"
 impl Display for u8:   fn to_str(): f"{*self}"
 impl Display for u16:  fn to_str(): f"{*self}"
 impl Display for u32:  fn to_str(): f"{*self}"
 impl Display for u64:  fn to_str(): f"{*self}"
+impl Display for u128: fn to_str(): f"{*self}"
 impl Display for usize: fn to_str(): f"{*self}"
 impl Display for isize: fn to_str(): f"{*self}"
 impl Display for f32:  fn to_str(): f"{*self}"
