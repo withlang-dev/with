@@ -907,7 +907,10 @@ fn target_with_compiler_source_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
     // #679/#1665: only compiler self-compiles inherit this regression budget.
     // Use the wire spelling until the pinned seed includes Target.rss_limit.
-    out = out.arg("rss-limit-bytes=1073741824")
+    // 2 GiB (2026-10-14): the 1 GiB budget went unenforced from #702 on (a
+    // serial self-compile ran in a worker, and the driver measured its own
+    // RSS delta, about 0); measured per lane it is 1.46-1.54 GB. #2407.
+    out = out.arg("rss-limit-bytes=2147483648")
     let roots: List[str] = List.new()
     roots.push("src")
     roots.push("rt")
@@ -1816,7 +1819,9 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
     check_args |> push(compiler_path)
     check_args |> push("check")
     check_args |> push("src/main.w")
-    let check = ctx.process_runner().run_capture_cwd(check_args, stdout_path, stderr_path, 180000, build_project_abs(root, repo_copy))
+    // A hang guard (#2371), not a speed budget: the battery runs this beside
+    // every other lane, and a loaded machine stretches a 45 s check past 180 s.
+    let check = ctx.process_runner().run_capture_cwd(check_args, stdout_path, stderr_path, 600000, build_project_abs(root, repo_copy))
     if check.rc == 124:
         return issue61_fail(ctx, "check timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
     if check.rc != 0:
@@ -1844,7 +1849,8 @@ fn invariance_run_check(ctx: &ActionCtx, compiler_path: &str, repo_copy: &str, l
     check_args |> push(build_owned_text(compiler_path))
     check_args |> push("check")
     check_args |> push("src/main.w")
-    let check = ctx.process_runner().run_capture_cwd(check_args, stdout_path, stderr_path, 240000, build_project_abs(root, repo_copy))
+    // A hang guard (#2371), as issue61-regression's.
+    let check = ctx.process_runner().run_capture_cwd(check_args, stdout_path, stderr_path, 600000, build_project_abs(root, repo_copy))
     if check.rc != 0:
         return invariance_fail(ctx, f"variant '{label}' changed the verdict (exit {check.rc}); the perturbed tree is left at " ++ repo_copy ++ " — stderr=" ++ stderr_path)
     if build_trim_trailing_line_endings(check.stdout) != "ok":
@@ -2105,6 +2111,29 @@ fn uat_tests_run(ctx: &ActionCtx, root: &str, compiler: &str, out_dir: &str, nam
     let stdout_rel = build_project_join(out_dir, name)
     let result = ctx.process_runner().run_capture_cwd_with_env(args, build_project_abs(root, stdout_rel), build_project_abs(root, build_project_join(out_dir, name ++ ".stderr")), 600000, build_project_abs(root, out_dir), envs)
     (result.rc, ctx.fs().read_text(stdout_rel))
+
+// `with uat` over uat/*.uat with the release compiler: the scenarios'
+// report is out/battery-uat/uat.stdout (`uat: <scenario> FAIL` lines).
+fn run_battery_uat_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        ctx.diagnostics().error("battery-uat: missing compiler input")
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0:
+        ctx.diagnostics().error("battery-uat: could not create " ++ out_dir)
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, inputs[0])
+    var argv: List[str] = List.new()
+    argv.push(compiler)
+    argv.push("uat")
+    let stdout_path = build_project_abs(root, build_project_join(out_dir, "uat.stdout"))
+    let stderr_path = build_project_abs(root, build_project_join(out_dir, "uat.stderr"))
+    let result = ctx.process_runner().run_capture_with_env(argv, stdout_path, stderr_path, 1800000, process_env().set("WITH_UAT_WITH", compiler))
+    print(result.stdout)
+    if result.rc != 0:
+        ctx.diagnostics().error(f"battery-uat: `with uat` exited {result.rc}; report " ++ stdout_path ++ "\n" ++ result.stderr)
+    0
 
 fn run_uat_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
@@ -3790,7 +3819,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     for ei in 0..empty_syms.len():
         let esym = empty_syms[ei]
         if esym != host_runtime.platform_symbol:
-            out = out.add_target(empty_file_target(empty_platform_blob_target("empty-", esym), empty_platform_blob_path("out/lib", esym)))
+            out = out.add_target(empty_file_target(empty_platform_blob_target("empty-", esym), empty_platform_blob_path("out/lib", esym)).dep("stage1"))
     out = out.add_target(with_object_target("cimport-stubs-object", stage_compiler_bin("with-stage2"), "rt/cimport_stubs.w", "out/lib/cimport_stubs.o", "-O1", "stage2"))
     var compat_runtime_obj = with_object_target("compat-runtime-object", stage_compiler_bin("with-stage2"), "out/gen/compat_runtime.w", "out/lib/compat_runtime.o", "-O1", "stage2")
     compat_runtime_obj = compat_runtime_obj.dep("compat-runtime-source")
@@ -3801,7 +3830,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("fiber-runtime-object", stage_compiler_bin("with-stage2"), "rt/fiber_runtime.w", "out/lib/fiber_runtime.o", "-O1", "stage2"))
     out = out.add_target(with_object_target("fiber-core-object", stage_compiler_bin("with-stage2"), host_runtime.fiber_core_source, "out/lib/fiber.o", "-O1", "stage2"))
 
+    // stage1 (and prepare-bootstrap-link-root before it) recreate out/lib:
+    // an object written into it is written after them.
     var fiber_asm = target_new(.CompileAsmObject, "fiber-asm-object", host_runtime.fiber_asm_source.clone()).output("out/lib/fiber_asm.o")
+    fiber_asm = fiber_asm.dep("stage1")
     out = out.add_target(fiber_asm)
 
     var embedded_objects = target_new(.EmbedObjectFiles, "embedded-objects-asm", "").output("out/lib/embedded_objects.s")
@@ -4330,6 +4362,18 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(contract_view_tests)
 
     // §18.5d: `with uat` over the planted scenarios in test/uat.
+    // The battery's uat phase (uat/*.uat under the release compiler this run
+    // built) as a target: scheduled beside the survey's lanes once `build`
+    // finishes, instead of a phase between the gate and the survey.
+    var battery_uat = target_new(.Action, "battery-uat", "").output("out/battery-uat")
+    battery_uat.action = run_battery_uat_action
+    battery_uat = battery_uat.input(release_compiler_bin("with"))
+    battery_uat = battery_uat.input("uat")
+    battery_uat = battery_uat.dep("build")
+    battery_uat = battery_uat.write_scope("out/battery-uat")
+    battery_uat = battery_uat.timeout(1800000)
+    out = out.add_target(battery_uat)
+
     var uat_tests = target_new(.Action, "uat-tests", "").output("out/uat-tests")
     uat_tests = uat_tests.allow_parallel()
     uat_tests.action = run_uat_tests_action
@@ -4799,6 +4843,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     battery_checks = battery_checks.dep("source-cache-tests")
     battery_checks = battery_checks.dep("last-green")
     out = out.add_target(battery_checks)
+
+    // The battery's one graph run (tools/battery.w): the gate, the uat
+    // scenarios and the survey under one name, so a driver that builds only
+    // the first of several `:target` selectors (#2330) still runs all three.
+    var battery = target_new(.Group, "battery", "")
+    battery = battery.dep("gate")
+    battery = battery.dep("battery-uat")
+    battery = battery.dep("battery-checks")
+    out = out.add_target(battery)
 
     var require_last_green = target_new(.Action, "require-last-green", "").output("out/command/require-last-green/ok")
     require_last_green.action = run_require_last_green_action

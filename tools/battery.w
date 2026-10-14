@@ -7,32 +7,27 @@
 //   1. refuses a dirty tree: a battery blesses committed sources (D49);
 //   2. takes one of two machine-wide battery slots, so a third battery cannot
 //      start by accident (a slot whose owner died is reclaimed);
-//   3. runs `src/main build :gate` — the release build plus the pre-battery
-//      gate (build.w's gate_fixed_targets and every test lane the last
-//      battery measured under 60 s); a red gate stops here, since the
-//      25-minute checks would only repeat it;
-//   4. runs `with uat` with the release compiler the gate built: the
-//      acceptance scenarios (uat/*.uat) — a fresh project, `with get` of each
-//      C library, the program a user writes over it. A red scenario stops
-//      here: `RED (uat): <scenarios>`. A scenario whose requirement the host
-//      lacks (network, display) is skipped and says so in out/battery/uat.log;
-//   5. runs `src/main build :battery-checks` — fixpoint, the drop and move
-//      audits, every test target, user-programs-safe, and the green evidence —
-//      as ONE survey invocation, so a red reports every failing target at
-//      once instead of one per battery. `--fail-fast` stops it at the first
-//      red target instead (the repair loop).
-// `--survey` keeps the phase order but not the phase barrier: a red gate
-// (or UAT) is recorded and the later phases still run — UAT when the gate
-// left a release compiler, checks always (its own survey skips whatever
-// depends on a failed build target) — so one battery reports independent
-// failures across phases instead of discovering them one battery apart.
-// The verdict is still RED if any phase was red; the gate remains the
-// merge signal, it just stops hiding the rest of the evidence.
+//   3. runs ONE `src/main build :battery` (the gate, battery-uat and
+//      battery-checks under one group target): the
+//      release build and the gate's targets, the acceptance scenarios
+//      (`battery-uat`: `with uat` over uat/*.uat with the release compiler
+//      the run built — a fresh project, `with get` of each C library, the
+//      program a user writes over it; a scenario whose requirement the host
+//      lacks is skipped and says so), and the survey (fixpoint, the drop and
+//      move audits, every test target, user-programs-safe, the green
+//      evidence), scheduled together by readiness and remaining path. The
+//      phases ran one after another and each waited for its slowest lane
+//      (2026-10-14: 75 min). A red is `RED: <target>` the moment it lands and
+//      the run continues, so one battery reports every failure;
+//      `--fail-fast` stops at the first (the repair loop). A red scenario is
+//      also named: `RED (uat): <scenarios>`.
+// `--survey` is accepted and changes nothing: one run reports every red.
 // The build steps report live: while the child runs, its log is polled once a
 // second and every newly failed target lands in status.txt as `RED: <target>`
 // the moment it appears, so a red known at minute 1 is read at minute 1.
-// Afterwards the wall times of every target both steps ran are merged into
-// out/.build-state/battery-times.tsv, the ledger the gate reads, and the
+// Afterwards the wall times of every target the run ran are merged into
+// out/.build-state/battery-times.tsv (and copied to the green store), the
+// ledger the driver orders lanes by, and the
 // evaluated-graph cache is dropped so the next `with build` re-reads it.
 // Logs, per-step wall times and out/battery/status.txt land in out/battery/.
 use std.crypto.sha256
@@ -259,48 +254,37 @@ assert(write_file(status, f"{head} {cwd}\n") == 0)
 print(f"battery: {head} in {cwd}")
 let ledger = "out/.build-state/battery-times.tsv"
 let flags = if fail_fast: " --fail-fast" else: ""
-// Every phase holds the machine awake (idle and, on AC, system sleep): on
-// 2026-10-11 a battery started inside a maintenance wake ran 45 s per 16 min
-// for three hours before anyone noticed, and only the uat step held a lock.
-let hold = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -i -s " else: ""
-// No caller-side wrapper is needed or wanted: every phase below already
-// runs under its own caffeinate hold, and the driver between phases only
-// merges times and writes status (seconds). Wrapping the invocation in
-// caffeinate or a keep-awake lease adds a second, redundant hold.
+// The run holds the machine awake (idle and, on AC, system sleep) and the
+// display lit (a uat scenario opens a window): on 2026-10-11 a battery
+// started inside a maintenance wake ran 45 s per 16 min for three hours.
+// No caller-side wrapper is needed: a second hold adds nothing.
 var rc = 0
-let gate_rc = step_live("gate", "WITH=$PWD/src/main " ++ hold ++ "src/main build :gate" ++ flags ++ " > out/battery/gate.log 2>&1", "out/battery/gate.log", status)
+// One graph run: the gate's targets, the uat scenarios (`battery-uat`, after
+// `build`) and the survey's are scheduled together by readiness and
+// remaining path, so no phase waits for the slowest lane of the one before.
+// A red is reported as it happens (step_live) and, under --fail-fast, stops
+// the run at the first; otherwise every target runs and reports.
+// A scenario that opens a window needs a lit display: the run holds the
+// display awake for its whole wall.
+let awake = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -d -i -s -u " else: ""
+let run_rc = step_live("battery", "WITH=$PWD/src/main " ++ awake ++ "src/main build :battery" ++ flags ++ " > out/battery/battery.log 2>&1", "out/battery/battery.log", status)
 merge_times(ledger, "out/.build-state/build-times.tsv")
-if gate_rc != 0:
-    rc = gate_rc
-    let failed = red_report("out/battery/gate.log")
-    print("RED (gate): " ++ failed)
-    append(status, "RED (gate): " ++ failed)
-// Without --survey a red phase stops the battery (the phase barrier); with
-// it, later phases still run and report their own reds. UAT additionally
-// needs the release compiler the gate builds: in survey mode a red gate
-// that left none records the skip instead of running a stale binary.
-if rc == 0 or survey:
-    if file_exists("out/release/bin/with"):
-        // A scenario that opens a window needs a lit display: on macOS the uat
-        // step holds it awake (and wakes it) for as long as it runs.
-        let awake = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -d -i -s -u " else: ""
-        let uat_rc = step_live("uat", "WITH_UAT_WITH=$PWD/out/release/bin/with " ++ awake ++ "out/release/bin/with uat > out/battery/uat.log 2>&1", "out/battery/uat.log", status)
-        if uat_rc != 0:
-            if rc == 0: rc = uat_rc
-            let failed = uat_failed("out/battery/uat.log")
-            print("RED (uat): " ++ failed)
-            append(status, "RED (uat): " ++ failed)
-    else:
-        print("battery: uat skipped (no out/release/bin/with from the gate)")
-        append(status, "uat skipped: no release compiler")
-if rc == 0 or survey:
-    let checks_rc = step_live("battery-checks", "WITH=$PWD/src/main " ++ hold ++ "src/main build :battery-checks" ++ flags ++ " > out/battery/checks.log 2>&1", "out/battery/checks.log", status)
-    merge_times(ledger, "out/.build-state/build-times.tsv")
-    if checks_rc != 0:
-        if rc == 0: rc = checks_rc
-        let failed = red_report("out/battery/checks.log")
-        print("failed: " ++ failed)
-        append(status, "failed: " ++ failed)
+if file_exists("out/battery-uat/uat.stdout"):
+    write_file("out/battery/uat.log", read_file("out/battery-uat/uat.stdout") ?? "")
+if run_rc != 0:
+    rc = run_rc
+    let failed = red_report("out/battery/battery.log")
+    print("failed: " ++ failed)
+    append(status, "failed: " ++ failed)
+    if failed.contains("battery-uat"):
+        let scenarios = uat_failed("out/battery/uat.log")
+        print("RED (uat): " ++ scenarios)
+        append(status, "RED (uat): " ++ scenarios)
+// The ledger goes to the green store too: a fresh worktree's driver orders
+// its lanes by the machine's last battery (build_graph_priorities).
+let green_dir = if env("WITH_GREEN_DIR").len() > 0: env("WITH_GREEN_DIR") else: env("HOME") ++ "/.local/with-green"
+if file_exists(ledger) and file_exists(green_dir):
+    write_file(green_dir ++ "/battery-times.tsv", read_file(ledger) ?? "")
 let verdict = if rc == 0: "GREEN" else: "RED"
 append(status, verdict ++ "\nBATTERY_DONE")
 let _ = remove_file(slot)

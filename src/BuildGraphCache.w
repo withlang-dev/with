@@ -13,6 +13,7 @@ use std.collections.HashMap
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_fs_file_stamp(path: &str) -> str
 
 const BUILD_CACHE_S_IFMT: i32 = 61440
 const BUILD_CACHE_S_IFDIR: i32 = 16384
@@ -31,6 +32,13 @@ var build_cache_compiler_fingerprint: str = ""
 // target actually runs (coarse, provably safe — fully-cached runs keep the
 // entire win).
 var build_cache_fp_memo: HashMap[str, str] = HashMap.new()
+
+// A regular file's fingerprint keyed on its path, mode and stamp (size and
+// mtime): valid across targets that run, since a rewrite changes the key.
+// Clearing the path memo after every executed target (below) made each
+// pooled lane's dispatch rehash the 170 MB stage compiler it takes as an
+// input — two seconds of serial driver time per lane, a minute per gate.
+var build_cache_stamp_memo: HashMap[str, str] = HashMap.new()
 
 pub fn build_cache_forget_fingerprints() -> Unit:
     build_cache_fp_memo = HashMap.new()
@@ -163,13 +171,24 @@ fn build_cache_fingerprint_symlink(path: &str, mode: i32) -> str:
     build_cache_sha256_text("symlink\nmode:" ++ f"{mode & 0o777}" ++ "\ntarget:" ++ build_graph_rt_readlink(path))
 
 pub fn build_cache_fingerprint_file(path: &str) -> str:
-    let memoized = build_cache_fp_memo.get(path)
-    if memoized.is_some():
-        return with_str_clone_ref(memoized.unwrap())
     let mode = build_graph_rt_file_mode(path)
     if mode < 0:
         return build_cache_sha256_text("absent\n")
     let kind = mode & BUILD_CACHE_S_IFMT
+    if kind != BUILD_CACHE_S_IFREG:
+        let memoized = build_cache_fp_memo.get(path)
+        if memoized.is_some():
+            return with_str_clone_ref(memoized.unwrap())
+    if kind == BUILD_CACHE_S_IFREG:
+        let stamp = with_fs_file_stamp(path)
+        if stamp.len() > 0:
+            let key = path ++ f"\t{mode}\t" ++ stamp
+            let hit = build_cache_stamp_memo.get(key)
+            if hit.is_some():
+                return with_str_clone_ref(hit.unwrap())
+            let stamped = build_cache_fingerprint_regular_file(path, mode)
+            build_cache_stamp_memo.insert(key, with_str_clone_ref(stamped))
+            return stamped
     var fp = ""
     if kind == BUILD_CACHE_S_IFDIR:
         fp = build_cache_fingerprint_directory(path, mode)

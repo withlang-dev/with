@@ -1903,7 +1903,7 @@ fn tool_effect_tool_identity(parts: &List[str]) -> str:
     let exe = parts[0]
     let resolved = tool_effect_resolve_executable(exe)
     if resolved.len() > 0:
-        return tool_effect_escape(resolved) ++ ":" ++ tool_sha256_text(with_fs_read_file(resolved))
+        return tool_effect_escape(resolved) ++ ":" ++ tool_executable_digest(resolved)
     tool_effect_escape(exe) ++ ":unresolved"
 
 fn tool_effect_record(line: &str):
@@ -1936,6 +1936,21 @@ fn tool_effect_env_text(process_env: &ProcessEnv) -> str:
 // nothing said so). Hashed once per binary per driver run.
 var g_compile_provenance_digests: HashMap[str, str] = HashMap.new()
 
+// The sha256 of an executable an action runs, once per path per process:
+// the provenance line and the effect record's tool identity both name it.
+// The effect record hashed the whole binary on every spawn, so an action
+// that runs a 170 MB compiler over 179 files spent 1.2 s per file hashing
+// it, serially, before par_run could start the next (d-acceptance-corpus:
+// 216 s for 16 s of checks). An action does not rebuild a binary it runs
+// under the same path, which is the assumption the provenance memo made.
+fn tool_executable_digest(path: &str) -> str:
+    match g_compile_provenance_digests.get(path):
+        Some(d) => return d.clone()
+        None => {}
+    let digest = tool_sha256_text(with_fs_read_file(path))
+    g_compile_provenance_digests.insert(path.to_owned(), digest.clone())
+    digest
+
 fn tool_compile_provenance(target: &str, parts: &List[str]):
     if parts.len() == 0: return
     let exe = parts[0].clone()
@@ -1943,12 +1958,7 @@ fn tool_compile_provenance(target: &str, parts: &List[str]):
     let slash = exe.rfind("/")
     if slash >= 0: base = exe[slash + 1..exe.len()].to_owned()
     if base != "with" and base != "with-stage1" and base != "with-stage2" and base != "with.unstamped" and base != "main": return
-    var digest = ""
-    match g_compile_provenance_digests.get(exe):
-        Some(d) => digest = d.clone()
-        None =>
-            digest = tool_sha256_text(with_fs_read_file(exe))
-            g_compile_provenance_digests.insert(exe.clone(), digest.clone())
+    let digest = tool_executable_digest(exe)
     var argv = ""
     for i in 1..parts.len(): argv = argv ++ " " ++ parts[i]
     print("[compile] " ++ target ++ " ran " ++ digest[0..12] ++ " " ++ exe ++ argv)

@@ -79,7 +79,10 @@ pub fn p7_compiler_path -> str:
     ""
 
 pub fn p7_case_dir(name: &str) -> str:
-    p7_abs("out/tmp/pre-d-p7/" ++ name)
+    // Per process: two targets run one fixture at once (with-test and
+    // validate-all-async both select an `await` case), and a shared case
+    // directory let one run delete the other's files.
+    p7_abs(f"out/tmp/pre-d-p7/{pid()}/" ++ name)
 
 pub fn p7_prepare_case(name: &str, package_name: &str) -> str:
     let case_dir = p7_case_dir(name)
@@ -137,7 +140,7 @@ fn p7_run_with_compiler_keeping_env(compiler: &str, case_dir: &str, label: &str,
         let store = p7_abs(f"out/tmp/pre-d-p7-store/{pid()}")
         let _clear = remove_tree(store)
         assert(set_env("WITH_BUILD_CACHE_DIR", store) == 0)
-    let capture_dir = p7_join(p7_abs("out/tmp/pre-d-p7-capture"), label)
+    let capture_dir = p7_join(p7_abs(f"out/tmp/pre-d-p7-capture/{pid()}"), label)
     let _remove = remove_tree(capture_dir)
     assert(mkdir_p(capture_dir) == 0)
     let stdout_path = p7_join(capture_dir, "stdout.txt")
