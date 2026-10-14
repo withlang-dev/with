@@ -391,6 +391,8 @@ pub type Compilation {
     // provided: every embedded bundle's corpus is read from source and
     // compiled in-unit as C (docs/spec/toolchain/wo_bundles.md "Retiring the shim", #955).
     emit_c_in_unit: bool,
+    // --emit-all (c_emit_module).
+    emit_all: bool,
 }
 
 pub type CompilationBinaryLinkPlan {
@@ -426,6 +428,7 @@ pub fn Compilation.init -> Compilation:
         bundle_fingerprint_path: "",
         bundle_corpus: "",
         emit_c_in_unit: false,
+        emit_all: false,
     }
 
 impl Compilation:
@@ -442,6 +445,7 @@ impl Compilation:
         self.set_debug_info(options.debug_info)
         self.set_compiler_hooks_enabled(options.compiler_hooks_enabled)
         self.set_target_kind(options.target_kind)
+        self.emit_all = options.emit_all
         self.link_objects = driver_clone_str_list(&options.link_objects)
         self.set_link_paths(&options.link_search_paths, &options.link_rpaths)
         self.set_link_bundles(&options.link_bundles)
@@ -1628,7 +1632,7 @@ impl Compilation:
         var emit_intern = self.zcu.pool
         if self.zcu.last_sema.pool.state.symbol_texts.len() > 1:
             emit_intern = self.zcu.last_sema.pool
-        let emitted = c_emit_module(move self.zcu.last_mir_module, typed_pool, emit_intern, move self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text, self.zcu.project_config.overflow_mode)
+        let emitted = c_emit_module(move self.zcu.last_mir_module, typed_pool, emit_intern, move self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text, self.zcu.project_config.overflow_mode, self.emit_all)
         if emitted.ok == 0:
             runtime_eprint("error: C emission failed: " ++ emitted.err_msg)
             return ""

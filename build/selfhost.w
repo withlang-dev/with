@@ -3973,6 +3973,10 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     let prelude_dir = bs_join(output_dir, "prelude_runtime")
     var prelude = ec_case("prelude runtime", prelude_dir, bs_join(prelude_dir, "prelude_runtime.w"))
     if bs_write_fixture(ctx, prelude.src, "fn main:\n    print(\"hello\")\n", "emit-c prelude runtime source") != 0: return 1
+    // --emit-all: every function and global of the standard library (pcre2
+    // included) as C, reached or not, so the C backend is proven over all of
+    // std here; the other cases emit only what their program reaches.
+    prelude.emit_flags.push("--emit-all")
     prelude.emit_timeout_ms = 600000
     prelude.expect_stdout = "hello"
     cases.push(prelude)
@@ -4003,6 +4007,14 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     if bs_write_fixture(ctx, intrinsics.src, bs_emit_c_generic_intrinsics_source(), "emit-c generic intrinsics source") != 0: return 1
     intrinsics.forbid_in_c = "generic_call: should be resolved"
     cases.push(intrinsics)
+
+    // A function nothing calls is not emitted: C emission writes what the
+    // program reaches (CCodegen emit_module), not all of std.
+    let unreached_dir = bs_join(output_dir, "unreached_function")
+    var unreached = ec_case("unreached function", unreached_dir, bs_join(unreached_dir, "unreached_function.w"))
+    if bs_write_fixture(ctx, unreached.src, "fn emit_c_unreached_marker(n: i32): n + 1\n\nfn main:\n    print(\"ok\")\n", "emit-c unreached function source") != 0: return 1
+    unreached.forbid_in_c = "emit_c_unreached_marker"
+    cases.push(unreached)
 
     var fixtures = 0
     for path in fs.list_files("test/emit_c"):

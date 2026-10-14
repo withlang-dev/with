@@ -345,6 +345,8 @@ type CCodegen {
     local_downcast_option_cache: HashMap[i64, i32],
     local_effective_cache: HashMap[i64, i32],
     local_ref_target_cache: HashMap[i64, i32],
+    // Write every function and global, reached or not (--emit-all).
+    emit_all: bool,
     // Each local's direct assignments, in block and statement order: CSR
     // over the body `assign_index_sym` (ensure_assign_index).
     assign_index_sym: i32,
@@ -404,8 +406,9 @@ impl CCodegen:
     fn intern_intern(s: &str) -> i32:
         self.intern.intern(s)
 
-pub fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sema, source_path: &str, source_text: &str, overflow_mode: i32) -> CEmitResult:
+pub fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sema, source_path: &str, source_text: &str, overflow_mode: i32, emit_all: bool) -> CEmitResult:
     var cg = CCodegen {
+        emit_all,
         mir_mod,
         ast,
         intern,
@@ -5023,6 +5026,67 @@ fn cc_direct_assign_local(body: &MirBody, stmt_id: i32) -> i32:
     if dst < 0 or dst >= body.place_locals.len() or body.place_proj_counts[dst] != 0: return -1
     let local = body.place_locals[dst]
     if local < 0 or local >= body.local_count(): -1 else: local
+
+// One global's C definition, and the C name that reaches it.
+type CGlobalDef {
+    sym: i32,
+    name: str,
+    text: str,
+}
+
+// Which bodies the emitted C reaches: a body is marked when C text names
+// it (`scan`) or it is a root (`mark`), and emitted once (`take`).
+type CReach {
+    by_name: HashMap[str, i32],
+    marked: List[bool],
+    done: List[bool],
+    waiting: isize,
+}
+
+fn CReach.new(n: isize) -> CReach:
+    var marked: List[bool] = List.new()
+    var done: List[bool] = List.new()
+    for _ in 0..n:
+        marked.push(false)
+        done.push(false)
+    CReach { by_name: HashMap.new(), marked, done, waiting: 0 }
+
+impl CReach:
+    mut fn name(c_name: str, body: i32): self.by_name.insert(c_name, body)
+
+    mut fn mark(body: i32):
+        if self.marked[body]: return
+        self.marked[body] = true
+        self.waiting += 1
+
+    // Mark every body an identifier of `text` names. Internal names end in
+    // `__<sym>` (fn_c_name), so only such identifiers are looked up.
+    mut fn scan(text: &str):
+        var i: isize = 0
+        let n = text.len()
+        while i < n:
+            let c = text[i]
+            if cc_is_ident_char(c) == 0:
+                i += 1
+                continue
+            let start = i
+            while i < n and cc_is_ident_char(text[i]) != 0: i += 1
+            if not is_digit(text[i - 1] as i32) or i - start < 4: continue
+            let id = text.slice(start, i)
+            if not id.contains("__"): continue
+            let body: i32 = self.by_name.get(&id) ?? -1
+            if body >= 0: self.mark(body)
+
+    // Whether `body` is marked and not yet emitted; marks it emitted.
+    mut fn take(body: i32) -> bool:
+        if not self.marked[body] or self.done[body]: return false
+        self.done[body] = true
+        self.waiting -= 1
+        true
+
+    fn pending(): self.waiting > 0
+
+    fn emitted(body: i32): self.done[body]
 
 fn cc_body_local_cache_key(body_fn_sym: i32, local_id: i32) -> i64:
     (body_fn_sym as i64) + ((local_id as i64) * 4294967296)
@@ -9928,6 +9992,37 @@ impl CCodegen:
         b.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
         move b.body
 
+    // Whether a global's initializer only computes its value: no call (a
+    // panic is a call) but a list literal's construction (MIR's
+    // COLLECTION_LITERAL into a List: it allocates and moves its elements,
+    // which earlier statements made), no drop that runs a user Drop impl
+    // (Sema's type_carries_user_drop; any other drop frees memory), no write
+    // to a global. Skipping such a body when nothing reads its global is
+    // unobservable. A set's or map's literal hashes its keys, which may run
+    // user code.
+    mut fn init_body_is_pure(body: &MirBody) -> bool:
+        for bb in 0..body.block_count():
+            let kind = body.term_kind(bb)
+            if kind == TermKind.TK_CALL and not self.call_is_list_literal(body, body.term_data1(bb), body.term_data2(bb)): return false
+            if kind == TermKind.TK_DROP_AND_GOTO and self.drop_runs_user_code(body, body.term_data0(bb)): return false
+            let start = body.bb_stmt_starts[bb]
+            for si in 0..body.bb_stmt_counts[bb]:
+                let stmt_id = start + si
+                if body.stmt_kinds[stmt_id] == StmtKind.Drop and self.drop_runs_user_code(body, body.stmt_d0[stmt_id]): return false
+                if body.stmt_kinds[stmt_id] != StmtKind.Assign: continue
+                if self.local_global_sym(body, self.place_local_id(body, body.stmt_d0[stmt_id])) != 0: return false
+        true
+
+    mut fn call_is_list_literal(body: &MirBody, args_id: i32, dest_place: i32) -> bool:
+        if body.call_intrinsic(args_id) != MirIntrinsic.COLLECTION_LITERAL: return false
+        self.generic_inst_base_name(self.sema.resolve_alias(self.place_tid(body, dest_place) as TypeId) as i32) == "List"
+
+    // Whether dropping `place` runs a user Drop impl.
+    mut fn drop_runs_user_code(body: &MirBody, place: i32) -> bool:
+        let local = self.place_local_id(body, place)
+        if local < 0 or local >= body.local_type_ids.len(): return true
+        self.sema.type_carries_user_drop(body.local_type_ids[local]) != 0
+
     // The global an initializer body stores into, or 0 for any other body.
     fn global_init_target(fn_sym: i32) -> i32:
         for i in 0..self.global_init_fn_syms.len():
@@ -9943,11 +10038,11 @@ impl CCodegen:
         "    memcpy(&" ++ g ++ ", &_0, sizeof(" ++ g ++ "));\n    return;"
 
     // The entry wrapper's calls, in declaration order (§9.1c).
-    fn global_init_calls_text() -> str:
+    fn global_init_calls_text(skipped: &List[i32]) -> str:
         var out = ""
         for di in 0..self.ast.decl_count():
             for i in 0..self.global_init_decl_indices.len():
-                if self.global_init_decl_indices[i] == di:
+                if self.global_init_decl_indices[i] == di and not skipped.contains(self.global_init_fn_syms[i]):
                     out = out ++ "    " ++ self.fn_c_name(self.global_init_fn_syms[i]) ++ "();\n"
         out
 
@@ -9982,14 +10077,17 @@ impl CCodegen:
                     used.insert(fn_sym, 1)
         used
 
-    mut fn emit_global_var_defs() -> str:
-        var out = ""
+    // Each global's definition and its C name ("" for an extern
+    // declaration, always written): emit_module writes the ones the emitted
+    // C names.
+    mut fn global_var_defs() -> List[CGlobalDef]:
+        var out: List[CGlobalDef] = List.new()
         let used_globals = self.collect_referenced_global_syms()
         if self.had_error != 0:
-            return ""
+            return out
         for di in 0..self.ast.decl_count():
             if self.check_interrupted() != 0:
-                return ""
+                return out
             if self.sema.decl_is_lazy_skipped(di):
                 continue
             let decl = self.ast.get_decl(di)
@@ -9999,7 +10097,7 @@ impl CCodegen:
                 let flags = self.ast.get_data2(decl)
                 if flags % 2 == 0 and not used_globals.contains(sym):
                     continue
-                out = out ++ self.global_var_definition(decl)
+                out.push(CGlobalDef { sym, name: self.global_c_name(sym), text: self.global_var_definition(decl) })
                 continue
             if kind == NodeKind.NK_EXTERN_VAR:
                 let sym = self.ast.get_data0(decl)
@@ -10011,9 +10109,7 @@ impl CCodegen:
                 // emitted reads convert implicitly.
                 if ci_libc_symbol_allowed_as(cc_intern_resolve(self.intern, sym), CI_LIBC_KIND_VAR):
                     continue
-                out = out ++ "extern " ++ self.c_decl(tid, self.global_c_name(sym)) ++ ";\n"
-        if out.len() > 0:
-            out = out ++ "\n"
+                out.push(CGlobalDef { sym, name: "", text: "extern " ++ self.c_decl(tid, self.global_c_name(sym)) ++ ";\n" })
         out
 
     mut fn emit_extern_fn_decl(decl: NodeId) -> str:
@@ -11064,7 +11160,7 @@ impl CCodegen:
         "        with_panic(WITH_STR_LIT(\"runtime fiber configuration cannot change after fibers exist\"), WITH_STR_LIT(\"\"), 0);\n" ++
         "    }\n"
 
-    mut fn emit_main_wrapper() -> str:
+    mut fn emit_main_wrapper(skipped_inits: &List[i32]) -> str:
         let main_sym = self.find_main_sym()
         if main_sym == 0:
             // A unit without `main` has no entry to run its startup
@@ -11079,7 +11175,7 @@ impl CCodegen:
         out = out ++ "    with_runtime_set_argv(argc, argv);\n"
         out = out ++ self.emit_runtime_fiber_config_call()
         out = out ++ "    with_runtime_init();\n"
-        out = out ++ self.global_init_calls_text()
+        out = out ++ self.global_init_calls_text(skipped_inits)
         if self.is_void_tid(ret_tid) != 0:
             out = out ++ "    " ++ main_name ++ "();\n"
             out = out ++ "    with_runtime_shutdown();\n"
@@ -11195,56 +11291,133 @@ impl CCodegen:
         self.prepare_c_type_instantiations()
         if self.had_error != 0:
             return ""
-        out.write(self.emit_struct_type_defs())
+        let struct_defs = self.emit_struct_type_defs()
         if self.had_error != 0:
             return ""
-        out.write(self.emit_cstr_literal_defs())
+        let cstr_defs = self.emit_cstr_literal_defs()
         if self.had_error != 0:
             return ""
-        out.write(self.emit_global_var_defs())
+        let global_defs = self.global_var_defs()
         if self.had_error != 0:
             return ""
-        out.write(self.emit_extern_fn_decls())
+        let extern_decls = self.emit_extern_fn_decls()
         if self.had_error != 0:
             return ""
 
-        // Forward declarations for all lowered functions.
+        // Forward declarations for all lowered functions; only the reached
+        // ones are written (below).
+        var decls: List[str] = List.new()
         for i in 0..self.mir_mod.bodies.len():
             if self.check_interrupted() != 0:
                 return ""
             let body = self.mir_body_at(i as i64)
-            if self.body_sig_index(body.fn_sym) < 0:
-                continue
-            out.write(self.emit_fn_decl(body))
-            out.write(";\n")
-        if self.mir_mod.bodies.len() > 0:
-            out.write("\n")
+            decls.push(if self.body_sig_index(body.fn_sym) < 0: "" else: self.emit_fn_decl(body))
 
         // #1766: every closure's environment struct, owned-cell glue and
         // prototype, before any body that creates or runs one.
-        out.write(self.emit_closure_decls())
+        let closure_decls = self.emit_closure_decls()
         if self.had_error != 0:
             return ""
 
-        // Function bodies buffer separately: emitting them discovers the fat
-        // fn-value thunks, whose static definitions must precede the bodies
-        // (all lowered functions already have prototypes above).
-        let bodies_out = COut.new()
+        // A body is emitted only when C text already emitted names it: the
+        // functions with external names (exports, the public runtime ABI),
+        // the startup wrapper, closures, globals and fn-value thunks are the
+        // roots. A program carries the whole standard library (pcre2
+        // included, through the prelude's std.regex) and used to emit all of
+        // it: 24 MB of C for `print("hi")`, about 17 MB of it the regex
+        // engine. Whatever the C names is emitted, so nothing a program
+        // reaches can go missing; reached bodies emit in declaration order.
+        // A global's initializer that only computes its value (no call, no
+        // drop, no write to another global) is reached through the global;
+        // any other runs at startup whatever reads it. pcre2's Unicode tables
+        // are such initializers, 6 MB of C (3.6 MB in one function).
+        let main_sym = self.find_main_sym()
+        var init_of_global: HashMap[i32, i32] = HashMap.new()
+        let body_count = self.mir_mod.bodies.len()
+        var reach = CReach.new(body_count + global_defs.len())
+        for gi in 0..global_defs.len():
+            if global_defs[gi].name.len() == 0 or self.emit_all: reach.mark((body_count + gi) as i32) else: reach.name(global_defs[gi].name, (body_count + gi) as i32)
         for i in 0..self.mir_mod.bodies.len():
-            if self.check_interrupted() != 0:
-                return ""
-            let body = self.mir_body_at(i as i64)
-            bodies_out.write(self.emit_fn_body(body))
-            bodies_out.write("\n")
+            let fn_sym = self.mir_body_at(i as i64).fn_sym
+            let init_global = self.global_init_target(fn_sym)
+            if init_global != 0:
+                if not self.emit_all and self.init_body_is_pure(self.mir_body_at(i as i64)): init_of_global.insert(init_global, i as i32) else: reach.mark(i as i32)
+                continue
+            if decls[i].len() == 0: continue
+            if self.emit_all or fn_sym == main_sym or not self.fn_c_name_is_internal(fn_sym): reach.mark(i as i32) else: reach.name(self.fn_c_name(fn_sym), i as i32)
+        reach.scan(&struct_defs)
+        reach.scan(&closure_decls)
+        var closure_texts: List[str] = List.new()
         for ci in 0..self.closure_syms.len():
             if self.check_interrupted() != 0:
                 return ""
-            bodies_out.write(self.emit_closure_body(ci as i32))
-            bodies_out.write("\n")
+            closure_texts.push(self.emit_closure_body(ci as i32))
+            reach.scan(&closure_texts[ci])
+        var body_texts: List[str] = List.new()
+        for _ in 0..self.mir_mod.bodies.len(): body_texts.push("")
+        var thunk_defs = ""
+        var grew = true
+        while grew:
+            grew = false
+            for i in 0..self.mir_mod.bodies.len():
+                if not reach.take(i as i32): continue
+                if self.check_interrupted() != 0:
+                    return ""
+                let body = self.mir_body_at(i as i64)
+                body_texts[i] = self.emit_fn_body(body)
+                reach.scan(&body_texts[i])
+                grew = true
+            for gi in 0..global_defs.len():
+                if not reach.take((body_count + gi) as i32): continue
+                reach.scan(&global_defs[gi].text)
+                let init: i32 = init_of_global.get(&global_defs[gi].sym) ?? -1
+                if init >= 0: reach.mark(init)
+                grew = true
+            // Emitting bodies discovers the fat fn-value thunks, which name
+            // their targets.
+            thunk_defs = self.emit_fat_thunk_defs()
+            reach.scan(&thunk_defs)
+            if reach.pending(): grew = true
+        if self.had_error != 0:
+            return ""
+        var skipped_inits: List[i32] = List.new()
+        for i in 0..body_count:
+            let fn_sym = self.mir_body_at(i as i64).fn_sym
+            if self.global_init_target(fn_sym) != 0 and not reach.emitted(i as i32): skipped_inits.push(fn_sym)
+        let main_wrapper = self.emit_main_wrapper(&skipped_inits)
+        if self.had_error != 0:
+            return ""
 
-        out.write(self.emit_fat_thunk_defs())
-        out.write(bodies_out.finish())
+        out.write(struct_defs)
+        out.write(cstr_defs)
+        var any_global = false
+        for gi in 0..global_defs.len():
+            if not reach.emitted((body_count + gi) as i32): continue
+            out.write(global_defs[gi].text)
+            any_global = true
+        if any_global:
+            out.write("\n")
+        out.write(extern_decls)
+        var any_decl = false
+        for i in 0..self.mir_mod.bodies.len():
+            if not reach.emitted(i as i32) or decls[i].len() == 0: continue
+            out.write(decls[i])
+            out.write(";\n")
+            any_decl = true
+        if any_decl:
+            out.write("\n")
+        out.write(closure_decls)
+        // The thunks' static definitions precede the bodies (every reached
+        // function already has its prototype above).
+        out.write(thunk_defs)
+        for i in 0..self.mir_mod.bodies.len():
+            if not reach.emitted(i as i32): continue
+            out.write(body_texts[i])
+            out.write("\n")
+        for ci in 0..closure_texts.len():
+            out.write(closure_texts[ci])
+            out.write("\n")
 
         // C entrypoint wrapper for With `main`.
-        out.write(self.emit_main_wrapper())
+        out.write(main_wrapper)
         out.finish()
