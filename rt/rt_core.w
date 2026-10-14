@@ -4444,6 +4444,21 @@ pub fn with_fs_chmod(path: &str, mode: i32) -> i32:
     cstr_free(cpath)
     rc
 
+// A file's identity for a fingerprint memo: "<size>:<mtime ns>", or ""
+// when it cannot be stat'ed. A rewrite changes it; the build driver hashes
+// a 170 MB stage compiler once per version instead of once per target.
+pub fn with_fs_file_stamp(path: &str) -> str:
+    var st: [24]u8 = [0 as u8; 24]
+    let cpath = str_to_cstr(path)
+    let rc = rt_stat(cpath, &st as *mut u8)
+    cstr_free(cpath)
+    if rc != 0:
+        return ""
+    let base = &raw const st as i64
+    let size = unsafe *(base as *const i64)
+    let modified = unsafe *((base + 16) as *const i64)
+    f"{size}:{modified}"
+
 pub fn with_fs_file_mode(path: &str) -> i32:
     let cpath = str_to_cstr(path)
     let rc = rt_file_mode(cpath)
