@@ -478,6 +478,7 @@ arbitrary statements and `goto` (§13.5a, §13.5b).
   - [§18.5b CLI One-Liners](toolchain/cli-one-liners.md)
   - [§18.5c Bundles and interfaces](toolchain/bundles-and-interfaces.md)
   - [§18.5d Acceptance scenarios](toolchain/acceptance-scenarios.md)
+  - [§18.5e Battery time](toolchain/battery-time.md)
   - [§18.6 Standard Library Design](stdlib/standard-library-design.md)
   - [§18.7 Freestanding Mode (`no_std`)](018_modules.md#187-freestanding-mode-no_std)
   - [§18.8 Package Management](toolchain/package-management.md)
