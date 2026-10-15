@@ -91,7 +91,9 @@ the UTF-8 declaration are briefs still owed). Step 2 landed 2026-10-15 as
 "Usage"; the spellings it chose are D133): the proofs are a corpus fixed
 point over retention, destruction and returns, the draft pairs producers
 with the one unary destroyer of a representation, and everything else is
-reported with its reason. Steps 3–6 are open.
+reported with its reason. The three facade-language questions it raised
+(a borrowed type with several origin types, the detach fact, the UTF-8
+declaration) are ruled in D134. Steps 3–6 are open.
 
 **What would reopen it.** A Conan Center majority of binary-only packages,
 or proofs that cover too little of ordinary libraries to make the registry
