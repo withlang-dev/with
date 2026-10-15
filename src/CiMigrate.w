@@ -10,6 +10,7 @@
 use CiIR
 use CiPrint
 use CImport
+use CiFacadeDraft
 use Lexer
 use Token
 use Parser
@@ -1088,6 +1089,12 @@ impl CiProject:
                 if name.len() == 0 or ci_is_system_decl(name) or (loc.len() > 0 and ci_is_system_path(loc)):
                     i = i + 1
                     continue
+                // D121: a global initialized to an allocator or to `free`
+                // is one (libxml2's `xmlFreeFunc xmlFree = free`).
+                if cursor >= 0:
+                    let alias = ci_var_initializer_alias(session, cursor)
+                    if ci_own_is_libc_allocator(alias) and not self.alloc_aliases.contains(name): self.alloc_aliases.push(name)
+                    if ci_own_is_libc_free(alias) and not self.free_aliases.contains(name): self.free_aliases.push(name)
                 if with_cimport_var_storage_class(session, i) == CX_SC_STATIC:
                     i = i + 1
                     continue
@@ -1176,6 +1183,9 @@ impl CiProject:
                 let symbol_id = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
                 self.symbols[symbol_id].add_consumer(module_id)
                 if cursor < 0 or with_ci_cursor_is_definition(session, cursor) == 0:
+                    // D121: a prototype makes the function API a facade may
+                    // describe; a definition alone is internal.
+                    if cursor >= 0: self.symbols[symbol_id].header_declared = 1
                     i = i + 1
                     continue
                 let existing_path = self.owner_module_path(symbol_id)
@@ -1648,8 +1658,12 @@ impl CiProject:
             names.push(ci_escape_reserved(with_cimport_fn_param_name(session, decl_idx, pi)))
         self.symbols[symbol_id].grow_params(count)
         self.symbols[symbol_id].has_definition = 1
+        // D121: the signature's types and the body's ownership records.
+        self.symbols[symbol_id].ret_ty = ci_ir_owned_text(with_cimport_fn_return_type_translated(session, decl_idx))
+        self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names))
         for pi in 0..count:
             let ptype = with_cimport_fn_param_type_translated(session, decl_idx, pi)
+            self.symbols[symbol_id].param_ty[pi] = ci_ir_owned_text(ptype)
             if not ci_type_text_is_fn_ptr(ptype): continue
             self.symbols[symbol_id].param_fn_ptr[pi] = 1
             if names[pi].len() == 0:
@@ -1849,6 +1863,39 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List
     if migrated == 0: 1 else: ci_migrate_apply_writes_clauses()
 
 // Translate a directory of .c files to .w files.
+// D121 (§16.2b.15 step 1): `with migrate --facade NAME <dir|file.c>`. The
+// units are scanned as a corpus, as a directory migration scans them, and
+// nothing is translated: the ownership proofs are drawn
+// (CiFacadeDraft.w resolve_ownership), the facade draft goes to stdout (or
+// `-o FILE`) and the report, one line per function, to stderr.
+pub fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &str, output_arg: &str) -> i32:
+    let input = ci_migrate_fs_path(input_arg)
+    var files: List[str] = List.new()
+    if with_fs_is_dir(input) != 0:
+        g_migrate_directory_input_dir = with_str_clone_ref(input)
+        files = ci_migrate_sorted_files(ci_migrate_collect_c_files(input, exclude_basenames))
+        if files.len() == 0:
+            eprint("migrate: no .c files found in " ++ input)
+            return 1
+    else: files.push(input)
+    var project = CiProject.new()
+    project.register_modules(&files)
+    for path in files:
+        if project.migrate_scan_file(path) != 0: return 1
+    project.resolve_ownership()
+    let draft = project.facade_draft(facade_name)
+    eprint(project.facade_report(facade_name))
+    if output_arg.len() > 0:
+        let output = ci_migrate_fs_path(output_arg)
+        ci_migrate_ensure_parent_dir(output)
+        if with_fs_write_file(output, draft) != 0:
+            eprint("migrate: could not write " ++ output)
+            return 1
+        return 0
+    with_write_stdout(draft)
+    with_flush_stdout()
+    0
+
 pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basenames: &str) -> i32:
     let input_dir = ci_migrate_fs_path(input_dir_arg)
     let output_dir = ci_migrate_fs_path(output_dir_arg)

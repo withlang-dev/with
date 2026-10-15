@@ -16945,6 +16945,190 @@ pub fn ci_body_call_evidence(session: i64, cursor: i32, params: &List[str]) -> s
         i = i + 1
     out
 
+// ── D121 (§16.2b.15): ownership evidence for a facade proof ──────────────
+//
+// What one body says about where its returned pointers come from and what
+// becomes of its parameters and locals. CiProject (CiFacadeDraft.w) draws
+// the corpus-wide proofs from these records: owned producer, borrowed return
+// with its origin, destroyer. The records, one per line:
+//   `ret:<src>`                      a `return` of <src>
+//   `localsrc:<local>:<src>`         a local initialized or assigned from <src>
+//   `localstore:<local>`             a local stored into a field, a global or
+//                                    an unknown place, or its address taken
+//   `localsink:<local>:<callee>:<i>` a local passed to a direct call
+//   `paramstore:<i>`                 parameter i stored through a pointer or
+//                                    into an element, or passed indirectly
+// and <src> is one of `null`, `param:<i>`, `local:<name>`,
+// `field:param:<i>`, `field:local:<name>` (a part of that value's memory:
+// a field, an element, an offset), `call:<callee>:<argmap>` (<argmap> lists
+// `<pos>=p<i>` and `<pos>=l<name>` for arguments that are a parameter or a
+// local, `,`-separated), `global`, or `mixed` (no single source).
+
+// Through parentheses, implicit casts and C-style casts. A C-style cast to
+// a named type has two children, the type reference and the operand (last);
+// ci_peel_transparent_and_cstyle peels only the one-child form.
+fn ci_own_peel(session: i64, cursor: i32) -> i32:
+    var c = ci_peel_transparent(session, cursor)
+    var depth = 0
+    while depth < 16 and with_ci_cursor_kind(session, c) == CXK_CSTYLE_CAST and with_ci_num_children(session, c) >= 1:
+        c = ci_peel_transparent(session, with_ci_child(session, c, with_ci_num_children(session, c) - 1))
+        depth = depth + 1
+    c
+
+// The value a place expression is a part of: `param:<i>`, `local:<name>`,
+// `global` (a name that is neither) or `mixed`.
+fn ci_own_place_root(session: i64, cursor: i32, params: &List[str], locals: &List[str]) -> str:
+    let c = ci_own_peel(session, cursor)
+    let kind = with_ci_cursor_kind(session, c)
+    let nc = with_ci_num_children(session, c)
+    if kind == CXK_DECL_REF:
+        let spelled = with_ci_cursor_spelling(session, c)
+        for pi in 0..params.len():
+            if spelled == params[pi] or ci_escape_reserved(spelled) == params[pi]: return f"param:{pi}"
+        for li in 0..locals.len():
+            if spelled == locals[li]: return "local:" ++ spelled
+        return "global"
+    if (kind == CXK_MEMBER_REF or kind == CXK_ARRAY_SUBSCRIPT) and nc >= 1:
+        return ci_own_place_root(session, with_ci_child(session, c, 0), params, locals)
+    if kind == CXK_UNARY_OP and nc == 1:
+        let op = with_ci_unary_op(session, c)
+        if op == UO_DEREF or op == UO_ADDR: return ci_own_place_root(session, with_ci_child(session, c, 0), params, locals)
+    if kind == CXK_BINARY_OP and nc == 2:
+        let op = with_ci_binary_op(session, c)
+        // Pointer arithmetic stays inside the left operand's memory.
+        if op == BO_ADD or op == BO_SUB: return ci_own_place_root(session, with_ci_child(session, c, 0), params, locals)
+    "mixed"
+
+fn ci_own_root_is_value(root: &str) -> bool: root.starts_with("param:") or root.starts_with("local:")
+
+// The <src> of a value expression.
+fn ci_own_source(session: i64, cursor: i32, params: &List[str], locals: &List[str]) -> str:
+    let c = ci_own_peel(session, cursor)
+    if ci_cursor_is_null_like(session, c): return "null"
+    let kind = with_ci_cursor_kind(session, c)
+    let nc = with_ci_num_children(session, c)
+    if kind == CXK_DECL_REF: return ci_own_place_root(session, c, params, locals)
+    if kind == CXK_MEMBER_REF or kind == CXK_ARRAY_SUBSCRIPT or kind == CXK_UNARY_OP or kind == CXK_BINARY_OP:
+        if kind == CXK_UNARY_OP and nc == 1:
+            let op = with_ci_unary_op(session, c)
+            if op != UO_DEREF and op != UO_ADDR: return "mixed"
+        if kind == CXK_BINARY_OP and nc == 2:
+            let op = with_ci_binary_op(session, c)
+            if op != BO_ADD and op != BO_SUB: return "mixed"
+        let root = ci_own_place_root(session, c, params, locals)
+        return if ci_own_root_is_value(root): "field:" ++ root else: root
+    if kind == CXK_CALL_EXPR and nc >= 1:
+        let callee = ci_call_callee_name(session, with_ci_child(session, c, 0))
+        if callee.len() == 0: return "mixed"
+        var argmap = ""
+        var ai = 1
+        while ai < nc:
+            let root = ci_own_place_root(session, with_ci_child(session, c, ai), params, locals)
+            let arg = ci_own_peel(session, with_ci_child(session, c, ai))
+            if with_ci_cursor_kind(session, arg) == CXK_DECL_REF and ci_own_root_is_value(root):
+                if argmap.len() > 0: argmap = argmap ++ ","
+                argmap = argmap ++ f"{ai - 1}=" ++ (if root.starts_with("param:"): "p" ++ root.slice(6, root.len()) else: "l" ++ root.slice(6, root.len()))
+            ai = ai + 1
+        return "call:" ++ callee ++ ":" ++ argmap
+    if kind == CXK_CONDITIONAL_OP and nc == 3:
+        let a = ci_own_source(session, with_ci_child(session, c, 1), params, locals)
+        let b = ci_own_source(session, with_ci_child(session, c, 2), params, locals)
+        if a == "null": return b
+        if b == "null" or a == b: return a
+        return "mixed"
+    "mixed"
+
+fn ci_own_collect_locals(session: i64, cursor: i32) -> List[str]:
+    var locals: List[str] = List.new()
+    if with_ci_cursor_kind(session, cursor) == CXK_VAR_DECL:
+        let name = with_ci_cursor_spelling(session, cursor)
+        if name.len() > 0: locals.push(name)
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        for inner in ci_own_collect_locals(session, with_ci_child(session, cursor, i)): locals.push(inner)
+        i = i + 1
+    locals
+
+fn ci_own_record_store(session: i64, value: i32, params: &List[str], locals: &List[str]) -> str:
+    let root = ci_own_place_root(session, value, params, locals)
+    let v = ci_own_peel(session, value)
+    if with_ci_cursor_kind(session, v) != CXK_DECL_REF: return ""
+    if root.starts_with("local:"): return "localstore:" ++ root.slice(6, root.len()) ++ "\n"
+    if root.starts_with("param:"): return "paramstore:" ++ root.slice(6, root.len()) ++ "\n"
+    ""
+
+fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]) -> str:
+    var out = ""
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+    if kind == CXK_RETURN_STMT and nc >= 1:
+        out = out ++ "ret:" ++ ci_own_source(session, with_ci_child(session, cursor, 0), params, locals) ++ "\n"
+    if kind == CXK_VAR_DECL:
+        let init = with_ci_var_initializer(session, cursor)
+        if init >= 0:
+            out = out ++ "localsrc:" ++ with_ci_cursor_spelling(session, cursor) ++ ":" ++ ci_own_source(session, init, params, locals) ++ "\n"
+    if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
+        let lhs = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+        let rhs = with_ci_child(session, cursor, 1)
+        let lhs_root = ci_own_place_root(session, lhs, params, locals)
+        if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF and lhs_root.starts_with("local:"):
+            out = out ++ "localsrc:" ++ lhs_root.slice(6, lhs_root.len()) ++ ":" ++ ci_own_source(session, rhs, params, locals) ++ "\n"
+        else:
+            out = out ++ ci_own_record_store(session, rhs, params, locals)
+    if kind == CXK_CALL_EXPR and nc >= 1:
+        let callee = ci_call_callee_name(session, with_ci_child(session, cursor, 0))
+        var ai = 1
+        while ai < nc:
+            let arg = with_ci_child(session, cursor, ai)
+            let root = ci_own_place_root(session, arg, params, locals)
+            let a = ci_own_peel(session, arg)
+            if with_ci_cursor_kind(session, a) == CXK_DECL_REF and root.starts_with("local:"):
+                if callee.len() > 0: out = out ++ "localsink:" ++ root.slice(6, root.len()) ++ ":" ++ callee ++ f":{ai - 1}\n"
+                else: out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
+            else if with_ci_cursor_kind(session, a) == CXK_DECL_REF and root.starts_with("param:") and callee.len() == 0:
+                out = out ++ "paramstore:" ++ root.slice(6, root.len()) ++ "\n"
+            else if with_ci_cursor_kind(session, a) == CXK_UNARY_OP and with_ci_unary_op(session, a) == UO_ADDR and root.starts_with("local:"):
+                // `f(&p)`: the callee may replace or keep the pointer.
+                out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
+            ai = ai + 1
+    if kind == CXK_UNARY_OP and nc == 1 and with_ci_unary_op(session, cursor) == UO_ADDR:
+        let root = ci_own_place_root(session, with_ci_child(session, cursor, 0), params, locals)
+        let operand = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+        if with_ci_cursor_kind(session, operand) == CXK_DECL_REF and root.starts_with("local:"):
+            out = out ++ "localstore:" ++ root.slice(6, root.len()) ++ "\n"
+    var i = 0
+    while i < nc:
+        out = out ++ ci_own_walk(session, with_ci_child(session, cursor, i), params, locals)
+        i = i + 1
+    out
+
+pub fn ci_body_ownership_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
+    let locals = ci_own_collect_locals(session, cursor)
+    ci_own_walk(session, cursor, params, locals)
+
+// D121: the allocator or deallocator a global's initializer names, through
+// casts: `xmlFreeFunc xmlFree = free`. "" when it names neither.
+pub fn ci_var_initializer_alias(session: i64, cursor: i32) -> str:
+    let init = with_ci_var_initializer(session, cursor)
+    if init < 0: return ""
+    let c = ci_own_peel(session, init)
+    if with_ci_cursor_kind(session, c) != CXK_DECL_REF: return ""
+    let name = with_ci_cursor_spelling(session, c)
+    if ci_own_is_libc_allocator(name) or ci_own_is_libc_free(name): name else: ""
+
+// C's allocators: a pointer they return is fresh and owned by the caller.
+pub fn ci_own_is_libc_allocator(name: &str) -> bool:
+    name == "malloc" or name == "calloc" or name == "realloc" or name == "strdup" or name == "strndup" or name == "aligned_alloc" or name == "valloc" or name == "reallocarray"
+
+pub fn ci_own_is_libc_free(name: &str) -> bool: name == "free"
+
+// Library functions that read their pointer arguments and keep nothing: a
+// value passed to one is not retained. Everything else outside the corpus
+// is taken to retain what it is handed (the asymmetry rule, §16.2b.2).
+pub fn ci_own_is_libc_observer(name: &str) -> bool:
+    name == "memset" or name == "memcpy" or name == "memmove" or name == "memcmp" or name == "memchr" or name == "strlen" or name == "strcmp" or name == "strncmp" or name == "strcpy" or name == "strncpy" or name == "strcat" or name == "strncat" or name == "strchr" or name == "strrchr" or name == "strstr" or name == "strcasecmp" or name == "strncasecmp" or name == "printf" or name == "fprintf" or name == "sprintf" or name == "snprintf" or name == "vfprintf" or name == "vsnprintf" or name == "puts" or name == "fputs" or name == "fwrite" or name == "fread" or name == "fopen" or name == "fclose" or name == "fflush" or name == "atoi" or name == "atol" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "sscanf" or name == "__builtin_expect" or name == "__assert_rtn" or name == "__assert_fail" or name == "abort" or name == "exit"
+
 fn ci_body_assigns_to(session: i64, cursor: i32, name: &str) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)
     // Binary assignment: lhs = rhs (kind 114 = BinaryOp)

@@ -949,6 +949,30 @@ type CiProjectSymbol {
     param_reason: List[str],
     has_definition: i32,
     unanalyzable: i32,
+    // D121 (§16.2b.15), CIPS_FN only: the ownership evidence the body
+    // gives and the proofs the fixed point draws. `ret_ty` and
+    // `param_ty[i]` are the translated signature types; `own_evidence`
+    // the raw `ret:`/`localsrc:`/`localstore:`/`localsink:` records
+    // (CImport.w ci_body_ownership_evidence); `param_stores[i]` 1 when the
+    // body retains parameter i (a field, a global, or a callee that
+    // retains it); `param_destroys[i]` 1 when it frees parameter i or
+    // hands it to a destroyer; `owns_return` 1 when every pointer it
+    // returns is a fresh allocation it never retained; `borrow_from` the
+    // parameter every returned pointer is a part of, else -1;
+    // `own_reason` the one-line proof or the reason none was found.
+    ret_ty: str,
+    param_ty: List[str],
+    own_evidence: str,
+    param_stores: List[i32],
+    param_destroys: List[i32],
+    owns_return: i32,
+    borrow_from: i32,
+    own_reason: str,
+    // 1 when a prototype declares the function (a header's API); a
+    // definition no prototype declares is internal: its proofs feed its
+    // callers' and it is never a facade item (a facade describes imported
+    // declarations, §16.2b.13).
+    header_declared: i32,
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
@@ -971,6 +995,15 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         param_reason: List.new(),
         has_definition: 0,
         unanalyzable: 0,
+        ret_ty: "",
+        param_ty: List.new(),
+        own_evidence: "",
+        param_stores: List.new(),
+        param_destroys: List.new(),
+        owns_return: 0,
+        borrow_from: -1,
+        own_reason: "",
+        header_declared: 0,
     }
 
 fn ci_pipe_i32_contains(items: &str, want: i32) -> bool:
@@ -1001,27 +1034,9 @@ impl CiProjectSymbol:
         while self.param_sinks.len() < n: self.param_sinks.push("")
         while self.param_nullable.len() < n: self.param_nullable.push(0)
         while self.param_reason.len() < n: self.param_reason.push("")
-
-    fn owned_copy() -> CiProjectSymbol:
-        CiProjectSymbol {
-            name: ci_ir_owned_text(self.name),
-            kind: self.kind,
-            owner_module: self.owner_module,
-            resolved_ty: self.resolved_ty,
-            resolved_ty_text: ci_ir_owned_text(self.resolved_ty_text),
-            consumers: ci_ir_owned_text(self.consumers),
-            owner_rank: self.owner_rank,
-            owner_definition_kind: self.owner_definition_kind,
-            param_fn_ptr: self.param_fn_ptr.clone(),
-            param_tested: self.param_tested.clone(),
-            param_aborting: self.param_aborting.clone(),
-            param_null_caller: self.param_null_caller.clone(),
-            param_sinks: self.param_sinks.clone(),
-            param_nullable: self.param_nullable.clone(),
-            param_reason: self.param_reason.clone(),
-            has_definition: self.has_definition,
-            unanalyzable: self.unanalyzable,
-        }
+        while self.param_ty.len() < n: self.param_ty.push("")
+        while self.param_stores.len() < n: self.param_stores.push(0)
+        while self.param_destroys.len() < n: self.param_destroys.push(0)
 
 fn ci_project_symbol_key(kind: i32, name: &str) -> str:
     if kind == CiProjectSymbolKind.CIPS_VAR:
@@ -1042,6 +1057,11 @@ pub type CiProject {
     symbol_index: HashMap[str, i32],
     // The (symbol, parameter) pairs one sink-chain walk has entered.
     sink_seen: HashMap[str, i32],
+    // D121: globals the corpus initializes to an allocator or to `free`
+    // (libxml2's `xmlFreeFunc xmlFree = free`): a call through one is a
+    // call to what it names. Source evidence, never a name.
+    alloc_aliases: List[str],
+    free_aliases: List[str],
 }
 
 fn CiProject.new -> CiProject:
@@ -1051,6 +1071,8 @@ fn CiProject.new -> CiProject:
         types: CiTypePool.new(),
         symbol_index: HashMap.new(),
         sink_seen: HashMap.new(),
+        alloc_aliases: List.new(),
+        free_aliases: List.new(),
     }
 
 impl CiProject:

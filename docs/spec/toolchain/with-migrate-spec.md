@@ -36,7 +36,35 @@ with migrate src/ -o out/             # directory mode
 with migrate src/ --check             # dry run: exit 1 if changes needed
 with migrate src/ --diff              # show unified diff
 with migrate src/ --stats             # print translation statistics
+with migrate src/ --facade libfoo     # the facade draft the sources prove (§16.2b.15)
 ```
+
+**`--facade NAME`** (D121, §16.2b.15 step 1) translates nothing. The units
+are scanned as one corpus, as a directory migration scans them, and the
+ownership facts their bodies prove are drawn as a least fixed point, in
+this order: retention (a parameter stored into a field or a global, or
+handed to a callee that retains it; a callee outside the package retains
+what it is given unless it is a C library function known to read and keep
+nothing), destruction (a parameter passed to `free`, to a global the
+package initializes to `free`, or to a package destroyer at its destroyed
+position), then returns: an owned producer returns, on every path, a fresh
+allocation (an allocator, or a package producer) it never retained; a
+borrowed return is, on every path, a part of one parameter's memory (the
+parameter, a field, an element, an offset), directly or through a package
+function proven to borrow from its argument. No name enters a verdict.
+
+The draft facade goes to stdout (`-o FILE` writes it): one `resource` per
+pointer-to-record representation that has at least one owned producer and
+exactly one unary destroyer, with every `from`, `drop` and `destroys`
+clause carrying its proof as a comment; `returns borrow R from param N` on
+every proven borrow whose return and origin are modeled resources and that
+retains no argument. The report on stderr names every function and how the
+draft presents it (owned producer, destroyer, borrow, lend, value-only) or
+why it stays raw (retains a parameter, returns global state, two sources,
+an unmodeled pointer type), and lists each representation the draft could
+not model (producers with no unary destroyer, or several) for the package
+registry (§16.2b.15 step 3). `with get` consumes this engine to write the
+package facade (step 5).
 
 **Modes:**
 - `write` (default) — write `.w` files

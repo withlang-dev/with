@@ -4309,6 +4309,92 @@ fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, c
     let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-nullable-by-evidence", check_args)
     checked.rc
 
+// D121 (§16.2b.15 step 1): `with migrate --facade NAME dir` proves a
+// package's ownership facts from its own bodies, with no name entering any
+// verdict: an owned producer is a fresh allocation never retained (directly,
+// through a local, or through a corpus producer in another unit); a borrowed
+// return is a part of a parameter's memory (directly or through a corpus
+// borrow); a destroyer frees its parameter or hands it to a destroyer (also
+// through a global the package initializes to `free`). Producers and the one
+// unary destroyer of a representation make a resource; retention, global
+// state and a return with two sources stay raw and say why. The draft then
+// compiles against the package's header.
+fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let lib_dir = bs_join(case_dir, "minilib")
+    let header = "#include <stdlib.h>\n#include <string.h>\nstruct attr { int k; };\nstruct node { struct node *next; struct attr *attr; int v; };\nstruct doc { struct node *root; int n; };\nstruct buf { int n; };\ntypedef void (*freefn)(void *);\nextern freefn lib_free;\nstruct node *node_new(void);\nvoid node_free(struct node *n);\nstruct attr *node_attr(struct node *n);\nvoid attr_free(struct attr *a);\nstruct buf *buf_new(void);\nvoid buf_free(struct buf *b);\nstruct node *node_next(struct node *n);\nstruct doc *doc_new(void);\nstruct doc *doc_open(const char *path);\nstruct node *doc_root(struct doc *d);\nstruct node *doc_first(struct doc *d);\nvoid doc_free(struct doc *d);\nvoid doc_discard(struct doc *d, int why);\nvoid doc_keep(struct doc *d);\nstruct node *doc_add(struct doc *d, struct node *n);\nstruct node *doc_pick(struct doc *d, int i);\nint doc_count(struct doc *d);\n"
+    var rc = bs_write_fixture(ctx, bs_join(lib_dir, "mini.h"), header, "facade by evidence header")
+    if rc != 0: return rc
+    let node_c = "#include \"mini.h\"\nfreefn lib_free = free;\ntypedef struct node *nodep;\nstruct node *node_new(void) { return calloc(1, sizeof(struct node)); }\nvoid node_free(struct node *n) { nodep p = (nodep)n; free(p); }\nstruct attr *node_attr(struct node *n) { return n->attr; }\nvoid attr_free(struct attr *a) { free(a); }\nstruct buf *buf_new(void) { return malloc(sizeof(struct buf)); }\nvoid buf_free(struct buf *b) { lib_free(b); }\nstruct node *node_next(struct node *n) { return n->next; }\n"
+    rc = bs_write_fixture(ctx, bs_join(lib_dir, "node.c"), node_c, "facade by evidence node unit")
+    if rc != 0: return rc
+    let doc_c = "#include \"mini.h\"\nstatic struct doc *g_doc;\nstatic struct doc *alloc_doc(void) { return malloc(sizeof(struct doc)); }\nstruct doc *doc_new(void) { struct doc *d = alloc_doc(); if (d == NULL) return NULL; memset(d, 0, sizeof *d); return d; }\nstruct doc *doc_open(const char *path) { (void)path; return doc_new(); }\nstruct node *doc_root(struct doc *d) { return d->root; }\nstruct node *doc_first(struct doc *d) { return doc_root(d); }\nvoid doc_free(struct doc *d) { struct node *n = d->root; while (n) { struct node *next = n->next; node_free(n); n = next; } free(d); }\nvoid doc_discard(struct doc *d, int why) { (void)why; doc_free(d); }\nvoid doc_keep(struct doc *d) { g_doc = d; }\nstruct node *doc_add(struct doc *d, struct node *n) { n->next = d->root; d->root = n; return n; }\nstruct node *doc_pick(struct doc *d, int i) { return i ? d->root : node_new(); }\nint doc_count(struct doc *d) { return d->n; }\n"
+    rc = bs_write_fixture(ctx, bs_join(lib_dir, "doc.c"), doc_c, "facade by evidence doc unit")
+    if rc != 0: return rc
+    let draft = bs_join(case_dir, "mini_facade.w")
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, lib_dir))
+    args |> push("--facade")
+    args |> push("mini")
+    args |> push("-o")
+    args |> push(bs_abs(root, draft))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-facade-by-evidence", args)
+    if result.rc != 0: return result.rc
+    // The draft: one resource per representation with producers and one
+    // unary destroyer, every clause with its proof.
+    rc = bs_file_contains(ctx, draft, "resource Doc wraps *mut doc\n        from doc_new    // proof: returns d, a fresh allocation never retained\n        from doc_open    // proof: returns doc_new(…), a fresh allocation never retained\n        drop doc_free    // proof: frees param 0\n        destroys doc_discard    // proof: frees its doc parameter\n", "facade draft: Doc resource")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, draft, "resource Node wraps *mut node\n        from node_new    // proof: returns calloc(…), a fresh allocation never retained\n        drop node_free    // proof: frees param 0\n", "facade draft: Node resource")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, draft, "resource Buf wraps *mut buf\n        from buf_new    // proof: returns malloc(…), a fresh allocation never retained\n        drop buf_free    // proof: frees param 0\n", "facade draft: Buf resource through the lib_free alias")
+    if rc != 0: return rc
+    // A borrowed-only resource (destroyed, never produced, lent from an
+    // owned one) and the borrow that defines it.
+    rc = bs_file_contains(ctx, draft, "resource Attr wraps *mut attr\n        drop attr_free    // proof: frees param 0\n", "facade draft: borrowed-only resource")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, draft, "fn node_attr\n        returns borrow Attr from param 0    // proof: returns a part of param 0\n", "facade draft: borrow of a field")
+    if rc != 0: return rc
+    // Retention, unproven returns and a borrowed type with two origin types
+    // (Node from Doc and Node from an owned Node) never reach the draft.
+    let text = ctx.fs().read_text(draft)
+    if text.contains("doc_add") or text.contains("doc_keep") or text.contains("doc_pick"):
+        return bs_fail(ctx, "facade draft presents a retaining or unproven function")
+    if text.contains("fn doc_root") or text.contains("fn doc_first") or text.contains("fn node_next"):
+        return bs_fail(ctx, "facade draft presents a borrow whose type has several origin types")
+    // The report says why.
+    rc = bs_assert_contains(ctx, result.stderr, "facade mini: 17 functions, 11 presented safely, 6 raw; 1 internal (no prototype declares them)", "facade report: summary")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, draft, "fn doc_count\n        lend    // proof: reads its resource parameters, keeps nothing\n", "facade draft: lend")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "Node: borrowed from Node (node_next) and from Doc (doc_root, doc_first); a borrowed value with several origin types is not ruled (§16.2b.6): no borrow clause is drafted", "facade report: several origin types")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "doc_first: raw: proof: returns doc_root(…), but Node is borrowed from several origin types (§16.2b.6)", "facade report: borrow through a corpus borrow, held back")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "node_attr: borrows Attr from param 0 (proof: returns a part of param 0)", "facade report: borrow")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "node_free: destroyer, param 0 (proof: frees it)", "facade report: destroyer through a cast local")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "doc_keep: raw: retains param 0", "facade report: global retention")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "doc_add: raw: retains param 1", "facade report: field retention")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "doc_pick: raw: returns *mut node unproven: no single source", "facade report: two sources")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "doc_count: lend (reads its resource parameters, keeps nothing)", "facade report: lend")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "doc_discard: destroyer, param 0 (proof: frees it)", "facade report: forwarded destroyer")
+    if rc != 0: return rc
+    // The draft is a facade the compiler accepts against the header.
+    let program = bs_join(lib_dir, "use_mini.w")
+    rc = bs_write_fixture(ctx, program, "use c_import(\"mini.h\")\n" ++ text ++ "\nfn main:\n    let Some(d) = Doc.doc_open(\"x\") else:\n        return 1\n    let Some(n) = Node.node_new() else:\n        return 2\n    let a = n.node_attr()\n    if a.is_none(): return 3\n    print(d.doc_count())\n", "facade by evidence program")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, program))
+    let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-facade-by-evidence", check_args)
+    checked.rc
+
 fn bs_check_migrate_zeroed_records(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "zeroed.c")
@@ -5305,6 +5391,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_zeroed_records(ctx, compiler_path, bs_join(output_dir, "zeroed_records"))
     if rc != 0: return rc
     rc = bs_check_migrate_nullable_by_evidence(ctx, compiler_path, bs_join(output_dir, "nullable_by_evidence"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_facade_by_evidence(ctx, compiler_path, bs_join(output_dir, "facade_by_evidence"))
     if rc != 0: return rc
     rc = bs_check_migrate_nullable_fn_pointer(ctx, compiler_path, bs_join(output_dir, "nullable_fn_pointer"))
     if rc != 0: return rc
