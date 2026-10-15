@@ -4698,15 +4698,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     emit_c_smoke = emit_c_smoke.dep("runtime")
     out = out.add_target(emit_c_smoke)
 
-    var test_green = target_new(.Action, "test-green", "").output("out/.build-state/test-green.json")
-    test_green.action = run_test_green_action
-    test_green = test_green.input(host_bin("out/bin/with-sha256"))
-    test_green = test_green.write_scope("out/.build-state")
-    test_green = test_green.write_scope("out/command/test-green")
-    test_green = test_green.dep("with-sha256")
-    test_green = test_green.dep("seed-driver")
-    test_green = test_green.arg(release_asset_for_host())
-    out = out.add_target(test_green)
+    // test-green is declared after the `tests` group below: it depends on
+    // every target the group runs.
 
     // The release compiler checks the build system's own source: the reseed
     // gate (`:install-user`, #745) runs exactly this, and nothing earlier did,
@@ -4771,6 +4764,24 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("rt-decl-audit")
     tests = tests.dep("unit-return-review")
     tests = tests.dep("test-green")
+    // test-green reads the run's evidence (build/retention.w test_green
+    // inputs: the test markers, the state files, the release compiler), so
+    // it depends on every target of the group and on `build`. The graph is
+    // scheduled by readiness, not list order: with only with-sha256 and
+    // seed-driver declared it ran before stage1 and found no compiler
+    // (2026-10-14).
+    var test_green = target_new(.Action, "test-green", "").output("out/.build-state/test-green.json")
+    test_green.action = run_test_green_action
+    test_green = test_green.input(host_bin("out/bin/with-sha256"))
+    test_green = test_green.write_scope("out/.build-state")
+    test_green = test_green.write_scope("out/command/test-green")
+    test_green = test_green.dep("with-sha256")
+    test_green = test_green.dep("seed-driver")
+    test_green = test_green.dep("build")
+    for tdi in 0..tests.deps.len():
+        if tests.deps[tdi] != "test-green": test_green = test_green.dep(build_owned_text(tests.deps[tdi]))
+    test_green = test_green.arg(release_asset_for_host())
+    out = out.add_target(test_green)
     out = out.add_target(tests)
     // The ownership battery in one invocation. The audits are listed before
     // the tests so they fall in the same consecutive pooled run as the
