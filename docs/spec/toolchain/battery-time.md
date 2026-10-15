@@ -15,10 +15,16 @@ run). The target set on 2026-10-14 was ten minutes.
 | 2026-10-14 | #2411 | 10-14 local-2 (one-graph driver) | 1298 s | the first battery under the one-graph seed: the store prune walked 20,798 files after every published target |
 | 2026-10-14 | #2413 | local-2 | 472 s (warm) | the store prune lists the top level; a directory listing is linear; an Action before the runner runs in the driver |
 | 2026-10-14 | 592eb6602 (#2414) | 10-14 local-3 | **390 s** (warm worktree), **491 s** (fresh worktree) | the first seed whose driver carries every fix |
+| 2026-10-14 | #2416 (closed, not merged) | local-3 | 562 s (fresh) | a critical lane's parallel window capped at half the jobserver budget: emit-c-smoke 279 s against 292 s, tools-tests 361 s against 170 s; no saving |
 
 A warm worktree already holds `out/` from an earlier run; a fresh worktree
 has only the seed, with the machine-wide stores (`~/.local/with-build-cache`,
 `~/.local/with-test-verdicts`) as any PR finds them.
+
+The campaign's stop rule was "under ten minutes, and the last iteration saved
+under 5%"; both held on 2026-10-14. Run-to-run variance on the fresh
+worktree is about ±100 s (a lane of 170 s in one run took 361 s in the
+next), which is the floor a further cut has to clear to be measured at all.
 
 ## Where the 491 s go (fresh worktree, seed local-3)
 
@@ -41,8 +47,22 @@ Elapsed stamps from the run's `[time]` lines:
 
 The wall is `build` (184 s, the chain seed → stage1 → stage2 that nothing
 shortens but a faster compile of the compiler) plus the longest test lane.
-`emit-c-smoke` runs its 34 cases one after another and is the lane that
-ends the run.
+`emit-c-smoke` is the lane that ends the run: 45 s alone, 280–290 s under
+the load of every other lane; its cases already run in parallel, and
+bounding its window changed nothing. What is left is the CPU the lanes burn
+and the compile chain, each a project of its own.
+
+## A determinism defect found on the way
+
+Three releases built on 2026-10-14 from identical `src/` had three
+different self-ids, so the verdict store and the build store served nothing
+across worktrees and the `.wo` store served one worktree a bundle naming
+another worktree's path. The cause is one line: `MirLower.source_location_
+operand` stamps `sema.current_module_path` raw into every panic site, so a
+std module compiled from a checkout carries that checkout's absolute path.
+The canonical spelling (`codegen_canonical_module_path`: `<embedded-std>/…`
+for std, the prefix map otherwise; D38, D50) is what it must use; the pin is
+`test/behavior/behav_panic_path_is_canonical.w`.
 
 ## How to measure
 
