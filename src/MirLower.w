@@ -3007,15 +3007,17 @@ impl MirBuilder:
     mut fn lower_synthesized_str_lit(text: &str) -> i32:
         self.lower_str_lit(self.pool.intern("\x01raw\x01" ++ text))
 
+    // The path a panic site or `#file` names is Sema's (source_path_text):
+    // a std module as `<embedded-std>/…`, an absolute path by its mapped
+    // spelling, never the checkout's absolute path.
     mut fn source_location_operand(node: i32) -> i32:
-        let path = if self.sema.current_module_path.len() > 0: self.sema.current_module_path.clone() else: "<unknown>"
+        let path = self.sema.source_path_text()
         let loc = self.sema.source_location_for_file_id(self.sema.local_file_id, self.ast.get_start(node))
         self.lower_synthesized_str_lit(f"{path}:{loc.line + 1}:{loc.col + 1}")
 
     mut fn source_file_operand(node: i32) -> i32:
         let _ = node
-        let path = if self.sema.current_module_path.len() > 0: self.sema.current_module_path.clone() else: "<unknown>"
-        self.lower_synthesized_str_lit(path)
+        self.lower_synthesized_str_lit(self.sema.source_path_text())
 
     mut fn source_line_operand(node: i32) -> i32:
         let loc = self.sema.source_location_for_file_id(self.sema.local_file_id, self.ast.get_start(node))

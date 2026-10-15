@@ -5699,6 +5699,22 @@ impl Sema:
         for si in 0..self.source_texts.len():
             self.source_line_offsets.push(sema_source_line_offsets(self.source_texts[si]))
 
+    // The path a panic site or `#file` names for the module being checked:
+    // a std module is `<embedded-std>/…` and an absolute path under
+    // WITH_FILE_PREFIX_MAP is its mapped spelling (codegen_canonical_
+    // module_path; D38, D50), never the checkout's absolute path. Every std
+    // module compiled from a worktree carried that worktree's path in each
+    // unwrap message, so identical sources gave a different compiler in
+    // every worktree and the machine-wide stores served one worktree's paths
+    // to the others (2026-10-14). A user's program keeps the path as it was
+    // spelled: `test/behavior/x.w:24:10` stays relative.
+    fn source_path_text() -> str:
+        let path = &self.current_module_path
+        if path.len() == 0: return "<unknown>"
+        let canonical = codegen_canonical_module_path(path)
+        if canonical.starts_with("<embedded-std>/") or path[0] == '/': return canonical
+        path.clone()
+
     fn source_location_for_file_id(file_id: i32, offset: i32) -> SemaSourceLocation:
         var source_index = 0
         if file_id != 0:
