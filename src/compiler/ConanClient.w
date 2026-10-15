@@ -34,16 +34,8 @@ pub type ConanLibraryScan {
     libs: List[str],
 }
 
-fn conan_temp_root() -> str:
-    if runtime_sysinfo_os() == "Windows":
-        let tmp = runtime_getenv("TMP")
-        if tmp.len() > 0: return tmp
-        return runtime_getenv("TEMP")
-    let tmp = runtime_getenv("TMPDIR")
-    if tmp.len() > 0: tmp else: "/tmp"
-
 fn conan_scratch_dir() -> str:
-    let base = conan_temp_root()
+    let base = runtime_temp_dir()
     if base.len() == 0:
         runtime_eprint("error: no temporary directory configured for Conan downloads (set TMP or TEMP)")
         return ""
@@ -958,52 +950,6 @@ pub fn conan_system_package_lib(name: &str) -> str:
     if name == "libudev": return "udev"
     ""
 
-// The host library a Linux `<name>/system` package links, given the dirs to
-// search. `-l<name>` needs `lib<name>.so`, which only the -dev package
-// installs; the runtime package installs `lib<name>.so.<N>` alone. So on a
-// host with no development packages, `with get c.raylib` wrote `-lGL` and the
-// program did not link ("cannot find -lGL") though libGL was installed. Returns
-// "" to keep `-l<name>` when the dev symlink is there, and when no soname is
-// either, so the linker's own "cannot find -l<name>" stays the diagnostic;
-// else the path of the highest `lib<name>.so.<N>`, as the symlink would name.
-// Only system packages come here: a Conan package's own archive never gives
-// way to a same-named host library.
-pub fn conan_host_lib_path(dirs: &List[str], name: &str) -> str:
-    for d in 0..dirs.len():
-        if runtime_file_exists(dirs[d] ++ "/lib" ++ name ++ ".so") != 0:
-            return ""
-    for d in 0..dirs.len():
-        var n = 63
-        while n >= 0:
-            let path = dirs[d] ++ "/lib" ++ name ++ ".so." ++ f"{n}"
-            if runtime_file_exists(path) != 0:
-                return path
-            n = n - 1
-    ""
-
-fn conan_linux_lib_dirs -> List[str]:
-    let dirs: List[str] = List.new()
-    dirs.push("/usr/lib/" ++ (if conan_detect_arch() == "armv8": "aarch64-linux-gnu" else: "x86_64-linux-gnu"))
-    dirs.push("/usr/lib64")
-    dirs.push("/usr/lib")
-    dirs
-
-// A system package's libs, with each one the host has only as a runtime
-// soname moved to a link input by path (conan_host_lib_path).
-fn conan_host_link_inputs(libs: List[str], link_args: List[str]) -> ConanLibraryScan:
-    if conan_detect_os() != "Linux":
-        return ConanLibraryScan { lib_paths: link_args, libs }
-    let dirs = conan_linux_lib_dirs()
-    var out_libs: List[str] = List.new()
-    var out_args = link_args
-    for i in 0..libs.len():
-        let path = conan_host_lib_path(&dirs, libs[i])
-        if path.len() > 0:
-            out_args.push(path)
-        else:
-            out_libs.push(with_str_clone_ref(libs[i]))
-    ConanLibraryScan { lib_paths: out_args, libs: out_libs }
-
 fn conan_known_link_metadata(name: &str, version: &str, libs: List[str], link_args: List[str]) -> ConanLibraryScan:
     let os = conan_detect_os()
     var out_libs = libs
@@ -1052,12 +998,11 @@ pub fn conan_write_known_system_package(name: &str, version: &str, project_root:
     var link_args: List[str] = List.new()
     if name == "opengl" and conan_detect_os() == "Macos":
         defines = conan_sorted_insert_unique(move defines, "GL_SILENCE_DEPRECATION=1")
-    var known = conan_known_link_metadata(name, version, move libs, move link_args)
-    let host = conan_host_link_inputs(move known.libs, move known.lib_paths)
-    let host_libs = host.libs
-    let host_link_args = host.lib_paths
+    let known = conan_known_link_metadata(name, version, move libs, move link_args)
+    // Names only: which host file a name means is the link's to find
+    // (compiler.HostLibs), on the machine that links.
     let requires: List[str] = List.new()
-    conan_write_metadata(dep_dir, name, version, "system", "system", "system", include_paths, lib_paths, host_libs, defines, host_link_args, requires) == 0
+    conan_write_metadata(dep_dir, name, version, "system", "system", "system", include_paths, lib_paths, known.libs, defines, known.lib_paths, requires) == 0
 
 fn conan_resolve_and_install_requirements(requirements: &List[str], project_root: &str, depth: i32, force_reinstall: bool) -> List[str]:
     let resolved: List[str] = List.new()

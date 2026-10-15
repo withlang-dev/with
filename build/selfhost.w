@@ -4267,7 +4267,7 @@ fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, c
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "evidence.c")
     let out_w = bs_join(case_dir, "evidence.w")
-    var rc = bs_write_fixture(ctx, src, "#include <assert.h>\n#include <stdlib.h>\ntypedef int (*cb_t)(int);\nstruct holder { cb_t stored; };\nstatic struct holder g;\nstatic int hidden(cb_t cb, int x) { if (cb == NULL) return -2; return cb(x); }\nint via_hidden(int x) { return hidden(NULL, x); }\nint handled(cb_t cb, int x) { if (cb == NULL) return -1; return cb(x); }\nint contract(cb_t cb, int x) { assert(cb != NULL); return cb(x); }\nint direct(cb_t cb, int x) { return cb(x); }\nint forwarded(cb_t cb, int x) { return direct(cb, x); }\nint stored(cb_t cb) { g.stored = cb; return 0; }\nint via_handled(cb_t cb, int x) { return handled(cb, x); }\nint caller(int x) { return direct(NULL, x); }\nint add1(int x) { return x + 1; }\nint run(void) { return handled(add1, 1) + contract(add1, 2) + direct(add1, 3) + forwarded(add1, 4) + via_handled(add1, 5); }\n", "nullable by evidence fixture")
+    var rc = bs_write_fixture(ctx, src, "#include <assert.h>\n#include <stdlib.h>\ntypedef int (*cb_t)(int);\nstruct holder { cb_t stored; };\nstatic struct holder g;\nstatic int hidden(cb_t cb, int x) { if (cb == NULL) return -2; return cb(x); }\nint via_hidden(int x) { return hidden(NULL, x); }\nint handled(cb_t cb, int x) { if (cb == NULL) return -1; return cb(x); }\nint contract(cb_t cb, int x) { assert(cb != NULL); return cb(x); }\nint sized(cb_t cb, int x) { (void) sizeof((cb != NULL) ? 1 : 0); (void) sizeof(sized(NULL, x)); if (cb == NULL) abort(); return cb(x); }\nint direct(cb_t cb, int x) { return cb(x); }\nint forwarded(cb_t cb, int x) { return direct(cb, x); }\nint stored(cb_t cb) { g.stored = cb; return 0; }\nint via_handled(cb_t cb, int x) { return handled(cb, x); }\nint caller(int x) { return direct(NULL, x); }\nint add1(int x) { return x + 1; }\nint run(void) { return handled(add1, 1) + contract(add1, 2) + sized(add1, 6) + direct(add1, 3) + forwarded(add1, 4) + via_handled(add1, 5); }\n", "nullable by evidence fixture")
     if rc != 0: return rc
     var args: List[str] = List.new()
     args |> push("migrate")
@@ -4286,6 +4286,10 @@ fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, c
     rc = bs_file_contains(ctx, out_w, "fn hidden(__param_cb: Option[extern \"C\" fn(c_int) -> c_int]", "evidence: static hidden is Option")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "contract param 0: non-null: the NULL branch aborts (a contract), no NULL callers", "evidence reason: assert")
+    if rc != 0: return rc
+    // A sizeof's operand never runs: neither its `?:` nor its call is evidence
+    // (glibc's assert wraps its test in one).
+    rc = bs_assert_contains(ctx, result.stderr, "sized param 0: non-null: the NULL branch aborts (a contract), no NULL callers", "evidence reason: under sizeof")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "direct param 0: Option: caller caller passes NULL", "evidence reason: NULL caller")
     if rc != 0: return rc
@@ -6677,9 +6681,11 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
     rc = bs_write_project_manifest(ctx, message_dir, "workspacemessage")
     if rc != 0: return rc
     // The PreLink command is the linker's own argv, so the flag the fixture
-    // appends is in that linker's syntax: the C driver's on Linux, lld's on
-    // macOS, where the native link is the compiler's lld (#1915).
-    let message_link_flag = if os() == "Linux": "-Wl,--gc-sections" else: "-dead_strip"
+    // appends is in that linker's syntax. Both native links are the
+    // compiler's own lld (#1915, D81): ELF lld on Linux, which takes no C
+    // driver's `-Wl,` (`unknown argument '-Wl,--gc-sections'`), and ld64
+    // lld on macOS.
+    let message_link_flag = if os() == "Linux": "--gc-sections" else: "-dead_strip"
     let message_build =
         "use std.build\n\n" ++
         "comptime with BuildCtx as ctx:\n" ++

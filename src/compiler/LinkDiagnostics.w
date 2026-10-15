@@ -67,12 +67,7 @@ pub fn link_missing_library_help(diagnostics: &str) -> str:
     help
 
 pub fn link_run_with_diagnostics(argv: &str, cwd: &str) -> i32:
-    var temp = runtime_getenv("TMPDIR")
-    if runtime_sysinfo_os() == "Windows":
-        temp = runtime_getenv("TMP")
-        if temp.len() == 0: temp = runtime_getenv("TEMP")
-    else if temp.len() == 0:
-        temp = "/tmp"
+    let temp = runtime_temp_dir()
     if temp.len() == 0:
         runtime_eprint("error: no temporary directory configured for linker diagnostics (set TMP or TEMP)")
         return -1

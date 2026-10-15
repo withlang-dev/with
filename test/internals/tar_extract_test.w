@@ -59,7 +59,7 @@ fn main:
     tar = tar ++ entry("ignored-name", "0", "#define DEMO 1\n", "")
     tar = tar ++ entry("pkg/lib/libdemo.link.a", "2", "", "libdemo.a")
     tar = tar ++ padded("", 1024)
-    let tmp = runtime_getenv("TMPDIR") ++ f"/with-tar-extract-{runtime_getpid()}"
+    let tmp = runtime_temp_dir() ++ f"/with-tar-extract-{runtime_getpid()}"
     let _clean = runtime_remove_tree(tmp)
     assert(runtime_mkdir_p(tmp) == 0)
     let gz = match compress_gzip(&bytes(tar)):

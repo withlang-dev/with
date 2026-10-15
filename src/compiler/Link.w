@@ -1,6 +1,7 @@
 use Archive
 use compiler.Runtime
 use compiler.LinkDiagnostics
+use compiler.HostLibs
 use compiler.EmbeddedBundles
 use compiler.BundleInterfaces
 use compiler.AbiStamp
@@ -422,49 +423,81 @@ fn link_stage_linux_dynamic_linker(sysroot: &str) -> str:
     ""
 
 fn link_stage_linux_crt_object(sysroot: &str, name: &str) -> str:
-    let multiarch = link_stage_linux_multiarch()
-    let usr = sysroot ++ "/usr/lib/" ++ multiarch ++ "/" ++ name
-    if link_stage_file_exists(usr):
-        return usr
-    let lib = sysroot ++ "/lib/" ++ multiarch ++ "/" ++ name
-    if link_stage_file_exists(lib):
-        return lib
+    for dir in host_library_trusted_dirs(sysroot, link_stage_linux_arch()):
+        let path = dir ++ "/" ++ name
+        if host_library_usable(&path, link_stage_linux_arch()): return path
     ""
 
+// gcc's own directory, `<libdir>/gcc/<triple>/<version>`: the triple is the
+// distribution's (x86_64-linux-gnu, x86_64-pc-linux-gnu, x86_64-redhat-linux),
+// so any naming this arch, at the highest major version with crtbegin.o.
 fn link_stage_linux_gcc_dir(sysroot: &str) -> str:
-    let base = sysroot ++ "/usr/lib/gcc/" ++ link_stage_linux_multiarch() ++ "/"
-    let candidates: List[str] = List.new()
-    candidates.push(base ++ "15")
-    candidates.push(base ++ "14")
-    candidates.push(base ++ "13")
-    candidates.push(base ++ "12")
-    candidates.push(base ++ "11")
-    candidates.push(base ++ "10")
-    candidates.push(base ++ "9")
-    for i in 0..candidates.len():
-        let dir = candidates[i]
-        if link_stage_file_exists(dir ++ "/crtbegin.o"):
-            return with_str_clone_ref(dir)
-    ""
+    let arch = link_stage_linux_arch()
+    var best = ""
+    var best_major: i64 = -1
+    for libdir in ["/usr/lib", "/usr/lib64"]:
+        for triple in runtime_list_files(sysroot ++ libdir ++ "/gcc").split("\n"):
+            let base = host_library_dir(triple)
+            if not triple.slice(base.len() + 1, triple.len()).starts_with(arch ++ "-"): continue
+            for dir in runtime_list_files(triple).split("\n"):
+                let version = dir.slice(host_library_dir(dir).len() + 1, dir.len())
+                var major: i64 = 0
+                var digits = 0
+                while digits < version.len() and version[digits] >= '0' and version[digits] <= '9':
+                    major = major * 10 + (version[digits] - '0') as i64
+                    digits += 1
+                if digits == 0 or major <= best_major: continue
+                if not host_library_usable(dir ++ "/crtbegin.o", arch): continue
+                best = dir.clone()
+                best_major = major
+    best
 
-fn link_stage_linux_system_lib_path(sysroot: &str, name: &str) -> str:
-    let libdir = sysroot ++ "/usr/lib/" ++ link_stage_linux_multiarch()
-    if name == "z":
-        if link_stage_file_exists(libdir ++ "/libz.so"):
-            return ""
-        if link_stage_file_exists(libdir ++ "/libz.so.1"):
-            return libdir ++ "/libz.so.1"
-    if name == "zstd":
-        if link_stage_file_exists(libdir ++ "/libzstd.so"):
-            return ""
-        if link_stage_file_exists(libdir ++ "/libzstd.so.1"):
-            return libdir ++ "/libzstd.so.1"
-    if name == "xml2":
-        if link_stage_file_exists(libdir ++ "/libxml2.so"):
-            return ""
-        if link_stage_file_exists(libdir ++ "/libxml2.so.16"):
-            return libdir ++ "/libxml2.so.16"
-    ""
+type LinkStageLinuxLibs {
+    dirs: List[str]
+    inputs: List[str]
+}
+
+fn link_stage_linux_dir_carries(dir: &str, name: &str) -> bool:
+    if name.starts_with(":"): return link_stage_file_exists(dir ++ "/" ++ name.slice(1, name.len()))
+    link_stage_file_exists(dir ++ "/lib" ++ name ++ ".so") or link_stage_file_exists(dir ++ "/lib" ++ name ++ ".a")
+
+// The directories a link names itself, `-L<dir>` or `-L <dir>`, in order:
+// a package's own (`with get`), the sysroot's, the program's.
+fn link_stage_explicit_search_dirs(extras: &List[str], link_args: &List[str], sysroot_lib: &str) -> List[str]:
+    let dirs: List[str] = List.new()
+    if sysroot_lib.len() > 0: dirs.push(sysroot_lib.clone())
+    for args in [extras, link_args]:
+        for i in 0..args.len():
+            if args[i] == "-L" and i + 1 < args.len(): dirs.push(args[i + 1].clone())
+            else if args[i].starts_with("-L") and args[i].len() > 2: dirs.push(args[i].slice(2, args[i].len()))
+    dirs
+
+// The link inputs for the libraries a program names: `-l<name>` for one a
+// directory the link names carries (a package's own archive never gives way
+// to a same-named host library) or `host_dirs` lacks, so the linker finds it
+// or says it cannot; else its host file by path (HostLibs), with that file's
+// directory to search.
+fn link_stage_linux_resolve_libs(host_dirs: &List[str], link_libs: &List[str], explicit_dirs: &List[str]) -> LinkStageLinuxLibs:
+    var dirs: List[str] = List.new()
+    let inputs: List[str] = List.new()
+    for name in link_libs:
+        if link_stage_framework_name(name).len() > 0:
+            with_eprint("error: link: \"" ++ name ++ "\" — Apple frameworks are only available on macOS targets\n")
+            continue
+        var named = false
+        for dir in explicit_dirs:
+            if link_stage_linux_dir_carries(dir, name): named = true
+        let path = if named: "" else: host_library_path(host_dirs, name, link_stage_linux_arch())
+        if path.len() == 0:
+            inputs.push("-l" ++ name)
+            continue
+        inputs.push(path.clone())
+        let dir = host_library_dir(&path)
+        var seen = false
+        for d in dirs:
+            if d == dir: seen = true
+        if not seen: dirs.push(dir)
+    LinkStageLinuxLibs { dirs, inputs }
 
 /// The `<from>` of WITH_FILE_PREFIX_MAP=<from>=<to> (src/FnAbi.w), or "".
 pub fn link_stage_file_prefix_map_root() -> str:
@@ -571,20 +604,17 @@ fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_pa
         args.push(with_str_clone_ref(extras[i]))
         inputs.push(with_str_clone_ref(extras[i]))
     args.push("-L" ++ lib)
-    // A library a program names that the sysroot does not carry (zlib, curl)
-    // is the host's, found after every sysroot one, as c_import finds its
-    // header (ClangBridge cimport_push_host_library_dirs). The compiler's own
-    // link names none.
-    if not compiler_link and link_libs.len() > 0 and target_spec_is_native():
-        args.push("-L/usr/lib/" ++ link_stage_linux_multiarch())
-        args.push("-L/lib/" ++ link_stage_linux_multiarch())
+    // A library a program names that the sysroot does not carry (GL, zlib,
+    // curl) is the host's (HostLibs), linked by path; its directory is
+    // searched after the sysroot for what a linker script there names. The
+    // compiler's own link names none.
+    let host_dirs = if not compiler_link and link_libs.len() > 0 and target_spec_is_native(): host_library_dirs("", link_stage_linux_arch()) else: List.new()
+    let resolved = link_stage_linux_resolve_libs(&host_dirs, link_libs, &link_stage_explicit_search_dirs(extras, link_args, &lib))
+    for dir in resolved.dirs: args.push("-L" ++ dir)
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 1))
-    for i in 0..link_libs.len():
-        let name = link_libs[i]
-        if link_stage_framework_name(name).len() > 0:
-            with_eprint("error: link: \"" ++ name ++ "\" — Apple frameworks are only available on macOS targets\n")
-        else:
-            args.push("-l" ++ name)
+    for input in resolved.inputs:
+        args.push(input.clone())
+        if not input.starts_with("-l"): inputs.push(input.clone())
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
     for i in 0..link_args.len():
         args.push(with_str_clone_ref(link_args[i]))
@@ -694,22 +724,14 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
         inputs.push(with_str_clone_ref(extra))
 
     args.push("-L" ++ gcc_dir)
-    args.push("-L" ++ sysroot ++ "/usr/lib/" ++ link_stage_linux_multiarch())
-    args.push("-L" ++ sysroot ++ "/lib/" ++ link_stage_linux_multiarch())
-    args.push("-L" ++ sysroot ++ "/usr/lib")
-    args.push("-L" ++ sysroot ++ "/lib")
+    for dir in host_library_trusted_dirs(sysroot, link_stage_linux_arch()): args.push("-L" ++ dir)
+    let host_dirs = if link_libs.len() > 0: host_library_dirs(sysroot, link_stage_linux_arch()) else: List.new()
+    let resolved = link_stage_linux_resolve_libs(&host_dirs, link_libs, &link_stage_explicit_search_dirs(extras, link_args, ""))
+    for dir in resolved.dirs: args.push("-L" ++ dir)
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 1))
-    for i in 0..link_libs.len():
-        let lib = link_libs[i]
-        if link_stage_framework_name(lib).len() > 0:
-            with_eprint("error: link: \"" ++ lib ++ "\" — Apple frameworks are only available on macOS targets\n")
-        else:
-            let fallback_lib = link_stage_linux_system_lib_path(sysroot, lib)
-            if fallback_lib.len() > 0:
-                args.push(with_str_clone_ref(fallback_lib))
-                inputs.push(fallback_lib)
-            else:
-                args.push("-l" ++ lib)
+    for input in resolved.inputs:
+        args.push(input.clone())
+        if not input.starts_with("-l"): inputs.push(input.clone())
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
     for arg in link_stage_driver_args_for_ld(link_args):
         args.push(arg.clone())
@@ -1793,11 +1815,13 @@ fn link_stage_undefined_symbols_need_compat_runtime(undef: &str) -> i32:
         return 1
     0
 
-fn link_stage_compiler_runtime_dir() -> str:
-    let argv0 = runtime_arg_at(0)
-    if argv0.len() == 0:
-        return "runtime"
-    link_stage_dirname(argv0) ++ "/runtime"
+// The compiler's own directory: argv[0] is a bare `with` when it runs from
+// PATH, whose dirname is the cwd, not where the compiler lives.
+fn link_stage_compiler_dir() -> str:
+    let exe = with_self_exe()
+    if exe.len() > 0: link_stage_dirname(exe) else: "."
+
+fn link_stage_compiler_runtime_dir(): link_stage_compiler_dir() ++ "/runtime"
 
 // D30, #1815: a link takes runtime and bridge objects of this compiler's
 // generation only (compiler.AbiStamp). Anything else is #761's corruption
@@ -1815,8 +1839,7 @@ fn link_stage_resolve_runtime_root() -> str:
         if not link_stage_named_runtime_root_is_this_generation(explicit):
             return ""
         return explicit
-    let argv0 = runtime_arg_at(0)
-    let compiler_dir = if argv0.len() > 0: link_stage_dirname(argv0) else: "."
+    let compiler_dir = link_stage_compiler_dir()
     let platform_object = link_stage_host_platform_runtime_object()
     let candidates: List[str] = List.new()
     candidates.push(link_stage_artifact_root() ++ "/lib")

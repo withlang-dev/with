@@ -988,11 +988,7 @@ impl Compilation:
         // is removed as one tree on every exit path. Only the runner SOURCE
         // stays in root — its generated `use` imports resolve from there.
         let stamp = f"{runtime_getpid()}.{runtime_clock_nanos()}"
-        let tmp_base_env = runtime_getenv("TMPDIR")
-        var tmp_base = if tmp_base_env.len() > 0: tmp_base_env else: "/tmp"
-        if tmp_base.ends_with("/"):
-            tmp_base = tmp_base.slice(0, tmp_base.len() - 1)
-        let tmp_dir = tmp_base ++ "/with-compiler-hook." ++ stamp
+        let tmp_dir = runtime_temp_dir() ++ "/with-compiler-hook." ++ stamp
         if runtime_mkdir_p(tmp_dir) != 0:
             runtime_eprint("error: could not create compiler hook temp directory: " ++ tmp_dir)
             return false

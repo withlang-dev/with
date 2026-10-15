@@ -251,9 +251,7 @@ fn build_cache_is_hex_digest(text: &str) -> bool:
 // What `path version --self-id` prints: its self-id, or "" when it has none
 // (an unstamped binary, or a compiler older than the slot).
 fn build_cache_binary_self_id(path: &str) -> str:
-    let tmp = build_graph_rt_getenv("TMPDIR")
-    let dir = if tmp.len() > 0: tmp else: "/tmp"
-    let base = dir ++ f"/with-self-id-{build_graph_rt_getpid()}"
+    let base = runtime_temp_dir() ++ f"/with-self-id-{build_graph_rt_getpid()}"
     var argv = build_graph_argv_append("", path)
     argv = build_graph_argv_append(argv, "version")
     argv = build_graph_argv_append(argv, "--self-id")
@@ -801,8 +799,10 @@ fn build_cache_output_path(root: &str, output: &str) -> str:
 
 fn build_cache_collect_output_paths(root: &str, target: &BuildGraphTarget) -> List[str]:
     var paths: List[str] = List.new()
-    if target.output.len() > 0:
-        paths.push(build_cache_output_path(root, target.output))
+    // An executable declares no output and still makes one (out/bin/<name>):
+    // a missing binary must make it stale, or `with run` finds no program.
+    let primary = if target.output.len() > 0: build_cache_output_path(root, target.output) else: build_graph_target_output_path(root, target, "", 0)
+    if primary.len() > 0: paths.push(primary)
     for i in 0..target.extra_outputs.len():
         let extra = target.extra_outputs[i]
         if extra.len() > 0:

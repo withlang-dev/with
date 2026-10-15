@@ -8744,6 +8744,15 @@ impl Sema:
             if self.bind_states[bi] != VarState.LIVE:
                 continue
             let view_ty: i32 = self.bind_types[bi]
+            // Rule 7 reads the holder's recorded origins as well as its
+            // initializer: a view stored into it later (`h.v.push(&n)`,
+            // `h.keep(&n)`, #1783) is what its destructor reads. A binding
+            // that depends on the origin neither way cannot outlive it, so
+            // its type is not walked: every live binding is asked at every
+            // scope exit, and the walk was half of `check src/main.w`.
+            let depends = self.binding_depends_on_origin(view_sym, origin_sym) != 0
+            if not depends and self.binding_value_depends_on_origin(view_sym, origin_sym) == 0:
+                continue
             // Rule 7's "variable implementing Drop" is any value whose drop
             // runs a destructor retaining the borrow: `Option[S]`, `(i32,
             // Option[S])` or `List[S]` of an ephemeral Drop `S` (a dependent
@@ -8751,12 +8760,8 @@ impl Sema:
             // type_has_drop_impl let an `Option[S]` declared before its
             // origin drop after it.
             let view_has_drop = self.type_owns_user_drop(view_ty)
-            let active_view = self.binding_depends_on_origin(view_sym, origin_sym) != 0 and self.binding_has_active_borrow_from(view_sym, origin_sym) != 0
-            // Rule 7 reads the holder's recorded origins as well as its
-            // initializer: a view stored into it later (`h.v.push(&n)`,
-            // `h.keep(&n)`, #1783) is what its destructor reads.
-            let drop_retains = view_has_drop != 0 and (self.binding_value_depends_on_origin(view_sym, origin_sym) != 0 or self.binding_depends_on_origin(view_sym, origin_sym) != 0)
-            if active_view or drop_retains:
+            let active_view = depends and self.binding_has_active_borrow_from(view_sym, origin_sym) != 0
+            if active_view or view_has_drop != 0:
                 let err_node = if node != 0: node else: self.binding_decl_node(view_sym)
                 let moved = node != 0 and node == self.move_site_node
                 if view_has_drop != 0:
