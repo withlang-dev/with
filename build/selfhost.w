@@ -4359,21 +4359,24 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     if rc != 0: return rc
     rc = bs_file_contains(ctx, draft, "fn node_attr\n        returns borrow Attr from param 0    // proof: returns a part of param 0\n", "facade draft: borrow of a field")
     if rc != 0: return rc
-    // Retention, unproven returns and a borrowed type with two origin types
-    // (Node from Doc and Node from an owned Node) never reach the draft.
+    // A Node borrowed from a Doc and one from an owned Node are one type
+    // whose origin is bound per call (D134): both borrows are drafted.
+    rc = bs_file_contains(ctx, draft, "fn doc_root\n        returns borrow Node from param 0    // proof: returns a part of param 0\n", "facade draft: borrow of a field")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, draft, "fn doc_first\n        returns borrow Node from param 0    // proof: returns doc_root(…)\n", "facade draft: borrow through a corpus borrow")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, draft, "fn node_next\n        returns borrow Node from param 0", "facade draft: borrow from an owned node")
+    if rc != 0: return rc
+    // Retention and unproven returns never reach the draft.
     let text = ctx.fs().read_text(draft)
     if text.contains("doc_add") or text.contains("doc_keep") or text.contains("doc_pick"):
         return bs_fail(ctx, "facade draft presents a retaining or unproven function")
-    if text.contains("fn doc_root") or text.contains("fn doc_first") or text.contains("fn node_next"):
-        return bs_fail(ctx, "facade draft presents a borrow whose type has several origin types")
     // The report says why.
-    rc = bs_assert_contains(ctx, result.stderr, "facade mini: 17 functions, 11 presented safely, 6 raw; 1 internal (no prototype declares them)", "facade report: summary")
+    rc = bs_assert_contains(ctx, result.stderr, "facade mini: 17 functions, 14 presented safely, 3 raw; 1 internal (no prototype declares them)", "facade report: summary")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, draft, "fn doc_count\n        lend    // proof: reads its resource parameters, keeps nothing\n", "facade draft: lend")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, result.stderr, "Node: borrowed from Node (node_next) and from Doc (doc_root, doc_first); a borrowed value with several origin types is not ruled (§16.2b.6): no borrow clause is drafted", "facade report: several origin types")
-    if rc != 0: return rc
-    rc = bs_assert_contains(ctx, result.stderr, "doc_first: raw: proof: returns doc_root(…), but Node is borrowed from several origin types (§16.2b.6)", "facade report: borrow through a corpus borrow, held back")
+    rc = bs_assert_contains(ctx, result.stderr, "doc_first: borrows Node from param 0 (proof: returns doc_root(…))", "facade report: borrow through a corpus borrow")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "node_attr: borrows Attr from param 0 (proof: returns a part of param 0)", "facade report: borrow")
     if rc != 0: return rc
@@ -4391,7 +4394,7 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     if rc != 0: return rc
     // The draft is a facade the compiler accepts against the header.
     let program = bs_join(lib_dir, "use_mini.w")
-    rc = bs_write_fixture(ctx, program, "use c_import(\"mini.h\")\n" ++ text ++ "\nfn main:\n    let Some(d) = Doc.doc_open(\"x\") else:\n        return 1\n    let Some(n) = Node.node_new() else:\n        return 2\n    let a = n.node_attr()\n    if a.is_none(): return 3\n    print(d.doc_count())\n", "facade by evidence program")
+    rc = bs_write_fixture(ctx, program, "use c_import(\"mini.h\")\n" ++ text ++ "\nfn main:\n    let Some(d) = Doc.open(\"x\") else:\n        return 1\n    let Some(n) = Node.new() else:\n        return 2\n    let a = n.attr()\n    if a.is_none(): return 3\n    let r = d.root()\n    if r.is_none(): return 4\n    print(d.count())\n", "facade by evidence program")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")

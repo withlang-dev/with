@@ -19,6 +19,7 @@ use ForeignPairState
 use compiler.FacadeRender
 use SemaTypes
 use Span
+use std.string.parse
 
 impl Sema:
     mut fn collect_c_facades():
@@ -1044,7 +1045,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1210,6 +1211,29 @@ impl Sema:
         if facade_clause_bridges(kind): c.bridged = 1
         if kind == FACADE_CLAUSE_LEND:
             c.lend = 1
+            return c
+        if kind == FACADE_CLAUSE_TEXT_BYTES:
+            // D134 (§16.2b.8): this item's text return stays owned bytes
+            // under a `text utf8` facade. It accompanies a `text return`.
+            c.text_bytes = 1
+            return c
+        if kind == FACADE_CLAUSE_DETACHES:
+            // D134 (§16.2b.6): the operation removes the value param N
+            // borrows from its origin and yields it owned, dependent on that
+            // origin. The parameter is a pointer a resource wraps; the
+            // renderer presents it on the borrowed view (verified below).
+            let pi = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+            if pi < 0:
+                return c
+            if self.get_type_kind(self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)) != TypeKind.TY_PTR:
+                let shown = self.facade_param_display(fn_sym, sig, pi)
+                self.emit_error(f"fn '{fname}': detaches {shown}: not a pointer, there is nothing to detach (§16.2b.6)", clause)
+                return c
+            if self.facade_param_receives(fn_sym, pi).len() != 1:
+                let shown = self.facade_param_display(fn_sym, sig, pi)
+                self.emit_error(f"fn '{fname}': detaches {shown}, which receives no one modeled resource; a detached value is the resource its parameter receives, taken out of its origin (§16.2b.6)", clause)
+                return c
+            c.detaches = pi
             return c
         if kind == FACADE_CLAUSE_CALLBACKS_NONE:
             c.callbacks_none = clause
@@ -2424,6 +2448,9 @@ pub fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_VALID_ON_FAILED: return "valid on failed"
     if kind == FACADE_CLAUSE_NULLABLE: return "nullable"
     if kind == FACADE_CLAUSE_TEXT_PARAM: return "text param"
+    if kind == FACADE_CLAUSE_TEXT_UTF8: return "text utf8"
+    if kind == FACADE_CLAUSE_TEXT_BYTES: return "text return bytes"
+    if kind == FACADE_CLAUSE_DETACHES: return "detaches"
     if kind == FACADE_CLAUSE_TEXT_RETURN: return "text return"
     if kind == FACADE_CLAUSE_BUFFER: return "buffer"
     if kind == FACADE_CLAUSE_FIXED: return "param … fixed"
@@ -3635,17 +3662,10 @@ impl Sema:
                     self.emit_error(f"fn '{pf}' borrows '{rn}' as the parent of its argument and fn '{cf}' from its argument ('from param'); '{bn}' is one type with one origin rule, and a borrowed value under both is not ruled (§16.2b.6)", node)
                     clash = true
                     break
-                if parent != 0:
-                    continue
-                let other = self.facade_param_receives(self.foreign_contracts[cj].fn_sym, self.foreign_contracts[cj].returns_borrow_from)
-                if other.len() == 1 and other[0] != origin[0]:
-                    let on: str = self.pool_resolve(self.facade_resources[origin[0]].name)
-                    let oth: str = self.pool_resolve(self.facade_resources[other[0]].name)
-                    let ofn: str = self.pool_resolve(self.foreign_contracts[cj].fn_sym)
-                    let bn = facade_render_borrowed_name(rn)
-                    self.emit_error(f"fn '{fname}' returns a borrowed '{rn}' from a '{on}', and fn '{ofn}' from a '{oth}'; '{bn}' holds a view of one origin resource, and a borrowed value with several origin types is not ruled (§16.2b.6)", node)
-                    clash = true
-                    break
+                // D134 (§16.2b.6): a borrowed value's origin is the
+                // argument's origin, bound at each call; one `Borrowed<R>`
+                // serves every origin resource, so two items borrowing R
+                // from different resources are no clash.
             if clash or self.diags.has_errors():
                 continue
             // The net: the type and the method exist.
@@ -3667,6 +3687,10 @@ impl Sema:
                 self.facade_declare_view_through_param(msig, from)
             else:
                 self.facade_declare_view_of_param(msig, from)
+                // D134: the same lend on the borrowed view (a borrow through
+                // a borrow) is a generic method, declared on instantiation.
+                let none: List[i32] = List.new()
+                self.facade_note_generic(facade_render_borrowed_name(host) ++ "." ++ mname, 2, fn_sym, ci, 0, none, 0, from)
 
     // ── record views (D66, spec §16.2b.6) ────────────────────────────────
     //
@@ -3774,6 +3798,9 @@ impl Sema:
             if msig < 0:
                 if hi == 0 or hi == 2:
                     self.emit_error(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.6)", node)
+                else if from >= 0:
+                    let none: List[i32] = List.new()
+                    self.facade_note_generic(mtext, 2, fn_sym, ci, 0, none, 0, from)
                 continue
             if not self.facade_sig_returns_record_view(msig, rn):
                 let rt: str = self.type_name(self.sig_return_type(msig))
@@ -3841,6 +3868,9 @@ impl Sema:
             if msig < 0:
                 if hi == 0 or hi == 2:
                     self.emit_error(f"fn '{fname}': '{what}' passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.8)", node)
+                else if from >= 0:
+                    let none: List[i32] = List.new()
+                    self.facade_note_generic(mtext, 2, fn_sym, ci, 0, none, 0, from)
                 continue
             if not self.facade_sig_returns_option_cstr(msig):
                 let rt: str = self.type_name(self.sig_return_type(msig))
@@ -4009,6 +4039,10 @@ impl Sema:
                 let htext = hosts[hi].clone()
                 if self.sig_text_index.contains(htext):
                     self.facade_add_call_effect(self.sig_text_index.get(htext).unwrap(), fn_sym, ci, self.facade_presented_touch_mask(fn_sym, ci), &domains, borrow, -1)
+                else if hi == 1:
+                    // The borrowed view's method is generic (D134): replayed
+                    // on each instantiation.
+                    self.facade_note_generic(htext, 1, fn_sym, ci, self.facade_presented_touch_mask(fn_sym, ci), domains, borrow, -1)
     // The signatures of the free renderings presenting contract `ci`: its
     // D64 bridge under the C name, or the case functions of its variadic
     // contract (D66) — under the C name or the item's `rename`.
@@ -4035,6 +4069,43 @@ impl Sema:
             if sig >= 0 and not self.facade_call_effect_index.contains(sig):
                 out.push(sig)
         out
+
+    // D134: a method of the generic `BorrowedR[Origin]` impl has no
+    // signature until a call instantiates it, so the facade's facts for it
+    // are kept by its effective name and replayed on each instantiation
+    // (SemaCheck.w check_generic_method_body_concrete).
+    mut fn facade_note_generic(text: &str, kind: i32, fn_sym: i32, ci: i32, mask: i32, domains: &List[i32], borrow: i32, param: i32):
+        var joined = ""
+        for i in 0..domains.len():
+            joined = joined ++ (if i > 0: "," else: "") ++ f"{domains[i]}"
+        let idx = self.fgp_kind.len()
+        let first: isize = if self.facade_generic_pending.contains(text): self.facade_generic_pending.get(text).unwrap() else: -1
+        self.fgp_next.push(first)
+        self.fgp_kind.push(kind)
+        self.fgp_fn_sym.push(fn_sym)
+        self.fgp_ci.push(ci)
+        self.fgp_mask.push(mask)
+        self.fgp_borrow.push(borrow)
+        self.fgp_param.push(param)
+        self.fgp_domains.push(joined)
+        self.facade_generic_pending.insert(text, idx)
+
+    mut fn facade_replay_generic(effective: &str, sig: i32):
+        if sig < 0 or not self.facade_generic_pending.contains(effective):
+            return
+        var i: isize = self.facade_generic_pending.get(effective).unwrap()
+        while i >= 0:
+            let kind = self.fgp_kind[i]
+            if kind == 1:
+                let domains: List[i32] = List.new()
+                for part in self.fgp_domains[i].split(","):
+                    if part.len() > 0:
+                        let d: i32 = parse(part)
+                        domains.push(d)
+                self.facade_add_call_effect(sig, self.fgp_fn_sym[i], self.fgp_ci[i], self.fgp_mask[i], domains, self.fgp_borrow[i], -1)
+            else if kind == 2: self.facade_declare_view_of_param(sig, self.fgp_param[i])
+            else if kind == 3: self.facade_declare_view_through_param(sig, self.fgp_param[i])
+            i = self.fgp_next[i]
 
     mut fn facade_add_call_effect(sig: i32, fn_sym: i32, ci: i32, mask: i32, domains: &List[i32], borrow: i32, borrow_param: i32):
         if self.facade_call_effect_index.contains(sig):
@@ -4149,6 +4220,18 @@ impl Sema:
             if self.facade_failed_state_resource(self.pool_resolve(name)) >= 0:
                 return true
         if kind == TypeKind.TY_GENERIC_INST:
+            // D134: `BorrowedR[Origin]` names its origin resource as a type
+            // argument and holds a view of it, not the resource; it is a
+            // foreign view. `DetachedR[Origin]` holds an owned R.
+            // (an instance's d0 is its base's symbol, as
+            // type_is_ephemeral_value reads it)
+            let bname = self.get_generic_inst_base(r as i32)
+            if bname != 0:
+                let bt: str = self.pool_resolve(bname)
+                for ci in 0..self.foreign_contracts.len():
+                    let res = self.foreign_contracts[ci].returns_borrow_resource
+                    if res != 0 and facade_render_borrowed_name(self.pool_resolve(res)) == bt: return false
+                if bt.starts_with("Detached") and self.facade_resource_named(bt.slice(8, bt.len()), -1) >= 0: return true
             for ai in 0..self.get_generic_inst_arg_count(r as i32):
                 if self.facade_type_holds_resource(self.get_generic_inst_arg(r as i32, ai), depth + 1):
                     return true
@@ -4487,7 +4570,11 @@ impl Sema:
             return -1
         let r = self.resolve_alias(tid as TypeId)
         let kind = self.get_type_kind(r)
-        let name = self.get_type_name(r)
+        var name = self.get_type_name(r)
+        // D134: `Borrowed<R>` is generic in its origin; an instance names
+        // its base.
+        if kind == TypeKind.TY_GENERIC_INST:
+            name = self.get_generic_inst_base(r as i32)
         if name != 0:
             let tn: str = self.pool_resolve(name)
             for ci in 0..self.foreign_contracts.len():

@@ -3,6 +3,8 @@
 use Sema
 use Ast
 use BorrowCfg
+
+extern fn with_getenv_str(name: &str) -> str
 use ComptimeEval
 use ComptimeValue
 use CapabilityRegistry
@@ -17459,14 +17461,19 @@ impl Sema:
             let view_sym: i32 = self.bind_names[bi]
             if view_sym == origin_sym or self.bind_states[bi] != VarState.LIVE:
                 continue
+            let trace = with_getenv_str("WITH_DEBUG_FACADE_POISON").len() > 0
             if self.binding_depends_on_origin(view_sym, origin_sym) == 0:
+                if trace: eprint("facade-poison: " ++ self.pool_resolve(view_sym) ++ " does not depend on " ++ self.pool_resolve(origin_sym))
                 continue
             if self.facade_type_holds_resource(self.bind_types[bi], 0):
+                if trace: eprint("facade-poison: " ++ self.pool_resolve(view_sym) ++ " holds a resource")
                 continue
             // D85: a parent borrow is the parent, not a view of its memory;
             // it lives as long as the parent's origin (§16.2b.6).
             if self.facade_type_is_parent_borrow(self.bind_types[bi]):
+                if trace: eprint("facade-poison: " ++ self.pool_resolve(view_sym) ++ " is a parent borrow")
                 continue
+            if trace: eprint("facade-poison: " ++ self.pool_resolve(view_sym) ++ " poisoned by " ++ self.pool_resolve(origin_sym))
             if self.binding_poisoned_origin_sym(view_sym) != 0:
                 continue
             self.mark_binding_poisoned_by_origin(view_sym, origin_sym, call_node)
@@ -29704,7 +29711,11 @@ impl Sema:
         if existing >= 0:
             return existing
         let param_concrete_types: List[i32] = List.new()
-        self.check_fn_body_concrete(fn_node, tp_syms, tp_types, mono_sym, param_concrete_types)
+        let made = self.check_fn_body_concrete(fn_node, tp_syms, tp_types, mono_sym, param_concrete_types)
+        // D134: a facade's facts for a method of `BorrowedR[Origin]`, kept
+        // by the method's effective name, go on this instantiation.
+        self.facade_replay_generic(self.pool_resolve(method_fn_sym), made)
+        made
 
 // Deduplicating symbol→type substitution accumulator. A mut-receiver
 // method because the pushes must land in the caller's vectors; an owned

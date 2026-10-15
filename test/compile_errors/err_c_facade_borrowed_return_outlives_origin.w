@@ -21,7 +21,7 @@ c facade dbf:
 fn main:
     let l = log_new()
     let db = Database.new(l, 1).unwrap()
-    var handle: Option[BorrowedDatabase] = None
+    var handle: Option[BorrowedDatabase[Statement]] = None
     if true:
         let s = Statement.new(db, 10).unwrap()
         handle = s.db()

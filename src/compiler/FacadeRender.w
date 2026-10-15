@@ -105,7 +105,10 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
         if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
             let text_view = facade_render_text_view(pool, intern, item)
             out = out ++ facade_render_hosted_fn_errors(pool, intern, ci, item)
-            let (text, use_of_error) = facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, false, false) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false, true))
+            // The borrowed view's impl (plain_methods) carries the
+            // borrow-returning lends too (D122, D134): a borrow taken
+            // through a borrow is one `Borrowed<R>[_]` viewing that borrow.
+            let (text, use_of_error) = facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, true, false, true) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false, true))
             out = out ++ text
             let rname: str = intern.resolve(pool.get_data0(item as NodeId))
             names.push(rname)
@@ -292,8 +295,10 @@ fn facade_render_public(text: &str) -> str:
         var end = start
         while end < text.len() and text[end] != '\n': end = end + 1
         let line = text.slice(start, end)
-        if line.starts_with("impl Drop for "): in_drop = true
-        else if line.starts_with("impl "): in_drop = false
+        // A generic impl (`impl[Origin] BorrowedR[Origin]:`, D134) is an
+        // impl too.
+        if line.starts_with("impl Drop for ") or line.starts_with("impl[Origin] Drop for "): in_drop = true
+        else if line.starts_with("impl ") or line.starts_with("impl["): in_drop = false
         var shown = line.clone()
         if line.starts_with("type ") or line.starts_with("error ") or line.starts_with("fn "):
             shown = "pub " ++ line
@@ -436,7 +441,11 @@ pub fn facade_render_text_view_name() -> str: "as_cstr"
 // record views — rendered on the failed-state type `Failed<R>`, the same
 // body over the same `repr` field, and nothing else (a borrowed-resource
 // return holds a view of a live `R`; Sema refuses the mark on one).
-fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32, with_borrowed_returns: bool, failed_only: bool) -> str:
+// `for_view`: the text is the borrowed view's impl (`BorrowedR[Origin]`),
+// where `self` is the view and a borrow taken through it views the view
+// (D122, D134); a parent borrow (D85) reads a field the view lacks and is
+// not rendered there.
+fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32, with_borrowed_returns: bool, failed_only: bool, for_view: bool = false) -> str:
     let repr_text = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId)
     let repr = facade_render_unalias(pool, intern, repr_text)
     let in_place = not repr.starts_with("*") and facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT)
@@ -446,6 +455,10 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32],
     for i in 0..items.len():
         let li = facade_render_lend_item(pool, intern, ci, items[i])
         if not facade_render_lend_hosted(pool, intern, &li, resource, repr):
+            continue
+        // A `detaches` item is a move method of the borrowed view (D134,
+        // facade_render_detach_methods), never a lend.
+        if li.detaches != 0:
             continue
         if failed_only and (not li.valid_on_failed or (li.borrow_res != 0 and not li.record_view)):
             continue
@@ -508,7 +521,24 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32],
             let from = facade_render_param_ref(pool, intern, decl, li.borrow_from)
             if from < 0:
                 continue
-            var origin = if from == 0: "self" else: facade_render_param_name(pool, intern, pool.fn_meta_param_start(meta), from)
+            if for_view and li.borrow_parent != 0:
+                continue
+            // A borrow through a borrow is a borrow of the same origin
+            // (D122, D134): in the view's impl the result views the view's
+            // origin, never the view (a view of a view would nest the
+            // origin type once per call, and instantiation would not end).
+            var origin = if from == 0: (if for_view: "self.origin" else: "self") else: facade_render_param_name(pool, intern, pool.fn_meta_param_start(meta), from)
+            // The origin's type, spelled so Sema's view-of-param facts read
+            // the declared result (D134): the host (the view's origin, in
+            // the view's impl), the parameter's resource, or the parent.
+            let host_name: str = intern.resolve(pool.get_data0(resource as NodeId))
+            var otype = if for_view: "Origin" else: host_name
+            if li.borrow_parent != 0: otype = intern.resolve(li.borrow_parent)
+            else if from != 0:
+                let arg_res = facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), from) as NodeId))
+                if arg_res <= 0:
+                    continue
+                otype = intern.resolve(pool.get_data0(arg_res as NodeId))
             // `returns borrow R from parent R of param N` (D85, §16.2b.6):
             // the borrow holds the parent the argument's resource holds —
             // its `parent` view — so it views the parent's origin, not the
@@ -524,10 +554,10 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32],
                 origin = origin ++ "." ++ pfield
             let bname = facade_render_borrowed_name(intern.resolve(li.borrow_res))
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
-            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ bname ++ "]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(" ++ bname ++ " { origin: " ++ origin ++ ", repr: " ++ handle ++ " })\n"
+            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ bname ++ "[" ++ otype ++ "]]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(" ++ bname ++ " { origin: " ++ origin ++ ", repr: " ++ handle ++ " })\n"
             continue
         if li.text_free != 0:
-            out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, "        ", pro)
+            out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, facade_render_text_utf8(pool) and not li.text_bytes, "        ", pro)
             continue
         let (ret, body) = facade_render_bridge_body(pool, intern, decl, &bridge, facade_render_call(pool, intern, decl, call_args), mname, "        ", if failed_only: "" else: facade_render_message_call(pool, intern, ci, resource))
         out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ pro ++ body
@@ -575,15 +605,74 @@ fn facade_render_borrowed_type(pool: AstPool, intern: InternPool, ci: &List[i32]
             let origin = facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), from) as NodeId))
             if origin <= 0:
                 continue
-            // A parent borrow (D85) views the parent itself: `&R`.
-            let parent = pool.get_extra(ops + 3)
-            let oname = intern.resolve(if parent != 0: parent else: pool.get_data0(origin as NodeId))
+            // D134 (§16.2b.6): one borrowed type serves every origin. The
+            // origin is a type parameter bound at each call by the value
+            // the constructing method hands it (`self`, a parameter, a
+            // parent view), so a `Node` borrowed from a `Doc` and one
+            // borrowed from an owned `Node` are one `BorrowedNode[_]`, and a
+            // borrow taken through a borrow views that borrow (D122).
             let bname = facade_render_borrowed_name(rname)
-            var out = "type " ++ bname ++ " = ephemeral { origin: &" ++ oname ++ ", repr: " ++ repr_text ++ " }\n"
-            if methods.len() > 0:
-                out = out ++ "impl " ++ bname ++ ":\n" ++ methods
+            var out = "type " ++ bname ++ "[Origin] ephemeral { origin: &Origin, repr: " ++ repr_text ++ " }\n"
+            let detach = facade_render_detach_methods(pool, intern, ci, resource, repr_text)
+            if methods.len() > 0 or detach.len() > 0:
+                out = out ++ "impl[Origin] " ++ bname ++ "[Origin]:\n" ++ methods ++ detach
+            // D134 (§16.2b.6): a detached value is owned — its Drop runs the
+            // resource's destroyer — and dependent on the origin it was taken
+            // out of, which it holds a view of, as a `borrows` child does.
+            if detach.len() > 0:
+                let dname = facade_render_detached_name(rname)
+                let drop_decl = facade_render_drop_decl(pool, intern, ci, resource)
+                let drop_call = facade_render_call(pool, intern, drop_decl, facade_render_repr_arg(pool, intern, drop_decl, repr_text, "self.repr", false))
+                out = out ++ "type " ++ dname ++ "[Origin] ephemeral { origin: &Origin, repr: " ++ repr_text ++ ", live: bool }\n"
+                out = out ++ "impl[Origin] Drop for " ++ dname ++ "[Origin]:\n    move fn drop():\n        if self.live: " ++ drop_call ++ "\n"
+                if methods.len() > 0:
+                    out = out ++ "impl[Origin] " ++ dname ++ "[Origin]:\n" ++ methods
             return out
     ""
+
+pub fn facade_render_detached_name(name: &str) -> str: "Detached" ++ name
+
+// The resource's `drop` operation's declaration, or 0.
+fn facade_render_drop_decl(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32) -> i32:
+    let cstart = pool.get_data1(resource as NodeId)
+    for k in 1..pool.get_data2(resource as NodeId) + 1:
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_DROP:
+            return facade_render_find_fn(pool, intern, ci, pool.get_extra(pool.get_data1(clause as NodeId)))
+    0
+
+// D134 (§16.2b.6): every `detaches param N` item whose param N receives
+// this resource, as a `move fn` of the borrowed view: the C call runs over
+// the view's handle, and the handle leaves as an owned `Detached<R>` that
+// views the same origin. The item is not a lend and renders nowhere else.
+fn facade_render_detach_methods(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32, repr_text: &str) -> str:
+    var out = ""
+    let repr = facade_render_unalias(pool, intern, repr_text)
+    let rname: str = intern.resolve(pool.get_data0(resource as NodeId))
+    let dname = facade_render_detached_name(rname)
+    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
+    for i in 0..items.len():
+        let li = facade_render_lend_item(pool, intern, ci, items[i])
+        if li.detaches == 0 or li.decl == 0:
+            continue
+        let decl = li.decl
+        let from = facade_render_param_ref(pool, intern, decl, li.detaches)
+        if from != 0:
+            continue
+        let meta = pool.find_fn_meta(decl as NodeId)
+        if meta < 0 or facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId)) != repr:
+            continue
+        let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
+        let mname = facade_render_present(pool, intern, ci, resource, fname)
+        let repr_arg = facade_render_repr_arg(pool, intern, decl, repr_text, "self.repr", false)
+        if repr_arg.len() == 0:
+            continue
+        let bridge = facade_render_bridge(pool, intern, decl, 1, -1, "")
+        if not bridge.ok:
+            continue
+        let call_args = if bridge.args.len() > 0: repr_arg ++ ", " ++ bridge.args else: repr_arg
+        out = out ++ "    move fn " ++ mname ++ "(" ++ bridge.params ++ ") -> " ++ dname ++ "[Origin]:\n" ++ facade_render_indent(bridge.prologue, "        ") ++ "        " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        " ++ dname ++ " { origin: self.origin, repr: self.repr, live: true }\n"
+    out
 
 pub fn facade_render_borrowed_name(name: &str) -> str: "Borrowed" ++ name
 
@@ -934,10 +1023,12 @@ type FacadeLendItem {
     variadic: i32,           // the `variadic param … selected by …` clause (D66 §16.2b.5), or 0
     record_view: bool,       // `returns borrow T from …` for an imported record T (D66 §16.2b.6): borrow_res is T
     text_free: i32,          // `text return, owned, freed by F` (D122 §16.2b.8): F's symbol, or 0
+    text_bytes: bool,        // `text return bytes` (D134 §16.2b.8): owned bytes even under a `text utf8` facade
+    detaches: i32,           // `detaches param N` (D134 §16.2b.6): the param ref, or 0
 }
 
 fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &List[i32], item: i32) -> FacadeLendItem:
-    var li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false, text_free: 0 }
+    var li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false, text_free: 0, text_bytes: false, detaches: 0 }
     let cstart = pool.get_data1(item as NodeId)
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(cstart + k)
@@ -965,6 +1056,8 @@ fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &List[i32], it
         else if kind == FACADE_CLAUSE_VALID_ON_FAILED: li.valid_on_failed = true
         // D122 (§16.2b.8): the returned text is new, owned, released with F.
         else if kind == FACADE_CLAUSE_TEXT_RETURN: li.text_free = pool.get_extra(ops)
+        else if kind == FACADE_CLAUSE_TEXT_BYTES: li.text_bytes = true
+        else if kind == FACADE_CLAUSE_DETACHES: li.detaches = pool.get_extra(ops)
         // A buffer pairing, a fixed argument and the status contract of a
         // copied-back length (D64) describe the lend's presented call
         // (facade_render_bridge); they make nothing stronger than a lend.
@@ -2371,7 +2464,7 @@ fn facade_render_free_ops(pool: AstPool, intern: InternPool, ci: &List[i32], fac
             continue
         if li.text_free != 0:
             let rendered_text = if li.rename != 0: presented else: facade_render_bridge_name(cname)
-            out = out ++ "fn " ++ rendered_text ++ "(" ++ bridge.params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, bridge.args), li.text_free, "    ", facade_render_indent(bridge.prologue, "    "))
+            out = out ++ "fn " ++ rendered_text ++ "(" ++ bridge.params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, bridge.args), li.text_free, facade_render_text_utf8(pool) and not li.text_bytes, "    ", facade_render_indent(bridge.prologue, "    "))
             continue
         if facade_render_fn_oks(pool, intern, decl).len() > 0:
             out = out ++ facade_render_fn_error_type(pool, intern, decl, presented, false)
@@ -2825,7 +2918,7 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &List[i32]
 fn facade_render_callback_hosted(pool: AstPool, intern: InternPool, cbi: &FacadeCallbackItem, resource: i32, repr: &str) -> bool:
     if cbi.decl == 0:
         return false
-    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false, text_free: 0 }
+    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false, text_free: 0, text_bytes: false, detaches: 0 }
     facade_render_lend_hosted(pool, intern, &li, resource, repr)
 
 // Whether some callback method of `resource` retains userdata: the
@@ -3395,7 +3488,7 @@ pub fn facade_render_record_view_methods(pool: AstPool, intern: InternPool, ci: 
             out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ view ++ "]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(unsafe { " ++ handle ++ " as " ++ view ++ " })\n"
             continue
         if li.text_free != 0:
-            out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, "        ", pro)
+            out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, facade_render_text_utf8(pool) and not li.text_bytes, "        ", pro)
             continue
         let (ret, body) = facade_render_bridge_body(pool, intern, decl, bridge, facade_render_call(pool, intern, decl, call_args), mname, "        ", "")
         out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ pro ++ body
@@ -3423,7 +3516,15 @@ fn facade_render_param_is_text(pool: AstPool, intern: InternPool, decl: i32, pi:
 // caller owns: its bytes are copied out (unknown encoding is bytes,
 // §16.2b.2 — `Option[List[u8]]` until a return is proved or declared
 // UTF-8), F releases the pointer on the same path, NULL is None.
-fn facade_render_text_return(pool: AstPool, intern: InternPool, ci: &List[i32], decl: i32, call: &str, free_sym: i32, indent: &str, prologue: &str) -> str:
+// D134 (§16.2b.8): whether the facade declares `text utf8` — a top-level
+// item of the block, found as every facade item is.
+fn facade_render_text_utf8(pool: AstPool) -> bool:
+    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_CLAUSE)
+    for i in 0..items.len():
+        if pool.get_data0(items[i] as NodeId) == FACADE_CLAUSE_TEXT_UTF8: return true
+    false
+
+fn facade_render_text_return(pool: AstPool, intern: InternPool, ci: &List[i32], decl: i32, call: &str, free_sym: i32, utf8: bool, indent: &str, prologue: &str) -> str:
     let taken = facade_render_param_names(pool, intern, decl)
     let repr = facade_render_fresh("repr", taken)
     let text = facade_render_fresh("text", taken)
@@ -3435,6 +3536,23 @@ fn facade_render_text_return(pool: AstPool, intern: InternPool, ci: &List[i32], 
     let fmeta = pool.find_fn_meta(fdecl as NodeId)
     let ftype = render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(fmeta), 0) as NodeId)
     let release = facade_render_call(pool, intern, fdecl, repr ++ " as " ++ ftype)
+    if utf8:
+        // `text utf8` (D134): the bytes are validated at the boundary and
+        // copied into a `str`; a return that is not UTF-8 is the library
+        // breaking its declared contract, a failure that names the C
+        // function, nothing repaired.
+        let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
+        let view = facade_render_fresh("view", taken)
+        var out = " -> Option[str]:\n" ++ prologue
+        out = out ++ indent ++ "let " ++ repr ++ " = " ++ call ++ "\n"
+        out = out ++ indent ++ "if " ++ repr ++ " == null: return None\n"
+        out = out ++ indent ++ "let " ++ view ++ " = unsafe { CStr.from_ptr(" ++ repr ++ " as *const i8) }\n"
+        out = out ++ indent ++ "let " ++ text ++ " = match " ++ view ++ ".to_str():\n"
+        out = out ++ indent ++ "    Ok(ok) => ok.to_owned()\n"
+        out = out ++ indent ++ "    Err(.InvalidAt(" ++ at ++ ")) => panic(f\"" ++ fname ++ ": the facade declares its text UTF-8, but the text returned is not UTF-8 at byte {" ++ at ++ "} (§16.2b.8)\")\n"
+        out = out ++ indent ++ release ++ "\n"
+        out = out ++ indent ++ "Some(" ++ text ++ ")\n"
+        return out
     var out = " -> Option[List[u8]]:\n" ++ prologue
     out = out ++ indent ++ "let " ++ repr ++ " = " ++ call ++ "\n"
     out = out ++ indent ++ "if " ++ repr ++ " == null: return None\n"

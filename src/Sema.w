@@ -563,6 +563,8 @@ pub type ForeignContract {
     nullable_params: List[i32],         // `nullable param N`: the facade establishes the parameter accepts NULL (§16.2b.8)
     text_params: List[i32],             // D122 `text param N`: input text of any C character type; takes a str (§16.2b.8)
     text_return_free: i32,              // D122 `text return, owned, freed by F`: F's symbol, or 0 (§16.2b.8)
+    text_bytes: i32,                    // D134 `text return bytes`: owned bytes even under a `text utf8` facade (§16.2b.8)
+    detaches: i32,                      // D134 `detaches param N`: the parameter index, or -1 (§16.2b.6)
     bridged: i32,                      // #2223: a clause makes the function render through a bridge (Ast.facade_clause_bridges) — the one owner the renderer's lend item and facade_contract_presented read
     buffer_ptr: List[i32],              // D64 §16.2b.8: each `buffer param P …` pairing's pointer parameter …
     buffer_len: List[i32],              // … its length parameter (parallel) …
@@ -1764,6 +1766,19 @@ pub type Sema {
     facade_call_effect_index: HashMap[i32, i32],   // sig -> facade_call_effects index
     facade_touch_nodes: HashMap[i32, i32],         // call node -> facade_call_effects index
     facade_touch_hit_params: HashMap[i32, i32],    // poisoned view sym -> the parameter the origin came through (-1: a domain)
+    // D134: facade facts for methods of the generic `BorrowedR[Origin]`
+    // impl, keyed by the method's effective name ("BorrowedR.m"); a generic
+    // method has no signature until it is instantiated, and each
+    // instantiation replays them (SemaFacade.w facade_replay_generic).
+    facade_generic_pending: HashMap[str, isize],   // effective name -> first entry
+    fgp_next: List[isize],
+    fgp_kind: List[i32],                           // 1 call effect, 2 view of param, 3 view through param
+    fgp_fn_sym: List[i32],
+    fgp_ci: List[i32],
+    fgp_mask: List[i32],
+    fgp_borrow: List[i32],
+    fgp_param: List[i32],
+    fgp_domains: List[str],                        // the touched domains, `,`-separated
     current_facade_sym: i32,                       // the `c facade` block being collected
     current_facade_node: i32,                      // its node: two same-named blocks (one per runtime file) are two blocks
     // A text-view return on a function that is no resource's method is
@@ -3614,6 +3629,15 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         facade_call_effect_index: sema_new_map_i32_i32(),
         facade_touch_nodes: sema_new_map_i32_i32(),
         facade_touch_hit_params: sema_new_map_i32_i32(),
+        facade_generic_pending: HashMap.new(),
+        fgp_next: List.new(),
+        fgp_kind: List.new(),
+        fgp_fn_sym: List.new(),
+        fgp_ci: List.new(),
+        fgp_mask: List.new(),
+        fgp_borrow: List.new(),
+        fgp_param: List.new(),
+        fgp_domains: List.new(),
         current_facade_sym: 0,
         current_facade_node: 0,
         facade_presented_syms: sema_new_map_i32_i32(),

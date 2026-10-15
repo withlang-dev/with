@@ -48,7 +48,7 @@ fn main:
     let s = Statement.new(d, 1)
     let (status, t) = Statement.open(d)
     let row: Result[Row, RowError] = Row.open(d)
-    let back: Option[BorrowedDatabase] = s.unwrap().db()
+    let back: Option[BorrowedDatabase[Statement]] = s.unwrap().db()
     match Row.open(d):
         Err(RowError.Failed(st)) => print(\"failed\")
         Err(RowError.NothingProduced(st)) => print(\"none\")

@@ -381,15 +381,6 @@ impl CiProject:
             if self.fd_owned_record(fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from])): out.push(si as i32)
         out
 
-    // The distinct origin representations of `record`'s borrows.
-    fn fd_borrow_origins(record: &str) -> List[str]:
-        var out: List[str] = List.new()
-        let candidates = self.fd_borrow_candidates(record)
-        for si in candidates:
-            let origin = fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from])
-            if not out.contains(origin): out.push(origin)
-        out
-
     // The representations the draft can model: one unary destroyer, and
     // either a producer (an owned resource) or a proven borrow of it from an
     // owned resource (a borrowed-only resource, libxml2's attribute shape).
@@ -421,11 +412,10 @@ impl CiProject:
             for si in others:
                 text = text ++ "        destroys " ++ self.symbols[si].name ++ "    // proof: frees its " ++ record ++ " parameter\n"
         // Borrows: a function that retains a pointer argument is not a lend
-        // (fd_borrow_candidates), and a borrowed value with several origin
-        // types is not ruled (§16.2b.6): such a representation's borrows are
-        // reported, never drafted.
+        // (fd_borrow_candidates). A borrowed value's origin is bound at each
+        // call (D134, §16.2b.6), so one representation may be borrowed from
+        // several origins.
         for record in modeled:
-            if self.fd_borrow_origins(record).len() != 1: continue
             let candidates = self.fd_borrow_candidates(record)
             for si in candidates:
                 text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        returns borrow " ++ fd_resource_name(record) ++ f" from param {self.symbols[si].borrow_from}    // " ++ self.symbols[si].own_reason ++ "\n"
@@ -468,9 +458,7 @@ impl CiProject:
                 verdict = f"raw: retains param {retained}; its lifetime contract is not proven"
             else if self.symbols[si].borrow_from >= 0:
                 let origin = fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from])
-                let origins = self.fd_borrow_origins(ret)
-                if modeled.contains(ret) and self.fd_owned_record(origin) and origins.len() == 1: verdict = "borrows " ++ fd_resource_name(ret) ++ f" from param {self.symbols[si].borrow_from} (" ++ self.symbols[si].own_reason ++ ")"
-                else if modeled.contains(ret) and self.fd_owned_record(origin): verdict = "raw: " ++ self.symbols[si].own_reason ++ ", but " ++ fd_resource_name(ret) ++ " is borrowed from several origin types (§16.2b.6)"
+                if modeled.contains(ret) and self.fd_owned_record(origin): verdict = "borrows " ++ fd_resource_name(ret) ++ f" from param {self.symbols[si].borrow_from} (" ++ self.symbols[si].own_reason ++ ")"
                 else: verdict = "raw: " ++ self.symbols[si].own_reason ++ f", but param {self.symbols[si].borrow_from} or the return is not a modeled resource"
             else if ret.len() > 0:
                 verdict = "raw: returns " ++ self.symbols[si].ret_ty ++ " unproven: " ++ self.symbols[si].own_reason
@@ -478,18 +466,6 @@ impl CiProject:
             if verdict.starts_with("raw:"): raw = raw + 1 else: safe = safe + 1
             lines = lines ++ "  " ++ fname ++ ": " ++ verdict ++ "\n"
         var head = "facade " ++ name ++ f": {total} functions, {safe} presented safely, {raw} raw" ++ (if internal > 0: f"; {internal} internal (no prototype declares them)" else: "") ++ "\n"
-        for record in modeled:
-            let origins = self.fd_borrow_origins(record)
-            if origins.len() < 2: continue
-            var described = ""
-            for origin in origins:
-                var names = ""
-                let candidates = self.fd_borrow_candidates(record)
-                for si in candidates:
-                    if fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from]) != origin: continue
-                    names = names ++ (if names.len() > 0: ", " else: "") ++ self.symbols[si].name
-                described = described ++ (if described.len() > 0: " and " else: "") ++ "from " ++ fd_resource_name(origin) ++ " (" ++ names ++ ")"
-            head = head ++ "  " ++ fd_resource_name(record) ++ ": borrowed " ++ described ++ "; a borrowed value with several origin types is not ruled (§16.2b.6): no borrow clause is drafted\n"
         for record in self.fd_representations():
             if modeled.contains(record): continue
             let producers = self.fd_producers_of(record).len()
