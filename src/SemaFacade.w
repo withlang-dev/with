@@ -3635,17 +3635,10 @@ impl Sema:
                     self.emit_error(f"fn '{pf}' borrows '{rn}' as the parent of its argument and fn '{cf}' from its argument ('from param'); '{bn}' is one type with one origin rule, and a borrowed value under both is not ruled (§16.2b.6)", node)
                     clash = true
                     break
-                if parent != 0:
-                    continue
-                let other = self.facade_param_receives(self.foreign_contracts[cj].fn_sym, self.foreign_contracts[cj].returns_borrow_from)
-                if other.len() == 1 and other[0] != origin[0]:
-                    let on: str = self.pool_resolve(self.facade_resources[origin[0]].name)
-                    let oth: str = self.pool_resolve(self.facade_resources[other[0]].name)
-                    let ofn: str = self.pool_resolve(self.foreign_contracts[cj].fn_sym)
-                    let bn = facade_render_borrowed_name(rn)
-                    self.emit_error(f"fn '{fname}' returns a borrowed '{rn}' from a '{on}', and fn '{ofn}' from a '{oth}'; '{bn}' holds a view of one origin resource, and a borrowed value with several origin types is not ruled (§16.2b.6)", node)
-                    clash = true
-                    break
+                // D134 (§16.2b.6): a borrowed value's origin is the
+                // argument's origin, bound at each call; one `Borrowed<R>`
+                // serves every origin resource, so two items borrowing R
+                // from different resources are no clash.
             if clash or self.diags.has_errors():
                 continue
             // The net: the type and the method exist.

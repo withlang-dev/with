@@ -105,7 +105,10 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
         if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
             let text_view = facade_render_text_view(pool, intern, item)
             out = out ++ facade_render_hosted_fn_errors(pool, intern, ci, item)
-            let (text, use_of_error) = facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, false, false) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false, true))
+            // The borrowed view's impl (plain_methods) carries the
+            // borrow-returning lends too (D122, D134): a borrow taken
+            // through a borrow is one `Borrowed<R>[_]` viewing that borrow.
+            let (text, use_of_error) = facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false, true))
             out = out ++ text
             let rname: str = intern.resolve(pool.get_data0(item as NodeId))
             names.push(rname)
@@ -524,7 +527,10 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32],
                 origin = origin ++ "." ++ pfield
             let bname = facade_render_borrowed_name(intern.resolve(li.borrow_res))
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
-            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ bname ++ "]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(" ++ bname ++ " { origin: " ++ origin ++ ", repr: " ++ handle ++ " })\n"
+            // The result is `Option[Borrowed<R>[O]]` with `O` the origin's
+            // type, inferred from the tail: the same text serves the
+            // resource's impl and its borrowed view's (D134).
+            out = out ++ head ++ mname ++ "(" ++ params ++ "):\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(" ++ bname ++ " { origin: " ++ origin ++ ", repr: " ++ handle ++ " })\n"
             continue
         if li.text_free != 0:
             out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, "        ", pro)
@@ -575,13 +581,16 @@ fn facade_render_borrowed_type(pool: AstPool, intern: InternPool, ci: &List[i32]
             let origin = facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), from) as NodeId))
             if origin <= 0:
                 continue
-            // A parent borrow (D85) views the parent itself: `&R`.
-            let parent = pool.get_extra(ops + 3)
-            let oname = intern.resolve(if parent != 0: parent else: pool.get_data0(origin as NodeId))
+            // D134 (§16.2b.6): one borrowed type serves every origin. The
+            // origin is a type parameter bound at each call by the value
+            // the constructing method hands it (`self`, a parameter, a
+            // parent view), so a `Node` borrowed from a `Doc` and one
+            // borrowed from an owned `Node` are one `BorrowedNode[_]`, and a
+            // borrow taken through a borrow views that borrow (D122).
             let bname = facade_render_borrowed_name(rname)
-            var out = "type " ++ bname ++ " = ephemeral { origin: &" ++ oname ++ ", repr: " ++ repr_text ++ " }\n"
+            var out = "type " ++ bname ++ "[Origin] ephemeral { origin: &Origin, repr: " ++ repr_text ++ " }\n"
             if methods.len() > 0:
-                out = out ++ "impl " ++ bname ++ ":\n" ++ methods
+                out = out ++ "impl[Origin] " ++ bname ++ "[Origin]:\n" ++ methods
             return out
     ""
 

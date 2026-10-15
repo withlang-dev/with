@@ -53,7 +53,7 @@ fn rows(db: &Database):
 
 // The borrow outlives the statement it came from: its origin is the
 // connection `db` names, so it may leave the function `st` dies in.
-fn handle_of(db: &Database) -> BorrowedDatabase:
+fn handle_of(db: &Database) -> BorrowedDatabase[Database]:
     let st = db.prepare().unwrap()
     st.database().unwrap()
 
