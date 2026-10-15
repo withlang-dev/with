@@ -55,9 +55,16 @@ fn par_slot_release(dir: &str, slot: i32):
 /// to open each slot. Returns each job's exit code in job order; -1 means
 /// the job could not be spawned. Returns only after every child is reaped.
 pub fn par_run(ctx: &ActionCtx, jobs: &List[ParJob], width: i32) -> List[i32]:
-    let limit = if width < 1: 1 else: width
     let js_dir = env("WITH_BUILD_JOBSERVER")
     let js_slots = parse(env("WITH_BUILD_JOBSERVER_SLOTS"))
+    var limit = if width < 1: 1 else: width
+    // A critical lane's children take no slots, so its window is bounded
+    // here instead, to half the budget: emit-c-smoke, the lane that ended
+    // the battery, started its 34 C compiles beside the 18-slot budget and
+    // ran 292 s under that load against 45 s alone (2026-10-14).
+    if js_dir.len() > 0 and js_slots > 0 and par_lane_critical(js_dir):
+        let share = if js_slots / 2 < 2: 2 else: js_slots / 2
+        if limit > share: limit = share
     let total = jobs.len()
     var rcs: List[i32] = List.new()
     var pids: List[i32] = List.new()
