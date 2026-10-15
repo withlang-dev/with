@@ -52,7 +52,7 @@ the load of every other lane; its cases already run in parallel, and
 bounding its window changed nothing. What is left is the CPU the lanes burn
 and the compile chain, each a project of its own.
 
-## A determinism defect found on the way
+## A determinism defect found on the way (fixed, #2418)
 
 Three releases built on 2026-10-14 from identical `src/` had three
 different self-ids, so the verdict store and the build store served nothing
@@ -61,7 +61,8 @@ another worktree's path. The cause is one line: `MirLower.source_location_
 operand` stamps `sema.current_module_path` raw into every panic site, so a
 std module compiled from a checkout carries that checkout's absolute path.
 The canonical spelling (`codegen_canonical_module_path`: `<embedded-std>/…`
-for std, the prefix map otherwise; D38, D50) is what it must use; the pin is
+for std, the prefix map otherwise; D38, D50) is what Sema now spells and MIR
+reads (#2418); two worktrees build one commit to byte-identical images. The pin is
 `test/behavior/behav_panic_path_is_canonical.w`.
 
 ## How to measure
