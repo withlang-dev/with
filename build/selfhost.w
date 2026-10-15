@@ -4326,10 +4326,10 @@ fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, c
 fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let lib_dir = bs_join(case_dir, "minilib")
-    let header = "#include <stdlib.h>\n#include <string.h>\nstruct attr { int k; };\nstruct node { struct node *next; struct attr *attr; int v; };\nstruct doc { struct node *root; int n; };\nstruct buf { int n; };\ntypedef void (*freefn)(void *);\nextern freefn lib_free;\nstruct node *node_new(void);\nvoid node_free(struct node *n);\nstruct attr *node_attr(struct node *n);\nvoid attr_free(struct attr *a);\nstruct buf *buf_new(void);\nvoid buf_free(struct buf *b);\nstruct node *node_next(struct node *n);\nstruct doc *doc_new(void);\nstruct doc *doc_open(const char *path);\nstruct node *doc_root(struct doc *d);\nstruct node *doc_first(struct doc *d);\nvoid doc_free(struct doc *d);\nvoid doc_discard(struct doc *d, int why);\nvoid doc_keep(struct doc *d);\nstruct node *doc_add(struct doc *d, struct node *n);\nstruct node *doc_pick(struct doc *d, int i);\nint doc_count(struct doc *d);\n"
+    let header = "#include <stdlib.h>\n#include <string.h>\nstruct attr { int k; };\nstruct node { struct node *next; struct attr *attr; int v; };\nstruct doc { struct node *root; int n; };\nstruct buf { int n; };\ntypedef void (*freefn)(void *);\nextern freefn lib_free;\nstruct node *node_new(void);\nvoid node_free(struct node *n);\nstruct attr *node_attr(struct node *n);\nvoid attr_free(struct attr *a);\nstruct buf *buf_new(void);\nvoid buf_free(struct buf *b);\nstruct buf *pool_take(int n);\nstruct buf *buf_alloc(int n) __attribute__((malloc));\nstruct node *node_next(struct node *n);\nstruct doc *doc_new(void);\nstruct doc *doc_open(const char *path);\nstruct node *doc_root(struct doc *d);\nstruct node *doc_first(struct doc *d);\nvoid doc_free(struct doc *d);\nvoid doc_discard(struct doc *d, int why);\nvoid doc_keep(struct doc *d);\nstruct node *doc_add(struct doc *d, struct node *n);\nstruct node *doc_pick(struct doc *d, int i);\nint doc_count(struct doc *d);\n"
     var rc = bs_write_fixture(ctx, bs_join(lib_dir, "mini.h"), header, "facade by evidence header")
     if rc != 0: return rc
-    let node_c = "#include \"mini.h\"\nfreefn lib_free = free;\ntypedef struct node *nodep;\nstruct node *node_new(void) { return calloc(1, sizeof(struct node)); }\nvoid node_free(struct node *n) { nodep p = (nodep)n; free(p); }\nstruct attr *node_attr(struct node *n) { return n->attr; }\nvoid attr_free(struct attr *a) { free(a); }\nstruct buf *buf_new(void) { return malloc(sizeof(struct buf)); }\nvoid buf_free(struct buf *b) { lib_free(b); }\nstruct node *node_next(struct node *n) { return n->next; }\n"
+    let node_c = "#include \"mini.h\"\nfreefn lib_free = free;\ntypedef struct node *nodep;\nstruct node *node_new(void) { return calloc(1, sizeof(struct node)); }\nvoid node_free(struct node *n) { nodep p = (nodep)n; free(p); }\nstruct attr *node_attr(struct node *n) { return n->attr; }\nvoid attr_free(struct attr *a) { free(a); }\nstruct buf *buf_new(void) { return malloc(sizeof(struct buf)); }\nvoid buf_free(struct buf *b) { lib_free(b); }\nstruct buf *buf_alloc(int n) { return pool_take(n); }\nstruct node *node_next(struct node *n) { return n->next; }\n"
     rc = bs_write_fixture(ctx, bs_join(lib_dir, "node.c"), node_c, "facade by evidence node unit")
     if rc != 0: return rc
     let doc_c = "#include \"mini.h\"\nstatic struct doc *g_doc;\nstatic struct doc *alloc_doc(void) { return malloc(sizeof(struct doc)); }\nstruct doc *doc_new(void) { struct doc *d = alloc_doc(); if (d == NULL) return NULL; memset(d, 0, sizeof *d); return d; }\nstruct doc *doc_open(const char *path) { (void)path; return doc_new(); }\nstruct node *doc_root(struct doc *d) { return d->root; }\nstruct node *doc_first(struct doc *d) { return doc_root(d); }\nvoid doc_free(struct doc *d) { struct node *n = d->root; while (n) { struct node *next = n->next; node_free(n); n = next; } free(d); }\nvoid doc_discard(struct doc *d, int why) { (void)why; doc_free(d); }\nvoid doc_keep(struct doc *d) { g_doc = d; }\nstruct node *doc_add(struct doc *d, struct node *n) { n->next = d->root; d->root = n; return n; }\nstruct node *doc_pick(struct doc *d, int i) { return i ? d->root : node_new(); }\nint doc_count(struct doc *d) { return d->n; }\n"
@@ -4351,7 +4351,11 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     if rc != 0: return rc
     rc = bs_file_contains(ctx, draft, "resource Node wraps *mut node\n        from node_new    // proof: returns calloc(…), a fresh allocation never retained\n        drop node_free    // proof: frees param 0\n", "facade draft: Node resource")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, draft, "resource Buf wraps *mut buf\n        from buf_new    // proof: returns malloc(…), a fresh allocation never retained\n        drop buf_free    // proof: frees param 0\n", "facade draft: Buf resource through the lib_free alias")
+    rc = bs_file_contains(ctx, draft, "resource Buf wraps *mut buf\n        from buf_new    // proof: returns malloc(…), a fresh allocation never retained\n        from buf_alloc    // annotation: __attribute__((malloc)), the return is a fresh allocation the caller owns\n        drop buf_free    // proof: frees param 0\n", "facade draft: Buf resource through the lib_free alias, and an annotated producer")
+    if rc != 0: return rc
+    // D121 step 3: what the body cannot prove (pool_take is not defined in
+    // the package), the library's own annotation states.
+    rc = bs_assert_contains(ctx, result.stderr, "buf_alloc: owned producer of Buf (annotation: __attribute__((malloc)), the return is a fresh allocation the caller owns) [attributes: malloc]", "facade report: annotated producer")
     if rc != 0: return rc
     // A borrowed-only resource (destroyed, never produced, lent from an
     // owned one) and the borrow that defines it.
@@ -4372,7 +4376,7 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     if text.contains("doc_add") or text.contains("doc_keep") or text.contains("doc_pick"):
         return bs_fail(ctx, "facade draft presents a retaining or unproven function")
     // The report says why.
-    rc = bs_assert_contains(ctx, result.stderr, "facade mini: 17 functions, 14 presented safely, 3 raw; 1 internal (no prototype declares them)", "facade report: summary")
+    rc = bs_assert_contains(ctx, result.stderr, "facade mini: 18 functions, 15 presented safely, 3 raw; 1 internal (no prototype declares them)", "facade report: summary")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, draft, "fn doc_count\n        lend    // proof: reads its resource parameters, keeps nothing\n", "facade draft: lend")
     if rc != 0: return rc

@@ -52,6 +52,11 @@ allocation (an allocator, or a package producer) it never retained; a
 borrowed return is, on every path, a part of one parameter's memory (the
 parameter, a field, an element, an offset), directly or through a package
 function proven to borrow from its argument. No name enters a verdict.
+Below a proof and above the registry (§16.2b.2) come the annotations the
+library ships: a declaration carrying `__attribute__((malloc))` whose body
+proves nothing is an owned producer with the provenance `annotation:`;
+`nonnull` and `returns_nonnull` are header facts `c_import` reads directly
+and the report names them beside the function.
 
 The draft facade goes to stdout (`-o FILE` writes it): one `resource` per
 pointer-to-record representation that has at least one owned producer and
