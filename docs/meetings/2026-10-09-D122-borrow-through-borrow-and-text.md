@@ -72,3 +72,6 @@ same path — unknown encoding is bytes (§16.2b.2).
 **Open, its own brief:** the spelling that declares a text return UTF-8
 (the ruling's "proved or declared UTF-8"), after which such a return
 presents as `Option[str]`; until then the caller converts the bytes.
+**Closed by D134 (2026-10-15):** `text utf8` at the facade level, `text
+return bytes` per item, validated at the boundary; and the detach fact,
+`detaches param N`, an owned value dependent on its origin.

@@ -11,6 +11,13 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.34:** three modeled-C rulings for the facade proof engine,
+2026-10-15 (D134). §16.2b.6: a borrowed value's origin is the argument's
+origin, bound per call, one borrowed type for every origin; `detaches param
+N` yields an owned, origin-dependent `R`. §16.2b.8: a facade-level `text
+utf8` declaration, `text return bytes` per item, validated at the boundary
+and a contract failure when violated.
+
 **Changelog v7.33:** locals typed by their uses, 2026-10-10 (D128). §4.2.1: a
 binding whose untyped integer literal typed it takes the type its demanding
 uses in its function agree on; `isize` where none narrows; two demands
