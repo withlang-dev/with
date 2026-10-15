@@ -4698,15 +4698,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     emit_c_smoke = emit_c_smoke.dep("runtime")
     out = out.add_target(emit_c_smoke)
 
-    var test_green = target_new(.Action, "test-green", "").output("out/.build-state/test-green.json")
-    test_green.action = run_test_green_action
-    test_green = test_green.input(host_bin("out/bin/with-sha256"))
-    test_green = test_green.write_scope("out/.build-state")
-    test_green = test_green.write_scope("out/command/test-green")
-    test_green = test_green.dep("with-sha256")
-    test_green = test_green.dep("seed-driver")
-    test_green = test_green.arg(release_asset_for_host())
-    out = out.add_target(test_green)
+    // test-green is declared after the `tests` group below: it depends on
+    // every target the group runs.
 
     // The release compiler checks the build system's own source: the reseed
     // gate (`:install-user`, #745) runs exactly this, and nothing earlier did,
@@ -4771,6 +4764,24 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("rt-decl-audit")
     tests = tests.dep("unit-return-review")
     tests = tests.dep("test-green")
+    // test-green reads the run's evidence (build/retention.w test_green
+    // inputs: the test markers, the state files, the release compiler), so
+    // it depends on every target of the group and on `build`. The graph is
+    // scheduled by readiness, not list order: with only with-sha256 and
+    // seed-driver declared it ran before stage1 and found no compiler
+    // (2026-10-14).
+    var test_green = target_new(.Action, "test-green", "").output("out/.build-state/test-green.json")
+    test_green.action = run_test_green_action
+    test_green = test_green.input(host_bin("out/bin/with-sha256"))
+    test_green = test_green.write_scope("out/.build-state")
+    test_green = test_green.write_scope("out/command/test-green")
+    test_green = test_green.dep("with-sha256")
+    test_green = test_green.dep("seed-driver")
+    test_green = test_green.dep("build")
+    for tdi in 0..tests.deps.len():
+        if tests.deps[tdi] != "test-green": test_green = test_green.dep(build_owned_text(tests.deps[tdi]))
+    test_green = test_green.arg(release_asset_for_host())
+    out = out.add_target(test_green)
     out = out.add_target(tests)
     // The ownership battery in one invocation. The audits are listed before
     // the tests so they fall in the same consecutive pooled run as the
@@ -4786,9 +4797,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     var last_green = target_new(.Action, "last-green-record", "").output("out/.build-state/last-green.json")
     last_green.action = run_last_green_action
     // D19: last-green is pure evidence assembly — it reads what test-green
-    // and fixpoint-evidence recorded and fails loudly when stale. It must
-    // never trigger rebuilds of the things it is blessing, so it carries no
-    // deps on the build/fixpoint targets.
+    // and fixpoint-evidence recorded and fails loudly when stale. It depends
+    // on test-green (the manifest it reads: the graph is scheduled by
+    // readiness, and without the edge it ran first, 2026-10-14) and on
+    // nothing it blesses beyond that: a rebuild of unchanged inputs is a
+    // cutoff, never a different compiler (D49, D50).
+    last_green = last_green.dep("test-green")
     last_green = last_green.input(host_bin("out/bin/with-sha256"))
     last_green = last_green.input(release_compiler_bin("with"))
     last_green = last_green.input("out/.build-state/seed-input.json")
@@ -4814,8 +4828,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     // `with run tools/battery.w` runs `build`, then this: every check a
     // battery blesses in ONE survey invocation, so a red reports every failing
     // target at once instead of one target per battery (Eric, 2026-09-26: "we
-    // need to work efficiently"). Targets run in declaration order, so the
-    // evidence (test-green, then last-green) is recorded after what it blesses.
+    // need to work efficiently"). The evidence targets (test-green, then
+    // last-green-record) declare edges on what they read, so the readiness
+    // scheduler records each after what it blesses.
     var battery_checks = target_new(.Group, "battery-checks", "")
     battery_checks = battery_checks.dep("seed-driver")
     battery_checks = battery_checks.dep("test-with-audits")

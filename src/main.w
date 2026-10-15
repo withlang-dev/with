@@ -2763,8 +2763,17 @@ fn build_graph_first_broken_dep(target: &BuildGraphTarget, failed: &List[str]) -
 // report times as before.
 var build_graph_quiet_times: bool = false
 
+// When this `with build` started: every [time] line ends with `@<elapsed>`,
+// so a log reads as a timeline (which lane ended when) and not only as a
+// list of durations; a lane's own lines count from the lane's start.
+var build_graph_time_origin: i64 = 0
+
 fn build_graph_time_eprint(line: &str):
-    if not build_graph_quiet_times: with_eprint(line)
+    if build_graph_quiet_times: return
+    if build_graph_time_origin > 0 and line.starts_with("[time] "):
+        with_eprint(line ++ " @" ++ build_graph_time_fmt(with_clock_nanos() - build_graph_time_origin))
+    else:
+        with_eprint(line)
 
 fn build_graph_enforce_rss(root: &str, graph: &BuildGraph, name: &str, peak: i64):
     let message = build_graph_rss_budget_error(graph, name, peak)
@@ -3093,7 +3102,13 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         // pooled Test child divides the inner sliding window by the pool
         // width (see build_pool_spawn) so lanes multiply across cores, not
         // into oversubscription.
-        let will_pool = build_graph_target_poolable(target, times_top_level)
+        // An Action lane without the runner is a `build :name --no-deps`
+        // child that evaluates build.w again: ~55 s under the seed around a
+        // 2 s compile, and a cold worktree has no runner until the seed's
+        // bootstrap runtime exists, so its eighteen bootstrap objects took
+        // 16 min of a 25 min battery (2026-10-14). Until the runner exists,
+        // an Action runs in the driver.
+        let will_pool = build_graph_target_poolable(target, times_top_level) and (target.kind != 23 or runner_path.len() > 0)
         // A serial target runs beside the lanes (its dependencies are
         // finished, build_graph_pick_ready); a lane's failure stops a
         // non-survey run before the next target starts.
@@ -3723,6 +3738,7 @@ fn cli_install_compiler_dsym(root: &str, target_name: &str, dest: &str) -> i32:
 
 fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCommandOptions) -> i32:
     let cmd_t0 = with_clock_nanos()
+    build_graph_time_origin = cmd_t0
     var actual_options = options
     var actual_source = move actual_options.source_path
     if actual_source == "":

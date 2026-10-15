@@ -182,6 +182,16 @@ src/main build :last-green
 not run: the fixpoint, the Sema regression rebuilds, the C migrator tests,
 the corpora migrated afresh and tested, and wo-drift.
 
+Before `build`, confirm `src/main` is the lock's seed: `shasum -a 256
+src/main` against the asset's digest in `seed.lock`. A host whose `src/main`
+fell behind the lock fails stage1 on current syntax, and `:seed` cannot
+always repair it (an old seed may not compile `build/https_fetch.w`); fetch
+the pinned asset by hand and verify its digest. On macOS, export
+`SDKROOT=$(xcrun --show-sdk-path)` for `:test`: the facade tests `c_import`
+`sqlite3.h`, `bzlib.h` and `curl/curl.h`, which the embedded darwin sysroot
+does not carry (it holds libc alone), so they read the host SDK. `SDKROOT`
+keys only the test-environment signature, never a stage build.
+
 `:test` runs the full suite and records current test evidence. `:test-green`
 is a fast evidence check/recorder for that completed test run; it is not a
 substitute for running `:test`. `:last-green` consumes the current test evidence
