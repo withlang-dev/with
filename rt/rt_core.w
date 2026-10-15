@@ -74,6 +74,7 @@ extern fn rt_remove_tree(path: *const u8) -> i32
 extern fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32
 extern fn rt_symlink(target: *const u8, link_path: *const u8) -> i32
 extern fn rt_list_files(path: *const u8) -> str
+extern fn rt_list_dir(path: *const u8) -> str
 extern fn rt_access(path: *const u8, mode: i32) -> i32
 extern fn rt_chmod(path: *const u8, mode: i32) -> i32
 extern fn rt_file_mode(path: *const u8) -> i32
@@ -4518,6 +4519,14 @@ pub fn with_fs_list_files(path: &str) -> str:
     let listing = rt_list_files(cpath)
     cstr_free(cpath)
     listing
+
+// The names in a directory, one per line, without descending: "" for a
+// path that is not a directory.
+pub fn with_fs_list_dir(path: &str) -> str:
+    let cpath = str_to_cstr(path)
+    let names = rt_list_dir(cpath)
+    cstr_free(cpath)
+    names
 
 // ── stdin I/O ──────────────────────────────────────────────────────
 

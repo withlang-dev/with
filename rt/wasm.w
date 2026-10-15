@@ -27,6 +27,7 @@
 use std.builtins.c_void
 
 extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
@@ -896,16 +897,44 @@ fn wasm_path_join(parent: *const u8, name: *const u8, out: *mut u8, cap: i64) ->
     wasm_store_u8(ob, at + nlen, 0)
     0
 
-fn rt_list_files_walk(path: *const u8, out: str) -> str:
+// A listing accumulates in one buffer, `{ ptr, len, cap }` at `acc`: the
+// old `out ++ line` per entry copied the whole listing again for each,
+// quadratic in the files listed (see darwin_aarch64.w).
+fn rt_list_push(acc: *mut i64, text: *const u8, n: i64):
+    var buf = unsafe *(acc as *const *mut u8)
+    let len = unsafe *((acc as i64 + 8) as *const i64)
+    var cap = unsafe *((acc as i64 + 16) as *const i64)
+    if len + n + 1 > cap:
+        var new_cap: i64 = if cap == 0: 4096 else: cap * 2
+        while new_cap < len + n + 1:
+            new_cap = new_cap * 2
+        buf = if cap == 0: with_alloc(new_cap) else: with_realloc(buf, cap, new_cap)
+        cap = new_cap
+        unsafe *(acc as *mut *mut u8) = buf
+        unsafe *((acc as i64 + 16) as *mut i64) = cap
+    let _ = with_memcpy((buf as i64 + len) as *mut u8, text, n)
+    unsafe *((buf as i64 + len + n) as *mut u8) = 10 as u8
+    unsafe *((acc as i64 + 8) as *mut i64) = len + n + 1
+
+fn rt_list_finish(acc: *mut i64) -> str:
+    let buf = unsafe *(acc as *const *mut u8)
+    let len = unsafe *((acc as i64 + 8) as *const i64)
+    if buf as i64 == 0:
+        return rt_empty_str()
+    let out = with_str_from_bytes(buf as *const u8, len)
+    with_free(buf)
+    out
+
+fn rt_list_files_walk(path: *const u8, acc: *mut i64):
     if not wasm_lstat_is_dir(path):
         if rt_file_mode(path) < 0:
-            return out
-        return out ++ with_str_from_cstr(path) ++ "\n"
+            return
+        rt_list_push(acc, path, wasm_cstr_len(path))
+        return
     var names_len: i64 = 0
     let names = wasm_read_dir_names(path, &raw mut names_len)
     if names as i64 == 0:
-        return out
-    var result = out
+        return
     var at: i64 = 0
     while at < names_len:
         let name = (names as i64 + at) as *const u8
@@ -913,13 +942,33 @@ fn rt_list_files_walk(path: *const u8, out: str) -> str:
         var child: [4096]u8 = [0 as u8; 4096]
         let cb = (&raw mut child) as *mut [4096]u8 as *mut u8
         if wasm_path_join(path, name, cb, WASM_PATH_MAX) == 0:
-            result = rt_list_files_walk(cb as *const u8, result)
+            rt_list_files_walk(cb as *const u8, acc)
         at = at + nlen + 1
     with_free(names)
-    result
 
 pub fn rt_list_files(path: *const u8) -> str:
-    rt_list_files_walk(path, rt_empty_str())
+    var acc: [3]i64 = [0 as i64; 3]
+    rt_list_files_walk(path, &acc as *mut [3]i64 as *mut i64)
+    rt_list_finish(&acc as *mut [3]i64 as *mut i64)
+
+// The names in a directory, one per line, no path and no descent; "" for
+// anything that is not a directory.
+pub fn rt_list_dir(path: *const u8) -> str:
+    var acc: [3]i64 = [0 as i64; 3]
+    if not wasm_lstat_is_dir(path):
+        return rt_empty_str()
+    var names_len: i64 = 0
+    let names = wasm_read_dir_names(path, &raw mut names_len)
+    if names as i64 == 0:
+        return rt_empty_str()
+    var at: i64 = 0
+    while at < names_len:
+        let name = (names as i64 + at) as *const u8
+        let nlen = wasm_cstr_len(name)
+        rt_list_push(&acc as *mut [3]i64 as *mut i64, name, nlen)
+        at = at + nlen + 1
+    with_free(names)
+    rt_list_finish(&acc as *mut [3]i64 as *mut i64)
 
 pub fn rt_remove_tree(path: *const u8) -> i32:
     if not wasm_lstat_is_dir(path):

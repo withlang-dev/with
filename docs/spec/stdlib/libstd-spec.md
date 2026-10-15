@@ -64,7 +64,7 @@ document does not redefine them; each module's header comment does.
 | `string`, `str`, `fixed_string`, `internal/str_abi` | String methods (ASCII classifiers); `str` shim; `FixedString[N]` for core/no_std; raw-pointer bridge |
 | `fmt` | fmt_int, fmt_float, fmt_bool |
 | `io` | read_line, read_bytes, read_all, print_str, print_line, print_int, write_raw, flush, `Stdin.lines` |
-| `fs` | file_exists, read_file, write_file, create_dir, mkdir_p, remove_file, rename_file, remove_dir, remove_tree, copy_tree, symlink, list_files_text, chmod, `IoError` |
+| `fs` | file_exists, read_file, write_file, create_dir, mkdir_p, remove_file, rename_file, remove_dir, remove_tree, copy_tree, symlink, list_files_text, list_dir_text, chmod, `IoError` |
 | `mem` | alloc, free_mem, mem_copy, mem_move, mem_set, mem_cmp |
 | `alloc` | Arena, Pool |
 | `hash` | Hasher, DefaultHasher, hash_str, hash_i64, combine |

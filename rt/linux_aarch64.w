@@ -680,22 +680,48 @@ fn rt_empty_str() -> str:
     var empty: [1]u8 = [0 as u8; 1]
     with_str_from_cstr(&empty as *const [1]u8 as *const u8)
 
-fn rt_list_files_append_line(out: str, path: *const u8) -> str:
-    let path_text = with_str_from_cstr(path)
-    out ++ path_text ++ "\n"
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8
 
-fn rt_list_files_walk(path: *const u8, out: str) -> str:
+// A listing accumulates in one buffer, `{ ptr, len, cap }` at `acc`: the
+// old `out ++ line` per entry copied the whole listing again for each,
+// quadratic in the files listed (see darwin_aarch64.w).
+fn rt_list_push(acc: *mut i64, text: *const u8, n: i64):
+    var buf = unsafe *(acc as *const *mut u8)
+    let len = unsafe *((acc as i64 + 8) as *const i64)
+    var cap = unsafe *((acc as i64 + 16) as *const i64)
+    if len + n + 1 > cap:
+        var new_cap: i64 = if cap == 0: 4096 else: cap * 2
+        while new_cap < len + n + 1:
+            new_cap = new_cap * 2
+        buf = if cap == 0: with_alloc(new_cap) else: with_realloc(buf, cap, new_cap)
+        cap = new_cap
+        unsafe *(acc as *mut *mut u8) = buf
+        unsafe *((acc as i64 + 16) as *mut i64) = cap
+    let _ = with_memcpy((buf as i64 + len) as *mut u8, text, n)
+    unsafe *((buf as i64 + len + n) as *mut u8) = 10 as u8
+    unsafe *((acc as i64 + 8) as *mut i64) = len + n + 1
+
+fn rt_list_finish(acc: *mut i64) -> str:
+    let buf = unsafe *(acc as *const *mut u8)
+    let len = unsafe *((acc as i64 + 8) as *const i64)
+    if buf as i64 == 0:
+        return rt_empty_str()
+    let out = with_str_from_bytes(buf as *const u8, len)
+    with_free(buf)
+    out
+
+fn rt_list_files_walk(path: *const u8, acc: *mut i64):
     var mode: i32 = 0
     let stat_rc = rt_lstat_mode(path, &mode as *mut i32)
     if stat_rc != 0:
-        return out
+        return
     if (mode & RT_S_IFMT) != RT_S_IFDIR:
-        return rt_list_files_append_line(out, path)
-
+        rt_list_push(acc, path, rt_cstr_len(path))
+        return
     let dir = rt_libc_opendir(path)
     if dir as i64 == 0:
-        return out
-    var result = out
+        return
     while true:
         let ent = rt_libc_readdir(dir)
         if ent as i64 == 0:
@@ -707,12 +733,31 @@ fn rt_list_files_walk(path: *const u8, out: str) -> str:
         let join_rc = rt_path_join(path, name, &child as *mut [4096]u8 as *mut u8, RT_PATH_MAX)
         if join_rc != 0:
             continue
-        result = rt_list_files_walk(&child as *const [4096]u8 as *const u8, result)
+        rt_list_files_walk(&child as *const [4096]u8 as *const u8, acc)
     let _close = rt_libc_closedir(dir)
-    result
 
 pub fn rt_list_files(path: *const u8) -> str:
-    rt_list_files_walk(path, rt_empty_str())
+    var acc: [3]i64 = [0 as i64; 3]
+    rt_list_files_walk(path, &acc as *mut [3]i64 as *mut i64)
+    rt_list_finish(&acc as *mut [3]i64 as *mut i64)
+
+// The names in a directory, one per line, no path and no descent; "" for
+// anything that is not a directory.
+pub fn rt_list_dir(path: *const u8) -> str:
+    var acc: [3]i64 = [0 as i64; 3]
+    let dir = rt_libc_opendir(path)
+    if dir as i64 == 0:
+        return rt_empty_str()
+    while true:
+        let ent = rt_libc_readdir(dir)
+        if ent as i64 == 0:
+            break
+        let name = rt_dirent_name(ent)
+        if rt_dirent_is_dot_or_dotdot(name):
+            continue
+        rt_list_push(&acc as *mut [3]i64 as *mut i64, name, rt_cstr_len(name))
+    let _close = rt_libc_closedir(dir)
+    rt_list_finish(&acc as *mut [3]i64 as *mut i64)
 
 pub fn rt_access(path: *const u8, mode: i32) -> i32:
     let r = rt_libc_access(path, mode)

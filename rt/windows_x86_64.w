@@ -148,6 +148,7 @@ extern fn GetTempFileNameW(path: *const u16, prefix: *const u16, unique: u32, bu
 extern fn GetFullPathNameW(path: *const u16, size: u32, buf: *mut u16, file_part: *mut *mut u16) -> u32
 extern fn with_str_from_cstr(s: *const u8) -> str
 extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 // UCRT has no stdin/stdout/stderr global variables; the FILE* streams come from
@@ -1083,25 +1084,54 @@ fn win_list_child_text(parent: &str, name: *const u16) -> str:
 // link itself, as the lstat walk lists a symlink on POSIX. (The walk asked
 // GetFileAttributesW, which calls a junction a directory, and listed its
 // target.)
-fn win_list_files_walk(wpath: *const u16, path: &str, attrs: u32, tag: u32, out: str) -> str:
-    // Parity with the unix walk (a failed lstat returns `out`): a path that
+// A listing accumulates in one buffer, `{ ptr, len, cap }` at `acc`: the
+// old `out ++ line` per entry copied the whole listing again for each,
+// quadratic in the files listed (see darwin_aarch64.w).
+fn win_list_push(acc: *mut i64, text: &str):
+    let n = text.len()
+    var buf = unsafe *(acc as *const *mut u8)
+    let len = unsafe *((acc as i64 + 8) as *const i64)
+    var cap = unsafe *((acc as i64 + 16) as *const i64)
+    if len + n + 1 > cap:
+        var new_cap: i64 = if cap == 0: 4096 else: cap * 2
+        while new_cap < len + n + 1:
+            new_cap = new_cap * 2
+        buf = if cap == 0: with_alloc(new_cap) else: with_realloc(buf, cap, new_cap)
+        cap = new_cap
+        unsafe *(acc as *mut *mut u8) = buf
+        unsafe *((acc as i64 + 16) as *mut i64) = cap
+    let _ = with_memcpy((buf as i64 + len) as *mut u8, win_str_data(text), n)
+    unsafe *((buf as i64 + len + n) as *mut u8) = 10 as u8
+    unsafe *((acc as i64 + 8) as *mut i64) = len + n + 1
+
+fn win_list_finish(acc: *mut i64) -> str:
+    let buf = unsafe *(acc as *const *mut u8)
+    let len = unsafe *((acc as i64 + 8) as *const i64)
+    if buf as i64 == 0:
+        return win_empty_str()
+    let out = with_str_from_bytes(buf as *const u8, len)
+    with_free(buf)
+    out
+
+fn win_list_files_walk(wpath: *const u16, path: &str, attrs: u32, tag: u32, acc: *mut i64):
+    // Parity with the unix walk (a failed lstat lists nothing): a path that
     // does not exist lists nothing, a file lists itself, a directory lists
     // its tree. Before this, "not a directory" covered both cases, so a
     // missing directory listed its own name (#1081: the compiler's cleanup
     // listing an absent out/lib went down the append branch).
     if (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0 or win_is_link(attrs, tag):
-        return out ++ path ++ "\n"
-    var result = out
+        win_list_push(acc, path)
+        return
     var star: [2]u16 = [42, 0]
     var child: [4096]u16 = [0; 4096]
     let child_ptr = &raw mut child as *mut [4096]u16 as *mut u16
     if win_wpath_join(wpath, &star as *const [2]u16 as *const u16, child_ptr, 4096) != 0:
-        return result
+        return
     var data: [600]u8 = [0; 600]
     let data_ptr = &raw mut data as *mut [600]u8 as *mut u8
     let h = FindFirstFileW(child_ptr as *const u16, data_ptr)
     if h == INVALID_HANDLE_VALUE:
-        return result
+        return
     while true:
         let name = win_find_name(data_ptr as *const u8)
         if not win_is_dot_or_dotdot(name):
@@ -1110,11 +1140,10 @@ fn win_list_files_walk(wpath: *const u16, path: &str, attrs: u32, tag: u32, out:
             // have been listed by FindFirstFileW.
             if win_wpath_join(wpath, name, child_ptr, 4096) == 0:
                 let child_text = win_list_child_text(path, name)
-                result = win_list_files_walk(child_ptr as *const u16, child_text, win_find_attrs(data_ptr as *const u8), win_find_tag(data_ptr as *const u8), result)
+                win_list_files_walk(child_ptr as *const u16, child_text, win_find_attrs(data_ptr as *const u8), win_find_tag(data_ptr as *const u8), acc)
         if FindNextFileW(h, data_ptr) == 0:
             break
     let _close = FindClose(h)
-    result
 
 // A path that is not UTF-8 names nothing, so it lists nothing, like a missing one.
 pub fn rt_list_files(path: *const u8) -> str:
@@ -1126,7 +1155,41 @@ pub fn rt_list_files(path: *const u8) -> str:
     var tag: u32 = 0
     if win_top_entry(&wpath as *const [4096]u16 as *const u16, &raw mut attrs as *mut u32, &raw mut tag as *mut u32) != 0:
         return win_empty_str()
-    win_list_files_walk(&wpath as *const [4096]u16 as *const u16, path_text, attrs, tag, win_empty_str())
+    var acc: [3]i64 = [0 as i64; 3]
+    win_list_files_walk(&wpath as *const [4096]u16 as *const u16, path_text, attrs, tag, &acc as *mut [3]i64 as *mut i64)
+    win_list_finish(&acc as *mut [3]i64 as *mut i64)
+
+// The names in a directory, one per line, no path and no descent; "" for
+// anything that is not a directory.
+pub fn rt_list_dir(path: *const u8) -> str:
+    var wpath: [4096]u16 = [0; 4096]
+    if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
+        return win_empty_str()
+    var attrs: u32 = 0
+    var tag: u32 = 0
+    if win_top_entry(&wpath as *const [4096]u16 as *const u16, &raw mut attrs as *mut u32, &raw mut tag as *mut u32) != 0:
+        return win_empty_str()
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0:
+        return win_empty_str()
+    var star: [2]u16 = [42, 0]
+    var pattern: [4096]u16 = [0; 4096]
+    let pattern_ptr = &raw mut pattern as *mut [4096]u16 as *mut u16
+    if win_wpath_join(&wpath as *const [4096]u16 as *const u16, &star as *const [2]u16 as *const u16, pattern_ptr, 4096) != 0:
+        return win_empty_str()
+    var data: [600]u8 = [0; 600]
+    let data_ptr = &raw mut data as *mut [600]u8 as *mut u8
+    let h = FindFirstFileW(pattern_ptr as *const u16, data_ptr)
+    if h == INVALID_HANDLE_VALUE:
+        return win_empty_str()
+    var acc: [3]i64 = [0 as i64; 3]
+    while true:
+        let name = win_find_name(data_ptr as *const u8)
+        if not win_is_dot_or_dotdot(name):
+            win_list_push(&acc as *mut [3]i64 as *mut i64, win_utf16_to_str(name))
+        if FindNextFileW(h, data_ptr) == 0:
+            break
+    let _close = FindClose(h)
+    win_list_finish(&acc as *mut [3]i64 as *mut i64)
 
 pub fn rt_access(path: *const u8, mode: i32) -> i32:
     let _ = mode
