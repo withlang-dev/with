@@ -4797,9 +4797,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     var last_green = target_new(.Action, "last-green-record", "").output("out/.build-state/last-green.json")
     last_green.action = run_last_green_action
     // D19: last-green is pure evidence assembly — it reads what test-green
-    // and fixpoint-evidence recorded and fails loudly when stale. It must
-    // never trigger rebuilds of the things it is blessing, so it carries no
-    // deps on the build/fixpoint targets.
+    // and fixpoint-evidence recorded and fails loudly when stale. It depends
+    // on test-green (the manifest it reads: the graph is scheduled by
+    // readiness, and without the edge it ran first, 2026-10-14) and on
+    // nothing it blesses beyond that: a rebuild of unchanged inputs is a
+    // cutoff, never a different compiler (D49, D50).
+    last_green = last_green.dep("test-green")
     last_green = last_green.input(host_bin("out/bin/with-sha256"))
     last_green = last_green.input(release_compiler_bin("with"))
     last_green = last_green.input("out/.build-state/seed-input.json")
@@ -4825,10 +4828,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     // `with run tools/battery.w` runs `build`, then this: every check a
     // battery blesses in ONE survey invocation, so a red reports every failing
     // target at once instead of one target per battery (Eric, 2026-09-26: "we
-    // need to work efficiently"). The driver runs the evidence targets
-    // (test-green, then last-green-record) after every other target
-    // (src/main.w build_graph_evidence_rank), so each is recorded after what
-    // it blesses without an edge on it (D19).
+    // need to work efficiently"). The evidence targets (test-green, then
+    // last-green-record) declare edges on what they read, so the readiness
+    // scheduler records each after what it blesses.
     var battery_checks = target_new(.Group, "battery-checks", "")
     battery_checks = battery_checks.dep("seed-driver")
     battery_checks = battery_checks.dep("test-with-audits")
