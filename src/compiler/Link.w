@@ -425,7 +425,7 @@ fn link_stage_linux_dynamic_linker(sysroot: &str) -> str:
 fn link_stage_linux_crt_object(sysroot: &str, name: &str) -> str:
     for dir in host_library_trusted_dirs(sysroot, link_stage_linux_arch()):
         let path = dir ++ "/" ++ name
-        if host_library_usable(&path, link_stage_linux_arch()): return path
+        if host_library_usable(path, link_stage_linux_arch()): return path
     ""
 
 // gcc's own directory, `<libdir>/gcc/<triple>/<version>`: the triple is the
@@ -448,7 +448,7 @@ fn link_stage_linux_gcc_dir(sysroot: &str) -> str:
                     digits += 1
                 if digits == 0 or major <= best_major: continue
                 if not host_library_usable(dir ++ "/crtbegin.o", arch): continue
-                best = dir.clone()
+                best = dir
                 best_major = major
     best
 
@@ -465,10 +465,10 @@ fn link_stage_linux_dir_carries(dir: &str, name: &str) -> bool:
 // a package's own (`with get`), the sysroot's, the program's.
 fn link_stage_explicit_search_dirs(extras: &List[str], link_args: &List[str], sysroot_lib: &str) -> List[str]:
     let dirs: List[str] = List.new()
-    if sysroot_lib.len() > 0: dirs.push(sysroot_lib.clone())
+    if sysroot_lib.len() > 0: dirs.push(sysroot_lib)
     for args in [extras, link_args]:
         for i in 0..args.len():
-            if args[i] == "-L" and i + 1 < args.len(): dirs.push(args[i + 1].clone())
+            if args[i] == "-L" and i + 1 < args.len(): dirs.push(args[i + 1])
             else if args[i].starts_with("-L") and args[i].len() > 2: dirs.push(args[i].slice(2, args[i].len()))
     dirs
 
@@ -491,8 +491,8 @@ fn link_stage_linux_resolve_libs(host_dirs: &List[str], link_libs: &List[str], e
         if path.len() == 0:
             inputs.push("-l" ++ name)
             continue
-        inputs.push(path.clone())
-        let dir = host_library_dir(&path)
+        inputs.push(path)
+        let dir = host_library_dir(path)
         var seen = false
         for d in dirs:
             if d == dir: seen = true
@@ -609,12 +609,12 @@ fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_pa
     // searched after the sysroot for what a linker script there names. The
     // compiler's own link names none.
     let host_dirs = if not compiler_link and link_libs.len() > 0 and target_spec_is_native(): host_library_dirs("", link_stage_linux_arch()) else: List.new()
-    let resolved = link_stage_linux_resolve_libs(&host_dirs, link_libs, &link_stage_explicit_search_dirs(extras, link_args, &lib))
+    let resolved = link_stage_linux_resolve_libs(host_dirs, link_libs, link_stage_explicit_search_dirs(extras, link_args, lib))
     for dir in resolved.dirs: args.push("-L" ++ dir)
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 1))
     for input in resolved.inputs:
-        args.push(input.clone())
-        if not input.starts_with("-l"): inputs.push(input.clone())
+        args.push(input)
+        if not input.starts_with("-l"): inputs.push(input)
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
     for i in 0..link_args.len():
         args.push(with_str_clone_ref(link_args[i]))
@@ -726,12 +726,12 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
     args.push("-L" ++ gcc_dir)
     for dir in host_library_trusted_dirs(sysroot, link_stage_linux_arch()): args.push("-L" ++ dir)
     let host_dirs = if link_libs.len() > 0: host_library_dirs(sysroot, link_stage_linux_arch()) else: List.new()
-    let resolved = link_stage_linux_resolve_libs(&host_dirs, link_libs, &link_stage_explicit_search_dirs(extras, link_args, ""))
+    let resolved = link_stage_linux_resolve_libs(host_dirs, link_libs, link_stage_explicit_search_dirs(extras, link_args, ""))
     for dir in resolved.dirs: args.push("-L" ++ dir)
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 1))
     for input in resolved.inputs:
-        args.push(input.clone())
-        if not input.starts_with("-l"): inputs.push(input.clone())
+        args.push(input)
+        if not input.starts_with("-l"): inputs.push(input)
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
     for arg in link_stage_driver_args_for_ld(link_args):
         args.push(arg.clone())
@@ -1363,7 +1363,7 @@ pub fn link_stage_rpath_driver_args(paths: &List[str], target_os: &str) -> List[
         out.push("-Xlinker")
         out.push("-rpath")
         out.push("-Xlinker")
-        out.push(path.clone())
+        out.push(path)
     out
 
 // The native-Windows lld-link path, resolved from the environment when the

@@ -998,7 +998,7 @@ pub fn conan_write_known_system_package(name: &str, version: &str, project_root:
     var link_args: List[str] = List.new()
     if name == "opengl" and conan_detect_os() == "Macos":
         defines = conan_sorted_insert_unique(move defines, "GL_SILENCE_DEPRECATION=1")
-    let known = conan_known_link_metadata(name, version, move libs, move link_args)
+    let known = conan_known_link_metadata(name, version, libs, link_args)
     // Names only: which host file a name means is the link's to find
     // (compiler.HostLibs), on the machine that links.
     let requires: List[str] = List.new()
