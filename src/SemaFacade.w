@@ -1044,7 +1044,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1210,6 +1210,29 @@ impl Sema:
         if facade_clause_bridges(kind): c.bridged = 1
         if kind == FACADE_CLAUSE_LEND:
             c.lend = 1
+            return c
+        if kind == FACADE_CLAUSE_TEXT_BYTES:
+            // D134 (§16.2b.8): this item's text return stays owned bytes
+            // under a `text utf8` facade. It accompanies a `text return`.
+            c.text_bytes = 1
+            return c
+        if kind == FACADE_CLAUSE_DETACHES:
+            // D134 (§16.2b.6): the operation removes the value param N
+            // borrows from its origin and yields it owned, dependent on that
+            // origin. The parameter is a pointer a resource wraps; the
+            // renderer presents it on the borrowed view (verified below).
+            let pi = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+            if pi < 0:
+                return c
+            if self.get_type_kind(self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)) != TypeKind.TY_PTR:
+                let shown = self.facade_param_display(fn_sym, sig, pi)
+                self.emit_error(f"fn '{fname}': detaches {shown}: not a pointer, there is nothing to detach (§16.2b.6)", clause)
+                return c
+            if self.facade_param_receives(fn_sym, pi).len() != 1:
+                let shown = self.facade_param_display(fn_sym, sig, pi)
+                self.emit_error(f"fn '{fname}': detaches {shown}, which receives no one modeled resource; a detached value is the resource its parameter receives, taken out of its origin (§16.2b.6)", clause)
+                return c
+            c.detaches = pi
             return c
         if kind == FACADE_CLAUSE_CALLBACKS_NONE:
             c.callbacks_none = clause
@@ -2424,6 +2447,9 @@ pub fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_VALID_ON_FAILED: return "valid on failed"
     if kind == FACADE_CLAUSE_NULLABLE: return "nullable"
     if kind == FACADE_CLAUSE_TEXT_PARAM: return "text param"
+    if kind == FACADE_CLAUSE_TEXT_UTF8: return "text utf8"
+    if kind == FACADE_CLAUSE_TEXT_BYTES: return "text return bytes"
+    if kind == FACADE_CLAUSE_DETACHES: return "detaches"
     if kind == FACADE_CLAUSE_TEXT_RETURN: return "text return"
     if kind == FACADE_CLAUSE_BUFFER: return "buffer"
     if kind == FACADE_CLAUSE_FIXED: return "param … fixed"

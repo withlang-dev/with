@@ -4809,7 +4809,17 @@ impl Parser:
                 return 0
             let kind = self.expect_ident()
             return self.pool.add_node(NodeKind.NK_FACADE_DOMAIN, start, self.prev_end(), name, kind, 0) as i32
-        self.emit_error("expected 'resource', 'handle', 'fn', 'domain' or 'use convention' in c facade (§16.2b)")
+        if self.current_ident_is("text"):
+            // D134 (§16.2b.8): `text utf8`, once per facade — every text
+            // return presents as Option[str], validated at the boundary;
+            // an item overrides with `text return bytes`.
+            self.advance()
+            if not self.current_ident_is("utf8"):
+                self.emit_error("a facade's text declaration is written 'text utf8' (§16.2b.8)")
+                return 0
+            self.advance()
+            return self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FACADE_CLAUSE_TEXT_UTF8, self.pool.extra_len(), 0) as i32
+        self.emit_error("expected 'resource', 'handle', 'fn', 'domain', 'text utf8' or 'use convention' in c facade (§16.2b)")
         0
 
     // The clauses indented deeper than their item. Collected first and written
@@ -4965,6 +4975,12 @@ impl Parser:
                 by = self.parse_facade_param_ref()
                 if by == 0: return 0
             ops.push(by)
+        else if word == "detaches":
+            // D134 (§16.2b.6): `detaches param N`.
+            kind = FACADE_CLAUSE_DETACHES
+            let r = self.parse_facade_param_ref()
+            if r == 0: return 0
+            ops.push(r)
         else if word == "retains":
             kind = FACADE_CLAUSE_RETAINS
             let r = self.parse_facade_param_ref()
@@ -5075,6 +5091,12 @@ impl Parser:
                 let r = self.parse_facade_param_ref()
                 if r == 0: return 0
                 ops.push(r)
+            else if self.current_text() == "return" and self.token_text_is(self.pos + 1, "bytes"):
+                // D134 (§16.2b.8): under a `text utf8` facade, this item's
+                // text return stays owned bytes.
+                self.advance()
+                self.advance()
+                kind = FACADE_CLAUSE_TEXT_BYTES
             else if self.current_text() == "return":
                 self.advance()
                 kind = FACADE_CLAUSE_TEXT_RETURN

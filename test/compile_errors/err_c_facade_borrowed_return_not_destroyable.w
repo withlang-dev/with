@@ -1,4 +1,4 @@
-//! expect-check-fail: unknown method 'close_v2' for type 'BorrowedDatabase'
+//! expect-check-fail: unknown method 'close_v2' for type 'BorrowedDatabase[Statement]'
 
 // D51 stage 6 (ruling §26: a borrowed return "cannot independently be
 // consumed or destroyed"): the database's destroyers are not presented on

@@ -5,7 +5,7 @@ void *malloc(unsigned long size);
 void *calloc(unsigned long count, unsigned long size);
 void free(void *p);
 
-typedef struct nd { struct nd *first; struct nd *next; int id; } nd;
+typedef struct nd { struct nd *first; struct nd *next; struct nd *parent; int id; } nd;
 typedef struct dc { nd *root; int id; } dc;
 
 static inline nd *nd_new(int id) { nd *n = (nd *)calloc(1, sizeof(nd)); n->id = id; return n; }
@@ -14,7 +14,11 @@ static inline nd *nd_first(nd *n) { return n->first; }
 static inline nd *nd_next(nd *n) { return n->next; }
 static inline int nd_id(nd *n) { return n->id; }
 /* Attaches a fresh child with the given id and returns the parent. */
-static inline int nd_grow(nd *n, int id) { nd *c = nd_new(id); c->next = n->first; n->first = c; return id; }
+static inline int nd_grow(nd *n, int id) { nd *c = nd_new(id); c->next = n->first; c->parent = n; n->first = c; return id; }
+/* Detaches a node from its parent's child list; the caller then owns it
+ * and frees it with nd_free (libxml2's xmlUnlinkNode). */
+static inline void nd_unlink(nd *n) { nd *p = n->parent; if (!p) return; if (p->first == n) { p->first = n->next; } else { nd *c = p->first; while (c && c->next != n) c = c->next; if (c) c->next = n->next; } n->next = 0; n->parent = 0; }
+static inline int nd_count(nd *n) { int k = 0; nd *c = n->first; while (c) { k++; c = c->next; } return k; }
 
 static inline dc *dc_new(int id) { dc *d = (dc *)calloc(1, sizeof(dc)); d->id = id; d->root = nd_new(id * 10); return d; }
 static inline void dc_free(dc *d) { nd_free(d->root); free(d); }
