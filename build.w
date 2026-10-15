@@ -4814,8 +4814,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     // `with run tools/battery.w` runs `build`, then this: every check a
     // battery blesses in ONE survey invocation, so a red reports every failing
     // target at once instead of one target per battery (Eric, 2026-09-26: "we
-    // need to work efficiently"). Targets run in declaration order, so the
-    // evidence (test-green, then last-green) is recorded after what it blesses.
+    // need to work efficiently"). The driver runs the evidence targets
+    // (test-green, then last-green-record) after every other target
+    // (src/main.w build_graph_evidence_rank), so each is recorded after what
+    // it blesses without an edge on it (D19).
     var battery_checks = target_new(.Group, "battery-checks", "")
     battery_checks = battery_checks.dep("seed-driver")
     battery_checks = battery_checks.dep("test-with-audits")

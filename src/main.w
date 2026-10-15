@@ -2106,6 +2106,21 @@ fn build_graph_pick_ready(graph: &BuildGraph, remaining: &List[i32], pool: &Pool
         var ready = true
         if t.kind == 23 and runner_gate.len() > 0 and t.name != runner_gate and not runner_upstream.contains(t.name):
             ready = false
+        // An evidence target runs once nothing else is running or left, in
+        // its rank order (build_graph_evidence_rank): it reads what the run
+        // recorded and carries no edge on what it blesses (D19), and the
+        // declaration order the serial driver gave it is not a readiness
+        // order. Scheduled by readiness alone, test-green ran before stage1
+        // and last-green-record before test-green (2026-10-14).
+        let rank = build_graph_evidence_rank(t.name)
+        if rank >= 0:
+            if pool.has_live(): ready = false
+            for j in 0..remaining.len():
+                if j == k: continue
+                let other = build_graph_evidence_rank(graph.targets[remaining[j]].name)
+                if other < 0 or other < rank:
+                    ready = false
+                    break
         for di in 0..t.deps.len():
             let dep = t.deps[di]
             if pool.dep_inflight(dep):
@@ -2214,8 +2229,15 @@ fn build_graph_ledger_ms(ledger: &str, name: &str) -> i64:
 // evidence targets stay in the driver: they read the run's own failures.
 fn build_graph_target_poolable(t: &BuildGraphTarget, top_level: bool) -> bool:
     if not top_level: return false
-    if t.name == "test-green" or t.name == "last-green" or t.name == "last-green-record": return false
+    if build_graph_evidence_rank(t.name) >= 0 or t.name == "last-green": return false
     t.kind == 23 or t.kind == 2 or t.kind == 19
+
+// The evidence targets, in the order they run once every other target of
+// the run is done (build_graph_pick_ready); -1 for any other target.
+fn build_graph_evidence_rank(name: &str) -> i32:
+    if name == "test-green": return 0
+    if name == "last-green-record": return 1
+    -1
 
 // Every target `name` depends on, transitively, by name.
 fn build_graph_transitive_deps(graph: &BuildGraph, name: &str) -> List[str]:
@@ -2763,8 +2785,17 @@ fn build_graph_first_broken_dep(target: &BuildGraphTarget, failed: &List[str]) -
 // report times as before.
 var build_graph_quiet_times: bool = false
 
+// When this `with build` started: every [time] line ends with `@<elapsed>`,
+// so a log reads as a timeline (which lane ended when) and not only as a
+// list of durations; a lane's own lines count from the lane's start.
+var build_graph_time_origin: i64 = 0
+
 fn build_graph_time_eprint(line: &str):
-    if not build_graph_quiet_times: with_eprint(line)
+    if build_graph_quiet_times: return
+    if build_graph_time_origin > 0 and line.starts_with("[time] "):
+        with_eprint(line ++ " @" ++ build_graph_time_fmt(with_clock_nanos() - build_graph_time_origin))
+    else:
+        with_eprint(line)
 
 fn build_graph_enforce_rss(root: &str, graph: &BuildGraph, name: &str, peak: i64):
     let message = build_graph_rss_budget_error(graph, name, peak)
@@ -3729,6 +3760,7 @@ fn cli_install_compiler_dsym(root: &str, target_name: &str, dest: &str) -> i32:
 
 fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCommandOptions) -> i32:
     let cmd_t0 = with_clock_nanos()
+    build_graph_time_origin = cmd_t0
     var actual_options = options
     var actual_source = move actual_options.source_path
     if actual_source == "":
