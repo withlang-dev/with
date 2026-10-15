@@ -3093,7 +3093,13 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         // pooled Test child divides the inner sliding window by the pool
         // width (see build_pool_spawn) so lanes multiply across cores, not
         // into oversubscription.
-        let will_pool = build_graph_target_poolable(target, times_top_level)
+        // An Action lane without the runner is a `build :name --no-deps`
+        // child that evaluates build.w again: ~55 s under the seed around a
+        // 2 s compile, and a cold worktree has no runner until the seed's
+        // bootstrap runtime exists, so its eighteen bootstrap objects took
+        // 16 min of a 25 min battery (2026-10-14). Until the runner exists,
+        // an Action runs in the driver.
+        let will_pool = build_graph_target_poolable(target, times_top_level) and (target.kind != 23 or runner_path.len() > 0)
         // A serial target runs beside the lanes (its dependencies are
         // finished, build_graph_pick_ready); a lane's failure stops a
         // non-survey run before the next target starts.
