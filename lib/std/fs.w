@@ -17,6 +17,7 @@ extern fn with_fs_remove_tree(path: &str) -> i32
 extern fn with_fs_copy_tree(src: &str, dst: &str) -> i32
 extern fn with_fs_symlink(target: &str, link_path: &str) -> i32
 extern fn with_fs_list_files(path: &str) -> str
+extern fn with_fs_list_dir(path: &str) -> str
 extern fn with_fs_mkdir_p(path: &str) -> i32
 extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 
@@ -55,6 +56,11 @@ pub fn symlink(target: &str, link_path: &str) -> i32:
 /// List files recursively under a path as newline-separated paths.
 pub fn list_files_text(path: &str) -> str:
     with_fs_list_files(path)
+
+/// The names in a directory, newline-separated, without descending; "" when
+/// the path is not a directory.
+pub fn list_dir_text(path: &str) -> str:
+    with_fs_list_dir(path)
 
 /// Write a string to a file, replacing its contents. Returns 0 on success.
 pub fn write_file(path: &str, data: &str) -> i32:

@@ -3182,7 +3182,13 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             if survey and survey_failed.len() > 0 and (target.name == "test-green" or target.name == "last-green" or target.name == "last-green-record"):
                 with_eprint("survey: skipping evidence target '" ++ target.name ++ "' (earlier failures)")
                 continue
-            if not build_action_worker_env_enabled():
+            // Until the runner exists (a cold worktree: the seed's bootstrap
+            // runtime is what the first Actions build), an Action runs here,
+            // in the driver's own evaluation of build.w. The worker child it
+            // took before evaluated build.w again around a 2 s compile: 18 s
+            // under stage1, 55 s under the seed, eighteen times in a row
+            // (2026-10-14, 961 s of a cold battery's wall).
+            if not build_action_worker_env_enabled() and (runner_path.len() > 0 or options.strict_effects):
                 var worker_rc: i32 = 0
                 if build_runner_target_eligible(target, options, runner_path, &runner_fallback):
                     let effects_path = build_runner_effects_path(root, target.name)

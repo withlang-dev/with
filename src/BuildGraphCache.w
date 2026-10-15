@@ -1231,16 +1231,19 @@ fn build_cache_store_prune(dir: &str):
     var keep = BUILD_CACHE_STORE_KEEP_DEFAULT
     let explicit = build_graph_rt_getenv("WITH_BUILD_CACHE_KEEP")
     if explicit.len() > 0: keep = build_cache_parse_i32(explicit, keep)
-    let entries = build_cache_split_lines(build_graph_rt_list_files(dir))
+    // The entries are the store's top-level directories that carry a `used`
+    // stamp (`sources/` has none). Listing them recursively walked every
+    // published output: 20,000 files, 8–17 s after each published target,
+    // most of a battery's wall (2026-10-14).
+    let entries = build_cache_split_lines(build_graph_rt_list_dir(dir))
     var names: List[str] = List.new()
     var stamps: List[i64] = List.new()
     for i in 0..entries.len():
-        let path = entries[i]
-        if not path.ends_with("/used"): continue
-        let entry = build_cache_store_dirname(path)
-        if build_cache_project_relative(dir, entry).contains("/"): continue
+        let entry = dir ++ "/" ++ entries[i]
+        let used = entry ++ "/used"
+        if build_graph_rt_file_exists(used) == 0: continue
         names.push(entry.clone())
-        stamps.push(build_cache_parse_i64(build_graph_rt_read_file(path)))
+        stamps.push(build_cache_parse_i64(build_graph_rt_read_file(used)))
     if names.len() <= keep: return
     // Drop the oldest until `keep` remain; a few entries, so the quadratic
     // selection is nothing.
