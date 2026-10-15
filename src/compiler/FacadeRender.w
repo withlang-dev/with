@@ -108,7 +108,7 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
             // The borrowed view's impl (plain_methods) carries the
             // borrow-returning lends too (D122, D134): a borrow taken
             // through a borrow is one `Borrowed<R>[_]` viewing that borrow.
-            let (text, use_of_error) = facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false, true))
+            let (text, use_of_error) = facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, true, false, true) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false, true))
             out = out ++ text
             let rname: str = intern.resolve(pool.get_data0(item as NodeId))
             names.push(rname)
@@ -295,8 +295,10 @@ fn facade_render_public(text: &str) -> str:
         var end = start
         while end < text.len() and text[end] != '\n': end = end + 1
         let line = text.slice(start, end)
-        if line.starts_with("impl Drop for "): in_drop = true
-        else if line.starts_with("impl "): in_drop = false
+        // A generic impl (`impl[Origin] BorrowedR[Origin]:`, D134) is an
+        // impl too.
+        if line.starts_with("impl Drop for ") or line.starts_with("impl[Origin] Drop for "): in_drop = true
+        else if line.starts_with("impl ") or line.starts_with("impl["): in_drop = false
         var shown = line.clone()
         if line.starts_with("type ") or line.starts_with("error ") or line.starts_with("fn "):
             shown = "pub " ++ line
@@ -439,7 +441,11 @@ pub fn facade_render_text_view_name() -> str: "as_cstr"
 // record views — rendered on the failed-state type `Failed<R>`, the same
 // body over the same `repr` field, and nothing else (a borrowed-resource
 // return holds a view of a live `R`; Sema refuses the mark on one).
-fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32, with_borrowed_returns: bool, failed_only: bool) -> str:
+// `for_view`: the text is the borrowed view's impl (`BorrowedR[Origin]`),
+// where `self` is the view and a borrow taken through it views the view
+// (D122, D134); a parent borrow (D85) reads a field the view lacks and is
+// not rendered there.
+fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32], resource: i32, with_borrowed_returns: bool, failed_only: bool, for_view: bool = false) -> str:
     let repr_text = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId)
     let repr = facade_render_unalias(pool, intern, repr_text)
     let in_place = not repr.starts_with("*") and facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT)
@@ -515,7 +521,24 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32],
             let from = facade_render_param_ref(pool, intern, decl, li.borrow_from)
             if from < 0:
                 continue
-            var origin = if from == 0: "self" else: facade_render_param_name(pool, intern, pool.fn_meta_param_start(meta), from)
+            if for_view and li.borrow_parent != 0:
+                continue
+            // A borrow through a borrow is a borrow of the same origin
+            // (D122, D134): in the view's impl the result views the view's
+            // origin, never the view (a view of a view would nest the
+            // origin type once per call, and instantiation would not end).
+            var origin = if from == 0: (if for_view: "self.origin" else: "self") else: facade_render_param_name(pool, intern, pool.fn_meta_param_start(meta), from)
+            // The origin's type, spelled so Sema's view-of-param facts read
+            // the declared result (D134): the host (the view's origin, in
+            // the view's impl), the parameter's resource, or the parent.
+            let host_name: str = intern.resolve(pool.get_data0(resource as NodeId))
+            var otype = if for_view: "Origin" else: host_name
+            if li.borrow_parent != 0: otype = intern.resolve(li.borrow_parent)
+            else if from != 0:
+                let arg_res = facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), from) as NodeId))
+                if arg_res <= 0:
+                    continue
+                otype = intern.resolve(pool.get_data0(arg_res as NodeId))
             // `returns borrow R from parent R of param N` (D85, §16.2b.6):
             // the borrow holds the parent the argument's resource holds —
             // its `parent` view — so it views the parent's origin, not the
@@ -531,10 +554,7 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32],
                 origin = origin ++ "." ++ pfield
             let bname = facade_render_borrowed_name(intern.resolve(li.borrow_res))
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
-            // The result is `Option[Borrowed<R>[O]]` with `O` the origin's
-            // type, inferred from the tail: the same text serves the
-            // resource's impl and its borrowed view's (D134).
-            out = out ++ head ++ mname ++ "(" ++ params ++ "):\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(" ++ bname ++ " { origin: " ++ origin ++ ", repr: " ++ handle ++ " })\n"
+            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ bname ++ "[" ++ otype ++ "]]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(" ++ bname ++ " { origin: " ++ origin ++ ", repr: " ++ handle ++ " })\n"
             continue
         if li.text_free != 0:
             out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, facade_render_text_utf8(pool) and not li.text_bytes, "        ", pro)

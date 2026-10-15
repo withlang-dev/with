@@ -27,10 +27,13 @@ c facade tree:
         detaches param 0
     fn nd_id
         lend
+        preserves param 0
     fn nd_grow
         lend
+        preserves param 0
     fn nd_count
         lend
+        preserves param 0
 
 fn main:
     let Some(d) = Doc.new(1) else:

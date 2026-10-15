@@ -25,12 +25,17 @@ c facade tree:
         returns borrow Node from param 0
     fn nd_next
         returns borrow Node from param 0
+    // Reads and appends leave every node where it is (§16.2b.7): without
+    // `preserves` a lend on the document would invalidate its views.
     fn nd_id
         lend
+        preserves param 0
     fn nd_grow
         lend
+        preserves param 0
     fn dc_id
         lend
+        preserves param 0
 
 fn main:
     let Some(d) = Doc.new(1) else:

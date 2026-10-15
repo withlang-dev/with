@@ -1090,6 +1090,8 @@ CLI dumps (`with check <file> <flag>`):
 | `--dump-tokens`, `--dump-ast`, `--dump-resolved`, `--dump-typed` | the lexer's tokens, the AST, resolution, and Sema's types per node |
 | `WITH_DEBUG_PERMUTE_TAGS=1` | compiler | plain enums get reversed tags, meaning unchanged: any behavior change is code that assumed a tag (route: a wrong variant) |
 | `WITH_TRACE_VARIANT_FALLBACK=1` | compiler | each variant lookup MirLower answered by name in a type that does not declare the variant |
+| `WITH_DEBUG_FACADE_POISON=1` | compiler | for every binding a modeled-C call could invalidate (§16.2b.7): poisoned, or which guard kept it (no dependence on the origin, holds a resource, a parent borrow) — the first stop when a view misuse is accepted or refused unexpectedly |
+| `WITH_DEBUG_MIGRATE_FACADE=1` | `with migrate --facade` | every definition's ownership evidence and the verdict drawn (D121) |
 | `--dump-mir`, `--dump-async-mir` | the lowered MIR bodies (synchronous, and after the async transform); every dump and trace flag reads `--bundle-corpus <corpus>` as `check` does, so a corpus module dumps from its source rather than vanishing behind its embedded interface; also when the typed validator refused one (`internal compiler error: invalid MIR before codegen … in \`Type.fn\``): the ICE names the body, and `--dump-mir` / `--explain-mir-origin '<fn>:_N'` read the invalid statement |
 | `--dump-place-map`, `--dump-drop-state`, `--dump-drop-plan`, `--dump-abi` | see the drop-state view and `--dump-abi` above |
 | `--trace-place`, `--explain-mir-origin`, `--trace-ownership`, `--trace-cleanup-edge` | one place's history, where a MIR local came from, its ownership states, one CFG edge |
