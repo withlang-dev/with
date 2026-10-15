@@ -21,14 +21,14 @@ fn host_lib_push_dir(dirs: List[str], dir: &str) -> List[str]:
     if dir.len() == 0 or runtime_is_dir(dir) == 0: return out
     for d in out:
         if d == dir: return out
-    out.push(dir.clone())
+    out.push(dir)
     out
 
 fn host_lib_sorted(xs: List[str]) -> List[str]:
     var out: List[str] = List.new()
     for x in xs:
         var i = out.len()
-        out.push(x.clone())
+        out.push(x)
         while i > 0 and out[i - 1] > out[i]:
             let prev = out[i - 1].clone()
             out[i - 1] = out[i].clone()
@@ -52,7 +52,7 @@ fn host_lib_conf_includes(root: &str, pattern: &str) -> List[str]:
     if suffix.contains("/") or suffix.contains("*"): return out
     for file in runtime_list_files(path.slice(0, slash)).split("\n"):
         if file.len() > prefix.len() + suffix.len() and file.starts_with(prefix) and file.ends_with(suffix):
-            out.push(file.clone())
+            out.push(file)
     host_lib_sorted(out)
 
 fn host_lib_read_conf(root: &str, conf: &str, depth: i32, dirs: List[str]) -> List[str]:
@@ -66,18 +66,18 @@ fn host_lib_read_conf(root: &str, conf: &str, depth: i32, dirs: List[str]) -> Li
         if line.starts_with("include ") or line.starts_with("include\t"):
             for operand in line.slice(8, line.len()).fields():
                 for file in host_lib_conf_includes(root, operand):
-                    out = host_lib_read_conf(root, file, depth + 1, move out)
+                    out = host_lib_read_conf(root, file, depth + 1, out)
         else:
             for dir in line.split(":"):
                 let d = dir.trim()
-                if d.starts_with("/"): out = host_lib_push_dir(move out, root ++ d)
+                if d.starts_with("/"): out = host_lib_push_dir(out, root ++ d)
     out
 
 fn host_lib_push_trusted(dirs: List[str], root: &str, arch: &str) -> List[str]:
     var out = dirs
     let multiarch = host_lib_multiarch(arch)
     for dir in ["/usr/lib/" ++ multiarch, "/lib/" ++ multiarch, "/usr/lib64", "/lib64", "/usr/lib", "/lib"]:
-        out = host_lib_push_dir(move out, root ++ dir)
+        out = host_lib_push_dir(out, root ++ dir)
     out
 
 /// The loader's trusted directories that exist under `root` ("" for the
@@ -91,9 +91,9 @@ pub fn host_library_dirs(root: &str, arch: &str) -> List[str]:
     var dirs: List[str] = List.new()
     if root.len() == 0:
         for dir in runtime_getenv("LIBRARY_PATH").split(":"):
-            if dir.starts_with("/"): dirs = host_lib_push_dir(move dirs, dir)
-    dirs = host_lib_push_trusted(move dirs, root, arch)
-    host_lib_read_conf(root, root ++ "/etc/ld.so.conf", 0, move dirs)
+            if dir.starts_with("/"): dirs = host_lib_push_dir(dirs, dir)
+    dirs = host_lib_push_trusted(dirs, root, arch)
+    host_lib_read_conf(root, root ++ "/etc/ld.so.conf", 0, dirs)
 
 fn host_lib_u16_le(data: &str, offset: i64) -> i64:
     if offset + 1 >= data.len(): -1 else: (data[offset] as i64) | ((data[offset + 1] as i64) << 8)
