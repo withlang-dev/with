@@ -8,8 +8,8 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20261014-local-2-0da433ee8a07
-with-darwin-aarch64=037024ea8a1be493f4dd9f89f7d70ecaef5d79cc02d104713a41ec0a1623a177
+version=nightly-20261014-local-3-c411d0e45
+with-darwin-aarch64=89e9e0acb3a07a7c19d162dfeb539e278068a04afe34e482a62007c17787e92e
 # darwin-aarch64, linux-x86_64 and windows-x86_64 are cut from main e4861e1d
 # (2026-10-11), each on its own host (studio128, eric-5090, win10) from a
 # stage2 == stage3 fixpoint: the first seeds whose runtime has the sized List
@@ -42,7 +42,7 @@ with-darwin-aarch64=037024ea8a1be493f4dd9f89f7d70ecaef5d79cc02d104713a41ec0a1623
 # libc++ and lld: a fresh clone in a bare ubuntu:24.04 (git, curl, bubblewrap)
 # runs :deps and build with no LLVM_PREFIX to a stage2 == stage3 fixpoint over
 # all 16 units, and its release compiler is this binary byte for byte.
-with-linux-x86_64=bdae9451633ba025b3afc674c80ad890b9f426e029958fd3217ba295274129e8
+with-linux-x86_64=e2e56c54ef88a8e5ad3531eb7ef6e32384d08542954e2dbb869b98d5c08947ba
 with-linux-aarch64.version=nightly-20261003-local-2-b78ceca2d3c5
 with-linux-aarch64=c5b434ce739a0ef2a8beddf09abd30f1f501aa2b9227b07a0b16bdf65f8f2898
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
@@ -55,6 +55,6 @@ with-linux-aarch64=c5b434ce739a0ef2a8beddf09abd30f1f501aa2b9227b07a0b16bdf65f8f2
 # v0.15.2.1: cross-built from ea377276 (v0.15.2.1 + the #1089 embed-slot
 # fix), an intermediate seed the native windows-aarch64 lane bootstraps and
 # verifies.
-with-windows-x86_64.exe=338a8425e256990ca360538ca5b3b7bc4cdf9dc61864bc29d673541d22a563fd
+with-windows-x86_64.exe=eeb223463833cf521582c42d86f0aec0fca702fd91d6f4e45082976b29fb89b3
 with-windows-aarch64.exe.version=v0.15.2.1
 with-windows-aarch64.exe=bb3b17c64ad057ddc852a5ee6a61a4e4a224780447013699d490e6f726893c73
