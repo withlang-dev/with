@@ -1182,6 +1182,10 @@ impl CiProject:
                     continue
                 let symbol_id = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
                 self.symbols[symbol_id].add_consumer(module_id)
+                // D121 step 3: the attributes any declaration carries, once.
+                let attrs = with_cimport_fn_attributes(session, i)
+                if attrs.len() > 0 and not self.symbols[symbol_id].attrs.contains(attrs):
+                    self.symbols[symbol_id].attrs = self.symbols[symbol_id].attrs ++ attrs
                 if cursor < 0 or with_ci_cursor_is_definition(session, cursor) == 0:
                     // D121: a prototype makes the function API a facade may
                     // describe; a definition alone is internal.

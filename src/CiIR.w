@@ -973,6 +973,10 @@ type CiProjectSymbol {
     // callers' and it is never a facade item (a facade describes imported
     // declarations, §16.2b.13).
     header_declared: i32,
+    // D121 step 3: the GNU attributes any of its declarations carry
+    // (`malloc;nonnull(1);returns_nonnull`), annotation evidence below a
+    // proof and above the registry (§16.2b.2).
+    attrs: str,
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
@@ -1004,6 +1008,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         borrow_from: -1,
         own_reason: "",
         header_declared: 0,
+        attrs: "",
     }
 
 fn ci_pipe_i32_contains(items: &str, want: i32) -> bool:

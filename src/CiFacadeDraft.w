@@ -145,6 +145,13 @@ impl CiProject:
         if src == "global": return "unknown:returns global state"
         "unknown:no single source"
 
+    // Whether any declaration of `si` carries the attribute `name`
+    // (`malloc`, `returns_nonnull`, or `nonnull` with its list).
+    fn fd_has_attr(si: i32, name: &str) -> bool:
+        for a in self.symbols[si].attrs.split(";"):
+            if a == name or a.starts_with(name ++ "("): return true
+        false
+
     fn fd_retains_any(si: i32) -> bool:
         for pi in 0..self.symbols[si].param_stores.len():
             if self.symbols[si].param_stores[pi] != 0: return true
@@ -307,9 +314,17 @@ impl CiProject:
                         break
                 if returns == 0: verdict = "unknown:no return statement in the body"
                 if verdict == "null": verdict = "unknown:returns only NULL"
+                // D121 step 3 (§16.2b.15): what the body does not prove, an
+                // annotation the library ships may state — `malloc` says the
+                // return is a fresh allocation the caller owns. Below a proof,
+                // above the registry; a proof that contradicts it (a part of
+                // a parameter is returned) wins.
+                if verdict.starts_with("unknown:") and self.fd_has_attr(si as i32, "malloc"):
+                    verdict = "owned"
+                    reason = "annotation: __attribute__((malloc)), the return is a fresh allocation the caller owns"
                 if verdict == "owned":
                     self.symbols[si].owns_return = 1
-                    self.symbols[si].own_reason = "proof: " ++ reason ++ ", a fresh allocation never retained"
+                    self.symbols[si].own_reason = if reason.starts_with("annotation:"): reason else: "proof: " ++ reason ++ ", a fresh allocation never retained"
                     changed = true
                 else if verdict.starts_with("borrow:"):
                     self.symbols[si].borrow_from = fd_i32(verdict.slice(7, verdict.len()))
@@ -464,6 +479,10 @@ impl CiProject:
                 verdict = "raw: returns " ++ self.symbols[si].ret_ty ++ " unproven: " ++ self.symbols[si].own_reason
             else: verdict = self.fd_lend_verdict(si as i32, modeled)
             if verdict.starts_with("raw:"): raw = raw + 1 else: safe = safe + 1
+            // The annotations the library ships, for the reader: nullability
+            // ones are header facts c_import reads directly (§16.2b.8).
+            let attrs = self.symbols[si].attrs
+            if attrs.len() > 0: verdict = verdict ++ " [attributes: " ++ attrs.replace(";", " ").trim() ++ "]"
             lines = lines ++ "  " ++ fname ++ ": " ++ verdict ++ "\n"
         var head = "facade " ++ name ++ f": {total} functions, {safe} presented safely, {raw} raw" ++ (if internal > 0: f"; {internal} internal (no prototype declares them)" else: "") ++ "\n"
         for record in self.fd_representations():

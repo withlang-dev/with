@@ -2788,6 +2788,53 @@ pub fn with_cimport_fn_is_noreturn(session: i64, idx: i32) -> i32:
             clang_disposeTokens(tu, tokens, token_count)
         found
 
+// D121 step 3 (§16.2b.15): the GNU attributes a function declaration
+// carries, as their tokens inside `__attribute__((…))` joined without
+// spaces and `;`-separated per attribute list: `malloc;nonnull(1,2);
+// returns_nonnull`. Read from the declaration's own tokens, as `noreturn`
+// is; "" when it carries none. Ownership metadata a library ships is
+// evidence below a proof and above the registry (§16.2b.2).
+pub fn with_cimport_fn_attributes(session: i64, idx: i32) -> str:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
+        let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
+        if clang_Cursor_hasAttrs(cursor) == 0: return ""
+        let extent = clang_getCursorExtent(cursor)
+        let tu = clang_Cursor_getTranslationUnit(cursor)
+        var tokens: *mut CXToken = 0 as *mut CXToken
+        var token_count: u32 = 0
+        clang_tokenize(tu, extent, &raw mut tokens, &raw mut token_count)
+        var out = ""
+        var depth: i32 = 0        // parentheses open inside an __attribute__
+        var armed = false         // the last token was `__attribute__`
+        var ti: u32 = 0
+        while ti < token_count:
+            let tok = *((tokens as i64 + ti as i64 * 24) as *const CXToken)  // sizeof(CXToken)=24
+            let sp = clang_getTokenSpelling(tu, tok)
+            let text = session_make_str(s, clang_getCString(sp) as *const u8)
+            clang_disposeString(sp)
+            if depth == 0:
+                if armed and text == "(":
+                    depth = 1
+                    armed = false
+                else: armed = text == "__attribute__"
+            else:
+                if text == "(":
+                    depth = depth + 1
+                    if depth > 2: out = out ++ text
+                else if text == ")":
+                    depth = depth - 1
+                    if depth > 1: out = out ++ text
+                    if depth == 0 and out.len() > 0 and not out.ends_with(";"): out = out ++ ";"
+                else if text == ",":
+                    out = out ++ (if depth == 2: ";" else: ",")
+                else: out = out ++ text
+            ti = ti + 1
+        if tokens as i64 != 0:
+            clang_disposeTokens(tu, tokens, token_count)
+        out
+
 // ── Translated type functions ───────────────────────────────
 
 pub fn with_cimport_fn_param_type_translated(session: i64, idx: isize, param: isize) -> str:
