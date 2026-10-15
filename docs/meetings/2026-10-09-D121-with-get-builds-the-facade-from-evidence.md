@@ -84,6 +84,15 @@ source a proof needs is reachable for Conan Center packages.
 6. The libxml2 UAT over the generated facade (its program: parse, walk the
    tree, read attributes, no `unsafe`).
 
+**Status of the work.** Step 1 landed as D122 (#2318; the detach fact and
+the UTF-8 declaration are briefs still owed). Step 2 landed 2026-10-15 as
+`with migrate --facade NAME <dir>` (`src/CiFacadeDraft.w`, the walker in
+`CImport.w` beside D107's; `docs/spec/toolchain/with-migrate-spec.md`
+"Usage"; the spellings it chose are D133): the proofs are a corpus fixed
+point over retention, destruction and returns, the draft pairs producers
+with the one unary destroyer of a representation, and everything else is
+reported with its reason. Steps 3–6 are open.
+
 **What would reopen it.** A Conan Center majority of binary-only packages,
 or proofs that cover too little of ordinary libraries to make the registry
 the minority source.

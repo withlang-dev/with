@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D133 — The facade proof engine is `with migrate --facade NAME`; a proven resource is named by its C record in CamelCase (delegated)](2026-10-15-D133-facade-proof-engine-spellings.md)
 - [D132 — A runtime object set is the linking compiler's when its objects are the bytes that compiler embeds, whoever compiled them](2026-10-14-D132-a-runtime-is-identified-by-its-bytes.md)
 - [D131 — Validation is scoped to its tier: a fix, a PR, a seed cut or release; migration runs only at a seed cut or release, or when a human asks](2026-10-14-D131-validation-tiers.md)
 - [D130 — `--emit-c` emits what the program reaches; `--emit-all` emits everything (delegated)](2026-10-14-D130-emit-c-emits-what-the-program-reaches.md)
