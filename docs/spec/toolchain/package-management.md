@@ -101,8 +101,12 @@ version, `with get` installs and applies it automatically; package-owned
 metadata needs no opt-in ceremony. A facade a package ships is trusted
 exactly as the package's own code is: it is pinned by the same lock and
 digest, and every fact it contributes carries the provenance
-`facade:<package>@<version>`, which the contract view reports. A locally
-generated draft facade is never trusted automatically. The toolchain
-publishes no facade beyond the C standard library's.
+`facade:<package>@<version>`, which the contract view reports. The facade
+`with get` builds from evidence is trusted fact by fact, each with its
+provenance (§16.2b.2); a facade a project writes by hand is the project's
+own and overrides any single fact. The toolchain publishes no facade beyond
+the C standard library's; it publishes the package registry
+(`registry/c/<package>/facts.w`, §16.2b.15), one cited facts file per
+package, landing by pull request.
 
 ---
