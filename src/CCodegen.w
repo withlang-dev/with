@@ -3543,8 +3543,13 @@ impl CCodegen:
             return ""
         let cstr_c = self.c_type(self.sema.ty_cstr as i32, 0)
         var out = ""
+        // One definition per text: a literal reached twice (a global the
+        // lowering referenced twice) is still one C constant.
+        var emitted: List[str] = List.new()
         for i in 0..texts.len():
             let text = texts[i]
+            if emitted.contains(text): continue
+            emitted.push(text)
             let data_name = cc_cstr_literal_data_name(text)
             let view_name = cc_cstr_literal_view_name(text)
             out = out ++ "static const uint8_t " ++ data_name ++ "[" ++ f"{text.len() + 1}" ++ "] = " ++ cc_cstr_literal_bytes_initializer(text) ++ ";\n"

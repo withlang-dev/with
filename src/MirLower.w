@@ -5782,6 +5782,16 @@ impl MirBuilder:
         if mode == CastMode.MOVE as i32:
             return self.lower_move_cast(expr, target_type_id, node)
         var op = self.lower_expr(expr)
+        // D120: a cast of a Copy value with drop glue (a value List into its
+        // distinct type) consumes a copy: one more holder, as a consuming
+        // call's argument is (retain_consumed_copy decides by the type).
+        if op >= 0 and self.sema.std_generic_of(self.sema.unwrap_builtin_arg_distinct(self.operand_type(op))) == StdGeneric.List:
+            if self.body.operand_kinds[op] == OperandKind.OK_COPY:
+                self.retain_consumed_copy(op)
+            else if self.body.operand_kinds[op] == OperandKind.OK_MOVE:
+                // A temporary (a call's result) cast into the distinct type
+                // moves into it: its own drop is cancelled.
+                self.consume_moved_operand(op)
         // D22 contextual materialization records the cast target on its source
         // expression. The central adjustment consumer has already copied the
         // pointee and performed this ordinary value cast, so do not cast the
@@ -13930,6 +13940,14 @@ impl MirBuilder:
         // may-suspend closure (#1985), and `xs.map(n => f(n).await)` lowered
         // as a plain call to the map symbol (D65 #1639 validator, #2011).
         let call_id = args_id
+        // D120: a writing List intrinsic makes its value-List receiver (the
+        // first argument) unique first; the make-unique call lands before
+        // this terminator.
+        if self.list_intrinsic_mutates(intrinsic) and self.body.call_arg_counts[args_id] > 0:
+            let recv_arg: i32 = self.body.call_arg_operands[self.body.call_arg_starts[args_id]]
+            if self.body.operand_kinds[recv_arg] != OperandKind.OK_CONSTANT:
+                let recv_place: i32 = self.body.operand_d0[recv_arg]
+                self.make_unique_before_mutation(recv_place)
         self.body.set_call_intrinsic(call_id, intrinsic)
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
@@ -14526,6 +14544,8 @@ impl MirBuilder:
         if list_place < 0 or list_place >= self.body.place_sema_types.len():
             return
         let ty = self.body.place_sema_types[list_place]
+        if with_getenv_str("WITH_TRACE_COW").len() > 0:
+            with_eprint(f"[cow] place={list_place} ty={ty} list={self.sema.std_generic_of(ty) == StdGeneric.List} copy={if ty > 0: self.sema.is_copy_frozen(ty as TypeId) else: -1}")
         if ty <= 0 or self.sema.std_generic_of(ty) != StdGeneric.List or self.sema.is_copy_frozen(ty as TypeId) == 0:
             return
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("__make_unique"), self.sema.ty_void)
