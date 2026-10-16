@@ -3827,6 +3827,12 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                             ci_record_untranslated_macro(name)
                             continue
                         let fn_kw = if ci_translation_calls_raw_function(translated): "unsafe fn " else: "fn "
+                        // A macro emitted as `unsafe fn` is itself a raw
+                        // call for every macro translated after it
+                        // (libxml2's `IS_EXTENDER(c)` is `xmlIsExtenderQ(c)`,
+                        // which calls `xmlCharInRange`): the caller is
+                        // `unsafe fn` too, or its body would not check.
+                        if fn_kw == "unsafe fn ": ci_record_raw_function_name(safe_name)
                         let r = ci_render_generated_fn_body(fn_kw ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ")" ++ ci_ret_suffix(inferred_ret), "    " ++ translated)
                         with_cimport_mark_name_emitted(name)
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):

@@ -87,6 +87,7 @@ use InternPool
 use render
 use CImport
 use Token
+use std.collections.HashMap
 
 // A pinned resource's cell is a `Box` (D54): Resolve makes the facade block
 // that declares one this module's import of std.box (the D29 gate), since
@@ -557,7 +558,8 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &List[i32],
             out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ bname ++ "[" ++ otype ++ "]]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(" ++ bname ++ " { origin: " ++ origin ++ ", repr: " ++ handle ++ " })\n"
             continue
         if li.text_free != 0:
-            out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, facade_render_text_utf8(pool) and not li.text_bytes, "        ", pro)
+            let text_ret = facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, facade_render_text_utf8(pool) and not li.text_bytes, "        ", pro)
+            if text_ret.len() > 0: out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ text_ret
             continue
         let (ret, body) = facade_render_bridge_body(pool, intern, decl, &bridge, facade_render_call(pool, intern, decl, call_args), mname, "        ", if failed_only: "" else: facade_render_message_call(pool, intern, ci, resource))
         out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ pro ++ body
@@ -877,6 +879,14 @@ fn facade_render_prefix_names(pool: AstPool, intern: InternPool, resource: i32) 
     let b = facade_render_struct_name(facade_render_unalias(pool, intern, spelled))
     if b.len() > 0 and (out.len() == 0 or out[0] != b):
         out.push(b)
+    // A struct tag written with a leading underscore (`struct _xmlDoc`,
+    // the C convention beside `typedef … xmlDoc`) names the same prefixes
+    // as the typedef: `xmlDocGetRootElement` is `get_root_element` on
+    // either spelling.
+    for i in 0..out.len():
+        var bare: str = out[i]
+        while bare.starts_with("_"): bare = bare.slice(1, bare.len())
+        if bare.len() > 0 and bare != out[i] and not out.contains(bare): out.push(bare)
     out
 
 // The struct name beneath one level of pointer, or "" for a shape with no
@@ -902,12 +912,26 @@ fn facade_render_struct_name(text: &str) -> str:
 // `sqlite3_`; `g_hash_table` → `g_hash_`, `g_`), and the longest matching
 // prefix wins. Being wrong here changes a spelling (§54), and a clash
 // between two operations still fails closed (facade_render_present).
+// `cname` in snake case (`xmlDocGetRootElement` → `xml_doc_get_root_element`);
+// a snake-case name is itself.
+fn facade_render_snake_name(cname: &str) -> str:
+    let s = ci_compute_snake_prefix(cname)
+    if s.ends_with("_") and not cname.ends_with("_"): s.slice(0, s.len() - 1) else: s
+
 fn facade_render_shorten(cname: &str, names: &List[str]) -> str:
     var best = ""
+    // A camel-case C name (libxml2's `xmlDocGetRootElement` on `xmlDoc`)
+    // is read in snake case, so the same prefixes shorten it:
+    // `xml_doc_get_root_element` less `xml_doc_` is `get_root_element`,
+    // `xmlFirstElementChild` on `xmlNode` less the library's `xml_` is
+    // `first_element_child`. A name already in snake case is unchanged.
+    let csnake = facade_render_snake_name(cname)
     for i in 0..names.len():
         let sname = names[i]
         let snake = ci_compute_snake_prefix(sname)
         var m = ci_strip_snake_prefix(cname, snake)
+        if m.len() == 0 and csnake != cname:
+            m = ci_strip_snake_prefix(csnake, snake)
         if m.len() == 0:
             m = ci_strip_struct_prefix(cname, sname)
         if m.len() > 0 and (best.len() == 0 or m.len() < best.len()):
@@ -919,7 +943,9 @@ fn facade_render_shorten(cname: &str, names: &List[str]) -> str:
             end = end - 1
             if snake[end] != '_':
                 continue
-            let lib = ci_strip_snake_prefix(cname, snake.slice(0, end + 1))
+            var lib = ci_strip_snake_prefix(cname, snake.slice(0, end + 1))
+            if lib.len() == 0 and csnake != cname:
+                lib = ci_strip_snake_prefix(csnake, snake.slice(0, end + 1))
             if lib.len() > 0 and (best.len() == 0 or lib.len() < best.len()):
                 best = lib
     if best.len() == 0 or keyword_lookup(best) >= 0:
@@ -971,7 +997,10 @@ fn facade_render_receiver(pool: AstPool, intern: InternPool, decl: i32) -> i32:
 // method too (apply_facade_dependency_effects).
 fn facade_render_receiver_method(pool: AstPool, intern: InternPool, ci: &List[i32], child: i32, producer: i32, slot: i32, ctor: &str, result: &str) -> str:
     let parent = facade_render_receiver(pool, intern, producer)
-    if parent <= 0:
+    // A producer made from its own resource (libxml2's `xmlDictCreateSub(xmlDict *)`)
+    // is its constructor alone: the receiver method would be a second
+    // definition of the same name on the same type.
+    if parent <= 0 or parent == child:
         return ""
     let pname: str = intern.resolve(pool.get_data0(parent as NodeId))
     let cname: str = intern.resolve(pool.get_data0(producer as NodeId))
@@ -1113,7 +1142,24 @@ fn facade_render_lend_hosted(pool: AstPool, intern: InternPool, li: &FacadeLendI
 // Every item of `kind` in every facade block of the compilation: a program's
 // facade may describe an operation of a resource another block declares
 // (its own `fn telldir` lending the toolchain libc facade's `CDir`).
+// The facade items of one kind, scanned once per pool (the same index
+// discipline as facade_render_alias_index): every presentation question
+// asks for them, per operation of every resource.
+var g_facade_items_pool: i64 = 0
+var g_facade_items: HashMap[i32, List[i32]] = HashMap.new()
+
 pub fn facade_render_all_items(pool: AstPool, kind: NodeKind) -> List[i32]:
+    if g_facade_items_pool != pool.shape():
+        g_facade_items_pool = pool.shape()
+        g_facade_items = HashMap.new()
+    let key = kind as i32
+    if not g_facade_items.contains(key): g_facade_items.insert(key, facade_render_scan_items(pool, kind))
+    let out: List[i32] = List.new()
+    if let Some(items) = g_facade_items.get(key):
+        for item in items: out.push(item)
+    out
+
+fn facade_render_scan_items(pool: AstPool, kind: NodeKind) -> List[i32]:
     let out: List[i32] = List.new()
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
@@ -1950,19 +1996,10 @@ fn facade_render_has_clause(pool: AstPool, resource: i32, kind: i32) -> bool:
 // `fclose(FILE *)` the program imported.
 fn facade_render_find_fn(pool: AstPool, intern: InternPool, ci: &List[i32], sym: i32) -> i32:
     let want: str = intern.resolve(sym)
-    var fallback: i32 = 0
-    for di in 0..pool.decl_count():
-        let decl = pool.get_decl(di)
-        let kind = pool.kind(decl)
-        if kind != NodeKind.NK_EXTERN_FN and kind != NodeKind.NK_FN_DECL:
-            continue
-        let have: str = intern.resolve(pool.get_data0(decl))
-        if have == want:
-            if di < ci.len() and ci[di] != 0:
-                return decl as i32
-            if fallback == 0:
-                fallback = decl as i32
-    fallback
+    facade_render_fn_index(pool, intern, ci)
+    let imported: i32 = g_facade_fn_ci_decl.get(want) ?? 0
+    if imported != 0: return imported
+    g_facade_fn_any_decl.get(want) ?? 0
 
 pub fn facade_render_param_count(pool: AstPool, decl: i32) -> i32:
     let meta = pool.find_fn_meta(decl as NodeId)
@@ -1998,6 +2035,50 @@ fn facade_render_const_of(p: &str, repr: &str) -> bool: repr.starts_with("*mut "
 // (zlib's `z_streamp` is `*mut z_stream`): the same text comparison Sema's
 // resolve_alias makes on TypeIds, so the renderer and the verifier agree on
 // which operation takes the representation.
+// ── the pool's declaration index ─────────────────────────────────────────
+//
+// The renderer and Sema's facade checks ask the same two questions of the
+// pool thousands of times per item: which type declaration is the alias
+// named `t`, and which declaration is the function named `f`. Over a
+// facade `with get` writes for libxml2 (fourteen headers, 27k
+// declarations, hundreds of items) a scan per question was 45 s per Sema
+// pass. One scan per pool answers both; the index is keyed on the pool's
+// identity and size, so a pool the comptime transform grew is scanned
+// again.
+var g_facade_alias_pool: i64 = 0
+var g_facade_alias_targets: HashMap[str, str] = HashMap.new()
+var g_facade_fn_pool: i64 = 0
+var g_facade_fn_ci: isize = -1
+var g_facade_fn_ci_decl: HashMap[str, i32] = HashMap.new()
+var g_facade_fn_any_decl: HashMap[str, i32] = HashMap.new()
+
+fn facade_render_alias_index(pool: AstPool, intern: InternPool):
+    if g_facade_alias_pool == pool.shape(): return
+    g_facade_alias_pool = pool.shape()
+    g_facade_alias_targets = HashMap.new()
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NodeKind.NK_TYPE_DECL or pool.get_data2(decl) % 8 != TypeDeclKind.Alias as i32: continue
+        let name: str = intern.resolve(pool.get_data0(decl))
+        // The first declaration of a name is the one the scan found.
+        if not g_facade_alias_targets.contains(name): g_facade_alias_targets.insert(name, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(decl)) as NodeId))
+
+// `ci` is the frontend's c_import origin per declaration: the same list
+// at every call for one pool, so its length is the key's third part.
+fn facade_render_fn_index(pool: AstPool, intern: InternPool, ci: &List[i32]):
+    if g_facade_fn_pool == pool.shape() and g_facade_fn_ci == ci.len(): return
+    g_facade_fn_pool = pool.shape()
+    g_facade_fn_ci = ci.len()
+    g_facade_fn_ci_decl = HashMap.new()
+    g_facade_fn_any_decl = HashMap.new()
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        let kind = pool.kind(decl)
+        if kind != NodeKind.NK_EXTERN_FN and kind != NodeKind.NK_FN_DECL: continue
+        let name: str = intern.resolve(pool.get_data0(decl))
+        if not g_facade_fn_any_decl.contains(name): g_facade_fn_any_decl.insert(name, decl as i32)
+        if di < ci.len() and ci[di] != 0 and not g_facade_fn_ci_decl.contains(name): g_facade_fn_ci_decl.insert(name, decl as i32)
+
 pub fn facade_render_unalias(pool: AstPool, intern: InternPool, text: &str) -> str:
     // A pointer's pointee is chased too (a header's `DIR *` translates to
     // `*mut __dirstream` where the facade names `*mut DIR`), as Sema's
@@ -2007,16 +2088,9 @@ pub fn facade_render_unalias(pool: AstPool, intern: InternPool, text: &str) -> s
     if text.starts_with("*const "):
         return "*const " ++ facade_render_unalias(pool, intern, text.slice(7, text.len()))
     var t: str = text.clone()
+    facade_render_alias_index(pool, intern)
     for _ in 0..16:
-        var target = ""
-        for di in 0..pool.decl_count():
-            let decl = pool.get_decl(di)
-            if pool.kind(decl) != NodeKind.NK_TYPE_DECL or pool.get_data2(decl) % 8 != TypeDeclKind.Alias as i32:
-                continue
-            let have: str = intern.resolve(pool.get_data0(decl))
-            if have == t:
-                target = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(decl)) as NodeId)
-                break
+        let target: str = g_facade_alias_targets.get(t) ?? ""
         // `type _IO_FILE = opaque` declares a distinct opaque type, not an
         // alias of `void`: stop at its name. A true alias of `c_void` —
         // `typedef void CURL;` translates to `type CURL = c_void` — is
@@ -2215,6 +2289,17 @@ fn facade_render_bridge_param(pool: AstPool, intern: InternPool, decl: i32, pi: 
         return b
     var shown = if ptype == "*const i8" or ptype == "*const c_char": "&str" else: ptype.clone()
     var arg = pname.clone()
+    // D121 step 6 (§16.2b.8): `nullable param N` on a C string presents
+    // `Option[&str]`; the text crosses as a NUL-terminated temporary that
+    // outlives the call, None as NULL (libxml2's optional encoding).
+    if shown == "&str" and facade_render_param_is_nullable(pool, intern, decl, pi):
+        let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
+        let local = facade_render_fresh(pname ++ "_text", taken)
+        let ptr = facade_render_fresh(pname ++ "_ptr", taken)
+        b.prologue = "let " ++ local ++ " = match " ++ pname ++ ":\n    Some(s) => Some(s.to_cstring().expect(\"" ++ fname ++ ": the text has an interior NUL byte, which C would read as its end (§16.3c)\"))\n    None => None\nlet " ++ ptr ++ ": " ++ ptype ++ " = match &" ++ local ++ ":\n    Some(t) => t.as_cstr().ptr() as " ++ ptype ++ "\n    None => null\n"
+        b.params = pname ++ ": Option[&str]"
+        b.args = ptr
+        return b
     let res = facade_render_received(pool, intern, ptype)
     if res > 0:
         let received = facade_render_received_arg(pool, intern, res, ptype, pname)
@@ -2464,7 +2549,8 @@ fn facade_render_free_ops(pool: AstPool, intern: InternPool, ci: &List[i32], fac
             continue
         if li.text_free != 0:
             let rendered_text = if li.rename != 0: presented else: facade_render_bridge_name(cname)
-            out = out ++ "fn " ++ rendered_text ++ "(" ++ bridge.params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, bridge.args), li.text_free, facade_render_text_utf8(pool) and not li.text_bytes, "    ", facade_render_indent(bridge.prologue, "    "))
+            let text_ret = facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, bridge.args), li.text_free, facade_render_text_utf8(pool) and not li.text_bytes, "    ", facade_render_indent(bridge.prologue, "    "))
+            if text_ret.len() > 0: out = out ++ "fn " ++ rendered_text ++ "(" ++ bridge.params ++ ")" ++ text_ret
             continue
         if facade_render_fn_oks(pool, intern, decl).len() > 0:
             out = out ++ facade_render_fn_error_type(pool, intern, decl, presented, false)
@@ -3488,7 +3574,8 @@ pub fn facade_render_record_view_methods(pool: AstPool, intern: InternPool, ci: 
             out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ view ++ "]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(unsafe { " ++ handle ++ " as " ++ view ++ " })\n"
             continue
         if li.text_free != 0:
-            out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, facade_render_text_utf8(pool) and not li.text_bytes, "        ", pro)
+            let text_ret = facade_render_text_return(pool, intern, ci, decl, facade_render_call(pool, intern, decl, call_args), li.text_free, facade_render_text_utf8(pool) and not li.text_bytes, "        ", pro)
+            if text_ret.len() > 0: out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ text_ret
             continue
         let (ret, body) = facade_render_bridge_body(pool, intern, decl, bridge, facade_render_call(pool, intern, decl, call_args), mname, "        ", "")
         out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ pro ++ body
@@ -3524,6 +3611,39 @@ fn facade_render_text_utf8(pool: AstPool) -> bool:
         if pool.get_data0(items[i] as NodeId) == FACADE_CLAUSE_TEXT_UTF8: return true
     false
 
+// The release of `repr` through an imported global holding a function
+// pointer (`freed by xmlFree`: libxml2's `xmlFreeFunc xmlFree`, which the
+// program may have set), or "" when no such global is imported. A nullable
+// pointer that is NULL at the call is the library breaking its contract: a
+// failure naming the C function, nothing repaired (D134).
+fn facade_render_release_through_var(pool: AstPool, intern: InternPool, decl: i32, free_sym: i32, repr: &str, indent: &str) -> str:
+    let want: str = intern.resolve(free_sym)
+    for di in 0..pool.decl_count():
+        let vdecl = pool.get_decl(di)
+        if pool.kind(vdecl) != NodeKind.NK_EXTERN_VAR: continue
+        let have: str = intern.resolve(pool.get_data0(vdecl))
+        if have != want: continue
+        var ty = render_type_expr(pool, intern, pool.get_data1(vdecl) as NodeId)
+        let nullable = ty.starts_with("Option[") and ty.ends_with("]")
+        if nullable: ty = ty.slice(7, ty.len() - 1)
+        let open = ty.find("fn(")
+        if open < 0: return ""
+        var depth = 0
+        var close = open + 2
+        while close < ty.len():
+            if ty[close] == '(': depth = depth + 1
+            else if ty[close] == ')':
+                depth = depth - 1
+                if depth == 0: break
+            close = close + 1
+        if close >= ty.len(): return ""
+        let ptype = ty.slice(open + 3, close)
+        let through = if ty.contains("unsafe "): "unsafe { f(" ++ repr ++ " as " ++ ptype ++ ") }" else: "f(" ++ repr ++ " as " ++ ptype ++ ")"
+        if not nullable: return "let f = " ++ want ++ "\n" ++ indent ++ through
+        let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
+        return "match " ++ want ++ ":\n" ++ indent ++ "    Some(f) => " ++ through ++ "\n" ++ indent ++ "    None => panic(\"" ++ fname ++ ": 'freed by " ++ want ++ "', but " ++ want ++ " is NULL (§16.2b.8)\")"
+    ""
+
 fn facade_render_text_return(pool: AstPool, intern: InternPool, ci: &List[i32], decl: i32, call: &str, free_sym: i32, utf8: bool, indent: &str, prologue: &str) -> str:
     let taken = facade_render_param_names(pool, intern, decl)
     let repr = facade_render_fresh("repr", taken)
@@ -3531,11 +3651,16 @@ fn facade_render_text_return(pool: AstPool, intern: InternPool, ci: &List[i32], 
     let at = facade_render_fresh("at", taken)
     let byte = facade_render_fresh("byte", taken)
     let fdecl = facade_render_find_fn(pool, intern, ci, free_sym)
-    if fdecl == 0:
+    let release = if fdecl != 0:
+        let fmeta = pool.find_fn_meta(fdecl as NodeId)
+        let ftype = render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(fmeta), 0) as NodeId)
+        facade_render_call(pool, intern, fdecl, repr ++ " as " ++ ftype)
+    else:
+        facade_render_release_through_var(pool, intern, decl, free_sym, repr, indent)
+    // No release, no text: the item is left out, and Sema's `freed by`
+    // check names what the clause failed to name (never a placeholder).
+    if release.len() == 0:
         return ""
-    let fmeta = pool.find_fn_meta(fdecl as NodeId)
-    let ftype = render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(fmeta), 0) as NodeId)
-    let release = facade_render_call(pool, intern, fdecl, repr ++ " as " ++ ftype)
     if utf8:
         // `text utf8` (D134): the bytes are validated at the boundary and
         // copied into a `str`; a return that is not UTF-8 is the library

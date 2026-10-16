@@ -10,4 +10,8 @@ scenario that applies on the host, skips with a reason the ones whose
 per failed step. `expect (human):` records a check a person performs; the
 runner prints it and never fails it. Programs a scenario writes into the
 project come from `uat/fixtures/` and are ordinary source files. `with
-init` writes `uat/hello.uat` and `uat/README.md`.
+init` writes `uat/hello.uat` and `uat/README.md`. In a checkout that holds
+the package registry (`registry/README.md`, §16.2b.15), a scenario's `with
+get` reads that checkout's facts (`WITH_REGISTRY=file://<root>`, set by
+the runner unless the caller set it): the battery proves the tree, its
+facts included, before they reach the repository's `main`.

@@ -23,7 +23,14 @@ c facade zlib:
 Clauses a file may state: on a resource, `from F` (an owned producer),
 `drop F` (the destroyer the resource is released with) and `destroys F`
 (another function that releases it); on an item, `consumes param N`,
-`returns borrow R from param N` and `lend`. The engine applies a fact only
+`returns borrow R from param N`, `lend`, `nullable param N`, `text param
+N` and `text return, owned, freed by F` (§16.2b.8: what a facade states
+about a parameter's or a return's shape, where the proofs reach neither;
+libxml2's optional encoding and the text `xmlGetProp` hands back, freed by
+`xmlFree`). An item may carry several. At the facade level, `text utf8`
+(D134: every text return presents as `Option[str]`, validated at the
+boundary; libxml2's `xmlChar` is a byte of UTF-8). The engine applies a
+fact only
 where a proof and the library's annotations said nothing (§16.2b.2), and
 the generated facade records each one with the provenance `registry:` and
 its citation.

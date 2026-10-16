@@ -125,7 +125,20 @@ project has none of its own; a `c facade <name>:` block in the project's
 source overrides any item the written block also has (`src/Resolve.w`,
 `src/compiler/Frontend.w merge_fetched_facades_frontend`,
 `src/compiler/ConanClient.w`, `docs/spec/toolchain/with-migrate-spec.md`).
-Step 6 is open.
+Step 6 landed 2026-10-16: `uat/libxml2.uat` parses a file, walks the
+element tree and reads attributes and content over the facade `with get`
+wrote, with no hand facade and no `unsafe`. What it took: a proof fix (a
+list walk `cur = cur->next` made the local its own second source, so no
+tree walk was a borrow), the registry stating shape beside ownership
+(`nullable param N`, `text param N`, `text return, owned, freed by F`,
+several per item: `registry/c/libxml2/facts.w`), `freed by` accepting an
+imported global that holds the function (`xmlFree` is a variable the
+program may set; the spec's own example), the renderer leaving out a text
+return it cannot release instead of emitting half an item, and the report
+naming where a retention proof stopped. libxml2's allocator is a function
+pointer, so `xmlReadFile`'s filename reaches `xmlMemStrdup` and stays
+unproven: the registry's `from xmlReadFile` covers it, with the copy's
+line cited, and the report says so beside the fact.
 
 **What would reopen it.** A Conan Center majority of binary-only packages,
 or proofs that cover too little of ordinary libraries to make the registry

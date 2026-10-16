@@ -118,6 +118,26 @@ resource) the written block also has, and the rest of the written block
 stays. Without CMake, Ninja or `with cc` the package installs with no
 facade and `with get` says why.
 
+**The registry states shape, too (step 6).** Beside its ownership facts, a
+registry file states `nullable param N`, `text param N` and `text return,
+owned, freed by F` on an item (§16.2b.8), several per item, each cited;
+the draft writes them into the item's block with the provenance
+`registry:`, and a producer or a destroyer that has no block of its own
+gets one for them. `freed by F` names an imported function or an imported
+global holding one (libxml2's `xmlFree`); the rendering releases the text
+through the pointer the global holds at the call, and a NULL there is a
+contract failure that names the C function. `nullable param N` on a
+`const char *` presents `Option[&str]`, NULL for None (§16.2b.8). A
+camel-case C name is shortened like a snake-case one (§16.2b.11):
+`xmlDocGetRootElement` on `xmlDoc` is `doc.get_root_element()`,
+`xmlFirstElementChild` on `xmlNode` is `node.first_element_child()` by the
+library's `xml_` prefix. A proof treats a local
+assigned from itself (`cur = cur->next`, a list walk) as one source, the
+value its other assignments gave it. The report says where a retention
+proof stopped: `retains param 0 (passed to xmlMemStrdup, which no unit
+defines)`, the store or the undefined callee at the end of the chain, so a
+reviewer of a registry fact sees what the fact covers.
+
 **Modes:**
 - `write` (default) — write `.w` files
 - `check` — report what would change, exit nonzero if any

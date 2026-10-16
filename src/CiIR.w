@@ -990,6 +990,13 @@ type CiProjectSymbol {
     // (CiFacts.w: `kind=…;cite=…`), "" when the file states none. Below
     // `attrs` and `gir`, above a convention profile (§16.2b.2).
     registry: str,
+    // D121 step 6: the registry's presentation facts for the function
+    // (`nullable:N`, `text_param:N`, `text_return:F`, one `kind|record|cite`
+    // per line), beside the one ownership fact in `registry`.
+    registry_more: str,
+    // D121 step 6: 1 when the function is variadic (never presentable
+    // without a `variadic` clause the draft does not write).
+    variadic: i32,
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
@@ -1022,6 +1029,8 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         own_reason: "",
         gir: "",
         registry: "",
+        registry_more: "",
+        variadic: 0,
         header_declared: 0,
         header_file: "",
         attrs: "",
@@ -1083,6 +1092,9 @@ pub type CiProject {
     // call to what it names. Source evidence, never a name.
     alloc_aliases: List[str],
     free_aliases: List[str],
+    // D121 step 6: the registry's facade-level `text utf8` citation, ""
+    // when the file states none.
+    registry_utf8: str,
     // D121 step 5: the symbols the last facade draft presented (every
     // producer, destroyer, borrow, lend and consumer it named), so the
     // facade `with get` writes can import the headers that declare them.
@@ -1103,6 +1115,7 @@ fn CiProject.new -> CiProject:
         symbol_index: HashMap.new(),
         sink_seen: HashMap.new(),
         alloc_aliases: List.new(),
+        registry_utf8: "",
         free_aliases: List.new(),
         presented: List.new(),
         unread: List.new(),

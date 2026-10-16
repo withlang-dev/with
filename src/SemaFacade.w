@@ -1553,11 +1553,23 @@ impl Sema:
                 let rt: str = self.type_name(ret)
                 self.emit_error(f"fn '{fname}' returns {rt}, not a pointer to a C character type; 'text return' describes new text C hands back (§16.2b.8)", clause)
                 return c
-            let free_sym = self.facade_fn_symbol_named(self.pool_resolve(self.ast.get_extra(ops)))
+            // F is an imported function taking one pointer, or an imported
+            // global that holds one (libxml2's `xmlFreeFunc xmlFree`, the
+            // spec's own example): the library names its release through a
+            // variable the program may have set.
+            let named: str = self.pool_resolve(self.ast.get_extra(ops))
+            var free_sym = self.facade_fn_symbol_named(named)
             let fsig = if free_sym != 0: self.get_sig(free_sym) else: -1
-            if fsig < 0 or self.sig_get_param_count(fsig) != 1 or self.get_type_kind(self.resolve_alias(self.sig_param_type(fsig, 0) as TypeId)) != TypeKind.TY_PTR:
-                let named: str = self.pool_resolve(self.ast.get_extra(ops))
-                self.emit_error(f"fn '{fname}': 'freed by {named}' names no imported function taking one pointer, the text to release (§16.2b.8)", clause)
+            var releases = fsig >= 0 and self.sig_get_param_count(fsig) == 1 and self.get_type_kind(self.resolve_alias(self.sig_param_type(fsig, 0) as TypeId)) == TypeKind.TY_PTR
+            if not releases and free_sym == 0:
+                let var_node = self.facade_extern_var_named(named)
+                let var_tid: i32 = if var_node != 0: self.extern_var_type_ids.get(var_node) ?? 0 else: 0
+                let fn_tid = if self.is_option_pointer_type(var_tid) != 0: self.callable_any_fn_type(self.option_pointer_payload_type(var_tid) as TypeId) else: self.callable_any_fn_type(var_tid as TypeId)
+                if fn_tid != 0 and self.get_type_d1(fn_tid as TypeId) == 1 and self.get_type_kind(self.resolve_alias(self.fn_type_param_type(fn_tid, 0) as TypeId)) == TypeKind.TY_PTR:
+                    free_sym = self.ast.get_data0(var_node)
+                    releases = true
+            if not releases:
+                self.emit_error(f"fn '{fname}': 'freed by {named}' names no imported function, or global holding one, that takes one pointer, the text to release (§16.2b.8)", clause)
                 return c
             if c.text_return_free != 0:
                 self.emit_error(f"fn '{fname}': 'text return' is stated twice (§16.2b.8)", clause)
@@ -4485,9 +4497,9 @@ impl Sema:
     // shape in stage 12b: the callback of a `callback param N userdata param
     // M` pairing (#1618; verify_facade_callback_items checks the pairing). A
     // raw pointer parameter accepts `null` as C declares it and needs no
-    // clause; a nullable C string (`Option[&str]`) or resource parameter
-    // (`Option[&R]`) is not modeled, and saying so beats rendering the
-    // clause as nothing.
+    // clause; a nullable `const char *` is `Option[&str]` (D121 step 6);
+    // a nullable resource parameter (`Option[&R]`) is not modeled, and
+    // saying so beats rendering the clause as nothing.
     mut fn verify_facade_nullable_items():
         for ci in 0..self.foreign_contracts.len():
             if self.foreign_contracts[ci].nullable_params.len() == 0 or self.facade_contract_is_callback_item(ci as i32):
@@ -4503,9 +4515,22 @@ impl Sema:
             for k in 0..self.foreign_contracts[ci].nullable_params.len():
                 let pi = self.foreign_contracts[ci].nullable_params[k]
                 if self.facade_param_is_fn_pointer(sig, pi): continue
+                // D121 step 6 (§16.2b.8): a nullable C string presents as
+                // `Option[&str]`, NULL for None (libxml2's optional
+                // encoding).
+                if self.facade_param_is_c_string(sig, pi): continue
                 let shown = self.facade_param_display(fn_sym, sig, pi)
-                self.emit_error(f"fn '{fname}': nullable {shown}; nullability is rendered for a function-pointer parameter (§16.6) and for the callback of a 'callback param N userdata param M' pairing (an absent callback takes its userdata with it, §16.2b.9), and a raw pointer parameter accepts null as C declares it — a nullable C string or resource parameter is not modeled (§16.2b.8)", self.foreign_contracts[ci].node)
+                self.emit_error(f"fn '{fname}': nullable {shown}; nullability is rendered for a function-pointer parameter (§16.6), for the callback of a 'callback param N userdata param M' pairing (an absent callback takes its userdata with it, §16.2b.9) and for a const char * (Option[&str]), and a raw pointer parameter accepts null as C declares it — a nullable resource parameter is not modeled (§16.2b.8)", self.foreign_contracts[ci].node)
                 break
+
+    // Parameter `pi` of signature `sig` is a `const char *` (§16.3c: the
+    // one C string shape that takes a `str`).
+    fn facade_param_is_c_string(sig: i32, pi: i32) -> bool:
+        let ptid = self.sig_param_type(sig, pi)
+        if ptid == 0: return false
+        let resolved = self.resolve_alias(ptid as TypeId)
+        if self.get_type_kind(resolved) != TypeKind.TY_PTR or self.get_type_d1(resolved) != 0: return false
+        self.resolve_alias(self.get_type_d0(resolved) as TypeId) == self.ty_i8
 
     // D102: parameter `pi` of signature `sig` is a C function pointer.
     fn facade_param_is_fn_pointer(sig: i32, pi: i32) -> bool:
@@ -5486,4 +5511,13 @@ impl Sema:
                 continue
             if self.safe_symbol_text(self.ast.get_data0(decl)) == name:
                 return self.ast.get_data0(decl)
+        0
+
+    // The `extern var` declaration named `name` (an imported global such as
+    // libxml2's `xmlFree`), or 0.
+    fn facade_extern_var_named(name: &str) -> i32:
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_EXTERN_VAR: continue
+            if self.safe_symbol_text(self.ast.get_data0(decl)) == name: return decl
         0
