@@ -7068,10 +7068,19 @@ impl CCodegen:
                 return "    abort();"
             let recv_ptr = self.list_recv_ptr_text(body, args_id)
             let elem_tid = self.list_element_tid(self.operand_tid(body, self.call_arg_operand(body, args_id, 0)))
+            let es = self.list_recv_elem_sizeof_text(body, args_id)
+            var out = ""
             if elem_tid > 0 and self.sema.type_needs_drop_frozen(elem_tid) != 0:
-                self.fail("emit-c: D120 copy-on-write of a List whose elements have copy glue is not emitted in C yet")
-                return "    abort();"
-            var out = "    (void)with_vec_make_unique_bits(" ++ recv_ptr ++ ", " ++ self.list_recv_elem_sizeof_text(body, args_id) ++ ");\n"
+                // A str element of the fresh buffer takes its own copy of the
+                // text (the C output copies a str by with_str_clone_ref, as
+                // every str copy of its is); any other element with glue is
+                // not emitted in C yet, and says so.
+                if self.sema.resolve_alias(elem_tid as TypeId) as i32 != self.sema.ty_str as i32:
+                    self.fail("emit-c: D120 copy-on-write of a List whose elements have copy glue (other than str) is not emitted in C yet")
+                    return "    abort();"
+                out = "    if (with_vec_make_unique_bits(" ++ recv_ptr ++ ", " ++ es ++ ")) " ++ cc_lbrace() ++ " int64_t __cow_n = with_vec_len(" ++ recv_ptr ++ "); for (int64_t __cow_i = 0; __cow_i < __cow_n; __cow_i++) " ++ cc_lbrace() ++ " with_str *__cow_e = (with_str*)with_vec_get_ptr_es(" ++ recv_ptr ++ ", __cow_i, " ++ es ++ "); *__cow_e = with_str_clone_ref(*__cow_e); " ++ cc_rbrace() ++ " " ++ cc_rbrace() ++ "\n"
+            else:
+                out = "    (void)with_vec_make_unique_bits(" ++ recv_ptr ++ ", " ++ es ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 

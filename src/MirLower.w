@@ -1029,6 +1029,15 @@ impl MirBuilder:
     // drop theirs. The operand stays a copy and records the hold; codegen
     // retains where it evaluates the operand, which is where the consumer
     // reads it, whatever order lowering emitted the two in.
+    // D120: a payload forwarded out of a carrier the lowering then retires
+    // (decomposes: its own drop is cancelled) is taken, never retained — a
+    // copy with glue would hold one count too many and leak. A payload of
+    // plain bits copies as before; a resource moves as before.
+    mut fn payload_take_operand(place: i32, ty: i32) -> i32:
+        if ty > 0 and self.sema.is_copy_frozen(ty as TypeId) != 0 and self.sema.type_needs_drop_frozen(ty) != 0:
+            return self.body.new_operand(OperandKind.OK_MOVE, place)
+        self.operand_for_place(place, ty)
+
     mut fn retain_consumed_copy(operand_id: i32):
         let place: i32 = self.body.operand_d0[operand_id]
         let ty = if place >= 0 and place < self.body.place_sema_types.len(): self.body.place_sema_types[place] else: 0
@@ -15321,6 +15330,9 @@ impl MirBuilder:
         self.operand_for_place(result_place, result_ty)
 
     mut fn lower_result_combinator_method(self_expr: i32, lowering: MethodLowering, arg_start: i32, arg_count: i32, node: i32) -> i32:
+        // The lowerings that decompose the subject (retire_decomposed_carrier
+        // below) take its payloads; the others forward a copy.
+        let decomposed = lowering == MethodLowering.ResInspect or lowering == MethodLowering.ResInspectErr or lowering == MethodLowering.ResContext or lowering == MethodLowering.ResWithContext
         if arg_count != 1:
             self.mark_unsupported()
             return self.unit_operand()
@@ -15395,7 +15407,7 @@ impl MirBuilder:
             let err_downcast2 = self.body.new_downcast_place(value_place, err_idx2)
             let err_payload_place2 = self.body.new_field_place(err_downcast2, 0, source_err_ty)
             let err_fields2: List[i32] = List.new()
-            err_fields2.push(self.operand_for_place(err_payload_place2, source_err_ty))
+            err_fields2.push(if decomposed: self.payload_take_operand(err_payload_place2, source_err_ty) else: self.operand_for_place(err_payload_place2, source_err_ty))
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields2, span)
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
             self.switch_to(join_bb)
@@ -15406,9 +15418,9 @@ impl MirBuilder:
             let ok_ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, source_ok_ty, 0, 0) as i32
             inspect_args.push(self.operand_for_place_arg(ok_payload_place, source_ok_ty, ok_ref_ty, span))
             let _ = self.lower_call_with_operand_args(mapper_op, inspect_args, self.sema.ty_void as i32, node)
-            ok_fields.push(self.operand_for_place(ok_payload_place, source_ok_ty))
+            ok_fields.push(if decomposed: self.payload_take_operand(ok_payload_place, source_ok_ty) else: self.operand_for_place(ok_payload_place, source_ok_ty))
         else:
-            ok_fields.push(self.operand_for_place(ok_payload_place, source_ok_ty))
+            ok_fields.push(if decomposed: self.payload_take_operand(ok_payload_place, source_ok_ty) else: self.operand_for_place(ok_payload_place, source_ok_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.ok, ok_fields, span)
         if context_message_local >= 0:
             let unused_message = self.place_for_local(context_message_local)
@@ -15445,9 +15457,9 @@ impl MirBuilder:
             let err_ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, source_err_ty, 0, 0) as i32
             inspect_err_args.push(self.operand_for_place_arg(err_payload_place, source_err_ty, err_ref_ty, span))
             let _ = self.lower_call_with_operand_args(mapper_op, inspect_err_args, self.sema.ty_void as i32, node)
-            err_fields.push(self.operand_for_place(err_payload_place, source_err_ty))
+            err_fields.push(if decomposed: self.payload_take_operand(err_payload_place, source_err_ty) else: self.operand_for_place(err_payload_place, source_err_ty))
         else:
-            err_fields.push(self.operand_for_place(err_payload_place, source_err_ty))
+            err_fields.push(if decomposed: self.payload_take_operand(err_payload_place, source_err_ty) else: self.operand_for_place(err_payload_place, source_err_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
