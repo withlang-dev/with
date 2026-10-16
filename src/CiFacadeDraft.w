@@ -79,6 +79,11 @@ fn fd_i32(text: &str) -> i32:
     let v: i32 = parse(text)
     v
 
+// A pointer to a C character type in the engine's spelling (`char`,
+// `unsigned char` such as libxml2's `xmlChar`, any constness).
+fn fd_is_char_pointer(ty: &str) -> bool:
+    ty == "*mut u8" or ty == "*const u8" or ty == "*mut i8" or ty == "*const i8" or ty == "*mut c_char" or ty == "*const c_char"
+
 impl CiProject:
     fn fd_is_alloc_call(name: &str) -> bool: ci_own_is_libc_allocator(name) or self.alloc_aliases.contains(name)
     fn fd_is_free_call(name: &str) -> bool: ci_own_is_libc_free(name) or self.free_aliases.contains(name)
@@ -112,8 +117,12 @@ impl CiProject:
             if parts[0] == "localsink" and parts.len() == 4:
                 if self.fd_callee_retains(parts[2], fd_i32(parts[3])): return "unknown:local " ++ local ++ " is passed to " ++ parts[2] ++ ", which retains it"
             if parts[0] == "localsrc" and parts.len() >= 3:
-                assigned = true
                 let src = line.slice(("localsrc:" ++ local ++ ":").len(), line.len())
+                // A local assigned from itself or a part of itself (`ret =
+                // ret->next` walking a list) adds no source: its value is
+                // still whatever its other assignments gave it.
+                if src == "local:" ++ local or src == "field:local:" ++ local: continue
+                assigned = true
                 let v = self.fd_source_verdict(si, src, depth + 1)
                 if v == "null": continue
                 if verdict == "null": verdict = v
@@ -207,11 +216,103 @@ impl CiProject:
     // What the registry says about `si`, for the report.
     fn fd_registry_summary(si: i32) -> str:
         let r = self.symbols[si].registry
-        if r.len() == 0: return ""
-        var parts = facts_kind(r) ++ ": " ++ facts_cite(r)
-        if self.symbols[si].borrow_from >= 0 and facts_kind(r) == "owned" and self.symbols[si].own_reason.starts_with("proof:"): parts = parts ++ "; DISAGREES: the proof returns a borrow"
-        if self.symbols[si].owns_return != 0 and facts_kind(r).starts_with("borrow:") and self.symbols[si].own_reason.starts_with("proof:"): parts = parts ++ "; DISAGREES: the proof returns a fresh allocation"
+        var parts = ""
+        if r.len() > 0:
+            parts = facts_kind(r) ++ ": " ++ facts_cite(r)
+            if self.symbols[si].borrow_from >= 0 and facts_kind(r) == "owned" and self.symbols[si].own_reason.starts_with("proof:"): parts = parts ++ "; DISAGREES: the proof returns a borrow"
+            if self.symbols[si].owns_return != 0 and facts_kind(r).starts_with("borrow:") and self.symbols[si].own_reason.starts_with("proof:"): parts = parts ++ "; DISAGREES: the proof returns a fresh allocation"
+        for line in self.symbols[si].registry_more.split("\n"):
+            if line.len() == 0: continue
+            parts = parts ++ (if parts.len() > 0: "; " else: "") ++ facts_kind(line) ++ ": " ++ facts_cite(line)
+        if parts.len() == 0: return ""
         " [registry: " ++ parts ++ "]"
+
+    // D121 step 6: the registry's presentation facts for `si` (CiFacts.w
+    // `presentation`): the function F a `text return` is freed by, or "".
+    fn fd_registry_text_return(si: i32) -> str:
+        for line in self.symbols[si].registry_more.split("\n"):
+            let kind = facts_kind(line)
+            if kind.starts_with("text_return:"): return kind.slice(12, kind.len())
+        ""
+
+    // Whether the registry states `what` (`nullable` or `text_param`) of
+    // parameter `pi`.
+    fn fd_registry_names_param(si: i32, what: &str, pi: i32) -> bool:
+        for line in self.symbols[si].registry_more.split("\n"):
+            let kind = facts_kind(line)
+            if kind.starts_with(what ++ ":") and fd_i32(kind.slice(what.len() + 1, kind.len())) == pi: return true
+        false
+
+    // The registry's presentation clauses for `si`, each with its citation,
+    // in the draft's spelling.
+    fn fd_registry_presentation_lines(si: i32) -> str:
+        var out = ""
+        for line in self.symbols[si].registry_more.split("\n"):
+            if line.len() == 0: continue
+            let kind = facts_kind(line)
+            let clause = if kind.starts_with("nullable:"): "nullable param " ++ kind.slice(9, kind.len()) else if kind.starts_with("text_param:"): "text param " ++ kind.slice(11, kind.len()) else: "text return, owned, freed by " ++ kind.slice(12, kind.len())
+            out = out ++ "        " ++ clause ++ "    // registry: " ++ facts_cite(line) ++ "\n"
+        out
+
+    // Why parameter `pi` of `si` counts as retained: the store itself, or
+    // the first callee that retains what it is given, followed to where the
+    // proof stops (a store, or a callee no unit defines).
+    fn fd_retain_reason(si: i32, pi: i32, depth: i32) -> str:
+        if depth > 6: return "a chain of calls too deep to follow"
+        let sinks = if pi < self.symbols[si].param_sinks.len(): with_str_clone_ref(self.symbols[si].param_sinks[pi]) else: ""
+        if sinks.contains("field;"): return "stored in a field"
+        if sinks.contains("global;"): return "stored in a global"
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if line == f"paramstore:{pi}": return "stored"
+        for sink in sinks.split(";"):
+            if not sink.contains(":"): continue
+            let kv = sink.split(":")
+            if not self.fd_callee_retains(kv[0], fd_i32(kv[1])): continue
+            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, kv[0])
+            if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ kv[0] ++ ", which no unit defines"
+            return "passed to " ++ kv[0] ++ " at param " ++ kv[1] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(kv[1]), depth + 1)
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if line.starts_with("localstore:") and self.fd_local_alias_param(si, line.slice(11, line.len())) == pi: return "stored through local " ++ line.slice(11, line.len())
+            if not line.starts_with("localsink:"): continue
+            let parts = line.split(":")
+            if parts.len() != 4 or self.fd_local_alias_param(si, parts[1]) != pi or not self.fd_callee_retains(parts[2], fd_i32(parts[3])): continue
+            let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, parts[2])
+            if ci < 0 or self.symbols[ci].has_definition == 0: return "passed to " ++ parts[2] ++ ", which no unit defines"
+            return "passed to " ++ parts[2] ++ " at param " ++ parts[3] ++ ", " ++ self.fd_retain_reason(ci, fd_i32(parts[3]), depth + 1)
+        "retained by evidence the report cannot restate"
+
+    // Whether parameter `pi` of `si` is one the facade language presents
+    // without a clause the draft does not write (SemaFacade.w
+    // facade_op_raw_beyond): a value, a `const char *` (§16.3c), a text
+    // parameter the registry states, or a pointer to a modeled record (a
+    // borrow of that resource). A callback, a pointer to a pointer, an
+    // array or a pointer to an unmodeled record leaves the call raw.
+    fn fd_param_presentable(si: i32, pi: i32, modeled: &List[str]) -> bool:
+        let p = with_str_clone_ref(self.symbols[si].param_ty[pi])
+        if not (p.starts_with("*") or p.starts_with("&") or p.starts_with("[") or p.starts_with("fn(") or p.starts_with("extern") or p.starts_with("unsafe ") or p.starts_with("Option[")): return true
+        if p == "*const i8" or p == "*const c_char": return true
+        if fd_is_char_pointer(p) and self.fd_registry_names_param(si, "text_param", pi): return true
+        let rec = fd_record_pointee(p)
+        rec.len() > 0 and modeled.contains(rec)
+
+    // The first parameter of `si` the facade language cannot present, or
+    // -1 (`repr_param` is the resource's own, handed by the rendering).
+    fn fd_unpresentable_param(si: i32, repr_param: i32, modeled: &List[str]) -> i32:
+        for pi in 0..self.symbols[si].param_ty.len():
+            if pi as i32 == repr_param: continue
+            if not self.fd_param_presentable(si, pi as i32, modeled): return pi as i32
+        -1
+
+    // Whether the draft can state `si` as an item whose return the clause
+    // covers (`skip_return`) or whose return must be a value, with every
+    // other parameter presentable: the renderer's "still a raw call" rule.
+    fn fd_presentable(si: i32, repr_param: i32, skip_return: bool, modeled: &List[str]) -> bool:
+        if self.symbols[si].variadic != 0: return false
+        if not skip_return and self.symbols[si].ret_ty.starts_with("*") and not (fd_is_char_pointer(self.symbols[si].ret_ty) and self.fd_registry_text_return(si).len() > 0): return false
+        self.fd_unpresentable_param(si, repr_param, modeled) < 0
+
+    fn fd_retains_verdict(si: i32, pi: i32) -> str:
+        f"raw: retains param {pi} (" ++ self.fd_retain_reason(si, pi, 0) ++ "); its lifetime contract is not proven"
 
     // What the introspection file says about `si`, for the report.
     fn fd_gir_summary(si: i32) -> str:
@@ -247,18 +348,25 @@ impl CiProject:
     // destroyer, a value-only call, a lend (every pointer parameter is a
     // modeled resource it reads and keeps), or `raw:` with the reason.
     fn fd_lend_verdict(si: i32, modeled: &List[str]) -> str:
-        if self.symbols[si].ret_ty.starts_with("*"): return "raw: returns " ++ self.symbols[si].ret_ty ++ ", a pointer to no record"
+        // A character pointer the registry says is new text the caller owns
+        // (`text return, owned, freed by F`) is presented; any other pointer
+        // to no record stays raw.
+        if self.symbols[si].ret_ty.starts_with("*") and not (fd_is_char_pointer(self.symbols[si].ret_ty) and self.fd_registry_text_return(si).len() > 0): return "raw: returns " ++ self.symbols[si].ret_ty ++ ", a pointer to no record"
         var pointer_params = 0
         var destroyed = -1
         var retained = -1
         var unmodeled = ""
         for pi in 0..self.symbols[si].param_ty.len():
             let p = self.symbols[si].param_ty[pi]
-            if not p.starts_with("*"): continue
-            pointer_params = pointer_params + 1
-            if self.symbols[si].param_destroys[pi] != 0: destroyed = pi as i32
-            else if self.symbols[si].param_stores[pi] != 0: retained = pi as i32
-            else if not modeled.contains(fd_record_pointee(p)) and unmodeled.len() == 0: unmodeled = p
+            let is_pointer = p.starts_with("*")
+            if is_pointer: pointer_params = pointer_params + 1
+            if is_pointer and self.symbols[si].param_destroys[pi] != 0: destroyed = pi as i32
+            else if is_pointer and self.symbols[si].param_stores[pi] != 0: retained = pi as i32
+            else if unmodeled.len() == 0 and not self.fd_param_presentable(si, pi as i32, modeled): unmodeled = p
+        // A `destroys` item hands the resource as the first parameter
+        // (§16.2b.13); a destroyer of a later one is not stated.
+        if destroyed > 0: return f"raw: destroys param {destroyed}, which is not its first parameter (§16.2b.13)"
+        if destroyed == 0 and unmodeled.len() > 0: return "raw: destroys param 0, but parameter of " ++ (if unmodeled.starts_with("*"): "unmodeled pointer type " else: "a callback or array type the facade does not describe: ") ++ unmodeled
         if destroyed >= 0: return f"destroyer, param {destroyed} (" ++ self.fd_destroy_reason(si, "it") ++ ")"
         // A retained parameter the introspection file says the callee
         // takes is consumed: the caller hands it over (§16.2b.15 item 2).
@@ -267,8 +375,8 @@ impl CiProject:
         // The registry may state a lend the proofs could not reach (a
         // retention the body only appears to make, an unmodeled type).
         if facts_kind(self.symbols[si].registry) == "lend" and pointer_params > 0: return "lend (registry: " ++ facts_cite(self.symbols[si].registry) ++ ")"
-        if retained >= 0: return f"raw: retains param {retained}; its lifetime contract is not proven"
-        if unmodeled.len() > 0: return "raw: parameter of unmodeled pointer type " ++ unmodeled
+        if retained >= 0: return self.fd_retains_verdict(si, retained)
+        if unmodeled.len() > 0: return "raw: parameter of " ++ (if unmodeled.starts_with("*"): "unmodeled pointer type " else: "a callback or array type the facade does not describe: ") ++ unmodeled
         if pointer_params == 0: return "value-only call"
         "lend (proof: reads its resource parameters, keeps nothing)"
 
@@ -556,27 +664,57 @@ impl CiProject:
     fn fd_owned_record(record: &str) -> bool:
         self.fd_producers_of(record).len() > 0 and self.fd_drop_of(record) >= 0
 
-    // The declared functions proven to return a borrow of `record` from an
-    // owned record, retaining nothing.
-    fn fd_borrow_candidates(record: &str) -> List[i32]:
+    // The declared functions proven to return a borrow of `record` from a
+    // modeled record (`origins`), retaining nothing. A borrowed value's
+    // origin is bound per call (D134), so a borrow of a node from a node
+    // (`xmlFirstElementChild`) is one candidate, its origin whatever the
+    // caller holds.
+    fn fd_borrow_candidates_from(record: &str, origins: &List[str]) -> List[i32]:
         var out: List[i32] = List.new()
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32) or self.symbols[si].header_declared == 0 or self.symbols[si].borrow_from < 0: continue
             if fd_record_pointee(self.symbols[si].ret_ty) != record or self.fd_retains_any(si as i32): continue
-            if self.fd_owned_record(fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from])): out.push(si as i32)
+            if origins.contains(fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from])) and self.fd_presentable(si as i32, -1, true, origins): out.push(si as i32)
         out
 
+    // The producers of `record` the draft can state as `from F`: owned
+    // return, every parameter presentable over `modeled`.
+    fn fd_presentable_producers_of(record: &str, modeled: &List[str]) -> List[i32]:
+        var out: List[i32] = List.new()
+        for si in self.fd_producers_of(record):
+            if self.fd_presentable(si, -1, true, modeled): out.push(si)
+        out
+
+    // The `destroys F` items of `record` the draft can state: the record is
+    // F's first parameter (§16.2b.13), the return a value, the rest
+    // presentable.
+    fn fd_presentable_destroyers_of(record: &str, unary: bool, modeled: &List[str]) -> List[i32]:
+        var out: List[i32] = List.new()
+        for si in self.fd_destroyers_of(record, unary):
+            if self.symbols[si].param_destroys.len() > 0 and self.symbols[si].param_destroys[0] != 0 and fd_record_pointee(self.symbols[si].param_ty[0]) == record and self.fd_presentable(si, 0, false, modeled): out.push(si)
+        out
+
+    fn fd_borrow_candidates(record: &str) -> List[i32]:
+        self.fd_borrow_candidates_from(record, &self.fd_modeled_records())
+
     // The representations the draft can model: one unary destroyer, and
-    // either a producer (an owned resource) or a proven borrow of it from an
-    // owned resource (a borrowed-only resource, libxml2's attribute shape).
-    // A representation the corpus destroys and never produces or lends is
+    // either a producer (an owned resource) or a proven borrow of it from a
+    // modeled resource (a borrowed-only resource, libxml2's node shape): a
+    // fixed point from the owned ones, so a chain of borrows reaches an
+    // owner and a record borrowed only from itself is not a resource. A
+    // representation the corpus destroys and never produces or lends is
     // not a resource here.
     fn fd_modeled_records() -> List[str]:
         var out: List[str] = List.new()
         let all = self.fd_representations()
-        for record in all:
-            if self.fd_drop_of(record) < 0: continue
-            if self.fd_producers_of(record).len() > 0 or self.fd_borrow_candidates(record).len() > 0: out.push(record)
+        var changed = true
+        while changed:
+            changed = false
+            for record in all:
+                if out.contains(record) or self.fd_drop_of(record) < 0: continue
+                if self.fd_presentable_producers_of(record, &out).len() > 0 or self.fd_borrow_candidates_from(record, &out).len() > 0:
+                    out.push(record)
+                    changed = true
         out
 
     // The facade draft: what the proofs establish, every clause with its
@@ -586,43 +724,57 @@ impl CiProject:
         self.presented = List.new()
         var text = "// Facade draft for " ++ name ++ ", proven from the package's own source (§16.2b.15, D121).\n// Every clause records its proof; a project may override any single fact.\n"
         text = text ++ "c facade " ++ name ++ ":\n"
+        if self.registry_utf8.len() > 0: text = text ++ "    text utf8    // registry: " ++ self.registry_utf8 ++ "\n"
         for record in modeled:
             text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps *mut " ++ record ++ "\n"
-            let producers = self.fd_producers_of(record)
+            let producers = self.fd_presentable_producers_of(record, &modeled)
             for si in producers:
                 self.presented.push(si)
                 text = text ++ "        from " ++ self.symbols[si].name ++ "    // " ++ self.symbols[si].own_reason ++ "\n"
             let drop = self.fd_drop_of(record)
             self.presented.push(drop)
             text = text ++ "        drop " ++ self.symbols[drop].name ++ "    // " ++ self.fd_destroy_reason(drop, "param 0") ++ "\n"
-            for si in self.fd_destroyers_of(record, true):
+            for si in self.fd_presentable_destroyers_of(record, true, &modeled):
                 if si != drop:
                     self.presented.push(si)
                     text = text ++ "        destroys " ++ self.symbols[si].name ++ "    // " ++ self.fd_destroy_reason(si, "its " ++ record ++ " parameter") ++ "\n"
-            for si in self.fd_destroyers_of(record, false):
+            for si in self.fd_presentable_destroyers_of(record, false, &modeled):
                 self.presented.push(si)
                 text = text ++ "        destroys " ++ self.symbols[si].name ++ "    // " ++ self.fd_destroy_reason(si, "its " ++ record ++ " parameter") ++ "\n"
         // Borrows: a function that retains a pointer argument is not a lend
         // (fd_borrow_candidates). A borrowed value's origin is bound at each
         // call (D134, §16.2b.6), so one representation may be borrowed from
         // several origins.
+        // Each fn block carries the registry's presentation facts for its
+        // function (D121 step 6); `blocks` keeps one block per function.
+        var blocks: List[i32] = List.new()
         for record in modeled:
             let candidates = self.fd_borrow_candidates(record)
             for si in candidates:
                 self.presented.push(si)
-                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        returns borrow " ++ fd_resource_name(record) ++ f" from param {self.symbols[si].borrow_from}    // " ++ self.symbols[si].own_reason ++ "\n"
+                blocks.push(si)
+                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        returns borrow " ++ fd_resource_name(record) ++ f" from param {self.symbols[si].borrow_from}    // " ++ self.symbols[si].own_reason ++ "\n" ++ self.fd_registry_presentation_lines(si)
         // Lends are the default (§16.2b.5); stating each records the proof
         // and presents the operation on its resource.
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
             if self.fd_is_lend(si as i32, modeled):
                 self.presented.push(si as i32)
+                blocks.push(si as i32)
                 let verdict = self.fd_lend_verdict(si as i32, modeled)
-                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        lend    // " ++ verdict.slice(verdict.find("(") + 1, verdict.len() - 1) ++ "\n"
+                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        lend    // " ++ verdict.slice(verdict.find("(") + 1, verdict.len() - 1) ++ "\n" ++ self.fd_registry_presentation_lines(si as i32)
             else if self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from < 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si as i32, modeled).starts_with("consumes param "):
                 self.presented.push(si as i32)
+                blocks.push(si as i32)
                 let consumed = self.fd_consumed_param(si as i32, modeled)
-                text = text ++ "    fn " ++ self.symbols[si].name ++ f"\n        consumes param {consumed}    // " ++ self.fd_consumed_reason(si as i32, consumed) ++ "\n"
+                text = text ++ "    fn " ++ self.symbols[si].name ++ f"\n        consumes param {consumed}    // " ++ self.fd_consumed_reason(si as i32, consumed) ++ "\n" ++ self.fd_registry_presentation_lines(si as i32)
+        // A producer or a destroyer has no fn block above; the registry's
+        // presentation facts on one (`xmlReadFile`'s nullable encoding) get
+        // their own.
+        for si in self.presented:
+            if blocks.contains(si) or self.symbols[si].registry_more.len() == 0: continue
+            blocks.push(si)
+            text = text ++ "    fn " ++ self.symbols[si].name ++ "\n" ++ self.fd_registry_presentation_lines(si)
         text
 
     // One line per function: how the draft presents it, or why it stays
@@ -643,8 +795,20 @@ impl CiProject:
             let fname = with_str_clone_ref(self.symbols[si].name)
             let ret = fd_record_pointee(self.symbols[si].ret_ty)
             var verdict = ""
-            if self.symbols[si].owns_return != 0 and modeled.contains(ret):
+            let unpresentable = if self.symbols[si].owns_return != 0 and modeled.contains(ret): self.fd_unpresentable_param(si as i32, -1, &modeled) else: -1
+            if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.symbols[si].variadic != 0:
+                verdict = "raw: owned producer of " ++ fd_resource_name(ret) ++ ", but variadic, which the facade does not describe"
+            else if unpresentable >= 0:
+                verdict = "raw: owned producer of " ++ fd_resource_name(ret) ++ f", but param {unpresentable} is " ++ self.symbols[si].param_ty[unpresentable] ++ ", which the facade does not describe"
+            else if self.symbols[si].owns_return != 0 and modeled.contains(ret):
                 verdict = "owned producer of " ++ fd_resource_name(ret) ++ " (" ++ self.symbols[si].own_reason ++ ")"
+                // The proofs' unproven retention of a parameter, which a
+                // registry producer's fact covers, is still said.
+                if self.symbols[si].own_reason.starts_with("registry:") and self.fd_retains_any(si as i32):
+                    for pi in 0..self.symbols[si].param_stores.len():
+                        if self.symbols[si].param_stores[pi] != 0:
+                            verdict = verdict ++ f"; the proofs could not clear param {pi} (" ++ self.fd_retain_reason(si as i32, pi as i32, 0) ++ ")"
+                            break
             else if self.symbols[si].owns_return != 0:
                 verdict = "raw: owned " ++ self.symbols[si].ret_ty ++ " (" ++ self.symbols[si].own_reason ++ "), but the package has no single destroyer of it: a registry fact names one"
             else if self.fd_retains_any(si as i32) and not self.fd_destroys_any(si as i32):
@@ -657,10 +821,10 @@ impl CiProject:
                 // takes it: consumed (the lend verdict's rule).
                 let consumed = self.fd_consumed_param(si as i32, modeled)
                 if ret.len() == 0 and consumed == retained: verdict = self.fd_lend_verdict(si as i32, modeled)
-                else: verdict = f"raw: retains param {retained}; its lifetime contract is not proven"
+                else: verdict = self.fd_retains_verdict(si as i32, retained)
             else if self.symbols[si].borrow_from >= 0:
                 let origin = fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from])
-                if modeled.contains(ret) and self.fd_owned_record(origin): verdict = "borrows " ++ fd_resource_name(ret) ++ f" from param {self.symbols[si].borrow_from} (" ++ self.symbols[si].own_reason ++ ")"
+                if modeled.contains(ret) and modeled.contains(origin): verdict = "borrows " ++ fd_resource_name(ret) ++ f" from param {self.symbols[si].borrow_from} (" ++ self.symbols[si].own_reason ++ ")"
                 else: verdict = "raw: " ++ self.symbols[si].own_reason ++ f", but param {self.symbols[si].borrow_from} or the return is not a modeled resource"
             else if ret.len() > 0:
                 verdict = "raw: returns " ++ self.symbols[si].ret_ty ++ " unproven: " ++ self.symbols[si].own_reason

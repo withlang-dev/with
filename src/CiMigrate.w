@@ -1664,6 +1664,7 @@ impl CiProject:
         let count = with_cimport_fn_param_count(session, decl_idx)
         self.symbols[symbol_id].grow_params(count)
         self.symbols[symbol_id].ret_ty = ci_ir_owned_text(with_cimport_fn_return_type_translated(session, decl_idx))
+        self.symbols[symbol_id].variadic = with_cimport_fn_is_variadic(session, decl_idx)
         for pi in 0..count:
             self.symbols[symbol_id].param_ty[pi] = ci_ir_owned_text(with_cimport_fn_param_type_translated(session, decl_idx, pi))
 
@@ -1676,6 +1677,7 @@ impl CiProject:
         self.symbols[symbol_id].has_definition = 1
         // D121: the signature's types and the body's ownership records.
         self.symbols[symbol_id].ret_ty = ci_ir_owned_text(with_cimport_fn_return_type_translated(session, decl_idx))
+        self.symbols[symbol_id].variadic = with_cimport_fn_is_variadic(session, decl_idx)
         self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names))
         for pi in 0..count:
             let ptype = with_cimport_fn_param_type_translated(session, decl_idx, pi)
@@ -1950,9 +1952,11 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
             Err(message) => return Err("registry: " ++ message)
         if registry.package != facade_name:
             return Err("registry: " ++ facts_path ++ " states facts for `" ++ registry.package ++ "`, not `" ++ facade_name ++ "`")
+        project.registry_utf8 = with_str_clone_ref(registry.utf8_cite)
         for si in 0..project.symbols.len():
             if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
             project.symbols[si].registry = registry.of(project.symbols[si].name)
+            project.symbols[si].registry_more = registry.presentation(project.symbols[si].name)
     project.resolve_ownership()
     Ok(project)
 
