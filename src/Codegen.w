@@ -3065,7 +3065,9 @@ impl Codegen:
         slot
 
 pub fn list_data_i64(v: &List[i64]) -> i64:
-    wl_list_data_ptr(v as i64)
+    // D120: a List of values is Copy, so `v as i64` would copy the list
+    // (D22 §6.2); the address is the reference relabeled (§16.11).
+    wl_list_data_ptr((v as *const List[i64]) as i64)
 
 // Element-wise copy so a caller can hand an owned vector to a consuming
 // sink (e.g. record_c_abi_transform) more than once under spec §3.8.
