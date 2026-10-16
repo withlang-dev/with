@@ -6995,6 +6995,13 @@ impl MirBuilder:
             var ip_base_ty = self.expr_type(self.ast.get_data0(place_expr))
             while ip_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_base_ty)) == TypeKind.TY_REF:
                 ip_base_ty = self.sema.get_type_d0(self.sema.resolve_alias(ip_base_ty))
+            // D120: a write into an element of a value List (`xs[i] = v`,
+            // `xs[i] += v`) makes the list unique first.
+            let ip_base_expr = self.ast.get_data0(place_expr)
+            let ip_base_kind = self.ast.kind(ip_base_expr)
+            if ip_base_ty > 0 and self.sema.std_generic_of(ip_base_ty) == StdGeneric.List and self.sema.is_copy_frozen(ip_base_ty as TypeId) != 0 and (ip_base_kind == NodeKind.NK_IDENT or ip_base_kind == NodeKind.NK_FIELD_ACCESS or ip_base_kind == NodeKind.NK_INDEX):
+                let ip_list_place = self.lower_expr_place(ip_base_expr)
+                self.make_unique_before_mutation(ip_list_place)
             if self.is_user_index_place(ip_base_ty) != 0:
                 let ip_set_sym = self.sema.pool_lookup_symbol("set")
                 let ip_type_sym = self.sema.get_type_name(ip_base_ty)

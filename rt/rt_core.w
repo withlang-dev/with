@@ -3316,8 +3316,13 @@ fn list_grow_es(v: *mut u8, es: i64):
     let vlen = list_get_len(v)
     if old_ptr as i64 != 0 and vlen > 0:
         rt_memcpy(new_ptr, old_ptr as *const u8, vlen * es)
+    // D120: a shared buffer stays with its other holders (this List now
+    // holds the fresh one); only a sole holder's buffer is freed.
     if old_ptr as i64 != 0 and list_alloc_bytes(v, es) > 0:
-        rt_free_sized(list_alloc_base(v, es), list_alloc_bytes(v, es))
+        if list_buffer_is_counted(v, es) and unsafe { (*list_holders(list_alloc_base(v, es), es)).load(.Acquire) } > 0:
+            unsafe { (*list_holders(list_alloc_base(v, es), es)).fetch_sub(1, .AcqRel) }
+        else:
+            rt_free_sized(list_alloc_base(v, es), list_alloc_bytes(v, es))
     list_set_ptr_field(v, new_ptr)
     list_set_cap(v, new_cap)
     list_set_start(v, 0)
@@ -3484,8 +3489,11 @@ pub fn with_vec_retain(v: *mut u8, es: i64):
 pub fn with_vec_release_last(v: *mut u8, es: i64) -> i64:
     if not list_buffer_is_counted(v, es):
         return 1
-    if unsafe { (*list_holders(list_alloc_base(v, es), es)).fetch_sub(1, .AcqRel) } == 0:
+    // A sole holder (count 0) is the last: nothing to decrement. A count
+    // above 0 means another holder, so this one steps away.
+    if unsafe { (*list_holders(list_alloc_base(v, es), es)).load(.Acquire) } == 0:
         return 1
+    unsafe { (*list_holders(list_alloc_base(v, es), es)).fetch_sub(1, .AcqRel) }
     list_set_ptr_field(v, 0 as *mut u8)
     list_set_len(v, 0)
     list_set_cap(v, 0)
@@ -3543,6 +3551,13 @@ pub fn with_vec_free_buffer_drop_origin_at(p0: *mut u8, cap0: i64, es: i64, star
     if p0 as i64 == 0: return
     let p = (p0 as i64 - start * es) as *mut u8
     let cap = cap0 + start
+    // D120: a buffer other holders share is released, not freed: the net
+    // under every drop path, whether or not codegen asked release_last.
+    if es > 0 and rt_payload_start_is_owned(p as *const u8) != 0 and list_buffer_align(es) <= RT_ALLOC_HEADER_SIZE:
+        let holders = (p as i64 - 8) as *mut Atomic[i64]
+        if unsafe { (*holders).load(.Acquire) } > 0:
+            unsafe { (*holders).fetch_sub(1, .AcqRel) }
+            return
     if p as i64 != 0 and cap > 0 and es > 0:
         // A header whose cap*elem_size overflows is not a List anymore: the
         // memory was freed and reused under us (the lsp-use-std hunt read

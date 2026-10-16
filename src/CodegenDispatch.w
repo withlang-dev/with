@@ -6045,7 +6045,7 @@ impl Codegen:
             let args: List[i64] = List.new()
             args.push(ptr)
             args.push(wl_const_int(wl_i64_type(self.context), es, 0))
-            let _ = wl_build_call(self.builder, retain_ty, retain_fn, list_data_i64(&args), 2)
+            wl_build_call(self.builder, retain_ty, retain_fn, list_data_i64(args), 2)
             return
         if tk == TypeKind.TY_TUPLE:
             for i in 0..self.sema.get_type_d1(resolved as TypeId):
@@ -6398,7 +6398,7 @@ impl Codegen:
         let rel_args: List[i64] = List.new()
         rel_args.push(ptr)
         rel_args.push(wl_const_int(i64_ty, es, 0))
-        let last = wl_build_call(self.builder, release_ty, release_fn, list_data_i64(&rel_args), 2)
+        let last = wl_build_call(self.builder, release_ty, release_fn, list_data_i64(rel_args), 2)
         let is_last = wl_build_icmp(self.builder, wl_int_ne(), last, wl_const_int(i64_ty, 0, 0))
         let last_bb = wl_append_bb(self.context, self.current_function, "drop.list.last")
         let done_bb = wl_append_bb(self.context, self.current_function, "drop.list.done")
@@ -10322,7 +10322,7 @@ impl Codegen:
             let mu_args: List[i64] = List.new()
             mu_args.push(recv_ptr)
             mu_args.push(mu_es)
-            let copied = wl_build_call(self.builder, mu_ty, mu_fn, list_data_i64(&mu_args), 2)
+            let copied = wl_build_call(self.builder, mu_ty, mu_fn, list_data_i64(mu_args), 2)
             let mu_elem_sema = self.mir_list_elem_sema_type_from_sema_type(recv_sema)
             if mu_elem_sema > 0 and self.sema.type_needs_drop_frozen(mu_elem_sema) != 0:
                 let did_copy = wl_build_icmp(self.builder, wl_int_ne(), copied, wl_const_int(i64_ty, 0, 0))
