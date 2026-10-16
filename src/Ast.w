@@ -254,8 +254,9 @@ pub const TDK_FLAG_BITPACKED: i32 = 32
 pub const TDK_FLAG_SPECIFIED: i32 = 64
 pub const TDK_FLAG_ERROR: i32 = 128
 // D120 (§4.3): `resource type T`, a struct whose meaning forbids
-// duplication; `resource` is a keyword only before `type`.
-pub const TDK_FLAG_RESOURCE: i32 = 1024
+// duplication; `resource` is a keyword only before `type`. Above the
+// @[repr(packed(N))] cap field (TDK_PACK_UNIT × 1..31).
+pub const TDK_FLAG_RESOURCE: i32 = 32768
 
 // D51 §16.2b stage 1: NK_FACADE_CLAUSE.d0 and the operands each kind writes
 // to extra (a 0 operand is "absent"; refs are NK_FACADE_PARAM_REF nodes).
