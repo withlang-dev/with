@@ -973,6 +973,10 @@ type CiProjectSymbol {
     // callers' and it is never a facade item (a facade describes imported
     // declarations, §16.2b.13).
     header_declared: i32,
+    // D121 step 5: the header the first prototype came from (a cursor
+    // location's file), "" for a function no header declares. The facade
+    // `with get` writes imports the headers that declare what it presents.
+    header_file: str,
     // D121 step 3: the GNU attributes any of its declarations carry
     // (`malloc;nonnull(1);returns_nonnull`), annotation evidence below a
     // proof and above the registry (§16.2b.2).
@@ -1019,6 +1023,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         gir: "",
         registry: "",
         header_declared: 0,
+        header_file: "",
         attrs: "",
     }
 
@@ -1078,6 +1083,16 @@ pub type CiProject {
     // call to what it names. Source evidence, never a name.
     alloc_aliases: List[str],
     free_aliases: List[str],
+    // D121 step 5: the symbols the last facade draft presented (every
+    // producer, destroyer, borrow, lend and consumer it named), so the
+    // facade `with get` writes can import the headers that declare them.
+    presented: List[i32],
+    // D121 step 5: the units `with get` could not read, each with the
+    // parser's reason; the report names them (a function only an unread
+    // unit defines stays raw, and the reader learns why).
+    unread: List[str],
+    // Why the last migrate_scan_file failed, "" when it did not.
+    scan_problem: str,
 }
 
 fn CiProject.new -> CiProject:
@@ -1089,6 +1104,9 @@ fn CiProject.new -> CiProject:
         sink_seen: HashMap.new(),
         alloc_aliases: List.new(),
         free_aliases: List.new(),
+        presented: List.new(),
+        unread: List.new(),
+        scan_problem: "",
     }
 
 impl CiProject:

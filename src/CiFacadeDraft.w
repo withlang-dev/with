@@ -581,20 +581,26 @@ impl CiProject:
 
     // The facade draft: what the proofs establish, every clause with its
     // proof beside it.
-    fn facade_draft(name: &str) -> str:
+    mut fn facade_draft(name: &str) -> str:
         let modeled = self.fd_modeled_records()
+        self.presented = List.new()
         var text = "// Facade draft for " ++ name ++ ", proven from the package's own source (§16.2b.15, D121).\n// Every clause records its proof; a project may override any single fact.\n"
         text = text ++ "c facade " ++ name ++ ":\n"
         for record in modeled:
             text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps *mut " ++ record ++ "\n"
             let producers = self.fd_producers_of(record)
             for si in producers:
+                self.presented.push(si)
                 text = text ++ "        from " ++ self.symbols[si].name ++ "    // " ++ self.symbols[si].own_reason ++ "\n"
             let drop = self.fd_drop_of(record)
+            self.presented.push(drop)
             text = text ++ "        drop " ++ self.symbols[drop].name ++ "    // " ++ self.fd_destroy_reason(drop, "param 0") ++ "\n"
             for si in self.fd_destroyers_of(record, true):
-                if si != drop: text = text ++ "        destroys " ++ self.symbols[si].name ++ "    // " ++ self.fd_destroy_reason(si, "its " ++ record ++ " parameter") ++ "\n"
+                if si != drop:
+                    self.presented.push(si)
+                    text = text ++ "        destroys " ++ self.symbols[si].name ++ "    // " ++ self.fd_destroy_reason(si, "its " ++ record ++ " parameter") ++ "\n"
             for si in self.fd_destroyers_of(record, false):
+                self.presented.push(si)
                 text = text ++ "        destroys " ++ self.symbols[si].name ++ "    // " ++ self.fd_destroy_reason(si, "its " ++ record ++ " parameter") ++ "\n"
         // Borrows: a function that retains a pointer argument is not a lend
         // (fd_borrow_candidates). A borrowed value's origin is bound at each
@@ -603,15 +609,18 @@ impl CiProject:
         for record in modeled:
             let candidates = self.fd_borrow_candidates(record)
             for si in candidates:
+                self.presented.push(si)
                 text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        returns borrow " ++ fd_resource_name(record) ++ f" from param {self.symbols[si].borrow_from}    // " ++ self.symbols[si].own_reason ++ "\n"
         // Lends are the default (§16.2b.5); stating each records the proof
         // and presents the operation on its resource.
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
             if self.fd_is_lend(si as i32, modeled):
+                self.presented.push(si as i32)
                 let verdict = self.fd_lend_verdict(si as i32, modeled)
                 text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        lend    // " ++ verdict.slice(verdict.find("(") + 1, verdict.len() - 1) ++ "\n"
             else if self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from < 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si as i32, modeled).starts_with("consumes param "):
+                self.presented.push(si as i32)
                 let consumed = self.fd_consumed_param(si as i32, modeled)
                 text = text ++ "    fn " ++ self.symbols[si].name ++ f"\n        consumes param {consumed}    // " ++ self.fd_consumed_reason(si as i32, consumed) ++ "\n"
         text

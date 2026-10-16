@@ -21,6 +21,7 @@ use std.string.StringBuilder
 extern fn with_write_stdout(s: &str) -> Unit
 extern fn with_flush_stdout() -> Unit
 extern fn with_fs_list_files(path: &str) -> str
+extern fn with_fs_file_exists(path: &str) -> i32
 extern fn with_str_clone_ref(s: &str) -> str
 
 // Width-slice mode: when > 0, skip declarations belonging to
@@ -1060,25 +1061,27 @@ impl CiProject:
     mut fn register_modules(files: &List[str]):
         for path in files: let _ = self.ensure_module(path)
 
+    // A unit the scan cannot use: the reason is said, kept for a report that
+    // names unread units (D121 step 5), and the session released.
+    mut fn scan_fail(session: i64, message: &str) -> i32:
+        eprint("migrate: " ++ message)
+        self.scan_problem = message.to_owned()
+        if session != 0: with_cimport_dispose(session)
+        1
+
     mut fn migrate_scan_file(input_path: &str) -> i32:
+        self.scan_problem = ""
         ci_migrate_prepare_include_path(input_path)
         ci_prepare_clang_resource_dir()
         let source = ci_migrate_wrapped_source(input_path)
-        if source.len() == 0:
-            eprint("migrate: cannot read " ++ input_path)
-            return 1
+        if source.len() == 0: return self.scan_fail(0, "cannot read " ++ input_path)
 
         let session = with_cimport_parse(source)
-        if session == 0:
-            eprint("migrate: failed to parse " ++ input_path)
-            return 1
+        if session == 0: return self.scan_fail(0, "failed to parse " ++ input_path)
         with_cimport_session_set_migration(session)
 
         let err_msg = with_cimport_error(session)
-        if err_msg.len() > 0:
-            eprint("migrate: parse error: " ++ err_msg)
-            with_cimport_dispose(session)
-            return 1
+        if err_msg.len() > 0: return self.scan_fail(session, "parse error: " ++ err_msg)
 
         let module_id = self.ensure_module(input_path)
         let count = with_cimport_decl_count(session)
@@ -1110,9 +1113,7 @@ impl CiProject:
 
                 let owner_type = ci_migrate_var_declared_type(session, ci_migrate_var_owner_type(session, i))
                 if owner_type.len() == 0 or ci_starts_with(owner_type, "__UNSUPPORTED:"):
-                    eprint("migrate: unsupported global owner type for " ++ name ++ " in " ++ input_path)
-                    with_cimport_dispose(session)
-                    return 1
+                    return self.scan_fail(session, "unsupported global owner type for " ++ name ++ " in " ++ input_path)
 
                 let owner_rank = ci_migrate_project_var_owner_rank(owner_kind)
                 if self.symbols[symbol_id].owner_module < 0:
@@ -1129,13 +1130,9 @@ impl CiProject:
                 let existing_path = self.owner_module_path(symbol_id)
                 if self.symbols[symbol_id].owner_rank == owner_rank:
                     if self.symbols[symbol_id].owner_definition_kind == CI_VAR_FULL_DEF and owner_kind == CI_VAR_FULL_DEF and existing_path != input_path:
-                        eprint("migrate: duplicate full global definition for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
-                        with_cimport_dispose(session)
-                        return 1
+                        return self.scan_fail(session, "duplicate full global definition for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
                     if self.symbols[symbol_id].resolved_ty_text.len() > 0 and self.symbols[symbol_id].resolved_ty_text != owner_type:
-                        eprint("migrate: conflicting global owner type for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
-                        with_cimport_dispose(session)
-                        return 1
+                        return self.scan_fail(session, "conflicting global owner type for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
                 if owner_rank > self.symbols[symbol_id].owner_rank or (owner_rank == self.symbols[symbol_id].owner_rank and ci_str_compare(input_path, existing_path) < 0):
                     self.symbols[symbol_id].owner_module = module_id
                     self.symbols[symbol_id].owner_rank = owner_rank
@@ -1195,14 +1192,14 @@ impl CiProject:
                     // defines: annotations (step 3) prove facts about it.
                     if cursor >= 0:
                         self.symbols[symbol_id].header_declared = 1
+                        // D121 step 5: the header this prototype is in.
+                        if self.symbols[symbol_id].header_file.len() == 0 and ci_migrate_location_is_header(loc): self.symbols[symbol_id].header_file = ci_migrate_location_file(loc)
                         if self.symbols[symbol_id].has_definition == 0: self.record_fn_signature(session, i, symbol_id)
                     i = i + 1
                     continue
                 let existing_path = self.owner_module_path(symbol_id)
                 if self.symbols[symbol_id].owner_module >= 0 and existing_path != input_path:
-                    eprint("migrate: duplicate function definition for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
-                    with_cimport_dispose(session)
-                    return 1
+                    return self.scan_fail(session, "duplicate function definition for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
                 self.symbols[symbol_id].owner_module = module_id
                 self.symbols[symbol_id].owner_rank = 1
                 self.symbols[symbol_id].owner_definition_kind = 1
@@ -1907,38 +1904,11 @@ pub fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &
         gir_files = ci_migrate_collect_gir_files(input)
     else: files.push(input)
     if gir_arg.len() > 0: gir_files.push(ci_migrate_fs_path(gir_arg))
-    var project = CiProject.new()
-    project.register_modules(&files)
-    for path in files:
-        if project.migrate_scan_file(path) != 0: return 1
-    // D121 step 3: the package's GObject-introspection facts, joined to the
-    // corpus by C identifier (CiGir.w).
-    if gir_files.len() > 0:
-        let gir = match gir_read_files(&gir_files):
-            Ok(g) => g
-            Err(message) =>
-                eprint("migrate: " ++ message)
-                return 1
-        for si in 0..project.symbols.len():
-            if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
-            var facts = gir.facts_of(project.symbols[si].name)
-            if gir.names_drop(project.symbols[si].name): facts = facts ++ (if facts.len() > 0: ";" else: "") ++ "drop=1"
-            project.symbols[si].gir = facts
-    // D121 step 4: the package registry's facts (CiFacts.w), the tier
-    // below the annotations.
-    if facts_arg.len() > 0:
-        let registry = match facts_read_file(ci_migrate_fs_path(facts_arg)):
-            Ok(f) => f
-            Err(message) =>
-                eprint("migrate: registry: " ++ message)
-                return 1
-        if registry.package != facade_name:
-            eprint("migrate: registry: " ++ facts_arg ++ " states facts for `" ++ registry.package ++ "`, not `" ++ facade_name ++ "`")
+    var project = match ci_facade_project(&files, facade_name, &gir_files, facts_arg, false):
+        Ok(p) => p
+        Err(message) =>
+            if message.len() > 0: eprint("migrate: " ++ message)
             return 1
-        for si in 0..project.symbols.len():
-            if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
-            project.symbols[si].registry = registry.of(project.symbols[si].name)
-    project.resolve_ownership()
     let draft = project.facade_draft(facade_name)
     eprint(project.facade_report(facade_name))
     if output_arg.len() > 0:
@@ -1951,6 +1921,116 @@ pub fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &
     with_write_stdout(draft)
     with_flush_stdout()
     0
+
+// The facade engine over an explicit corpus: every unit scanned, then the
+// package's GObject-introspection facts (CiGir.w, D121 step 3) and the
+// registry's facts file (CiFacts.w, step 4) joined to the symbols by C
+// identifier, then the ownership fixed point. A unit the parser refuses
+// ends the run (`migrate --facade`), or, for the package `with get` builds
+// (`tolerate_unread`), is named in `project.unread` with the reason and
+// skipped: a function only that unit defines stays raw and the report says
+// why. An empty Err was already said on stderr.
+fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str], facts_path: &str, tolerate_unread: bool) -> Result[CiProject, str]:
+    var project = CiProject.new()
+    project.register_modules(files)
+    for path in files:
+        if project.migrate_scan_file(path) != 0:
+            if not tolerate_unread: return Err("")
+            project.unread.push(path ++ ": " ++ project.scan_problem)
+    if gir_files.len() > 0:
+        let gir = gir_read_files(gir_files)?
+        for si in 0..project.symbols.len():
+            if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
+            var facts = gir.facts_of(project.symbols[si].name)
+            if gir.names_drop(project.symbols[si].name): facts = facts ++ (if facts.len() > 0: ";" else: "") ++ "drop=1"
+            project.symbols[si].gir = facts
+    if facts_path.len() > 0:
+        let registry = match facts_read_file(ci_migrate_fs_path(facts_path)):
+            Ok(f) => f
+            Err(message) => return Err("registry: " ++ message)
+        if registry.package != facade_name:
+            return Err("registry: " ++ facts_path ++ " states facts for `" ++ registry.package ++ "`, not `" ++ facade_name ++ "`")
+        for si in 0..project.symbols.len():
+            if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
+            project.symbols[si].registry = registry.of(project.symbols[si].name)
+    project.resolve_ownership()
+    Ok(project)
+
+// The spelling a project's `c_import` gives `header` (a prototype's file in
+// the package's source), under the include directories the installed
+// package has: the shortest tail of the path that exists under one of them
+// (`…/include/libxml/tree.h` under `include/libxml2` is `libxml/tree.h`).
+// "" when the package installs no header of that name.
+fn ci_facade_import_spelling(header: &str, import_dirs: &List[str]) -> str:
+    let parts = header.split("/")
+    for k in 1..parts.len() + 1:
+        var rel = ""
+        for pi in parts.len() - k..parts.len():
+            rel = if rel.len() == 0: parts[pi] else: rel ++ "/" ++ parts[pi]
+        if rel.starts_with("."): continue
+        for dir in import_dirs:
+            if with_fs_file_exists(dir ++ "/" ++ rel) != 0: return rel
+    ""
+
+// D121 step 5: the facade and the report of a fetched package, written by
+// `with get` (compiler.ConanClient). The corpus is the units the package's
+// own build compiles, with that build's include paths and defines (its
+// generated headers among them), every `.gir` under the source, and the
+// registry's facts file when the registry has one. The facade imports the
+// installed headers that declare what it presents (`import_dirs`: the
+// package's include paths; a function whose prototype is in a header the
+// package does not install is not presentable and the report says so) and
+// names the package's link library. Returns the report's summary, or ""
+// when nothing could be written (the reason is on stderr).
+pub fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], defines: &List[str], source_dir: &str, facade_name: &str, version: &str, facts_path: &str, import_dirs: &List[str], link_lib: &str, facade_path: &str, report_path: &str) -> str:
+    migrate_reset_options()
+    for path in include_paths: migrate_add_include_path(path)
+    for define in defines: migrate_add_define(define)
+    g_migrate_directory_input_dir = ci_migrate_fs_path(source_dir)
+    let gir_files = ci_migrate_collect_gir_files(ci_migrate_fs_path(source_dir))
+    var files: List[str] = List.new()
+    for unit in units: files.push(ci_migrate_fs_path(unit))
+    var project = match ci_facade_project(&files, facade_name, &gir_files, facts_path, true):
+        Ok(p) => p
+        Err(message) =>
+            if message.len() > 0: eprint("with get: facade of " ++ facade_name ++ ": " ++ message)
+            return ""
+    // A prototype in a header the package does not install cannot be
+    // imported, so its function is no facade item.
+    var uninstalled = ""
+    var uninstalled_count = 0
+    for si in 0..project.symbols.len():
+        if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or project.symbols[si].header_declared == 0: continue
+        if project.symbols[si].header_file.len() == 0 or ci_facade_import_spelling(project.symbols[si].header_file, import_dirs).len() > 0: continue
+        project.symbols[si].header_declared = 0
+        uninstalled_count = uninstalled_count + 1
+        if uninstalled_count <= 12: uninstalled = uninstalled ++ (if uninstalled.len() > 0: ", " else: "") ++ project.symbols[si].name
+    let draft = project.facade_draft(facade_name)
+    var spellings: List[str] = List.new()
+    for si in project.presented:
+        if project.symbols[si].header_file.len() == 0: continue
+        let rel = ci_facade_import_spelling(project.symbols[si].header_file, import_dirs)
+        if rel.len() > 0 and not spellings.contains(rel): spellings = ci_migrate_sorted_insert(spellings, rel)
+
+    var text = "// Facade of " ++ facade_name ++ " " ++ version ++ ", written by `with get` from the package's evidence (§16.2b.15, D121);\n// the report beside it says how each function is presented and why. A project's own\n// `c facade " ++ facade_name ++ ":` block overrides any item here (§16.2b.2).\n"
+    for rel in spellings:
+        text = text ++ "use c_import(\"" ++ rel ++ "\"" ++ (if link_lib.len() > 0: ", link: \"" ++ link_lib ++ "\"" else: "") ++ ")\n"
+    text = text ++ "\n" ++ draft
+    var report = project.facade_report(facade_name)
+    if uninstalled_count > 0:
+        report = report ++ f"  {uninstalled_count} function(s) are declared only by headers the package does not install, so no facade item presents them: " ++ uninstalled ++ (if uninstalled_count > 12: ", …" else: "") ++ "\n"
+    if project.unread.len() > 0:
+        report = report ++ f"  {project.unread.len()} unit(s) could not be read; a function only an unread unit defines is unproven:\n"
+        for line in project.unread: report = report ++ "    " ++ line ++ "\n"
+    ci_migrate_ensure_parent_dir(ci_migrate_fs_path(facade_path))
+    if with_fs_write_file(ci_migrate_fs_path(facade_path), text) != 0:
+        eprint("with get: could not write " ++ facade_path)
+        return ""
+    if with_fs_write_file(ci_migrate_fs_path(report_path), report) != 0:
+        eprint("with get: could not write " ++ report_path)
+        return ""
+    let summary_end = report.find("\n")
+    if summary_end < 0: report else: report.slice(0, summary_end)
 
 pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basenames: &str) -> i32:
     let input_dir = ci_migrate_fs_path(input_dir_arg)
