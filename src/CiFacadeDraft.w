@@ -695,7 +695,7 @@ impl CiProject:
         out
 
     fn fd_borrow_candidates(record: &str) -> List[i32]:
-        self.fd_borrow_candidates_from(record, &self.fd_modeled_records())
+        self.fd_borrow_candidates_from(record, self.fd_modeled_records())
 
     // The representations the draft can model: one unary destroyer, and
     // either a producer (an owned resource) or a proven borrow of it from a
@@ -712,7 +712,7 @@ impl CiProject:
             changed = false
             for record in all:
                 if out.contains(record) or self.fd_drop_of(record) < 0: continue
-                if self.fd_presentable_producers_of(record, &out).len() > 0 or self.fd_borrow_candidates_from(record, &out).len() > 0:
+                if self.fd_presentable_producers_of(record, out).len() > 0 or self.fd_borrow_candidates_from(record, out).len() > 0:
                     out.push(record)
                     changed = true
         out
@@ -727,18 +727,18 @@ impl CiProject:
         if self.registry_utf8.len() > 0: text = text ++ "    text utf8    // registry: " ++ self.registry_utf8 ++ "\n"
         for record in modeled:
             text = text ++ "    resource " ++ fd_resource_name(record) ++ " wraps *mut " ++ record ++ "\n"
-            let producers = self.fd_presentable_producers_of(record, &modeled)
+            let producers = self.fd_presentable_producers_of(record, modeled)
             for si in producers:
                 self.presented.push(si)
                 text = text ++ "        from " ++ self.symbols[si].name ++ "    // " ++ self.symbols[si].own_reason ++ "\n"
             let drop = self.fd_drop_of(record)
             self.presented.push(drop)
             text = text ++ "        drop " ++ self.symbols[drop].name ++ "    // " ++ self.fd_destroy_reason(drop, "param 0") ++ "\n"
-            for si in self.fd_presentable_destroyers_of(record, true, &modeled):
+            for si in self.fd_presentable_destroyers_of(record, true, modeled):
                 if si != drop:
                     self.presented.push(si)
                     text = text ++ "        destroys " ++ self.symbols[si].name ++ "    // " ++ self.fd_destroy_reason(si, "its " ++ record ++ " parameter") ++ "\n"
-            for si in self.fd_presentable_destroyers_of(record, false, &modeled):
+            for si in self.fd_presentable_destroyers_of(record, false, modeled):
                 self.presented.push(si)
                 text = text ++ "        destroys " ++ self.symbols[si].name ++ "    // " ++ self.fd_destroy_reason(si, "its " ++ record ++ " parameter") ++ "\n"
         // Borrows: a function that retains a pointer argument is not a lend
@@ -795,7 +795,7 @@ impl CiProject:
             let fname = with_str_clone_ref(self.symbols[si].name)
             let ret = fd_record_pointee(self.symbols[si].ret_ty)
             var verdict = ""
-            let unpresentable = if self.symbols[si].owns_return != 0 and modeled.contains(ret): self.fd_unpresentable_param(si as i32, -1, &modeled) else: -1
+            let unpresentable = if self.symbols[si].owns_return != 0 and modeled.contains(ret): self.fd_unpresentable_param(si as i32, -1, modeled) else: -1
             if self.symbols[si].owns_return != 0 and modeled.contains(ret) and self.symbols[si].variadic != 0:
                 verdict = "raw: owned producer of " ++ fd_resource_name(ret) ++ ", but variadic, which the facade does not describe"
             else if unpresentable >= 0:
