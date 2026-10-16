@@ -4259,6 +4259,9 @@ impl Parser:
                     return self.parse_fat_arrow_single()
             return self.parse_ident_or_call()
         if t == TokenKind.TK_KW_IT:
+            if self.suppress_fat_arrow_closure == 0 and self.pos + 1 < self.tokens.len():
+                if self.tokens.get_tag(self.pos + 1) == TokenKind.TK_FAT_ARROW:
+                    return self.parse_fat_arrow_single()
             let start = self.current_start()
             let end_pos = self.current_end()
             self.advance()
@@ -4326,7 +4329,7 @@ impl Parser:
             let move_kw_end = self.current_end()
             self.advance()
             // move IDENT => expr
-            if self.peek() == TokenKind.TK_IDENT:
+            if self.peek() == TokenKind.TK_IDENT or self.peek() == TokenKind.TK_KW_IT:
                 if self.pos + 1 < self.tokens.len():
                     if self.tokens.get_tag(self.pos + 1) == TokenKind.TK_FAT_ARROW:
                         let node = self.parse_fat_arrow_single()
@@ -8122,6 +8125,11 @@ impl Parser:
         if t == TokenKind.TK_L_BRACKET:
             return self.parse_slice_pattern(start)
 
+        if t == TokenKind.TK_KW_IT:
+            self.emit_error_code("'it' is a reserved keyword and cannot be used as an identifier", "E0953")
+            self.advance()
+            return self.poisoned_expr()
+
         self.emit_error("expected pattern")
         if self.peek() != TokenKind.TK_EOF:
             self.advance()
@@ -8729,7 +8737,12 @@ impl Parser:
     // Parse: IDENT => expr (single untyped parameter fat-arrow closure)
     mut fn parse_fat_arrow_single() -> NodeId:
         let start = self.current_start()
-        let param_sym = self.expect_ident()
+        var param_sym: i32 = 0
+        if self.peek() == TokenKind.TK_KW_IT:
+            self.emit_error_code("'it' is a reserved keyword and cannot be used as a parameter name", "E0953")
+            self.advance()
+        else:
+            param_sym = self.expect_ident()
         self.expect(TokenKind.TK_FAT_ARROW)
         let extra_start = self.pool.extra_len()
         self.pool.add_extra(param_sym)
@@ -8765,7 +8778,7 @@ impl Parser:
                 self.emit_error_code("'it' is a reserved keyword and cannot be used as a parameter name", "E0953")
                 self.advance()
                 params.push(0)
-                params.push(0)
+                params.push(if self.peek() == TokenKind.TK_COLON: self.parse_closure_param_type() else: 0)
                 if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
@@ -9480,12 +9493,14 @@ impl Parser:
 
             var name: i32 = 0
             var param_pattern: NodeId = 0 as NodeId
-            if self.param_binding_should_parse_pattern():
+            if self.peek() == TokenKind.TK_KW_IT:
+                self.emit_error_code("'it' is a reserved keyword and cannot be used as a parameter name", "E0953")
+                self.advance()
+                name = self.intern.intern("__it")
+            else if self.param_binding_should_parse_pattern():
                 param_pattern = self.parse_pattern()
                 let synth = f"__param_pat_{self.pos}_{(params.len() / (FN_PARAM_STRIDE as i64)) as i32}"
                 name = self.intern.intern(synth)
-            else if self.peek() == TokenKind.TK_IDENT:
-                name = self.expect_ident()
             else:
                 name = self.expect_ident()
             if name == 0:
