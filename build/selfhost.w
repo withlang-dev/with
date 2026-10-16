@@ -4436,7 +4436,7 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     // producer's get a block of their own.
     rc = bs_file_contains(ctx, draft, "c facade mini:\n    text utf8    // registry: mini.h: every string the library hands back is UTF-8\n", "facade draft: the facade-level UTF-8 declaration the registry states")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, draft, "fn doc_first_live\n        returns borrow Node from param 0    // proof: returns a part of param 0\n", "facade draft: a borrow through a list walk")
+    rc = bs_file_contains(ctx, draft, "fn doc_first_live\n        returns borrow Node from param 0    // proof: returns cur\n", "facade draft: a borrow through a list walk")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, draft, "fn node_text\n        lend    // proof: reads its resource parameters, keeps nothing\n        text return, owned, freed by lib_free    // registry: node.c: returns a string from malloc, released with lib_free\n", "facade draft: a text return the registry states")
     if rc != 0: return rc
