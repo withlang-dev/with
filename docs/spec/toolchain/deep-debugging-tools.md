@@ -1135,6 +1135,7 @@ Environment switches (set on the compiler's run unless noted):
 | `WITH_DEBUG_POOL_FLOW=1` | codegen | the AST and symbol pool sizes handed to the backend |
 | `WITH_TRACE_CMP=1` | codegen | each integer `==`/`!=` with its operand types and signedness |
 | `WITH_TRACE_VECDROP=1` | codegen | each List drop and whether its elements need dropping |
+| `WITH_TRACE_COW=1` | MIR | each mutation site of a collection place (D120): the place, its type, whether it is a value List/HashMap/HashSet (a make-unique call is emitted) or not |
 | `WITH_TRACE_CARGS=1` | C backend | each extern call's signature and argument count |
 | `WITH_ANALYZE_TRACE=pool-views` | analyze | `audit:pool-views`'s per-body walk |
 | `WITH_TRACE_GRAPH=1` | build | the build graph as it materializes |

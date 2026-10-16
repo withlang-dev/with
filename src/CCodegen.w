@@ -79,6 +79,7 @@ enum CcBuiltin: i32:
     LIST_REMOVE
     LIST_CLEAR
     LIST_MAKE_UNIQUE
+    MAP_MAKE_UNIQUE
     MAP_NEW
     MAP_INSERT
     MAP_GET
@@ -202,6 +203,7 @@ fn cc_builtin_uses_list_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.LIST_REMOVE: return true
     if kind == CcBuiltin.LIST_CLEAR: return true
     if kind == CcBuiltin.LIST_MAKE_UNIQUE: return true
+    if kind == CcBuiltin.MAP_MAKE_UNIQUE: return true
     if kind == CcBuiltin.LIST_POP: return true
     if kind == CcBuiltin.LIST_EXTEND: return true
     if kind == CcBuiltin.LIST_TAKE_FRONT: return true
@@ -6768,6 +6770,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.LIST_REMOVE: return CcBuiltin.LIST_REMOVE
     if intrinsic == MirIntrinsic.LIST_CLEAR: return CcBuiltin.LIST_CLEAR
     if intrinsic == MirIntrinsic.LIST_MAKE_UNIQUE: return CcBuiltin.LIST_MAKE_UNIQUE
+    if intrinsic == MirIntrinsic.MAP_MAKE_UNIQUE: return CcBuiltin.MAP_MAKE_UNIQUE
     if intrinsic == MirIntrinsic.LIST_POP: return CcBuiltin.LIST_POP
     if intrinsic == MirIntrinsic.MAP_NEW: return CcBuiltin.MAP_NEW
     if intrinsic == MirIntrinsic.MAP_INSERT: return CcBuiltin.MAP_INSERT
@@ -7074,6 +7077,17 @@ impl CCodegen:
             // bit copies the same way. The element copy glue is the LLVM
             // backend's (mir_emit_list_element_copy_glue_ptr).
             var out = "    (void)with_vec_make_unique_bits(" ++ recv_ptr ++ ", " ++ es ++ ");\n"
+            out = out ++ f"    goto bb{next_bb};"
+            return out
+
+        if kind == CcBuiltin.MAP_MAKE_UNIQUE:
+            // D120 stage 2: the same before a mutation of a value HashMap or
+            // HashSet; the handle slot is rewritten when the table is copied.
+            if argc < 1:
+                self.fail("map make-unique expects one argument")
+                return "    abort();"
+            let recv = self.map_recv_text(body, args_id)
+            var out = "    (void)with_hashmap_make_unique((void**)&(" ++ recv ++ "));\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 

@@ -10791,6 +10791,14 @@ impl Sema:
             // make-unique before every mutation). A List of resources moves.
             if generic_base == self.syms.list and self.get_generic_inst_arg_count(resolved as i32) == 1:
                 return self.is_copy(self.get_generic_inst_arg(resolved as i32, 0) as TypeId)
+            // D120 (§2.3): a HashMap or HashSet of values is a value the
+            // same way — the table is shared under a count and copied at the
+            // first mutation (D120 stage 2).
+            if generic_base == self.syms.hashmap or generic_base == self.syms.hashset:
+                for ai in 0..self.get_generic_inst_arg_count(resolved as i32):
+                    if self.is_copy(self.get_generic_inst_arg(resolved as i32, ai) as TypeId) == 0:
+                        return 0
+                return 1
             // Generic instances (List[T], etc.) are non-Copy by default.
             // Copy iff there is an explicit `impl[T: Copy] Copy for Base[T]` registered.
             // Do NOT call type_implements_trait(copy_trait) here — it just calls is_copy() back.
