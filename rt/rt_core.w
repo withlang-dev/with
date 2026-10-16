@@ -3984,11 +3984,17 @@ pub fn with_hasher_finish(state: *mut u8) -> i64:
 //  24: entry capacity 32: len (live)     40: key_size       48: val_size
 //  56: is_str_key (i32)                  64: hash_fn        72: eq_fn
 //  80: index (*mut i32)                  88: index capacity 96: entries used
-// Total: 104 bytes
+// 104: holders (Atomic[i64], D120)
+// Total: 112 bytes
 //
 // A key is hashed and compared by its kind (#2180): a key whose bytes are
 // its value by those bytes, a `str` by the bytes it views, and any other key
 // by the hash and equality functions the compiler generated for its type.
+//
+// D120 (§2.3): a HashMap or HashSet of values is a value — a copy shares
+// the table under an atomic count of the holders beyond the first, as a
+// List does its buffer (list_holders) and a str its bytes; the first
+// mutation of a shared table copies it (with_hashmap_make_unique).
 
 let HM_OFF_KEYS: i64 = 0
 let HM_OFF_VALS: i64 = 8
@@ -4003,7 +4009,8 @@ let HM_OFF_EQFN: i64 = 72
 let HM_OFF_INDEX: i64 = 80
 let HM_OFF_ICAP: i64 = 88
 let HM_OFF_NENT: i64 = 96
-let HM_SIZE: i64 = 104
+let HM_OFF_HOLDERS: i64 = 104
+let HM_SIZE: i64 = 112
 
 pub type MapKeyHashFn = *const fn(*const u8) -> u64
 pub type MapKeyEqFn = *const fn(*const u8, *const u8) -> i32
@@ -4292,6 +4299,60 @@ pub fn with_hashmap_free(map: *mut u8):
     rt_free_sized(hm_live(m), ecap)
     rt_free_sized(hm_index(m) as *mut u8, hm_icap(m) * 4)
     rt_free_sized(map, HM_SIZE)
+
+fn hm_holders(m: i64) -> *mut Atomic[i64]: (m + HM_OFF_HOLDERS) as *mut Atomic[i64]
+
+// A copy of the map at `map` (D120): one more holder of its table.
+pub fn with_hashmap_retain(map: *mut u8):
+    if map as i64 != 0:
+        unsafe { (*hm_holders(map as i64)).fetch_add(1, .AcqRel) }
+
+// The drop of a map: 1 when this holder was the last, so the caller drops
+// the entries and frees the table; else 0, the table left to its other
+// holders.
+pub fn with_hashmap_release_last(map: *mut u8) -> i64:
+    if map as i64 == 0: return 1
+    if unsafe { (*hm_holders(map as i64)).load(.Acquire) } == 0: return 1
+    unsafe { (*hm_holders(map as i64)).fetch_sub(1, .AcqRel) }
+    0
+
+// Whether the map at `map` alone holds its table.
+pub fn with_hashmap_is_unique(map: *mut u8) -> i64:
+    if map as i64 == 0: return 1
+    if unsafe { (*hm_holders(map as i64)).load(.Acquire) } == 0: 1 else: 0
+
+// Before a mutation: a shared table is copied, bit for bit (its dead
+// entries too, so the index stays valid), into a fresh one this holder
+// alone holds, stored back through `slot`; the shared one loses this
+// holder. 1 when a copy was made, so the caller runs the entries' copy
+// glue (a retain per str key or value, recursively) over the fresh table.
+pub fn with_hashmap_make_unique(slot: *mut *mut u8) -> i64:
+    let map = unsafe *slot
+    if with_hashmap_is_unique(map) != 0: return 0
+    let m = map as i64
+    let ecap = hm_ecap(m)
+    let ksz = hm_key_size(m)
+    let vsz = hm_val_size(m)
+    let icap = hm_icap(m)
+    let fresh = rt_alloc(HM_SIZE)
+    rt_memcpy(fresh, map as *const u8, HM_SIZE)
+    let f = fresh as i64
+    let keys = rt_alloc(ecap * ksz)
+    rt_memcpy(keys, hm_keys(m) as *const u8, ecap * ksz)
+    let vals = rt_alloc(ecap * vsz)
+    rt_memcpy(vals, hm_vals(m) as *const u8, ecap * vsz)
+    let live = rt_alloc(ecap)
+    rt_memcpy(live, hm_live(m) as *const u8, ecap)
+    let index = rt_alloc(icap * 4)
+    rt_memcpy(index, hm_index(m) as *const u8, icap * 4)
+    hm_set_field(f, HM_OFF_KEYS, keys as i64)
+    hm_set_field(f, HM_OFF_VALS, vals as i64)
+    hm_set_field(f, HM_OFF_LIVE, live as i64)
+    hm_set_field(f, HM_OFF_INDEX, index as i64)
+    hm_set_field(f, HM_OFF_HOLDERS, 0)
+    unsafe { (*hm_holders(m)).fetch_sub(1, .AcqRel) }
+    unsafe *slot = fresh
+    1
 
 // D110: insert `val` under an observed key: a present key's value is replaced
 // where it stands; an absent key goes in as the map's own copy. A str key is

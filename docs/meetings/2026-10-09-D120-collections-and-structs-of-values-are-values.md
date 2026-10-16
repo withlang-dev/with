@@ -109,10 +109,16 @@ a regression counted only when it holds across them, a held one escalated.
 **Status of the work.** `resource type` landed 2026-10-16 (`src/Parser.w`
 reads `resource` before `type` and marks the declaration, `TDK_FLAG_RESOURCE`;
 Sema refuses a `Copy` impl on one and never counts it Copy; a `resource
-type` that is not a struct is refused; the keyword is contextual). The
-copy-on-write collections and compositional value structs, the uniqueness
-checks, the C boundary rule, per-instantiation generics, the copy report and
-the 2% measurement are open: the compiler is NON-COMPLIANT on those.
+type` that is not a struct is refused; the keyword is contextual). A `List`
+of values is a value since 2026-10-16 (PR #2440, stage 1 of the plan: the
+holder count in the buffer's allocation header, copy glue retains, drop
+glue releases, a make-unique call before every mutation, measured 2.4% and
+3.2% on the self-host under Amendment 1). A `HashMap` or `HashSet` of
+values is a value with stage 2 (the count in the table block,
+`with_hashmap_make_unique`, the entries' copy glue after a copy). The
+compositional value structs (and so `BTreeMap`), the uniqueness proof and
+hoisting, the C boundary rule, per-instantiation generics and the copy
+report are open: the compiler is NON-COMPLIANT on those.
 
 **What would reopen it.** Self-host time or a corpus suite more than 2%
 slower with the cost not removable; or a program where the deferred copy

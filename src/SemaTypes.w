@@ -382,6 +382,7 @@ pub enum MirIntrinsic: i32:
     // a shared buffer (holders > 0) is copied first (copy-on-write). Last,
     // so no ordinal above moves.
     LIST_MAKE_UNIQUE
+    MAP_MAKE_UNIQUE
 
 // Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
 // List/HashMap, and compared throughout MIR lowering and codegen.

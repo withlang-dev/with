@@ -7018,7 +7018,7 @@ impl MirBuilder:
             // `xs[i] += v`) makes the list unique first.
             let ip_base_expr = self.ast.get_data0(place_expr)
             let ip_base_kind = self.ast.kind(ip_base_expr)
-            if ip_base_ty > 0 and self.sema.std_generic_of(ip_base_ty) == StdGeneric.List and self.sema.is_copy_frozen(ip_base_ty as TypeId) != 0 and (ip_base_kind == NodeKind.NK_IDENT or ip_base_kind == NodeKind.NK_FIELD_ACCESS or ip_base_kind == NodeKind.NK_INDEX):
+            if self.cow_collection_of(ip_base_ty) != StdGeneric.None and (ip_base_kind == NodeKind.NK_IDENT or ip_base_kind == NodeKind.NK_FIELD_ACCESS or ip_base_kind == NodeKind.NK_INDEX):
                 let ip_list_place = self.lower_expr_place(ip_base_expr)
                 self.make_unique_before_mutation(ip_list_place)
             if self.is_user_index_place(ip_base_ty) != 0:
@@ -14538,29 +14538,41 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, unit, args_id, elem_place, next_bb)
         self.switch_to(next_bb)
 
-    // D120 (§2.3): the List intrinsics that write their receiver.
+    // D120 (§2.3): the List, HashMap and HashSet intrinsics that write
+    // their receiver.
     fn list_intrinsic_mutates(kind: MirIntrinsic) -> bool:
-        kind == MirIntrinsic.LIST_PUSH or kind == MirIntrinsic.LIST_SET or kind == MirIntrinsic.LIST_REMOVE or kind == MirIntrinsic.LIST_CLEAR or kind == MirIntrinsic.LIST_POP or kind == MirIntrinsic.LIST_EXTEND or kind == MirIntrinsic.LIST_SLOT or kind == MirIntrinsic.LIST_ITER_PLACE or kind == MirIntrinsic.LIST_GET_DISJOINT or kind == MirIntrinsic.LIST_RESTORE_FRONT or kind == MirIntrinsic.LIST_TAKE_FRONT
+        kind == MirIntrinsic.LIST_PUSH or kind == MirIntrinsic.LIST_SET or kind == MirIntrinsic.LIST_REMOVE or kind == MirIntrinsic.LIST_CLEAR or kind == MirIntrinsic.LIST_POP or kind == MirIntrinsic.LIST_EXTEND or kind == MirIntrinsic.LIST_SLOT or kind == MirIntrinsic.LIST_ITER_PLACE or kind == MirIntrinsic.LIST_GET_DISJOINT or kind == MirIntrinsic.LIST_RESTORE_FRONT or kind == MirIntrinsic.LIST_TAKE_FRONT or kind == MirIntrinsic.MAP_INSERT or kind == MirIntrinsic.MAP_REMOVE or kind == MirIntrinsic.MAP_CLEAR or kind == MirIntrinsic.MAP_INCREMENT or kind == MirIntrinsic.MAP_DECREMENT or kind == MirIntrinsic.MAP_UPDATE or kind == MirIntrinsic.MAP_ENTRY or kind == MirIntrinsic.MAP_TAKE_AT
 
-    // D120 (§2.3): a mutation of a List of values the compiler has not
-    // proven unique is preceded by LIST_MAKE_UNIQUE on the place — a copy
-    // of a value list shares its buffer under a count, and the first
-    // mutation of a shared buffer copies it (copy-on-write). A List of
-    // resources moves and is never shared, so it takes no check. Where the
-    // check sits is MIR's (D65); the uniqueness proof and the hoisting out
-    // of loops are the plan's stage 4.
+    // D120 (§2.3): whether a place holds a collection of values whose
+    // buffer may be shared: a List (stage 1), a HashMap or HashSet (stage
+    // 2). A BTreeMap is a struct over a List and follows the struct rule.
+    fn cow_collection_of(ty: i32) -> StdGeneric:
+        if ty <= 0: return StdGeneric.None
+        let g = self.sema.std_generic_of(ty)
+        if g != StdGeneric.List and g != StdGeneric.HashMap and g != StdGeneric.HashSet: return StdGeneric.None
+        if self.sema.is_copy_frozen(ty as TypeId) == 0: return StdGeneric.None
+        g
+
+    // D120 (§2.3): a mutation of a collection of values the compiler has
+    // not proven unique is preceded by a make-unique call on the place — a
+    // copy of a value collection shares its buffer under a count, and the
+    // first mutation of a shared buffer copies it (copy-on-write). A
+    // collection of resources moves and is never shared, so it takes no
+    // check. Where the check sits is MIR's (D65); the uniqueness proof and
+    // the hoisting out of loops are the plan's stage 4.
     mut fn make_unique_before_mutation(list_place: i32):
         if list_place < 0 or list_place >= self.body.place_sema_types.len():
             return
         let ty = self.body.place_sema_types[list_place]
+        let g = self.cow_collection_of(ty)
         if with_getenv_str("WITH_TRACE_COW").len() > 0:
-            with_eprint(f"[cow] place={list_place} ty={ty} list={self.sema.std_generic_of(ty) == StdGeneric.List} copy={if ty > 0: self.sema.is_copy_frozen(ty as TypeId) else: -1}")
-        if ty <= 0 or self.sema.std_generic_of(ty) != StdGeneric.List or self.sema.is_copy_frozen(ty as TypeId) == 0:
+            with_eprint(f"[cow] place={list_place} ty={ty} collection={g as i32} copy={if ty > 0: self.sema.is_copy_frozen(ty as TypeId) else: -1}")
+        if g == StdGeneric.None:
             return
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("__make_unique"), self.sema.ty_void)
         let args: List[i32] = [self.body.new_operand(OperandKind.OK_COPY, list_place)]
         let args_id = self.body.new_call_args(args)
-        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_MAKE_UNIQUE)
+        self.body.set_call_intrinsic(args_id, if g == StdGeneric.List: MirIntrinsic.LIST_MAKE_UNIQUE else: MirIntrinsic.MAP_MAKE_UNIQUE)
         let result_local = self.new_temp(self.sema.ty_void)
         let result_place = self.place_for_local(result_local)
         let next_bb = self.new_block()

@@ -6036,6 +6036,16 @@ impl Codegen:
             args.push(ptr)
             let _ = wl_build_call(self.builder, wl_global_get_value_type(retain_fn), retain_fn, list_data_i64(&args), 1)
             return
+        // D120 stage 2: a HashMap or HashSet of values shares its table —
+        // one more holder.
+        if self.mir_hash_collection_kind(resolved) != 0 and wl_get_type_kind(ty) == wl_struct_type_kind():
+            let handle_ptr = wl_build_struct_gep(self.builder, ty, ptr, 0)
+            let handle = wl_build_load(self.builder, wl_ptr_type(self.context), handle_ptr)
+            let retain_fn = self.ensure_hm_fn("with_hashmap_retain", wl_void_type(self.context))
+            let retain_ty = wl_function_type(wl_void_type(self.context), list_data_i64(self.make_ptr_list()), 1, 0)
+            let args: List[i64] = [handle]
+            wl_build_call(self.builder, retain_ty, retain_fn, list_data_i64(args), 1)
+            return
         // D120: a List of values shares its buffer — one more holder.
         if self.mir_sema_type_is_std_list(resolved):
             let elem_sema = self.mir_list_elem_sema_type_from_sema_type(resolved)
@@ -6479,6 +6489,12 @@ impl Codegen:
         wl_function_type(ret_ty, list_data_i64(&params), 2, 0)
 
     mut fn mir_emit_hash_collection_element_drops(handle: i64, sema_ty: i32, collection_kind: i32) -> Unit:
+        self.mir_emit_hash_collection_element_glue(handle, sema_ty, collection_kind, false)
+
+    // The per-entry glue over a map's live entries: each key's and value's
+    // drop, or (D120 stage 2, after make-unique copied the table) each
+    // key's and value's copy glue — a retain per str, recursively.
+    mut fn mir_emit_hash_collection_element_glue(handle: i64, sema_ty: i32, collection_kind: i32, copy_glue: bool):
         let key_sema = self.mir_hash_collection_arg_sema_type(sema_ty, 0)
         let value_sema = if collection_kind == 1: self.mir_hash_collection_arg_sema_type(sema_ty, 1) else: 0
         let drop_key = key_sema > 0 and self.sema.type_needs_drop_frozen(key_sema) != 0
@@ -6526,9 +6542,12 @@ impl Codegen:
             key_args.push(handle)
             key_args.push(idx_phi)
             let key_ptr = wl_build_call(self.builder, key_fn_ty, key_fn, list_data_i64(&key_args), 2)
-            self.member_drop_depth = self.member_drop_depth + 1
-            self.mir_emit_element_drop(key_ptr, key_ty, key_sema)
-            self.member_drop_depth = self.member_drop_depth - 1
+            if copy_glue:
+                self.mir_emit_copy_glue_ptr(key_ptr, key_ty, key_sema)
+            else:
+                self.member_drop_depth = self.member_drop_depth + 1
+                self.mir_emit_element_drop(key_ptr, key_ty, key_sema)
+                self.member_drop_depth = self.member_drop_depth - 1
         if drop_value:
             let value_fn = self.ensure_hashmap_slot_runtime_fn("with_hashmap_value_ptr_at", ptr_ty)
             let value_fn_ty = self.hashmap_slot_runtime_fn_type(ptr_ty)
@@ -6536,9 +6555,12 @@ impl Codegen:
             value_args.push(handle)
             value_args.push(idx_phi)
             let value_ptr = wl_build_call(self.builder, value_fn_ty, value_fn, list_data_i64(&value_args), 2)
-            self.member_drop_depth = self.member_drop_depth + 1
-            self.mir_emit_element_drop(value_ptr, value_ty, value_sema)
-            self.member_drop_depth = self.member_drop_depth - 1
+            if copy_glue:
+                self.mir_emit_copy_glue_ptr(value_ptr, value_ty, value_sema)
+            else:
+                self.member_drop_depth = self.member_drop_depth + 1
+                self.mir_emit_element_drop(value_ptr, value_ty, value_sema)
+                self.member_drop_depth = self.member_drop_depth - 1
         wl_build_br(self.builder, advance_bb)
 
         wl_position_at_end(self.builder, advance_bb)
@@ -6564,12 +6586,26 @@ impl Codegen:
             return false
         let handle_ptr = wl_build_struct_gep(self.builder, ty, ptr, 0)
         let handle = wl_build_load(self.builder, wl_ptr_type(self.context), handle_ptr)
-        self.mir_emit_hash_collection_element_drops(handle, sema_ty, collection_kind)
+        // D120 stage 2: a map of values may share its table; only the last
+        // holder drops the entries and frees it. A map of resources is
+        // never shared and takes the same path: its count is always zero.
+        let i64_ty = wl_i64_type(self.context)
+        let release_fn = self.ensure_hm_fn("with_hashmap_release_last", i64_ty)
+        let release_ty = wl_function_type(i64_ty, list_data_i64(self.make_ptr_list()), 1, 0)
+        let rel_args: List[i64] = [handle]
+        let last = wl_build_call(self.builder, release_ty, release_fn, list_data_i64(rel_args), 1)
+        let is_last = wl_build_icmp(self.builder, wl_int_ne(), last, wl_const_int(i64_ty, 0, 0))
+        let last_bb = wl_append_bb(self.context, self.current_function, "drop.map.last")
+        let done_bb = wl_append_bb(self.context, self.current_function, "drop.map.done")
+        wl_build_cond_br(self.builder, is_last, last_bb, done_bb)
+        wl_position_at_end(self.builder, last_bb)
+        self.mir_emit_hash_collection_element_glue(handle, sema_ty, collection_kind, false)
         let free_fn = self.ensure_hm_fn("with_hashmap_free", wl_void_type(self.context))
-        let free_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&self.make_ptr_list()), 1, 0)
-        let free_args: List[i64] = List.new()
-        free_args.push(handle)
-        let _ = wl_build_call(self.builder, free_ty, free_fn, list_data_i64(&free_args), 1)
+        let free_ty = wl_function_type(wl_void_type(self.context), list_data_i64(self.make_ptr_list()), 1, 0)
+        let free_args: List[i64] = [handle]
+        wl_build_call(self.builder, free_ty, free_fn, list_data_i64(free_args), 1)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
         true
 
     fn mir_slotmap_elem_sema_type_from_sema_type(sema_ty: i32) -> i32:
@@ -10331,6 +10367,35 @@ impl Codegen:
                 wl_build_cond_br(self.builder, did_copy, glue_bb, after_bb)
                 wl_position_at_end(self.builder, glue_bb)
                 self.mir_emit_list_element_copy_glue_ptr(recv_ptr, recv_sema)
+                wl_build_br(self.builder, after_bb)
+                wl_position_at_end(self.builder, after_bb)
+            result = 0
+
+        else if intrinsic == MirIntrinsic.MAP_MAKE_UNIQUE:
+            // D120 stage 2: copy-on-write before a mutation of a value
+            // HashMap or HashSet. The runtime copies a shared table bit for
+            // bit and rewrites the handle slot (the struct's first field);
+            // keys and values with copy glue are then each retained.
+            let slot_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+            let recv_op = body.call_arg_operands[arg_start]
+            let recv_sema = self.mir_operand_sema_type(body, recv_op)
+            let mu_fn = self.ensure_hm_fn("with_hashmap_make_unique", i64_ty)
+            let mu_ty = wl_function_type(i64_ty, list_data_i64(self.make_ptr_list()), 1, 0)
+            let mu_args: List[i64] = [slot_ptr]
+            let copied = wl_build_call(self.builder, mu_ty, mu_fn, list_data_i64(mu_args), 1)
+            let collection_kind = self.mir_hash_collection_kind(recv_sema)
+            let key_sema = self.mir_hash_collection_arg_sema_type(recv_sema, 0)
+            let value_sema = if collection_kind == 1: self.mir_hash_collection_arg_sema_type(recv_sema, 1) else: 0
+            let glue_key = key_sema > 0 and self.sema.type_needs_drop_frozen(key_sema) != 0
+            let glue_value = value_sema > 0 and self.sema.type_needs_drop_frozen(value_sema) != 0
+            if collection_kind != 0 and (glue_key or glue_value):
+                let did_copy = wl_build_icmp(self.builder, wl_int_ne(), copied, wl_const_int(i64_ty, 0, 0))
+                let glue_bb = wl_append_bb(self.context, self.current_function, "cow.map.glue")
+                let after_bb = wl_append_bb(self.context, self.current_function, "cow.map.done")
+                wl_build_cond_br(self.builder, did_copy, glue_bb, after_bb)
+                wl_position_at_end(self.builder, glue_bb)
+                let handle = wl_build_load(self.builder, ptr_ty, slot_ptr)
+                self.mir_emit_hash_collection_element_glue(handle, recv_sema, collection_kind, true)
                 wl_build_br(self.builder, after_bb)
                 wl_position_at_end(self.builder, after_bb)
             result = 0

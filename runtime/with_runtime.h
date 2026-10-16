@@ -154,6 +154,11 @@ int64_t with_hashmap_len(void *handle);
 void with_set_memory_limit_bytes(int64_t limit);
 void with_hashmap_clear(void *handle);
 void with_hashmap_free(void *handle);
+// D120: a HashMap or HashSet of values shares its table under a count (rt_core.w).
+void with_hashmap_retain(void *handle);
+int64_t with_hashmap_release_last(void *handle);
+int64_t with_hashmap_is_unique(void *handle);
+int64_t with_hashmap_make_unique(void **slot);
 void with_hashmap_increment(void *handle, const void *key, int64_t is_str_key);
 void with_hashmap_decrement(void *handle, const void *key, int64_t is_str_key);
 
