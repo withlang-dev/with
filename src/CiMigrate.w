@@ -1904,7 +1904,7 @@ pub fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &
         gir_files = ci_migrate_collect_gir_files(input)
     else: files.push(input)
     if gir_arg.len() > 0: gir_files.push(ci_migrate_fs_path(gir_arg))
-    var project = match ci_facade_project(&files, facade_name, &gir_files, facts_arg, false):
+    var project = match ci_facade_project(files, facade_name, gir_files, facts_arg, false):
         Ok(p) => p
         Err(message) =>
             if message.len() > 0: eprint("migrate: " ++ message)
@@ -1990,7 +1990,7 @@ pub fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str]
     let gir_files = ci_migrate_collect_gir_files(ci_migrate_fs_path(source_dir))
     var files: List[str] = List.new()
     for unit in units: files.push(ci_migrate_fs_path(unit))
-    var project = match ci_facade_project(&files, facade_name, &gir_files, facts_path, true):
+    var project = match ci_facade_project(files, facade_name, gir_files, facts_path, true):
         Ok(p) => p
         Err(message) =>
             if message.len() > 0: eprint("with get: facade of " ++ facade_name ++ ": " ++ message)

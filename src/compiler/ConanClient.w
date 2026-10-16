@@ -1635,7 +1635,7 @@ fn conan_fetch_source_tree(name: &str, version: &str, fetched: &ConanFetchedReci
     if runtime_mkdir_p(raw_dir) != 0 or runtime_mkdir_p(work ++ "/tools") != 0 or runtime_mkdir_p(work ++ "/recipe") != 0:
         return ConanSourceTree { source_dir: "", problem: "could not create " ++ work }
     runtime_eprint("  downloading " ++ fetched.source.urls[0])
-    let picked = conan_pick_archive(&fetched.source, work, conan_archive_download, conan_archive_digest)
+    let picked = conan_pick_archive(fetched.source, work, conan_archive_download, conan_archive_digest)
     let archive = picked.path.clone()
     if archive.len() == 0: return ConanSourceTree { source_dir: "", problem: "no source archive of " ++ name ++ "/" ++ version ++ " could be used:" ++ picked.tried }
     if conan_extract_any(archive, raw_dir) != 0:
@@ -1681,7 +1681,7 @@ fn conan_configure_source(name: &str, version: &str, project_root: &str, dep_dir
 
     var env = recipe_env
     env.source_folder = source_dir.to_owned()
-    let variables = recipe_cmake_variables(recipe, &env)
+    let variables = recipe_cmake_variables(recipe, env)
     if not variables.ok: return name ++ "/" ++ version ++ ": " ++ variables.problem
     for undecided in variables.notes: runtime_eprint("  note: " ++ name ++ " recipe " ++ undecided ++ "; a CMake variable under it is not set")
     var prefix_path = ""
@@ -1838,7 +1838,7 @@ fn conan_compile_commands_corpus(path: &str) -> ConanCorpus:
         if line.trim().starts_with("}"):
             if file.ends_with(".c") and command.len() > 0:
                 let unit = conan_corpus_absolute(directory, file)
-                if conan_push_unique(&units, unit): units.push(unit)
+                if conan_push_unique(units, unit): units.push(unit)
                 let words = conan_shell_words(command)
                 var wi = 0
                 while wi < words.len():
@@ -1846,19 +1846,19 @@ fn conan_compile_commands_corpus(path: &str) -> ConanCorpus:
                     if w == "-I" or w == "-isystem":
                         if wi + 1 < words.len():
                             let dir = conan_corpus_absolute(directory, words[wi + 1])
-                            if conan_push_unique(&include_paths, dir): include_paths.push(dir)
+                            if conan_push_unique(include_paths, dir): include_paths.push(dir)
                         wi = wi + 2
                         continue
                     if w == "-D":
-                        if wi + 1 < words.len() and conan_push_unique(&defines, words[wi + 1]): defines.push(words[wi + 1])
+                        if wi + 1 < words.len() and conan_push_unique(defines, words[wi + 1]): defines.push(words[wi + 1])
                         wi = wi + 2
                         continue
                     if w.starts_with("-I") and w.len() > 2:
                         let dir = conan_corpus_absolute(directory, w.slice(2, w.len()))
-                        if conan_push_unique(&include_paths, dir): include_paths.push(dir)
+                        if conan_push_unique(include_paths, dir): include_paths.push(dir)
                     else if w.starts_with("-D") and w.len() > 2:
                         let define = w.slice(2, w.len())
-                        if conan_push_unique(&defines, define): defines.push(define)
+                        if conan_push_unique(defines, define): defines.push(define)
                     wi = wi + 1
             directory = ""
             file = ""
@@ -1943,7 +1943,7 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     let registry = conan_registry_facts(name, dep_dir)
     if registry.note.len() > 0: runtime_eprint("  note: " ++ registry.note)
     let report_path = dep_dir ++ "/facade-report.txt"
-    let summary = migrate_c_facade_for_package(&corpus.units, &corpus.include_paths, &corpus.defines, source_dir, name, version, registry.path, &import_dirs, link_lib, dep_dir ++ "/facade.w", report_path)
+    let summary = migrate_c_facade_for_package(corpus.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, link_lib, dep_dir ++ "/facade.w", report_path)
     if summary.len() == 0: return
     let q = "\x22"
     let pin = "{\n  " ++ q ++ "registry_commit" ++ q ++ ": " ++ q ++ conan_json_escape(registry.commit) ++ q ++ ",\n  " ++ q ++ "facts_sha256" ++ q ++ ": " ++ q ++ registry.sha256 ++ q ++ "\n}\n"
@@ -1968,17 +1968,17 @@ fn conan_facade_of_binary(name: &str, version: &str, project_root: &str, dep_dir
     let work = dep_dir ++ "/.build"
     let _clean = runtime_remove_tree(work)
     var recipe_env = conan_built_recipe_env(version, "")
-    let resolved = match conan_install_recipe_requirements(name, version, fetched.recipe, &recipe_env, project_root, depth):
+    let resolved = match conan_install_recipe_requirements(name, version, fetched.recipe, recipe_env, project_root, depth):
         Ok(r) => r
         Err(problem) =>
             runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ problem)
             return
-    let tree = conan_fetch_source_tree(name, version, &fetched, work)
+    let tree = conan_fetch_source_tree(name, version, fetched, work)
     if tree.problem.len() > 0:
         runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ tree.problem)
         let _gone = runtime_remove_tree(work)
         return
-    let configured = conan_configure_source(name, version, project_root, dep_dir, work, tree.source_dir, &resolved, fetched.recipe, fetched.recipe_cmake, recipe_env, &cmake_env, cmake_env_name, &tools)
+    let configured = conan_configure_source(name, version, project_root, dep_dir, work, tree.source_dir, resolved, fetched.recipe, fetched.recipe_cmake, recipe_env, cmake_env, cmake_env_name, tools)
     if configured.len() > 0:
         runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ configured)
         let _gone = runtime_remove_tree(work)
@@ -2004,18 +2004,18 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     if tools.problem.len() > 0: return conan_source_fail("", tools.problem)
 
     var recipe_env = conan_built_recipe_env(version, "")
-    let resolved = match conan_install_recipe_requirements(name, version, recipe, &recipe_env, project_root, depth):
+    let resolved = match conan_install_recipe_requirements(name, version, recipe, recipe_env, project_root, depth):
         Ok(r) => r
         Err(problem) => return conan_source_fail("", problem)
 
     let dep_dir = conan_absolute(project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version)
     let _clean = runtime_remove_tree(dep_dir)
     let work = dep_dir ++ "/.build"
-    let tree = conan_fetch_source_tree(name, version, &fetched, work)
+    let tree = conan_fetch_source_tree(name, version, fetched, work)
     if tree.problem.len() > 0: return conan_source_fail(dep_dir, tree.problem)
     let source_dir = tree.source_dir
 
-    let configured = conan_configure_source(name, version, project_root, dep_dir, work, source_dir, &resolved, recipe, fetched.recipe_cmake, recipe_env, &cmake_env, cmake_env_name, &tools)
+    let configured = conan_configure_source(name, version, project_root, dep_dir, work, source_dir, resolved, recipe, fetched.recipe_cmake, recipe_env, cmake_env, cmake_env_name, tools)
     if configured.len() > 0: return conan_source_fail(dep_dir, configured)
     let cmake = tools.cmake
     // Keep going past a test or example program that does not link: the
