@@ -10785,6 +10785,12 @@ impl Sema:
                 return 0
             if generic_base == self.syms.handle:
                 return 1
+            // D120 (§2.3): a List of values is a value — a copy shares the
+            // buffer under an atomic count (codegen's copy glue retains it)
+            // and the first mutation of a shared buffer copies it (MIR's
+            // make-unique before every mutation). A List of resources moves.
+            if generic_base == self.syms.list and self.get_generic_inst_arg_count(resolved as i32) == 1:
+                return self.is_copy(self.get_generic_inst_arg(resolved as i32, 0) as TypeId)
             // Generic instances (List[T], etc.) are non-Copy by default.
             // Copy iff there is an explicit `impl[T: Copy] Copy for Base[T]` registered.
             // Do NOT call type_implements_trait(copy_trait) here — it just calls is_copy() back.

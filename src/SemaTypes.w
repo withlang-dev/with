@@ -128,6 +128,9 @@ pub enum MirIntrinsic: i32:
     LIST_SET
     LIST_REMOVE
     LIST_CLEAR
+    // D120: before a mutation of a List place MIR could not prove unique —
+    // a shared buffer (holders > 0) is copied first (copy-on-write).
+    LIST_MAKE_UNIQUE
     LIST_POP
     // D116: `a ++ b` over sequences builds a List (the call's result);
     // `a ++= b` extends the receiver (arg 0) by the sequence in arg 1.
