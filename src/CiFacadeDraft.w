@@ -31,6 +31,7 @@
 use CiIR
 use CImport
 use CiGir
+use CiFacts
 use std.string.parse
 
 extern fn with_str_clone_ref(s: &str) -> str
@@ -159,7 +160,7 @@ impl CiProject:
     // A function the proofs are about: one a unit defines, or one the
     // package's introspection files declare facts for (D121 step 3).
     fn fd_subject(si: i32) -> bool:
-        self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and (self.symbols[si].has_definition != 0 or self.symbols[si].gir.len() > 0)
+        self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and (self.symbols[si].has_definition != 0 or self.symbols[si].gir.len() > 0 or self.symbols[si].registry.len() > 0)
 
     // The pointer parameters of `si`: how many, and the index of the one
     // when there is exactly one (else -1).
@@ -183,13 +184,34 @@ impl CiProject:
         for pi in 0..self.symbols[si].param_ty.len():
             if self.symbols[si].param_destroys[pi] != 0: continue
             if self.fd_gir_takes(si, pi as i32) and modeled.contains(fd_record_pointee(self.symbols[si].param_ty[pi])): return pi as i32
+        // The registry's `consumes param N` (D121 step 4), below the file.
+        let kind = facts_kind(self.symbols[si].registry)
+        if kind.starts_with("consumes:"):
+            let pi = fd_i32(kind.slice(9, kind.len()))
+            if self.fd_param_is_pointer(si, pi) and self.symbols[si].param_destroys[pi] == 0 and modeled.contains(fd_record_pointee(self.symbols[si].param_ty[pi])): return pi
         -1
 
-    // Why `si` destroys its parameter: the body's proof, or the
-    // introspection file naming it the record's destroyer.
+    // Why `si` consumes the parameter `fd_consumed_param` found.
+    fn fd_consumed_reason(si: i32, pi: i32) -> str:
+        if self.fd_gir_takes(si, pi): "annotation: gir transfer-ownership=\"full\", the callee takes it" else: "registry: " ++ facts_cite(self.symbols[si].registry)
+
+    // Why `si` destroys its parameter: the body's proof, the introspection
+    // file naming it the record's destroyer, or the registry's fact.
     fn fd_destroy_reason(si: i32, what: &str) -> str:
         if self.symbols[si].gir.contains("dropby=gir"): return "annotation: the introspection file names it the record's free function"
-        "proof: frees " ++ what ++ (if self.symbols[si].gir.contains("drop=1"): "; the introspection file names it the record's free function" else: "")
+        if self.symbols[si].registry.contains("|by=registry"): return "registry: " ++ facts_cite(self.symbols[si].registry)
+        let named_by_file = self.symbols[si].gir.contains("drop=1")
+        let named_by_registry = facts_kind(self.symbols[si].registry) == "drop"
+        "proof: frees " ++ what ++ (if named_by_file: "; the introspection file names it the record's free function" else if named_by_registry: "; the registry names it the drop: " ++ facts_cite(self.symbols[si].registry) else: "")
+
+    // What the registry says about `si`, for the report.
+    fn fd_registry_summary(si: i32) -> str:
+        let r = self.symbols[si].registry
+        if r.len() == 0: return ""
+        var parts = facts_kind(r) ++ ": " ++ facts_cite(r)
+        if self.symbols[si].borrow_from >= 0 and facts_kind(r) == "owned" and self.symbols[si].own_reason.starts_with("proof:"): parts = parts ++ "; DISAGREES: the proof returns a borrow"
+        if self.symbols[si].owns_return != 0 and facts_kind(r).starts_with("borrow:") and self.symbols[si].own_reason.starts_with("proof:"): parts = parts ++ "; DISAGREES: the proof returns a fresh allocation"
+        " [registry: " ++ parts ++ "]"
 
     // What the introspection file says about `si`, for the report.
     fn fd_gir_summary(si: i32) -> str:
@@ -241,11 +263,14 @@ impl CiProject:
         // A retained parameter the introspection file says the callee
         // takes is consumed: the caller hands it over (§16.2b.15 item 2).
         let consumed = self.fd_consumed_param(si, modeled)
-        if consumed >= 0 and (retained < 0 or retained == consumed): return f"consumes param {consumed} (annotation: gir transfer-ownership=\"full\", the callee takes it)"
+        if consumed >= 0 and (retained < 0 or retained == consumed): return f"consumes param {consumed} (" ++ self.fd_consumed_reason(si, consumed) ++ ")"
+        // The registry may state a lend the proofs could not reach (a
+        // retention the body only appears to make, an unmodeled type).
+        if facts_kind(self.symbols[si].registry) == "lend" and pointer_params > 0: return "lend (registry: " ++ facts_cite(self.symbols[si].registry) ++ ")"
         if retained >= 0: return f"raw: retains param {retained}; its lifetime contract is not proven"
         if unmodeled.len() > 0: return "raw: parameter of unmodeled pointer type " ++ unmodeled
         if pointer_params == 0: return "value-only call"
-        "lend (reads its resource parameters, keeps nothing)"
+        "lend (proof: reads its resource parameters, keeps nothing)"
 
     fn fd_is_lend(si: i32, modeled: &List[str]) -> bool:
         self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from < 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si, modeled).starts_with("lend")
@@ -364,6 +389,19 @@ impl CiProject:
             self.symbols[si].param_destroys[0] = 1
             self.symbols[si].gir = self.symbols[si].gir ++ ";dropby=gir"
             seeded = true
+        // The registry's `drop F` / `destroys F` on a resource: F destroys
+        // its parameter of that record (D121 step 4), where nothing above
+        // proved it.
+        for si in 0..n:
+            let kind = facts_kind(self.symbols[si].registry)
+            if not self.fd_subject(si as i32) or not (kind == "drop" or kind == "destroys"): continue
+            let record = facts_record(self.symbols[si].registry)
+            for pi in 0..self.symbols[si].param_ty.len():
+                if self.symbols[si].param_destroys[pi] != 0 or fd_record_pointee(self.symbols[si].param_ty[pi]) != record: continue
+                self.symbols[si].param_destroys[pi] = 1
+                self.symbols[si].registry = self.symbols[si].registry ++ "|by=registry"
+                seeded = true
+                break
         if seeded: self.fd_propagate_destruction()
         // 3. Returns.
         changed = true
@@ -421,13 +459,27 @@ impl CiProject:
                             reason = "annotation: gir transfer-ownership=\"none\", " ++ (if inst >= 0: "a part of the instance parameter" else: "a part of its one pointer parameter")
                         else: verdict = "unknown:gir transfer-ownership=\"none\" names no single origin parameter"
                     else if transfer == "container": verdict = "unknown:gir transfer-ownership=\"container\": the caller owns the container and not its elements, which the facade language does not state"
+                // The registry's `from F` / `returns borrow R from param N`
+                // (D121 step 4), where nothing above settled the return.
+                let registry = self.symbols[si].registry
+                if verdict.starts_with("unknown:") and registry.len() > 0:
+                    let kind = facts_kind(registry)
+                    if kind == "owned":
+                        verdict = "owned"
+                        reason = "registry: " ++ facts_cite(registry)
+                    else if kind.starts_with("borrow:"):
+                        let origin = fd_i32(kind.slice(7, kind.len()))
+                        if self.fd_param_is_pointer(si as i32, origin):
+                            verdict = kind
+                            reason = "registry: " ++ facts_cite(registry)
+                        else: verdict = f"unknown:the registry's borrow origin, param {origin}, is not a pointer parameter"
                 if verdict == "owned":
                     self.symbols[si].owns_return = 1
-                    self.symbols[si].own_reason = if reason.starts_with("annotation:"): reason else: "proof: " ++ reason ++ ", a fresh allocation never retained"
+                    self.symbols[si].own_reason = if reason.starts_with("annotation:") or reason.starts_with("registry:"): reason else: "proof: " ++ reason ++ ", a fresh allocation never retained"
                     changed = true
                 else if verdict.starts_with("borrow:"):
                     self.symbols[si].borrow_from = fd_i32(verdict.slice(7, verdict.len()))
-                    self.symbols[si].own_reason = if reason.starts_with("annotation:"): reason else: "proof: " ++ reason
+                    self.symbols[si].own_reason = if reason.starts_with("annotation:") or reason.starts_with("registry:"): reason else: "proof: " ++ reason
                     changed = true
                 else: self.symbols[si].own_reason = verdict.slice(8, verdict.len()).to_owned()
         // WITH_DEBUG_MIGRATE_FACADE=1: every definition's evidence and
@@ -492,6 +544,12 @@ impl CiProject:
             if not self.symbols[si].gir.contains("drop=1"): continue
             if named >= 0: return -1
             named = si
+        if named >= 0: return named
+        // The registry's `drop F` (D121 step 4), below the file.
+        for si in unary:
+            if facts_kind(self.symbols[si].registry) != "drop": continue
+            if named >= 0: return -1
+            named = si
         named
 
     // A representation someone can own: a producer and a drop.
@@ -551,10 +609,11 @@ impl CiProject:
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
             if self.fd_is_lend(si as i32, modeled):
-                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        lend    // proof: reads its resource parameters, keeps nothing\n"
+                let verdict = self.fd_lend_verdict(si as i32, modeled)
+                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        lend    // " ++ verdict.slice(verdict.find("(") + 1, verdict.len() - 1) ++ "\n"
             else if self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from < 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si as i32, modeled).starts_with("consumes param "):
                 let consumed = self.fd_consumed_param(si as i32, modeled)
-                text = text ++ "    fn " ++ self.symbols[si].name ++ f"\n        consumes param {consumed}    // annotation: gir transfer-ownership=\"full\", the callee takes it\n"
+                text = text ++ "    fn " ++ self.symbols[si].name ++ f"\n        consumes param {consumed}    // " ++ self.fd_consumed_reason(si as i32, consumed) ++ "\n"
         text
 
     // One line per function: how the draft presents it, or why it stays
@@ -602,7 +661,7 @@ impl CiProject:
             // ones are header facts c_import reads directly (§16.2b.8).
             let attrs = self.symbols[si].attrs
             if attrs.len() > 0: verdict = verdict ++ " [attributes: " ++ attrs.replace(";", " ").trim() ++ "]"
-            verdict = verdict ++ self.fd_gir_summary(si as i32)
+            verdict = verdict ++ self.fd_gir_summary(si as i32) ++ self.fd_registry_summary(si as i32)
             lines = lines ++ "  " ++ fname ++ ": " ++ verdict ++ "\n"
         var head = "facade " ++ name ++ f": {total} functions, {safe} presented safely, {raw} raw" ++ (if internal > 0: f"; {internal} internal (no prototype declares them)" else: "") ++ "\n"
         for record in self.fd_representations():

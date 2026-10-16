@@ -12,6 +12,7 @@ use CiPrint
 use CImport
 use CiFacadeDraft
 use CiGir
+use CiFacts
 use Lexer
 use Token
 use Parser
@@ -1893,7 +1894,7 @@ fn ci_migrate_collect_gir_files(input_dir: &str) -> List[str]:
         if line.ends_with(".gir") and not ci_migrate_basename_is_hidden(line): files = ci_migrate_sorted_insert(files, line)
     files
 
-pub fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &str, output_arg: &str, gir_arg: &str) -> i32:
+pub fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &str, output_arg: &str, gir_arg: &str, facts_arg: &str) -> i32:
     let input = ci_migrate_fs_path(input_arg)
     var files: List[str] = List.new()
     var gir_files: List[str] = List.new()
@@ -1923,6 +1924,20 @@ pub fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &
             var facts = gir.facts_of(project.symbols[si].name)
             if gir.names_drop(project.symbols[si].name): facts = facts ++ (if facts.len() > 0: ";" else: "") ++ "drop=1"
             project.symbols[si].gir = facts
+    // D121 step 4: the package registry's facts (CiFacts.w), the tier
+    // below the annotations.
+    if facts_arg.len() > 0:
+        let registry = match facts_read_file(ci_migrate_fs_path(facts_arg)):
+            Ok(f) => f
+            Err(message) =>
+                eprint("migrate: registry: " ++ message)
+                return 1
+        if registry.package != facade_name:
+            eprint("migrate: registry: " ++ facts_arg ++ " states facts for `" ++ registry.package ++ "`, not `" ++ facade_name ++ "`")
+            return 1
+        for si in 0..project.symbols.len():
+            if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
+            project.symbols[si].registry = registry.of(project.symbols[si].name)
     project.resolve_ownership()
     let draft = project.facade_draft(facade_name)
     eprint(project.facade_report(facade_name))

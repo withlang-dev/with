@@ -4326,8 +4326,19 @@ fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, c
 fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let lib_dir = bs_join(case_dir, "minilib")
-    let header = "#include <stdlib.h>\n#include <string.h>\nstruct attr { int k; };\nstruct node { struct node *next; struct attr *attr; int v; };\nstruct doc { struct node *root; int n; };\nstruct buf { int n; };\ntypedef void (*freefn)(void *);\nextern freefn lib_free;\nstruct node *node_new(void);\nvoid node_free(struct node *n);\nstruct attr *node_attr(struct node *n);\nvoid attr_free(struct attr *a);\nstruct buf *buf_new(void);\nvoid buf_free(struct buf *b);\nstruct buf *pool_take(int n);\nstruct buf *buf_alloc(int n) __attribute__((malloc));\nstruct node *node_next(struct node *n);\nstruct doc *doc_new(void);\nstruct doc *doc_open(const char *path);\nstruct node *doc_root(struct doc *d);\nstruct node *doc_first(struct doc *d);\nvoid doc_free(struct doc *d);\nvoid doc_discard(struct doc *d, int why);\nvoid doc_keep(struct doc *d);\nstruct node *doc_add(struct doc *d, struct node *n);\nstruct node *doc_pick(struct doc *d, int i);\nint doc_count(struct doc *d);\nstruct item { int v; };\nstruct item *item_new(void);\nvoid item_free(struct item *i);\nvoid item_release(struct item *i);\nstruct buf *buf_fetch(int n);\nstruct node *doc_last(struct doc *d);\nvoid doc_adopt(struct doc *d, struct node *n);\n"
+    let header = "#include <stdlib.h>\n#include <string.h>\nstruct attr { int k; };\nstruct node { struct node *next; struct attr *attr; int v; };\nstruct doc { struct node *root; int n; };\nstruct buf { int n; };\ntypedef void (*freefn)(void *);\nextern freefn lib_free;\nstruct node *node_new(void);\nvoid node_free(struct node *n);\nstruct attr *node_attr(struct node *n);\nvoid attr_free(struct attr *a);\nstruct buf *buf_new(void);\nvoid buf_free(struct buf *b);\nstruct buf *pool_take(int n);\nstruct buf *buf_alloc(int n) __attribute__((malloc));\nstruct node *node_next(struct node *n);\nstruct doc *doc_new(void);\nstruct doc *doc_open(const char *path);\nstruct node *doc_root(struct doc *d);\nstruct node *doc_first(struct doc *d);\nvoid doc_free(struct doc *d);\nvoid doc_discard(struct doc *d, int why);\nvoid doc_keep(struct doc *d);\nstruct node *doc_add(struct doc *d, struct node *n);\nstruct node *doc_pick(struct doc *d, int i);\nint doc_count(struct doc *d);\nstruct item { int v; };\nstruct item *item_new(void);\nvoid item_free(struct item *i);\nvoid item_release(struct item *i);\nstruct buf *buf_fetch(int n);\nstruct node *doc_last(struct doc *d);\nvoid doc_adopt(struct doc *d, struct node *n);\nstruct pool { struct node *top; };\nstruct pool *pool_new(void);\nvoid pool_free(struct pool *p);\nvoid pool_drop(struct pool *p);\nstruct pool *pool_fetch(void);\nvoid pool_push(struct pool *p, struct node *n);\nstruct node *pool_peek(struct pool *p);\nint pool_size(struct pool *p);\n"
     var rc = bs_write_fixture(ctx, bs_join(lib_dir, "mini.h"), header, "facade by evidence header")
+    if rc != 0: return rc
+    // D121 step 4: the registry's facts file, the tier below the
+    // introspection file. `pool` has two unary destroyers and no file
+    // names one; `pool_fetch`, `pool_peek` and `pool_size` have no body;
+    // `pool_push` retains a parameter the registry says it takes.
+    let facts = "// mini 1.0: what neither the bodies nor Mini-1.0.gir settle.\nc facade mini:\n    resource Pool wraps *mut pool\n        drop pool_free    // mini.h: pool_free releases the pool; pool_drop is its alias\n        from pool_fetch    // pool.c (not in this package): returns a pool the caller owns\n    fn pool_push\n        consumes param 1    // pool.c: the node is linked into the pool, which frees it\n    fn pool_peek\n        returns borrow Node from param 0    // pool.c: returns p->top\n    fn pool_size\n        lend    // pool.c: counts the nodes, stores nothing\n"
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "facts.w"), facts, "facade by evidence registry facts")
+    if rc != 0: return rc
+    // A fact without its citation is refused: the review rule the tool
+    // enforces.
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "bad_facts.w"), "c facade mini:\n    resource Pool wraps *mut pool\n        drop pool_free\n", "facade by evidence uncited fact")
     if rc != 0: return rc
     // D121 step 3, the introspection half: `item` has two unary destroyers
     // and the file names one; `buf_fetch` and `doc_last` have no body in
@@ -4337,7 +4348,7 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     let gir = "<?xml version=\"1.0\"?>\n<repository version=\"1.2\" xmlns=\"http://www.gtk.org/introspection/core/1.0\" xmlns:c=\"http://www.gtk.org/introspection/c/1.0\" xmlns:glib=\"http://www.gtk.org/introspection/glib/1.0\">\n  <namespace name=\"Mini\" version=\"1.0\">\n    <record name=\"item\" c:type=\"struct item\" free-function=\"item_free\">\n      <constructor name=\"new\" c:identifier=\"item_new\"><return-value transfer-ownership=\"full\"><type name=\"item\"/></return-value></constructor>\n    </record>\n    <record name=\"buf\" c:type=\"struct buf\">\n      <constructor name=\"fetch\" c:identifier=\"buf_fetch\"><return-value transfer-ownership=\"full\"><type name=\"buf\"/></return-value><parameters><parameter name=\"n\" transfer-ownership=\"none\"><type name=\"gint\"/></parameter></parameters></constructor>\n    </record>\n    <record name=\"doc\" c:type=\"struct doc\">\n      <method name=\"last\" c:identifier=\"doc_last\"><return-value transfer-ownership=\"none\"><type name=\"node\"/></return-value><parameters><instance-parameter name=\"d\" transfer-ownership=\"none\"><type name=\"doc\"/></instance-parameter></parameters></method>\n      <method name=\"adopt\" c:identifier=\"doc_adopt\"><return-value transfer-ownership=\"none\"><type name=\"none\"/></return-value><parameters><instance-parameter name=\"d\" transfer-ownership=\"none\"><type name=\"doc\"/></instance-parameter><parameter name=\"n\" transfer-ownership=\"full\"><type name=\"node\"/></parameter></parameters></method>\n    </record>\n    <record name=\"node\" c:type=\"struct node\">\n      <method name=\"next\" c:identifier=\"node_next\"><return-value transfer-ownership=\"full\"><type name=\"node\"/></return-value><parameters><instance-parameter name=\"n\" transfer-ownership=\"none\"><type name=\"node\"/></instance-parameter></parameters></method>\n    </record>\n  </namespace>\n</repository>\n"
     rc = bs_write_fixture(ctx, bs_join(lib_dir, "Mini-1.0.gir"), gir, "facade by evidence introspection file")
     if rc != 0: return rc
-    let node_c = "#include \"mini.h\"\nfreefn lib_free = free;\ntypedef struct node *nodep;\nstruct node *node_new(void) { return calloc(1, sizeof(struct node)); }\nvoid node_free(struct node *n) { nodep p = (nodep)n; free(p); }\nstruct attr *node_attr(struct node *n) { return n->attr; }\nvoid attr_free(struct attr *a) { free(a); }\nstruct buf *buf_new(void) { return malloc(sizeof(struct buf)); }\nvoid buf_free(struct buf *b) { lib_free(b); }\nstruct buf *buf_alloc(int n) { return pool_take(n); }\nstruct node *node_next(struct node *n) { return n->next; }\nstruct item *item_new(void) { return malloc(sizeof(struct item)); }\nvoid item_free(struct item *i) { free(i); }\nvoid item_release(struct item *i) { free(i); }\n"
+    let node_c = "#include \"mini.h\"\nfreefn lib_free = free;\ntypedef struct node *nodep;\nstruct node *node_new(void) { return calloc(1, sizeof(struct node)); }\nvoid node_free(struct node *n) { nodep p = (nodep)n; free(p); }\nstruct attr *node_attr(struct node *n) { return n->attr; }\nvoid attr_free(struct attr *a) { free(a); }\nstruct buf *buf_new(void) { return malloc(sizeof(struct buf)); }\nvoid buf_free(struct buf *b) { lib_free(b); }\nstruct buf *buf_alloc(int n) { return pool_take(n); }\nstruct node *node_next(struct node *n) { return n->next; }\nstruct item *item_new(void) { return malloc(sizeof(struct item)); }\nvoid item_free(struct item *i) { free(i); }\nvoid item_release(struct item *i) { free(i); }\nstruct pool *pool_new(void) { return calloc(1, sizeof(struct pool)); }\nvoid pool_free(struct pool *p) { free(p); }\nvoid pool_drop(struct pool *p) { free(p); }\nvoid pool_push(struct pool *p, struct node *n) { n->next = p->top; p->top = n; }\n"
     rc = bs_write_fixture(ctx, bs_join(lib_dir, "node.c"), node_c, "facade by evidence node unit")
     if rc != 0: return rc
     let doc_c = "#include \"mini.h\"\nstatic struct doc *g_doc;\nstatic struct doc *alloc_doc(void) { return malloc(sizeof(struct doc)); }\nstruct doc *doc_new(void) { struct doc *d = alloc_doc(); if (d == NULL) return NULL; memset(d, 0, sizeof *d); return d; }\nstruct doc *doc_open(const char *path) { (void)path; return doc_new(); }\nstruct node *doc_root(struct doc *d) { return d->root; }\nstruct node *doc_first(struct doc *d) { return doc_root(d); }\nvoid doc_free(struct doc *d) { struct node *n = d->root; while (n) { struct node *next = n->next; node_free(n); n = next; } free(d); }\nvoid doc_discard(struct doc *d, int why) { (void)why; doc_free(d); }\nvoid doc_keep(struct doc *d) { g_doc = d; }\nstruct node *doc_add(struct doc *d, struct node *n) { n->next = d->root; d->root = n; return n; }\nstruct node *doc_pick(struct doc *d, int i) { return i ? d->root : node_new(); }\nint doc_count(struct doc *d) { return d->n; }\nvoid doc_adopt(struct doc *d, struct node *n) { n->next = d->root; d->root = n; }\n"
@@ -4349,10 +4360,23 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     args |> push(bs_abs(root, lib_dir))
     args |> push("--facade")
     args |> push("mini")
+    args |> push("--facts")
+    args |> push(bs_abs(root, bs_join(case_dir, "facts.w")))
     args |> push("-o")
     args |> push(bs_abs(root, draft))
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-facade-by-evidence", args)
     if result.rc != 0: return result.rc
+    var bad_args: List[str] = List.new()
+    bad_args |> push("migrate")
+    bad_args |> push(bs_abs(root, lib_dir))
+    bad_args |> push("--facade")
+    bad_args |> push("mini")
+    bad_args |> push("--facts")
+    bad_args |> push(bs_abs(root, bs_join(case_dir, "bad_facts.w")))
+    let bad = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-facade-uncited-fact", &bad_args, 180000, case_dir)
+    if bad.rc == 0: return bs_fail(ctx, "a registry fact without its citation was accepted")
+    rc = bs_assert_contains(ctx, bad.stderr, "bad_facts.w:3: a fact needs its citation after `//`", "registry: an uncited fact is refused with its line")
+    if rc != 0: return rc
     // The draft: one resource per representation with producers and one
     // unary destroyer, every clause with its proof.
     rc = bs_file_contains(ctx, draft, "resource Doc wraps *mut doc\n        from doc_new    // proof: returns d, a fresh allocation never retained\n        from doc_open    // proof: returns doc_new(…), a fresh allocation never retained\n        drop doc_free    // proof: frees param 0\n        destroys doc_discard    // proof: frees its doc parameter\n", "facade draft: Doc resource")
@@ -4396,8 +4420,22 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "item_free: destroyer, param 0 (proof: frees it; the introspection file names it the record's free function) [gir: a record's free function]", "facade report: named destroyer")
     if rc != 0: return rc
+    // D121 step 4: the registry's facts, below the file, each with its
+    // citation as provenance; the drop among two unary destroyers.
+    rc = bs_file_contains(ctx, draft, "resource Pool wraps *mut pool\n        from pool_new    // proof: returns calloc(…), a fresh allocation never retained\n        from pool_fetch    // registry: pool.c (not in this package): returns a pool the caller owns\n        drop pool_free    // proof: frees param 0; the registry names it the drop: mini.h: pool_free releases the pool; pool_drop is its alias\n        destroys pool_drop    // proof: frees its pool parameter\n", "facade draft: the registry names the drop and a producer")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, draft, "fn pool_peek\n        returns borrow Node from param 0    // registry: pool.c: returns p->top\n", "facade draft: a borrow the registry states")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, draft, "fn pool_push\n        consumes param 1    // registry: pool.c: the node is linked into the pool, which frees it\n", "facade draft: a consumed parameter the registry states")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, draft, "fn pool_size\n        lend    // registry: pool.c: counts the nodes, stores nothing\n", "facade draft: a lend the registry states")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "pool_push: consumes param 1 (registry: pool.c: the node is linked into the pool, which frees it) [registry: consumes:1: pool.c: the node is linked into the pool, which frees it]", "facade report: registry consumes")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "pool_drop: destroyer, param 0 (proof: frees it)", "facade report: the other unary destroyer")
+    if rc != 0: return rc
     // The report says why.
-    rc = bs_assert_contains(ctx, result.stderr, "facade mini: 24 functions, 21 presented safely, 3 raw; 1 internal (no prototype declares them)", "facade report: summary")
+    rc = bs_assert_contains(ctx, result.stderr, "facade mini: 31 functions, 28 presented safely, 3 raw; 1 internal (no prototype declares them)", "facade report: summary")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, draft, "fn doc_count\n        lend    // proof: reads its resource parameters, keeps nothing\n", "facade draft: lend")
     if rc != 0: return rc
@@ -4413,13 +4451,13 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "doc_pick: raw: returns *mut node unproven: no single source", "facade report: two sources")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, result.stderr, "doc_count: lend (reads its resource parameters, keeps nothing)", "facade report: lend")
+    rc = bs_assert_contains(ctx, result.stderr, "doc_count: lend (proof: reads its resource parameters, keeps nothing)", "facade report: lend")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "doc_discard: destroyer, param 0 (proof: frees it)", "facade report: forwarded destroyer")
     if rc != 0: return rc
     // The draft is a facade the compiler accepts against the header.
     let program = bs_join(lib_dir, "use_mini.w")
-    rc = bs_write_fixture(ctx, program, "use c_import(\"mini.h\")\n" ++ text ++ "\nfn main:\n    let Some(d) = Doc.open(\"x\") else:\n        return 1\n    let Some(n) = Node.new() else:\n        return 2\n    let a = n.attr()\n    if a.is_none(): return 3\n    let r = d.root()\n    if r.is_none(): return 4\n    let Some(i) = Item.new() else:\n        return 5\n    let l = d.last()\n    if l.is_none(): return 6\n    print(d.count())\n", "facade by evidence program")
+    rc = bs_write_fixture(ctx, program, "use c_import(\"mini.h\")\n" ++ text ++ "\nfn main:\n    let Some(d) = Doc.open(\"x\") else:\n        return 1\n    let Some(n) = Node.new() else:\n        return 2\n    let a = n.attr()\n    if a.is_none(): return 3\n    let r = d.root()\n    if r.is_none(): return 4\n    let Some(i) = Item.new() else:\n        return 5\n    let l = d.last()\n    if l.is_none(): return 6\n    let Some(p) = Pool.new() else:\n        return 7\n    print(p.size())\n    print(d.count())\n", "facade by evidence program")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
