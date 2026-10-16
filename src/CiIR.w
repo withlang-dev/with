@@ -977,6 +977,11 @@ type CiProjectSymbol {
     // (`malloc;nonnull(1);returns_nonnull`), annotation evidence below a
     // proof and above the registry (§16.2b.2).
     attrs: str,
+    // D121 step 3: what the package's GObject-introspection files declare
+    // about the function (CiGir.w: the return's transfer, nullability and
+    // introspected type, the instance parameter, each parameter's
+    // transfer), "" when no file names it. The same tier as `attrs`.
+    gir: str,
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
@@ -1007,6 +1012,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         owns_return: 0,
         borrow_from: -1,
         own_reason: "",
+        gir: "",
         header_declared: 0,
         attrs: "",
     }

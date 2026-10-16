@@ -56,7 +56,22 @@ Below a proof and above the registry (§16.2b.2) come the annotations the
 library ships: a declaration carrying `__attribute__((malloc))` whose body
 proves nothing is an owned producer with the provenance `annotation:`;
 `nonnull` and `returns_nonnull` are header facts `c_import` reads directly
-and the report names them beside the function.
+and the report names them beside the function. The package's
+GObject-introspection files (every `*.gir` under the input directory, or
+one named with `--gir FILE`) are read the same way (`src/CiGir.w`, over
+`std.encoding.xml`), joined by C identifier: a return with
+`transfer-ownership="full"` the body proves nothing about is an owned
+producer; one with `"none"` is a borrow of the instance parameter when the
+function is a method, else of its one pointer parameter (D134: one origin
+per call); a parameter with `"full"` that is a modeled resource and not
+destroyed is `consumes param N`; a record's `free-function` (or
+`glib:unref-func`) is its destroyer when no body proves it, and among
+several proven unary destroyers names the `drop`. A function only the file
+describes (declared, never defined in the package) is a subject with its
+declared signature. `transfer-ownership="container"`, callbacks, closures
+and out-parameters stay raw with their reason. The report prints what the
+file said beside each function and says DISAGREES where the proof and the
+file differ; the proof stands.
 
 The draft facade goes to stdout (`-o FILE` writes it): one `resource` per
 pointer-to-record representation that has at least one owned producer and

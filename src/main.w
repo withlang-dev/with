@@ -305,7 +305,7 @@ fn cli_value_or_prefix(argc: i32, flag: &str, prefix: &str) -> str:
 // Every flag the driver reads, for any command (#2198). A flag is known by
 // its name, the part before any `=`.
 fn cli_known_flags() -> List[str]:
-    ["--abi-sha", "--alloc", "--bundle-corpus", "--bundle-fingerprint", "--c-export-functions", "--c-export", "--c-sysroot", "--c-target", "--ceremony-census", "--check", "--contains", "--convert-goto-to-structured", "--debug-alloc-filter", "--debug-alloc", "--deterministic", "--diff", "--dry-run", "--dump-abi", "--dump-ast", "--dump-async-mir", "--dump-drop-plan", "--dump-drop-state", "--dump-mir", "--dump-place-map", "--dump-project-info", "--dump-resolved", "--dump-tokens", "--dump-typed", "--emit-all", "--emit-bundle-interface", "--emit-bundle-manifest", "--emit-c", "--emit-obj", "--exclude", "--exit-code", "--explain-mir-origin", "--explain", "--facade", "--fail-fast", "--filter", "--force-reinstall", "--force", "--freestanding", "--from-source", "--generation", "--graph", "--help", "--ir-roundtrip", "--keep-binary", "--lib", "--link-bundle", "--link-object", "--migrate-one", "--name", "--no-c-export", "--no-deps", "--no-prelude", "--no-runtime", "--no-std", "--open", "--out", "--output", "--overflow", "--prefer-brace", "--prefer-colon", "--prefer-curly", "--prelude", "--quiet", "--release", "--runtime-generation", "--self-id", "--sema-body-order-reverse", "--shared-defs", "--shared-fragment", "--stats", "--strict-effects", "--target", "--test", "--trace-alloc", "--trace-cleanup-edge", "--trace-ownership", "--trace-place", "--validate-all", "--validate-ownership", "--verbose", "--version", "--width-slice", "-D", "-e", "-f", "-g0", "-h", "-I", "-include", "-l", "-n", "-o", "-O0", "-O1", "-O2", "-O3", "-p", "-q", "-v", "-w"]
+    ["--abi-sha", "--alloc", "--bundle-corpus", "--bundle-fingerprint", "--c-export-functions", "--c-export", "--c-sysroot", "--c-target", "--ceremony-census", "--check", "--contains", "--convert-goto-to-structured", "--debug-alloc-filter", "--debug-alloc", "--deterministic", "--diff", "--dry-run", "--dump-abi", "--dump-ast", "--dump-async-mir", "--dump-drop-plan", "--dump-drop-state", "--dump-mir", "--dump-place-map", "--dump-project-info", "--dump-resolved", "--dump-tokens", "--dump-typed", "--emit-all", "--emit-bundle-interface", "--emit-bundle-manifest", "--emit-c", "--emit-obj", "--exclude", "--exit-code", "--explain-mir-origin", "--explain", "--facade", "--fail-fast", "--filter", "--force-reinstall", "--force", "--freestanding", "--from-source", "--generation", "--gir", "--graph", "--help", "--ir-roundtrip", "--keep-binary", "--lib", "--link-bundle", "--link-object", "--migrate-one", "--name", "--no-c-export", "--no-deps", "--no-prelude", "--no-runtime", "--no-std", "--open", "--out", "--output", "--overflow", "--prefer-brace", "--prefer-colon", "--prefer-curly", "--prelude", "--quiet", "--release", "--runtime-generation", "--self-id", "--sema-body-order-reverse", "--shared-defs", "--shared-fragment", "--stats", "--strict-effects", "--target", "--test", "--trace-alloc", "--trace-cleanup-edge", "--trace-ownership", "--trace-place", "--validate-all", "--validate-ownership", "--verbose", "--version", "--width-slice", "-D", "-e", "-f", "-g0", "-h", "-I", "-include", "-l", "-n", "-o", "-O0", "-O1", "-O2", "-O3", "-p", "-q", "-v", "-w"]
 
 // The first argument that looks like a flag and names none the driver
 // knows, or "". A flag's value (`-o out`, `--target x`) is skipped.
@@ -5421,7 +5421,7 @@ fn migrate_apply_std_use_fixits(output_path: &str) -> i32:
 
 fn run_migrate_command(argc: i32) -> i32:
     if argc < 3:
-        eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir] [-include header] [--exclude basename] [--c-export] [--c-target triple --c-sysroot dir] [--facade NAME]")
+        eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir] [-include header] [--exclude basename] [--c-export] [--c-target triple --c-sysroot dir] [--facade NAME [--gir FILE]]")
         return 1
     // #1915: the migrator parses C as c_import does (compiler.Frontend): on
     // Windows x86_64 for the windows-gnu target against the C runtime the
@@ -5451,11 +5451,18 @@ fn run_migrate_command(argc: i32) -> i32:
     // D121: `--facade NAME` draws the package's facade draft instead of a
     // migration (CiMigrate.w migrate_c_facade).
     var facade_name = ""
+    // `--gir FILE`: a GObject-introspection file outside the input tree
+    // (every `.gir` under the input directory is read without it).
+    var gir_path = ""
     var ai = 2
     while ai < argc:
         let arg = with_arg_at(ai)
         if arg == "--facade" and ai + 1 < argc:
             facade_name = with_arg_at(ai + 1)
+            ai = ai + 2
+            continue
+        if arg == "--gir" and ai + 1 < argc:
+            gir_path = with_arg_at(ai + 1)
             ai = ai + 2
             continue
         if arg == "--c-target" and ai + 1 < argc:
@@ -5558,7 +5565,7 @@ fn run_migrate_command(argc: i32) -> i32:
         ci_set_c_model(c_target, c_sysroot)
 
     if facade_name.len() > 0:
-        return migrate_c_facade(source_path, facade_name, exclude_basenames, output_path)
+        return migrate_c_facade(source_path, facade_name, exclude_basenames, output_path, gir_path)
 
     // Detect if source is a directory (ends with / or doesn't end with .c/.h)
     let is_dir = (source_path.len() > 0 and source_path[source_path.len() - 1] == 47) or (source_path.len() > 2 and source_path.slice(source_path.len() - 2, source_path.len()) != ".c" and source_path.slice(source_path.len() - 2, source_path.len()) != ".h")
