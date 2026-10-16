@@ -71,7 +71,16 @@ describes (declared, never defined in the package) is a subject with its
 declared signature. `transfer-ownership="container"`, callbacks, closures
 and out-parameters stay raw with their reason. The report prints what the
 file said beside each function and says DISAGREES where the proof and the
-file differ; the proof stands.
+file differ; the proof stands. Below both comes the package registry
+(`--facts FILE`, `registry/c/<package>/facts.w` in the toolchain's
+repository, `registry/README.md`; `src/CiFacts.w`): a facade fragment in
+the draft's own spelling whose every fact carries its citation after `//`
+(a fact without one is refused with its line), stating what neither a
+proof nor an annotation settled: `from F`, `drop F` and `destroys F` on a
+resource, `consumes param N`, `returns borrow R from param N` and `lend`
+on an item. Among several proven unary destroyers the registry's `drop`
+is the drop; a registry fact's provenance in the draft is `registry:` with
+its citation; the report says DISAGREES where a proof differs.
 
 The draft facade goes to stdout (`-o FILE` writes it): one `resource` per
 pointer-to-record representation that has at least one owned producer and

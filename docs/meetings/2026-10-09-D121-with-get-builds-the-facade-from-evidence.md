@@ -106,7 +106,13 @@ instance or the one pointer parameter), a parameter's `full` transfer as
 among several, its `drop`; a function only the file describes is a subject
 with its declared signature; the report says DISAGREES where the file and
 a proof differ, and the proof stands. The compiler using a new std module
-raised the minimum seed. Steps 4–6 are open.
+raised the minimum seed. Step 4 landed 2026-10-15 on Eric's "proceed" to
+the brief (D136): the registry is `registry/c/<package>/facts.w` in this
+repository, a facade fragment in the draft's own spelling, every fact with
+its citation after `//`, landing by pull request; the engine reads it with
+`--facts FILE` (`src/CiFacts.w`) below proofs and annotations, and
+`registry/c/zlib/facts.w` names `gzclose` the drop of `gzFile_s`. Steps
+5–6 are open.
 
 **What would reopen it.** A Conan Center majority of binary-only packages,
 or proofs that cover too little of ordinary libraries to make the registry

@@ -982,6 +982,10 @@ type CiProjectSymbol {
     // introspected type, the instance parameter, each parameter's
     // transfer), "" when no file names it. The same tier as `attrs`.
     gir: str,
+    // D121 step 4: the package registry's fact for the function
+    // (CiFacts.w: `kind=…;cite=…`), "" when the file states none. Below
+    // `attrs` and `gir`, above a convention profile (§16.2b.2).
+    registry: str,
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
@@ -1013,6 +1017,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         borrow_from: -1,
         own_reason: "",
         gir: "",
+        registry: "",
         header_declared: 0,
         attrs: "",
     }
