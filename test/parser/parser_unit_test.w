@@ -317,6 +317,45 @@ fn test_goto_and_statement_labels:
     assert(adjacent_pool.kind(adjacent_inner) == NodeKind.NK_LABEL)
     assert(adjacent_pool.kind(adjacent_pool.get_data1(adjacent_inner)) == NodeKind.NK_RETURN)
 
+fn parse_first_diag(src: str) -> (i32, str, str):
+    var lexer = Lexer.init(src, 0)
+    let tokens = lexer.tokenize()
+    var intern = InternPool.init()
+    var diags = DiagnosticList.init()
+    var parser = Parser.init(tokens, src, 0, intern, diags)
+    let _ = parser.parse_module()
+    let count = parser.diags.count()
+    if count == 0:
+        return (0, "", "")
+    let d = &parser.diags.items[0]
+    (count, d.code, d.message)
+
+fn test_it_keyword_in_param_and_pattern_diagnostics:
+    let fn_param = parse_first_diag("fn f(it: i32) -> i32: it\n")
+    assert(fn_param.0 == 1)
+    assert(fn_param.1 == "E0953")
+    assert(fn_param.2 == "'it' is a reserved keyword and cannot be used as a parameter name")
+
+    let bound_param = parse_first_diag("fn f[I: Iter[&T]](it: I) -> i32: 0\n")
+    assert(bound_param.0 == 1)
+    assert(bound_param.1 == "E0953")
+    assert(bound_param.2 == "'it' is a reserved keyword and cannot be used as a parameter name")
+
+    let pat_param = parse_first_diag("fn f((it, x): (i32, i32)) -> i32: x\n")
+    assert(pat_param.0 == 1)
+    assert(pat_param.1 == "E0953")
+    assert(pat_param.2 == "'it' is a reserved keyword and cannot be used as an identifier")
+
+    let for_pat = parse_first_diag("fn f:\n    for it in [1, 2]:\n        0\n")
+    assert(for_pat.0 == 1)
+    assert(for_pat.1 == "E0953")
+    assert(for_pat.2 == "'it' is a reserved keyword and cannot be used as an identifier")
+
+    let single_closure = parse_first_diag("fn f:\n    let g = it => it + 1\n")
+    assert(single_closure.0 == 1)
+    assert(single_closure.1 == "E0953")
+    assert(single_closure.2 == "'it' is a reserved keyword and cannot be used as a parameter name")
+
 fn main:
     test_char_literal_lowering()
     test_byte_char_literal_lowering()
@@ -337,4 +376,6 @@ fn main:
     test_c_import_malformed_syntax_matrix()
     test_chained_sugar_precedence_and_associativity()
     test_goto_and_statement_labels()
+    test_it_keyword_in_param_and_pattern_diagnostics()
     print("ok")
+
