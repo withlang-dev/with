@@ -6281,6 +6281,7 @@ impl MirBuilder:
         let elem: i32 = self.sema.concat_sequence_nodes.get(concat_node) ?? 0
         let target = self.lower_expr_place(place_expr)
         let more = self.lower_concat_operand(more_expr, elem)
+        self.make_unique_before_mutation(target)
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("extend"), self.sema.ty_void)
         let args: List[i32] = List.new()
         args.push(self.body.new_operand(OperandKind.OK_COPY, target))
@@ -10167,6 +10168,7 @@ impl MirBuilder:
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
         self.switch_to(body_bb)
+        self.make_unique_before_mutation(list_place)
         let slot_local = self.new_temp(slot_ty)
         let slot_place = self.place_for_local(slot_local)
         let slot_args: List[i32] = List.new()
@@ -11616,6 +11618,7 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, span)
         if self.type_needs_value_drop(elem_ty) != 0:
             self.schedule_drop(local_id, DropKind.DK_VALUE)
+        self.make_unique_before_mutation(list_place)
         let args: List[i32] = [self.body.new_operand(OperandKind.OK_COPY, list_place), idx_op]
         let args_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_REMOVE)
@@ -13711,6 +13714,9 @@ impl MirBuilder:
                 recv_op = self.lower_contextual_copy_adjustment(self_expr)
             else if self.callee_has_mut_self(callee_sym):
                 recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
+                // D120: a `mut self` method of a value List writes it.
+                if recv_op >= 0 and self.body.operand_kinds[recv_op] != OperandKind.OK_CONSTANT:
+                    self.make_unique_before_mutation(self.body.operand_d0[recv_op])
             else if self.callee_has_move_self(callee_sym) and self.ast.kind(self_expr) == NodeKind.NK_IDENT and self.lookup_local(self.ast.get_data0(self_expr)) >= 0:
                 // §9.5/#D5: a `move self` receiver that is a caller-owned LOCAL is
                 // CONSUMED — lower it as OK_MOVE of the caller's place and consume it
@@ -14498,7 +14504,35 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, unit, args_id, elem_place, next_bb)
         self.switch_to(next_bb)
 
+    // D120 (§2.3): the List intrinsics that write their receiver.
+    fn list_intrinsic_mutates(kind: MirIntrinsic) -> bool:
+        kind == MirIntrinsic.LIST_PUSH or kind == MirIntrinsic.LIST_SET or kind == MirIntrinsic.LIST_REMOVE or kind == MirIntrinsic.LIST_CLEAR or kind == MirIntrinsic.LIST_POP or kind == MirIntrinsic.LIST_EXTEND or kind == MirIntrinsic.LIST_SLOT or kind == MirIntrinsic.LIST_ITER_PLACE or kind == MirIntrinsic.LIST_GET_DISJOINT or kind == MirIntrinsic.LIST_RESTORE_FRONT or kind == MirIntrinsic.LIST_TAKE_FRONT
+
+    // D120 (§2.3): a mutation of a List of values the compiler has not
+    // proven unique is preceded by LIST_MAKE_UNIQUE on the place — a copy
+    // of a value list shares its buffer under a count, and the first
+    // mutation of a shared buffer copies it (copy-on-write). A List of
+    // resources moves and is never shared, so it takes no check. Where the
+    // check sits is MIR's (D65); the uniqueness proof and the hoisting out
+    // of loops are the plan's stage 4.
+    mut fn make_unique_before_mutation(list_place: i32):
+        if list_place < 0 or list_place >= self.body.place_sema_types.len():
+            return
+        let ty = self.body.place_sema_types[list_place]
+        if ty <= 0 or self.sema.std_generic_of(ty) != StdGeneric.List or self.sema.is_copy_frozen(ty as TypeId) == 0:
+            return
+        let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("__make_unique"), self.sema.ty_void)
+        let args: List[i32] = [self.body.new_operand(OperandKind.OK_COPY, list_place)]
+        let args_id = self.body.new_call_args(args)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_MAKE_UNIQUE)
+        let result_local = self.new_temp(self.sema.ty_void)
+        let result_place = self.place_for_local(result_local)
+        let next_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+        self.switch_to(next_bb)
+
     mut fn emit_list_push(list_place: i32, elem_op: i32, span: i32):
+        self.make_unique_before_mutation(list_place)
         let push_sym = self.sema.syms.push
         let fn_op = self.const_operand(ConstKind.CK_FN, push_sym, self.sema.ty_void)
         let args: List[i32] = List.new()
@@ -15932,6 +15966,9 @@ impl MirBuilder:
     mut fn lower_intrinsic_call_with_receiver_operand(intrinsic: MirIntrinsic, recv_op: i32, recv_type: i32, method_sym: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
         let call_args: List[i32] = List.new()
+        // D120: a writing intrinsic on a value List makes it unique first.
+        if self.list_intrinsic_mutates(intrinsic) and self.body.operand_kinds[recv_op] != OperandKind.OK_CONSTANT:
+            self.make_unique_before_mutation(self.body.operand_d0[recv_op])
         // A builtin reads its receiver in place (D110): a copy takes no hold.
         if self.body.operand_kinds[recv_op] == OperandKind.OK_MOVE:
             self.consume_moved_operand(recv_op)

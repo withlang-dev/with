@@ -78,6 +78,7 @@ enum CcBuiltin: i32:
 
     LIST_REMOVE
     LIST_CLEAR
+    LIST_MAKE_UNIQUE
     MAP_NEW
     MAP_INSERT
     MAP_GET
@@ -200,6 +201,7 @@ fn cc_builtin_uses_list_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.LIST_ULEN32: return true
     if kind == CcBuiltin.LIST_REMOVE: return true
     if kind == CcBuiltin.LIST_CLEAR: return true
+    if kind == CcBuiltin.LIST_MAKE_UNIQUE: return true
     if kind == CcBuiltin.LIST_POP: return true
     if kind == CcBuiltin.LIST_EXTEND: return true
     if kind == CcBuiltin.LIST_TAKE_FRONT: return true
@@ -6760,6 +6762,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
 
     if intrinsic == MirIntrinsic.LIST_REMOVE: return CcBuiltin.LIST_REMOVE
     if intrinsic == MirIntrinsic.LIST_CLEAR: return CcBuiltin.LIST_CLEAR
+    if intrinsic == MirIntrinsic.LIST_MAKE_UNIQUE: return CcBuiltin.LIST_MAKE_UNIQUE
     if intrinsic == MirIntrinsic.LIST_POP: return CcBuiltin.LIST_POP
     if intrinsic == MirIntrinsic.MAP_NEW: return CcBuiltin.MAP_NEW
     if intrinsic == MirIntrinsic.MAP_INSERT: return CcBuiltin.MAP_INSERT
@@ -7048,6 +7051,22 @@ impl CCodegen:
                 return "    abort();"
             let recv_ptr = self.list_recv_ptr_text(body, args_id)
             var out = "    with_vec_clear(" ++ recv_ptr ++ ");\n"
+            out = out ++ f"    goto bb{next_bb};"
+            return out
+
+        if kind == CcBuiltin.LIST_MAKE_UNIQUE:
+            // D120: copy-on-write before a mutation of a value List. The C
+            // backend copies bits; a List whose elements carry copy glue is
+            // not emitted in C yet, and says so.
+            if argc < 1:
+                self.fail("list make-unique expects one argument")
+                return "    abort();"
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
+            let elem_tid = self.list_element_tid(self.operand_tid(body, self.call_arg_operand(body, args_id, 0)))
+            if elem_tid > 0 and self.sema.type_needs_drop_frozen(elem_tid) != 0:
+                self.fail("emit-c: D120 copy-on-write of a List whose elements have copy glue is not emitted in C yet")
+                return "    abort();"
+            var out = "    (void)with_vec_make_unique_bits(" ++ recv_ptr ++ ", " ++ self.list_recv_elem_sizeof_text(body, args_id) ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 

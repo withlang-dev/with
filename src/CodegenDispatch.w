@@ -5913,6 +5913,47 @@ impl Codegen:
 
     // #606: emit a [0..len) loop that drops each live element of a List via the
     // runtime accessors, then leaves the buffer for mir_emit_vec_free_ptr.
+    // D120: after copy-on-write copied a shared buffer's bits, each element
+    // with copy glue (a str, a value list, a struct holding one) is one more
+    // holder of what it shares: the copy glue runs over the fresh buffer.
+    mut fn mir_emit_list_element_copy_glue_ptr(ptr: i64, list_sema_ty: i32):
+        if ptr == 0 or list_sema_ty <= 0:
+            return
+        let elem_sema = self.mir_list_elem_sema_type_from_sema_type(list_sema_ty)
+        if elem_sema <= 0 or self.sema.type_needs_drop_frozen(elem_sema) == 0:
+            return
+        let elem_ty = self.mir_sema_type_to_llvm(elem_sema)
+        if elem_ty == 0:
+            return
+        let i64_ty = wl_i64_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
+        let len_val = self.mir_list_len_inline(ptr)
+        let buffer = wl_build_load(self.builder, ptr_ty, ptr)
+        let zero = wl_const_int(i64_ty, 0, 0)
+        let has_elems = wl_build_icmp(self.builder, wl_int_sgt(), len_val, zero)
+        let entry_bb = wl_get_insert_block(self.builder)
+        let loop_bb = wl_append_bb(self.context, self.current_function, "cow.glue.loop")
+        let done_bb = wl_append_bb(self.context, self.current_function, "cow.glue.done")
+        wl_build_cond_br(self.builder, has_elems, loop_bb, done_bb)
+        wl_position_at_end(self.builder, loop_bb)
+        let idx_phi = wl_build_phi(self.builder, i64_ty)
+        let elem_indices: List[i64] = List.new()
+        elem_indices.push(idx_phi)
+        let elem_ptr = wl_build_gep(self.builder, elem_ty, buffer, list_data_i64(&elem_indices), 1)
+        self.mir_emit_copy_glue_ptr(elem_ptr, elem_ty, elem_sema)
+        let next_idx = wl_build_add(self.builder, idx_phi, wl_const_int(i64_ty, 1, 0))
+        let more = wl_build_icmp(self.builder, wl_int_slt(), next_idx, len_val)
+        wl_build_cond_br(self.builder, more, loop_bb, done_bb)
+        let loop_end_bb = wl_get_insert_block(self.builder)
+        let phi_vals: List[i64] = List.new()
+        phi_vals.push(zero)
+        phi_vals.push(next_idx)
+        let phi_bbs: List[i64] = List.new()
+        phi_bbs.push(entry_bb)
+        phi_bbs.push(loop_end_bb)
+        wl_add_incoming(idx_phi, list_data_i64(&phi_vals), list_data_i64(&phi_bbs), 2)
+        wl_position_at_end(self.builder, done_bb)
+
     mut fn mir_emit_list_element_drops_ptr(ptr: i64, list_sema_ty: i32):
         if ptr == 0 or list_sema_ty <= 0:
             return
@@ -5994,6 +6035,17 @@ impl Codegen:
             let args: List[i64] = List.new()
             args.push(ptr)
             let _ = wl_build_call(self.builder, wl_global_get_value_type(retain_fn), retain_fn, list_data_i64(&args), 1)
+            return
+        // D120: a List of values shares its buffer — one more holder.
+        if self.mir_sema_type_is_std_list(resolved):
+            let elem_sema = self.mir_list_elem_sema_type_from_sema_type(resolved)
+            let es = if elem_sema > 0: self.mir_list_elem_size_of_sema(elem_sema) else: 0
+            let retain_fn = self.ensure_list_runtime_fn("with_vec_retain", wl_void_type(self.context), 2)
+            let retain_ty = self.get_list_fn_type("with_vec_retain", wl_void_type(self.context), 2)
+            let args: List[i64] = List.new()
+            args.push(ptr)
+            args.push(wl_const_int(wl_i64_type(self.context), es, 0))
+            let _ = wl_build_call(self.builder, retain_ty, retain_fn, list_data_i64(&args), 2)
             return
         if tk == TypeKind.TY_TUPLE:
             for i in 0..self.sema.get_type_d1(resolved as TypeId):
@@ -6333,11 +6385,30 @@ impl Codegen:
         let elem_sema = self.mir_list_elem_sema_type_from_sema_type(sema_ty)
         if with_getenv_str("WITH_TRACE_VECDROP").len() > 0:
             with_eprint(f"[vecdrop] sema_ty={sema_ty} elem_sema={elem_sema} needs_drop={if elem_sema > 0: self.sema.type_needs_drop_frozen(elem_sema) else: -1}")
-        if elem_sema > 0 and self.sema.type_needs_drop_frozen(elem_sema) != 0:
-            self.mir_emit_list_element_drops_ptr(ptr, sema_ty)
         if elem_sema <= 0:
             sema_phase_bug(f"BUG: dropping a List whose element Sema did not type (sema_ty={sema_ty}; D115 Amendment 1)")
-        self.mir_emit_list_free_ptr(ptr, self.mir_list_elem_size_of_sema(elem_sema))
+        let es = self.mir_list_elem_size_of_sema(elem_sema)
+        // D120: a List of values may share its buffer; only the last holder
+        // drops the elements and frees it (with_vec_release_last blanks the
+        // header otherwise). A List of resources is never shared and takes
+        // the same path: its count is always zero.
+        let i64_ty = wl_i64_type(self.context)
+        let release_fn = self.ensure_list_runtime_fn("with_vec_release_last", i64_ty, 2)
+        let release_ty = self.get_list_fn_type("with_vec_release_last", i64_ty, 2)
+        let rel_args: List[i64] = List.new()
+        rel_args.push(ptr)
+        rel_args.push(wl_const_int(i64_ty, es, 0))
+        let last = wl_build_call(self.builder, release_ty, release_fn, list_data_i64(&rel_args), 2)
+        let is_last = wl_build_icmp(self.builder, wl_int_ne(), last, wl_const_int(i64_ty, 0, 0))
+        let last_bb = wl_append_bb(self.context, self.current_function, "drop.list.last")
+        let done_bb = wl_append_bb(self.context, self.current_function, "drop.list.done")
+        wl_build_cond_br(self.builder, is_last, last_bb, done_bb)
+        wl_position_at_end(self.builder, last_bb)
+        if self.sema.type_needs_drop_frozen(elem_sema) != 0:
+            self.mir_emit_list_element_drops_ptr(ptr, sema_ty)
+        self.mir_emit_list_free_ptr(ptr, es)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
         true
 
     // HashMap[K, V] and HashSet[T] are opaque { ptr } values in LLVM. Generic
@@ -10237,6 +10308,32 @@ impl Codegen:
             rm_args.push(idx64)
             rm_args.push(rm_es)
             let _ = wl_build_call(self.builder, remove_ty, remove_fn, list_data_i64(&rm_args), 3)
+
+        else if intrinsic == MirIntrinsic.LIST_MAKE_UNIQUE:
+            // D120: copy-on-write before a mutation of a value List. The
+            // runtime copies the bits of a shared buffer; elements with copy
+            // glue (a str) are then each retained in the fresh buffer.
+            let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+            let recv_op = body.call_arg_operands[arg_start]
+            let recv_sema = self.mir_operand_sema_type(body, recv_op)
+            let mu_es = wl_const_int(i64_ty, self.mir_list_recv_elem_size(body, args_id), 0)
+            let mu_fn = self.ensure_list_runtime_fn("with_vec_make_unique_bits", i64_ty, 2)
+            let mu_ty = self.get_list_fn_type("with_vec_make_unique_bits", i64_ty, 2)
+            let mu_args: List[i64] = List.new()
+            mu_args.push(recv_ptr)
+            mu_args.push(mu_es)
+            let copied = wl_build_call(self.builder, mu_ty, mu_fn, list_data_i64(&mu_args), 2)
+            let mu_elem_sema = self.mir_list_elem_sema_type_from_sema_type(recv_sema)
+            if mu_elem_sema > 0 and self.sema.type_needs_drop_frozen(mu_elem_sema) != 0:
+                let did_copy = wl_build_icmp(self.builder, wl_int_ne(), copied, wl_const_int(i64_ty, 0, 0))
+                let glue_bb = wl_append_bb(self.context, self.current_function, "cow.glue")
+                let after_bb = wl_append_bb(self.context, self.current_function, "cow.done")
+                wl_build_cond_br(self.builder, did_copy, glue_bb, after_bb)
+                wl_position_at_end(self.builder, glue_bb)
+                self.mir_emit_list_element_copy_glue_ptr(recv_ptr, recv_sema)
+                wl_build_br(self.builder, after_bb)
+                wl_position_at_end(self.builder, after_bb)
+            result = 0
 
         else if intrinsic == MirIntrinsic.LIST_CLEAR:
             // #606: drop each live element before resetting len. No-op for POD elements
