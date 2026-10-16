@@ -1,5 +1,6 @@
 // A/B wall-clock measurement of two compilers on one workload (D120's
-// merge gate: self-host compile time and the corpus suites within 2%).
+// merge gate: self-host compile time and the corpus suites within 5%,
+// D120 Amendment 1).
 //
 //   with run tools/ab_bench.w <baseline-with> <candidate-with> <rounds> -- <cmd...>
 //
@@ -7,8 +8,8 @@
 // round runs the baseline then the candidate (interleaved, A B A B …), the
 // wall is the clock around the whole command, and the report gives each
 // side's median, the ratio candidate/baseline, and the spread (min..max)
-// of the per-round ratios, which is what a 2% verdict is judged on: a
-// regression counts only when every round's ratio exceeds 1.02.
+// of the per-round ratios, which is what the verdict is judged on: a
+// regression counts only when every round's ratio exceeds 1.05.
 use std.process
 use std.time
 use std.string.parse
@@ -68,4 +69,4 @@ fn main:
     let ma = median(a)
     let mb = median(b)
     print(f"median\t{ma:.2}\t{mb:.2}\t{mb / ma:.4}")
-    print(f"ratio spread {lo:.4}..{hi:.4}; regression counts only when every round exceeds 1.02: " ++ (if lo > 1.02: "REGRESSION" else: "within the gate or noise"))
+    print(f"ratio spread {lo:.4}..{hi:.4}; regression counts only when every round exceeds 1.05: " ++ (if lo > 1.05: "REGRESSION" else: "within the gate or noise"))
