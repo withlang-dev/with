@@ -2,14 +2,17 @@
 
 // #1395: the match-arm form of the owned join — same rule as `if`.
 // A List field, not a str: a str field read copies (D111).
-type S { p: List[i32] }
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+type S { p: List[Tok] }
 impl S:
     mut fn f(c: bool):
-        let path: List[i32] = match c:
+        let path: List[Tok] = match c:
             true => self.p
             false => List.new()
         print(path.len())
 fn main:
-    var s = S { p: [1, 2] }
+    var s = S { p: [Tok { id: 1 }, Tok { id: 2 }] }
     s.f(true)
     print(s.p.len())

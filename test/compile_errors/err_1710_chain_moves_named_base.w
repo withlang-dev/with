@@ -5,10 +5,13 @@
 // a silent `Some()`. D22 stage 4 retypes a named-base chain as a view.
 // A List field, not a str: a str field is copied (D111).
 
-type P { a: List[i32], b: i32 }
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+type P { a: List[Tok], b: i32 }
 
 fn main:
-    let o: Option[P] = Some(P { a: [1, 2, 3], b: 4 })
+    let o: Option[P] = Some(P { a: [Tok { id: 1 }, Tok { id: 2 }, Tok { id: 3 }], b: 4 })
     let first = o?.a
     let second = o?.a
     print(f"{first.is_some()} {second.is_some()}")

@@ -5,7 +5,7 @@
 // to vacate the field or `&self.cur` / `.clone()` to observe it. Non-binding
 // patterns on the same place observe it and are not an error. A List payload,
 // not a str: a str payload is copied (D111).
-enum Tok { LBrace | S(List[i32]) }
+enum Tok { LBrace | S(List[Tok]) }
 type P { cur: Option[Tok] = Some(.LBrace) }
 extend P:
     mut fn peek_len() -> i32:

@@ -4,9 +4,9 @@
 // consumes the local whole (§2.2: whole values decompose whole), so a later
 // use is a use-after-move — not a silent read of the reset sentinel. A List
 // payload, not a str: a str is a value and is copied (D111).
-enum Tok { LBrace | S(List[i32]) }
+enum Tok { LBrace | S(List[Tok]) }
 fn show(t: &Option[Tok]) -> i32: match t { Some(_) => 1, None => 0 }
 fn main:
-    var y: Option[Tok] = Some(.S([1]))
+    var y: Option[Tok] = Some(.S([Tok { id: 1 }]))
     let n = match y { Some(.S(s)) => s.len(), _ => 0 }
     print(f"{n} {show(&y)}")

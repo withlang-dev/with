@@ -5,11 +5,14 @@
 // still read Unit while the body was checked, so the check never ran for
 // inferred returns and this vacated the receiver's field.
 // A List field, not a str: a str field read copies (D111).
-type S { p: List[i32] }
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+type S { p: List[Tok] }
 impl S:
     mut fn r(c: bool):
-        if c: self.p else: List[i32].new()
+        if c: self.p else: List[Tok].new()
 fn main:
-    var s = S { p: [1, 2] }
+    var s = S { p: [Tok { id: 1 }, Tok { id: 2 }] }
     print(s.r(true).len())
     print(s.p.len())

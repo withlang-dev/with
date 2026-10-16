@@ -2,7 +2,10 @@
 
 // #1395: `??` with an owned default is an owned join; its Option operand is
 // a field, so the payload would move out of it.
-type S { o: Option[List[i32]] }
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+type S { o: Option[List[Tok]] }
 fn g(c: bool):
     var s = S { o: Some(List.new()) }
     let v = s.o ?? List.new()

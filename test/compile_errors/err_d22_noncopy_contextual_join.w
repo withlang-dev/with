@@ -1,7 +1,10 @@
-//! expect-error: `??` would need to copy a `List[i32]`, which is not Copy
+//! expect-error: `??` would need to copy a `List[Tok]`, which is not Copy
 
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
 fn main:
-    let found: List[i32] = List.new()
-    let fallback: List[i32] = List.new()
-    let carrier: Option[&List[i32]] = Some(&found)
+    let found: List[Tok] = List.new()
+    let fallback: List[Tok] = List.new()
+    let carrier: Option[&List[Tok]] = Some(&found)
     let owned = carrier ?? fallback

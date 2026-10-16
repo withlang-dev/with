@@ -6,11 +6,14 @@
 // exempt (behav_const_consumed_twice_materializes). A List global, not a
 // str: a str global is read by copy (D111).
 
-var g: List[i32] = [1, 2]
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+var g: List[Tok] = [Tok { id: 1 }, Tok { id: 2 }]
 
-type T { inputs: List[List[i32]] }
+type T { inputs: List[List[Tok]] }
 impl T:
-    move fn input(path: List[i32]) -> T:
+    move fn input(path: List[Tok]) -> T:
         var t = self
         t.inputs.push(path)
         t

@@ -4,14 +4,17 @@
 // passed check and double-freed at runtime (the borrow-base tail copied the
 // List and both owners dropped it).
 
-type Holder { v: List[i32], n: i32 }
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+type Holder { v: List[Tok], n: i32 }
 
 impl Holder:
-    fn grab(self: &Self) -> List[i32]: self.v
+    fn grab(self: &Self) -> List[Tok]: self.v
 
 fn main:
-    var xs: List[i32] = List.new()
-    xs.push(7)
+    var xs: List[Tok] = List.new()
+    xs.push(Tok { id: 7 })
     let h = Holder { v: xs, n: 1 }
     let got = h.grab()
     assert(got.len() == 1)

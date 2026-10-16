@@ -4,10 +4,13 @@
 // and a field never moves out implicitly — the error the tail `self.items`
 // gets. A List field, not a str: a str field is copied (D111).
 
-type Holder { n: i32, items: List[i32] }
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+type Holder { n: i32, items: List[Tok] }
 extend Holder:
-    mut fn replace(v: List[i32]) -> List[i32]: self.items = v
+    mut fn replace(v: List[Tok]) -> List[Tok]: self.items = v
 
 fn main:
     var h = Holder { n: 0, items: List.new() }
-    print(h.replace([1]).len())
+    print(h.replace([Tok { id: 1 }]).len())
