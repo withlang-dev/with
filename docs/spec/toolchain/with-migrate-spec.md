@@ -92,8 +92,31 @@ draft presents it (owned producer, destroyer, borrow, lend, value-only) or
 why it stays raw (retains a parameter, returns global state, two sources,
 an unmodeled pointer type), and lists each representation the draft could
 not model (producers with no unary destroyer, or several) for the package
-registry (§16.2b.15 step 3). `with get` consumes this engine to write the
-package facade (step 5).
+registry (§16.2b.15 step 3).
+
+**`with get` writes the facade (step 5).** After it installs a C package,
+`with get` runs this engine over the package's own build: the source the
+recipe names is fetched and configured with CMake (the build `with get`
+makes when it builds from source, or a configure-only pass under
+`.with/deps/c/<name>/<version>/.build` for a Conan Center binary), and the
+corpus is exactly the C units that build compiles, with its include paths
+and defines (`compile_commands.json`), every `.gir` under the source, and
+the registry's facts file for the package, fetched from the toolchain's
+repository at one commit (`WITH_REGISTRY=<base URL>` names a mirror or a
+fixture instead). It writes `.with/deps/c/<name>/<version>/facade.w`, a
+complete module (`use c_import` of each installed header that declares a
+presented function, then the draft), and `facade-report.txt` beside it,
+whose summary `with get` prints; a function whose prototype is only in a
+header the package does not install is not presentable and the report
+says so, and a unit the parser could not read is named with the reason. The
+lock pins the registry commit and the facts file's digest (`registry`,
+`facts_sha256`), and a restore fetches the file at that commit. A program
+reaches the facade as `use facades.<name>` when the project has no
+`facades/<name>.w` of its own under `lib/` or `src/`; a `c facade <name>:`
+block in the project's source overrides any item (an fn item, or a
+resource) the written block also has, and the rest of the written block
+stays. Without CMake, Ninja or `with cc` the package installs with no
+facade and `with get` says why.
 
 **Modes:**
 - `write` (default) — write `.w` files

@@ -17,6 +17,7 @@ use std.http
 use compiler.Link
 use std.crypto.sha256
 use std.string.StringBuilder
+use CiMigrate
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn str_from_byte(b: i32) -> str
 extern fn with_fs_chmod(path: &str, mode: i32) -> i32
@@ -1226,6 +1227,8 @@ fn conan_install_binary(name: &str, version: &str, recipe_rev: &str, project_roo
         let _remove = runtime_remove_tree(dep_dir)
         return ""
     runtime_eprint("  installed to .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
+    // D121 step 5: the facade, from the package's source.
+    conan_facade_of_binary(name, version, project_root, dep_dir, depth)
     with_str_clone_ref(version)
 
 fn conan_recipe_config_url(name: &str) -> str:
@@ -1577,116 +1580,135 @@ fn conan_write_cmake_package_config(project_root: &str, reference: &str, cmake_d
 
 type ConanCMakeConfig { define: str, problem: str }
 
-fn conan_install_from_source(name: &str, version: &str, project_root: &str, depth: i32) -> str:
-    let platform = conan_detect_os() ++ "/" ++ conan_detect_arch()
-    let cmake_env_name = conan_package_cmake_env_name(name)
-    let cmake_env = conan_package_cmake_env(name)
-    if cmake_env.problem.len() > 0:
-        return conan_source_fail("", cmake_env_name ++ " entry '" ++ cmake_env.problem ++ "' is not NAME=VALUE (entries are separated by `;`)")
-    let why = if g_conan_from_source: "--from-source" else: if cmake_env.defines.len() > 0: cmake_env_name ++ " is set" else: if conan_builds_from_source_only(): "on Windows every C package is built by the SDK's toolchain" else: "Conan Center has no binary for " ++ platform ++ " that this toolchain can link"
-    runtime_eprint("  " ++ why ++ "; building " ++ name ++ "/" ++ version ++ " from source")
-    let folder = conan_recipe_folder(name, version)
-    let data = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conandata.yml")) else: ""
-    let recipe = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conanfile.py")) else: ""
-    if data.len() == 0 or recipe.len() == 0:
-        return conan_source_fail("", "could not read the Conan Center recipe of " ++ name ++ "/" ++ version)
-    let source = conan_data_source(data, version)
-    if source.urls.len() == 0 or source.sha256.len() == 0:
-        return conan_source_fail("", "the recipe of " ++ name ++ " lists no source archive for " ++ version)
-    // A recipe that ships its own CMakeLists.txt exports it; asking for one
-    // that is not there is a 404 printed at the user.
-    let exports_cmake = recipe.contains("\"CMakeLists.txt\", self.recipe_folder") or recipe.contains("\"CMakeLists.txt\", src=self.recipe_folder") or recipe.contains("exports_sources = \"CMakeLists.txt\"") or recipe.contains("exports_sources = [\"CMakeLists.txt\"")
-    let patch_problem = conan_data_patch_problem(data, version)
-    if patch_problem.len() > 0: return conan_source_fail("", name ++ "/" ++ version ++ " cannot be built from source: " ++ patch_problem)
-    let recipe_cmake = if exports_cmake: conan_http_get(conan_recipe_file_url(name, folder, "CMakeLists.txt")) else: ""
+// What a source build needs on this host: CMake, Ninja, `with cc` and this
+// executable (the C compiler the launchers name). `problem` says what is
+// missing, for the user, before anything is downloaded.
+type ConanSourceTools { cmake: str, ninja: str, self_exe: str, problem: str }
 
-    // Prerequisites first: say what is missing before downloading anything.
+fn conan_tools_problem(problem: &str) -> ConanSourceTools: ConanSourceTools { cmake: "", ninja: "", self_exe: "", problem: problem.to_owned() }
+
+fn conan_source_tools(name: &str) -> ConanSourceTools:
+
     if not with_cc_available():
-        return conan_source_fail("", "building " ++ name ++ " from source needs `with cc`, and this build of `with` has none: the LLVM SDK it was linked against predates it")
+        return conan_tools_problem("building " ++ name ++ " from source needs `with cc`, and this build of `with` has none: the LLVM SDK it was linked against predates it")
     let cmake = conan_build_tool("cmake", "WITH_CMAKE")
     let ninja = conan_build_tool("ninja", "WITH_NINJA")
     if cmake.len() == 0 or ninja.len() == 0:
         let missing = if cmake.len() == 0 and ninja.len() == 0: "cmake and ninja" else: if cmake.len() == 0: "cmake" else: "ninja"
         if embedded_sdk_tools_dir().len() > 0:
-            return conan_source_fail("", "building " ++ name ++ " from source needs " ++ missing ++ ", which this compiler's SDK tools (" ++ embedded_sdk_tools_dir() ++ ") lack; set WITH_CMAKE / WITH_NINJA to name them")
+            return conan_tools_problem("building " ++ name ++ " from source needs " ++ missing ++ ", which this compiler's SDK tools (" ++ embedded_sdk_tools_dir() ++ ") lack; set WITH_CMAKE / WITH_NINJA to name them")
         if conan_builds_from_source_only():
-            return conan_source_fail("", "building " ++ name ++ " from source needs the LLVM SDK's " ++ missing ++ " (" ++ link_stage_windows_sdk_dir() ++ "/bin), which it does not carry (or set WITH_CMAKE / WITH_NINJA)")
-        return conan_source_fail("", "building " ++ name ++ " from source needs " ++ missing ++ ", which " ++ (if missing.contains(" and "): "are" else: "is") ++ " not on PATH; install " ++ (if missing.contains(" and "): "them" else: "it") ++ " (or set WITH_CMAKE / WITH_NINJA) and run `with get` again")
+            return conan_tools_problem("building " ++ name ++ " from source needs the LLVM SDK's " ++ missing ++ " (" ++ link_stage_windows_sdk_dir() ++ "/bin), which it does not carry (or set WITH_CMAKE / WITH_NINJA)")
+        return conan_tools_problem("building " ++ name ++ " from source needs " ++ missing ++ ", which " ++ (if missing.contains(" and "): "are" else: "is") ++ " not on PATH; install " ++ (if missing.contains(" and "): "them" else: "it") ++ " (or set WITH_CMAKE / WITH_NINJA) and run `with get` again")
     let self_exe = conan_self_exe()
-    if self_exe.len() == 0: return conan_source_fail("", "could not locate this `with` executable to use as the C compiler")
+    if self_exe.len() == 0: return conan_tools_problem("could not locate this `with` executable to use as the C compiler")
+    ConanSourceTools { cmake, ninja, self_exe, problem: "" }
 
-    var recipe_env = conan_built_recipe_env(version, "")
-    let requires = recipe_requirements(recipe, &recipe_env)
-    if not requires.ok: return conan_source_fail("", name ++ "/" ++ version ++ ": " ++ requires.problem)
+// The recipe of a package on Conan Center: conandata.yml, conanfile.py, the
+// source archive they name and the CMakeLists.txt the recipe exports, when
+// it does (asking for one that is not there is a 404 printed at the user).
+type ConanFetchedRecipe { folder: str, data: str, recipe: str, recipe_cmake: str, source: ConanSource, problem: str }
+
+fn conan_fetch_recipe(name: &str, version: &str) -> ConanFetchedRecipe:
+    let none = ConanSource { urls: List.new(), sha256: "" }
+    let folder = conan_recipe_folder(name, version)
+    let data = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conandata.yml")) else: ""
+    let recipe = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conanfile.py")) else: ""
+    if data.len() == 0 or recipe.len() == 0:
+        return ConanFetchedRecipe { folder, data, recipe, recipe_cmake: "", source: none, problem: "could not read the Conan Center recipe of " ++ name ++ "/" ++ version }
+    let source = conan_data_source(data, version)
+    if source.urls.len() == 0 or source.sha256.len() == 0:
+        return ConanFetchedRecipe { folder, data, recipe, recipe_cmake: "", source: none, problem: "the recipe of " ++ name ++ " lists no source archive for " ++ version }
+    let exports_cmake = recipe.contains("\"CMakeLists.txt\", self.recipe_folder") or recipe.contains("\"CMakeLists.txt\", src=self.recipe_folder") or recipe.contains("exports_sources = \"CMakeLists.txt\"") or recipe.contains("exports_sources = [\"CMakeLists.txt\"")
+    let patch_problem = conan_data_patch_problem(data, version)
+    if patch_problem.len() > 0:
+        return ConanFetchedRecipe { folder, data, recipe, recipe_cmake: "", source: none, problem: name ++ "/" ++ version ++ " cannot be built from source: " ++ patch_problem }
+    let recipe_cmake = if exports_cmake: conan_http_get(conan_recipe_file_url(name, folder, "CMakeLists.txt")) else: ""
+    ConanFetchedRecipe { folder, data, recipe, recipe_cmake, source, problem: "" }
+
+// The package's source, under `work`: downloaded from the recipe's mirrors,
+// unpacked into `work/src` and patched as the recipe says.
+type ConanSourceTree { source_dir: str, problem: str }
+
+fn conan_fetch_source_tree(name: &str, version: &str, fetched: &ConanFetchedRecipe, work: &str) -> ConanSourceTree:
+    let raw_dir = work ++ "/src"
+    if runtime_mkdir_p(raw_dir) != 0 or runtime_mkdir_p(work ++ "/tools") != 0 or runtime_mkdir_p(work ++ "/recipe") != 0:
+        return ConanSourceTree { source_dir: "", problem: "could not create " ++ work }
+    runtime_eprint("  downloading " ++ fetched.source.urls[0])
+    let picked = conan_pick_archive(&fetched.source, work, conan_archive_download, conan_archive_digest)
+    let archive = picked.path.clone()
+    if archive.len() == 0: return ConanSourceTree { source_dir: "", problem: "no source archive of " ++ name ++ "/" ++ version ++ " could be used:" ++ picked.tried }
+    if conan_extract_any(archive, raw_dir) != 0:
+        return ConanSourceTree { source_dir: "", problem: "could not extract " ++ conan_path_basename(archive) ++ " (it needs `tar`" ++ (if archive.ends_with(".zip"): " with zip support, or `unzip`" else: if archive.ends_with(".xz"): " and `xz`" else: "") ++ ")" }
+    let source_dir = conan_source_root(raw_dir)
+    for patch_file in conan_data_patches(fetched.data, version):
+        let patch = conan_http_get(conan_recipe_file_url(name, fetched.folder, patch_file))
+        if patch.len() == 0: return ConanSourceTree { source_dir: "", problem: "could not fetch the recipe's " ++ patch_file }
+        let problem = conan_apply_patch(patch, source_dir, conan_patch_read, conan_patch_write)
+        if problem.len() > 0: return ConanSourceTree { source_dir: "", problem: patch_file ++ ": " ++ problem }
+    ConanSourceTree { source_dir, problem: "" }
+
+// The packages the recipe requires, each installed (a version range asks
+// for the newest release Conan Center has in it), as `name/version`.
+fn conan_install_recipe_requirements(name: &str, version: &str, recipe: &str, recipe_env: &RecipeEnv, project_root: &str, depth: i32) -> Result[List[str], str]:
+    let requires = recipe_requirements(recipe, recipe_env)
+    if not requires.ok: return Err(name ++ "/" ++ version ++ ": " ++ requires.problem)
     for undecided in requires.notes:
         runtime_eprint("  note: " ++ name ++ " recipe " ++ undecided ++ "; a requirement under it is not installed")
     let resolved: List[str] = List.new()
     for reference in requires.requires:
         let required = conan_ref_name(reference)
         let written = conan_ref_version(reference)
-        // A version range asks for the newest release Conan Center has in it.
         let installed = conan_install_internal(required, written, project_root, depth + 1, false)
         if installed.len() == 0:
-            return conan_source_fail("", name ++ "/" ++ version ++ " requires " ++ reference ++ ", which could not be installed (above)")
+            return Err(name ++ "/" ++ version ++ " requires " ++ reference ++ ", which could not be installed (above)")
         resolved.push(required ++ "/" ++ installed)
+    Ok(resolved)
 
-    let dep_dir = conan_absolute(project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version)
-    let _clean = runtime_remove_tree(dep_dir)
-    let work = dep_dir ++ "/.build"
-    let raw_dir = work ++ "/src"
+// Configures the package's CMake build into `work/b` with this toolchain as
+// the compiler and every requirement's package config in reach, exporting
+// the compile commands (the facade engine reads them, D121 step 5).
+// Returns the problem, "" when configured.
+fn conan_configure_source(name: &str, version: &str, project_root: &str, dep_dir: &str, work: &str, source_dir: &str, resolved: &List[str], recipe: &str, recipe_cmake: &str, recipe_env: RecipeEnv, cmake_env: &ConanCMakeEnv, cmake_env_name: &str, tools: &ConanSourceTools) -> str:
     let tools_dir = work ++ "/tools"
-    if runtime_mkdir_p(raw_dir) != 0 or runtime_mkdir_p(tools_dir) != 0 or runtime_mkdir_p(work ++ "/recipe") != 0:
-        return conan_source_fail(dep_dir, "could not create " ++ work)
-    runtime_eprint("  downloading " ++ source.urls[0])
-    let picked = conan_pick_archive(&source, work, conan_archive_download, conan_archive_digest)
-    let archive = picked.path.clone()
-    let tried = picked.tried.clone()
-    if archive.len() == 0: return conan_source_fail(dep_dir, "no source archive of " ++ name ++ "/" ++ version ++ " could be used:" ++ tried)
-    if conan_extract_any(archive, raw_dir) != 0:
-        return conan_source_fail(dep_dir, "could not extract " ++ conan_path_basename(archive) ++ " (it needs `tar`" ++ (if archive.ends_with(".zip"): " with zip support, or `unzip`" else: if archive.ends_with(".xz"): " and `xz`" else: "") ++ ")")
-    let source_dir = conan_source_root(raw_dir)
-    for patch_file in conan_data_patches(data, version):
-        let patch = conan_http_get(conan_recipe_file_url(name, folder, patch_file))
-        if patch.len() == 0: return conan_source_fail(dep_dir, "could not fetch the recipe's " ++ patch_file)
-        let problem = conan_apply_patch(patch, source_dir, conan_patch_read, conan_patch_write)
-        if problem.len() > 0: return conan_source_fail(dep_dir, patch_file ++ ": " ++ problem)
-
     // The project's own CMakeLists, or the one the recipe ships for it.
-    var cmake_dir = source_dir.clone()
+    var cmake_dir = source_dir.to_owned()
     if recipe_cmake.len() > 0:
         cmake_dir = work ++ "/recipe"
-        if runtime_write_file(cmake_dir ++ "/CMakeLists.txt", recipe_cmake) != 0: return conan_source_fail(dep_dir, "could not write the recipe's CMakeLists.txt")
+        if runtime_write_file(cmake_dir ++ "/CMakeLists.txt", recipe_cmake) != 0: return "could not write the recipe's CMakeLists.txt"
     else if runtime_file_exists(source_dir ++ "/CMakeLists.txt") == 0:
-        return conan_source_fail(dep_dir, name ++ "/" ++ version ++ " builds with " ++ conan_recipe_build_system(recipe) ++ "; `with get` builds CMake projects from source, so this package needs a platform Conan Center has a binary for")
+        return name ++ "/" ++ version ++ " builds with " ++ conan_recipe_build_system(recipe) ++ "; `with get` builds CMake projects from source, so this package needs a platform Conan Center has a binary for"
 
-    recipe_env.source_folder = source_dir.clone()
-    let variables = recipe_cmake_variables(recipe, &recipe_env)
-    if not variables.ok: return conan_source_fail(dep_dir, name ++ "/" ++ version ++ ": " ++ variables.problem)
+    var env = recipe_env
+    env.source_folder = source_dir.to_owned()
+    let variables = recipe_cmake_variables(recipe, &env)
+    if not variables.ok: return name ++ "/" ++ version ++ ": " ++ variables.problem
     for undecided in variables.notes: runtime_eprint("  note: " ++ name ++ " recipe " ++ undecided ++ "; a CMake variable under it is not set")
     var prefix_path = ""
     for reference in resolved:
         if prefix_path.len() > 0: prefix_path = prefix_path ++ ";"
         prefix_path = prefix_path ++ conan_absolute(project_root ++ "/.with/deps/c/" ++ reference)
     var configure = ""
-    configure = conan_argv_append(configure, cmake)
+    configure = conan_argv_append(configure, tools.cmake)
     configure = conan_argv_append(configure, "-S")
     configure = conan_argv_append(configure, cmake_dir)
     configure = conan_argv_append(configure, "-B")
     configure = conan_argv_append(configure, work ++ "/b")
     configure = conan_argv_append(configure, "-G")
     configure = conan_argv_append(configure, "Ninja")
-    configure = conan_argv_append(configure, "-DCMAKE_MAKE_PROGRAM=" ++ ninja)
-    configure = conan_argv_append(configure, "-DCMAKE_C_COMPILER=" ++ conan_write_launcher(tools_dir, "cc", self_exe))
+    configure = conan_argv_append(configure, "-DCMAKE_MAKE_PROGRAM=" ++ tools.ninja)
+    configure = conan_argv_append(configure, "-DCMAKE_C_COMPILER=" ++ conan_write_launcher(tools_dir, "cc", tools.self_exe))
     // #1915: a project that declares C++ (raylib's `project(raylib C CXX)`)
     // gets clang's C++ driver too, never the host's c++.
-    configure = conan_argv_append(configure, "-DCMAKE_CXX_COMPILER=" ++ conan_write_launcher_named(tools_dir, "c++", self_exe, "cc --driver-mode=g++"))
-    configure = conan_argv_append(configure, "-DCMAKE_AR=" ++ conan_write_launcher(tools_dir, "__ar", self_exe))
-    configure = conan_argv_append(configure, "-DCMAKE_RANLIB=" ++ conan_write_launcher(tools_dir, "__ranlib", self_exe))
+    configure = conan_argv_append(configure, "-DCMAKE_CXX_COMPILER=" ++ conan_write_launcher_named(tools_dir, "c++", tools.self_exe, "cc --driver-mode=g++"))
+    configure = conan_argv_append(configure, "-DCMAKE_AR=" ++ conan_write_launcher(tools_dir, "__ar", tools.self_exe))
+    configure = conan_argv_append(configure, "-DCMAKE_RANLIB=" ++ conan_write_launcher(tools_dir, "__ranlib", tools.self_exe))
     configure = conan_argv_append(configure, "-DCMAKE_BUILD_TYPE=Release")
     configure = conan_argv_append(configure, "-DBUILD_SHARED_LIBS=OFF")
     configure = conan_argv_append(configure, "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
     configure = conan_argv_append(configure, "-DCMAKE_INSTALL_PREFIX=" ++ dep_dir)
     configure = conan_argv_append(configure, "-DCMAKE_INSTALL_LIBDIR=lib")
+    configure = conan_argv_append(configure, "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
     // Windows (#1915): CMake's Windows-Clang module links every program with
     // Visual Studio's default library set; gdi32, winspool and comdlg32 are
     // not in the SDK (a package that uses them names them itself). Its
@@ -1701,7 +1723,7 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     for reference in resolved:
         let written = conan_write_cmake_package_config(project_root, reference, work ++ "/cmake-deps")
         if written.problem.len() > 0:
-            return conan_source_fail(dep_dir, "could not write the CMake package config of " ++ reference ++ " for " ++ name ++ "/" ++ version ++ ": " ++ written.problem)
+            return "could not write the CMake package config of " ++ reference ++ " for " ++ name ++ "/" ++ version ++ ": " ++ written.problem
         if written.define.len() > 0: configure = conan_argv_append(configure, written.define)
     for i in 0..variables.names.len(): configure = conan_argv_append(configure, "-D" ++ variables.names[i] ++ "=" ++ variables.values[i])
     for define in cmake_env.defines:
@@ -1710,7 +1732,284 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     runtime_eprint("  configuring...")
     if conan_run_tool(configure, 900000) != 0:
         for unknown in variables.unknown: runtime_eprint("  note: the recipe also sets " ++ unknown ++ ", which could not be evaluated")
-        return conan_source_fail(dep_dir, "CMake could not configure " ++ name ++ "/" ++ version ++ " (its output is above)")
+        return "CMake could not configure " ++ name ++ "/" ++ version ++ " (its output is above)"
+    ""
+
+// ── The facade (D121 step 5, §16.2b.15) ──────────────────────────────
+//
+// `with get` writes `.with/deps/c/<name>/<version>/facade.w` and the
+// report beside it from the package's evidence: the C units its own build
+// compiles (proofs), the annotations and introspection files it ships, and
+// the registry's facts file for it (registry/c/<name>/facts.w in the
+// toolchain's repository, D136), fetched at one commit of that repository
+// and pinned in the lock. The engine is the migrator's
+// (CiMigrate.w migrate_c_facade_for_package).
+
+// The corpus a CMake build compiles, from its compile_commands.json: every
+// C unit, with the union of the include directories and defines the build
+// gives them (its generated headers among them). CMake's Ninja generator
+// writes one key per line and a "command" string; that is what is read.
+type ConanCorpus { units: List[str], include_paths: List[str], defines: List[str] }
+
+fn conan_json_unescape(text: &str) -> str:
+    var out = StringBuilder.new()
+    var i = 0
+    while i < text.len():
+        if text[i] == '\\' and i + 1 < text.len():
+            let next = text[i + 1]
+            if next == 'n': out.push_byte('\n')
+            else if next == 't': out.push_byte('\t')
+            else: out.push_byte(next)
+            i = i + 2
+            continue
+        out.push_byte(text[i])
+        i = i + 1
+    out.to_str()
+
+// The JSON string value of `  "key": "…"` on one line, "" for another line.
+fn conan_json_line_string(line: &str, key: &str) -> str:
+    let head = "\"" ++ key ++ "\": \""
+    let at = conan_find_text(line.trim(), head)
+    if at != 0: return ""
+    let rest = line.trim().slice(head.len(), line.trim().len())
+    var end = 0
+    while end < rest.len():
+        if rest[end] == '\\': end = end + 2
+        else if rest[end] == '"': break
+        else: end = end + 1
+    if end > rest.len(): end = rest.len()
+    conan_json_unescape(rest.slice(0, end))
+
+// A shell command line as argv: words split at blanks, double or single
+// quotes grouping (CMake quotes a path with a blank in it).
+fn conan_shell_words(command: &str) -> List[str]:
+    var words: List[str] = List.new()
+    var word = StringBuilder.new()
+    var in_word = false
+    var quote = 0 as u8
+    for i in 0..command.len():
+        let c = command[i]
+        if quote != 0:
+            if c == quote: quote = 0 as u8
+            else: word.push_byte(c)
+            continue
+        if c == '"' or c == '\'':
+            quote = c
+            in_word = true
+            continue
+        if c == ' ' or c == '\t':
+            if in_word:
+                words.push(word.to_str())
+                word = StringBuilder.new()
+                in_word = false
+            continue
+        word.push_byte(c)
+        in_word = true
+    if in_word: words.push(word.to_str())
+    words
+
+fn conan_corpus_absolute(directory: &str, path: &str) -> str:
+    if path.starts_with("/") or (path.len() > 2 and path[1] == ':'): path.to_owned() else: directory ++ "/" ++ path
+
+fn conan_push_unique(items: &List[str], item: &str) -> bool: item.len() > 0 and not conan_list_contains(items, item)
+
+fn conan_compile_commands_corpus(path: &str) -> ConanCorpus:
+    var units: List[str] = List.new()
+    var include_paths: List[str] = List.new()
+    var defines: List[str] = List.new()
+    var directory = ""
+    var file = ""
+    var command = ""
+    for line in runtime_read_file(path).split("\n"):
+        let d = conan_json_line_string(line, "directory")
+        if d.len() > 0: directory = d
+        let f = conan_json_line_string(line, "file")
+        if f.len() > 0: file = f
+        let c = conan_json_line_string(line, "command")
+        if c.len() > 0: command = c
+        if line.trim().starts_with("}"):
+            if file.ends_with(".c") and command.len() > 0:
+                let unit = conan_corpus_absolute(directory, file)
+                if conan_push_unique(&units, unit): units.push(unit)
+                let words = conan_shell_words(command)
+                var wi = 0
+                while wi < words.len():
+                    let w = words[wi]
+                    if w == "-I" or w == "-isystem":
+                        if wi + 1 < words.len():
+                            let dir = conan_corpus_absolute(directory, words[wi + 1])
+                            if conan_push_unique(&include_paths, dir): include_paths.push(dir)
+                        wi = wi + 2
+                        continue
+                    if w == "-D":
+                        if wi + 1 < words.len() and conan_push_unique(&defines, words[wi + 1]): defines.push(words[wi + 1])
+                        wi = wi + 2
+                        continue
+                    if w.starts_with("-I") and w.len() > 2:
+                        let dir = conan_corpus_absolute(directory, w.slice(2, w.len()))
+                        if conan_push_unique(&include_paths, dir): include_paths.push(dir)
+                    else if w.starts_with("-D") and w.len() > 2:
+                        let define = w.slice(2, w.len())
+                        if conan_push_unique(&defines, define): defines.push(define)
+                    wi = wi + 1
+            directory = ""
+            file = ""
+            command = ""
+    ConanCorpus { units, include_paths, defines }
+
+// The registry's facts file for a package (D136), at one commit of the
+// toolchain's repository: the commit a lock restore pinned, else the tip of
+// `main` resolved once per run. `WITH_REGISTRY=<base URL>` (https:// or
+// file://, a tree holding registry/c/<name>/facts.w: a mirror, or a test's
+// fixture) replaces the repository and pins no commit. `path` is "" when
+// the registry has no file for the package; `note` says when it could not
+// be asked at all.
+type ConanRegistryFacts { path: str, commit: str, sha256: str, note: str }
+
+fn conan_registry_none(commit: &str, note: &str) -> ConanRegistryFacts: ConanRegistryFacts { path: "", commit: commit.to_owned(), sha256: "", note: note.to_owned() }
+
+var g_conan_registry_commit: str = ""
+var g_conan_registry_asked: bool = false
+
+pub fn conan_set_registry_commit(commit: &str):
+    g_conan_registry_commit = commit.to_owned()
+    g_conan_registry_asked = commit.len() > 0
+
+fn CONAN_REGISTRY_REPOSITORY -> str: "withlang-dev/with"
+
+fn conan_registry_commit() -> str:
+    if g_conan_registry_asked: return with_str_clone_ref(g_conan_registry_commit)
+    g_conan_registry_asked = true
+    let response = https_get_response_timeout("https://api.github.com/repos/" ++ CONAN_REGISTRY_REPOSITORY() ++ "/commits/main", 5, 20000, 20000)
+    if response.status == 200: g_conan_registry_commit = json_extract_string(response.body, "sha")
+    with_str_clone_ref(g_conan_registry_commit)
+
+fn conan_registry_facts(name: &str, dep_dir: &str) -> ConanRegistryFacts:
+
+    let path = dep_dir ++ "/facts.w"
+    let base = runtime_getenv("WITH_REGISTRY")
+    var text = ""
+    var commit = ""
+    if base.len() > 0:
+        let url = base ++ "/registry/c/" ++ name ++ "/facts.w"
+        if url.starts_with("file://"):
+            let local = conan_file_url_path(url)
+            if runtime_file_exists(local) == 0: return conan_registry_none("", "")
+            text = runtime_read_file(local)
+        else:
+            let response = https_get_response_timeout(url, 5, 20000, 20000)
+            if response.status == 404: return conan_registry_none("", "")
+            if response.status != 200: return conan_registry_none("", "the registry at " ++ base ++ " could not be read (status " ++ f"{response.status}" ++ ")")
+            text = response.body
+    else:
+        commit = conan_registry_commit()
+        if commit.len() == 0: return conan_registry_none("", "the registry (github.com/" ++ CONAN_REGISTRY_REPOSITORY() ++ ") could not be reached, so its facts for " ++ name ++ " are not used")
+        let response = https_get_response_timeout("https://raw.githubusercontent.com/" ++ CONAN_REGISTRY_REPOSITORY() ++ "/" ++ commit ++ "/registry/c/" ++ name ++ "/facts.w", 5, 20000, 20000)
+        if response.status == 404: return conan_registry_none(commit, "")
+        if response.status != 200: return conan_registry_none(commit, "the registry's facts for " ++ name ++ " could not be read (status " ++ f"{response.status}" ++ ")")
+        text = response.body
+    if runtime_write_file(path, text) != 0: return conan_registry_none(commit, "could not write " ++ path)
+    ConanRegistryFacts { path, commit, sha256: conan_sha256_text(text), note: "" }
+
+fn conan_sha256_text(data: &str) -> str:
+    var digest: [32]u8 = [0 as u8; 32]
+    sha256_hash_str(data, &raw mut digest[0] as *mut u8)
+    sha256_hex(&digest[0] as *const u8)
+
+// Writes the package's facade and report from the build in `build_dir`
+// (configured, its compile_commands.json present) over `source_dir`, and
+// `facade.json` with the registry pin the lock records. The installed
+// package's metadata says which headers a project imports and what it
+// links. Said on stderr: the report's summary, or why there is no facade.
+fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str, build_dir: &str):
+    let commands = build_dir ++ "/compile_commands.json"
+    if runtime_file_exists(commands) == 0:
+        runtime_eprint("  facade: no compile_commands.json in " ++ build_dir ++ "; the package's units were not read, so no facade is written")
+        return
+    let corpus = conan_compile_commands_corpus(commands)
+    let meta = runtime_read_file(dep_dir ++ "/metadata.json")
+    var import_dirs: List[str] = List.new()
+    for rel in json_extract_string_array(meta, "include_paths"): import_dirs.push(dep_dir ++ "/" ++ rel)
+    let libs = json_extract_string_array(meta, "libs")
+    let link_lib: str = if libs.len() > 0: libs[0] else: ""
+    let registry = conan_registry_facts(name, dep_dir)
+    if registry.note.len() > 0: runtime_eprint("  note: " ++ registry.note)
+    let report_path = dep_dir ++ "/facade-report.txt"
+    let summary = migrate_c_facade_for_package(&corpus.units, &corpus.include_paths, &corpus.defines, source_dir, name, version, registry.path, &import_dirs, link_lib, dep_dir ++ "/facade.w", report_path)
+    if summary.len() == 0: return
+    let q = "\x22"
+    let pin = "{\n  " ++ q ++ "registry_commit" ++ q ++ ": " ++ q ++ conan_json_escape(registry.commit) ++ q ++ ",\n  " ++ q ++ "facts_sha256" ++ q ++ ": " ++ q ++ registry.sha256 ++ q ++ "\n}\n"
+    let _pin = runtime_write_file(dep_dir ++ "/facade.json", pin)
+    runtime_eprint("  " ++ summary ++ " (.with/deps/c/" ++ name ++ "/" ++ version ++ "/facade-report.txt)")
+
+// The facade of a package installed as a Conan Center binary: its source
+// is fetched and configured (never built) under `dep_dir/.build`, read, and
+// removed. Without the source build's tools the package has no proofs;
+// the reason is said and the package stays installed without a facade.
+fn conan_facade_of_binary(name: &str, version: &str, project_root: &str, dep_dir: &str, depth: i32):
+    let tools = conan_source_tools(name)
+    if tools.problem.len() > 0:
+        runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ tools.problem)
+        return
+    let fetched = conan_fetch_recipe(name, version)
+    if fetched.problem.len() > 0:
+        runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ fetched.problem)
+        return
+    let cmake_env_name = conan_package_cmake_env_name(name)
+    let cmake_env = conan_package_cmake_env(name)
+    let work = dep_dir ++ "/.build"
+    let _clean = runtime_remove_tree(work)
+    var recipe_env = conan_built_recipe_env(version, "")
+    let resolved = match conan_install_recipe_requirements(name, version, fetched.recipe, &recipe_env, project_root, depth):
+        Ok(r) => r
+        Err(problem) =>
+            runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ problem)
+            return
+    let tree = conan_fetch_source_tree(name, version, &fetched, work)
+    if tree.problem.len() > 0:
+        runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ tree.problem)
+        let _gone = runtime_remove_tree(work)
+        return
+    let configured = conan_configure_source(name, version, project_root, dep_dir, work, tree.source_dir, &resolved, fetched.recipe, fetched.recipe_cmake, recipe_env, &cmake_env, cmake_env_name, &tools)
+    if configured.len() > 0:
+        runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ configured)
+        let _gone = runtime_remove_tree(work)
+        return
+    conan_write_facade(name, version, dep_dir, tree.source_dir, work ++ "/b")
+    let _gone = runtime_remove_tree(work)
+
+fn conan_install_from_source(name: &str, version: &str, project_root: &str, depth: i32) -> str:
+    let platform = conan_detect_os() ++ "/" ++ conan_detect_arch()
+    let cmake_env_name = conan_package_cmake_env_name(name)
+    let cmake_env = conan_package_cmake_env(name)
+    if cmake_env.problem.len() > 0:
+        return conan_source_fail("", cmake_env_name ++ " entry '" ++ cmake_env.problem ++ "' is not NAME=VALUE (entries are separated by `;`)")
+    let why = if g_conan_from_source: "--from-source" else: if cmake_env.defines.len() > 0: cmake_env_name ++ " is set" else: if conan_builds_from_source_only(): "on Windows every C package is built by the SDK's toolchain" else: "Conan Center has no binary for " ++ platform ++ " that this toolchain can link"
+    runtime_eprint("  " ++ why ++ "; building " ++ name ++ "/" ++ version ++ " from source")
+    let fetched = conan_fetch_recipe(name, version)
+    if fetched.problem.len() > 0: return conan_source_fail("", fetched.problem)
+    let recipe = fetched.recipe
+    let source = fetched.source
+
+    // Prerequisites first: say what is missing before downloading anything.
+    let tools = conan_source_tools(name)
+    if tools.problem.len() > 0: return conan_source_fail("", tools.problem)
+
+    var recipe_env = conan_built_recipe_env(version, "")
+    let resolved = match conan_install_recipe_requirements(name, version, recipe, &recipe_env, project_root, depth):
+        Ok(r) => r
+        Err(problem) => return conan_source_fail("", problem)
+
+    let dep_dir = conan_absolute(project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version)
+    let _clean = runtime_remove_tree(dep_dir)
+    let work = dep_dir ++ "/.build"
+    let tree = conan_fetch_source_tree(name, version, &fetched, work)
+    if tree.problem.len() > 0: return conan_source_fail(dep_dir, tree.problem)
+    let source_dir = tree.source_dir
+
+    let configured = conan_configure_source(name, version, project_root, dep_dir, work, source_dir, &resolved, recipe, fetched.recipe_cmake, recipe_env, &cmake_env, cmake_env_name, &tools)
+    if configured.len() > 0: return conan_source_fail(dep_dir, configured)
+    let cmake = tools.cmake
     // Keep going past a test or example program that does not link: the
     // library is what gets installed, and the install step says if it is missing.
     var build = ""
@@ -1728,11 +2027,13 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     install = conan_argv_append(install, work ++ "/b")
     if conan_run_tool(install, 300000) != 0:
         return conan_source_fail(dep_dir, name ++ "/" ++ version ++ " did not build (the compiler's output is above" ++ (if build_rc != 0: "; the build step failed" else: "") ++ ")")
-    let _work = runtime_remove_tree(work)
     let package_env = conan_built_recipe_env(version, dep_dir)
     if conan_write_binary_metadata(name, version, "built", "built", source.sha256, dep_dir, resolved, &package_env, recipe, true) != 0:
         return conan_source_fail(dep_dir, "could not write metadata for " ++ name ++ "/" ++ version)
     runtime_eprint("  built " ++ name ++ "/" ++ version ++ " into .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
+    // D121 step 5: the facade, from the build that just ran.
+    conan_write_facade(name, version, dep_dir, source_dir, work ++ "/b")
+    let _work = runtime_remove_tree(work)
     version.to_owned()
 
 // A lock entry that was built from source: reuse the build, or build the same

@@ -4463,7 +4463,38 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     check_args |> push("check")
     check_args |> push(bs_abs(root, program))
     let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-facade-by-evidence", check_args)
-    checked.rc
+    if checked.rc != 0: return checked.rc
+    // D121 step 5: the facade `with get` writes lives at
+    // `.with/deps/c/<name>/<version>/facade.w`, and `use facades.<name>`
+    // reaches it when the project has no facade of that name of its own
+    // (src/Resolve.w). A `c facade <name>:` block in the project's source
+    // overrides any single item of it (here the resource, with another
+    // drop) and the rest of the written block stays (`pool_size`).
+    let proj = bs_join(case_dir, "fetched")
+    let dep = bs_join(proj, ".with/deps/c/mini/1.0")
+    rc = bs_write_fixture(ctx, bs_join(proj, "with.toml"), "[package]\nname = \"fetched\"\nversion = \"0.1.0\"\n\n[deps]\nc.mini = \"1.0\"\n", "fetched facade manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(dep, "metadata.json"), "{\n  \"name\": \"mini\",\n  \"version\": \"1.0\",\n  \"recipe_revision\": \"built\",\n  \"package_id\": \"built\",\n  \"package_revision\": \"0\",\n  \"include_paths\": [\"include\"],\n  \"lib_paths\": [],\n  \"libs\": [],\n  \"defines\": [],\n  \"link_args\": [],\n  \"requires\": []\n}\n", "fetched facade metadata")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(dep, "include/mini.h"), header, "fetched facade header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(dep, "facade.w"), "use c_import(\"mini.h\")\n\n" ++ text, "fetched facade")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(proj, "src/override.w"), "use facades.mini\nuse c_import(\"mini.h\")\n\nc facade mini:\n    resource Pool wraps *mut pool\n        from pool_new\n        drop pool_drop\n", "fetched facade override")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(proj, "src/main.w"), "use facades.mini\nuse override\n\nfn main:\n    let Some(p) = Pool.new() else:\n        return 7\n    print(p.size())\n", "fetched facade program")
+    if rc != 0: return rc
+    var fetched_args: List[str] = List.new()
+    fetched_args |> push("check")
+    fetched_args |> push("src/main.w")
+    let fetched = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "check-fetched-facade", &fetched_args, 180000, proj, process_env().set("WITH_DUMP_FACADE", "1"))
+    if fetched.rc != 0:
+        return bs_fail(ctx, "a program using the fetched facade with a project override did not check: " ++ fetched.stderr)
+    rc = bs_assert_contains(ctx, fetched.stderr, "pool_drop(", "fetched facade: the project's drop renders")
+    if rc != 0: return rc
+    if fetched.stderr.contains("pool_free("):
+        return bs_fail(ctx, "fetched facade: the written block's drop still renders beside the project's override")
+    0
 
 fn bs_check_migrate_zeroed_records(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
