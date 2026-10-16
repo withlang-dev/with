@@ -82,7 +82,7 @@ document does not redefine them; each module's header comment does.
 | `net` | tcp_listen, tcp_accept, tcp_connect, udp_bind, udp_connect, send, recv, socket_close, sock_port |
 | `http`, `tls` | https_get, https_download (private URL parsing); TlsConn, tls_connect/send/recv (TLS 1.2) |
 | `json` | JsonParser, json_parse, json_find, json_str, json_int, json_skip |
-| `encoding`, `encoding/*` | `DecodeError`; base64, base64url, base16, base32, base32hex (RFC 4648) |
+| `encoding`, `encoding/*` | `DecodeError`; base64, base64url, base16, base32, base32hex (RFC 4648); `encoding/xml` strict tree reader (`XmlDocument`, `XmlElement`, D135) |
 | `crypto/*` | SHA-256, HMAC-SHA256, AES-128, AES-GCM, EC P-256, ECDSA, RSA PKCS#1 v1.5 verify, X.509, ChaCha20, Poly1305, ChaCha20-Poly1305, endian (private) |
 | `regex`, `re/` | `Regex`/`Match`/`Captures` facade over migrated PCRE2 (`docs/regex-spec.md`) |
 | `zlib`, `zip`, `zl/` | compress/decompress/gzip facade and ZIP reader over migrated zlib + minizip |
@@ -689,9 +689,19 @@ fn CsvWriter.flush(self: &mut Self) -> Result[(), CsvError]
 RFC 4180 compliant. Handles quoted fields, embedded newlines,
 and embedded delimiters.
 
-#### 3.6 `std.encoding.xml` — XML tokenizer
+#### 3.6 `std.encoding.xml` — XML reader
 
-**Status (2026-09-22): not started.** Sourcing candidate: `expat` (MIT, hardened) migrated whole and facaded, if a full parser is wanted; the tokenizer below is small enough for native With.
+**Status (2026-10-15): landed, as a strict native tree reader (D135).**
+`XmlDocument.parse(source)` / `parse_file(path)` return
+`Result[XmlDocument, XmlError]`; an `XmlElement` carries its name,
+attributes, child elements and direct character data, queried with
+`attr`, `has_attr`, `child` and `count`. Elements, attributes, text,
+CDATA, comments, PIs, the predefined entities and numeric character
+references; a DOCTYPE is skipped; namespace prefixes pass through on the
+names; malformed input is an error naming the line. Its first consumer is
+the facade proof engine reading GObject-introspection files (§16.2b.15).
+The tokenizer sketched below is derivable from it when a streaming
+consumer appears; `expat` was not needed.
 
 ```
 type XmlToken =
@@ -950,7 +960,7 @@ Refreshed order for the native remainder, by what it unblocks:
 | 13 | `std.url` | Promote `http.w`'s private parser |
 | 14 | `std.io.buffered` | Reduces syscall overhead |
 | 15 | `std.context` cancellation | Reconcile with the existing `context.w` record (ruling) |
-| 16 | `std.encoding.csv`, `.xml` | Data interchange; xml sourcing candidate `expat` to rule |
+| 16 | `std.encoding.csv`, `.xml` | Data interchange; `.xml` landed native (D135) |
 | 17 | `std.debug` | Stack traces, panic hooks |
 | 18 | `std.semver` | Package management support |
 
@@ -982,7 +992,7 @@ are sized by their facade, not the engine, and are not listed.
 | `io.buffered` | 200–300 |
 | `context` cancellation | 300–400 |
 | `encoding.csv` | 200–300 |
-| `encoding.xml` | 400–600 native, or a facade over `expat` |
+| `encoding.xml` | landed: 300 native (D135) |
 | `debug` | 200–400 |
 | `semver` | 150–200 |
 | **Total** | **~5,500–8,500** |
