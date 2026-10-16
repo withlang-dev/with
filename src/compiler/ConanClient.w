@@ -1781,14 +1781,22 @@ fn conan_json_line_string(line: &str, key: &str) -> str:
     conan_json_unescape(rest.slice(0, end))
 
 // A shell command line as argv: words split at blanks, double or single
-// quotes grouping (CMake quotes a path with a blank in it).
+// quotes grouping, a backslash escaping the next character outside single
+// quotes (CMake writes `-DSQLITE_API=__attribute__\(\(visibility\(\"default\"\)\)\)`).
 fn conan_shell_words(command: &str) -> List[str]:
     var words: List[str] = List.new()
     var word = StringBuilder.new()
     var in_word = false
     var quote = 0 as u8
-    for i in 0..command.len():
+    var i = 0
+    while i < command.len():
         let c = command[i]
+        i = i + 1
+        if quote != '\'' and c == '\\' and i < command.len():
+            word.push_byte(command[i])
+            i = i + 1
+            in_word = true
+            continue
         if quote != 0:
             if c == quote: quote = 0 as u8
             else: word.push_byte(c)

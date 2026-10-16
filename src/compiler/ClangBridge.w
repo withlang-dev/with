@@ -2815,6 +2815,11 @@ pub fn with_cimport_fn_attributes(session: i64, idx: i32) -> str:
             let text = session_make_str(s, clang_getCString(sp) as *const u8)
             clang_disposeString(sp)
             if depth == 0:
+                // A definition's extent holds its body; the attributes a
+                // declaration carries end where the body begins (an
+                // amalgamation's `__attribute__((fallthrough))` inside a
+                // body is not the function's).
+                if text == "{": break
                 if armed and text == "(":
                     depth = 1
                     armed = false
