@@ -91,7 +91,7 @@ pub fn gir_read_files(paths: &List[str]) -> Result[GirFacts, str]:
             Ok(d) => d
             Err(e) => return Err(path ++ f":{e.line}: " ++ e.message)
         if doc.root.name != "repository": return Err(path ++ ": not a GObject-introspection repository (root element <" ++ doc.root.name ++ ">)")
-        facts = gir_walk(&doc.root, facts)
+        facts = gir_walk(doc.root, facts)
     Ok(facts)
 
 /// The value of `key` in a facts string, or "".
