@@ -1542,6 +1542,19 @@ impl AstPool:
     fn decl_count() -> i32:
         self.state.decls.len() as i32
 
+    // The pool's identity for a cache keyed on it (the renderer's alias
+    // and declaration indexes): two handles to one pool agree, and a pool
+    // rebuilt by the comptime transform differs.
+    fn identity() -> i64:
+        self.state as i64
+
+    // The pool's shape for the same caches: its identity with its node
+    // and declaration counts, which any addition to it changes (a
+    // declaration, or a clause a convention profile synthesizes into an
+    // existing facade block).
+    fn shape() -> i64:
+        self.identity() ^ ((self.node_count() as i64) << 24) ^ ((self.decl_count() as i64) << 48)
+
     fn get_decl(idx: isize) -> NodeId:
         (self.state.decls[idx]) as NodeId
 
