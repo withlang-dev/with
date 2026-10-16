@@ -4,8 +4,11 @@
 // `c`, so each call consumes the originating place. The second call is the
 // ordinary use-after-move, reported at the call. A List, not a str: a str
 // capture is copied (D111).
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
 fn main:
-    var c: List[i32] = [1]
-    let f: fn() -> List[i32] = () => c
+    var c: List[Tok] = [Tok { id: 1 }]
+    let f: fn() -> List[Tok] = () => c
     print(f().len())
     print(f().len())

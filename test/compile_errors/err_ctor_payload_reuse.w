@@ -4,13 +4,16 @@
 // in a second constructor is a use-of-moved-value error, not a silent
 // read of the blanked slot. A List, not a str: a str is a value and is
 // copied (D111).
-enum CtorReuseTok { Items(List[i32]) | End }
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+enum CtorReuseTok { Items(List[Tok]) | End }
 error CtorReuseErr =
-    Bad(items: List[i32])
+    Bad(items: List[Tok])
     Empty
 
 fn main:
-    let label: List[i32] = [1]
+    let label: List[Tok] = [Tok { id: 1 }]
     let t = CtorReuseTok.Items(label)
     let e = CtorReuseErr.Bad(label)
     let _ = t

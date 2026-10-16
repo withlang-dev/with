@@ -5,8 +5,11 @@
 // same error as the tail `name` itself. The compiler does not clone.
 // A List global, not a str: a str global is read by copy (D111).
 
-var name: List[i32] = List.new()
-fn compute() -> List[i32]: [1, 2]
-fn f -> List[i32]: name = compute()
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+var name: List[Tok] = List.new()
+fn compute() -> List[Tok]: [Tok { id: 1 }, Tok { id: 2 }]
+fn f -> List[Tok]: name = compute()
 
 fn main: print(f().len())

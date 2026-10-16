@@ -5,12 +5,15 @@
 // implicit field move. Before the fix it passed check and the `mut fn`
 // vacated `self.p` (reset-on-move), so the caller read an empty field.
 // A List field, not a str: a str field read copies (D111).
-type S { p: List[i32] }
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+type S { p: List[Tok] }
 impl S:
     mut fn f():
-        let path: List[i32] = if self.p.len() > 0: self.p else: List.new()
+        let path: List[Tok] = if self.p.len() > 0: self.p else: List.new()
         print(path.len())
 fn main:
-    var s = S { p: [1, 2] }
+    var s = S { p: [Tok { id: 1 }, Tok { id: 2 }] }
     s.f()
     print(f"after=[{s.p.len()}]")

@@ -4,7 +4,10 @@
 // element), so a later projection reads blanked storage and must be
 // rejected. A List element, not a str: a str is a value and is copied (D111).
 
-fn pair() -> (i32, List[i32]): (42, [1, 2])
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+fn pair() -> (i32, List[Tok]): (42, [Tok { id: 1 }, Tok { id: 2 }])
 
 fn main:
     let t = pair()

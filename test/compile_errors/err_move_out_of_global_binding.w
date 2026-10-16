@@ -4,14 +4,17 @@
 // local left the old bytes in the global: the reassignment dropped them, and
 // so did the caller of the returned value (debug-alloc: DOUBLE FREE).
 
-var g: List[str] = List.new()
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+var g: List[Tok] = List.new()
 
-fn take() -> List[str]:
+fn take() -> List[Tok]:
     let out = g
     g = List.new()
     out
 
 fn main:
-    g.push("a")
+    g.push(Tok { id: 1 })
     let t = take()
     print(f"{t.len()}")

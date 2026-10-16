@@ -5,8 +5,11 @@
 // forbids.
 // A List global, not a str: a str global is read by copy (D111).
 
-var name: List[i32] = List.new()
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+var name: List[Tok] = List.new()
 fn pick(p: bool):
-    if p: name = [1] else: name = [2]
+    if p: name = [Tok { id: 1 }] else: name = [Tok { id: 2 }]
 
 fn main: print(pick(true).len())

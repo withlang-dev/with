@@ -2,8 +2,11 @@
 
 // #1406: moving the origin of a live joined element view.
 
-fn mkv() -> List[str]:
-    var v: List[str] = List.new()
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+fn mkv() -> List[Tok]:
+    var v: List[Tok] = List.new()
     v.push("a".clone())
     v.push("b".clone())
     v

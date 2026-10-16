@@ -30,7 +30,10 @@
 //   drop  — a Drop struct: single-ownership NOW, flip-independent. These cells
 //           carry the real move-checker ground truth and would have caught #696
 //           the day #613 landed.
-//   vec   — List[i32] (POD elements): copy-on-move TODAY (#607/A5), so its moves
+//   vec   — List[i32]: a List of values is a value (D120): its implicit moves
+//           are copies (the field cells expect OK, as str does); an explicit
+//           `move x` still invalidates the binding (the loop cells keep
+//           MOVE-ERR, #691). Before D111/D120 (#607/A5): copy-on-move, so its moves
 //           never invalidate and true-positive cells EXPECT OK. The #691 wide
 //           flip makes List single-owner; when it lands, flip the vec
 //           true-positive expectations to MOVE-ERR (mirrors drop_audit's
@@ -324,14 +327,15 @@ fn build_cells() -> List[Cell]:
 
     // #1395: a field value reaching an owned result, on every base.
     // D111: a str is a value; reading its field anywhere copies it, so a
-    // str field never makes an implicit move (OK on every form). A List
-    // keeps D32: only the view forms, `.clone()` and `move` are OK.
+    // str field never makes an implicit move (OK on every form), and so is a
+    // List of values (D120): every form copies its field. A List of resources
+    // keeps D32 (only the view forms, `.clone()` and `move`), the drop shape.
     for shape in ["str", "vec"]:
         for base in ["mutrecv", "readrecv", "local"]:
             for form in ["plain", "if", "match", "coalesce", "block", "break", "arg", "retinfer", "clone", "move", "ifview", "matchview", "blockview", "viewarg"]:
                 if form == "move" and base == "readrecv":
                     continue
-                let expect = if shape == "str" or form == "plain" or form == "clone" or form == "move" or form == "ifview" or form == "matchview" or form == "blockview": "OK" else: "FIELD-ERR"
+                let expect = if shape == "str" or shape == "vec" or form == "plain" or form == "clone" or form == "move" or form == "ifview" or form == "matchview" or form == "blockview": "OK" else: "FIELD-ERR"
                 cells.push(Cell { name: f"field_{form}/{base}/{shape}", source: sc_field(shape, base, form), expect })
     cells
 

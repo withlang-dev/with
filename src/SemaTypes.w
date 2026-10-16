@@ -378,6 +378,10 @@ pub enum MirIntrinsic: i32:
     SIMD_MASK_LANE
     // (mask, index, bool) -> the mask with that lane set, range-checked.
     SIMD_MASK_LANE_SET
+    // D120: before a mutation of a List place MIR could not prove unique —
+    // a shared buffer (holders > 0) is copied first (copy-on-write). Last,
+    // so no ordinal above moves.
+    LIST_MAKE_UNIQUE
 
 // Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
 // List/HashMap, and compared throughout MIR lowering and codegen.

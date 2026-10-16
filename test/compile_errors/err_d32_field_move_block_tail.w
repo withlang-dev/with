@@ -2,7 +2,10 @@
 
 // #1395: a block's value is its tail; a bound block value is owned, so a
 // field tail moves out of its owner.
-type S { p: List[i32] }
+type Tok { id: i32 }
+impl Drop for Tok:
+    move fn drop(): {}
+type S { p: List[Tok] }
 fn g():
     var s = S { p: List.new() }
     let v = { let _n = 1

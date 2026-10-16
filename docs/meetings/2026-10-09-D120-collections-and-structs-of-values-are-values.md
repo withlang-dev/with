@@ -98,6 +98,14 @@ revisit.
 (D115 Amendment 1): the count lives in the allocation, so the header stays
 32 bytes.
 
+**Amendment 1 (2026-10-16, Eric, verbatim: "relax the bar to 5%").** The
+merge bar is 5%, not 2%: stage 1 measured 2.4% and 3.2% slower on the
+self-host check across two interleaved sets (the uniqueness check at every
+mutation; `tools/ab_bench.w`, PR #2440), was held under the 2% rule, and
+Eric relaxed the bar rather than hold the slice for stage 4's hoisting.
+Everything else in the merge conditions stands: interleaved repeated runs,
+a regression counted only when it holds across them, a held one escalated.
+
 **Status of the work.** `resource type` landed 2026-10-16 (`src/Parser.w`
 reads `resource` before `type` and marks the declaration, `TDK_FLAG_RESOURCE`;
 Sema refuses a `Copy` impl on one and never counts it Copy; a `resource

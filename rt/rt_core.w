@@ -3316,8 +3316,13 @@ fn list_grow_es(v: *mut u8, es: i64):
     let vlen = list_get_len(v)
     if old_ptr as i64 != 0 and vlen > 0:
         rt_memcpy(new_ptr, old_ptr as *const u8, vlen * es)
+    // D120: a shared buffer stays with its other holders (this List now
+    // holds the fresh one); only a sole holder's buffer is freed.
     if old_ptr as i64 != 0 and list_alloc_bytes(v, es) > 0:
-        rt_free_sized(list_alloc_base(v, es), list_alloc_bytes(v, es))
+        if list_buffer_is_counted(v, es) and unsafe { (*list_holders(list_alloc_base(v, es), es)).load(.Acquire) } > 0:
+            unsafe { (*list_holders(list_alloc_base(v, es), es)).fetch_sub(1, .AcqRel) }
+        else:
+            rt_free_sized(list_alloc_base(v, es), list_alloc_bytes(v, es))
     list_set_ptr_field(v, new_ptr)
     list_set_cap(v, new_cap)
     list_set_start(v, 0)
@@ -3447,6 +3452,85 @@ pub fn with_vec_free_buffer_at(p: *mut u8, cap: i64, es: i64, start: i64):
 
 pub fn with_vec_free_buffer(p: *mut u8, cap: i64, es: i64) -> Unit: with_vec_free_buffer_at(p, cap, es, 0)
 
+// D120 (§2.3): a List of values is copied in O(1) by sharing its buffer
+// under an atomic count of the holders beyond the first, in the
+// allocation header's second word (a str's `str_holders`). An over-aligned
+// buffer (list_buffer_align above the header size) is placed inside a
+// block whose header holds the count instead (rt_alloc_aligned_with_origin
+// writes the block's payload start at base - 8). The element size says
+// which, as it says everything about a buffer (D115 Amendment 1).
+fn list_holders(base: *mut u8, es: i64) -> *mut Atomic[i64]:
+    if list_buffer_align(es) <= RT_ALLOC_HEADER_SIZE:
+        return (base as i64 - 8) as *mut Atomic[i64]
+    let block = unsafe *((base as i64 - 8) as *const i64)
+    (block - 8) as *mut Atomic[i64]
+
+// Whether the List at `v` holds a counted buffer: one this allocator
+// owns. A list literal's storage can be the compiler's (static, never
+// grown, D113): no header, no count — such a buffer is never written in
+// place (make-unique copies it) and never freed (the free path knows).
+// The header's own words decide: a compiler-owned buffer has capacity 0
+// (§4.3c, D119: "the elements live in the frame; capacity 0"), every heap
+// buffer a capacity above 0. Asking the allocator (rt_payload_start_is_owned
+// walks the slab tables) cost a third of the compiler's own time at every
+// push.
+fn list_buffer_is_counted(v: *mut u8, es: i64) -> bool:
+    let p = list_get_ptr_field(v)
+    p as i64 != 0 and es > 0 and list_alloc_bytes(v, es) > 0
+
+// A copy of the List at `v`: one more holder of its buffer.
+pub fn with_vec_retain(v: *mut u8, es: i64):
+    if list_buffer_is_counted(v, es):
+        unsafe { (*list_holders(list_alloc_base(v, es), es)).fetch_add(1, .AcqRel) }
+
+// The drop of the List at `v`: 1 when this holder was the last, so the
+// caller drops the elements and frees the buffer; else 0, with the header
+// blanked so nothing of the buffer is touched through it again.
+pub fn with_vec_release_last(v: *mut u8, es: i64) -> i64:
+    if not list_buffer_is_counted(v, es):
+        return 1
+    // A sole holder (count 0) is the last: nothing to decrement. A count
+    // above 0 means another holder, so this one steps away.
+    if unsafe { (*list_holders(list_alloc_base(v, es), es)).load(.Acquire) } == 0:
+        return 1
+    unsafe { (*list_holders(list_alloc_base(v, es), es)).fetch_sub(1, .AcqRel) }
+    list_set_ptr_field(v, 0 as *mut u8)
+    list_set_len(v, 0)
+    list_set_cap(v, 0)
+    list_set_start(v, 0)
+    0
+
+// Whether the List at `v` alone holds its buffer: an empty one does; a
+// compiler-owned (static) one never does, so a mutation copies it out.
+pub fn with_vec_is_unique(v: *mut u8, es: i64) -> i64:
+    let p = list_get_ptr_field(v)
+    if p as i64 == 0 or es <= 0:
+        return 1
+    if not list_buffer_is_counted(v, es):
+        return 0
+    if unsafe { (*list_holders(list_alloc_base(v, es), es)).load(.Acquire) } == 0: 1 else: 0
+
+// Before a mutation: a shared buffer of bit-copy elements is copied, its
+// live elements into a fresh buffer this List alone holds, and the shared
+// one loses this holder. Elements with copy glue (a str) take the
+// per-type copy codegen emits beside this (D120 stage 2).
+pub fn with_vec_make_unique_bits(v: *mut u8, es: i64) -> i64:
+    if with_vec_is_unique(v, es) != 0:
+        return 0
+    let old = list_get_ptr_field(v)
+    let n = list_get_len(v)
+    let fresh = if n > 0: list_buffer_alloc(n * es, es) else: 0 as *mut u8
+    if n > 0:
+        rt_memcpy(fresh, old as *const u8, n * es)
+    // A counted buffer loses this holder; a compiler-owned one is left as
+    // it is (it is never freed).
+    if list_buffer_is_counted(v, es):
+        unsafe { (*list_holders(list_alloc_base(v, es), es)).fetch_sub(1, .AcqRel) }
+    list_set_ptr_field(v, fresh)
+    list_set_cap(v, n)
+    list_set_start(v, 0)
+    1
+
 pub fn with_vec_free_es(v: *mut u8, es: i64):
     with_vec_free_buffer_at(list_get_ptr_field(v), list_get_cap(v), es, list_get_start(v))
     list_set_ptr_field(v, 0 as *mut u8)
@@ -3467,6 +3551,13 @@ pub fn with_vec_free_buffer_drop_origin_at(p0: *mut u8, cap0: i64, es: i64, star
     if p0 as i64 == 0: return
     let p = (p0 as i64 - start * es) as *mut u8
     let cap = cap0 + start
+    // D120: a buffer other holders share is released, not freed: the net
+    // under every drop path, whether or not codegen asked release_last.
+    if es > 0 and cap > 0 and list_buffer_align(es) <= RT_ALLOC_HEADER_SIZE:
+        let holders = (p as i64 - 8) as *mut Atomic[i64]
+        if unsafe { (*holders).load(.Acquire) } > 0:
+            unsafe { (*holders).fetch_sub(1, .AcqRel) }
+            return
     if p as i64 != 0 and cap > 0 and es > 0:
         // A header whose cap*elem_size overflows is not a List anymore: the
         // memory was freed and reused under us (the lsp-use-std hunt read

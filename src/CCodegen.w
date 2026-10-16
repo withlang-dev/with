@@ -78,6 +78,7 @@ enum CcBuiltin: i32:
 
     LIST_REMOVE
     LIST_CLEAR
+    LIST_MAKE_UNIQUE
     MAP_NEW
     MAP_INSERT
     MAP_GET
@@ -200,6 +201,7 @@ fn cc_builtin_uses_list_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.LIST_ULEN32: return true
     if kind == CcBuiltin.LIST_REMOVE: return true
     if kind == CcBuiltin.LIST_CLEAR: return true
+    if kind == CcBuiltin.LIST_MAKE_UNIQUE: return true
     if kind == CcBuiltin.LIST_POP: return true
     if kind == CcBuiltin.LIST_EXTEND: return true
     if kind == CcBuiltin.LIST_TAKE_FRONT: return true
@@ -3541,8 +3543,13 @@ impl CCodegen:
             return ""
         let cstr_c = self.c_type(self.sema.ty_cstr as i32, 0)
         var out = ""
+        // One definition per text: a literal reached twice (a global the
+        // lowering referenced twice) is still one C constant.
+        var emitted: List[str] = List.new()
         for i in 0..texts.len():
             let text = texts[i]
+            if emitted.contains(text): continue
+            emitted.push(text)
             let data_name = cc_cstr_literal_data_name(text)
             let view_name = cc_cstr_literal_view_name(text)
             out = out ++ "static const uint8_t " ++ data_name ++ "[" ++ f"{text.len() + 1}" ++ "] = " ++ cc_cstr_literal_bytes_initializer(text) ++ ";\n"
@@ -6760,6 +6767,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
 
     if intrinsic == MirIntrinsic.LIST_REMOVE: return CcBuiltin.LIST_REMOVE
     if intrinsic == MirIntrinsic.LIST_CLEAR: return CcBuiltin.LIST_CLEAR
+    if intrinsic == MirIntrinsic.LIST_MAKE_UNIQUE: return CcBuiltin.LIST_MAKE_UNIQUE
     if intrinsic == MirIntrinsic.LIST_POP: return CcBuiltin.LIST_POP
     if intrinsic == MirIntrinsic.MAP_NEW: return CcBuiltin.MAP_NEW
     if intrinsic == MirIntrinsic.MAP_INSERT: return CcBuiltin.MAP_INSERT
@@ -7048,6 +7056,24 @@ impl CCodegen:
                 return "    abort();"
             let recv_ptr = self.list_recv_ptr_text(body, args_id)
             var out = "    with_vec_clear(" ++ recv_ptr ++ ");\n"
+            out = out ++ f"    goto bb{next_bb};"
+            return out
+
+        if kind == CcBuiltin.LIST_MAKE_UNIQUE:
+            // D120: copy-on-write before a mutation of a value List. The C
+            // backend copies bits; a List whose elements carry copy glue is
+            // not emitted in C yet, and says so.
+            if argc < 1:
+                self.fail("list make-unique expects one argument")
+                return "    abort();"
+            let recv_ptr = self.list_recv_ptr_text(body, args_id)
+            let es = self.list_recv_elem_sizeof_text(body, args_id)
+            // The C output copies every value by its bits and leans on the
+            // runtime's owned-payload check at a free (a copied str is not
+            // retained here either, D111); the fresh buffer's elements are
+            // bit copies the same way. The element copy glue is the LLVM
+            // backend's (mir_emit_list_element_copy_glue_ptr).
+            var out = "    (void)with_vec_make_unique_bits(" ++ recv_ptr ++ ", " ++ es ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 

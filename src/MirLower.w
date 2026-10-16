@@ -1029,6 +1029,15 @@ impl MirBuilder:
     // drop theirs. The operand stays a copy and records the hold; codegen
     // retains where it evaluates the operand, which is where the consumer
     // reads it, whatever order lowering emitted the two in.
+    // D120: a payload forwarded out of a carrier the lowering then retires
+    // (decomposes: its own drop is cancelled) is taken, never retained — a
+    // copy with glue would hold one count too many and leak. A payload of
+    // plain bits copies as before; a resource moves as before.
+    mut fn payload_take_operand(place: i32, ty: i32) -> i32:
+        if ty > 0 and self.sema.is_copy_frozen(ty as TypeId) != 0 and self.sema.type_needs_drop_frozen(ty) != 0:
+            return self.body.new_operand(OperandKind.OK_MOVE, place)
+        self.operand_for_place(place, ty)
+
     mut fn retain_consumed_copy(operand_id: i32):
         let place: i32 = self.body.operand_d0[operand_id]
         let ty = if place >= 0 and place < self.body.place_sema_types.len(): self.body.place_sema_types[place] else: 0
@@ -5782,6 +5791,16 @@ impl MirBuilder:
         if mode == CastMode.MOVE as i32:
             return self.lower_move_cast(expr, target_type_id, node)
         var op = self.lower_expr(expr)
+        // D120: a cast of a Copy value with drop glue (a value List into its
+        // distinct type) consumes a copy: one more holder, as a consuming
+        // call's argument is (retain_consumed_copy decides by the type).
+        if op >= 0 and self.sema.std_generic_of(self.sema.unwrap_builtin_arg_distinct(self.operand_type(op))) == StdGeneric.List:
+            if self.body.operand_kinds[op] == OperandKind.OK_COPY:
+                self.retain_consumed_copy(op)
+            else if self.body.operand_kinds[op] == OperandKind.OK_MOVE:
+                // A temporary (a call's result) cast into the distinct type
+                // moves into it: its own drop is cancelled.
+                self.consume_moved_operand(op)
         // D22 contextual materialization records the cast target on its source
         // expression. The central adjustment consumer has already copied the
         // pointee and performed this ordinary value cast, so do not cast the
@@ -6281,6 +6300,7 @@ impl MirBuilder:
         let elem: i32 = self.sema.concat_sequence_nodes.get(concat_node) ?? 0
         let target = self.lower_expr_place(place_expr)
         let more = self.lower_concat_operand(more_expr, elem)
+        self.make_unique_before_mutation(target)
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("extend"), self.sema.ty_void)
         let args: List[i32] = List.new()
         args.push(self.body.new_operand(OperandKind.OK_COPY, target))
@@ -6994,6 +7014,13 @@ impl MirBuilder:
             var ip_base_ty = self.expr_type(self.ast.get_data0(place_expr))
             while ip_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_base_ty)) == TypeKind.TY_REF:
                 ip_base_ty = self.sema.get_type_d0(self.sema.resolve_alias(ip_base_ty))
+            // D120: a write into an element of a value List (`xs[i] = v`,
+            // `xs[i] += v`) makes the list unique first.
+            let ip_base_expr = self.ast.get_data0(place_expr)
+            let ip_base_kind = self.ast.kind(ip_base_expr)
+            if ip_base_ty > 0 and self.sema.std_generic_of(ip_base_ty) == StdGeneric.List and self.sema.is_copy_frozen(ip_base_ty as TypeId) != 0 and (ip_base_kind == NodeKind.NK_IDENT or ip_base_kind == NodeKind.NK_FIELD_ACCESS or ip_base_kind == NodeKind.NK_INDEX):
+                let ip_list_place = self.lower_expr_place(ip_base_expr)
+                self.make_unique_before_mutation(ip_list_place)
             if self.is_user_index_place(ip_base_ty) != 0:
                 let ip_set_sym = self.sema.pool_lookup_symbol("set")
                 let ip_type_sym = self.sema.get_type_name(ip_base_ty)
@@ -10167,6 +10194,7 @@ impl MirBuilder:
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
         self.switch_to(body_bb)
+        self.make_unique_before_mutation(list_place)
         let slot_local = self.new_temp(slot_ty)
         let slot_place = self.place_for_local(slot_local)
         let slot_args: List[i32] = List.new()
@@ -11616,6 +11644,7 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, span)
         if self.type_needs_value_drop(elem_ty) != 0:
             self.schedule_drop(local_id, DropKind.DK_VALUE)
+        self.make_unique_before_mutation(list_place)
         let args: List[i32] = [self.body.new_operand(OperandKind.OK_COPY, list_place), idx_op]
         let args_id = self.body.new_call_args(args)
         self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_REMOVE)
@@ -13711,6 +13740,9 @@ impl MirBuilder:
                 recv_op = self.lower_contextual_copy_adjustment(self_expr)
             else if self.callee_has_mut_self(callee_sym):
                 recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
+                // D120: a `mut self` method of a value List writes it.
+                if recv_op >= 0 and self.body.operand_kinds[recv_op] != OperandKind.OK_CONSTANT:
+                    self.make_unique_before_mutation(self.body.operand_d0[recv_op])
             else if self.callee_has_move_self(callee_sym) and self.ast.kind(self_expr) == NodeKind.NK_IDENT and self.lookup_local(self.ast.get_data0(self_expr)) >= 0:
                 // §9.5/#D5: a `move self` receiver that is a caller-owned LOCAL is
                 // CONSUMED — lower it as OK_MOVE of the caller's place and consume it
@@ -13917,6 +13949,14 @@ impl MirBuilder:
         // may-suspend closure (#1985), and `xs.map(n => f(n).await)` lowered
         // as a plain call to the map symbol (D65 #1639 validator, #2011).
         let call_id = args_id
+        // D120: a writing List intrinsic makes its value-List receiver (the
+        // first argument) unique first; the make-unique call lands before
+        // this terminator.
+        if self.list_intrinsic_mutates(intrinsic) and self.body.call_arg_counts[args_id] > 0:
+            let recv_arg: i32 = self.body.call_arg_operands[self.body.call_arg_starts[args_id]]
+            if self.body.operand_kinds[recv_arg] != OperandKind.OK_CONSTANT:
+                let recv_place: i32 = self.body.operand_d0[recv_arg]
+                self.make_unique_before_mutation(recv_place)
         self.body.set_call_intrinsic(call_id, intrinsic)
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
@@ -14498,7 +14538,37 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, unit, args_id, elem_place, next_bb)
         self.switch_to(next_bb)
 
+    // D120 (§2.3): the List intrinsics that write their receiver.
+    fn list_intrinsic_mutates(kind: MirIntrinsic) -> bool:
+        kind == MirIntrinsic.LIST_PUSH or kind == MirIntrinsic.LIST_SET or kind == MirIntrinsic.LIST_REMOVE or kind == MirIntrinsic.LIST_CLEAR or kind == MirIntrinsic.LIST_POP or kind == MirIntrinsic.LIST_EXTEND or kind == MirIntrinsic.LIST_SLOT or kind == MirIntrinsic.LIST_ITER_PLACE or kind == MirIntrinsic.LIST_GET_DISJOINT or kind == MirIntrinsic.LIST_RESTORE_FRONT or kind == MirIntrinsic.LIST_TAKE_FRONT
+
+    // D120 (§2.3): a mutation of a List of values the compiler has not
+    // proven unique is preceded by LIST_MAKE_UNIQUE on the place — a copy
+    // of a value list shares its buffer under a count, and the first
+    // mutation of a shared buffer copies it (copy-on-write). A List of
+    // resources moves and is never shared, so it takes no check. Where the
+    // check sits is MIR's (D65); the uniqueness proof and the hoisting out
+    // of loops are the plan's stage 4.
+    mut fn make_unique_before_mutation(list_place: i32):
+        if list_place < 0 or list_place >= self.body.place_sema_types.len():
+            return
+        let ty = self.body.place_sema_types[list_place]
+        if with_getenv_str("WITH_TRACE_COW").len() > 0:
+            with_eprint(f"[cow] place={list_place} ty={ty} list={self.sema.std_generic_of(ty) == StdGeneric.List} copy={if ty > 0: self.sema.is_copy_frozen(ty as TypeId) else: -1}")
+        if ty <= 0 or self.sema.std_generic_of(ty) != StdGeneric.List or self.sema.is_copy_frozen(ty as TypeId) == 0:
+            return
+        let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("__make_unique"), self.sema.ty_void)
+        let args: List[i32] = [self.body.new_operand(OperandKind.OK_COPY, list_place)]
+        let args_id = self.body.new_call_args(args)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.LIST_MAKE_UNIQUE)
+        let result_local = self.new_temp(self.sema.ty_void)
+        let result_place = self.place_for_local(result_local)
+        let next_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+        self.switch_to(next_bb)
+
     mut fn emit_list_push(list_place: i32, elem_op: i32, span: i32):
+        self.make_unique_before_mutation(list_place)
         let push_sym = self.sema.syms.push
         let fn_op = self.const_operand(ConstKind.CK_FN, push_sym, self.sema.ty_void)
         let args: List[i32] = List.new()
@@ -15260,6 +15330,9 @@ impl MirBuilder:
         self.operand_for_place(result_place, result_ty)
 
     mut fn lower_result_combinator_method(self_expr: i32, lowering: MethodLowering, arg_start: i32, arg_count: i32, node: i32) -> i32:
+        // The lowerings that decompose the subject (retire_decomposed_carrier
+        // below) take its payloads; the others forward a copy.
+        let decomposed = lowering == MethodLowering.ResInspect or lowering == MethodLowering.ResInspectErr or lowering == MethodLowering.ResContext or lowering == MethodLowering.ResWithContext
         if arg_count != 1:
             self.mark_unsupported()
             return self.unit_operand()
@@ -15334,7 +15407,7 @@ impl MirBuilder:
             let err_downcast2 = self.body.new_downcast_place(value_place, err_idx2)
             let err_payload_place2 = self.body.new_field_place(err_downcast2, 0, source_err_ty)
             let err_fields2: List[i32] = List.new()
-            err_fields2.push(self.operand_for_place(err_payload_place2, source_err_ty))
+            err_fields2.push(if decomposed: self.payload_take_operand(err_payload_place2, source_err_ty) else: self.operand_for_place(err_payload_place2, source_err_ty))
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields2, span)
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
             self.switch_to(join_bb)
@@ -15345,9 +15418,9 @@ impl MirBuilder:
             let ok_ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, source_ok_ty, 0, 0) as i32
             inspect_args.push(self.operand_for_place_arg(ok_payload_place, source_ok_ty, ok_ref_ty, span))
             let _ = self.lower_call_with_operand_args(mapper_op, inspect_args, self.sema.ty_void as i32, node)
-            ok_fields.push(self.operand_for_place(ok_payload_place, source_ok_ty))
+            ok_fields.push(if decomposed: self.payload_take_operand(ok_payload_place, source_ok_ty) else: self.operand_for_place(ok_payload_place, source_ok_ty))
         else:
-            ok_fields.push(self.operand_for_place(ok_payload_place, source_ok_ty))
+            ok_fields.push(if decomposed: self.payload_take_operand(ok_payload_place, source_ok_ty) else: self.operand_for_place(ok_payload_place, source_ok_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.ok, ok_fields, span)
         if context_message_local >= 0:
             let unused_message = self.place_for_local(context_message_local)
@@ -15384,9 +15457,9 @@ impl MirBuilder:
             let err_ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, source_err_ty, 0, 0) as i32
             inspect_err_args.push(self.operand_for_place_arg(err_payload_place, source_err_ty, err_ref_ty, span))
             let _ = self.lower_call_with_operand_args(mapper_op, inspect_err_args, self.sema.ty_void as i32, node)
-            err_fields.push(self.operand_for_place(err_payload_place, source_err_ty))
+            err_fields.push(if decomposed: self.payload_take_operand(err_payload_place, source_err_ty) else: self.operand_for_place(err_payload_place, source_err_ty))
         else:
-            err_fields.push(self.operand_for_place(err_payload_place, source_err_ty))
+            err_fields.push(if decomposed: self.payload_take_operand(err_payload_place, source_err_ty) else: self.operand_for_place(err_payload_place, source_err_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -15932,6 +16005,9 @@ impl MirBuilder:
     mut fn lower_intrinsic_call_with_receiver_operand(intrinsic: MirIntrinsic, recv_op: i32, recv_type: i32, method_sym: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
         let call_args: List[i32] = List.new()
+        // D120: a writing intrinsic on a value List makes it unique first.
+        if self.list_intrinsic_mutates(intrinsic) and self.body.operand_kinds[recv_op] != OperandKind.OK_CONSTANT:
+            self.make_unique_before_mutation(self.body.operand_d0[recv_op])
         // A builtin reads its receiver in place (D110): a copy takes no hold.
         if self.body.operand_kinds[recv_op] == OperandKind.OK_MOVE:
             self.consume_moved_operand(recv_op)

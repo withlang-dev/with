@@ -21,7 +21,8 @@ everything below is open, and the compiler is NON-COMPLIANT on it.
    pointer into it goes to C; a generic function decides per instantiation.
 4. **A report** names where CoW copies can occur.
 5. **Merge gate:** self-host compile time and the pcre2 and zlib corpus
-   test suites each within 2% by interleaved, repeated local A/B. A held
+   test suites each within 5% (Amendment 1, 2026-10-16; the ruling said
+   2%) by interleaved, repeated local A/B. A held
    regression goes to Eric with the numbers and a profile. Three
    microbenchmarks (a push loop through a field, an element write through
    a parameter, share-then-mutate) are tracked, never gating.
