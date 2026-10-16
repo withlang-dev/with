@@ -4497,9 +4497,9 @@ impl Sema:
     // shape in stage 12b: the callback of a `callback param N userdata param
     // M` pairing (#1618; verify_facade_callback_items checks the pairing). A
     // raw pointer parameter accepts `null` as C declares it and needs no
-    // clause; a nullable C string (`Option[&str]`) or resource parameter
-    // (`Option[&R]`) is not modeled, and saying so beats rendering the
-    // clause as nothing.
+    // clause; a nullable `const char *` is `Option[&str]` (D121 step 6);
+    // a nullable resource parameter (`Option[&R]`) is not modeled, and
+    // saying so beats rendering the clause as nothing.
     mut fn verify_facade_nullable_items():
         for ci in 0..self.foreign_contracts.len():
             if self.foreign_contracts[ci].nullable_params.len() == 0 or self.facade_contract_is_callback_item(ci as i32):
@@ -4520,7 +4520,7 @@ impl Sema:
                 // encoding).
                 if self.facade_param_is_c_string(sig, pi): continue
                 let shown = self.facade_param_display(fn_sym, sig, pi)
-                self.emit_error(f"fn '{fname}': nullable {shown}; nullability is rendered for a function-pointer parameter (§16.6) and for the callback of a 'callback param N userdata param M' pairing (an absent callback takes its userdata with it, §16.2b.9), and a raw pointer parameter accepts null as C declares it — a nullable C string or resource parameter is not modeled (§16.2b.8)", self.foreign_contracts[ci].node)
+                self.emit_error(f"fn '{fname}': nullable {shown}; nullability is rendered for a function-pointer parameter (§16.6), for the callback of a 'callback param N userdata param M' pairing (an absent callback takes its userdata with it, §16.2b.9) and for a const char * (Option[&str]), and a raw pointer parameter accepts null as C declares it — a nullable resource parameter is not modeled (§16.2b.8)", self.foreign_contracts[ci].node)
                 break
 
     // Parameter `pi` of signature `sig` is a `const char *` (§16.3c: the
