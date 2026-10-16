@@ -576,6 +576,11 @@ pub fn run_uat_command(argv: &List[str]) -> i32:
             eprint("error: one scenario name at most")
             return 2
     let root = uat_project_root()
+    // A scenario's `with get` reads this checkout's package registry
+    // (registry/c/<name>/facts.w, D136) rather than the repository's main:
+    // the battery proves the tree, its facts included. `WITH_REGISTRY` set
+    // by the caller stands.
+    if env("WITH_REGISTRY").len() == 0 and with_fs_file_exists(uat_join(root, "registry/README.md")) != 0: set_env("WITH_REGISTRY", "file://" ++ root)
     let paths = uat_list_scenarios(root)
     if paths.len() == 0:
         eprint("error: no scenarios: uat/*.uat is empty or missing (with init writes uat/hello.uat)")

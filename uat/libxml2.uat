@@ -1,0 +1,10 @@
+scenario: libxml2 from a fresh project, over the facade with get writes
+requires: network
+
+new directory
+run: with init .
+run: with get c.libxml2
+expect stderr contains: facade libxml2:
+write src/main.w from libxml2_main.w
+run: with run
+expect stdout: libxml2 UAT passed
