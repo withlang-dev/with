@@ -1344,13 +1344,20 @@ pub fn resolve_own_tree_candidate(rel_path: &str) -> str:
 // A dotted import that resolved to its parent's file (`use std.math.TAU` is
 // std/math.w) names its last segment; one that resolved to its own file
 // (`use std.math`) imports the whole module.
+// `use facades.<name>` that resolved to the facade `with get` wrote
+// (`.with/deps/c/<name>/<version>/facade.w`, D121 step 5) is that whole
+// module too.
 fn resolve_dotted_selection(dotted: &str, resolved_path: &str) -> str:
     var last_dot = -1
     for i in 0..dotted.len():
         if dotted[i] == '.': last_dot = i as i32
     if last_dot <= 0 or resolved_path.len() == 0 or resolved_path.replace("\\", "/").ends_with(dotted.replace(".", "/") ++ ".w"):
         return ""
-    dotted.slice(last_dot + 1, dotted.len())
+    let last = dotted.slice(last_dot + 1, dotted.len())
+    let path = resolved_path.replace("\\", "/")
+    if dotted.starts_with("facades.") and path.ends_with("/facade.w") and ("/" ++ path).contains("/.with/deps/c/" ++ last ++ "/"):
+        return ""
+    last
 
 fn resolve_is_prelude_path(dotted: &str) -> bool:
     dotted == "std.prelude" or dotted == "std.prelude_core" or dotted == "std.prelude_alloc"
