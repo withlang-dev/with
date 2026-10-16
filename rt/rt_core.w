@@ -3469,14 +3469,14 @@ fn list_holders(base: *mut u8, es: i64) -> *mut Atomic[i64]:
 // owns. A list literal's storage can be the compiler's (static, never
 // grown, D113): no header, no count — such a buffer is never written in
 // place (make-unique copies it) and never freed (the free path knows).
+// The header's own words decide: a compiler-owned buffer has capacity 0
+// (§4.3c, D119: "the elements live in the frame; capacity 0"), every heap
+// buffer a capacity above 0. Asking the allocator (rt_payload_start_is_owned
+// walks the slab tables) cost a third of the compiler's own time at every
+// push.
 fn list_buffer_is_counted(v: *mut u8, es: i64) -> bool:
     let p = list_get_ptr_field(v)
-    if p as i64 == 0 or es <= 0:
-        return false
-    let base = list_alloc_base(v, es)
-    if list_buffer_align(es) <= RT_ALLOC_HEADER_SIZE:
-        return rt_payload_start_is_owned(base as *const u8) != 0
-    rt_payload_start_is_owned((unsafe *((base as i64 - 8) as *const i64)) as *const u8) != 0
+    p as i64 != 0 and es > 0 and list_alloc_bytes(v, es) > 0
 
 // A copy of the List at `v`: one more holder of its buffer.
 pub fn with_vec_retain(v: *mut u8, es: i64):
@@ -3553,7 +3553,7 @@ pub fn with_vec_free_buffer_drop_origin_at(p0: *mut u8, cap0: i64, es: i64, star
     let cap = cap0 + start
     // D120: a buffer other holders share is released, not freed: the net
     // under every drop path, whether or not codegen asked release_last.
-    if es > 0 and rt_payload_start_is_owned(p as *const u8) != 0 and list_buffer_align(es) <= RT_ALLOC_HEADER_SIZE:
+    if es > 0 and cap > 0 and list_buffer_align(es) <= RT_ALLOC_HEADER_SIZE:
         let holders = (p as i64 - 8) as *mut Atomic[i64]
         if unsafe { (*holders).load(.Acquire) } > 0:
             unsafe { (*holders).fetch_sub(1, .AcqRel) }
