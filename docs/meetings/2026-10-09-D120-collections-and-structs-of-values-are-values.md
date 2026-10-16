@@ -98,6 +98,14 @@ revisit.
 (D115 Amendment 1): the count lives in the allocation, so the header stays
 32 bytes.
 
+**Status of the work.** `resource type` landed 2026-10-16 (`src/Parser.w`
+reads `resource` before `type` and marks the declaration, `TDK_FLAG_RESOURCE`;
+Sema refuses a `Copy` impl on one and never counts it Copy; a `resource
+type` that is not a struct is refused; the keyword is contextual). The
+copy-on-write collections and compositional value structs, the uniqueness
+checks, the C boundary rule, per-instantiation generics, the copy report and
+the 2% measurement are open: the compiler is NON-COMPLIANT on those.
+
 **What would reopen it.** Self-host time or a corpus suite more than 2%
 slower with the cost not removable; or a program where the deferred copy
 misleads more than the move error would have.

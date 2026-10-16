@@ -1092,6 +1092,10 @@ impl Sema:
         let is_generic_decl = if self.type_decl_tp_count(node) != 0: 1 else: 0
         if is_ephemeral != 0:
             self.ephemeral_types.insert(name, 1)
+        // D120 (§4.3): declared a resource, so never a value, whatever its
+        // fields; redundant beside a Drop impl, which already makes it one.
+        if type_decl_is_resource(packed_kind) != 0:
+            self.resource_type_names.insert(name, 1)
 
         if sub_kind == TypeDeclKind.Struct:
             let field_count = self.ast.get_extra(extra_start)
@@ -2970,6 +2974,11 @@ impl Sema:
             // whichever decl the (gated) lookup resolves from this module.
             let conflict_shadowed = self.type_sym_is_shadowed(type_name)
             let conflict_want_std = if conflict_shadowed != 0: self.type_tid_std_tier(self.resolve_alias(self.lookup_named_type_visible(type_name) as TypeId) as i32) else: 0
+            // D120 (§4.3): a `resource type` is declared to have identity;
+            // copying one would be the bug the declaration names.
+            if self.resource_type_names.contains(type_name):
+                self.emit_error("type '" ++ self.pool_resolve(type_name) ++ "' cannot implement Copy: it is declared 'resource type', a value never duplicated (§4.3)", node)
+                return
             if self.impl_lookup.contains(type_name):
                 let drop_idx: i32 = self.impl_lookup.get(type_name).unwrap()
                 let drop_start = self.impl_starts[drop_idx]

@@ -363,6 +363,9 @@ impl Parser:
         let t = self.peek()
         if t == TokenKind.TK_KW_FN or t == TokenKind.TK_KW_TYPE or t == TokenKind.TK_KW_ENUM or t == TokenKind.TK_KW_USE or t == TokenKind.TK_KW_EXTERN or t == TokenKind.TK_KW_ERROR or t == TokenKind.TK_KW_CONST or t == TokenKind.TK_KW_PUB or t == TokenKind.TK_KW_GLOBAL:
             return 1
+        // D120 (§4.3): `resource type` is a declaration.
+        if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "resource") and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_KW_TYPE:
+            return 1
         // D51 §16.2b: `c facade name:` is a declaration; without this an
         // implicit-main file read the block as executable statements.
         if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "c") and (self.token_text_is(self.pos + 1, "facade") or self.token_text_is(self.pos + 1, "convention")):
@@ -1435,6 +1438,16 @@ impl Parser:
             return self.parse_fn_decl(is_pub, start, 0, 1, 0)
         if t == TokenKind.TK_KW_TYPE:
             return self.parse_type_decl(is_pub, start)
+        // D120 (§4.3): `resource type T`; `resource` is a keyword only here.
+        if t == TokenKind.TK_IDENT and self.is_ident_named("resource") and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_KW_TYPE:
+            self.advance()
+            let node = self.parse_type_decl(is_pub, start)
+            if node != 0 and self.pool.kind(node) == NodeKind.NK_TYPE_DECL:
+                let packed = self.pool.get_data2(node)
+                if type_decl_sub_kind(packed) != TypeDeclKind.Struct:
+                    self.emit_error("'resource type' declares a struct; an alias, a distinct type, an enum or a union has the identity of what it wraps (§4.3)")
+                self.pool.set_data2(node, packed + TDK_FLAG_RESOURCE)
+            return node
         if t == TokenKind.TK_KW_ENUM:
             return self.parse_enum_decl(is_pub, start)
         if t == TokenKind.TK_KW_USE:
