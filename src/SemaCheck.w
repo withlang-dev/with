@@ -31704,11 +31704,12 @@ impl Sema:
         let type_node = self.ast.get_data1(callee)
         self.collect_target_type_from_type_node(type_node, iter_elem_ty, node)
 
-    // The leading i64 parameters of a str intrinsic (with_str_slice_ref,
-    // with_str_byte_at_ref, with_str_repeat_ref): an index or a count.
-    fn str_intrinsic_index_param_count(method_name: &str) -> i32:
-        if method_name == "slice": return 2
-        if method_name == "byte_at" or method_name == "repeat": return 1
+    // The declared parameter type of a str intrinsic (BuiltinSigs): `i64` for
+    // slice/byte_at/repeat (#2023), `&str` for contains/starts_with/ends_with/
+    // index_of/split/replace (#2434).
+    fn str_intrinsic_param_type(method_name: &str) -> i32:
+        if method_name == "slice" or method_name == "byte_at" or method_name == "repeat": return self.ty_i64 as i32
+        if method_name == "contains" or method_name == "starts_with" or method_name == "ends_with" or method_name == "index_of" or method_name == "split" or method_name == "replace": return self.ty_str_view as i32
         0
 
     // What `sum` and `product` yield over elements of `elem`: the number,
@@ -34428,6 +34429,8 @@ impl Sema:
                 let join_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                 if join_elem_ty != 0 and self.get_type_kind(self.auto_deref_ref_ptr_type(self.resolve_alias(join_elem_ty as TypeId))) != TypeKind.TY_STR and self.type_has_unresolved_parts(join_elem_ty) == 0:
                     self.emit_error(f"List.join joins str elements, and this List holds `{self.type_name(join_elem_ty)}`; turn each element into text first: `v.iter() |> map(f\"\{it\}\") |> collect[List]()`", node)
+                if arg_count >= 1:
+                    self.check_builtin_method_call_arg(mc_call_name, 0, self.ty_str_view as i32, arg_types[0], self.ast.get_extra(extra_start))
             else if type_name_sym == self.syms.list and field == self.syms.contains:
                 // D22: List.contains(value: &T) observes — arg[0] is &T; an
                 // owned argument auto-refs at the call site.
@@ -34967,11 +34970,15 @@ impl Sema:
                 // #2023 (D22/D27): an index or count parameter is an owned i64
                 // demand; checking it records the materialization of a Copy
                 // view argument (`s.slice(0, xs[i])`) that MIR then performs.
-                let str_index_params = self.str_intrinsic_index_param_count(self.pool_resolve(field))
-                for sai in 0..str_index_params:
-                    if sai < arg_types.len():
+                // #2434: the `&str` parameters of contains/starts_with/
+                // ends_with/index_of/split/replace are checked the same way,
+                // so a non-str argument (such as a Regex) is refused in Sema
+                // instead of aborting Codegen.str_view_arg.
+                let str_param_ty = self.str_intrinsic_param_type(self.pool_resolve(field))
+                if str_param_ty != 0:
+                    for sai in 0..mc_resolved_arg_count:
                         let sa_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, sai) else: self.ast.get_extra(extra_start + sai)
-                        if self.check_builtin_method_call_arg("str." ++ self.pool_resolve(field), sai, self.ty_i64 as i32, arg_types[sai], sa_node) == 0:
+                        if self.check_builtin_method_call_arg("str." ++ self.pool_resolve(field), sai, str_param_ty, arg_types[sai], sa_node) == 0:
                             return 0
                 return str_builtin_ret
         if resolved_tk == TypeKind.TY_ARRAY or resolved_tk == TypeKind.TY_SLICE:

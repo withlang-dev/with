@@ -358,6 +358,10 @@ pub fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32)
     if kind == NodeKind.NK_C_STRING_LIT:
         return prefix ++ "c\"" ++ intern.resolve(pool.get_data0(node)) ++ "\""
 
+    if kind == NodeKind.NK_REGEX_LIT:
+        let flags = if pool.get_data1(node) != 0: intern.resolve(pool.get_data1(node)) else: ""
+        return prefix ++ "/" ++ intern.resolve(pool.get_data0(node)) ++ "/" ++ flags
+
     if kind == NodeKind.NK_BOOL_LIT:
         if pool.get_data0(node) != 0:
             return prefix ++ "true"

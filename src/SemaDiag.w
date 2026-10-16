@@ -155,6 +155,14 @@ impl Sema:
         let help = self.argument_literal_default_help(arg_node, expr_text, expected_ty, actual_ty)
         if help.len() > 0:
             diag.add_help(help)
+        else if actual_name == "Regex" and arg_index == 0:
+            let re_text = if expr_text.len() > 0: expr_text else: "re"
+            if call_name == "str.replace":
+                diag.add_help("regex replacement is a Regex method: `" ++ re_text ++ ".replace(text, replacement)` (§18.5b)")
+            else if call_name == "str.split":
+                diag.add_help("regex splitting is a Regex method: `" ++ re_text ++ ".split(text)`")
+            else if call_name == "str.contains":
+                diag.add_help("regex matching is `text =~ " ++ re_text ++ "` or `" ++ re_text ++ ".is_match(text)` (§18.5b)")
         self.diags.emit(move diag)
 
     fn unknown_type_message(sym: i32) -> str:
