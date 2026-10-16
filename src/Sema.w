@@ -1098,6 +1098,9 @@ pub type Sema {
     lang_trait_syms: HashMap[i32, i32],
     local_type_names: HashMap[i32, i32],
     distinct_type_names: HashMap[i32, i32],
+    // D120 (§4.3): the structs declared `resource type`, by name symbol:
+    // never Copy, whatever their fields.
+    resource_type_names: HashMap[i32, i32],
     // §4.5 (D75, #1802): the ownership mode of a cast whose target relabels
     // its source (CastMode, keyed by the NK_CAST node). Absent: an ordinary
     // value conversion. MirLower materializes the mode; it never re-derives it.
@@ -3340,6 +3343,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         lang_trait_syms,
         local_type_names,
         distinct_type_names: sema_new_map_i32_i32(),
+        resource_type_names: sema_new_map_i32_i32(),
         cast_modes: sema_new_map_i32_i32(),
         ephemeral_types,
         sealed_traits,
@@ -10724,6 +10728,11 @@ impl Sema:
             if self.has_drop_method(name) != 0:
                 if sema_debug_move_enabled() != 0:
                     with_eprint("[noncopy] type=" ++ self.pool_resolve(name) ++ " reason=drop")
+                return 0
+            // D120 (§4.3): declared a resource.
+            if name > 0 and self.resource_type_names.contains(name):
+                if sema_debug_move_enabled() != 0:
+                    with_eprint("[noncopy] type=" ++ self.pool_resolve(name) ++ " reason=resource type")
                 return 0
             // A distinct wrapper's Copy-ness follows its inner type — the
             // compiler knows the payload; requiring an explicit impl would be
