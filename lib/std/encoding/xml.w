@@ -43,7 +43,7 @@ impl XmlElement:
     /// The value of the attribute named `name`, if present.
     pub fn attr(wanted: &str) -> Option[&str]:
         for a in self.attrs:
-            if a.name == wanted: return Some(&a.value)
+            if a.name == wanted: return &a.value
         None
 
     pub fn has_attr(wanted: &str) -> bool:
@@ -54,7 +54,7 @@ impl XmlElement:
     /// The first child element named `name`, if any.
     pub fn child(wanted: &str) -> Option[&XmlElement]:
         for c in self.children:
-            if c.name == wanted: return Some(c)
+            if c.name == wanted: return c
         None
 
     /// How many child elements are named `name`.

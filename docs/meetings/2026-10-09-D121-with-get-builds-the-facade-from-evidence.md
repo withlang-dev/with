@@ -97,8 +97,16 @@ declaration) are ruled in D134. Step 3's Clang half landed 2026-10-15: a
 declaration's `__attribute__((…))` tokens are read by the bridge
 (`with_cimport_fn_attributes`), `malloc` makes an otherwise unproven
 return an owned producer with the provenance `annotation:`, and the report
-names every attribute a function carries; GObject-introspection transfer
-annotations (a `.gir` input) are the other half, open. Steps 4–6 are open.
+names every attribute a function carries. Its GObject-introspection half
+landed the same day: `src/CiGir.w` reads every `.gir` under the package
+(or `--gir FILE`) through `std.encoding.xml` (D135), and the engine takes
+the return's transfer (`full` an owned producer, `none` a borrow of the
+instance or the one pointer parameter), a parameter's `full` transfer as
+`consumes param N`, and a record's `free-function` as its destroyer or,
+among several, its `drop`; a function only the file describes is a subject
+with its declared signature; the report says DISAGREES where the file and
+a proof differ, and the proof stands. The compiler using a new std module
+raised the minimum seed. Steps 4–6 are open.
 
 **What would reopen it.** A Conan Center majority of binary-only packages,
 or proofs that cover too little of ordinary libraries to make the registry

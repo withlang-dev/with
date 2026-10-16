@@ -30,6 +30,7 @@
 
 use CiIR
 use CImport
+use CiGir
 use std.string.parse
 
 extern fn with_str_clone_ref(s: &str) -> str
@@ -85,13 +86,16 @@ impl CiProject:
     fn fd_callee_retains(callee: &str, index: i32) -> bool:
         if self.fd_is_free_call(callee) or self.fd_is_alloc_call(callee) or ci_own_is_libc_observer(callee): return false
         let si = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
-        if si < 0 or self.symbols[si].has_definition == 0: return true
+        if si < 0: return true
+        // A callee no unit defines retains what it is given (the asymmetry
+        // rule), unless the introspection file says it takes nothing there.
+        if self.symbols[si].has_definition == 0: return gir_param_transfer(self.symbols[si].gir, index) != "none"
         index < self.symbols[si].param_stores.len() and self.symbols[si].param_stores[index] != 0
 
     fn fd_callee_destroys(callee: &str, index: i32) -> bool:
         if self.fd_is_free_call(callee): return true
         let si = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
-        if si < 0 or self.symbols[si].has_definition == 0: return false
+        if si < 0 or not self.fd_subject(si): return false
         index < self.symbols[si].param_destroys.len() and self.symbols[si].param_destroys[index] != 0
 
     // The verdict for a local of `si`: "owned", "borrow:<i>", "null" (never
@@ -132,7 +136,7 @@ impl CiProject:
             let argmap = if colon >= 0: rest.slice(colon + 1, rest.len()).to_owned() else: ""
             if self.fd_is_alloc_call(callee): return "owned"
             let ci = self.find_symbol(CiProjectSymbolKind.CIPS_FN, callee)
-            if ci < 0 or self.symbols[ci].has_definition == 0: return "unknown:" ++ callee ++ " is not defined in the package"
+            if ci < 0 or not self.fd_subject(ci): return "unknown:" ++ callee ++ " is not defined in the package"
             if self.symbols[ci].owns_return != 0: return "owned"
             if self.symbols[ci].borrow_from >= 0:
                 let arg = fd_argmap_at(argmap, self.symbols[ci].borrow_from)
@@ -151,6 +155,61 @@ impl CiProject:
         for a in self.symbols[si].attrs.split(";"):
             if a == name or a.starts_with(name ++ "("): return true
         false
+
+    // A function the proofs are about: one a unit defines, or one the
+    // package's introspection files declare facts for (D121 step 3).
+    fn fd_subject(si: i32) -> bool:
+        self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and (self.symbols[si].has_definition != 0 or self.symbols[si].gir.len() > 0)
+
+    // The pointer parameters of `si`: how many, and the index of the one
+    // when there is exactly one (else -1).
+    fn fd_sole_pointer_param(si: i32) -> i32:
+        var count = 0
+        var sole = -1
+        for pi in 0..self.symbols[si].param_ty.len():
+            if self.symbols[si].param_ty[pi].starts_with("*"):
+                count = count + 1
+                sole = pi as i32
+        if count == 1: sole else: -1
+
+    // Parameter `pi` of `si` the introspection file says the callee takes
+    // (`transfer-ownership="full"`), a pointer to a record.
+    fn fd_gir_takes(si: i32, pi: i32) -> bool:
+        self.fd_param_is_pointer(si, pi) and fd_record_pointee(self.symbols[si].param_ty[pi]).len() > 0 and gir_param_transfer(self.symbols[si].gir, pi) == "full"
+
+    // The first modeled resource parameter the introspection file says the
+    // callee takes and the body does not destroy, else -1.
+    fn fd_consumed_param(si: i32, modeled: &List[str]) -> i32:
+        for pi in 0..self.symbols[si].param_ty.len():
+            if self.symbols[si].param_destroys[pi] != 0: continue
+            if self.fd_gir_takes(si, pi as i32) and modeled.contains(fd_record_pointee(self.symbols[si].param_ty[pi])): return pi as i32
+        -1
+
+    // Why `si` destroys its parameter: the body's proof, or the
+    // introspection file naming it the record's destroyer.
+    fn fd_destroy_reason(si: i32, what: &str) -> str:
+        if self.symbols[si].gir.contains("dropby=gir"): return "annotation: the introspection file names it the record's free function"
+        "proof: frees " ++ what ++ (if self.symbols[si].gir.contains("drop=1"): "; the introspection file names it the record's free function" else: "")
+
+    // What the introspection file says about `si`, for the report.
+    fn fd_gir_summary(si: i32) -> str:
+        let g = self.symbols[si].gir
+        if g.len() == 0: return ""
+        var parts = ""
+        let ret = gir_fact(g, "ret")
+        let rtype = gir_fact(g, "rtype")
+        if ret != "-" and ret.len() > 0 and rtype != "none": parts = "return transfer " ++ ret
+        if gir_fact(g, "rnull") == "1": parts = parts ++ (if parts.len() > 0: ", " else: "") ++ "nullable return"
+        if rtype == "utf8" or rtype == "filename": parts = parts ++ (if parts.len() > 0: ", " else: "") ++ "returns " ++ rtype
+        for pi in 0..self.symbols[si].param_ty.len():
+            let t = gir_param_transfer(g, pi as i32)
+            if t == "full" or t == "container": parts = parts ++ (if parts.len() > 0: ", " else: "") ++ f"param {pi} transfer " ++ t
+        if g.contains("drop=1"): parts = parts ++ (if parts.len() > 0: ", " else: "") ++ "a record's free function"
+        // A proof and the file disagreeing is worth a loud line: one of
+        // them is wrong, and the proof stands (§16.2b.2).
+        if self.symbols[si].borrow_from >= 0 and ret == "full" and not self.symbols[si].own_reason.starts_with("annotation:"): parts = parts ++ "; DISAGREES: the proof returns a borrow"
+        if self.symbols[si].owns_return != 0 and ret == "none" and not self.symbols[si].own_reason.starts_with("annotation:"): parts = parts ++ "; DISAGREES: the proof returns a fresh allocation"
+        if parts.len() == 0: "" else: " [gir: " ++ parts ++ "]"
 
     fn fd_retains_any(si: i32) -> bool:
         for pi in 0..self.symbols[si].param_stores.len():
@@ -178,7 +237,11 @@ impl CiProject:
             if self.symbols[si].param_destroys[pi] != 0: destroyed = pi as i32
             else if self.symbols[si].param_stores[pi] != 0: retained = pi as i32
             else if not modeled.contains(fd_record_pointee(p)) and unmodeled.len() == 0: unmodeled = p
-        if destroyed >= 0: return f"destroyer, param {destroyed} (proof: frees it)"
+        if destroyed >= 0: return f"destroyer, param {destroyed} (" ++ self.fd_destroy_reason(si, "it") ++ ")"
+        // A retained parameter the introspection file says the callee
+        // takes is consumed: the caller hands it over (§16.2b.15 item 2).
+        let consumed = self.fd_consumed_param(si, modeled)
+        if consumed >= 0 and (retained < 0 or retained == consumed): return f"consumes param {consumed} (annotation: gir transfer-ownership=\"full\", the callee takes it)"
         if retained >= 0: return f"raw: retains param {retained}; its lifetime contract is not proven"
         if unmodeled.len() > 0: return "raw: parameter of unmodeled pointer type " ++ unmodeled
         if pointer_params == 0: return "value-only call"
@@ -215,56 +278,16 @@ impl CiProject:
     fn fd_param_is_pointer(si: i32, pi: i32) -> bool:
         pi >= 0 and pi < self.symbols[si].param_ty.len() and self.symbols[si].param_ty[pi].starts_with("*")
 
-    // D121: the corpus-wide ownership proofs, drawn once after every unit
-    // is scanned. Each phase is a monotone fixed point; the order of units
-    // never enters. Retention and destruction are facts about pointer
-    // parameters, reached directly or through a local that stands for one.
-    mut fn resolve_ownership():
+    // A parameter is destroyed when the body passes it, or a local that
+    // stands for it, to a destroyer at its destroyed position: to a fixed
+    // point over the corpus.
+    mut fn fd_propagate_destruction():
         let n = self.symbols.len()
-        // 1. Retention.
-        for si in 0..n:
-            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
-            let count = self.symbols[si].param_sinks.len()
-            for pi in 0..count:
-                if not self.fd_param_is_pointer(si as i32, pi as i32): continue
-                if self.symbols[si].param_sinks[pi].contains("field;") or self.symbols[si].param_sinks[pi].contains("global;"): self.symbols[si].param_stores[pi] = 1
-            for line in self.symbols[si].own_evidence.split("\n"):
-                if line.starts_with("paramstore:"):
-                    let pi = fd_i32(line.slice(11, line.len()))
-                    if self.fd_param_is_pointer(si as i32, pi): self.symbols[si].param_stores[pi] = 1
-                if line.starts_with("localstore:"):
-                    let pi = self.fd_local_alias_param(si as i32, line.slice(11, line.len()))
-                    if pi >= 0: self.symbols[si].param_stores[pi] = 1
         var changed = true
         while changed:
             changed = false
             for si in 0..n:
-                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
-                let count = self.symbols[si].param_sinks.len()
-                for pi in 0..count:
-                    if self.symbols[si].param_stores[pi] != 0 or not self.fd_param_is_pointer(si as i32, pi as i32): continue
-                    for sink in self.symbols[si].param_sinks[pi].split(";"):
-                        if not sink.contains(":"): continue
-                        let kv = sink.split(":")
-                        if self.fd_callee_retains(kv[0], fd_i32(kv[1])):
-                            self.symbols[si].param_stores[pi] = 1
-                            changed = true
-                            break
-                for line in self.symbols[si].own_evidence.split("\n"):
-                    if not line.starts_with("localsink:"): continue
-                    let parts = line.split(":")
-                    if parts.len() != 4: continue
-                    let pi = self.fd_local_alias_param(si as i32, parts[1])
-                    if pi < 0 or self.symbols[si].param_stores[pi] != 0: continue
-                    if self.fd_callee_retains(parts[2], fd_i32(parts[3])):
-                        self.symbols[si].param_stores[pi] = 1
-                        changed = true
-        // 2. Destruction.
-        changed = true
-        while changed:
-            changed = false
-            for si in 0..n:
-                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+                if not self.fd_subject(si as i32): continue
                 let count = self.symbols[si].param_sinks.len()
                 for pi in 0..count:
                     if self.symbols[si].param_destroys[pi] != 0 or not self.fd_param_is_pointer(si as i32, pi as i32): continue
@@ -284,12 +307,70 @@ impl CiProject:
                     if self.fd_callee_destroys(parts[2], fd_i32(parts[3])):
                         self.symbols[si].param_destroys[pi] = 1
                         changed = true
+
+    // D121: the corpus-wide ownership proofs, drawn once after every unit
+    // is scanned. Each phase is a monotone fixed point; the order of units
+    // never enters. Retention and destruction are facts about pointer
+    // parameters, reached directly or through a local that stands for one.
+    mut fn resolve_ownership():
+        let n = self.symbols.len()
+        // 1. Retention.
+        for si in 0..n:
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
+            let count = self.symbols[si].param_sinks.len()
+            for pi in 0..count:
+                if not self.fd_param_is_pointer(si as i32, pi as i32): continue
+                if self.symbols[si].param_sinks[pi].contains("field;") or self.symbols[si].param_sinks[pi].contains("global;"): self.symbols[si].param_stores[pi] = 1
+            for line in self.symbols[si].own_evidence.split("\n"):
+                if line.starts_with("paramstore:"):
+                    let pi = fd_i32(line.slice(11, line.len()))
+                    if self.fd_param_is_pointer(si as i32, pi): self.symbols[si].param_stores[pi] = 1
+                if line.starts_with("localstore:"):
+                    let pi = self.fd_local_alias_param(si as i32, line.slice(11, line.len()))
+                    if pi >= 0: self.symbols[si].param_stores[pi] = 1
+        var changed = true
+        while changed:
+            changed = false
+            for si in 0..n:
+                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
+                let count = self.symbols[si].param_sinks.len()
+                for pi in 0..count:
+                    if self.symbols[si].param_stores[pi] != 0 or not self.fd_param_is_pointer(si as i32, pi as i32): continue
+                    for sink in self.symbols[si].param_sinks[pi].split(";"):
+                        if not sink.contains(":"): continue
+                        let kv = sink.split(":")
+                        if self.fd_callee_retains(kv[0], fd_i32(kv[1])):
+                            self.symbols[si].param_stores[pi] = 1
+                            changed = true
+                            break
+                for line in self.symbols[si].own_evidence.split("\n"):
+                    if not line.starts_with("localsink:"): continue
+                    let parts = line.split(":")
+                    if parts.len() != 4: continue
+                    let pi = self.fd_local_alias_param(si as i32, parts[1])
+                    if pi < 0 or self.symbols[si].param_stores[pi] != 0: continue
+                    if self.fd_callee_retains(parts[2], fd_i32(parts[3])):
+                        self.symbols[si].param_stores[pi] = 1
+                        changed = true
+        // 2. Destruction: the bodies' proofs first; then the introspection
+        // file's `free-function` seeds a unary pointer-parameter function
+        // no body proved (D121 step 3), and the fixed point reaches its
+        // callers.
+        self.fd_propagate_destruction()
+        var seeded = false
+        for si in 0..n:
+            if not self.fd_subject(si as i32) or not self.symbols[si].gir.contains("drop=1"): continue
+            if self.symbols[si].param_ty.len() != 1 or not self.fd_param_is_pointer(si as i32, 0) or self.symbols[si].param_destroys[0] != 0: continue
+            self.symbols[si].param_destroys[0] = 1
+            self.symbols[si].gir = self.symbols[si].gir ++ ";dropby=gir"
+            seeded = true
+        if seeded: self.fd_propagate_destruction()
         // 3. Returns.
         changed = true
         while changed:
             changed = false
             for si in 0..n:
-                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
                 if self.symbols[si].owns_return != 0 or self.symbols[si].borrow_from >= 0: continue
                 if fd_record_pointee(self.symbols[si].ret_ty).len() == 0:
                     self.symbols[si].own_reason = "returns no pointer to a record"
@@ -322,26 +403,44 @@ impl CiProject:
                 if verdict.starts_with("unknown:") and self.fd_has_attr(si as i32, "malloc"):
                     verdict = "owned"
                     reason = "annotation: __attribute__((malloc)), the return is a fresh allocation the caller owns"
+                // The introspection file's transfer on the return: `full`
+                // is the caller's; `none` is a borrow, of the instance
+                // parameter when the function is a method, else of its
+                // one pointer parameter (D134: one origin per call).
+                let gir = self.symbols[si].gir
+                if verdict.starts_with("unknown:") and gir.len() > 0:
+                    let transfer = gir_fact(gir, "ret")
+                    if transfer == "full":
+                        verdict = "owned"
+                        reason = "annotation: gir transfer-ownership=\"full\", the caller owns the return"
+                    else if transfer == "none":
+                        let inst = fd_i32(gir_fact(gir, "inst"))
+                        let origin = if inst >= 0: inst else: self.fd_sole_pointer_param(si as i32)
+                        if origin >= 0:
+                            verdict = f"borrow:{origin}"
+                            reason = "annotation: gir transfer-ownership=\"none\", " ++ (if inst >= 0: "a part of the instance parameter" else: "a part of its one pointer parameter")
+                        else: verdict = "unknown:gir transfer-ownership=\"none\" names no single origin parameter"
+                    else if transfer == "container": verdict = "unknown:gir transfer-ownership=\"container\": the caller owns the container and not its elements, which the facade language does not state"
                 if verdict == "owned":
                     self.symbols[si].owns_return = 1
                     self.symbols[si].own_reason = if reason.starts_with("annotation:"): reason else: "proof: " ++ reason ++ ", a fresh allocation never retained"
                     changed = true
                 else if verdict.starts_with("borrow:"):
                     self.symbols[si].borrow_from = fd_i32(verdict.slice(7, verdict.len()))
-                    self.symbols[si].own_reason = "proof: " ++ reason
+                    self.symbols[si].own_reason = if reason.starts_with("annotation:"): reason else: "proof: " ++ reason
                     changed = true
                 else: self.symbols[si].own_reason = verdict.slice(8, verdict.len()).to_owned()
         // WITH_DEBUG_MIGRATE_FACADE=1: every definition's evidence and
         // verdicts, for reading a verdict back to the line that gave it.
         if with_getenv_str("WITH_DEBUG_MIGRATE_FACADE").len() > 0:
             for si in 0..n:
-                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
                 var stores = ""
                 var destroys = ""
                 for pi in 0..self.symbols[si].param_ty.len():
                     stores = stores ++ (if self.symbols[si].param_stores[pi] != 0: "1" else: "0")
                     destroys = destroys ++ (if self.symbols[si].param_destroys[pi] != 0: "1" else: "0")
-                eprint("facade: " ++ self.symbols[si].name ++ " -> " ++ self.symbols[si].ret_ty ++ (if self.symbols[si].header_declared != 0: " (declared)" else: " (internal)") ++ " stores=" ++ stores ++ " destroys=" ++ destroys ++ f" owns={self.symbols[si].owns_return} borrow_from={self.symbols[si].borrow_from}: " ++ self.symbols[si].own_reason)
+                eprint("facade: " ++ self.symbols[si].name ++ " -> " ++ self.symbols[si].ret_ty ++ (if self.symbols[si].header_declared != 0: " (declared)" else: " (internal)") ++ " stores=" ++ stores ++ " destroys=" ++ destroys ++ f" owns={self.symbols[si].owns_return} borrow_from={self.symbols[si].borrow_from}: " ++ self.symbols[si].own_reason ++ (if self.symbols[si].gir.len() > 0: " gir=" ++ self.symbols[si].gir else: ""))
                 for line in self.symbols[si].own_evidence.split("\n"):
                     if line.len() > 0: eprint("    " ++ line)
                 for pi in 0..self.symbols[si].param_sinks.len():
@@ -352,7 +451,7 @@ impl CiProject:
     fn fd_representations() -> List[str]:
         var out: List[str] = List.new()
         for si in 0..self.symbols.len():
-            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
             if self.symbols[si].owns_return != 0:
                 let r = fd_record_pointee(self.symbols[si].ret_ty)
                 if r.len() > 0 and not out.contains(r): out.push(r)
@@ -365,7 +464,7 @@ impl CiProject:
     fn fd_producers_of(record: &str) -> List[i32]:
         var out: List[i32] = List.new()
         for si in 0..self.symbols.len():
-            if self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and self.symbols[si].has_definition != 0 and self.symbols[si].header_declared != 0 and self.symbols[si].owns_return != 0 and fd_record_pointee(self.symbols[si].ret_ty) == record: out.push(si as i32)
+            if self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and self.fd_subject(si as i32) and self.symbols[si].header_declared != 0 and self.symbols[si].owns_return != 0 and fd_record_pointee(self.symbols[si].ret_ty) == record: out.push(si as i32)
         out
 
     // The functions destroying a parameter of `record`; `unary` keeps those
@@ -373,7 +472,7 @@ impl CiProject:
     fn fd_destroyers_of(record: &str, unary: bool) -> List[i32]:
         var out: List[i32] = List.new()
         for si in 0..self.symbols.len():
-            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0 or self.symbols[si].header_declared == 0: continue
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32) or self.symbols[si].header_declared == 0: continue
             let count = self.symbols[si].param_destroys.len()
             for pi in 0..count:
                 if self.symbols[si].param_destroys[pi] != 0 and fd_record_pointee(self.symbols[si].param_ty[pi]) == record:
@@ -382,16 +481,29 @@ impl CiProject:
                     break
         out
 
-    // A representation someone can own: a producer and one unary destroyer.
+    // The `drop` of `record`: its one unary destroyer, or among several the
+    // one the introspection file names as the record's free function
+    // (D121 step 3); -1 when neither settles it (the registry's question).
+    fn fd_drop_of(record: &str) -> i32:
+        let unary = self.fd_destroyers_of(record, true)
+        if unary.len() == 1: return unary[0]
+        var named = -1
+        for si in unary:
+            if not self.symbols[si].gir.contains("drop=1"): continue
+            if named >= 0: return -1
+            named = si
+        named
+
+    // A representation someone can own: a producer and a drop.
     fn fd_owned_record(record: &str) -> bool:
-        self.fd_producers_of(record).len() > 0 and self.fd_destroyers_of(record, true).len() == 1
+        self.fd_producers_of(record).len() > 0 and self.fd_drop_of(record) >= 0
 
     // The declared functions proven to return a borrow of `record` from an
     // owned record, retaining nothing.
     fn fd_borrow_candidates(record: &str) -> List[i32]:
         var out: List[i32] = List.new()
         for si in 0..self.symbols.len():
-            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0 or self.symbols[si].header_declared == 0 or self.symbols[si].borrow_from < 0: continue
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32) or self.symbols[si].header_declared == 0 or self.symbols[si].borrow_from < 0: continue
             if fd_record_pointee(self.symbols[si].ret_ty) != record or self.fd_retains_any(si as i32): continue
             if self.fd_owned_record(fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from])): out.push(si as i32)
         out
@@ -405,7 +517,7 @@ impl CiProject:
         var out: List[str] = List.new()
         let all = self.fd_representations()
         for record in all:
-            if self.fd_destroyers_of(record, true).len() != 1: continue
+            if self.fd_drop_of(record) < 0: continue
             if self.fd_producers_of(record).len() > 0 or self.fd_borrow_candidates(record).len() > 0: out.push(record)
         out
 
@@ -420,12 +532,12 @@ impl CiProject:
             let producers = self.fd_producers_of(record)
             for si in producers:
                 text = text ++ "        from " ++ self.symbols[si].name ++ "    // " ++ self.symbols[si].own_reason ++ "\n"
-            let drops = self.fd_destroyers_of(record, true)
-            for si in drops:
-                text = text ++ "        drop " ++ self.symbols[si].name ++ "    // proof: frees param 0\n"
-            let others = self.fd_destroyers_of(record, false)
-            for si in others:
-                text = text ++ "        destroys " ++ self.symbols[si].name ++ "    // proof: frees its " ++ record ++ " parameter\n"
+            let drop = self.fd_drop_of(record)
+            text = text ++ "        drop " ++ self.symbols[drop].name ++ "    // " ++ self.fd_destroy_reason(drop, "param 0") ++ "\n"
+            for si in self.fd_destroyers_of(record, true):
+                if si != drop: text = text ++ "        destroys " ++ self.symbols[si].name ++ "    // " ++ self.fd_destroy_reason(si, "its " ++ record ++ " parameter") ++ "\n"
+            for si in self.fd_destroyers_of(record, false):
+                text = text ++ "        destroys " ++ self.symbols[si].name ++ "    // " ++ self.fd_destroy_reason(si, "its " ++ record ++ " parameter") ++ "\n"
         // Borrows: a function that retains a pointer argument is not a lend
         // (fd_borrow_candidates). A borrowed value's origin is bound at each
         // call (D134, §16.2b.6), so one representation may be borrowed from
@@ -437,9 +549,12 @@ impl CiProject:
         // Lends are the default (§16.2b.5); stating each records the proof
         // and presents the operation on its resource.
         for si in 0..self.symbols.len():
-            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
             if self.fd_is_lend(si as i32, modeled):
                 text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        lend    // proof: reads its resource parameters, keeps nothing\n"
+            else if self.symbols[si].header_declared != 0 and self.symbols[si].owns_return == 0 and self.symbols[si].borrow_from < 0 and fd_record_pointee(self.symbols[si].ret_ty).len() == 0 and self.fd_lend_verdict(si as i32, modeled).starts_with("consumes param "):
+                let consumed = self.fd_consumed_param(si as i32, modeled)
+                text = text ++ "    fn " ++ self.symbols[si].name ++ f"\n        consumes param {consumed}    // annotation: gir transfer-ownership=\"full\", the callee takes it\n"
         text
 
     // One line per function: how the draft presents it, or why it stays
@@ -452,7 +567,7 @@ impl CiProject:
         var total = 0
         var internal = 0
         for si in 0..self.symbols.len():
-            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32): continue
             if self.symbols[si].header_declared == 0:
                 internal = internal + 1
                 continue
@@ -470,7 +585,11 @@ impl CiProject:
                     if self.symbols[si].param_stores[pi] != 0:
                         retained = pi as i32
                         break
-                verdict = f"raw: retains param {retained}; its lifetime contract is not proven"
+                // Retained, and the introspection file says the callee
+                // takes it: consumed (the lend verdict's rule).
+                let consumed = self.fd_consumed_param(si as i32, modeled)
+                if ret.len() == 0 and consumed == retained: verdict = self.fd_lend_verdict(si as i32, modeled)
+                else: verdict = f"raw: retains param {retained}; its lifetime contract is not proven"
             else if self.symbols[si].borrow_from >= 0:
                 let origin = fd_record_pointee(self.symbols[si].param_ty[self.symbols[si].borrow_from])
                 if modeled.contains(ret) and self.fd_owned_record(origin): verdict = "borrows " ++ fd_resource_name(ret) ++ f" from param {self.symbols[si].borrow_from} (" ++ self.symbols[si].own_reason ++ ")"
@@ -483,6 +602,7 @@ impl CiProject:
             // ones are header facts c_import reads directly (§16.2b.8).
             let attrs = self.symbols[si].attrs
             if attrs.len() > 0: verdict = verdict ++ " [attributes: " ++ attrs.replace(";", " ").trim() ++ "]"
+            verdict = verdict ++ self.fd_gir_summary(si as i32)
             lines = lines ++ "  " ++ fname ++ ": " ++ verdict ++ "\n"
         var head = "facade " ++ name ++ f": {total} functions, {safe} presented safely, {raw} raw" ++ (if internal > 0: f"; {internal} internal (no prototype declares them)" else: "") ++ "\n"
         for record in self.fd_representations():

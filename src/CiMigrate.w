@@ -11,6 +11,7 @@ use CiIR
 use CiPrint
 use CImport
 use CiFacadeDraft
+use CiGir
 use Lexer
 use Token
 use Parser
@@ -1188,8 +1189,12 @@ impl CiProject:
                     self.symbols[symbol_id].attrs = self.symbols[symbol_id].attrs ++ attrs
                 if cursor < 0 or with_ci_cursor_is_definition(session, cursor) == 0:
                     // D121: a prototype makes the function API a facade may
-                    // describe; a definition alone is internal.
-                    if cursor >= 0: self.symbols[symbol_id].header_declared = 1
+                    // describe; a definition alone is internal. The
+                    // declaration's signature is kept for a function no unit
+                    // defines: annotations (step 3) prove facts about it.
+                    if cursor >= 0:
+                        self.symbols[symbol_id].header_declared = 1
+                        if self.symbols[symbol_id].has_definition == 0: self.record_fn_signature(session, i, symbol_id)
                     i = i + 1
                     continue
                 let existing_path = self.owner_module_path(symbol_id)
@@ -1655,6 +1660,15 @@ impl CiProject:
     // parameters are function pointers, whether the body tests each for
     // NULL (and how), the NULL literals it passes to corpus callees, and
     // where it passes or stores its own parameters.
+    // The translated signature types of a declaration, for a function the
+    // package declares and never defines (D121 step 3).
+    mut fn record_fn_signature(session: i64, decl_idx: i32, symbol_id: i32):
+        let count = with_cimport_fn_param_count(session, decl_idx)
+        self.symbols[symbol_id].grow_params(count)
+        self.symbols[symbol_id].ret_ty = ci_ir_owned_text(with_cimport_fn_return_type_translated(session, decl_idx))
+        for pi in 0..count:
+            self.symbols[symbol_id].param_ty[pi] = ci_ir_owned_text(with_cimport_fn_param_type_translated(session, decl_idx, pi))
+
     mut fn record_fn_evidence(session: i64, decl_idx: i32, cursor: i32, symbol_id: i32):
         let count = with_cimport_fn_param_count(session, decl_idx)
         var names: List[str] = List.new()
@@ -1872,20 +1886,43 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List
 // nothing is translated: the ownership proofs are drawn
 // (CiFacadeDraft.w resolve_ownership), the facade draft goes to stdout (or
 // `-o FILE`) and the report, one line per function, to stderr.
-pub fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &str, output_arg: &str) -> i32:
+// Every `*.gir` under `input_dir`, sorted.
+fn ci_migrate_collect_gir_files(input_dir: &str) -> List[str]:
+    var files: List[str] = List.new()
+    for line in with_fs_list_files(input_dir).split("\n"):
+        if line.ends_with(".gir") and not ci_migrate_basename_is_hidden(line): files = ci_migrate_sorted_insert(files, line)
+    files
+
+pub fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &str, output_arg: &str, gir_arg: &str) -> i32:
     let input = ci_migrate_fs_path(input_arg)
     var files: List[str] = List.new()
+    var gir_files: List[str] = List.new()
     if with_fs_is_dir(input) != 0:
         g_migrate_directory_input_dir = with_str_clone_ref(input)
         files = ci_migrate_sorted_files(ci_migrate_collect_c_files(input, exclude_basenames))
         if files.len() == 0:
             eprint("migrate: no .c files found in " ++ input)
             return 1
+        gir_files = ci_migrate_collect_gir_files(input)
     else: files.push(input)
+    if gir_arg.len() > 0: gir_files.push(ci_migrate_fs_path(gir_arg))
     var project = CiProject.new()
     project.register_modules(&files)
     for path in files:
         if project.migrate_scan_file(path) != 0: return 1
+    // D121 step 3: the package's GObject-introspection facts, joined to the
+    // corpus by C identifier (CiGir.w).
+    if gir_files.len() > 0:
+        let gir = match gir_read_files(&gir_files):
+            Ok(g) => g
+            Err(message) =>
+                eprint("migrate: " ++ message)
+                return 1
+        for si in 0..project.symbols.len():
+            if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
+            var facts = gir.facts_of(project.symbols[si].name)
+            if gir.names_drop(project.symbols[si].name): facts = facts ++ (if facts.len() > 0: ";" else: "") ++ "drop=1"
+            project.symbols[si].gir = facts
     project.resolve_ownership()
     let draft = project.facade_draft(facade_name)
     eprint(project.facade_report(facade_name))
