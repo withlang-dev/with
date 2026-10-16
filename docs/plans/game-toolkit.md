@@ -123,6 +123,15 @@ when the client is absent.
 9. **Templates live in the compiler and run in the battery.** Every
    template is generated, built and tested on every host the battery
    covers, for every platform and store combination it offers.
+10. **No `unsafe` in a game.** A store or platform SDK enters a project
+    through `with add`, and what it brings is a facade (§16.2b), not raw
+    bindings. The template, the `game` package and the developer's code
+    call modeled methods. An SDK surface no facade clause can model is a
+    compiler issue to file, never `unsafe` handed to the developer. This
+    rule comes from WIPE: its Steam binding has 22 `unsafe` sites over a
+    raw `c_import`. All of them but the callback pump map onto facade
+    clauses that exist today. The pump is waiting on
+    withlang-dev/with#2425.
 
 ## 3. The command surface
 
@@ -153,7 +162,7 @@ Every answer is a flag:
 | `--type game` | Joins the existing `app` and `lib` types. |
 | `--template basic\|twin-stick` | The genre starting point (Unreal's model). `basic` is the screens with an empty play state; `twin-stick` is WIPE's skeleton. |
 | `--platforms pc,mac,linux,steam-deck` | Additive; also accepted later by `with add platform` (Flutter's model). |
-| `--store steam\|none` | The store backend; also `with add store`. |
+| `--store steam\|none` | The store backend; also `with add steam` (§3.2.1). |
 | `--org com.example` | Reverse-domain identifier for the save directory and bundle IDs. |
 | `--yes` | Defaults, or the last answers if `--reuse`. |
 | `--reuse` | The answers from the previous run on this machine. |
@@ -170,7 +179,7 @@ On an existing game project, additive and idempotent:
 ```text
 with add platform steam-deck
 with add platform switch       # the slot and the build target; refuses to build until platform.switch is installed
-with add store steam
+with add steam                 # the store: the SDK, its facade, the backend (§3.2.1)
 with add replay
 with add achievements
 with add audio
@@ -182,6 +191,40 @@ guess which of the developer's files depend on it.
 
 Whether `with add` is a top-level verb or `with init --add` is decided in
 milestone 3; the plan's examples assume the verb.
+
+#### 3.2.1 `with add steam`
+
+`--store steam` at creation and `with add steam` later do the same thing,
+in this order:
+
+1. **The SDK, from the developer.** Valve's terms allow redistributing
+   `libsteam_api` and nothing else from the SDK, so the toolchain cannot
+   fetch the headers. `with add steam --sdk steamworks_sdk_165.zip` (or a
+   prompt for the path) unpacks the headers into an ignored
+   `vendor/steamworks/public/` and the redistributable libraries into the
+   committed `vendor/steamworks/redistributable_bin/`, and records the SDK
+   version in `with.toml`. WIPE's `vendor/steamworks/README.md` is the
+   manual form of this step.
+2. **The facade, from evidence.** Valve ships `steam_api.json` in the
+   SDK. It describes 34 interfaces, 921 flat methods and their interface
+   accessors, with buffer and out-parameter annotations (`array_count` 26,
+   `out_string_count` 16, `out_array_count` 14, `out_struct` 6, and a few
+   more). It also lists 196 callback structs with their callback ids,
+   which is the tag-to-payload table #2425 needs. That is §16.2b.15's
+   second tier of evidence: annotations the library ships. The library has
+   no source, so the first tier doesn't apply. What the JSON doesn't state
+   comes from a registry facts file reviewed once per SDK version (the
+   third tier): the init call and its status as a resource, and the
+   lifetime of returned text such as `GetStringForActionOrigin`'s. Nobody
+   writes a facade per project.
+3. **The backend.** The `game.steam` platform, the Steam Input assets
+   generated from the game's action declaration (§4.1), and the `build.w`
+   edits (link `steam_api`, the library beside the executable,
+   `steam_appid.txt` for development runs).
+4. **The report.** Like `with get`, it says how many functions present
+   safely and which stay raw, each with its fact's source. The 81 async
+   `callresult` methods are another tagged-message shape and stay raw
+   until #2425 is resolved.
 
 ### 3.3 Answers are typed
 
@@ -201,7 +244,7 @@ dependency order, each with the WIPE file it is extracted from:
 | `game.input` | `input.w` | `Device`, `Prompts`, `MenuState`, stick deadzones, echo suppression |
 | `game.keyboard` | `keyboard.w` | `sample_keys()`: the only raylib input call |
 | `game.gamepads` | `gamepads.w`, `sdl.w` | The SDL producer, every pad open, last-used drives, lizard mode |
-| `game.steam` | `steam.w`, `achievement_sync.w` | `SteamPlatform`: Input, achievements, overlay, manual dispatch |
+| `game.steam` | `steam.w`, `achievement_sync.w` | `SteamPlatform` over the Steam facade of §3.2.1: Input, achievements, overlay, manual dispatch. No `unsafe` (rule 10). |
 | `game.save` | `save.w`, `settings.w`, `paths.w` | Atomic writes, backup, version refusal, the settings file, asset and data paths |
 | `game.clock` | the step clock in `game.w` | `STEPS_PER_SECOND`, `simulation_steps`, elapsed derived from steps |
 | `game.record` | `record.w` | Recording and exact replay |
@@ -252,12 +295,17 @@ changes.
 
 ### Milestone 1: extract, and WIPE still passes
 
-1. Create `lib/game/` in the `with` repository with the modules of §4,
+1. WIPE's Steam binding moves onto a facade built from `steam_api.json`
+   and a facts file (§3.2.1 step 2), written by hand this once.
+   `src/steam.w` keeps no `unsafe` except the callback pump, and that only
+   until #2425 lands. Every place the facade can't say what the code
+   needs is filed as a compiler issue.
+2. Create `lib/game/` in the `with` repository with the modules of §4,
    moved from WIPE with their tests (`test/*_contracts.w`).
-2. WIPE depends on `game` through `with get`; its own copies are deleted.
-3. WIPE builds on Mac, Linux and Windows, and all its test files pass. The
+3. WIPE depends on `game` through `with get`; its own copies are deleted.
+4. WIPE builds on Mac, Linux and Windows, and all its test files pass. The
    Steam UAT passes on a machine with Steam and a controller.
-4. The package's tests join the battery.
+5. The package's tests join the battery.
 
 This milestone ships no template. It ends when WIPE's `src/` holds only
 the game.
@@ -277,8 +325,8 @@ the game.
 ### Milestone 3: the command
 
 1. `with init --type game` with the flags and prompts of §3.1.
-2. `with add platform` and `with add store`, with `with add` or
-   `--add` decided here.
+2. `with add platform` and `with add steam` (§3.2.1), with `with add`
+   or `--add` decided here. The facade generator reads `steam_api.json`.
 3. `--dry-run`, `--list-templates`, `--reuse`.
 4. The `twin-stick` template, cut from WIPE.
 
@@ -302,6 +350,8 @@ replaces the drawing module of §2 rule 4 for its renderer. Then mobile.
 - The same project, copied to a Deck and launched from Steam, plays with the Deck's controls and shows Steam's prompt names.
 - `with add platform switch` on that project produces a target that fails to build with the message of §4.2 and does not affect the other targets.
 - WIPE depends on `game` and passes its battery with no toolkit code left in `src/`.
+- No `unsafe` in a generated project's `src/` or in `lib/game/` (rule 10). Until #2425 lands, the one exception is the callback pump in `game.steam`, and that exception is the acceptance item still open.
+- `with add steam --sdk <zip>` on a project created with `--store none` produces the same project as `--store steam` did.
 - Every template and platform/store combination is generated and built in the battery; a template that cannot be built is a failed battery, not a warning.
 
 ## 7. Open questions
@@ -311,6 +361,10 @@ replaces the drawing module of §2 rule 4 for its renderer. Then mobile.
 3. The form of the action declaration (§4.1): `comptime` or a table.
 4. Whether the `card` template is wanted by anyone; it is not planned
    until someone is.
+5. `with add steam` or `with add store steam`. The first is shorter; the
+   second keeps stores a typed enumeration in the grammar (§3.3).
+6. Where registry facts files for closed-source SDKs live, and who
+   reviews one for each SDK release.
 
 ## 8. Advice that does not apply
 
