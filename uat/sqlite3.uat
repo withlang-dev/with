@@ -4,6 +4,7 @@ requires: network
 new directory
 run: with init .
 run: with get c.sqlite3
+expect stderr contains: facade sqlite3:
 write src/main.w from sqlite3_main.w
 copy lib/facades/sqlite3.w to src/facades/sqlite3.w
 run: with run

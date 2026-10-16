@@ -797,8 +797,63 @@ impl Zcu:
     // are ordinary user declarations, not c_import ones: a c_import-origin
     // symbol is hidden from modules without a c_import of their own, and a
     // resource type must be usable wherever its module is imported.
-    mut fn render_c_facades_frontend(pool: AstPool) -> AstPool:
+    // D121 step 5 (§16.2b.15): a project overrides any single fact of the
+    // facade `with get` wrote (`.with/deps/c/<name>/<version>/facade.w`,
+    // reached as `facades.<name>`). The items of every `c facade <name>:`
+    // block in the project's own source join the written block before it
+    // renders: a written fn item or resource the project also describes is
+    // dropped (the project's clause is the one contract, §16.2b.2, an
+    // explicit facade clause over the evidence tiers), every other written
+    // item stays, and the project's blocks are left empty. One block renders
+    // the whole facade in one module, so a written item that names a type
+    // the project's resource renders (a borrow of it) resolves.
+    mut fn merge_fetched_facades_frontend(pool: AstPool) -> AstPool:
         var out = pool
+        let count = out.decl_count()
+        for i in 0..count:
+            let decl = out.get_decl(i)
+            if out.kind(decl) != NodeKind.NK_C_FACADE or not frontend_path_is_fetched_facade(self.decl_source_path_frontend(i)): continue
+            let name = out.get_data0(decl)
+            var fn_syms: List[i32] = List.new()
+            var resource_syms: List[i32] = List.new()
+            var moved: List[i32] = List.new()
+            var moved_count: i32 = 0
+            var project_blocks: List[i32] = List.new()
+            for j in 0..count:
+                let other = out.get_decl(j)
+                if j == i or out.kind(other) != NodeKind.NK_C_FACADE or out.get_data0(other) != name: continue
+                if frontend_path_is_fetched_facade(self.decl_source_path_frontend(j)): continue
+                project_blocks.push(other as i32)
+                let start = out.get_data1(other)
+                for k in 0..out.get_data2(other):
+                    let item = out.get_extra(start + k)
+                    if out.kind(item as NodeId) == NodeKind.NK_FACADE_FN: fn_syms.push(out.get_data0(item as NodeId))
+                    else if out.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE: resource_syms.push(out.get_data0(item as NodeId))
+                    moved.push(item)
+                    moved_count = moved_count + 1
+            if moved_count == 0: continue
+            let start = out.get_data1(decl)
+            let item_count = out.get_data2(decl)
+            var kept: List[i32] = List.new()
+            var kept_count: i32 = 0
+            for k in 0..item_count:
+                let item = out.get_extra(start + k)
+                let kind = out.kind(item as NodeId)
+                let sym = out.get_data0(item as NodeId)
+                let overridden = (kind == NodeKind.NK_FACADE_FN and fn_syms.contains(sym)) or (kind == NodeKind.NK_FACADE_RESOURCE and resource_syms.contains(sym))
+                if not overridden:
+                    kept.push(item)
+                    kept_count = kept_count + 1
+            let new_start = out.extra_len()
+            for item in kept: out.add_extra(item)
+            for item in moved: out.add_extra(item)
+            out.set_data1(decl, new_start)
+            out.set_data2(decl, kept_count + moved_count)
+            for block in project_blocks: out.set_data2(block as NodeId, 0)
+        out
+
+    mut fn render_c_facades_frontend(pool: AstPool) -> AstPool:
+        var out = self.merge_fetched_facades_frontend(pool)
         let base_count = out.decl_count()
         for i in 0..base_count:
             let decl = out.get_decl(i)
@@ -3252,6 +3307,12 @@ fn frontend_parent_module_rel(module_rel: &str) -> str:
     if last_slash <= 0:
         return ""
     module_rel.slice(0, last_slash as i64)
+
+// The facade `with get` wrote for a fetched package (D121 step 5), by its
+// place: `.with/deps/c/<name>/<version>/facade.w`.
+fn frontend_path_is_fetched_facade(path: &str) -> bool:
+    let p = path.replace("\\", "/")
+    ("/" ++ p).contains("/.with/deps/c/") and p.ends_with("/facade.w")
 
 fn frontend_resolve_module_rel(module_dir: &str, rel_path: &str) -> str:
     let cand1 = resolve_join(module_dir, rel_path)

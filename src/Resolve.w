@@ -1344,13 +1344,20 @@ pub fn resolve_own_tree_candidate(rel_path: &str) -> str:
 // A dotted import that resolved to its parent's file (`use std.math.TAU` is
 // std/math.w) names its last segment; one that resolved to its own file
 // (`use std.math`) imports the whole module.
+// `use facades.<name>` that resolved to the facade `with get` wrote
+// (`.with/deps/c/<name>/<version>/facade.w`, D121 step 5) is that whole
+// module too.
 fn resolve_dotted_selection(dotted: &str, resolved_path: &str) -> str:
     var last_dot = -1
     for i in 0..dotted.len():
         if dotted[i] == '.': last_dot = i as i32
     if last_dot <= 0 or resolved_path.len() == 0 or resolved_path.replace("\\", "/").ends_with(dotted.replace(".", "/") ++ ".w"):
         return ""
-    dotted.slice(last_dot + 1, dotted.len())
+    let last = dotted.slice(last_dot + 1, dotted.len())
+    let path = resolved_path.replace("\\", "/")
+    if dotted.starts_with("facades.") and path.ends_with("/facade.w") and ("/" ++ path).contains("/.with/deps/c/" ++ last ++ "/"):
+        return ""
+    last
 
 fn resolve_is_prelude_path(dotted: &str) -> bool:
     dotted == "std.prelude" or dotted == "std.prelude_core" or dotted == "std.prelude_alloc"
@@ -1458,6 +1465,29 @@ pub fn resolve_project_root_candidate(module_dir: &str, rel_path: &str) -> str:
     if resolve_file_exists(src_cand):
         return src_cand
 
+    resolve_fetched_facade_candidate(root, rel_path)
+
+// D121 step 5 (§16.2b.15): `use facades.<name>` names the facade `with get`
+// wrote for the fetched package `c.<name>`, at
+// `.with/deps/c/<name>/<version>/facade.w` for the version with.toml pins,
+// when the project has no `facades/<name>.w` of its own under lib/ or src/.
+pub fn resolve_fetched_facade_candidate(root: &str, rel_path: &str) -> str:
+    if not rel_path.starts_with("facades/") or not rel_path.ends_with(".w"): return ""
+    let name = rel_path.slice("facades/".len(), rel_path.len() - 2)
+    if name.len() == 0 or name.contains("/"): return ""
+    let key = "c." ++ name
+    for line in with_fs_read_file(resolve_join(root, "with.toml")).split("\n"):
+        let t = line.trim()
+        if not t.starts_with(key): continue
+        let rest: str = t.slice(key.len(), t.len()).trim()
+        if not rest.starts_with("="): continue
+        let open = rest.find("\"")
+        if open < 0: continue
+        let close = rest.slice(open + 1, rest.len()).find("\"")
+        if close < 0: continue
+        let version = rest.slice(open + 1, open + 1 + close)
+        let cand = resolve_join(root, ".with/deps/c/" ++ name ++ "/" ++ version ++ "/facade.w")
+        if resolve_file_exists(cand): return cand
     ""
 
 pub fn resolve_join(a: &str, b: &str) -> str:

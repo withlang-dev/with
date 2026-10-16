@@ -111,8 +111,21 @@ the brief (D136): the registry is `registry/c/<package>/facts.w` in this
 repository, a facade fragment in the draft's own spelling, every fact with
 its citation after `//`, landing by pull request; the engine reads it with
 `--facts FILE` (`src/CiFacts.w`) below proofs and annotations, and
-`registry/c/zlib/facts.w` names `gzclose` the drop of `gzFile_s`. Steps
-5–6 are open.
+`registry/c/zlib/facts.w` names `gzclose` the drop of `gzFile_s`. Step 5
+landed 2026-10-16: `with get` runs the engine over the package's own build
+(the units its CMake build compiles, with that build's include paths and
+defines, so generated headers resolve; for a Conan Center binary the
+source is fetched and configured, never built), fetches the registry's
+facts file at one commit of this repository and pins the commit and the
+file's digest in the lock, and writes `.with/deps/c/<name>/<version>/facade.w`
+(a complete module: the `use c_import` lines of the installed headers that
+declare what it presents, then the draft) with `facade-report.txt` beside
+it, printing the summary. `use facades.<name>` reaches that facade when the
+project has none of its own; a `c facade <name>:` block in the project's
+source overrides any item the written block also has (`src/Resolve.w`,
+`src/compiler/Frontend.w merge_fetched_facades_frontend`,
+`src/compiler/ConanClient.w`, `docs/spec/toolchain/with-migrate-spec.md`).
+Step 6 is open.
 
 **What would reopen it.** A Conan Center majority of binary-only packages,
 or proofs that cover too little of ordinary libraries to make the registry

@@ -16,8 +16,17 @@ pub type LockEntry {
     package_id: str,
     package_rev: str,
     sha256: str,
+    // D121 step 5: the commit of the toolchain's repository whose registry
+    // facts file (registry/c/<name>/facts.w, D136) the package's facade was
+    // built with, and that file's digest; "" when none was used. A restore
+    // fetches the file at that commit.
+    registry: str,
+    facts_sha256: str,
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
+
+fn lock_entry_none() -> LockEntry:
+    LockEntry { name: "", source: "", version: "", recipe_rev: "", package_id: "", package_rev: "", sha256: "", registry: "", facts_sha256: "" }
 
 pub type LockFile {
     entries: List[LockEntry],
@@ -211,13 +220,13 @@ pub fn lock_load(project_root: &str) -> LockFile:
         return lock_empty()
     let json = runtime_read_file(path)
     var lock = lock_empty()
-    var current = LockEntry { name: "", source: "", version: "", recipe_rev: "", package_id: "", package_rev: "", sha256: "" }
+    var current = lock_entry_none()
     let lines = lock_split_nonempty_lines(json)
     for i in 0..lines.len():
         let line = lines[i]
         let entry_name = lock_line_entry_name(line)
         if entry_name.len() > 0:
-            current = LockEntry { name: entry_name, source: "", version: "", recipe_rev: "", package_id: "", package_rev: "", sha256: "" }
+            current = LockEntry { name: entry_name, source: "", version: "", recipe_rev: "", package_id: "", package_rev: "", sha256: "", registry: "", facts_sha256: "" }
             continue
         if current.name.len() == 0:
             continue
@@ -241,13 +250,21 @@ pub fn lock_load(project_root: &str) -> LockFile:
         if package_rev.len() > 0:
             current.package_rev = package_rev
             continue
+        let facts_digest = lock_line_string_value(line, "facts_sha256")
+        if facts_digest.len() > 0:
+            current.facts_sha256 = facts_digest
+            continue
         let digest = lock_line_string_value(line, "sha256")
         if digest.len() > 0:
             current.sha256 = digest
             continue
+        let registry = lock_line_string_value(line, "registry")
+        if registry.len() > 0:
+            current.registry = registry
+            continue
         if lock_find_text(line, "}") >= 0:
             lock = lock_upsert(lock, current)
-            current = LockEntry { name: "", source: "", version: "", recipe_rev: "", package_id: "", package_rev: "", sha256: "" }
+            current = lock_entry_none()
     lock
 
 pub fn lock_upsert(lock: &LockFile, entry: LockEntry) -> LockFile:
@@ -291,12 +308,18 @@ pub fn lock_write(project_root: &str, lock: &LockFile) -> i32:
         text = text ++ "    " ++ q ++ lock_json_escape(entry.name) ++ q ++ ": {\n"
         text = text ++ lock_json_string("source", entry.source, true)
         text = text ++ lock_json_string("version", entry.version, entry.source == "conan" or entry.source == "built")
-        if entry.source == "built": text = text ++ lock_json_string("sha256", entry.sha256, false)
+        // D121 step 5: the registry commit and facts digest the facade was
+        // built with, when the registry had a file for the package.
+        let pinned = entry.registry.len() > 0 or entry.facts_sha256.len() > 0
+        if entry.source == "built": text = text ++ lock_json_string("sha256", entry.sha256, pinned)
         if entry.source == "conan":
             text = text ++ lock_json_string("recipe_rev", entry.recipe_rev, true)
             text = text ++ lock_json_string("package_id", entry.package_id, true)
             text = text ++ lock_json_string("package_rev", entry.package_rev, true)
-            text = text ++ lock_json_string("sha256", entry.sha256, false)
+            text = text ++ lock_json_string("sha256", entry.sha256, pinned)
+        if pinned and (entry.source == "built" or entry.source == "conan"):
+            text = text ++ lock_json_string("registry", entry.registry, true)
+            text = text ++ lock_json_string("facts_sha256", entry.facts_sha256, false)
         let suffix = if i + 1 < lock.entries.len(): "," else: ""
         text = text ++ "    }" ++ suffix ++ "\n"
     text = text ++ "  }\n"
@@ -336,22 +359,26 @@ fn lock_entry_from_installed_c_dep(project_root: &str, name: &str, version: &str
     let dep_dir = lock_c_dep_dir(project_root, name, version)
     let meta = runtime_read_file(dep_dir ++ "/metadata.json")
     if meta.len() == 0:
-        return LockEntry { name: "", source: "", version: "", recipe_rev: "", package_id: "", package_rev: "", sha256: "" }
+        return lock_entry_none()
     let recipe_rev = lock_json_extract_string(meta, "recipe_revision")
     let package_id = lock_json_extract_string(meta, "package_id")
     let package_rev = lock_json_extract_string(meta, "package_revision")
     let dep_name = "c." ++ name
+    // D121 step 5: the registry pin the facade was built with (facade.json).
+    let pin = runtime_read_file(dep_dir ++ "/facade.json")
+    let registry = lock_json_extract_string(pin, "registry_commit")
+    let facts_sha256 = lock_json_extract_string(pin, "facts_sha256")
     if recipe_rev == "system" and package_id == "system" and package_rev == "system":
-        return LockEntry { name: dep_name, source: "system", version: with_str_clone_ref(version), recipe_rev: "", package_id: "", package_rev: "", sha256: "" }
+        return LockEntry { name: dep_name, source: "system", version: with_str_clone_ref(version), recipe_rev: "", package_id: "", package_rev: "", sha256: "", registry: "", facts_sha256: "" }
     // Built from source: what pins it is the source archive's digest.
     if recipe_rev == "built":
-        return LockEntry { name: dep_name, source: "built", version: with_str_clone_ref(version), recipe_rev: "", package_id: "", package_rev: "", sha256: package_rev }
+        return LockEntry { name: dep_name, source: "built", version: with_str_clone_ref(version), recipe_rev: "", package_id: "", package_rev: "", sha256: package_rev, registry, facts_sha256 }
     let tgz_path = dep_dir ++ "/conan_package.tgz"
     let digest = lock_sha256_file(tgz_path)
     if digest.len() == 0:
         runtime_eprint("error: cannot lock c." ++ name ++ "@" ++ version ++ ": missing fetched archive " ++ tgz_path)
-        return LockEntry { name: "", source: "", version: "", recipe_rev: "", package_id: "", package_rev: "", sha256: "" }
-    LockEntry { name: dep_name, source: "conan", version: with_str_clone_ref(version), recipe_rev, package_id, package_rev, sha256: digest }
+        return lock_entry_none()
+    LockEntry { name: dep_name, source: "conan", version: with_str_clone_ref(version), recipe_rev, package_id, package_rev, sha256: digest, registry, facts_sha256 }
 
 // The dedup memo travels WITH the lock through the recursion: sibling
 // subtrees must see each other's visits, and an owned List parameter is
@@ -420,6 +447,9 @@ fn lock_restore_entry(project_root: &str, entry: &LockEntry) -> i32:
             return 0
         runtime_eprint("error: unsupported system package in lock file: " ++ entry.name ++ "@" ++ entry.version)
         return 1
+    // D121 step 5: a facade rebuilt by the restore uses the registry at the
+    // commit the lock pinned.
+    conan_set_registry_commit(entry.registry)
     if entry.source == "built":
         if conan_restore_locked_source(c_name, entry.version, entry.sha256, project_root):
             runtime_eprint("restored " ++ entry.name ++ "@" ++ entry.version ++ " (built from source)")
@@ -464,4 +494,4 @@ pub fn lock_restore(project_root: &str) -> i32:
 
 // #747: explicit owned copy — LockEntry's fields are owned strs now.
 fn lock_entry_clone(e: &LockEntry) -> LockEntry:
-    LockEntry { name: with_str_clone_ref(e.name), source: with_str_clone_ref(e.source), version: with_str_clone_ref(e.version), recipe_rev: with_str_clone_ref(e.recipe_rev), package_id: with_str_clone_ref(e.package_id), package_rev: with_str_clone_ref(e.package_rev), sha256: with_str_clone_ref(e.sha256) }
+    LockEntry { name: with_str_clone_ref(e.name), source: with_str_clone_ref(e.source), version: with_str_clone_ref(e.version), recipe_rev: with_str_clone_ref(e.recipe_rev), package_id: with_str_clone_ref(e.package_id), package_rev: with_str_clone_ref(e.package_rev), sha256: with_str_clone_ref(e.sha256), registry: with_str_clone_ref(e.registry), facts_sha256: with_str_clone_ref(e.facts_sha256) }
