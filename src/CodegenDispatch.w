@@ -6074,9 +6074,11 @@ impl Codegen:
                 gep_indices.push(wl_const_int(wl_i32_type(self.context), i, 0))
                 self.mir_emit_copy_glue_ptr(wl_build_gep(self.builder, ty, ptr, list_data_i64(&gep_indices), 2), elem_llvm, elem_sema)
             return
-        if tk == TypeKind.TY_STRUCT and wl_get_type_kind(ty) == wl_struct_type_kind():
+        // D120 stage 3: a struct of values, or an instance of a generic
+        // struct of values (one with no variants), copies field by field.
+        if (tk == TypeKind.TY_STRUCT or (tk == TypeKind.TY_GENERIC_INST and self.mir_enum_variant_count(resolved) == 0)) and wl_get_type_kind(ty) == wl_struct_type_kind() and self.find_struct_index_by_type(ty) >= 0:
             let struct_idx = self.find_struct_index_by_type(ty)
-            if struct_idx < 0 or self.is_union_struct_index(struct_idx) or self.is_bitpacked_struct(ty):
+            if self.is_union_struct_index(struct_idx) or self.is_bitpacked_struct(ty):
                 sema_phase_bug(f"BUG: no copy glue for Copy type {self.sema.type_name(resolved)} (D111)")
             let field_start: i32 = self.struct_field_starts[struct_idx]
             for fi in 0..self.struct_field_counts[struct_idx]:

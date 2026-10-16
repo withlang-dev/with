@@ -115,10 +115,14 @@ holder count in the buffer's allocation header, copy glue retains, drop
 glue releases, a make-unique call before every mutation, measured 2.4% and
 3.2% on the self-host under Amendment 1). A `HashMap` or `HashSet` of
 values is a value with stage 2 (the count in the table block,
-`with_hashmap_make_unique`, the entries' copy glue after a copy). The
-compositional value structs (and so `BTreeMap`), the uniqueness proof and
-hoisting, the C boundary rule, per-instantiation generics and the copy
-report are open: the compiler is NON-COMPLIANT on those.
+`with_hashmap_make_unique`, the entries' copy glue after a copy). A struct
+of values is a value with stage 3 (no `impl Copy` written; `BTreeMap` and
+`BTreeSet` follow through their `List`; the std identity types without a
+Drop impl — Task, JoinHandle, Atomic, the lock guards — are declared
+`resource type`, Atomic by the compiler's own knowledge while the pinned
+seed predates the keyword). The uniqueness proof and hoisting, the C
+boundary rule, per-instantiation generics and the copy report are open:
+the compiler is NON-COMPLIANT on those.
 
 **What would reopen it.** Self-host time or a corpus suite more than 2%
 slower with the cost not removable; or a program where the deferred copy

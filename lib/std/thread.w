@@ -10,12 +10,12 @@ type RawFn0I32 {
 }
 
 /// Handle to a spawned thread's result.
-pub type JoinHandle {
+pub resource type JoinHandle {
     handle: i64
 }
 
 /// Scope-owned OS-thread handle returned by `scope`'s `s.spawn(...)`.
-pub type ScopedJoinHandle ephemeral {
+pub resource type ScopedJoinHandle ephemeral {
     scope: i64,
     index: i32,
     handle: i64,

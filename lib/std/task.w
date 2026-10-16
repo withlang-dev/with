@@ -17,12 +17,12 @@ extern fn with_runtime_run_one_step() -> Unit
 /// Opaque handle to a running fiber. Returned by async fn calls.
 /// The result_buf points to a heap-allocated buffer where the fiber
 /// writes its return value. Await loads from it and frees it.
-pub type Task[T] { fiber_id: i32, result_buf: *mut u8 }
+pub resource type Task[T] { fiber_id: i32, result_buf: *mut u8 }
 
 /// Scope-owned task handle returned by `async scope`'s `s.track(...)`.
 /// It has the same ABI as Task[T], but its cleanup is owned by the scope,
 /// so dropping the handle itself does not cancel the fiber.
-pub type ScopedTask[T] ephemeral { fiber_id: i32, result_buf: *mut u8 }
+pub resource type ScopedTask[T] ephemeral { fiber_id: i32, result_buf: *mut u8 }
 
 async fn task_cancel_point(): ()
 
