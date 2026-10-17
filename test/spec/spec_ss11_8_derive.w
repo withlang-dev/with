@@ -58,7 +58,8 @@ fn main:
     assert(PIXEL_HAS_ORD)
     assert(PIXEL_HAS_DEBUG)
     assert(PIXEL_HAS_CLONE)
-    assert(not PIXEL_IS_COPY)
+    // D120 (§4.3): a struct of values is a value; Copy needs no derive.
+    assert(PIXEL_IS_COPY)
     assert(NAME_HAS_DEFAULT)
     assert(NAME_HAS_CLONE)
     assert(NAME_HAS_ORD)

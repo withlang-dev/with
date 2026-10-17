@@ -2743,7 +2743,7 @@ impl Sema:
             for pi in 0..payload_count:
                 let payload_tid: i32 = self.type_extra[(pos + 2 + pi)]
                 let payload = out.ct_build_ident(decl, ct_payload_bind_sym(intern, pi))
-                if self.is_copy(payload_tid as TypeId) != 0:
+                if self.is_copy(payload_tid as TypeId) != 0 and self.type_declares_clone(payload_tid) == 0:
                     args.push(payload)
                 else:
                     let no_args: List[i32] = List.new()
@@ -2802,8 +2802,12 @@ impl Sema:
                 let field_sym: i32 = self.type_extra[(te_start + fi * 3)]
                 let field_tid: i32 = self.type_extra[(te_start + fi * 3 + 1)]
                 let field_expr = ct_build_self_field(out, decl, self_sym, field_sym)
+                // D120: a struct of values is Copy without declaring it; one
+                // that also writes its own `clone` means it (Leaf's clone
+                // adds one in spec_ss11_8_derive), so a Copy field copies
+                // only when its type declares no clone of its own.
                 let field_value =
-                    if self.is_copy(field_tid as TypeId) != 0:
+                    if self.is_copy(field_tid as TypeId) != 0 and self.type_declares_clone(field_tid) == 0:
                         field_expr
                     else:
                         let no_args: List[i32] = List.new()

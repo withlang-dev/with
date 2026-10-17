@@ -10846,6 +10846,22 @@ impl Sema:
             return self.fields_all_copy(resolved as i32)
         1
 
+    // Whether a type's declaration writes its own `clone` (an `impl Clone`
+    // or an inherent method): a derived clone of a value that holds it
+    // calls it rather than copying (D120 makes a struct of values Copy
+    // without a declaration, and its own clone still means something).
+    mut fn type_declares_clone(tid: i32) -> i32:
+        if tid <= 0: return 0
+        let resolved = self.resolve_alias(tid as TypeId)
+        let tk = self.get_type_kind(resolved)
+        if tk == TypeKind.TY_GENERIC_INST:
+            return self.select_trait_impl_for_generic_inst(resolved as i32, self.syms.clone_trait)
+        if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_ENUM: return 0
+        let name = self.get_type_d0(resolved)
+        if name <= 0: return 0
+        if self.select_trait_impl(name, self.syms.clone_trait) != 0: return 1
+        if self.lookup_method_sig(name, self.pool_intern("clone")) >= 0: 1 else: 0
+
     // D120 (§2.3, stage 3): every field of the struct (or struct instance)
     // is a value; a cyclic field reads as not (the visit stack breaks it).
     mut fn fields_all_copy(resolved: i32) -> i32:
