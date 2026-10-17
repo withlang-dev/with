@@ -1,6 +1,8 @@
 //! expect-check-fail: wrong argument type in call to 'take_buffer'
 
-type Buffer { text: str }
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type Buffer { text: str }
 
 fn take_buffer(value: Buffer) -> i64: value.text.len()
 

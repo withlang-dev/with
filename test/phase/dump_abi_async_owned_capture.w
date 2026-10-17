@@ -4,7 +4,8 @@
 //! expect-check-stdout: -> OWNED
 //! expect-check-stdout-not: SHARE-PLACE
 
-type Task[T] { fiber_id: i32, result_buf: *mut u8 }
+// std.task declares Task a resource (D120); this prelude-free model does too.
+resource type Task[T] { fiber_id: i32, result_buf: *mut u8 }
 
 async fn echo[T](value: T) -> T: value
 

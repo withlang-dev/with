@@ -1038,8 +1038,33 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_MOVE, place)
         self.operand_for_place(place, ty)
 
+    // §16.11 / D8: a direct deref or index through a raw pointer (`*p`, `p[i]`
+    // with `p: *const/*mut T`) is a bitwise read, pairing with the raw store
+    // (`assign_target_is_raw_pointer_store`) that skips drop-before-overwrite.
+    // Retaining on `let v = *p` incremented the count that `Box.drop` (`let v
+    // = *cell; drop(v)`), `Box.into_inner`, and `comptime_try_eval_expr_result`
+    // (`var sema = *sema_ptr` ... `*sema_ptr = synced_sema`) were taking out
+    // of raw memory — leaking every boxed value collection/struct and pinning
+    // Sema's ~130 tables at holder_count > 0 across self-check.
+    fn place_is_raw_pointer_pointee(place: i32) -> bool:
+        if place < 0 or place >= self.body.place_locals.len():
+            return false
+        if self.body.place_proj_counts[place] != 1:
+            return false
+        let ps = self.body.place_proj_starts[place]
+        let pk = self.body.proj_kinds[ps]
+        if pk != ProjKind.PK_DEREF and pk != ProjKind.PK_INDEX:
+            return false
+        let base_local = self.body.place_locals[place]
+        if base_local < 0 or base_local >= self.body.local_type_ids.len():
+            return false
+        let base_ty = self.body.local_type_ids[base_local] as i32
+        base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(base_ty as TypeId)) == TypeKind.TY_PTR
+
     mut fn retain_consumed_copy(operand_id: i32):
         let place: i32 = self.body.operand_d0[operand_id]
+        if self.place_is_raw_pointer_pointee(place):
+            return
         let ty = if place >= 0 and place < self.body.place_sema_types.len(): self.body.place_sema_types[place] else: 0
         if ty > 0 and self.sema.is_copy_frozen(ty as TypeId) != 0 and self.sema.type_needs_drop_frozen(ty) != 0:
             self.body.set_operand_hold(operand_id, MIR_HOLD_RETAIN)
@@ -7504,12 +7529,17 @@ impl MirBuilder:
             // double-free the moved-out bindings:
             //   1. the materialized scrutinee copy (rhs_place), and
             //   2. a named source expression (which is copied, not moved, into it).
+            // D111/D120: a subject that is a value with drop glue (a struct of
+            // values, stage 3) had its parts copied out with their own holds
+            // (carrier_read_kind), so it still holds its own and keeps its
+            // drop — retire_decomposed_carrier's rule; cancelled, the holds
+            // leaked (da_var_destructure_owned_moves_once).
             let mat_local = mir_place_plain_local(&self.body, rhs_place)
-            if mat_local >= 0:
+            if mat_local >= 0 and not self.carrier_copies(self.local_type(mat_local)):
                 self.cancel_stmt_temp_for_local(mat_local)
                 self.cancel_scheduled_value_drop_for_local(mat_local)
                 self.mark_local_value_moved(mat_local)
-            self.cancel_scheduled_value_drop_for_receiver_expr(rhs)
+                self.cancel_scheduled_value_drop_for_receiver_expr(rhs)
             return
 
         let success_bb = self.new_block()
@@ -17685,7 +17715,14 @@ impl MirBuilder:
             // to blank — `move w.f` is a plain copy and must not enter the move
             // machinery (marking it moved would wrongly suppress a Drop owner's
             // partial drop).
-            if self.ast.kind(mv_inner) == NodeKind.NK_FIELD_ACCESS:
+            // D16/D120: the same for a local binding — `move sema` of a value
+            // with drop glue is a move (the source is reset and never
+            // dropped), never a retained copy that leaves the source live
+            // (Sema already refuses a later use of the binding, #691). Read
+            // as a copy, a moved Sema stayed live across every exit path and
+            // the drop plan dropped it field by field at each one: the
+            // self-build's IR grew four-fold and LLVM peaked at 8 GB.
+            if self.ast.kind(mv_inner) == NodeKind.NK_FIELD_ACCESS or (self.ast.kind(mv_inner) == NodeKind.NK_IDENT and self.lookup_local(self.ast.get_data0(mv_inner)) >= 0):
                 let mv_fty = self.expr_type(mv_inner)
                 if mv_fty != 0 and self.sema.type_needs_drop_frozen(mv_fty) != 0:
                     let mv_place = self.lower_expr_place(mv_inner)

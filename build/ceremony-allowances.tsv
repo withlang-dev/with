@@ -4,3 +4,8 @@ clone-call	build	169	176	D112 corpus code: the pinned seed predates D111, so a s
 move-arg	build	163	169	#2390: the empty wo-wasm32 slots thread Build/Target through the existing consuming helpers (add_empty_wo_blob_targets/target_with_empty_wo_blobs) at three cross embedded sites; each move spells the builder-pattern ownership transfer those signatures declare, as every neighboring call does
 move-arg	src	847	848	D124 (#2329): the new wrapping-constant-cast diagnostic is emitted through the same Diagnostic ownership transfer as the neighboring negated-membership lint
 move-arg	src	847	851	#1856 (§4.2.1): the three pending-soft-use lists join the FnBodyEnv scope snapshot beside the pending-generic maps; each move spells the same env ownership transfer every neighboring field declares
+lit-ptr-len	rt	0	45	the pattern joins the census with this change: the 124 dbg_puts/make_str sites of rt_core.w are swept here (dbg_puts takes &str); what remains is the byte-level seams (rt_write, rt_buf_write_ascii, dbg_cstr_eq_lit, the platform files), the next sweep, and the bar records them at the reseed
+lit-ptr-len	src	0	36	the pattern joins the census with this change; the c_strncmp/LLVM-bridge sites in src/compiler are the next sweep, and the bar records them at the reseed
+len-cast	rt	0	2	rt/ is counted from this change on (the runtime is written With, not a corpus); its counts today, recorded into the bar at the reseed
+let-underscore	rt	0	599	rt/ is counted from this change on (the runtime is written With, not a corpus); its counts today (`let _ = rt_write(...)` and kin), recorded into the bar at the reseed
+move-arg	rt	0	5	rt/ is counted from this change on (the runtime is written With, not a corpus); its counts today, recorded into the bar at the reseed

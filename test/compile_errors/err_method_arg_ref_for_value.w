@@ -4,7 +4,9 @@
 // sema error with a source location — previously it surfaced only as
 // a codegen failure naming the enclosing function (or miscompiled).
 
-type Payload { n: i32 }
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type Payload { n: i32 }
 type Sink { total: i32 }
 
 fn Sink.absorb(mut self: Self, p: Payload) -> i32:

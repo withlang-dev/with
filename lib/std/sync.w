@@ -23,7 +23,7 @@ pub fn fence(order: Order) -> Unit:
     0
 
 /// Lock-free atomic operations on integer and pointer types.
-pub type Atomic[T] {
+pub resource type Atomic[T] {
     val: T,
 }
 
@@ -63,13 +63,13 @@ pub type Mutex[T] {
 
 /// Immutable guard from `Mutex.enter()`. Provides scoped read access.
 @[no_await_guard]
-pub type MutexGuard[T] ephemeral {
+pub resource type MutexGuard[T] ephemeral {
     ptr: *mut u8,
 }
 
 /// Mutable guard from `Mutex.enter_mut()`. Provides scoped write access.
 @[no_await_guard]
-pub type MutexGuardMut[T] ephemeral {
+pub resource type MutexGuardMut[T] ephemeral {
     ptr: *mut u8,
 }
 
@@ -80,13 +80,13 @@ pub type RwLock[T] {
 
 /// Read guard from `RwLock.enter()`.
 @[no_await_guard]
-pub type RwReadGuard[T] ephemeral {
+pub resource type RwReadGuard[T] ephemeral {
     ptr: *mut u8,
 }
 
 /// Write guard from `RwLock.enter_mut()`.
 @[no_await_guard]
-pub type RwWriteGuard[T] ephemeral {
+pub resource type RwWriteGuard[T] ephemeral {
     ptr: *mut u8,
 }
 

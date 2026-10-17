@@ -602,12 +602,12 @@ qualifies for:
 @[derive(all)]
 type Color { r: u8, g: u8, b: u8, a: u8 }
 // Derives: Clone, Default, Eq, Ord, Debug
-// (NOT Copy — aggregate types require explicit Copy opt-in)
+// (Copy is not derived: a struct of values is already a value, §4.3 D120)
 
 @[derive(all)]
 type User { name: str, email: str, age: i32 }
 // Derives: Clone, Default, Eq, Debug
-// (NOT Copy — aggregate types require explicit Copy opt-in)
+// (Copy is not derived: a struct of values is already a value, §4.3 D120)
 // (NOT Ord — not all fields implement Ord by default)
 ```
 

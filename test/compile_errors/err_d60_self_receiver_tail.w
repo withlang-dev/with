@@ -4,7 +4,9 @@
 // whole receiver out — exactly what the tail `self` does, so a `mut fn`
 // receiver is too weak for it.
 
-type P { name: str }
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type P { name: str }
 extend P:
     mut fn reset -> P: self = P { name: "b".clone() }
 

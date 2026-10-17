@@ -3,7 +3,8 @@
 // `implicit Ctx` is not filled from `with c(...)`. The help names both
 // spellings that work: pass it explicitly (`ctx: c`, a move) or declare
 // `ctx: implicit &Ctx`. (#2049: it was filled with a copy — a double free.)
-type Ctx { name: str }
+// D120: a struct of value fields is a value; a resource is the non-Copy one.
+resource type Ctx { name: str }
 
 fn take(x: i32, ctx: implicit Ctx) -> i32: x + ctx.name.len() as i32
 

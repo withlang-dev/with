@@ -5,8 +5,10 @@
 // view-deps analysis previously dropped deps on realloc and missed
 // this). E0701's primary coverage lives in the sibling fixtures.
 
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
 @[no_await_guard]
-type Guard {
+resource type Guard {
     value: i32,
 }
 

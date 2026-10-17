@@ -1,5 +1,7 @@
 //! expect-check-fail: 'copy' requires the type to implement Copy or Clone
-type Buffer:
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type Buffer:
     data: i32
     len: i32
 

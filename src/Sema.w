@@ -1332,6 +1332,13 @@ pub type Sema {
     // is_copy cycle guard — HashSet (heap handle) so is_copy can be `&Self` and
     // mutate it through a copied handle (D7 interior-mutability recipe).
     copy_visit_stack: HashSet[i32],
+    // D120 stage 3: the struct field walk of is_copy, memoized per resolved
+    // type once it is exact (no unresolved field, no cycle met); without it
+    // every query walked every field of every struct (type_needs_drop stops
+    // at the first droppable field; this walk must see them all).
+    struct_copy_cache: HashMap[i32, i32],
+    copy_walk_incomplete: i32,
+    copy_cycle_hits: i32,
     // type_needs_drop cycle guard — HashSet (heap handle) for `&Self` interior mut.
     needs_drop_visit: HashSet[i32],
     current_drop_type_sym: i32,
@@ -2776,6 +2783,7 @@ impl Sema:
         self.layout_align_cache = HashMap.new()
         self.layout_field_offset_cache = HashMap.new()
         self.is_copy_cache = sema_new_map_i32_i32()
+        self.struct_copy_cache = HashMap.new()
         self.needs_drop_result_cache = sema_new_map_i32_i32()
         self.unwrapped_type_cache = sema_new_map_i32_i32()
         self.generic_struct_field_type_cache = sema_new_map_i64_i32()
@@ -3448,6 +3456,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         drop_method_cache,
         liveness_byte_cache,
         copy_visit_stack: HashSet.new(),
+        struct_copy_cache: HashMap.new(),
+        copy_walk_incomplete: 0,
+        copy_cycle_hits: 0,
         needs_drop_visit: HashSet.new(),
         current_drop_type_sym: 0,
         pattern_subject_node: 0,
@@ -10742,11 +10753,22 @@ impl Sema:
                 if distinct_inner != resolved as i32:
                     return self.is_copy(distinct_inner as TypeId)
             if name > 0:
-                return self.select_trait_impl(name, self.syms.copy_trait)
+                if self.select_trait_impl(name, self.syms.copy_trait) != 0:
+                    return 1
+                // §13.4: a generator value is consumed once — its state
+                // struct is a running producer, not a value of its fields.
+                if self.generator_state_yield_types.contains(resolved as i32):
+                    return 0
+                // D120 (§2.3, stage 3): a struct whose fields are all values
+                // is a value — no `impl Copy` written (one is legal and
+                // redundant). A Drop impl or `resource type` was refused
+                // above: identity is compositional, with those two exceptions.
+                return self.fields_all_copy(resolved as i32)
             return 0
         if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_RANGE:
             // Break copy-check recursion on cyclic type graphs.
             if self.copy_visit_stack.contains(resolved as i32):
+                self.copy_cycle_hits += 1
                 return 0
             self.copy_visit_stack.insert(resolved as i32)
 
@@ -10781,7 +10803,11 @@ impl Sema:
         if tk == TypeKind.TY_GENERIC_INST:
             let generic_base = self.get_generic_inst_base(resolved as i32)
             let generic_base_name = self.pool_resolve(generic_base)
-            if generic_base_name == "Sender" or generic_base_name == "Receiver":
+            // D120 (§2.3): an Atomic is a cell other threads address — its
+            // identity is its storage (it is compiler-modeled, as the
+            // channel ends are; the std declaration cannot spell `resource
+            // type` while the seed predates the keyword).
+            if generic_base_name == "Sender" or generic_base_name == "Receiver" or generic_base_name == "Atomic":
                 return 0
             if generic_base == self.syms.handle:
                 return 1
@@ -10799,11 +10825,70 @@ impl Sema:
                     if self.is_copy(self.get_generic_inst_arg(resolved as i32, ai) as TypeId) == 0:
                         return 0
                 return 1
-            // Generic instances (List[T], etc.) are non-Copy by default.
-            // Copy iff there is an explicit `impl[T: Copy] Copy for Base[T]` registered.
+            // Generic instances (Option[T], etc.) are Copy when an explicit
+            // `impl[T: Copy] Copy for Base[T]` is registered.
             // Do NOT call type_implements_trait(copy_trait) here — it just calls is_copy() back.
-            return self.select_trait_impl_for_generic_inst(resolved as i32, self.syms.copy_trait)
+            if self.select_trait_impl_for_generic_inst(resolved as i32, self.syms.copy_trait) != 0:
+                return 1
+            // D120 (§2.3, stage 3): an instance of a generic struct is a
+            // value when its fields are, unless the struct has a Drop impl
+            // or is declared a resource. An enum instance stays opt-in.
+            if generic_base > 0 and self.resource_type_names.contains(generic_base):
+                return 0
+            if self.type_has_drop_impl(resolved as i32) != 0 or self.has_drop_method(generic_base) != 0:
+                return 0
+            // A SlotMap addresses its slots by Handle: the handles are its
+            // identity, and the runtime keeps no holder count for one.
+            if generic_base == self.syms.slotmap:
+                return 0
+            if self.type_reflection_variant_count(resolved as i32) > 0:
+                return 0
+            return self.fields_all_copy(resolved as i32)
         1
+
+    // Whether a type's declaration writes its own `clone` (an `impl Clone`
+    // or an inherent method): a derived clone of a value that holds it
+    // calls it rather than copying (D120 makes a struct of values Copy
+    // without a declaration, and its own clone still means something).
+    mut fn type_declares_clone(tid: i32) -> i32:
+        if tid <= 0: return 0
+        let resolved = self.resolve_alias(tid as TypeId)
+        let tk = self.get_type_kind(resolved)
+        if tk == TypeKind.TY_GENERIC_INST:
+            return self.select_trait_impl_for_generic_inst(resolved as i32, self.syms.clone_trait)
+        if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_ENUM: return 0
+        let name = self.get_type_d0(resolved)
+        if name <= 0: return 0
+        if self.select_trait_impl(name, self.syms.clone_trait) != 0: return 1
+        if self.lookup_method_sig(name, self.pool_intern("clone")) >= 0: 1 else: 0
+
+    // D120 (§2.3, stage 3): every field of the struct (or struct instance)
+    // is a value; a cyclic field reads as not (the visit stack breaks it).
+    mut fn fields_all_copy(resolved: i32) -> i32:
+        if self.struct_copy_cache.contains(resolved):
+            return self.struct_copy_cache.get(resolved).unwrap()
+        if self.copy_visit_stack.contains(resolved):
+            self.copy_cycle_hits += 1
+            return 0
+        self.copy_visit_stack.insert(resolved)
+        let incomplete_before: i32 = self.copy_walk_incomplete
+        let hits_before: i32 = self.copy_cycle_hits
+        self.copy_walk_incomplete = 0
+        var out: i32 = 1
+        let field_count = self.type_reflection_field_count(resolved)
+        for fi in 0..field_count:
+            let field_ty = self.type_reflection_field_type(resolved, fi)
+            if field_ty == 0:
+                self.copy_walk_incomplete = 1
+            if field_ty == 0 or self.is_copy(field_ty as TypeId) == 0:
+                out = 0
+                break
+        self.copy_visit_stack.remove(resolved)
+        // Exact when every field was typed and no cycle truncated the walk.
+        if self.copy_walk_incomplete == 0 and self.copy_cycle_hits == hits_before:
+            self.struct_copy_cache.insert(resolved, out)
+        if incomplete_before != 0: self.copy_walk_incomplete = 1
+        out
 
     fn has_drop_method(type_name: i32) -> i32:
         if type_name <= 0:

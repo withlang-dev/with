@@ -10,7 +10,9 @@
 // consuming parameters, an `extern "C" fn` pointer field, and an impl block
 // with `fn`, `mut fn` and `move fn` methods. Layout attributes cover both
 // an unused type and a demanded packed type in the on-demand consumer.
-pub type Pair { pub a: i32, pub b: i32 }
+// D120: a struct of values is a value; `take(p: Pair)` consumes only a
+// resource, which is the property this bundle demonstrates.
+pub resource type Pair { pub a: i32, pub b: i32 }
 @[repr(packed)]
 pub type Packet { pub tag: u8, pub word: i32 }
 pub type Word = i32

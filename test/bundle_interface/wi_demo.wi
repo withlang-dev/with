@@ -15,7 +15,8 @@ pub enum Level: u8:
 impl Copy for Level
 @[packed]
 pub type Packet { pub tag: u8, pub word: i32 }
-pub type Pair { pub a: i32, pub b: i32 }
+impl Copy for Packet
+pub resource type Pair { pub a: i32, pub b: i32 }
 pub type VarArgs = c_va_list
 pub type Word = i32
 pub const GREETING: str = "hi\n"

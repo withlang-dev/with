@@ -1985,13 +1985,39 @@ impl Codegen:
     // on every str the source carries; a taken copy hands the value over and
     // blanks the source, so the source's drop releases nothing.
     mut fn mir_eval_operand(body: &MirBody, operand_id: i32, expected_ty: i64) -> i64:
-        let value = self.mir_eval_operand_raw(body, operand_id, expected_ty)
         let hold = body.operand_hold(operand_id)
         if hold == 0:
-            return value
+            return self.mir_eval_operand_raw(body, operand_id, expected_ty)
         let place = body.operand_d0[operand_id]
         let sema_ty = if place >= 0 and place < body.place_sema_types.len(): body.place_sema_types[place] else: 0
         let place_ty = if sema_ty > 0: self.mir_sema_type_to_llvm(sema_ty) else: 0
+        // D120 stage 3: a held copy of a large aggregate (a struct of values
+        // the size of Zcu) travels through memory: the source is moved into
+        // a slot by memcpy, the glue or the blank runs on the source, and
+        // the consumer loads the slot — so its load and store stay an
+        // adjacent pair that wl_lower_aggregate_copies turns into a memmove.
+        // Read as a first-class value with the glue between the load and
+        // the consumer's store, SROA scalarized the 2,378 leaves of a Zcu
+        // into a load and an insertvalue each, and the backend's store
+        // merging went quadratic (the #1129 class): one unit's `llc` took
+        // 41 s against 2 s.
+        if place_ty != 0 and (wl_get_type_kind(place_ty) == wl_struct_type_kind() or wl_get_type_kind(place_ty) == wl_array_type_kind()) and self.abi_size_of(place_ty) >= 64 and not self.bitpacked_place_proj.contains(place):
+            var big_src = self.mir_place_ptr(body, place, false, 0)
+            let big_local = body.place_locals[place]
+            if big_src != 0 and body.place_proj_counts[place] == 0 and big_local >= 0 and self.mir_indirect_value_local_types.contains(big_local):
+                big_src = self.mir_indirect_value_local_ptr(big_local, big_src)
+            if big_src != 0:
+                let slot = self.create_entry_alloca(place_ty)
+                self.emit_llvm_memcpy(slot, big_src, self.abi_size_of(place_ty))
+                if hold == MIR_HOLD_TAKE:
+                    wl_build_store(self.builder, self.build_default_value(place_ty), big_src)
+                else:
+                    self.mir_emit_copy_glue_ptr(big_src, place_ty, sema_ty)
+                let loaded = wl_build_load(self.builder, place_ty, slot)
+                if expected_ty != 0 and expected_ty != place_ty:
+                    return self.mir_coerce_value_to_sema_type(loaded, expected_ty, 0, false)
+                return loaded
+        let value = self.mir_eval_operand_raw(body, operand_id, expected_ty)
         let src_ptr = if place_ty != 0: self.mir_place_ptr(body, place, false, 0) else: 0
         if src_ptr == 0:
             // A value local (SSA) has no storage to blank: its uncoerced
@@ -6074,22 +6100,72 @@ impl Codegen:
                 gep_indices.push(wl_const_int(wl_i32_type(self.context), i, 0))
                 self.mir_emit_copy_glue_ptr(wl_build_gep(self.builder, ty, ptr, list_data_i64(&gep_indices), 2), elem_llvm, elem_sema)
             return
-        if tk == TypeKind.TY_STRUCT and wl_get_type_kind(ty) == wl_struct_type_kind():
-            let struct_idx = self.find_struct_index_by_type(ty)
-            if struct_idx < 0 or self.is_union_struct_index(struct_idx) or self.is_bitpacked_struct(ty):
-                sema_phase_bug(f"BUG: no copy glue for Copy type {self.sema.type_name(resolved)} (D111)")
-            let field_start: i32 = self.struct_field_starts[struct_idx]
-            for fi in 0..self.struct_field_counts[struct_idx]:
-                let field_sema = self.mir_project_field_sema_type(resolved, self.struct_field_names[field_start + fi])
-                let field_index = self.get_llvm_field_index(ty, fi)
-                let field_ptr = wl_build_struct_gep(self.builder, ty, ptr, field_index)
-                let field_llvm: i64 = self.struct_field_types[field_start + fi]
-                self.mir_emit_copy_glue_ptr(field_ptr, field_llvm, field_sema)
+        // D120 stage 3: a struct of values, or an instance of a generic
+        // struct of values (one with no variants), copies field by field —
+        // through one cached per-type function, as the drop glue does
+        // (#691): inlined at every consumed copy, a struct of hundreds of
+        // collection fields (Sema) put thousands of retains into one
+        // function and the self-build's LLVM peaked at 8 GB.
+        if (tk == TypeKind.TY_STRUCT or (tk == TypeKind.TY_GENERIC_INST and self.mir_enum_variant_count(resolved) == 0)) and wl_get_type_kind(ty) == wl_struct_type_kind() and self.find_struct_index_by_type(ty) >= 0:
+            let copy_fn = self.ensure_structural_copy_fn(resolved, ty)
+            self.mir_call_drop(ptr, ty, copy_fn, wl_global_get_value_type(copy_fn))
             return
         if (tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and wl_get_type_kind(ty) == wl_struct_type_kind() and wl_count_struct_elem_types(ty) >= 2:
             self.mir_emit_copy_glue_enum_ptr(ptr, ty, resolved)
             return
         sema_phase_bug(f"BUG: no copy glue for Copy type {self.sema.type_name(resolved)} (D111)")
+
+    // The field-by-field copy glue of a struct: the body of its per-type
+    // copy function.
+    mut fn mir_emit_struct_copy_glue_fields(ptr: i64, ty: i64, resolved: i32):
+        let struct_idx = self.find_struct_index_by_type(ty)
+        if struct_idx < 0 or self.is_union_struct_index(struct_idx) or self.is_bitpacked_struct(ty):
+            sema_phase_bug(f"BUG: no copy glue for Copy type {self.sema.type_name(resolved)} (D111)")
+        let field_start: i32 = self.struct_field_starts[struct_idx]
+        for fi in 0..self.struct_field_counts[struct_idx]:
+            let field_sema = self.mir_project_field_sema_type(resolved, self.struct_field_names[field_start + fi])
+            let field_index = self.get_llvm_field_index(ty, fi)
+            let field_ptr = wl_build_struct_gep(self.builder, ty, ptr, field_index)
+            let field_llvm: i64 = self.struct_field_types[field_start + fi]
+            self.mir_emit_copy_glue_ptr(field_ptr, field_llvm, field_sema)
+
+    // D120 stage 3: the cached per-type copy glue `__copy_struct_<ty>(ptr)`,
+    // the twin of ensure_structural_drop_fn: O(types + sites) IR instead of
+    // O(sites × fields). Declared before its body is built, so a nested
+    // field of the same type calls the declaration. Internal linkage.
+    mut fn ensure_structural_copy_fn(sema_ty: i32, llvm_ty: i64) -> i64:
+        let fn_name = "__copy_struct_" ++ f"{sema_ty}"
+        let existing = wl_get_named_function(self.llmod, fn_name)
+        if existing != 0:
+            return existing
+        let params: List[i64] = [llvm_ty]
+        let flags: List[i32] = [4]
+        let abi_index = self.compute_fn_abi(wl_void_type(self.context), params, flags, FN_ABI_WITH, 0)
+        let fn_ty = self.fn_abis[abi_index].llvm_ty
+        let copy_fn = wl_add_function(self.llmod, fn_name, fn_ty)
+        self.bind_fn_abi(self.intern.intern(fn_name), abi_index, copy_fn)
+        wl_set_linkage(copy_fn, wl_internal_linkage())
+
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_bb = wl_get_insert_block(self.builder)
+        self.current_function = copy_fn
+        self.current_function_name_sym = 0
+        self.current_function_node = 0
+        self.current_ret_type = wl_void_type(self.context)
+        let entry = wl_append_bb(self.context, copy_fn, "entry")
+        wl_position_at_end(self.builder, entry)
+        self.mir_emit_struct_copy_glue_fields(wl_get_param(copy_fn, 0), llvm_ty, sema_ty)
+        wl_build_ret_void(self.builder)
+        self.current_function = saved_fn
+        self.current_function_name_sym = saved_fn_name_sym
+        self.current_function_node = saved_fn_node
+        self.current_ret_type = saved_ret_ty
+        if saved_bb != 0:
+            wl_position_at_end(self.builder, saved_bb)
+        copy_fn
 
     // The active variant's payloads, by tag, as mir_emit_drop_enum_ptr walks them.
     mut fn mir_emit_copy_glue_enum_ptr(ptr: i64, ty: i64, enum_sema_ty: i32):
