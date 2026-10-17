@@ -17685,7 +17685,14 @@ impl MirBuilder:
             // to blank — `move w.f` is a plain copy and must not enter the move
             // machinery (marking it moved would wrongly suppress a Drop owner's
             // partial drop).
-            if self.ast.kind(mv_inner) == NodeKind.NK_FIELD_ACCESS:
+            // D16/D120: the same for a local binding — `move sema` of a value
+            // with drop glue is a move (the source is reset and never
+            // dropped), never a retained copy that leaves the source live
+            // (Sema already refuses a later use of the binding, #691). Read
+            // as a copy, a moved Sema stayed live across every exit path and
+            // the drop plan dropped it field by field at each one: the
+            // self-build's IR grew four-fold and LLVM peaked at 8 GB.
+            if self.ast.kind(mv_inner) == NodeKind.NK_FIELD_ACCESS or (self.ast.kind(mv_inner) == NodeKind.NK_IDENT and self.lookup_local(self.ast.get_data0(mv_inner)) >= 0):
                 let mv_fty = self.expr_type(mv_inner)
                 if mv_fty != 0 and self.sema.type_needs_drop_frozen(mv_fty) != 0:
                     let mv_place = self.lower_expr_place(mv_inner)

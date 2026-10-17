@@ -3510,6 +3510,29 @@ pub fn with_vec_is_unique(v: *mut u8, es: i64) -> i64:
         return 0
     if unsafe { (*list_holders(list_alloc_base(v, es), es)).load(.Acquire) } == 0: 1 else: 0
 
+// WITH_TRACE_COW_COPIES=<bytes>: every copy-on-write copy (a List buffer,
+// a map table) of at least that many bytes is reported with a backtrace,
+// so the site that shares a big value and then writes it is named.
+var cow_trace_state: i32 = 0            // 0=unread, 1=off, 2=on
+var cow_trace_min_bytes: i64 = 0
+
+fn cow_trace_copy(what: *const u8, what_len: i64, bytes: i64):
+    if cow_trace_state == 0:
+        let parsed = rt_parse_limit_cstr(rt_getenv(c"WITH_TRACE_COW_COPIES".ptr))
+        if parsed > 0:
+            cow_trace_min_bytes = parsed
+            cow_trace_state = 2
+        else:
+            cow_trace_state = 1
+    if cow_trace_state != 2 or bytes < cow_trace_min_bytes:
+        return
+    dbg_puts("[cow-copy] " as *const u8, 11)
+    dbg_puts(what, what_len)
+    dbg_puts(" bytes=" as *const u8, 7)
+    dbg_put_i64(bytes)
+    dbg_puts("\n" as *const u8, 1)
+    rt_backtrace_print()
+
 // Before a mutation: a shared buffer of bit-copy elements is copied, its
 // live elements into a fresh buffer this List alone holds, and the shared
 // one loses this holder. Elements with copy glue (a str) take the
@@ -3519,6 +3542,7 @@ pub fn with_vec_make_unique_bits(v: *mut u8, es: i64) -> i64:
         return 0
     let old = list_get_ptr_field(v)
     let n = list_get_len(v)
+    cow_trace_copy("list" as *const u8, 4, n * es)
     let fresh = if n > 0: list_buffer_alloc(n * es, es) else: 0 as *mut u8
     if n > 0:
         rt_memcpy(fresh, old as *const u8, n * es)
@@ -4334,6 +4358,7 @@ pub fn with_hashmap_make_unique(slot: *mut *mut u8) -> i64:
     let ksz = hm_key_size(m)
     let vsz = hm_val_size(m)
     let icap = hm_icap(m)
+    cow_trace_copy("map" as *const u8, 3, ecap * (ksz + vsz + 1) + icap * 4)
     let fresh = rt_alloc(HM_SIZE)
     rt_memcpy(fresh, map as *const u8, HM_SIZE)
     let f = fresh as i64
