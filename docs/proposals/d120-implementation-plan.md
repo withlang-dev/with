@@ -5,8 +5,9 @@
 document is a derivative plan: it cannot amend the ruling, and where they
 disagree the ruling stands. `resource type` landed 2026-10-16 (PR #2438),
 stage 1 the same day (PR #2440, under Amendment 1), stage 2 (PR #2441),
-stage 3 (PR #2442), stage 4 (PR #2444), stage 5 with this change; stage 6
-and the final corpus measurements are open.
+stage 3 (PR #2442), stage 4 (PR #2444), stage 5 (PR #2445), and stage 6
+(the `.clone()` and value-copy sweep, plus `test/benchmark/cow_value_lists.w`)
+with this change.
 
 ## What the ruling asks for
 

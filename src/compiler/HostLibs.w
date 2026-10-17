@@ -60,7 +60,7 @@ fn host_lib_read_conf(root: &str, conf: &str, depth: i32, dirs: List[str]) -> Li
     if depth > 8: return out
     for raw in runtime_read_file(conf).split("\n"):
         let hash = raw.find("#")
-        let text = if hash >= 0: raw.slice(0, hash) else: raw.clone()
+        let text = if hash >= 0: raw.slice(0, hash) else: raw
         let line = text.trim()
         if line.len() == 0 or line.starts_with("hwcap "): continue
         if line.starts_with("include ") or line.starts_with("include\t"):

@@ -1532,16 +1532,18 @@ pub fn mir_test_uninstantiated_generic_local:
 // said ok. shape: 0 = read after the drop, 1 = read before it, 2 = drop,
 // rewrite, read, 3 = the drop on one arm only (a may-drop, not judged),
 // 4 = the drop is a drop-and-goto terminator, 5 = the read is a call
-// argument.
+// argument, 6 = the read is through a reference temporary (`_r = ref(_2.f);
+// drop(_2); _out = copy _r.*`).
 fn read_after_drop_verdict(shape: i32) -> str:
     var mir_mod = MirModule.init()
-    for kind in [0, TypeKind.TY_STRUCT, TypeKind.TY_INT]:
+    for kind in [0, TypeKind.TY_STRUCT, TypeKind.TY_INT, TypeKind.TY_REF]:
         mir_mod.sema_type_kinds.push(kind)
-        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d0.push(if kind == TypeKind.TY_REF: 2 else: 0)
         mir_mod.sema_type_d1.push(0)
         mir_mod.sema_type_d2.push(0)
     let whole_ty = 1
     let int_ty = 2
+    let ref_ty = 3
     mir_mod.sema_moved_drop_types.insert(whole_ty, 1)
     mir_mod.sema_dropped_types.insert(whole_ty, 1)
     var body = MirBody.init_for_fn(1)
@@ -1553,19 +1555,30 @@ fn read_after_drop_verdict(shape: i32) -> str:
     let field = body.new_field_place(whole, 0, int_ty)
     let out_local = body.new_temp(int_ty)
     let out = body.new_place(out_local)
+    let ref1_local = body.new_temp(ref_ty)
+    let ref1 = body.new_place(ref1_local)
+    let ref2_local = body.new_temp(ref_ty)
+    let ref2 = body.new_place(ref2_local)
+    let deref_place = body.new_deref_place(ref2, int_ty)
     let entry = body.new_block()
     let read_bb = body.new_block()
     let done = body.new_block()
     let no_fields: List[i32] = List.new()
     let no_field_table = body.new_agg_fields(&no_fields, &no_fields)
     let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, no_field_table, 0)
-    let read_op = body.new_operand(OperandKind.OK_COPY, field)
+    let read_op = body.new_operand(OperandKind.OK_COPY, if shape == 6: deref_place else: field)
     let read = body.new_rvalue(RvalueKind.RK_USE, read_op, 0, 0)
     body.push_stmt(entry, StmtKind.StorageLive, whole_local, 0, 0)
     body.push_stmt(entry, StmtKind.Assign, whole, init, 0)
+    if shape == 6:
+        let take_ref = body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, field, 0)
+        body.push_stmt(entry, StmtKind.Assign, ref1, take_ref, 0)
+        let ref1_op = body.new_operand(OperandKind.OK_COPY, ref1)
+        let copy_ref = body.new_rvalue(RvalueKind.RK_USE, ref1_op, 0, 0)
+        body.push_stmt(entry, StmtKind.Assign, ref2, copy_ref, 0)
     if shape == 1:
         body.push_stmt(entry, StmtKind.Assign, out, read, 0)
-    if shape == 0 or shape == 1 or shape == 2 or shape == 5:
+    if shape == 0 or shape == 1 or shape == 2 or shape == 5 or shape == 6:
         body.push_stmt(entry, StmtKind.Drop, whole, 0, 0)
     if shape == 2:
         body.push_stmt(entry, StmtKind.Assign, whole, init, 0)
@@ -1608,6 +1621,7 @@ pub fn mir_test_read_after_drop:
     assert(read_after_drop_verdict(3) == "")
     assert(read_after_drop_verdict(4).contains("read of _2 after every path reaching it dropped _2"))
     assert(read_after_drop_verdict(5).contains("read of _2 after every path reaching it dropped _2"))
+    assert(read_after_drop_verdict(6).contains("read of _2 after every path reaching it dropped _2"))
 
 // #1993: an owned local (the lowering recorded it as owned cleanup) moved
 // out, then read: the read sees what its new owner holds. `t.join_cleanup();

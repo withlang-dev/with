@@ -63,9 +63,9 @@ fn cp_patched_text(path: &str, creates: bool, original: &str, hunks: &List[CpHun
         let at = if hunks[hi].old.len() == 0: (if want < 0: 0 else: want) else: cp_locate(&file, want, &hunks[hi].old)
         if at < 0: return ("", f"hunk {hi + 1} of the patch does not apply to " ++ path)
         let rebuilt: List[str] = List.new()
-        for i in 0..at: rebuilt.push(file[i].clone())
+        for i in 0..at: rebuilt.push(file[i])
         for line in hunks[hi].new: rebuilt.push(line.to_owned())
-        for i in at + hunks[hi].old.len()..file.len(): rebuilt.push(file[i].clone())
+        for i in at + hunks[hi].old.len()..file.len(): rebuilt.push(file[i])
         shift = (shift + (at - want) + hunks[hi].new.len() - hunks[hi].old.len()) as i32
         file = rebuilt
     var text = file.join("\n")
@@ -82,7 +82,7 @@ pub fn conan_apply_patch(patch: &str, root: &str, read: fn(&str) -> str, write: 
     var i = 0
     while i <= lines.len():
         let at_end = i == lines.len()
-        let line = if at_end: "" else: lines[i].clone()
+        let line = if at_end: "" else: lines[i]
         let file_header = not at_end and line.starts_with("--- ") and i + 1 < lines.len() and lines[i + 1].starts_with("+++ ")
         if at_end or file_header:
             if path.len() > 0 and hunks.len() > 0:

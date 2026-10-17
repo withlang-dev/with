@@ -101,14 +101,14 @@ for d in decls:
     print(d.path ++ f":{d.start}: pub " ++ d.name ++ " is used by nothing outside its package (D100: pub is what another package needs)")
     if apply:
         var starts: List[i64] = match edits.get(d.path):
-            Some(v) => v.clone()
+            Some(v) => v
             None => List.new()
         starts.push(d.start)
-        edits.insert(d.path.clone(), move starts)
+        edits.insert(d.path, starts)
 if apply:
     for (path, starts) in edits:
         var text = read_file(path).unwrap_or("")
-        var remaining = starts.clone()
+        var remaining = *starts
         // Highest offset first, so earlier offsets stay valid.
         while remaining.len() > 0:
             var best = 0

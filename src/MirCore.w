@@ -2613,6 +2613,11 @@ impl MirDroppedSet:
 // reads of Maybe places (mir_read_of_uninit_place), never a projection.
 // Must-dropped: a read on a path that dropped only on some paths is not
 // judged here.
+fn mir_place_starts_with_deref(body: &MirBody, place: i32) -> bool:
+    if place < 0 or place >= body.place_locals.len() or body.place_proj_counts[place] <= 0:
+        return false
+    body.proj_kinds[body.place_proj_starts[place]] == ProjKind.PK_DEREF
+
 fn validate_read_after_drop(body: &MirBody) -> str:
     let local_count = body.local_type_ids.len()
     let block_count = body.block_count()
@@ -2620,8 +2625,12 @@ fn validate_read_after_drop(body: &MirBody) -> str:
         return ""
     // Only locals some whole drop targets can be read after a drop.
     var slot: List[i32] = List.new()
+    var write_count: List[i32] = List.new()
+    var ref_target: List[i32] = List.new()
     for _ in 0..local_count:
         slot.push(-1)
+        write_count.push(0)
+        ref_target.push(-1)
     var width: i32 = 0
     for bb in 0..block_count:
         for si in body.bb_stmt_starts[bb]..body.bb_stmt_starts[bb] + body.bb_stmt_counts[bb]:
@@ -2630,13 +2639,53 @@ fn validate_read_after_drop(body: &MirBody) -> str:
                 if local >= 0 and local < local_count and slot[local] < 0:
                     slot[local] = width
                     width += 1
+            else if body.stmt_kind(si) == StmtKind.Assign:
+                let dst = mir_whole_drop_local(body, body.stmt_data0(si))
+                if dst >= 0 and dst < local_count:
+                    write_count[dst] += 1
         if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
             let local = mir_whole_drop_local(body, body.term_data0(bb))
             if local >= 0 and local < local_count and slot[local] < 0:
                 slot[local] = width
                 width += 1
+        else if body.term_kind(bb) == TermKind.TK_CALL:
+            let dst = mir_whole_drop_local(body, body.term_data2(bb))
+            if dst >= 0 and dst < local_count:
+                write_count[dst] += 1
     if width == 0:
         return ""
+    // Single-assignment reference temporaries (`_19 = ref(shared, _3[_18]);
+    // _20 = copy _19`) borrow their source local: dereferencing `_20.*` after
+    // `drop(_3)` reads freed storage just as `_3[_18]` does.
+    var ref_changed = true
+    while ref_changed:
+        ref_changed = false
+        for bb in 0..block_count:
+            for si in body.bb_stmt_starts[bb]..body.bb_stmt_starts[bb] + body.bb_stmt_counts[bb]:
+                if body.stmt_kind(si) != StmtKind.Assign:
+                    continue
+                let dst = mir_whole_drop_local(body, body.stmt_data0(si))
+                if dst < 0 or dst >= local_count or write_count[dst] != 1 or ref_target[dst] >= 0:
+                    continue
+                let rv = body.stmt_data1(si)
+                if rv < 0 or rv >= body.rval_kinds.len():
+                    continue
+                let rk = body.rval_kinds[rv]
+                if rk == RvalueKind.RK_REF:
+                    let p = body.rval_d1[rv]
+                    if p >= 0 and p < body.place_locals.len():
+                        let base = body.place_locals[p]
+                        let target = if mir_place_starts_with_deref(body, p): (if base >= 0 and base < local_count: ref_target[base] else: -1) else: base
+                        if target >= 0 and target < local_count and slot[target] >= 0:
+                            ref_target[dst] = target
+                            ref_changed = true
+                else if rk == RvalueKind.RK_USE:
+                    let op = body.rval_d0[rv]
+                    if op >= 0 and op < body.operand_kinds.len() and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE):
+                        let src = mir_whole_drop_local(body, body.operand_d0[op])
+                        if src >= 0 and src < local_count and ref_target[src] >= 0:
+                            ref_target[dst] = ref_target[src]
+                            ref_changed = true
     // Forward must-analysis: a block's input is the meet (AND) of its
     // reachable predecessors' outputs; the entry starts with nothing dropped.
     var reached: List[i32] = List.new()
@@ -2699,11 +2748,26 @@ fn validate_read_after_drop(body: &MirBody) -> str:
                 for local in mir_rvalue_read_locals(body, body.stmt_data1(si)):
                     if state.has(&slot, local):
                         return f"fn sym{body.fn_sym} stmt{si} span={body.stmt_spans[si]}: read of _{local} after every path reaching it dropped _{local}: the value it reads is freed (§2.5.1)"
+                for op in mir_rvalue_operands(body, body.stmt_data1(si)):
+                    if op >= 0 and op < body.operand_kinds.len() and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE):
+                        let p = body.operand_d0[op]
+                        if mir_place_starts_with_deref(body, p):
+                            let base = body.place_locals[p]
+                            let borrowed = if base >= 0 and base < local_count: ref_target[base] else: -1
+                            if state.has(&slot, borrowed):
+                                return f"fn sym{body.fn_sym} stmt{si} span={body.stmt_spans[si]}: read of _{borrowed} after every path reaching it dropped _{borrowed}: the value it reads is freed (§2.5.1)"
             state.transfer_stmt(body, &slot, si)
         for op in mir_term_operands(body, bb):
             let local = mir_local_of_operand(body, op)
             if state.has(&slot, local):
                 return f"fn sym{body.fn_sym} bb{bb}: read of _{local} after every path reaching it dropped _{local}: the value it reads is freed (§2.5.1)"
+            if op >= 0 and op < body.operand_kinds.len() and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE):
+                let p = body.operand_d0[op]
+                if mir_place_starts_with_deref(body, p):
+                    let base = body.place_locals[p]
+                    let borrowed = if base >= 0 and base < local_count: ref_target[base] else: -1
+                    if state.has(&slot, borrowed):
+                        return f"fn sym{body.fn_sym} bb{bb}: read of _{borrowed} after every path reaching it dropped _{borrowed}: the value it reads is freed (§2.5.1)"
     ""
 
 // A block's dropped set on entry: nothing at the entry block, else the AND

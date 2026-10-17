@@ -178,7 +178,7 @@ pub fn with_cc_main() -> i32:
             if toolchain.problem.len() > 0:
                 with_eprint("error: with cc: " ++ toolchain.problem)
                 return 1
-            for extra in toolchain.args: args.push(extra.clone())
+            for extra in toolchain.args: args.push(extra)
     for i in 2..with_arg_count(): args.push(with_arg_at(i))
     if not first.starts_with("-cc1") and with_sysinfo_os() == "Macos" and cc_may_link():
         let ld = cc_self_linker("ld64.lld")

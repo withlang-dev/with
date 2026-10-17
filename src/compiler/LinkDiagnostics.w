@@ -21,7 +21,7 @@ pub fn link_missing_libraries(diagnostics: &str) -> List[str]:
             var seen = false
             for previous in missing:
                 if previous == name: seen = true
-            if not seen: missing.push(name.clone())
+            if not seen: missing.push(name)
     missing
 
 fn link_debian_library_package(name: &str) -> str:
@@ -58,7 +58,7 @@ pub fn link_missing_library_help(diagnostics: &str) -> str:
             var seen = false
             for previous in packages:
                 if previous == package: seen = true
-            if not seen: packages.push(package.clone())
+            if not seen: packages.push(package)
     help = help ++ "Install the development packages providing these files, or add their directory to the project's library search paths.\n"
     if packages.len() > 0:
         help = help ++ "On Debian/Ubuntu, the known packages above can be installed with:\n  sudo apt-get install"

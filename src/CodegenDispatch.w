@@ -5513,13 +5513,22 @@ impl Codegen:
             if owner_sym != 0 and self.sema.drop_consumed_field(owner_sym, field_sym) != 0:
                 fi = fi - 1
                 continue
-            let field_ty: i64 = self.struct_field_types[field_slot]
-            let llvm_fi = self.get_llvm_field_index(ty, fi)
-            let field_ptr = wl_build_struct_gep(self.builder, ty, ptr, llvm_fi)
             var field_sema_ty: i32 = 0
             if owner_sema_ty > 0:
                 field_sema_ty = self.mir_project_field_sema_type(owner_sema_ty, field_sym)
+            if field_sema_ty > 0 and self.sema.type_needs_drop_frozen(field_sema_ty) == 0:
+                fi = fi - 1
+                continue
+            let field_ty: i64 = self.struct_field_types[field_slot]
+            let llvm_fi = self.get_llvm_field_index(ty, fi)
+            let field_ptr = wl_build_struct_gep(self.builder, ty, ptr, llvm_fi)
             if field_sema_ty > 0:
+                if self.mir_sema_type_is_std_list(field_sema_ty) or self.mir_hash_collection_kind(field_sema_ty) != 0:
+                    let dfn = self.ensure_structural_drop_fn(field_sema_ty, field_ty)
+                    if dfn != 0:
+                        self.mir_call_drop(field_ptr, field_ty, dfn, wl_global_get_value_type(dfn))
+                        fi = fi - 1
+                        continue
                 self.mir_emit_drop_ptr_for_sema_type(field_ptr, field_ty, field_sema_ty)
             else:
                 self.mir_emit_drop_ptr(field_ptr, field_ty)
@@ -6127,10 +6136,111 @@ impl Codegen:
         let field_start: i32 = self.struct_field_starts[struct_idx]
         for fi in 0..self.struct_field_counts[struct_idx]:
             let field_sema = self.mir_project_field_sema_type(resolved, self.struct_field_names[field_start + fi])
+            if field_sema <= 0 or self.sema.type_needs_drop_frozen(field_sema) == 0:
+                continue
             let field_index = self.get_llvm_field_index(ty, fi)
             let field_ptr = wl_build_struct_gep(self.builder, ty, ptr, field_index)
             let field_llvm: i64 = self.struct_field_types[field_start + fi]
             self.mir_emit_copy_glue_ptr(field_ptr, field_llvm, field_sema)
+
+    // D120 stage 2: cached per-type `__list_make_unique_<ty>(ptr)` for lists
+    // whose elements need copy glue, beside drop/copy glue (#691).
+    mut fn ensure_list_make_unique_fn(list_sema_ty: i32, elem_size: i64) -> i64:
+        let resolved = self.mir_resolve_alias_at(list_sema_ty)
+        let fn_name = "__list_make_unique_" ++ f"{resolved}"
+        let existing = wl_get_named_function(self.llmod, fn_name)
+        if existing != 0:
+            return existing
+        let i64_ty = wl_i64_type(self.context)
+        let void_ty = wl_void_type(self.context)
+        let fn_ty = wl_function_type(void_ty, list_data_i64(self.make_ptr_list()), 1, 0)
+        let fn_val = wl_add_function(self.llmod, fn_name, fn_ty)
+        wl_set_linkage(fn_val, wl_internal_linkage())
+
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_bb = wl_get_insert_block(self.builder)
+        self.current_function = fn_val
+        self.current_function_name_sym = 0
+        self.current_function_node = 0
+        self.current_ret_type = void_ty
+        let entry = wl_append_bb(self.context, fn_val, "entry")
+        wl_position_at_end(self.builder, entry)
+        let recv_ptr = wl_get_param(fn_val, 0)
+        let mu_fn = self.ensure_list_runtime_fn("with_vec_make_unique_bits", i64_ty, 2)
+        let mu_ty = self.get_list_fn_type("with_vec_make_unique_bits", i64_ty, 2)
+        let mu_args: List[i64] = List.new()
+        mu_args.push(recv_ptr)
+        mu_args.push(wl_const_int(i64_ty, elem_size, 0))
+        let copied = wl_build_call(self.builder, mu_ty, mu_fn, list_data_i64(&mu_args), 2)
+        let did_copy = wl_build_icmp(self.builder, wl_int_ne(), copied, wl_const_int(i64_ty, 0, 0))
+        let glue_bb = wl_append_bb(self.context, fn_val, "cow.glue")
+        let after_bb = wl_append_bb(self.context, fn_val, "cow.done")
+        wl_build_cond_br(self.builder, did_copy, glue_bb, after_bb)
+        wl_position_at_end(self.builder, glue_bb)
+        self.mir_emit_list_element_copy_glue_ptr(recv_ptr, resolved)
+        wl_build_br(self.builder, after_bb)
+        wl_position_at_end(self.builder, after_bb)
+        wl_build_ret_void(self.builder)
+        self.current_function = saved_fn
+        self.current_function_name_sym = saved_fn_name_sym
+        self.current_function_node = saved_fn_node
+        self.current_ret_type = saved_ret_ty
+        if saved_bb != 0:
+            wl_position_at_end(self.builder, saved_bb)
+        fn_val
+
+    // D120 stage 2: cached per-type `__map_make_unique_<ty>(slot_ptr)` for
+    // HashMap/HashSet whose keys or values need copy glue.
+    mut fn ensure_map_make_unique_fn(map_sema_ty: i32, collection_kind: i32) -> i64:
+        let resolved = self.mir_resolve_alias_at(map_sema_ty)
+        let fn_name = "__map_make_unique_" ++ f"{resolved}"
+        let existing = wl_get_named_function(self.llmod, fn_name)
+        if existing != 0:
+            return existing
+        let i64_ty = wl_i64_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
+        let void_ty = wl_void_type(self.context)
+        let fn_ty = wl_function_type(void_ty, list_data_i64(self.make_ptr_list()), 1, 0)
+        let fn_val = wl_add_function(self.llmod, fn_name, fn_ty)
+        wl_set_linkage(fn_val, wl_internal_linkage())
+
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_bb = wl_get_insert_block(self.builder)
+        self.current_function = fn_val
+        self.current_function_name_sym = 0
+        self.current_function_node = 0
+        self.current_ret_type = void_ty
+        let entry = wl_append_bb(self.context, fn_val, "entry")
+        wl_position_at_end(self.builder, entry)
+        let slot_ptr = wl_get_param(fn_val, 0)
+        let mu_fn = self.ensure_hm_fn("with_hashmap_make_unique", i64_ty)
+        let mu_ty = wl_function_type(i64_ty, list_data_i64(self.make_ptr_list()), 1, 0)
+        let mu_args: List[i64] = List.new()
+        mu_args.push(slot_ptr)
+        let copied = wl_build_call(self.builder, mu_ty, mu_fn, list_data_i64(&mu_args), 1)
+        let did_copy = wl_build_icmp(self.builder, wl_int_ne(), copied, wl_const_int(i64_ty, 0, 0))
+        let glue_bb = wl_append_bb(self.context, fn_val, "cow.map.glue")
+        let after_bb = wl_append_bb(self.context, fn_val, "cow.map.done")
+        wl_build_cond_br(self.builder, did_copy, glue_bb, after_bb)
+        wl_position_at_end(self.builder, glue_bb)
+        let handle = wl_build_load(self.builder, ptr_ty, slot_ptr)
+        self.mir_emit_hash_collection_element_glue(handle, resolved, collection_kind, true)
+        wl_build_br(self.builder, after_bb)
+        wl_position_at_end(self.builder, after_bb)
+        wl_build_ret_void(self.builder)
+        self.current_function = saved_fn
+        self.current_function_name_sym = saved_fn_name_sym
+        self.current_function_node = saved_fn_node
+        self.current_ret_type = saved_ret_ty
+        if saved_bb != 0:
+            wl_position_at_end(self.builder, saved_bb)
+        fn_val
 
     // D120 stage 3: the cached per-type copy glue `__copy_struct_<ty>(ptr)`,
     // the twin of ensure_structural_drop_fn: O(types + sites) IR instead of
@@ -10426,57 +10536,53 @@ impl Codegen:
 
         else if intrinsic == MirIntrinsic.LIST_MAKE_UNIQUE:
             // D120: copy-on-write before a mutation of a value List. The
-            // runtime copies the bits of a shared buffer; elements with copy
-            // glue (a str) are then each retained in the fresh buffer.
+            // bits case calls the runtime directly; elements with copy glue
+            // call the cached per-type `__list_make_unique_<ty>` helper.
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let recv_op = body.call_arg_operands[arg_start]
             let recv_sema = self.mir_operand_sema_type(body, recv_op)
-            let mu_es = wl_const_int(i64_ty, self.mir_list_recv_elem_size(body, args_id), 0)
-            let mu_fn = self.ensure_list_runtime_fn("with_vec_make_unique_bits", i64_ty, 2)
-            let mu_ty = self.get_list_fn_type("with_vec_make_unique_bits", i64_ty, 2)
-            let mu_args: List[i64] = List.new()
-            mu_args.push(recv_ptr)
-            mu_args.push(mu_es)
-            let copied = wl_build_call(self.builder, mu_ty, mu_fn, list_data_i64(mu_args), 2)
+            let raw_es = self.mir_list_recv_elem_size(body, args_id)
             let mu_elem_sema = self.mir_list_elem_sema_type_from_sema_type(recv_sema)
             if mu_elem_sema > 0 and self.sema.type_needs_drop_frozen(mu_elem_sema) != 0:
-                let did_copy = wl_build_icmp(self.builder, wl_int_ne(), copied, wl_const_int(i64_ty, 0, 0))
-                let glue_bb = wl_append_bb(self.context, self.current_function, "cow.glue")
-                let after_bb = wl_append_bb(self.context, self.current_function, "cow.done")
-                wl_build_cond_br(self.builder, did_copy, glue_bb, after_bb)
-                wl_position_at_end(self.builder, glue_bb)
-                self.mir_emit_list_element_copy_glue_ptr(recv_ptr, recv_sema)
-                wl_build_br(self.builder, after_bb)
-                wl_position_at_end(self.builder, after_bb)
+                let fn_val = self.ensure_list_make_unique_fn(recv_sema, raw_es)
+                let fn_ty = wl_function_type(void_ty, list_data_i64(self.make_ptr_list()), 1, 0)
+                let args: List[i64] = List.new()
+                args.push(recv_ptr)
+                wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 1)
+            else:
+                let mu_es = wl_const_int(i64_ty, raw_es, 0)
+                let mu_fn = self.ensure_list_runtime_fn("with_vec_make_unique_bits", i64_ty, 2)
+                let mu_ty = self.get_list_fn_type("with_vec_make_unique_bits", i64_ty, 2)
+                let mu_args: List[i64] = List.new()
+                mu_args.push(recv_ptr)
+                mu_args.push(mu_es)
+                wl_build_call(self.builder, mu_ty, mu_fn, list_data_i64(&mu_args), 2)
             result = 0
 
         else if intrinsic == MirIntrinsic.MAP_MAKE_UNIQUE:
             // D120 stage 2: copy-on-write before a mutation of a value
-            // HashMap or HashSet. The runtime copies a shared table bit for
-            // bit and rewrites the handle slot (the struct's first field);
-            // keys and values with copy glue are then each retained.
+            // HashMap or HashSet. The bits case calls the runtime directly;
+            // keys/values with copy glue call `__map_make_unique_<ty>`.
             let slot_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let recv_op = body.call_arg_operands[arg_start]
             let recv_sema = self.mir_operand_sema_type(body, recv_op)
-            let mu_fn = self.ensure_hm_fn("with_hashmap_make_unique", i64_ty)
-            let mu_ty = wl_function_type(i64_ty, list_data_i64(self.make_ptr_list()), 1, 0)
-            let mu_args: List[i64] = [slot_ptr]
-            let copied = wl_build_call(self.builder, mu_ty, mu_fn, list_data_i64(mu_args), 1)
             let collection_kind = self.mir_hash_collection_kind(recv_sema)
             let key_sema = self.mir_hash_collection_arg_sema_type(recv_sema, 0)
             let value_sema = if collection_kind == 1: self.mir_hash_collection_arg_sema_type(recv_sema, 1) else: 0
             let glue_key = key_sema > 0 and self.sema.type_needs_drop_frozen(key_sema) != 0
             let glue_value = value_sema > 0 and self.sema.type_needs_drop_frozen(value_sema) != 0
             if collection_kind != 0 and (glue_key or glue_value):
-                let did_copy = wl_build_icmp(self.builder, wl_int_ne(), copied, wl_const_int(i64_ty, 0, 0))
-                let glue_bb = wl_append_bb(self.context, self.current_function, "cow.map.glue")
-                let after_bb = wl_append_bb(self.context, self.current_function, "cow.map.done")
-                wl_build_cond_br(self.builder, did_copy, glue_bb, after_bb)
-                wl_position_at_end(self.builder, glue_bb)
-                let handle = wl_build_load(self.builder, ptr_ty, slot_ptr)
-                self.mir_emit_hash_collection_element_glue(handle, recv_sema, collection_kind, true)
-                wl_build_br(self.builder, after_bb)
-                wl_position_at_end(self.builder, after_bb)
+                let fn_val = self.ensure_map_make_unique_fn(recv_sema, collection_kind)
+                let fn_ty = wl_function_type(void_ty, list_data_i64(self.make_ptr_list()), 1, 0)
+                let args: List[i64] = List.new()
+                args.push(slot_ptr)
+                wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(&args), 1)
+            else:
+                let mu_fn = self.ensure_hm_fn("with_hashmap_make_unique", i64_ty)
+                let mu_ty = wl_function_type(i64_ty, list_data_i64(self.make_ptr_list()), 1, 0)
+                let mu_args: List[i64] = List.new()
+                mu_args.push(slot_ptr)
+                wl_build_call(self.builder, mu_ty, mu_fn, list_data_i64(&mu_args), 1)
             result = 0
 
         else if intrinsic == MirIntrinsic.LIST_CLEAR:

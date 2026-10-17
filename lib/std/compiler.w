@@ -123,7 +123,7 @@ pub fn SourceLocation.new(file: str, start: i32, end: i32) -> SourceLocation:
 // A location is retained by every info record that names it, so a caller
 // attaching one location to several records clones it (§3.8).
 impl Clone for SourceLocation:
-    fn clone(): SourceLocation { file: self.file.clone(), start: self.start, end: self.end }
+    fn clone(): *self
 
 pub fn ModuleInfo.new(name: str, path: str) -> ModuleInfo:
     ModuleInfo { name, path }

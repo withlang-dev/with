@@ -208,7 +208,7 @@ impl[T] HashSet[T]:
     fn debug_form_of(texts: &List[str]) -> str:
         let parts: List[str] = List.with_capacity(texts.len())
         for i in debug_entry_order(texts, texts):
-            parts.push(texts[i].clone())
+            parts.push(texts[i])
         "{" ++ parts.join(", ") ++ "}"
 
 fn debug_entry_before(keys: &List[str], values: &List[str], a: i64, b: i64) -> bool:

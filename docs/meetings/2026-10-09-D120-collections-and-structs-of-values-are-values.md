@@ -1,9 +1,7 @@
 # D120 — Collections and structs of values are values: copy-on-write with an atomic count; `resource type` declares a resource
 
 **Date:** 2026-10-09. **Status:** ruled (Eric Hartford). **Extends** D111 (identity decides copy or move)
-from `str` to collections and structs. **The compiler is NON-COMPLIANT**
-until implemented; the implementation merges only within the measured
-margins below.
+from `str` to collections and structs. **The compiler is COMPLIANT** (stages 1–6 landed).
 
 **Context.** D119 called `List` a resource, as D111 had left it ("keep move
 semantics until something forces the question"). Eric raised Swift's
@@ -122,7 +120,9 @@ Drop impl — Task, JoinHandle, Atomic, the lock guards — are declared
 `resource type`, Atomic by the compiler's own knowledge while the pinned
 seed predates the keyword). The uniqueness proof and loop hoisting landed in
 stage 4 (PR #2444); the C boundary rule, per-instantiation generics and the
-`with analyze … cow` copy report land in stage 5.
+`with analyze … cow` copy report landed in stage 5 (PR #2445); the `.clone()`
+and value-copy sweep and microbenchmarks (`test/benchmark/cow_value_lists.w`)
+landed in stage 6.
 
 **What would reopen it.** Self-host time or a corpus suite more than 2%
 slower with the cost not removable; or a program where the deferred copy
