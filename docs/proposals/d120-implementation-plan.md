@@ -5,8 +5,8 @@
 document is a derivative plan: it cannot amend the ruling, and where they
 disagree the ruling stands. `resource type` landed 2026-10-16 (PR #2438),
 stage 1 the same day (PR #2440, under Amendment 1), stage 2 (PR #2441),
-stage 3 with this change; the stages after it are open, and the compiler
-is NON-COMPLIANT on them.
+stage 3 (PR #2442), stage 4 with this change; the stages after it are open,
+and the compiler is NON-COMPLIANT on them.
 
 ## What the ruling asks for
 

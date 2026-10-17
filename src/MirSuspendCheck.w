@@ -957,6 +957,9 @@ fn suspend_rvalue_operands(body: &MirBody, rval_id: i32) -> List[i32]:
             out.push(body.agg_field_operands[body.agg_field_starts[d1] + fi])
     else if kind == RvalueKind.RK_STR_CONCAT_N:
         out = suspend_call_operands(body, d0)
+    else if kind == RvalueKind.RK_SLICE:
+        out.push(d1)
+        out.push(body.rval_d2[rval_id])
     out
 
 fn suspend_call_operands(body: &MirBody, call_id: i32) -> List[i32]:
@@ -988,7 +991,7 @@ fn last_use_stmt_event(body: &MirBody, stmt_id: i32, local: i32, drops_read: boo
                 return 1
         if rval >= 0 and rval < body.rval_kinds.len():
             let rk = body.rval_kinds[rval]
-            let borrowed = if rk == RvalueKind.RK_REF: body.rval_d1[rval] else: if rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN: body.rval_d0[rval] else: -1
+            let borrowed = if rk == RvalueKind.RK_REF: body.rval_d1[rval] else: if rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN or rk == RvalueKind.RK_SLICE: body.rval_d0[rval] else: -1
             if suspend_place_root_local(body, borrowed) == local:
                 return 1
         if suspend_direct_place_local(body, d0) == local:
@@ -996,10 +999,13 @@ fn last_use_stmt_event(body: &MirBody, stmt_id: i32, local: i32, drops_read: boo
         if suspend_place_root_local(body, d0) == local:
             return 1
         return 0
-    if (kind == StmtKind.StorageDead or kind == StmtKind.Drop) and suspend_place_root_local(body, d0) == local:
-        // A drop releases what the local holds: a read of it, to a caller
-        // asking whether the value is still owed anything.
-        return if drops_read and kind == StmtKind.Drop: 1 else: 2
+    if kind == StmtKind.StorageDead:
+        return if d0 == local: 2 else: 0
+    if kind == StmtKind.Drop:
+        if suspend_direct_place_local(body, d0) == local:
+            return if drops_read: 1 else: 2
+        if suspend_place_root_local(body, d0) == local:
+            return 1
     0
 
 // What a block's terminator does with `local`: 1 reads it, 2 defines it, 0
@@ -1015,15 +1021,21 @@ fn last_use_term_event(body: &MirBody, bb: i32, local: i32, drops_read: bool) ->
                 return 1
         if suspend_direct_place_local(body, body.term_data2(bb)) == local:
             return 2
+        if suspend_place_root_local(body, body.term_data2(bb)) == local:
+            return 1
         return 0
+    if kind == TermKind.TK_RETURN:
+        return if local == 0: 1 else: 0
     if kind == TermKind.TK_SWITCH_INT:
         let op = body.term_data0(bb)
         if op >= 0 and op < body.operand_kinds.len() and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE) and suspend_place_root_local(body, body.operand_d0[op]) == local:
             return 1
         return 0
-    if kind == TermKind.TK_DROP_AND_GOTO and suspend_place_root_local(body, body.term_data0(bb)) == local:
-        if drops_read: return 1
-        return 2
+    if kind == TermKind.TK_DROP_AND_GOTO:
+        if suspend_direct_place_local(body, body.term_data0(bb)) == local:
+            return if drops_read: 1 else: 2
+        if suspend_place_root_local(body, body.term_data0(bb)) == local:
+            return 1
     0
 
 fn last_use_successors(body: &MirBody, bb: i32) -> List[i32]:
@@ -1094,58 +1106,310 @@ fn last_use_live_after(body: &MirBody, live_in: &List[i32], bb: i32, stmt_index:
             return true
     false
 
-// D111: at a variable's last use a copy is a move. A retained copy of a
+fn last_use_type_can_hold_view(sema: &Sema, tid: i32, from_normal_call: bool) -> bool:
+    if tid <= 0:
+        return false
+    let resolved = sema.resolve_alias(tid as TypeId)
+    let tk = sema.get_type_kind(resolved)
+    if tk == TypeKind.TY_VOID or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_INT or tk == TypeKind.TY_FLOAT:
+        return false
+    if from_normal_call:
+        if tk == TypeKind.TY_STR:
+            return false
+        let sg = sema.std_generic_of(resolved as i32)
+        if sg == StdGeneric.List or sg == StdGeneric.HashMap or sg == StdGeneric.HashSet or sg == StdGeneric.BTreeMap or sg == StdGeneric.BTreeSet:
+            return false
+    true
+
+// Directed edges `src -> dst` where `dst` may receive an unretained view
+// (reference, slice, iterator, or projection) into `src`'s buffer.
+fn last_use_build_view_edges(sema: &Sema, body: &MirBody) -> List[List[i32]]:
+    let local_count = body.local_count()
+    var edges: List[List[i32]] = List.new()
+    var ref_target: List[i32] = List.new()
+    for _ in 0..local_count:
+        edges.push(List.new())
+        ref_target.push(-1)
+    for bb in 0..body.block_count():
+        for si in 0..body.bb_stmt_counts[bb]:
+            let stmt_id = body.bb_stmt_starts[bb] + si
+            if body.stmt_kind(stmt_id) != StmtKind.Assign:
+                continue
+            let dst = suspend_place_root_local(body, body.stmt_data0(stmt_id))
+            let rval = body.stmt_data1(stmt_id)
+            if dst <= 0 or dst >= local_count or rval < 0 or rval >= body.rval_kinds.len():
+                continue
+            let rk = body.rval_kinds[rval]
+            let b = if rk == RvalueKind.RK_REF: body.rval_d1[rval] else: if rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_SLICE: body.rval_d0[rval] else: -1
+            let b_root = suspend_place_root_local(body, b)
+            if b_root > 0 and b_root < local_count:
+                ref_target[dst] = b_root
+    for bb in 0..body.block_count():
+        for si in 0..body.bb_stmt_counts[bb]:
+            let stmt_id = body.bb_stmt_starts[bb] + si
+            if body.stmt_kind(stmt_id) != StmtKind.Assign:
+                continue
+            let dst = suspend_place_root_local(body, body.stmt_data0(stmt_id))
+            let rval = body.stmt_data1(stmt_id)
+            if dst <= 0 or dst >= local_count or rval < 0 or rval >= body.rval_kinds.len():
+                continue
+            if not last_use_type_can_hold_view(sema, body.local_type_ids[dst], false):
+                continue
+            let rk = body.rval_kinds[rval]
+            let b = if rk == RvalueKind.RK_REF: body.rval_d1[rval] else: if rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_SLICE: body.rval_d0[rval] else: -1
+            let b_root = suspend_place_root_local(body, b)
+            if b_root > 0 and b_root < local_count and b_root != dst:
+                edges[b_root].push(dst)
+            else if rk == RvalueKind.RK_USE or rk == RvalueKind.RK_CAST or rk == RvalueKind.RK_AGGREGATE or rk == RvalueKind.RK_ARRAY_FILL:
+                let ops = suspend_rvalue_operands(body, rval)
+                for oi in 0..ops.len():
+                    let op = ops[oi]
+                    if op < 0 or op >= body.operand_kinds.len():
+                        continue
+                    let ok = body.operand_kinds[op]
+                    if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
+                        continue
+                    let hold = body.operand_hold(op)
+                    if hold != MIR_HOLD_RETAIN and hold != MIR_HOLD_TAKE:
+                        let src = suspend_place_root_local(body, body.operand_d0[op])
+                        if src > 0 and src < local_count and src != dst:
+                            edges[src].push(dst)
+        if body.term_kind(bb) == TermKind.TK_CALL:
+            let call_id = body.term_data1(bb)
+            let from_normal_call = body.call_intrinsic(call_id) == MirIntrinsic.NONE
+            let ops = suspend_call_operands(body, call_id)
+            ops.push(body.term_data0(bb))
+            let dst = suspend_place_root_local(body, body.term_data2(bb))
+            let dst_ok = dst > 0 and dst < local_count and last_use_type_can_hold_view(sema, body.local_type_ids[dst], from_normal_call)
+            for oi in 0..ops.len():
+                let op = ops[oi]
+                if op < 0 or op >= body.operand_kinds.len():
+                    continue
+                let ok = body.operand_kinds[op]
+                if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
+                    continue
+                let hold = body.operand_hold(op)
+                if hold == MIR_HOLD_RETAIN or hold == MIR_HOLD_TAKE:
+                    continue
+                let src = suspend_place_root_local(body, body.operand_d0[op])
+                if src <= 0 or src >= local_count:
+                    continue
+                if dst_ok and src != dst:
+                    edges[src].push(dst)
+                for oj in 0..ops.len():
+                    let op2 = ops[oj]
+                    if op2 >= 0 and op2 < body.operand_kinds.len() and (body.operand_kinds[op2] == OperandKind.OK_COPY or body.operand_kinds[op2] == OperandKind.OK_MOVE):
+                        let arg_root = suspend_place_root_local(body, body.operand_d0[op2])
+                        let target = if arg_root > 0 and arg_root < local_count: ref_target[arg_root] else: -1
+                        if target > 0 and target < local_count and src != target and last_use_type_can_hold_view(sema, body.local_type_ids[target], from_normal_call):
+                            edges[src].push(target)
+    edges
+
+fn last_use_reachable_views(edges: &List[List[i32]], local: i32) -> (List[i32], List[i32]):
+    let local_count = edges.len()
+    var in_views: List[i32] = List.new()
+    for _ in 0..local_count:
+        in_views.push(0)
+    var view_locals: List[i32] = List.new()
+    var work: List[i32] = [local]
+    while work.len() > 0:
+        let u = work.pop().unwrap()
+        for i in 0..edges[u].len():
+            let v = edges[u][i]
+            if v != local and in_views[v] == 0:
+                in_views[v] = 1
+                view_locals.push(v)
+                work.push(v)
+    (in_views, view_locals)
+
+fn last_use_site_operands(body: &MirBody, bb: i32, si: i32) -> List[i32]:
+    if si < body.bb_stmt_counts[bb]:
+        let stmt_id = body.bb_stmt_starts[bb] + si
+        return suspend_rvalue_operands(body, body.stmt_data1(stmt_id))
+    var ops = suspend_call_operands(body, body.term_data1(bb))
+    ops.push(body.term_data0(bb))
+    ops
+
+fn last_use_quick_after_verdict(body: &MirBody, bb: i32, stmt_index: i32, local: i32, drops_read: bool) -> i32:
+    var cur_bb = bb
+    var start_si = stmt_index + 1
+    var check_term = stmt_index < body.bb_stmt_counts[bb]
+    var steps = 0
+    while steps < 8 and cur_bb >= 0 and cur_bb < body.block_count():
+        var si = start_si
+        while si < body.bb_stmt_counts[cur_bb]:
+            let event = last_use_stmt_event(body, body.bb_stmt_starts[cur_bb] + si, local, drops_read)
+            if event != 0:
+                return event
+            si = si + 1
+        if check_term:
+            let term_event = last_use_term_event(body, cur_bb, local, drops_read)
+            if term_event != 0:
+                return term_event
+        let tk = body.term_kind(cur_bb)
+        if tk == TermKind.TK_RETURN or tk == TermKind.TK_UNREACHABLE:
+            return 2
+        if tk == TermKind.TK_GOTO:
+            cur_bb = body.term_data0(cur_bb)
+        else if tk == TermKind.TK_CALL:
+            cur_bb = body.term_data3(cur_bb)
+        else if tk == TermKind.TK_DROP_AND_GOTO:
+            cur_bb = body.term_data1(cur_bb)
+        else:
+            return 0
+        start_si = 0
+        check_term = true
+        steps = steps + 1
+    0
+
+// D111 & D120: at a variable's last use a copy is a move. A retained copy of a
 // whole local that nothing reads afterwards on any path (a drop is not a
 // read) becomes a take: codegen hands the value over and blanks the local,
-// so its later drop releases nothing — no retain, no release. Only a local
-// no view can reach qualifies: nothing borrows it and every operand naming
-// it is a retained copy, since a view of its buffer must not outlive the
-// last hold. Liveness is per candidate local, one bit per block.
-pub fn mir_mark_last_use_holds(body: MirBody) -> MirBody:
+// so its later drop releases nothing — no retain, no release, and a CoW
+// collection buffer stays unique across the handoff. Earlier borrows, field
+// projections, or mutations of the local qualify as long as no view derived
+// from the local is read at or after the take point.
+pub fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
     var out = body
     if out.operand_holds.len() == 0:
         return out
     let local_count = out.local_count()
-    var view_free: List[i32] = List.new()
     var held: List[i32] = List.new()
+    var may_have_views: List[i32] = List.new()
     for _ in 0..local_count:
-        view_free.push(1)
         held.push(0)
+        may_have_views.push(0)
+    var any_held = false
     for oi in 0..out.operand_kinds.len():
-        let kind = out.operand_kinds[oi]
-        if kind != OperandKind.OK_COPY and kind != OperandKind.OK_MOVE:
+        let ok = out.operand_kinds[oi]
+        if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
             continue
-        let root = suspend_place_root_local(&out, out.operand_d0[oi])
-        if root < 0 or root >= local_count:
+        let place = out.operand_d0[oi]
+        let root = suspend_place_root_local(out, place)
+        if root <= 0 or root >= local_count:
             continue
-        if out.operand_hold(oi as i32) == MIR_HOLD_RETAIN and suspend_direct_place_local(&out, out.operand_d0[oi]) == root:
-            held[root] = 1
+        if out.operand_hold(oi as i32) == MIR_HOLD_RETAIN and out.place_proj_counts[place] == 0:
+            if out.local_is_global[root] == 0 and out.local_is_caller_place[root] == 0:
+                held[root] = 1
+                any_held = true
         else:
-            view_free[root] = 0
+            may_have_views[root] = 1
+    if not any_held:
+        return out
     for ri in 0..out.rval_kinds.len():
         let rk = out.rval_kinds[ri]
-        let borrowed = if rk == RvalueKind.RK_REF: out.rval_d1[ri] else: if rk == RvalueKind.RK_ADDR_OF: out.rval_d0[ri] else: -1
-        let root = suspend_place_root_local(&out, borrowed)
-        if root >= 0 and root < local_count: view_free[root] = 0
-    for local in 1..local_count:
-        if held[local] == 0 or view_free[local] == 0 or out.local_is_global[local] != 0 or out.local_is_caller_place[local] != 0:
-            continue
-        let live_in = last_use_live_in(&out, local, false)
-        for bb in 0..out.block_count():
-            for si in 0..out.bb_stmt_counts[bb] + 1:
-                let operands = if si < out.bb_stmt_counts[bb]:
-                    let stmt_id = out.bb_stmt_starts[bb] + si
-                    if out.stmt_kind(stmt_id) == StmtKind.Assign: suspend_rvalue_operands(&out, out.stmt_data1(stmt_id)) else: List.new()
-                else if out.term_kind(bb) == TermKind.TK_CALL: suspend_call_operands(&out, out.term_data1(bb))
-                else: List.new()
+        let b = if rk == RvalueKind.RK_REF: out.rval_d1[ri] else: if rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_SLICE: out.rval_d0[ri] else: -1
+        let b_root = suspend_place_root_local(out, b)
+        if b_root > 0 and b_root < local_count:
+            may_have_views[b_root] = 1
+    var local_sites: List[List[i32]] = List.new()
+    for _ in 0..local_count:
+        local_sites.push(List.new())
+    var any_site = false
+    for bb in 0..out.block_count():
+        for si in 0..out.bb_stmt_counts[bb] + 1:
+            var dst_root: i32 = -1
+            var operands: List[i32] = List.new()
+            if si < out.bb_stmt_counts[bb]:
+                let stmt_id = out.bb_stmt_starts[bb] + si
+                if out.stmt_kind(stmt_id) != StmtKind.Assign:
+                    continue
+                let rval = out.stmt_data1(stmt_id)
+                if rval < 0 or rval >= out.rval_kinds.len():
+                    continue
+                let rk = out.rval_kinds[rval]
+                if rk == RvalueKind.RK_REF or rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN:
+                    continue
+                dst_root = suspend_place_root_local(out, out.stmt_data0(stmt_id))
+                operands = suspend_rvalue_operands(out, rval)
+            else if out.term_kind(bb) == TermKind.TK_CALL:
+                dst_root = suspend_place_root_local(out, out.term_data2(bb))
+                operands = suspend_call_operands(out, out.term_data1(bb))
+                operands.push(out.term_data0(bb))
+            else:
+                continue
+            for oi in 0..operands.len():
+                let op = operands[oi]
+                let local = suspend_held_copy_local(out, op)
+                if local <= 0 or local >= local_count or held[local] == 0 or dst_root == local:
+                    continue
                 var reads = 0
-                var held_op: i32 = -1
+                for oj in 0..operands.len():
+                    let op2 = operands[oj]
+                    if op2 >= 0 and op2 < out.operand_kinds.len() and (out.operand_kinds[op2] == OperandKind.OK_COPY or out.operand_kinds[op2] == OperandKind.OK_MOVE):
+                        if suspend_place_root_local(out, out.operand_d0[op2]) == local:
+                            reads = reads + 1
+                if reads == 1:
+                    local_sites[local].push(bb)
+                    local_sites[local].push(si)
+                    local_sites[local].push(op)
+                    any_site = true
+    if not any_site:
+        return out
+    var live_in_cache: List[List[i32]] = List.new()
+    for _ in 0..local_count:
+        live_in_cache.push(List.new())
+    var view_edges_built = false
+    var view_edges: List[List[i32]] = List.new()
+    for local in 1..local_count:
+        let sites = &local_sites[local]
+        if sites.len() == 0:
+            continue
+        var views_computed = false
+        var in_views: List[i32] = List.new()
+        var view_locals: List[i32] = List.new()
+        var idx = 0
+        while idx < sites.len():
+            let bb = sites[idx]
+            let si = sites[idx + 1]
+            let held_op = sites[idx + 2]
+            idx = idx + 3
+            let q = last_use_quick_after_verdict(out, bb, si, local, false)
+            if q == 1:
+                continue
+            if q == 0:
+                if live_in_cache[local].len() == 0:
+                    live_in_cache[local] = last_use_live_in(out, local, false)
+                if last_use_live_after(out, live_in_cache[local], bb, si, local, false):
+                    continue
+            if may_have_views[local] == 0:
+                out.set_operand_hold(held_op, MIR_HOLD_TAKE)
+                out.mark_local_ever_moved(local)
+                continue
+            if not view_edges_built:
+                view_edges = last_use_build_view_edges(sema, out)
+                view_edges_built = true
+            if not views_computed:
+                let (iv, vl) = last_use_reachable_views(view_edges, local)
+                in_views = iv
+                view_locals = vl
+                views_computed = true
+            var any_view_live = false
+            if view_locals.len() > 0:
+                let operands = last_use_site_operands(out, bb, si)
                 for oi in 0..operands.len():
-                    if suspend_place_root_local(&out, out.operand_d0[operands[oi]]) == local:
-                        reads = reads + 1
-                        if suspend_held_copy_local(&out, operands[oi]) == local: held_op = operands[oi]
-                if reads == 1 and held_op >= 0 and not last_use_live_after(&out, &live_in, bb, si, local, false):
-                    out.set_operand_hold(held_op, MIR_HOLD_TAKE)
+                    let op = operands[oi]
+                    if op >= 0 and op < out.operand_kinds.len() and (out.operand_kinds[op] == OperandKind.OK_COPY or out.operand_kinds[op] == OperandKind.OK_MOVE):
+                        let root = suspend_place_root_local(out, out.operand_d0[op])
+                        if root > 0 and root < local_count and in_views[root] != 0:
+                            any_view_live = true
+                            break
+                if not any_view_live:
+                    for vi in 0..view_locals.len():
+                        let v = view_locals[vi]
+                        let vq = last_use_quick_after_verdict(out, bb, si, v, false)
+                        if vq == 1:
+                            any_view_live = true
+                            break
+                        if vq == 0:
+                            if live_in_cache[v].len() == 0:
+                                live_in_cache[v] = last_use_live_in(out, v, false)
+                            if last_use_live_after(out, live_in_cache[v], bb, si, v, false):
+                                any_view_live = true
+                                break
+            if not any_view_live:
+                out.set_operand_hold(held_op, MIR_HOLD_TAKE)
+                out.mark_local_ever_moved(local)
     out
 
 pub fn check_no_await_guard_suspends(mir_mod: &MirModule, ast: AstPool, sema: &Sema, diags: DiagnosticList) -> DiagnosticList:
