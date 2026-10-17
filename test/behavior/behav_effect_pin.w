@@ -2,7 +2,9 @@
 
 // @[effect] pin: function body exactly matches the declared effect contract.
 
-type Resource { id: i32 }
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type Resource { id: i32 }
 impl Resource:
     fn drop(move self: Self): ()
 
