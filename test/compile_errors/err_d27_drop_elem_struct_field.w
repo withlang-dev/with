@@ -2,7 +2,9 @@
 
 // D27 E3: a known owned field is a demand; &Thing remains a view.
 
-type Thing { vals: List[i32] }
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type Thing { vals: List[i32] }
 type Holder { t: Thing }
 
 fn main:

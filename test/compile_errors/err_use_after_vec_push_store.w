@@ -1,7 +1,9 @@
 //! expect-check-fail: use of moved value
 
 use std.builtins.print_i32
-type Payload {
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type Payload {
     values: List[i32],
 }
 

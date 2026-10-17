@@ -1,5 +1,7 @@
 //! expect-check-fail: use of moved value
-type Counter { value: i32 }
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type Counter { value: i32 }
 
 impl Counter:
     fn into_value(move self: Self) -> i32:

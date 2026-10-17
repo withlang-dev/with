@@ -4,7 +4,9 @@
 // `ctx` exactly as `Some(ctx)` does. The shorthand marked nothing, so the
 // read below compiled and printed the moved-out (blank) string.
 
-type Ctx { n: i32, tag: str }
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type Ctx { n: i32, tag: str }
 
 fn h(ud: Option[Ctx]) -> i32: match ud:
     Some(u) => u.n

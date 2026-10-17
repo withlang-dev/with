@@ -1,6 +1,8 @@
 //! expect-check-fail: 'copy' requires the type to implement Copy or Clone
 
-type Lock { id: i32 }
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type Lock { id: i32 }
 impl Lock:
     fn drop(move self: Self): ()
 // Lock has no Copy and no Clone impl

@@ -3,7 +3,9 @@
 // D27 E1: a declared Thing return is an owned demand that cannot be satisfied
 // by the `&Thing` element view (D22 §13.6).
 
-type Thing { vals: List[i32] }
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type Thing { vals: List[i32] }
 
 fn take_first(items: &List[Thing]) -> Thing: items[0]
 

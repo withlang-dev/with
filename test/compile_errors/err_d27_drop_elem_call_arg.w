@@ -2,7 +2,9 @@
 
 // D27 E3: a by-value parameter is an owned demand; &Thing cannot satisfy it.
 
-type Thing { vals: List[i32] }
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type Thing { vals: List[i32] }
 
 fn consume(t: Thing) -> i64: t.vals.len()
 

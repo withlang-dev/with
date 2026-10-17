@@ -2,7 +2,9 @@
 
 // #1137: ordering two views of a type with neither `Ord.cmp` nor `lt` used
 // to fall through as a pointer comparison of the two references.
-type Tag { id: i32, pad: i64 }
+// D120: a struct of values is a value; this one is declared a resource
+// so it still moves and still takes no copy.
+resource type Tag { id: i32, pad: i64 }
 
 fn first(a: &Tag, b: &Tag) -> bool: a < b
 
