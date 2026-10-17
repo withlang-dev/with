@@ -537,7 +537,7 @@ impl Compilation:
                 return AstPool.new()
             root_text = root_text ++ "use " ++ dotted ++ "\n"
         let root_path = wi_path ++ ".root.w"
-        var taken_zcu = move self.zcu
+        taken_zcu = move self.zcu
         let source_dir = frontend_dirname(root_path)
         taken_zcu.reset_for_new_invocation(source_dir, root_path, "")
         taken_zcu.project_config = self.project_config_for_source(root_path)
