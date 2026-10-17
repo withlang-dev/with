@@ -1038,8 +1038,33 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_MOVE, place)
         self.operand_for_place(place, ty)
 
+    // §16.11 / D8: a direct deref or index through a raw pointer (`*p`, `p[i]`
+    // with `p: *const/*mut T`) is a bitwise read, pairing with the raw store
+    // (`assign_target_is_raw_pointer_store`) that skips drop-before-overwrite.
+    // Retaining on `let v = *p` incremented the count that `Box.drop` (`let v
+    // = *cell; drop(v)`), `Box.into_inner`, and `comptime_try_eval_expr_result`
+    // (`var sema = *sema_ptr` ... `*sema_ptr = synced_sema`) were taking out
+    // of raw memory — leaking every boxed value collection/struct and pinning
+    // Sema's ~130 tables at holder_count > 0 across self-check.
+    fn place_is_raw_pointer_pointee(place: i32) -> bool:
+        if place < 0 or place >= self.body.place_locals.len():
+            return false
+        if self.body.place_proj_counts[place] != 1:
+            return false
+        let ps = self.body.place_proj_starts[place]
+        let pk = self.body.proj_kinds[ps]
+        if pk != ProjKind.PK_DEREF and pk != ProjKind.PK_INDEX:
+            return false
+        let base_local = self.body.place_locals[place]
+        if base_local < 0 or base_local >= self.body.local_type_ids.len():
+            return false
+        let base_ty = self.body.local_type_ids[base_local] as i32
+        base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(base_ty as TypeId)) == TypeKind.TY_PTR
+
     mut fn retain_consumed_copy(operand_id: i32):
         let place: i32 = self.body.operand_d0[operand_id]
+        if self.place_is_raw_pointer_pointee(place):
+            return
         let ty = if place >= 0 and place < self.body.place_sema_types.len(): self.body.place_sema_types[place] else: 0
         if ty > 0 and self.sema.is_copy_frozen(ty as TypeId) != 0 and self.sema.type_needs_drop_frozen(ty) != 0:
             self.body.set_operand_hold(operand_id, MIR_HOLD_RETAIN)

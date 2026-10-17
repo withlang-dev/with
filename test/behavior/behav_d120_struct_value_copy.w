@@ -12,6 +12,7 @@
 // through one copy leaves the other alone. The same for an instance of a
 // generic struct of values, so a BTreeMap of values is a value. Passing a
 // value struct copies it, so the caller still has it.
+use std.box.Box
 use std.collections.BTreeMap
 
 type Point { x: i32, y: i32 }
@@ -39,5 +40,9 @@ fn main:
     var n = m
     n.insert("b", 2)
     print(f"m.len {m.len()} n.len {n.len()}")
+    let boxed_drop = Box.new(Named { name: "d" ++ "rop", tags: ["k"] })
+    drop(boxed_drop)
+    var unboxed = Box.new(Named { name: "i" ++ "n", tags: ["m"] }).into_inner()
+    unboxed.tags.push("n")
     print(f"sum {total(p) + 0 * total(p)}")
-    print(f"{p.x == 1 and a.tags.len() == 1}".replace("true", "ok"))
+    print(f"{p.x == 1 and a.tags.len() == 1 and unboxed.tags.len() == 2}".replace("true", "ok"))
