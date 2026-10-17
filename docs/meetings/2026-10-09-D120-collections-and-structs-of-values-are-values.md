@@ -120,9 +120,9 @@ of values is a value with stage 3 (no `impl Copy` written; `BTreeMap` and
 `BTreeSet` follow through their `List`; the std identity types without a
 Drop impl — Task, JoinHandle, Atomic, the lock guards — are declared
 `resource type`, Atomic by the compiler's own knowledge while the pinned
-seed predates the keyword). The uniqueness proof and hoisting, the C
-boundary rule, per-instantiation generics and the copy report are open:
-the compiler is NON-COMPLIANT on those.
+seed predates the keyword). The uniqueness proof and loop hoisting landed in
+stage 4 (PR #2444); the C boundary rule, per-instantiation generics and the
+`with analyze … cow` copy report land in stage 5.
 
 **What would reopen it.** Self-host time or a corpus suite more than 2%
 slower with the cost not removable; or a program where the deferred copy

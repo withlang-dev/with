@@ -9,6 +9,7 @@ use Ast
 use Diagnostic
 use InternPool
 use Mir
+use MirLower
 use Sema
 use MirCore
 use SemaTypes
@@ -57,6 +58,8 @@ fn analysis_with_node_location(fact: AnalysisFact, sema: &Sema, node: i32, sourc
 fn analysis_sig_path(sema: &Sema, sym: i32, fallback: &str) -> str:
     let found = sema.fn_decl_source_paths.get(sym)
     if found.is_some(): return with_str_clone_ref(found.unwrap())
+    let spec = sema.specialization_source_paths.get(sym)
+    if spec.is_some(): return with_str_clone_ref(spec.unwrap())
     // Generated specialization names have no source-path entry. Sema's
     // canonical declaration still owns their source identity.
     let decl = sema.receiver_decl_node_for_sig(sema.get_sig(sym))
@@ -2523,6 +2526,55 @@ fn analysis_call_closure(report: &AnalysisReport, root: &str) -> str:
         lines.push("\n")
     lines.join("")
 
+fn analysis_cow_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str) -> str:
+    var out = ""
+    var total = 0
+    var through_field = 0
+    var through_param = 0
+    var in_loop = 0
+    var before_mut = 0
+    for bi in 0..mir_mod.bodies.len():
+        let body = &mir_mod.bodies[bi]
+        if body.lowering_failed != 0:
+            continue
+        let fn_name = sema.pool_resolve(body.fn_sym)
+        let fn_path = analysis_sig_path(sema, body.fn_sym, source_path)
+        if not source_path.starts_with("<embedded-std>") and fn_path.starts_with("<embedded-std>"):
+            continue
+        let fn_source = analysis_source_for_path(sema, fn_path, source_text)
+        for bb in 0..body.block_count():
+            if body.term_kind(bb) != TermKind.TK_CALL:
+                continue
+            let call_id = body.term_data1(bb)
+            let intr = body.call_intrinsic(call_id)
+            if intr != MirIntrinsic.LIST_MAKE_UNIQUE and intr != MirIntrinsic.MAP_MAKE_UNIQUE:
+                continue
+            let start = body.call_arg_starts[call_id]
+            let count = body.call_arg_counts[call_id]
+            if count <= 0 or start < 0 or start >= body.call_arg_operands.len():
+                continue
+            let op = body.call_arg_operands[start]
+            if op < 0 or op >= body.operand_d0.len():
+                continue
+            let reason = mir_body_cow_check_reason(sema, body, bb)
+            if reason.len() == 0:
+                continue
+            let place_text = mir_body_cow_place_text(sema, body, body.operand_d0[op])
+            let span = body.bb_term_spans[bb]
+            let line = if span > 0 and fn_source.len() > 0: analysis_line_for_offset(fn_source, span) else: 0
+            let col = if span > 0 and fn_source.len() > 0: analysis_column_for_offset(fn_source, span) else: 0
+            total = total + 1
+            if reason == "through a field":
+                through_field = through_field + 1
+            else if reason == "through a parameter":
+                through_param = through_param + 1
+            else if reason == "copied in the loop":
+                in_loop = in_loop + 1
+            else:
+                before_mut = before_mut + 1
+            out = out ++ f"{fn_path}:{line}:{col}\t{fn_name}\t{place_text}\t{reason}\n"
+    out ++ f"cow: {total} checks — {through_field} through a field, {through_param} through a parameter, {in_loop} copied in the loop, {before_mut} copied before mutation\n"
+
 fn analysis_help() -> str:
     "with analyze <file.w> <request>\n" ++
         "  facts | snapshot                         stable TSV facts from Sema + MIR\n" ++
@@ -2538,7 +2590,7 @@ fn analysis_help() -> str:
         "  explain:modules                        why each module is loaded: package, engine, prelude-closure, corpus-private, and its importers\n" ++
         "  explain:origin:<fn>[:<binding>]         the view origins Sema recorded: per parameter and per view binding\n" ++
         "  contract                                the modeled foreign contract (§16.2b): every fact with its provenance, then audit:contract\n" ++
-        "  move-sites | seam-sites                 ownership worklists (owned-param call sites; aliasing/blanking seams)\n" ++
+        "  move-sites | seam-sites | cow           ownership and copy-on-write worklists\n" ++
         "  path:call:<from>:<to>                   shortest live MIR call path\n" ++
         "  closure:call:<root>                     live MIR call closure\n" ++
         "  lldb:<query>                            breakpoints derived from matching facts\n" ++
@@ -2598,6 +2650,8 @@ pub fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool
         return CompilerAnalysisResult { text: analysis_move_sites(sema, source_path), status: 0, needs_codegen: false, codegen_query: "", report }
     if request == "seam-sites":
         return CompilerAnalysisResult { text: analysis_seam_sites(sema, mir_mod, source_path, source_text), status: 0, needs_codegen: false, codegen_query: "", report }
+    if request == "cow":
+        return CompilerAnalysisResult { text: analysis_cow_sites(sema, mir_mod, source_path, source_text), status: 0, needs_codegen: false, codegen_query: "", report }
     if request.starts_with("explain:origin:"):
         let eo_target = analysis_slice(request, 15, request.len() as i32)
         return CompilerAnalysisResult { text: analysis_explain_origin(sema, eo_target, source_path), status: 0, needs_codegen: false, codegen_query: "", report }

@@ -11636,7 +11636,8 @@ impl Sema:
                     let line = self.node_line(self.discard_lets.get(sym) ?? 0)
                     self.emit_error_with_help("use of moved value", node, f"`let _ = {name}` dropped `{name}` at line {line}; remove it to keep `{name}`")
                 else:
-                    self.emit_error_with_help("use of moved value", node, "a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move")
+                    let moved_msg = if self.in_concrete_generic_body != 0 and tid != 0: f"use of moved value (`{self.type_name(tid)}`)" else: "use of moved value"
+                    self.emit_error_with_help(moved_msg, node, "a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move")
             if sym != self.assign_target_revive_sym:
                 self.note_param_effect(sym, EFF_READ)
                 if is_local:
