@@ -1015,31 +1015,31 @@ fn dbg_invalid_free_forensics(payload: i64):
     while i < rt_slab_range_count:
         let start = rt_range_start(rt_slab_range_base, i)
         if header >= start and header < rt_range_end(rt_slab_range_base, rt_slab_range_cap, i):
-            dbg_puts("debug-alloc: invalid-free forensics: slab range " as *const u8, 48)
+            dbg_puts("debug-alloc: invalid-free forensics: slab range ")
             dbg_put_i64(i as i64)
-            dbg_puts(" start=" as *const u8, 7)
+            dbg_puts(" start=")
             dbg_put_i64(start)
-            dbg_puts(" header-offset=" as *const u8, 15)
+            dbg_puts(" header-offset=")
             dbg_put_i64(header - start)
-            dbg_puts(" header-word=" as *const u8, 13)
+            dbg_puts(" header-word=")
             dbg_put_i64(unsafe *(header as *const i64))
-            dbg_puts("\n" as *const u8, 1)
+            dbg_puts("\n")
             return
         i = i + 1
     var j: i32 = 0
     while j < rt_large_range_count:
         let lstart = rt_range_start(rt_large_range_base, j)
         if payload >= lstart and payload < rt_range_end(rt_large_range_base, rt_large_range_cap, j):
-            dbg_puts("debug-alloc: invalid-free forensics: large range " as *const u8, 49)
+            dbg_puts("debug-alloc: invalid-free forensics: large range ")
             dbg_put_i64(j as i64)
-            dbg_puts(" start=" as *const u8, 7)
+            dbg_puts(" start=")
             dbg_put_i64(lstart)
-            dbg_puts(" payload-offset=" as *const u8, 16)
+            dbg_puts(" payload-offset=")
             dbg_put_i64(payload - lstart)
-            dbg_puts("\n" as *const u8, 1)
+            dbg_puts("\n")
             return
         j = j + 1
-    dbg_puts("debug-alloc: invalid-free forensics: address is in no slab or large range\n" as *const u8, 74)
+    dbg_puts("debug-alloc: invalid-free forensics: address is in no slab or large range\n")
 
 fn free_small_block(block: i64, idx: i32):
     if alloc_no_reuse_on() != 0:
@@ -1092,13 +1092,13 @@ fn dbg_trace_on:
 fn dbg_trace_allocation(size: i64, address: i64, origin: i64):
     // No strings or formatting allocations while the allocator lock is held.
     // ALLOC <requested bytes> <payload address> <origin token>
-    dbg_puts(c"ALLOC ".ptr, 6)
+    dbg_puts("ALLOC ")
     dbg_put_i64(size)
-    dbg_puts(c" ".ptr, 1)
+    dbg_puts(" ")
     dbg_put_i64(address)
-    dbg_puts(c" ".ptr, 1)
+    dbg_puts(" ")
     dbg_put_i64(origin)
-    dbg_puts(c"\n".ptr, 1)
+    dbg_puts("\n")
 
 fn dbg_on() -> i32:
     if dbg_state == 0:
@@ -1150,7 +1150,12 @@ fn dbg_filter_mode() -> i32:
             dbg_filter_state = 1
     dbg_filter_state
 
-fn dbg_puts(s: *const u8, n: i64):
+// The debug allocator's own writes to stderr: a str (a literal is one, {ptr,
+// len}, immortal, no count traffic), or raw bytes where only a pointer and
+// a length exist (an origin tag, a payload).
+fn dbg_puts(s: &str): dbg_put_bytes(str_data(s), s.len())
+
+fn dbg_put_bytes(s: *const u8, n: i64):
     let _ = rt_write(2, s, n)
 
 fn dbg_put_i64(v: i64):
@@ -1222,16 +1227,16 @@ fn dbg_trap_free_check(ptr_addr: i64, drop_origin_ptr: i64, drop_origin_len: i64
     if dbg_trap_free_addr() != ptr_addr:
         return
     dbg_trap_free_count = dbg_trap_free_count + 1
-    dbg_puts("debug-alloc: trap-free hit=" as *const u8, 27)
+    dbg_puts("debug-alloc: trap-free hit=")
     dbg_put_i64(dbg_trap_free_count)
-    dbg_puts(" addr=" as *const u8, 6)
+    dbg_puts(" addr=")
     dbg_put_i64(ptr_addr)
     if drop_origin_ptr != 0 and drop_origin_len > 0:
-        dbg_puts(" origin=" as *const u8, 8)
-        dbg_puts(drop_origin_ptr as *const u8, drop_origin_len)
-    dbg_puts("\n" as *const u8, 1)
+        dbg_puts(" origin=")
+        dbg_put_bytes(drop_origin_ptr as *const u8, drop_origin_len)
+    dbg_puts("\n")
     if dbg_trap_free_hit() == dbg_trap_free_count:
-        with_panic_core(make_str("debug-alloc: trapped free of watched address" as *const u8, 44), make_str("" as *const u8, 0), 0)
+        with_panic_core("debug-alloc: trapped free of watched address", "", 0)
 
 fn dbg_trap_alloc_hit() -> i64:
     if dbg_trap_alloc_hit_state == 0:
@@ -1249,23 +1254,23 @@ fn dbg_trap_alloc_check(ptr_addr: i64, origin: i64):
     if dbg_trap_free_addr() != ptr_addr:
         return
     dbg_trap_alloc_count = dbg_trap_alloc_count + 1
-    dbg_puts("debug-alloc: trap-alloc hit=" as *const u8, 28)
+    dbg_puts("debug-alloc: trap-alloc hit=")
     dbg_put_i64(dbg_trap_alloc_count)
-    dbg_puts(" addr=" as *const u8, 6)
+    dbg_puts(" addr=")
     dbg_put_i64(ptr_addr)
-    dbg_puts(" origin=" as *const u8, 8)
+    dbg_puts(" origin=")
     dbg_put_i64(origin)
-    dbg_puts("\n" as *const u8, 1)
+    dbg_puts("\n")
     if dbg_trap_alloc_hit() == dbg_trap_alloc_count:
-        with_panic_core(make_str("debug-alloc: trapped alloc of watched address" as *const u8, 45), make_str("" as *const u8, 0), 0)
+        with_panic_core("debug-alloc: trapped alloc of watched address", "", 0)
 
 fn rt_alloc_effective_limit_unlocked() -> i64:
     if rt_alloc_limit_state == 0:
         let raw = rt_getenv(c"WITH_MEMORY_LIMIT_BYTES".ptr)
         let parsed = rt_parse_limit_cstr(raw)
         if parsed < 0:
-            dbg_puts("error: WITH_MEMORY_LIMIT_BYTES must be a non-negative byte count" as *const u8, 64)
-            dbg_puts("\n" as *const u8, 1)
+            dbg_puts("error: WITH_MEMORY_LIMIT_BYTES must be a non-negative byte count")
+            dbg_puts("\n")
             rt_exit(125)
         if parsed > 0:
             rt_alloc_limit_bytes = parsed
@@ -1277,25 +1282,25 @@ fn rt_alloc_effective_limit_unlocked() -> i64:
     0
 
 fn rt_alloc_report_limit_exceeded(requested: i64, limit: i64):
-    dbg_puts("with: memory limit exceeded: committed=" as *const u8, 39)
+    dbg_puts("with: memory limit exceeded: committed=")
     dbg_put_i64(rt_alloc_committed_bytes)
-    dbg_puts(" requested=" as *const u8, 11)
+    dbg_puts(" requested=")
     dbg_put_i64(requested)
-    dbg_puts(" limit=" as *const u8, 7)
+    dbg_puts(" limit=")
     dbg_put_i64(limit)
-    dbg_puts(" bytes" as *const u8, 6)
-    dbg_puts("\n" as *const u8, 1)
+    dbg_puts(" bytes")
+    dbg_puts("\n")
     rt_exit(125)
 
 // The system refused memory. Say so before exiting: a bare exit 99 left the
 // Windows c_import UATs with empty logs after the compiler grew to 29 GB
 // (#1387). Writes straight to fd 2 — the allocator cannot allocate here.
 fn rt_alloc_report_out_of_memory(requested: i64):
-    dbg_puts("with: out of memory: requested=" as *const u8, 31)
+    dbg_puts("with: out of memory: requested=")
     dbg_put_i64(requested)
-    dbg_puts(" committed=" as *const u8, 11)
+    dbg_puts(" committed=")
     dbg_put_i64(rt_alloc_committed_bytes)
-    dbg_puts(" bytes\n" as *const u8, 7)
+    dbg_puts(" bytes\n")
     rt_exit(99)
 
 fn rt_alloc_reserve_mmap_bytes(total: i64):
@@ -1374,7 +1379,7 @@ fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
         probes = probes + 1
     if dbg_full_warned == 0:
         dbg_full_warned = 1
-        dbg_puts("debug-alloc: ledger full, tracking truncated\n" as *const u8, 45)
+        dbg_puts("debug-alloc: ledger full, tracking truncated\n")
 
 // Mark a free. Returns 1 if this is a double free (already freed, not reused).
 fn dbg_mark_free(addr: i64, drop_origin_ptr: i64, drop_origin_len: i64) -> i32:
@@ -1508,39 +1513,39 @@ fn dbg_put_root_reason(e: i64):
     let ptr = unsafe *((e + 56) as *const i64)
     let len = unsafe *((e + 64) as *const i64)
     if ptr != 0 and len > 0:
-        dbg_puts(" root=" as *const u8, 6)
-        dbg_puts(ptr as *const u8, len)
+        dbg_puts(" root=")
+        dbg_put_bytes(ptr as *const u8, len)
 
 fn dbg_put_origin(origin: i64):
     if origin == DBG_ORIGIN_WITH_ALLOC:
-        dbg_puts("with_alloc" as *const u8, 10)
+        dbg_puts("with_alloc")
     else if origin == DBG_ORIGIN_LIST:
-        dbg_puts("List" as *const u8, 3)
+        dbg_puts("List")
     else if origin == DBG_ORIGIN_CHANNEL:
-        dbg_puts("channel" as *const u8, 7)
+        dbg_puts("channel")
     else if origin == DBG_ORIGIN_FIBER:
-        dbg_puts("fiber" as *const u8, 5)
+        dbg_puts("fiber")
     else:
-        dbg_puts("unknown" as *const u8, 7)
+        dbg_puts("unknown")
 
 fn dbg_put_drop_origin(ptr: i64, len: i64):
     if ptr != 0 and len > 0:
-        dbg_puts(ptr as *const u8, len)
+        dbg_put_bytes(ptr as *const u8, len)
     else:
-        dbg_puts("<untagged>" as *const u8, 10)
+        dbg_puts("<untagged>")
 
 fn dbg_report_double_free(addr: i64, size: i64, origin: i64, first_drop_ptr: i64, first_drop_len: i64, second_drop_ptr: i64, second_drop_len: i64):
-    dbg_puts("debug-alloc: DOUBLE FREE addr=" as *const u8, 30)
+    dbg_puts("debug-alloc: DOUBLE FREE addr=")
     dbg_put_i64(addr)
-    dbg_puts(" size=" as *const u8, 6)
+    dbg_puts(" size=")
     dbg_put_i64(size)
-    dbg_puts(" origin=" as *const u8, 8)
+    dbg_puts(" origin=")
     dbg_put_origin(origin)
-    dbg_puts(" first_drop=" as *const u8, 12)
+    dbg_puts(" first_drop=")
     dbg_put_drop_origin(first_drop_ptr, first_drop_len)
-    dbg_puts(" second_drop=" as *const u8, 13)
+    dbg_puts(" second_drop=")
     dbg_put_drop_origin(second_drop_ptr, second_drop_len)
-    dbg_puts("\n" as *const u8, 1)
+    dbg_puts("\n")
     rt_exit(134)
 
 // Poison a freed small-block payload so use-after-free reads corrupt loudly.
@@ -1580,25 +1585,25 @@ pub fn with_debug_alloc_report_leaks() -> Unit:
                     continue
                 let size = unsafe *((e + 8) as *const i64)
                 let origin = unsafe *((e + 24) as *const i64)
-                dbg_puts("debug-alloc: LEAK addr=" as *const u8, 23)
+                dbg_puts("debug-alloc: LEAK addr=")
                 dbg_put_i64(a)
-                dbg_puts(" size=" as *const u8, 6)
+                dbg_puts(" size=")
                 dbg_put_i64(size)
-                dbg_puts(" origin=" as *const u8, 8)
+                dbg_puts(" origin=")
                 dbg_put_origin(origin)
                 dbg_put_root_reason(e)
-                dbg_puts("\n" as *const u8, 1)
+                dbg_puts("\n")
                 leaks = leaks + 1
         slot = slot + 1
-    dbg_puts("debug-alloc: leak count=" as *const u8, 24)
+    dbg_puts("debug-alloc: leak count=")
     dbg_put_i64(leaks)
-    dbg_puts(" allocations=" as *const u8, 13)
+    dbg_puts(" allocations=")
     dbg_put_i64(dbg_alloc_total)
-    dbg_puts("\n" as *const u8, 1)
+    dbg_puts("\n")
     if suppressed > 0:
-        dbg_puts("debug-alloc: suppressed leak count=" as *const u8, 35)
+        dbg_puts("debug-alloc: suppressed leak count=")
         dbg_put_i64(suppressed)
-        dbg_puts("\n" as *const u8, 1)
+        dbg_puts("\n")
 
 pub fn with_debug_alloc_mark_root(ptr: *mut u8, reason: *const u8, reason_len: i64) -> Unit:
     if dbg_on() == 0:
@@ -1766,14 +1771,14 @@ fn rt_free_unlocked_with_drop_origin(ptr_arg: *mut u8, drop_origin_ptr: i64, dro
             if dbg_size <= RT_LARGE_THRESHOLD:
                 dbg_scribble(ptr as i64, dbg_size)
     if rt_payload_start_can_be_owned(ptr as *const u8) == 0:
-        dbg_puts("invalid free addr=" as *const u8, 18)
+        dbg_puts("invalid free addr=")
         dbg_put_i64(ptr as i64)
         if drop_origin_ptr != 0 and drop_origin_len > 0:
-            dbg_puts(" origin=" as *const u8, 8)
-            dbg_puts(drop_origin_ptr as *const u8, drop_origin_len)
-        dbg_puts("\n" as *const u8, 1)
+            dbg_puts(" origin=")
+            dbg_put_bytes(drop_origin_ptr as *const u8, drop_origin_len)
+        dbg_puts("\n")
         dbg_invalid_free_forensics(ptr as i64)
-        with_panic_core(make_str("invalid free: pointer is not an allocated payload start" as *const u8, 55), make_str("" as *const u8, 0), 0)
+        with_panic_core("invalid free: pointer is not an allocated payload start", "", 0)
     let block = alloc_header_ptr(ptr as *const u8) as i64
     let size = unsafe *(block as *const i64)
     if alloc_system_on() != 0:
@@ -1916,7 +1921,7 @@ fn str_has_interior_nul(s: &str) -> bool:
 // (`str_data(s) as *const c_char`) is unaffected and stays explicit/unsafe.
 fn str_to_cstr(s: &str) -> *const u8:
     if str_has_interior_nul(s):
-        let empty = make_str("" as *const u8, 0)
+        let empty = ""
         with_panic_core("str to C string conversion: interior NUL byte", empty, 0)
     let slen = str_length(s)
     let buf = rt_alloc(slen + 1)
@@ -1975,7 +1980,7 @@ fn cstr_lend_map(size: i64) -> *mut u8:
 
 pub fn with_cstr_lend(s: &str) -> *mut u8:
     if str_has_interior_nul(s):
-        let empty = make_str("" as *const u8, 0)
+        let empty = ""
         with_panic_core("str to C string conversion: interior NUL byte", empty, 0)
     let slen = str_length(s)
     // payload = text + its terminator + the guard byte at the block's end
@@ -1989,7 +1994,7 @@ pub fn with_cstr_lend(s: &str) -> *mut u8:
         block = cstr_lend_map(size)
     rt_allocator_unlock()
     if block as i64 == 0:
-        let empty = make_str("" as *const u8, 0)
+        let empty = ""
         with_panic_core("out of memory lending a str to C", empty, 0)
     unsafe *(block as *mut i64) = class as i64
     let payload = (block as i64 + CSTR_LEND_HEADER) as *mut u8
@@ -2295,8 +2300,8 @@ pub fn with_fmt_u64(n: u64) -> str:
 
 pub fn with_fmt_bool(b: i32) -> str:
     if b != 0:
-        return make_str("true" as *const u8, 4)
-    make_str("false" as *const u8, 5)
+        return "true"
+    "false"
 
 // #761 observing form: returns an independent OWNED copy (the consuming
 // form's identity return aliases its operand — a flip caller that drops
@@ -2686,7 +2691,7 @@ pub fn with_str_concat_ref(a: &str, b: &str) -> str:
     let al = str_length(a)
     let bl = str_length(b)
     let total = al + bl
-    var result = make_str("" as *const u8, 0)
+    var result = ""
     if total != 0:
         let out = rt_alloc(total + 1)
         let ap = str_data(a)
@@ -2730,7 +2735,7 @@ pub fn with_str_concat_n(parts: *const str, count: i64) -> str:
     for i in 0..count:
         total = total + str_concat_part_len(parts, i)
     if total == 0:
-        return make_str("" as *const u8, 0)
+        return ""
     str_concat_n_copy(parts, count, total)
 
 pub fn with_str_concat_n_move_first(parts: *const str, count: i64) -> str:
@@ -2738,9 +2743,9 @@ pub fn with_str_concat_n_move_first(parts: *const str, count: i64) -> str:
     for i in 0..count:
         total = total + str_concat_part_len(parts, i)
     if total == 0:
-        return make_str("" as *const u8, 0)
+        return ""
     if count <= 0:
-        return make_str("" as *const u8, 0)
+        return ""
 
     let first_len = str_concat_part_len(parts, 0)
     let first_ptr = str_concat_part_data(parts, 0)
@@ -2821,7 +2826,7 @@ pub fn with_str_cmp_ref(a: &str, b: &str) -> i32:
 pub fn with_str_clone_ref(s: &str) -> str:
     let slen = s.len()
     if slen == 0:
-        return make_str("" as *const u8, 0)
+        return ""
     // &s is the reference slot; slot -> header -> data. (The seed-era
     // double-deref dodge retired with the 2026-08-17 reseed — the flip
     // compiler's RK_CAST preserves the reference value.)
@@ -2862,7 +2867,7 @@ pub fn with_str_slice_ref(s: &str, start_arg: i64, end_arg: i64) -> str:
     if start < 0: start = 0
     if end > slen: end = slen
     if start >= end:
-        return make_str("" as *const u8, 0)
+        return ""
     // See with_str_clone_ref: reference value -> header -> data.
     let data = unsafe *(s as *const str as *const *const u8)
     alloc_str((data as i64 + start) as *const u8, end - start)
@@ -2955,7 +2960,7 @@ fn str_trim_ref(s: &str) -> str:
             break
         end = end - 1
     if start >= end:
-        return make_str("" as *const u8, 0)
+        return ""
     // #747: owned copy, never `return s`/a view (see with_str_slice).
     alloc_str((sp as i64 + start) as *const u8, end - start)
 
@@ -2964,7 +2969,7 @@ pub fn with_str_trim_ref(s: &str) -> str:
 
 fn str_to_upper_ref(s: &str) -> str:
     let slen = str_length(s)
-    if slen == 0: return make_str("" as *const u8, 0)  // #747: never return s (alias)
+    if slen == 0: return ""  // #747: never return s (alias)
     let out = rt_alloc(slen + 1)
     let sp = str_data(s)
     var i: i64 = 0
@@ -2983,7 +2988,7 @@ pub fn with_str_to_upper_ref(s: &str) -> str:
 
 fn str_to_lower_ref(s: &str) -> str:
     let slen = str_length(s)
-    if slen == 0: return make_str("" as *const u8, 0)  // #747: never return s (alias)
+    if slen == 0: return ""  // #747: never return s (alias)
     let out = rt_alloc(slen + 1)
     let sp = str_data(s)
     var i: i64 = 0
@@ -3003,7 +3008,7 @@ pub fn with_str_to_lower_ref(s: &str) -> str:
 fn str_repeat_ref(s: &str, count: i64) -> str:
     let slen = str_length(s)
     if count <= 0 or slen == 0:
-        return make_str("" as *const u8, 0)
+        return ""
     let total = slen * count
     let out = rt_alloc(total + 1)
     let sp = str_data(s)
@@ -3021,7 +3026,7 @@ fn str_replace_ref(s: &str, old: &str, new_s: &str) -> str:
     let sl = str_length(s)
     let ol = str_length(old)
     let nl = str_length(new_s)
-    if sl == 0: return make_str("" as *const u8, 0)
+    if sl == 0: return ""
     // #747: the no-op paths copy, never `return s` (see with_str_slice).
     if ol == 0: return alloc_str(str_data(s), sl)
     let sp = str_data(s)
@@ -3077,7 +3082,7 @@ pub fn with_str_from_vec_u8(v: *const u8) -> str:
     let vp = v as *mut u8
     let len = list_get_len(vp)
     if len <= 0:
-        return make_str("" as *const u8, 0)
+        return ""
     alloc_str(list_get_ptr_field(vp), len)
 
 // FNV-1a, unkeyed: the same on every run, for names derived from text
@@ -3206,7 +3211,7 @@ pub fn with_arg_count() -> i32:
 
 pub fn with_arg_at(idx: isize) -> str:
     if idx < 0 or idx >= saved_argc or saved_argv_raw == 0:
-        return make_str("" as *const u8, 0)
+        return ""
     let s = unsafe *((saved_argv_raw + idx as i64 * 8) as *const *const u8)
     make_str(s, cstr_len(s))
 
@@ -3215,7 +3220,7 @@ pub fn with_getenv_str(name: &str) -> str:
     let val = rt_getenv(cname)
     cstr_free(cname)
     if val as i64 == 0:
-        return make_str("" as *const u8, 0)
+        return ""
     // An owned copy: the environment block is libc's, and a later
     // setenv may free or rewrite the bytes a shared str would still name
     // (D111 copies share their buffer).
@@ -3333,7 +3338,7 @@ fn list_grow_es(v: *mut u8, es: i64):
 pub fn with_vec_take_front_es(v: *mut u8, es: i64):
     let vlen = list_get_len(v)
     if vlen <= 0:
-        with_panic_core(make_str("List index out of bounds" as *const u8, 23), make_str("" as *const u8, 0), 0)
+        with_panic_core("List index out of bounds", "", 0)
     list_set_ptr_field(v, (list_get_ptr_field(v) as i64 + es) as *mut u8)
     list_set_start(v, list_get_start(v) + 1)
     list_set_len(v, vlen - 1)
@@ -3427,7 +3432,7 @@ pub fn with_vec_take_into_es(v: *mut u8, src: *mut u8, es: i64):
 pub fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8:
     let vlen = list_get_len(v)
     if idx < 0 or idx >= vlen:
-        with_panic_core(make_str("List index out of bounds" as *const u8, 23), make_str("" as *const u8, 0), 0)
+        with_panic_core("List index out of bounds", "", 0)
     (list_get_ptr_field(v) as i64 + idx * es) as *mut u8
 
 pub fn with_vec_len(v: *mut u8) -> i64:
@@ -3516,7 +3521,7 @@ pub fn with_vec_is_unique(v: *mut u8, es: i64) -> i64:
 var cow_trace_state: i32 = 0            // 0=unread, 1=off, 2=on
 var cow_trace_min_bytes: i64 = 0
 
-fn cow_trace_copy(what: *const u8, what_len: i64, bytes: i64):
+fn cow_trace_copy(what: &str, bytes: i64):
     if cow_trace_state == 0:
         let parsed = rt_parse_limit_cstr(rt_getenv(c"WITH_TRACE_COW_COPIES".ptr))
         if parsed > 0:
@@ -3526,11 +3531,11 @@ fn cow_trace_copy(what: *const u8, what_len: i64, bytes: i64):
             cow_trace_state = 1
     if cow_trace_state != 2 or bytes < cow_trace_min_bytes:
         return
-    dbg_puts("[cow-copy] " as *const u8, 11)
-    dbg_puts(what, what_len)
-    dbg_puts(" bytes=" as *const u8, 7)
+    dbg_puts("[cow-copy] ")
+    dbg_puts(what)
+    dbg_puts(" bytes=")
     dbg_put_i64(bytes)
-    dbg_puts("\n" as *const u8, 1)
+    dbg_puts("\n")
     rt_backtrace_print()
 
 // Before a mutation: a shared buffer of bit-copy elements is copied, its
@@ -3542,7 +3547,7 @@ pub fn with_vec_make_unique_bits(v: *mut u8, es: i64) -> i64:
         return 0
     let old = list_get_ptr_field(v)
     let n = list_get_len(v)
-    cow_trace_copy("list" as *const u8, 4, n * es)
+    cow_trace_copy("list", n * es)
     let fresh = if n > 0: list_buffer_alloc(n * es, es) else: 0 as *mut u8
     if n > 0:
         rt_memcpy(fresh, old as *const u8, n * es)
@@ -3588,17 +3593,17 @@ pub fn with_vec_free_buffer_drop_origin_at(p0: *mut u8, cap0: i64, es: i64, star
         // response-JSON bytes here and trapped on the bare multiply, which
         // disguised heap corruption as arithmetic). Name the corruption.
         if cap > 9223372036854775807 / es:
-            dbg_puts("corrupt vec header at free: buffer=" as *const u8, 35)
+            dbg_puts("corrupt vec header at free: buffer=")
             dbg_put_i64(p as i64)
-            dbg_puts(" cap=" as *const u8, 5)
+            dbg_puts(" cap=")
             dbg_put_i64(cap)
-            dbg_puts(" elem_size=" as *const u8, 11)
+            dbg_puts(" elem_size=")
             dbg_put_i64(es)
             if drop_origin as i64 != 0 and drop_origin_len > 0:
-                dbg_puts(" origin=" as *const u8, 8)
-                dbg_puts(drop_origin, drop_origin_len)
-            dbg_puts("\n" as *const u8, 1)
-            with_panic_core(make_str("corrupt vec header: freed memory reused or overwritten" as *const u8, 54), make_str("" as *const u8, 0), 0)
+                dbg_puts(" origin=")
+                dbg_put_bytes(drop_origin, drop_origin_len)
+            dbg_puts("\n")
+            with_panic_core("corrupt vec header: freed memory reused or overwritten", "", 0)
         rt_free_sized_with_drop_origin(p, cap * es, drop_origin, drop_origin_len)
 
 // D111: a str is a value — an immutable, shared, counted buffer. A str place
@@ -3680,13 +3685,13 @@ pub fn with_vec_push_str(v: *mut u8, val: str):
     with_vec_push_es(v, &val as *const u8, 16)
     // with_vec_push bit-copies raw element bytes. The List now owns this str
     // header, so disarm the by-value local before its scope cleanup runs.
-    unsafe *(&raw mut val as *mut str) = make_str("" as *const u8, 0)
+    unsafe *(&raw mut val as *mut str) = ""
 
 pub fn with_vec_get_str(v: *mut u8, idx: i64) -> str:
     let p = with_vec_get_ptr_es(v, idx, 16)
     if p as i64 != 0:
         return unsafe *(p as *const str)
-    make_str("" as *const u8, 0)
+    ""
 
 pub fn with_vec_push_bool(v: *mut u8, val: i32):
     with_vec_push_es(v, &val as *const u8, 4)
@@ -4358,7 +4363,7 @@ pub fn with_hashmap_make_unique(slot: *mut *mut u8) -> i64:
     let ksz = hm_key_size(m)
     let vsz = hm_val_size(m)
     let icap = hm_icap(m)
-    cow_trace_copy("map" as *const u8, 3, ecap * (ksz + vsz + 1) + icap * 4)
+    cow_trace_copy("map", ecap * (ksz + vsz + 1) + icap * 4)
     let fresh = rt_alloc(HM_SIZE)
     rt_memcpy(fresh, map as *const u8, HM_SIZE)
     let f = fresh as i64
@@ -4452,19 +4457,19 @@ fn fs_read_file_status_c(cpath: *const u8, status: *mut i32) -> str:
     unsafe *status = 0
     if fs_path_is_dir_c(cpath):
         unsafe *status = -21  // EISDIR
-        return make_str("" as *const u8, 0)
+        return ""
     let fd = rt_open(cpath, 0, 0)  // O_RDONLY
     if fd < 0:
         unsafe *status = fd
-        return make_str("" as *const u8, 0)
+        return ""
     let size = rt_seek(fd, 0, 2)  // SEEK_END
     if size < 0:
         let _ = rt_close(fd)
         unsafe *status = size as i32
-        return make_str("" as *const u8, 0)
+        return ""
     if size == 0:
         let _ = rt_close(fd)
-        return make_str("" as *const u8, 0)
+        return ""
     let _ = rt_seek(fd, 0, 0)  // SEEK_SET
     let buf = rt_alloc(size + 1)
     var total: i64 = 0
@@ -4474,14 +4479,14 @@ fn fs_read_file_status_c(cpath: *const u8, status: *mut i32) -> str:
             let _ = rt_close(fd)
             rt_free(buf)
             unsafe *status = r as i32
-            return make_str("" as *const u8, 0)
+            return ""
         if r == 0: break
         total = total + r
     let _ = rt_close(fd)
     if total < size:
         rt_free(buf)
         unsafe *status = -5  // EIO
-        return make_str("" as *const u8, 0)
+        return ""
     unsafe *((buf as i64 + total) as *mut u8) = 0
     make_str(buf as *const u8, total)
 
@@ -4716,12 +4721,12 @@ pub fn with_read_line_stdin() -> str:
         if buf[len] == 10: break  // '\n'
         len = len + 1
     if len == 0:
-        return make_str("" as *const u8, 0)
+        return ""
     alloc_str(&buf as *const u8, len)
 
 pub fn with_read_bytes_stdin(count: i32) -> str:
     if count <= 0:
-        return make_str("" as *const u8, 0)
+        return ""
     let buf = rt_alloc(count as i64 + 1)
     var total: i64 = 0
     while total < count as i64:
@@ -4762,7 +4767,7 @@ pub fn with_lines_out_ref(out: *mut u8, s: &str) -> Unit:
 pub fn with_str_join(parts: *mut u8, sep: &str) -> str:
     let plen = list_get_len(parts)
     if plen == 0:
-        return make_str("" as *const u8, 0)
+        return ""
     let sep_p = str_data(sep)
     let sep_l = str_length(sep)
     // Calculate total length
@@ -5056,7 +5061,7 @@ pub fn with_sysinfo_hostname() -> str:
     var buf: [256]u8 = [0 as u8; 256]
     let buf_ptr = (&raw mut buf) as *mut [256]u8 as *mut u8
     if rt_gethostname(buf_ptr, 256) != 0:
-        return make_str("unknown" as *const u8, 7)
+        return "unknown"
     buf[255] = 0
     alloc_str(buf_ptr as *const u8, cstr_len(buf_ptr as *const u8))
 

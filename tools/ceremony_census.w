@@ -2,7 +2,7 @@
 // (CLAUDE.md "Ceremony is a design defect, not a user error").
 //
 // Lexical patterns are counted from the tokens of every tracked .w file
-// under src/, lib/, tools/, build/, build.w and examples/ (test/ fixtures
+// under src/, lib/, rt/, tools/, build/, build.w and examples/ (test/ fixtures
 // spell these forms on purpose and are not counted):
 //   clone-call       `.clone()`
 //   len-cast         `.len() as`
@@ -10,6 +10,8 @@
 //   move-arg         `move x` (not `move fn` / `move self`)
 //   copy-arg         `copy x`
 //   vec-name         the identifier `Vec` (D118: it names no type; target 0)
+//   lit-ptr-len      `"…" as *const u8, N` — a literal cast to its bytes
+//                    with a hand-counted length (a literal is a str: pass it)
 // Typed patterns come from one compilation of src/main.w, which covers the
 // compiler and lib/std (`with check --ceremony-census`):
 //   str-clone              `.clone()` on a str
@@ -52,7 +54,7 @@ fn area_of(path: &str):
     else: path.slice(0, path.find("/"))
 
 fn counted(path: &str) -> bool:
-    path.ends_with(".w") and (path == "build.w" or path.starts_with("src/") or path.starts_with("lib/") or path.starts_with("tools/") or path.starts_with("build/") or path.starts_with("examples/"))
+    path.ends_with(".w") and (path == "build.w" or path.starts_with("src/") or path.starts_with("lib/") or path.starts_with("rt/") or path.starts_with("tools/") or path.starts_with("build/") or path.starts_with("examples/"))
 
 // D112: a directory holding a corpus.stamp is a migrated corpus, generated
 // code that carries its migrator generation's idioms; it is never counted
@@ -147,6 +149,8 @@ impl Census:
                 self.bump(f"move-arg\t{area}")
             else if tag == TokenKind.TK_KW_COPY and i + 1 < n and tokens.get_tag(i + 1) == TokenKind.TK_IDENT:
                 self.bump(f"copy-arg\t{area}")
+            else if tag == TokenKind.TK_STRING_LIT and i + 6 < n and tokens.get_tag(i + 1) == TokenKind.TK_KW_AS and tokens.get_tag(i + 2) == TokenKind.TK_STAR and word(i + 3) == "const" and word(i + 4) == "u8" and tokens.get_tag(i + 5) == TokenKind.TK_COMMA and tokens.get_tag(i + 6) == TokenKind.TK_INT_LIT:
+                self.bump(f"lit-ptr-len\t{area}")
             else if tag == TokenKind.TK_IDENT and word(i) == "Vec":
                 self.bump(f"vec-name\t{area}")
 
