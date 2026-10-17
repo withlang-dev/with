@@ -5740,6 +5740,8 @@ impl MirBuilder:
             else:
                 self.mark_string_base_fields_may_alias(self.place_base_local(place))
             let is_exclusive = op == UnaryOp.UOP_RAW_REF_MUT
+            if is_exclusive:
+                self.make_unique_indexed_bases_of_place(place)
             let rv = self.body.new_rvalue(RvalueKind.RK_REF, if is_exclusive: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED, place, 0)
             var ty = self.expr_type(node)
             // §10.6/§10.8: `&x` in ref-to-dyn position takes the dyn ref type
@@ -6910,8 +6912,12 @@ impl MirBuilder:
 
         // A str range is a `&str` (D71 §4.8a), and a `&str` is its own
         // `{ptr, len}` (#1810): the slice is the view itself, like `[]T`.
-        let slice_rv = self.body.new_rvalue(RvalueKind.RK_SLICE, base_place, start_op, end_op)
         let slice_ty = self.expr_type(node)
+        let slice_res = if slice_ty != 0: self.sema.resolve_alias(slice_ty as TypeId) else: 0
+        let exp_res = if self.expected_type != 0: self.sema.resolve_alias(self.expected_type as TypeId) else: 0
+        if (slice_res != 0 and self.sema.get_type_kind(slice_res) == TypeKind.TY_SLICE and self.sema.get_type_d1(slice_res) != 0) or (exp_res != 0 and self.sema.get_type_kind(exp_res) == TypeKind.TY_SLICE and self.sema.get_type_d1(exp_res) != 0):
+            self.make_unique_before_mutation(base_place)
+        let slice_rv = self.body.new_rvalue(RvalueKind.RK_SLICE, base_place, start_op, end_op)
         let slice_local = self.new_temp(slice_ty)
         let slice_place = self.place_for_local(slice_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, slice_place, slice_rv, self.ast.get_start(node))
@@ -7126,6 +7132,8 @@ impl MirBuilder:
             let ca_op = self.ast.get_data0(rhs_expr)
             let ca_inc_expr = self.ast.get_data2(rhs_expr)
             let ca_place = self.lower_expr_place(place_expr)
+            if self.ast.kind(place_expr) != NodeKind.NK_INDEX:
+                self.make_unique_indexed_bases_of_place(ca_place)
             let ca_elem_ty = self.assignment_place_value_type(place_expr)
             let ca_cur = self.body.new_operand(OperandKind.OK_COPY, ca_place)
             let ca_inc = self.lower_expr(ca_inc_expr)
@@ -7134,6 +7142,8 @@ impl MirBuilder:
             return if read_back != 0: self.read_assigned_place(place_expr, ca_place, read_back) else: -1
 
         let place = self.lower_expr_place(place_expr)
+        if self.ast.kind(place_expr) != NodeKind.NK_INDEX:
+            self.make_unique_indexed_bases_of_place(place)
         let saved_expected = self.expected_type
         let dest_ty = self.assignment_place_value_type(place_expr)
         let rhs_reset_start = self.pending_reset_locals.len() as i32
@@ -12811,6 +12821,8 @@ impl MirBuilder:
         // the caller's binding keeps sole ownership across the call.
         if self.sema.slice_coerce_args.contains(arg_node):
             let sc_place = self.lower_expr_place(arg_node)
+            if (self.sema.slice_coerce_args.get(arg_node).copied() ?? 0) >= 2:
+                self.make_unique_before_mutation(sc_place)
             let sc_start = self.int_const_operand(0, self.sema.ty_i64)
             let sc_len_local = self.new_temp(self.sema.ty_i64)
             let sc_len_place = self.place_for_local(sc_len_local)
@@ -13201,8 +13213,10 @@ impl MirBuilder:
     // expression is already `&Box[L]`, so judging it found no autoref and
     // passed the Box value where `as_ref` takes `&Box` — the callee read the
     // list node itself as the box, and recursion returned the head or crashed.
-    mut fn lower_generic_receiver_arg(recv_node: i32, method_sym: i32, sig_idx: i32) -> i32:
+    mut fn lower_generic_receiver_arg(recv_node: i32, method_sym: i32, sig_idx: i32, mut_recv: bool = false) -> i32:
         let raw_op = self.lower_receiver_with_method_autoderef_for_method(recv_node, method_sym)
+        if mut_recv and raw_op >= 0 and self.body.operand_kinds[raw_op] != OperandKind.OK_CONSTANT:
+            self.make_unique_before_mutation(self.body.operand_d0[raw_op])
         if sig_idx < 0 or self.sema.sig_get_param_count(sig_idx) <= 0:
             return raw_op
         if self.body.operand_kinds[raw_op] != OperandKind.OK_COPY:
@@ -13640,6 +13654,8 @@ impl MirBuilder:
         // require_generic_call_contract (the single decision point); here we
         // only need "did sema record a signature" to pick the lowering arm.
         let method_is_unresolved = callee_sym == method_sym and not has_recorded_method_sig
+        let call_ret_res = self.sema.resolve_alias(self.expr_type(node) as TypeId)
+        let returns_mut_ptr = call_ret_res > 0 and self.sema.get_type_kind(call_ret_res) == TypeKind.TY_PTR and self.sema.get_type_d1(call_ret_res) != 0
         if method_is_unresolved or self.sym_is_generic_fn(callee_sym):
                 let gc_fn_op = self.const_operand(ConstKind.CK_FN, callee_sym, 0)
                 let gc_args: List[i32] = List.new()
@@ -13672,7 +13688,7 @@ impl MirBuilder:
                             let gc_recv_place = self.lower_expr_place(self_expr)
                             self.body.new_operand(OperandKind.OK_MOVE, gc_recv_place)
                         else:
-                            self.lower_generic_receiver_arg(self_expr, method_sym, gc_sig_idx)
+                            self.lower_generic_receiver_arg(self_expr, method_sym, gc_sig_idx, self.callee_has_mut_self(callee_sym) or returns_mut_ptr)
                     if self.callee_has_move_self(callee_sym):
                         self.consume_moved_operand(gc_recv_op)
                     gc_args.push(gc_recv_op)
@@ -13773,6 +13789,9 @@ impl MirBuilder:
                 // D120: a `mut self` method of a value List writes it.
                 if recv_op >= 0 and self.body.operand_kinds[recv_op] != OperandKind.OK_CONSTANT:
                     self.make_unique_before_mutation(self.body.operand_d0[recv_op])
+            else if returns_mut_ptr:
+                let ptr_recv_sig = if has_recorded_method_sig: recorded_method_sig else: self.call_sig_for_sym(callee_sym)
+                recv_op = self.lower_generic_receiver_arg(self_expr, method_sym, ptr_recv_sig, true)
             else if self.callee_has_move_self(callee_sym) and self.ast.kind(self_expr) == NodeKind.NK_IDENT and self.lookup_local(self.ast.get_data0(self_expr)) >= 0:
                 // §9.5/#D5: a `move self` receiver that is a caller-owned LOCAL is
                 // CONSUMED — lower it as OK_MOVE of the caller's place and consume it
@@ -14604,6 +14623,33 @@ impl MirBuilder:
         let next_bb = self.new_block()
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
+
+    // D120 stage 5: when `&raw mut xs[i]` (or `xs[i].field = v`, `xs[i][j]`)
+    // mutates through an index projection of a CoW List, make every indexed
+    // List base along `place`'s projection chain unique from outer to inner.
+    mut fn make_unique_indexed_bases_of_place(place: i32):
+        var bases: List[i32] = List.new()
+        var cur = place
+        var steps = 0
+        while cur >= 0 and steps < 32:
+            steps = steps + 1
+            var next = -1
+            for k in 0..self.body.index_place_places.len():
+                if self.body.index_place_places[k] == cur:
+                    let b = self.body.index_place_bases[k]
+                    bases.push(b)
+                    next = b
+                    break
+            if next < 0:
+                for k in 0..self.body.field_place_places.len():
+                    if self.body.field_place_places[k] == cur:
+                        next = self.body.field_place_bases[k]
+                        break
+            cur = next
+        var bi = bases.len() as i32 - 1
+        while bi >= 0:
+            self.make_unique_before_mutation(bases[bi])
+            bi = bi - 1
 
     mut fn emit_list_push(list_place: i32, elem_op: i32, span: i32):
         self.make_unique_before_mutation(list_place)
@@ -18277,6 +18323,41 @@ fn cow_local_is_loop_invariant(sema: &Sema, body: &MirBody, in_loop: &List[i32],
 // its creation, whole move/take assignment, or last make-unique is already
 // unique and needs no runtime check; a check on a loop-invariant local not
 // yet unique entering a loop is hoisted once into the loop preheader.
+fn cow_natural_loop_for_header(body: &MirBody, reachable: &List[i32], preds: &List[List[i32]], h: i32) -> List[i32]:
+    let bb_count = body.block_count()
+    var in_loop: List[i32] = List.new()
+    for _ in 0..bb_count:
+        in_loop.push(0)
+    var any_back = false
+    for pi in 0..preds[h].len():
+        let u = preds[h][pi]
+        if u < h or u >= bb_count or reachable[u] == 0:
+            continue
+        var vis: List[i32] = List.new()
+        for _ in 0..bb_count:
+            vis.push(0)
+        vis[h] = 1
+        var work: List[i32] = List.new()
+        if vis[u] == 0:
+            vis[u] = 1
+            work.push(u)
+        while work.len() > 0:
+            let curr = work.pop().unwrap()
+            for ppi in 0..preds[curr].len():
+                let p = preds[curr][ppi]
+                if p >= 0 and p < bb_count and reachable[p] != 0 and vis[p] == 0:
+                    vis[p] = 1
+                    work.push(p)
+        if vis[0] != 0:
+            continue
+        any_back = true
+        for b in 0..bb_count:
+            if vis[b] != 0:
+                in_loop[b] = 1
+    if not any_back:
+        return List.new()
+    in_loop
+
 fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
     var out = body
     let local_count = out.local_count()
@@ -18327,33 +18408,10 @@ fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
     for h in 1..orig_bb_count:
         if reachable[h] == 0:
             continue
-        var back_sources: List[i32] = List.new()
-        for pi in 0..preds[h].len():
-            let u = preds[h][pi]
-            if u >= h and u < orig_bb_count and reachable[u] != 0:
-                back_sources.push(u)
-        if back_sources.len() == 0:
+        let in_loop = cow_natural_loop_for_header(&out, &reachable, &preds, h)
+        if in_loop.len() == 0:
             continue
         let cur_bb_count = out.block_count()
-        var in_loop: List[i32] = List.new()
-        for _ in 0..cur_bb_count:
-            in_loop.push(0)
-        in_loop[h] = 1
-        var work: List[i32] = List.new()
-        for bi in 0..back_sources.len():
-            let u = back_sources[bi]
-            if in_loop[u] == 0:
-                in_loop[u] = 1
-                work.push(u)
-        while work.len() > 0:
-            let curr = work.pop().unwrap()
-            for pi in 0..preds[curr].len():
-                let p = preds[curr][pi]
-                if p >= 0 and p < cur_bb_count and reachable[p] != 0 and in_loop[p] == 0:
-                    in_loop[p] = 1
-                    work.push(p)
-        if in_loop[0] != 0:
-            continue
         var pre_bb: i32 = -1
         var single_entry = true
         for bb in 0..cur_bb_count:
@@ -18407,7 +18465,7 @@ fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
             let new_args: List[i32] = [new_arg_op]
             let new_args_id = out.new_call_args(new_args)
             out.set_call_intrinsic(new_args_id, mu_intr)
-            out.set_terminator(pre_bb, TermKind.TK_CALL as i32, mu_fn_op, new_args_id, mu_res_place, cont_bb, 0)
+            out.set_terminator(pre_bb, TermKind.TK_CALL as i32, mu_fn_op, new_args_id, mu_res_place, cont_bb, out.bb_term_spans[mu_bb])
             if trace_cow:
                 with_eprint(f"[cow] hoist local={local} header={h} pre={pre_bb}")
             pre_bb = cont_bb
@@ -18443,6 +18501,143 @@ fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
             let next_bb: i32 = out.term_data3(bb)
             out.set_terminator(bb, TermKind.TK_GOTO as i32, next_bb, 0, 0, 0, 0)
     out
+
+fn cow_unwrap_ref_place(body: &MirBody, place_id: i32) -> i32:
+    var cur = place_id
+    var steps = 0
+    while cur >= 0 and cur < body.place_locals.len() and steps < 8:
+        steps = steps + 1
+        if body.place_proj_counts[cur] != 1:
+            break
+        let p_start = body.place_proj_starts[cur]
+        if body.proj_kinds[p_start] != ProjKind.PK_DEREF:
+            break
+        let local = body.place_locals[cur]
+        if local <= body.n_params or local >= body.local_names.len() or body.local_names[local] != 0:
+            break
+        var target = -1
+        for si in 0..body.stmt_kinds.len():
+            if body.stmt_kinds[si] != StmtKind.Assign:
+                continue
+            let lhs = body.stmt_d0[si]
+            if lhs < 0 or lhs >= body.place_locals.len() or body.place_locals[lhs] != local or body.place_proj_counts[lhs] != 0:
+                continue
+            let rv = body.stmt_d1[si]
+            if rv >= 0 and rv < body.rval_kinds.len():
+                let rk = body.rval_kinds[rv]
+                if rk == RvalueKind.RK_REF:
+                    target = body.rval_d1[rv]
+                    break
+                if rk == RvalueKind.RK_ADDR_OF:
+                    target = body.rval_d0[rv]
+                    break
+        if target < 0:
+            break
+        cur = target
+    cur
+
+pub fn mir_body_cow_place_text(sema: &Sema, body: &MirBody, place_id: i32) -> str:
+    let place = cow_unwrap_ref_place(body, place_id)
+    if place < 0 or place >= body.place_locals.len():
+        return "<unknown>"
+    let local = body.place_locals[place]
+    let p_start = body.place_proj_starts[place]
+    let p_count = body.place_proj_counts[place]
+    let has_user_name = local >= 0 and local < body.local_names.len() and body.local_names[local] != 0
+    var out = if has_user_name: sema.pool_resolve_symbol(body.local_names[local]) else: f"_{local}"
+    var cur_ty = if local >= 0 and local < body.local_type_ids.len(): body.local_type_ids[local] else: 0
+    for i in 0..p_count:
+        let pk = body.proj_kinds[(p_start + i)]
+        let pd = body.proj_d0[(p_start + i)]
+        if pk == ProjKind.PK_DEREF:
+            if cur_ty != 0:
+                let dr = sema.resolve_alias(cur_ty as TypeId)
+                let dtk = sema.get_type_kind(dr)
+                cur_ty = if dtk == TypeKind.TY_REF or dtk == TypeKind.TY_PTR: sema.get_type_d0(dr) else: 0
+            if not has_user_name:
+                out = out ++ ".*"
+            continue
+        if pk == ProjKind.PK_FIELD:
+            var rendered = ""
+            var next_ty: i32 = 0
+            if cur_ty != 0:
+                let resolved = sema.resolve_alias(cur_ty as TypeId)
+                let fcount = sema.type_reflection_field_count(resolved as i32)
+                if pd >= 0 and pd < fcount:
+                    let fname = sema.type_reflection_field_name(resolved as i32, pd)
+                    let ftext = sema.pool_resolve_symbol(fname)
+                    if ftext.len() > 0:
+                        rendered = "." ++ ftext
+                    next_ty = sema.type_reflection_field_type_frozen(resolved as i32, pd)
+                else:
+                    let ftext = sema.pool_resolve_symbol(pd)
+                    if ftext.len() > 0:
+                        rendered = "." ++ ftext
+                    if sema.get_type_kind(resolved) == TypeKind.TY_STRUCT:
+                        next_ty = sema.struct_field_type_frozen(resolved as i32, pd)
+            if rendered.len() == 0:
+                rendered = f".f{pd}"
+            out = out ++ rendered
+            cur_ty = next_ty
+            continue
+        if pk == ProjKind.PK_TUPLE_INDEX:
+            out = out ++ f".{pd}"
+            cur_ty = 0
+            continue
+        if pk == ProjKind.PK_INDEX:
+            let idx_name = if pd >= 0 and pd < body.local_names.len() and body.local_names[pd] != 0: sema.pool_resolve_symbol(body.local_names[pd]) else: f"_{pd}"
+            out = out ++ "[" ++ idx_name ++ "]"
+            cur_ty = 0
+            continue
+    out
+
+pub fn mir_body_cow_check_reason(sema: &Sema, body: &MirBody, bb: i32) -> str:
+    let (reachable, preds) = cow_compute_reachable_and_preds(body)
+    if bb < 0 or bb >= reachable.len() or reachable[bb] == 0 or body.term_kind(bb) != TermKind.TK_CALL:
+        return ""
+    let call_id = body.term_data1(bb)
+    let ops = suspend_call_operands(body, call_id)
+    if ops.len() == 0:
+        return ""
+    let place = cow_unwrap_ref_place(body, body.operand_d0[ops[0]])
+    if place < 0 or place >= body.place_locals.len():
+        return ""
+    let p_start = body.place_proj_starts[place]
+    let p_count = body.place_proj_counts[place]
+    for i in 0..p_count:
+        let pk = body.proj_kinds[(p_start + i)]
+        if pk == ProjKind.PK_FIELD or pk == ProjKind.PK_TUPLE_INDEX:
+            return "through a field"
+    let local = body.place_locals[place]
+    if local >= 1 and local <= body.n_params:
+        return "through a parameter"
+    let local_count = body.local_count()
+    var ref_root: List[i32] = List.new()
+    for _ in 0..local_count:
+        ref_root.push(-1)
+    for b in 0..body.block_count():
+        for si in 0..body.bb_stmt_counts[b]:
+            let stmt_id = body.bb_stmt_starts[b] + si
+            if body.stmt_kind(stmt_id) != StmtKind.Assign:
+                continue
+            let dst = suspend_direct_place_local(body, body.stmt_data0(stmt_id))
+            let rval = body.stmt_data1(stmt_id)
+            if dst > 0 and dst < local_count and rval >= 0 and rval < body.rval_kinds.len():
+                let rk = body.rval_kinds[rval]
+                let base_pl = if rk == RvalueKind.RK_REF: body.rval_d1[rval] else: if rk == RvalueKind.RK_ADDR_OF: body.rval_d0[rval] else: -1
+                let root = suspend_place_root_local(body, base_pl)
+                if root > 0 and root < local_count:
+                    ref_root[dst] = root
+    let bb_count = body.block_count()
+    for h in 1..bb_count:
+        if reachable[h] == 0:
+            continue
+        let in_loop = cow_natural_loop_for_header(body, &reachable, &preds, h)
+        if in_loop.len() == 0:
+            continue
+        if in_loop[bb] != 0 and not cow_local_is_loop_invariant(sema, body, in_loop, ref_root, local):
+            return "copied in the loop"
+    "copied before mutation"
 
 // §4.3c (D119): a List literal that is never pushed, grown, moved out,
 // stored or retained does not touch the heap. A literal's value starts in
