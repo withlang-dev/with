@@ -1088,7 +1088,10 @@ impl BundleEmitter:
                 let offset = sema.type_layout_struct_field_offset_frozen(resolved as i32, fi)
                 fields_row = fields_row ++ f_name ++ ":" ++ f_spelling ++ f":{offset}:{f_align}:" ++ f_default_text ++ ";"
             let body = if field_count == 0: "{}" else: "{ " ++ fields ++ " }"
-            decl = if sub_kind == TypeDeclKind.Union: pub_text ++ "type " ++ name ++ " = union " ++ body else: pub_text ++ "type " ++ name ++ " " ++ body
+            // D120 (§4.3): a resource crosses as one — spelled plain, a
+            // struct of values would be a value to the consumer's compiler.
+            let resource_text = if sub_kind != TypeDeclKind.Union and sema.resource_type_names.contains(name_sym): "resource " else: ""
+            decl = if sub_kind == TypeDeclKind.Union: pub_text ++ "type " ++ name ++ " = union " ++ body else: pub_text ++ resource_text ++ "type " ++ name ++ " " ++ body
         else if sub_kind == TypeDeclKind.Opaque:
             kind_row = "opaque"
             has_layout = false
