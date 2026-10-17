@@ -7504,12 +7504,17 @@ impl MirBuilder:
             // double-free the moved-out bindings:
             //   1. the materialized scrutinee copy (rhs_place), and
             //   2. a named source expression (which is copied, not moved, into it).
+            // D111/D120: a subject that is a value with drop glue (a struct of
+            // values, stage 3) had its parts copied out with their own holds
+            // (carrier_read_kind), so it still holds its own and keeps its
+            // drop — retire_decomposed_carrier's rule; cancelled, the holds
+            // leaked (da_var_destructure_owned_moves_once).
             let mat_local = mir_place_plain_local(&self.body, rhs_place)
-            if mat_local >= 0:
+            if mat_local >= 0 and not self.carrier_copies(self.local_type(mat_local)):
                 self.cancel_stmt_temp_for_local(mat_local)
                 self.cancel_scheduled_value_drop_for_local(mat_local)
                 self.mark_local_value_moved(mat_local)
-            self.cancel_scheduled_value_drop_for_receiver_expr(rhs)
+                self.cancel_scheduled_value_drop_for_receiver_expr(rhs)
             return
 
         let success_bb = self.new_block()
