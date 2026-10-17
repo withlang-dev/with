@@ -8812,7 +8812,7 @@ impl MirBuilder:
         let used_codes = child.gen_loop_used_codes
         let exit_labels = mir_clone_i32_list(&child.gen_loop_exit_labels)
         let exit_kinds = mir_clone_i32_list(&child.gen_loop_exit_kinds)
-        child.body = mir_mark_stack_literals(child.sema, mir_mark_last_use_holds(move child.body))
+        child.body = mir_mark_stack_literals(child.sema, mir_prove_cow_uniqueness(child.sema, mir_mark_last_use_holds(child.sema, move child.body)))
         var finished = LoweredFunction { body: move child.body, anonymous_bodies: move child.anonymous_bodies }
         self.anonymous_bodies.push(move finished.body)
         while finished.anonymous_bodies.len() > 0:
@@ -14577,11 +14577,7 @@ impl MirBuilder:
     // buffer may be shared: a List (stage 1), a HashMap or HashSet (stage
     // 2). A BTreeMap is a struct over a List and follows the struct rule.
     fn cow_collection_of(ty: i32) -> StdGeneric:
-        if ty <= 0: return StdGeneric.None
-        let g = self.sema.std_generic_of(ty)
-        if g != StdGeneric.List and g != StdGeneric.HashMap and g != StdGeneric.HashSet: return StdGeneric.None
-        if self.sema.is_copy_frozen(ty as TypeId) == 0: return StdGeneric.None
-        g
+        cow_collection_of_sema(self.sema, ty)
 
     // D120 (§2.3): a mutation of a collection of values the compiler has
     // not proven unique is preceded by a make-unique call on the place — a
@@ -16453,7 +16449,7 @@ impl MirBuilder:
         child.pop_scope_inline()
         child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
         child.verify_goto_labels()
-        child.body = mir_mark_stack_literals(child.sema, mir_mark_last_use_holds(move child.body))
+        child.body = mir_mark_stack_literals(child.sema, mir_prove_cow_uniqueness(child.sema, mir_mark_last_use_holds(child.sema, move child.body)))
         var finished = LoweredFunction { body: move child.body, anonymous_bodies: move child.anonymous_bodies }
         self.anonymous_bodies.push(move finished.body)
         while finished.anonymous_bodies.len() > 0:
@@ -18052,6 +18048,402 @@ fn stack_literal_final(fwd: &List[i32], local: i32) -> i32:
     while fwd[at] >= 0: at = fwd[at]
     at
 
+fn cow_collection_of_sema(sema: &Sema, ty: i32) -> StdGeneric:
+    if ty <= 0: return StdGeneric.None
+    let g = sema.std_generic_of(ty)
+    if g != StdGeneric.List and g != StdGeneric.HashMap and g != StdGeneric.HashSet: return StdGeneric.None
+    if sema.is_copy_frozen(ty as TypeId) == 0: return StdGeneric.None
+    g
+
+fn cow_intrinsic_creates_unique(kind: MirIntrinsic) -> bool:
+    kind == MirIntrinsic.LIST_NEW or kind == MirIntrinsic.LIST_WITH_CAPACITY or kind == MirIntrinsic.MAP_NEW or kind == MirIntrinsic.COLLECTION_LITERAL or kind == MirIntrinsic.MAP_LITERAL or kind == MirIntrinsic.LIST_CONCAT or kind == MirIntrinsic.STR_SPLIT or kind == MirIntrinsic.LIST_MAP or kind == MirIntrinsic.LIST_FILTER or kind == MirIntrinsic.ITER_COLLECT
+
+fn cow_local_of_operand(body: &MirBody, ref_root: &List[i32], op: i32) -> i32:
+    if op < 0 or op >= body.operand_kinds.len():
+        return -1
+    let ok = body.operand_kinds[op]
+    if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
+        return -1
+    let root = suspend_place_root_local(body, body.operand_d0[op])
+    if root >= 0 and root < ref_root.len() and ref_root[root] >= 0:
+        return ref_root[root]
+    root
+
+fn cow_arg_preserves_uniqueness(sema: &Sema, body: &MirBody, call_id: i32, intr: MirIntrinsic, arg_idx: i32) -> bool:
+    if intr == MirIntrinsic.LIST_MAKE_UNIQUE or intr == MirIntrinsic.MAP_MAKE_UNIQUE:
+        return true
+    if intr != MirIntrinsic.NONE and intr != MirIntrinsic.GENERIC_CALL and intr != MirIntrinsic.DYN_CALL:
+        return true
+    let sig = if call_id >= 0 and call_id < body.call_sig_indices.len(): body.call_sig_indices[call_id] else: -1
+    if sig >= 0 and arg_idx == 0:
+        let mode = sema.sig_receiver_mode(sig)
+        if mode == ReceiverMode.Read or mode == ReceiverMode.Mut:
+            return true
+    false
+
+fn cow_transfer_stmt(body: &MirBody, candidates: &List[i32], ref_root: &List[i32], stmt_id: i32, state_in: List[i32]) -> List[i32]:
+    var state = state_in
+    let kind = body.stmt_kind(stmt_id)
+    let d0 = body.stmt_data0(stmt_id)
+    let d1 = body.stmt_data1(stmt_id)
+    if kind == StmtKind.StorageLive:
+        if d0 >= 0 and d0 < candidates.len() and candidates[d0] != 0:
+            state[d0] = if d1 != 0: 1 else: 0
+        return state
+    if kind == StmtKind.StorageDead or kind == StmtKind.Drop:
+        let direct = if kind == StmtKind.StorageDead: d0 else: suspend_direct_place_local(body, d0)
+        if direct >= 0 and direct < candidates.len() and candidates[direct] != 0:
+            state[direct] = 0
+        return state
+    if kind == StmtKind.Assign:
+        if d1 >= 0 and d1 < body.rval_kinds.len():
+            let rk = body.rval_kinds[d1]
+            if rk == RvalueKind.RK_USE or rk == RvalueKind.RK_CAST or rk == RvalueKind.RK_ARRAY_FILL:
+                let op = body.rval_d0[d1]
+                if op >= 0 and op < body.operand_kinds.len() and body.operand_kinds[op] == OperandKind.OK_COPY and body.operand_hold(op) == MIR_HOLD_RETAIN:
+                    let root = cow_local_of_operand(body, ref_root, op)
+                    if root >= 0 and root < candidates.len() and candidates[root] != 0:
+                        state[root] = 0
+            else if rk == RvalueKind.RK_AGGREGATE:
+                let ops = suspend_rvalue_operands(body, d1)
+                for oi in 0..ops.len():
+                    let op = ops[oi]
+                    if op >= 0 and op < body.operand_kinds.len() and body.operand_kinds[op] == OperandKind.OK_COPY and body.operand_hold(op) == MIR_HOLD_RETAIN:
+                        let root = cow_local_of_operand(body, ref_root, op)
+                        if root >= 0 and root < candidates.len() and candidates[root] != 0:
+                            state[root] = 0
+        let dst = suspend_direct_place_local(body, d0)
+        if dst >= 0 and dst < candidates.len() and candidates[dst] != 0:
+            var dst_unique: i32 = 0
+            if d1 >= 0 and d1 < body.rval_kinds.len() and body.rval_kinds[d1] == RvalueKind.RK_USE:
+                let op = body.rval_d0[d1]
+                if op >= 0 and op < body.operand_kinds.len():
+                    let ok = body.operand_kinds[op]
+                    if ok == OperandKind.OK_CONSTANT:
+                        dst_unique = 1
+                    else if ok == OperandKind.OK_MOVE or (ok == OperandKind.OK_COPY and body.operand_hold(op) == MIR_HOLD_TAKE):
+                        let src = suspend_direct_place_local(body, body.operand_d0[op])
+                        if src >= 0 and src < candidates.len() and candidates[src] != 0:
+                            dst_unique = state[src]
+            state[dst] = dst_unique
+    state
+
+fn cow_transfer_term(sema: &Sema, body: &MirBody, candidates: &List[i32], ref_root: &List[i32], bb: i32, state_in: List[i32]) -> List[i32]:
+    var state = state_in
+    let kind = body.term_kind(bb)
+    if kind == TermKind.TK_DROP_AND_GOTO:
+        let direct = suspend_direct_place_local(body, body.term_data0(bb))
+        if direct >= 0 and direct < candidates.len() and candidates[direct] != 0:
+            state[direct] = 0
+        return state
+    if kind == TermKind.TK_CALL:
+        let call_id = body.term_data1(bb)
+        let intr = body.call_intrinsic(call_id)
+        let ops = suspend_call_operands(body, call_id)
+        if intr == MirIntrinsic.LIST_MAKE_UNIQUE or intr == MirIntrinsic.MAP_MAKE_UNIQUE:
+            if ops.len() > 0:
+                let arg0 = ops[0]
+                if arg0 >= 0 and arg0 < body.operand_kinds.len():
+                    let target = suspend_direct_place_local(body, body.operand_d0[arg0])
+                    if target >= 0 and target < candidates.len() and candidates[target] != 0:
+                        state[target] = 1
+            return state
+        for oi in 0..ops.len():
+            let op = ops[oi]
+            if op < 0 or op >= body.operand_kinds.len():
+                continue
+            let ok = body.operand_kinds[op]
+            if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
+                continue
+            let root = cow_local_of_operand(body, ref_root, op)
+            if root >= 0 and root < candidates.len() and candidates[root] != 0:
+                if (ok == OperandKind.OK_COPY and body.operand_hold(op) == MIR_HOLD_RETAIN) or not cow_arg_preserves_uniqueness(sema, body, call_id, intr, oi as i32):
+                    state[root] = 0
+        let dst = suspend_direct_place_local(body, body.term_data2(bb))
+        if dst >= 0 and dst < candidates.len() and candidates[dst] != 0:
+            state[dst] = if cow_intrinsic_creates_unique(intr): 1 else: 0
+    state
+
+fn cow_compute_reachable_and_preds(body: &MirBody) -> (List[i32], List[List[i32]]):
+    let bb_count = body.block_count()
+    var reachable: List[i32] = List.new()
+    var preds: List[List[i32]] = List.new()
+    for _ in 0..bb_count:
+        reachable.push(0)
+        preds.push(List.new())
+    if bb_count == 0:
+        return (reachable, preds)
+    var work: List[i32] = [0]
+    reachable[0] = 1
+    while work.len() > 0:
+        let bb = work.pop().unwrap()
+        let succs = last_use_successors(body, bb)
+        for si in 0..succs.len():
+            let s = succs[si]
+            if s >= 0 and s < bb_count:
+                preds[s].push(bb)
+                if reachable[s] == 0:
+                    reachable[s] = 1
+                    work.push(s)
+    (reachable, preds)
+
+fn cow_compute_unique_dataflow(sema: &Sema, body: &MirBody, candidates: &List[i32], cand_locals: &List[i32], ref_root: &List[i32], reachable: &List[i32], preds: &List[List[i32]]) -> (List[i32], List[i32]):
+    let bb_count = body.block_count()
+    let local_count = body.local_count()
+    var unique_in: List[i32] = List.new()
+    var unique_out: List[i32] = List.new()
+    for bb in 0..bb_count:
+        let active = bb > 0 and reachable[bb] != 0
+        for l in 0..local_count:
+            if active and candidates[l] != 0:
+                unique_in.push(1)
+                unique_out.push(1)
+            else:
+                unique_in.push(0)
+                unique_out.push(0)
+    var state: List[i32] = List.new()
+    for _ in 0..local_count:
+        state.push(0)
+    var changed = true
+    while changed:
+        changed = false
+        for bb in 0..bb_count:
+            if reachable[bb] == 0:
+                continue
+            let has_preds = bb > 0 and preds[bb].len() > 0
+            for ci in 0..cand_locals.len():
+                let l = cand_locals[ci]
+                var u: i32 = 0
+                if has_preds:
+                    u = 1
+                    for pi in 0..preds[bb].len():
+                        let p = preds[bb][pi]
+                        if unique_out[p * local_count + l] == 0:
+                            u = 0
+                            break
+                state[l] = u
+                unique_in[bb * local_count + l] = u
+            for si in 0..body.bb_stmt_counts[bb]:
+                state = cow_transfer_stmt(body, candidates, ref_root, body.bb_stmt_starts[bb] + si, state)
+            state = cow_transfer_term(sema, body, candidates, ref_root, bb, state)
+            for ci in 0..cand_locals.len():
+                let l = cand_locals[ci]
+                let idx = bb * local_count + l
+                if unique_out[idx] != state[l]:
+                    unique_out[idx] = state[l]
+                    changed = true
+    (unique_in, unique_out)
+
+fn cow_local_is_loop_invariant(sema: &Sema, body: &MirBody, in_loop: &List[i32], ref_root: &List[i32], local: i32) -> bool:
+    for bb in 0..body.block_count():
+        if bb >= in_loop.len() or in_loop[bb] == 0:
+            continue
+        for si in 0..body.bb_stmt_counts[bb]:
+            let stmt_id = body.bb_stmt_starts[bb] + si
+            let kind = body.stmt_kind(stmt_id)
+            let d0 = body.stmt_data0(stmt_id)
+            let d1 = body.stmt_data1(stmt_id)
+            if (kind == StmtKind.StorageLive or kind == StmtKind.StorageDead) and d0 == local:
+                return false
+            if kind == StmtKind.Drop and suspend_direct_place_local(body, d0) == local:
+                return false
+            if kind == StmtKind.Assign:
+                if suspend_direct_place_local(body, d0) == local:
+                    return false
+                let ops = suspend_rvalue_operands(body, d1)
+                for oi in 0..ops.len():
+                    let op = ops[oi]
+                    if op >= 0 and op < body.operand_kinds.len() and body.operand_kinds[op] == OperandKind.OK_COPY and body.operand_hold(op) == MIR_HOLD_RETAIN and cow_local_of_operand(body, ref_root, op) == local:
+                        return false
+        let tkind = body.term_kind(bb)
+        if tkind == TermKind.TK_DROP_AND_GOTO and suspend_direct_place_local(body, body.term_data0(bb)) == local:
+            return false
+        if tkind == TermKind.TK_CALL:
+            if suspend_direct_place_local(body, body.term_data2(bb)) == local:
+                return false
+            let call_id = body.term_data1(bb)
+            let intr = body.call_intrinsic(call_id)
+            if intr != MirIntrinsic.LIST_MAKE_UNIQUE and intr != MirIntrinsic.MAP_MAKE_UNIQUE:
+                let ops = suspend_call_operands(body, call_id)
+                for oi in 0..ops.len():
+                    let op = ops[oi]
+                    if cow_local_of_operand(body, ref_root, op) == local:
+                        if (body.operand_kinds[op] == OperandKind.OK_COPY and body.operand_hold(op) == MIR_HOLD_RETAIN) or not cow_arg_preserves_uniqueness(sema, body, call_id, intr, oi as i32):
+                            return false
+    true
+
+// D120 stage 4 (§2.3): static uniqueness proof and loop-invariant hoisting
+// for local collections of values. A local that was never copied from since
+// its creation, whole move/take assignment, or last make-unique is already
+// unique and needs no runtime check; a check on a loop-invariant local not
+// yet unique entering a loop is hoisted once into the loop preheader.
+fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
+    var out = body
+    let local_count = out.local_count()
+    var candidates: List[i32] = List.new()
+    var cand_locals: List[i32] = List.new()
+    for l in 0..local_count:
+        if l > out.n_params and out.local_is_global[l] == 0 and out.local_is_caller_place[l] == 0 and cow_collection_of_sema(sema, out.local_type_ids[l]) != StdGeneric.None:
+            candidates.push(1)
+            cand_locals.push(l)
+        else:
+            candidates.push(0)
+    if cand_locals.len() == 0:
+        return out
+    var has_make_unique = false
+    for bb in 0..out.block_count():
+        if out.term_kind(bb) == TermKind.TK_CALL:
+            let call_id = out.term_data1(bb)
+            let intr = out.call_intrinsic(call_id)
+            if intr == MirIntrinsic.LIST_MAKE_UNIQUE or intr == MirIntrinsic.MAP_MAKE_UNIQUE:
+                let ops = suspend_call_operands(out, call_id)
+                if ops.len() > 0 and ops[0] >= 0 and ops[0] < out.operand_kinds.len():
+                    let target = suspend_direct_place_local(out, out.operand_d0[ops[0]])
+                    if target > 0 and target < local_count and candidates[target] != 0:
+                        has_make_unique = true
+                        break
+    if not has_make_unique:
+        return out
+    var ref_root: List[i32] = List.new()
+    for _ in 0..local_count:
+        ref_root.push(-1)
+    for bb in 0..out.block_count():
+        for si in 0..out.bb_stmt_counts[bb]:
+            let stmt_id = out.bb_stmt_starts[bb] + si
+            if out.stmt_kind(stmt_id) != StmtKind.Assign:
+                continue
+            let dst = suspend_direct_place_local(out, out.stmt_data0(stmt_id))
+            let rval = out.stmt_data1(stmt_id)
+            if dst > 0 and dst < local_count and rval >= 0 and rval < out.rval_kinds.len():
+                let rk = out.rval_kinds[rval]
+                let b = if rk == RvalueKind.RK_REF: out.rval_d1[rval] else: if rk == RvalueKind.RK_ADDR_OF: out.rval_d0[rval] else: -1
+                let root = suspend_place_root_local(out, b)
+                if root > 0 and root < local_count:
+                    ref_root[dst] = root
+    let trace_cow = with_getenv_str("WITH_TRACE_COW").len() > 0
+    let orig_bb_count = out.block_count()
+    var (reachable, preds) = cow_compute_reachable_and_preds(out)
+    var (unique_in, unique_out) = cow_compute_unique_dataflow(sema, out, candidates, cand_locals, ref_root, reachable, preds)
+    for h in 1..orig_bb_count:
+        if reachable[h] == 0:
+            continue
+        var back_sources: List[i32] = List.new()
+        for pi in 0..preds[h].len():
+            let u = preds[h][pi]
+            if u >= h and u < orig_bb_count and reachable[u] != 0:
+                back_sources.push(u)
+        if back_sources.len() == 0:
+            continue
+        let cur_bb_count = out.block_count()
+        var in_loop: List[i32] = List.new()
+        for _ in 0..cur_bb_count:
+            in_loop.push(0)
+        in_loop[h] = 1
+        var work: List[i32] = List.new()
+        for bi in 0..back_sources.len():
+            let u = back_sources[bi]
+            if in_loop[u] == 0:
+                in_loop[u] = 1
+                work.push(u)
+        while work.len() > 0:
+            let curr = work.pop().unwrap()
+            for pi in 0..preds[curr].len():
+                let p = preds[curr][pi]
+                if p >= 0 and p < cur_bb_count and reachable[p] != 0 and in_loop[p] == 0:
+                    in_loop[p] = 1
+                    work.push(p)
+        if in_loop[0] != 0:
+            continue
+        var pre_bb: i32 = -1
+        var single_entry = true
+        for bb in 0..cur_bb_count:
+            if in_loop[bb] == 0:
+                continue
+            for pi in 0..preds[bb].len():
+                let p = preds[bb][pi]
+                if reachable[p] != 0 and in_loop[p] == 0:
+                    if bb != h or (pre_bb >= 0 and pre_bb != p):
+                        single_entry = false
+                        break
+                    pre_bb = p
+            if not single_entry:
+                break
+        if not single_entry or pre_bb < 0 or out.term_kind(pre_bb) != TermKind.TK_GOTO or out.term_data0(pre_bb) != h:
+            continue
+        let orig_pre_bb = pre_bb
+        var hoisted_any = false
+        for ci in 0..cand_locals.len():
+            let local = cand_locals[ci]
+            if unique_out[orig_pre_bb * local_count + local] != 0:
+                continue
+            var mu_bb: i32 = -1
+            for bb in 0..cur_bb_count:
+                if in_loop[bb] == 0 or out.term_kind(bb) != TermKind.TK_CALL:
+                    continue
+                let call_id = out.term_data1(bb)
+                let intr = out.call_intrinsic(call_id)
+                if intr != MirIntrinsic.LIST_MAKE_UNIQUE and intr != MirIntrinsic.MAP_MAKE_UNIQUE:
+                    continue
+                let ops = suspend_call_operands(out, call_id)
+                if ops.len() > 0 and suspend_direct_place_local(out, out.operand_d0[ops[0]]) == local:
+                    mu_bb = bb
+                    break
+            if mu_bb < 0:
+                continue
+            if not cow_local_is_loop_invariant(sema, out, in_loop, ref_root, local):
+                continue
+            let drop_live = last_use_live_in(out, local, true)
+            if h >= drop_live.len() or drop_live[h] == 0:
+                continue
+            let mu_call_id = out.term_data1(mu_bb)
+            let mu_intr = out.call_intrinsic(mu_call_id)
+            let mu_ops = suspend_call_operands(out, mu_call_id)
+            let mu_place: i32 = out.operand_d0[mu_ops[0]]
+            let mu_fn_op: i32 = out.term_data0(mu_bb)
+            let mu_res_place: i32 = out.term_data2(mu_bb)
+            let cont_bb: i32 = out.new_block() as i32
+            out.set_terminator(cont_bb, TermKind.TK_GOTO as i32, h, 0, 0, 0, 0)
+            let new_arg_op = out.new_operand(OperandKind.OK_COPY, mu_place)
+            let new_args: List[i32] = [new_arg_op]
+            let new_args_id = out.new_call_args(new_args)
+            out.set_call_intrinsic(new_args_id, mu_intr)
+            out.set_terminator(pre_bb, TermKind.TK_CALL as i32, mu_fn_op, new_args_id, mu_res_place, cont_bb, 0)
+            if trace_cow:
+                with_eprint(f"[cow] hoist local={local} header={h} pre={pre_bb}")
+            pre_bb = cont_bb
+            hoisted_any = true
+        if hoisted_any:
+            let (next_reach, next_preds) = cow_compute_reachable_and_preds(out)
+            reachable = next_reach
+            preds = next_preds
+            let (next_in, next_out) = cow_compute_unique_dataflow(sema, out, candidates, cand_locals, ref_root, reachable, preds)
+            unique_in = next_in
+            unique_out = next_out
+    for bb in 0..out.block_count():
+        if bb >= reachable.len() or reachable[bb] == 0 or out.term_kind(bb) != TermKind.TK_CALL:
+            continue
+        let call_id = out.term_data1(bb)
+        let intr = out.call_intrinsic(call_id)
+        if intr != MirIntrinsic.LIST_MAKE_UNIQUE and intr != MirIntrinsic.MAP_MAKE_UNIQUE:
+            continue
+        let ops = suspend_call_operands(out, call_id)
+        if ops.len() == 0:
+            continue
+        let target = suspend_direct_place_local(out, out.operand_d0[ops[0]])
+        if target <= out.n_params or target >= local_count or candidates[target] == 0:
+            continue
+        var state: List[i32] = List.new()
+        for l in 0..local_count:
+            state.push(unique_in[bb * local_count + l])
+        for si in 0..out.bb_stmt_counts[bb]:
+            state = cow_transfer_stmt(out, candidates, ref_root, out.bb_stmt_starts[bb] + si, state)
+        if state[target] != 0:
+            if trace_cow:
+                with_eprint(f"[cow] elide local={target} bb={bb}")
+            let next_bb: i32 = out.term_data3(bb)
+            out.set_terminator(bb, TermKind.TK_GOTO as i32, next_bb, 0, 0, 0, 0)
+    out
+
 // §4.3c (D119): a List literal that is never pushed, grown, moved out,
 // stored or retained does not touch the heap. A literal's value starts in
 // its call's destination and may pass by whole moves into one holder (a
@@ -18115,7 +18507,8 @@ fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
             if to <= 0 or to >= local_count or out.rval_kinds[rval] != RvalueKind.RK_USE:
                 continue
             let op = out.rval_d0[rval]
-            if link_op[op] != 0 or out.operand_kinds[op] != OperandKind.OK_MOVE:
+            let is_move_or_take = out.operand_kinds[op] == OperandKind.OK_MOVE or (out.operand_kinds[op] == OperandKind.OK_COPY and out.operand_hold(op) == MIR_HOLD_TAKE)
+            if link_op[op] != 0 or not is_move_or_take:
                 continue
             let from = suspend_direct_place_local(out, out.operand_d0[op])
             if from <= 0 or from >= local_count or holds[from] == 0 or from == to or out.local_is_global[to] != 0:
@@ -18462,7 +18855,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
     // D32: field vacates need a mutable path — rebind the owned param.
     var owned_builder = builder
     owned_builder.verify_goto_labels()
-    owned_builder.body = mir_mark_stack_literals(owned_builder.sema, mir_mark_last_use_holds(move owned_builder.body))
+    owned_builder.body = mir_mark_stack_literals(owned_builder.sema, mir_prove_cow_uniqueness(owned_builder.sema, mir_mark_last_use_holds(owned_builder.sema, move owned_builder.body)))
     LoweredFunction { body: move owned_builder.body, anonymous_bodies: move owned_builder.anonymous_bodies }
 
 fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, group: i32) -> MirBody:

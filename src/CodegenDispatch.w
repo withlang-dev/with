@@ -2018,7 +2018,10 @@ impl Codegen:
                     return self.mir_coerce_value_to_sema_type(loaded, expected_ty, 0, false)
                 return loaded
         let value = self.mir_eval_operand_raw(body, operand_id, expected_ty)
-        let src_ptr = if place_ty != 0: self.mir_place_ptr(body, place, false, 0) else: 0
+        var src_ptr = if place_ty != 0: self.mir_place_ptr(body, place, false, 0) else: 0
+        let src_local = if place >= 0 and place < body.place_locals.len(): body.place_locals[place] else: -1
+        if src_ptr != 0 and body.place_proj_counts[place] == 0 and src_local >= 0 and self.mir_indirect_value_local_types.contains(src_local):
+            src_ptr = self.mir_indirect_value_local_ptr(src_local, src_ptr)
         if src_ptr == 0:
             // A value local (SSA) has no storage to blank: its uncoerced
             // value is retained through a slot, and its own drop releases.
