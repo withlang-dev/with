@@ -15,6 +15,7 @@ extern fn with_str_clone_ref(s: &str) -> str
 extern fn str_from_byte(b: i32) -> str
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8)
 extern fn abort() -> Never
 
 fn ast_pool_phase_bug(message: &str):
@@ -325,7 +326,7 @@ fn facade_clause_operand_count(kind: i32) -> i32:
 // Whether an NK_FACADE_RESOURCE item is a callback-scope handle (§16.2b.9).
 // The one error type a facade states for all of its fallible operations
 // (§16.2b.4, D97), or 0 when each resource and operation has its own.
-pub fn facade_error_sym(pool: AstPool, facade: i32) -> i32:
+pub fn facade_error_sym(pool: &AstPool, facade: i32) -> i32:
     let extra_start = pool.get_data1(facade as NodeId)
     for k in 0..pool.get_data2(facade as NodeId):
         let item = pool.get_extra(extra_start + k)
@@ -333,7 +334,7 @@ pub fn facade_error_sym(pool: AstPool, facade: i32) -> i32:
     0
 
 // The `c facade` block an item belongs to, or 0.
-pub fn facade_of_item(pool: AstPool, item: i32) -> i32:
+pub fn facade_of_item(pool: &AstPool, item: i32) -> i32:
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_C_FACADE: continue
@@ -343,18 +344,18 @@ pub fn facade_of_item(pool: AstPool, item: i32) -> i32:
     0
 
 // The shared error type of the facade an item belongs to, or 0.
-pub fn facade_item_error_sym(pool: AstPool, item: i32) -> i32:
+pub fn facade_item_error_sym(pool: &AstPool, item: i32) -> i32:
     let facade = facade_of_item(pool, item)
     if facade == 0: 0 else: facade_error_sym(pool, facade)
 
-pub fn facade_item_is_handle(pool: AstPool, item: i32) -> bool:
+pub fn facade_item_is_handle(pool: &AstPool, item: i32) -> bool:
     if item <= 0 or pool.kind(item as NodeId) != NodeKind.NK_FACADE_RESOURCE: return false
     let extra_start = pool.get_data1(item as NodeId)
     for k in 0..pool.get_data2(item as NodeId):
         if pool.get_data0(pool.get_extra(extra_start + 1 + k) as NodeId) == FACADE_CLAUSE_HANDLE: return true
     false
 
-pub fn facade_clause_profile_rule(pool: AstPool, clause: i32) -> i32:
+pub fn facade_clause_profile_rule(pool: &AstPool, clause: i32) -> i32:
     if clause <= 0 or pool.kind(clause as NodeId) != NodeKind.NK_FACADE_CLAUSE: return 0
     let own = facade_clause_operand_count(pool.get_data0(clause as NodeId))
     if own < 0 or pool.get_data2(clause as NodeId) <= own: return 0
@@ -667,6 +668,7 @@ pub enum FStringSegmentKind: i32:
 // Node 0 is reserved as a null sentinel.
 
 type AstPoolState {
+    holders: i64,
     kinds: List[i32],
     starts: List[i32],
     ends: List[i32],
@@ -823,15 +825,40 @@ type AstPoolState {
     frozen: i32,
 }
 
+// A counted handle over the node tables (#2449), as InternPool is: `clone()`
+// is another holder, dropping the last frees every table. A function that
+// reads or appends takes `&AstPool`; a type that keeps a handle stores a
+// clone.
 pub type AstPool {
     state: *mut AstPoolState,
 }
-impl Copy for AstPool
+
+impl Drop for AstPool:
+    move fn drop():
+        let st = self.state
+        if st as i64 == 0:
+            return
+        if st.holders > 1:
+            st.holders = st.holders - 1
+            return
+        let block = unsafe *st
+        drop(block)
+        with_free(st as *mut u8)
+
+impl AstPool:
+    fn clone() -> AstPool:
+        let st = self.state
+        st.holders = st.holders + 1
+        AstPool { state: self.state }
+
+    fn holders() -> i64:
+        self.state.holders
 
 fn AstPool.new -> AstPool:
     let ptr = with_alloc(sizeof[AstPoolState]()) as *mut AstPoolState
     unsafe:
         *ptr = AstPoolState {
+            holders: 1,
             kinds: List.new(),
             starts: List.new(),
             ends: List.new(),
@@ -957,8 +984,9 @@ fn AstPool.new -> AstPool:
 
 // Mark the pool as immutable. Any subsequent mutation will print an error.
 impl AstPool:
-    mut fn freeze():
-        self.state.frozen = 1
+    fn freeze():
+        let st = self.state
+        st.frozen = 1
 
     // Add a node to the pool, returns the node index.
     fn add_node(kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
@@ -1005,8 +1033,9 @@ impl AstPool:
             return AstFileId(0)
         AstFileId(self.state.files[i])
 
-    mut fn set_current_file_id(file_id: AstFileId):
-        self.state.current_file_id = file_id as i32
+    fn set_current_file_id(file_id: AstFileId):
+        let st = self.state
+        st.current_file_id = file_id as i32
 
     // Get node kind at index
     fn kind(idx: NodeId) -> i32:
@@ -1042,8 +1071,9 @@ impl AstPool:
     fn literal_suffix(idx: NodeId) -> i32:
         self.state.literal_suffixes[(idx as i32)]
 
-    mut fn set_literal_suffix(idx: NodeId, suffix: i32):
-        self.state.literal_suffixes[(idx as i32)] = suffix
+    fn set_literal_suffix(idx: NodeId, suffix: i32):
+        let st = self.state
+        st.literal_suffixes[(idx as i32)] = suffix
 
     fn int_literal_digit_idx(idx: NodeId) -> i32:
         self.state.int_literal_digit_idxs[(idx as i32)]
@@ -1051,9 +1081,10 @@ impl AstPool:
     fn int_literal_radix(idx: NodeId) -> i32:
         self.state.int_literal_radices[(idx as i32)]
 
-    mut fn set_int_literal_exact(idx: NodeId, digit_idx: i32, radix: i32):
-        self.state.int_literal_digit_idxs[(idx as i32)] = digit_idx
-        self.state.int_literal_radices[(idx as i32)] = radix
+    fn set_int_literal_exact(idx: NodeId, digit_idx: i32, radix: i32):
+        let st = self.state
+        st.int_literal_digit_idxs[(idx as i32)] = digit_idx
+        st.int_literal_radices[(idx as i32)] = radix
 
     fn has_int_literal_exact(idx: NodeId) -> bool:
         self.int_literal_digit_idx(idx) >= 0 and self.int_literal_radix(idx) >= 2
@@ -1505,6 +1536,10 @@ impl AstPool:
     fn get_extra(idx: isize) -> i32:
         self.state.extra[idx]
 
+    fn set_extra(idx: isize, val: i32):
+        let st = self.state
+        st.extra[idx] = val
+
     fn optional_chain_is_call(extra_start: i32) -> i32:
         if extra_start < 0 or extra_start >= self.extra_len():
             return 0
@@ -1543,8 +1578,9 @@ impl AstPool:
 
     // Drops the declarations added after the first `count` (§17.5: an arm
     // of a module-level target selection that is not taken).
-    mut fn truncate_decls(count: i32):
-        while self.state.decls.len() > count: let _ = self.state.decls.pop()
+    fn truncate_decls(count: i32):
+        let st = self.state
+        while st.decls.len() > count: let _ = st.decls.pop()
 
     fn decl_count() -> i32:
         self.state.decls.len() as i32
@@ -1565,14 +1601,16 @@ impl AstPool:
     fn get_decl(idx: isize) -> NodeId:
         (self.state.decls[idx]) as NodeId
 
-    mut fn set_local_decl_count(n: i32):
-        self.state.local_decl_count = n
+    fn set_local_decl_count(n: i32):
+        let st = self.state
+        st.local_decl_count = n
 
     fn local_decl_count() -> i32:
         self.state.local_decl_count
 
-    mut fn set_prelude_decl_count(n: i32):
-        self.state.prelude_decl_count = n
+    fn set_prelude_decl_count(n: i32):
+        let st = self.state
+        st.prelude_decl_count = n
 
     fn prelude_decl_count() -> i32:
         self.state.prelude_decl_count
@@ -1621,12 +1659,13 @@ impl AstPool:
     // name by import precedence. A type member carries its identity `tid`
     // (#1757): types keep their short names, so the ident alone could name
     // another module's type of that name.
-    mut fn bind_namespace_ident(idx: NodeId, sym: i32, tid: i32):
-        self.state.kinds[(idx as i32)] = NodeKind.NK_IDENT
-        self.state.data0[(idx as i32)] = sym
-        self.state.data1[(idx as i32)] = 0
-        self.state.data2[(idx as i32)] = 0
-        self.state.namespace_bound_set.insert(idx as i32, tid)
+    fn bind_namespace_ident(idx: NodeId, sym: i32, tid: i32):
+        let st = self.state
+        st.kinds[(idx as i32)] = NodeKind.NK_IDENT
+        st.data0[(idx as i32)] = sym
+        st.data1[(idx as i32)] = 0
+        st.data2[(idx as i32)] = 0
+        st.namespace_bound_set.insert(idx as i32, tid)
 
     fn is_namespace_bound(idx: NodeId) -> bool: self.state.namespace_bound_set.contains(idx as i32)
 
@@ -1634,20 +1673,25 @@ impl AstPool:
     // value or fn, or is no namespace access.
     fn namespace_bound_type(idx: NodeId) -> i32: self.state.namespace_bound_set.get(idx as i32) ?? 0
 
-    mut fn set_data0(idx: NodeId, val: i32):
-        self.state.data0[(idx as i32)] = val
+    fn set_data0(idx: NodeId, val: i32):
+        let st = self.state
+        st.data0[(idx as i32)] = val
 
-    mut fn set_data1(idx: NodeId, val: i32):
-        self.state.data1[(idx as i32)] = val
+    fn set_data1(idx: NodeId, val: i32):
+        let st = self.state
+        st.data1[(idx as i32)] = val
 
-    mut fn set_data2(idx: NodeId, val: i32):
-        self.state.data2[(idx as i32)] = val
+    fn set_data2(idx: NodeId, val: i32):
+        let st = self.state
+        st.data2[(idx as i32)] = val
 
-    mut fn set_start(idx: NodeId, val: i32):
-        self.state.starts[(idx as i32)] = val
+    fn set_start(idx: NodeId, val: i32):
+        let st = self.state
+        st.starts[(idx as i32)] = val
 
-    mut fn set_end(idx: NodeId, val: i32):
-        self.state.ends[(idx as i32)] = val
+    fn set_end(idx: NodeId, val: i32):
+        let st = self.state
+        st.ends[(idx as i32)] = val
 
     // Store fn decl metadata: [node, flags, ret_type, param_start, param_count, tp_start, tp_count]
     fn add_fn_meta(node: NodeId, flags: i32, ret: i32, ps: i32, pc: i32, ts: i32, tc: i32):
@@ -1771,8 +1815,9 @@ impl AstPool:
     // after the full imported AST is assembled, so inherit the trait receiver
     // here, before freeze, rather than guessing while an individual file parses.
     // Associated trait methods have no receiver and remain unchanged.
-    mut fn inherit_trait_impl_receivers(intern: InternPool):
-        if self.state.frozen != 0:
+    fn inherit_trait_impl_receivers(intern: &InternPool):
+        let st = self.state
+        if st.frozen != 0:
             ast_pool_phase_bug("BUG: trait impl receiver inheritance ran after AstPool.freeze")
         for impl_di in 0..self.decl_count():
             let impl_node = self.get_decl(impl_di)
@@ -1844,9 +1889,9 @@ impl AstPool:
                     if default_node != 0:
                         self.set_fn_param_default(new_param_start, pi + 1, default_node)
 
-                self.state.fn_meta[(meta + 1)] = self.fn_meta_flags(meta) + FN_META_REQUIRED_UNIT
-                self.state.fn_meta[(meta + 3)] = new_param_start
-                self.state.fn_meta[(meta + 4)] = old_param_count + 1
+                st.fn_meta[(meta + 1)] = self.fn_meta_flags(meta) + FN_META_REQUIRED_UNIT
+                st.fn_meta[(meta + 3)] = new_param_start
+                st.fn_meta[(meta + 4)] = old_param_count + 1
 
                 let pattern_meta = self.find_fn_param_pattern_meta(method_node)
                 if pattern_meta >= 0:
@@ -1856,8 +1901,8 @@ impl AstPool:
                     self.add_fn_param_pattern_value(0 as NodeId)
                     for pi in 0..old_pattern_count:
                         self.add_fn_param_pattern_value(self.fn_param_pattern_value(old_pattern_start + pi))
-                    self.state.fn_param_pattern_meta[(pattern_meta + 1)] = new_pattern_start
-                    self.state.fn_param_pattern_meta[(pattern_meta + 2)] = old_pattern_count + 1
+                    st.fn_param_pattern_meta[(pattern_meta + 1)] = new_pattern_start
+                    st.fn_param_pattern_meta[(pattern_meta + 2)] = old_pattern_count + 1
 
     // §9.5 (#1930): in an instance method declared in its type's own module
     // (§18.1: the file that declares the type), a field of the receiver is in
@@ -1872,8 +1917,9 @@ impl AstPool:
     // c_import's declarations and the types and methods a `c facade`
     // renders (`generated_files`) are the compiler's text, not a module
     // anyone wrote: their C parameter names stand.
-    mut fn resolve_receiver_field_names(intern: InternPool, decl_is_c_import: &List[i32], generated_files: &List[i32]):
-        if self.state.frozen != 0:
+    fn resolve_receiver_field_names(intern: &InternPool, decl_is_c_import: &List[i32], generated_files: &List[i32]):
+        let st = self.state
+        if st.frozen != 0:
             ast_pool_phase_bug("BUG: receiver field-name resolution ran after AstPool.freeze")
         let self_sym = intern.intern("self")
         let generated: HashMap[i32, i32] = HashMap.new()
@@ -1900,7 +1946,7 @@ impl AstPool:
     // The struct or union `fn_node` is an instance method of when the file
     // declaring the method declares the type, else 0. A derive the compiler
     // generates carries its type's span: it is not a method anyone wrote.
-    fn own_module_receiver_type(fn_node: NodeId, self_sym: i32, intern: InternPool, struct_decls: &HashMap[i64, i32]) -> i32:
+    fn own_module_receiver_type(fn_node: NodeId, self_sym: i32, intern: &InternPool, struct_decls: &HashMap[i64, i32]) -> i32:
         if self.kind(fn_node) != NodeKind.NK_FN_DECL or self.get_data1(fn_node) == 0 or self.fn_decl_body_is_interface(fn_node):
             return 0
         let meta = self.find_fn_meta(fn_node)
@@ -1922,11 +1968,12 @@ impl AstPool:
             return 0
         decl
 
-    mut fn resolve_method_receiver_field_names(fn_node: NodeId, owner: i32, self_sym: i32, decl_nodes: &HashMap[i32, i32]):
-        self.state.receiver_field_methods.insert(fn_node as i32, owner)
+    fn resolve_method_receiver_field_names(fn_node: NodeId, owner: i32, self_sym: i32, decl_nodes: &HashMap[i32, i32]):
+        let st = self.state
+        st.receiver_field_methods.insert(fn_node as i32, owner)
         let fields_ex = self.get_data1(owner as NodeId)
         for fi in 0..self.get_extra(fields_ex):
-            self.state.receiver_field_keys.insert(ast_pair_key(owner, self.get_extra(fields_ex + 1 + fi * 3)), 1)
+            st.receiver_field_keys.insert(ast_pair_key(owner, self.get_extra(fields_ex + 1 + fi * 3)), 1)
         let file = self.file(fn_node) as i32
         let body = self.get_data1(fn_node) as NodeId
         let body_start = self.get_start(body)
@@ -1989,18 +2036,18 @@ impl AstPool:
             if is_param or nested:
                 continue
             let receiver = self.add_node(NodeKind.NK_IDENT, start, end, self_sym, 0, 0)
-            self.state.files[(receiver as i32)] = file
+            st.files[(receiver as i32)] = file
             if callees.contains(n):
                 let access = self.add_node(NodeKind.NK_FIELD_ACCESS, start, end, receiver as i32, sym, 0)
-                self.state.files[(access as i32)] = file
-                self.state.receiver_field_accesses.insert(access as i32, owner)
-                self.state.kinds[n] = NodeKind.NK_GROUPED
-                self.state.data0[n] = access as i32
+                st.files[(access as i32)] = file
+                st.receiver_field_accesses.insert(access as i32, owner)
+                st.kinds[n] = NodeKind.NK_GROUPED
+                st.data0[n] = access as i32
             else:
-                self.state.kinds[n] = NodeKind.NK_FIELD_ACCESS
-                self.state.data0[n] = receiver as i32
-                self.state.data1[n] = sym
-                self.state.receiver_field_accesses.insert(n, owner)
+                st.kinds[n] = NodeKind.NK_FIELD_ACCESS
+                st.data0[n] = receiver as i32
+                st.data1[n] = sym
+                st.receiver_field_accesses.insert(n, owner)
 
     fn receiver_type_has_field(owner: i32, sym: i32) -> bool: self.state.receiver_field_keys.contains(ast_pair_key(owner, sym))
 
@@ -2451,7 +2498,7 @@ fn ast_pair_key(a: i32, b: i32): (a as i64) * 4294967296 + (b as i64)
 
 // The value of a `for` body that is exactly `yield E` — inline, or the only
 // line of its block — else 0. §13.6a: that body is the yield form.
-fn ast_for_body_yield_value(pool: AstPool, body: i32) -> i32:
+fn ast_for_body_yield_value(pool: &AstPool, body: i32) -> i32:
     var node = body
     if node != 0 and pool.kind(node) == NodeKind.NK_BLOCK:
         let count = pool.get_data1(node)

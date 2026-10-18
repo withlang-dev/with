@@ -641,19 +641,6 @@ extend Codegen:
         self.sema = Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new())
         s
 
-    // Take-and-return partners for the pools the analysis backend lends the
-    // codegen run (#726): the caller restores them after take_sema, so no
-    // still-viewed pool is ever dropped inside the backend seam.
-    pub mut fn take_pool() -> AstPool:
-        var p = self.pool
-        self.pool = AstPool.new()
-        p
-
-    pub mut fn take_intern() -> InternPool:
-        var i = self.intern
-        self.intern = InternPool.init()
-        i
-
 fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: InternPool, sema: Sema) -> Codegen:
     var cg = Codegen.init_with_opt(module_name, opt_level)
     let overflow_mode: i32 = sema.overflow_mode
@@ -1838,7 +1825,7 @@ impl Codegen:
     // and must keep the module alive through generation. Removes the per-cg
     // deep copy of all MIR bodies, and is the sharing contract per-unit
     // generation threads reuse (#681).
-    mut fn gen_module_from_mir(mir_module_ptr: i64, ast_pool: AstPool) -> i32:
+    mut fn gen_module_from_mir(mir_module_ptr: i64, ast_pool: &AstPool) -> i32:
         let mir_err = unsafe { validate_mir_module((*(mir_module_ptr as *const MirModule))) }
         if mir_err.len() > 0:
             with_eprint("error: invalid MIR input for LLVM backend: " ++ mir_err)
@@ -7775,10 +7762,10 @@ impl Codegen:
 
     // ── gen_module: multi-pass entry point ────────────────────────────
 
-    mut fn gen_module(ast_pool: AstPool) -> i32:
+    mut fn gen_module(ast_pool: &AstPool) -> i32:
         if self.debug_pool_flow_enabled():
             with_eprint(f"[llvm-cg] gen_module input.decls={ast_pool.decl_count()} input.nodes={ast_pool.node_count()}")
-        self.pool = ast_pool
+        self.pool = ast_pool.clone()
         self.build_type_decl_name_index()
         if self.debug_pool_flow_enabled():
             with_eprint(f"[llvm-cg] gen_module self.decls={self.pool.decl_count()} self.nodes={self.pool.node_count()}")

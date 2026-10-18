@@ -302,7 +302,7 @@ pub type MirBuilder = ephemeral {
     pool: InternPool,
 }
 
-fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> MirBuilder:
+fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -> MirBuilder:
     var body = MirBody.init(fn_sym, sema)
     let entry = body.new_block()
     MirBuilder {
@@ -401,8 +401,8 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         string_field_alias_flags: List.new(),
         no_suspend_nodes: List.new(),
         sema,
-        ast,
-        pool,
+        ast: ast.clone(),
+        pool: pool.clone(),
     }
 
 impl MirBuilder:
@@ -18073,7 +18073,7 @@ impl MirBuilder:
         self.mark_unsupported()
         self.unit_operand()
 
-fn mir_symbol_for_pool(sema: &Sema, pool: InternPool, sym: i32) -> i32:
+fn mir_symbol_for_pool(sema: &Sema, pool: &InternPool, sym: i32) -> i32:
     if sym == 0:
         return 0
     // sym is a Sema-pool identity. Numeric symbol IDs have meaning only in
@@ -19063,7 +19063,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
     owned_builder.body = mir_mark_stack_literals(owned_builder.sema, mir_prove_cow_uniqueness(owned_builder.sema, mir_mark_last_use_holds(owned_builder.sema, move owned_builder.body)))
     LoweredFunction { body: move owned_builder.body, anonymous_bodies: move owned_builder.anonymous_bodies }
 
-fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, group: i32) -> MirBody:
+fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, group: i32) -> MirBody:
     let dispatch_sym = sema.fn_clause_group_name(group)
     let sig_idx = sema.get_sig(dispatch_sym)
     let dispatch_body_sym = mir_symbol_for_pool(sema, pool, dispatch_sym)
@@ -19268,7 +19268,7 @@ impl MirBody:
 // value and runs nothing. The state struct's fields are the parameters in
 // order; each argument moves in, except a generator method's borrowed
 // receiver, whose place the value views.
-fn lower_generator_constructor(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32) -> MirBody:
+fn lower_generator_constructor(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32) -> MirBody:
     let state_tid: i32 = sema.generator_fn_state_types.get(fn_sym).unwrap()
     var builder = MirBuilder.init(sema, ast_pool, pool, body_sym)
     builder.body.local_type_ids[0] = state_tid
@@ -19312,14 +19312,14 @@ fn lower_generator_constructor(sema: &Sema, ast_pool: AstPool, pool: InternPool,
 // then the constructor and `each`.
 // The builder of a specialization's body: Sema's per-instance facts are
 // keyed by its symbol.
-fn specialization_builder(sema: &Sema, ast_pool: AstPool, pool: InternPool, mono_sym: i32) -> MirBuilder:
+fn specialization_builder(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, mono_sym: i32) -> MirBuilder:
     var builder = MirBuilder.init(sema, ast_pool, pool, mono_sym)
     builder.body.instance_sym = mono_sym
     builder
 
 // `instance_sym`: the specialization a generic gen fn's producer belongs to
 // (0 for a non-generic one).
-fn lower_generator_functions(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32, instance_sym: i32) -> LoweredFunction:
+fn lower_generator_functions(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32, instance_sym: i32) -> LoweredFunction:
     let run_sym: i32 = sema.generator_fn_run_syms.get(fn_sym).unwrap()
     var producer_builder = MirBuilder.init(sema, ast_pool, pool, mir_symbol_for_pool(sema, pool, run_sym))
     producer_builder.body.instance_sym = instance_sym
@@ -19330,7 +19330,7 @@ fn lower_generator_functions(sema: &Sema, ast_pool: AstPool, pool: InternPool, f
 
 // D69 (§13.4): the generator value's `move fn each(body)` hands its stored
 // arguments and `body` to the producer, which runs the gen fn's body.
-fn lower_generator_each_body(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_sym: i32) -> MirBody:
+fn lower_generator_each_body(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_sym: i32) -> MirBody:
     let each_sym: i32 = sema.generator_fn_each_syms.get(fn_sym).unwrap()
     let run_sym: i32 = sema.generator_fn_run_syms.get(fn_sym).unwrap()
     let state_tid: i32 = sema.generator_fn_state_types.get(fn_sym).unwrap()
@@ -19368,10 +19368,10 @@ fn lower_generator_each_body(sema: &Sema, ast_pool: AstPool, pool: InternPool, f
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     return move builder.body
 
-fn mir_fn_is_generic_template(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32) -> bool:
+fn mir_fn_is_generic_template(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32) -> bool:
     mir_fn_is_generic_template_at(sema, ast_pool, pool, fn_node, -1)
 
-fn mir_fn_is_generic_template_at(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, decl_index: i32) -> bool:
+fn mir_fn_is_generic_template_at(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32, decl_index: i32) -> bool:
     let meta = ast_pool.find_fn_meta(fn_node)
     if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
         return true
@@ -19453,7 +19453,7 @@ pub type MirLowerResult {
     mir_module: MirModule,
 }
 
-fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool, specialization: i32) -> ConcreteSpecializationLowerResult:
+fn lower_concrete_specialization(sema: Sema, ast_pool: &AstPool, pool: &InternPool, specialization: i32) -> ConcreteSpecializationLowerResult:
     let fn_node: i32 = sema.concrete_specialization_nodes[specialization]
     let mono_sym: i32 = sema.concrete_specialization_syms[specialization]
     let subst_start: i32 = sema.concrete_specialization_subst_starts[specialization]
@@ -19531,7 +19531,7 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
 // `fn(value: &T) -> str`: the generated form of T, every component formatted
 // with `:?` (lower_debug_form). Sema registered the formatter, its signature
 // and every formatter it calls before the specialization fixpoint ended.
-fn lower_debug_formatter(sema: &Sema, ast_pool: AstPool, pool: InternPool, entry: i32) -> MirBody:
+fn lower_debug_formatter(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, entry: i32) -> MirBody:
     let fn_sym = sema.debug_fmt_fns[entry]
     let sig = sema.debug_fmt_sigs[entry]
     let tid = sema.debug_fmt_tids[entry]
@@ -19555,7 +19555,7 @@ fn lower_debug_formatter(sema: &Sema, ast_pool: AstPool, pool: InternPool, entry
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     return move builder.body
 
-pub fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLowerResult:
+pub fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirLowerResult:
     var sema = input_sema
     sema.prepare_source_line_offsets()
     // #916: lowering a call reads whether its callee may suspend.
@@ -19640,7 +19640,7 @@ pub fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> Mi
 
     MirLowerResult { sema, mir_module: mir_mod }
 
-pub fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: AstPool, pool: InternPool) -> List[i32]:
+pub fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: &AstPool, pool: &InternPool) -> List[i32]:
     let tailrec_syms: List[i32] = List.new()
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)
@@ -19758,14 +19758,14 @@ fn mir_body_has_non_tail_call_to(body: &MirBody, target_sym: i32) -> bool:
             return true
     false
 
-fn tailrec_find_decl(ast_pool: AstPool, fn_sym: i32) -> i32:
+fn tailrec_find_decl(ast_pool: &AstPool, fn_sym: i32) -> i32:
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)
         if ast_pool.kind(decl) == NodeKind.NK_FN_DECL and ast_pool.get_data0(decl) == fn_sym:
             return decl as i32
     0
 
-fn mir_fn_is_tailrec(ast_pool: AstPool, fn_sym: i32) -> i32:
+fn mir_fn_is_tailrec(ast_pool: &AstPool, fn_sym: i32) -> i32:
     let fn_node = tailrec_find_decl(ast_pool, fn_sym)
     if fn_node == 0:
         return 0
@@ -19774,7 +19774,7 @@ fn mir_fn_is_tailrec(ast_pool: AstPool, fn_sym: i32) -> i32:
         return 1
     0
 
-fn mir_tailrec_sig_compatible(sema: &Sema, ast_pool: AstPool, fn_a: i32, fn_b: i32) -> i32:
+fn mir_tailrec_sig_compatible(sema: &Sema, ast_pool: &AstPool, fn_a: i32, fn_b: i32) -> i32:
     let sig_a = sema.get_sig(fn_a)
     let sig_b = sema.get_sig(fn_b)
     if sig_a < 0 or sig_b < 0:
@@ -20096,7 +20096,7 @@ impl MirModule:
             syms.push(self.bodies[body_idx].fn_sym)
         syms
 
-    mut fn verify_tailrec_contracts(sema: &Sema, ast_pool: AstPool, tailrec_syms: &List[i32]) -> List[TailrecViolation]:
+    mut fn verify_tailrec_contracts(sema: &Sema, ast_pool: &AstPool, tailrec_syms: &List[i32]) -> List[TailrecViolation]:
         let violations: List[TailrecViolation] = List.new()
         let body_count = self.body_count()
         var processed: List[i32] = List.new()

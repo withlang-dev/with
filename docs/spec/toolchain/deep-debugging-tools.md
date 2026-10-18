@@ -414,7 +414,7 @@ on any violation.
 `audit:pool-views` (also in `audit:all`, #1323) finds a reference into a
 growable pool that is still read after the pool may have grown — the
 `let name = intern.resolve(sym)` … `intern.intern(…)` … `name ++ …` shape that
-segfaulted the release compiler. `InternPool` lives behind a Copy `*mut`
+segfaulted the release compiler. `InternPool` lives behind a counted `*mut`
 handle, so the ordinary view-invalidation check cannot see the aliasing; the
 audit derives every role from the live MIR instead of names: a *pool field* is
 the `F` in `<place>.F[i]` whose element some body returns a `ref` to (through

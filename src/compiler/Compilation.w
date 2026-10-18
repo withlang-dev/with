@@ -73,7 +73,7 @@ fn compilation_debug_pool_flow_enabled() -> i32:
         return 0
     1
 
-fn compilation_debug_pool_flow(label: &str, pool: InternPool, typed_pool: AstPool, sema: &Sema):
+fn compilation_debug_pool_flow(label: &str, pool: &InternPool, typed_pool: &AstPool, sema: &Sema):
     if compilation_debug_pool_flow_enabled() == 0:
         return
     runtime_eprint(f"[comp] {label} pool.symbols={pool.state.symbol_texts.len()} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.state.symbol_texts.len()} sema.ast.decls={sema.ast.decl_count()}")
@@ -141,7 +141,7 @@ fn compilation_debug_type_names_enabled() -> i32:
         return 0
     1
 
-fn compilation_dump_type_names(stage: &str, pool: AstPool, intern: InternPool):
+fn compilation_dump_type_names(stage: &str, pool: &AstPool, intern: &InternPool):
     if compilation_debug_type_names_enabled() == 0:
         return
     runtime_eprint(f"[type-names] stage={stage} decls={pool.decl_count()}")
@@ -164,7 +164,7 @@ fn compilation_dump_type_names(stage: &str, pool: AstPool, intern: InternPool):
         let msg = f"[type-names] {stage} decl={di} node={decl as i32} kind={kind_name} name_sym={name_sym} name={name}"
         runtime_eprint(msg)
 
-fn compilation_find_fn_decl_index(pool: AstPool, fn_sym: i32) -> i32:
+fn compilation_find_fn_decl_index(pool: &AstPool, fn_sym: i32) -> i32:
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_FN_DECL:
@@ -173,7 +173,7 @@ fn compilation_find_fn_decl_index(pool: AstPool, fn_sym: i32) -> i32:
             return di
     -1
 
-fn compilation_mir_error_span(zcu: &Zcu, pool: AstPool, fn_sym: i32, raw_span: i32) -> Span:
+fn compilation_mir_error_span(zcu: &Zcu, pool: &AstPool, fn_sym: i32, raw_span: i32) -> Span:
     let decl_index = compilation_find_fn_decl_index(pool, fn_sym)
     if decl_index >= 0:
         let decl = pool.get_decl(decl_index)
@@ -188,7 +188,7 @@ fn compilation_mir_error_span(zcu: &Zcu, pool: AstPool, fn_sym: i32, raw_span: i
 
 // A span inside the function `fn_sym` is defined in: its file, the given
 // byte range (a MIR pass names a call or statement by its AST node).
-fn compilation_mir_span_range(zcu: &Zcu, pool: AstPool, fn_sym: i32, start: i32, end: i32) -> Span:
+fn compilation_mir_span_range(zcu: &Zcu, pool: &AstPool, fn_sym: i32, start: i32, end: i32) -> Span:
     let decl_index = compilation_find_fn_decl_index(pool, fn_sym)
     let file_id = if decl_index >= 0: zcu.decl_source_file_id_frontend(decl_index) else: 0
     let s = if start > 0: start else: 0
@@ -277,7 +277,7 @@ fn compilation_parse_i32(text: &str) -> i32:
         i = i + 1
     value * sign
 
-fn compilation_decl_index_for_node(pool: AstPool, node: NodeId) -> i32:
+fn compilation_decl_index_for_node(pool: &AstPool, node: NodeId) -> i32:
     for di in 0..pool.decl_count():
         if pool.get_decl(di) == node:
             return di
@@ -312,7 +312,7 @@ fn compilation_span_file_id_for_path(zcu: &Zcu, path: &str) -> i32:
             return zcu.decl_source_file_id_frontend(di)
     0
 
-fn compilation_type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
+fn compilation_type_decl_is_pub(pool: &AstPool, extra_start: i32, sub_kind: i32) -> bool:
     if sub_kind == TypeDeclKind.Struct or sub_kind == TypeDeclKind.Union:
         let field_count = pool.get_extra(extra_start)
         let vis_idx = extra_start + 1 + field_count * 4
@@ -782,7 +782,7 @@ impl Compilation:
             return ""
         self.dump_project_info(pool)
 
-    fn dump_project_info(pool: AstPool) -> str:
+    fn dump_project_info(pool: &AstPool) -> str:
         let taken_zcu = &self.zcu
         var function_count = 0
         var type_count = 0
@@ -845,7 +845,7 @@ impl Compilation:
                 out = out ++ f"type path={path} name={name} pub={compilation_bool_digit(is_pub)} kind={kind_name} span={pool.get_start(decl)}..{pool.get_end(decl)}\n"
         out
 
-    fn project_info_source(pool: AstPool) -> str:
+    fn project_info_source(pool: &AstPool) -> str:
         let taken_zcu = &self.zcu
         var out = "fn __with_compiler_hook_project_info() -> ProjectInfo:\n"
         out = out ++ "    var project = ProjectInfo.new()\n"
@@ -882,7 +882,7 @@ impl Compilation:
                 out = out ++ "    project = project.add_type(TypeInfo.new(\"" ++ compilation_escape_with_string(module_name) ++ "\", \"" ++ compilation_escape_with_string(name) ++ "\", " ++ (if is_pub: "true" else: "false") ++ ", false, \"" ++ kind_name ++ "\", " ++ loc ++ "))\n"
         out ++ "    project\n"
 
-fn compilation_compiler_hook_arg_for_type(pool: AstPool, intern: InternPool, type_node: i32) -> str:
+fn compilation_compiler_hook_arg_for_type(pool: &AstPool, intern: &InternPool, type_node: i32) -> str:
     let rendered = render_type_expr(pool, intern, type_node as NodeId)
     if rendered == "ProjectInfo":
         return "project"
@@ -892,7 +892,7 @@ fn compilation_compiler_hook_arg_for_type(pool: AstPool, intern: InternPool, typ
         return "source_emitter"
     ""
 
-fn compilation_compiler_hook_call_args(pool: AstPool, intern: InternPool, hook_node: NodeId) -> str:
+fn compilation_compiler_hook_call_args(pool: &AstPool, intern: &InternPool, hook_node: NodeId) -> str:
     let meta = pool.find_fn_meta(hook_node)
     if meta < 0:
         return ""
@@ -910,7 +910,7 @@ fn compilation_compiler_hook_call_args(pool: AstPool, intern: InternPool, hook_n
     out
 
 impl Compilation:
-    fn compiler_hook_runner_source(pool: AstPool, source_path: &str, diag_path: &str, emitted_source_path: &str, token: &str) -> str:
+    fn compiler_hook_runner_source(pool: &AstPool, source_path: &str, diag_path: &str, emitted_source_path: &str, token: &str) -> str:
         let taken_zcu = &self.zcu
         let root = if taken_zcu.project_config.root_dir.len() > 0: taken_zcu.project_config.root_dir.clone() else: frontend_dirname(source_path)
         let hook_count = pool.compiler_hook_count()
@@ -975,7 +975,7 @@ impl Compilation:
             self.zcu.render_all_diagnostics_frontend()
         emitted
 
-    mut fn run_after_typecheck_hooks(pool: AstPool, source_path: &str) -> bool:
+    mut fn run_after_typecheck_hooks(pool: &AstPool, source_path: &str) -> bool:
         self.compiler_hook_emitted_source = ""
         if pool.compiler_hook_count() == 0:
             return true
@@ -1042,13 +1042,13 @@ impl Compilation:
         self.compiler_hook_emitted_source = emitted_source
         true
 
-    mut fn prepare_pool_after_typecheck_hooks(pool: AstPool, source_path: &str) -> AstPool:
+    mut fn prepare_pool_after_typecheck_hooks(pool: &AstPool, source_path: &str) -> AstPool:
         if pool.decl_count() == 0:
-            return pool
+            return pool.clone()
         if not self.run_after_typecheck_hooks(pool, source_path):
             return AstPool.new()
         if self.compiler_hook_emitted_source.len() == 0:
-            return pool
+            return pool.clone()
         let base_source = if self.zcu.current_source_text.len() > 0: self.zcu.current_source_text.clone() else: runtime_read_file(source_path)
         let cfg = move self.zcu.project_config
         let combined = base_source ++ "\n\n// <with compiler hook emitted source>\n" ++ self.compiler_hook_emitted_source
@@ -1058,10 +1058,10 @@ impl Compilation:
     fn has_errors() -> bool:
         self.zcu.diagnostics.has_errors()
 
-    fn get_pool() -> InternPool:
+    fn get_pool() -> &InternPool:
         self.zcu.pool
 
-    mut fn emit_ir(pool: AstPool) -> bool:
+    mut fn emit_ir(pool: &AstPool) -> bool:
         let source_path = self.zcu.current_source_path.clone()
         let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, source_path)
         if prepared_pool.decl_count() == 0:
@@ -1187,7 +1187,7 @@ impl Compilation:
         self.zcu = taken_zcu
         pool
 
-    mut fn check_pool(pool: AstPool, source_path: &str) -> bool:
+    mut fn check_pool(pool: &AstPool, source_path: &str) -> bool:
         if pool.decl_count() == 0:
             return false
         if self.zcu.frontend_sema_completed == 0:
@@ -1216,7 +1216,7 @@ impl Compilation:
             return false
         self.check_pool(pool, source_paths[0])
 
-    mut fn prepare_binary_link_from_pool(pool: AstPool, source_path: &str, obj_path: &str, bin_path: &str) -> CompilationBinaryLinkPlan:
+    mut fn prepare_binary_link_from_pool(pool: &AstPool, source_path: &str, obj_path: &str, bin_path: &str) -> CompilationBinaryLinkPlan:
         self.last_link_command_available = 0
         self.last_link_command = link_stage_empty_command()
         self.last_link_rc = 0
@@ -1356,7 +1356,7 @@ pub fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationB
     link_result
 
 impl Compilation:
-    mut fn finish_binary_from_pool(pool: AstPool, source_path: &str, obj_path: &str, bin_path: &str) -> str:
+    mut fn finish_binary_from_pool(pool: &AstPool, source_path: &str, obj_path: &str, bin_path: &str) -> str:
         let link_plan = self.prepare_binary_link_from_pool(pool, source_path, obj_path, bin_path)
         self.execute_binary_link_plan(link_plan)
 
@@ -1625,9 +1625,7 @@ impl Compilation:
         if not compilation_ensure_output_dir(link_stage_dirname(final_output)):
             return ""
 
-        var emit_intern = self.zcu.pool
-        if self.zcu.last_sema.pool.state.symbol_texts.len() > 1:
-            emit_intern = self.zcu.last_sema.pool
+        let emit_intern = if self.zcu.last_sema.pool.symbol_count() > 0: self.zcu.last_sema.pool.clone() else: self.zcu.pool.clone()
         let emitted = c_emit_module(move self.zcu.last_mir_module, typed_pool, emit_intern, move self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text, self.zcu.project_config.overflow_mode, self.emit_all)
         if emitted.ok == 0:
             runtime_eprint("error: C emission failed: " ++ emitted.err_msg)
@@ -1640,9 +1638,9 @@ impl Compilation:
 
         final_output
 
-    mut fn emit_typed(pool: AstPool) -> bool:
+    mut fn emit_typed(pool: &AstPool) -> bool:
         var taken_zcu = move self.zcu
-        let typed_pool = pool
+        let typed_pool = pool.clone()
         if typed_pool.decl_count() == 0:
             runtime_eprint("error: no source loaded for typed emission")
             return false
@@ -1701,7 +1699,7 @@ impl Compilation:
             return false
         self.emit_typed(pool)
 
-    mut fn print_mir(pool: AstPool) -> bool:
+    mut fn print_mir(pool: &AstPool) -> bool:
         if self.zcu.last_mir_module.body_count() == 0:
             let _ = self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
@@ -1715,7 +1713,7 @@ impl Compilation:
             return false
         self.print_mir(pool)
 
-    mut fn dump_drop_state(pool: AstPool) -> str:
+    mut fn dump_drop_state(pool: &AstPool) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
             let _ = self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
@@ -1728,7 +1726,7 @@ impl Compilation:
             return ""
         self.dump_drop_state(pool)
 
-    mut fn trace_place(pool: AstPool, spec: &str) -> str:
+    mut fn trace_place(pool: &AstPool, spec: &str) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
             let _ = self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
@@ -1741,7 +1739,7 @@ impl Compilation:
             return ""
         self.trace_place(pool, spec)
 
-    mut fn explain_mir_origin(pool: AstPool, spec: &str) -> str:
+    mut fn explain_mir_origin(pool: &AstPool, spec: &str) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
             let _ = self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
@@ -1754,7 +1752,7 @@ impl Compilation:
             return ""
         self.explain_mir_origin(pool, spec)
 
-    mut fn trace_ownership(pool: AstPool, spec: &str) -> str:
+    mut fn trace_ownership(pool: &AstPool, spec: &str) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
             let _ = self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
@@ -1767,7 +1765,7 @@ impl Compilation:
             return ""
         self.trace_ownership(pool, spec)
 
-    mut fn dump_drop_plan(pool: AstPool) -> str:
+    mut fn dump_drop_plan(pool: &AstPool) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
             let _ = self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
@@ -1780,7 +1778,7 @@ impl Compilation:
             return ""
         self.dump_drop_plan(pool)
 
-    mut fn dump_place_map(pool: AstPool) -> str:
+    mut fn dump_place_map(pool: &AstPool) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
             let _ = self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
@@ -1883,7 +1881,7 @@ pub fn compiler_analyze_file(source_path: &str, request: &str) -> CompilerAnalys
     comp.analyze_file(source_path, request)
 
 impl Compilation:
-    mut fn trace_cleanup_edge(pool: AstPool, spec: &str) -> str:
+    mut fn trace_cleanup_edge(pool: &AstPool, spec: &str) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
             let _ = self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
@@ -1924,7 +1922,7 @@ impl Compilation:
             return mir_name_fn_syms(mir_err, &self.zcu.pool)
         "ok"
 
-    mut fn dump_async_mir(pool: AstPool) -> str:
+    mut fn dump_async_mir(pool: &AstPool) -> str:
         if self.zcu.last_async_mir_module.body_count() == 0:
             let _ = self.run_async_mir_lower(pool)
         if self.zcu.last_async_mir_module.body_count() == 0:
@@ -1950,13 +1948,13 @@ impl Compilation:
             out.push(with_str_clone_ref(self.zcu.tracked_input_paths[i]))
         out
 
-    fn active_pool(pool: AstPool) -> AstPool:
+    fn active_pool(pool: &AstPool) -> AstPool:
         if self.zcu.typed_pool_cache.decl_count() > 0:
-            self.zcu.typed_pool_cache.require_same_storage(&pool, "Compilation.active_pool")
-            return self.zcu.typed_pool_cache
-        pool
+            self.zcu.typed_pool_cache.require_same_storage(pool, "Compilation.active_pool")
+            return self.zcu.typed_pool_cache.clone()
+        pool.clone()
 
-    mut fn run_mir_lower(pool: AstPool) -> Unit:
+    mut fn run_mir_lower(pool: &AstPool):
         let do_profile = profile_enabled()
         let active_pool = pool
         compilation_debug_pool_flow("run_mir_lower:start", self.zcu.pool, active_pool, self.zcu.last_sema)
@@ -2135,14 +2133,14 @@ impl Compilation:
         var async_mod = move async_artifacts.out_mod
         self.zcu.set_codegen_snapshot(move mir_mod, "", move async_mod, "")
 
-    mut fn run_async_mir_lower(pool: AstPool) -> Unit:
+    mut fn run_async_mir_lower(pool: &AstPool):
         let _ = self.run_mir_lower(pool)
         if self.zcu.diagnostics.has_errors():
             var mir_snapshot = move self.zcu.last_mir_module
             self.zcu.set_codegen_snapshot(move mir_snapshot, self.zcu.last_mir_dump, AsyncMirModule.init(), "")
             return
 
-    mut fn ensure_codegen_mir(pool: AstPool) -> bool:
+    mut fn ensure_codegen_mir(pool: &AstPool) -> bool:
         if self.zcu.last_mir_module.body_count() == 0:
             let _ = self.run_mir_lower(pool)
         if self.zcu.diagnostics.has_errors():

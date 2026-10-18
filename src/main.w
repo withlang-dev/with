@@ -1037,8 +1037,7 @@ fn run_cli(full_argc: i32) -> i32:
             comp.print_warnings()
             with_eprint("error: emit-c-header: compilation failed")
             return 1
-        let sema = comp.zcu.last_sema
-        with_write(sema.cheader_generate("WITH_C_EXPORT_H"))
+        with_write(comp.zcu.last_sema.cheader_generate("WITH_C_EXPORT_H"))
         return 0
     if cli_command(argc) == "ir":
         if source == "":
@@ -4000,7 +3999,6 @@ fn dump_ast(source_file: &str, no_std: bool, alloc_mode: bool, include_header: b
     var diags = DiagnosticList.init()
     var parser = Parser.init(move tokens, text, 0, intern, move diags)
     let pool = parser.parse_module()
-    intern = parser.intern
     diags = move parser.diags
 
     if diags.has_errors():
@@ -4274,7 +4272,6 @@ fn discover_test_functions(text: &str) -> TestDiscovery:
     var diags = DiagnosticList.init()
     var parser = Parser.init(move tokens, text, 0, intern, move diags)
     let pool = parser.parse_module()
-    intern = parser.intern
     diags = move parser.diags
 
     let test_names: List[str] = List.new()
@@ -4305,7 +4302,6 @@ fn discover_bench_functions(text: &str) -> BenchDiscovery:
     var diags = DiagnosticList.init()
     var parser = Parser.init(move tokens, text, 0, intern, move diags)
     let pool = parser.parse_module()
-    intern = parser.intern
     diags = move parser.diags
 
     let bench_names: List[str] = List.new()

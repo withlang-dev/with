@@ -140,7 +140,7 @@ fn Zcu.init -> Zcu:
     let sema_seed: Sema = Sema.placeholder(pool, DiagnosticList.init(), AstPool.new())
     zcu_debug_init("Zcu.init:sema_seed")
     Zcu {
-        pool: pool,
+        pool: pool.clone(),
         frontend_pool: pool,
         // Zcu owns the active diagnostic list. The placeholder snapshot has an
         // independent empty list so neither field aliases or moves from the other.
@@ -264,7 +264,7 @@ impl Zcu:
             out.push(zcu_owned_text(self.import_conflicts[i]))
         out
 
-    mut fn seed_decl_source_paths(new_pool: AstPool, path: &str, file_id: i32):
+    mut fn seed_decl_source_paths(new_pool: &AstPool, path: &str, file_id: i32):
         self.decl_source_paths = List.new()
         self.decl_source_file_ids = List.new()
         self.decl_is_c_import = List.new()
@@ -510,16 +510,16 @@ impl Zcu:
     mut fn set_pending_warnings(warnings: List[str]):
         self.pending_warnings = warnings
 
-    mut fn set_pool(new_pool: InternPool):
-        self.pool = new_pool
+    mut fn set_pool(new_pool: &InternPool):
+        self.pool = new_pool.clone()
 
-    mut fn set_frontend_pool(new_pool: InternPool):
-        self.frontend_pool = new_pool
+    mut fn set_frontend_pool(new_pool: &InternPool):
+        self.frontend_pool = new_pool.clone()
 
     mut fn sync_from_sema(sema: Sema):
         if zcu_debug_pool_flow_enabled() != 0:
-            runtime_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.state.symbol_texts.len()} sema.pool={sema.pool.state.symbol_texts.len()} sema.ast.decls={sema.ast.decl_count()}")
-        self.pool = sema.pool
+            runtime_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.symbol_count()} sema.pool={sema.pool.symbol_count()} sema.ast.decls={sema.ast.decl_count()}")
+        self.pool = sema.pool.clone()
         var tracked_paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &sema.tracked_input_paths)
         // Callers move sema.diags into Zcu.diagnostics before syncing. The moved
@@ -529,7 +529,7 @@ impl Zcu:
         sema.diags = DiagnosticList.init()
         self.last_sema = sema
         if zcu_debug_pool_flow_enabled() != 0:
-            runtime_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.state.symbol_texts.len()} last_sema.pool={self.last_sema.pool.state.symbol_texts.len()} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
+            runtime_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.symbol_count()} last_sema.pool={self.last_sema.pool.symbol_count()} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
 
     mut fn set_resolve_snapshot(result: &ResolveResult, root_path: &str):
         let modules: List[ResolvedModule] = List.new()
@@ -591,9 +591,9 @@ impl Zcu:
         }
         self.resolved_root_path = zcu_owned_text(root_path)
 
-    mut fn set_typed_snapshot(typed_dump: &str, typed_pool: AstPool):
+    mut fn set_typed_snapshot(typed_dump: &str, typed_pool: &AstPool):
         self.last_typed_dump = with_str_clone_ref(typed_dump)
-        self.typed_pool_cache = typed_pool
+        self.typed_pool_cache = typed_pool.clone()
 
     mut fn set_codegen_snapshot(mir_mod: MirModule, mir_dump: &str, async_mod: AsyncMirModule, async_dump: &str):
         self.last_mir_module = mir_mod
@@ -608,7 +608,7 @@ impl Zcu:
         let empty = zcu_new_list_str()
         self.last_link_lib_names = empty
 
-    mut fn capture_last_link_lib_names(new_pool: InternPool, result: &ResolveResult):
+    mut fn capture_last_link_lib_names(new_pool: &InternPool, result: &ResolveResult):
         self.reset_last_link_lib_names()
         for li in 0..result.link_libs.len():
             let lib_sym = result.link_libs[li]

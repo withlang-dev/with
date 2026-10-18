@@ -197,7 +197,7 @@ fn resolve_normalize_source_text(text: &str) -> str:
         i = i + 1
     out.to_str()
 
-fn resolve_from_root_pool(root_path: &str, root_text: &str, root_file_id: i32, root_pool: AstPool, pool: InternPool, diags: DiagnosticList, emit_resolve_diags: bool) -> ResolveArtifacts:
+fn resolve_from_root_pool(root_path: &str, root_text: &str, root_file_id: i32, root_pool: &AstPool, pool: &InternPool, diags: DiagnosticList, emit_resolve_diags: bool) -> ResolveArtifacts:
     resolve_from_root_pool_with_prefix(root_path, root_text, root_file_id, root_pool, pool, move diags, emit_resolve_diags, 0, 1)
 
 // `first_file_id` is the caller's next unused file id: imported modules are
@@ -205,7 +205,7 @@ fn resolve_from_root_pool(root_path: &str, root_text: &str, root_file_id: i32, r
 // registered (#930 — the resolver and the frontend each counted from 1, and
 // an imported module's parse error rendered against the embedded stdlib
 // text that shared its number).
-pub fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_file_id: i32, root_pool: AstPool, pool: InternPool, diags: DiagnosticList, emit_resolve_diags: bool, root_prefix_skip: i32, first_file_id: i32) -> ResolveArtifacts:
+pub fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_file_id: i32, root_pool: &AstPool, pool: &InternPool, diags: DiagnosticList, emit_resolve_diags: bool, root_prefix_skip: i32, first_file_id: i32) -> ResolveArtifacts:
     var state = ResolveState.init(pool, move diags, emit_resolve_diags)
     state.root_prefix_skip = root_prefix_skip
     state.next_file_id = first_file_id
@@ -246,7 +246,6 @@ pub fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root
             if src.interface:
                 parser.enable_interface_mode()
             let parsed = parser.parse_module()
-            state.pool = parser.intern
             state.diags = move parser.diags
             state.process_module_with_pool(work, text, parsed)
 
@@ -254,7 +253,7 @@ pub fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root
 
     let modules = state.build_module_table()
     ResolveArtifacts {
-        pool: state.pool,
+        pool: move state.pool,
         diags: move state.diags,
         result: ResolveResult {
             modules,
@@ -275,9 +274,9 @@ pub fn resolve_interface_use_lines(text: &str) -> str:
             out = out ++ lines[i] ++ "\n"
     out
 
-fn ResolveState.init(pool: InternPool, diags: DiagnosticList, emit_resolve_diags: bool) -> ResolveState:
+fn ResolveState.init(pool: &InternPool, diags: DiagnosticList, emit_resolve_diags: bool) -> ResolveState:
     ResolveState {
-        pool,
+        pool: pool.clone(),
         diags,
         result: ResolveResult.init(),
         module_paths: resolve_new_list_str(),
@@ -297,13 +296,13 @@ fn ResolveState.init(pool: InternPool, diags: DiagnosticList, emit_resolve_diags
         root_prefix_skip: 0,
     }
 
-fn resolve_node_valid(pool: AstPool, node: i32) -> bool:
+fn resolve_node_valid(pool: &AstPool, node: i32) -> bool:
     node > 0 and node < pool.node_count()
 
-fn resolve_extra_valid(pool: AstPool, idx: i32) -> bool:
+fn resolve_extra_valid(pool: &AstPool, idx: i32) -> bool:
     idx >= 0 and idx < pool.extra_len()
 
-fn resolve_extra_or_zero(pool: AstPool, idx: i32) -> i32:
+fn resolve_extra_or_zero(pool: &AstPool, idx: i32) -> i32:
     if not resolve_extra_valid(pool, idx):
         return 0
     pool.get_extra(idx)
@@ -352,7 +351,7 @@ impl ResolveState:
             })
         out
 
-    mut fn process_module_with_pool(module_id: i32, source_text: &str, ast_pool: AstPool):
+    mut fn process_module_with_pool(module_id: i32, source_text: &str, ast_pool: &AstPool):
         self.module_processed[module_id] = 1
         // #682-inc1: root's own decl count excludes the prelude prefix
         // (decl 0's use plus everything from the skip boundary on).
@@ -507,7 +506,7 @@ fn resolve_decl_def_kind(kind: i32) -> i32:
     if kind == NodeKind.NK_IMPL_DECL: return DefKind.DK_IMPL
     -1
 
-fn resolve_decl_name(pool: AstPool, decl: NodeId) -> i32:
+fn resolve_decl_name(pool: &AstPool, decl: NodeId) -> i32:
     let kind = pool.kind(decl)
     if kind == NodeKind.NK_FN_DECL: return pool.get_data0(decl)
     if kind == NodeKind.NK_TYPE_DECL: return pool.get_data0(decl)
@@ -553,7 +552,7 @@ impl ResolveState:
         })
         self.binding_map.insert(resolve_binding_key(scope_id, symbol), def_id)
 
-    fn resolve_fn_body(ast_pool: AstPool, module_id: i32, module_scope: i32, fn_node: i32, fn_def: i32, walk_body: bool):
+    fn resolve_fn_body(ast_pool: &AstPool, module_id: i32, module_scope: i32, fn_node: i32, fn_def: i32, walk_body: bool):
         let fn_scope = self.add_scope(module_id, module_scope, fn_def, ScopeKind.SK_FN)
 
         // Register parameters as defs/bindings in function scope.
@@ -579,7 +578,7 @@ impl ResolveState:
         if walk_body and not ast_pool.fn_decl_body_is_interface(fn_node) and resolve_node_valid(ast_pool, body):
             self.walk_expr(ast_pool, module_id, fn_def, fn_scope, body)
 
-    fn walk_type_expr(ast_pool: AstPool, module_id: i32, current_scope: i32, node: i32):
+    fn walk_type_expr(ast_pool: &AstPool, module_id: i32, current_scope: i32, node: i32):
         if not resolve_node_valid(ast_pool, node):
             return
         let kind = ast_pool.kind(node)
@@ -625,7 +624,7 @@ impl ResolveState:
             self.walk_type_expr(ast_pool, module_id, current_scope, ast_pool.get_data2(node))
             return
 
-    fn walk_expr(ast_pool: AstPool, module_id: i32, parent_def: i32, current_scope: i32, node: i32):
+    fn walk_expr(ast_pool: &AstPool, module_id: i32, parent_def: i32, current_scope: i32, node: i32):
         if not resolve_node_valid(ast_pool, node):
             return
 
@@ -993,7 +992,7 @@ impl ResolveState:
                 self.walk_expr(ast_pool, module_id, parent_def, arm_scope, arm_body)
             return
 
-    fn bind_pattern(ast_pool: AstPool, module_id: i32, parent_def: i32, current_scope: i32, pat: i32):
+    fn bind_pattern(ast_pool: &AstPool, module_id: i32, parent_def: i32, current_scope: i32, pat: i32):
         if not resolve_node_valid(ast_pool, pat):
             return
 
@@ -1078,7 +1077,7 @@ impl ResolveState:
                 self.add_binding(current_scope, rest_sym, d)
             return
 
-    fn record_identifier_use(ast_pool: AstPool, module_id: i32, current_scope: i32, node: i32, sym: i32):
+    fn record_identifier_use(ast_pool: &AstPool, module_id: i32, current_scope: i32, node: i32, sym: i32):
         if sym <= 0 or (not resolve_node_valid(ast_pool, node)):
             return
 
@@ -1107,7 +1106,7 @@ impl ResolveState:
 
         -1
 
-    fn use_path_dotted(ast_pool: AstPool, path_start: i32, path_count: i32) -> str:
+    fn use_path_dotted(ast_pool: &AstPool, path_start: i32, path_count: i32) -> str:
         var out = ""
         for i in 0..path_count:
             if i > 0:
@@ -1156,7 +1155,7 @@ impl ResolveState:
     // resolve_use_file for a dotted name: the embedded std tree first, then
     // the module's directory, the root's, and the parent module of the path.
     // An in-place resource (`init`) not declared `movable` is pinned (D54).
-    fn facade_declares_pinned_resource(ast_pool: AstPool, facade: NodeId) -> bool:
+    fn facade_declares_pinned_resource(ast_pool: &AstPool, facade: NodeId) -> bool:
         let extra_start = ast_pool.get_data1(facade)
         for i in 0..ast_pool.get_data2(facade):
             let item = ast_pool.get_extra(extra_start + i)
@@ -1176,7 +1175,7 @@ impl ResolveState:
     // A facade whose fn item keeps or hands C a userdata value (stage 9,
     // spec §16.2b.9: `retains … by`, `consumes … destroyed_by`, `callback …
     // userdata`) renders it through a `Box` cell the same way.
-    fn facade_declares_kept_userdata(ast_pool: AstPool, facade: NodeId) -> bool:
+    fn facade_declares_kept_userdata(ast_pool: &AstPool, facade: NodeId) -> bool:
         let extra_start = ast_pool.get_data1(facade)
         for i in 0..ast_pool.get_data2(facade):
             let item = ast_pool.get_extra(extra_start + i)
@@ -1226,7 +1225,7 @@ impl ResolveState:
                 return self.resolve_module_rel(self.root_source_dir, rel_fallback)
         ""
 
-    fn resolve_use_file(module_id: i32, ast_pool: AstPool, path_start: i32, path_count: i32) -> str:
+    fn resolve_use_file(module_id: i32, ast_pool: &AstPool, path_start: i32, path_count: i32) -> str:
         if path_count <= 0:
             return ""
 
@@ -1653,7 +1652,7 @@ fn resolved_scope_kind_name(kind: i32) -> str:
     if kind == ScopeKind.SK_COMPREHENSION: return "comprehension"
     "unknown"
 
-fn print_resolved(result: &ResolveResult, pool: InternPool, root_path: &str):
+fn print_resolved(result: &ResolveResult, pool: &InternPool, root_path: &str):
     with_write(f"resolved root={root_path} modules={result.modules.len()} defs={result.defs.len()}\n")
 
     for mi in 0..result.modules.len():
@@ -1690,7 +1689,7 @@ fn print_resolved(result: &ResolveResult, pool: InternPool, root_path: &str):
             line = line ++ pool.resolve(result.link_libs[li])
         with_write(line ++ "\n")
 
-pub fn dump_resolved(result: &ResolveResult, pool: InternPool, root_path: &str) -> str:
+pub fn dump_resolved(result: &ResolveResult, pool: &InternPool, root_path: &str) -> str:
     var out = ""
     out = out ++ f"resolved root={root_path} modules={result.modules.len()} defs={result.defs.len()}\n"
 

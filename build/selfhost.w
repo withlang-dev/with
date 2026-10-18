@@ -5,6 +5,7 @@ use build.par
 use pcre2
 use std.build
 use std.process
+use std.string.parse
 use std.sysinfo
 fn selfhost_owned_text(s: &str): s ++ ""
 
@@ -931,6 +932,8 @@ pub fn run_cli_selfhost_lsp_action(ctx: ActionCtx) -> i32:
     rc = bs_check_lsp_dot_completion(ctx, compiler_path)
     if rc != 0: return rc
     rc = bs_check_lsp_references_rename_hover(ctx, compiler_path)
+    if rc != 0: return rc
+    rc = bs_check_lsp_memory_flat(ctx, compiler_path)
     if rc != 0: return rc
     bs_check_lsp_prelude_trait_scope_slow(ctx, compiler_path)
 
@@ -9677,3 +9680,42 @@ pub fn run_cli_selfhost_object_symbol_action(ctx: ActionCtx) -> i32:
     let nm_arg = if args.len() > 0: selfhost_owned_text(args[0]) else: "nm"
     let nm_tool = bs_build_w_tool_from_env("NM", nm_arg)
     bs_check_object_symbols(ctx, compiler_path, nm_tool, bs_join(output_dir, "cases"))
+
+// #2449: the server's footprint stays flat across reparses. Every edit once
+// leaked its intern pool's 1 MB arena page and node tables (both were Copy
+// handles with no Drop); peak RSS grew about half a megabyte per edit. The
+// runtime's committed byte count, asked through `with/memory` before and
+// after fifty edits, may grow by less than a megabyte.
+fn bs_lsp_memory_request(id: i32) -> str:
+    "{\"jsonrpc\":\"2.0\",\"id\":" ++ f"{id}" ++ ",\"method\":\"with/memory\",\"params\":{}}"
+
+fn bs_lsp_committed_bytes(stdout: &str, id: i32) -> i64:
+    let marker = "\"id\":" ++ f"{id}" ++ ",\"result\":{\"committedBytes\":"
+    let at = stdout.find(marker)
+    if at < 0: return -1
+    var end = at + marker.len()
+    while end < stdout.len() and stdout.byte_at(end) >= 48 and stdout.byte_at(end) <= 57: end = end + 1
+    let bytes: i64 = parse(stdout.slice(at + marker.len(), end))
+    bytes
+
+fn bs_check_lsp_memory_flat(ctx: &ActionCtx, compiler_path: &str) -> i32:
+    let init = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"capabilities\":{}}}"
+    let uri = "file:///tmp/lsp_memory.w"
+    let didopen = "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":\"" ++ uri ++ "\",\"languageId\":\"with\",\"version\":1,\"text\":" ++ bs_json_string("fn main:\n    print(\"a\")\n") ++ "}}}"
+    var input = bs_lsp_frame(init) ++ bs_lsp_frame(didopen) ++ bs_lsp_frame(bs_lsp_memory_request(100))
+    for i in 0..50:
+        let text = bs_json_string("fn main:\n    print(\"a" ++ f"{i}" ++ "\")\n")
+        input = input ++ bs_lsp_frame("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\"params\":{\"textDocument\":{\"uri\":\"" ++ uri ++ "\",\"version\":" ++ f"{i + 2}" ++ "},\"contentChanges\":[{\"text\":" ++ text ++ "}]}}")
+    input = input ++ bs_lsp_frame(bs_lsp_memory_request(101))
+    input = input ++ bs_lsp_frame("{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"shutdown\",\"params\":{}}")
+    input = input ++ bs_lsp_frame("{\"jsonrpc\":\"2.0\",\"method\":\"exit\",\"params\":{}}")
+    let result = bs_run_cli_capture_input(ctx, compiler_path, "lsp-memory-flat", bs_lsp_args(), input, 60000)
+    if result.rc != 0:
+        return bs_fail(ctx, "lsp-memory-flat: the server exited " ++ f"{result.rc}: " ++ result.stderr)
+    let before = bs_lsp_committed_bytes(result.stdout, 100)
+    let after = bs_lsp_committed_bytes(result.stdout, 101)
+    if before < 0 or after < 0:
+        return bs_fail(ctx, "lsp-memory-flat: no with/memory answer in the server's output")
+    if after - before >= 1048576:
+        return bs_fail(ctx, "lsp-memory-flat: the server's committed bytes grew " ++ f"{after - before}" ++ " over 50 edits (" ++ f"{before} -> {after}" ++ "); a reparse leaks")
+    0

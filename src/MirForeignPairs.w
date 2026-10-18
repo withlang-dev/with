@@ -517,7 +517,7 @@ impl PairsBody:
             self.counts.push((self.steps.len() - first) as i32)
             self.build_edges(body, bb)
 
-fn pairs_site_span(ast: AstPool, body: &MirBody, pb: &PairsBody, site: PairsStepSite) -> (i32, i32):
+fn pairs_site_span(ast: &AstPool, body: &MirBody, pb: &PairsBody, site: PairsStepSite) -> (i32, i32):
     // A retained origin that dies or moves is reported at the setter that
     // retained it: the death is a generated drop with no source of its own.
     if (site.kind == PAIRS_SITE_EXPIRE or site.kind == PAIRS_SITE_MOVED) and site.key >= 0 and site.key < pb.origin_bb.len() and pb.origin_bb[site.key] >= 0:
@@ -557,7 +557,7 @@ pub type PairsFinding {
     help: str,
 }
 
-fn pairs_describe(ast: AstPool, sema: &Sema, body: &MirBody, pb: &PairsBody, site: PairsStepSite) -> PairsFinding:
+fn pairs_describe(ast: &AstPool, sema: &Sema, body: &MirBody, pb: &PairsBody, site: PairsStepSite) -> PairsFinding:
     let (start, end) = pairs_site_span(ast, body, pb, site)
     // A dying or moving origin names the resource that retained it: the
     // subject of the setter that did.
@@ -608,7 +608,7 @@ pub type PairsReport {
 }
 
 impl PairsReport:
-    mut fn check_body(ast: AstPool, sema: &Sema, body: &MirBody):
+    mut fn check_body(ast: &AstPool, sema: &Sema, body: &MirBody):
         if body.block_count() <= 0 or not pairs_body_relevant(sema, body):
             return
         var pb = pairs_body_new(body)
@@ -648,7 +648,7 @@ pub fn pairs_dump_enabled() -> bool: with_getenv_str("WITH_DUMP_PAIR_FLOW").len(
 // Every body of the module, after lowering and before codegen
 // (compiler/Compilation.w run_mir_lower): a module with no callback pair
 // costs one table lookup.
-pub fn check_foreign_pairs(mir_mod: &MirModule, ast: AstPool, sema: &Sema) -> PairsReport:
+pub fn check_foreign_pairs(mir_mod: &MirModule, ast: &AstPool, sema: &Sema) -> PairsReport:
     var report = PairsReport { findings: List.new() }
     if sema.facade_pair_ops.len() == 0:
         return report

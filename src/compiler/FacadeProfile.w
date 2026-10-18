@@ -52,7 +52,7 @@ fn facade_profile_glob_at(pattern: &str, pi: i32, name: &str, ni: i32) -> bool:
     facade_profile_glob_at(pattern, pi + 1, name, ni + 1)
 
 // The `c convention` block named `dotted`, or 0.
-pub fn facade_profile_find(pool: AstPool, intern: InternPool, dotted: &str) -> i32:
+pub fn facade_profile_find(pool: &AstPool, intern: &InternPool, dotted: &str) -> i32:
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_C_CONVENTION: continue
@@ -60,7 +60,7 @@ pub fn facade_profile_find(pool: AstPool, intern: InternPool, dotted: &str) -> i
         if have == dotted: return decl as i32
     0
 
-pub fn facade_profile_dotted(pool: AstPool, intern: InternPool, item: i32) -> str:
+pub fn facade_profile_dotted(pool: &AstPool, intern: &InternPool, item: i32) -> str:
     let start = pool.get_data0(item as NodeId)
     var dotted = ""
     for i in 0..pool.get_data1(item as NodeId):
@@ -71,7 +71,7 @@ pub fn facade_profile_dotted(pool: AstPool, intern: InternPool, item: i32) -> st
 // The imported C functions in the pool, one declaring node per name (a
 // c_import may declare a name as both the extern and its wrapper; the
 // first is the one the facade's own clauses resolve, facade_render_find_fn).
-fn facade_profile_imported_fns(pool: AstPool, intern: InternPool, ci: &List[i32]) -> (List[str], List[i32]):
+fn facade_profile_imported_fns(pool: &AstPool, intern: &InternPool, ci: &List[i32]) -> (List[str], List[i32]):
     let names: List[str] = List.new()
     let decls: List[i32] = List.new()
     for di in 0..pool.decl_count():
@@ -89,7 +89,7 @@ fn facade_profile_imported_fns(pool: AstPool, intern: InternPool, ci: &List[i32]
         decls.push(decl as i32)
     (names, decls)
 
-fn facade_profile_p0(pool: AstPool, intern: InternPool, decl: i32) -> str:
+fn facade_profile_p0(pool: &AstPool, intern: &InternPool, decl: i32) -> str:
     if facade_render_param_count(pool, decl) == 0: return ""
     facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, 0))
 
@@ -102,7 +102,7 @@ fn facade_profile_accepts(p0: &str, repr: &str) -> bool:
     if (p0 == "*mut c_void" or p0 == "*const c_void") and repr.starts_with("*"): return true
     p0 == "*mut " ++ repr
 
-fn facade_profile_return(pool: AstPool, intern: InternPool, decl: i32) -> str:
+fn facade_profile_return(pool: &AstPool, intern: &InternPool, decl: i32) -> str:
     let meta = pool.find_fn_meta(decl as NodeId)
     let ret = pool.fn_meta_ret(meta)
     if ret == 0: return ""
@@ -110,7 +110,7 @@ fn facade_profile_return(pool: AstPool, intern: InternPool, decl: i32) -> str:
 
 // Whether `decl` has the shape a resource-rule template of `kind` states
 // over a resource wrapping `repr`.
-fn facade_profile_shape_fits(pool: AstPool, intern: InternPool, decl: i32, kind: i32, out_ref: i32, repr: &str) -> bool:
+fn facade_profile_shape_fits(pool: &AstPool, intern: &InternPool, decl: i32, kind: i32, out_ref: i32, repr: &str) -> bool:
     if kind == FACADE_CLAUSE_FROM:
         if out_ref == 0: return facade_profile_return(pool, intern, decl) == repr
         let pi = facade_render_param_ref(pool, intern, decl, out_ref)
@@ -124,7 +124,7 @@ fn facade_profile_shape_fits(pool: AstPool, intern: InternPool, decl: i32, kind:
 // fact class `kind` would: `drop` is one fact; production (`from`/`init`) is
 // one shape (verify_facade_resource refuses both); a `destroys` is shadowed
 // by any destroy clause naming the same function.
-fn facade_profile_shadowing_clause(pool: AstPool, intern: InternPool, resource: i32, kind: i32, fn_name: &str) -> i32:
+fn facade_profile_shadowing_clause(pool: &AstPool, intern: &InternPool, resource: i32, kind: i32, fn_name: &str) -> i32:
     let extra_start = pool.get_data1(resource as NodeId)
     for k in 0..pool.get_data2(resource as NodeId):
         let clause = pool.get_extra(extra_start + 1 + k)
@@ -138,14 +138,14 @@ fn facade_profile_shadowing_clause(pool: AstPool, intern: InternPool, resource: 
 
 // An fn item anywhere describing `fn_name` (the facade's exception to the
 // profile, ruling §7.2), or 0.
-fn facade_profile_explicit_fn_item(pool: AstPool, intern: InternPool, fn_name: &str) -> i32:
+fn facade_profile_explicit_fn_item(pool: &AstPool, intern: &InternPool, fn_name: &str) -> i32:
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
     for i in 0..items.len():
         let have: str = intern.resolve(pool.get_data0(items[i] as NodeId))
         if have == fn_name: return items[i]
     0
 
-fn facade_profile_record(pool: AstPool, at: i32, rule: i32, status: i32, subject: i32, candidates: &List[i32]) -> i32:
+fn facade_profile_record(pool: &AstPool, at: i32, rule: i32, status: i32, subject: i32, candidates: &List[i32]) -> i32:
     let extra_start = pool.extra_len()
     pool.add_extra(subject)
     pool.add_extra(candidates.len() as i32)
@@ -156,7 +156,7 @@ fn facade_profile_record(pool: AstPool, at: i32, rule: i32, status: i32, subject
 // pattern replaced by the matched function, the rule appended, the span the
 // `use convention` item's (a diagnostic about the clause points at the
 // adoption, in the facade's own file).
-fn facade_profile_clause(pool: AstPool, at: i32, template: i32, fn_sym: i32, rule: i32) -> i32:
+fn facade_profile_clause(pool: &AstPool, at: i32, template: i32, fn_sym: i32, rule: i32) -> i32:
     let kind = pool.get_data0(template as NodeId)
     let ops = pool.get_data1(template as NodeId)
     let count = pool.get_data2(template as NodeId)
@@ -168,7 +168,7 @@ fn facade_profile_clause(pool: AstPool, at: i32, template: i32, fn_sym: i32, rul
     pool.add_node(NodeKind.NK_FACADE_CLAUSE, pool.get_start(at as NodeId), pool.get_end(at as NodeId), kind, extra_start, count + 1) as i32
 
 // Rewrites a node's extra list as `head ++ tail`.
-fn facade_profile_append_extras(pool: AstPool, node: i32, head_start: i32, head_count: i32, tail: &List[i32]) -> i32:
+fn facade_profile_append_extras(pool: &AstPool, node: i32, head_start: i32, head_count: i32, tail: &List[i32]) -> i32:
     let extra_start = pool.extra_len()
     for i in 0..head_count: pool.add_extra(pool.get_extra(head_start + i))
     for i in 0..tail.len(): pool.add_extra(tail[i])
@@ -176,7 +176,7 @@ fn facade_profile_append_extras(pool: AstPool, node: i32, head_start: i32, head_
 
 // Applies `profile` to `facade` for its `use convention` item `at`: states
 // every uniquely matched rule and records every outcome on the item.
-pub fn facade_profile_apply(pool: AstPool, intern: InternPool, ci: &List[i32], facade: i32, at: i32, profile: i32) -> AstPool:
+pub fn facade_profile_apply(pool: AstPool, intern: &InternPool, ci: &List[i32], facade: i32, at: i32, profile: i32) -> AstPool:
     var p = pool
     let records: List[i32] = List.new()
     let (names, decls) = facade_profile_imported_fns(p, intern, ci)

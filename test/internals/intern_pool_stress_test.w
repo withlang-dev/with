@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 use compiler.foundation.Ids
-use compiler.foundation.InternPool
+use InternPool
 use std.builtins.int_to_string
 
 

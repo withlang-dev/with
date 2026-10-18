@@ -18,7 +18,7 @@ fn backend_debug_pool_flow_enabled() -> i32:
     1
 
 impl Zcu:
-    mut fn compile_to_object_backend(pool: AstPool, opt_level: i32, output_path: &str, debug_info: bool, module_object_mode: bool) -> i32:
+    mut fn compile_to_object_backend(pool: &AstPool, opt_level: i32, output_path: &str, debug_info: bool, module_object_mode: bool) -> i32:
         if self.last_mir_module.body_count() == 0:
             runtime_eprint("error: missing MIR input for LLVM backend")
             return 1
@@ -30,23 +30,17 @@ impl Zcu:
             let env_units0 = codegen_units_env_count()
             let unit_count0 = if env_units0 > 0: env_units0 else: codegen_units_default_count(self.last_mir_module.body_count())
             if unit_count0 > 1:
-                var backend_pool0 = pool
-                if self.last_sema.ast.decl_count() > 0:
-                    backend_pool0 = self.last_sema.ast
+                let backend_pool0 = if self.last_sema.ast.decl_count() > 0: self.last_sema.ast.clone() else: pool.clone()
                 return self.compile_units_generated(backend_pool0, opt_level, output_path, debug_info, unit_count0)
-        var backend_pool = pool
-        var backend_intern = self.pool
-        // D17/#697: Copy pool handles captured before the sema moves; codegen
-        // OWNS the sema for the emission (take-and-return, the lower_module
-        // pattern) and every exit path hands it back — last_sema is blank in
-        // between, never aliased.
-        let sema_ast: AstPool = self.last_sema.ast
-        let sema_pool: InternPool = self.last_sema.pool
-        if sema_ast.decl_count() > 0:
-            backend_pool = sema_ast
-        if sema_pool.state.symbol_texts.len() > 1:
-            backend_intern = sema_pool
-        var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, move backend_intern, move self.last_sema)
+        // D17/#697: codegen OWNS the sema for the emission (take-and-return,
+        // the lower_module pattern) and every exit path hands it back —
+        // last_sema is blank in between, never aliased. The pools it works
+        // from are further holders of the sema's (or the zcu's) pools (#2449).
+        let sema_decls = self.last_sema.ast.decl_count()
+        let sema_symbols = self.last_sema.pool.symbol_count()
+        let backend_pool = if sema_decls > 0: self.last_sema.ast.clone() else: pool.clone()
+        let backend_intern = if sema_symbols > 0: self.last_sema.pool.clone() else: self.pool.clone()
+        var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
         // Cloned, never moved (here and at the other Codegen seams): the root
         // file's warnings render after codegen (#1447).
@@ -58,13 +52,13 @@ impl Zcu:
         cg.module_object_mode = if module_object_mode: 1 else: 0
         if not debug_info:
             cg.debug_info = 0
-        if self.pool.state.symbol_texts.len() <= 4 or sema_pool.state.symbol_texts.len() <= 4 or backend_debug_pool_flow_enabled() != 0:
-            runtime_eprint(f"[backend] zcu.pool symbols={self.pool.state.symbol_texts.len()}")
-            runtime_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.state.symbol_texts.len()}")
-            runtime_eprint(f"[backend] sema.pool symbols={sema_pool.state.symbol_texts.len()}")
-            runtime_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={sema_ast.decl_count()}")
-        if self.pool.state.symbol_texts.len() <= 4 or sema_pool.state.symbol_texts.len() <= 4 or cg.intern.state.symbol_texts.len() <= 4 or backend_debug_pool_flow_enabled() != 0:
-            runtime_eprint(f"[backend] cg.intern symbols={cg.intern.state.symbol_texts.len()}")
+        if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or backend_debug_pool_flow_enabled() != 0:
+            runtime_eprint(f"[backend] zcu.pool symbols={self.pool.symbol_count()}")
+            runtime_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.symbol_count()}")
+            runtime_eprint(f"[backend] sema.pool symbols={sema_symbols}")
+            runtime_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={sema_decls}")
+        if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or cg.intern.symbol_count() <= 3 or backend_debug_pool_flow_enabled() != 0:
+            runtime_eprint(f"[backend] cg.intern symbols={cg.intern.symbol_count()}")
         if backend_debug_pool_flow_enabled() != 0:
             runtime_eprint(f"[backend-diag] pool.extra_len={backend_pool.extra_len()} pool.nodes={backend_pool.node_count()}")
             backend_dump_struct_extras(backend_pool, cg.intern)
@@ -109,7 +103,7 @@ impl Zcu:
     // applies the shared global-ownership surgery, writes the unit's small
     // bitcode, and disposes everything before the next round. Threads then
     // optimize+emit the small bitcodes concurrently.
-    mut fn compile_units_generated(pool: AstPool, opt_level: i32, output_path: &str, debug_info: bool, unit_count: i32) -> i32:
+    mut fn compile_units_generated(pool: &AstPool, opt_level: i32, output_path: &str, debug_info: bool, unit_count: i32) -> i32:
         let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
         var backend_mir = move self.last_mir_module
         let mir_ptr = &raw const backend_mir as i64
@@ -136,13 +130,10 @@ impl Zcu:
         var pipeline = codegen_unit_pipeline(unit_count, output_path, opt_level, do_profile, emit_window)
         var k: i32 = 0
         while k < unit_count:
-            var backend_intern = self.pool
             // D17/#697: per-round take-and-return — each round's Codegen owns
             // the sema and hands it back before deinit or any early return.
-            let round_sema_pool = self.last_sema.pool
-            if round_sema_pool.state.symbol_texts.len() > 1:
-                backend_intern = round_sema_pool
-            var cg = Codegen.init_with_opt_and_intern(f"with_module_u{k}", opt_level, move backend_intern, move self.last_sema)
+            let backend_intern = if self.last_sema.pool.symbol_count() > 0: self.last_sema.pool.clone() else: self.pool.clone()
+            var cg = Codegen.init_with_opt_and_intern(f"with_module_u{k}", opt_level, backend_intern, move self.last_sema)
             cg.source_file = with_str_clone_ref(self.current_source_path)
             cg.source_text = with_str_clone_ref(self.current_source_text)
             cg.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
@@ -158,12 +149,12 @@ impl Zcu:
             while ai < assign.fn_syms.len():
                 cg.unit_assign_insert(assign.fn_syms[ai], assign.units[ai], ai)
                 ai = ai + 1
-            let unit_symbols_before = cg.intern.state.symbol_texts.len()
+            let unit_symbols_before = cg.intern.symbol_count()
             let rc = cg.gen_module_from_mir(mir_ptr, pool)
             // Symbols a unit adds to the shared pool: numbered in unit order,
             // what parallel generation would have to reproduce.
             if do_profile:
-                runtime_eprint(f"[profile] llvm.unit{k}.symbols_added {cg.intern.state.symbol_texts.len() - unit_symbols_before}")
+                runtime_eprint(f"[profile] llvm.unit{k}.symbols_added {cg.intern.symbol_count() - unit_symbols_before}")
             var tracked = move self.tracked_input_paths
             self.tracked_input_paths = tracked_input_merge_unique(move tracked, &cg.tracked_input_paths)
             if rc != 0:
@@ -199,34 +190,31 @@ impl Zcu:
         self.last_codegen_unit_count = unit_count
         0
 
-    mut fn emit_ir_backend(pool: AstPool, opt_level: i32) -> bool:
+    mut fn emit_ir_backend(pool: &AstPool, opt_level: i32) -> bool:
         if self.last_mir_module.body_count() == 0:
             runtime_eprint("error: missing MIR input for LLVM backend")
             return false
-        var backend_pool = pool
-        var backend_intern = self.pool
-        // D17/#697: take-and-return (docs/spec/implementation/memory-model.md seam rule) — Copy
-        // handles captured first, sema moved in, handed back on every exit.
-        let sema_ast: AstPool = self.last_sema.ast
-        let sema_pool: InternPool = self.last_sema.pool
-        if sema_ast.decl_count() > 0:
-            backend_pool = sema_ast
-        if sema_pool.state.symbol_texts.len() > 1:
-            backend_intern = sema_pool
-        var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, move backend_intern, move self.last_sema)
+        // D17/#697: take-and-return (docs/spec/implementation/memory-model.md
+        // seam rule) — sema moved in, handed back on every exit; the pools are
+        // further holders (#2449).
+        let sema_decls = self.last_sema.ast.decl_count()
+        let sema_symbols = self.last_sema.pool.symbol_count()
+        let backend_pool = if sema_decls > 0: self.last_sema.ast.clone() else: pool.clone()
+        let backend_intern = if sema_symbols > 0: self.last_sema.pool.clone() else: self.pool.clone()
+        var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
         cg.source_text = with_str_clone_ref(self.current_source_text)
         cg.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
         cg.add_bundle_prefixes(&self.link_bundle_prefixes)
         cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
-        if self.pool.state.symbol_texts.len() <= 4 or sema_pool.state.symbol_texts.len() <= 4 or backend_debug_pool_flow_enabled() != 0:
-            runtime_eprint(f"[backend] zcu.pool symbols={self.pool.state.symbol_texts.len()}")
-            runtime_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.state.symbol_texts.len()}")
-            runtime_eprint(f"[backend] sema.pool symbols={sema_pool.state.symbol_texts.len()}")
-            runtime_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={sema_ast.decl_count()}")
-        if self.pool.state.symbol_texts.len() <= 4 or sema_pool.state.symbol_texts.len() <= 4 or cg.intern.state.symbol_texts.len() <= 4 or backend_debug_pool_flow_enabled() != 0:
-            runtime_eprint(f"[backend] cg.intern symbols={cg.intern.state.symbol_texts.len()}")
+        if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or backend_debug_pool_flow_enabled() != 0:
+            runtime_eprint(f"[backend] zcu.pool symbols={self.pool.symbol_count()}")
+            runtime_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.symbol_count()}")
+            runtime_eprint(f"[backend] sema.pool symbols={sema_symbols}")
+            runtime_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={sema_decls}")
+        if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or cg.intern.symbol_count() <= 3 or backend_debug_pool_flow_enabled() != 0:
+            runtime_eprint(f"[backend] cg.intern symbols={cg.intern.symbol_count()}")
         var backend_mir = move self.last_mir_module
         let result = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)
         var tracked_paths = move self.tracked_input_paths
@@ -241,7 +229,7 @@ impl Zcu:
     // Run the real LLVM backend with analysis instrumentation enabled, but do not
     // print IR or emit an object. The returned facts come from the same marshalling
     // and callee-binding branches used for production codegen.
-    mut fn analyze_codegen_backend(pool: AstPool, opt_level: i32, query: &str) -> AnalysisBackendResult:
+    mut fn analyze_codegen_backend(pool: &AstPool, opt_level: i32, query: &str) -> AnalysisBackendResult:
         if self.last_mir_module.body_count() == 0:
             let report = AnalysisReport.init()
             report.fail("missing MIR input for codegen analysis")
@@ -252,13 +240,12 @@ impl Zcu:
         // assign-then-overwrite pattern DROPPED a still-viewed InternPool.
         // Freed pool pages were recycled into the LLVM context and the
         // corruption surfaced as audit segfaults on valid-looking types.
-        // Now: the winner is chosen without dropping the loser, the loser
-        // stays owned by its home field, and everything lent to the codegen
-        // run is restored after take_sema.
+        // Now (#2449): the codegen run holds the pools it works from as
+        // further holders; nothing is lent, so nothing is restored after
+        // take_sema.
         let use_sema_ast = self.last_sema.ast.decl_count() > 0
-        let use_sema_pool = self.last_sema.pool.state.symbol_texts.len() > 1
-        let backend_intern = if use_sema_pool: move self.last_sema.pool else: move self.pool
-        var cg = Codegen.init_with_opt_and_intern("with_analysis", opt_level, move backend_intern, move self.last_sema)
+        let backend_intern = if self.last_sema.pool.symbol_count() > 0: self.last_sema.pool.clone() else: self.pool.clone()
+        var cg = Codegen.init_with_opt_and_intern("with_analysis", opt_level, backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
         cg.source_text = with_str_clone_ref(self.current_source_text)
         cg.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
@@ -267,7 +254,7 @@ impl Zcu:
         cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
         cg.enable_analysis(query)
         var backend_mir = move self.last_mir_module
-        let backend_pool = if use_sema_ast: move cg.sema.ast else: move pool
+        let backend_pool = if use_sema_ast: cg.sema.ast.clone() else: pool.clone()
         let rc = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)
         cg.audit_declared_share_place_contracts()
         cg.audit_return_shape_contracts()
@@ -280,15 +267,9 @@ impl Zcu:
         let status = if rc != 0: 1 else: cg.analysis_status()
         self.last_mir_module = move backend_mir
         self.last_sema = cg.take_sema()
-        if use_sema_ast:
-            self.last_sema.ast = cg.take_pool()
-        if use_sema_pool:
-            self.last_sema.pool = cg.take_intern()
-        else:
-            self.pool = cg.take_intern()
         AnalysisBackendResult { report: move cg.analysis_report, status }
 
-fn backend_dump_struct_extras(pool: AstPool, intern: InternPool):
+fn backend_dump_struct_extras(pool: &AstPool, intern: &InternPool):
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_TYPE_DECL:

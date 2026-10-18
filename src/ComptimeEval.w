@@ -376,12 +376,12 @@ fn comptime_int_canonical_bug(type_id: i32, value: i64, width: i32, is_unsigned:
 fn comptime_control_error() -> ComptimeControl:
     ComptimeControl { kind: ComptimeControlKind.CTL_ERROR, value: comptime_value_invalid(), label: 0 }
 
-fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_success: i32) -> ComptimeEvaluator:
-    let decl_index_by_node = comptime_decl_index_map(&ast)
+fn ComptimeEvaluator.init(sema: Sema, ast: &AstPool, pool: &InternPool, require_success: i32) -> ComptimeEvaluator:
+    let decl_index_by_node = comptime_decl_index_map(ast)
     ComptimeEvaluator {
         sema,
-        ast,
-        pool,
+        ast: ast.clone(),
+        pool: pool.clone(),
         slot_syms: List.new(),
         slot_values: List.new(),
         slot_muts: List.new(),
@@ -1654,41 +1654,41 @@ impl ComptimeEvaluator:
 // table in the Sema, and the first write by the evaluator would copy each
 // one (1,908 copies over 64 KB in one check of src/main.w). Writing a blank
 // Sema back releases the original's hold, so the evaluator's Sema is the one
-// holder and nothing is copied. The blank reuses the taken Sema's pool and
-// AST handles (Copy): a fresh InternPool.init() is an arena page of 1 MB
-// that is never freed, once per evaluation (behav_1944's 32 MB limit).
-unsafe fn comptime_take_sema(sema_ptr: *mut Sema) -> Sema:
-    let taken = *sema_ptr
+// holder and nothing is copied. The blank holds the taken Sema's pool and AST
+// (further holders, #2449): a fresh InternPool.init() per evaluation was a
+// 1 MB arena page each time (behav_1944's 32 MB limit).
+// The evaluator works on `ast`, the pool of the node it evaluates (a further
+// holder); the blank keeps the taken Sema's own.
+unsafe fn comptime_take_sema(sema_ptr: *mut Sema, ast: &AstPool) -> Sema:
+    var taken = *sema_ptr
     *sema_ptr = Sema.placeholder(taken.pool, DiagnosticList.init(), taken.ast)
+    taken.ast = ast.clone()
     taken
 
-pub unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
-    var sema = comptime_take_sema(sema_ptr)
-    sema.ast = ast
+pub unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeEvalResult:
+    var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 0)
     let value = evaluator.eval_root(node)
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-pub unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
-    var sema = comptime_take_sema(sema_ptr)
-    sema.ast = ast
+pub unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeEvalResult:
+    var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 1)
     let value = evaluator.eval_root(node)
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-pub unsafe fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
+pub unsafe fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeValue:
     var result = comptime_try_eval_expr_result(sema_ptr, ast, pool, node)
     return move result.value
 
-pub unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
+pub unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeValue:
     var result = comptime_force_eval_expr_result(sema_ptr, ast, pool, node)
     return move result.value
 
-pub unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, strict_effects: i32, suppress_side_effects: i32) -> ComptimeEvalResult:
-    var sema = comptime_take_sema(sema_ptr)
-    sema.ast = ast
+pub unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, strict_effects: i32, suppress_side_effects: i32) -> ComptimeEvalResult:
+    var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
@@ -1714,9 +1714,8 @@ pub unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool,
             comptime_value_invalid()
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-pub unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: List[str], output: &str, extra_outputs: &List[str], args_values: List[str], write_scopes: &List[str], timeout_ms: i32, cwd: &str, env: List[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
-    var sema = comptime_take_sema(sema_ptr)
-    sema.ast = ast
+pub unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: List[str], output: &str, extra_outputs: &List[str], args_values: List[str], write_scopes: &List[str], timeout_ms: i32, cwd: &str, env: List[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
+    var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
@@ -4319,7 +4318,7 @@ fn comptime_decl_kind_for_function(name: &str) -> i32:
     0
 
 impl ComptimeEvaluator:
-    mut fn function_decl_summary_value(comp: &Compilation, ast_pool: AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
+    mut fn function_decl_summary_value(comp: &Compilation, ast_pool: &AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
         let decl_type = self.named_type_id("DeclSummary", node)
         let kind_type = self.named_type_id("DeclKind", node)
         if decl_type == 0 or kind_type == 0:
@@ -4364,7 +4363,7 @@ impl ComptimeEvaluator:
         self.extra_values.push(notes)
         comptime_value_struct(decl_type, start, 14)
 
-    mut fn type_decl_summary_value(comp: &Compilation, ast_pool: AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
+    mut fn type_decl_summary_value(comp: &Compilation, ast_pool: &AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
         let decl_type = self.named_type_id("DeclSummary", node)
         let kind_type = self.named_type_id("DeclKind", node)
         if decl_type == 0 or kind_type == 0:

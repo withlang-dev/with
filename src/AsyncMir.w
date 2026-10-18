@@ -126,7 +126,7 @@ fn async_suspend_kind_name(kind: i32) -> str:
         return "select_await"
     "unknown"
 
-pub fn dump_async_mir_module(mod: &AsyncMirModule, pool: InternPool) -> str:
+pub fn dump_async_mir_module(mod: &AsyncMirModule, pool: &InternPool) -> str:
     var out = ""
     out = out ++ f"async-mir module bodies={mod.body_count()}"
     out = out ++ f" suspend_points={mod.total_suspend_points()}\n"
