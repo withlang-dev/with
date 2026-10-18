@@ -2530,7 +2530,7 @@ fn sdk_linux_sysroot_abs(root: &str, a: &str) -> str: sdk_abs(root, sdk_linux_sy
 // beside those builds' directories.
 fn sdk_linux_resource_rel(build_dir: &str) -> str: sdk_join(sdk_dirname(build_dir), "linux-resource-dir")
 
-// sdk-runtimes (linux-x86_64): compiler-rt and the static libc++ into the
+// sdk-runtimes (Linux): compiler-rt and the static libc++ into the
 // output prefix, before the SDK's ninja, cmake and LLVM are built with them.
 pub fn run_sdk_runtimes_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()

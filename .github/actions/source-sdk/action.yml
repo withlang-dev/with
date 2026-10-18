@@ -60,11 +60,13 @@ runs:
         need=0
         bootstrap_tools="clang clang++ cmake ninja"
         # windows-gnu bootstraps from its own lld and archiver (build/sdk.w
-        # sdk_bootstrap_set); the Visual Studio recipe from clang-cl.
+        # sdk_bootstrap_set); the Visual Studio recipe from clang-cl, and
+        # its windows libc step archives with llvm-ar like the gnu one
+        # (sdk-windows-libc failed without it, SDK run 39152082294).
         if [[ $gnu_windows == 1 ]]; then
           bootstrap_tools="$bootstrap_tools lld-link ld.lld llvm-ar llvm-ranlib"
         elif [[ "$RUNNER_OS" == Windows ]]; then
-          bootstrap_tools="$bootstrap_tools clang-cl lld-link"
+          bootstrap_tools="$bootstrap_tools clang-cl lld-link llvm-ar llvm-ranlib"
         fi
         for tool in $bootstrap_tools; do
           usable "$tool" || need=1

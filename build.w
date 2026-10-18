@@ -1397,13 +1397,13 @@ fn sdk_build_root_arg(ctx: &BuildCtx, platform: &str) -> str:
 fn sdk_jobs_arg(ctx: &BuildCtx) -> str:
     ctx.env_input("PARALLEL_JOBS")
 
-// linux-x86_64: the SDK's own runtimes, which its ninja, cmake and LLVM link.
+// Linux: the SDK's own runtimes, which its ninja, cmake and LLVM link.
 fn sdk_runtimes_target(ctx: &BuildCtx) -> Target:
     let platform = sdk_current_platform()
     let bootstrap_prefix = sdk_bootstrap_prefix_arg(ctx, platform)
     let output_prefix = sdk_output_prefix_arg(ctx, platform)
     let build_root = sdk_build_root_arg(ctx, platform)
-    var target = target_new(.Action, "sdk-runtimes", "").output(output_prefix ++ "/lib/x86_64-unknown-linux-gnu/libc++.a")
+    var target = target_new(.Action, "sdk-runtimes", "").output(output_prefix ++ "/lib/" ++ sdk_linux_triple(arch()) ++ "/libc++.a")
     target.action = run_sdk_runtimes_action
     target = target.arg(build_owned_text(bootstrap_prefix))
     target = target.arg(build_owned_text(output_prefix))
@@ -1492,8 +1492,10 @@ fn sdk_ninja_target(ctx: &BuildCtx) -> Target:
     // libc and libc++.
     if sdk_platform_is_windows(platform):
         target = target.dep("sdk-libcxx")
-    // linux-x86_64 links its ninja against the SDK's runtimes.
-    if os() == "Linux" and arch() == "x86_64":
+    // Linux links its ninja against the SDK's runtimes, on either arch:
+    // the action's toolchain flags name the sysroot and libc++ for both
+    // (the linux-aarch64 SDK job's ninja configure failed without them).
+    if os() == "Linux":
         target = target.dep("sdk-runtimes")
         target = target.input(sdk_linux_sysroot_pack())
     target.timeout(1800000)
@@ -1560,8 +1562,8 @@ fn sdk_llvm_target(ctx: &BuildCtx) -> Target:
     else:
         target = target.input(output_prefix ++ "/bin/cmake" ++ host_exe_suffix())
         target = target.dep("sdk-cmake")
-    // linux-x86_64 builds its runtimes and LLVM against the With sysroot.
-    if os() == "Linux" and arch() == "x86_64":
+    // Linux builds its runtimes and LLVM against the With sysroot.
+    if os() == "Linux":
         target = target.dep("linux-sysroot")
         target = target.input(sdk_linux_sysroot_pack())
         // Its LLVM is built with the zlib the SDK builds (build/sdk.w).
@@ -3103,8 +3105,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(sdk_windows_libc_target(ctx))
     out = out.add_target(sdk_compiler_rt_builtins_target(ctx))
     out = out.add_target(sdk_libcxx_target(ctx))
-    if os() == "Linux" and arch() == "x86_64":
+    if os() == "Linux":
         out = out.add_target(sdk_runtimes_target(ctx))
+    if os() == "Linux" and arch() == "x86_64":
         out = add_sdk_cross_aarch64_targets(move out, ctx)
     out = out.add_target(sdk_ninja_target(ctx))
     out = out.add_target(sdk_cmake_target(ctx))
