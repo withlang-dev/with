@@ -177,7 +177,7 @@ pub fn run_source_fetch_tests_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let stamp = ctx.output()
-    let scratch = sf_join("out/command", ctx.target_name())
+    let scratch = sf_join("out/command", ctx.target_name() ++ "/scratch")
     let _clean = fs.remove_tree(scratch)
     if fs.mkdir_all(sf_join(scratch, "got")) != 0:
         return sft_fail(ctx, "could not create " ++ scratch)
@@ -332,7 +332,7 @@ pub fn run_source_cache_tests_action(ctx: ActionCtx) -> i32:
     if inputs.len() == 0:
         return sft_fail(ctx, "requires the release compiler as its first input")
     let compiler = inputs[0]
-    let scratch = sf_join("out/command", ctx.target_name())
+    let scratch = sf_join("out/command", ctx.target_name() ++ "/scratch")
     let _clean = fs.remove_tree(scratch)
     if fs.mkdir_all(scratch) != 0:
         return sft_fail(ctx, "could not create " ++ scratch)

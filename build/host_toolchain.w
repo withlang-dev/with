@@ -285,7 +285,7 @@ fn ht_setup_windows_dll_project(ctx: &ActionCtx, scratch: &str, compiler: &str) 
 fn ht_windows_builds(ctx: &ActionCtx, root: &str, compiler: &str) -> List[str]:
     let fs = ctx.fs()
     let out: List[str] = List.new()
-    let scratch = ht_join("out/command", ctx.target_name())
+    let scratch = ht_join("out/command", ctx.target_name() ++ "/scratch")
     let _clean = fs.remove_tree(scratch)
     if fs.mkdir_all(scratch) != 0:
         out.push("problem: could not create " ++ scratch)
@@ -365,7 +365,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
     else if linux and not fs.host_exists("/usr/bin/bwrap"):
         problems.push("the Linux sandbox needs bubblewrap (/usr/bin/bwrap); install it to run :no-host-toolchain")
     else:
-        let scratch = ht_join("out/command", ctx.target_name())
+        let scratch = ht_join("out/command", ctx.target_name() ++ "/scratch")
         let _clean = fs.remove_tree(scratch)
         let home = ht_join(root, ht_join(scratch, "home"))
         if fs.mkdir_all(ht_join(scratch, "home/tmp")) != 0:
