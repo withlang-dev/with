@@ -6,6 +6,8 @@ use Span
 use std.collections.HashMap
 use MirCore
 use SemaTypes
+extern fn with_getenv_str(name: &str) -> str
+extern fn with_eprint(s: &str)
 
 fn suspend_bit_index(local_count: i32, bb: i32, local: i32) -> i32:
     bb * local_count + local
@@ -1121,6 +1123,18 @@ fn last_use_type_can_hold_view(sema: &Sema, tid: i32, from_normal_call: bool) ->
             return false
     true
 
+// Whether the value an operand copies can carry a view into its source's
+// buffer: an integer read out of a list (`out[i] = state[l]`) cannot, so it
+// makes no edge (it once did, and the copy of a plain element made the
+// destination list a "view" of the source, which kept every later handoff
+// of the source a retained copy: the stage 4 dataflow copied its state
+// vector at every statement of the compiler, 239,743 times per self-check).
+fn last_use_operand_can_carry_view(sema: &Sema, body: &MirBody, op: i32) -> bool:
+    let place = body.operand_d0[op]
+    if place < 0 or place >= body.place_sema_types.len():
+        return true
+    last_use_type_can_hold_view(sema, body.place_sema_types[place], false)
+
 // Directed edges `src -> dst` where `dst` may receive an unretained view
 // (reference, slice, iterator, or projection) into `src`'s buffer.
 fn last_use_build_view_edges(sema: &Sema, body: &MirBody) -> List[List[i32]]:
@@ -1170,7 +1184,7 @@ fn last_use_build_view_edges(sema: &Sema, body: &MirBody) -> List[List[i32]]:
                     if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
                         continue
                     let hold = body.operand_hold(op)
-                    if hold != MIR_HOLD_RETAIN and hold != MIR_HOLD_TAKE:
+                    if hold != MIR_HOLD_RETAIN and hold != MIR_HOLD_TAKE and last_use_operand_can_carry_view(sema, body, op):
                         let src = suspend_place_root_local(body, body.operand_d0[op])
                         if src > 0 and src < local_count and src != dst:
                             edges[src].push(dst)
@@ -1190,6 +1204,8 @@ fn last_use_build_view_edges(sema: &Sema, body: &MirBody) -> List[List[i32]]:
                     continue
                 let hold = body.operand_hold(op)
                 if hold == MIR_HOLD_RETAIN or hold == MIR_HOLD_TAKE:
+                    continue
+                if not last_use_operand_can_carry_view(sema, body, op):
                     continue
                 let src = suspend_place_root_local(body, body.operand_d0[op])
                 if src <= 0 or src >= local_count:
@@ -1346,6 +1362,7 @@ pub fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
                     any_site = true
     if not any_site:
         return out
+    let trace = with_getenv_str("WITH_TRACE_COW").len() > 0
     var live_in_cache: List[List[i32]] = List.new()
     for _ in 0..local_count:
         live_in_cache.push(List.new())
@@ -1366,13 +1383,16 @@ pub fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
             idx = idx + 3
             let q = last_use_quick_after_verdict(out, bb, si, local, false)
             if q == 1:
+                if trace: with_eprint(f"[cow-last-use] fn_sym={out.fn_sym} _{local} at bb{bb}:{si}: kept, read soon after")
                 continue
             if q == 0:
                 if live_in_cache[local].len() == 0:
                     live_in_cache[local] = last_use_live_in(out, local, false)
                 if last_use_live_after(out, live_in_cache[local], bb, si, local, false):
+                    if trace: with_eprint(f"[cow-last-use] fn_sym={out.fn_sym} _{local} at bb{bb}:{si}: kept, live after")
                     continue
             if may_have_views[local] == 0:
+                if trace: with_eprint(f"[cow-last-use] fn_sym={out.fn_sym} _{local} at bb{bb}:{si}: taken")
                 out.set_operand_hold(held_op, MIR_HOLD_TAKE)
                 out.mark_local_ever_moved(local)
                 continue
@@ -1392,6 +1412,7 @@ pub fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
                     if op >= 0 and op < out.operand_kinds.len() and (out.operand_kinds[op] == OperandKind.OK_COPY or out.operand_kinds[op] == OperandKind.OK_MOVE):
                         let root = suspend_place_root_local(out, out.operand_d0[op])
                         if root > 0 and root < local_count and in_views[root] != 0:
+                            if trace: with_eprint(f"[cow-last-use] fn_sym={out.fn_sym} _{local} at bb{bb}:{si}: kept, the site reads view _{root}")
                             any_view_live = true
                             break
                 if not any_view_live:
@@ -1399,15 +1420,18 @@ pub fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
                         let v = view_locals[vi]
                         let vq = last_use_quick_after_verdict(out, bb, si, v, false)
                         if vq == 1:
+                            if trace: with_eprint(f"[cow-last-use] fn_sym={out.fn_sym} _{local} at bb{bb}:{si}: kept, view _{v} read soon after")
                             any_view_live = true
                             break
                         if vq == 0:
                             if live_in_cache[v].len() == 0:
                                 live_in_cache[v] = last_use_live_in(out, v, false)
                             if last_use_live_after(out, live_in_cache[v], bb, si, v, false):
+                                if trace: with_eprint(f"[cow-last-use] fn_sym={out.fn_sym} _{local} at bb{bb}:{si}: kept, view _{v} live after")
                                 any_view_live = true
                                 break
             if not any_view_live:
+                if trace: with_eprint(f"[cow-last-use] fn_sym={out.fn_sym} _{local} at bb{bb}:{si}: taken (views dead)")
                 out.set_operand_hold(held_op, MIR_HOLD_TAKE)
                 out.mark_local_ever_moved(local)
     out

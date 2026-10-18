@@ -124,6 +124,22 @@ stage 4 (PR #2444); the C boundary rule, per-instantiation generics and the
 and value-copy sweep and microbenchmarks (`test/benchmark/cow_value_lists.w`)
 landed in stage 6.
 
+**The merge-gate measurement (2026-10-18).** Each stage's A/B was taken
+against the main before it, so the per-stage ratios compounded unseen:
+against the last pre-CoW compiler (60693617b) the self-host `check
+src/main.w` measured 1.088–1.104 (median 1.093), a counted regression.
+All of it was in `mir.lower`: the last-use pass drew a view edge for an
+integer copied out of a list, which kept the stage 4 dataflow's own state
+vector a retained copy and copied it at every statement (239,743 copies
+over 4 KB per self-check); with that fixed, the drop guard reading a word
+at a time and the dataflow's arrays sized per candidate, the self-host
+measures 0.990–1.048 (median 1.032) against the same baseline; the pcre2
+suite (RunTest -8 0-29) 0.924–0.991 and the zlib round trip 0.992–1.000
+(`tools/ab_bench.w`, `tools/corpus_ab.w`, three interleaved rounds each).
+What remains of the 3% is the uniqueness check at the mutation sites the
+proof does not cover (`with_vec_is_unique`, about 0.9 s of a 45 s check)
+and the proof's own dataflow (about 0.4 s).
+
 **What would reopen it.** Self-host time or a corpus suite more than 2%
 slower with the cost not removable; or a program where the deferred copy
 misleads more than the move error would have.

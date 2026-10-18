@@ -880,11 +880,18 @@ fn alloc_store_small_header(block: i64, size: i64):
 // are zero (the reset sentinel), else 0. The compiler emits a call to this in
 // front of a user `Drop` so the destructor never runs on a moved-from value
 // (all-zero ⇒ the value owns nothing ⇒ skipping its drop is correct).
+// The drop guard on a value whose size is not 8 or 16 (codegen inlines
+// those): a word at a time, as rt_memcmp reads, then the tail bytes. The
+// byte loop cost 0.5 s of a self-check once structs of values dropped
+// through it (D120 stage 3).
 fn rt_value_is_zero(ptr: *const u8, size: i64) -> i32:
     var i: i64 = 0
+    while i + 8 <= size:
+        if unsafe *((ptr as i64 + i) as *const i64) != 0:
+            return 0
+        i = i + 8
     while i < size:
-        let b = unsafe *((ptr as i64 + i) as *const u8)
-        if b != 0:
+        if unsafe *((ptr as i64 + i) as *const u8) != 0:
             return 0
         i = i + 1
     1
