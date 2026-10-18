@@ -3,9 +3,12 @@ module build.examples
 // The examples lane (#1150, D55 ruling 4): every program under examples/
 // is built with the release compiler and run, and every package test
 // runs, so a rotted example turns the battery red. The list is the
-// lane's contract: untracked user work beside it (examples/spiral) is not
-// an example. Nothing is written under examples/: binaries land under the
-// lane's output directory and the tests run from the project root.
+// lane's contract. Nothing is written under examples/: binaries land under
+// the lane's output directory and the tests run from the project root.
+// A project on a fetched C package (examples/spiral, raylib) is checked
+// and built when `with get` has run in it and skipped with a printed
+// reason when it has not: the gate is offline, and the release scenario
+// uat/raylib_spiral.uat fetches and renders raylib for real.
 
 use std.build
 use std.sysinfo
@@ -60,6 +63,14 @@ fn ex_packages() -> List[str]:
 fn ex_projects() -> List[str]:
     var out = List.new()
     if os() != "Windows": out.push("examples/c-interop")
+    out
+
+/// Projects on a fetched C package: (project, the dependency's directory
+/// under .with/deps, the `with get` that fetches it). Checked and built from
+/// the project directory, never run (a window).
+fn ex_fetched_projects() -> List[(str, str, str)]:
+    var out = List.new()
+    out.push(("examples/spiral", ".with/deps/c/raylib", "with get c.raylib"))
     out
 
 /// Package test files (standalone), run with `with test` from the root.
@@ -218,6 +229,24 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
         test_args.push(":test")
         failures += ex_run(ctx, test_args, slug ++ ".test", ex_abs(root, project), 300000)
 
+    var skipped = 0
+    for (project, dep_dir, get) in ex_fetched_projects():
+        let slug = ex_slug(project)
+        let cwd = ex_abs(root, project)
+        if not fs.exists(ex_join(cwd, dep_dir)):
+            skipped += 1
+            print(f"examples-tests: {project} skipped: `{get}` has not run in it (network); uat/raylib_spiral.uat covers the package")
+            continue
+        var check_args: List[str] = List.new()
+        check_args.push(compiler)
+        check_args.push("check")
+        check_args.push("src/main.w")
+        failures += ex_run(ctx, check_args, slug ++ ".check", cwd, 120000)
+        var build_args: List[str] = List.new()
+        build_args.push(compiler)
+        build_args.push("build")
+        failures += ex_run(ctx, build_args, slug ++ ".build", cwd, 300000)
+
     for test in ex_tests():
         var args: List[str] = List.new()
         args.push(compiler.clone())
@@ -227,7 +256,7 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
 
     if failures > 0:
         ctx.diagnostics().error(f"examples-tests: {failures} step(s) failed; an example tracks the current spec (D55 ruling 4): a spec change updates it in the same change, a compiler or stdlib change that breaks it is a defect")
-    let total = ex_checked().len() + ex_programs().len() + ex_packages().len() + ex_projects().len() * 2 + ex_tests().len()
-    let _ = fs.write_text(ex_join(out_dir, ".stamp"), f"ok: {total} example steps\n")
-    print(f"examples-tests: {total} steps green")
+    let total = ex_checked().len() + ex_programs().len() + ex_packages().len() + ex_projects().len() * 2 + (ex_fetched_projects().len() - skipped) * 2 + ex_tests().len()
+    let _ = fs.write_text(ex_join(out_dir, ".stamp"), f"ok: {total} example steps, {skipped} skipped\n")
+    print(f"examples-tests: {total} steps green, {skipped} skipped")
     0
