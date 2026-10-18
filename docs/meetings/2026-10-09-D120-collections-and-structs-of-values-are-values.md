@@ -140,6 +140,14 @@ What remains of the 3% is the uniqueness check at the mutation sites the
 proof does not cover (`with_vec_is_unique`, about 0.9 s of a 45 s check)
 and the proof's own dataflow (about 0.4 s).
 
-**What would reopen it.** Self-host time or a corpus suite more than 2%
+**Amendment 2 (2026-10-18, Eric, verbatim: "raise the bar to 5%").** The
+reopening threshold is the merge bar: 5%, as Amendment 1 set it, not the
+ruling's original 2%. Brought by the merge-gate measurement above: the
+remaining self-host cost (about 3%, the uniqueness check at the mutation
+sites the proof does not cover plus the proof's own dataflow) sat under the
+merge bar and over the old reopening clause, which would have reopened a
+decision whose gate it passed. One number now does both jobs.
+
+**What would reopen it.** Self-host time or a corpus suite more than 5%
 slower with the cost not removable; or a program where the deferred copy
 misleads more than the move error would have.
