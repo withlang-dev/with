@@ -2406,7 +2406,7 @@ pub unsafe fn pcre2_code_copy_with_tables_8(__param_code: *const pcre2_real_code
 
     ((*__local_newcode).executable_jit = null)
 
-    (__local_newtables = (((*(&raw const (*__param_code).memctl as *const pcre2_memctl)).malloc.unwrap()((((1088 as c_ulong) +% (sizeof[usize]() as c_ulong)) as c_ulong), (*(&raw const (*__param_code).memctl as *const pcre2_memctl)).memory_data) as *mut u8)))
+    (__local_newtables = (((*(&raw const (*__param_code).memctl as *const pcre2_memctl)).malloc.unwrap()((((1088 as c_ulong) +% (sizeof[c_ulong]() as c_ulong)) as c_ulong), (*(&raw const (*__param_code).memctl as *const pcre2_memctl)).memory_data) as *mut u8)))
 
     if ((if __local_newtables == null: 1 else: 0) != 0) {
         (*(&raw const (*__param_code).memctl as *const pcre2_memctl)).free.unwrap()((__local_newcode as *mut c_void), (*(&raw const (*__param_code).memctl as *const pcre2_memctl)).memory_data)

@@ -97,8 +97,10 @@ fn conan_https_to_file(url: &str, path: &str, timeout_ms: i32) -> i32:
     if not url.starts_with("https://"):
         runtime_eprint("error: Conan download needs an https:// or file:// URL: " ++ url)
         return 1
+    let connect_ms = if timeout_ms > 0 and timeout_ms < 20000: timeout_ms else: 20000
+    let idle_ms = if timeout_ms > 0 and timeout_ms < 30000: timeout_ms else: 30000
     for attempt in 1..4:
-        if https_download(url.to_owned(), path.to_owned()) == 0: return 0
+        if https_download_timeout(url.to_owned(), path.to_owned(), connect_ms, idle_ms) == 0: return 0
         if attempt < 3: let _ = runtime_nanosleep(attempt as i64 * 1000000000)
     runtime_eprint("error: Conan download failed after 3 attempts: " ++ url ++ " -> " ++ path)
     1

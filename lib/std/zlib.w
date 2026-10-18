@@ -67,14 +67,14 @@ pub fn compress_gzip(data: &List[u8]) -> Result[List[u8], ZlibError]:
 pub fn compress_gzip_level(data: &List[u8], level: i32) -> Result[List[u8], ZlibError]:
     if level < Z_DEFAULT_COMPRESSION or level > Z_BEST_COMPRESSION:
         return Err(zlib_error(Z_STREAM_ERROR, "zlib compression level must be -1..9"))
-    if data.len() > ZLIB_MAX_CHUNK:
+    if (data.len() as i64) > (ZLIB_MAX_CHUNK as i64):
         return Err(zlib_error(Z_BUF_ERROR, "zlib gzip input is too large"))
     var stream: z_stream_s
     let init_rc = unsafe { deflateInit2_(&raw mut stream, level, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int) }
     if init_rc != Z_OK:
         return Err(zlib_code_error(init_rc))
     let out_len = unsafe { deflateBound(&raw mut stream, data.len() as c_ulong) }
-    if out_len > ZLIB_MAX_CHUNK:
+    if (out_len as i64) > (ZLIB_MAX_CHUNK as i64):
         unsafe { deflateEnd(&raw mut stream) }
         return Err(zlib_error(Z_BUF_ERROR, "zlib gzip output is too large"))
     let out_ptr = with_alloc(out_len as i64)

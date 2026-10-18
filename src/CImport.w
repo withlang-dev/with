@@ -5612,6 +5612,10 @@ fn ci_is_comparison_op(op: &str) -> bool:
 
 fn ci_map_sizeof_type(c_type: &str) -> str:
     let t = ci_trim(c_type)
+    if t == "size_t":
+        return "c_ulong"
+    if t == "ssize_t":
+        return "c_long"
     // Try builtin typedef first
     let mapped = ci_map_builtin_typedef(t)
     if mapped.len() > 0:
@@ -5626,9 +5630,17 @@ fn ci_map_sizeof_type(c_type: &str) -> str:
     if ci_is_c_ident(t):
         let translated_typedef = ci_lookup_known(t, g_macro_type_aliases)
         if translated_typedef.len() > 0:
+            if translated_typedef == "size_t":
+                return "c_ulong"
+            if translated_typedef == "ssize_t":
+                return "c_long"
             return ci_normalize_translated_type_name(translated_typedef)
         let macro_value = ci_trim(ci_lookup_macro_value(0, t))
         if macro_value.len() > 0 and ci_is_c_ident(macro_value):
+            if macro_value == "size_t":
+                return "c_ulong"
+            if macro_value == "ssize_t":
+                return "c_long"
             let normalized_macro_value = ci_normalize_translated_type_name(macro_value)
             if normalized_macro_value != macro_value:
                 return normalized_macro_value

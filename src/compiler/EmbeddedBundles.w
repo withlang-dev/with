@@ -95,10 +95,14 @@ pub fn bundle_manifest_paths(manifest: &str) -> List[str]:
         start = end + 1
     out
 
-// Every prefix any embedded bundle provides.
+// Every prefix any embedded bundle for the active target provides.
 pub fn embedded_bundle_prefixes() -> List[str]:
     let out: List[str] = List.new()
     for bi in 0..embedded_bundle_count():
+        if not embedded_bundle_present(bi):
+            continue
+        if not embedded_bundle_for_this_target(bi):
+            continue
         let prefixes = bundle_manifest_prefixes(embedded_bundle_manifest_text(bi))
         for pi in 0..prefixes.len():
             out.push(with_str_clone_ref(prefixes[pi]))

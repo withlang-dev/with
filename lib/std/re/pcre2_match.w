@@ -741,7 +741,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_62 {
-        (__local_frame_size__goto_7016_12 = (((((((((((offsetof[heapframe](ovector) as usize) as c_ulong) +% ((((((*__local_re__goto_6969_24).top_bracket as c_int) * 2) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong)) as c_ulong) +% ((offsetof[heapframe_align](frame) as usize) as c_ulong)) as c_ulong) -% (1 as c_ulong)) as c_ulong) & ((~(((offsetof[heapframe_align](frame) as usize) as c_ulong) -% (1 as c_ulong))) as c_ulong)) as c_ulong)))
+        (__local_frame_size__goto_7016_12 = (((((((((((offsetof[heapframe](ovector) as usize) as c_ulong) +% ((((((*__local_re__goto_6969_24).top_bracket as c_int) * 2) as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong)) as c_ulong) +% ((offsetof[heapframe_align](frame) as usize) as c_ulong)) as c_ulong) -% (1 as c_ulong)) as c_ulong) & ((~(((offsetof[heapframe_align](frame) as usize) as c_ulong) -% (1 as c_ulong))) as c_ulong)) as c_ulong)))
         ((*__local_mb__goto_7024_14).heap_limit = (((if (if (*__local_mcontext).heap_limit < (*__local_re__goto_6969_24).limit_heap: 1 else: 0) != 0: (*__local_mcontext).heap_limit else: (*__local_re__goto_6969_24).limit_heap) as c_uint)))
         ((*__local_mb__goto_7024_14).match_limit = (((if (if (*__local_mcontext).match_limit < (*__local_re__goto_6969_24).limit_match: 1 else: 0) != 0: (*__local_mcontext).match_limit else: (*__local_re__goto_6969_24).limit_match) as c_uint)))
         ((*__local_mb__goto_7024_14).match_limit_depth = (((if (if (*__local_mcontext).depth_limit < (*__local_re__goto_6969_24).limit_depth: 1 else: 0) != 0: (*__local_mcontext).depth_limit else: (*__local_re__goto_6969_24).limit_depth) as c_uint)))
@@ -2897,7 +2897,7 @@ unsafe fn recurse_update_offsets(__param_F: *mut heapframe, __param_P: *mut heap
 
         } else {
             if ((if __local_diff >= 4: 1 else: 0) != 0) {
-                with_memcpy(((__local_dst as *mut c_void) as *mut u8), ((__local_src as *const c_void) as *const u8), ((((__local_diff as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
+                with_memcpy(((__local_dst as *mut c_void) as *mut u8), ((__local_src as *const c_void) as *const u8), ((((__local_diff as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong) as i64))
             }
         }
 
@@ -2923,7 +2923,7 @@ unsafe fn recurse_update_offsets(__param_F: *mut heapframe, __param_P: *mut heap
 
     } else {
         if ((if __local_diff >= 4: 1 else: 0) != 0) {
-            with_memcpy(((__local_dst as *mut c_void) as *mut u8), ((__local_src as *const c_void) as *const u8), ((((__local_diff as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
+            with_memcpy(((__local_dst as *mut c_void) as *mut u8), ((__local_src as *const c_void) as *const u8), ((((__local_diff as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong) as i64))
         }
     }
 
@@ -5083,7 +5083,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
         ((*__param_match_data).ovector[0] = (((((((*__local_F__goto_692_12).start_match as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         ((*__param_match_data).ovector[1] = (((((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__local_i__goto_713_10 = (((2 * (if (if ((__param_top_bracket as c_int) + 1) > (*__param_match_data).oveccount: 1 else: 0) != 0: ((*__param_match_data).oveccount as c_int) else: (((__param_top_bracket as c_int) + 1) as c_int))) as c_uint)))
-        with_memcpy(((((&(*__param_match_data).ovector[0] as *mut c_ulong) + ((2 as isize) as usize)) as *mut c_void) as *mut u8), ((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *const u8), ((((((__local_i__goto_713_10 as c_uint) -% (2 as c_uint)) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
+        with_memcpy(((((&(*__param_match_data).ovector[0] as *mut c_ulong) + ((2 as isize) as usize)) as *mut c_void) as *mut u8), ((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *const u8), ((((((__local_i__goto_713_10 as c_uint) -% (2 as c_uint)) as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong) as i64))
         goto '__ci_bb_94
     }
 
@@ -42782,7 +42782,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6496 {
-        with_memcpy(((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *mut u8), ((((__local_assert_accept_frame__goto_697_12 as *mut c_char) + ((offsetof[heapframe](ovector) as usize) as usize)) as *const c_void) as *const u8), (((((*__local_assert_accept_frame__goto_697_12).offset_top as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
+        with_memcpy(((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *mut u8), ((((__local_assert_accept_frame__goto_697_12 as *mut c_char) + ((offsetof[heapframe](ovector) as usize) as usize)) as *const c_void) as *const u8), (((((*__local_assert_accept_frame__goto_697_12).offset_top as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong) as i64))
         ((*__local_F__goto_692_12).offset_top = (*__local_assert_accept_frame__goto_697_12).offset_top)
         ((*__local_F__goto_692_12).mark = (*__local_assert_accept_frame__goto_697_12).mark)
         goto '__ci_bb_6491
@@ -43226,7 +43226,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6582 {
-        with_memcpy(((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *mut u8), ((((__local_assert_accept_frame__goto_697_12 as *mut c_char) + ((offsetof[heapframe](ovector) as usize) as usize)) as *const c_void) as *const u8), (((((*__local_assert_accept_frame__goto_697_12).offset_top as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
+        with_memcpy(((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *mut u8), ((((__local_assert_accept_frame__goto_697_12 as *mut c_char) + ((offsetof[heapframe](ovector) as usize) as usize)) as *const c_void) as *const u8), (((((*__local_assert_accept_frame__goto_697_12).offset_top as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong) as i64))
         ((*__local_F__goto_692_12).offset_top = (*__local_assert_accept_frame__goto_697_12).offset_top)
         ((*__local_F__goto_692_12).mark = (*__local_assert_accept_frame__goto_697_12).mark)
         ((*__param_mb).end_subject = (*__local_F__goto_692_12).temp_sptr[0])
@@ -43638,7 +43638,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6656 {
-        with_memcpy(((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *mut u8), ((((__local_assert_accept_frame__goto_697_12 as *mut c_char) + ((offsetof[heapframe](ovector) as usize) as usize)) as *const c_void) as *const u8), (((((*__local_assert_accept_frame__goto_697_12).offset_top as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
+        with_memcpy(((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *mut u8), ((((__local_assert_accept_frame__goto_697_12 as *mut c_char) + ((offsetof[heapframe](ovector) as usize) as usize)) as *const c_void) as *const u8), (((((*__local_assert_accept_frame__goto_697_12).offset_top as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong) as i64))
         ((*__local_F__goto_692_12).offset_top = (*__local_assert_accept_frame__goto_697_12).offset_top)
         goto '__ci_bb_6657
     }
@@ -44289,7 +44289,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6778 {
-        with_memcpy(((((__local_P__goto_694_12 as *mut c_char) + ((offsetof[heapframe](ovector) as usize) as usize)) as *mut c_void) as *mut u8), ((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *const u8), (((((*__local_F__goto_692_12).offset_top as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
+        with_memcpy(((((__local_P__goto_694_12 as *mut c_char) + ((offsetof[heapframe](ovector) as usize) as usize)) as *mut c_void) as *mut u8), ((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *const u8), (((((*__local_F__goto_692_12).offset_top as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong) as i64))
         ((*__local_P__goto_694_12).offset_top = (*__local_F__goto_692_12).offset_top)
         ((*__local_P__goto_694_12).mark = (*__local_F__goto_692_12).mark)
         ((*__local_F__goto_692_12).back_frame = (((((((__local_F__goto_692_12 as *mut c_char) as usize) -% ((__local_P__goto_694_12 as *mut c_char) as usize)) as c_long) / (sizeof[c_char]() as c_long)) as c_ulong)))
@@ -44381,7 +44381,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6795 {
-        with_memcpy(((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *mut u8), ((&(*__local_P__goto_694_12).ovector[0] as *mut c_ulong) as *const u8), (((((*__local_F__goto_692_12).offset_top as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
+        with_memcpy(((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *mut u8), ((&(*__local_P__goto_694_12).ovector[0] as *mut c_ulong) as *const u8), (((((*__local_F__goto_692_12).offset_top as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong) as i64))
         ((*__local_F__goto_692_12).offset_top = (*__local_P__goto_694_12).offset_top)
         goto '__ci_bb_6797
     }
@@ -44646,7 +44646,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6851 {
-        with_memcpy(((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *mut u8), ((&(*__local_P__goto_694_12).ovector[0] as *mut c_ulong) as *const u8), (((((*__local_F__goto_692_12).offset_top as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
+        with_memcpy(((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *mut u8), ((&(*__local_P__goto_694_12).ovector[0] as *mut c_ulong) as *const u8), (((((*__local_F__goto_692_12).offset_top as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong) as i64))
         ((*__local_F__goto_692_12).offset_top = (*__local_P__goto_694_12).offset_top)
         goto '__ci_bb_6853
     }

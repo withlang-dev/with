@@ -215,7 +215,7 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
     (__local_src_bytes = __param_bytes + (sizeof[pcre2_serialized_data]() as usize))
 
-    (__local_tables = (((*__local_memctl).malloc.unwrap()((((1088 as c_ulong) +% (sizeof[usize]() as c_ulong)) as c_ulong), (*__local_memctl).memory_data) as *mut u8)))
+    (__local_tables = (((*__local_memctl).malloc.unwrap()((((1088 as c_ulong) +% (sizeof[c_ulong]() as c_ulong)) as c_ulong), (*__local_memctl).memory_data) as *mut u8)))
 
     if ((if __local_tables == null: 1 else: 0) != 0) {
         return -48

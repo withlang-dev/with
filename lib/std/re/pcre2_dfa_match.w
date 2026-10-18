@@ -4242,7 +4242,7 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
     }
 
     '__ci_bb_155 {
-        with_memmove((((__param_offsets + ((2 as isize) as usize)) as *mut c_void) as *mut u8), ((__param_offsets as *const c_void) as *const u8), ((((__local_count__goto_759_9 as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
+        with_memmove((((__param_offsets + ((2 as isize) as usize)) as *mut c_void) as *mut u8), ((__param_offsets as *const c_void) as *const u8), ((((__local_count__goto_759_9 as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong) as i64))
         goto '__ci_bb_156
     }
 
