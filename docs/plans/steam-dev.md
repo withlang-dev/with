@@ -219,8 +219,8 @@ reuse inside a target today, and a comment-only edit is correctly a no-op.
 So the Mac builds 3.6× faster. With a push of 2.4-10.8 s on this Wi-Fi
 (§3.4), a Mac build plus push is 21-29 s against 65 s on the Deck. That
 is why cross-building is the target and the Deck builder is the interim.
-Per-module incremental compilation would help both, and is a compiler
-finding in its own right (an issue to file).
+Rebuilding only what changed would help both; where those 18 s go and
+the staged way to cut them is `docs/plans/incremental-compilation.md`.
 
 ### 4.2 The target: cross-build on the Mac
 
