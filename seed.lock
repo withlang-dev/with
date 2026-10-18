@@ -41,25 +41,19 @@ with-darwin-aarch64=0bafc9b65804371da93b64d7615e7fc4d8dc0a6d12d314cca9d1eaa333b1
 # (2e8defaa) cannot compile main since 4cc11b86 (#2068). A fresh clone of main
 # 8cc883a7 with it as the seed runs :deps, builds to a stage2 == stage3
 # fixpoint over all 16 units and passes :no-host-toolchain.
-# linux-aarch64 is wave-arm64 b78ceca2 (#1915, D81), bootstrapped natively in
-# tools/docker/linux-aarch64 by a compiler cross-built on eric-5090 (v0.15.2.0
-# cannot build this tree). It embeds its runtime, the glibc 2.28 sysroot,
-# libc++ and lld: a fresh clone in a bare ubuntu:24.04 (git, curl, bubblewrap)
-# runs :deps and build with no LLVM_PREFIX to a stage2 == stage3 fixpoint over
-# all 16 units, and its release compiler is this binary byte for byte.
+# linux-aarch64 is cut from main 3d73b98c (#2305, D118), bootstrapped natively
+# in tools/docker/linux-aarch64 to a stage2 == stage3 fixpoint over all 16
+# units and verified against :no-host-toolchain.
 with-linux-x86_64=b64212315b948e39ff5c42e39cd62315c13406dfce5a6d86771a5697e226cbf5
-with-linux-aarch64.version=nightly-20261003-local-2-b78ceca2d3c5
-with-linux-aarch64=c5b434ce739a0ef2a8beddf09abd30f1f501aa2b9227b07a0b16bdf65f8f2898
+with-linux-aarch64=8b31429cacb68995ef60c62410aea416e801a0ff007111a73a001919af3b425d
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
 # that carries its own linker (lld), dlltool, C runtime, clang resource
 # directory and cmake/ninja, so a fresh Windows checkout runs :seed, :deps
 # and build with no SDK, HOME or LLVM_PREFIX. Built on win10 from a fresh
 # clone by the previous seed (6cd934e8) with the windows-gnu SDK of sdk.lock;
 # stage2 == stage3 over all 16 units, and the published binary is that
-# build's fixpoint-verified release compiler. windows-aarch64 stays on
-# v0.15.2.1: cross-built from ea377276 (v0.15.2.1 + the #1089 embed-slot
-# fix), an intermediate seed the native windows-aarch64 lane bootstraps and
-# verifies.
+# build's fixpoint-verified release compiler. windows-aarch64 is cross-built
+# from main 3d73b98c (#2305, D118), an intermediate seed the native
+# windows-aarch64 lane bootstraps and verifies.
 with-windows-x86_64.exe=6886e76ed2fdc104d41e82f3d08098676565e9957d2847dfc186b02ef3372504
-with-windows-aarch64.exe.version=v0.15.2.1
-with-windows-aarch64.exe=bb3b17c64ad057ddc852a5ee6a61a4e4a224780447013699d490e6f726893c73
+with-windows-aarch64.exe=9ae0d160a717f4553cd0c23b26e71e01863c7dc0417e5bc103d9498c340a3296

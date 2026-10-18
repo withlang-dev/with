@@ -70,9 +70,9 @@ jobs:
             mesa_sha256: 418f1938dc48d401538cf6440d3c718e2f456ef2023e44133105263f483e903f
           - arch: aarch64
             runner: windows-11-arm
-            seed_version: v0.15.2.1
+            seed_version: nightly-20261015-local-1-efcb91c30a6a
             seed_asset: with-windows-aarch64.exe
-            seed_sha256: bb3b17c64ad057ddc852a5ee6a61a4e4a224780447013699d490e6f726893c73
+            seed_sha256: 9ae0d160a717f4553cd0c23b26e71e01863c7dc0417e5bc103d9498c340a3296
             mesa_arch: arm64
             mesa_sha256: bd1c00a49504b3efe20037cf29fa437380cfb5cbe73f196272624b94938330f1
     steps:
@@ -892,9 +892,9 @@ jobs:
       # The seed.lock pin (#1915): a self-contained compiler that embeds its
       # runtime, sysroot and lld, so it needs no runtime bundle, linker shim
       # or host libxml2.
-      WITH_SEED_VERSION: nightly-20261003-local-2-b78ceca2d3c5
+      WITH_SEED_VERSION: nightly-20261015-local-1-efcb91c30a6a
       WITH_SEED_ASSET: with-linux-aarch64
-      WITH_SEED_SHA256: c5b434ce739a0ef2a8beddf09abd30f1f501aa2b9227b07a0b16bdf65f8f2898
+      WITH_SEED_SHA256: 8b31429cacb68995ef60c62410aea416e801a0ff007111a73a001919af3b425d
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: nightly-sdk-20260930-e997223d40ce
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
@@ -1053,9 +1053,9 @@ jobs:
       WITH_SEED_REPO: withlang-dev/with
       # CI-produced by seed-windows-aarch64.yml (cross-built on Linux, published
       # to the seed-windows-aarch64 prerelease) -- never a hand-uploaded asset.
-      WITH_SEED_VERSION: v0.15.2.1
+      WITH_SEED_VERSION: nightly-20261015-local-1-efcb91c30a6a
       WITH_SEED_ASSET: with-windows-aarch64.exe
-      WITH_SEED_SHA256: bb3b17c64ad057ddc852a5ee6a61a4e4a224780447013699d490e6f726893c73
+      WITH_SEED_SHA256: 9ae0d160a717f4553cd0c23b26e71e01863c7dc0417e5bc103d9498c340a3296
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: sdk-windows-aarch64
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-aarch64.tar.gz
