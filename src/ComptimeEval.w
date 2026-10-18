@@ -1649,8 +1649,21 @@ impl ComptimeEvaluator:
             let _ = self.fail(0, "incomplete workspace interception for '" ++ record.name ++ "': " ++ reason)
             return
 
+// The evaluator owns the Sema while it runs and hands it back in
+// comptime_eval_finish. Under D120 a read through the pointer retains every
+// table in the Sema, and the first write by the evaluator would copy each
+// one (1,908 copies over 64 KB in one check of src/main.w). Writing a blank
+// Sema back releases the original's hold, so the evaluator's Sema is the one
+// holder and nothing is copied. The blank reuses the taken Sema's pool and
+// AST handles (Copy): a fresh InternPool.init() is an arena page of 1 MB
+// that is never freed, once per evaluation (behav_1944's 32 MB limit).
+unsafe fn comptime_take_sema(sema_ptr: *mut Sema) -> Sema:
+    let taken = *sema_ptr
+    *sema_ptr = Sema.placeholder(taken.pool, DiagnosticList.init(), taken.ast)
+    taken
+
 pub unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
-    var sema = *sema_ptr
+    var sema = comptime_take_sema(sema_ptr)
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 0)
@@ -1658,7 +1671,7 @@ pub unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, p
     comptime_eval_finish(sema_ptr, evaluator, value)
 
 pub unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
-    var sema = *sema_ptr
+    var sema = comptime_take_sema(sema_ptr)
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 1)
@@ -1674,7 +1687,7 @@ pub unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: 
     return move result.value
 
 pub unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, strict_effects: i32, suppress_side_effects: i32) -> ComptimeEvalResult:
-    var sema = *sema_ptr
+    var sema = comptime_take_sema(sema_ptr)
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 1)
@@ -1702,7 +1715,7 @@ pub unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool,
     comptime_eval_finish(sema_ptr, evaluator, value)
 
 pub unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: List[str], output: &str, extra_outputs: &List[str], args_values: List[str], write_scopes: &List[str], timeout_ms: i32, cwd: &str, env: List[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
-    var sema = *sema_ptr
+    var sema = comptime_take_sema(sema_ptr)
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 1)
