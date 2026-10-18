@@ -1,11 +1,11 @@
-# Handoff — 2026-10-18 (evening): #2449 pools fixed (PR #2453 → main c98c84156), D22/D44 compliant (PR #2451 → 809561fc6), D120 Amendment 2 (#2450); the decisions still to implement
+# Handoff — 2026-10-18 (evening): examples/spiral (#2455 → 6a6580c25), #2449 pools fixed (PR #2453 → c98c84156), D22/D44 compliant (PR #2451 → 809561fc6), D120 Amendment 2 (#2450); the decisions still to implement
 
 Read this section first; everything below "0-prev." is the archive of
 earlier windows and is superseded where it disagrees.
 
 ## 0. Where the work stands
 
-**Main is c98c84156.** Three merges this window, in order:
+**Main is 6a6580c25.** Five merges this window, in order (newest last):
 - **#2450 → 88c6fc333 (docs):** D120 Amendment 2, Eric verbatim "raise the
   bar to 5%": the record's "what would reopen it" is the 5% merge bar, not
   the ruling's 2%; the decision-log index line follows.
@@ -43,6 +43,20 @@ earlier windows and is superseded where it disagrees.
   spelling; the single-owner restructure, one pool per compilation with
   every phase borrowing it, removes them — Sema/Codegen would become
   view-holding types; not started).
+
+- **#2455 → 6a6580c25:** `examples/spiral`, the interactive raylib
+  spiral that sat untracked since 2026-09-19, reviewed and tracked: the
+  loop runs in f32 from one `GetTime() as f32` (§4.2.6 forbids the
+  implicit isize→f64 and f64→f32 it had), scaffold `.git`/AGENTS.md/
+  CLAUDE.md/out removed, README explains `with get c.raylib`. The examples
+  lane gains the fetched-package class (`ex_fetched_projects`): checked and
+  built when `.with/deps/c/raylib` exists, skipped with a printed reason
+  when not (the gate is offline; the raylib UAT covers the package). The
+  home checkout keeps its fetched `.with/` so the lane takes the full path
+  there. Battery 261 s. Reseeded (generation unchanged, no compiler
+  source moved).
+- **#2454 → 8f72c913a:** this handoff became the tracked
+  `docs/handoff.md`; no root `handoff.md` any more.
 
 **Filed:** #2452 — the build-graph cache key hashes build.w/build/ but not
 the directory listings build.w enumerates (`list_files("src")`): a deleted
