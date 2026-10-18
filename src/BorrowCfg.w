@@ -133,7 +133,7 @@ impl CfgGraph:
 // Build a CFG from an AST expression subtree.
 // For now, builds a simple linear CFG from the expression.
 // Full implementation requires walking the AST expression tree.
-fn build_cfg(pool: AstPool, expr_node: i32) -> CfgGraph:
+fn build_cfg(pool: &AstPool, expr_node: i32) -> CfgGraph:
     var graph = CfgGraph.init()
 
     let start = pool.get_start(expr_node)
@@ -152,7 +152,7 @@ fn build_cfg(pool: AstPool, expr_node: i32) -> CfgGraph:
 
     graph
 
-fn build_expr(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
+fn build_expr(graph: CfgGraph, pool: &AstPool, node: i32) -> i32:
     let kind = pool.kind(node)
     let start = pool.get_start(node)
     let end = pool.get_end(node)
@@ -183,7 +183,7 @@ fn build_expr(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     // Default: simple expression node
     graph.add_node(CfgNodeKind.Expr, start, end)
 
-fn build_block(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
+fn build_block(graph: CfgGraph, pool: &AstPool, node: i32) -> i32:
     let extra_start = pool.get_data0(node)
     let stmt_count = pool.get_data1(node)
     let tail = pool.get_data2(node)
@@ -216,7 +216,7 @@ fn build_block(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
         return graph.add_node(CfgNodeKind.Expr, start, end)
     first
 
-fn build_if(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
+fn build_if(graph: CfgGraph, pool: &AstPool, node: i32) -> i32:
     let cond_node_idx = pool.get_data0(node)
     let then_node_idx = pool.get_data1(node)
     let else_node_idx = pool.get_data2(node)
@@ -237,7 +237,7 @@ fn build_if(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
 
     branch
 
-fn build_while(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
+fn build_while(graph: CfgGraph, pool: &AstPool, node: i32) -> i32:
     let cond_node_idx = pool.get_data0(node)
     let body_node_idx = pool.get_data1(node)
     let start = pool.get_start(node)
@@ -253,7 +253,7 @@ fn build_while(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
 
     cond
 
-fn build_do_while(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
+fn build_do_while(graph: CfgGraph, pool: &AstPool, node: i32) -> i32:
     let body_node_idx = pool.get_data0(node)
     let cond_node_idx = pool.get_data1(node)
     let start = pool.get_start(node)
@@ -269,7 +269,7 @@ fn build_do_while(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
 
     body_n
 
-fn build_loop(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
+fn build_loop(graph: CfgGraph, pool: &AstPool, node: i32) -> i32:
     let body_node_idx = pool.get_data0(node)
     let start = pool.get_start(node)
     let end = pool.get_end(node)

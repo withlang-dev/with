@@ -187,7 +187,7 @@ impl Zcu:
         var paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_insert_unique(move paths, path)
 
-fn count_non_use_decls_frontend(pool: AstPool) -> i32:
+fn count_non_use_decls_frontend(pool: &AstPool) -> i32:
     var count: i32 = 0
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
@@ -200,7 +200,7 @@ impl Zcu:
     // is loaded: a target under an `internal` path segment is importable only
     // from inside its parent's tree (resolve_internal_import_refusal). One
     // pass here covers every path that loaded a module.
-    mut fn check_internal_imports_frontend(pool: AstPool):
+    mut fn check_internal_imports_frontend(pool: &AstPool):
         for di in 0..pool.decl_count():
             let decl = pool.get_decl(di)
             if pool.kind(decl) != NodeKind.NK_USE_DECL: continue
@@ -215,7 +215,7 @@ impl Zcu:
             let span = Span { file: self.decl_source_file_id_frontend(di), start: pool.get_start(decl), end: pool.get_end(decl) }
             self.diagnostics.emit(Diagnostic.err(refusal, span))
 
-    mut fn emit_missing_import_frontend(pool: AstPool, decl: i32):
+    mut fn emit_missing_import_frontend(pool: &AstPool, decl: i32):
         // #932: name the module — an unnamed miss cost a debugger session
         // to bisect (a fresh clone lacks the build-generated modules).
         let path_start = pool.get_data0(decl)
@@ -276,7 +276,7 @@ fn frontend_debug_type_names_enabled() -> i32:
         return 0
     1
 
-fn frontend_dump_type_decl_names(stage: &str, pool: AstPool, intern: InternPool):
+fn frontend_dump_type_decl_names(stage: &str, pool: &AstPool, intern: &InternPool):
     if frontend_debug_type_names_enabled() == 0:
         return
     runtime_eprint(f"[type-names] stage={stage} decls={pool.decl_count()}")
@@ -564,7 +564,6 @@ impl Zcu:
             let tokens = lexer.tokenize()
             var parser = Parser.init_with_pool(move tokens, synthetic, ci_file_id, self.pool, move self.diagnostics, out)
             out = parser.parse_module()
-            self.pool = parser.intern
             self.diagnostics = move parser.diags
 
             let after = out.decl_count()
@@ -672,7 +671,6 @@ impl Zcu:
         let tokens = lexer.tokenize()
         var parser = Parser.init_with_pool(move tokens, text, file_id, self.pool, move self.diagnostics, out)
         out = parser.parse_module()
-        self.pool = parser.intern
         self.diagnostics = move parser.diags
         self.append_decl_source_paths(out.decl_count() - before, self.decl_source_path_frontend(owner), file_id)
         out
@@ -739,7 +737,7 @@ impl Zcu:
 
     // The names a program's facade block states: its resources, its
     // producers, and its fn items.
-    fn collect_facade_claims_frontend(pool: AstPool, facade: i32, claimed: List[str]) -> List[str]:
+    fn collect_facade_claims_frontend(pool: &AstPool, facade: i32, claimed: List[str]) -> List[str]:
         let extra_start = pool.get_data1(facade as NodeId)
         for i in 0..pool.get_data2(facade as NodeId):
             let item = pool.get_extra(extra_start + i)
@@ -881,7 +879,7 @@ impl Zcu:
             out = self.splice_facade_text_frontend(out, &text, "<facade " ++ facade_name ++ ">", i)
         out
 
-    fn c_import_cache_key_frontend(pool: AstPool, decl: i32, header_spec: &str) -> str:
+    fn c_import_cache_key_frontend(pool: &AstPool, decl: i32, header_spec: &str) -> str:
         // v18: the #357 COwned owning/borrowing wrappers are retired — libc's
         // owned resources are the toolchain libc facade, rendered after
         // translation, and `owns:`/`borrows:` no longer shape the text; v17:
@@ -1195,7 +1193,7 @@ impl Zcu:
     mut fn c_import_emit_header_error_frontend(decl: i32, header_spec: &str):
         self.c_import_emit_header_error_detail_frontend(decl, header_spec, "")
 
-    mut fn c_import_emit_untranslated_error_frontend(pool: AstPool, decl: i32, kind: &str, name: &str):
+    mut fn c_import_emit_untranslated_error_frontend(pool: &AstPool, decl: i32, kind: &str, name: &str):
         let display_name = if name.len() > 0: with_str_clone_ref(name) else: "<unknown>"
         let span = Span {
             file: 0,
@@ -1206,47 +1204,47 @@ impl Zcu:
 
     // §16.2 selective-import record, appended to the extra array after the
     // no_methods group: [strict_flag, only_count, only_name_0, ...].
-    fn c_import_select_base_frontend(pool: AstPool, decl: i32) -> i32:
+    fn c_import_select_base_frontend(pool: &AstPool, decl: i32) -> i32:
         let link_start = pool.get_data1(decl)
         let packed = pool.get_data2(decl)
         link_start + c_import_link_count(packed) + c_import_allow_count(packed) + c_import_no_methods_count(packed)
 
-    fn c_import_is_strict_frontend(pool: AstPool, decl: i32) -> bool:
+    fn c_import_is_strict_frontend(pool: &AstPool, decl: i32) -> bool:
         (pool.get_extra(self.c_import_select_base_frontend(pool, decl)) & 1) != 0
 
-    fn c_import_is_cxx_frontend(pool: AstPool, decl: i32):
+    fn c_import_is_cxx_frontend(pool: &AstPool, decl: i32):
         (pool.get_extra(self.c_import_select_base_frontend(pool, decl)) & 2) != 0
 
-    fn c_import_only_count_frontend(pool: AstPool, decl: i32) -> i32:
+    fn c_import_only_count_frontend(pool: &AstPool, decl: i32) -> i32:
         pool.get_extra(self.c_import_select_base_frontend(pool, decl) + 1)
 
-    fn c_import_only_name_frontend(pool: AstPool, decl: i32, idx: i32) -> str:
+    fn c_import_only_name_frontend(pool: &AstPool, decl: i32, idx: i32) -> str:
         with_str_clone_ref(self.pool.resolve(pool.get_extra(self.c_import_select_base_frontend(pool, decl) + 2 + idx)))
 
     // #357 ownership-annotation record: [owns_count, owns..., borrows_count,
     // borrows...] follows the selective-import record [strict, only_count, only...].
-    fn c_import_ann_base_frontend(pool: AstPool, decl: i32) -> i32:
+    fn c_import_ann_base_frontend(pool: &AstPool, decl: i32) -> i32:
         let sel = self.c_import_select_base_frontend(pool, decl)
         sel + 2 + pool.get_extra(sel + 1)
 
-    fn c_import_owns_count_frontend(pool: AstPool, decl: i32) -> i32:
+    fn c_import_owns_count_frontend(pool: &AstPool, decl: i32) -> i32:
         pool.get_extra(self.c_import_ann_base_frontend(pool, decl))
 
-    fn c_import_owns_entry_frontend(pool: AstPool, decl: i32, idx: i32) -> str:
+    fn c_import_owns_entry_frontend(pool: &AstPool, decl: i32, idx: i32) -> str:
         with_str_clone_ref(self.pool.resolve(pool.get_extra(self.c_import_ann_base_frontend(pool, decl) + 1 + idx)))
 
-    fn c_import_borrows_count_frontend(pool: AstPool, decl: i32) -> i32:
+    fn c_import_borrows_count_frontend(pool: &AstPool, decl: i32) -> i32:
         let ab = self.c_import_ann_base_frontend(pool, decl)
         pool.get_extra(ab + 1 + pool.get_extra(ab))
 
-    fn c_import_borrows_entry_frontend(pool: AstPool, decl: i32, idx: i32) -> str:
+    fn c_import_borrows_entry_frontend(pool: &AstPool, decl: i32, idx: i32) -> str:
         let ab = self.c_import_ann_base_frontend(pool, decl)
         with_str_clone_ref(self.pool.resolve(pool.get_extra(ab + 2 + pool.get_extra(ab) + idx)))
 
     // A produced declaration's bound name (fn/type/const/extern all store the
     // name symbol in d0). For `Type.method` names, the leading segment before the
     // dot is the type a selective import would have requested.
-    fn c_import_decl_bound_name_frontend(pool: AstPool, decl: i32) -> str:
+    fn c_import_decl_bound_name_frontend(pool: &AstPool, decl: i32) -> str:
         with_str_clone_ref(self.pool.resolve(pool.get_data0(decl)))
 
 // Foundational scaffolding a selective import must always keep: the unnamed
@@ -1269,14 +1267,14 @@ fn frontend_name_selects(want: &str, dname: &str) -> bool:
     false
 
 impl Zcu:
-    fn c_import_only_matches_frontend(pool: AstPool, decl: i32, dname: &str) -> bool:
+    fn c_import_only_matches_frontend(pool: &AstPool, decl: i32, dname: &str) -> bool:
         let n = self.c_import_only_count_frontend(pool, decl)
         for oi in 0..n:
             if frontend_name_selects(self.c_import_only_name_frontend(pool, decl, oi), dname):
                 return true
         false
 
-    fn c_import_produced_name_frontend(pool: AstPool, before: i32, after: i32, want: &str) -> bool:
+    fn c_import_produced_name_frontend(pool: &AstPool, before: i32, after: i32, want: &str) -> bool:
         var di = before
         while di < after:
             if frontend_name_selects(want, self.c_import_decl_bound_name_frontend(pool, pool.get_decl(di))):
@@ -1284,7 +1282,7 @@ impl Zcu:
             di = di + 1
         false
 
-    mut fn c_import_emit_selective_missing_frontend(pool: AstPool, decl: i32, name: &str):
+    mut fn c_import_emit_selective_missing_frontend(pool: &AstPool, decl: i32, name: &str):
         let span = Span { file: 0, start: pool.get_start(decl), end: pool.get_end(decl) }
         var msg = "c_import: requested symbol '" ++ name ++ "' is not available"
         if self.c_import_omitted_symbols.contains(name):
@@ -1295,7 +1293,7 @@ impl Zcu:
 
     // strict: every omission recorded in `synthetic` that is not acknowledged via
     // allow_untranslated becomes a non-zero import failure.
-    mut fn c_import_emit_strict_omissions_frontend(pool: AstPool, decl: i32, synthetic: &str):
+    mut fn c_import_emit_strict_omissions_frontend(pool: &AstPool, decl: i32, synthetic: &str):
         let prefix = "// @with-cimport-omitted|"
         var pos = 0
         let total = synthetic.len()
@@ -1321,7 +1319,7 @@ impl Zcu:
                 break
             pos = line_end + 1
 
-    fn c_import_decl_allows_untranslated_frontend(pool: AstPool, decl: i32, name: &str) -> bool:
+    fn c_import_decl_allows_untranslated_frontend(pool: &AstPool, decl: i32, name: &str) -> bool:
         if name.len() == 0:
             return false
         let link_start = pool.get_data1(decl)
@@ -1334,7 +1332,7 @@ impl Zcu:
                 return true
         false
 
-    fn c_import_first_unallowed_untranslated_frontend(pool: AstPool, decl: i32, names: &str) -> str:
+    fn c_import_first_unallowed_untranslated_frontend(pool: &AstPool, decl: i32, names: &str) -> str:
         var i = 0
         let total = names.len()
         while i < total:
@@ -1349,7 +1347,7 @@ impl Zcu:
                     return name
         ""
 
-    mut fn c_import_expand_header_spec_frontend(header_spec_raw: &str, pool: AstPool, decl: i32) -> str:
+    mut fn c_import_expand_header_spec_frontend(header_spec_raw: &str, pool: &AstPool, decl: i32) -> str:
         let decoded = c_import_decode_escapes(header_spec_raw)
         let rendered = c_import_render_header_spec(decoded)
         let header = c_import_trim(rendered)
@@ -1963,7 +1961,7 @@ impl Zcu:
         self.compile_source_frontend_mode(text, name, file_id, 0)
 
     // The Sema that checks the final pool, configured from this frontend.
-    mut fn new_module_sema(text: &str, pool: AstPool) -> Sema:
+    mut fn new_module_sema(text: &str, pool: &AstPool) -> Sema:
         var sema = self.configure_tracked_input_sema(Sema.init(self.pool, move self.diagnostics, pool))
         sema.source_text = with_str_clone_ref(text)
         sema.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
@@ -2018,7 +2016,6 @@ impl Zcu:
             let ptokens = plexer.tokenize()
             var pparser = Parser.init(move ptokens, synthetic, 0, self.pool, move self.diagnostics)
             pool = pparser.parse_module()
-            self.pool = pparser.intern
             self.diagnostics = move pparser.diags
             self.seed_decl_source_paths(pool, name, file_id)
             pool = self.expand_prelude_closure_frontend(pool)
@@ -2035,7 +2032,6 @@ impl Zcu:
             if interface_root:
                 uparser.enable_interface_mode()
             pool = uparser.parse_module()
-            self.pool = uparser.intern
             self.diagnostics = move uparser.diags
             self.append_decl_source_paths(pool.decl_count() - before_user, name, file_id)
         else:
@@ -2047,7 +2043,6 @@ impl Zcu:
             if interface_root:
                 parser.enable_interface_mode()
             pool = parser.parse_module()
-            self.pool = parser.intern
             self.diagnostics = move parser.diags
             self.seed_decl_source_paths(pool, name, file_id)
         for extra_i in 0..self.extra_source_names.len():
@@ -2061,7 +2056,6 @@ impl Zcu:
             let extra_tokens = extra_lexer.tokenize()
             var extra_parser = Parser.init_with_pool(move extra_tokens, extra_text, extra_file_id, self.pool, move self.diagnostics, pool)
             pool = extra_parser.parse_module()
-            self.pool = extra_parser.intern
             self.diagnostics = move extra_parser.diags
             self.append_decl_source_paths(pool.decl_count() - before, extra_name, extra_file_id)
         if do_profile:
@@ -2087,7 +2081,7 @@ impl Zcu:
         if do_profile:
             let resolve_ns = runtime_clock_nanos() - t_resolve
             runtime_eprint(f"[profile] frontend.resolve  {resolve_ns / 1000000}.{(resolve_ns % 1000000) / 1000} ms")
-        self.pool = artifacts.pool
+        self.pool = move artifacts.pool
         self.diagnostics = move artifacts.diags
         self.set_resolve_snapshot(artifacts.result, name)
         // #930: the resolver numbered imported modules from next_file_id;
@@ -2203,7 +2197,7 @@ impl Zcu:
             // The comptime transform must run against the same intern pool that
             // pre-sema prepared, otherwise cloned AST symbol ids may be resolved
             // against a stale symbol table in the transform pass.
-            self.pool = pre_sema.pool
+            self.pool = pre_sema.pool.clone()
             let t_transform = runtime_clock_nanos()
             pool = pre_sema.comptime_transform_module(pool, self.pool)
             if profile_comptime:
@@ -2356,7 +2350,6 @@ impl Zcu:
             if src.interface:
                 parser.enable_interface_mode()
             merged_pool = parser.parse_module()
-            self.pool = parser.intern
             self.diagnostics = move parser.diags
             self.add_source_text_mapping(mod.file_id, path, text)
             self.append_decl_source_paths(merged_pool.decl_count() - before, path, mod.file_id)
@@ -2491,7 +2484,7 @@ impl Zcu:
     // §18.2 gate); its link name keeps the bundle's module-qualified name
     // (fn_abi_module_link_name). The earlier declaration keeps the short name,
     // so a source definition always does (D39: the interface yields).
-    fn displace_colliding_interface_fns(pool: AstPool, base: i32):
+    fn displace_colliding_interface_fns(pool: &AstPool, base: i32):
         let taken: HashMap[i32, str] = HashMap.new()
         for di in 0..pool.decl_count():
             let decl = pool.get_decl(di) as i32
@@ -2524,7 +2517,7 @@ impl Zcu:
     // its declarations, so they are an owner of their own. A same-owner
     // duplicate keeps one name (Sema's "shadowing is not allowed"), and
     // interface storage keeps its own table (D39).
-    fn displace_colliding_globals(pool: AstPool):
+    fn displace_colliding_globals(pool: &AstPool):
         let taken: HashMap[i32, str] = HashMap.new()
         for pass in 0..2:
             for di in 0..pool.decl_count():
@@ -2556,7 +2549,7 @@ impl Zcu:
     // keeps the flat name; Sema binds each module's calls by §18.2
     // precedence (resolve_displaced_fn_ident: the importer's to its wrapper,
     // std.re's to its own import).
-    fn displace_c_import_wrappers(pool: AstPool):
+    fn displace_c_import_wrappers(pool: &AstPool):
         var extern_names: List[i32] = List.new()
         var extern_paths: List[str] = List.new()
         var extern_imports: List[bool] = List.new()
@@ -2597,7 +2590,7 @@ impl Zcu:
     // declarations take their names first, whatever the merge order; each
     // c_import is an owner of its own (#1753). A header's extern stays the
     // one global C symbol (D29).
-    fn displace_colliding_c_import_fns(pool: AstPool):
+    fn displace_colliding_c_import_fns(pool: &AstPool):
         let taken: HashMap[i32, str] = HashMap.new()
         for pass in 0..2:
             for di in 0..pool.decl_count():
@@ -2629,7 +2622,6 @@ impl Zcu:
         var parser = Parser.init_with_pool(move tokens, chunk, chunk_file_id, self.pool, move self.diagnostics, out)
         parser.enable_interface_mode()
         out = parser.parse_module()
-        self.pool = parser.intern
         self.diagnostics = move parser.diags
         self.add_source_text_mapping(chunk_file_id, path, chunk)
         self.append_decl_source_paths(out.decl_count() - before_decls, path, chunk_file_id)
@@ -3025,7 +3017,7 @@ fn frontend_path_is_std_rc_module(path: &str) -> bool:
         return true
     false
 
-fn frontend_name_shadowed_by_extern(tier: &List[i32], pool: AstPool, name: i32) -> bool:
+fn frontend_name_shadowed_by_extern(tier: &List[i32], pool: &AstPool, name: i32) -> bool:
     for i in 0..tier.len():
         let d = tier[i]
         if pool.kind(d) == NodeKind.NK_EXTERN_FN and pool.get_data0(d) == name:
@@ -3039,12 +3031,12 @@ fn frontend_fn_decl_rank(kind: i32) -> i32:
         return 1
     0
 
-fn frontend_fn_decl_is_method(pool: AstPool, intern: InternPool, decl: i32) -> bool:
+fn frontend_fn_decl_is_method(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
     if pool.kind(decl) != NodeKind.NK_FN_DECL:
         return false
     frontend_str_contains_byte(intern.resolve(pool.get_data0(decl)), 46)
 
-fn frontend_fn_decl_is_generic(pool: AstPool, decl: i32) -> bool:
+fn frontend_fn_decl_is_generic(pool: &AstPool, decl: i32) -> bool:
     if pool.kind(decl) != NodeKind.NK_FN_DECL:
         return false
     let meta = pool.find_fn_meta(decl as NodeId)
@@ -3065,7 +3057,7 @@ const FRONTEND_FN_DISPLACE = 2
 // (one global C symbol in every tier), an interface decl (displaced by the
 // on-demand interface merge instead: displace_colliding_interface_fns,
 // #1362) and a c_export fn (one exported C name) keep the drop.
-fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: AstPool, intern: InternPool, idx: i32, higher_names: &List[i32]) -> i32:
+fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: &AstPool, intern: &InternPool, idx: i32, higher_names: &List[i32]) -> i32:
     let current = tier[idx]
     let current_kind = pool.kind(current)
     if frontend_fn_decl_is_method(pool, intern, current):
@@ -3121,10 +3113,10 @@ fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: AstPool, 
         j = j + 1
     FRONTEND_FN_KEEP
 
-fn frontend_fn_decl_is_displaceable(pool: AstPool, intern: InternPool, decl: i32) -> bool:
+fn frontend_fn_decl_is_displaceable(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
     pool.kind(decl) == NodeKind.NK_FN_DECL and not pool.fn_decl_body_is_interface(decl as NodeId) and not frontend_fn_decl_is_c_export(pool, intern, decl)
 
-fn frontend_fn_decl_is_c_export(pool: AstPool, intern: InternPool, decl: i32) -> bool:
+fn frontend_fn_decl_is_c_export(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
     let meta = pool.find_fn_meta(decl as NodeId)
     // The tp_start slot of a non-generic fn carries its callconv.
     meta >= 0 and pool.fn_meta_tp_count(meta) == 0 and pool.fn_meta_tp_start(meta) != 0 and intern.resolve(pool.fn_meta_tp_start(meta)).starts_with("c_export:")
@@ -3134,7 +3126,7 @@ fn frontend_fn_decl_is_c_export(pool: AstPool, intern: InternPool, decl: i32) ->
 // collide with it. Sema recognizes the `$in$` infix, keeps the short name for
 // diagnostics, and resolves each module's references
 // (Sema.record_displaced_fn, Sema.resolve_displaced_fn_ident).
-fn frontend_displace_fn_decl(pool: AstPool, intern: InternPool, decl: i32, path: &str):
+fn frontend_displace_fn_decl(pool: &AstPool, intern: &InternPool, decl: i32, path: &str):
     let name: str = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
     let canonical = codegen_canonical_module_path(path)
     var tag = StringBuilder.with_capacity(canonical.len())
@@ -3146,7 +3138,7 @@ fn frontend_displace_fn_decl(pool: AstPool, intern: InternPool, decl: i32, path:
             tag.push_byte('_')
     pool.set_data0(decl as NodeId, intern.intern(name ++ "$in$" ++ tag.to_str()))
 
-fn frontend_global_decl_mut(pool: AstPool, decl: i32) -> i32:
+fn frontend_global_decl_mut(pool: &AstPool, decl: i32) -> i32:
     let kind = pool.kind(decl)
     if kind == NodeKind.NK_EXTERN_VAR:
         return if pool.get_data2(decl) != 0: 1 else: 0
@@ -3154,7 +3146,7 @@ fn frontend_global_decl_mut(pool: AstPool, decl: i32) -> i32:
         return pool.get_data2(decl) % 2
     -1
 
-fn frontend_global_decl_type_text(pool: AstPool, intern: InternPool, decl: i32) -> str:
+fn frontend_global_decl_type_text(pool: &AstPool, intern: &InternPool, decl: i32) -> str:
     let kind = pool.kind(decl)
     if kind == NodeKind.NK_EXTERN_VAR:
         return render_type_expr(pool, intern, (pool.get_data1(decl)) as NodeId)
@@ -3164,7 +3156,7 @@ fn frontend_global_decl_type_text(pool: AstPool, intern: InternPool, decl: i32) 
             return render_type_expr(pool, intern, (type_ann) as NodeId)
     ""
 
-fn frontend_extern_var_matches_decl(pool: AstPool, intern: InternPool, decl: i32, other: i32) -> bool:
+fn frontend_extern_var_matches_decl(pool: &AstPool, intern: &InternPool, decl: i32, other: i32) -> bool:
     if pool.kind(decl) != NodeKind.NK_EXTERN_VAR:
         return false
     let other_kind = pool.kind(other)
@@ -3180,13 +3172,13 @@ fn frontend_extern_var_matches_decl(pool: AstPool, intern: InternPool, decl: i32
         return false
     other_type == decl_type
 
-fn frontend_extern_var_shadowed_by_tier(tier: &List[i32], pool: AstPool, intern: InternPool, decl: i32) -> bool:
+fn frontend_extern_var_shadowed_by_tier(tier: &List[i32], pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
     for i in 0..tier.len():
         if frontend_extern_var_matches_decl(pool, intern, decl, tier[i]):
             return true
     false
 
-fn frontend_extern_var_shadowed_in_tier(tier: &List[i32], pool: AstPool, intern: InternPool, idx: i32) -> bool:
+fn frontend_extern_var_shadowed_in_tier(tier: &List[i32], pool: &AstPool, intern: &InternPool, idx: i32) -> bool:
     let decl = tier[idx]
     for j in 0..tier.len():
         if j == idx:
@@ -3343,7 +3335,7 @@ fn frontend_resolve_module_rel(module_dir: &str, rel_path: &str) -> str:
     resolve_own_tree_candidate(rel_path)
 
 impl Zcu:
-    fn use_path_name_frontend(pool: AstPool, path_start: i32, path_count: i32) -> str:
+    fn use_path_name_frontend(pool: &AstPool, path_start: i32, path_count: i32) -> str:
         var path = ""
         for pi in 0..path_count:
             if pi > 0:
@@ -3352,7 +3344,7 @@ impl Zcu:
             path = path ++ self.pool.resolve(seg)
         path
 
-fn frontend_pool_has_type_decl_named(pool: AstPool, sym: i32) -> bool:
+fn frontend_pool_has_type_decl_named(pool: &AstPool, sym: i32) -> bool:
     if sym == 0:
         return false
     for di in 0..pool.decl_count():
@@ -3362,7 +3354,7 @@ fn frontend_pool_has_type_decl_named(pool: AstPool, sym: i32) -> bool:
     false
 
 impl Zcu:
-    fn use_decl_is_local_type_selector_frontend(pool: AstPool, decl: i32) -> bool:
+    fn use_decl_is_local_type_selector_frontend(pool: &AstPool, decl: i32) -> bool:
         if pool.kind(decl) != NodeKind.NK_USE_DECL:
             return false
         let selector_count = pool.get_data2(decl)
@@ -3462,7 +3454,6 @@ impl Zcu:
         if src.interface:
             parser.enable_interface_mode()
         let merged_pool = parser.parse_module()
-        self.pool = parser.intern
         self.diagnostics = move parser.diags
         self.append_decl_source_paths(merged_pool.decl_count() - before, path, file_id)
         merged_pool
@@ -3487,7 +3478,7 @@ pub fn frontend_dirname(path: &str) -> str:
 
 // D89: whether any field of the program takes its numeric type from its
 // uses (the parser marks such a field's type node).
-fn frontend_has_inferred_numeric_fields(pool: AstPool) -> bool:
+fn frontend_has_inferred_numeric_fields(pool: &AstPool) -> bool:
     for i in 1..pool.node_count():
         if pool.kind(i as NodeId) == NodeKind.NK_TYPE_NAMED and pool.get_data2(i as NodeId) != 0: return true
     false

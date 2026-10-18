@@ -3,7 +3,7 @@
 use compiler.foundation.Ids
 use compiler.foundation.Types
 use compiler.foundation.Values
-use compiler.foundation.InternPool
+use InternPool
 
 fn main:
     var p = InternPool.init()

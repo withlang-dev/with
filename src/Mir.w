@@ -37,7 +37,7 @@ impl MirModule:
     // name. A signature outranks a generic template of the same name (a
     // concrete specialization registers its own sig); a builtin never
     // shadows either.
-    mut fn snapshot_sema_callables(sema: &Sema, pool: InternPool):
+    mut fn snapshot_sema_callables(sema: &Sema, pool: &InternPool):
         for si in 0..sema.sig_names.len():
             let name = sema.pool_resolve(sema.sig_names[si])
             if name.len() > 0:

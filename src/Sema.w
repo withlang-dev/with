@@ -3046,7 +3046,7 @@ fn sema_method_lookup_new -> SemaMethodLookup:
 fn sema_visibility_cache_key(from_path: &str, to_path: &str) -> str:
     from_path ++ "->" ++ to_path
 
-fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
+fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
     let named_types = sema_new_map_i32_i32()
     let exact_type_cache_heads = sema_new_map_i64_i32()
     let type_decl_nodes = sema_new_map_i32_i32()
@@ -3167,9 +3167,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let generic_enum_payload_cache_counts = sema_new_map_i64_i32()
     let generic_enum_payload_cache_values: List[i32] = List.new()
     var s = Sema {
-        pool: pool,
+        pool: pool.clone(),
         diags: diags,
-        ast: ast,
+        ast: ast.clone(),
         decl_index_by_node: sema_new_map_i32_i32(),
         type_kinds: List.new(),
         type_d0: List.new(),
@@ -4026,7 +4026,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     s.rebuild_decl_index()
     return s
 
-fn Sema.placeholder(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
+fn Sema.placeholder(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
     return sema_empty_state(pool, move diags, ast)
 
 // #602: mark param `idx` of extern/c_import fn `name_sym` as retaining its ptr.
@@ -4113,7 +4113,7 @@ impl Sema:
         for i in 0..retains_count:
             self.register_retains_entry(self.ast.get_extra(ep + i))
 
-fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
+fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
     var s = sema_empty_state(pool, move diags, ast)
 
     // Index 0 = error type (sentinel).
@@ -6809,7 +6809,7 @@ impl Sema:
             return expected as i32
         0
 
-pub fn sema_node_is_numeric_literal(ast: AstPool, node: i32) -> bool:
+pub fn sema_node_is_numeric_literal(ast: &AstPool, node: i32) -> bool:
     if node == 0:
         return false
     let kind = ast.kind(node)
@@ -6818,7 +6818,7 @@ pub fn sema_node_is_numeric_literal(ast: AstPool, node: i32) -> bool:
 // A bitwise operand written as an int literal under grouping and `~` wrappers
 // (`(~1)`, `~0x3c`) adapts to the other operand's integer type exactly like a
 // bare literal; the mixed-signedness rule is for concretely typed operands.
-pub fn sema_node_is_bitwise_adaptable_literal(ast: AstPool, node: i32) -> bool:
+pub fn sema_node_is_bitwise_adaptable_literal(ast: &AstPool, node: i32) -> bool:
     var cur = node
     while cur != 0:
         let kind = ast.kind(cur)

@@ -20,6 +20,7 @@ use std.collections.HashMap
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_alloc_committed_bytes() -> i64
 
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_read_line_stdin() -> str
@@ -475,7 +476,7 @@ impl LspDocument:
         var parser = Parser.init(move tokens, self.text, 0, intern, move diags)
         parser.enable_implicit_main_mode()  // §18.5b (D74): an open root is an entry source
         self.fast_pool = parser.parse_module()
-        self.fast_intern = parser.intern
+        self.fast_intern = intern
         self.fast_text_len = self.text.len() as i32
         self.fast_valid = true
 
@@ -486,13 +487,13 @@ impl LspDocument:
         var comp = Compilation.init()
         comp.set_prelude_mode(2)
         let pool = comp.compile_entry_source_text(self.path, self.text)
-        self.cached_pool = pool
-        self.cached_intern = comp.zcu.pool
+        self.cached_pool = pool.clone()
+        self.cached_intern = comp.zcu.pool.clone()
         self.cached_diags = move comp.zcu.diagnostics
         self.cached_decl_paths = move comp.zcu.decl_source_paths
         // Build type-at-offset map from sema's typed_expr_types.
         // Iterate all AST nodes and check which have type info.
-        let sema = comp.zcu.last_sema
+        let sema = move comp.zcu.last_sema
         let typed = sema.typed_expr_types
         self.cached_type_at = HashMap.new()
         for ni in 0..pool.node_count():
@@ -1035,7 +1036,7 @@ impl LspState:
 fn lsp_is_ident_char(ch: i32) -> bool:
     (ch >= 97 and ch <= 122) or (ch >= 65 and ch <= 90) or (ch >= 48 and ch <= 57) or ch == 95
 
-fn lsp_resolve_receiver_type(pool: AstPool, intern: InternPool, receiver: &str, offset: i32) -> str:
+fn lsp_resolve_receiver_type(pool: &AstPool, intern: &InternPool, receiver: &str, offset: i32) -> str:
     // Find the enclosing function, then look for:
     // 1. Parameter with type annotation: fn foo(x: MyType) → "MyType"
     // 2. Let binding with type annotation: let x: MyType = ... → "MyType"
@@ -1099,7 +1100,7 @@ fn lsp_resolve_receiver_type(pool: AstPool, intern: InternPool, receiver: &str, 
                                     return ret_type
     ""
 
-fn lsp_fn_return_type(pool: AstPool, intern: InternPool, fn_name: &str) -> str:
+fn lsp_fn_return_type(pool: &AstPool, intern: &InternPool, fn_name: &str) -> str:
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_FN_DECL:
@@ -1114,7 +1115,7 @@ fn lsp_fn_return_type(pool: AstPool, intern: InternPool, fn_name: &str) -> str:
         break
     ""
 
-fn lsp_type_node_to_name(pool: AstPool, intern: InternPool, type_node: i32) -> str:
+fn lsp_type_node_to_name(pool: &AstPool, intern: &InternPool, type_node: i32) -> str:
     let tk = pool.kind(type_node as NodeId)
     if tk == NodeKind.NK_TYPE_NAMED:
         return with_str_clone_ref(intern.resolve(pool.get_data0(type_node as NodeId)))
@@ -1197,18 +1198,16 @@ impl LspState:
         // that are visible at the cursor position.
         // Fast-tier scope-aware completion (cached).
         let parsed = self.get_parsed(uri, text)
-        let parse_pool = parsed.pool
-        let parse_intern = parsed.intern
-        let enclosing_fn = lsp_find_enclosing_fn(parse_pool, offset)
+        let enclosing_fn = lsp_find_enclosing_fn(parsed.pool, offset)
         var scope_names: List[str] = List.new()
         if enclosing_fn as i32 != 0:
-            let params = lsp_collect_fn_params(parse_pool, parse_intern, enclosing_fn)
+            let params = lsp_collect_fn_params(parsed.pool, parsed.intern, enclosing_fn)
             for pi in 0..params.len():
                 scope_names.push(with_str_clone_ref(params[pi]))
             // Walk body recursively to collect bindings visible at cursor.
-            let body = parse_pool.get_data1(enclosing_fn)
+            let body = parsed.pool.get_data1(enclosing_fn)
             if body != 0:
-                let bindings = lsp_collect_bindings_rec(parse_pool, parse_intern, body, offset)
+                let bindings = lsp_collect_bindings_rec(parsed.pool, parsed.intern, body, offset)
                 for bi in 0..bindings.len():
                     scope_names.push(with_str_clone_ref(bindings[bi]))
         for si in 0..scope_names.len():
@@ -1292,9 +1291,9 @@ fn lsp_parse_file(text: &str) -> LspParseResult:
     var parser = Parser.init(move tokens, text, 0, intern, move diags)
     parser.enable_implicit_main_mode()  // §18.5b (D74): an open root is an entry source
     let pool = parser.parse_module()
-    LspParseResult { pool, intern: parser.intern }
+    LspParseResult { pool, intern }
 
-fn lsp_find_enclosing_fn(pool: AstPool, offset: i32) -> NodeId:
+fn lsp_find_enclosing_fn(pool: &AstPool, offset: i32) -> NodeId:
     // Find the function whose span contains the cursor. Use the start of
     // the NEXT declaration as the upper bound, not get_end — the parser's
     // end span may not cover trailing blank lines inside the function.
@@ -1321,7 +1320,7 @@ fn lsp_find_enclosing_fn(pool: AstPool, offset: i32) -> NodeId:
             best = decl
     best
 
-fn lsp_collect_fn_params(pool: AstPool, intern: InternPool, fn_node: NodeId) -> List[str]:
+fn lsp_collect_fn_params(pool: &AstPool, intern: &InternPool, fn_node: NodeId) -> List[str]:
     let names: List[str] = List.new()
     let meta = pool.find_fn_meta(fn_node)
     if meta < 0:
@@ -1336,7 +1335,7 @@ fn lsp_collect_fn_params(pool: AstPool, intern: InternPool, fn_node: NodeId) -> 
                 names.push(with_str_clone_ref(pname))
     names
 
-fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset: i32) -> List[str]:
+fn lsp_collect_bindings_rec(pool: &AstPool, intern: &InternPool, node: i32, offset: i32) -> List[str]:
     let empty: List[str] = List.new()
     if node == 0:
         return empty
@@ -1923,6 +1922,12 @@ pub fn run_lsp() -> i32:
 
         else if method == "shutdown":
             lsp_write_response(jrpc_result_null(id))
+
+        // `with/memory`: the runtime's committed byte count, so a test can
+        // pin the server's footprint flat across reparses (#2449: every
+        // reparse once leaked its intern pool's 1 MB arena page).
+        else if method == "with/memory":
+            lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("committedBytes", f"{with_alloc_committed_bytes()}") ++ jobj_end()))
 
         else if method == "exit":
             with_free(tokens as *mut u8)

@@ -45,7 +45,7 @@ impl COut:
     fn finish() -> str:
         with_fmt_buf_finish(self.buf)
 
-fn cc_intern_resolve(intern: InternPool, sym: i32) -> str:
+fn cc_intern_resolve(intern: &InternPool, sym: i32) -> str:
     with_str_clone_ref(intern.resolve_symbol(sym))
 
 
@@ -410,12 +410,12 @@ impl CCodegen:
     fn intern_intern(s: &str) -> i32:
         self.intern.intern(s)
 
-pub fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sema, source_path: &str, source_text: &str, overflow_mode: i32, emit_all: bool) -> CEmitResult:
+pub fn c_emit_module(mir_mod: MirModule, ast: &AstPool, intern: &InternPool, sema: Sema, source_path: &str, source_text: &str, overflow_mode: i32, emit_all: bool) -> CEmitResult:
     var cg = CCodegen {
         emit_all,
         mir_mod,
-        ast,
-        intern,
+        ast: ast.clone(),
+        intern: intern.clone(),
         sema,
         overflow_mode,
         had_error: 0,

@@ -137,7 +137,7 @@ fn sema_trait_impl_method_contract_missing -> SemaTraitImplMethodContract:
         param_count: 0,
     }
 
-fn sema_node_is_zero_int_literal(ast: AstPool, node: i32) -> bool:
+fn sema_node_is_zero_int_literal(ast: &AstPool, node: i32) -> bool:
     if node == 0 or ast.kind(node) != NodeKind.NK_INT_LIT:
         return false
     let fast = ast.int_literal_fast_i64(node as NodeId)
@@ -21339,7 +21339,7 @@ impl Sema:
             pos = pos + 2 + pc
         1
 
-fn sema_pattern_is_catchall(ast: AstPool, pat: i32) -> bool:
+fn sema_pattern_is_catchall(ast: &AstPool, pat: i32) -> bool:
     if pat == 0:
         return true
     let kind = ast.kind(pat)
@@ -21351,7 +21351,7 @@ fn sema_pattern_is_catchall(ast: AstPool, pat: i32) -> bool:
         return sema_pattern_is_catchall(ast, ast.get_data1(pat))
     false
 
-fn sema_pattern_covers_variant(ast: AstPool, pat: i32, variant_sym: i32) -> bool:
+fn sema_pattern_covers_variant(ast: &AstPool, pat: i32, variant_sym: i32) -> bool:
     if pat == 0:
         return false
     let kind = ast.kind(pat)

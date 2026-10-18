@@ -726,7 +726,7 @@ type SuspendSiteSpan {
 }
 impl Copy for SuspendSiteSpan
 
-fn suspend_site_span(ast: AstPool, body: &MirBody, bb: i32) -> SuspendSiteSpan:
+fn suspend_site_span(ast: &AstPool, body: &MirBody, bb: i32) -> SuspendSiteSpan:
     let call_id = body.term_data1(bb)
     let node = body.call_ast_node(call_id)
     var start: i32 = body.bb_term_spans[bb]
@@ -745,7 +745,7 @@ fn suspend_reported_site(reported_starts: &List[i32], reported_ends: &List[i32],
             return true
     false
 
-fn suspend_no_suspend_site_span(ast: AstPool, body: &MirBody, bb: i32, no_suspend_node: i32) -> SuspendSiteSpan:
+fn suspend_no_suspend_site_span(ast: &AstPool, body: &MirBody, bb: i32, no_suspend_node: i32) -> SuspendSiteSpan:
     var site = suspend_site_span(ast, body, bb)
     if site.start <= 0 and no_suspend_node != 0:
         site.start = ast.get_start(no_suspend_node)
@@ -824,7 +824,7 @@ fn suspend_emit_derived_guard_error(diags: DiagnosticList, sema: &Sema, body: &M
     out.emit(move diag)
     out
 
-fn suspend_check_body(ast: AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
+fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
     let local_count = body.local_count()
     let bb_count = body.block_count()
@@ -892,7 +892,7 @@ fn suspend_check_body(ast: AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32],
                 break
     out
 
-fn suspend_check_no_suspend_body(ast: AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
+fn suspend_check_no_suspend_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
     let reported_starts: List[i32] = List.new()
     let reported_ends: List[i32] = List.new()
@@ -1436,7 +1436,7 @@ pub fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
                 out.mark_local_ever_moved(local)
     out
 
-pub fn check_no_await_guard_suspends(mir_mod: &MirModule, ast: AstPool, sema: &Sema, diags: DiagnosticList) -> DiagnosticList:
+pub fn check_no_await_guard_suspends(mir_mod: &MirModule, ast: &AstPool, sema: &Sema, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
     let body_by_fn = suspend_build_body_index(mir_mod)
     let body_may_suspend = suspend_compute_may_suspend(mir_mod, body_by_fn)

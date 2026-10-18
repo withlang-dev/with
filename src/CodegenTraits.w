@@ -207,7 +207,7 @@ impl Codegen:
                 return i
         -1
 
-fn codegen_type_node_mentions_self(pool: AstPool, self_sym: i32, type_node: i32) -> i32:
+fn codegen_type_node_mentions_self(pool: &AstPool, self_sym: i32, type_node: i32) -> i32:
     if type_node == 0:
         return 0
     let kind = pool.kind(type_node)

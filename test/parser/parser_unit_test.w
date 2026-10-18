@@ -72,7 +72,6 @@ fn test_callconv_metadata_unquotes_string_literal:
     var parser = Parser.init(tokens, src, 0, intern, diags)
     let pool = parser.parse_module()
     assert(not parser.diags.has_errors())
-    intern = parser.intern
     let decl = pool.get_decl(0)
     let meta = pool.find_fn_meta(decl)
     assert(meta >= 0)
@@ -158,8 +157,7 @@ fn test_trait_layout_contains_assoc_and_methods:
 fn test_recovery_to_next_top_level_decl:
     let src = "fn a:\n    1\nfor\nfn b:\n    2\n"
     let result = parse_module_allow_errors(src)
-    let pool = result.0
-    let diag_count = result.1
+    let (pool, diag_count) = result
     assert(diag_count > 0)
     assert(pool.decl_count() == 2)
 
@@ -192,8 +190,7 @@ fn test_c_import_requires_string_literal:
 fn test_multi_error_recovery_golden:
     let src = "fn a:\n    1\nlet =\nuse\nfn b:\n    2\n"
     let result = parse_module_allow_errors(src)
-    let pool = result.0
-    let diag_count = result.1
+    let (pool, diag_count) = result
     assert(diag_count >= 2)
     assert(pool.decl_count() >= 1)
     let d0 = pool.get_decl(0)

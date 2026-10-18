@@ -38,32 +38,32 @@ type AsyncLower = ephemeral {
     cur_body: AsyncMirBody,
 }
 
-fn async_ast_get_data0(ast: AstPool, node: i32) -> i32:
+fn async_ast_get_data0(ast: &AstPool, node: i32) -> i32:
     ast.get_data0(node)
 
-fn async_ast_get_data1(ast: AstPool, node: i32) -> i32:
+fn async_ast_get_data1(ast: &AstPool, node: i32) -> i32:
     ast.get_data1(node)
 
-fn async_ast_get_data2(ast: AstPool, node: i32) -> i32:
+fn async_ast_get_data2(ast: &AstPool, node: i32) -> i32:
     ast.get_data2(node)
 
-fn async_ast_get_end(ast: AstPool, node: i32) -> i32:
+fn async_ast_get_end(ast: &AstPool, node: i32) -> i32:
     ast.get_end(node)
 
-fn async_ast_get_start(ast: AstPool, node: i32) -> i32:
+fn async_ast_get_start(ast: &AstPool, node: i32) -> i32:
     ast.get_start(node)
 
-fn async_ast_kind(ast: AstPool, node: i32) -> i32:
+fn async_ast_kind(ast: &AstPool, node: i32) -> i32:
     ast.kind(node)
 
 fn async_body_suspend_count(body: &AsyncMirBody) -> i32:
     body.suspend_count()
 
-pub fn lower_async_module(mir_mod: &MirModule, ast: AstPool, pool: InternPool, sema: &Sema, diags: DiagnosticList) -> AsyncLowerResult:
+pub fn lower_async_module(mir_mod: &MirModule, ast: &AstPool, pool: &InternPool, sema: &Sema, diags: DiagnosticList) -> AsyncLowerResult:
     var lower = AsyncLower {
         mir_mod,
-        ast,
-        pool,
+        ast: ast.clone(),
+        pool: pool.clone(),
         sema,
         diags,
         out_mod: AsyncMirModule.init(),
@@ -346,22 +346,22 @@ impl AsyncLower:
             self.walk_expr(async_ast_get_data1(self.ast, node))
             return
 
-fn async_node_valid(ast: AstPool, node: i32) -> bool:
+fn async_node_valid(ast: &AstPool, node: i32) -> bool:
     node > 0 and node < ast.node_count()
 
-fn async_extra_or_zero(ast: AstPool, idx: i32) -> i32:
+fn async_extra_or_zero(ast: &AstPool, idx: i32) -> i32:
     if idx < 0 or idx >= ast.extra_len():
         return 0
     ast.get_extra(idx)
 
-fn async_find_fn_decl(ast: AstPool, fn_sym: i32) -> NodeId:
+fn async_find_fn_decl(ast: &AstPool, fn_sym: i32) -> NodeId:
     for di in 0..ast.decl_count():
         let decl = ast.get_decl(di)
         if ast.kind(decl) == NodeKind.NK_FN_DECL and ast.get_data0(decl) == fn_sym:
             return decl
     0 as NodeId
 
-fn async_fn_flavor(ast: AstPool, fn_decl: NodeId) -> i32:
+fn async_fn_flavor(ast: &AstPool, fn_decl: NodeId) -> i32:
     if (fn_decl as i32) == 0:
         return AsyncBodyKind.Sync
     let flags = ast.get_data2(fn_decl)

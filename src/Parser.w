@@ -136,10 +136,9 @@ type InterpolatedExprParseAttempt {
     node: NodeId,
     consumed_all: i32,
     had_errors: i32,
-    pool: AstPool,
-    intern: InternPool,
-    // The diagnostics travel out with the attempt: in shared mode the caller
-    // must put them back into self.diags (like intern/pool). Leaving them in
+    // The sub-parser holds the enclosing parser's pools as further holders
+    // (#2449), so nothing travels back but the diagnostics: in shared mode
+    // the caller must put them back into self.diags. Leaving them in
     // the sub-parser double-freed the list on module-parse-error paths — the
     // compiler died with an invalid free BEFORE printing the diagnostic
     // (seam-sites' move-through-ref row for this fn was this exact bug).
@@ -151,21 +150,19 @@ type InterpolatedExprParseAttempt {
     implicit_it_depth: i32,
 }
 
-fn Parser.init(tokens: TokenList, source: &str, file_id: i32, intern: InternPool, diags: DiagnosticList) -> Parser:
+fn Parser.init(tokens: TokenList, source: &str, file_id: i32, intern: &InternPool, diags: DiagnosticList) -> Parser:
     Parser.init_with_pool(move tokens, source, file_id, intern, move diags, AstPool.new())
 
-fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: InternPool, diags: DiagnosticList, pool: AstPool) -> Parser:
-    // #747: store the pool that HOLDS the file id. `var file_pool = pool`
-    // MOVES the pool under owned semantics; the literal previously stored the
-    // moved-from `pool` (blank) while the real pool dropped with file_pool at
-    // exit. The Copy world aliased the two headers, which hid both defects.
-    var file_pool = pool
-    file_pool.set_current_file_id(AstFileId(file_id))
+// The parser owns the node pool it fills (the caller takes it back from
+// parse_module) and holds the caller's intern pool as another holder
+// (#2449): the caller keeps its own handle, nothing is handed back.
+fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: &InternPool, diags: DiagnosticList, pool: AstPool) -> Parser:
+    pool.set_current_file_id(AstFileId(file_id))
     Parser {
         tokens,
         pos: 0,
-        pool: file_pool,
-        intern,
+        pool,
+        intern: intern.clone(),
         diags,
         source: with_str_clone_ref(source),
         file_id,
@@ -1042,7 +1039,7 @@ impl Parser:
             self.skip_separators()
 
         self.synthesize_implicit_main()
-        self.pool
+        move self.pool
 
     // One module-level item: a declaration, an impl/trait block, a
     // `comptime:` block, a target selection, or (implicit main) a statement.
@@ -5574,8 +5571,6 @@ impl Parser:
                     // splitting when the full text is not a complete expression.
                     let hole_source_start = start + 2 + expr_start_pos
                     let full_attempt = self.parse_interpolated_expr_attempt(hole_text, 0, hole_source_start)
-                    self.intern = full_attempt.intern
-                    self.pool = full_attempt.pool
                     // use_shared_diags=0: attempt.diags is the throwaway local list;
                     // self.diags was never moved, so nothing to restore.
                     if full_attempt.consumed_all != 0 and full_attempt.had_errors == 0:
@@ -5814,8 +5809,6 @@ impl Parser:
 
     mut fn parse_interpolated_expr(expr_text: &str, base_start: i32) -> NodeId:
         var attempt = self.parse_interpolated_expr_attempt(expr_text, 1, base_start)
-        self.intern = attempt.intern
-        self.pool = attempt.pool
         // Shared mode moved self.diags into the sub-parser; put it back.
         self.diags = move attempt.diags
         self.take_interpolated_it(attempt.saw_implicit_it, attempt.implicit_it_depth)
@@ -5829,7 +5822,7 @@ fn fstring_spec_digit(ch: u8): ch >= '0' and ch <= '9'
 // §15.4.2 modes: d x X b o f e g s ?
 fn fstring_spec_mode(ch: u8): ch == 'd' or ch == 'x' or ch == 'X' or ch == 'b' or ch == 'o' or ch == 'f' or ch == 'e' or ch == 'g' or ch == 's' or ch == '?'
 
-fn offset_interpolated_expr_spans(pool: AstPool, first_node: i32, delta: i32):
+fn offset_interpolated_expr_spans(pool: &AstPool, first_node: i32, delta: i32):
     if delta == 0:
         return
     var ni = first_node
@@ -5853,7 +5846,7 @@ impl Parser:
         let sub_tokens = lexer.tokenize()
         let parse_diags = if use_shared_diags != 0: move self.diags else: DiagnosticList.init()
         let first_node = self.pool.node_count()
-        var sub_parser = Parser.init_with_pool(move sub_tokens, source_text, self.file_id, self.intern, move parse_diags, self.pool)
+        var sub_parser = Parser.init_with_pool(move sub_tokens, source_text, self.file_id, self.intern, move parse_diags, self.pool.clone())
         sub_parser.implicit_it_depth = self.implicit_it_depth
         let result = sub_parser.parse_expr()
         sub_parser.skip_newlines()
@@ -5864,8 +5857,6 @@ impl Parser:
             node: result,
             consumed_all,
             had_errors,
-            pool: sub_parser.pool,
-            intern: sub_parser.intern,
             diags: move sub_parser.diags,
             used_shared_diags: use_shared_diags,
             saw_implicit_it: sub_parser.saw_implicit_it,

@@ -2932,23 +2932,23 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     // #1323: `InternPool.resolve` hands out a view into `symbol_texts`; a
     // binding read after anything that interns is a use-after-free (the
     // release compiler segfaulted in ct_generate_debug_derive). The pool sits
-    // behind a Copy `*mut` handle, so the view-invalidation check cannot see
+    // behind a counted `*mut` handle (#2449), so the view-invalidation check cannot see
     // the aliasing; audit:pool-views finds it on the live MIR call graph.
     // `dangling` is the defect; `safe` finishes with the view before
     // interning and `reads_only` crosses only non-growing calls.
     let pool_view_input = build_project_join(out_dir, "pool-view-input.w")
     let pool_view_source =
         "use InternPool\n\n" ++
-        "fn dangling(pool: InternPool, sym: i32) -> str:\n" ++
+        "fn dangling(pool: &InternPool, sym: i32) -> str:\n" ++
         "    let name = pool.resolve(sym)\n" ++
         "    pool.intern(\"fresh\")\n" ++
         "    name ++ \"!\"\n\n" ++
-        "fn safe(pool: InternPool, sym: i32) -> str:\n" ++
+        "fn safe(pool: &InternPool, sym: i32) -> str:\n" ++
         "    let name = pool.resolve(sym)\n" ++
         "    let owned = name ++ \"!\"\n" ++
         "    pool.intern(\"fresh\")\n" ++
         "    owned\n\n" ++
-        "fn reads_only(pool: InternPool, sym: i32) -> i32:\n" ++
+        "fn reads_only(pool: &InternPool, sym: i32) -> i32:\n" ++
         "    let name = pool.resolve(sym)\n" ++
         "    let n = pool.symbol_count()\n" ++
         "    name.len() as i32 + n\n\n" ++

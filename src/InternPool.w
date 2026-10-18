@@ -1,9 +1,13 @@
 // Wave 1 foundations: unified intern pool.
 //
-// InternPool is a thin handle wrapping a heap-allocated state block.
-// Copies of InternPool share the same underlying data — List growth
-// in one copy is visible to all. This is critical because Sema stores
-// InternPool by value and passes self by value on every method call.
+// InternPool is a counted handle over a heap-allocated state block (#2449).
+// Every handle is a holder: `clone()` makes another, dropping one releases
+// it, and the release that finds no other holder frees the symbols, the
+// maps and the string arena. Interning through any handle is visible
+// through every other (the pool is append-only, so sharing is benign); a
+// function that only reads or interns takes `&InternPool`, a type that
+// keeps a handle stores a clone, and one owner per compilation holds the
+// original. Nothing leaks: the last handle out frees the block.
 
 use compiler.foundation.Types
 use compiler.foundation.Values
@@ -14,6 +18,7 @@ extern fn with_getenv_str(name: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8)
 
 fn intern_debug_init_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
@@ -32,9 +37,15 @@ type ValueId = i32
 
 // ── String arena ──────────────────────────────────────────────────
 // Append-only page chain for interned string data. Pages are never
-// freed or moved, so pointers into the arena are stable forever.
+// freed or moved while the pool lives, so pointers into the arena are
+// stable for the pool's lifetime; the arena's drop frees them. Every
+// string sits at least INTERN_PAGE_LEAD bytes into its page: a str whose
+// payload started a page would read as an owned allocation to the
+// runtime's holder count (rt_payload_start_is_owned), and its copies
+// would then retain and release the page itself.
 
 const INTERN_PAGE_SIZE = 1048576  // 1MB per page
+const INTERN_PAGE_LEAD = 16
 
 type InternStringArena {
     pages: List[*mut u8],
@@ -43,9 +54,14 @@ type InternStringArena {
 
 fn InternStringArena.new() -> InternStringArena:
     let first = with_alloc(INTERN_PAGE_SIZE)
-    var arena = InternStringArena { pages: List.new(), offset: 0 }
+    var arena = InternStringArena { pages: List.new(), offset: INTERN_PAGE_LEAD }
     arena.pages.push(first)
     arena
+
+impl Drop for InternStringArena:
+    move fn drop():
+        for i in 0..self.pages.len():
+            with_free(self.pages[i])
 
 impl InternStringArena:
     mut fn store(s: &str) -> str:
@@ -55,10 +71,10 @@ impl InternStringArena:
         let len = s.len()
         let need = len + 1
         if self.offset + need > INTERN_PAGE_SIZE:
-            let page_size = if need > INTERN_PAGE_SIZE: need else: INTERN_PAGE_SIZE
+            let page_size = if INTERN_PAGE_LEAD + need > INTERN_PAGE_SIZE: INTERN_PAGE_LEAD + need else: INTERN_PAGE_SIZE
             let page = with_alloc(page_size)
             self.pages.push(page)
-            self.offset = 0
+            self.offset = INTERN_PAGE_LEAD
         let page = self.pages[self.pages.len() - 1]
         let dest = (page as i64 + self.offset) as *mut u8
         with_memcpy(dest, src, len)
@@ -71,6 +87,7 @@ impl InternStringArena:
 // ── InternPool ────────────────────────────────────────────────────
 
 type InternPoolState {
+    holders: i64,
     symbol_texts: List[str],
     symbol_map: HashMap[str, i32],
     strings: InternStringArena,
@@ -83,7 +100,6 @@ type InternPoolState {
 pub type InternPool {
     state: *mut InternPoolState,
 }
-impl Copy for InternPool
 
 fn intern_new_map_str_i32 -> HashMap[str, i32]:
     let map: HashMap[str, i32] = HashMap.new()
@@ -91,8 +107,9 @@ fn intern_new_map_str_i32 -> HashMap[str, i32]:
 
 fn InternPool.init -> InternPool:
     intern_debug_init("InternPool.init:start")
-    let ptr = with_alloc(256) as *mut InternPoolState
+    let ptr = with_alloc(sizeof[InternPoolState]()) as *mut InternPoolState
     unsafe *ptr = InternPoolState {
+        holders: 1,
         symbol_texts: List.new(),
         symbol_map: intern_new_map_str_i32(),
         strings: InternStringArena.new(),
@@ -111,9 +128,28 @@ fn InternPool.init -> InternPool:
 fn InternPool.new -> InternPool:
     InternPool.init()
 
+impl Drop for InternPool:
+    move fn drop():
+        let st = self.state
+        if st as i64 == 0:
+            return
+        if st.holders > 1:
+            st.holders = st.holders - 1
+            return
+        let block = unsafe *st
+        drop(block)
+        with_free(st as *mut u8)
+
 impl InternPool:
-    fn deinit():
-        return
+    // Another holder of the same pool: a type that keeps the handle stores
+    // this; a function that only reads takes `&InternPool`.
+    fn clone() -> InternPool:
+        let st = self.state
+        st.holders = st.holders + 1
+        InternPool { state: self.state }
+
+    fn holders() -> i64:
+        self.state.holders
 
     fn intern_str(s: &str) -> Symbol:
         let st = self.state
