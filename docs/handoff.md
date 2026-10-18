@@ -84,7 +84,9 @@ invalidates the gate (the guard hook only blocks under a battery).
 2. **D118 aarch64 seeds (#2305)** — the seeds are cut and pinned (#2451);
    the GitHub lanes run nightly; check `linux aarch64` / `windows aarch64`
    lanes go green on the next run (they are post-hoc, D56).
-3. **D123 — std.mssql, clean-room.** Not started (`mssql-cleanroom.md`).
+3. **D123 — std.mssql: deferred until after v0.16.0 (Eric, 2026-10-18; #2458,
+   milestone post-v0.16.0).** The open questions (port mssql-rs vs link its
+   ODBC driver, binary provenance, rustls, the `from` provider) are in #2458.
 4. **Standing items:** D30 (runtime in-unit; rt objects as cache —
    "TRANSITIONAL" in CLAUDE.md), D104's comptime allocator follow-up
    (#2220), #2452 (build-graph cache listings), the pool single-owner
