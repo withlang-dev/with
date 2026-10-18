@@ -228,10 +228,9 @@ iterators; `remove`, `drain` and `into_iter`/`into_keys`/`into_values`
 transfer; an owned collection is `m.keys() |> map(it.clone()) |>
 collect[List]()` and a typed binding never collects. §2.3: transport is not
 duplication — the compiler never produces a second live value from one unless
-the type is `Copy`, intrinsics and runtime helpers included. The compiler is
-NON-COMPLIANT (#1158, #1187): don't add callers of
-`keys()`/`values()`/`items()` as `List`s, don't byte-copy a non-`Copy` element
-out of a container, and follow the D44 entry's non-compliance list.
+the type is `Copy`, intrinsics and runtime helpers included (#1158, #1159,
+#1187). Don't add callers of `keys()`/`values()`/`items()` as `List`s or
+byte-copy a non-`Copy` element out of a container.
 
 **D51 has one canonical, complete source:
 `docs/meetings/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`.**

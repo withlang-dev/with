@@ -1572,6 +1572,14 @@ impl Sema:
             return
         self.emit_error(f"{call_name} copies its key when it inserts it, and `{self.type_name(key_ty)}` is not a value it can copy; use `entry(key)`", node)
 
+    // #1159 / §2.3: reading a value by value out of a container slot (`get`,
+    // `or_insert`) duplicates the stored element while the container retains
+    // ownership, so the element type must be `Copy`.
+    mut fn check_slot_get_copy(call_name: &str, elem_ty: i32, node: i32) -> i32:
+        if elem_ty != 0 and self.is_copy(elem_ty as TypeId) == 0:
+            self.emit_error(f"cannot copy `{self.type_name(elem_ty)}` out of `{call_name}` because `{self.type_name(elem_ty)}` is not `Copy`", node)
+        elem_ty
+
     mut fn check_builtin_method_call_arg(call_name: &str, arg_index: isize, expected: i32, actual: i32, arg_node: i32) -> i32:
         if expected == 0 or actual == 0:
             return 1
@@ -32088,7 +32096,7 @@ impl Sema:
             if method_name == "set" and arg_index == 1:
                 return self.get_generic_inst_arg(resolved as i32, 0)
         if owner_sym == self.syms.hashmapentry:
-            if method_name == "set" and arg_index == 0:
+            if (method_name == "set" or method_name == "or_insert") and arg_index == 0:
                 return self.get_generic_inst_arg(resolved as i32, 1)
         if owner_sym == self.syms.slotmap:
             if field == self.syms.insert and arg_index == 0:
@@ -34634,12 +34642,12 @@ impl Sema:
                     return self.list_traverse_return_type(recv_type, arg_types, mc_resolved_arg_count, node)
             if type_name_sym == self.syms.listslot:
                 if field == self.syms.get:
-                    return self.get_generic_inst_arg(recv_type, 0)
+                    return self.check_slot_get_copy("ListSlot.get", self.get_generic_inst_arg(recv_type, 0), node)
                 if mc_method_name_raw == "set":
                     return self.ty_void as i32
             if type_name_sym == self.syms.listrange:
                 if field == self.syms.get:
-                    return self.get_generic_inst_arg(recv_type, 0)
+                    return self.check_slot_get_copy("ListRange.get", self.get_generic_inst_arg(recv_type, 0), node)
                 if mc_method_name_raw == "set":
                     return self.ty_void as i32
                 if generic_len_ret != 0:
@@ -34817,9 +34825,9 @@ impl Sema:
                     return self.ensure_generic_inst_type(self.syms.hashmapentry, entry_args, 2) as i32
             if type_name_sym == self.syms.hashmapentry:
                 if field == self.syms.or_insert:
-                    return self.get_generic_inst_arg(recv_type, 1)
+                    return self.check_slot_get_copy("HashMapEntry.or_insert", self.get_generic_inst_arg(recv_type, 1), node)
                 if field == self.syms.get:
-                    return self.get_generic_inst_arg(recv_type, 1)
+                    return self.check_slot_get_copy("HashMapEntry.get", self.get_generic_inst_arg(recv_type, 1), node)
                 if mc_method_name_raw == "set":
                     return self.ty_void as i32
             if type_name_sym == self.syms.hashset:
@@ -34856,7 +34864,7 @@ impl Sema:
                     return generic_len_ret
             if type_name_sym == self.syms.slotmapslot:
                 if field == self.syms.get:
-                    return self.get_generic_inst_arg(recv_type, 0)
+                    return self.check_slot_get_copy("SlotMapSlot.get", self.get_generic_inst_arg(recv_type, 0), node)
                 if mc_method_name_raw == "set":
                     return self.ty_void as i32
             if type_name_sym == self.syms.option:
