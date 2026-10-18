@@ -75,3 +75,18 @@ in size, so it's worth getting that answer before the phases are fixed."
 **What would reopen it.** A permissive driver's license changing; FreeTDS
 relicensing (it then joins the reading list); `i128` proving impossible on
 a target std.mssql must support.
+
+**Deferred (Eric, 2026-10-18): "we are putting off mssql until after the
+next release."** Nothing of std.mssql is built before then. The direction
+had moved the same day: Eric named microsoft/mssql-rs (MIT) as the source
+to port, then raised linking its compiled ODBC driver (`mssql-odbc`, a C
+library exporting the 50 standard ODBC entry points) behind a hand-written
+`extern fn` std module, with the binaries sideloaded once and pinned rather
+than a Rust toolchain in the SDK build. Open when the work resumes, all
+Eric's: port versus link; if linking, where the pinned binaries come from
+(upstream publishes none: no releases, the crate is not on crates.io) and
+how a TLS fix reaches them; OpenSSL versus rustls on Linux (the seed links
+no host library); and whether a `from` provider trait replaces the
+compiler's hardcoded backend table so the driver need not live in the
+compiler. Measured 2026-10-18: `mssql-tds` 52k production lines and 67k of
+inline tests, `mssql-odbc` 41k production lines. Tracked in #2458.
