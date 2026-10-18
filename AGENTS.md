@@ -198,18 +198,16 @@ or D21's place-threading pipeline rule.
 Any document, comment, test, TODO, plan or behavior that conflicts with it is
 non-conforming. Don't edit, reinterpret, narrow or broaden it;
 `docs/proposals/d22-implementation-plan.md` is a derivative plan that can't
-amend it. **D22 map-view and contextual-Copy is in progress.** `HashMap[K,
+amend it. **D22 map-view and contextual-Copy is implemented.** `HashMap[K,
 V].get` and `BTreeMap[K, V].get` uniformly return `Option[&V]`; `remove`
 transfers and returns `Option[V]`. Copy-ness never changes a lookup signature.
 A `&T` stays a reference during inference and pattern projection, including
 when `T: Copy`; it materializes an independent `T` only once an owned-value
 demand is established. `Option`, `Result`, patterns, `?`, `??` and eliminators
-are transparent to view origins. The compiler is deliberately NON-COMPLIANT
-while D22 lands: don't restore conditional `get` returns, teach new code that
-lookup owns/copies, or treat a lost origin through `unwrap` as precedent; follow
-the plan and its full NON-COMPLIANT acceptance matrix. Specification §§3.4,
-3.8, 9.7, 10, 13.3, 21.1 and `docs/meetings/README.md` D22 are conforming
-projections.
+are transparent to view origins. Don't restore conditional `get` returns, teach
+new code that lookup owns/copies, or treat a lost origin through `unwrap` as
+precedent. Specification §§3.4, 3.8, 9.7, 10, 13.3, 21.1 and
+`docs/meetings/README.md` D22 are conforming projections.
 
 **D27 extends the doctrine to positional collections: element access
 observes; `remove` transfers.** `xs[i]` denotes the element place; a positional

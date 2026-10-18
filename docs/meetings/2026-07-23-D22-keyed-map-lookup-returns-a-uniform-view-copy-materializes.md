@@ -96,11 +96,11 @@ four materialized view arms, arm-order independence, and an explicit result
 annotation that stabilizes later edits. Non-`Copy` `??` diagnostics pin every
 applicable remedy and never recommend an unavailable clone or invalid borrow.
 
-**Implementation sequencing.** Doctrine lands first. The excluded
-`test/non_compliant/d22/` matrix versions the acceptance criteria without
-weakening the green battery. Transparent-carrier origin propagation lands
-before contextual Copy reads and join materialization; implementation design
-is a separate follow-up and must preserve the one ABI descriptor rule.
+**Implementation sequencing.** Doctrine landed first, followed by transparent-
+carrier origin propagation, contextual Copy reads, join materialization, and
+promotion of the acceptance matrix into `test/compile_errors/`,
+`test/debug_alloc/`, and `test/behavior/` while preserving the one ABI
+descriptor rule.
 
 **What would reopen this.** Evidence that contextual Copy materialization
 cannot be defined as one expected-type operation across calls, returns,

@@ -1939,6 +1939,13 @@ impl ComptimeEvaluator:
                 if self.sema.get_type_kind(ret_resolved) == TypeKind.TY_INT:
                     let adapted = comptime_bit_result(signal.value.data0, self.comptime_int_width(ret_type), self.comptime_int_is_unsigned(ret_type))
                     return comptime_control_value(comptime_value_int(ret_type, adapted))
+            if signal.value.kind == ComptimeValueKind.CV_LIST or signal.value.kind == ComptimeValueKind.CV_MAP:
+                let ret_resolved_coll = self.sema.resolve_alias(ret_type as TypeId)
+                if self.sema.get_type_kind(ret_resolved_coll) == TypeKind.TY_GENERIC_INST and (signal.value.type_id == 0 or self.sema.get_type_kind(self.sema.resolve_alias(signal.value.type_id)) != TypeKind.TY_GENERIC_INST):
+                    var owned_coll = signal
+                    owned_coll.kind = ComptimeControlKind.CTL_VALUE
+                    owned_coll.value.type_id = ret_type
+                    return owned_coll
         if signal.kind == ComptimeControlKind.CTL_RETURN:
             var owned = move signal
             return comptime_control_value(move owned.value)
@@ -2663,7 +2670,7 @@ impl ComptimeEvaluator:
 // map surface eval_map_method_call handles). Unknown methods still fail
 // inside the handlers with a named diagnostic.
 fn comptime_pipeline_builtin_method(name: &str) -> i32:
-    if name == "push" or name == "pop" or name == "get" or name == "set" or name == "clear" or name == "len" or name == "is_empty" or name == "contains" or name == "insert" or name == "remove": 1 else: 0
+    if name == "push" or name == "pop" or name == "get" or name == "set" or name == "clear" or name == "len" or name == "is_empty" or name == "capacity" or name == "contains" or name == "insert" or name == "remove" or name == "clone" or name == "first" or name == "last" or name == "rest" or name == "join" or name == "iter" or name == "iter_ref" or name == "into_iter" or name == "enumerate" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "drop" or name == "take_while" or name == "drop_while" or name == "fold" or name == "reduce" or name == "any" or name == "all" or name == "none" or name == "count" or name == "sum" or name == "product" or name == "find" or name == "position" or name == "for_each" or name == "collect" or name == "keys" or name == "into_keys" or name == "values" or name == "into_values" or name == "drain" or name == "increment" or name == "decrement": 1 else: 0
 
 fn comptime_string_builder_constructor_method(name: &str) -> str:
     if name == "StringBuilder.new" or name.ends_with(".StringBuilder.new"):
@@ -2778,6 +2785,8 @@ impl ComptimeEvaluator:
     fn comptime_value_semantic_type(value: &ComptimeValue) -> i32:
         if value.type_id != 0:
             return value.type_id
+        if value.kind == ComptimeValueKind.CV_INT:
+            return self.sema.ty_i64 as i32
         if value.kind == ComptimeValueKind.CV_FLOAT:
             return self.sema.ty_f64 as i32
         if value.kind == ComptimeValueKind.CV_BOOL:
@@ -2786,6 +2795,15 @@ impl ComptimeEvaluator:
             return self.sema.ty_str as i32
         if value.kind == ComptimeValueKind.CV_VOID:
             return self.sema.ty_void as i32
+        if value.kind == ComptimeValueKind.CV_TUPLE:
+            let elems: List[i32] = List.new()
+            for i in 0..value.extra_count:
+                let elem = self.extra_value_at((value.extra_start + i) as i64)
+                let et = self.comptime_value_semantic_type(&elem)
+                if et == 0:
+                    return 0
+                elems.push(et)
+            return self.sema.ensure_tuple_type(elems, value.extra_count) as i32
         0
 
     fn comptime_int_width(type_id: i32) -> i32:
