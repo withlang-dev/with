@@ -170,7 +170,7 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
                 ((*(__param_where_ as *mut *const u8)) = (if (if (((*__local_re).flags as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0: (&raw const (*__local_re).start_bitmap[0] as *const u8) else: (null as *const u8)))
             },
             24 => {
-                ((*(__param_where_ as *mut c_ulong)) = (((((offsetof[heapframe](ovector) as usize) as c_ulong) +% ((((((*__local_re).top_bracket as c_int) * 2) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong)) as c_ulong)))
+                ((*(__param_where_ as *mut c_ulong)) = (((((offsetof[heapframe](ovector) as usize) as c_ulong) +% ((((((*__local_re).top_bracket as c_int) * 2) as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong)) as c_ulong)))
             },
             23 => {
                 ((*(__param_where_ as *mut c_uint)) = (((if (((*__local_re).flags as c_uint) & (4194304 as c_uint)) != 0: 1 else: 0) as c_uint)))

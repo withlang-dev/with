@@ -1272,6 +1272,8 @@ fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, ex
             let carried = embedded_windows_sysroot_dir()
             if carried.len() > 0:
                 return link_stage_windows_native_link_plan(carried, obj_path, bin_path, extras, link_libs, link_args)
+        if target_spec_is_wasm() and (ld_path.len() == 0 or link_stage_wasm_lld_for(ld_path).len() == 0) and lld_flavor_linked("wasm"):
+            return link_stage_wasm_native_link_plan(obj_path, bin_path, extras, link_libs, link_args)
         if ld_path.len() == 0:
             if runtime_sysinfo_os() == "Windows":
                 with_eprint("error: missing Windows LLVM linker metadata (" ++ root ++ "/llvm_ld), no WITH_LLVM_LD / LLVM_LD / LLVM_PREFIX in the environment, and this compiler carries no Windows linker and C runtime of its own (one cross-linked from another host, or linked against a Visual Studio-built SDK): extract the with-llvm-sdk-<version>-windows-x86_64.tar.gz release asset sdk.lock pins and set LLVM_PREFIX to its llvm-<version>-windows-x86_64-msvc directory")
@@ -1284,6 +1286,26 @@ fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, ex
     if link_stage_linux_uses_own_sysroot():
         return link_stage_linux_native_link_plan(obj_path, bin_path, extras, link_libs, link_args)
     let command = link_stage_make_link_command("cc", obj_path, bin_path, extras, link_libs, link_args)
+    link_stage_plan_for_command(move command)
+
+// #2131 / #1915: a wasm32 link with no external wasm-ld is this binary's own
+// lld wasm driver (`with __ld -flavor wasm`, src/compiler/LldDriver.w).
+fn link_stage_wasm_native_link_plan(obj_path: &str, bin_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> LinkStagePlan:
+    let self_exe = with_self_exe()
+    if self_exe.len() == 0:
+        with_eprint("error: link: cannot find this compiler's own executable to run its linker (argv[0] is '" ++ runtime_arg_at(0) ++ "')")
+        return link_stage_plan_fail()
+    var command = link_stage_make_wasm_llvm_link_command("wasm-ld", obj_path, bin_path, extras, link_libs, link_args)
+    if command.linker.len() == 0:
+        return link_stage_plan_fail()
+    let args: List[str] = List.new()
+    args.push("__ld")
+    args.push("-flavor")
+    args.push("wasm")
+    for i in 0..command.args.len():
+        args.push(with_str_clone_ref(command.args[i]))
+    command.args = args
+    command.linker = with_str_clone_ref(self_exe)
     link_stage_plan_for_command(move command)
 
 // #1915 (D81): a native Windows link with no SDK named is this binary's own

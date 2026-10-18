@@ -458,7 +458,7 @@ pub unsafe fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_mat
     (__local_size = ((((sizeof[pcre2_memctl]() as c_ulong) +% (sizeof[usize]() as c_ulong)) as c_ulong)))
 
     if ((if __param_lengthsptr != null: 1 else: 0) != 0) {
-        (__local_size = (__local_size +% ((sizeof[usize]() as c_ulong) *% (__local_count as c_ulong))))
+        (__local_size = (__local_size +% ((sizeof[c_ulong]() as c_ulong) *% (__local_count as c_ulong))))
     }
 
     (__local_i = ((0 as c_int)))
@@ -497,7 +497,7 @@ pub unsafe fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_mat
     } else {
         ((*__param_lengthsptr) = __local_lensp)
 
-        (__local_sp = ((((__local_lensp as *mut c_char) + (((sizeof[usize]() as c_ulong) *% (__local_count as c_ulong)) as usize)) as *mut u8)))
+        (__local_sp = ((((__local_lensp as *mut c_char) + (((sizeof[c_ulong]() as c_ulong) *% (__local_count as c_ulong)) as usize)) as *mut u8)))
 
     }
 

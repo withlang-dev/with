@@ -236,7 +236,7 @@ fn https_get_once(url: &str, connect_ms: i32, idle_ms: i32) -> HttpResponse:
     let location = http_header_value(headers, "Location")
     HttpResponse { status, headers, body, location }
 
-pub fn https_get_response(url: str, max_redirects: i32) -> HttpResponse: https_get_response_timeout(url, max_redirects, 0, 0)
+pub fn https_get_response(url: str, max_redirects: i32) -> HttpResponse: https_get_response_timeout(url, max_redirects, 20000, 30000)
 
 /// https_get_response that gives up on a server that does not accept the
 /// connection within `connect_ms`, or says nothing for `idle_ms` (status -1).
@@ -262,7 +262,7 @@ pub fn https_get(url: str) -> str:
         return ""
     return move response.body
 
-pub fn https_download(url: str, dest_path: str) -> i32: https_download_timeout(url, dest_path, 0, 0)
+pub fn https_download(url: str, dest_path: str) -> i32: https_download_timeout(url, dest_path, 20000, 30000)
 
 /// https_download that gives up on a server that does not accept the
 /// connection within `connect_ms`, or says nothing for `idle_ms`.
