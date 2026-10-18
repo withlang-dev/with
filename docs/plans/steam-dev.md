@@ -12,11 +12,14 @@ with dev debug deck                # the same, stopped at main under LLDB on the
 with dev watch deck                # edit, save, and the running game picks up the change
 ```
 
-The link is a USB-C cable, a USB-C Ethernet adapter, or the local network;
-the commands do not change with it. This is the development loop around the
-game toolkit (`docs/plans/game-toolkit.md`), the part that Milestone 4 of
-that plan ("the Deck, end to end") needs every day and that no native
-language ships. Valve's SteamOS Devkit Client covers pairing and upload for
+The link is the one Valve supports for development: Wi-Fi, or wired
+Ethernet through a USB-C hub (§3.4). The bar is that this feels effortless:
+one tap on the Deck to pair, no passwords, no BIOS, no Desktop Mode.
+
+This is the development loop around the game toolkit
+(`docs/plans/game-toolkit.md`), the part that Milestone 4 of that plan
+("the Deck, end to end") needs every day and that no native language
+ships. Valve's SteamOS Devkit Client covers pairing and upload for
 engines that integrate it; it has no notion of a With build, a With
 recording or a With debugger session.
 
@@ -33,40 +36,57 @@ Paths are relative to the `with` repository unless they name WIPE.
 
 | Need | State | Where |
 |---|---|---|
-| Source-level debug info | DWARF lines (Phase 1) and local and parameter variables (#1348) | `docs/completed/debug.md`, `test/behavior/behav_debug_info_variables.w` |
-| Build for `linux_x86_64` from a Mac | **Not possible for a game.** `BuildTarget.linux_x86_64` exists, but `c_import` refuses to run under `--target` (it would parse the host's headers), Conan selection uses the host OS, and no Linux sysroot ships. `with build :cross` fails loudly. | `src/CImport.w`, `docs/spec/toolchain/with-build.md` §Cross-Platform Targets; WIPE `docs/steam-and-steam-deck-support.md` §8 |
+| Source-level debug info | **Emitted by default; no `-g` flag exists or is needed.** Verified on macOS arm64 (v0.15.3.0, 2026-10-18): `with build -O0` gives a `.dSYM`, line breakpoints in `.w` files, `frame variable` with parameters and locals, and a backtrace in With source. The default build optimizes, so small functions are inlined and a breakpoint on their lines has no location; a dev build is `-O0`. `--release` writes no `.dSYM`. | `docs/completed/debug.md`, `test/behavior/behav_debug_info_variables.w` |
+| Build for `linux_x86_64` from a Mac | **Not possible for a game yet.** `BuildTarget.linux_x86_64` exists, and the link stage already takes a Linux sysroot (`WITH_LINUX_SYSROOT`, `src/compiler/Link.w:385-412`) and the bundled `ld.lld`. What refuses is `c_import` under `--target` (`src/CImport.w:754`: it would parse the host's headers), and Conan selection uses the host OS. `with build :cross` fails loudly. | `src/CImport.w`, `src/compiler/Link.w`, `docs/spec/toolchain/with-build.md` §Cross-Platform Targets |
 | A Linux build that runs on the Deck | Proven by WIPE: built **on the Deck** with the Deck's own With install, `libsteam_api.so` beside the executable with an `$ORIGIN` rpath. This is the only deployment path used so far. | WIPE `build.w`, `docs/steam-and-steam-deck-support.md` §8 |
 | Shared-library output and a loader | None | — |
 | Hot reload | None. `docs/proposals/with-ui.md` proposes state-as-snapshot reload for UI; nothing is built. | — |
 | Deterministic recording and exact replay | Proven in WIPE; becomes `game.record` | WIPE `src/record.w` |
 | An editor integration | `with-vscode`, `with lsp` | `with-vscode/` |
 
-### 1.2 On the Deck
+### 1.2 On the Deck (probed 2026-10-18)
 
-- SteamOS is x86_64 Linux with a read-only root. Anything the toolchain
-  installs lives under the `deck` user's home; nothing needs the root
-  filesystem unlocked.
-- SSH is off by default. Turning it on needs a password for `deck` and
-  Desktop Mode once. Valve's Devkit Client does the same through its own
-  service; this plan uses plain SSH so it works on a retail Deck without
-  that service (community reports say the service's setup script refuses
-  non-Manjaro hosts on a retail Deck; unverified here).
-- Game Mode runs games under gamescope. A game launched over SSH into
-  Desktop Mode is not the environment players get: Steam Input, the
-  overlay and the 1280×800 gamescope output only exist in Game Mode. The
-  launch path must therefore go through Steam (a non-Steam shortcut, or the
-  app ID when Steamworks is set up), not `ssh deck ./game`.
-- The USB-C port is a host port by default. A BIOS setting, *USB Dual Role
-  Device* (Advanced → USB Configuration → DRD), lets it act as a USB
-  device; community projects use it for HID gadgets. **Whether a CDC-NCM
-  network gadget works from SteamOS to macOS is unverified** and is
-  Milestone 0's spike.
+Eric's Deck, read over SSH after pairing:
+
+| Fact | Value |
+|---|---|
+| Model, BIOS | LCD (`Jupiter`), F7A0133 |
+| OS | SteamOS 3.8.28 (build 20260922.1), kernel 6.18.50-valve2, read-only root |
+| CPU, memory | AMD Custom APU 0405, 8 threads; 14 GiB |
+| With | `~/.local/bin/with`, v0.15.3.0, the same as the Mac; LLVM 22.1.6 with `ld.lld` under `~/with/.deps/`, which is why it links with no `cc` (there is none) |
+| Debug server | `/usr/bin/gdbserver` ships with SteamOS; no `lldb-server` |
+| Sync | `/usr/bin/rsync` ships with SteamOS |
+| Devkit Service | Running: Developer Mode was on. Advertises `_steamos-devkit._tcp` over mDNS, serves HTTP on port 32000 |
+| SSH | Off until a pairing turns it on (§3.2) |
+| Wi-Fi | 2.4 GHz channel 11, 20 MHz, power saving on: tx 52 Mbit/s, ping 13-75 ms. The Mac was on 5 GHz at 1080 Mbit/s on the same network |
+
+What this means:
+
+- **Pairing is Valve's, and it is the effortless part.** The Devkit Service
+  is SteamOS's adb. `POST /register` with a public key makes Steam show a
+  "Development host pairing" prompt on the Deck; one tap accepts it, and the
+  service then turns sshd on (`steamos-enable-sshd`) and appends the key to
+  `~deck/.ssh/authorized_keys`. No password, no Desktop Mode. Verified on
+  this Deck. The service accepts only `ssh-rsa` keys (`write_key` rejects
+  anything else), so the toolchain makes an RSA key for it.
+- **Game Mode is the only real environment.** Steam Input, the overlay and
+  gamescope's 1280×800 output exist only there, so the launch goes through
+  Steam (§3.3), never `ssh deck ./game`.
+- **USB-C as a direct data link is not a supported path.** The port is
+  fixed as an xHCI host at boot (PCI `1022:162c`); `dwc3-pci`, the driver
+  for device mode, binds only `1022:163a`, which the firmware presents
+  only when the BIOS's *USB Dual Role Device* is set to DRD. SteamOS and
+  the Steam client offer no toggle for it (searched the system tools and
+  the client's UI strings), and Valve's devkit documentation names Wi-Fi
+  and hub Ethernet only. The kernel does ship `libcomposite` and
+  `usb_f_ncm`, and Valve's own `usbhid-gadget-passthru` is installed, so it
+  is possible; it is not supported. Decided 2026-10-18: not this plan.
 
 ### 1.3 What other toolchains do
 
 | Toolchain | Deploy | Debug | Reload |
 |---|---|---|---|
-| SteamOS Devkit Client | Pair by mDNS + SSH key, rsync upload, register in Game Mode | Not a debugger | No |
+| SteamOS Devkit Client | mDNS discovery; `POST :32000/register` and an on-Deck approval install the key and start sshd; rsync upload; `steam://devkit-1/create-shortcut` over Steam's IPC pipe registers the game in Game Mode | Can install `gdbserver` sessions; no source-level client of its own | No |
 | Godot DeployToSteamOS | Rides the Devkit Client's keys | No | No |
 | Unreal / Unity | Their own device managers | Native remote debuggers | Live Coding (Unreal), domain reload (Unity) |
 | Odin / Handmade Hero pattern | — | — | Game as a shared library, host keeps memory, `dlopen` on change |
@@ -77,10 +97,10 @@ attach. That is the seam.
 
 ## 2. Design rules
 
-1. **The transport is SSH; the cable is a detail.** Every verb is SSH,
-   `rsync` over SSH, or a port forwarded through SSH. USB is a way to get
-   an IP link (§3.4), never a second protocol. Nothing listens on the
-   Deck's network unauthenticated.
+1. **Valve's path, then SSH.** Pairing uses the Devkit Service's
+   approval; every verb after it is SSH, `rsync` over SSH, or a port
+   forwarded through SSH. The toolchain adds nothing that listens on the
+   Deck's network.
 2. **Run where players run.** `with dev run` launches through Steam in Game
    Mode. Desktop Mode is a flag (`--desktop`) for when gamescope is the
    suspect, and it says so in its output.
@@ -127,7 +147,7 @@ in the project. A device named on the command line that is not in
 
 | Command | Does |
 |---|---|
-| `with dev pair <name> [--host H]` | Finds the Deck (mDNS, or `--host`), checks it is SteamOS on x86_64, installs an SSH key (asks for the `deck` password once), installs `lldb-server` and the dev agent into `~/.local/share/with-dev/`, records the device. Idempotent. |
+| `with dev pair [<name>]` | Finds every Deck advertising `_steamos-devkit._tcp`; with one, uses it, with several, asks which. If the service does not answer, says exactly where the toggle is (Settings → System → Developer Mode, then Developer → Development host pairing). Posts the toolchain's RSA key to `/register`, prints "Approve the pairing on your Deck", and waits for the tap. Then checks SteamOS on x86_64, installs `lldb-server` into `~/.local/share/with-dev/`, records the device. Idempotent; a second run on a paired Deck is silent. |
 | `with dev status <name>` | Reachable? Game Mode or Desktop? Free space, battery, the installed tool versions, the last build pushed. |
 | `with dev deploy <name>` | Builds the Linux package (§4), `rsync`s it by content hash into `~/.local/share/with-dev/games/<project>/`, creates or updates the Game Mode shortcut. Prints bytes sent. |
 | `with dev run <name> [-- args]` | `deploy`, then launches through Steam, then streams stdout, stderr and the game's log to the terminal until the game exits; Ctrl-C stops the game, not just the stream. Exit status is the game's. |
@@ -153,84 +173,99 @@ under `lldb-server`, the dev channel port) and `exec`s the game. The
 shortcut never changes between runs, so Steam's controller configuration
 for it persists.
 
-How the toolchain creates the shortcut and asks Steam to launch it, from
-SSH, without the Devkit Service, is Milestone 0's second spike. The
-candidates, in order of preference: the `steam://` URL handler invoked in
-the Game Mode session; the Devkit Service's helper scripts where present;
-writing `shortcuts.vdf` with Steam closed (the fallback, and it restarts
-Steam, which the command must say). If no candidate works on a retail
-Deck, `with dev run` requires the Devkit Service and says so at `pair`.
+The mechanism is the one the Devkit Client uses, read from its
+`devkit-utils`: a line `devkit-1 steam://devkit-1/create-shortcut?...`
+written to the Steam client's IPC pipe `~/.steam/steam.pipe`, with the
+reply arriving as a file the client writes. The same pipe carries the
+launch and `dumpcontrollerconfig`. Whether the toolchain drives the pipe
+itself or installs Valve's helper scripts is open item 5 of Milestone 0;
+both work without Desktop Mode, and neither writes `shortcuts.vdf`.
 
 ### 3.4 The link
 
-| Link | How | State |
-|---|---|---|
-| Wi-Fi / LAN | mDNS `steamdeck.local` | Works today |
-| USB-C Ethernet adapter or dock, cable to the Mac | Link-local IPv6 / mDNS on the direct link | Works with standard hardware; to verify end to end |
-| USB-C cable, Deck as a USB network device | BIOS DRD on; a CDC-NCM gadget configured through configfs by `with dev pair --usb` (needs `sudo` once); macOS's built-in CDC-NCM driver on the other side | **Unverified.** Milestone 0, spike 1. If it fails, "over USB" means the adapter row, and the plan says so. |
+| Link | State |
+|---|---|
+| Wi-Fi | Supported by Valve; measured below |
+| Wired Ethernet through a USB-C hub or dock | Supported by Valve; same commands |
+| USB-C cable straight to the Mac | Not supported (§1.2); not offered |
 
-All three appear to the toolchain as an address. `with dev status` names
-which link it is on and its measured throughput, because a 2 GB asset
-push over Wi-Fi is a different afternoon.
+Measured on Eric's network, 2026-10-18: pushing a 9 MB file (WIPE's
+executable is 8,980,144 bytes) took 2.4 s, 9.0 s and 10.8 s on three runs;
+`rsync -z` of WIPE's 18.9 MB of sources and assets took 10.6 s. The Deck
+was on 2.4 GHz with power saving on. Two consequences:
+
+- `with dev status` reports the band, bit rate and power-save state, and
+  says when the Deck is on 2.4 GHz while the Mac is on 5 GHz. During a
+  session `with dev run` turns power saving off through Valve's own helper
+  (`steamos-disable-wireless-power-management`, which the Devkit Client
+  uses) and says so.
+- Pushes are content-addressed and compressed: only changed files move, and
+  an unchanged executable is never sent twice.
 
 ## 4. Building for the Deck
 
-`with dev deploy` needs a Linux x86_64 package. Today With cannot produce
-one from a Mac for a game that `c_import`s raylib and SDL (§1.1), but the
-Deck can build it itself. The plan uses the Deck and files cross-building.
+### 4.1 Measured
 
-### 4.1 Now: build on the Deck
+WIPE at `5653888`, v0.15.3.0 on both ends, 2026-10-18:
 
-Eric's Deck already has With installed and builds WIPE there; that has been
-the only deployment path so far. So the default builder is the device
-itself, and the tool's job is to automate what is done by hand today.
+| | Deck (8 threads) | Mac (Apple M5 Max, 18 cores) |
+|---|---|---|
+| Clean build of `:wipe` | 66.8 s (peak RSS 411 MB) | 20.4 s |
+| One real edit (a function added to `src/presentation.w`) | 65.5 s | 18.1 s |
+| No change | 0.4 s | — |
 
-`[devices.deck]` takes `build = "<builder>"`, one of:
+Any source change rebuilds the whole executable; there is no per-module
+reuse inside a target today, and a comment-only edit is correctly a no-op.
+So the Mac builds 3.6× faster. With a push of 2.4-10.8 s on this Wi-Fi
+(§3.4), a Mac build plus push is 21-29 s against 65 s on the Deck. That
+is why cross-building is the target and the Deck builder is the interim.
+Per-module incremental compilation would help both, and is a compiler
+finding in its own right (an issue to file).
 
-- **`device`** (default): `rsync` the project's sources and assets (not
-  `out/` or `.with/`) to `~/.local/share/with-dev/src/<project>/`, run
-  `with build` there over SSH, and run the result in place. Nothing built
-  is copied, so there is no deploy step separate from the build. `pair`
-  checks the Deck's `with version` against the developer's and warns on a
-  mismatch; `with dev pair --update-compiler` installs the matching one
-  under `~`. The Deck's `.with/deps` and build cache stay between builds.
-- **`container`**: the Steam Linux Runtime 4 SDK image (`steamrt4`) on the
-  developer's machine, then push. On Apple Silicon this runs under x86_64
-  emulation; its build time is unmeasured. Worth having when the Deck is
-  slower than the emulated container, or for CI.
-- **`ssh:<host>`**: any Linux x86_64 machine, then push.
+### 4.2 The target: cross-build on the Mac
 
-Every builder runs `with build` on a synced copy, so `build.w` is the same
-program everywhere. Eric has said cross-building and building on the Deck
-are equally acceptable (2026-10-18); the device builder is first because it
-works today.
+Valve publishes the sysroot: `repo.steampowered.com/steamrt4/images/<version>/`
+carries `com.valvesoftware.SteamRuntime.Sdk-amd64,i386-steamrt4-sysroot.tar.gz`
+(1.12 GB; the runtime-only `Platform` sysroot is 314 MB). The latest,
+4.0.20261007.263973, holds everything WIPE links against: glibc and its
+crt objects, GCC 14's `crtbegin.o`, SDL3 3.4.18 (shared and static), GL,
+EGL, X11, Wayland, Vulkan, ALSA, PulseAudio and udev headers and
+libraries. Building against it is also what Valve recommends for native
+games (WIPE `docs/steam-and-steam-deck-support.md` §8).
 
-Two consequences of building on the device:
+The compiler work, each an issue to file:
 
-- **Debug paths.** The DWARF names Deck paths. §6's source map maps
-  `~/.local/share/with-dev/src/<project>` back to the local checkout, and
-  the unstripped executable is pulled back once per debug session (or LLDB
-  reads it remotely through `lldb-server platform`).
-- **Reload speed.** Tier 2 of §7 costs a Deck build. Milestone 0 measures a
-  one-file-change rebuild of WIPE on the Deck; that number decides whether
-  `watch` should prefer the container.
+1. **`c_import` under `--target`** parses headers with the target triple
+   and the sysroot (`--sysroot`, `-isystem <sysroot>/usr/include`) instead
+   of refusing (`src/CImport.w:754`). This is the one hard piece: layouts,
+   macros and `#if __linux__` must come from the target, never the host.
+2. **Target-keyed C dependencies.** Conan selection takes the target, and
+   `.with/deps/c/<name>/<version>` gains a target key. raylib and SDL3 for
+   `linux-x86_64` come from Conan as on a Linux host, or SDL3 from the
+   sysroot itself.
+3. **The sysroot as a fetched artifact.** `with.toml` names it
+   (`[targets.steam-deck] sysroot = "steamrt4@4.0.20261007.263973"`); the
+   toolchain downloads it once into a shared cache, verifies it against the
+   `.mtree.gz` Valve publishes beside it, and passes it to the link stage
+   that already reads `WITH_LINUX_SYSROOT`.
+4. **The link with the bundled `ld.lld`** and that sysroot, so no Linux
+   `cc` is needed on a Mac. The Linux link path already uses the sysroot's
+   crt objects and dynamic linker (`src/compiler/Link.w:385-420`).
 
-### 4.2 The real road: cross-building
+When these land, the device's `build` defaults to `cross`.
 
-The compiler work, filed as issues, not done in this plan:
+### 4.3 Until then: build on the Deck
 
-1. `c_import` under `--target` reads a target sysroot's headers
-   (`--sysroot`, or the SDK's) instead of refusing.
-2. Conan dependency selection takes the target, and `.with/deps/c/` gains
-   a target key.
-3. A Linux x86_64 sysroot is a fetchable artifact (extracted from
-   `steamrt4`), named in `with.toml`, not an environment variable.
-4. The link step uses `ld.lld` with that sysroot, so no Linux `cc` is
-   needed on a Mac.
+The Deck builder automates what Eric does by hand today. `rsync` the
+project's sources and assets (not `out/` or `.with/`) to
+`~/.local/share/with-dev/src/<project>/`, run `with build` there over SSH,
+run the result in place. `pair` checks the Deck's `with version` against
+the Mac's and offers to install the matching compiler under `~`. The
+Deck's `.with/deps` and build cache persist. The DWARF then names Deck
+paths, which §6's source map maps back to the checkout.
 
-When these land, `build = "cross"` is available, and becomes the default
-only if Milestone 0's numbers show it beats building on the Deck. Each is a With gap this toolkit found; that is the
-point of building it.
+Every builder runs `with build` on the same `build.w`, so the program that
+decides what a package is never forks.
 
 ## 5. The dev channel
 
@@ -254,13 +289,21 @@ package that links it.
 
 ## 6. Debugging
 
+- **What works today**: DWARF is on by default and LLDB reads it (§1.1):
+  line breakpoints, parameters, locals and backtraces in With source,
+  verified on the Mac at `-O0`. So the only build change for debugging is
+  the optimization level: `with dev debug` builds `-O0`, and `with dev run`
+  keeps the default so the Deck's frame rate is the real one.
 - **The server**: `lldb-server` for Linux x86_64 from the LLVM release the
-  compiler already uses, installed by `pair` into the device directory. One
-  LLVM version on both ends.
+  compiler already uses (22.1.6), installed by `pair` into the device
+  directory, so both ends are one LLVM version. SteamOS's preinstalled
+  `/usr/bin/gdbserver` is the fallback; LLDB speaks its protocol
+  (`gdb-remote`). Whether the Deck's With LLVM tree includes `lldb-server`
+  was not checked; if not, `pair` copies it.
 - **The session**: `with dev debug` forwards the server's port over SSH,
   then runs LLDB here with `platform select remote-linux`, the executable
   with its DWARF, and `settings set target.source-map <builder path>
-  <project path>` so a container or remote build still shows local files.
+  <project path>` so a cross or Deck build still shows local files.
 - **Symbols**: the dev package is stripped for the push; the unstripped
   executable stays on the developer's machine and LLDB loads it by build
   ID. The push stays small and the debugger has everything.
@@ -306,9 +349,11 @@ layout change, so rule 6 holds without schema migration. `snapshot` /
 `restore` shortens long sessions when the snapshot's type hash matches;
 otherwise replay from the start, and say so.
 
-Costs to measure in Milestone 3, none known now: build time on the chosen
-builder; Steam relaunch time in Game Mode; replay speed for a ten-minute
-session.
+Costs: the build is measured (§4.1): 18 s plus a push on the Mac, 65 s on
+the Deck, for WIPE. Still to measure in Milestone 3: Steam relaunch time
+in Game Mode, and replay speed for a ten-minute session. At these build
+times tier 2 is a 20-30 s loop; tier 1 and the dev channel's `pause` /
+`step N` are what make tuning feel instant.
 
 ### Tier 3: code, in process (later, and only if tier 2 is too slow)
 
@@ -330,25 +375,29 @@ slow to use.
 
 ### Milestone 0: spikes, answered on a real Deck
 
-1. USB network gadget (§3.4): does a CDC-NCM gadget from SteamOS with DRD
-   enabled come up on macOS, and at what throughput? Record the answer and
-   the commands.
-2. Launching from SSH (§3.3): which candidate creates a shortcut and
-   starts it in Game Mode on a retail Deck without the Devkit Service?
-3. `lldb-server` from the compiler's LLVM release runs from `~` on SteamOS
-   and LLDB on a Mac attaches to a WIPE Linux build through an SSH forward,
-   with source lines.
-4. Build time for WIPE on the Deck: clean, and after a one-file change.
-   The same in the `steamrt4` container on Apple Silicon, for comparison.
+Answered 2026-10-18 on Eric's Deck:
 
-Each answer is written into this plan before Milestone 1 begins; a "no"
-changes the plan, not the code.
+1. ~~USB network gadget~~: not supported by Valve; dropped (§1.2).
+2. Pairing without a password: **yes**, through the Devkit Service (§1.2).
+3. Build times: **measured** (§4.1).
+4. Debug info: **works** on the Mac at `-O0` (§1.1).
+
+Still open:
+
+5. Launching in Game Mode over Steam's IPC pipe (§3.3) from the toolchain's
+   own code, without Valve's helper scripts installed.
+6. `lldb-server` from LLVM 22.1.6 runs from `~` on SteamOS, and LLDB on the
+   Mac attaches to a WIPE Linux build through an SSH forward, with source
+   lines.
+7. A one-shot manual cross-build: WIPE's object files from the Mac with
+   `c_import` pointed by hand at the steamrt4 sysroot, linked with `ld.lld`,
+   run on the Deck. It shows how far issue 1 of §4.2 really is.
 
 ### Milestone 1: deploy and run
 
 1. `with dev pair`, `status`, `deploy`, `run`, `logs`, `shell`, `unpair`
    for `kind = "steam-deck"` and `kind = "linux"`.
-2. The `device` builder; then `container` and `ssh:`.
+2. The Deck builder (§4.3).
 3. WIPE runs on the Deck in Game Mode from `with dev run deck` on a Mac,
    with its output in the Mac's terminal.
 4. Tests: a fake device (a Linux container with SSH) in the battery, so
@@ -370,9 +419,9 @@ changes the plan, not the code.
 
 ### Milestone 4: cross-building
 
-The four issues of §4.2, when the compiler takes them up. The plan's
-acceptance does not wait on them; the default builder changes when they
-land.
+The four issues of §4.2. It may run beside Milestones 2 and 3, since it
+touches the compiler and they touch the toolchain. It is done when
+`with dev run deck` on the Mac builds on the Mac, and the Deck only runs.
 
 ### After this plan
 
@@ -398,8 +447,8 @@ each a private backend implementing the same four verbs.
 ## 10. Open questions
 
 1. `with dev <verb>` or `with run --device` plus separate verbs.
-2. Require Valve's Devkit Service (its pairing, its launch path), or keep
-   plain SSH as the baseline. Depends on Milestone 0, spike 2.
+2. ~~Require Valve's Devkit Service~~: yes, decided 2026-10-18. It is the
+   supported path and the effortless one.
 3. Whether `[devices]` belongs in `with.toml` (shared with the team) or
    only in the user's config (addresses are personal). The proposal keeps
    the kind in the project and the address in the user's config.
@@ -413,7 +462,8 @@ each a private backend implementing the same four verbs.
 |---|---|
 | "Launch over SSH into Desktop Mode, it's simpler." | Not where players run (rule 2): no Steam Input layout, no overlay, no gamescope. Available as `--desktop`, labeled. |
 | "Copy the state across a reload and hope the layout matches." | Rule 6. Restart-and-replay is correct by construction because the toolkit has exact replay. |
-| "Run `gdbserver` from the SteamOS repositories." | The root is read-only and the package manager is off by default; `lldb-server` from the compiler's own LLVM installs under `~` and matches the LLDB on the other end. |
+| "Make the Deck a USB network device so builds go over the cable." | Possible (the kernel has the gadget modules) but unsupported: it needs the BIOS DRD switch and root gadget setup, and Valve documents only Wi-Fi and hub Ethernet. Decided 2026-10-18: Valve's path. |
+| "Pair by asking for the `deck` password." | The Devkit Service's on-Deck approval does the same with one tap, and is Valve's. |
 | "Expose a debug port on the network for convenience." | Rule 1. Everything rides the SSH connection the developer authenticated. |
 
 ## 12. References
@@ -424,5 +474,12 @@ each a private backend implementing the same four verbs.
   and §9 (the Verified checklist).
 - Valve, SteamOS Devkit Client and Service (open source, GitLab); Steamworks
   partner docs, "Loading and running games on Steam Deck".
-- DeckJoy (Lucaber/deckjoy): DRD mode used for a USB gadget.
+- SteamOS Devkit Service source (mirror `evlaV/steamos-devkit-service`):
+  `/register`, the `approve-ssh-key` and `install-ssh-key` hooks.
+- SteamOS Devkit Client source (mirror `flibitijibibo/steamos-devkit`):
+  `client/devkit-utils/` (`steam-client-create-shortcut`, `steam-devkit-rpc`,
+  the `steam.pipe` protocol in `devkit_utils/__init__.py`).
+- Steam Linux Runtime 4 images: `https://repo.steampowered.com/steamrt4/images/`.
 - Godot DeployToSteamOS: a third-party deploy riding the Devkit Client.
+- On the USB gadget path: `dafta/DeckMTP`, `jmedina21/deck-as-controller`,
+  and Valve's `usbhid-gadget-passthru` (on SteamOS).
