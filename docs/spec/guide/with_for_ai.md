@@ -1,9 +1,7 @@
 # With for AI — Compact Project Primer
 
-> **D22 status (2026-07-23): A new decision has been made, but implementation
-> is still in progress.** This primer teaches the normative D22 map-view,
-> contextual-Copy, and transparent-origin rules. Do not infer contrary language
-> semantics from current compiler behavior.
+> **D22 (ruled 2026-07-23, implemented 2026-10-18).** This primer teaches the
+> normative D22 map-view, contextual-Copy, and transparent-origin rules.
 
 **Purpose:** Give an AI assistant enough context to read, write, review, and modify With code meaningfully without loading the full language specification.
 
@@ -454,10 +452,6 @@ survives `Option`, `Result`, patterns, `?`, `??`, and eliminators until
 contextual Copy, explicit clone, or consuming removal creates an independent
 owned value. Consequently a map cannot be mutated while a surviving view into
 it will be used later; a copied snapshot remains valid.
-
-**Implementation note:** these rules are normative but currently
-NON-COMPLIANT. AI-generated code must target the rules, not work around their
-unfinished implementation.
 
 ### Positional element access (D27)
 

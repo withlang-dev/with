@@ -6,7 +6,7 @@
 // D100 (§18.3): without `pub` a declaration is visible throughout its
 // package; `pub` is what another package needs. Every `pub` written to
 // satisfy the old per-file rule inside one package overstates the API.
-// This asks the compiler, never the text: `with analyze <root> select:…`
+// This asks the compiler, never the text: `with analyze <root> facts`
 // gives every declaration with its module, every resolved call, method
 // resolution and name reference (`reference` facts carry the referencing
 // and the declaring package); a `pub` declaration of the root's package
@@ -21,6 +21,7 @@ use std.fs
 use std.process
 use std.os
 use std.string.parse
+use std.collections.HashMap
 
 fn fail(msg: &str) -> Never:
     eprint("pub_lint: " ++ msg)
@@ -28,12 +29,12 @@ fn fail(msg: &str) -> Never:
 
 type Decl { path: str, name: str, start: i64, kind: str }
 
-fn facts(root: &str, query: &str) -> List[str]:
-    let out_path = "out/tmp/pub_lint_" ++ query.replace(":", "_").replace("=", "_").replace(",", "_") ++ ".txt"
+fn all_facts(root: &str) -> List[str]:
+    let out_path = "out/tmp/pub_lint_facts.txt"
     let compiler = if env("WITH").len() > 0: env("WITH") else: "with".to_owned()
-    let argv: List[str] = [compiler, "analyze", root.to_owned(), query.to_owned()]
+    let argv: List[str] = [compiler, "analyze", root.to_owned(), "facts".to_owned()]
     let finished = run_to_files(&argv, out_path, out_path ++ ".stderr", 900000)
-    if finished.code != 0: fail("`with analyze " ++ root ++ " " ++ query ++ "` exited " ++ f"{finished.code}; see " ++ out_path ++ ".stderr")
+    if finished.code != 0: fail("`with analyze " ++ root ++ " facts` exited " ++ f"{finished.code}; see " ++ out_path ++ ".stderr")
     var rows: List[str] = List.new()
     for l in read_file(out_path).unwrap_or("").split("\n"):
         if l.starts_with("fact\t"): rows.push(l.to_owned())
@@ -59,36 +60,33 @@ let root = argv[1].to_owned()
 let apply = argv.len() > 2 and argv[2] == "--apply"
 let _ = mkdir_p("out/tmp")
 
-// Declarations of the root's package, with their module and start byte.
+// Single-pass extraction over `with analyze <root> facts`: declarations and
+// types of the root's package, plus references/calls/method-resolutions from
+// another package.
 var decls: List[Decl] = List.new()
-for row in facts(root, "select:stage=ast,kind=declaration"):
-    let path = column(row, 18)
-    if package_of(path) != "<program>" or path.starts_with("<c_import"): continue
-    let name = column(row, 19)
-    if name.contains("$in$"): continue
-    decls.push(Decl { path, name, start: parse(column(row, 14)), kind: "fn" })
-// Declared types (struct, enum, alias) carry their declaration's module and
-// start byte in the type facts.
-for row in facts(root, "select:stage=sema,kind=type"):
-    let path = column(row, 18)
-    if path.len() == 0 or package_of(path) != "<program>" or path.starts_with("<c_import"): continue
-    let name = column(row, 19)
-    if name.contains("$in$") or name.contains("[") or column(row, 14).len() == 0: continue
-    decls.push(Decl { path, name, start: parse(column(row, 14)), kind: "type" })
-
-// Names referenced from another package than the declaration's: calls
-// (by callee name — the sig's declaration is in the same program), method
-// resolutions (owner.method) and name references (the fact says both
-// packages itself).
 var used_outside: HashMap[str, i32] = HashMap.new()
-for row in facts(root, "select:kind=reference"):
-    let detail = column(row, 20)
-    if detail_field(detail, "from-package") != detail_field(detail, "target-package"):
-        used_outside.insert(column(row, 19), 1)
-for row in facts(root, "select:kind=call"):
-    if package_of(column(row, 18)) != "<program>": used_outside.insert(column(row, 19), 1)
-for row in facts(root, "select:kind=method-resolution"):
-    if package_of(column(row, 18)) != "<program>": used_outside.insert(column(row, 19), 1)
+for row in all_facts(root):
+    let stage = column(row, 1)
+    let kind = column(row, 2)
+    if stage == "ast" and kind == "declaration":
+        let path = column(row, 18)
+        if package_of(path) != "<program>" or path.starts_with("<c_import"): continue
+        let name = column(row, 19)
+        if name.contains("$in$"): continue
+        decls.push(Decl { path, name, start: parse(column(row, 14)), kind: "fn" })
+    else if stage == "sema" and kind == "type":
+        let path = column(row, 18)
+        if path.len() == 0 or package_of(path) != "<program>" or path.starts_with("<c_import"): continue
+        let name = column(row, 19)
+        if name.contains("$in$") or name.contains("[") or column(row, 14).len() == 0: continue
+        decls.push(Decl { path, name, start: parse(column(row, 14)), kind: "type" })
+    else if kind == "reference":
+        let detail = column(row, 20)
+        if detail_field(detail, "from-package") != detail_field(detail, "target-package"):
+            used_outside.insert(column(row, 19), 1)
+    else if kind == "call" or kind == "method-resolution":
+        if package_of(column(row, 18)) != "<program>":
+            used_outside.insert(column(row, 19), 1)
 
 var reported = 0
 var edits: HashMap[str, List[i64]] = HashMap.new()

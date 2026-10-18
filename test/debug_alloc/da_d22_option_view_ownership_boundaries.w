@@ -1,0 +1,25 @@
+//! expect-debug-alloc: leak count=0
+// D22 acceptance cell, promoted 2026-10-18 (the matrix's metadata follows).
+// owner-stage: 5
+// required-verdict: compile-and-run under `--debug-alloc`
+// exact-type: `copied` is `Option[i32]`; `cloned` is `Option[List[i64]]`
+// expected-diagnostic: none
+// origin-set: `.copied()` and `.cloned()` results both have `{}`
+// drop-behavior: copied scalar is independent; cloned and map-owned List buffers each drop once; leak count=0
+
+use std.collections.HashMap
+fn main:
+    var counts: HashMap[i32, i32] = HashMap.new()
+    counts.insert(1, 61)
+    let copied: Option[i32] = counts.get(1).copied()
+    counts.clear()
+    assert(copied.unwrap() == 61)
+
+    var jobs: HashMap[i32, List[i64]] = HashMap.new()
+    let stored: List[i64] = List.new()
+    stored.push(62)
+    jobs.insert(1, move stored)
+    let cloned: Option[List[i64]] = jobs.get(1).cloned()
+    jobs.clear()
+    let owned = cloned.unwrap()
+    assert(owned[0] == 62)

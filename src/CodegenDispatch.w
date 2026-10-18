@@ -10895,7 +10895,13 @@ impl Codegen:
                 wl_position_at_end(self.builder, live_bb)
                 let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
                 let dest_is_view = dest_sema > 0 and self.mir_type_kind_at(self.mir_resolve_alias_at(dest_sema)) == TypeKind.TY_REF
-                result = if dest_is_view: self.mir_ref_from_slot_ptr(slot_ptr, dest_sema) else: wl_build_load(self.builder, self.mir_dest_llvm_type(body, dest_place), slot_ptr)
+                if dest_is_view:
+                    result = self.mir_ref_from_slot_ptr(slot_ptr, dest_sema)
+                else:
+                    let dest_llvm = self.mir_dest_llvm_type(body, dest_place)
+                    if dest_place >= 0:
+                        self.mir_emit_copy_glue_ptr(slot_ptr, dest_llvm, dest_sema)
+                    result = wl_build_load(self.builder, dest_llvm, slot_ptr)
 
         else if intrinsic == MirIntrinsic.MAP_TAKE_AT:
             // D44: a consuming traversal moves entry `slot` into its (K, V)
@@ -11271,6 +11277,9 @@ impl Codegen:
             self.emit_runtime_panic("SlotMapSlot.get requires a valid handle")
             wl_position_at_end(self.builder, sms_ok_bb)
             let sms_elem_ty = self.mir_slotmapslot_elem_type_from_recv(body, args_id)
+            let sms_elem_sema = self.mir_slotmapslot_elem_sema_type_from_recv(body, args_id)
+            if dest_place >= 0:
+                self.mir_emit_copy_glue_ptr(sms_val_ptr, sms_elem_ty, sms_elem_sema)
             result = wl_build_load(self.builder, sms_elem_ty, sms_val_ptr)
 
         else if intrinsic == MirIntrinsic.SLOTMAPSLOT_SET:
@@ -11364,22 +11373,18 @@ impl Codegen:
             let oi_default = self.mir_intrinsic_arg(body, args_id, 1)
             let oi_recv_op = body.call_arg_operands[arg_start]
             let oi_recv_sema = self.mir_operand_sema_type(body, oi_recv_op)
+            let oi_key_tid = self.mir_hash_collection_arg_sema_type(oi_recv_sema, 0)
+            let oi_val_tid = self.mir_hash_collection_arg_sema_type(oi_recv_sema, 1)
             var oi_key_ty: i64 = i64_ty
             var oi_val_ty: i64 = wl_type_of(oi_default)
-            if oi_recv_sema > 0:
-                let oi_resolved = self.mir_resolve_alias_at(oi_recv_sema)
-                if self.mir_type_kind_at(oi_resolved) == TypeKind.TY_GENERIC_INST:
-                    let oi_te_start = self.mir_type_d1_at(oi_resolved)
-                    let oi_key_tid = self.mir_type_extra_at(oi_te_start)
-                    if oi_key_tid > 0:
-                        let oi_kt = self.mir_sema_type_to_llvm(oi_key_tid)
-                        if oi_kt != 0:
-                            oi_key_ty = oi_kt
-                    let oi_val_tid = self.mir_type_extra_at(oi_te_start + 1)
-                    if oi_val_tid > 0:
-                        let oi_vt = self.mir_sema_type_to_llvm(oi_val_tid)
-                        if oi_vt != 0:
-                            oi_val_ty = oi_vt
+            if oi_key_tid > 0:
+                let oi_kt = self.mir_sema_type_to_llvm(oi_key_tid)
+                if oi_kt != 0:
+                    oi_key_ty = oi_kt
+            if oi_val_tid > 0:
+                let oi_vt = self.mir_sema_type_to_llvm(oi_val_tid)
+                if oi_vt != 0:
+                    oi_val_ty = oi_vt
             let oi_entry_fields: List[i64] = List.new()
             oi_entry_fields.push(ptr_ty)
             oi_entry_fields.push(oi_key_ty)
@@ -11391,6 +11396,8 @@ impl Codegen:
             let oi_is_str = wl_const_int(i64_ty, if self.is_str_type(oi_key_ty): 1 else: 0, 0)
             let oi_key_alloca = self.create_entry_alloca(oi_key_ty)
             wl_build_store(self.builder, oi_key, oi_key_alloca)
+            let oi_val_alloca = self.create_entry_alloca(oi_val_ty)
+            wl_build_store(self.builder, self.mir_intrinsic_value_as(body, args_id, 1, oi_default, oi_val_ty), oi_val_alloca)
             // contains?
             let oi_contains_fn = self.ensure_hm_fn("with_hashmap_contains", wl_i32_type(self.context))
             let oi_c_params: List[i64] = List.new()
@@ -11405,12 +11412,12 @@ impl Codegen:
             let oi_found = wl_build_call(self.builder, oi_c_fn_ty, oi_contains_fn, list_data_i64(&oi_c_args), 3)
             let oi_cond = wl_build_icmp(self.builder, wl_int_eq(), oi_found, wl_const_int(wl_i32_type(self.context), 0, 0))
             let oi_insert_bb = wl_append_bb(self.context, self.current_function, "entry.insert")
+            let oi_found_bb = wl_append_bb(self.context, self.current_function, "entry.found")
             let oi_get_bb = wl_append_bb(self.context, self.current_function, "entry.get")
-            wl_build_cond_br(self.builder, oi_cond, oi_insert_bb, oi_get_bb)
+            wl_build_cond_br(self.builder, oi_cond, oi_insert_bb, oi_found_bb)
             // insert default
             wl_position_at_end(self.builder, oi_insert_bb)
-            let oi_val_alloca = self.create_entry_alloca(oi_val_ty)
-            wl_build_store(self.builder, self.mir_intrinsic_value_as(body, args_id, 1, oi_default, oi_val_ty), oi_val_alloca)
+            self.mir_emit_copy_glue_ptr(oi_key_alloca, oi_key_ty, oi_key_tid)
             let oi_ins_fn = self.ensure_hm_fn("with_hashmap_insert", void_ty)
             let oi_i_params: List[i64] = List.new()
             oi_i_params.push(ptr_ty)
@@ -11424,6 +11431,13 @@ impl Codegen:
             oi_i_args.push(oi_val_alloca)
             oi_i_args.push(oi_is_str)
             let _ = wl_build_call(self.builder, oi_i_fn_ty, oi_ins_fn, list_data_i64(&oi_i_args), 4)
+            wl_build_br(self.builder, oi_get_bb)
+            // already present: drop unused default
+            wl_position_at_end(self.builder, oi_found_bb)
+            if oi_val_tid > 0 and self.sema.type_needs_drop_frozen(oi_val_tid) != 0:
+                self.member_drop_depth = self.member_drop_depth + 1
+                self.mir_emit_drop_ptr_for_sema_type(oi_val_alloca, oi_val_ty, oi_val_tid)
+                self.member_drop_depth = self.member_drop_depth - 1
             wl_build_br(self.builder, oi_get_bb)
             // get value
             wl_position_at_end(self.builder, oi_get_bb)
@@ -11441,6 +11455,8 @@ impl Codegen:
             oi_g_args.push(oi_out_alloca)
             oi_g_args.push(oi_is_str)
             let _ = wl_build_call(self.builder, oi_g_fn_ty, oi_get_fn, list_data_i64(&oi_g_args), 4)
+            if dest_place >= 0:
+                self.mir_emit_copy_glue_ptr(oi_out_alloca, oi_val_ty, oi_val_tid)
             result = wl_build_load(self.builder, oi_val_ty, oi_out_alloca)
 
         else if intrinsic == MirIntrinsic.ENTRY_GET:
@@ -11448,22 +11464,18 @@ impl Codegen:
             let eg_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let eg_recv_op = body.call_arg_operands[arg_start]
             let eg_recv_sema = self.mir_operand_sema_type(body, eg_recv_op)
+            let eg_key_tid = self.mir_hash_collection_arg_sema_type(eg_recv_sema, 0)
+            let eg_val_tid = self.mir_hash_collection_arg_sema_type(eg_recv_sema, 1)
             var eg_key_ty: i64 = i64_ty
             var eg_val_ty: i64 = i64_ty
-            if eg_recv_sema > 0:
-                let eg_resolved = self.mir_resolve_alias_at(eg_recv_sema)
-                if self.mir_type_kind_at(eg_resolved) == TypeKind.TY_GENERIC_INST:
-                    let eg_te_start = self.mir_type_d1_at(eg_resolved)
-                    let eg_key_tid = self.mir_type_extra_at(eg_te_start)
-                    if eg_key_tid > 0:
-                        let eg_kt = self.mir_sema_type_to_llvm(eg_key_tid)
-                        if eg_kt != 0:
-                            eg_key_ty = eg_kt
-                    let eg_val_tid = self.mir_type_extra_at(eg_te_start + 1)
-                    if eg_val_tid > 0:
-                        let eg_vt = self.mir_sema_type_to_llvm(eg_val_tid)
-                        if eg_vt != 0:
-                            eg_val_ty = eg_vt
+            if eg_key_tid > 0:
+                let eg_kt = self.mir_sema_type_to_llvm(eg_key_tid)
+                if eg_kt != 0:
+                    eg_key_ty = eg_kt
+            if eg_val_tid > 0:
+                let eg_vt = self.mir_sema_type_to_llvm(eg_val_tid)
+                if eg_vt != 0:
+                    eg_val_ty = eg_vt
             let eg_dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
             if eg_dest_sema > 0:
                 let eg_dt = self.mir_sema_type_to_llvm(self.mir_resolve_alias_at(eg_dest_sema))
@@ -11494,6 +11506,9 @@ impl Codegen:
             eg_g_args.push(eg_out_alloca)
             eg_g_args.push(eg_is_str)
             let _ = wl_build_call(self.builder, eg_g_fn_ty, eg_get_fn, list_data_i64(&eg_g_args), 4)
+            let eg_copy_sema = if eg_dest_sema > 0: eg_dest_sema else: eg_val_tid
+            if dest_place >= 0:
+                self.mir_emit_copy_glue_ptr(eg_out_alloca, eg_val_ty, eg_copy_sema)
             result = wl_build_load(self.builder, eg_val_ty, eg_out_alloca)
 
         else if intrinsic == MirIntrinsic.ENTRY_SET:
@@ -11502,20 +11517,16 @@ impl Codegen:
             let es_val_raw = self.mir_intrinsic_arg(body, args_id, 1)
             let es_recv_op = body.call_arg_operands[arg_start]
             let es_recv_sema = self.mir_operand_sema_type(body, es_recv_op)
+            let es_key_tid = self.mir_hash_collection_arg_sema_type(es_recv_sema, 0)
+            let es_val_tid = self.mir_hash_collection_arg_sema_type(es_recv_sema, 1)
             var es_key_ty: i64 = i64_ty
             var es_val_ty: i64 = 0
-            if es_recv_sema > 0:
-                let es_resolved = self.mir_resolve_alias_at(es_recv_sema)
-                if self.mir_type_kind_at(es_resolved) == TypeKind.TY_GENERIC_INST:
-                    let es_te_start = self.mir_type_d1_at(es_resolved)
-                    let es_key_tid = self.mir_type_extra_at(es_te_start)
-                    if es_key_tid > 0:
-                        let es_kt = self.mir_sema_type_to_llvm(es_key_tid)
-                        if es_kt != 0:
-                            es_key_ty = es_kt
-                    let es_val_tid = self.mir_type_extra_at(es_te_start + 1)
-                    if es_val_tid > 0:
-                        es_val_ty = self.mir_sema_type_to_llvm(es_val_tid)
+            if es_key_tid > 0:
+                let es_kt = self.mir_sema_type_to_llvm(es_key_tid)
+                if es_kt != 0:
+                    es_key_ty = es_kt
+            if es_val_tid > 0:
+                es_val_ty = self.mir_sema_type_to_llvm(es_val_tid)
             let es_val = self.mir_intrinsic_value_as(body, args_id, 1, es_val_raw, es_val_ty)
             let es_entry_fields: List[i64] = List.new()
             es_entry_fields.push(ptr_ty)
@@ -11528,7 +11539,9 @@ impl Codegen:
             let es_is_str = wl_const_int(i64_ty, if self.is_str_type(es_key_ty): 1 else: 0, 0)
             let es_key_alloca = self.create_entry_alloca(es_key_ty)
             wl_build_store(self.builder, es_key, es_key_alloca)
-            let es_val_alloca = self.create_entry_alloca(wl_type_of(es_val))
+            self.mir_emit_copy_glue_ptr(es_key_alloca, es_key_ty, es_key_tid)
+            let es_val_llvm = wl_type_of(es_val)
+            let es_val_alloca = self.create_entry_alloca(es_val_llvm)
             wl_build_store(self.builder, es_val, es_val_alloca)
             let es_ins_fn = self.ensure_hm_fn("with_hashmap_insert", void_ty)
             let es_i_params: List[i64] = List.new()
@@ -11542,7 +11555,8 @@ impl Codegen:
             es_i_args.push(es_key_alloca)
             es_i_args.push(es_val_alloca)
             es_i_args.push(es_is_str)
-            result = wl_build_call(self.builder, es_i_fn_ty, es_ins_fn, list_data_i64(&es_i_args), 4)
+            self.mir_emit_owned_map_insert(es_ins_fn, es_i_fn_ty, &es_i_args, es_key_tid, es_val_tid, es_key_ty, es_val_llvm)
+            result = 0
 
         else:
             return false
@@ -12131,12 +12145,15 @@ impl Codegen:
             let vrg_gep: List[i64] = List.new()
             vrg_gep.push(vrg_abs)
             let vrg_elem_ptr = wl_build_gep(self.builder, vrg_elem_ty, vrg_typed_ptr, list_data_i64(&vrg_gep), 1)
+            if dest_place >= 0:
+                self.mir_emit_copy_glue_ptr(vrg_elem_ptr, vrg_elem_ty, vrg_dest_sema)
             result = wl_build_load(self.builder, vrg_elem_ty, vrg_elem_ptr)
 
         else if intrinsic == MirIntrinsic.VECRANGE_SET:
             // ListRange[T].set(i, value) — store value at data_ptr[offset + i]
             let vrs_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let vrs_idx = self.mir_intrinsic_arg(body, args_id, 1)
+            let vrs_elem_sema = self.mir_recv_elem_sema_type(body, args_id)
             let vrs_want = self.mir_recv_elem_llvm_type(body, args_id, "ListRange.set")
             let vrs_val = self.mir_intrinsic_arg_as(body, args_id, 2, vrs_want)
             let vrs_idx64 = self.coerce_int(vrs_idx, i64_ty)
@@ -12166,6 +12183,10 @@ impl Codegen:
             let vrs_gep: List[i64] = List.new()
             vrs_gep.push(vrs_abs)
             let vrs_elem_ptr = wl_build_gep(self.builder, vrs_elem_ty, vrs_typed_ptr, list_data_i64(&vrs_gep), 1)
+            if vrs_elem_sema > 0 and self.sema.type_needs_drop_frozen(vrs_elem_sema) != 0:
+                self.member_drop_depth = self.member_drop_depth + 1
+                self.mir_emit_drop_ptr_for_sema_type(vrs_elem_ptr, vrs_elem_ty, vrs_elem_sema)
+                self.member_drop_depth = self.member_drop_depth - 1
             wl_build_store(self.builder, vrs_val, vrs_elem_ptr)
 
         else if intrinsic == MirIntrinsic.VECRANGE_LEN:
@@ -12295,6 +12316,8 @@ impl Codegen:
             let sg_gep_indices: List[i64] = List.new()
             sg_gep_indices.push(sg_idx)
             let sg_elem_ptr = wl_build_gep(self.builder, sg_elem_ty, sg_typed_ptr, list_data_i64(&sg_gep_indices), 1)
+            if dest_place >= 0:
+                self.mir_emit_copy_glue_ptr(sg_elem_ptr, sg_elem_ty, sg_dest_sema)
             result = wl_build_load(self.builder, sg_elem_ty, sg_elem_ptr)
 
         else if intrinsic == MirIntrinsic.VECSLOT_SET:

@@ -885,7 +885,12 @@ impl Sema:
         let at = if arm_node > 0: arm_node else: report_node
         let noncopy = self.contextual_join_noncopy_pointee(expected, actual)
         if noncopy != 0:
-            self.emit_error(join_name ++ " would need to copy a `" ++ self.type_name(noncopy) ++ "`, which is not Copy", at)
+            let msg = join_name ++ " would need to copy a `" ++ self.type_name(noncopy) ++ "`, which is not Copy"
+            let help = if self.type_implements_trait(noncopy as TypeId, self.syms.clone_trait) != 0:
+                "call `.clone()` on the borrowed side to produce an owned `" ++ self.type_name(noncopy) ++ "`, or borrow the owned side with `&`"
+            else:
+                "borrow the owned side with `&` so both sides are `" ++ self.type_name(actual) ++ "`, or implement `Clone` for `" ++ self.type_name(noncopy) ++ "`"
+            self.emit_error_with_help(msg, at, help)
             return
         self.emit_error(join_name ++ " expression of type `" ++ self.type_name(actual) ++ "` cannot produce `" ++ self.type_name(expected) ++ "`", at)
 
@@ -1571,6 +1576,14 @@ impl Sema:
         if key_ty == 0 or self.get_type_kind(self.resolve_alias(key_ty as TypeId)) == TypeKind.TY_STR or self.type_needs_drop(key_ty) == 0:
             return
         self.emit_error(f"{call_name} copies its key when it inserts it, and `{self.type_name(key_ty)}` is not a value it can copy; use `entry(key)`", node)
+
+    // #1159 / §2.3: reading a value by value out of a container slot (`get`,
+    // `or_insert`) duplicates the stored element while the container retains
+    // ownership, so the element type must be `Copy`.
+    mut fn check_slot_get_copy(call_name: &str, elem_ty: i32, node: i32) -> i32:
+        if elem_ty != 0 and self.is_copy(elem_ty as TypeId) == 0:
+            self.emit_error(f"cannot copy `{self.type_name(elem_ty)}` out of `{call_name}` because `{self.type_name(elem_ty)}` is not `Copy`", node)
+        elem_ty
 
     mut fn check_builtin_method_call_arg(call_name: &str, arg_index: isize, expected: i32, actual: i32, arg_node: i32) -> i32:
         if expected == 0 or actual == 0:
@@ -16533,9 +16546,15 @@ impl Sema:
             return self.compute_expr_storage_origin_mask(self.ast.get_data0(node))
         if kind == NodeKind.NK_ASSIGN:
             return self.compute_expr_storage_origin_mask(self.ast.get_data0(node)) | self.compute_expr_storage_origin_mask(self.ast.get_data1(node))
-        if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
+        if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
             // A handle read out of the place views what the place holds.
             if self.type_is_view_handle(self.typed_expr_types.get(node) ?? 0):
+                return 0
+            return self.compute_place_storage_origin_mask(node)
+        if kind == NodeKind.NK_INDEX:
+            // D27 types `xs[i]` as `&Elem`; it reads a stored view handle only
+            // when `Elem` itself is a view (`&&T` / `&[]T`).
+            if self.type_is_view_of_view(self.typed_expr_types.get(node) ?? 0):
                 return 0
             return self.compute_place_storage_origin_mask(node)
         if kind == NodeKind.NK_UNARY:
@@ -32088,7 +32107,7 @@ impl Sema:
             if method_name == "set" and arg_index == 1:
                 return self.get_generic_inst_arg(resolved as i32, 0)
         if owner_sym == self.syms.hashmapentry:
-            if method_name == "set" and arg_index == 0:
+            if (method_name == "set" or method_name == "or_insert") and arg_index == 0:
                 return self.get_generic_inst_arg(resolved as i32, 1)
         if owner_sym == self.syms.slotmap:
             if field == self.syms.insert and arg_index == 0:
@@ -34634,12 +34653,12 @@ impl Sema:
                     return self.list_traverse_return_type(recv_type, arg_types, mc_resolved_arg_count, node)
             if type_name_sym == self.syms.listslot:
                 if field == self.syms.get:
-                    return self.get_generic_inst_arg(recv_type, 0)
+                    return self.check_slot_get_copy("ListSlot.get", self.get_generic_inst_arg(recv_type, 0), node)
                 if mc_method_name_raw == "set":
                     return self.ty_void as i32
             if type_name_sym == self.syms.listrange:
                 if field == self.syms.get:
-                    return self.get_generic_inst_arg(recv_type, 0)
+                    return self.check_slot_get_copy("ListRange.get", self.get_generic_inst_arg(recv_type, 0), node)
                 if mc_method_name_raw == "set":
                     return self.ty_void as i32
                 if generic_len_ret != 0:
@@ -34817,9 +34836,9 @@ impl Sema:
                     return self.ensure_generic_inst_type(self.syms.hashmapentry, entry_args, 2) as i32
             if type_name_sym == self.syms.hashmapentry:
                 if field == self.syms.or_insert:
-                    return self.get_generic_inst_arg(recv_type, 1)
+                    return self.check_slot_get_copy("HashMapEntry.or_insert", self.get_generic_inst_arg(recv_type, 1), node)
                 if field == self.syms.get:
-                    return self.get_generic_inst_arg(recv_type, 1)
+                    return self.check_slot_get_copy("HashMapEntry.get", self.get_generic_inst_arg(recv_type, 1), node)
                 if mc_method_name_raw == "set":
                     return self.ty_void as i32
             if type_name_sym == self.syms.hashset:
@@ -34856,7 +34875,7 @@ impl Sema:
                     return generic_len_ret
             if type_name_sym == self.syms.slotmapslot:
                 if field == self.syms.get:
-                    return self.get_generic_inst_arg(recv_type, 0)
+                    return self.check_slot_get_copy("SlotMapSlot.get", self.get_generic_inst_arg(recv_type, 0), node)
                 if mc_method_name_raw == "set":
                     return self.ty_void as i32
             if type_name_sym == self.syms.option:

@@ -988,6 +988,17 @@ fn analysis_audit_call_contracts(report: &AnalysisReport, sema: &Sema, mir_mod: 
             let mono = body.call_mono_sym(ci as i32)
             let required = body.call_requires_contract(ci as i32)
             let argc = body.call_arg_counts[ci]
+            let intrinsic = body.call_intrinsic(ci as i32)
+            if intrinsic == MirIntrinsic.VECSLOT_GET or intrinsic == MirIntrinsic.SLOTMAPSLOT_GET or intrinsic == MirIntrinsic.VECRANGE_GET or intrinsic == MirIntrinsic.ENTRY_GET or intrinsic == MirIntrinsic.ENTRY_OR_INSERT:
+                let start = body.call_arg_starts[ci]
+                if argc > 0:
+                    let recv_ty = mir_validate_operand_type(mir_mod, body, body.call_arg_operands[start])
+                    let recv_resolved = if recv_ty > 0: sema.resolve_alias(recv_ty as TypeId) else: 0
+                    let recv_unwrapped = if recv_resolved > 0 and sema.get_type_kind(recv_resolved) == TypeKind.TY_REF: sema.resolve_alias(sema.get_type_d0(recv_resolved) as TypeId) else: recv_resolved
+                    let elem_idx = if intrinsic == MirIntrinsic.ENTRY_GET or intrinsic == MirIntrinsic.ENTRY_OR_INSERT: 1 else: 0
+                    let elem_ty = if recv_unwrapped > 0 and sema.get_type_kind(recv_unwrapped) == TypeKind.TY_GENERIC_INST: sema.get_generic_inst_arg(recv_unwrapped as i32, elem_idx) else: 0
+                    if elem_ty > 0 and sema.is_copy_frozen(elem_ty as TypeId) == 0:
+                        report.fail(f"body {body.fn_sym} call {ci}: extraction intrinsic {intrinsic as i32} copies non-Copy type {elem_ty}")
             if required and (sig < 0 or sig >= sema.sig_names.len() or mono == 0):
                 report.fail(f"body {body.fn_sym} call {ci}: required concrete contract is incomplete sig={sig} mono={mono}")
                 continue

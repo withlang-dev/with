@@ -6,8 +6,8 @@
 // map get) yield &T views under D22 — reading through them is covered here.
 // A direct `.iter().next()` chain is a §15.3 error (next() mutates a
 // temporary): test/compile_errors/err_iter_next_rvalue_receiver.w. Mutation
-// through a map view is a pending Stage 8 rejection:
-// test/non_compliant/d22/err_d22_map_view_mutation.w.
+// through a map view is rejected by
+// test/compile_errors/err_d22_map_view_mutation.w.
 
 type Inner {
     tags: List[i32],

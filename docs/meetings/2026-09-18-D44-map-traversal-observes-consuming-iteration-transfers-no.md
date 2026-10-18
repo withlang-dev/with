@@ -2,10 +2,9 @@
 
 **Laws:** 5 (docs/mission.md).
 
-**Date:** 2026-09-18. **Status:** ruled (Eric, "make it canon"); specification
-§2.3, §13.3, §13.5, §4 (the iteration example) and §22.1 rule 7 blessed
-verbatim the same day. The compiler is NON-COMPLIANT until the
-implementation lands (list below). **Issues:** #1158, #1187.
+**Date:** 2026-09-18. **Status:** ruled and implemented (Eric, "make it canon");
+specification §2.3, §13.3, §13.5, §4 (the iteration example) and §22.1 rule 7
+blessed verbatim the same day. **Issues:** #1158, #1159, #1187.
 
 **Ruling.** `for (k, v) in map` is `map.iter()` and binds `k: &K`, `v: &V`.
 `keys()`, `values()` and `iter()` return concrete ephemeral iterator structs

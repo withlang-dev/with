@@ -1,6 +1,6 @@
 # D22 Implementation Plan — Uniform Keyed Lookup, Contextual Copy, and View Origins
 
-**Status (2026-07-23): Implementation in progress.**
+**Status (2026-10-18): Implemented; all 66 acceptance fixtures promoted to active lanes.**
 
 ## Authority and scope
 
