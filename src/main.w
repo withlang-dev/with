@@ -2459,6 +2459,12 @@ impl PoolState:
         let err_text = with_fs_read_file(self.errs[idx])
         if err_text.len() > 0:
             with_ewrite(err_text)
+        // A worker whose capture files are gone at retire ran an action that
+        // removed out/command/<target> (its scratch, once); whatever it
+        // printed is lost, and a failure would otherwise arrive with no
+        // message (the no-host-toolchain lane, 2026-10-18).
+        if with_fs_file_exists(self.errs[idx]) == 0 or with_fs_file_exists(self.outs[idx]) == 0:
+            with_eprint("error: build.w target '" ++ name ++ "' removed its own capture files under out/command/ while it ran; its output is lost (an action's scratch is a subdirectory of its capture directory, never the directory)")
         build_graph_time_eprint("[time] " ++ name ++ " " ++ build_graph_time_fmt(spent))
         let ran_via_runner = self.via_runner[idx]
         let effects_path = with_str_clone_ref(self.effects_paths[idx])

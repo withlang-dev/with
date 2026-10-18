@@ -53,6 +53,11 @@ jobs:
           # links nothing of the host.
           sudo apt-get install -y --no-install-recommends libbz2-dev libsqlite3-dev \
             libcurl4-openssl-dev bubblewrap
+          # Ubuntu 24.04 confines unprivileged user namespaces behind AppArmor;
+          # on this runner image bwrap then fails with `setting up uid map:
+          # Permission denied` before it can sandbox anything. The check is of
+          # the toolchain, not of the host's namespace policy.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Fetch LLVM SDK
         run: |
