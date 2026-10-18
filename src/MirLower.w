@@ -18242,19 +18242,19 @@ fn cow_compute_reachable_and_preds(body: &MirBody) -> (List[i32], List[List[i32]
     (reachable, preds)
 
 fn cow_compute_unique_dataflow(sema: &Sema, body: &MirBody, candidates: &List[i32], cand_locals: &List[i32], ref_root: &List[i32], reachable: &List[i32], preds: &List[List[i32]]) -> (List[i32], List[i32]):
+    // One bit per (block, candidate): bb_count x cand_count, never x
+    // local_count (that was block-count x local-count words per body, most
+    // of a self-check's large-allocation traffic).
     let bb_count = body.block_count()
     let local_count = body.local_count()
-    var unique_in: List[i32] = List.new()
-    var unique_out: List[i32] = List.new()
+    let cand_count = cand_locals.len()
+    var unique_in: List[i32] = List.with_capacity(bb_count * cand_count)
+    var unique_out: List[i32] = List.with_capacity(bb_count * cand_count)
     for bb in 0..bb_count:
-        let active = bb > 0 and reachable[bb] != 0
-        for l in 0..local_count:
-            if active and candidates[l] != 0:
-                unique_in.push(1)
-                unique_out.push(1)
-            else:
-                unique_in.push(0)
-                unique_out.push(0)
+        let active = if bb > 0 and reachable[bb] != 0: 1 else: 0
+        for _ in 0..cand_count:
+            unique_in.push(active)
+            unique_out.push(active)
     var state: List[i32] = List.new()
     for _ in 0..local_count:
         state.push(0)
@@ -18272,17 +18272,17 @@ fn cow_compute_unique_dataflow(sema: &Sema, body: &MirBody, candidates: &List[i3
                     u = 1
                     for pi in 0..preds[bb].len():
                         let p = preds[bb][pi]
-                        if unique_out[p * local_count + l] == 0:
+                        if unique_out[p * cand_count + ci] == 0:
                             u = 0
                             break
                 state[l] = u
-                unique_in[bb * local_count + l] = u
+                unique_in[bb * cand_count + ci] = u
             for si in 0..body.bb_stmt_counts[bb]:
                 state = cow_transfer_stmt(body, candidates, ref_root, body.bb_stmt_starts[bb] + si, state)
             state = cow_transfer_term(sema, body, candidates, ref_root, bb, state)
             for ci in 0..cand_locals.len():
                 let l = cand_locals[ci]
-                let idx = bb * local_count + l
+                let idx = bb * cand_count + ci
                 if unique_out[idx] != state[l]:
                     unique_out[idx] = state[l]
                     changed = true
@@ -18440,7 +18440,7 @@ fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
         var hoisted_any = false
         for ci in 0..cand_locals.len():
             let local = cand_locals[ci]
-            if unique_out[orig_pre_bb * local_count + local] != 0:
+            if unique_out[orig_pre_bb * cand_locals.len() + ci] != 0:
                 continue
             var mu_bb: i32 = -1
             for bb in 0..cur_bb_count:
@@ -18499,8 +18499,10 @@ fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
         if target <= out.n_params or target >= local_count or candidates[target] == 0:
             continue
         var state: List[i32] = List.new()
-        for l in 0..local_count:
-            state.push(unique_in[bb * local_count + l])
+        for _ in 0..local_count:
+            state.push(0)
+        for ci in 0..cand_locals.len():
+            state[cand_locals[ci]] = unique_in[bb * cand_locals.len() + ci]
         for si in 0..out.bb_stmt_counts[bb]:
             state = cow_transfer_stmt(out, candidates, ref_root, out.bb_stmt_starts[bb] + si, state)
         if state[target] != 0:
