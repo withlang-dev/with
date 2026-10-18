@@ -121,12 +121,12 @@ pub fn tar_extract_text_keep(data: &str, dest: &str, strip: i32, keep: &List[str
         if kind == 'K':
             long_link = te_field(payload, 0, payload.len())
             continue
-        var name = long_name.clone()
+        var name = long_name
         if name.len() == 0:
             name = te_field(data, header, 100)
             let prefix = te_field(data, header + 345, 155)
             if prefix.len() > 0: name = prefix ++ "/" ++ name
-        var link = long_link.clone()
+        var link = long_link
         if link.len() == 0: link = te_field(data, header + 157, 100)
         long_name = ""
         long_link = ""

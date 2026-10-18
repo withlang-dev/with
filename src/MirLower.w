@@ -7767,25 +7767,33 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, read_place, read_rv, self.ast.get_start(tail_expr))
         self.body.new_operand(OperandKind.OK_COPY, read_place)
 
-    // D111: a view tail (`out.trim()`, a `&str` into a local of this block)
-    // where the block's demand is the owned value copies it out, with its
-    // hold, BEFORE the block's scope-exit drops. Left lazy, the consumer's
-    // copy ran after `drop(out)` and read the freed buffer (NULs where the
-    // text was, for any `out` that had grown past its literal).
+    // D111/D120: a view tail (`out.trim()`, `xs[n - 1]`, a `&T` into a local
+    // of this block) where the block's demand is the owned value copies it
+    // out, with its hold when drop-bearing, BEFORE the block's scope-exit
+    // drops. Left lazy, the consumer's copy ran after `drop(out)` / `drop(xs)`
+    // and read the freed buffer.
     mut fn materialize_tail_view_for_owned_demand(result: i32, tail_expr: i32) -> i32:
         let kind: i32 = self.body.operand_kinds[result]
-        if kind != OperandKind.OK_COPY and kind != OperandKind.OK_MOVE: return result
         if kind != OperandKind.OK_COPY: return result
         let place: i32 = self.body.operand_d0[result]
         // Sema's contextual copy (D22, D111) lowered the view tail as a lazy
-        // read through it, `copy+retain view.*`: a projected place, never a
-        // plain local, of the owned Copy type with drop glue.
+        // read through it, `copy view.*`: a projected place, never a plain
+        // local, of the owned Copy type.
         if mir_place_plain_local(self.body, place) >= 0: return result
         let read_ty = self.operand_type(result)
-        if read_ty == 0 or self.sema.is_copy_frozen(read_ty as TypeId) == 0 or self.sema.type_needs_drop_frozen(read_ty) == 0: return result
+        if read_ty == 0 or self.sema.is_copy_frozen(read_ty as TypeId) == 0: return result
         // Only where the owned value is demanded: a `&str` tail of a `&str`
         // function (`self.scratch_path`) stays the borrow it is.
-        if self.expected_type == 0 or self.sema.resolve_alias(self.expected_type as TypeId) != self.sema.resolve_alias(read_ty as TypeId): return result
+        let owned_demand = self.has_contextual_copy_adjustment(tail_expr) != 0 or (self.expected_type != 0 and self.sema.resolve_alias(self.expected_type as TypeId) == self.sema.resolve_alias(read_ty as TypeId))
+        if not owned_demand: return result
+        if self.sema.type_needs_drop_frozen(read_ty) == 0:
+            if self.drop_scope_starts.len() == 0 or self.drop_local_ids.len() <= self.drop_scope_starts[(self.drop_scope_starts.len() - 1)]:
+                return result
+            let owned_tmp = self.new_temp(read_ty)
+            let owned_place = self.place_for_local(owned_tmp)
+            let owned_rv = self.body.new_rvalue(RvalueKind.RK_USE, result, 0, 0)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, owned_place, owned_rv, self.ast.get_start(tail_expr))
+            return self.body.new_operand(OperandKind.OK_COPY, owned_place)
         // The copy is one more holder (D111): it retains here, where it is
         // read, not where the consumer would have read it after the drops.
         self.retain_consumed_copy(result)

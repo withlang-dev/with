@@ -134,7 +134,7 @@ pub fn bzip2_decompress(data: &str) -> List[str]:
                 break
             if magic != 0x314159265359:
                 result.push("")
-                result.push(if bits.problem.len() > 0: bits.problem.clone() else: "a corrupt bzip2 block header")
+                result.push(if bits.problem.len() > 0: bits.problem else: "a corrupt bzip2 block header")
                 return result
             let block_crc = bits.bits(32)
             if bits.bit() != 0:
@@ -219,7 +219,7 @@ pub fn bzip2_decompress(data: &str) -> List[str]:
                 let symbol = bits.symbol(&tables[selectors[group_index - 1]])
                 if bits.problem.len() > 0:
                     result.push("")
-                    result.push(bits.problem.clone())
+                    result.push(bits.problem)
                     return result
                 if symbol <= 1:
                     // RUNA / RUNB: a run of the front symbol, in bijective base 2.

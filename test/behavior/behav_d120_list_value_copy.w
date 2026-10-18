@@ -2,6 +2,7 @@
 //! expect-stdout: a 3 b 4 c 5
 //! expect-stdout: names 2 kept 1
 //! expect-stdout: sum 6
+//! expect-stdout: tail 19999
 //! expect-stdout: ok
 
 // D120 (§2.3): a List of values is a value. `let b = a` copies it in O(1)
@@ -13,6 +14,12 @@ fn total(xs: List[isize]) -> isize:
     var s = 0
     for x in xs: s += x
     s
+
+fn tail_last_after_cow_write(xs0: List[i64]) -> i64:
+    var xs = xs0
+    let n = xs.len()
+    xs[n - 1] = 19999
+    xs[n - 1]
 
 fn main:
     var a = [1, 2, 3]
@@ -27,4 +34,8 @@ fn main:
     kept.pop()
     print(f"names {names.len()} kept {kept.len()}")
     print(f"sum {total(a)}")
-    print(f"{a.len() == 3}".replace("true", "ok"))
+    var big: List[i64] = List.with_capacity(20000)
+    for i in 0..20000:
+        big.push(i)
+    print(f"tail {tail_last_after_cow_write(big)}")
+    print(f"{a.len() == 3 and big.len() == 20000}".replace("true", "ok"))

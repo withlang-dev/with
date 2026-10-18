@@ -114,7 +114,7 @@ pub fn with_ld_main() -> i32:
         flavor = "mingw"
     let args: List[str] = List.new()
     args.push(lld_tool_name(flavor))
-    for i in 0..rest.len(): args.push(rest[i].clone())
+    for i in 0..rest.len(): args.push(rest[i])
     lld_link(flavor, &args)
 
 // This executable, to run `with __ld` as a child: argv[0] when it names a

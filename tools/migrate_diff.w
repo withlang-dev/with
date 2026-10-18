@@ -107,9 +107,9 @@ fn rules_by_function(dir: &str) -> HashMap[str, List[str]]:
         let entry = parts[0] ++ ": " ++ parts[2]
         match out.get(parts[1]):
             Some(existing) =>
-                var v = existing.clone()
+                var v = *existing
                 v.push(entry)
-                out.insert(parts[1].to_owned(), move v)
+                out.insert(parts[1].to_owned(), v)
             None => out.insert(parts[1].to_owned(), [entry])
     out
 
@@ -123,11 +123,11 @@ let new_rules = rules_by_function(argv[2])
 // longer applies): a difference beyond these is not a rewrite's.
 fn print_rules(name: &str, old_rules: &HashMap[str, List[str]], new_rules: &HashMap[str, List[str]]):
     let applied: List[str] = match new_rules.get(name):
-        Some(v) => v.clone()
+        Some(v) => v
         None => List.new()
     for r in applied: print("    rule " ++ r)
     let before: List[str] = match old_rules.get(name):
-        Some(v) => v.clone()
+        Some(v) => v
         None => List.new()
     for r in before:
         if not applied.contains(r): print("    rule (old side only) " ++ r)

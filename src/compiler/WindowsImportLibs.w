@@ -126,9 +126,9 @@ fn wil_def(self_exe: &str, crt: &str, arch: &str, name: &str, work: &str) -> str
     argv.push("-w")
     argv.push("-I")
     argv.push(crt ++ "/def-include")
-    argv.push(input.clone())
+    argv.push(input)
     argv.push("-o")
-    argv.push(pre.clone())
+    argv.push(pre)
     let problem = wil_run(&argv, work, "def-" ++ name)
     if problem.len() > 0: return "error: preprocessing " ++ input ++ ": " ++ problem
     if not common: return pre
@@ -178,13 +178,13 @@ pub fn windows_import_libs_write(dir: &str, names: &List[str]) -> WindowsImportL
             let _rm = runtime_remove_tree(work)
             return WindowsImportLibs { written, problem: def.slice(7, def.len()) }
         let argv: List[str] = List.new()
-        argv.push(self_exe.clone())
+        argv.push(self_exe)
         argv.push("__dlltool")
         argv.push("-m")
         argv.push(if arch == "aarch64": "arm64" else: "i386:x86-64")
         argv.push("-k")
         argv.push("-d")
-        argv.push(def.clone())
+        argv.push(def)
         argv.push("-l")
         argv.push(dir ++ "/lib" ++ name ++ ".a")
         let problem = wil_run(&argv, work, "dlltool-" ++ name)
@@ -202,7 +202,7 @@ pub fn with_windows_import_libs_main(args: &List[str]) -> i32:
         runtime_eprint("usage: with __windows-import-libs <dir> <dll-name>...")
         return 2
     let names: List[str] = List.new()
-    for i in 1..args.len(): names.push(args[i].clone())
+    for i in 1..args.len(): names.push(args[i])
     if runtime_mkdir_p(args[0]) != 0:
         runtime_eprint("error: could not create " ++ args[0])
         return 1
