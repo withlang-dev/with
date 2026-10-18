@@ -8164,6 +8164,9 @@ impl Parser:
                 self.skip_newlines()
                 continue
             let fname = self.expect_ident()
+            // A failed name consumed nothing: leave, or this loop re-reads
+            // the same token forever (`match o: { Some(x) => x }` hung).
+            if fname == 0 and self.peek() != TokenKind.TK_IDENT: break
             var fpat: NodeId = 0 as NodeId
             if self.peek() == TokenKind.TK_COLON:
                 self.advance()
