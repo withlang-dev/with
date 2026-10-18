@@ -6,8 +6,12 @@ document is a derivative plan: it cannot amend the ruling, and where they
 disagree the ruling stands. `resource type` landed 2026-10-16 (PR #2438),
 stage 1 the same day (PR #2440, under Amendment 1), stage 2 (PR #2441),
 stage 3 (PR #2442), stage 4 (PR #2444), stage 5 (PR #2445), and stage 6
-(the `.clone()` and value-copy sweep, plus `test/benchmark/cow_value_lists.w`)
-with this change.
+(PR #2446, the `.clone()` and value-copy sweep, plus
+`test/benchmark/cow_value_lists.w`). The measurement below was taken
+against the pre-CoW compiler on 2026-10-18, after the stages had each been
+measured only against the main before them: self-host 1.093 before the
+last-use view-edge fix, 1.032 after; pcre2 0.966; zlib 0.992 (the decision
+record's "Status of the work" has the figures and the cause).
 
 ## What the ruling asks for
 
