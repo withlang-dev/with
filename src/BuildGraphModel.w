@@ -3,7 +3,7 @@ extern fn with_getenv_str(name: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
 // BuildGraphModel -- parsed build.w graph data and serialization.
 
-pub type BuildGraphTarget {
+type BuildGraphTarget {
     kind: i32,
     name: str,
     entry: str,
@@ -30,12 +30,12 @@ pub type BuildGraphTarget {
     action_source_paths: List[str],
 }
 
-pub type BuildGraphGeneratedSource {
+type BuildGraphGeneratedSource {
     path: str,
     contents: str,
 }
 
-pub type BuildGraph {
+type BuildGraph {
     ok: bool,
     error_msg: str,
     raw_text: str,
@@ -54,7 +54,7 @@ type BuildGraphSelectedTargets {
     visiting_names: List[str],
 }
 
-pub fn empty_build_graph -> BuildGraph:
+fn empty_build_graph -> BuildGraph:
     BuildGraph {
         ok: false,
         error_msg: "",
@@ -97,7 +97,7 @@ fn build_graph_target_new(kind: i32, name: &str, entry: &str, target_kind: i32, 
         action_source_paths: List.new(),
     }
 
-pub fn empty_build_graph_target -> BuildGraphTarget:
+fn empty_build_graph_target -> BuildGraphTarget:
     build_graph_target_new(-1, "", "", 0, 0, "")
 
 fn build_graph_split_nonempty_lines(text: &str) -> List[str]:
@@ -161,7 +161,7 @@ fn build_graph_escape(value: &str) -> str:
             out = out ++ value.slice(i as i64, (i + 1) as i64)
     out
 
-pub fn build_graph_emit(graph: &BuildGraph) -> str:
+fn build_graph_emit(graph: &BuildGraph) -> str:
     var out = "WITH_BUILD_GRAPH\t2\n"
     out = out ++ "package\t" ++ build_graph_escape(graph.package_name) ++ "\t" ++ build_graph_escape(graph.package_version) ++ "\n"
     if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
@@ -229,7 +229,7 @@ fn build_graph_parse_i32(text: &str) -> i32:
         i = i + 1
     value * sign
 
-pub fn parse_build_graph(text: &str) -> BuildGraph:
+fn parse_build_graph(text: &str) -> BuildGraph:
     var graph = empty_build_graph()
     graph.raw_text = with_str_clone_ref(text)
     if text.len() == 0:
@@ -379,7 +379,7 @@ fn build_graph_parse_rss_limit(text: &str):
         value = value * 10 + digit as i64
     if value > 0: value else: -1 as i64
 
-pub fn build_graph_resolve_rss_budgets(graph: BuildGraph) -> BuildGraph:
+fn build_graph_resolve_rss_budgets(graph: BuildGraph) -> BuildGraph:
     var out = graph
     for ti in 0..out.targets.len():
         let target = &out.targets[ti]
@@ -400,7 +400,7 @@ pub fn build_graph_resolve_rss_budgets(graph: BuildGraph) -> BuildGraph:
         out.targets[ti].args = args
     out
 
-pub fn bg_clone_str_list(values: &List[str]) -> List[str]:
+fn bg_clone_str_list(values: &List[str]) -> List[str]:
     let out: List[str] = List.new()
     for i in 0..values.len():
         out.push(with_str_clone_ref(values[i]))
@@ -454,7 +454,7 @@ fn build_graph_output_index(paths: &List[str], path: &str) -> i64:
 // ordering-only edge stays the author's to declare. Runs once, before the
 // graph is emitted, so cached graph text and every filtered subgraph carry
 // the completed edges.
-pub fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
+fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
     var out = graph
     let out_paths: List[str] = List.new()
     let out_owners: List[str] = List.new()
@@ -488,14 +488,14 @@ pub fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
             out.targets[i].deps.push(with_str_clone_ref(to_add[ai]))
     out
 
-pub fn build_graph_filter_target(graph: &BuildGraph, target_name: &str) -> BuildGraph:
+fn build_graph_filter_target(graph: &BuildGraph, target_name: &str) -> BuildGraph:
     var names: List[str] = List.new()
     if target_name.len() > 0: names.push(with_str_clone_ref(target_name))
     build_graph_filter_targets(graph, &names)
 
 // The graph restricted to the closures of every named root (`build :a
 // :b`); no roots means the whole graph, as one empty name did before.
-pub fn build_graph_filter_targets(graph: &BuildGraph, target_names: &List[str]) -> BuildGraph:
+fn build_graph_filter_targets(graph: &BuildGraph, target_names: &List[str]) -> BuildGraph:
     var out = empty_build_graph()
     out.ok = graph.ok
     out.error_msg = with_str_clone_ref(graph.error_msg)
@@ -523,7 +523,7 @@ pub fn build_graph_filter_targets(graph: &BuildGraph, target_names: &List[str]) 
         out.raw_text = build_graph_emit(out)
     out
 
-pub fn build_graph_filter_single_target(graph: &BuildGraph, target_name: &str) -> BuildGraph:
+fn build_graph_filter_single_target(graph: &BuildGraph, target_name: &str) -> BuildGraph:
     var out = empty_build_graph()
     out.ok = graph.ok
     out.error_msg = with_str_clone_ref(graph.error_msg)
@@ -548,7 +548,7 @@ pub fn build_graph_filter_single_target(graph: &BuildGraph, target_name: &str) -
     out
 
 // --no-deps over several roots: each named target alone, no dependencies.
-pub fn build_graph_filter_single_targets(graph: &BuildGraph, target_names: &List[str]) -> BuildGraph:
+fn build_graph_filter_single_targets(graph: &BuildGraph, target_names: &List[str]) -> BuildGraph:
     var out = empty_build_graph()
     out.ok = graph.ok
     out.error_msg = with_str_clone_ref(graph.error_msg)

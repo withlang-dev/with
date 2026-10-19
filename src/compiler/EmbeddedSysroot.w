@@ -50,7 +50,7 @@ var g_sdk_tools_resolved: bool = false
 var g_windows_sysroot_dir: str = ""
 var g_windows_sysroot_resolved: bool = false
 
-pub fn darwin_sdk_set_configured(path: &str):
+fn darwin_sdk_set_configured(path: &str):
     g_darwin_configured_sdk = with_str_clone_ref(path)
 
 fn es_str_from_raw_parts(ptr: *const u8, len: i64) -> str:
@@ -91,7 +91,7 @@ fn es_dirname(path: &str) -> str:
     if last <= 0: "" else: path.slice(0, last as i64)
 
 // The user's cache directory for what this compiler materializes.
-pub fn with_user_cache_dir() -> str:
+fn with_user_cache_dir() -> str:
     let xdg = runtime_getenv("XDG_CACHE_HOME")
     if xdg.len() > 0:
         return xdg
@@ -184,7 +184,7 @@ fn es_materialize(pack: &str, kind: &str, what: &str) -> str:
 
 // The materialized embedded sysroot, or "" when this binary carries none
 // (built off macOS) or it could not be written (the reason is printed).
-pub fn embedded_darwin_sysroot_dir() -> str:
+fn embedded_darwin_sysroot_dir() -> str:
     if g_darwin_sysroot_resolved:
         return with_str_clone_ref(g_darwin_sysroot_dir)
     g_darwin_sysroot_resolved = true
@@ -199,7 +199,7 @@ pub fn embedded_darwin_sysroot_dir() -> str:
 // binary carries none (built off Windows) or it could not be written (the
 // reason is printed). Unpacked beside its final name and renamed into
 // place, as es_materialize does, keyed by the pack's hash.
-pub fn embedded_windows_sysroot_dir() -> str:
+fn embedded_windows_sysroot_dir() -> str:
     if g_windows_sysroot_resolved:
         return with_str_clone_ref(g_windows_sysroot_dir)
     g_windows_sysroot_resolved = true
@@ -232,7 +232,7 @@ pub fn embedded_windows_sysroot_dir() -> str:
 // #1915 (D81): the materialized linux sysroot a native linux-x86_64 link
 // and c_import read, or "" when this binary carries none or it could not
 // be written (the reason is printed).
-pub fn embedded_linux_sysroot_dir() -> str:
+fn embedded_linux_sysroot_dir() -> str:
     if g_linux_sysroot_resolved:
         return with_str_clone_ref(g_linux_sysroot_dir)
     g_linux_sysroot_resolved = true
@@ -246,7 +246,7 @@ pub fn embedded_linux_sysroot_dir() -> str:
 // share/cmake-<v>), or "" when this binary carries none or they could not
 // be written (the reason is printed). A Windows compiler carries them in its
 // Windows toolchain.
-pub fn embedded_sdk_tools_dir() -> str:
+fn embedded_sdk_tools_dir() -> str:
     if g_sdk_tools_resolved:
         return with_str_clone_ref(g_sdk_tools_dir)
     g_sdk_tools_resolved = true
@@ -263,7 +263,7 @@ pub fn embedded_sdk_tools_dir() -> str:
 // The macOS SDK a link and c_import read: WITH_SDKROOT, SDKROOT or with.toml
 // [c_import] sdk_path when one names it, else the embedded sysroot. "" only
 // when this compiler carries no sysroot and none is named.
-pub fn darwin_sdk_root() -> str:
+fn darwin_sdk_root() -> str:
     let with_sdkroot = runtime_getenv("WITH_SDKROOT")
     if with_sdkroot.len() > 0:
         return with_sdkroot
@@ -276,13 +276,13 @@ pub fn darwin_sdk_root() -> str:
 
 // darwin_sdk_root() on a macOS host, "" elsewhere (c_import on another host
 // reads that host's headers; a cross target names its own).
-pub fn host_darwin_sdk_root() -> str:
+fn host_darwin_sdk_root() -> str:
     if runtime_sysinfo_os() != "Macos": "" else: darwin_sdk_root()
 
 // The sysroot whose C headers c_import and `with cc` read on this host:
 // the darwin one on macOS; on linux-x86_64 WITH_LINUX_SYSROOT or the
 // embedded one (#1915, D81); "" elsewhere.
-pub fn host_c_sysroot() -> str:
+fn host_c_sysroot() -> str:
     if runtime_sysinfo_os() == "Macos":
         return darwin_sdk_root()
     if runtime_sysinfo_os() == "Linux" and (runtime_sysinfo_arch() == "x86_64" or runtime_sysinfo_arch() == "aarch64"):

@@ -82,12 +82,12 @@ fn host_lib_push_trusted(dirs: List[str], root: &str, arch: &str) -> List[str]:
 
 /// The loader's trusted directories that exist under `root` ("" for the
 /// running host): where the C library itself lives, whatever the layout.
-pub fn host_library_trusted_dirs(root: &str, arch: &str): host_lib_push_trusted(List.new(), root, arch)
+fn host_library_trusted_dirs(root: &str, arch: &str): host_lib_push_trusted(List.new(), root, arch)
 
 /// The directories a link searches for a library the program names, in
 /// order, each existing once. `root` is "" for the running host, else a
 /// sysroot; LIBRARY_PATH is the running host's alone.
-pub fn host_library_dirs(root: &str, arch: &str) -> List[str]:
+fn host_library_dirs(root: &str, arch: &str) -> List[str]:
     var dirs: List[str] = List.new()
     if root.len() == 0:
         for dir in runtime_getenv("LIBRARY_PATH").split(":"):
@@ -134,7 +134,7 @@ fn host_lib_archive_foreign(data: &str, arch: &str) -> bool:
 
 /// The file is a library a link for `arch` can use: it exists, and it is
 /// neither an ELF file nor an archive built for another machine.
-pub fn host_library_usable(path: &str, arch: &str) -> bool:
+fn host_library_usable(path: &str, arch: &str) -> bool:
     if runtime_file_exists(path) == 0 or runtime_is_dir(path) != 0: return false
     let data = runtime_read_file(path)
     if data.starts_with("!<arch>\n"): not host_lib_archive_foreign(data, arch) else: not host_lib_elf_foreign(data, 0, arch)
@@ -145,7 +145,7 @@ pub fn host_library_usable(path: &str, arch: &str) -> bool:
 /// since `lib<name>.so` comes only with a development package and a runtime
 /// package installs `lib<name>.so.<N>` alone, the highest such soname, as the
 /// symlink would name. `:<file>` names the file itself.
-pub fn host_library_path(dirs: &List[str], name: &str, arch: &str) -> str:
+fn host_library_path(dirs: &List[str], name: &str, arch: &str) -> str:
     if name.starts_with(":"):
         for dir in dirs:
             let path = dir ++ "/" ++ name.slice(1, name.len())
@@ -164,6 +164,6 @@ pub fn host_library_path(dirs: &List[str], name: &str, arch: &str) -> str:
     ""
 
 /// The directory part of a resolved library path.
-pub fn host_library_dir(path: &str) -> str:
+fn host_library_dir(path: &str) -> str:
     let slash = path.rfind("/")
     if slash <= 0: "/" else: path.slice(0, slash)

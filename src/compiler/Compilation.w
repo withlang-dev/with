@@ -356,7 +356,7 @@ fn compilation_type_decl_kind_name(sub_kind: i32) -> str:
 // Transitional orchestration root:
 // owns compiler-facing config/Zcu state while reusing Driver execution per call.
 // This removes long-lived Driver field ownership from Compilation.
-pub type Compilation {
+type Compilation {
     zcu: Zcu,
     config: CompilationConfig,
     cli_diag_gen_starts: List[i32],
@@ -395,14 +395,14 @@ pub type Compilation {
     emit_all: bool,
 }
 
-pub type CompilationBinaryLinkPlan {
+type CompilationBinaryLinkPlan {
     ok: bool,
     obj_path: str,
     bin_path: str,
     command: LinkStageCommand,
 }
 
-pub fn Compilation.init -> Compilation:
+fn Compilation.init -> Compilation:
     compilation_debug_init("Compilation.init:start")
     let zcu: Zcu = Zcu.init()
     compilation_debug_init("Compilation.init:zcu_ready")
@@ -453,7 +453,7 @@ impl Compilation:
         self.bundle_interface_path = with_str_clone_ref(options.bundle_interface_path)
         self.set_bundle_fingerprint(options.bundle_corpus, options.bundle_fingerprint_path)
 
-    pub mut fn set_link_bundles(prefixes: &List[str]):
+    mut fn set_link_bundles(prefixes: &List[str]):
         self.link_bundles = driver_clone_str_list(prefixes)
         self.link_bundles_loaded = false
 
@@ -461,7 +461,7 @@ impl Compilation:
     // `check` too, the second fingerprint pass runs on the emitted .wi. The
     // corpus also reaches codegen (Zcu.bundle_corpus): a bundle build owns
     // every module under it (C3).
-    pub mut fn set_bundle_fingerprint(corpus: &str, fingerprint_path: &str):
+    mut fn set_bundle_fingerprint(corpus: &str, fingerprint_path: &str):
         self.bundle_corpus = with_str_clone_ref(corpus)
         self.bundle_fingerprint_path = with_str_clone_ref(fingerprint_path)
         var taken_zcu = move self.zcu
@@ -1319,7 +1319,7 @@ fn compilation_write_unit_digests(obj_path: &str) -> bool:
         return false
     true
 
-pub fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinaryLinkPlan) -> LinkStageResult:
+fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinaryLinkPlan) -> LinkStageResult:
     if not plan.ok:
         return link_stage_result_fail()
     var owned = move plan
@@ -1826,7 +1826,7 @@ fn analysis_request_inner(request: &str):
     if analysis_request_after_mir(request): request.slice(10, request.len()) else: with_str_clone_ref(request)
 
 impl Compilation:
-    pub mut fn analyze_file(source_path: &str, request: &str) -> CompilerAnalysisResult:
+    mut fn analyze_file(source_path: &str, request: &str) -> CompilerAnalysisResult:
         self.zcu.analysis_partial_semantics = 1
         // The analyzed file is the root, compiled as `check` and `build`
         // compile it: an entry source whose top-level statements are its
@@ -1876,7 +1876,7 @@ impl Compilation:
 
 // Public one-shot entry for compiler-integrated tools. Compilation remains an
 // orchestration implementation detail; tools consume the shared analysis schema.
-pub fn compiler_analyze_file(source_path: &str, request: &str) -> CompilerAnalysisResult:
+fn compiler_analyze_file(source_path: &str, request: &str) -> CompilerAnalysisResult:
     var comp = Compilation.init()
     comp.analyze_file(source_path, request)
 

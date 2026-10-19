@@ -20,7 +20,7 @@ fn xz_crc32_table() -> List[i64]:
         table.push(c)
     table
 
-pub fn xz_crc32(data: &str, start: i64, end: i64) -> i64:
+fn xz_crc32(data: &str, start: i64, end: i64) -> i64:
     let table = xz_crc32_table()
     var crc = XZ_MASK32
     for i in start..end:
@@ -350,7 +350,7 @@ fn xz_bytes_to_str(v: &List[u8]) -> str:
 
 // The decompressed contents of the .xz file `data`; "" and the reason in
 // the second element on failure. Concatenated streams are read in turn.
-pub fn xz_decompress(data: &str) -> List[str]:
+fn xz_decompress(data: &str) -> List[str]:
     var dec = XzLzma { data: data.to_owned(), at: 0, end: 0, range: 0, code: 0, probs: List.new(), lc: 0, lp: 0, pb: 0, state: 0, rep0: 0, rep1: 0, rep2: 0, rep3: 0, out: List.new(), dict_start: 0, problem: "" }
     let result: List[str] = List.new()
     var at: i64 = 0

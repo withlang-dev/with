@@ -548,7 +548,7 @@ fn pairs_op_name(sema: &Sema, op: i32) -> str:
     sema.facade_pair_op_display(op)
 
 // A finding, reported by compiler/Compilation.w in the body's own file.
-pub type PairsFinding {
+type PairsFinding {
     fn_sym: i32,
     start: i32,
     end: i32,
@@ -603,7 +603,7 @@ fn pairs_dump(sema: &Sema, body: &MirBody, pb: &PairsBody, flow: &ForeignPairPla
         eprint(f"  violation step{flow.violations[vi]}")
 
 // The module's findings, collected body by body.
-pub type PairsReport {
+type PairsReport {
     findings: List[PairsFinding],
 }
 
@@ -643,12 +643,12 @@ impl PairsReport:
                 let last = self.findings.len() - 1
                 eprint(f"  finding {self.findings[last].start}..{self.findings[last].end}: {self.findings[last].message}")
 
-pub fn pairs_dump_enabled() -> bool: with_getenv_str("WITH_DUMP_PAIR_FLOW").len() > 0
+fn pairs_dump_enabled() -> bool: with_getenv_str("WITH_DUMP_PAIR_FLOW").len() > 0
 
 // Every body of the module, after lowering and before codegen
 // (compiler/Compilation.w run_mir_lower): a module with no callback pair
 // costs one table lookup.
-pub fn check_foreign_pairs(mir_mod: &MirModule, ast: &AstPool, sema: &Sema) -> PairsReport:
+fn check_foreign_pairs(mir_mod: &MirModule, ast: &AstPool, sema: &Sema) -> PairsReport:
     var report = PairsReport { findings: List.new() }
     if sema.facade_pair_ops.len() == 0:
         return report

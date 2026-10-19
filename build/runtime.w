@@ -219,7 +219,7 @@ fn br_generate_embedded_stdlib(ctx: &ActionCtx, files: &List[str]) -> str:
     out.push_str("let EMBEDDED_STD_MODULE_LIST: str = ")
     out.push_str(br_raw_string_literal(listing.to_str()))
     out.push_str("\n\n")
-    out.push_str("pub fn embedded_std_source_data(path: &str) -> str:\n")
+    out.push_str("fn embedded_std_source_data(path: &str) -> str:\n")
     for i in 0..files.len():
         let path = files[i]
         let rel = br_embedded_rel_path(path)
@@ -231,7 +231,7 @@ fn br_generate_embedded_stdlib(ctx: &ActionCtx, files: &List[str]) -> str:
         out.push_str(sym ++ ".clone()")
         out.push_str("\n")
     out.push_str("    return \"\"\n\n")
-    out.push_str("pub fn embedded_std_list_modules_data() -> str:\n")
+    out.push_str("fn embedded_std_list_modules_data() -> str:\n")
     out.push_str("    return EMBEDDED_STD_MODULE_LIST.clone()\n")
     out.to_str()
 
@@ -266,13 +266,13 @@ fn br_generate_embedded_bundles(entries: &List[str]) -> str:
         out.push_str("extern let with_embedded_wo_" ++ sym ++ "_manifest_end: u8\n")
         out.push_str("extern let with_embedded_wo_" ++ sym ++ "_wi_start: u8\n")
         out.push_str("extern let with_embedded_wo_" ++ sym ++ "_wi_end: u8\n")
-    out.push_str(f"\npub fn embedded_bundles_count_data() -> i32: {entries.len()}\n\n")
-    out.push_str("pub fn embedded_bundles_name_data(index: i32) -> str:\n")
+    out.push_str(f"\nfn embedded_bundles_count_data() -> i32: {entries.len()}\n\n")
+    out.push_str("fn embedded_bundles_name_data(index: i32) -> str:\n")
     for i in 0..entries.len():
         out.push_str(f"    if index == {i}: return \"" ++ br_bundle_entry_name(entries[i]) ++ "\"\n")
     out.push_str("    \"\"\n\n")
     // The target a slot was built for; "" is this compiler's own.
-    out.push_str("pub fn embedded_bundles_target_data(index: i32) -> str:\n")
+    out.push_str("fn embedded_bundles_target_data(index: i32) -> str:\n")
     for i in 0..entries.len():
         out.push_str(f"    if index == {i}: return \"" ++ br_bundle_entry_target(entries[i]) ++ "\"\n")
     out.push_str("    \"\"\n\n")
@@ -287,7 +287,7 @@ fn br_generate_embedded_bundles(entries: &List[str]) -> str:
         let kind = kinds[ki]
         let blob = if kind.starts_with("manifest"): "manifest" else if kind.starts_with("interface"): "wi" else: "o"
         let edge = if kind.ends_with("start"): "start" else: "end"
-        out.push_str("pub fn embedded_bundles_" ++ kind ++ "_data(index: i32) -> i64:\n")
+        out.push_str("fn embedded_bundles_" ++ kind ++ "_data(index: i32) -> i64:\n")
         for i in 0..entries.len():
             out.push_str(f"    if index == {i}: return (&with_embedded_wo_" ++ br_bundle_entry_symbol(entries[i]) ++ "_" ++ blob ++ "_" ++ edge ++ " as *const u8) as i64\n")
         out.push_str("    0\n\n")
@@ -321,7 +321,7 @@ fn br_generate_embedded_runtime(ctx: &ActionCtx, files: &List[str]) -> str:
     out.push_str("let EMBEDDED_RT_MODULE_LIST: str = ")
     out.push_str(br_raw_string_literal(listing.to_str()))
     out.push_str("\n\n")
-    out.push_str("pub fn embedded_rt_source_data(path: &str) -> str:\n")
+    out.push_str("fn embedded_rt_source_data(path: &str) -> str:\n")
     for i in 0..files.len():
         let path = files[i]
         let sym = f"EMBEDDED_RT_{i}"
@@ -332,7 +332,7 @@ fn br_generate_embedded_runtime(ctx: &ActionCtx, files: &List[str]) -> str:
         out.push_str(sym ++ ".clone()")
         out.push_str("\n")
     out.push_str("    return \"\"\n\n")
-    out.push_str("pub fn embedded_rt_list_modules_data() -> str:\n")
+    out.push_str("fn embedded_rt_list_modules_data() -> str:\n")
     out.push_str("    return EMBEDDED_RT_MODULE_LIST.clone()\n")
     out.to_str()
 

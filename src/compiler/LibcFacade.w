@@ -112,7 +112,7 @@ fn libc_facade_operand(line: &str) -> str:
 // first. A declaration of another shape — a program's own `fopen` over
 // `void *` — is not described: it stays the raw surface, which removes
 // capability and never asserts a contract the declarations do not carry.
-pub fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claimed: &List[str]) -> str:
+fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claimed: &List[str]) -> str:
     let lines = libc_facade_source().split("\n")
     var kept_names: List[str] = List.new()
     var kept_reprs: List[str] = List.new()

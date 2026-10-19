@@ -9,7 +9,7 @@ use BuildGraphTools
 use Resolve
 extern fn with_str_clone_ref(s: &str) -> str
 
-pub type BuildGraphDispatchResult {
+type BuildGraphDispatchResult {
     handled: bool,
     rc: i32,
 }
@@ -46,7 +46,7 @@ impl BuildGraphOutputOwners:
 // command selects: two targets that declare one output make its bytes depend
 // on which ran last, whether or not this command runs both (#2014). Every
 // shared output is named, not only the first.
-pub fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path: &str) -> i32:
+fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path: &str) -> i32:
     var seen = BuildGraphOutputOwners { paths: List.new(), owners: List.new() }
     var shared = 0
     for gi in 0..graph.generated_sources.len():
@@ -61,7 +61,7 @@ pub fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path:
             shared = shared + seen.claim(build_graph_resolve_project_path(root, target.extra_outputs[oi]), owner)
     if shared > 0: 1 else: 0
 
-pub fn build_graph_write_generated_sources(root: &str, graph: &BuildGraph) -> i32:
+fn build_graph_write_generated_sources(root: &str, graph: &BuildGraph) -> i32:
     for gi in 0..graph.generated_sources.len():
         let generated = graph.generated_sources[gi]
         if not build_graph_generated_path_valid(generated.path):
@@ -94,7 +94,7 @@ fn build_graph_verify_completed_deps(target: &BuildGraphTarget, completed: &List
             return 1
     0
 
-pub fn build_graph_dispatch_standard_target(root: &str, target: &BuildGraphTarget, completed_targets: &List[str]) -> BuildGraphDispatchResult:
+fn build_graph_dispatch_standard_target(root: &str, target: &BuildGraphTarget, completed_targets: &List[str]) -> BuildGraphDispatchResult:
     let containment_rc = build_graph_validate_target_containment(root, target)
     if containment_rc != 0:
         return build_graph_dispatch_result(true, containment_rc)

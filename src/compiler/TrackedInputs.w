@@ -1,7 +1,7 @@
 use compiler.Runtime
 extern fn with_str_clone_ref(s: &str) -> str
 
-pub type TrackedReadResult {
+type TrackedReadResult {
     ok: bool,
     resolved_path: str,
     contents: str,
@@ -14,7 +14,7 @@ fn tracked_read_ok(path: &str, contents: &str) -> TrackedReadResult:
 fn tracked_read_error(path: &str, msg: &str) -> TrackedReadResult:
     TrackedReadResult { false, with_str_clone_ref(path), "", with_str_clone_ref(msg) }
 
-pub fn tracked_input_str_compare(a: &str, b: &str) -> i32:
+fn tracked_input_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
     while i < min_len as i32:
@@ -29,7 +29,7 @@ pub fn tracked_input_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
-pub fn tracked_input_insert_unique(paths: List[str], path: &str) -> List[str]:
+fn tracked_input_insert_unique(paths: List[str], path: &str) -> List[str]:
     if path.len() == 0:
         return paths
     var out: List[str] = List.new()
@@ -47,7 +47,7 @@ pub fn tracked_input_insert_unique(paths: List[str], path: &str) -> List[str]:
         out.push(with_str_clone_ref(path))
     out
 
-pub fn tracked_input_merge_unique(left: List[str], right: &List[str]) -> List[str]:
+fn tracked_input_merge_unique(left: List[str], right: &List[str]) -> List[str]:
     var out = left
     for i in 0..right.len():
         out = tracked_input_insert_unique(move out, right[i])
@@ -150,10 +150,10 @@ fn tracked_authorized_root(source_path: &str, package_root: &str) -> str:
         return ""
     dir
 
-pub fn tracked_embed_resolve(source_path: &str, raw_path: &str) -> str:
+fn tracked_embed_resolve(source_path: &str, raw_path: &str) -> str:
     tracked_resolve_source_relative(source_path, raw_path)
 
-pub fn tracked_embed_read(source_path: &str, raw_path: &str, package_root: &str) -> TrackedReadResult:
+fn tracked_embed_read(source_path: &str, raw_path: &str, package_root: &str) -> TrackedReadResult:
     // #585: resolve relative to the source file, NORMALIZE, then enforce that
     // the normalized path stays inside the authorized root — so an internal
     // '..' that resolves back inside the package (src/main.w embedding

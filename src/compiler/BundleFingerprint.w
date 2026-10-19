@@ -38,7 +38,7 @@ fn bf_sorted_lines(lines: &List[str]) -> List[str]:
 // The canonical TSV: a header naming the format and target, then one row
 // per corpus module (the set of bundle-provided modules is part of the
 // contract) and every export's row(s), one per line, sorted.
-pub fn bundle_fingerprint_text(model: &BundleInterfaceModel) -> str:
+fn bundle_fingerprint_text(model: &BundleInterfaceModel) -> str:
     var lines: List[str] = List.new()
     for mi in 0..model.modules.len():
         lines.push("module\t" ++ model.modules[mi])
@@ -58,4 +58,4 @@ pub fn bundle_fingerprint_text(model: &BundleInterfaceModel) -> str:
         out = out ++ sorted[li] ++ "\n"
     out
 
-pub fn bundle_fingerprint_sha(text: &str) -> str: bundle_text_sha256(text)
+fn bundle_fingerprint_sha(text: &str) -> str: bundle_text_sha256(text)

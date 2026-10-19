@@ -9,14 +9,14 @@ use compiler.EmbeddedStdlib
 use compiler.EmbeddedRuntime
 use compiler.Runtime
 
-pub type ModuleSource {
+type ModuleSource {
     text: str,
     // Interface flavor: bodyless declarations parse in the Parser's
     // interface mode (Parser.enable_interface_mode).
     interface: bool,
 }
 
-pub fn module_source_read(path: &str) -> ModuleSource:
+fn module_source_read(path: &str) -> ModuleSource:
     let interface_text = bundle_interface_text(path)
     if interface_text.len() > 0:
         return ModuleSource { text: interface_text, interface: true }

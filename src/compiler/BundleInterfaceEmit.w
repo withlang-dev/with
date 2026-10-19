@@ -44,7 +44,7 @@ pub const BX_NOTE: i32 = 6
 
 // One exported declaration: its `.wi` text (newline-terminated, attribute
 // lines included) and its fingerprint row(s).
-pub type BundleExport {
+type BundleExport {
     kind: i32,
     mod_path: str,
     name: str,
@@ -52,7 +52,7 @@ pub type BundleExport {
     row: str,
 }
 
-pub type BundleInterfaceModel {
+type BundleInterfaceModel {
     ok: bool,
     corpus: str,
     // canonical corpus module paths, sorted bytewise, and the resolver's
@@ -125,7 +125,7 @@ type BundleEmitter {
     origin_global_names: HashMap[str, i32],
 }
 
-pub type BundleInterfaceText {
+type BundleInterfaceText {
     text: str,
     errors: List[str],
 }
@@ -1302,7 +1302,7 @@ impl BundleEmitter:
         self.current_module = ""
 
 // Build the exported-declaration model of the corpus modules in `sema`.
-pub fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &List[str]) -> BundleInterfaceModel:
+fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &List[str]) -> BundleInterfaceModel:
     var em = bx_new_emitter(corpus, unlowered_globals)
     em.walk(sema)
     let ordered = bx_sorted_strings(&em.modules)
@@ -1344,7 +1344,7 @@ fn bx_module_export_order(model: &BundleInterfaceModel, mod_path: &str) -> List[
 
 // The `.wi` text: one `module <path>` section per corpus module (sorted),
 // the module's `use` lines in import order, then its exports.
-pub fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> BundleInterfaceText:
+fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> BundleInterfaceText:
     var out = StringBuilder.new()
     var errors: List[str] = List.new()
     for mi in 0..model.modules.len():

@@ -23,7 +23,7 @@ extern fn with_eprint(s: &str) -> Unit
 
 // ── Helpers ────────────────────────────────────────────────────
 
-pub fn ci_make_indent(n: i32) -> str:
+fn ci_make_indent(n: i32) -> str:
     var out = ""
     var i: i32 = 0
     while i < n:
@@ -95,7 +95,7 @@ fn ci_contains_str(s: &str, needle: &str) -> bool:
         i = i + 1
     false
 
-pub fn ci_strip_one_outer_paren(s: &str) -> str:
+fn ci_strip_one_outer_paren(s: &str) -> str:
     if s.len() < 2:
         return with_str_clone_ref(s)
     if s[0] != 40 or s[s.len() - 1] != 41:
@@ -151,7 +151,7 @@ fn ci_stmt_ir_renders_nothing(stmts: CiStmtPool, id: CiStmtId) -> bool:
 // the body's own level, where a tail assignment is a statement; in an arm an
 // assignment is its value, and an empty arm prints `0`. Anything not shown to
 // be Unit answers false, which keeps `-> Unit`: never wrong, only spelled.
-pub fn ci_stmt_ir_tail_is_unit(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, top: bool) -> bool:
+fn ci_stmt_ir_tail_is_unit(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, top: bool) -> bool:
     if (id as i32) == 0:
         return false
     let kind = stmts.kind(id)
@@ -286,7 +286,7 @@ fn ci_float_type_name(bits: i32) -> str:
 // it cheap to change the convention later.
 // Inside an `unsafe fn` body the context is already unsafe, so the prefix is
 // omitted (SemaCheck warns on it); the parentheses stay so precedence does.
-pub fn ci_wrap_unsafe(inner: &str) -> str:
+fn ci_wrap_unsafe(inner: &str) -> str:
     if g_ci_print_in_unsafe_fn: return "(" ++ inner ++ ")"
     "(unsafe " ++ inner ++ ")"
 
@@ -472,7 +472,7 @@ fn ci_type_has_raw_pointer(types: CiTypePool, id: CiTypeId) -> bool:
             i = i + 1
     false
 
-pub fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
+fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
     if (id as i32) == 0:
         return "<ci:ty:0>"
     let kind = types.kind(id)
@@ -538,7 +538,7 @@ fn ci_field_base_needs_borrow(types: CiTypePool, ty: CiTypeId) -> bool:
             return false
     kind == CiTypeKind.CT_STRUCT or kind == CiTypeKind.CT_NAMED
 
-pub fn ci_named_type_is_scalar(name: &str) -> bool:
+fn ci_named_type_is_scalar(name: &str) -> bool:
     if name == "bool" or name == "void":
         return true
     if name == "usize" or name == "isize":
@@ -551,7 +551,7 @@ pub fn ci_named_type_is_scalar(name: &str) -> bool:
         return true
     ci_starts_with_str(name, "c_")
 
-pub fn ci_type_needs_memcpy_assignment(types: CiTypePool, ty: CiTypeId) -> bool:
+fn ci_type_needs_memcpy_assignment(types: CiTypePool, ty: CiTypeId) -> bool:
     if (ty as i32) == 0:
         return false
     let kind = types.kind(ty)
@@ -577,7 +577,7 @@ pub fn ci_type_needs_memcpy_assignment(types: CiTypePool, ty: CiTypeId) -> bool:
 // value-returning carrier functions are plain fns).
 var g_ci_print_in_unsafe_fn: bool = false
 
-pub fn ci_print_set_unsafe_fn_context(enabled: bool) -> Unit:
+fn ci_print_set_unsafe_fn_context(enabled: bool) -> Unit:
     g_ci_print_in_unsafe_fn = enabled
 
 fn ci_print_unsafe_stmt(indent: &str, call: &str) -> str:
@@ -643,7 +643,7 @@ extern fn i64_to_string(n: i64) -> str
 // this position must be emitted as `&base[0] as *mut T`. Also
 // unused in A2; B4 turns it on.
 
-pub fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec: i32, wants_ptr: i32) -> str:
+fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec: i32, wants_ptr: i32) -> str:
     if (id as i32) == 0:
         return "<ci:expr:0>"
     let kind = exprs.kind(id)
@@ -944,7 +944,7 @@ fn ci_print_note_unknown(detail: &str):
     g_ci_print_unknowns.push(detail.clone())
 
 /// The printer's unrenderable-node records since the last take; taking clears.
-pub fn ci_print_take_unknowns() -> List[str]:
+fn ci_print_take_unknowns() -> List[str]:
     var taken: List[str] = List.new()
     for i in 0..g_ci_print_unknowns.len():
         taken.push(g_ci_print_unknowns[i].clone())
@@ -953,7 +953,7 @@ pub fn ci_print_take_unknowns() -> List[str]:
 
 // ── CiStmt printing ──────────────────────────────────────────
 
-pub fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
+fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
     if (id as i32) == 0:
         return ci_make_indent(depth) ++ "<ci:stmt:0>\n"
     let kind = stmts.kind(id)
@@ -1370,7 +1370,7 @@ fn ci_roundtrip_fn_decl -> i32:
     let expected = "fn foo() -> i32 {\n    return 42\n\n}\n"
     ci_expect_eq("fn_decl_return_literal", actual, expected)
 
-pub fn ci_ir_roundtrip_test -> i32:
+fn ci_ir_roundtrip_test -> i32:
     var fails: i32 = 0
     fails = fails + ci_roundtrip_types()
     fails = fails + ci_roundtrip_exprs()

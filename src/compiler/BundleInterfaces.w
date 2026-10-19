@@ -19,7 +19,7 @@ var g_bundle_interface_texts: HashMap[str, str] = HashMap.new()
 
 // sha256 hex of a text — the manifest's `interface-sha` (the .wi bytes) and
 // the fingerprint (the canonical declaration rows).
-pub fn bundle_text_sha256(text: &str) -> str:
+fn bundle_text_sha256(text: &str) -> str:
     var digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(text, &raw mut digest[0] as *mut u8)
     sha256_hex(&digest[0] as *const u8)
@@ -27,14 +27,14 @@ pub fn bundle_text_sha256(text: &str) -> str:
 // `--bundle-corpus <rel>` names the module `<embedded-std>/<rel>.w` or the
 // directory `<embedded-std>/<rel>/` — `std/re` is pcre2's corpus, `std/wi_demo`
 // the one-module demo.
-pub fn bundle_corpus_contains(corpus: &str, canonical_path: &str) -> bool:
+fn bundle_corpus_contains(corpus: &str, canonical_path: &str) -> bool:
     if corpus.len() == 0:
         return false
     let base = "<embedded-std>/" ++ corpus
     canonical_path == base ++ ".w" or canonical_path.starts_with(base ++ "/")
 
 // `<embedded-std>/std/re/defs.w` → `std.re.defs`; "" for any other path.
-pub fn bundle_module_dotted_name(canonical_path: &str) -> str:
+fn bundle_module_dotted_name(canonical_path: &str) -> str:
     let prefix = "<embedded-std>/"
     if not canonical_path.starts_with(prefix) or not canonical_path.ends_with(".w"):
         return ""
@@ -45,7 +45,7 @@ pub fn bundle_module_dotted_name(canonical_path: &str) -> str:
     out
 
 // The `module <path>` section paths of an interface file, in file order.
-pub fn bundle_interface_section_paths(wi_text: &str) -> List[str]:
+fn bundle_interface_section_paths(wi_text: &str) -> List[str]:
     let out: List[str] = List.new()
     var start: i64 = 0
     while start < wi_text.len():
@@ -60,7 +60,7 @@ pub fn bundle_interface_section_paths(wi_text: &str) -> List[str]:
 
 // The interface section registered for a canonical module path; "" when the
 // path is not bundle-provided.
-pub fn bundle_interface_text(path: &str) -> str:
+fn bundle_interface_text(path: &str) -> str:
     let found = g_bundle_interface_texts.get(path)
     if found.is_none():
         return ""
@@ -68,7 +68,7 @@ pub fn bundle_interface_text(path: &str) -> str:
 
 // A path some registered interface names as a section, even an empty one
 // (a bundle root `bundle.w` holds only `use` lines).
-pub fn bundle_interface_registered(path: &str) -> bool:
+fn bundle_interface_registered(path: &str) -> bool:
     g_bundle_interface_texts.contains(path)
 
 fn bundle_interface_trim(s: &str) -> str:
@@ -85,7 +85,7 @@ fn bundle_interfaces_register_section(path: &str, text: &str):
 
 // Register every `module <path>` section of an interface file. Returns the
 // section count so a file with none is a loud error at the caller.
-pub fn bundle_interfaces_register_wi(wi_text: &str) -> isize:
+fn bundle_interfaces_register_wi(wi_text: &str) -> isize:
     var count = 0
     var section_path = ""
     var section_start: i64 = 0

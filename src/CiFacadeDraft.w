@@ -39,7 +39,7 @@ extern fn with_getenv_str(name: &str) -> str
 
 // `R` for `*mut R` / `*const R` when R is a record; "" for anything else
 // (a pointer to a pointer, to a scalar, to `c_void`, a function pointer).
-pub fn fd_record_pointee(ty: &str) -> str:
+fn fd_record_pointee(ty: &str) -> str:
     let t = ty.trim()
     var rest = ""
     if t.starts_with("*mut "): rest = t.slice(5, t.len()).trim().to_owned()
@@ -53,7 +53,7 @@ pub fn fd_record_pointee(ty: &str) -> str:
 // → `ZStreamS`, `sqlite3` → `Sqlite3`; one that would equal the C name
 // takes `Handle` so the two never collide. Presentation only (§16.2b.2):
 // the project renames it as it likes.
-pub fn fd_resource_name(record: &str) -> str:
+fn fd_resource_name(record: &str) -> str:
     var camel = ""
     var upper_next = true
     for i in 0..record.len():

@@ -13,14 +13,14 @@ pub const C_VA_LIST_POINTER: i32 = 0
 pub const C_VA_LIST_SYSV_X86_64: i32 = 1
 pub const C_VA_LIST_AAPCS64: i32 = 2
 
-pub fn type_layout_c_va_list_kind() -> i32:
+fn type_layout_c_va_list_kind() -> i32:
     let arch = target_spec_arch()
     let os = target_spec_os()
     if arch == "x86_64" and os != "Windows": return C_VA_LIST_SYSV_X86_64
     if arch == "aarch64" and os == "Linux": return C_VA_LIST_AAPCS64
     C_VA_LIST_POINTER
 
-pub fn type_layout_c_va_list_size() -> i64:
+fn type_layout_c_va_list_size() -> i64:
     let kind = type_layout_c_va_list_kind()
     if kind == C_VA_LIST_SYSV_X86_64: return 24
     if kind == C_VA_LIST_AAPCS64: return 32
@@ -49,10 +49,10 @@ fn type_layout_int_bytes(bits: i32) -> i64:
 // `struct { tag; union { variants… }; }`. Sema's model and codegen's LLVM
 // body (`{ tag, [n x unit] }`, `enum_body_from_layout`) are both read from
 // this shape; neither derives a second one.
-pub type SizeAlign { size: i64, align: i64 }
-pub type EnumShape { payload_offset: i64, size: i64, align: i64 }
+type SizeAlign { size: i64, align: i64 }
+type EnumShape { payload_offset: i64, size: i64, align: i64 }
 
-pub fn type_layout_enum_shape(tag_size: i64, tag_align: i64, payload_size: i64, payload_align: i64) -> EnumShape:
+fn type_layout_enum_shape(tag_size: i64, tag_align: i64, payload_size: i64, payload_align: i64) -> EnumShape:
     let align = if payload_align > tag_align: payload_align else: tag_align
     let payload_offset = type_layout_align_up(tag_size, payload_align)
     EnumShape { payload_offset: payload_offset, size: type_layout_align_up(payload_offset + payload_size, align), align: align }
@@ -61,7 +61,7 @@ pub fn type_layout_enum_shape(tag_size: i64, tag_align: i64, payload_size: i64, 
 // N × size(T) rounded up to a power of two — LLVM's `<N x T>` allocation and
 // clang's `vector_size` / `ext_vector_type(N)` on every supported target
 // (`Vector[f32, 3]` is 16 bytes, 16-aligned).
-pub fn type_layout_vector_bytes(n: i32, lane_bits: i32) -> i64:
+fn type_layout_vector_bytes(n: i32, lane_bits: i32) -> i64:
     let raw = n as i64 * type_layout_int_bytes(lane_bits)
     var size: i64 = 1
     while size < raw:
@@ -71,7 +71,7 @@ pub fn type_layout_vector_bytes(n: i32, lane_bits: i32) -> i64:
 // Its alignment is the target's for that shape, as clang lays it out: its
 // size on x86_64 and wasm, at most 16 bytes on AArch64 (clang's AArch64
 // MaxVectorAlign is 128 bits: `vector_size(32)` is 16-aligned there).
-pub fn type_layout_vector_align(size: i64) -> i64:
+fn type_layout_vector_align(size: i64) -> i64:
     if target_spec_arch() == "aarch64" and size > 16: 16 else: size
 
 impl Sema:

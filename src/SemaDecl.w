@@ -948,7 +948,7 @@ impl Sema:
 // Whether a string literal's interned source text denotes a NUL byte: a raw
 // literal (`\x01raw\x01` prefix) holds its bytes as written; any other spells
 // one as `\0`, `\x00` or `\u{0}`.
-pub fn sema_string_literal_has_nul(raw: &str) -> bool:
+fn sema_string_literal_has_nul(raw: &str) -> bool:
     let n = raw.len()
     let is_raw = n >= 5 and raw[0] == 1 and raw[1] == 'r' and raw[2] == 'a' and raw[3] == 'w' and raw[4] == 1
     var i = if is_raw: 5 else: 0
@@ -2383,7 +2383,7 @@ impl Sema:
             self.mutable_global_syms.insert(name, 1)
         self.register_top_level_global_decl(name, tid, is_mut, node, GLOBAL_VALUE_DECL_EXTERN)
 
-pub fn sema_str_find_char(text: &str, needle: i32) -> i32:
+fn sema_str_find_char(text: &str, needle: i32) -> i32:
     for i in 0..text.len():
         if text[i] == needle:
             return i as i32

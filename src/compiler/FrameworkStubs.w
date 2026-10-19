@@ -399,7 +399,7 @@ fn fs_framework_tbd(cache: &DscCache, name: &str) -> str:
 // Writes <dir>/<Name>.framework/<Name>.tbd for each framework name, from
 // this machine's dyld shared cache. "" when every stub is written, else why
 // not.
-pub fn framework_stubs_write(dir: &str, names: &List[str]) -> str:
+fn framework_stubs_write(dir: &str, names: &List[str]) -> str:
     if runtime_sysinfo_os() != "Macos":
         return "Apple framework stubs are generated on macOS only"
     let cache = fs_open_cache()
@@ -421,7 +421,7 @@ pub fn framework_stubs_write(dir: &str, names: &List[str]) -> str:
 // The framework names of `-framework <Name>` and `-weak_framework <Name>`
 // pairs in a package's link arguments: a weakly linked framework needs its
 // stub at link time as any other does.
-pub fn framework_names_in_link_args(link_args: &List[str]) -> List[str]:
+fn framework_names_in_link_args(link_args: &List[str]) -> List[str]:
     let out: List[str] = List.new()
     for i in 0..link_args.len():
         if (link_args[i] == "-framework" or link_args[i] == "-weak_framework") and i + 1 < link_args.len():
@@ -430,7 +430,7 @@ pub fn framework_names_in_link_args(link_args: &List[str]) -> List[str]:
 
 // `with __framework-stubs <dir> <Name>...`: the step `with get` runs, on its
 // own (the :no-host-toolchain check uses it).
-pub fn with_framework_stubs_main(args: &List[str]) -> i32:
+fn with_framework_stubs_main(args: &List[str]) -> i32:
     if args.len() < 2:
         runtime_eprint("usage: with __framework-stubs <dir> <Framework>...")
         return 2

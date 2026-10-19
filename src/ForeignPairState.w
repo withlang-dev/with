@@ -3,7 +3,7 @@
 // A row describes possible foreign states, never how many setters were seen.
 // Zero is the foreign default on both sides. -1/-1 is a compatible pair
 // supplied by a caller whose concrete userdata type is not known here.
-pub type ForeignPairAlternative {
+type ForeignPairAlternative {
     callback_type: i32,
     userdata_type: i32,
     userdata_origin: i32,
@@ -15,7 +15,7 @@ pub type ForeignPairAlternative {
 }
 impl Copy for ForeignPairAlternative
 
-pub type ForeignPairState {
+type ForeignPairState {
     alternatives: List[ForeignPairAlternative],
 }
 
@@ -27,19 +27,19 @@ fn foreign_pair_add(state: &ForeignPairState, alternative: ForeignPairAlternativ
         if foreign_pair_alternative_equal(state.alternatives[i], alternative): return
     state.alternatives.push(alternative)
 
-pub fn foreign_pair_initial(defaults: bool) -> ForeignPairState:
+fn foreign_pair_initial(defaults: bool) -> ForeignPairState:
     let state = ForeignPairState { alternatives: List.new() }
     let ty: i32 = if defaults: 0 else: -1
     foreign_pair_add(state, ForeignPairAlternative { callback_type: ty, userdata_type: ty, userdata_origin: -1, guard: -1, succeeded: true })
     state
 
-pub fn foreign_pair_join(a: &ForeignPairState, b: &ForeignPairState) -> ForeignPairState:
+fn foreign_pair_join(a: &ForeignPairState, b: &ForeignPairState) -> ForeignPairState:
     let result = ForeignPairState { alternatives: List.new() }
     for i in 0..a.alternatives.len(): foreign_pair_add(result, a.alternatives[i])
     for i in 0..b.alternatives.len(): foreign_pair_add(result, b.alternatives[i])
     result
 
-pub fn foreign_pair_equal(a: &ForeignPairState, b: &ForeignPairState) -> bool:
+fn foreign_pair_equal(a: &ForeignPairState, b: &ForeignPairState) -> bool:
     if a.alternatives.len() != b.alternatives.len(): return false
     for i in 0..a.alternatives.len():
         var found = false
@@ -51,7 +51,7 @@ pub fn foreign_pair_equal(a: &ForeignPairState, b: &ForeignPairState) -> bool:
 // A failed setter preserves the previous pair only when Sema's foreign
 // contract explicitly supplies that guarantee. Otherwise both components
 // become unknown/incompatible and a modeled reset is required.
-pub fn foreign_pair_set(state: &ForeignPairState, callback: bool, ty: i32, origin: i32, guard: i32, can_fail: bool, preserves_on_failure: bool) -> ForeignPairState:
+fn foreign_pair_set(state: &ForeignPairState, callback: bool, ty: i32, origin: i32, guard: i32, can_fail: bool, preserves_on_failure: bool) -> ForeignPairState:
     let result = ForeignPairState { alternatives: List.new() }
     for i in 0..state.alternatives.len():
         let previous = &state.alternatives[i]
@@ -75,7 +75,7 @@ pub fn foreign_pair_set(state: &ForeignPairState, callback: bool, ty: i32, origi
                 })
     result
 
-pub fn foreign_pair_on_edge(state: &ForeignPairState, guard: i32, succeeded: bool) -> ForeignPairState:
+fn foreign_pair_on_edge(state: &ForeignPairState, guard: i32, succeeded: bool) -> ForeignPairState:
     let result = ForeignPairState { alternatives: List.new() }
     for i in 0..state.alternatives.len():
         let alternative = &state.alternatives[i]
@@ -83,14 +83,14 @@ pub fn foreign_pair_on_edge(state: &ForeignPairState, guard: i32, succeeded: boo
             foreign_pair_add(result, alternative)
     result
 
-pub fn foreign_pair_can_invoke(state: &ForeignPairState) -> bool:
+fn foreign_pair_can_invoke(state: &ForeignPairState) -> bool:
     for i in 0..state.alternatives.len():
         let alternative = &state.alternatives[i]
         if alternative.callback_type < -1 or alternative.callback_type != alternative.userdata_type:
             return false
     true
 
-pub fn foreign_pair_retains_origin(state: &ForeignPairState, origin: i32) -> bool:
+fn foreign_pair_retains_origin(state: &ForeignPairState, origin: i32) -> bool:
     if origin < 0: return false
     for i in 0..state.alternatives.len():
         if state.alternatives[i].userdata_origin == origin: return true
@@ -108,7 +108,7 @@ pub const FOREIGN_PAIR_CREATE: i32 = 6
 // modeled reset — the retained origins are still held.
 pub const FOREIGN_PAIR_UNKNOWN: i32 = 7
 
-pub fn foreign_pair_unknown(state: &ForeignPairState) -> ForeignPairState:
+fn foreign_pair_unknown(state: &ForeignPairState) -> ForeignPairState:
     let result = ForeignPairState { alternatives: List.new() }
     for i in 0..state.alternatives.len():
         foreign_pair_add(result, ForeignPairAlternative { callback_type: -2, userdata_type: -3, userdata_origin: state.alternatives[i].userdata_origin, guard: -1, succeeded: true })
@@ -116,17 +116,17 @@ pub fn foreign_pair_unknown(state: &ForeignPairState) -> ForeignPairState:
 
 // Whether any alternative still holds a retained userdata origin: a
 // resource in that state is ephemeral (§16.2b.9) and cannot escape.
-pub fn foreign_pair_retains_any(state: &ForeignPairState) -> bool:
+fn foreign_pair_retains_any(state: &ForeignPairState) -> bool:
     for i in 0..state.alternatives.len():
         if state.alternatives[i].userdata_origin >= 0: return true
     false
 
-pub fn foreign_pair_absent() -> ForeignPairState:
+fn foreign_pair_absent() -> ForeignPairState:
     let state = ForeignPairState { alternatives: List.new() }
     foreign_pair_add(state, ForeignPairAlternative { callback_type: -4, userdata_type: -4, userdata_origin: -1, guard: -1, succeeded: true })
     state
 
-pub type ForeignPairBlock {
+type ForeignPairBlock {
     action: i32,
     ty: i32,
     origin: i32,
@@ -137,7 +137,7 @@ pub type ForeignPairBlock {
 }
 impl Copy for ForeignPairBlock
 
-pub type ForeignPairEdge {
+type ForeignPairEdge {
     from: i32,
     to: i32,
     guard: i32,
@@ -145,7 +145,7 @@ pub type ForeignPairEdge {
 }
 impl Copy for ForeignPairEdge
 
-pub type ForeignPairFlow {
+type ForeignPairFlow {
     inputs: List[ForeignPairState],
     violations: List[i32],
 }
@@ -164,7 +164,7 @@ fn foreign_pair_transfer(state: &ForeignPairState, block: &ForeignPairBlock) -> 
 // Every predecessor, including backwards edges, contributes until the finite
 // set stops growing. Report requirements only after convergence: an early
 // sweep's empty row is unreachable, not evidence that cleanup is safe.
-pub fn foreign_pair_flow(blocks: &List[ForeignPairBlock], edges: &List[ForeignPairEdge], entry: &ForeignPairState) -> ForeignPairFlow:
+fn foreign_pair_flow(blocks: &List[ForeignPairBlock], edges: &List[ForeignPairEdge], entry: &ForeignPairState) -> ForeignPairFlow:
     var inputs: List[ForeignPairState] = List.new()
     var outputs: List[ForeignPairState] = List.new()
     for i in 0..blocks.len():
@@ -197,12 +197,12 @@ pub fn foreign_pair_flow(blocks: &List[ForeignPairBlock], edges: &List[ForeignPa
 // resources forever. MIR supplies the canonical keys and move/borrow facts.
 // Multiple possible targets require a weak update: either resource may have
 // been left unchanged. This deliberately loses correlation, never safety.
-pub type ForeignPairPlaces {
+type ForeignPairPlaces {
     values: List[ForeignPairState],
     references: List[List[i32]],
 }
 
-pub fn foreign_pair_places(width: i32) -> ForeignPairPlaces:
+fn foreign_pair_places(width: i32) -> ForeignPairPlaces:
     let values: List[ForeignPairState] = List.new()
     let references: List[List[i32]] = List.new()
     for key in 0..width:
@@ -212,7 +212,7 @@ pub fn foreign_pair_places(width: i32) -> ForeignPairPlaces:
         references.push(targets)
     ForeignPairPlaces { values, references }
 
-pub fn foreign_pair_places_clone(source: &ForeignPairPlaces) -> ForeignPairPlaces:
+fn foreign_pair_places_clone(source: &ForeignPairPlaces) -> ForeignPairPlaces:
     var result = foreign_pair_places(source.values.len() as i32)
     for key in 0..source.values.len():
         result.values[key] = foreign_pair_on_edge(source.values[key], -1, true)
@@ -222,7 +222,7 @@ pub fn foreign_pair_places_clone(source: &ForeignPairPlaces) -> ForeignPairPlace
         result.references[key] = targets
     result
 
-pub fn foreign_pair_places_join(a: &ForeignPairPlaces, b: &ForeignPairPlaces) -> ForeignPairPlaces:
+fn foreign_pair_places_join(a: &ForeignPairPlaces, b: &ForeignPairPlaces) -> ForeignPairPlaces:
     assert(a.values.len() == b.values.len())
     var result = foreign_pair_places_clone(a)
     for key in 0..a.values.len():
@@ -249,7 +249,7 @@ impl ForeignPairPlaces:
         // An existing reference to the source still names that storage. Moving
         // the owner cannot silently retarget it and hide an invalidated borrow.
 
-    pub mut fn apply_at(place: i32, block: &ForeignPairBlock) -> bool:
+    mut fn apply_at(place: i32, block: &ForeignPairBlock) -> bool:
         let count = self.references[place].len()
         if count == 0: return false
         var valid = true
@@ -260,12 +260,12 @@ impl ForeignPairPlaces:
             self.values[key] = if count == 1: move after else: foreign_pair_join(self.values[key], after)
         valid
 
-pub fn foreign_pair_origin_live(places: &ForeignPairPlaces, origin: i32) -> bool:
+fn foreign_pair_origin_live(places: &ForeignPairPlaces, origin: i32) -> bool:
     for key in 0..places.values.len():
         if foreign_pair_retains_origin(places.values[key], origin): return true
     false
 
-pub fn foreign_pair_places_equal(a: &ForeignPairPlaces, b: &ForeignPairPlaces) -> bool:
+fn foreign_pair_places_equal(a: &ForeignPairPlaces, b: &ForeignPairPlaces) -> bool:
     if a.values.len() != b.values.len(): return false
     for key in 0..a.values.len():
         if not foreign_pair_equal(a.values[key], b.values[key]): return false
@@ -284,12 +284,12 @@ pub const FOREIGN_STEP_EXPIRE: i32 = 3
 // stored into longer-lived storage): valid only while it retains nothing.
 pub const FOREIGN_STEP_ESCAPE: i32 = 4
 
-pub fn foreign_pair_place_retains_any(places: &ForeignPairPlaces, place: i32) -> bool:
+fn foreign_pair_place_retains_any(places: &ForeignPairPlaces, place: i32) -> bool:
     for i in 0..places.references[place].len():
         if foreign_pair_retains_any(places.values[places.references[place][i]]): return true
     false
 
-pub type ForeignPairStep {
+type ForeignPairStep {
     action: i32,
     place: i32,
     source: i32,
@@ -297,7 +297,7 @@ pub type ForeignPairStep {
 }
 impl Copy for ForeignPairStep
 
-pub type ForeignPairPlaceFlow {
+type ForeignPairPlaceFlow {
     inputs: List[ForeignPairPlaces],
     reachable: List[bool],
     // Global step indices, so the MIR adapter can recover exact spans.
@@ -330,7 +330,7 @@ fn foreign_pair_places_edge(source: &ForeignPairPlaces, edge: &ForeignPairEdge) 
         if result.values[key].alternatives.len() == 0: reachable = false
     (move result, reachable)
 
-pub fn foreign_pair_place_flow(starts: &List[i32], counts: &List[i32], steps: &List[ForeignPairStep], edges: &List[ForeignPairEdge], entry: &ForeignPairPlaces) -> ForeignPairPlaceFlow:
+fn foreign_pair_place_flow(starts: &List[i32], counts: &List[i32], steps: &List[ForeignPairStep], edges: &List[ForeignPairEdge], entry: &ForeignPairPlaces) -> ForeignPairPlaceFlow:
     assert(starts.len() == counts.len())
     var inputs: List[ForeignPairPlaces] = List.new()
     var outputs: List[ForeignPairPlaces] = List.new()

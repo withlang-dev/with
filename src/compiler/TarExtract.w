@@ -72,7 +72,7 @@ fn te_dirname(path: &str) -> str:
 
 // Unpacks the tar image `data` into `dest`, dropping the first `strip`
 // components of every name. "" on success, else why not.
-pub fn tar_extract_text(data: &str, dest: &str, strip: i32) -> str:
+fn tar_extract_text(data: &str, dest: &str, strip: i32) -> str:
     let all: List[str] = List.new()
     tar_extract_text_keep(data, dest, strip, &all)
 
@@ -87,7 +87,7 @@ fn te_kept(rel: &str, keep: &List[str]) -> bool:
 // tar_extract_text, writing only the entries whose stripped name starts with
 // one of `keep`: the few directories of a large source archive a step needs
 // (compiler.WindowsImportLibs).
-pub fn tar_extract_text_keep(data: &str, dest: &str, strip: i32, keep: &List[str]) -> str:
+fn tar_extract_text_keep(data: &str, dest: &str, strip: i32, keep: &List[str]) -> str:
     if runtime_mkdir_p(dest) != 0: return "could not create " ++ dest
     var at: i64 = 0
     var long_name = ""
@@ -157,13 +157,13 @@ fn te_bytes(text: &str) -> List[u8]:
     out
 
 // Unpacks the gzip-compressed tar `archive` into `dest`. "" or why not.
-pub fn tar_gz_extract(archive: &str, dest: &str, strip: i32) -> str:
+fn tar_gz_extract(archive: &str, dest: &str, strip: i32) -> str:
     let all: List[str] = List.new()
     tar_gz_extract_keep(archive, dest, strip, &all)
 
 // Unpacks the gzip-compressed tar image `packed` (bytes in memory, an
 // embedded blob) into `dest`. "" or why not.
-pub fn tar_gz_extract_data(packed: &str, dest: &str, strip: i32) -> str:
+fn tar_gz_extract_data(packed: &str, dest: &str, strip: i32) -> str:
     match decompress_gzip_with_limit(&te_bytes(packed), 8589934592):
         .Ok(tar) =>
             if tar.len() == 0: return "an empty embedded archive"
@@ -172,7 +172,7 @@ pub fn tar_gz_extract_data(packed: &str, dest: &str, strip: i32) -> str:
         .Err(e) => "an embedded archive: " ++ e.message
 
 // tar_gz_extract, writing only the entries under one of `keep`.
-pub fn tar_gz_extract_keep(archive: &str, dest: &str, strip: i32, keep: &List[str]) -> str:
+fn tar_gz_extract_keep(archive: &str, dest: &str, strip: i32, keep: &List[str]) -> str:
     let packed = runtime_read_file(archive)
     if packed.len() == 0: return "could not read " ++ archive
     match decompress_gzip_with_limit(&te_bytes(packed), 8589934592):
@@ -183,7 +183,7 @@ pub fn tar_gz_extract_keep(archive: &str, dest: &str, strip: i32, keep: &List[st
         .Err(e) => archive ++ ": " ++ e.message
 
 // Unpacks the xz-compressed tar `archive` into `dest`. "" or why not.
-pub fn tar_xz_extract(archive: &str, dest: &str, strip: i32) -> str:
+fn tar_xz_extract(archive: &str, dest: &str, strip: i32) -> str:
     let packed = runtime_read_file(archive)
     if packed.len() == 0: return "could not read " ++ archive
     let r = xz_decompress(packed)
@@ -191,7 +191,7 @@ pub fn tar_xz_extract(archive: &str, dest: &str, strip: i32) -> str:
     tar_extract_text(r[0], dest, strip)
 
 // Unpacks the bzip2-compressed tar `archive` into `dest`. "" or why not.
-pub fn tar_bz2_extract(archive: &str, dest: &str, strip: i32) -> str:
+fn tar_bz2_extract(archive: &str, dest: &str, strip: i32) -> str:
     let packed = runtime_read_file(archive)
     if packed.len() == 0: return "could not read " ++ archive
     let r = bzip2_decompress(packed)
@@ -199,14 +199,14 @@ pub fn tar_bz2_extract(archive: &str, dest: &str, strip: i32) -> str:
     tar_extract_text(r[0], dest, strip)
 
 // Unpacks the zip `archive` into `dest`. "" or why not.
-pub fn zip_extract(archive: &str, dest: &str) -> str:
+fn zip_extract(archive: &str, dest: &str) -> str:
     match extract(archive, dest):
         .Ok(_) => ""
         .Err(e) => archive ++ ": " ++ e.message
 
 // Unpacks `archive` into `dest` by what its first bytes say it is: a gzip,
 // xz or bzip2 tarball, or a zip (a URL's name need not say). "" or why not.
-pub fn archive_extract(archive: &str, dest: &str) -> str:
+fn archive_extract(archive: &str, dest: &str) -> str:
     let head = runtime_read_file(archive)
     if head.len() < 6: return "could not read " ++ archive
     if head[0] == 0x1F and head[1] == 0x8B: return tar_gz_extract(archive, dest, 0)

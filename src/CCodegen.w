@@ -298,7 +298,7 @@ fn cc_builtin_is_str_len(kind: CcBuiltin) -> bool:
 fn cc_builtin_is_arr_len(kind: CcBuiltin) -> bool:
     kind == CcBuiltin.ARR_LEN or kind == CcBuiltin.ARR_LEN32 or kind == CcBuiltin.ARR_LEN64 or kind == CcBuiltin.ARR_ULEN32
 
-pub type CEmitResult {
+type CEmitResult {
     ok: i32,
     source: str,
     err_msg: str,
@@ -410,7 +410,7 @@ impl CCodegen:
     fn intern_intern(s: &str) -> i32:
         self.intern.intern(s)
 
-pub fn c_emit_module(mir_mod: MirModule, ast: &AstPool, intern: &InternPool, sema: Sema, source_path: &str, source_text: &str, overflow_mode: i32, emit_all: bool) -> CEmitResult:
+fn c_emit_module(mir_mod: MirModule, ast: &AstPool, intern: &InternPool, sema: Sema, source_path: &str, source_text: &str, overflow_mode: i32, emit_all: bool) -> CEmitResult:
     var cg = CCodegen {
         emit_all,
         mir_mod,

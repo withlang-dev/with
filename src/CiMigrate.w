@@ -30,7 +30,7 @@ extern fn with_str_clone_ref(s: &str) -> str
 // are pruned. Set via migrate_set_width_slice().
 var g_migrate_width_slice: i32 = 0
 
-pub fn migrate_set_width_slice(val: i32):
+fn migrate_set_width_slice(val: i32):
     g_migrate_width_slice = val
 
 // Check whether a C declaration name belongs to a width family
@@ -38,7 +38,7 @@ pub fn migrate_set_width_slice(val: i32):
 // prune_width_family_decls shell function:
 //   - PCRE2_UCHAR16, PCRE2_UCHAR32, PCRE2_SPTR16, PCRE2_SPTR32
 //   - Any identifier ending in _16 or _32
-pub fn ci_migrate_is_width_family_name(name: &str) -> bool:
+fn ci_migrate_is_width_family_name(name: &str) -> bool:
     if g_migrate_width_slice == 0:
         return false
     let len = name.len()
@@ -90,7 +90,7 @@ var g_migrate_libc_symbols_used: str = ""
 // emitting the record itself.
 var g_ci_translate_migrate_mode: i32 = 0
 
-pub fn ci_translate_in_migrate_mode -> bool: g_ci_translate_migrate_mode != 0
+fn ci_translate_in_migrate_mode -> bool: g_ci_translate_migrate_mode != 0
 var g_migrate_unsafe_extern_fn_names: str = ""
 
 fn ci_migrate_text_is_blank(text: &str) -> bool:
@@ -102,22 +102,22 @@ fn ci_migrate_text_is_blank(text: &str) -> bool:
         i = i + 1
     true
 
-pub fn migrate_set_shared_defs(prefix: &str):
+fn migrate_set_shared_defs(prefix: &str):
     g_migrate_shared_defs_prefix = with_str_clone_ref(prefix)
 
-pub fn migrate_set_directory_one_basename(basename: &str):
+fn migrate_set_directory_one_basename(basename: &str):
     g_migrate_directory_one_basename = with_str_clone_ref(basename)
 
-pub fn migrate_set_shared_fragment_path(path: &str):
+fn migrate_set_shared_fragment_path(path: &str):
     g_migrate_shared_fragment_path = with_str_clone_ref(path)
 
-pub fn migrate_add_include_path(path: &str) -> Unit:
+fn migrate_add_include_path(path: &str) -> Unit:
     g_migrate_include_paths.push(ci_migrate_fs_path(path))
 
-pub fn migrate_add_forced_include(path: &str) -> Unit:
+fn migrate_add_forced_include(path: &str) -> Unit:
     g_migrate_forced_includes.push(ci_migrate_fs_path(path))
 
-pub fn migrate_reset_options():
+fn migrate_reset_options():
     g_migrate_width_slice = 0
     g_migrate_shared_defs_prefix = ""
     ci_migrate_shared_defs_reset()
@@ -136,20 +136,20 @@ pub fn migrate_reset_options():
     g_migrate_fn_translated = 0
     g_migrate_fn_translated_total = 0
 
-pub fn ci_migrate_shared_defs_active() -> bool:
+fn ci_migrate_shared_defs_active() -> bool:
     g_migrate_shared_defs_prefix.len() > 0
 
 // True when the output compiles without the prelude: a .wo bundle corpus
 // (build/wo.w builds every corpus `--no-prelude`), or `with migrate
 // --no-prelude`. The preamble then carries the prelude-only vocabulary the
 // translation reaches for (c_void, unreachable) — see ci_migrate_preamble_text.
-pub fn ci_migrate_output_is_prelude_free() -> bool:
+fn ci_migrate_output_is_prelude_free() -> bool:
     g_migrate_prelude_free != 0
 
 // Sema classifies extern declarations in every lib/std module as compiler
 // implementation bindings (sema_extern_is_compiler_implementation). Match
 // that declaration policy for every corpus, without a library-name exception.
-pub fn ci_migrate_shared_defs_targets_std_zone() -> bool:
+fn ci_migrate_shared_defs_targets_std_zone() -> bool:
     ci_starts_with(g_migrate_shared_defs_prefix, "std.")
 
 fn ci_migrate_shared_defs_reset:
@@ -194,7 +194,7 @@ fn ci_migrate_shared_decl_upgrade_opaque_type(name: &str, rendered: &str):
             break
         j = j + 1
 
-pub fn ci_migrate_shared_decl_add(kind: &str, name: &str, rendered: &str) -> bool:
+fn ci_migrate_shared_decl_add(kind: &str, name: &str, rendered: &str) -> bool:
     if not ci_migrate_shared_defs_active():
         return false
     let key = ci_migrate_shared_decl_key(kind, name)
@@ -263,7 +263,7 @@ fn ci_migrate_libc_reset:
     g_migrate_libc_symbols_used = ""
     return
 
-pub fn ci_migrate_note_libc_symbol(name: &str):
+fn ci_migrate_note_libc_symbol(name: &str):
     if name.len() == 0:
         return
     let key = "|" ++ name ++ "|"
@@ -286,7 +286,7 @@ fn ci_migrate_note_unsafe_extern_fn(name: &str):
         g_migrate_unsafe_extern_fn_names = g_migrate_unsafe_extern_fn_names ++ key
     return
 
-pub fn ci_migrate_extern_fn_call_requires_unsafe(name: &str) -> bool:
+fn ci_migrate_extern_fn_call_requires_unsafe(name: &str) -> bool:
     if name.len() == 0:
         return false
     ci_find_str(g_migrate_unsafe_extern_fn_names, "|" ++ name ++ "|") >= 0
@@ -531,9 +531,9 @@ fn ci_migrate_render_preamble_fn(signature: &str, colon_expr: &str, brace_expr: 
 // importer's identity when another owner holds the name
 // (Frontend.displace_colliding_c_import_fns, #1882), so neither captures
 // the other's calls.
-pub fn ci_overflow_helper_name(op: &str, ty: &str): "__with_builtin_" ++ op ++ "_overflow_" ++ ty
+fn ci_overflow_helper_name(op: &str, ty: &str): "__with_builtin_" ++ op ++ "_overflow_" ++ ty
 
-pub fn ci_u128_mul_helper_name(): "u128_mul_would_overflow"
+fn ci_u128_mul_helper_name(): "u128_mul_would_overflow"
 
 fn ci_migrate_render_overflow_helper(name: &str, op: &str, ty: &str, is_signed: bool):
     let token = if op == "add": "+%" else if op == "sub": "-%" else: "*%"
@@ -560,7 +560,7 @@ fn ci_migrate_render_fn_with_body(signature: &str, body: &str) -> str:
 // decomposition keeps the check to multiplies and shifts, inline on every
 // target at every -O level. The shared helper is emitted once, before the
 // i128 multiply that first needs it.
-pub fn ci_migrate_render_u128_mul_would_overflow(name: &str) -> str:
+fn ci_migrate_render_u128_mul_would_overflow(name: &str) -> str:
     let comment = "// The 128-bit overflow checks stay division-free on purpose: `/` on i128/u128\n// lowers to the __divti3/__udivti3 compiler-rt libcalls, and this shim is\n// compiled into freestanding runtime objects whose COFF link has no builtins\n// library to resolve them from. Limb decomposition keeps the check to multiplies\n// and shifts, which lower inline on every target and at every -O level.\n"
     let body = "    let a_hi = (a >> 64) as u64\n    let b_hi = (b >> 64) as u64\n    if a_hi != 0 and b_hi != 0: return true\n    let a_lo = (a as u64) as u128\n    let b_lo = (b as u64) as u128\n    let cross = (a_hi as u128) *% b_lo +% (b_hi as u128) *% a_lo\n    if (cross >> 64) != 0: return true\n    let low = a_lo *% b_lo\n    ((low >> 64) +% cross) >> 64 != 0\n"
     comment ++ ci_migrate_hygienic(ci_migrate_render_fn_with_body("fn " ++ name ++ "(a: u128, b: u128) -> bool", body))
@@ -578,7 +578,7 @@ fn ci_migrate_render_mul_overflow_128(name: &str, shared: &str, ty: &str, is_sig
 // import defines only the ones its inline bodies call, under the c_import
 // spelling (ci_overflow_helper_name). The 128-bit multiply's shared limb
 // check is rendered once by the caller (ci_migrate_render_u128_mul_would_overflow).
-pub fn ci_migrate_render_overflow_helper_for(op: &str, ty: &str) -> str:
+fn ci_migrate_render_overflow_helper_for(op: &str, ty: &str) -> str:
     let is_signed = ty[0] == 'i'
     let name = ci_overflow_helper_name(op, ty)
     if op == "mul" and (ty == "i128" or ty == "u128"):
@@ -703,8 +703,8 @@ fn ci_migrate_merge_shared_fragment_texts(output_dir: &str, fragments: &List[str
 // ONE source for the preamble decls, the structural IR lowering, the text
 // mapper, and CiPrint's struct init/copy — a second derivation anywhere is
 // #880's bug (and #761's corruption class: one symbol, two contracts).
-pub fn ci_rt_ptr_mut() -> str: "*mut u8"
-pub fn ci_rt_ptr_const() -> str: "*const u8"
+fn ci_rt_ptr_mut() -> str: "*mut u8"
+fn ci_rt_ptr_const() -> str: "*const u8"
 
 // Generate the self-contained preamble that every migrated file needs.
 // In shared-defs mode this goes into defs.w; otherwise into each file.
@@ -838,7 +838,7 @@ fn ci_migrate_is_runtime_cabi_function(name: &str) -> bool:
 // flat namespace while preserving the original linker symbol. The fixed
 // preamble externs are already canonical migrator declarations, so their names
 // remain unchanged.
-pub fn ci_migrate_c_function_name(name: &str) -> str:
+fn ci_migrate_c_function_name(name: &str) -> str:
     let safe_name = ci_escape_reserved(name)
     if ci_translate_in_migrate_mode() and ci_migrate_is_runtime_cabi_function(name) and not ci_migrate_preamble_declares_runtime_extern(name):
         return "__with_cabi_" ++ safe_name
@@ -855,7 +855,7 @@ pub fn ci_migrate_c_function_name(name: &str) -> str:
 // ── Migrate entry points (moved from CImport.w in D3) ─────────
 // D43: the then arm can fall through as Unit, while the else assignment
 // has a str value. Unit deliberately discards that mixed branching tail.
-pub fn migrate_add_define(define: &str) -> Unit:
+fn migrate_add_define(define: &str) -> Unit:
     // define is "NAME=VALUE" or just "NAME"
     if ci_str_contains(define, "="):
         let eq_pos = ci_find_substr(define, "=")
@@ -892,11 +892,11 @@ var g_migrate_system_object_macros: HashMap[str, i32] = HashMap.new()
 // the one in effect.
 var g_migrate_macro_last_values: HashMap[str, str] = HashMap.new()
 
-pub fn ci_migrate_system_object_macro(name: &str) -> bool: g_migrate_system_object_macros.contains(name)
+fn ci_migrate_system_object_macro(name: &str) -> bool: g_migrate_system_object_macros.contains(name)
 
 // The replacement list of `name`'s definition in effect, without the comment
 // a header puts after it; "" for a name that is no object-like macro.
-pub fn ci_migrate_object_macro_body(name: &str) -> str:
+fn ci_migrate_object_macro_body(name: &str) -> str:
     if not g_migrate_macro_last_values.contains(name): return ""
     var text = g_migrate_macro_last_values.get(name).unwrap().clone()
     let block_comment = text.find("/*")
@@ -905,7 +905,7 @@ pub fn ci_migrate_object_macro_body(name: &str) -> str:
     if line_comment >= 0: text = text.slice(0, line_comment)
     ci_trim(text)
 
-pub fn ci_migrate_object_macro_shape(name: &str, depth: i32) -> str:
+fn ci_migrate_object_macro_shape(name: &str, depth: i32) -> str:
     let body = ci_migrate_object_macro_body(name)
     if depth > 16 or body.len() == 0: return "other"
     var one_token = true
@@ -945,7 +945,7 @@ fn ci_capture_macro_values(session: i64):
                 if with_cimport_macro_is_system(session, i) != 0: g_migrate_system_object_macros.insert(ci_ir_owned_text(name), 1)
         i = i + 1
 
-pub fn ci_collect_macro_type_names(session: i64) -> str:
+fn ci_collect_macro_type_names(session: i64) -> str:
     let count = with_cimport_decl_count(session)
     var names = ""
     var i = 0
@@ -958,7 +958,7 @@ pub fn ci_collect_macro_type_names(session: i64) -> str:
         i = i + 1
     names
 
-pub fn ci_collect_macro_type_aliases(session: i64) -> str:
+fn ci_collect_macro_type_aliases(session: i64) -> str:
     let count = with_cimport_decl_count(session)
     var aliases = ""
     var i: i32 = 0
@@ -1424,7 +1424,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     g_migrate_fn_translated_total = g_migrate_fn_translated_total + g_migrate_fn_translated
     0
 
-pub fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
+fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
     let input_path = ci_migrate_fs_path(input_path_arg)
     let output_path = ci_migrate_fs_path(output_path_arg)
     var project = CiProject.new()
@@ -1637,7 +1637,7 @@ fn ci_migrate_fn_nullable_index(name: &str) -> i32:
 /// D107: 1 when parameter `index` of corpus function `name` is `Option`,
 /// 0 when the corpus decided it non-null, -1 when the corpus has no
 /// verdict (not a corpus definition: D102's declaration rules apply).
-pub fn ci_migrate_fn_param_nullable(name: &str, index: isize) -> i32:
+fn ci_migrate_fn_param_nullable(name: &str, index: isize) -> i32:
     let i = ci_migrate_fn_nullable_index(name)
     if i < 0: return -1
     let bits = g_migrate_fn_nullable_bits[i]
@@ -1646,7 +1646,7 @@ pub fn ci_migrate_fn_param_nullable(name: &str, index: isize) -> i32:
     if c == '1': 1 else if c == '0': 0 else: -1
 
 /// The reason behind `ci_migrate_fn_param_nullable`'s verdict, or "".
-pub fn ci_migrate_fn_param_reason(name: &str, index: isize) -> str:
+fn ci_migrate_fn_param_reason(name: &str, index: isize) -> str:
     let i = ci_migrate_fn_nullable_index(name)
     if i < 0: return ""
     let parts = g_migrate_fn_nullable_reasons[i].split("|")
@@ -1893,7 +1893,7 @@ fn ci_migrate_collect_gir_files(input_dir: &str) -> List[str]:
         if line.ends_with(".gir") and not ci_migrate_basename_is_hidden(line): files = ci_migrate_sorted_insert(files, line)
     files
 
-pub fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &str, output_arg: &str, gir_arg: &str, facts_arg: &str) -> i32:
+fn migrate_c_facade(input_arg: &str, facade_name: &str, exclude_basenames: &str, output_arg: &str, gir_arg: &str, facts_arg: &str) -> i32:
     let input = ci_migrate_fs_path(input_arg)
     var files: List[str] = List.new()
     var gir_files: List[str] = List.new()
@@ -1986,7 +1986,7 @@ fn ci_facade_import_spelling(header: &str, import_dirs: &List[str]) -> str:
 // package does not install is not presentable and the report says so) and
 // names the package's link library. Returns the report's summary, or ""
 // when nothing could be written (the reason is on stderr).
-pub fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], defines: &List[str], source_dir: &str, facade_name: &str, version: &str, facts_path: &str, import_dirs: &List[str], link_lib: &str, facade_path: &str, report_path: &str) -> str:
+fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], defines: &List[str], source_dir: &str, facade_name: &str, version: &str, facts_path: &str, import_dirs: &List[str], link_lib: &str, facade_path: &str, report_path: &str) -> str:
     migrate_reset_options()
     for path in include_paths: migrate_add_include_path(path)
     for define in defines: migrate_add_define(define)
@@ -2036,7 +2036,7 @@ pub fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str]
     let summary_end = report.find("\n")
     if summary_end < 0: report else: report.slice(0, summary_end)
 
-pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basenames: &str) -> i32:
+fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basenames: &str) -> i32:
     let input_dir = ci_migrate_fs_path(input_dir_arg)
     let output_dir = ci_migrate_fs_path(output_dir_arg)
     g_migrate_fn_translated_total = 0
@@ -2507,7 +2507,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
 
 
 // ── ci_migrate_var_* helpers (moved from CImport.w in D3) ─────
-pub fn ci_migrate_set_error(msg: &str):
+fn ci_migrate_set_error(msg: &str):
     if g_migrate_file_error.len() == 0:
         g_migrate_file_error = with_str_clone_ref(msg)
 
@@ -2828,7 +2828,7 @@ var g_migrate_file_error: str = ""
 // Set via migrate_set_no_c_export().
 pub var g_migrate_no_c_export: i32 = 0
 
-pub fn migrate_set_no_c_export(val: i32):
+fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val
 
 // When true, the output compiles without the prelude (a .wo bundle corpus,
@@ -2837,7 +2837,7 @@ pub fn migrate_set_no_c_export(val: i32):
 // workspace's prelude_mode (ComptimeEval) or the CLI flag.
 var g_migrate_prelude_free: i32 = 0
 
-pub fn migrate_set_prelude_free(val: i32) -> Unit:
+fn migrate_set_prelude_free(val: i32) -> Unit:
     g_migrate_prelude_free = val
 
 // Keep local-definition behavior for globals while preserving C ABI symbols
@@ -2845,25 +2845,25 @@ pub fn migrate_set_prelude_free(val: i32) -> Unit:
 // that are compiled as std modules but still expose C-compatible entrypoints.
 var g_migrate_export_function_defs: i32 = 0
 
-pub fn migrate_set_export_function_defs(val: i32):
+fn migrate_set_export_function_defs(val: i32):
     g_migrate_export_function_defs = val
 
 // Block style preference for migrated output.
 // 0 = colon-form (default), 2 = brace-form (--prefer-brace).
 var g_migrate_block_style: i32 = 0
 
-pub fn migrate_set_block_style(val: i32):
+fn migrate_set_block_style(val: i32):
     g_migrate_block_style = val
 
-pub fn migrate_prefer_brace() -> bool:
+fn migrate_prefer_brace() -> bool:
     g_migrate_block_style == 2
 
 var g_migrate_convert_goto_to_structured: i32 = 0
 
-pub fn migrate_set_convert_goto_to_structured(val: i32):
+fn migrate_set_convert_goto_to_structured(val: i32):
     g_migrate_convert_goto_to_structured = val
 
-pub fn migrate_convert_goto_to_structured() -> bool:
+fn migrate_convert_goto_to_structured() -> bool:
     g_migrate_convert_goto_to_structured != 0
 
 // Per-file and cumulative counters for translated functions.

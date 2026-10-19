@@ -25,12 +25,12 @@ extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 fn CONAN_CENTER_URL -> str: "https://center2.conan.io"
 fn CONAN_INDEX_RAW -> str: "https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes"
 
-pub type ConanPackagePick {
+type ConanPackagePick {
     package_id: str,
     shared: bool,
 }
 
-pub type ConanLibraryScan {
+type ConanLibraryScan {
     lib_paths: List[str],
     libs: List[str],
 }
@@ -59,7 +59,7 @@ fn conan_run_tool(argv: &str, timeout_ms: i32) -> i32:
     runtime_remove_tree(scratch)
     rc
 
-pub fn conan_http_get(url: &str) -> str:
+fn conan_http_get(url: &str) -> str:
     let scratch = conan_scratch_dir()
     if scratch.len() == 0: return ""
     let tmp = scratch ++ "/response.json"
@@ -436,7 +436,7 @@ fn conan_range_term_holds(version: &str, term: &str) -> bool:
 // separated by spaces all hold, `||` separates alternatives, and what follows
 // a `,` is an option (`include_prerelease`), without which a pre-release
 // (`3.0.0-beta`) is in no range.
-pub fn conan_version_in_range(version: &str, range: &str) -> bool:
+fn conan_version_in_range(version: &str, range: &str) -> bool:
     var body: str = range.trim().to_owned()
     if body.starts_with("["): body = body.slice(1, body.len())
     if body.ends_with("]"): body = body.slice(0, body.len() - 1)
@@ -517,7 +517,7 @@ fn conan_block_is_linkable(block: &str, target_os: &str, target_arch: &str) -> b
 
 // The first linkable static package of a ConanCenter search listing, else the
 // first linkable shared one.
-pub fn conan_pick_package(response: &str, target_os: &str, target_arch: &str) -> ConanPackagePick:
+fn conan_pick_package(response: &str, target_os: &str, target_arch: &str) -> ConanPackagePick:
     var best_id = ""
     var best_shared = false
     let json_len = response.len()
@@ -588,7 +588,7 @@ fn conan_ref_name(req: &str) -> str:
 // A requirement names `name/version`, optionally followed by `@user/channel`,
 // `#recipe_revision` and `:package_id` (pulseaudio pins
 // `flac/1.4.2#<revision>:<package id>`). The version ends at the first of them.
-pub fn conan_ref_version(req: &str) -> str:
+fn conan_ref_version(req: &str) -> str:
     let slash = conan_find_char(req, 47)
     if slash <= 0:
         return ""
@@ -691,7 +691,7 @@ fn conan_windows_libs_without_import_lib(dest_dir: &str, lib_paths: &List[str], 
         if not windows_lib_in_dirs(lib, &dirs): out.push(lib.clone())
     out
 
-pub fn conan_library_name_from_path(path: &str) -> str:
+fn conan_library_name_from_path(path: &str) -> str:
     let base = conan_path_basename(path)
     // Windows linkers append .lib to the supplied name verbatim. The lib
     // prefix convention belongs to Unix -l lookup, not COFF filenames.
@@ -756,7 +756,7 @@ fn conan_scan_libraries(dep_dir: &str) -> ConanLibraryScan:
 // cannot be read: an incomplete link interface is never written.
 
 // conaninfo's `key=value` lines under `[section]`.
-pub fn conan_info_section(info: &str, section: &str) -> List[str]:
+fn conan_info_section(info: &str, section: &str) -> List[str]:
     let out: List[str] = List.new()
     let lines = conan_split_nonempty_lines(info)
     var inside = false
@@ -776,26 +776,26 @@ fn conan_info_setting(info: &str, key: &str) -> str:
     ""
 
 // The option values a package binary was built with (#2084).
-pub fn conan_parse_options_from_info(info: &str) -> List[str]: conan_info_section(info, "options")
+fn conan_parse_options_from_info(info: &str) -> List[str]: conan_info_section(info, "options")
 
 // What a binary was built with, as its conaninfo states it.
-pub fn conan_binary_recipe_env(info: &str, version: &str, dep_dir: &str) -> RecipeEnv:
+fn conan_binary_recipe_env(info: &str, version: &str, dep_dir: &str) -> RecipeEnv:
     RecipeEnv { os: conan_info_setting(info, "os"), arch: conan_info_setting(info, "arch"), compiler: conan_info_setting(info, "compiler"), compiler_version: conan_info_setting(info, "compiler.version"), build_type: conan_info_setting(info, "build_type"), version: version.to_owned(), package_folder: dep_dir.to_owned(), source_folder: "", options: conan_parse_options_from_info(info), options_known: true }
 
 // What a package built here is built with: this platform, the SDK's clang,
 // and the recipe's own default options.
-pub fn conan_built_recipe_env(version: &str, dep_dir: &str) -> RecipeEnv:
+fn conan_built_recipe_env(version: &str, dep_dir: &str) -> RecipeEnv:
     let os = conan_detect_os()
     RecipeEnv { os: os.clone(), arch: conan_detect_arch(), compiler: if os == "Macos": "apple-clang" else: "clang", compiler_version: "", build_type: "Release", version: version.to_owned(), package_folder: dep_dir.to_owned(), source_folder: "", options: List.new(), options_known: false }
 
 // One component of a package, as the build links it: `requires` names a
 // sibling component, or `name/version:component` of another package.
-pub type ConanComponentLink { name: str, libs: List[str], lib_paths: List[str], link_args: List[str], defines: List[str], include_paths: List[str], requires: List[str] }
+type ConanComponentLink { name: str, libs: List[str], lib_paths: List[str], link_args: List[str], defines: List[str], include_paths: List[str], requires: List[str] }
 
-pub type ConanPackageLink { problem: str, warnings: List[str], components: List[ConanComponentLink] }
+type ConanPackageLink { problem: str, warnings: List[str], components: List[ConanComponentLink] }
 
 // The component that stands for a package without components.
-pub fn CONAN_WHOLE_COMPONENT -> str: "*"
+fn CONAN_WHOLE_COMPONENT -> str: "*"
 
 // Whether `lib` is a library file in one of the package's directories.
 fn conan_package_has_lib(dep_dir: &str, libdirs: &List[str], lib: &str) -> bool:
@@ -855,7 +855,7 @@ fn conan_component_link(dep_dir: &str, requirements: &List[str], c: &RecipeCompo
     (out, warnings, "")
 
 // The link interface `package_info` describes for the package in `dep_dir`.
-pub fn conan_package_link(dep_dir: &str, requirements: &List[str], info: &RecipePackageInfo) -> ConanPackageLink:
+fn conan_package_link(dep_dir: &str, requirements: &List[str], info: &RecipePackageInfo) -> ConanPackageLink:
     var out = ConanPackageLink { problem: "", warnings: List.new(), components: List.new() }
     for n in info.notes: out.warnings.push("recipe " ++ n)
     if info.components.len() == 0:
@@ -874,7 +874,7 @@ pub fn conan_package_link(dep_dir: &str, requirements: &List[str], info: &Recipe
     out
 
 // A pkg-config file's `field:` value with its variables substituted.
-pub fn conan_pc_field(text: &str, field: &str) -> str:
+fn conan_pc_field(text: &str, field: &str) -> str:
     let names: List[str] = List.new()
     let values: List[str] = List.new()
     var found = ""
@@ -896,7 +896,7 @@ pub fn conan_pc_field(text: &str, field: &str) -> str:
 // What the pkg-config files a build installed say a static consumer links:
 // every file's `Libs` and `Libs.private`. `-L` is the package's own
 // directory, which `lib_paths` already names.
-pub fn conan_pc_link(dep_dir: &str, requirements: &List[str], pc_texts: &List[str]) -> ConanPackageLink:
+fn conan_pc_link(dep_dir: &str, requirements: &List[str], pc_texts: &List[str]) -> ConanPackageLink:
     var out = ConanPackageLink { problem: "", warnings: List.new(), components: List.new() }
     var link = ConanComponentLink { name: CONAN_WHOLE_COMPONENT(), libs: List.new(), lib_paths: List.new(), link_args: List.new(), defines: List.new(), include_paths: List.new(), requires: List.new() }
     if runtime_is_dir(dep_dir ++ "/lib") != 0: link.lib_paths.push("lib")
@@ -948,7 +948,7 @@ fn conan_fetch_recipe_revision_text(name: &str, version: &str, recipe_rev: &str)
 
 // A `<name>/system` recipe that stands for one library the host provides:
 // Conan Center has no binary and no source for it, only the name to link.
-pub fn conan_system_package_lib(name: &str) -> str:
+fn conan_system_package_lib(name: &str) -> str:
     if name == "egl": return "EGL"
     if name == "libudev": return "udev"
     ""
@@ -984,7 +984,7 @@ fn conan_known_link_metadata(name: &str, version: &str, libs: List[str], link_ar
         return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
     ConanLibraryScan { lib_paths: out_args, libs: out_libs }
 
-pub fn conan_write_known_system_package(name: &str, version: &str, project_root: &str) -> bool:
+fn conan_write_known_system_package(name: &str, version: &str, project_root: &str) -> bool:
     if version != "system":
         return false
     if name != "opengl" and name != "xorg" and conan_system_package_lib(name).len() == 0:
@@ -1146,7 +1146,7 @@ fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, pack
 // ships.
 fn conan_builds_from_source_only() -> bool: conan_detect_os() == "Windows"
 
-pub fn conan_restore_locked_binary_package(name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, expected_sha256: &str, project_root: &str) -> bool:
+fn conan_restore_locked_binary_package(name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, expected_sha256: &str, project_root: &str) -> bool:
     if conan_builds_from_source_only():
         runtime_eprint("error: the lock pins c." ++ name ++ "@" ++ version ++ " to a Conan Center binary; on Windows packages are built from source (#1915): run `with get c." ++ name ++ "` again to lock the source build")
         return false
@@ -1261,7 +1261,7 @@ fn conan_recipe_folder(name: &str, version: &str) -> str:
 // `with get --from-source`: skip Conan Center's binaries.
 var g_conan_from_source: bool = false
 
-pub fn conan_set_from_source(enabled: bool) -> Unit:
+fn conan_set_from_source(enabled: bool) -> Unit:
     g_conan_from_source = enabled
 
 // `WITH_GET_CMAKE_<PACKAGE>` (the name uppercased, `-` as `_`): CMake cache
@@ -1272,7 +1272,7 @@ pub fn conan_set_from_source(enabled: bool) -> Unit:
 // release lane renders raylib through its software rasterizer (rlsw) with
 // `WITH_GET_CMAKE_RAYLIB=PLATFORM=RGFW;OPENGL_VERSION=Software;USE_EXTERNAL_GLFW=OFF`
 // (#1375; the RGFW window backend has no GLFW to import).
-pub fn conan_package_cmake_env_name(name: &str) -> str:
+fn conan_package_cmake_env_name(name: &str) -> str:
     var out = "WITH_GET_CMAKE_"
     for i in 0..name.len():
         let c = name[i]
@@ -1281,12 +1281,12 @@ pub fn conan_package_cmake_env_name(name: &str) -> str:
         else: out = out ++ name.slice(i, i + 1)
     out
 
-pub type ConanCMakeEnv {
+type ConanCMakeEnv {
     defines: List[str],   // `-DNAME=VALUE`, in the order written
     problem: str,        // "" or the entry that is not `NAME=VALUE`
 }
 
-pub fn conan_cmake_env_parse(text: &str) -> ConanCMakeEnv:
+fn conan_cmake_env_parse(text: &str) -> ConanCMakeEnv:
     var defines: List[str] = List.new()
     for raw in text.split(";"):
         let entry = raw.trim()
@@ -1434,7 +1434,7 @@ type ConanCMakeLinkSet {
 /// The value of `self.cpp_info.set_property("<property>", "<value>")` in a
 /// recipe, or "" when it sets none (a component's property is not the
 /// package's).
-pub fn conan_recipe_cpp_info_property(recipe: &str, property: &str) -> str:
+fn conan_recipe_cpp_info_property(recipe: &str, property: &str) -> str:
     for quote in ["\"", "'"]:
         let needle = "self.cpp_info.set_property(" ++ quote ++ property ++ quote ++ ","
         let at = recipe.find(needle)
@@ -1881,7 +1881,7 @@ fn conan_registry_none(commit: &str, note: &str) -> ConanRegistryFacts: ConanReg
 var g_conan_registry_commit: str = ""
 var g_conan_registry_asked: bool = false
 
-pub fn conan_set_registry_commit(commit: &str):
+fn conan_set_registry_commit(commit: &str):
     g_conan_registry_commit = commit.to_owned()
     g_conan_registry_asked = commit.len() > 0
 
@@ -2048,7 +2048,7 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
 
 // A lock entry that was built from source: reuse the build, or build the same
 // version again; the recipe's digest for it must still be the locked one.
-pub fn conan_restore_locked_source(name: &str, version: &str, sha256: &str, project_root: &str) -> bool:
+fn conan_restore_locked_source(name: &str, version: &str, sha256: &str, project_root: &str) -> bool:
     if runtime_file_exists(project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version ++ "/metadata.json") != 0: return true
     let folder = conan_recipe_folder(name, version)
     let data = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conandata.yml")) else: ""
@@ -2088,5 +2088,5 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
     conan_install_from_source(name, version, project_root, depth)
 
 // Public API. Returns the concrete installed version, or "" on failure.
-pub fn conan_install(name: &str, version_hint: &str, project_root: &str, force_reinstall: bool) -> str:
+fn conan_install(name: &str, version_hint: &str, project_root: &str, force_reinstall: bool) -> str:
     conan_install_internal(name, version_hint, project_root, 0, force_reinstall)

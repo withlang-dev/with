@@ -21,28 +21,28 @@
 
 use std.encoding.xml
 
-pub type GirFn {
+type GirFn {
     pub c_name: str,
     // `ret=<full|none|container|->;rnull=<0|1>;rtype=<name>;inst=<-1|0>;p=<t,t,…>`
     pub facts: str,
 }
 
-pub type GirFacts {
+type GirFacts {
     pub fns: List[GirFn],
     // The functions the files name as a record's or class's destroyer.
     pub drops: List[str],
 }
 
-pub fn GirFacts.new() -> GirFacts: GirFacts { fns: List.new(), drops: List.new() }
+fn GirFacts.new() -> GirFacts: GirFacts { fns: List.new(), drops: List.new() }
 
 impl GirFacts:
     /// The facts for the C function named `c_name`, or "".
-    pub fn facts_of(c_name: &str) -> str:
+    fn facts_of(c_name: &str) -> str:
         for f in self.fns:
             if f.c_name == c_name: return f.facts
         ""
 
-    pub fn names_drop(c_name: &str) -> bool: self.drops.contains(c_name)
+    fn names_drop(c_name: &str) -> bool: self.drops.contains(c_name)
 
 fn gir_attr_or(el: &XmlElement, name: &str, fallback: &str) -> str:
     match el.attr(name):
@@ -84,7 +84,7 @@ fn gir_walk(el: &XmlElement, out: GirFacts) -> GirFacts:
     facts
 
 /// Reads every `.gir` in `paths` into one fact set.
-pub fn gir_read_files(paths: &List[str]) -> Result[GirFacts, str]:
+fn gir_read_files(paths: &List[str]) -> Result[GirFacts, str]:
     var facts = GirFacts.new()
     for path in paths:
         let doc = match XmlDocument.parse_file(path):
@@ -95,14 +95,14 @@ pub fn gir_read_files(paths: &List[str]) -> Result[GirFacts, str]:
     Ok(facts)
 
 /// The value of `key` in a facts string, or "".
-pub fn gir_fact(facts: &str, key: &str) -> str:
+fn gir_fact(facts: &str, key: &str) -> str:
     for entry in facts.split(";"):
         if entry.starts_with(key ++ "="): return entry.slice(key.len() + 1, entry.len())
     ""
 
 /// Parameter `index`'s transfer in a facts string: `full`, `none`,
 /// `container`, or `-` when the file states none.
-pub fn gir_param_transfer(facts: &str, index: i32) -> str:
+fn gir_param_transfer(facts: &str, index: i32) -> str:
     let params = gir_fact(facts, "p").split(",")
     if index < 0 or index >= params.len(): return "-"
     params[index]

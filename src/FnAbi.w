@@ -39,7 +39,7 @@ pub const PM_IGNORE: i32 = 4
 
 // Context-owned LLVM handles are data, never classification inputs at a
 // call site. Descriptors are immutable after interning in Codegen.
-pub type ArgAbi {
+type ArgAbi {
     source_ty: i64,
     llvm_ty: i64,
     pass: i32,
@@ -48,7 +48,7 @@ pub type ArgAbi {
 }
 impl Copy for ArgAbi
 
-pub type FnAbi {
+type FnAbi {
     arg_start: i32,
     arg_count: i32,
     ret: ArgAbi,
@@ -65,7 +65,7 @@ pub const FN_ABI_ASYNC: i32 = 3
 // The classifier. `uses_value_ref_abi` is Sema's finalized share-place
 // verdict for the parameter; `platform_indirect` is the platform's answer
 // for the parameter's LLVM type (fn_abi_platform_aggregate_indirect).
-pub fn fn_abi_pass_mode(uses_value_ref_abi: i32, platform_indirect: bool) -> i32:
+fn fn_abi_pass_mode(uses_value_ref_abi: i32, platform_indirect: bool) -> i32:
     if uses_value_ref_abi != 0:
         return PM_INDIRECT_PLACE
     if platform_indirect:
@@ -75,18 +75,18 @@ pub fn fn_abi_pass_mode(uses_value_ref_abi: i32, platform_indirect: bool) -> i32
 // Closure returns stay direct in LLVM so its hidden target sret precedes
 // the environment consistently (#806). Async bodies use their in-unit value
 // convention. These exceptions belong to the hashed ABI rules too.
-pub fn fn_abi_return_pass(convention: i32, has_value: bool, platform_indirect: bool) -> i32:
+fn fn_abi_return_pass(convention: i32, has_value: bool, platform_indirect: bool) -> i32:
     if not has_value: return PM_IGNORE
     if convention == FN_ABI_CLOSURE or convention == FN_ABI_ASYNC: return PM_DIRECT
     if platform_indirect: PM_INDIRECT else: PM_DIRECT
 
-pub fn fn_abi_argument_pass(place: i32, convention: i32, platform_indirect: bool) -> i32:
+fn fn_abi_argument_pass(place: i32, convention: i32, platform_indirect: bool) -> i32:
     fn_abi_pass_mode(place, convention != FN_ABI_ASYNC and platform_indirect)
 
 // Destruction owns the value in its existing storage. The body and the
 // compiler's subsequent field cleanup must observe the same moved fields.
 // This is owned Indirect, without byval copying; it is never a borrow.
-pub fn fn_abi_owned_place(drop_receiver: bool, aggregate: bool) -> bool:
+fn fn_abi_owned_place(drop_receiver: bool, aggregate: bool) -> bool:
     drop_receiver and aggregate
 
 // A struct or array larger than two words is passed as a pointer to a
@@ -100,10 +100,10 @@ pub fn fn_abi_owned_place(drop_receiver: bool, aggregate: bool) -> bool:
 // one (SysV x86_64, `target_byval`); under With's own conventions it is a
 // plain pointer to the caller's copy on every target, as windows-x86_64's
 // has always been.
-pub fn fn_abi_indirect_uses_byval(convention: i32, target_byval: bool) -> bool:
+fn fn_abi_indirect_uses_byval(convention: i32, target_byval: bool) -> bool:
     convention == FN_ABI_C and target_byval
 
-pub fn fn_abi_platform_aggregate_indirect(windows_x86_64: bool, is_aggregate: bool, size: i64) -> bool:
+fn fn_abi_platform_aggregate_indirect(windows_x86_64: bool, is_aggregate: bool, size: i64) -> bool:
     is_aggregate and size > (if windows_x86_64: 8 else: 16)
 
 // §4.3d / §16.1 (D78): a vector crossing a C call goes where the target's C
@@ -112,10 +112,10 @@ pub fn fn_abi_platform_aggregate_indirect(windows_x86_64: bool, is_aggregate: bo
 // passes a pointer to a caller-made copy and returns through sret, SysV
 // x86_64 passes it in memory (byval) and returns it by value, and Windows
 // x86_64 leaves both to LLVM's vector lowering.
-pub fn fn_abi_c_vector_param_indirect(arch: &str, os: &str, size: i64) -> bool:
+fn fn_abi_c_vector_param_indirect(arch: &str, os: &str, size: i64) -> bool:
     size > 16 and (arch == "aarch64" or (arch == "x86_64" and os != "Windows"))
 
-pub fn fn_abi_c_vector_return_indirect(arch: &str, size: i64) -> bool:
+fn fn_abi_c_vector_return_indirect(arch: &str, size: i64) -> bool:
     size > 16 and arch == "aarch64"
 
 // C's array typedef on SysV x86_64 (Linux and Darwin alike) decays to the
@@ -123,22 +123,22 @@ pub fn fn_abi_c_vector_return_indirect(arch: &str, size: i64) -> bool:
 // ordinary aggregate ABI (including the caller-allocated copy at a foreign
 // C call), and Darwin arm64, Windows and WebAssembly represent va_list as a
 // pointer value.
-pub fn fn_abi_c_va_list_uses_caller_place(os: &str, arch: &str) -> bool:
+fn fn_abi_c_va_list_uses_caller_place(os: &str, arch: &str) -> bool:
     arch == "x86_64" and os != "Windows"
 
 // D75 (§16.2b.5): a function defined with a trailing `...` has the C
 // calling convention, whatever else its declaration says — its variable
 // arguments arrive where the target's C caller puts them, and
 // llvm.va_start reads them from there.
-pub fn fn_abi_definition_convention(c_callconv: bool, variadic: bool) -> i32:
+fn fn_abi_definition_convention(c_callconv: bool, variadic: bool) -> i32:
     if c_callconv or variadic: FN_ABI_C else: FN_ABI_WITH
 
 // ── Symbols ─────────────────────────────────────────────────────────────
 
 // A function whose symbol has no text (synthesized) links as __fn_<sym>.
-pub fn fn_abi_anonymous_symbol(sym: i32) -> str: f"__fn_{sym}"
+fn fn_abi_anonymous_symbol(sym: i32) -> str: f"__fn_{sym}"
 
-pub fn codegen_hash_name_component(value: i64) -> str:
+fn codegen_hash_name_component(value: i64) -> str:
     if value < 0:
         return "n" ++ f"{0 - value}"
     f"{value}"
@@ -163,7 +163,7 @@ fn fn_abi_std_tree_relative(path: &str) -> str:
 // compiler's own build maps its project root to /with-src; a debugger maps it
 // back (`settings set target.source-map /with-src <checkout>`). The mapping
 // applies at a path boundary only: /a/with never rewrites /a/with-staging.
-pub fn fn_abi_file_prefix_mapped(path: &str) -> str:
+fn fn_abi_file_prefix_mapped(path: &str) -> str:
     let mapping = with_getenv_str("WITH_FILE_PREFIX_MAP")
     let eq = mapping.find("=")
     if eq <= 0: return with_str_clone_ref(path)
@@ -174,7 +174,7 @@ pub fn fn_abi_file_prefix_mapped(path: &str) -> str:
         return to ++ path.slice(from.len(), path.len())
     with_str_clone_ref(path)
 
-pub fn codegen_canonical_module_path(path: &str) -> str:
+fn codegen_canonical_module_path(path: &str) -> str:
     if path.len() == 0 or path == "<unknown>":
         return with_str_clone_ref(path)
     if path[0] == '<':
@@ -193,7 +193,7 @@ pub fn codegen_canonical_module_path(path: &str) -> str:
         return resolve_normalize_path(path)
     fn_abi_file_prefix_mapped(resolve_join(cwd, path))
 
-pub fn codegen_is_runtime_source_file(source_path: &str) -> bool:
+fn codegen_is_runtime_source_file(source_path: &str) -> bool:
     source_path.starts_with("rt/") or source_path.contains("/rt/") or
         source_path.starts_with("rt\\") or source_path.contains("\\rt\\") or
         source_path == "out/gen/compat_runtime.w" or
@@ -201,7 +201,7 @@ pub fn codegen_is_runtime_source_file(source_path: &str) -> bool:
         source_path.ends_with("/out/gen/compat_runtime.w") or
         source_path.ends_with("\\out\\gen\\compat_runtime.w")
 
-pub fn codegen_is_runtime_abi_symbol(base_name: &str) -> bool:
+fn codegen_is_runtime_abi_symbol(base_name: &str) -> bool:
     if base_name.starts_with("with_") or base_name.starts_with("rt_") or base_name.starts_with("wl_"):
         return true
     base_name == "__open" or base_name == "pthread_self" or
@@ -213,7 +213,7 @@ pub fn codegen_is_runtime_abi_symbol(base_name: &str) -> bool:
 // externs call them by. Link-name preservation only — an extern of the same
 // name elsewhere (a c_import of memset) keeps the C ABI, so this is kept out
 // of codegen_is_runtime_abi_symbol.
-pub fn codegen_is_wasm_libc_provider_symbol(base_name: &str) -> bool:
+fn codegen_is_wasm_libc_provider_symbol(base_name: &str) -> bool:
     base_name == "_exit" or base_name == "abort" or
         base_name == "malloc" or base_name == "free" or
         base_name == "memcpy" or base_name == "memmove" or base_name == "memset" or
@@ -225,13 +225,13 @@ pub fn codegen_is_wasm_libc_provider_symbol(base_name: &str) -> bool:
         base_name == "ispunct" or base_name == "isspace" or base_name == "isupper" or
         base_name == "isxdigit" or base_name == "tolower" or base_name == "toupper"
 
-pub fn codegen_preserve_runtime_link_name(source_path: &str, base_name: &str) -> bool:
+fn codegen_preserve_runtime_link_name(source_path: &str, base_name: &str) -> bool:
     codegen_is_runtime_source_file(source_path) and (codegen_is_runtime_abi_symbol(base_name) or codegen_is_wasm_libc_provider_symbol(base_name))
 
 // The prefix every module-qualified symbol of `source_path` carries:
 // `__with_mod_<hash(canonical module path)>__`. A .wo bundle's manifest lists
 // one per module; an undefined symbol starting with it is that bundle's.
-pub fn fn_abi_module_link_prefix(source_path: &str) -> str:
+fn fn_abi_module_link_prefix(source_path: &str) -> str:
     let canonical_path = codegen_canonical_module_path(source_path)
     if canonical_path.len() == 0 or canonical_path == "<unknown>":
         return ""
@@ -240,7 +240,7 @@ pub fn fn_abi_module_link_prefix(source_path: &str) -> str:
 // A function's link name when objects are built per module:
 // __with_mod_<hash(canonical module path)>__<base>. Runtime ABI symbols keep
 // their bare names; whole-program mode keeps every base name.
-pub fn fn_abi_module_link_name(module_object_mode: i32, source_path: &str, base_name: &str) -> str:
+fn fn_abi_module_link_name(module_object_mode: i32, source_path: &str, base_name: &str) -> str:
     if module_object_mode == 0:
         return with_str_clone_ref(base_name)
     if codegen_preserve_runtime_link_name(source_path, base_name):

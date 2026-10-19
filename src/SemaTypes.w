@@ -1,6 +1,6 @@
 // Type tags shared by semantic analysis and the frozen MIR type tables.
 // Keep this vocabulary independent of the semantic-analysis driver.
-pub enum TypeKind: i32:
+enum TypeKind: i32:
     TY_ERR = 0
     TY_INT = 1
     TY_FLOAT = 2
@@ -44,7 +44,7 @@ pub type TypeId = i32
 
 // §4.3d (D78): the vector operation Sema decided for a node
 // (Sema.vector_ops); MirLower lowers it and never re-derives it.
-pub enum VectorOp: i32:
+enum VectorOp: i32:
     // `f32x4(a, b, c, d)` / `Vector[T, N](...)`: the call's arguments are
     // the lanes, in order.
     CONSTRUCT = 1
@@ -74,14 +74,14 @@ pub enum VectorOp: i32:
 
 impl Copy for VectorOp
 
-pub enum BorrowKind: i32:
+enum BorrowKind: i32:
     SHARED = 0
     EXCLUSIVE = 1
 
 // §4.5 (D75, #1802): what a cast whose target relabels its source does with
 // the source (Sema.cast_modes). The target states the mode, as a parameter's
 // type does.
-pub enum CastMode: i32:
+enum CastMode: i32:
     // An owned value crosses into or out of its distinct type: the source is
     // consumed and the result owns it.
     MOVE = 1
@@ -93,7 +93,7 @@ pub enum CastMode: i32:
     REF_RELABEL = 3
 
 // D61 (§15.4.7): how `:?` formats one registered type (Sema.debug_fmt_*).
-pub enum DebugFmtKind: i32:
+enum DebugFmtKind: i32:
     // A formatter MirLower synthesizes: struct, enum, tuple, array, slice,
     // List, Box — each component formatted with `:?`.
     SYNTH = 1
@@ -107,7 +107,7 @@ pub enum DebugFmtKind: i32:
 // operations. Both LLVM and C backends read these instead of
 // inferring builtin kind from method names at codegen time.
 
-pub enum MirIntrinsic: i32:
+enum MirIntrinsic: i32:
     NONE
     LIST_NEW
     FIXED_STRING_NEW
@@ -389,7 +389,7 @@ pub enum MirIntrinsic: i32:
 impl Copy for MirIntrinsic
 
 // D44: the std-only slot accessors a map traversal walks (std.collections).
-pub fn mir_map_slot_intrinsic(name: &str) -> MirIntrinsic:
+fn mir_map_slot_intrinsic(name: &str) -> MirIntrinsic:
     if name == "slot_count": return MirIntrinsic.MAP_CAPACITY
     if name == "slot_live": return MirIntrinsic.MAP_SLOT_OCCUPIED
     if name == "slot_key": return MirIntrinsic.MAP_KEY_AT
@@ -397,7 +397,7 @@ pub fn mir_map_slot_intrinsic(name: &str) -> MirIntrinsic:
     if name == "slot_take": return MirIntrinsic.MAP_TAKE_AT
     MirIntrinsic.NONE
 
-pub fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: &str) -> MirIntrinsic:
+fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: &str) -> MirIntrinsic:
     if method_name == "len":
         return base
     if base == MirIntrinsic.LIST_LEN:
@@ -431,7 +431,7 @@ pub fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: &str) -> MirInt
 // the method it resolved (check_method_call_parts) and records it per call
 // and instance; MirLower switches on the record and never compares a method
 // or type name.
-pub enum MethodLowering: i32:
+enum MethodLowering: i32:
     None = 0
     PtrAsOption
     ExplicitDrop
@@ -477,7 +477,7 @@ impl Copy for MethodLowering
 
 // D65 phase 5 (#2043): which std generic a type is, by Sema's identity for
 // the instance's declaration — never by a later stage reading its name.
-pub enum StdGeneric: i32:
+enum StdGeneric: i32:
     None = 0
     List
     HashMap

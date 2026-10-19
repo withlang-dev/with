@@ -549,7 +549,7 @@ fn uat_project_root() -> str:
     // take it); scenarios live in its `uat/`.
     uat_abs(".")
 
-pub fn uat_list_scenarios(root: &str) -> List[str]:
+fn uat_list_scenarios(root: &str) -> List[str]:
     var out: List[str] = List.new()
     let listing = with_fs_list_files(uat_join(root, "uat"))
     for line in listing.split("\n"):
@@ -557,7 +557,7 @@ pub fn uat_list_scenarios(root: &str) -> List[str]:
         if p.ends_with(".uat") and not p.contains("/fixtures/"): out.push(p.clone())
     uat_sort_strings(move out)
 
-pub fn run_uat_command(argv: &List[str]) -> i32:
+fn run_uat_command(argv: &List[str]) -> i32:
     var list_only = false
     var keep = false
     var wanted = ""

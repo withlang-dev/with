@@ -19,7 +19,7 @@ type AsyncSnapshot {
     resume_bb: i32,
 }
 
-pub type AsyncLowerResult {
+type AsyncLowerResult {
     out_mod: AsyncMirModule,
     diags: DiagnosticList,
 }
@@ -59,7 +59,7 @@ fn async_ast_kind(ast: &AstPool, node: i32) -> i32:
 fn async_body_suspend_count(body: &AsyncMirBody) -> i32:
     body.suspend_count()
 
-pub fn lower_async_module(mir_mod: &MirModule, ast: &AstPool, pool: &InternPool, sema: &Sema, diags: DiagnosticList) -> AsyncLowerResult:
+fn lower_async_module(mir_mod: &MirModule, ast: &AstPool, pool: &InternPool, sema: &Sema, diags: DiagnosticList) -> AsyncLowerResult:
     var lower = AsyncLower {
         mir_mod,
         ast: ast.clone(),

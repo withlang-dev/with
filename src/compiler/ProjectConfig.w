@@ -4,7 +4,7 @@ use Overflow
 
 extern fn with_str_clone_ref(s: &str) -> str
 
-pub type ProjectConfig {
+type ProjectConfig {
     root_dir: str,
     manifest_path: str,
     manifest_error: str,
@@ -39,7 +39,7 @@ pub type ProjectConfig {
     lint_partial_statement_match: bool,
 }
 
-pub fn project_config_default -> ProjectConfig:
+fn project_config_default -> ProjectConfig:
     ProjectConfig {
         root_dir: "",
         manifest_path: "",
@@ -86,7 +86,7 @@ fn project_config_clone_str_list(values: &List[str]) -> List[str]:
         out.push(project_config_clone_str(values[i]))
     out
 
-pub fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
+fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
     ProjectConfig {
         root_dir: project_config_clone_str(cfg.root_dir),
         manifest_path: project_config_clone_str(cfg.manifest_path),
@@ -122,10 +122,10 @@ pub fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
         lint_partial_statement_match: cfg.lint_partial_statement_match,
     }
 
-pub fn project_config_file_exists(path: &str) -> bool:
+fn project_config_file_exists(path: &str) -> bool:
     runtime_read_file(path).len() > 0
 
-pub fn project_config_find_root(start_dir: &str) -> str:
+fn project_config_find_root(start_dir: &str) -> str:
     var cur = if start_dir.len() > 0: with_str_clone_ref(start_dir) else: "."
     while true:
         let manifest = resolve_join(cur, "with.toml")
@@ -137,7 +137,7 @@ pub fn project_config_find_root(start_dir: &str) -> str:
         cur = parent
     ""
 
-pub fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
+fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
     let source_path = project_config_absolutize_path(source_path_raw)
     let root = project_config_find_root(resolve_dirname(source_path))
     if root.len() == 0:
@@ -488,7 +488,7 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
             out = project_config_load_dep_component(move out, req_name, req_version, req_component)
     out
 
-pub fn project_config_json_str_array(json: &str, key: &str) -> List[str]:
+fn project_config_json_str_array(json: &str, key: &str) -> List[str]:
     // Simple JSON array extractor: find "key": [...] and extract string values.
     var result: List[str] = List.new()
     let needle = "\"" ++ key ++ "\""
@@ -678,7 +678,7 @@ fn project_config_is_string_array_value(value: &str) -> bool:
             return false
     not expect_value or project_config_trim(text.slice(1, text.len() - 1)).len() == 0
 
-pub fn project_config_resolve_c_import_header(cfg: &ProjectConfig, decl_dir: &str, header_spec_raw: &str) -> str:
+fn project_config_resolve_c_import_header(cfg: &ProjectConfig, decl_dir: &str, header_spec_raw: &str) -> str:
     let header_spec = project_config_trim(header_spec_raw)
     if header_spec.len() == 0:
         return with_str_clone_ref(header_spec_raw)
@@ -759,7 +759,7 @@ fn project_config_normalize_absolute_path(path: &str) -> str:
             out = out.slice(0, out.len() - 1)
     out
 
-pub fn project_config_absolutize_path(path: &str) -> str:
+fn project_config_absolutize_path(path: &str) -> str:
     if path.len() == 0:
         return with_str_clone_ref(path)
     if project_config_is_absolute_path(path):

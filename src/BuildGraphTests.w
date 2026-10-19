@@ -15,7 +15,7 @@ type BuildGraphExternalTestJob {
     pid: i32,
 }
 
-pub fn build_graph_test_target_files(root: &str, entry: &str) -> List[str]:
+fn build_graph_test_target_files(root: &str, entry: &str) -> List[str]:
     let files: List[str] = List.new()
     if not build_graph_path_has_glob(entry):
         files.push(resolve_join(root, entry))
@@ -41,7 +41,7 @@ fn build_graph_test_compiler_arg(arg: &str) -> str:
         return arg.slice(prefix.len(), arg.len())
     ""
 
-pub fn build_graph_test_compiler(root: &str, target: &BuildGraphTarget) -> str:
+fn build_graph_test_compiler(root: &str, target: &BuildGraphTarget) -> str:
     for ai in 0..target.args.len():
         let value = build_graph_test_compiler_arg(target.args[ai])
         if value.len() > 0:
@@ -137,7 +137,7 @@ fn build_graph_eprint_capture_tail(label: &str, path: &str) -> Unit:
     for i in start..n:
         build_graph_rt_eprint("  | " ++ lines[i])
 
-pub fn build_graph_run_external_test_file(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_path: &str) -> i32:
+fn build_graph_run_external_test_file(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_path: &str) -> i32:
     let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
     if build_graph_rt_mkdir_p(capture_dir) != 0:
         build_graph_rt_eprint("error: could not create test output directory for target '" ++ target.name ++ "': " ++ capture_dir)
@@ -175,13 +175,13 @@ fn build_graph_finish_external_test_job(target: &BuildGraphTarget, job: &BuildGr
     let _remove_stderr = build_graph_rt_remove_file(job.stderr_path)
     0
 
-pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_files: &List[str]) -> i32:
+fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_files: &List[str]) -> i32:
     build_graph_run_test_files_pool(root, target, compiler_path, test_files, false)
 
 // `echo` is `with test`'s view (a person at a terminal): each file runs
 // without a forced --quiet and its output is printed as it finishes. A lane
 // keeps the captures to itself and prints only failures.
-pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_files: &List[str], echo: bool) -> i32:
+fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_files: &List[str], echo: bool) -> i32:
     let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
     if build_graph_rt_mkdir_p(capture_dir) != 0:
         build_graph_rt_eprint("error: could not create test output directory for target '" ++ target.name ++ "': " ++ capture_dir)

@@ -27,7 +27,7 @@ fn zcu_new_list_str -> List[str]:
     let out: List[str] = List.new()
     out
 
-pub fn zcu_debug_init_enabled() -> i32:
+fn zcu_debug_init_enabled() -> i32:
     let raw = runtime_getenv("WITH_DEBUG_STAGE1_TRACE")
     if raw.len() == 0:
         return 0
@@ -48,7 +48,7 @@ fn zcu_debug_pool_flow_enabled() -> i32:
 //
 // This is the canonical per-compilation owner of interned semantic state,
 // diagnostics, and source/import context.
-pub type Zcu {
+type Zcu {
     pool: InternPool,
     frontend_pool: InternPool,
     diagnostics: DiagnosticList,

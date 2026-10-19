@@ -40,7 +40,7 @@ extern fn with_clang_main(argc: i32, argv: *mut *mut u8, ctx: *const ClangToolCo
 // False when this compiler was linked against an SDK published before `with
 // cc`: the link then aliases with_clang_main to a stand-in (build/compiler.w),
 // which must never be called.
-pub fn with_cc_available() -> bool: embedded_clang_driver_linked()
+fn with_cc_available() -> bool: embedded_clang_driver_linked()
 
 // A NUL-terminated copy that lives for the rest of the process, as argv does.
 unsafe fn cc_c_string(s: &str) -> *mut u8:
@@ -139,7 +139,7 @@ fn cc_linux_resource_dir(headers: &str, sysroot: &str) -> str:
     dir
 
 // argv[0] is `with`, argv[1] is `cc`; everything after it is clang's.
-pub fn with_cc_main() -> i32:
+fn with_cc_main() -> i32:
     if not with_cc_available():
         with_eprint("error: this build of `with` has no C compiler: the LLVM SDK it was linked against predates `with cc`")
         return 127

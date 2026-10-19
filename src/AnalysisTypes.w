@@ -3,7 +3,7 @@ extern fn with_str_clone_ref(s: &str) -> str
 // emit this one schema so analysis commands join live compiler state instead
 // of parsing human-oriented dumps.
 
-pub enum AnalysisStage: i32:
+enum AnalysisStage: i32:
     Ast = 1
     Sema = 2
     Mir = 3
@@ -14,7 +14,7 @@ pub enum AnalysisStage: i32:
 
 impl Copy for AnalysisStage
 
-pub enum AnalysisFactKind: i32:
+enum AnalysisFactKind: i32:
     Declaration = 1
     Signature = 2
     Parameter = 3
@@ -56,7 +56,7 @@ pub enum AnalysisFactKind: i32:
 // than exposing Sema's internal ReceiverMode representation.
 impl Copy for AnalysisFactKind
 
-pub enum AnalysisReceiverMode: i32:
+enum AnalysisReceiverMode: i32:
     None = 0
     Read = 1
     Mut = 2
@@ -65,7 +65,7 @@ pub enum AnalysisReceiverMode: i32:
 
 impl Copy for AnalysisReceiverMode
 
-pub enum AnalysisDeclarationFlag: i32:
+enum AnalysisDeclarationFlag: i32:
     ExplicitReceiver = 256
     Generic = 512
     ReceiverProven = 1024
@@ -75,7 +75,7 @@ pub enum AnalysisDeclarationFlag: i32:
     SyntheticReceiver = 16384
     TraitDeclaration = 32768
 
-pub enum AnalysisMethodRegistrationFlag: i32:
+enum AnalysisMethodRegistrationFlag: i32:
     Inherent = 1
     Extension = 2
     Generic = 4
@@ -86,23 +86,23 @@ pub enum AnalysisMethodRegistrationFlag: i32:
 
 // Public analysis-domain diagnostic severity. Compiler clients consume this
 // schema instead of reaching into Diagnostic.w's private representation.
-pub enum AnalysisDiagnosticSeverity: i32:
+enum AnalysisDiagnosticSeverity: i32:
     Error = 1
     Warning = 2
     Note = 3
 
-pub fn analysis_required_receiver_mode(effects: i32) -> AnalysisReceiverMode:
+fn analysis_required_receiver_mode(effects: i32) -> AnalysisReceiverMode:
     if effects & 12 != 0: return AnalysisReceiverMode.Move
     if effects & 2 != 0: return AnalysisReceiverMode.Mut
     AnalysisReceiverMode.Read
 
-pub fn analysis_receiver_keyword(mode: AnalysisReceiverMode) -> str:
+fn analysis_receiver_keyword(mode: AnalysisReceiverMode) -> str:
     if mode == AnalysisReceiverMode.Read: return "fn"
     if mode == AnalysisReceiverMode.Mut: return "mut fn"
     if mode == AnalysisReceiverMode.Move: return "move fn"
     ""
 
-pub enum AnalysisMarshalStrategy: i32:
+enum AnalysisMarshalStrategy: i32:
     DirectValue = 1
     TransparentSlot = 2
     ExistingPointer = 3
@@ -119,7 +119,7 @@ pub enum AnalysisMarshalStrategy: i32:
 
 impl Copy for AnalysisMarshalStrategy
 
-pub fn analysis_marshal_strategy_name(strategy: AnalysisMarshalStrategy) -> str:
+fn analysis_marshal_strategy_name(strategy: AnalysisMarshalStrategy) -> str:
     if strategy == AnalysisMarshalStrategy.DirectValue: return "direct-value"
     if strategy == AnalysisMarshalStrategy.TransparentSlot: return "transparent-slot"
     if strategy == AnalysisMarshalStrategy.ExistingPointer: return "existing-pointer"
@@ -133,7 +133,7 @@ pub fn analysis_marshal_strategy_name(strategy: AnalysisMarshalStrategy) -> str:
     if strategy == AnalysisMarshalStrategy.CallBuilder: return "call-builder"
     "unknown"
 
-pub type AnalysisFact {
+type AnalysisFact {
     stage: AnalysisStage,
     kind: AnalysisFactKind,
     id: i32,
@@ -156,13 +156,13 @@ pub type AnalysisFact {
     detail: str,
 }
 
-pub type AnalysisReport {
+type AnalysisReport {
     facts: List[AnalysisFact],
     violations: List[str],
     notes: List[str],
 }
 
-pub type AnalysisBackendResult {
+type AnalysisBackendResult {
     report: AnalysisReport,
     status: i32,
 }
@@ -275,9 +275,9 @@ fn analysis_kind_name(kind: AnalysisFactKind) -> str:
     if kind == AnalysisFactKind.Operator: return "operator"
     "unknown"
 
-pub fn analysis_slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
+fn analysis_slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
 
-pub fn analysis_find_from(text: &str, needle: &str, start: i32) -> i32:
+fn analysis_find_from(text: &str, needle: &str, start: i32) -> i32:
     let n = text.len()
     let m = needle.len()
     if m == 0:
@@ -292,7 +292,7 @@ pub fn analysis_find_from(text: &str, needle: &str, start: i32) -> i32:
         i = i + 1
     -1
 
-pub fn analysis_parse_i32(text: &str) -> i32:
+fn analysis_parse_i32(text: &str) -> i32:
     if text.len() == 0: return 0
     var sign: i32 = 1
     var i = 0
@@ -376,7 +376,7 @@ fn analysis_term_matches(fact: &AnalysisFact, term: &str) -> bool:
         return analysis_parse_i32(actual) & mask == mask
     actual == wanted
 
-pub fn analysis_fact_matches(fact: &AnalysisFact, query: &str) -> bool:
+fn analysis_fact_matches(fact: &AnalysisFact, query: &str) -> bool:
     if query.len() == 0 or query == "all":
         return true
     var start: i32 = 0

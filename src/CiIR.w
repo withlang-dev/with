@@ -36,7 +36,7 @@ fn ci_ir_phase_bug(message: &str):
     with_eprint(message)
     abort()
 
-pub fn ci_ir_owned_text(text: &str) -> str:
+fn ci_ir_owned_text(text: &str) -> str:
     if text.len() == 0:
         return ""
     with_str_clone_ref(text)
@@ -86,7 +86,7 @@ fn ci_array_dims_comma(dims: &str) -> i64:
 
 /// The element type text of an array type text, "" when it is not one: the
 /// row `[T; 3]` of `[T; 2, 3]` (D119), `T` of `[T; 3]` and of `[3]T`.
-pub fn ci_array_text_elem(ty: &str) -> str:
+fn ci_array_text_elem(ty: &str) -> str:
     let (semi, close) = ci_array_text_split(ty)
     if semi <= 0:
         return if close > 0: ty.slice(close + 1, ty.len()).trim() else: ""
@@ -97,7 +97,7 @@ pub fn ci_array_text_elem(ty: &str) -> str:
 
 /// The outer count text of an array type text, "" for a slice or a
 /// non-array: 2 for `[T; 2, 3]`.
-pub fn ci_array_text_count(ty: &str) -> str:
+fn ci_array_text_count(ty: &str) -> str:
     let dims = ci_array_text_dims(ty)
     let comma = ci_array_dims_comma(dims)
     if comma < 0: dims else: dims.slice(0, comma).trim()
@@ -105,7 +105,7 @@ pub fn ci_array_text_count(ty: &str) -> str:
 /// `[elem; count]`, `[]elem` for a slice (no count); an array element joins
 /// the dimensions in index order (D119): `[c_int; 3]` counted 2 is
 /// `[c_int; 2, 3]`.
-pub fn ci_array_text(elem: &str, count: &str) -> str:
+fn ci_array_text(elem: &str, count: &str) -> str:
     if count.len() == 0:
         return "[]" ++ elem
     let (semi, close) = ci_array_text_split(elem)
@@ -115,7 +115,7 @@ pub fn ci_array_text(elem: &str, count: &str) -> str:
 /// D119 (with-migrate-spec.md "Arrays"): the `List` a C local or file-scope
 /// array declares: `[T; N]` is `List[T]`, `[T; M, N]` is `List[[T; N]]` (its
 /// rows stay inline values); "" for a slice or a non-array.
-pub fn ci_array_list_text(ty: &str) -> str:
+fn ci_array_list_text(ty: &str) -> str:
     let elem = ci_array_text_elem(ty)
     if elem.len() == 0 or ci_array_text_count(ty).len() == 0: return ""
     "List[" ++ elem ++ "]"
@@ -126,10 +126,10 @@ fn ci_ir_free_list_str(v: &List[str]): with_vec_free_es(v as *const List[str] as
 
 // ── CiType ────────────────────────────────────────────────────
 
-pub type CiTypeId = distinct i32
+type CiTypeId = distinct i32
 impl Copy for CiTypeId
 
-pub enum CiTypeKind: i32:
+enum CiTypeKind: i32:
     CT_VOID = 1
     CT_BOOL = 2
     CT_INT = 3       // d0 = bits, d1 = is_unsigned (0 or 1)
@@ -153,7 +153,7 @@ type CiTypePoolState {
     frozen: i32,
 }
 
-pub type CiTypePool {
+type CiTypePool {
     state: *mut CiTypePoolState,
 }
 impl Copy for CiTypePool
@@ -270,10 +270,10 @@ impl CiTypePool:
 
 // ── CiExpr ────────────────────────────────────────────────────
 
-pub type CiExprId = distinct i32
+type CiExprId = distinct i32
 impl Copy for CiExprId
 
-pub enum CiExprKind: i32:
+enum CiExprKind: i32:
     // Literals — d0 = string_idx of the already-formatted literal
     // text (decimal digits for ints/chars, suffix-stripped float
     // text, full quoted form for string literals). Printer is
@@ -328,7 +328,7 @@ pub enum CiExprKind: i32:
     CIE_UNSAFE = 80            // d0 = inner expr
 
 
-pub enum CiBinOp: i32:
+enum CiBinOp: i32:
     CIBO_ADD = 0
     CIBO_SUB = 1
     CIBO_MUL = 2
@@ -358,7 +358,7 @@ pub enum CiBinOp: i32:
     // value). Used for expressions like `(x = y)`.
     CIBO_ASSIGN = 21
 
-pub enum CiUnaryOp: i32:
+enum CiUnaryOp: i32:
     CIUO_NEG = 0
     CIUO_PLUS = 1
     CIUO_LOGICAL_NOT = 2
@@ -375,7 +375,7 @@ type CiExprPoolState {
     frozen: i32,
 }
 
-pub type CiExprPool {
+type CiExprPool {
     state: *mut CiExprPoolState,
 }
 impl Copy for CiExprPool
@@ -517,13 +517,13 @@ impl CiExprPool:
 
 // ── CiStmt ────────────────────────────────────────────────────
 
-pub type CiStmtId = distinct i32
+type CiStmtId = distinct i32
 impl Copy for CiStmtId
 
 // CIS_EXPR flag: the C expression's value is `void` (#1838).
 pub const CI_STMT_EXPR_VOID: i32 = 1
 
-pub enum CiStmtKind: i32:
+enum CiStmtKind: i32:
     CIS_EXPR = 1             // d0 = expr_id; flags: CI_STMT_EXPR_VOID
     CIS_RETURN = 2           // d0 = expr_id (0 = bare return)
     CIS_BLOCK = 3            // d0 = stmts_extra_start, d1 = stmts_count, d2 = label_sym (0 if none)
@@ -554,7 +554,7 @@ type CiStmtPoolState {
     frozen: i32,
 }
 
-pub type CiStmtPool {
+type CiStmtPool {
     state: *mut CiStmtPoolState,
 }
 impl Copy for CiStmtPool
@@ -717,10 +717,10 @@ impl CiStmtPool:
 
 // ── CiDecl ────────────────────────────────────────────────────
 
-pub type CiDeclId = distinct i32
+type CiDeclId = distinct i32
 impl Copy for CiDeclId
 
-pub enum CiDeclKind: i32:
+enum CiDeclKind: i32:
     // d0 = name_sym, d1 = ret_ty_id, d2 = body_block_stmt (0 for extern)
     // extra: [param_count, param0_name, param0_ty, param1_name, param1_ty, ...]
     // flags: bit0=is_extern bit1=is_static bit2=is_variadic bit3=is_c_export
@@ -767,7 +767,7 @@ type CiDeclPoolState {
     frozen: i32,
 }
 
-pub type CiDeclPool {
+type CiDeclPool {
     state: *mut CiDeclPoolState,
 }
 impl Copy for CiDeclPool
@@ -913,7 +913,7 @@ impl CiModule:
 // table so ownership and cross-module type resolution come from the
 // compiler rather than shell-side string rewriting.
 
-pub enum CiProjectSymbolKind: i32:
+enum CiProjectSymbolKind: i32:
     CIPS_VAR = 1
     CIPS_FN = 2
     CIPS_TYPE = 3
@@ -1077,7 +1077,7 @@ fn ci_project_symbol_key(kind: i32, name: &str) -> str:
         return "t:" ++ name
     "m:" ++ name
 
-pub type CiProject {
+type CiProject {
     module_paths: List[str],
     symbols: List[CiProjectSymbol],
     types: CiTypePool,

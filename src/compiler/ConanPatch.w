@@ -73,7 +73,7 @@ fn cp_patched_text(path: &str, creates: bool, original: &str, hunks: &List[CpHun
     (text, "")
 
 // Applies every file's hunks. Returns "" or what went wrong.
-pub fn conan_apply_patch(patch: &str, root: &str, read: fn(&str) -> str, write: fn(&str, &str) -> i32) -> str:
+fn conan_apply_patch(patch: &str, root: &str, read: fn(&str) -> str, write: fn(&str, &str) -> i32) -> str:
     let lines = cp_lines(patch)
     var path = ""
     var creates = false

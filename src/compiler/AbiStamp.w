@@ -10,12 +10,12 @@
 // value differs from this one (#761: never a silent mixed-ABI link).
 extern fn with_str_from_cstr(p: *const u8) -> str
 
-pub fn compiler_abi_sha() -> str:
+fn compiler_abi_sha() -> str:
     with_str_from_cstr(c"WITHABISHASTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr)
 
 // True once the slot has been patched (an unstamped binary still carries the
 // sentinel). Bundle keys must never be computed from an unstamped compiler.
-pub fn compiler_abi_sha_is_stamped() -> bool:
+fn compiler_abi_sha_is_stamped() -> bool:
     not compiler_abi_sha().starts_with("WITHABISHASTAMP")
 
 // The one rule for linking a .wo bundle against this compiler (D38, #761):
@@ -26,7 +26,7 @@ pub fn compiler_abi_sha_is_stamped() -> bool:
 // the bundles it embeds unchecked (#1330), as a hand-linked compiler keeps
 // no generation (#1815). Both link paths (Compilation.load_link_bundles,
 // Link.link_stage_select_embedded_bundles) read this; neither re-derives it.
-pub fn abi_identity_refuses_bundle(self_abi: &str, bundle_abi: &str) -> bool:
+fn abi_identity_refuses_bundle(self_abi: &str, bundle_abi: &str) -> bool:
     not self_abi.starts_with("WITHABISHASTAMP") and bundle_abi != self_abi
 
 // The compiler's own identity: the sha256 of its unstamped image, patched in
@@ -36,13 +36,13 @@ pub fn abi_identity_refuses_bundle(self_abi: &str, bundle_abi: &str) -> bool:
 // invocation, which cost every `with build`, no-op included, most of a
 // second. The version stamp is provenance, not semantics (D13), so it is
 // taken before the version is patched in.
-pub fn compiler_self_id() -> str:
+fn compiler_self_id() -> str:
     with_str_from_cstr(c"WITHSELFIDSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr)
 
 // True once the slot has been patched. An unstamped binary (a compile's
 // intermediate, or a compiler older than the slot) is fingerprinted by
 // hashing the file, as before.
-pub fn compiler_self_id_is_stamped() -> bool:
+fn compiler_self_id_is_stamped() -> bool:
     not compiler_self_id().starts_with("WITHSELFIDSTAMP")
 
 // #1815 (D30): which compiler generation this binary is, and which generation
@@ -56,13 +56,13 @@ pub fn compiler_self_id_is_stamped() -> bool:
 // its producer's generation in `<dir>/.producer`, and a compiler whose
 // embedded runtime came from another generation (stage1 carries the seed's)
 // never falls back to it.
-pub fn compiler_generation() -> str:
+fn compiler_generation() -> str:
     with_str_from_cstr(c"WITHGENSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr)
 
-pub fn compiler_runtime_generation() -> str:
+fn compiler_runtime_generation() -> str:
     with_str_from_cstr(c"WITHRTGENSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr)
 
 // An unstamped (hand-linked) compiler knows no generation; the link stage then
 // keeps its pre-#1815 byte-identity rule.
-pub fn compiler_generation_is_stamped() -> bool:
+fn compiler_generation_is_stamped() -> bool:
     not compiler_generation().starts_with("WITHGENSTAMP") and not compiler_runtime_generation().starts_with("WITHRTGENSTAMP")

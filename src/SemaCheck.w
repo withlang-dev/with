@@ -190,7 +190,7 @@ fn sema_path_is_runtime_implementation(path: &str) -> i32:
         return 1
     0
 
-pub fn sema_path_is_migrated_regex_implementation(path: &str) -> i32:
+fn sema_path_is_migrated_regex_implementation(path: &str) -> i32:
     if path.starts_with("lib/std/re/") or path.starts_with("<embedded-std>/std/re/"):
         return 1
     if path.contains("/lib/std/re/") or path.contains("\\lib\\std\\re\\"):
@@ -211,7 +211,7 @@ fn sema_path_is_compiler_source_implementation(path: &str) -> i32:
         return 1
     0
 
-pub fn sema_path_is_user_lint_source(path: &str) -> i32:
+fn sema_path_is_user_lint_source(path: &str) -> i32:
     if path.len() == 0:
         return 1
     if sema_path_is_std_implementation(path) != 0:
@@ -1792,7 +1792,7 @@ impl Sema:
     // What the collected demands decide, for the second check: per inferred
     // field, [type node, type, conflict, first type, its use, second type,
     // its use]. No demand leaves the default; two different ones conflict.
-    pub fn inferred_field_decisions() -> List[i32]:
+    fn inferred_field_decisions() -> List[i32]:
         var out: List[i32] = List.new()
         for k in 0..self.inferred_field_nodes.len():
             let default_ty = self.resolve_alias(self.inferred_field_aliases[k] as TypeId) as i32
@@ -7935,11 +7935,11 @@ impl Sema:
         row
 
     // The row call `node` resolved to, or -1.
-    pub fn builtin_call_sig(node: i32) -> i32: self.builtin_call_sigs.get(node) ?? &-1
+    fn builtin_call_sig(node: i32) -> i32: self.builtin_call_sigs.get(node) ?? &-1
 
     // D110: argument `i` of a call resolved to `row` — 1 observed (`&T`), 0
     // taken, -1 when there is no row or no such parameter.
-    pub fn builtin_row_observed(row: i32, i: i32) -> i32:
+    fn builtin_row_observed(row: i32, i: i32) -> i32:
         if row < 0 or i < 0 or i >= self.builtin_sig_modes[row].len(): -1 else: if self.builtin_sig_modes[row].byte_at(i) == 'o': 1 else: 0
 
     // D110: whether a call resolved to `row` stores argument `i`: taken as one
@@ -9909,7 +9909,7 @@ const BORROW_LIVE: i32 = 2
 
 // #1827: Sema.global_calls chained by caller (global_call_index), the
 // bundle build's index for fn_global_effects.
-pub type SemaGlobalCallIndex {
+type SemaGlobalCallIndex {
     head: HashMap[i32, i32],
     next: List[i32],
 }
@@ -12523,7 +12523,7 @@ type AutoderefStep {
     step_ty: i32,
 }
 
-pub type SemaDerefInfo {
+type SemaDerefInfo {
     ok: i32,
     target_ty: i32,
     result_ref_ty: i32,
@@ -13053,7 +13053,7 @@ fn sema_operator_method_name(op: i32) -> str:
     if op == BinaryOp.OP_MATMUL: return "matmul"
     ""
 
-pub fn sema_operator_symbol_text(op: i32) -> str:
+fn sema_operator_symbol_text(op: i32) -> str:
     if op == BinaryOp.OP_ADD: return "+"
     if op == BinaryOp.OP_SUB: return "-"
     if op == BinaryOp.OP_MUL: return "*"
@@ -13610,7 +13610,7 @@ impl Sema:
     // The nodes of an untyped constant's initializer that take the type of
     // the use: its literals and the operators over them, through the
     // constants it names. A shift's amount keeps its own type (§4.2.4).
-    pub fn untyped_const_value_path(node: i32, out0: List[i32]) -> List[i32]:
+    fn untyped_const_value_path(node: i32, out0: List[i32]) -> List[i32]:
         var out = out0
         if node == 0:
             return out
@@ -15479,7 +15479,7 @@ impl Sema:
     // then each of the two types as a length and its encoding (the second
     // has length 0 when there is none). A binding whose demanded type cannot
     // be carried is left out, and stays the List it is without its uses.
-    pub fn literal_decisions_from_demands() -> List[i32]:
+    fn literal_decisions_from_demands() -> List[i32]:
         // (let, type, second type or 0, use, second use), in this check's ids.
         var found: List[i32] = List.new()
         var found_at = sema_new_map_i32_i32()
@@ -22546,7 +22546,7 @@ impl Sema:
     // declares it `None | Some(T)`; codegen, which builds and tests Options
     // knowing only their LLVM type, asks here instead of assuming an order.
     // Option is not a repr enum: a variant's discriminant is its index.
-    pub fn std_option_variant_index(variant_sym: i32) -> i32:
+    fn std_option_variant_index(variant_sym: i32) -> i32:
         var i = self.named_type_candidate_head(self.syms.option)
         while i >= 0:
             let tid = self.resolve_alias(self.named_type_candidate_tids[i] as TypeId) as i32
@@ -22558,11 +22558,11 @@ impl Sema:
 
     // The tag of that variant: its discriminant, which is not its index
     // under WITH_DEBUG_PERMUTE_TAGS. -1 without an Option.
-    pub fn std_option_variant_tag(variant_sym: i32) -> i64: self.std_generic_enum_variant_tag(self.syms.option, variant_sym)
+    fn std_option_variant_tag(variant_sym: i32) -> i64: self.std_generic_enum_variant_tag(self.syms.option, variant_sym)
 
     // The tag of a variant of std's generic enum `enum_sym` (Option,
     // Result): its discriminant. -1 when the program has no such enum.
-    pub fn std_generic_enum_variant_tag(enum_sym: i32, variant_sym: i32) -> i64:
+    fn std_generic_enum_variant_tag(enum_sym: i32, variant_sym: i32) -> i64:
         var i = self.named_type_candidate_head(enum_sym)
         while i >= 0:
             let tid = self.resolve_alias(self.named_type_candidate_tids[i] as TypeId) as i32
@@ -22607,7 +22607,7 @@ impl Sema:
 
     // The tag of variant `index` of `enum_tid` (an enum or an instance of a
     // generic one): what codegen stores and tests, asked here (D65).
-    pub fn enum_variant_discriminant_by_index(enum_tid: i32, index: i32) -> i64:
+    fn enum_variant_discriminant_by_index(enum_tid: i32, index: i32) -> i64:
         let decl = self.enum_variant_decl_type(enum_tid)
         if decl == 0:
             sema_phase_bug(f"BUG: codegen asked a tag of type {enum_tid}, which declares no variants")
@@ -39119,7 +39119,7 @@ impl Sema:
     // whole-program Sema, about half of every compile, for demands that
     // all agreed). Two demands that disagree differ from the binding in
     // at least one, so the second check still reports them.
-    pub fn literal_demands_change_types() -> bool:
+    fn literal_demands_change_types() -> bool:
         var i = 0
         while i + 2 < self.literal_demands.len():
             let let_node: i32 = self.literal_demands[i]
