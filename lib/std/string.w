@@ -20,7 +20,6 @@
 
 use std.collections
 extern fn with_lines_out_ref(out: *mut u8, s: &str) -> Unit
-extern fn with_parse_i64_ref(s: &str) -> i64
 extern fn with_str_len(s: &str) -> i64
 @[effect(v: write)]
 extern fn with_vec_append_bytes(v: *mut u8, s: &str) -> Unit
@@ -415,8 +414,25 @@ pub fn to_upper(c: i32) -> i32:
     if c >= 97 and c <= 122: c - 32 else: c
 
 /// Convert a string to an i64 integer. Returns 0 on invalid input.
+/// A With digit loop, not the runtime's with_parse_i64_ref: parsing is pure,
+/// so it is comptime-evaluable (#2460; a build action evaluated at comptime
+/// parses its env and args through here).
 pub fn string_to_int(s: &str) -> i64:
-    with_parse_i64_ref(s)
+    if s.len() == 0: return 0
+    var neg = false
+    var i: i64 = 0
+    if s[0] == 45:
+        neg = true
+        i = 1
+    else if s[0] == 43:
+        i = 1
+    var result: i64 = 0
+    while i < s.len():
+        let c = s[i]
+        if c < 48 or c > 57: break
+        result = result * 10 + (c - 48) as i64
+        i = i + 1
+    if neg: 0 - result else: result
 
 /// Split text into lines. Returns a List of strings, one per line.
 pub fn lines(s: &str) -> List[str]:

@@ -97,6 +97,7 @@ extern fn with_write(s: &str) -> Unit
 extern fn with_ewrite(s: &str) -> Unit
 extern fn with_getenv_str(name: &str) -> str
 extern fn with_setenv_str(name: &str, value: &str) -> i32
+extern fn with_getpid() -> i32
 extern fn with_parse_i64_ref(s: &str) -> i64
 extern fn with_str_len(s: &str) -> i64
 extern fn with_str_byte_at_ref(s: &str, index: i64) -> i32
@@ -8123,6 +8124,30 @@ impl ComptimeEvaluator:
                 else:
                     with_str_ends_with_ref(with_str_clone_ref(text.text), with_str_clone_ref(needle.text))
             return comptime_control_value(comptime_value_bool(result))
+        // #2460: host facts and jobserver plumbing a tool action reaches
+        // through std's free functions. The evaluator in tool mode *is* the
+        // build process, so its own pid is the slot owner a native runner
+        // would name; the slot symlink/remove pair is driver state outside
+        // any action's declared write scope by design (build/par.w).
+        if fn_name == "with_getpid":
+            if arg_values.len() != 0:
+                return self.fail(node, "with_getpid takes no arguments")
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_getpid() as i64))
+        if fn_name == "with_fs_symlink":
+            if arg_values.len() != 2:
+                return self.fail(node, "with_fs_symlink takes two arguments")
+            let target = arg_values[0]
+            let link_path = arg_values[1]
+            if target.kind != ComptimeValueKind.CV_STR or link_path.kind != ComptimeValueKind.CV_STR:
+                return self.fail(node, "with_fs_symlink expects string arguments")
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_symlink(target.text, link_path.text) as i64))
+        if fn_name == "with_fs_remove_file":
+            if arg_values.len() != 1:
+                return self.fail(node, "with_fs_remove_file takes one argument")
+            let path = arg_values[0]
+            if path.kind != ComptimeValueKind.CV_STR:
+                return self.fail(node, "with_fs_remove_file argument must be a string")
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_remove_file(path.text) as i64))
         if fn_name == "with_sysinfo_os" or fn_name == "with_sysinfo_arch" or fn_name == "with_sysinfo_hostname":
             if arg_values.len() != 0:
                 return self.fail(node, "sysinfo runtime call takes no arguments")
