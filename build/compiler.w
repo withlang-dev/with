@@ -399,7 +399,7 @@ fn comp_libclang_path(llvm_prefix: &str) -> str:
     if legacy.len() > 0:
         return legacy
     if os() == "Windows":
-        return llvm_prefix ++ "/lib/libclang.lib"
+        return llvm_prefix ++ "/lib/libclang.a"
     llvm_prefix ++ "/lib/libclang.dylib"
 
 fn comp_select_libclang_path(fs: &ToolFs, llvm_prefix: &str) -> str:
@@ -420,14 +420,12 @@ fn comp_select_libclang_path(fs: &ToolFs, llvm_prefix: &str) -> str:
 fn comp_link_path_is_dynamic(path: &str) -> bool:
     not path.ends_with(".a") and not path.ends_with(".lib")
 
-// The SDK's static libclang, the marker `:deps` installs: libclang.lib in a
-// Visual Studio-built SDK (windows-aarch64), libclang.a everywhere else,
-// the windows-gnu x86_64 SDK included (#1915).
+// The SDK's static libclang, the marker `:deps` installs: libclang.a in
+// every pinned SDK now - the windows-aarch64 SDK rebuilt by sdk-release
+// (run 39180949033) is a windows-gnu build like x86_64's (#1915), where
+// the hand-built Visual Studio SDK pinned before it shipped libclang.lib.
 pub fn compiler_default_libclang_archive_path() -> str:
-    let prefix = compiler_default_llvm_prefix()
-    if os() == "Windows" and arch() == "aarch64":
-        return prefix ++ "/lib/libclang.lib"
-    prefix ++ "/lib/libclang.a"
+    compiler_default_llvm_prefix() ++ "/lib/libclang.a"
 
 const COMP_CLT_SDK = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
 const COMP_XCODE_SDK = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
