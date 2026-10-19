@@ -68,7 +68,7 @@ jobs:
       # prefix — no rename).
       CROSS_SDK_TAG: sdk-windows-aarch64
       CROSS_SDK_ASSET: with-llvm-sdk-22.1.6-windows-aarch64.tar.gz
-      CROSS_SDK_SHA256: ad13e07af474d683c699f041c52cd98697df9781b581dda913d39d92be186743
+      CROSS_SDK_SHA256: f137ee12d0f55348da94e5e55b4ee43ef60e4a1788f23156f93f9d4f645454ee
       # Cross target.
       CROSS_TRIPLE: aarch64-pc-windows-msvc
       # xwin: MSVC CRT + Windows SDK (ucrt/um) arm64 import libraries.
