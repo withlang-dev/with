@@ -777,6 +777,27 @@ fn link_stage_windows_is_compiler_link(extras: &List[str]) -> bool:
 fn link_stage_is_llvm_bridge_rsp(extra: &str) -> bool:
     extra.starts_with("@") and extra.ends_with("/llvm_ld.rsp")
 
+// The SDK whose archives a compiler link reads is the one its llvm_ld.rsp
+// names. That is not necessarily the SDK containing the lld executable: a
+// cross link runs the host's lld-link over the target SDK's archives, and
+// its C runtime and compiler-rt builtins belong to that target SDK too.
+fn link_stage_windows_sdk_dir_from_rsp(extras: &List[str]) -> str:
+    for i in 0..extras.len():
+        let extra = extras[i]
+        if link_stage_is_llvm_bridge_rsp(extra):
+            for raw in runtime_read_file(extra.slice(1, extra.len())).split("\n"):
+                let path = raw.trim().replace("\"", "")
+                if path.ends_with("/lib/libclang.a") or path.ends_with("/lib/libclang.lib"):
+                    return link_stage_dirname(link_stage_dirname(path))
+    ""
+
+fn link_stage_windows_effective_sdk_dir(sdk_dir: &str, extras: &List[str], compiler_link: bool) -> str:
+    if compiler_link:
+        let rsp_sdk = link_stage_windows_sdk_dir_from_rsp(extras)
+        if rsp_sdk.len() > 0:
+            return rsp_sdk
+    sdk_dir ++ ""
+
 // The architecture of a Windows link: the cross target's, else the host's.
 fn link_stage_windows_arch() -> str:
     if not target_spec_is_native():
@@ -900,21 +921,22 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_p
     let inputs: List[str] = List.new()
     let outputs: List[str] = List.new()
     let compiler_link = link_stage_windows_is_compiler_link(extras)
+    let link_sdk_dir = link_stage_windows_effective_sdk_dir(sdk_dir, extras, compiler_link)
     let arch = link_stage_windows_arch()
     // The SDK recipe covers x86_64, and windows-aarch64 since its SDK is a
     // windows-gnu build too (run 39180949033): a gnu SDK links from its own
     // libc on either arch, while a Visual Studio-built aarch64 SDK (the one
     // pinned before it) keeps the Visual Studio recipe below (#1915).
-    let sdk_is_gnu = link_stage_file_exists(sdk_dir ++ "/lib/libclang.a")
+    let sdk_is_gnu = link_stage_file_exists(link_sdk_dir ++ "/lib/libclang.a")
     let sdk_libc = (arch == "x86_64" or sdk_is_gnu) and (not compiler_link or sdk_is_gnu)
-    let libc_dir = if sdk_libc: link_stage_windows_libc_dir(sdk_dir, arch) else: ""
-    let builtins = if sdk_libc: link_stage_windows_builtins(sdk_dir, arch) else: ""
+    let libc_dir = if sdk_libc: link_stage_windows_libc_dir(link_sdk_dir, arch) else: ""
+    let builtins = if sdk_libc: link_stage_windows_builtins(link_sdk_dir, arch) else: ""
     if sdk_libc:
         if not link_stage_file_exists(libc_dir ++ "/crt2.o"):
-            with_eprint("error: the LLVM SDK at " ++ sdk_dir ++ " carries no Windows C runtime (" ++ libc_dir ++ "/crt2.o); a Windows link reads the SDK only (#1915). Install an SDK built with `with build :sdk-windows-libc` (or name one with WITH_WINDOWS_LIBC_DIR).")
+            with_eprint("error: the LLVM SDK at " ++ link_sdk_dir ++ " carries no Windows C runtime (" ++ libc_dir ++ "/crt2.o); a Windows link reads the SDK only (#1915). Install an SDK built with `with build :sdk-windows-libc` (or name one with WITH_WINDOWS_LIBC_DIR).")
             return link_stage_empty_command()
         if not link_stage_file_exists(builtins):
-            with_eprint("error: the LLVM SDK at " ++ sdk_dir ++ " carries no compiler-rt builtins for Windows (" ++ builtins ++ "); build them with `with build :sdk-compiler-rt-builtins` (#1915).")
+            with_eprint("error: the LLVM SDK at " ++ link_sdk_dir ++ " carries no compiler-rt builtins for Windows (" ++ builtins ++ "); build them with `with build :sdk-compiler-rt-builtins` (#1915).")
             return link_stage_empty_command()
     args.push("/nologo")
     // Reproducible PE output: lld-link derives the header timestamp and the

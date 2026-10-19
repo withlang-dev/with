@@ -626,12 +626,29 @@ fn cross_windows_libclang(fs: &ToolFs, lib_dir: &str) -> str:
     let gnu = lib_dir ++ "/libclang.a"
     if fs.host_exists(gnu): gnu else: lib_dir ++ "/libclang.lib"
 
+// A windows-gnu SDK's LLVM archives are C++ against that SDK's own libc++
+// and libunwind, as the native metadata records (build/compiler.w's
+// windows_gnu_sdk branch). A Visual Studio-built SDK needs neither here:
+// Link.w's Visual Studio recipe names libcpmt/libcmt instead.
+fn cross_windows_gnu_cxx_link_lines(ctx: &ActionCtx, prefix: &str, arch: &str, libclang: &str) -> str:
+    if not libclang.ends_with("/lib/libclang.a"): return ""
+    let fs = ctx.fs()
+    let libc_lib = prefix ++ "/libc/windows/" ++ arch ++ "-w64-mingw32/lib"
+    var out = ""
+    for name in ["libc++.a", "libunwind.a"]:
+        let path = libc_lib ++ "/" ++ name
+        if not fs.host_exists(path):
+            ctx.diagnostics().error("cross-windows-llvm-link-metadata: missing " ++ path ++ "; a windows-gnu SDK carries its C++ runtime in its Windows libc")
+        out = out ++ comp_rsp_path(path) ++ "\n"
+    out
+
 // Generate cross/windows_x86_64/llvm_ld.rsp: the windows LLVM SDK's
-// static clang+LLVM import/static archives, in lld-link positional
-// form (one archive per line, no GNU flags). The MSVC CRT and Windows
-// SDK import libraries are appended by the windows link recipe
-// (link_stage_make_windows_llvm_link_command) from the WITH_WINDOWS_*
-// lib dirs, so they are not repeated here.
+// static clang+LLVM archives, in lld-link positional form (one archive
+// per line, no GNU flags). The C runtime and Windows import libraries
+// are appended by the windows link recipe
+// (link_stage_make_windows_llvm_link_command), from the same target SDK
+// for a windows-gnu build and from WITH_WINDOWS_* for a Visual Studio
+// one, so they are not repeated here.
 fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let output_path = ctx.output()
@@ -667,6 +684,7 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     ld_rsp = ld_rsp ++ comp_lld_alias_lines(&comp_sdk_lld_flavors(fs, lib_dir, "Windows"), "Windows", false)
     ld_rsp = ld_rsp ++ comp_dsymutil_link_lines(false, lib_dir, "Windows", false)
     ld_rsp = ld_rsp ++ comp_dlltool_link_lines(false, "Windows", false)
+    ld_rsp = ld_rsp ++ cross_windows_gnu_cxx_link_lines(ctx, cross_windows_llvm_prefix(), "x86_64", libclang)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-llvm-link-metadata: could not write: " ++ output_path)
     0
@@ -730,6 +748,7 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     ld_rsp = ld_rsp ++ comp_lld_alias_lines(&comp_sdk_lld_flavors(fs, lib_dir, "Windows"), "Windows", false)
     ld_rsp = ld_rsp ++ comp_dsymutil_link_lines(false, lib_dir, "Windows", false)
     ld_rsp = ld_rsp ++ comp_dlltool_link_lines(false, "Windows", false)
+    ld_rsp = ld_rsp ++ cross_windows_gnu_cxx_link_lines(ctx, cross_windows_aarch64_llvm_prefix(), "aarch64", libclang)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: could not write: " ++ output_path)
     0
