@@ -618,9 +618,17 @@ fn cross_windows_object_target(name: &str, source: &str, opt: &str) -> Target:
     let stem = if base.ends_with(".w"): base.slice(0, base.len() - 2) else: base
     cross_windows_object_target_named(name, source, stem ++ ".o", opt)
 
+// The cross SDK's static libclang, by whichever naming its build used
+// (libclang.a from a windows-gnu SDK build, libclang.lib from a Visual
+// Studio one) - the same selection the native metadata makes
+// (build/compiler.w comp_select_libclang_path).
+fn cross_windows_libclang(fs: &ToolFs, lib_dir: &str) -> str:
+    let gnu = lib_dir ++ "/libclang.a"
+    if fs.host_exists(gnu): gnu else: lib_dir ++ "/libclang.lib"
+
 // Generate cross/windows_x86_64/llvm_ld.rsp: the windows LLVM SDK's
 // static clang+LLVM import/static archives, in lld-link positional
-// form (one .lib per line, no GNU flags). The MSVC CRT and Windows
+// form (one archive per line, no GNU flags). The MSVC CRT and Windows
 // SDK import libraries are appended by the windows link recipe
 // (link_stage_make_windows_llvm_link_command) from the WITH_WINDOWS_*
 // lib dirs, so they are not repeated here.
@@ -628,7 +636,7 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let output_path = ctx.output()
     let lib_dir = cross_windows_llvm_prefix() ++ "/lib"
-    let libclang = lib_dir ++ "/libclang.lib"
+    let libclang = cross_windows_libclang(fs, lib_dir)
     if not fs.host_exists(libclang):
         ctx.diagnostics().error("cross-windows-llvm-link-metadata: missing " ++ libclang ++ "; extract the with-llvm-sdk-" ++ compiler_llvm_version() ++ "-windows-x86_64 release asset into .deps/")
     let lib_files = fs.host_list_files(lib_dir)
@@ -639,11 +647,11 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     for i in 0..lib_files.len():
         let path = lib_files[i]
         let name = comp_path_basename(path)
-        if name.ends_with(".lib"):
-            if (name.starts_with("clang") or name.starts_with("libclang")) and path != libclang:
+        if name.ends_with(".a") or name.ends_with(".lib"):
+            if (name.starts_with("libclang") or name.starts_with("clang")) and path != libclang:
                 clang_archives.push(build_owned_text(path))
             else:
-                if name.starts_with("LLVM") and name != "LLVM-C.lib":
+                if (name.starts_with("libLLVM") or name.starts_with("LLVM")) and name != "LLVM-C.lib":
                     llvm_archives.push(build_owned_text(path))
     var ld_rsp = comp_rsp_path(libclang) ++ "\n"
     let sorted_clang = comp_sort_strings(clang_archives)
@@ -685,13 +693,13 @@ fn cross_windows_aarch64_object_target(name: &str, source: &str, opt: &str) -> T
     cross_windows_aarch64_object_target_named(name, source, stem ++ ".o", opt)
 
 // Generate cross/windows_aarch64/llvm_ld.rsp — arm64 sibling of
-// run_cross_windows_llvm_link_metadata_action; identical .lib selection
-// against the windows-aarch64 SDK prefix.
+// run_cross_windows_llvm_link_metadata_action; identical archive
+// selection against the windows-aarch64 SDK prefix.
 fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let output_path = ctx.output()
     let lib_dir = cross_windows_aarch64_llvm_prefix() ++ "/lib"
-    let libclang = lib_dir ++ "/libclang.lib"
+    let libclang = cross_windows_libclang(fs, lib_dir)
     if not fs.host_exists(libclang):
         ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: missing " ++ libclang ++ "; extract the with-llvm-sdk-" ++ compiler_llvm_version() ++ "-windows-aarch64 release asset into .deps/")
     let lib_files = fs.host_list_files(lib_dir)
@@ -702,11 +710,11 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     for i in 0..lib_files.len():
         let path = lib_files[i]
         let name = comp_path_basename(path)
-        if name.ends_with(".lib"):
-            if (name.starts_with("clang") or name.starts_with("libclang")) and path != libclang:
+        if name.ends_with(".a") or name.ends_with(".lib"):
+            if (name.starts_with("libclang") or name.starts_with("clang")) and path != libclang:
                 clang_archives.push(build_owned_text(path))
             else:
-                if name.starts_with("LLVM") and name != "LLVM-C.lib":
+                if (name.starts_with("libLLVM") or name.starts_with("LLVM")) and name != "LLVM-C.lib":
                     llvm_archives.push(build_owned_text(path))
     var ld_rsp = comp_rsp_path(libclang) ++ "\n"
     let sorted_clang = comp_sort_strings(clang_archives)
