@@ -413,9 +413,9 @@ impl Zcu:
         // list (clear+set) so a prior compile in the same process — `with test`
         // runs many — cannot leak stale include dirs.
         ci_set_include_paths(self.project_config.c_import_include_paths)
-        // Windows x86_64: parse against the SDK's libc, the one the link
+        // Windows: parse against the SDK's libc, the one the link
         // reads (#1915, Link.w link_stage_windows_libc_root). A Windows target
-        // the SDK's libc does not cover yet (aarch64) keeps the explicit
+        // whose SDK carries no libc for its arch keeps the explicit
         // WITH_WINDOWS_*_INCDIR dirs; both are no-ops off Windows.
         if link_stage_windows_c_target_uses_sdk_libc():
             ci_set_windows_target(link_stage_windows_c_target(), link_stage_windows_libc_root())

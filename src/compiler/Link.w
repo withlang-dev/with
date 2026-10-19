@@ -826,18 +826,29 @@ fn link_stage_windows_libc_dir(sdk_dir: &str, arch: &str) -> str:
 
 // The C target a Windows c_import parses for: mingw-w64's headers are
 // written for the GNU environment, the environment With's own Windows
-// x86_64 objects target too (TargetSpec).
+// objects target too (TargetSpec).
 fn link_stage_windows_c_target() -> str: link_stage_windows_arch() ++ "-w64-windows-gnu"
 
-// Whether this compilation targets Windows x86_64, whose programs and
-// c_import read the SDK's libc (windows-aarch64 follows in its own slice).
+// Whether a Windows compilation reads the SDK's libc, the same one its
+// link reads. x86_64 always did (#1915); aarch64 does when the SDK
+// actually carries its aarch64 libc — the windows-gnu SDK since
+// #2470/#2471 does, a Visual Studio-built one does not and keeps the
+// explicit WITH_WINDOWS_*_INCDIR fallback. Without this, a native
+// aarch64 c_import parsed mingw-w64's headers as the host MSVC target
+// and every header failed (run 39296788835).
+fn link_stage_windows_uses_sdk_libc_for(windows: bool, arch: &str, sdk_dir: &str) -> bool:
+    if not windows: return false
+    if arch == "x86_64": return true
+    if sdk_dir.len() == 0: return false
+    link_stage_file_exists(link_stage_windows_libc_dir(sdk_dir, arch) ++ "/crt2.o")
+
 fn link_stage_windows_c_target_uses_sdk_libc() -> bool:
     let windows = if target_spec_is_native(): runtime_sysinfo_os() == "Windows" else: target_spec_active_kind() == 5 or target_spec_active_kind() == 6
-    windows and link_stage_windows_arch() == "x86_64"
+    link_stage_windows_uses_sdk_libc_for(windows, link_stage_windows_arch(), link_stage_windows_sdk_dir())
 
 // The Windows libc c_import reads for this compilation: the SDK's (the same
-// one the link will read), "" when the target is not Windows x86_64 or the
-// SDK carries none.
+// one the link will read), "" when the target does not use it or the SDK
+// carries none.
 // The toolchain a native Windows link and `with cc` read, laid out as the
 // LLVM SDK is: the SDK above the lld the link runs (the build's record, or
 // the SDK the environment names), else the one this compiler carries
