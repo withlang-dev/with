@@ -53,7 +53,8 @@ with-linux-aarch64=8b31429cacb68995ef60c62410aea416e801a0ff007111a73a001919af3b4
 # clone by the previous seed (6cd934e8) with the windows-gnu SDK of sdk.lock;
 # stage2 == stage3 over all 16 units, and the published binary is that
 # build's fixpoint-verified release compiler. windows-aarch64 is cross-built
-# from main 3d73b98c (#2305, D118), an intermediate seed the native
+# from main 35afb3a7a (#2305, #2470, #2471) by seed-windows-aarch64 run
+# 39288117180 against the windows-gnu SDK, an intermediate seed the native
 # windows-aarch64 lane bootstraps and verifies.
 with-windows-x86_64.exe=6886e76ed2fdc104d41e82f3d08098676565e9957d2847dfc186b02ef3372504
-with-windows-aarch64.exe=9ae0d160a717f4553cd0c23b26e71e01863c7dc0417e5bc103d9498c340a3296
+with-windows-aarch64.exe=f27e7459c0039682e6b228e60abfbbcc750eb2a1dd61531269f08cb65380c967
