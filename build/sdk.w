@@ -1313,6 +1313,15 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         if not gnu.ok: return 1
         for i in 0..gnu.items.len():
             configure.push(sdk_owned_text(gnu.items[i]))
+        // The gnu args name CMAKE_SYSTEM_NAME, so CMake calls this
+        // crosscompiling and LLVM configures a NATIVE sub-build for its
+        // tablegens. That configure inherits none of the INIT flags, so its
+        // compiler check links bare clang and cannot find -lunwind (SDK run
+        // 39180949033). Hand it the same args through LLVM's own channel.
+        var native_flags = ""
+        for i in 0..gnu.items.len():
+            native_flags = native_flags ++ (if i > 0: ";" else: "") ++ gnu.items[i]
+        configure.push("-DCROSS_TOOLCHAIN_FLAGS_NATIVE=" ++ native_flags)
         configure.push("-DLLVM_HOST_TRIPLE=" ++ sdk_windows_triple(sdk_windows_host_arch()))
         configure.push("-DCLANG_DEFAULT_RTLIB=compiler-rt")
         configure.push("-DCLANG_DEFAULT_UNWINDLIB=libunwind")
