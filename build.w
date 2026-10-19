@@ -677,7 +677,10 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let sorted_llvm = comp_sort_strings(llvm_archives)
     for i in 0..sorted_llvm.len():
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
-    ld_rsp = ld_rsp ++ comp_clang_main_link_lines(comp_sdk_has_clang_main(fs, lib_dir), "Windows", false, false)
+    // A windows-gnu SDK mangles clang_main Itanium-style; only a Visual
+    // Studio-built SDK (libclang.lib) uses the MSVC spelling, as the native
+    // metadata records (build/compiler.w windows_gnu_sdk).
+    ld_rsp = ld_rsp ++ comp_clang_main_link_lines(comp_sdk_has_clang_main(fs, lib_dir), "Windows", libclang.ends_with("/lib/libclang.a"), false)
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
     // #1915: a compiler cross-linked for Windows carries no `with __ld`;
     // its names are stand-ins (build/compiler.w comp_sdk_lld_flavors).
@@ -741,7 +744,7 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let sorted_llvm = comp_sort_strings(llvm_archives)
     for i in 0..sorted_llvm.len():
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
-    ld_rsp = ld_rsp ++ comp_clang_main_link_lines(comp_sdk_has_clang_main(fs, lib_dir), "Windows", false, false)
+    ld_rsp = ld_rsp ++ comp_clang_main_link_lines(comp_sdk_has_clang_main(fs, lib_dir), "Windows", libclang.ends_with("/lib/libclang.a"), false)
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
     // #1915: a compiler cross-linked for Windows carries no `with __ld`;
     // its names are stand-ins (build/compiler.w comp_sdk_lld_flavors).
