@@ -11,6 +11,7 @@ module build.par
 use std.build
 use std.fs
 use std.process
+use std.string
 
 
 pub type ParJob {
@@ -42,34 +43,15 @@ fn par_slot_acquire(dir: &str, slots: i32) -> i32:
     -1
 
 // This lane is on the critical path (the driver lists it in the
-// jobserver's `critical` file): its children take no slots.
-fn par_lane_critical(dir: &str) -> bool:
+// jobserver's `critical` file): its children take no slots. The read goes
+// through the ToolFs capability: std.fs's read_file reaches a pointer
+// out-param extern the comptime evaluator cannot call (#2460).
+fn par_lane_critical(ctx: &ActionCtx, dir: &str) -> bool:
     let lane = env("WITH_BUILD_LANE")
-    dir.len() > 0 and lane.len() > 0 and ("\n" ++ (read_file(dir ++ "/critical") ?? "")).contains("\n" ++ lane ++ "\n")
+    dir.len() > 0 and lane.len() > 0 and ("\n" ++ (ctx.fs().read_text_opt(dir ++ "/critical") ?? "")).contains("\n" ++ lane ++ "\n")
 
 fn par_slot_release(dir: &str, slot: i32):
     if dir.len() > 0 and slot >= 0: remove_file(dir ++ f"/slot-{slot}")
-
-// string_to_int's rule (sign, digits until the first non-digit, 0 when
-// none), spelled in With: std's parse reaches an extern the comptime
-// evaluator cannot call, and a build action may run in it (#2460; the
-// windows-x86_64 SDK job's sdk-windows-libc failed there).
-fn par_slots_from(s: &str) -> i32:
-    if s.len() == 0: return 0
-    var neg = false
-    var i: i64 = 0
-    if s[0] == 45:
-        neg = true
-        i = 1
-    else if s[0] == 43:
-        i = 1
-    var result: i32 = 0
-    while i < s.len():
-        let c = s[i]
-        if c < 48 or c > 57: break
-        result = result * 10 + (c - 48) as i32
-        i = i + 1
-    if neg: 0 - result else: result
 
 /// Runs every job with at most `width` children alive, reaping the oldest
 /// to open each slot. Returns each job's exit code in job order; -1 means
@@ -77,7 +59,7 @@ fn par_slots_from(s: &str) -> i32:
 pub fn par_run(ctx: &ActionCtx, jobs: &List[ParJob], width: i32) -> List[i32]:
     let limit = if width < 1: 1 else: width
     let js_dir = env("WITH_BUILD_JOBSERVER")
-    let js_slots = par_slots_from(env("WITH_BUILD_JOBSERVER_SLOTS"))
+    let js_slots = parse(env("WITH_BUILD_JOBSERVER_SLOTS"))
     let total = jobs.len()
     var rcs: List[i32] = List.new()
     var pids: List[i32] = List.new()
@@ -88,7 +70,7 @@ pub fn par_run(ctx: &ActionCtx, jobs: &List[ParJob], width: i32) -> List[i32]:
         if next < total and next - oldest < limit:
             // The first child alive runs in the lane's own slot; a lane on the
             // critical path takes none.
-            let free = next == oldest or par_lane_critical(js_dir)
+            let free = next == oldest or par_lane_critical(ctx, js_dir)
             let slot = if free: -1 else: par_slot_acquire(js_dir, js_slots)
             if free or slot >= 0:
                 let job = &jobs[next]
