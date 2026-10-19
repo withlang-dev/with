@@ -43,4 +43,13 @@ fn main:
     assert(command.linker == "lld-link")
     assert(has_arg(&command, target ++ "/libc/windows/"))
     assert(not has_arg(&command, host ++ "/libc/windows/"))
+
+    // The c_import parse reads the same SDK libc as the link: on aarch64
+    // too when the SDK carries it (run 39296788835 parsed mingw-w64's
+    // headers as the host MSVC target instead), never from an SDK without
+    // the arch's crt, and never off Windows.
+    assert(link_stage_windows_uses_sdk_libc_for(true, "aarch64", target))
+    assert(not link_stage_windows_uses_sdk_libc_for(true, "aarch64", host))
+    assert(link_stage_windows_uses_sdk_libc_for(true, "x86_64", host))
+    assert(not link_stage_windows_uses_sdk_libc_for(false, "aarch64", target))
     print("ok")

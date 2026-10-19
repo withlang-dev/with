@@ -2,6 +2,15 @@
 bootstrap/** linguist-vendored
 out/** linguist-generated
 
+# The seed/SDK locks are parsed line-by-line by the build layer, and
+# seed-driver length-checks each digest at exactly 64 hex chars. Under
+# core.autocrlf=true a native Windows checkout rewrites them to CRLF, so
+# every digest reads 65 chars with a trailing "\r" and seed-driver refuses
+# the pinned seed on Windows only (run 39296788835). Pin LF so the locks
+# parse to the same values on every platform.
+seed.lock text eol=lf
+sdk.lock text eol=lf
+
 # embed_file fixtures are embedded byte-for-byte and their content is asserted
 # exactly. Pin LF so a native Windows checkout (core.autocrlf=true, the default
 # on GitHub's Windows runners) does not rewrite them to CRLF, which would make
