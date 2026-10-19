@@ -347,11 +347,13 @@ status line.
 (release-only invalid free — retest after R1c since it implicates
 generation divergence across the object boundary).
 
-## 9. Status refresh, 2026-10-19 (for Eric's read before any D30 code)
+## 9. Status refresh, 2026-10-19 (ruling recorded)
 
 Verified today against main `ea58cf5c9` (installed compiler `b4c471c3`).
 Nothing in sections 1-8 is re-decided here; this addendum records what is
-still true, what moved, and what needs a ruling before R2c resumes.
+still true, what moved, and the rulings Eric gave on 2026-10-19 by
+approving the D30 brief. R2c code may resume in the order at the end of
+this section; it has not landed yet.
 
 **Where the stages stand.** R1 is complete and merged (the boundary is
 With only, rules enforced). R2a is dark code in tree (the cache-key
@@ -367,8 +369,9 @@ link paths) has not started.
 under the lane: runs, `true`. The acceptance cell: 1 passed. A by-hand
 `extern fn with_fs_exists` call is refused, but the wording is now the
 generic "manual extern function call requires unsafe context", not
-August's named-diagnostic text — if the named remedies still matter,
-that is a small diagnostic regression to restore or bless away.
+August's named-diagnostic text. Per the approved brief that is a small
+diagnostic regression to restore, not bless away: the diagnostic should
+again name the remedies.
 
 **Fact base, re-counted.** `extern fn with_*` declarations in lib/std:
 304 (222 in August — the surface grew while the lane waited).
@@ -381,28 +384,42 @@ classified at a time. D22/D44 landing since August changed view
 machinery the runtime modules compile against, so some August classes
 may already be gone — and new ones may exist.
 
-**Decisions needed before R2c code** (section 6, unchanged, plus the
-flip-blocker):
+**Rulings (Eric, 2026-10-19, approving the D30 brief).**
 
-1. The c_import stub archive: linked on demand (the plan's pick) or
-   rolled into the cache rule.
-2. The wasm32 placement of the runtime TUs: per-target in-unit, or the
-   precompiled `rt_core_wasm32.o` converted by the same cache rule.
-3. Whether `WITH_RT_IN_UNIT` keeps a name after the flip, or the lane
-   becomes the only mode and the variable dies with R3 (the plan's pick).
-4. The flip-blocker is one Sema property (D103): `use` keeps both the
-   qualified (`m.f`) and flat (`f`) spelling of a sibling-imported name,
-   and the flat spelling mis-binds cross-module ("unresolved name 'f'
-   reads name-as-value"). It blocks every in-unit module with siblings,
-   runtime or not. R2c cannot finish until the flat spelling stops
-   capturing; that is a language-visible change and needs a ruling, not
-   a workaround in rt code.
+1. **c_import stubs stay on demand, outside the runtime cache.** They are
+   weak, optional bridge fallbacks, not program-runtime definitions, and
+   are linked only when a link actually needs one. They still obey
+   D132's generation/byte-identity discipline. R2c enumerates the symbols
+   that require them; if no user-program link needs any, they leave user
+   links entirely rather than surviving as another runtime seam.
+2. **wasm32 compiles its runtime in-unit, per target.** No special
+   precompiled-only wasm route survives; D53 already anticipates exactly
+   this consequence of D30. A later R3 cache may include wasm32 under
+   the normal compiler-plus-target key.
+3. **`WITH_RT_IN_UNIT` dies at the flip.** It is an internal transition
+   flag only; after the flip there is one runtime mode, and its check
+   fixture becomes an ordinary default-mode test.
+4. **No import-spelling change.** Correction to the earlier draft of
+   this section: D103 is the value-to-`Option` conversion, not module
+   lookup. The controlling rule is D70 and spec §18.2: an explicit import
+   provides both the flat (`f`) and qualified (`m.f`) spelling, and the
+   last explicit import wins. The flip-blocker — a sibling-imported name
+   mis-binding cross-module under the flat spelling — is therefore a
+   compiler canonical-module-identity bug in the #751/#1350 area, not a
+   language question and not something to work around in rt code. Fix
+   binding so embedded/runtime sibling modules resolve by their own
+   import graph, imported private helpers neither leak nor capture, and
+   §18.2 precedence holds exactly. Adversarial fixtures: same-named
+   private helpers, same-named public functions, qualified access to a
+   shadowed import, and a user definition sharing a runtime helper's
+   name.
 
-**Proposed order when code resumes.** (0) Re-run the lane sweep and
-update section 8's table in place. (1) The D103 ruling and fix, on its
-own stack. (2) R2c type erasures in the order of ascending blast radius
-already recorded (libc primitives, then ListView places, then &str
-pairs), lane-green at each step. (3) The flip, and R3's deletion of the
-legacy link, as separate commits per the bootstrap rules (runtime
-exports and Link.w never in the same commit). No stage below starts
-until the ruling column above is filled.
+**Order now that the ruling is given.** (0) Re-run the lane sweep and
+update section 8's table in place. (1) The canonical-module-identity
+fix, on its own stack, with the fixtures above; restore the
+named-remedy diagnostic noted in the sense checks. (2) R2c type
+erasures in the order of ascending blast radius already recorded (libc
+primitives, then ListView places, then &str pairs), lane-green at each
+step. (3) The flip, and R3's deletion of the legacy link, as separate
+commits per the bootstrap rules (runtime exports and Link.w never in
+the same commit).
