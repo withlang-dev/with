@@ -1318,9 +1318,13 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         // tablegens. That configure inherits none of the INIT flags, so its
         // compiler check links bare clang and cannot find -lunwind (SDK run
         // 39180949033). Hand it the same args through LLVM's own channel.
+        // Items escape their own ';' as '\;': the value is itself a CMake
+        // list, and an unescaped one (CMAKE_TRY_COMPILE_PLATFORM_VARIABLES
+        // carries two names) would split into a stray extra item, dropping
+        // the standard libraries from the NATIVE try_compile projects.
         var native_flags = ""
         for i in 0..gnu.items.len():
-            native_flags = native_flags ++ (if i > 0: ";" else: "") ++ gnu.items[i]
+            native_flags = native_flags ++ (if i > 0: ";" else: "") ++ gnu.items[i].replace(";", "\\;")
         configure.push("-DCROSS_TOOLCHAIN_FLAGS_NATIVE=" ++ native_flags)
         configure.push("-DLLVM_HOST_TRIPLE=" ++ sdk_windows_triple(sdk_windows_host_arch()))
         configure.push("-DCLANG_DEFAULT_RTLIB=compiler-rt")
