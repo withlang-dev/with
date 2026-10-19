@@ -901,10 +901,12 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_p
     let outputs: List[str] = List.new()
     let compiler_link = link_stage_windows_is_compiler_link(extras)
     let arch = link_stage_windows_arch()
-    // The SDK recipe covers x86_64; windows-aarch64 programs keep the
-    // Visual Studio recipe until its libc slice lands (#1915).
+    // The SDK recipe covers x86_64, and windows-aarch64 since its SDK is a
+    // windows-gnu build too (run 39180949033): a gnu SDK links from its own
+    // libc on either arch, while a Visual Studio-built aarch64 SDK (the one
+    // pinned before it) keeps the Visual Studio recipe below (#1915).
     let sdk_is_gnu = link_stage_file_exists(sdk_dir ++ "/lib/libclang.a")
-    let sdk_libc = arch == "x86_64" and (not compiler_link or sdk_is_gnu)
+    let sdk_libc = (arch == "x86_64" or sdk_is_gnu) and (not compiler_link or sdk_is_gnu)
     let libc_dir = if sdk_libc: link_stage_windows_libc_dir(sdk_dir, arch) else: ""
     let builtins = if sdk_libc: link_stage_windows_builtins(sdk_dir, arch) else: ""
     if sdk_libc:

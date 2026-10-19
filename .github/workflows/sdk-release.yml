@@ -452,7 +452,7 @@ jobs:
           printf '%s  %s\n' "$WITH_SDK_SHA256" "$sdk" | sha256sum -c -
           tar -xzf "$sdk" -C .deps
           prefix=".deps/llvm-22.1.6-windows-aarch64-msvc"
-          test -f "$prefix/lib/libclang.lib" || { echo "SDK libclang.lib missing"; ls -la "$prefix/lib" | head; exit 1; }
+          test -f "$prefix/lib/libclang.a" || { echo "SDK libclang.a missing"; ls -la "$prefix/lib" | head; exit 1; }
           test -f "$prefix/bin/lld-link.exe" || { echo "SDK lld-link.exe missing"; ls -la "$prefix/bin" | head; exit 1; }
 
       - name: Fetch windows-aarch64 seed

@@ -10,7 +10,7 @@ name: seed windows-aarch64 (cross)
 # then (a) builds the windows-aarch64 runtime/bridge objects
 # (`:cross-rt-windows-aarch64`) and (b) cross-emits + COFF-links the compiler
 # binary itself for arm64 Windows. The PE/COFF link statically pulls the TARGET
-# arch's libclang.lib / LLVM*.lib from the windows-aarch64 LLVM SDK, so this job
+# arch's libclang.a / LLVM*.a from the windows-aarch64 LLVM SDK, so this job
 # REQUIRES the `sdk-windows-aarch64` asset. It fails loudly (below) if that SDK
 # is not published. The MSVC CRT + Windows SDK (ucrt/um) arm64 import libs come
 # from `xwin`.
@@ -92,7 +92,7 @@ jobs:
       - name: Guard — require the windows-aarch64 SDK asset (fail loudly)
         run: |
           set -euo pipefail
-          # The cross link statically pulls the arm64 libclang.lib/LLVM*.lib from
+          # The cross link statically pulls the arm64 libclang.a/LLVM*.a from
           # this SDK. Without it there is nothing to link against — fail now with a
           # clear message rather than deep in the link with an obscure error.
           if ! gh release view "$CROSS_SDK_TAG" --repo "$GITHUB_REPOSITORY" \
@@ -198,8 +198,8 @@ jobs:
             || { echo "cross SDK sha256 mismatch: want=$CROSS_SDK_SHA256 got=$got"; exit 1; }
           tar -xzf /tmp/cross-sdk.tar.gz -C src-tree/.deps
           cross_prefix="src-tree/.deps/llvm-${LLVM_VER}-windows-aarch64-msvc"
-          test -f "$cross_prefix/lib/libclang.lib" \
-            || { echo "cross SDK libclang.lib missing at $cross_prefix"; ls -la "$cross_prefix/lib" 2>/dev/null | head; exit 1; }
+          test -f "$cross_prefix/lib/libclang.a" \
+            || { echo "cross SDK libclang.a missing at $cross_prefix"; ls -la "$cross_prefix/lib" 2>/dev/null | head; exit 1; }
 
       - name: Set up linker shim (SDK lld + lld-link + libxml2.so.16)
         run: |
