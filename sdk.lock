@@ -50,7 +50,7 @@ with-llvm-sdk-22.1.6-windows-x86_64.tar.gz.sha256=830bc3dc38bdffc71693aed4e28817
 with-llvm-sdk-22.1.6-windows-x86_64.tar.gz.manifest=6ef4af37a583ba96881f4b16e3c43798397c8ece0be56d78f8d61c507c3b1c7c
 
 with-llvm-sdk-22.1.6-windows-aarch64.tar.gz.version=sdk-windows-aarch64
-with-llvm-sdk-22.1.6-windows-aarch64.tar.gz=ad13e07af474d683c699f041c52cd98697df9781b581dda913d39d92be186743
+with-llvm-sdk-22.1.6-windows-aarch64.tar.gz=f137ee12d0f55348da94e5e55b4ee43ef60e4a1788f23156f93f9d4f645454ee
 
 # The v0.15.1 .tar.zst SDKs are the bootstrap inputs sdk-release.yml and the
 # windows legs read.
