@@ -57,7 +57,7 @@ enum ScopeKind: i32:
     SK_COMPREHENSION = 7
 
 // Module metadata used by --dump-resolved.
-pub type ResolvedModule {
+type ResolvedModule {
     module_id: i32,
     file_id: i32,
     path: str,
@@ -66,7 +66,7 @@ pub type ResolvedModule {
     decl_count: i32,
 }
 
-pub type ResolvedImport {
+type ResolvedImport {
     module_id: i32,
     index_in_module: i32,
     kind: i32,
@@ -86,7 +86,7 @@ pub type ResolvedImport {
     span_end: i32,
 }
 
-pub type ResolvedDef {
+type ResolvedDef {
     def_id: i32,
     module_id: i32,
     parent_def: i32,
@@ -98,7 +98,7 @@ pub type ResolvedDef {
 
 impl Copy for ResolvedDef
 
-pub type ResolvedScope {
+type ResolvedScope {
     scope_id: i32,
     module_id: i32,
     parent_scope: i32,
@@ -108,7 +108,7 @@ pub type ResolvedScope {
 
 impl Copy for ResolvedScope
 
-pub type ResolvedBinding {
+type ResolvedBinding {
     scope_id: i32,
     symbol: i32,
     def_id: i32,
@@ -116,7 +116,7 @@ pub type ResolvedBinding {
 
 impl Copy for ResolvedBinding
 
-pub type ResolvedUse {
+type ResolvedUse {
     module_id: i32,
     node_id: i32,
     symbol: i32,
@@ -127,7 +127,7 @@ pub type ResolvedUse {
 
 impl Copy for ResolvedUse
 
-pub type ResolveResult {
+type ResolveResult {
     modules: List[ResolvedModule],
     imports: List[ResolvedImport],
     defs: List[ResolvedDef],
@@ -148,7 +148,7 @@ fn ResolveResult.init -> ResolveResult:
         link_libs: List.new(),
     }
 
-pub type ResolveArtifacts {
+type ResolveArtifacts {
     pool: InternPool,
     diags: DiagnosticList,
     result: ResolveResult,
@@ -205,7 +205,7 @@ fn resolve_from_root_pool(root_path: &str, root_text: &str, root_file_id: i32, r
 // registered (#930 — the resolver and the frontend each counted from 1, and
 // an imported module's parse error rendered against the embedded stdlib
 // text that shared its number).
-pub fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_file_id: i32, root_pool: &AstPool, pool: &InternPool, diags: DiagnosticList, emit_resolve_diags: bool, root_prefix_skip: i32, first_file_id: i32) -> ResolveArtifacts:
+fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_file_id: i32, root_pool: &AstPool, pool: &InternPool, diags: DiagnosticList, emit_resolve_diags: bool, root_prefix_skip: i32, first_file_id: i32) -> ResolveArtifacts:
     var state = ResolveState.init(pool, move diags, emit_resolve_diags)
     state.root_prefix_skip = root_prefix_skip
     state.next_file_id = first_file_id
@@ -266,7 +266,7 @@ pub fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root
         },
     }
 
-pub fn resolve_interface_use_lines(text: &str) -> str:
+fn resolve_interface_use_lines(text: &str) -> str:
     var out = ""
     let lines = text.split("\n")
     for i in 0..lines.len():
@@ -1327,7 +1327,7 @@ extern fn with_fs_is_dir(path: &str) -> i32
 // strategies 4b and 6 read them from the tree root, so the compiler resolves
 // a module the same from any directory (compiler.Runtime
 // runtime_own_tree_root; "" for an installed release, which embeds them).
-pub fn resolve_own_tree_candidate(rel_path: &str) -> str:
+fn resolve_own_tree_candidate(rel_path: &str) -> str:
     let root = runtime_own_tree_root()
     if root.len() == 0: return ""
     let gen_cand = resolve_join(root, resolve_join("out/gen", rel_path))
@@ -1402,7 +1402,7 @@ fn embedded_bundle_providing(dotted: &str) -> str:
 // §18.3 (D100): a module whose path has a segment named `internal` is
 // importable only by modules inside the tree rooted at that segment's parent.
 // Returns the refusal, or "" when `importer` may import `target`.
-pub fn resolve_internal_import_refusal(importer: &str, target: &str, dotted: &str) -> str:
+fn resolve_internal_import_refusal(importer: &str, target: &str, dotted: &str) -> str:
     let target_std = resolve_path_is_std(target)
     let target_norm = resolve_normalize_path(target)
     let segments = target_norm.split("/")
@@ -1423,7 +1423,7 @@ pub fn resolve_internal_import_refusal(importer: &str, target: &str, dotted: &st
 
 fn resolve_path_is_std(path: &str) -> bool: path.starts_with("<embedded-std>/") or path.starts_with("lib/std/") or path.contains("/lib/std/")
 
-pub fn import_not_found_message(dotted: &str) -> str:
+fn import_not_found_message(dotted: &str) -> str:
     // A bundled corpus is in the compiler as an object and an interface,
     // never as source (D38). A compilation that needs its bodies (--emit-c
     // compiles every module in-unit) has them only in a source checkout (#2118).
@@ -1435,10 +1435,10 @@ pub fn import_not_found_message(dotted: &str) -> str:
         msg = msg ++ " (build-generated modules live under out/gen; run `with build` once in a fresh checkout)"
     msg
 
-pub fn resolve_file_exists(path: &str) -> bool:
+fn resolve_file_exists(path: &str) -> bool:
     with_fs_read_file(path).len() > 0
 
-pub fn resolve_parent_lib_candidate(module_dir: &str, rel_path: &str) -> str:
+fn resolve_parent_lib_candidate(module_dir: &str, rel_path: &str) -> str:
     var cur = with_str_clone_ref(module_dir)
     while true:
         let lib_dir = resolve_join(cur, "lib")
@@ -1451,7 +1451,7 @@ pub fn resolve_parent_lib_candidate(module_dir: &str, rel_path: &str) -> str:
         cur = parent
     ""
 
-pub fn resolve_project_root_candidate(module_dir: &str, rel_path: &str) -> str:
+fn resolve_project_root_candidate(module_dir: &str, rel_path: &str) -> str:
     let root = resolve_find_project_root(module_dir)
     if root.len() == 0:
         return ""
@@ -1470,7 +1470,7 @@ pub fn resolve_project_root_candidate(module_dir: &str, rel_path: &str) -> str:
 // wrote for the fetched package `c.<name>`, at
 // `.with/deps/c/<name>/<version>/facade.w` for the version with.toml pins,
 // when the project has no `facades/<name>.w` of its own under lib/ or src/.
-pub fn resolve_fetched_facade_candidate(root: &str, rel_path: &str) -> str:
+fn resolve_fetched_facade_candidate(root: &str, rel_path: &str) -> str:
     if not rel_path.starts_with("facades/") or not rel_path.ends_with(".w"): return ""
     let name = rel_path.slice("facades/".len(), rel_path.len() - 2)
     if name.len() == 0 or name.contains("/"): return ""
@@ -1489,7 +1489,7 @@ pub fn resolve_fetched_facade_candidate(root: &str, rel_path: &str) -> str:
         if resolve_file_exists(cand): return cand
     ""
 
-pub fn resolve_join(a: &str, b: &str) -> str:
+fn resolve_join(a: &str, b: &str) -> str:
     if a.len() == 0:
         return with_str_clone_ref(b)
     if b.len() == 0:
@@ -1500,7 +1500,7 @@ pub fn resolve_join(a: &str, b: &str) -> str:
         return resolve_normalize_path(a ++ b)
     resolve_normalize_path(a ++ "/" ++ b)
 
-pub fn resolve_dirname(path: &str) -> str:
+fn resolve_dirname(path: &str) -> str:
     var last = -1
     for i in 0..path.len():
         if path[i] == 47:
@@ -1511,7 +1511,7 @@ pub fn resolve_dirname(path: &str) -> str:
         return "/"
     path.slice(0, last as i64)
 
-pub fn resolve_normalize_path(path: &str) -> str:
+fn resolve_normalize_path(path: &str) -> str:
     if path.len() == 0:
         return with_str_clone_ref(path)
 
@@ -1546,7 +1546,7 @@ pub fn resolve_normalize_path(path: &str) -> str:
 // collapse lexically. Embedded pseudo-paths (`<embedded-std>/...`) are already
 // canonical. Used only as the module_map key; stored module paths keep their
 // original spelling (downstream tier checks match on relative prefixes).
-pub fn resolve_canonical_module_key(path: &str) -> str:
+fn resolve_canonical_module_key(path: &str) -> str:
     if path.len() == 0 or path.starts_with("<"):
         return with_str_clone_ref(path)
     var p = with_str_clone_ref(path)
@@ -1689,7 +1689,7 @@ fn print_resolved(result: &ResolveResult, pool: &InternPool, root_path: &str):
             line = line ++ pool.resolve(result.link_libs[li])
         with_write(line ++ "\n")
 
-pub fn dump_resolved(result: &ResolveResult, pool: &InternPool, root_path: &str) -> str:
+fn dump_resolved(result: &ResolveResult, pool: &InternPool, root_path: &str) -> str:
     var out = ""
     out = out ++ f"resolved root={root_path} modules={result.modules.len()} defs={result.defs.len()}\n"
 

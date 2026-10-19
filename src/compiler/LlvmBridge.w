@@ -502,19 +502,19 @@ fn empty_cstr() -> *const u8:
 
 // ── Lifecycle ───────────────────────────────────────────────────
 
-pub fn wl_context_create() -> i64: unsafe { LLVMContextCreate() as i64 }
+fn wl_context_create() -> i64: unsafe { LLVMContextCreate() as i64 }
 
-pub fn wl_context_dispose(c: i64): unsafe { LLVMContextDispose(c as *mut u8) }
+fn wl_context_dispose(c: i64): unsafe { LLVMContextDispose(c as *mut u8) }
 
-pub fn wl_module_create(name: &str, ctx: i64) -> i64:
+fn wl_module_create(name: &str, ctx: i64) -> i64:
     unsafe:
         LLVMModuleCreateWithNameInContext(to_cstr(name), ctx as *mut u8) as i64
 
-pub fn wl_module_dispose(m: i64): unsafe { LLVMDisposeModule(m as *mut u8) }
+fn wl_module_dispose(m: i64): unsafe { LLVMDisposeModule(m as *mut u8) }
 
-pub fn wl_builder_create(ctx: i64) -> i64: unsafe { LLVMCreateBuilderInContext(ctx as *mut u8) as i64 }
+fn wl_builder_create(ctx: i64) -> i64: unsafe { LLVMCreateBuilderInContext(ctx as *mut u8) as i64 }
 
-pub fn wl_builder_dispose(b: i64): unsafe { LLVMDisposeBuilder(b as *mut u8) }
+fn wl_builder_dispose(b: i64): unsafe { LLVMDisposeBuilder(b as *mut u8) }
 
 // ── Target initialization ───────────────────────────────────────
 
@@ -534,7 +534,7 @@ fn llvm_init_lock():
 fn llvm_init_unlock():
     llvm_init_lock_word.store(0, .Release)
 
-pub fn wl_init_native_target() -> i32:
+fn wl_init_native_target() -> i32:
     unsafe:
         llvm_init_lock()
         if llvm_native_target_done == 0:
@@ -551,7 +551,7 @@ pub fn wl_init_native_target() -> i32:
         llvm_init_unlock()
         0
 
-pub fn wl_init_native_asm_printer() -> i32:
+fn wl_init_native_asm_printer() -> i32:
     unsafe:
         llvm_init_lock()
         if llvm_native_asm_printer_done == 0:
@@ -562,7 +562,7 @@ pub fn wl_init_native_asm_printer() -> i32:
         llvm_init_unlock()
         0
 
-pub fn wl_init_native_asm_parser() -> i32:
+fn wl_init_native_asm_parser() -> i32:
     unsafe:
         llvm_init_lock()
         if llvm_native_asm_parser_done == 0:
@@ -586,7 +586,7 @@ fn codegen_level(level: i32) -> i32:
 var wl_active_triple_buf: [128]u8 = [0 as u8; 128]
 var wl_active_triple_len: i32 = 0
 
-pub fn wl_set_active_target_triple(triple: str) -> Unit:
+fn wl_set_active_target_triple(triple: str) -> Unit:
     var n = triple.len() as i32
     if n > 127:
         n = 127
@@ -615,7 +615,7 @@ fn llvm_object_triple(default_triple: *mut u8) -> *const u8:
         return c"aarch64-pc-windows-msvc".ptr as *const u8
     default_triple as *const u8
 
-pub fn wl_init_target_machine(mod_ref: i64, level: i32) -> i64:
+fn wl_init_target_machine(mod_ref: i64, level: i32) -> i64:
     unsafe:
         let default_triple = LLVMGetDefaultTargetTriple()
         let triple = llvm_object_triple(default_triple)
@@ -645,71 +645,71 @@ pub fn wl_init_target_machine(mod_ref: i64, level: i32) -> i64:
         LLVMDisposeMessage(default_triple)
         tm as i64
 
-pub fn wl_dispose_target_machine(tm: i64): unsafe { LLVMDisposeTargetMachine(tm as *mut u8) }
+fn wl_dispose_target_machine(tm: i64): unsafe { LLVMDisposeTargetMachine(tm as *mut u8) }
 
 // ── Types ───────────────────────────────────────────────────────
 
-pub fn wl_i1_type(c: i64) -> i64: unsafe { LLVMInt1TypeInContext(c as *mut u8) as i64 }
-pub fn wl_i8_type(c: i64) -> i64: unsafe { LLVMInt8TypeInContext(c as *mut u8) as i64 }
-pub fn wl_i16_type(c: i64) -> i64: unsafe { LLVMInt16TypeInContext(c as *mut u8) as i64 }
-pub fn wl_i32_type(c: i64) -> i64: unsafe { LLVMInt32TypeInContext(c as *mut u8) as i64 }
-pub fn wl_i64_type(c: i64) -> i64: unsafe { LLVMInt64TypeInContext(c as *mut u8) as i64 }
-pub fn wl_i128_type(c: i64) -> i64: unsafe { LLVMInt128TypeInContext(c as *mut u8) as i64 }
-pub fn wl_int_type_n(c: i64, bits: i32) -> i64: unsafe { LLVMIntTypeInContext(c as *mut u8, bits as u32) as i64 }
-pub fn wl_f32_type(c: i64) -> i64: unsafe { LLVMFloatTypeInContext(c as *mut u8) as i64 }
-pub fn wl_f64_type(c: i64) -> i64: unsafe { LLVMDoubleTypeInContext(c as *mut u8) as i64 }
-pub fn wl_void_type(c: i64) -> i64: unsafe { LLVMVoidTypeInContext(c as *mut u8) as i64 }
-pub fn wl_ptr_type(c: i64) -> i64: unsafe { LLVMPointerTypeInContext(c as *mut u8, 0) as i64 }
-pub fn wl_array_type(elem: i64, size: i64) -> i64: unsafe { LLVMArrayType2(elem as *mut u8, size as u64) as i64 }
+fn wl_i1_type(c: i64) -> i64: unsafe { LLVMInt1TypeInContext(c as *mut u8) as i64 }
+fn wl_i8_type(c: i64) -> i64: unsafe { LLVMInt8TypeInContext(c as *mut u8) as i64 }
+fn wl_i16_type(c: i64) -> i64: unsafe { LLVMInt16TypeInContext(c as *mut u8) as i64 }
+fn wl_i32_type(c: i64) -> i64: unsafe { LLVMInt32TypeInContext(c as *mut u8) as i64 }
+fn wl_i64_type(c: i64) -> i64: unsafe { LLVMInt64TypeInContext(c as *mut u8) as i64 }
+fn wl_i128_type(c: i64) -> i64: unsafe { LLVMInt128TypeInContext(c as *mut u8) as i64 }
+fn wl_int_type_n(c: i64, bits: i32) -> i64: unsafe { LLVMIntTypeInContext(c as *mut u8, bits as u32) as i64 }
+fn wl_f32_type(c: i64) -> i64: unsafe { LLVMFloatTypeInContext(c as *mut u8) as i64 }
+fn wl_f64_type(c: i64) -> i64: unsafe { LLVMDoubleTypeInContext(c as *mut u8) as i64 }
+fn wl_void_type(c: i64) -> i64: unsafe { LLVMVoidTypeInContext(c as *mut u8) as i64 }
+fn wl_ptr_type(c: i64) -> i64: unsafe { LLVMPointerTypeInContext(c as *mut u8, 0) as i64 }
+fn wl_array_type(elem: i64, size: i64) -> i64: unsafe { LLVMArrayType2(elem as *mut u8, size as u64) as i64 }
 
-pub fn wl_function_type(ret: i64, params_ptr: i64, count: i32, is_vararg: i32) -> i64:
+fn wl_function_type(ret: i64, params_ptr: i64, count: i32, is_vararg: i32) -> i64:
     unsafe:
         let params = if count > 0: params_ptr as *const *mut u8 else: 0 as *const *mut u8
         LLVMFunctionType(ret as *mut u8, params, count as u32, is_vararg) as i64
 
-pub fn wl_struct_type(ctx: i64, elems_ptr: i64, count: i32, packed: i32) -> i64:
+fn wl_struct_type(ctx: i64, elems_ptr: i64, count: i32, packed: i32) -> i64:
     unsafe:
         LLVMStructTypeInContext(ctx as *mut u8, elems_ptr as *const *mut u8, count as u32, packed) as i64
 
-pub fn wl_struct_create_named(ctx: i64, name: &str) -> i64:
+fn wl_struct_create_named(ctx: i64, name: &str) -> i64:
     unsafe:
         LLVMStructCreateNamed(ctx as *mut u8, to_cstr(name)) as i64
 
-pub fn wl_struct_set_body(ty: i64, elems_ptr: i64, count: i32, packed: i32):
+fn wl_struct_set_body(ty: i64, elems_ptr: i64, count: i32, packed: i32):
     unsafe:
         LLVMStructSetBody(ty as *mut u8, elems_ptr as *const *mut u8, count as u32, packed)
 
-pub fn wl_struct_set_body_2(ty: i64, t0: i64, t1: i64, packed: i32):
+fn wl_struct_set_body_2(ty: i64, t0: i64, t1: i64, packed: i32):
     unsafe:
         var elems: [2]i64 = [t0, t1]
         LLVMStructSetBody(ty as *mut u8, &elems as *const *mut u8, 2, packed)
 
-pub fn wl_struct_get_type_at(ty: i64, idx: i32) -> i64: unsafe { LLVMStructGetTypeAtIndex(ty as *mut u8, idx as u32) as i64 }
-pub fn wl_count_struct_elem_types(ty: i64) -> i32: unsafe { LLVMCountStructElementTypes(ty as *mut u8) as i32 }
-pub fn wl_is_packed_struct(ty: i64) -> bool: unsafe { LLVMIsPackedStruct(ty as *mut u8) != 0 }
-pub fn wl_is_opaque_struct(ty: i64) -> bool: unsafe { LLVMIsOpaqueStruct(ty as *mut u8) != 0 }
-pub fn wl_get_element_type(ty: i64) -> i64: unsafe { LLVMGetElementType(ty as *mut u8) as i64 }
-pub fn wl_get_array_length(ty: i64) -> i64: unsafe { LLVMGetArrayLength2(ty as *mut u8) as i64 }
+fn wl_struct_get_type_at(ty: i64, idx: i32) -> i64: unsafe { LLVMStructGetTypeAtIndex(ty as *mut u8, idx as u32) as i64 }
+fn wl_count_struct_elem_types(ty: i64) -> i32: unsafe { LLVMCountStructElementTypes(ty as *mut u8) as i32 }
+fn wl_is_packed_struct(ty: i64) -> bool: unsafe { LLVMIsPackedStruct(ty as *mut u8) != 0 }
+fn wl_is_opaque_struct(ty: i64) -> bool: unsafe { LLVMIsOpaqueStruct(ty as *mut u8) != 0 }
+fn wl_get_element_type(ty: i64) -> i64: unsafe { LLVMGetElementType(ty as *mut u8) as i64 }
+fn wl_get_array_length(ty: i64) -> i64: unsafe { LLVMGetArrayLength2(ty as *mut u8) as i64 }
 // §4.3d: SIMD vectors, `<N x T>`.
-pub fn wl_vector_type(elem: i64, count: i32) -> i64: unsafe { LLVMVectorType(elem as *mut u8, count as u32) as i64 }
-pub fn wl_get_vector_size(ty: i64) -> i32: unsafe { LLVMGetVectorSize(ty as *mut u8) as i32 }
-pub fn wl_build_insert_element(b: i64, list: i64, elt: i64, idx: i64) -> i64:
+fn wl_vector_type(elem: i64, count: i32) -> i64: unsafe { LLVMVectorType(elem as *mut u8, count as u32) as i64 }
+fn wl_get_vector_size(ty: i64) -> i32: unsafe { LLVMGetVectorSize(ty as *mut u8) as i32 }
+fn wl_build_insert_element(b: i64, list: i64, elt: i64, idx: i64) -> i64:
     unsafe { LLVMBuildInsertElement(b as *mut u8, list as *mut u8, elt as *mut u8, idx as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_extract_element(b: i64, list: i64, idx: i64) -> i64:
+fn wl_build_extract_element(b: i64, list: i64, idx: i64) -> i64:
     unsafe { LLVMBuildExtractElement(b as *mut u8, list as *mut u8, idx as *mut u8, empty_cstr()) as i64 }
-pub fn wl_const_vector(vals_ptr: i64, count: i32) -> i64: unsafe { LLVMConstVector(vals_ptr as *const *mut u8, count as u32) as i64 }
+fn wl_const_vector(vals_ptr: i64, count: i32) -> i64: unsafe { LLVMConstVector(vals_ptr as *const *mut u8, count as u32) as i64 }
 
 // ── Type queries ────────────────────────────────────────────────
 
-pub fn wl_type_of(v: i64) -> i64: unsafe { LLVMTypeOf(v as *mut u8) as i64 }
-pub fn wl_get_type_kind(ty: i64) -> i32: unsafe { LLVMGetTypeKind(ty as *mut u8) }
-pub fn wl_get_return_type(ft: i64) -> i64: unsafe { LLVMGetReturnType(ft as *mut u8) as i64 }
-pub fn wl_count_params(fn_val: i64) -> i32: unsafe { LLVMCountParams(fn_val as *mut u8) as i32 }
-pub fn wl_count_param_types(ft: i64) -> i32: unsafe { LLVMCountParamTypes(ft as *mut u8) as i32 }
-pub fn wl_get_param(fn_val: i64, i: isize) -> i64: unsafe { LLVMGetParam(fn_val as *mut u8, i as u32) as i64 }
-pub fn wl_get_int_type_width(ty: i64) -> i32: unsafe { LLVMGetIntTypeWidth(ty as *mut u8) as i32 }
-pub fn wl_is_fn_var_arg(ft: i64) -> i32: unsafe { LLVMIsFunctionVarArg(ft as *mut u8) }
-pub fn wl_global_get_value_type(v: i64) -> i64:
+fn wl_type_of(v: i64) -> i64: unsafe { LLVMTypeOf(v as *mut u8) as i64 }
+fn wl_get_type_kind(ty: i64) -> i32: unsafe { LLVMGetTypeKind(ty as *mut u8) }
+fn wl_get_return_type(ft: i64) -> i64: unsafe { LLVMGetReturnType(ft as *mut u8) as i64 }
+fn wl_count_params(fn_val: i64) -> i32: unsafe { LLVMCountParams(fn_val as *mut u8) as i32 }
+fn wl_count_param_types(ft: i64) -> i32: unsafe { LLVMCountParamTypes(ft as *mut u8) as i32 }
+fn wl_get_param(fn_val: i64, i: isize) -> i64: unsafe { LLVMGetParam(fn_val as *mut u8, i as u32) as i64 }
+fn wl_get_int_type_width(ty: i64) -> i32: unsafe { LLVMGetIntTypeWidth(ty as *mut u8) as i32 }
+fn wl_is_fn_var_arg(ft: i64) -> i32: unsafe { LLVMIsFunctionVarArg(ft as *mut u8) }
+fn wl_global_get_value_type(v: i64) -> i64:
     unsafe:
         if v == 0:
             return 0
@@ -717,7 +717,7 @@ pub fn wl_global_get_value_type(v: i64) -> i64:
         if kind != LLVM_FunctionValueKind and kind != LLVM_GlobalAliasValueKind and kind != LLVM_GlobalIFuncValueKind and kind != LLVM_GlobalVariableValueKind:
             return 0
         LLVMGlobalGetValueType(v as *mut u8) as i64
-pub fn wl_get_allocated_type(v: i64) -> i64:
+fn wl_get_allocated_type(v: i64) -> i64:
     unsafe:
         let value = v as *mut u8
         if LLVMIsAAllocaInst(value) as i64 == 0:
@@ -725,104 +725,104 @@ pub fn wl_get_allocated_type(v: i64) -> i64:
         LLVMGetAllocatedType(value) as i64
 
 // Type kind constants
-pub fn wl_void_type_kind() -> i32: LLVM_VoidTypeKind
-pub fn wl_float_type_kind() -> i32: LLVM_FloatTypeKind
-pub fn wl_double_type_kind() -> i32: LLVM_DoubleTypeKind
-pub fn wl_integer_type_kind() -> i32: LLVM_IntegerTypeKind
-pub fn wl_function_type_kind() -> i32: LLVM_FunctionTypeKind
-pub fn wl_struct_type_kind() -> i32: LLVM_StructTypeKind
-pub fn wl_array_type_kind() -> i32: LLVM_ArrayTypeKind
-pub fn wl_pointer_type_kind() -> i32: LLVM_PointerTypeKind
-pub fn wl_vector_type_kind() -> i32: LLVM_VectorTypeKind
-pub fn wl_function_value_kind() -> i32: LLVM_FunctionValueKind
+fn wl_void_type_kind() -> i32: LLVM_VoidTypeKind
+fn wl_float_type_kind() -> i32: LLVM_FloatTypeKind
+fn wl_double_type_kind() -> i32: LLVM_DoubleTypeKind
+fn wl_integer_type_kind() -> i32: LLVM_IntegerTypeKind
+fn wl_function_type_kind() -> i32: LLVM_FunctionTypeKind
+fn wl_struct_type_kind() -> i32: LLVM_StructTypeKind
+fn wl_array_type_kind() -> i32: LLVM_ArrayTypeKind
+fn wl_pointer_type_kind() -> i32: LLVM_PointerTypeKind
+fn wl_vector_type_kind() -> i32: LLVM_VectorTypeKind
+fn wl_function_value_kind() -> i32: LLVM_FunctionValueKind
 
 // ── Constants ───────────────────────────────────────────────────
 
-pub fn wl_const_int(ty: i64, val: i64, sign_ext: i32) -> i64:
+fn wl_const_int(ty: i64, val: i64, sign_ext: i32) -> i64:
     unsafe:
         LLVMConstInt(ty as *mut u8, val as u64, sign_ext) as i64
 
-pub fn wl_const_int_words(ty: i64, lo: i64, hi: i64, word_count: i32) -> i64:
+fn wl_const_int_words(ty: i64, lo: i64, hi: i64, word_count: i32) -> i64:
     unsafe:
         var words: [2]u64 = [lo as u64, hi as u64]
         LLVMConstIntOfArbitraryPrecision(ty as *mut u8, word_count as u32, &words as *const u64) as i64
 
-pub fn wl_const_real(ty: i64, val: f64) -> i64: unsafe { LLVMConstReal(ty as *mut u8, val) as i64 }
+fn wl_const_real(ty: i64, val: f64) -> i64: unsafe { LLVMConstReal(ty as *mut u8, val) as i64 }
 
 // A float literal's own text, rounded once into `ty` by APFloat — the conversion
 // clang uses for the same text. `wl_const_real` takes an f64, so an f32 literal that
 // reaches it has already been rounded to f64 and rounds a second time.
-pub fn wl_const_real_of_string(ty: i64, text: &str) -> i64:
+fn wl_const_real_of_string(ty: i64, text: &str) -> i64:
     unsafe:
         LLVMConstRealOfString(ty as *mut u8, to_cstr(text)) as i64
 
-pub fn wl_const_null(ty: i64) -> i64: unsafe { LLVMConstNull(ty as *mut u8) as i64 }
-pub fn wl_get_undef(ty: i64) -> i64: unsafe { LLVMGetUndef(ty as *mut u8) as i64 }
+fn wl_const_null(ty: i64) -> i64: unsafe { LLVMConstNull(ty as *mut u8) as i64 }
+fn wl_get_undef(ty: i64) -> i64: unsafe { LLVMGetUndef(ty as *mut u8) as i64 }
 
-pub fn wl_const_string(ctx: i64, s: &str, dont_null: i32) -> i64:
+fn wl_const_string(ctx: i64, s: &str, dont_null: i32) -> i64:
     unsafe:
         let sp = *(s as *const str as *const *const u8)
         LLVMConstStringInContext(ctx as *mut u8, sp, s.len() as u32, dont_null) as i64
 
-pub fn wl_const_struct(ctx: i64, vals_ptr: i64, count: i32, packed: i32) -> i64:
+fn wl_const_struct(ctx: i64, vals_ptr: i64, count: i32, packed: i32) -> i64:
     unsafe:
         LLVMConstStructInContext(ctx as *mut u8, vals_ptr as *const *mut u8, count as u32, packed) as i64
 
-pub fn wl_const_named_struct(ty: i64, vals_ptr: i64, count: i32) -> i64:
+fn wl_const_named_struct(ty: i64, vals_ptr: i64, count: i32) -> i64:
     unsafe:
         LLVMConstNamedStruct(ty as *mut u8, vals_ptr as *const *mut u8, count as u32) as i64
 
-pub fn wl_const_array(elem_ty: i64, vals_ptr: i64, count: i32) -> i64:
+fn wl_const_array(elem_ty: i64, vals_ptr: i64, count: i32) -> i64:
     unsafe:
         LLVMConstArray2(elem_ty as *mut u8, vals_ptr as *const *mut u8, count as u64) as i64
 
-pub fn wl_const_bitcast(val: i64, ty: i64) -> i64: unsafe { LLVMConstBitCast(val as *mut u8, ty as *mut u8) as i64 }
-pub fn wl_const_int_to_ptr(val: i64, ty: i64) -> i64: unsafe { LLVMConstIntToPtr(val as *mut u8, ty as *mut u8) as i64 }
-pub fn wl_const_int_sext_val(v: i64) -> i64: unsafe { LLVMConstIntGetSExtValue(v as *mut u8) }
-pub fn wl_is_constant(v: i64) -> i32: unsafe { LLVMIsConstant(v as *mut u8) }
-pub fn wl_size_of(ty: i64) -> i64: unsafe { LLVMSizeOf(ty as *mut u8) as i64 }
+fn wl_const_bitcast(val: i64, ty: i64) -> i64: unsafe { LLVMConstBitCast(val as *mut u8, ty as *mut u8) as i64 }
+fn wl_const_int_to_ptr(val: i64, ty: i64) -> i64: unsafe { LLVMConstIntToPtr(val as *mut u8, ty as *mut u8) as i64 }
+fn wl_const_int_sext_val(v: i64) -> i64: unsafe { LLVMConstIntGetSExtValue(v as *mut u8) }
+fn wl_is_constant(v: i64) -> i32: unsafe { LLVMIsConstant(v as *mut u8) }
+fn wl_size_of(ty: i64) -> i64: unsafe { LLVMSizeOf(ty as *mut u8) as i64 }
 
 // ── ICmp predicates ─────────────────────────────────────────────
 
-pub fn wl_int_eq() -> i32: LLVM_IntEQ
-pub fn wl_int_ne() -> i32: LLVM_IntNE
-pub fn wl_int_slt() -> i32: LLVM_IntSLT
-pub fn wl_int_sgt() -> i32: LLVM_IntSGT
-pub fn wl_int_sle() -> i32: LLVM_IntSLE
-pub fn wl_int_sge() -> i32: LLVM_IntSGE
-pub fn wl_int_ult() -> i32: LLVM_IntULT
-pub fn wl_int_ule() -> i32: LLVM_IntULE
-pub fn wl_int_uge() -> i32: LLVM_IntUGE
-pub fn wl_int_ugt() -> i32: LLVM_IntUGT
+fn wl_int_eq() -> i32: LLVM_IntEQ
+fn wl_int_ne() -> i32: LLVM_IntNE
+fn wl_int_slt() -> i32: LLVM_IntSLT
+fn wl_int_sgt() -> i32: LLVM_IntSGT
+fn wl_int_sle() -> i32: LLVM_IntSLE
+fn wl_int_sge() -> i32: LLVM_IntSGE
+fn wl_int_ult() -> i32: LLVM_IntULT
+fn wl_int_ule() -> i32: LLVM_IntULE
+fn wl_int_uge() -> i32: LLVM_IntUGE
+fn wl_int_ugt() -> i32: LLVM_IntUGT
 
 // ── FCmp predicates ─────────────────────────────────────────────
 
-pub fn wl_real_oeq() -> i32: LLVM_RealOEQ
-pub fn wl_real_une() -> i32: LLVM_RealUNE
-pub fn wl_real_olt() -> i32: LLVM_RealOLT
-pub fn wl_real_ogt() -> i32: LLVM_RealOGT
-pub fn wl_real_ole() -> i32: LLVM_RealOLE
-pub fn wl_real_oge() -> i32: LLVM_RealOGE
+fn wl_real_oeq() -> i32: LLVM_RealOEQ
+fn wl_real_une() -> i32: LLVM_RealUNE
+fn wl_real_olt() -> i32: LLVM_RealOLT
+fn wl_real_ogt() -> i32: LLVM_RealOGT
+fn wl_real_ole() -> i32: LLVM_RealOLE
+fn wl_real_oge() -> i32: LLVM_RealOGE
 
 // ── Functions ───────────────────────────────────────────────────
 
-pub fn wl_add_function(m: i64, name: &str, fn_type: i64) -> i64:
+fn wl_add_function(m: i64, name: &str, fn_type: i64) -> i64:
     unsafe:
         LLVMAddFunction(m as *mut u8, to_cstr(name), fn_type as *mut u8) as i64
 
-pub fn wl_get_named_function(m: i64, name: &str) -> i64:
+fn wl_get_named_function(m: i64, name: &str) -> i64:
     unsafe:
         LLVMGetNamedFunction(m as *mut u8, to_cstr(name)) as i64
 
-pub fn wl_get_named_global(m: i64, name: &str) -> i64:
+fn wl_get_named_global(m: i64, name: &str) -> i64:
     unsafe:
         LLVMGetNamedGlobal(m as *mut u8, to_cstr(name)) as i64
 
-pub fn wl_get_first_function(m: i64) -> i64: unsafe { LLVMGetFirstFunction(m as *mut u8) as i64 }
-pub fn wl_get_next_function(v: i64) -> i64: unsafe { LLVMGetNextFunction(v as *mut u8) as i64 }
-pub fn wl_is_declaration(v: i64) -> i32: unsafe { LLVMIsDeclaration(v as *mut u8) }
+fn wl_get_first_function(m: i64) -> i64: unsafe { LLVMGetFirstFunction(m as *mut u8) as i64 }
+fn wl_get_next_function(v: i64) -> i64: unsafe { LLVMGetNextFunction(v as *mut u8) as i64 }
+fn wl_is_declaration(v: i64) -> i32: unsafe { LLVMIsDeclaration(v as *mut u8) }
 
-pub fn wl_add_fn_attr(ctx: i64, fn_val: i64, attr_name: &str):
+fn wl_add_fn_attr(ctx: i64, fn_val: i64, attr_name: &str):
     unsafe:
         let name = to_cstr(attr_name)
         let kind = LLVMGetEnumAttributeKindForName(name, c_strlen(name) as u64)
@@ -831,7 +831,7 @@ pub fn wl_add_fn_attr(ctx: i64, fn_val: i64, attr_name: &str):
             // LLVMAttributeIndex -1 = function index (0xFFFFFFFF as u32)
             LLVMAddAttributeAtIndex(fn_val as *mut u8, 4294967295 as u32, attr)
 
-pub fn wl_add_param_attr(ctx: i64, fn_val: i64, param_idx: i32, attr_name: &str):
+fn wl_add_param_attr(ctx: i64, fn_val: i64, param_idx: i32, attr_name: &str):
     unsafe:
         let name = to_cstr(attr_name)
         let kind = LLVMGetEnumAttributeKindForName(name, c_strlen(name) as u64)
@@ -842,12 +842,12 @@ pub fn wl_add_param_attr(ctx: i64, fn_val: i64, param_idx: i32, attr_name: &str)
 // A string ("target-dependent") function attribute, e.g. the
 // wasm-import-module / wasm-import-name pair that tells the WebAssembly
 // object writer which import namespace an extern declaration lives in.
-pub fn wl_add_fn_string_attr(ctx: i64, fn_val: i64, key: &str, value: &str) -> Unit:
+fn wl_add_fn_string_attr(ctx: i64, fn_val: i64, key: &str, value: &str) -> Unit:
     unsafe:
         let attr = LLVMCreateStringAttribute(ctx as *mut u8, to_cstr(key) as *const u8, key.len() as u32, to_cstr(value) as *const u8, value.len() as u32)
         LLVMAddAttributeAtIndex(fn_val as *mut u8, 4294967295 as u32, attr)
 
-pub fn wl_add_param_byval_attr(ctx: i64, fn_val: i64, param_idx: i32, ty: i64):
+fn wl_add_param_byval_attr(ctx: i64, fn_val: i64, param_idx: i32, ty: i64):
     unsafe:
         let name = "byval" as *const u8
         let kind = LLVMGetEnumAttributeKindForName(name, 5 as u64)
@@ -855,7 +855,7 @@ pub fn wl_add_param_byval_attr(ctx: i64, fn_val: i64, param_idx: i32, ty: i64):
             let attr = LLVMCreateTypeAttribute(ctx as *mut u8, kind, ty as *mut u8)
             LLVMAddAttributeAtIndex(fn_val as *mut u8, (param_idx + 1) as u32, attr)
 
-pub fn wl_add_sret_attr(ctx: i64, fn_val: i64, param_idx: i32, ty: i64):
+fn wl_add_sret_attr(ctx: i64, fn_val: i64, param_idx: i32, ty: i64):
     unsafe:
         let name = "sret" as *const u8
         let kind = LLVMGetEnumAttributeKindForName(name, 4 as u64)
@@ -867,7 +867,7 @@ pub fn wl_add_sret_attr(ctx: i64, fn_val: i64, param_idx: i32, ty: i64):
 // type carried by an `sret(T)` attribute, or 0 when the parameter is not
 // sret-lowered. Used to reconstruct a by-value signature from an already
 // sret-lowered concrete function (win64 aggregate return).
-pub fn wl_get_param_sret_type(fn_val: i64, param_idx: i32) -> i64:
+fn wl_get_param_sret_type(fn_val: i64, param_idx: i32) -> i64:
     unsafe:
         let name = "sret" as *const u8
         let kind = LLVMGetEnumAttributeKindForName(name, 4 as u64)
@@ -878,7 +878,7 @@ pub fn wl_get_param_sret_type(fn_val: i64, param_idx: i32) -> i64:
             return 0
         LLVMGetTypeAttributeValue(attr) as i64
 
-pub fn wl_add_call_param_byval_attr(ctx: i64, call_val: i64, param_idx: i32, ty: i64):
+fn wl_add_call_param_byval_attr(ctx: i64, call_val: i64, param_idx: i32, ty: i64):
     unsafe:
         let name = "byval" as *const u8
         let kind = LLVMGetEnumAttributeKindForName(name, 5 as u64)
@@ -886,7 +886,7 @@ pub fn wl_add_call_param_byval_attr(ctx: i64, call_val: i64, param_idx: i32, ty:
             let attr = LLVMCreateTypeAttribute(ctx as *mut u8, kind, ty as *mut u8)
             LLVMAddCallSiteAttribute(call_val as *mut u8, (param_idx + 1) as u32, attr)
 
-pub fn wl_get_byval_type(value: i64, param_idx: i32, call_site: bool) -> i64:
+fn wl_get_byval_type(value: i64, param_idx: i32, call_site: bool) -> i64:
     unsafe:
         let kind = LLVMGetEnumAttributeKindForName(c"byval".ptr, 5)
         if kind == 0: return 0
@@ -897,7 +897,7 @@ pub fn wl_get_byval_type(value: i64, param_idx: i32, call_site: bool) -> i64:
         if attribute == 0: return 0
         LLVMGetTypeAttributeValue(attribute) as i64
 
-pub fn wl_add_call_sret_attr(ctx: i64, call_val: i64, param_idx: i32, ty: i64):
+fn wl_add_call_sret_attr(ctx: i64, call_val: i64, param_idx: i32, ty: i64):
     unsafe:
         let name = "sret" as *const u8
         let kind = LLVMGetEnumAttributeKindForName(name, 4 as u64)
@@ -907,113 +907,113 @@ pub fn wl_add_call_sret_attr(ctx: i64, call_val: i64, param_idx: i32, ty: i64):
 
 // ── Basic blocks ────────────────────────────────────────────────
 
-pub fn wl_append_bb(ctx: i64, fn_val: i64, name: &str) -> i64:
+fn wl_append_bb(ctx: i64, fn_val: i64, name: &str) -> i64:
     unsafe:
         LLVMAppendBasicBlockInContext(ctx as *mut u8, fn_val as *mut u8, to_cstr(name)) as i64
 
-pub fn wl_position_at_end(b: i64, bb: i64):
+fn wl_position_at_end(b: i64, bb: i64):
     unsafe:
         LLVMPositionBuilderAtEnd(b as *mut u8, bb as *mut u8)
 
-pub fn wl_position_before(b: i64, instr: i64):
+fn wl_position_before(b: i64, instr: i64):
     unsafe:
         LLVMPositionBuilderBefore(b as *mut u8, instr as *mut u8)
 
-pub fn wl_get_insert_block(b: i64) -> i64: unsafe { LLVMGetInsertBlock(b as *mut u8) as i64 }
+fn wl_get_insert_block(b: i64) -> i64: unsafe { LLVMGetInsertBlock(b as *mut u8) as i64 }
 // Parent function of the builder's current insertion block. This is the
 // authoritative "function currently being built" — unlike a cached field it
 // cannot go stale when codegen emits into a locally-constructed wrapper.
-pub fn wl_get_insert_function(b: i64) -> i64:
+fn wl_get_insert_function(b: i64) -> i64:
     unsafe { LLVMGetBasicBlockParent(LLVMGetInsertBlock(b as *mut u8)) as i64 }
-pub fn wl_get_bb_terminator(bb: i64) -> i64: unsafe { LLVMGetBasicBlockTerminator(bb as *mut u8) as i64 }
-pub fn wl_get_entry_bb(fn_val: i64) -> i64: unsafe { LLVMGetEntryBasicBlock(fn_val as *mut u8) as i64 }
-pub fn wl_get_first_instr(bb: i64) -> i64: unsafe { LLVMGetFirstInstruction(bb as *mut u8) as i64 }
-pub fn wl_bb_as_value(bb: i64) -> i64: unsafe { LLVMBasicBlockAsValue(bb as *mut u8) as i64 }
+fn wl_get_bb_terminator(bb: i64) -> i64: unsafe { LLVMGetBasicBlockTerminator(bb as *mut u8) as i64 }
+fn wl_get_entry_bb(fn_val: i64) -> i64: unsafe { LLVMGetEntryBasicBlock(fn_val as *mut u8) as i64 }
+fn wl_get_first_instr(bb: i64) -> i64: unsafe { LLVMGetFirstInstruction(bb as *mut u8) as i64 }
+fn wl_bb_as_value(bb: i64) -> i64: unsafe { LLVMBasicBlockAsValue(bb as *mut u8) as i64 }
 
 // ── Builder: binary arithmetic ──────────────────────────────────
 
-pub fn wl_build_add(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildAdd(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_sub(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildSub(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_mul(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildMul(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_nsw_add(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildNSWAdd(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_nsw_sub(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildNSWSub(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_nsw_mul(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildNSWMul(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_sdiv(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildSDiv(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_srem(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildSRem(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_udiv(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildUDiv(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_urem(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildURem(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_fadd(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildFAdd(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_fsub(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildFSub(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_fmul(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildFMul(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_fdiv(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildFDiv(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_frem(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildFRem(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_and(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildAnd(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_or(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildOr(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_xor(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildXor(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_shl(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildShl(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_ashr(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildAShr(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_lshr(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildLShr(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_add(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildAdd(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_sub(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildSub(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_mul(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildMul(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_nsw_add(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildNSWAdd(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_nsw_sub(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildNSWSub(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_nsw_mul(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildNSWMul(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_sdiv(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildSDiv(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_srem(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildSRem(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_udiv(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildUDiv(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_urem(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildURem(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_fadd(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildFAdd(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_fsub(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildFSub(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_fmul(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildFMul(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_fdiv(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildFDiv(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_frem(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildFRem(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_and(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildAnd(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_or(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildOr(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_xor(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildXor(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_shl(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildShl(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_ashr(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildAShr(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
+fn wl_build_lshr(b: i64, l: i64, r: i64) -> i64: unsafe { LLVMBuildLShr(b as *mut u8, l as *mut u8, r as *mut u8, empty_cstr()) as i64 }
 
 // ── Builder: unary ──────────────────────────────────────────────
 
-pub fn wl_build_neg(b: i64, v: i64) -> i64: unsafe { LLVMBuildNeg(b as *mut u8, v as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_not(b: i64, v: i64) -> i64: unsafe { LLVMBuildNot(b as *mut u8, v as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_fneg(b: i64, v: i64) -> i64: unsafe { LLVMBuildFNeg(b as *mut u8, v as *mut u8, empty_cstr()) as i64 }
+fn wl_build_neg(b: i64, v: i64) -> i64: unsafe { LLVMBuildNeg(b as *mut u8, v as *mut u8, empty_cstr()) as i64 }
+fn wl_build_not(b: i64, v: i64) -> i64: unsafe { LLVMBuildNot(b as *mut u8, v as *mut u8, empty_cstr()) as i64 }
+fn wl_build_fneg(b: i64, v: i64) -> i64: unsafe { LLVMBuildFNeg(b as *mut u8, v as *mut u8, empty_cstr()) as i64 }
 
 // ── Builder: comparison ─────────────────────────────────────────
 
-pub fn wl_build_icmp(b: i64, pred: i32, l: i64, r: i64) -> i64:
+fn wl_build_icmp(b: i64, pred: i32, l: i64, r: i64) -> i64:
     unsafe:
         LLVMBuildICmp(b as *mut u8, pred, l as *mut u8, r as *mut u8, empty_cstr()) as i64
 
-pub fn wl_build_fcmp(b: i64, pred: i32, l: i64, r: i64) -> i64:
+fn wl_build_fcmp(b: i64, pred: i32, l: i64, r: i64) -> i64:
     unsafe:
         LLVMBuildFCmp(b as *mut u8, pred, l as *mut u8, r as *mut u8, empty_cstr()) as i64
 
 // ── Builder: memory ─────────────────────────────────────────────
 
-pub fn wl_build_alloca(b: i64, ty: i64) -> i64: unsafe { LLVMBuildAlloca(b as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
+fn wl_build_alloca(b: i64, ty: i64) -> i64: unsafe { LLVMBuildAlloca(b as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
 
-pub fn wl_build_alloca_named(b: i64, ty: i64, name: &str) -> i64:
+fn wl_build_alloca_named(b: i64, ty: i64, name: &str) -> i64:
     unsafe:
         LLVMBuildAlloca(b as *mut u8, ty as *mut u8, to_cstr(name)) as i64
 
-pub fn wl_build_load(b: i64, ty: i64, ptr: i64) -> i64:
+fn wl_build_load(b: i64, ty: i64, ptr: i64) -> i64:
     unsafe:
         LLVMBuildLoad2(b as *mut u8, ty as *mut u8, ptr as *mut u8, empty_cstr()) as i64
 
-pub fn wl_build_store(b: i64, val: i64, ptr: i64) -> i64:
+fn wl_build_store(b: i64, val: i64, ptr: i64) -> i64:
     unsafe:
         LLVMBuildStore(b as *mut u8, val as *mut u8, ptr as *mut u8) as i64
 
-pub fn wl_set_volatile(inst: i64, is_volatile: i32):
+fn wl_set_volatile(inst: i64, is_volatile: i32):
     unsafe:
         LLVMSetVolatile(inst as *mut u8, if is_volatile != 0: 1 else: 0)
 
 // The alignment a load, store or alloca promises for its address (#1958:
 // an Option payload accessed at the model's alignment, below LLVM's for
 // its type).
-pub fn wl_set_alignment(inst: i64, align: i64):
+fn wl_set_alignment(inst: i64, align: i64):
     unsafe:
         LLVMSetAlignment(inst as *mut u8, align as u32)
 
-pub fn wl_build_load_volatile(b: i64, ty: i64, ptr: i64) -> i64:
+fn wl_build_load_volatile(b: i64, ty: i64, ptr: i64) -> i64:
     unsafe:
         let load = LLVMBuildLoad2(b as *mut u8, ty as *mut u8, ptr as *mut u8, empty_cstr())
         LLVMSetVolatile(load, 1)
         load as i64
 
-pub fn wl_build_store_volatile(b: i64, val: i64, ptr: i64) -> i64:
+fn wl_build_store_volatile(b: i64, val: i64, ptr: i64) -> i64:
     unsafe:
         let store = LLVMBuildStore(b as *mut u8, val as *mut u8, ptr as *mut u8)
         LLVMSetVolatile(store, 1)
         store as i64
 
-pub fn wl_build_gep(b: i64, ty: i64, ptr: i64, idx_ptr: i64, cnt: i32) -> i64:
+fn wl_build_gep(b: i64, ty: i64, ptr: i64, idx_ptr: i64, cnt: i32) -> i64:
     unsafe:
         LLVMBuildGEP2(b as *mut u8, ty as *mut u8, ptr as *mut u8, idx_ptr as *const *mut u8, cnt as u32, empty_cstr()) as i64
 
-pub fn wl_build_struct_gep(b: i64, ty: i64, ptr: i64, idx: i32) -> i64:
+fn wl_build_struct_gep(b: i64, ty: i64, ptr: i64, idx: i32) -> i64:
     unsafe:
         LLVMBuildStructGEP2(b as *mut u8, ty as *mut u8, ptr as *mut u8, idx as u32, empty_cstr()) as i64
 
@@ -1021,7 +1021,7 @@ pub fn wl_build_struct_gep(b: i64, ty: i64, ptr: i64, idx: i32) -> i64:
 // go through to_cstr, whose fixed 4096-byte slot silently truncates longer
 // strings (and a C-string API would stop at embedded nulls). Emits a private
 // null-terminated constant array global and returns it (opaque pointer).
-pub fn wl_build_global_string_ptr(b: i64, s: &str) -> i64:
+fn wl_build_global_string_ptr(b: i64, s: &str) -> i64:
     unsafe:
         let bb = LLVMGetInsertBlock(b as *mut u8)
         let func = LLVMGetBasicBlockParent(bb)
@@ -1040,33 +1040,33 @@ pub fn wl_build_global_string_ptr(b: i64, s: &str) -> i64:
 
 // ── Builder: globals ────────────────────────────────────────────
 
-pub fn wl_add_global(m: i64, ty: i64, name: &str) -> i64:
+fn wl_add_global(m: i64, ty: i64, name: &str) -> i64:
     unsafe:
         LLVMAddGlobal(m as *mut u8, ty as *mut u8, to_cstr(name)) as i64
 
-pub fn wl_set_initializer(g: i64, v: i64): unsafe { LLVMSetInitializer(g as *mut u8, v as *mut u8) }
-pub fn wl_set_global_constant(g: i64, c: i32): unsafe { LLVMSetGlobalConstant(g as *mut u8, c) }
-pub fn wl_set_linkage(g: i64, link: i32): unsafe { LLVMSetLinkage(g as *mut u8, link) }
-pub fn wl_set_call_conv(fn_val: i64, cc: i32): unsafe { LLVMSetFunctionCallConv(fn_val as *mut u8, cc as u32) }
+fn wl_set_initializer(g: i64, v: i64): unsafe { LLVMSetInitializer(g as *mut u8, v as *mut u8) }
+fn wl_set_global_constant(g: i64, c: i32): unsafe { LLVMSetGlobalConstant(g as *mut u8, c) }
+fn wl_set_linkage(g: i64, link: i32): unsafe { LLVMSetLinkage(g as *mut u8, link) }
+fn wl_set_call_conv(fn_val: i64, cc: i32): unsafe { LLVMSetFunctionCallConv(fn_val as *mut u8, cc as u32) }
 
-pub fn wl_cc_c() -> i32: LLVM_CCallConv
-pub fn wl_cc_fast() -> i32: LLVM_FastCallConv
-pub fn wl_cc_x86_stdcall() -> i32: LLVM_X86StdcallCallConv
-pub fn wl_cc_x86_fastcall() -> i32: LLVM_X86FastcallCallConv
-pub fn wl_cc_x86_thiscall() -> i32: 33
-pub fn wl_cc_win64() -> i32: LLVM_Win64CallConv
-pub fn wl_cc_aarch64_vfabi() -> i32: 97
-pub fn wl_internal_linkage() -> i32: LLVM_InternalLinkage
-pub fn wl_private_linkage() -> i32: LLVM_PrivateLinkage
-pub fn wl_external_linkage() -> i32: LLVM_ExternalLinkage
+fn wl_cc_c() -> i32: LLVM_CCallConv
+fn wl_cc_fast() -> i32: LLVM_FastCallConv
+fn wl_cc_x86_stdcall() -> i32: LLVM_X86StdcallCallConv
+fn wl_cc_x86_fastcall() -> i32: LLVM_X86FastcallCallConv
+fn wl_cc_x86_thiscall() -> i32: 33
+fn wl_cc_win64() -> i32: LLVM_Win64CallConv
+fn wl_cc_aarch64_vfabi() -> i32: 97
+fn wl_internal_linkage() -> i32: LLVM_InternalLinkage
+fn wl_private_linkage() -> i32: LLVM_PrivateLinkage
+fn wl_external_linkage() -> i32: LLVM_ExternalLinkage
 let LLVM_AppendingLinkage: i32 = 7
 
 // ── Codegen-unit splitting primitives (#650) ─────────────────────
 
-pub fn wl_write_bitcode(m: i64, path: &str) -> i32:
+fn wl_write_bitcode(m: i64, path: &str) -> i32:
     unsafe { LLVMWriteBitcodeToFile(m as *mut u8, to_cstr(path)) }
 
-pub fn wl_parse_bitcode_in_context(ctx: i64, path: &str) -> i64:
+fn wl_parse_bitcode_in_context(ctx: i64, path: &str) -> i64:
     unsafe:
         var mem_buf: *mut u8 = 0 as *mut u8
         var err: *mut u8 = 0 as *mut u8
@@ -1092,10 +1092,10 @@ pub fn wl_parse_bitcode_in_context(ctx: i64, path: &str) -> i64:
             return 0
         m as i64
 
-pub fn wl_fn_is_declaration(f: i64) -> i32: unsafe { LLVMIsDeclaration(f as *mut u8) }
-pub fn wl_fn_block_count(f: i64) -> i32: unsafe { LLVMCountBasicBlocks(f as *mut u8) as i32 }
+fn wl_fn_is_declaration(f: i64) -> i32: unsafe { LLVMIsDeclaration(f as *mut u8) }
+fn wl_fn_block_count(f: i64) -> i32: unsafe { LLVMCountBasicBlocks(f as *mut u8) as i32 }
 
-pub fn wl_fn_instruction_count(f: i64) -> isize:
+fn wl_fn_instruction_count(f: i64) -> isize:
     var count = 0
     unsafe:
         var bb = LLVMGetFirstBasicBlock(f as *mut u8)
@@ -1116,7 +1116,7 @@ pub fn wl_fn_instruction_count(f: i64) -> isize:
 // is guaranteed: the target emits an unaligned access ("The compiler emits
 // unaligned loads/stores"). Runs before the per-function cleanup passes;
 // returns the number of accesses relaxed.
-pub fn wl_relax_packed_access_alignment(f: i64) -> isize:
+fn wl_relax_packed_access_alignment(f: i64) -> isize:
     var relaxed = 0
     unsafe:
         var bb = LLVMGetFirstBasicBlock(f as *mut u8)
@@ -1165,7 +1165,7 @@ fn wl_address_through_packed_struct(addr: i64) -> bool:
 // destination may be the same place), a store of a zero aggregate becomes
 // `llvm.memset`, and a load left without uses is erased. Runs before the
 // per-function cleanup passes; returns the number of stores rewritten.
-pub fn wl_lower_aggregate_copies(f: i64, ctx: i64, dl: i64, min_bytes: i64) -> isize:
+fn wl_lower_aggregate_copies(f: i64, ctx: i64, dl: i64, min_bytes: i64) -> isize:
     var rewritten = 0
     unsafe:
         let builder = LLVMCreateBuilderInContext(ctx as *mut u8)
@@ -1228,7 +1228,7 @@ pub fn wl_lower_aggregate_copies(f: i64, ctx: i64, dl: i64, min_bytes: i64) -> i
 
 // Every use of `old_v` becomes a use of `new_v` (#1850: a definition takes
 // over the declaration of its symbol).
-pub fn wl_replace_all_uses_with(old_v: i64, new_v: i64):
+fn wl_replace_all_uses_with(old_v: i64, new_v: i64):
     unsafe { LLVMReplaceAllUsesWith(old_v as *mut u8, new_v as *mut u8) }
 
 // Mirror Function::deleteBody(): drop every reference held by the body
@@ -1236,7 +1236,7 @@ pub fn wl_replace_all_uses_with(old_v: i64, new_v: i64):
 // and terminators reference successor blocks, so blocks cannot simply be
 // deleted front-to-back — replace all instruction uses with undef first,
 // then erase instructions, then the emptied blocks.
-pub fn wl_delete_function_body(f: i64) -> Unit:
+fn wl_delete_function_body(f: i64) -> Unit:
     unsafe:
         var bb = LLVMGetFirstBasicBlock(f as *mut u8)
         while bb as i64 != 0:
@@ -1260,17 +1260,17 @@ pub fn wl_delete_function_body(f: i64) -> Unit:
             LLVMDeleteBasicBlock(bb)
             bb = LLVMGetFirstBasicBlock(f as *mut u8)
 
-pub fn wl_get_first_global(m: i64) -> i64: unsafe { LLVMGetFirstGlobal(m as *mut u8) as i64 }
-pub fn wl_get_next_global(g: i64) -> i64: unsafe { LLVMGetNextGlobal(g as *mut u8) as i64 }
-pub fn wl_global_has_initializer(g: i64) -> i32:
+fn wl_get_first_global(m: i64) -> i64: unsafe { LLVMGetFirstGlobal(m as *mut u8) as i64 }
+fn wl_get_next_global(g: i64) -> i64: unsafe { LLVMGetNextGlobal(g as *mut u8) as i64 }
+fn wl_global_has_initializer(g: i64) -> i32:
     unsafe { if LLVMGetInitializer(g as *mut u8) as i64 != 0: 1 else: 0 }
-pub fn wl_get_linkage(v: i64) -> i32: unsafe { LLVMGetLinkage(v as *mut u8) }
-pub fn wl_appending_linkage() -> i32: LLVM_AppendingLinkage
-pub fn wl_delete_global(g: i64) -> Unit: unsafe { LLVMDeleteGlobal(g as *mut u8) }
-pub fn wl_clear_initializer(g: i64) -> Unit:
+fn wl_get_linkage(v: i64) -> i32: unsafe { LLVMGetLinkage(v as *mut u8) }
+fn wl_appending_linkage() -> i32: LLVM_AppendingLinkage
+fn wl_delete_global(g: i64) -> Unit: unsafe { LLVMDeleteGlobal(g as *mut u8) }
+fn wl_clear_initializer(g: i64) -> Unit:
     unsafe { LLVMSetInitializer(g as *mut u8, 0 as *mut u8) }
 
-pub fn wl_get_value_name(v: i64) -> str:
+fn wl_get_value_name(v: i64) -> str:
     unsafe:
         var len: u64 = 0
         let p = LLVMGetValueName2(v as *mut u8, &raw mut len)
@@ -1280,113 +1280,113 @@ pub fn wl_get_value_name(v: i64) -> str:
 
 // ── Builder: control flow ───────────────────────────────────────
 
-pub fn wl_build_br(b: i64, bb: i64) -> i64: unsafe { LLVMBuildBr(b as *mut u8, bb as *mut u8) as i64 }
-pub fn wl_build_cond_br(b: i64, cond: i64, then_bb: i64, else_bb: i64) -> i64:
+fn wl_build_br(b: i64, bb: i64) -> i64: unsafe { LLVMBuildBr(b as *mut u8, bb as *mut u8) as i64 }
+fn wl_build_cond_br(b: i64, cond: i64, then_bb: i64, else_bb: i64) -> i64:
     unsafe:
         LLVMBuildCondBr(b as *mut u8, cond as *mut u8, then_bb as *mut u8, else_bb as *mut u8) as i64
-pub fn wl_build_ret(b: i64, val: i64) -> i64: unsafe { LLVMBuildRet(b as *mut u8, val as *mut u8) as i64 }
-pub fn wl_build_ret_void(b: i64) -> i64: unsafe { LLVMBuildRetVoid(b as *mut u8) as i64 }
-pub fn wl_build_unreachable(b: i64) -> i64: unsafe { LLVMBuildUnreachable(b as *mut u8) as i64 }
-pub fn wl_build_switch(b: i64, val: i64, else_bb: i64, n: i32) -> i64:
+fn wl_build_ret(b: i64, val: i64) -> i64: unsafe { LLVMBuildRet(b as *mut u8, val as *mut u8) as i64 }
+fn wl_build_ret_void(b: i64) -> i64: unsafe { LLVMBuildRetVoid(b as *mut u8) as i64 }
+fn wl_build_unreachable(b: i64) -> i64: unsafe { LLVMBuildUnreachable(b as *mut u8) as i64 }
+fn wl_build_switch(b: i64, val: i64, else_bb: i64, n: i32) -> i64:
     unsafe:
         LLVMBuildSwitch(b as *mut u8, val as *mut u8, else_bb as *mut u8, n as u32) as i64
-pub fn wl_add_case(sw: i64, val: i64, bb: i64):
+fn wl_add_case(sw: i64, val: i64, bb: i64):
     unsafe:
         LLVMAddCase(sw as *mut u8, val as *mut u8, bb as *mut u8)
 
 // ── Builder: cast ───────────────────────────────────────────────
 
-pub fn wl_build_zext(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildZExt(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_sext(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildSExt(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_trunc(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildTrunc(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_si_to_fp(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildSIToFP(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_ui_to_fp(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildUIToFP(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_bitcast(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildBitCast(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_int_to_ptr(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildIntToPtr(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_ptr_to_int(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildPtrToInt(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_fp_cast(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildFPCast(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
-pub fn wl_build_fp_ext(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildFPExt(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
+fn wl_build_zext(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildZExt(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
+fn wl_build_sext(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildSExt(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
+fn wl_build_trunc(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildTrunc(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
+fn wl_build_si_to_fp(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildSIToFP(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
+fn wl_build_ui_to_fp(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildUIToFP(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
+fn wl_build_bitcast(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildBitCast(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
+fn wl_build_int_to_ptr(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildIntToPtr(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
+fn wl_build_ptr_to_int(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildPtrToInt(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
+fn wl_build_fp_cast(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildFPCast(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
+fn wl_build_fp_ext(b: i64, v: i64, ty: i64) -> i64: unsafe { LLVMBuildFPExt(b as *mut u8, v as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
 
 // ── Builder: phi / select / extract / insert ────────────────────
 
-pub fn wl_build_phi(b: i64, ty: i64) -> i64: unsafe { LLVMBuildPhi(b as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
+fn wl_build_phi(b: i64, ty: i64) -> i64: unsafe { LLVMBuildPhi(b as *mut u8, ty as *mut u8, empty_cstr()) as i64 }
 
-pub fn wl_add_incoming(phi: i64, vals_ptr: i64, bbs_ptr: i64, count: i32):
+fn wl_add_incoming(phi: i64, vals_ptr: i64, bbs_ptr: i64, count: i32):
     unsafe:
         LLVMAddIncoming(phi as *mut u8, vals_ptr as *const *mut u8, bbs_ptr as *const *mut u8, count as u32)
 
-pub fn wl_build_select(b: i64, cond: i64, then_v: i64, else_v: i64) -> i64:
+fn wl_build_select(b: i64, cond: i64, then_v: i64, else_v: i64) -> i64:
     unsafe:
         LLVMBuildSelect(b as *mut u8, cond as *mut u8, then_v as *mut u8, else_v as *mut u8, empty_cstr()) as i64
 
-pub fn wl_build_extract_value(b: i64, agg: i64, idx: i32) -> i64:
+fn wl_build_extract_value(b: i64, agg: i64, idx: i32) -> i64:
     unsafe:
         LLVMBuildExtractValue(b as *mut u8, agg as *mut u8, idx as u32, empty_cstr()) as i64
 
-pub fn wl_build_insert_value(b: i64, agg: i64, val: i64, idx: i32) -> i64:
+fn wl_build_insert_value(b: i64, agg: i64, val: i64, idx: i32) -> i64:
     unsafe:
         LLVMBuildInsertValue(b as *mut u8, agg as *mut u8, val as *mut u8, idx as u32, empty_cstr()) as i64
 
 // ── Builder: call ───────────────────────────────────────────────
 
-pub fn wl_build_call(b: i64, fn_ty: i64, fn_val: i64, args_ptr: i64, cnt: isize) -> i64:
+fn wl_build_call(b: i64, fn_ty: i64, fn_val: i64, args_ptr: i64, cnt: isize) -> i64:
     unsafe:
         let args = if cnt > 0: args_ptr as *const *mut u8 else: 0 as *const *mut u8
         LLVMBuildCall2(b as *mut u8, fn_ty as *mut u8, fn_val as *mut u8, args, cnt as u32, empty_cstr()) as i64
 
-pub fn wl_set_tail_call(call: i64): unsafe { LLVMSetTailCall(call as *mut u8, 1) }
-pub fn wl_set_musttail_call(call: i64): unsafe { LLVMSetTailCallKind(call as *mut u8, LLVM_TailCallKindMustTail) }
+fn wl_set_tail_call(call: i64): unsafe { LLVMSetTailCall(call as *mut u8, 1) }
+fn wl_set_musttail_call(call: i64): unsafe { LLVMSetTailCallKind(call as *mut u8, LLVM_TailCallKindMustTail) }
 
 // ── Misc builder / value ops ────────────────────────────────────
 
-pub fn wl_instruction_erase(v: i64): unsafe { LLVMInstructionEraseFromParent(v as *mut u8) }
-pub fn wl_get_value_kind(v: i64) -> i32: unsafe { LLVMGetValueKind(v as *mut u8) }
-pub fn wl_get_first_use(v: i64) -> i64: unsafe { LLVMGetFirstUse(v as *mut u8) as i64 }
+fn wl_instruction_erase(v: i64): unsafe { LLVMInstructionEraseFromParent(v as *mut u8) }
+fn wl_get_value_kind(v: i64) -> i32: unsafe { LLVMGetValueKind(v as *mut u8) }
+fn wl_get_first_use(v: i64) -> i64: unsafe { LLVMGetFirstUse(v as *mut u8) as i64 }
 
-pub fn wl_set_value_name(v: i64, name: &str):
+fn wl_set_value_name(v: i64, name: &str):
     unsafe:
         let sp = *(name as *const str as *const *const u8)
         LLVMSetValueName2(v as *mut u8, sp, name.len() as u64)
 
 // ── Intrinsics ──────────────────────────────────────────────────
 
-pub fn wl_lookup_intrinsic_id(name: &str) -> i32:
+fn wl_lookup_intrinsic_id(name: &str) -> i32:
     unsafe:
         let sp = *(name as *const str as *const *const u8)
         LLVMLookupIntrinsicID(sp, name.len() as u64) as i32
 
-pub fn wl_get_intrinsic_decl(m: i64, id: i32, tys_ptr: i64, cnt: i32) -> i64:
+fn wl_get_intrinsic_decl(m: i64, id: i32, tys_ptr: i64, cnt: i32) -> i64:
     unsafe:
         LLVMGetIntrinsicDeclaration(m as *mut u8, id as u32, tys_ptr as *const *mut u8, cnt as u64) as i64
 
-pub fn wl_intrinsic_get_type(ctx: i64, id: i32, tys_ptr: i64, cnt: i32) -> i64:
+fn wl_intrinsic_get_type(ctx: i64, id: i32, tys_ptr: i64, cnt: i32) -> i64:
     unsafe:
         LLVMIntrinsicGetType(ctx as *mut u8, id as u32, tys_ptr as *const *mut u8, cnt as u64) as i64
 
 // ── Data layout queries ─────────────────────────────────────────
 
-pub fn wl_get_module_data_layout(m: i64) -> i64: unsafe { LLVMGetModuleDataLayout(m as *mut u8) as i64 }
+fn wl_get_module_data_layout(m: i64) -> i64: unsafe { LLVMGetModuleDataLayout(m as *mut u8) as i64 }
 
-pub fn wl_abi_size_of(dl: i64, ty: i64) -> i64:
+fn wl_abi_size_of(dl: i64, ty: i64) -> i64:
     unsafe:
         if dl == 0 or ty == 0: return 0
         LLVMABISizeOfType(dl as *mut u8, ty as *mut u8) as i64
 
 // The byte offset of struct `ty`'s member `elem` (#1964: a tuple body's
 // element offsets are checked against TypeLayout's).
-pub fn wl_offset_of_element(dl: i64, ty: i64, elem: i32) -> i64:
+fn wl_offset_of_element(dl: i64, ty: i64, elem: i32) -> i64:
     unsafe:
         if dl == 0 or ty == 0: return 0
         LLVMOffsetOfElement(dl as *mut u8, ty as *mut u8, elem as u32) as i64
 
-pub fn wl_abi_align_of(dl: i64, ty: i64) -> i32:
+fn wl_abi_align_of(dl: i64, ty: i64) -> i32:
     unsafe:
         if dl == 0 or ty == 0: return 1
         LLVMABIAlignmentOfType(dl as *mut u8, ty as *mut u8) as i32
 
 // ── Struct name ─────────────────────────────────────────────────
 
-pub fn wl_get_struct_name(ty: i64) -> str:
+fn wl_get_struct_name(ty: i64) -> str:
     unsafe:
         let name = LLVMGetStructName(ty as *mut u8)
         if name as i64 == 0: return ""
@@ -1397,11 +1397,11 @@ pub fn wl_get_struct_name(ty: i64) -> str:
 
 // ── Param types ─────────────────────────────────────────────────
 
-pub fn wl_get_param_types(fn_ty: i64, out_ptr: i64):
+fn wl_get_param_types(fn_ty: i64, out_ptr: i64):
     unsafe:
         LLVMGetParamTypes(fn_ty as *mut u8, out_ptr as *mut *mut u8)
 
-pub fn wl_get_fn_param_type(fn_ty: i64, index: i32) -> i64:
+fn wl_get_fn_param_type(fn_ty: i64, index: i32) -> i64:
     unsafe:
         let count = LLVMCountParamTypes(fn_ty as *mut u8)
         if index as u32 >= count: return 0
@@ -1412,7 +1412,7 @@ pub fn wl_get_fn_param_type(fn_ty: i64, index: i32) -> i64:
 
 // ── Module verification / emission ──────────────────────────────
 
-pub fn wl_verify_module(m: i64) -> i32:
+fn wl_verify_module(m: i64) -> i32:
     unsafe:
         var err: *mut u8 = 0 as *mut u8
         let result = LLVMVerifyModule(m as *mut u8, LLVM_ReturnStatusAction, &raw mut err)
@@ -1427,7 +1427,7 @@ pub fn wl_verify_module(m: i64) -> i32:
             LLVMDisposeMessage(err)
         result
 
-pub fn wl_emit_object(tm: i64, m: i64, path: &str) -> i32:
+fn wl_emit_object(tm: i64, m: i64, path: &str) -> i32:
     unsafe:
         if tm == 0:
             let msg = "LLVM emit error: null target machine\n"
@@ -1450,7 +1450,7 @@ pub fn wl_emit_object(tm: i64, m: i64, path: &str) -> i32:
             LLVMDisposeMessage(err)
         result
 
-pub fn wl_optimize(m: i64, tm: i64, level: i32):
+fn wl_optimize(m: i64, tm: i64, level: i32):
     unsafe:
         let passes = if level == 0: "default<O0>"
             else if level == 1: "default<O1>"
@@ -1463,7 +1463,7 @@ pub fn wl_optimize(m: i64, tm: i64, level: i32):
             if msg as i64 != 0: LLVMDisposeErrorMessage(msg)
         LLVMDisposePassBuilderOptions(opts)
 
-pub fn wl_run_always_inline(m: i64, tm: i64):
+fn wl_run_always_inline(m: i64, tm: i64):
     unsafe:
         let opts = LLVMCreatePassBuilderOptions()
         let err = LLVMRunPasses(m as *mut u8, to_cstr("always-inline"), tm as *mut u8, opts)
@@ -1472,7 +1472,7 @@ pub fn wl_run_always_inline(m: i64, tm: i64):
             if msg as i64 != 0: LLVMDisposeErrorMessage(msg)
         LLVMDisposePassBuilderOptions(opts)
 
-pub fn wl_promote_allocas(fn_val: i64, tm: i64):
+fn wl_promote_allocas(fn_val: i64, tm: i64):
     unsafe:
         let opts = LLVMCreatePassBuilderOptions()
         let err = LLVMRunPassesOnFunction(fn_val as *mut u8, to_cstr("mem2reg"), tm as *mut u8, opts)
@@ -1481,7 +1481,7 @@ pub fn wl_promote_allocas(fn_val: i64, tm: i64):
             if msg as i64 != 0: LLVMDisposeErrorMessage(msg)
         LLVMDisposePassBuilderOptions(opts)
 
-pub fn wl_run_function_passes(fn_val: i64, tm: i64, passes: &str) -> i32:
+fn wl_run_function_passes(fn_val: i64, tm: i64, passes: &str) -> i32:
     unsafe:
         let opts = LLVMCreatePassBuilderOptions()
         let err = LLVMRunPassesOnFunction(fn_val as *mut u8, to_cstr(passes), tm as *mut u8, opts)
@@ -1500,7 +1500,7 @@ pub fn wl_run_function_passes(fn_val: i64, tm: i64, passes: &str) -> i32:
 
 // A pass pipeline over the whole module (`function(sroa,mem2reg)`); 1 on a
 // pipeline error, which is printed.
-pub fn wl_run_module_passes(m: i64, tm: i64, passes: &str) -> i32:
+fn wl_run_module_passes(m: i64, tm: i64, passes: &str) -> i32:
     unsafe:
         let opts = LLVMCreatePassBuilderOptions()
         let err = LLVMRunPasses(m as *mut u8, to_cstr(passes), tm as *mut u8, opts)
@@ -1516,15 +1516,15 @@ pub fn wl_run_module_passes(m: i64, tm: i64, passes: &str) -> i32:
             LLVMDisposeErrorMessage(msg)
         1
 
-pub fn wl_verify_function(fn_val: i64) -> i32:
+fn wl_verify_function(fn_val: i64) -> i32:
     // PrintMessage: the verifier names its complaint on stderr; silent
     // ReturnStatus cost a blind IR-archaeology session.
     unsafe:
         LLVMVerifyFunction(fn_val as *mut u8, LLVM_PrintMessageAction)
 
-pub fn wl_dump_value(v: i64): unsafe { LLVMDumpValue(v as *mut u8) }
+fn wl_dump_value(v: i64): unsafe { LLVMDumpValue(v as *mut u8) }
 
-pub fn wl_print_ir(m: i64):
+fn wl_print_ir(m: i64):
     unsafe:
         let ir = LLVMPrintModuleToString(m as *mut u8)
         if ir as i64 != 0:
@@ -1533,7 +1533,7 @@ pub fn wl_print_ir(m: i64):
             LLVMDisposeMessage(ir)
 
 // The textual LLVM type (`{ ptr, i64 }`, `%Option_i32`), for diagnostics.
-pub fn wl_print_type(ty: i64) -> str:
+fn wl_print_type(ty: i64) -> str:
     if ty == 0:
         return "<none>"
     unsafe:
@@ -1553,13 +1553,13 @@ type WithList {
     elem_size: i64,
 }
 
-pub fn wl_list_data_ptr(v: i64) -> i64:
+fn wl_list_data_ptr(v: i64) -> i64:
     if v == 0: return 0
     (unsafe *(v as *const WithList)).ptr as i64
 
 // ── Entry alloca helper ─────────────────────────────────────────
 
-pub fn wl_create_entry_alloca(builder: i64, fn_val: i64, ty: i64) -> i64:
+fn wl_create_entry_alloca(builder: i64, fn_val: i64, ty: i64) -> i64:
     unsafe:
         let entry = LLVMGetEntryBasicBlock(fn_val as *mut u8)
         let first = LLVMGetFirstInstruction(entry)
@@ -1576,15 +1576,15 @@ pub fn wl_create_entry_alloca(builder: i64, fn_val: i64, ty: i64) -> i64:
 
 // ── Debug info (DWARF) ──────────────────────────────────────────
 
-pub fn wl_di_create_builder(mod_ref: i64) -> i64: unsafe { LLVMCreateDIBuilder(mod_ref as *mut u8) as i64 }
+fn wl_di_create_builder(mod_ref: i64) -> i64: unsafe { LLVMCreateDIBuilder(mod_ref as *mut u8) as i64 }
 
-pub fn wl_di_dispose_builder(builder: i64): unsafe { LLVMDisposeDIBuilder(builder as *mut u8) }
+fn wl_di_dispose_builder(builder: i64): unsafe { LLVMDisposeDIBuilder(builder as *mut u8) }
 
-pub fn wl_di_finalize(builder: i64): unsafe { LLVMDIBuilderFinalize(builder as *mut u8) }
+fn wl_di_finalize(builder: i64): unsafe { LLVMDIBuilderFinalize(builder as *mut u8) }
 
-pub fn wl_debug_metadata_version() -> i32: unsafe { LLVMDebugMetadataVersion() as i32 }
+fn wl_debug_metadata_version() -> i32: unsafe { LLVMDebugMetadataVersion() as i32 }
 
-pub fn wl_add_module_flag_int(mod_ref: i64, key: &str, val: i32):
+fn wl_add_module_flag_int(mod_ref: i64, key: &str, val: i32):
     unsafe:
         let k = to_cstr(key)
         let ctx = LLVMGetModuleContext(mod_ref as *mut u8)
@@ -1592,13 +1592,13 @@ pub fn wl_add_module_flag_int(mod_ref: i64, key: &str, val: i32):
         let md = LLVMValueAsMetadata(int_val)
         LLVMAddModuleFlag(mod_ref as *mut u8, LLVM_ModuleFlagBehaviorWarning, k, c_strlen(k) as u64, md)
 
-pub fn wl_di_create_file(builder: i64, filename: &str, directory: &str) -> i64:
+fn wl_di_create_file(builder: i64, filename: &str, directory: &str) -> i64:
     unsafe:
         let fn_ptr = *(filename as *const str as *const *const u8)
         let dir_ptr = *(directory as *const str as *const *const u8)
         LLVMDIBuilderCreateFile(builder as *mut u8, fn_ptr, filename.len() as u64, dir_ptr, directory.len() as u64) as i64
 
-pub fn wl_di_create_compile_unit(builder: i64, file: i64, producer: &str, is_optimized: i32, dwarf_version: i32, lang: i32) -> i64:
+fn wl_di_create_compile_unit(builder: i64, file: i64, producer: &str, is_optimized: i32, dwarf_version: i32, lang: i32) -> i64:
     unsafe:
         let _ = dwarf_version
         let pp = *(producer as *const str as *const *const u8)
@@ -1608,12 +1608,12 @@ pub fn wl_di_create_compile_unit(builder: i64, file: i64, producer: &str, is_opt
             LLVM_DWARFEmissionFull, 0, 0, 0,
             empty_cstr(), 0, empty_cstr(), 0) as i64
 
-pub fn wl_di_create_subroutine_type(builder: i64, file: i64, param_types_ptr: i64, count: i32) -> i64:
+fn wl_di_create_subroutine_type(builder: i64, file: i64, param_types_ptr: i64, count: i32) -> i64:
     unsafe:
         let params = if count > 0: param_types_ptr as *const *mut u8 else: 0 as *const *mut u8
         LLVMDIBuilderCreateSubroutineType(builder as *mut u8, file as *mut u8, params, count as u32, LLVM_DIFlagZero) as i64
 
-pub fn wl_di_create_function(builder: i64, scope: i64, name: &str, linkage_name: &str, file: i64, line: i32, ty: i64, is_definition: i32, scope_line: i32, is_optimized: i32) -> i64:
+fn wl_di_create_function(builder: i64, scope: i64, name: &str, linkage_name: &str, file: i64, line: i32, ty: i64, is_definition: i32, scope_line: i32, is_optimized: i32) -> i64:
     unsafe:
         let np = *(name as *const str as *const *const u8)
         let lp = *(linkage_name as *const str as *const *const u8)
@@ -1622,50 +1622,50 @@ pub fn wl_di_create_function(builder: i64, scope: i64, name: &str, linkage_name:
             file as *mut u8, line as u32, ty as *mut u8,
             0, is_definition, scope_line as u32, LLVM_DIFlagZero, is_optimized) as i64
 
-pub fn wl_di_set_subprogram(function: i64, subprogram: i64):
+fn wl_di_set_subprogram(function: i64, subprogram: i64):
     unsafe:
         LLVMSetSubprogram(function as *mut u8, subprogram as *mut u8)
 
-pub fn wl_di_get_subprogram(function: i64) -> i64: unsafe { LLVMGetSubprogram(function as *mut u8) } as i64
+fn wl_di_get_subprogram(function: i64) -> i64: unsafe { LLVMGetSubprogram(function as *mut u8) } as i64
 
-pub fn wl_di_subprogram_line(subprogram: i64) -> i32: unsafe { LLVMDISubprogramGetLine(subprogram as *mut u8) } as i32
+fn wl_di_subprogram_line(subprogram: i64) -> i32: unsafe { LLVMDISubprogramGetLine(subprogram as *mut u8) } as i32
 
-pub fn wl_di_create_debug_location(context: i64, line: i32, col: i32, scope: i64) -> i64:
+fn wl_di_create_debug_location(context: i64, line: i32, col: i32, scope: i64) -> i64:
     unsafe:
         LLVMDIBuilderCreateDebugLocation(context as *mut u8, line as u32, col as u32, scope as *mut u8, 0 as *mut u8) as i64
 
-pub fn wl_di_set_current_location(builder: i64, location: i64):
+fn wl_di_set_current_location(builder: i64, location: i64):
     unsafe:
         LLVMSetCurrentDebugLocation2(builder as *mut u8, location as *mut u8)
 
-pub fn wl_di_clear_current_location(builder: i64):
+fn wl_di_clear_current_location(builder: i64):
     unsafe:
         LLVMSetCurrentDebugLocation2(builder as *mut u8, 0 as *mut u8)
 
-pub fn wl_di_flag_zero() -> i32: LLVM_DIFlagZero
-pub fn wl_dwarf_lang_c() -> i32: LLVM_DWARFSourceLanguageC
-pub fn wl_dwarf_lang_with() -> i32: LLVM_DWARFSourceLanguageC
+fn wl_di_flag_zero() -> i32: LLVM_DIFlagZero
+fn wl_dwarf_lang_c() -> i32: LLVM_DWARFSourceLanguageC
+fn wl_dwarf_lang_with() -> i32: LLVM_DWARFSourceLanguageC
 
 // DW_ATE encoding constants
-pub fn wl_dwarf_ate_boolean() -> i32: 2
-pub fn wl_dwarf_ate_float() -> i32: 4
-pub fn wl_dwarf_ate_signed() -> i32: 5
-pub fn wl_dwarf_ate_unsigned() -> i32: 7
-pub fn wl_dwarf_ate_unsigned_char() -> i32: 8
+fn wl_dwarf_ate_boolean() -> i32: 2
+fn wl_dwarf_ate_float() -> i32: 4
+fn wl_dwarf_ate_signed() -> i32: 5
+fn wl_dwarf_ate_unsigned() -> i32: 7
+fn wl_dwarf_ate_unsigned_char() -> i32: 8
 
 // DI type constructors
 
-pub fn wl_di_create_basic_type(builder: i64, name: &str, size_in_bits: u64, encoding: i32) -> i64:
+fn wl_di_create_basic_type(builder: i64, name: &str, size_in_bits: u64, encoding: i32) -> i64:
     unsafe:
         let np = *(name as *const str as *const *const u8)
         LLVMDIBuilderCreateBasicType(builder as *mut u8, np, name.len() as u64, size_in_bits, encoding, LLVM_DIFlagZero) as i64
 
-pub fn wl_di_create_pointer_type(builder: i64, pointee_ty: i64, size_in_bits: u64) -> i64:
+fn wl_di_create_pointer_type(builder: i64, pointee_ty: i64, size_in_bits: u64) -> i64:
     unsafe:
         let pt = if pointee_ty != 0: pointee_ty as *mut u8 else: 0 as *mut u8
         LLVMDIBuilderCreatePointerType(builder as *mut u8, pt, size_in_bits, 0, 0, empty_cstr(), 0) as i64
 
-pub fn wl_di_create_struct_type(builder: i64, scope: i64, name: &str, file: i64, line: i32, size_in_bits: u64, align_in_bits: u32, elements_ptr: i64, num_elements: i32) -> i64:
+fn wl_di_create_struct_type(builder: i64, scope: i64, name: &str, file: i64, line: i32, size_in_bits: u64, align_in_bits: u32, elements_ptr: i64, num_elements: i32) -> i64:
     unsafe:
         let np = *(name as *const str as *const *const u8)
         let sc = if scope != 0: scope as *mut u8 else: 0 as *mut u8
@@ -1673,49 +1673,49 @@ pub fn wl_di_create_struct_type(builder: i64, scope: i64, name: &str, file: i64,
         let elems = if num_elements > 0: elements_ptr as *const *mut u8 else: 0 as *const *mut u8
         LLVMDIBuilderCreateStructType(builder as *mut u8, sc, np, name.len() as u64, fi, line as u32, size_in_bits, align_in_bits, LLVM_DIFlagZero, 0 as *mut u8, elems, num_elements as u32, 0, 0 as *mut u8, empty_cstr(), 0) as i64
 
-pub fn wl_di_create_member_type(builder: i64, scope: i64, name: &str, file: i64, line: i32, size_in_bits: u64, align_in_bits: u32, offset_in_bits: u64, ty: i64) -> i64:
+fn wl_di_create_member_type(builder: i64, scope: i64, name: &str, file: i64, line: i32, size_in_bits: u64, align_in_bits: u32, offset_in_bits: u64, ty: i64) -> i64:
     unsafe:
         let np = *(name as *const str as *const *const u8)
         let sc = if scope != 0: scope as *mut u8 else: 0 as *mut u8
         let fi = if file != 0: file as *mut u8 else: 0 as *mut u8
         LLVMDIBuilderCreateMemberType(builder as *mut u8, sc, np, name.len() as u64, fi, line as u32, size_in_bits, align_in_bits, offset_in_bits, LLVM_DIFlagZero, ty as *mut u8) as i64
 
-pub fn wl_di_create_unspecified_type(builder: i64, name: &str) -> i64:
+fn wl_di_create_unspecified_type(builder: i64, name: &str) -> i64:
     unsafe:
         let np = *(name as *const str as *const *const u8)
         LLVMDIBuilderCreateUnspecifiedType(builder as *mut u8, np, name.len() as u64) as i64
 
-pub fn wl_di_create_auto_variable(builder: i64, scope: i64, name: &str, file: i64, line: i32, ty: i64) -> i64:
+fn wl_di_create_auto_variable(builder: i64, scope: i64, name: &str, file: i64, line: i32, ty: i64) -> i64:
     unsafe:
         let np = *(name as *const str as *const *const u8)
         LLVMDIBuilderCreateAutoVariable(builder as *mut u8, scope as *mut u8, np, name.len() as u64, file as *mut u8, line as u32, ty as *mut u8, 1, LLVM_DIFlagZero, 0) as i64
 
-pub fn wl_di_create_parameter_variable(builder: i64, scope: i64, name: &str, arg_no: i32, file: i64, line: i32, ty: i64) -> i64:
+fn wl_di_create_parameter_variable(builder: i64, scope: i64, name: &str, arg_no: i32, file: i64, line: i32, ty: i64) -> i64:
     unsafe:
         let np = *(name as *const str as *const *const u8)
         LLVMDIBuilderCreateParameterVariable(builder as *mut u8, scope as *mut u8, np, name.len() as u64, arg_no as u32, file as *mut u8, line as u32, ty as *mut u8, 1, LLVM_DIFlagZero) as i64
 
-pub fn wl_di_create_expression(builder: i64) -> i64:
+fn wl_di_create_expression(builder: i64) -> i64:
     unsafe:
         LLVMDIBuilderCreateExpression(builder as *mut u8, 0 as *const i64, 0) as i64
 
 // `DW_OP_deref`: the variable is at the address its storage holds.
-pub fn wl_di_create_deref_expression(builder: i64) -> i64:
+fn wl_di_create_deref_expression(builder: i64) -> i64:
     var ops: [1]i64 = [0x06 as i64; 1]
     unsafe:
         LLVMDIBuilderCreateExpression(builder as *mut u8, &ops[0] as *const i64, 1) as i64
 
-pub fn wl_di_insert_declare_before(builder: i64, storage: i64, var_info: i64, expr: i64, debug_loc: i64, instr: i64) -> Unit:
+fn wl_di_insert_declare_before(builder: i64, storage: i64, var_info: i64, expr: i64, debug_loc: i64, instr: i64) -> Unit:
     unsafe:
         let _ = LLVMDIBuilderInsertDeclareRecordBefore(builder as *mut u8, storage as *mut u8, var_info as *mut u8, expr as *mut u8, debug_loc as *mut u8, instr as *mut u8)
 
-pub fn wl_is_argument(v: i64) -> bool: v != 0 and unsafe { LLVMIsAArgument(v as *mut u8) } as i64 != 0
+fn wl_is_argument(v: i64) -> bool: v != 0 and unsafe { LLVMIsAArgument(v as *mut u8) } as i64 != 0
 
-pub fn wl_is_alloca(v: i64) -> bool: v != 0 and unsafe { LLVMIsAAllocaInst(v as *mut u8) } as i64 != 0
+fn wl_is_alloca(v: i64) -> bool: v != 0 and unsafe { LLVMIsAAllocaInst(v as *mut u8) } as i64 != 0
 
-pub fn wl_di_current_location(builder: i64) -> i64: unsafe { LLVMGetCurrentDebugLocation2(builder as *mut u8) } as i64
+fn wl_di_current_location(builder: i64) -> i64: unsafe { LLVMGetCurrentDebugLocation2(builder as *mut u8) } as i64
 
-pub fn wl_di_create_lexical_block(builder: i64, scope: i64, file: i64, line: i32, col: i32) -> i64:
+fn wl_di_create_lexical_block(builder: i64, scope: i64, file: i64, line: i32, col: i32) -> i64:
     unsafe:
         LLVMDIBuilderCreateLexicalBlock(builder as *mut u8, scope as *mut u8, file as *mut u8, line as u32, col as u32) as i64
 
@@ -1728,7 +1728,7 @@ fn map_ordering(order: i32) -> i32:
     if order == 3: return LLVM_AtomicOrderingAcquireRelease
     LLVM_AtomicOrderingSequentiallyConsistent
 
-pub fn wl_build_atomic_load(b: i64, ty: i64, ptr: i64, order: i32) -> i64:
+fn wl_build_atomic_load(b: i64, ty: i64, ptr: i64, order: i32) -> i64:
     unsafe:
         let load = LLVMBuildLoad2(b as *mut u8, ty as *mut u8, ptr as *mut u8, "atomic_load" as *const u8)
         LLVMSetOrdering(load, map_ordering(order))
@@ -1736,7 +1736,7 @@ pub fn wl_build_atomic_load(b: i64, ty: i64, ptr: i64, order: i32) -> i64:
         LLVMSetAlignment(load, LLVMABIAlignmentOfType(dl, ty as *mut u8))
         load as i64
 
-pub fn wl_build_atomic_store(b: i64, val: i64, ptr: i64, order: i32):
+fn wl_build_atomic_store(b: i64, val: i64, ptr: i64, order: i32):
     unsafe:
         let store = LLVMBuildStore(b as *mut u8, val as *mut u8, ptr as *mut u8)
         LLVMSetOrdering(store, map_ordering(order))
@@ -1756,27 +1756,27 @@ fn map_rmw_op(rmw_op: i32) -> i32:
     if rmw_op == 9: return LLVM_AtomicRMWBinOpUMax
     LLVM_AtomicRMWBinOpXchg
 
-pub fn wl_build_atomic_rmw(b: i64, rmw_op: i32, ptr: i64, val: i64, order: i32) -> i64:
+fn wl_build_atomic_rmw(b: i64, rmw_op: i32, ptr: i64, val: i64, order: i32) -> i64:
     unsafe:
         LLVMBuildAtomicRMW(b as *mut u8, map_rmw_op(rmw_op), ptr as *mut u8, val as *mut u8, map_ordering(order), 0) as i64
 
-pub fn wl_build_cmpxchg(b: i64, ptr: i64, expected: i64, desired: i64, success_order: i32, failure_order: i32, is_weak: i32) -> i64:
+fn wl_build_cmpxchg(b: i64, ptr: i64, expected: i64, desired: i64, success_order: i32, failure_order: i32, is_weak: i32) -> i64:
     unsafe:
         let result = LLVMBuildAtomicCmpXchg(b as *mut u8, ptr as *mut u8, expected as *mut u8, desired as *mut u8, map_ordering(success_order), map_ordering(failure_order), 0)
         if is_weak != 0: LLVMSetWeak(result, 1)
         result as i64
 
-pub fn wl_extract_value(b: i64, agg: i64, index: i32) -> i64:
+fn wl_extract_value(b: i64, agg: i64, index: i32) -> i64:
     unsafe:
         LLVMBuildExtractValue(b as *mut u8, agg as *mut u8, index as u32, empty_cstr()) as i64
 
-pub fn wl_build_fence(b: i64, order: i32):
+fn wl_build_fence(b: i64, order: i32):
     unsafe:
         let _ = LLVMBuildFence(b as *mut u8, map_ordering(order), 0, empty_cstr())
 
 // ── Inline Assembly ─────────────────────────────────────────────
 
-pub fn wl_get_inline_asm(fn_ty: i64, asm_str: &str, constraints: &str, has_side_effects: i32, is_align_stack: i32) -> i64:
+fn wl_get_inline_asm(fn_ty: i64, asm_str: &str, constraints: &str, has_side_effects: i32, is_align_stack: i32) -> i64:
     unsafe:
         let ap = *(asm_str as *const str as *const *const u8)
         let cp = *(constraints as *const str as *const *const u8)
@@ -1796,13 +1796,13 @@ fn path_to_cstr(path: &str, buf: *mut u8) -> *const u8:
     unsafe *((buf as i64 + n) as *mut u8) = 0
     buf as *const u8
 
-pub fn wl_assemble_to_object(source_path: &str, output_path: &str) -> i32:
+fn wl_assemble_to_object(source_path: &str, output_path: &str) -> i32:
     wl_assemble_to_object_for_triple(source_path, output_path, "")
 
 // Assemble a .s file for an explicit target triple ("" = the active/
 // host triple). Build-graph compile_asm_object targets pass a
 // `triple=` arg for cross-target runtime assembly.
-pub fn wl_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple_str: &str) -> i32:
+fn wl_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple_str: &str) -> i32:
     unsafe:
         let _ = wl_init_native_target()
         let _ = wl_init_native_asm_printer()
@@ -1847,7 +1847,7 @@ pub fn wl_assemble_to_object_for_triple(source_path: &str, output_path: &str, tr
         LLVMContextDispose(ctx)
         rc
 
-pub fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
+fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
     unsafe:
         let _ = wl_init_native_target()
         let _ = wl_init_native_asm_printer()

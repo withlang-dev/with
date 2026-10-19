@@ -63,18 +63,18 @@ extern let with_embedded_wasm32_fiber_stubs_o_end: u8
 // time.
 var link_stage_rt_in_unit_flag: i32 = 0
 
-pub fn link_stage_set_rt_in_unit(on: i32) -> Unit:
+fn link_stage_set_rt_in_unit(on: i32) -> Unit:
     link_stage_rt_in_unit_flag = on
 
 fn link_stage_rt_in_unit() -> i32:
     link_stage_rt_in_unit_flag
 
-pub type LinkStageEnvVar {
+type LinkStageEnvVar {
     name: str,
     value: str,
 }
 
-pub type LinkStageCommand {
+type LinkStageCommand {
     linker: str,
     args: List[str],
     cwd: str,
@@ -84,18 +84,18 @@ pub type LinkStageCommand {
     cleanup_files: List[str],
 }
 
-pub type LinkStageResult {
+type LinkStageResult {
     ok: bool,
     rc: i32,
     command: LinkStageCommand,
 }
 
-pub type LinkStagePlan {
+type LinkStagePlan {
     ok: bool,
     command: LinkStageCommand,
 }
 
-pub fn link_stage_empty_command() -> LinkStageCommand:
+fn link_stage_empty_command() -> LinkStageCommand:
     LinkStageCommand {
         linker: "",
         args: List.new(),
@@ -106,7 +106,7 @@ pub fn link_stage_empty_command() -> LinkStageCommand:
         cleanup_files: List.new(),
     }
 
-pub fn link_stage_result_fail() -> LinkStageResult:
+fn link_stage_result_fail() -> LinkStageResult:
     LinkStageResult { ok: false, rc: 1, command: link_stage_empty_command() }
 
 fn link_stage_plan_fail() -> LinkStagePlan:
@@ -115,7 +115,7 @@ fn link_stage_plan_fail() -> LinkStagePlan:
 fn link_stage_plan_for_command(command: LinkStageCommand) -> LinkStagePlan:
     LinkStagePlan { ok: true, command }
 
-pub fn link_stage_result_for_command(command: LinkStageCommand) -> LinkStageResult:
+fn link_stage_result_for_command(command: LinkStageCommand) -> LinkStageResult:
     let rc = command.run()
     link_stage_cleanup_files(command.cleanup_files)
     LinkStageResult { ok: rc == 0, rc, command }
@@ -202,7 +202,7 @@ fn link_stage_is_temp_archive_path(path: &str) -> bool:
 // #357: a `link:` entry of the form "framework:Name" links an Apple framework
 // (`-framework Name`) instead of a plain library (`-l<name>`). Darwin-only —
 // the caller guards other platforms. Returns "" for a non-framework entry.
-pub fn link_stage_framework_name(lib: &str) -> str:
+fn link_stage_framework_name(lib: &str) -> str:
     let prefix = "framework:"
     if lib.len() > prefix.len() and lib.slice(0, prefix.len()) == prefix:
         return lib.slice(prefix.len(), lib.len())
@@ -213,7 +213,7 @@ pub fn link_stage_framework_name(lib: &str) -> str:
 // non-Darwin target a framework entry is a loud error (frameworks are macOS)
 // and yields no args. (Returns a List because With has no safe mutable-ref
 // param to push through.)
-pub fn link_stage_lib_args(lib: &str, is_darwin: i32) -> List[str]:
+fn link_stage_lib_args(lib: &str, is_darwin: i32) -> List[str]:
     let out: List[str] = List.new()
     let fw = link_stage_framework_name(lib)
     if fw.len() > 0:
@@ -232,7 +232,7 @@ pub fn link_stage_lib_args(lib: &str, is_darwin: i32) -> List[str]:
 // the user's libraries are linked as one group; ld64 and lld-link are
 // order-insensitive and take no marker. `via_driver` selects the `-Wl,`
 // spelling for a C compiler driver.
-pub fn link_stage_archive_group_marker(is_elf: i32, via_driver: i32, open: i32) -> str:
+fn link_stage_archive_group_marker(is_elf: i32, via_driver: i32, open: i32) -> str:
     if is_elf == 0: return ""
     let flag = if open != 0: "--start-group" else: "--end-group"
     if via_driver != 0: "-Wl," ++ flag else: flag
@@ -245,11 +245,11 @@ fn link_stage_collect_cleanup_files(extras: &List[str]) -> List[str]:
             cleanup.push(with_str_clone_ref(extra))
     cleanup
 
-pub fn link_stage_cleanup_files(files: &List[str]):
+fn link_stage_cleanup_files(files: &List[str]):
     for i in 0..files.len():
         let _remove = runtime_remove_file(files[i])
 
-pub fn link_stage_basename(path: &str) -> str:
+fn link_stage_basename(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len():
         if path[i] == 47:
@@ -285,7 +285,7 @@ fn link_stage_cleanup_owned_temp_archives_in(dir: &str, pid_text: &str):
 // A link's runtime archives are content-named and kept (link_stage_make_archive);
 // what this process can leave is a `<obj>.<pid>.<nanos>.a` it made and did
 // not rename into place.
-pub fn link_stage_cleanup_current_process_temp_archives():
+fn link_stage_cleanup_current_process_temp_archives():
     let root = link_stage_artifact_root()
     let pid_text = f"{runtime_getpid()}"
     link_stage_cleanup_owned_temp_archives_in(root ++ "/lib", pid_text)
@@ -500,7 +500,7 @@ fn link_stage_linux_resolve_libs(host_dirs: &List[str], link_libs: &List[str], e
     LinkStageLinuxLibs { dirs, inputs }
 
 /// The `<from>` of WITH_FILE_PREFIX_MAP=<from>=<to> (src/FnAbi.w), or "".
-pub fn link_stage_file_prefix_map_root() -> str:
+fn link_stage_file_prefix_map_root() -> str:
     let mapping = runtime_getenv("WITH_FILE_PREFIX_MAP")
     let eq = mapping.find("=")
     if eq <= 0: "" else: mapping.slice(0, eq)
@@ -778,7 +778,7 @@ fn link_stage_is_llvm_bridge_rsp(extra: &str) -> bool:
     extra.starts_with("@") and extra.ends_with("/llvm_ld.rsp")
 
 // The architecture of a Windows link: the cross target's, else the host's.
-pub fn link_stage_windows_arch() -> str:
+fn link_stage_windows_arch() -> str:
     if not target_spec_is_native():
         return if target_spec_active_kind() == 6: "aarch64" else: "x86_64"
     let arch = runtime_sysinfo_arch()
@@ -806,11 +806,11 @@ fn link_stage_windows_libc_dir(sdk_dir: &str, arch: &str) -> str:
 // The C target a Windows c_import parses for: mingw-w64's headers are
 // written for the GNU environment, the environment With's own Windows
 // x86_64 objects target too (TargetSpec).
-pub fn link_stage_windows_c_target() -> str: link_stage_windows_arch() ++ "-w64-windows-gnu"
+fn link_stage_windows_c_target() -> str: link_stage_windows_arch() ++ "-w64-windows-gnu"
 
 // Whether this compilation targets Windows x86_64, whose programs and
 // c_import read the SDK's libc (windows-aarch64 follows in its own slice).
-pub fn link_stage_windows_c_target_uses_sdk_libc() -> bool:
+fn link_stage_windows_c_target_uses_sdk_libc() -> bool:
     let windows = if target_spec_is_native(): runtime_sysinfo_os() == "Windows" else: target_spec_active_kind() == 5 or target_spec_active_kind() == 6
     windows and link_stage_windows_arch() == "x86_64"
 
@@ -821,7 +821,7 @@ pub fn link_stage_windows_c_target_uses_sdk_libc() -> bool:
 // LLVM SDK is: the SDK above the lld the link runs (the build's record, or
 // the SDK the environment names), else the one this compiler carries
 // (compiler.EmbeddedSysroot, #1915 D81). "" when there is neither.
-pub fn link_stage_windows_sdk_dir() -> str:
+fn link_stage_windows_sdk_dir() -> str:
     let ld = link_stage_llvm_ld_path()
     if ld.len() > 0:
         return link_stage_sdk_dir_of(ld)
@@ -829,7 +829,7 @@ pub fn link_stage_windows_sdk_dir() -> str:
         return embedded_windows_sysroot_dir()
     ""
 
-pub fn link_stage_windows_libc_root() -> str:
+fn link_stage_windows_libc_root() -> str:
     if not link_stage_windows_c_target_uses_sdk_libc():
         return ""
     let sdk = link_stage_windows_sdk_dir()
@@ -1359,7 +1359,7 @@ fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &L
 // to the linker. The native macOS link is lld itself now (#1915), so the
 // driver's wrapper is unwrapped here; every other argument passes as written
 // and lld names one it does not know.
-pub fn link_stage_driver_args_for_ld(link_args: &List[str]) -> List[str]:
+fn link_stage_driver_args_for_ld(link_args: &List[str]) -> List[str]:
     var out: List[str] = List.new()
     var i = 0
     while i < link_args.len():
@@ -1378,7 +1378,7 @@ pub fn link_stage_driver_args_for_ld(link_args: &List[str]) -> List[str]:
 // Separate argv entries protect spaces, commas, dollar signs and loader
 // tokens. The command runs directly, so no shell ever expands these values.
 // Windows loads beside the executable itself; wasm has no dynamic loader.
-pub fn link_stage_rpath_driver_args(paths: &List[str], target_os: &str) -> List[str]:
+fn link_stage_rpath_driver_args(paths: &List[str], target_os: &str) -> List[str]:
     var out: List[str] = List.new()
     if target_os != "Linux" and target_os != "Macos": return out
     for path in paths:
@@ -1451,7 +1451,7 @@ fn link_stage_undef_contains_symbol(undef: &str, name: &str) -> bool:
 // host `nm`: each undefined external symbol of LC_SYMTAB, one per line, as
 // nm prints them (with Mach-O's leading underscore). "<probe-failed>" when
 // the file is not a 64-bit little-endian Mach-O object this can read.
-pub fn link_stage_macho_undefined_symbols(path: &str) -> str:
+fn link_stage_macho_undefined_symbols(path: &str) -> str:
     let data = runtime_read_file(path)
     if data.len() < 32 or link_stage_read_u32_le(data, 0) != 0xfeedfacf:
         return "<probe-failed>"
@@ -1502,7 +1502,7 @@ fn link_stage_read_u16_le(data: &str, offset: i64) -> i64:
 // The external symbols a COFF object (regular or /bigobj) references and does
 // not define, one per line: storage class EXTERNAL, section 0, value 0 (a
 // nonzero value is a common symbol). "<probe-failed>" when it is not one.
-pub fn link_stage_coff_undefined_symbols(path: &str) -> str:
+fn link_stage_coff_undefined_symbols(path: &str) -> str:
     let data = runtime_read_file(path)
     if data.len() < 20:
         return "<probe-failed>"
@@ -1551,7 +1551,7 @@ fn link_stage_read_u64_le_small(data: &str, offset: i32) -> i64:
 // `nm -u` prints. "<not-elf>" when the file is no ELF object at all,
 // "<probe-failed>" when it is one this reader cannot read. Read in-process,
 // so a Linux link needs no host nm (#1915, D81).
-pub fn link_stage_elf_undefined_symbols(path: &str) -> str:
+fn link_stage_elf_undefined_symbols(path: &str) -> str:
     let data = runtime_read_file(path)
     if data.len() < 64 or data[0] != 0x7f or data[1] != 'E' or data[2] != 'L' or data[3] != 'F':
         return "<not-elf>"
@@ -1691,7 +1691,7 @@ fn link_stage_undefined_symbols_need_fiber_runtime(undef: &str) -> i32:
 // ── .wo bundles (docs/spec/toolchain/wo_bundles.md, D38) ─────────────────────────────
 
 // The value of the first manifest line `key <value>…` ("" if absent).
-pub fn link_stage_bundle_manifest_field(manifest: &str, key: &str) -> str:
+fn link_stage_bundle_manifest_field(manifest: &str, key: &str) -> str:
     let want = key ++ " "
     var start: i64 = 0
     while start < manifest.len():
@@ -1761,7 +1761,7 @@ fn LINK_BUNDLE_FAILED -> str: "<bundle-failed>"
 // must not join too.
 var link_stage_explicit_bundle_prefixes: List[str] = List.new()
 
-pub fn link_stage_add_explicit_bundle_prefixes(prefixes: &List[str]):
+fn link_stage_add_explicit_bundle_prefixes(prefixes: &List[str]):
     for i in 0..prefixes.len():
         let prefix = prefixes[i]
         if not link_stage_explicit_bundle_prefixes.contains(prefix):
@@ -1892,7 +1892,7 @@ fn link_stage_resolve_runtime_root() -> str:
 // refuses (#1899: the runner named a seed-compiled out/bootstrap-lib whose
 // rt_core.o matched, before its .producer existed, and every action of the
 // run fell back to comptime evaluation).
-pub fn link_stage_named_runtime_root_is_this_generation(dir: &str) -> bool:
+fn link_stage_named_runtime_root_is_this_generation(dir: &str) -> bool:
     not compiler_generation_is_stamped() or link_stage_runtime_dir_producer(dir) == compiler_generation() or link_stage_runtime_dir_matches_embedded(dir)
 
 // A runtime directory whose objects are byte for byte the ones this compiler
@@ -1927,7 +1927,7 @@ fn link_stage_runtime_dir_producer(dir: &str) -> str:
 // compiler's generation, or when its objects are the ones this compiler
 // embeds (link_stage_runtime_dir_matches_embedded), with or without a
 // .producer.
-pub fn link_stage_runtime_dir_is_this_generation(dir: &str) -> bool:
+fn link_stage_runtime_dir_is_this_generation(dir: &str) -> bool:
     if compiler_generation_is_stamped():
         return link_stage_runtime_dir_producer(dir) == compiler_generation() or link_stage_runtime_dir_matches_embedded(dir)
     let embedded = link_stage_embedded_runtime_object("rt_core.o")
@@ -2063,7 +2063,7 @@ fn link_stage_platform_runtime_object() -> str:
         return ""
     link_stage_host_platform_runtime_object()
 
-pub fn link_stage_host_platform_runtime_object() -> str:
+fn link_stage_host_platform_runtime_object() -> str:
     let os = runtime_sysinfo_os()
     let arch = runtime_sysinfo_arch()
     if os == "Linux" and arch == "x86_64":
@@ -2107,7 +2107,7 @@ fn link_stage_make_archive(obj_path: &str) -> str:
         return ""
     ar_path
 
-pub fn link_stage_make_archive_to_path(obj_path: &str, ar_path: &str) -> str:
+fn link_stage_make_archive_to_path(obj_path: &str, ar_path: &str) -> str:
     let members: List[str] = List.new()
     members.push(with_str_clone_ref(obj_path))
     let rc = create_static_archive(ar_path, members)
@@ -2145,7 +2145,7 @@ fn link_stage_undefined_symbols_need_llvm_bridge(undef: &str) -> bool:
         link_stage_undef_contains_symbol(undef, "LLVM") or
         link_stage_undef_contains_symbol(undef, "clang_")
 
-pub fn link_stage_dirname(path: &str) -> str:
+fn link_stage_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len():
         if path[i] == 47 or path[i] == 92: // '/' or '\'
@@ -2154,7 +2154,7 @@ pub fn link_stage_dirname(path: &str) -> str:
         return "."
     path.slice(0, last_slash as i64)
 
-pub fn link_stage_source_stem(source_path: &str) -> str:
+fn link_stage_source_stem(source_path: &str) -> str:
     var last_slash = -1
     for i in 0..source_path.len():
         if source_path[i] == 47 or source_path[i] == 92: // '/' or '\'
@@ -2194,14 +2194,14 @@ fn link_stage_sanitize_relative_dir(path: &str) -> str:
         i = i + 1
     out
 
-pub fn link_stage_output_dir_for_source(source_path: &str) -> str:
+fn link_stage_output_dir_for_source(source_path: &str) -> str:
     let artifact_root = link_stage_artifact_root()
     let dir = link_stage_sanitize_relative_dir(link_stage_dirname(source_path))
     if dir.len() == 0:
         return artifact_root
     artifact_root ++ "/" ++ dir
 
-pub fn link_stage_output_path_for_source(source_path: &str) -> str:
+fn link_stage_output_path_for_source(source_path: &str) -> str:
     let base = link_stage_output_dir_for_source(source_path) ++ "/" ++ link_stage_source_stem(source_path)
     if target_spec_is_wasm():
         return base ++ ".wasm"
@@ -2221,7 +2221,7 @@ fn link_stage_link_object_to_binary_plan(obj_path: &str, bin_path: &str, link_li
     let no_extra_objects: List[str] = List.new()
     link_stage_link_object_to_binary_plan_with_units(obj_path, no_extra_objects, bin_path, link_libs, link_search_paths, move link_args, needs_async_runtime)
 
-pub fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_objects: &List[str], bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStagePlan:
+fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_objects: &List[str], bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStagePlan:
     let extras: List[str] = List.new()
     // #650 codegen units: sibling .o files are full linker inputs like the
     // primary object (objects always load wholly, so position is irrelevant).

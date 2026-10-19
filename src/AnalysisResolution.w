@@ -753,7 +753,7 @@ fn resolution_audit_expr_operands(report: &AnalysisReport, sema: &Sema, mir_mod:
     report.note(f"resolution-audit: expression-operands judged={checked} disagree={disagree}")
     checked
 
-pub fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str):
+fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str):
     let calls = resolution_audit_calls(report, sema, mir_mod, pool, source_path, source_text)
     let field_places = resolution_audit_field_places(report, sema, mir_mod, pool, source_path, source_text)
     let lets = resolution_audit_let_bindings(report, sema, mir_mod, pool, source_path, source_text)

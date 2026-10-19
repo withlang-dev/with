@@ -142,7 +142,7 @@ fn wil_def(self_exe: &str, crt: &str, arch: &str, name: &str, work: &str) -> str
 
 // Whether `name` resolves to a library in one of `dirs`, as a Windows link
 // looks it up (compiler.Link link_stage_windows_find_lib).
-pub fn windows_lib_in_dirs(name: &str, dirs: &List[str]) -> bool:
+fn windows_lib_in_dirs(name: &str, dirs: &List[str]) -> bool:
     for d in dirs:
         for candidate in ["lib" ++ name ++ ".a", name ++ ".lib", "lib" ++ name ++ ".lib", name ++ ".a"]:
             if runtime_file_exists(d ++ "/" ++ candidate) != 0: return true
@@ -151,9 +151,9 @@ pub fn windows_lib_in_dirs(name: &str, dirs: &List[str]) -> bool:
 // Writes <dir>/lib<name>.a for each name mingw-w64 has a .def for. The names
 // written; `problem` says why not, and is "" on success. A name with no .def
 // is not an in-box DLL mingw-w64 knows and is left to the link to report.
-pub type WindowsImportLibs { written: List[str], problem: str }
+type WindowsImportLibs { written: List[str], problem: str }
 
-pub fn windows_import_libs_write(dir: &str, names: &List[str]) -> WindowsImportLibs:
+fn windows_import_libs_write(dir: &str, names: &List[str]) -> WindowsImportLibs:
     let written: List[str] = List.new()
     if runtime_sysinfo_os() != "Windows":
         return WindowsImportLibs { written, problem: "Windows import libraries are generated on Windows only" }
@@ -197,7 +197,7 @@ pub fn windows_import_libs_write(dir: &str, names: &List[str]) -> WindowsImportL
 
 // `with __windows-import-libs <dir> <name>...`: the step `with get` runs, on
 // its own (the :no-host-toolchain check uses it).
-pub fn with_windows_import_libs_main(args: &List[str]) -> i32:
+fn with_windows_import_libs_main(args: &List[str]) -> i32:
     if args.len() < 2:
         runtime_eprint("usage: with __windows-import-libs <dir> <dll-name>...")
         return 2

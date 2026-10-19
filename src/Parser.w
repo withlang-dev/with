@@ -40,7 +40,7 @@ enum DeclBody:
     Braced      // `{ ... }`: members separated by newlines or semicolons
     Missing     // no introducer where one is required; already reported
 impl Copy for DeclBody
-pub type Parser {
+type Parser {
     tokens: TokenList,
     pos: i32,
     pool: AstPool,
@@ -9830,7 +9830,7 @@ fn parse_i64(text: &str) -> i64:
 // The binary operator a compound assignment token applies (`+=` is
 // OP_ADD), -1 for a token that is none. The one table: the parser's
 // assignment grammar and the C migrator's write scan (CiMigrate) read it.
-pub fn parser_compound_assign_op(t: i32) -> i32:
+fn parser_compound_assign_op(t: i32) -> i32:
     if t == TokenKind.TK_PLUS_EQ: return BinaryOp.OP_ADD
     if t == TokenKind.TK_PLUS_PLUS_EQ: return BinaryOp.OP_CONCAT
     if t == TokenKind.TK_MINUS_EQ: return BinaryOp.OP_SUB

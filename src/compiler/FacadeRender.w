@@ -92,7 +92,7 @@ use std.collections.HashMap
 // A pinned resource's cell is a `Box` (D54): Resolve makes the facade block
 // that declares one this module's import of std.box (the D29 gate), since
 // the rendering is spliced after resolution.
-pub fn facade_render_block(pool: &AstPool, intern: &InternPool, facade: i32, ci: &List[i32]) -> str:
+fn facade_render_block(pool: &AstPool, intern: &InternPool, facade: i32, ci: &List[i32]) -> str:
     var out = ""
     let extra_start = pool.get_data1(facade as NodeId)
     let count = pool.get_data2(facade as NodeId)
@@ -141,12 +141,12 @@ pub fn facade_render_block(pool: &AstPool, intern: &InternPool, facade: i32, ci:
 // reads this presentation's own. Returns those declarations as source text
 // ("" when the block repeats nothing); a repetition without distinct
 // renames is left as written, and Sema refuses it.
-pub fn facade_render_presentation_prefix() -> str: "__with_presented_"
+fn facade_render_presentation_prefix() -> str: "__with_presented_"
 
 // A diagnostic names such a declaration by the C function it declares:
 // `text` with every presentation's declaration name replaced by that
 // function's.
-pub fn facade_render_shown_names(text: &str) -> str:
+fn facade_render_shown_names(text: &str) -> str:
     let prefix = facade_render_presentation_prefix()
     if not text.contains(prefix):
         return text.clone()
@@ -157,7 +157,7 @@ pub fn facade_render_shown_names(text: &str) -> str:
         out = out ++ (if at >= 0: parts[i].slice(at + 6, parts[i].len()) else: prefix ++ parts[i])
     out
 
-pub fn facade_render_presentation_aliases(pool: &AstPool, intern: &InternPool, facade: i32, ci: &List[i32]) -> (str, List[i32]):
+fn facade_render_presentation_aliases(pool: &AstPool, intern: &InternPool, facade: i32, ci: &List[i32]) -> (str, List[i32]):
     var out = ""
     // Per declaration emitted, the index of the import's declaration it
     // is another name for.
@@ -410,10 +410,10 @@ fn facade_render_handle_callback_type(pool: &AstPool, intern: &InternPool, text:
 
 // A NUL-terminated C string's pointer type as c_import spells it, aliases
 // chased: `char *` is `*mut i8`, `const char *` is `*const i8`.
-pub fn facade_render_is_c_string_ptr(text: &str) -> bool:
+fn facade_render_is_c_string_ptr(text: &str) -> bool:
     text == "*mut i8" or text == "*const i8" or text == "*mut c_char" or text == "*const c_char"
 
-pub fn facade_render_text_view_name() -> str: "as_cstr"
+fn facade_render_text_view_name() -> str: "as_cstr"
 
 // A lend operation on a pointer or in-place resource, rendered as a `&self`
 // method of the resource (§16.2b.5: "once a resource is modeled, its
@@ -632,7 +632,7 @@ fn facade_render_borrowed_type(pool: &AstPool, intern: &InternPool, ci: &List[i3
             return out
     ""
 
-pub fn facade_render_detached_name(name: &str) -> str: "Detached" ++ name
+fn facade_render_detached_name(name: &str) -> str: "Detached" ++ name
 
 // The resource's `drop` operation's declaration, or 0.
 fn facade_render_drop_decl(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32) -> i32:
@@ -676,7 +676,7 @@ fn facade_render_detach_methods(pool: &AstPool, intern: &InternPool, ci: &List[i
         out = out ++ "    move fn " ++ mname ++ "(" ++ bridge.params ++ ") -> " ++ dname ++ "[Origin]:\n" ++ facade_render_indent(bridge.prologue, "        ") ++ "        " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        " ++ dname ++ " { origin: self.origin, repr: self.repr, live: true }\n"
     out
 
-pub fn facade_render_borrowed_name(name: &str) -> str: "Borrowed" ++ name
+fn facade_render_borrowed_name(name: &str) -> str: "Borrowed" ++ name
 
 fn facade_render_resources_wrapping(pool: &AstPool, intern: &InternPool, repr: &str) -> isize:
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
@@ -721,7 +721,7 @@ type FacadeSurface {
 
 // The name operation `cname` is presented under on `resource`: its
 // `rename`, its shortened name when that is unambiguous, else the C name.
-pub fn facade_render_present(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32, cname: &str) -> str:
+fn facade_render_present(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32, cname: &str) -> str:
     let s = facade_render_surface(pool, intern, ci, resource)
     for i in 0..s.cnames.len():
         if s.cnames[i] != cname:
@@ -738,7 +738,7 @@ pub fn facade_render_present(pool: &AstPool, intern: &InternPool, ci: &List[i32]
 // Why `cname` keeps its imported name on `resource` — the other operations
 // its shortened name would also spell, as "'db_get' (a lend method), the
 // resource's Drop" — or "" when its presentation is not ambiguous.
-pub fn facade_render_presentation_clash(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32, cname: &str) -> str:
+fn facade_render_presentation_clash(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32, cname: &str) -> str:
     let s = facade_render_surface(pool, intern, ci, resource)
     for i in 0..s.cnames.len():
         let explicit: bool = s.explicit[i]
@@ -756,7 +756,7 @@ pub fn facade_render_presentation_clash(pool: &AstPool, intern: &InternPool, ci:
     ""
 
 // The C names of every operation presented on `resource`, each once.
-pub fn facade_render_presented_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32) -> List[str]:
+fn facade_render_presented_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32) -> List[str]:
     let s = facade_render_surface(pool, intern, ci, resource)
     let out: List[str] = List.new()
     for i in 0..s.cnames.len():
@@ -771,7 +771,7 @@ pub fn facade_render_presented_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
     out
 
 // Those of them an fn item renames.
-pub fn facade_render_renamed_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32) -> List[str]:
+fn facade_render_renamed_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32) -> List[str]:
     let ops = facade_render_presented_ops(pool, intern, ci, resource)
     let out: List[str] = List.new()
     for i in 0..ops.len():
@@ -782,7 +782,7 @@ pub fn facade_render_renamed_ops(pool: &AstPool, intern: &InternPool, ci: &List[
 // The shortened name of `cname` on `resource`, ambiguity aside ("" when no
 // prefix matches): what an ambiguity note names as the spelling both
 // operations would take.
-pub fn facade_render_shortened(pool: &AstPool, intern: &InternPool, resource: i32, cname: &str) -> str:
+fn facade_render_shortened(pool: &AstPool, intern: &InternPool, resource: i32, cname: &str) -> str:
     facade_render_shorten(cname, &facade_render_prefix_names(pool, intern, resource))
 
 // The presented surface of a resource: its constructors (`from`, `init`),
@@ -1020,7 +1020,7 @@ fn facade_render_receiver_method(pool: &AstPool, intern: &InternPool, ci: &List[
 // Whether `cname` is an operation some resource clause names (`from`,
 // `init`, `preinit`, `drop`, `destroys`): an fn item describing one adds
 // facts to that operation and is not a lend method beside its constructor.
-pub fn facade_render_is_resource_op(pool: &AstPool, intern: &InternPool, cname: &str) -> bool:
+fn facade_render_is_resource_op(pool: &AstPool, intern: &InternPool, cname: &str) -> bool:
     let resources = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
     for ri in 0..resources.len():
         let res = resources[ri]
@@ -1148,7 +1148,7 @@ fn facade_render_lend_hosted(pool: &AstPool, intern: &InternPool, li: &FacadeLen
 var g_facade_items_pool: i64 = 0
 var g_facade_items: HashMap[i32, List[i32]] = HashMap.new()
 
-pub fn facade_render_all_items(pool: &AstPool, kind: NodeKind) -> List[i32]:
+fn facade_render_all_items(pool: &AstPool, kind: NodeKind) -> List[i32]:
     if g_facade_items_pool != pool.shape():
         g_facade_items_pool = pool.shape()
         g_facade_items = HashMap.new()
@@ -1838,8 +1838,8 @@ fn facade_render_out_producer(pool: &AstPool, intern: &InternPool, name: &str, r
 // type and the type of a resource a failed producer still produced. Sema
 // (SemaFacade.w facade_generated_type_names) refuses a program in which
 // either name already denotes another type.
-pub fn facade_render_error_name(name: &str) -> str: name ++ "Error"
-pub fn facade_render_failed_name(name: &str) -> str: "Failed" ++ name
+fn facade_render_error_name(name: &str) -> str: name ++ "Error"
+fn facade_render_failed_name(name: &str) -> str: "Failed" ++ name
 
 // ── one error type per facade (§16.2b.4, D97, #2179) ────────────────────
 //
@@ -1861,7 +1861,7 @@ pub fn facade_render_failed_name(name: &str) -> str: "Failed" ++ name
 // producer is projected.
 
 // The facade's one error type for an item of it, or "".
-pub fn facade_render_shared_error(pool: &AstPool, intern: &InternPool, item: i32) -> str:
+fn facade_render_shared_error(pool: &AstPool, intern: &InternPool, item: i32) -> str:
     let sym = facade_item_error_sym(pool, item)
     if sym == 0: return ""
     let name: str = intern.resolve(sym)
@@ -1882,7 +1882,7 @@ fn facade_render_names_message(pool: &AstPool, facade: i32) -> bool:
 // The `FailedWith<R>` variant a failure that still produced `R` is
 // reported as: `FailedWithResource` of `<R>Error`, or the shared error's
 // own variant for `R`.
-pub fn facade_render_failed_with_name(name: &str, shared: bool) -> str: if shared: "FailedWith" ++ name else: "FailedWithResource"
+fn facade_render_failed_with_name(name: &str, shared: bool) -> str: if shared: "FailedWith" ++ name else: "FailedWithResource"
 
 // The error a presented operation's `ok` projection returns, and whether
 // its `Failed` must carry an empty message (the shared error has one and
@@ -2001,7 +2001,7 @@ fn facade_render_find_fn(pool: &AstPool, intern: &InternPool, ci: &List[i32], sy
     if imported != 0: return imported
     g_facade_fn_any_decl.get(want) ?? 0
 
-pub fn facade_render_param_count(pool: &AstPool, decl: i32) -> i32:
+fn facade_render_param_count(pool: &AstPool, decl: i32) -> i32:
     let meta = pool.find_fn_meta(decl as NodeId)
     if meta < 0: 0 else: pool.fn_meta_param_count(meta)
 
@@ -2079,7 +2079,7 @@ fn facade_render_fn_index(pool: &AstPool, intern: &InternPool, ci: &List[i32]):
         if not g_facade_fn_any_decl.contains(name): g_facade_fn_any_decl.insert(name, decl as i32)
         if di < ci.len() and ci[di] != 0 and not g_facade_fn_ci_decl.contains(name): g_facade_fn_ci_decl.insert(name, decl as i32)
 
-pub fn facade_render_unalias(pool: &AstPool, intern: &InternPool, text: &str) -> str:
+fn facade_render_unalias(pool: &AstPool, intern: &InternPool, text: &str) -> str:
     // A pointer's pointee is chased too (a header's `DIR *` translates to
     // `*mut __dirstream` where the facade names `*mut DIR`), as Sema's
     // facade_same_type compares them.
@@ -2456,11 +2456,11 @@ fn facade_render_fn_ok(pool: &AstPool, intern: &InternPool, decl: i32) -> i32:
     0
 
 // The rendered name of a free operation presented under its C name.
-pub fn facade_render_bridge_name(cname: &str) -> str: "__with_facade_" ++ cname
+fn facade_render_bridge_name(cname: &str) -> str: "__with_facade_" ++ cname
 
 // `<Fn>Error`: the error type of a presented operation's `ok` projection,
 // named after its presented name (`compress` → `CompressError`).
-pub fn facade_render_fn_error_name(presented: &str) -> str:
+fn facade_render_fn_error_name(presented: &str) -> str:
     if presented.len() == 0: return "Error"
     // A snake_case presented name is CamelCased (`exec_with` →
     // `ExecWithError`); a name with capitals of its own keeps them
@@ -2570,7 +2570,7 @@ fn facade_render_resource_named(pool: &AstPool, intern: &InternPool, name: &str)
 // The rendered name of one case of a variadic contract (D66, §16.2b.5):
 // `<base>__<CONST>`, the base being the presented method name, or the free
 // operation's rendered name (`__with_facade_<name>`, or its `rename`).
-pub fn facade_render_variadic_case_name(base: &str, sel: &str) -> str: base ++ "__" ++ sel
+fn facade_render_variadic_case_name(base: &str, sel: &str) -> str: base ++ "__" ++ sel
 
 // One method or function per case of a `variadic param N selected by
 // param P:` contract (D66, spec §16.2b.5). The declaration stays variadic:
@@ -2704,7 +2704,7 @@ fn facade_render_fresh(base: &str, taken: &str) -> str:
 // The parameter index a facade `param` reference names (`param N`,
 // `param name`, `param type T`), or -1: Sema's facade_resolve_param resolves
 // the same reference against the signature and reports a miss.
-pub fn facade_render_param_ref(pool: &AstPool, intern: &InternPool, decl: i32, ref_node: i32) -> i32:
+fn facade_render_param_ref(pool: &AstPool, intern: &InternPool, decl: i32, ref_node: i32) -> i32:
     let meta = pool.find_fn_meta(decl as NodeId)
     if meta < 0 or ref_node == 0:
         return -1
@@ -3017,7 +3017,7 @@ fn facade_render_resource_keeps_userdata(pool: &AstPool, intern: &InternPool, ci
             return true
     false
 
-pub fn facade_render_param_type(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> str:
+fn facade_render_param_type(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> str:
     let meta = pool.find_fn_meta(decl as NodeId)
     render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), pi) as NodeId)
 
@@ -3096,7 +3096,7 @@ fn facade_render_callback_type(pool: &AstPool, intern: &InternPool, text: &str) 
 
 // The alias a handle's slice is transmuted through: `[]H` cannot be
 // spelled as a call's type argument.
-pub fn facade_render_slice_alias(hname: &str) -> str: "__with_facade_slice_" ++ hname
+fn facade_render_slice_alias(hname: &str) -> str: "__with_facade_slice_" ++ hname
 
 // Whether some `callback … argv … as &[H]` clause presents a vector of the
 // handle named `hname`.
@@ -3431,7 +3431,7 @@ fn facade_render_callback_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32
 // whether there is one, and its return and first parameter types with
 // aliases chased ("" when absent). The toolchain libc facade
 // (compiler/LibcFacade.w) describes only declarations of libc's own shape.
-pub fn facade_render_import_shape(pool: &AstPool, intern: &InternPool, ci: &List[i32], name: &str) -> (bool, str, str):
+fn facade_render_import_shape(pool: &AstPool, intern: &InternPool, ci: &List[i32], name: &str) -> (bool, str, str):
     for di in 0..pool.decl_count():
         if di >= ci.len() or ci[di] == 0:
             continue
@@ -3468,7 +3468,7 @@ pub fn facade_render_import_shape(pool: &AstPool, intern: &InternPool, ci: &List
 
 // The record names the fn items of `facade` (every block when `facade` is
 // 0) borrow that no resource carries: the view types to host.
-pub fn facade_render_record_view_names(pool: &AstPool, intern: &InternPool, facade: i32) -> List[str]:
+fn facade_render_record_view_names(pool: &AstPool, intern: &InternPool, facade: i32) -> List[str]:
     let out: List[str] = List.new()
     let items = if facade != 0: facade_render_block_items(pool, facade, NodeKind.NK_FACADE_FN) else: facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
     for i in 0..items.len():
@@ -3515,7 +3515,7 @@ fn facade_render_lend_hosted_by_record(pool: &AstPool, intern: &InternPool, li: 
 
 // The record view `rname` whose pointer the item's first parameter takes,
 // or "": the host of a method rendered on the view.
-pub fn facade_render_record_host(pool: &AstPool, intern: &InternPool, ci: &List[i32], item: i32) -> str:
+fn facade_render_record_host(pool: &AstPool, intern: &InternPool, ci: &List[i32], item: i32) -> str:
     let li = facade_render_lend_item(pool, intern, ci, item)
     let names = facade_render_record_view_names(pool, intern, 0)
     for i in 0..names.len():
@@ -3526,7 +3526,7 @@ pub fn facade_render_record_host(pool: &AstPool, intern: &InternPool, ci: &List[
 // The presented name of `cname` on the record view `rname`: the item's
 // `rename`, else the C name less the record's prefix (§16.2a, as a
 // resource's operations shorten), else the C name.
-pub fn facade_render_present_record(pool: &AstPool, intern: &InternPool, rname: &str, cname: &str) -> str:
+fn facade_render_present_record(pool: &AstPool, intern: &InternPool, rname: &str, cname: &str) -> str:
     let renamed = facade_render_item_rename(pool, intern, cname)
     if renamed.len() > 0:
         return renamed
@@ -3536,7 +3536,7 @@ pub fn facade_render_present_record(pool: &AstPool, intern: &InternPool, rname: 
     if short.len() > 0: short else: cname.to_owned()
 
 // The methods of the record view `rname`, rendered inside `impl <rname>:`.
-pub fn facade_render_record_view_methods(pool: &AstPool, intern: &InternPool, ci: &List[i32], rname: &str) -> str:
+fn facade_render_record_view_methods(pool: &AstPool, intern: &InternPool, ci: &List[i32], rname: &str) -> str:
     var out = ""
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
     for i in 0..items.len():

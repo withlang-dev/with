@@ -43,7 +43,7 @@ extern fn with_codegen_loop_get_continue(idx: i32) -> i64
 extern fn with_codegen_loop_get_result(idx: i32) -> i64
 
 // Atomic operations
-pub enum AtomicRmwOp: i32:
+enum AtomicRmwOp: i32:
     XCHG = 0
     ADD = 1
     SUB = 2
@@ -55,7 +55,7 @@ pub enum AtomicRmwOp: i32:
     UMIN = 8
     UMAX = 9
 
-pub enum AtomicOrdering: i32:
+enum AtomicOrdering: i32:
     RELAXED = 0
     ACQUIRE = 1
     RELEASE = 2
@@ -99,7 +99,7 @@ type CodegenDebugState {
     location: i64,
 }
 
-pub type Codegen {
+type Codegen {
     // LLVM handles
     context: i64,
     llmod: i64,
@@ -602,18 +602,18 @@ pub type Codegen {
     mir_default_unreachable_bbs: List[i64],
 }
 
-pub type DynArgInfo {
+type DynArgInfo {
     type_sym: i32,
     use_ptr: i32,
 }
 
-pub type CallArgValue {
+type CallArgValue {
     value: i64,
     cleanup_ptr: i64,
 }
 
 // A call operand that is a string literal, with its decoded text.
-pub type StrLiteralOperand {
+type StrLiteralOperand {
     found: bool,
     text: str,
 }
@@ -636,7 +636,7 @@ fn Codegen.init(module_name: &str) -> Codegen:
 // aliased — and hands it back via take_sema. The swap leaves a placeholder so
 // every cg teardown path (explicit deinit or scope exit) stays untouched.
 extend Codegen:
-    pub mut fn take_sema() -> Sema:
+    mut fn take_sema() -> Sema:
         var s = move self.sema
         self.sema = Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new())
         s
@@ -1934,7 +1934,7 @@ impl Codegen:
                 return self.dyn_trait_from_type_node(self.pool.get_extra(g_extra))
         0
 
-pub fn codegen_hash_type_trait_key(type_sym: i32, trait_sym: i32) -> i32:
+fn codegen_hash_type_trait_key(type_sym: i32, trait_sym: i32) -> i32:
     type_sym * 10007 + trait_sym
 
 impl Codegen:
@@ -3051,20 +3051,20 @@ impl Codegen:
             wl_set_alignment(slot, declared)
         slot
 
-pub fn list_data_i64(v: &List[i64]) -> i64:
+fn list_data_i64(v: &List[i64]) -> i64:
     // D120: a List of values is Copy, so `v as i64` would copy the list
     // (D22 §6.2); the address is the reference relabeled (§16.11).
     wl_list_data_ptr((v as *const List[i64]) as i64)
 
 // Element-wise copy so a caller can hand an owned vector to a consuming
 // sink (e.g. record_c_abi_transform) more than once under spec §3.8.
-pub fn list_copy_i64(src: &List[i64]) -> List[i64]:
+fn list_copy_i64(src: &List[i64]) -> List[i64]:
     let out: List[i64] = List.new()
     for i in 0..src.len():
         out.push(src[i])
     out
 
-pub fn list_zeros_i64(n: i32) -> List[i64]:
+fn list_zeros_i64(n: i32) -> List[i64]:
     let out: List[i64] = List.new()
     for _i in 0..n:
         out.push(0)
@@ -5485,7 +5485,7 @@ pub const MODE_SITE_DECL_TYPE_NODE: i32 = 16
 pub const MODE_SITE_BODY_TYPE_NODE: i32 = 17
 pub const MODE_SITE_COUNT: i32 = 18
 
-pub fn mode_site_name(site: i32) -> str:
+fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_FIELD_TYPE_THROUGH_ADDRESS: return "projected-type field through an address"
     if site == MODE_SITE_FIELD_PTR_THROUGH_ADDRESS: return "place-ptr field through an address"
     if site == MODE_SITE_INDEX_THROUGH_ADDRESS: return "place-ptr index through an address"
@@ -5506,7 +5506,7 @@ pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_BODY_TYPE_NODE: return "body type node LLVM type"
     "unknown"
 
-pub fn mode_site_owner(site: i32) -> str:
+fn mode_site_owner(site: i32) -> str:
     if site == MODE_SITE_MARSHAL_EXISTING_POINTER: return "the operand's Sema category"
     if site == MODE_SITE_PARAM_BY_ADDRESS or site == MODE_SITE_PARAM_PLACE_ALIAS or site == MODE_SITE_EVAL_INDIRECT_LOCAL or site == MODE_SITE_REF_VALUE_IS_ADDRESS: return "FnAbi's PassMode"
     if site == MODE_SITE_SIZEOF_TYPE_ARG: return "Sema's type argument"
@@ -5518,7 +5518,7 @@ pub fn mode_site_owner(site: i32) -> str:
     "Sema's place category"
 
 // What a site re-derived its fact from before it read the owner.
-pub fn mode_site_derivation(site: i32) -> str:
+fn mode_site_derivation(site: i32) -> str:
     if site == MODE_SITE_SIZEOF_TYPE_ARG or site == MODE_SITE_STRUCT_FIELD_TYPE or site == MODE_SITE_DECL_TYPE_NODE or site == MODE_SITE_BODY_TYPE_NODE: return "the AST type node"
     if site == MODE_SITE_FIELD_INDEX: return "the LLVM struct registry"
     if site == MODE_SITE_CAPTURE_BY_PLACE or site == MODE_SITE_CLOSURE_OWNED_ENV: return "the closure's AST spelling"
@@ -5531,12 +5531,12 @@ pub const AST_DERIVATION_TYPE: i32 = 0
 pub const AST_DERIVATION_CONST: i32 = 1
 pub const AST_DERIVATION_COUNT: i32 = 2
 
-pub fn ast_derivation_name(kind: i32) -> str:
+fn ast_derivation_name(kind: i32) -> str:
     if kind == AST_DERIVATION_TYPE: return "AST type node resolved by codegen"
     if kind == AST_DERIVATION_CONST: return "constant expression evaluated by codegen"
     "unknown"
 
-pub fn ast_derivation_owner(kind: i32) -> str:
+fn ast_derivation_owner(kind: i32) -> str:
     if kind == AST_DERIVATION_TYPE: return "the type Sema recorded for the node"
     "the value Sema evaluated"
 
@@ -6491,7 +6491,7 @@ fn codegen_extern_uses_internal_abi(name: &str, cc_name: &str) -> bool:
         return false
     codegen_is_runtime_abi_symbol(name)
 
-pub fn codegen_c_abi_needs_byval_attr() -> bool:
+fn codegen_c_abi_needs_byval_attr() -> bool:
     let os = target_spec_os()
     let arch = target_spec_arch()
     arch == "x86_64" and (os == "Linux" or os == "Macos")
@@ -6506,7 +6506,7 @@ fn codegen_c_abi_sysv_x86_64() -> bool: target_spec_arch() == "x86_64" and targe
 // c_abi_sysv_classify's verdict for a struct with an unaligned field.
 const CODEGEN_SYSV_MEMORY: i32 = -2
 
-pub fn codegen_windows_x86_64() -> bool:
+fn codegen_windows_x86_64() -> bool:
     let os = target_spec_os()
     let arch = target_spec_arch()
     os == "Windows" and arch == "x86_64"
@@ -7471,7 +7471,7 @@ impl Codegen:
 // Compiles a method body with the struct's type params bound to concrete types.
 // Called lazily when the method is first invoked on a monomorphized struct.
 
-pub type ConcreteMirFunction {
+type ConcreteMirFunction {
     sym: i32,
     value: i64,
     fn_type: i64,

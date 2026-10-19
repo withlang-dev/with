@@ -3467,7 +3467,7 @@ fn frontend_normalize_module_path(module_name: &str) -> str:
             out = out ++ module_name.slice(i as i64, (i + 1) as i64)
     out
 
-pub fn frontend_dirname(path: &str) -> str:
+fn frontend_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len():
         if path[i] == 47: // '/'

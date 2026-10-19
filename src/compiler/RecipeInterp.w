@@ -307,7 +307,7 @@ const N_CONTINUE = 41
 const N_RAISE = 42
 const N_CLASS = 43      // s: kids
 
-pub type PyNode { kind: i32, a: i32, b: i32, c: i32, s: str, kids: List[i32], line: i32 }
+type PyNode { kind: i32, a: i32, b: i32, c: i32, s: str, kids: List[i32], line: i32 }
 
 type PyParser { toks: List[PyTok], at: i32, nodes: List[PyNode], err: str }
 
@@ -850,9 +850,9 @@ impl PyParser:
 
 // The recipe as a tree: the nodes, the top-level statements, and what could
 // not be read ("" when all of it was).
-pub type PyModule { nodes: List[PyNode], top: List[i32], problem: str }
+type PyModule { nodes: List[PyNode], top: List[i32], problem: str }
 
-pub fn py_parse(src: &str) -> PyModule:
+fn py_parse(src: &str) -> PyModule:
     var p = PyParser { toks: py_lex(src), at: 0, nodes: List.new(), err: "" }
     var top: List[i32] = List.new()
     while p.kind() != PT_EOF and p.err.len() == 0:
@@ -880,7 +880,7 @@ const V_VER = 11        // s: a version, compared by component
 const V_OPT = 12        // s: an option's value, as Conan spells it
 const V_NAMED = 13      // s: a name from outside the recipe (`os.path.join`)
 
-pub type PyVal { k: i32, n: i64, s: str }
+type PyVal { k: i32, n: i64, s: str }
 
 fn pv(k: i32, n: i64, s: &str): PyVal { k, n, s: s.to_owned() }
 fn pv_copy(v: &PyVal): PyVal { k: v.k, n: v.n, s: v.s.clone() }
@@ -903,16 +903,16 @@ type PyNames { items: List[str] }
 // package's version and directory, and its options as `name=value` when the
 // binary states them (`options_known`); otherwise the recipe's defaults are
 // taken and its `config_options` and `configure` run over them.
-pub type RecipeEnv { os: str, arch: str, compiler: str, compiler_version: str, build_type: str, version: str, package_folder: str, source_folder: str, options: List[str], options_known: bool }
+type RecipeEnv { os: str, arch: str, compiler: str, compiler_version: str, build_type: str, version: str, package_folder: str, source_folder: str, options: List[str], options_known: bool }
 
 // One `cpp_info`: the package's own, or a component's.
-pub type RecipeComponent { name: str, libs: List[str], system_libs: List[str], frameworks: List[str], libdirs: List[str], includedirs: List[str], defines: List[str], exelinkflags: List[str], requires: List[str] }
+type RecipeComponent { name: str, libs: List[str], system_libs: List[str], frameworks: List[str], libdirs: List[str], includedirs: List[str], defines: List[str], exelinkflags: List[str], requires: List[str] }
 
 // What `package_info` said: the package's own cpp_info, its components in
 // the order the recipe names them, and every decision that could not be made
 // (`notes`). `ok` is false when the recipe or the method could not be read
 // at all (`problem`).
-pub type RecipePackageInfo { ok: bool, problem: str, notes: List[str], root: RecipeComponent, components: List[RecipeComponent] }
+type RecipePackageInfo { ok: bool, problem: str, notes: List[str], root: RecipeComponent, components: List[RecipeComponent] }
 
 const PY_NORMAL = 0
 const PY_RETURN = 1
@@ -925,7 +925,7 @@ type PyInterp { nodes: List[PyNode], lists: List[PyList], dkeys: List[PyList], d
 
 // Numeric order of two versions, component by component; a missing
 // component is 0, and a component that is not a number orders as text.
-pub fn py_version_order(a: &str, b: &str) -> i32:
+fn py_version_order(a: &str, b: &str) -> i32:
     let pa = a.split(".")
     let pb = b.split(".")
     let n = if pa.len() > pb.len(): pa.len() else: pb.len()
@@ -1917,7 +1917,7 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
 
 // The options a package built here is made with, as conaninfo spells them:
 // the recipe's defaults after its `config_options` and `configure`.
-pub fn recipe_built_options(recipe: &str, env: &RecipeEnv) -> List[str]:
+fn recipe_built_options(recipe: &str, env: &RecipeEnv) -> List[str]:
     var out: List[str] = List.new()
     let (ip, problem) = recipe_interp(recipe, env)
     if problem.len() > 0: return out
@@ -1929,7 +1929,7 @@ pub fn recipe_built_options(recipe: &str, env: &RecipeEnv) -> List[str]:
     out
 
 // `package_info`, run: what the package's cpp_info and its components hold.
-pub fn recipe_package_info(recipe: &str, env: &RecipeEnv) -> RecipePackageInfo:
+fn recipe_package_info(recipe: &str, env: &RecipeEnv) -> RecipePackageInfo:
     let (ip0, problem) = recipe_interp(recipe, env)
     if problem.len() > 0: return recipe_failed(problem)
     var ip = ip0
@@ -1954,9 +1954,9 @@ pub fn recipe_package_info(recipe: &str, env: &RecipeEnv) -> RecipePackageInfo:
 // What `requirements` and `build_requirements` ask for: the packages the
 // library needs, and the tools its build runs, as the recipe writes them
 // (`zlib/[>=1.2.11 <2]`).
-pub type RecipeRequirements { ok: bool, problem: str, notes: List[str], requires: List[str], tool_requires: List[str] }
+type RecipeRequirements { ok: bool, problem: str, notes: List[str], requires: List[str], tool_requires: List[str] }
 
-pub fn recipe_requirements(recipe: &str, env: &RecipeEnv) -> RecipeRequirements:
+fn recipe_requirements(recipe: &str, env: &RecipeEnv) -> RecipeRequirements:
     let (ip0, problem) = recipe_interp(recipe, env)
     if problem.len() > 0: return RecipeRequirements { ok: false, problem, notes: List.new(), requires: List.new(), tool_requires: List.new() }
     var ip = ip0
@@ -1975,9 +1975,9 @@ pub fn recipe_requirements(recipe: &str, env: &RecipeEnv) -> RecipeRequirements:
 
 // The variables `generate` sets on its CMakeToolchain, as CMake spells
 // their values; `unknown` names each one whose value could not be evaluated.
-pub type RecipeCMake { ok: bool, problem: str, notes: List[str], names: List[str], values: List[str], unknown: List[str] }
+type RecipeCMake { ok: bool, problem: str, notes: List[str], names: List[str], values: List[str], unknown: List[str] }
 
-pub fn recipe_cmake_variables(recipe: &str, env: &RecipeEnv) -> RecipeCMake:
+fn recipe_cmake_variables(recipe: &str, env: &RecipeEnv) -> RecipeCMake:
     var out = RecipeCMake { ok: false, problem: "", notes: List.new(), names: List.new(), values: List.new(), unknown: List.new() }
     let (ip0, problem) = recipe_interp(recipe, env)
     if problem.len() > 0:

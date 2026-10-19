@@ -120,7 +120,7 @@ enum ControlTargetKind: i32:
     CT_LOOP = 1
     CT_BLOCK = 2
 
-pub type MirBuilder = ephemeral {
+type MirBuilder = ephemeral {
     body: MirBody,
     anonymous_bodies: List[MirBody],
     cur_bb: BlockId,
@@ -18546,7 +18546,7 @@ fn cow_unwrap_ref_place(body: &MirBody, place_id: i32) -> i32:
         cur = target
     cur
 
-pub fn mir_body_cow_place_text(sema: &Sema, body: &MirBody, place_id: i32) -> str:
+fn mir_body_cow_place_text(sema: &Sema, body: &MirBody, place_id: i32) -> str:
     let place = cow_unwrap_ref_place(body, place_id)
     if place < 0 or place >= body.place_locals.len():
         return "<unknown>"
@@ -18601,7 +18601,7 @@ pub fn mir_body_cow_place_text(sema: &Sema, body: &MirBody, place_id: i32) -> st
             continue
     out
 
-pub fn mir_body_cow_check_reason(sema: &Sema, body: &MirBody, bb: i32) -> str:
+fn mir_body_cow_check_reason(sema: &Sema, body: &MirBody, bb: i32) -> str:
     let (reachable, preds) = cow_compute_reachable_and_preds(body)
     if bb < 0 or bb >= reachable.len() or reachable[bb] == 0 or body.term_kind(bb) != TermKind.TK_CALL:
         return ""
@@ -19448,7 +19448,7 @@ impl MirModule:
             if self.find_body(mono_sym) < 0:
                 sema_phase_bug(f"BUG: concrete generic Drop contract has no prelowered MIR body: type={tid} mono={mono_sym}")
 
-pub type MirLowerResult {
+type MirLowerResult {
     sema: Sema,
     mir_module: MirModule,
 }
@@ -19555,7 +19555,7 @@ fn lower_debug_formatter(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, ent
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     return move builder.body
 
-pub fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirLowerResult:
+fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirLowerResult:
     var sema = input_sema
     sema.prepare_source_line_offsets()
     // #916: lowering a call reads whether its callee may suspend.
@@ -19640,7 +19640,7 @@ pub fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> 
 
     MirLowerResult { sema, mir_module: mir_mod }
 
-pub fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: &AstPool, pool: &InternPool) -> List[i32]:
+fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: &AstPool, pool: &InternPool) -> List[i32]:
     let tailrec_syms: List[i32] = List.new()
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)

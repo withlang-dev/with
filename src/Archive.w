@@ -351,7 +351,7 @@ fn create_gnu_indexed_archive(output_path: &str, member_names: &List[str], membe
 // on Windows a backslash is a path character and escapes only a double
 // quote; elsewhere (GNU) it escapes the next character and single quotes
 // quote too.
-pub fn ar_tokenize_response(text: &str, windows_quoting: bool) -> List[str]:
+fn ar_tokenize_response(text: &str, windows_quoting: bool) -> List[str]:
     let out: List[str] = List.new()
     var token = ""
     var started = false
@@ -390,12 +390,12 @@ pub fn ar_tokenize_response(text: &str, windows_quoting: bool) -> List[str]:
 
 // `args` with every `@file` replaced by the arguments that file holds
 // (a response file may name another). `ok` is false when one cannot be read.
-pub type ArResponseArgs {
+type ArResponseArgs {
     ok: bool,
     args: List[str],
 }
 
-pub fn ar_expand_response_args(args: &List[str], windows_quoting: bool, depth: i32) -> ArResponseArgs:
+fn ar_expand_response_args(args: &List[str], windows_quoting: bool, depth: i32) -> ArResponseArgs:
     let out: List[str] = List.new()
     for i in 0..args.len():
         let arg = args[i]
@@ -414,7 +414,7 @@ pub fn ar_expand_response_args(args: &List[str], windows_quoting: bool, depth: i
             out.push(with_str_clone_ref(inner.args[j]))
     ArResponseArgs { ok: true, args: out }
 
-pub fn create_static_archive(output_path: &str, member_paths: &List[str]) -> i32:
+fn create_static_archive(output_path: &str, member_paths: &List[str]) -> i32:
     let member_count = member_paths.len()
     let member_names: List[str] = List.new()
     let member_data: List[str] = List.new()

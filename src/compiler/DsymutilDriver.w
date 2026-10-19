@@ -22,7 +22,7 @@ type DsymutilToolContext { path: *const u8, prepend_arg: *const u8, needs_prepen
 // int dsymutil_main(int, char **, const llvm::ToolContext &).
 extern fn with_dsymutil_main(argc: i32, argv: *mut *mut u8, ctx: *const DsymutilToolContext) -> i32
 
-pub fn with_dsymutil_available() -> bool: embedded_dsymutil_linked()
+fn with_dsymutil_available() -> bool: embedded_dsymutil_linked()
 
 unsafe fn ds_c_string(s: &str) -> *mut u8:
     let out = with_alloc(s.len() + 1)
@@ -32,7 +32,7 @@ unsafe fn ds_c_string(s: &str) -> *mut u8:
     out
 
 // argv[0] is `with`, argv[1] is `__dsymutil`; the rest is dsymutil's.
-pub fn with_dsymutil_cli_main() -> i32:
+fn with_dsymutil_cli_main() -> i32:
     if not with_dsymutil_available():
         runtime_eprint("error: this build of `with` has no dsymutil: the LLVM SDK it was linked against predates lib/libdsymutilMain.a (#1915)")
         return 127

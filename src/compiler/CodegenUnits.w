@@ -32,7 +32,7 @@ extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
 extern fn with_thread_join(handle: i64) -> i32
 
 // Explicit override; 0 means "unset — use the host-aware default".
-pub fn codegen_units_env_count() -> i32:
+fn codegen_units_env_count() -> i32:
     let raw = runtime_getenv("WITH_CODEGEN_UNITS")
     if raw.len() == 0:
         return 0
@@ -47,12 +47,12 @@ type CodegenUnitsSysInfo {
 extern fn with_sysinfo(out: *mut u8) -> i32
 
 // Partition compiler-sized inputs independently of the available workers.
-pub fn codegen_units_default_count(mir_body_count: i32) -> i32: codegen_units_count_for(mir_body_count)
+fn codegen_units_default_count(mir_body_count: i32) -> i32: codegen_units_count_for(mir_body_count)
 
 // Emit-phase concurrency width (#681 windowing) — policy in
 // compiler.CodegenUnitsPolicy; this wrapper reads the env override and
 // host sysinfo.
-pub fn codegen_units_emit_width(unit_count: i32, total_mir_cost: i64) -> i32:
+fn codegen_units_emit_width(unit_count: i32, total_mir_cost: i64) -> i32:
     let raw = runtime_getenv("WITH_CODEGEN_EMIT_WIDTH")
     if raw.len() > 0:
         let n = parse(raw)
@@ -66,7 +66,7 @@ pub fn codegen_units_emit_width(unit_count: i32, total_mir_cost: i64) -> i32:
 // non-private global definitions and appending-linkage arrays
 // (llvm.global_ctors, llvm.used); other units keep private globals and
 // reference the rest.
-pub fn codegen_units_apply_global_ownership(unit_module: i64, k: i32) -> Unit:
+fn codegen_units_apply_global_ownership(unit_module: i64, k: i32) -> Unit:
     if k != 0:
         var g = wl_get_first_global(unit_module)
         while g != 0:
@@ -90,13 +90,13 @@ pub fn codegen_units_apply_global_ownership(unit_module: i64, k: i32) -> Unit:
         g0 = wl_get_next_global(g0)
 
 // Unit object path: unit 0 owns the canonical object path.
-pub fn codegen_unit_object_path(obj_path: &str, k: i32) -> str:
+fn codegen_unit_object_path(obj_path: &str, k: i32) -> str:
     if k == 0: with_str_clone_ref(obj_path) else: f"{obj_path}.u{k}.o"
 
 // #681 per-unit generation: assign MIR bodies to units BEFORE any LLVM
 // exists. Cost proxy = total MIR statements per body; greedy least-loaded
 // packing over the fixed MIR body order is deterministic.
-pub type CodegenUnitAssign {
+type CodegenUnitAssign {
     unit_count: i32,
     fn_syms: List[i32],
     units: List[i32],
@@ -104,7 +104,7 @@ pub type CodegenUnitAssign {
     total_cost: i64,
 }
 
-pub fn codegen_units_assign_from_mir(mir_ptr: i64, unit_count: i32) -> CodegenUnitAssign:
+fn codegen_units_assign_from_mir(mir_ptr: i64, unit_count: i32) -> CodegenUnitAssign:
     let fn_syms: List[i32] = List.new()
     let units: List[i32] = List.new()
     let bin_loads: List[i64] = List.new()
@@ -199,7 +199,7 @@ unsafe fn codegen_unit_emit_thread_entry(arg: *mut u8) -> i32:
 // codegen_units_emit_width). A failed spawn runs the unit inline. The jobs
 // are allocated up front so no job moves while a thread reads it, and
 // every started thread is joined by `finish` before the pipeline drops.
-pub type CodegenUnitPipeline {
+type CodegenUnitPipeline {
     jobs: List[CodegenUnitEmitJob],
     handles: List[i64],
     window: i32,
@@ -207,7 +207,7 @@ pub type CodegenUnitPipeline {
     rc: i32,
 }
 
-pub fn codegen_unit_pipeline(unit_count: i32, obj_path: &str, opt_level: i32, do_profile: bool, window: i32) -> CodegenUnitPipeline:
+fn codegen_unit_pipeline(unit_count: i32, obj_path: &str, opt_level: i32, do_profile: bool, window: i32) -> CodegenUnitPipeline:
     let jobs: List[CodegenUnitEmitJob] = List.new()
     for k in 0..unit_count:
         jobs.push(CodegenUnitEmitJob { context: 0, llmod: 0, obj_path: with_str_clone_ref(obj_path), opt_level, unit_index: k, do_profile, rc: 0 })
@@ -248,7 +248,7 @@ impl CodegenUnitPipeline:
             runtime_eprint(f"error: codegen-units generated emit failed with exit code {self.rc}")
         self.rc
 
-pub fn codegen_unit_extra_objects(obj_path: &str, unit_count: i32) -> List[str]:
+fn codegen_unit_extra_objects(obj_path: &str, unit_count: i32) -> List[str]:
     let extras: List[str] = List.new()
     var k: i32 = 1
     while k < unit_count:

@@ -10,7 +10,7 @@ extern fn with_str_clone_ref(s: &str) -> str
 use Overflow
 use compiler.EmbeddedClangResourceData
 
-pub enum BuildOutputKind: i32:
+enum BuildOutputKind: i32:
     Binary = 0
     Object = 1
     C = 2
@@ -19,13 +19,13 @@ pub enum BuildOutputKind: i32:
 
 impl Copy for BuildOutputKind
 
-pub enum DriverPreludeMode: i32:
+enum DriverPreludeMode: i32:
     Full = 0
     Core = 1
     None = 2
     Alloc = 3
 
-pub type BuildCommandOptions {
+type BuildCommandOptions {
     source_path: str,
     output_path: str,
     output_kind: BuildOutputKind,
@@ -71,7 +71,7 @@ pub type BuildCommandOptions {
     compiler_hooks_enabled: bool,
 }
 
-pub type BuildGraphCommandOptions {
+type BuildGraphCommandOptions {
     // The first `:target` selector ("" when none): pseudo-target dispatch
     // (install-user, effects) and labels still speak of one. The graph
     // itself is selected by selected_targets, every selector in order.
@@ -87,13 +87,13 @@ pub type BuildGraphCommandOptions {
     explain_target: str,
 }
 
-pub type TestCommandOptions {
+type TestCommandOptions {
     filter: str,
     verbose: bool,
     quiet: bool,
 }
 
-pub type MigrateCommandOptions {
+type MigrateCommandOptions {
     source_path: str,
     output_path: str,
     include_paths: List[str],
@@ -114,20 +114,20 @@ pub type MigrateCommandOptions {
     ir_roundtrip: bool,
 }
 
-pub type BuildCommandParseResult {
+type BuildCommandParseResult {
     ok: bool,
     error_msg: str,
     build: BuildCommandOptions,
     graph: BuildGraphCommandOptions,
 }
 
-pub fn driver_internal_overflow_mode -> i32:
+fn driver_internal_overflow_mode -> i32:
     let mode = overflow_mode_parse(with_getenv_str("WITH_INTERNAL_OVERFLOW_MODE"))
     if overflow_mode_valid(mode):
         return mode
     -1
 
-pub fn build_command_options_default -> BuildCommandOptions:
+fn build_command_options_default -> BuildCommandOptions:
     BuildCommandOptions {
         source_path: "",
         output_path: "",
@@ -158,18 +158,18 @@ pub fn build_command_options_default -> BuildCommandOptions:
         compiler_hooks_enabled: true,
     }
 
-pub fn driver_clone_str(s: &str) -> str:
+fn driver_clone_str(s: &str) -> str:
     if s.len() == 0:
         return ""
     with_str_clone_ref(s)
 
-pub fn driver_clone_str_list(values: &List[str]) -> List[str]:
+fn driver_clone_str_list(values: &List[str]) -> List[str]:
     let out: List[str] = List.new()
     for i in 0..values.len():
         out.push(driver_clone_str(values[i]))
     out
 
-pub fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOptions:
+fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOptions:
     BuildCommandOptions {
         source_path: driver_clone_str(base.source_path),
         output_path: driver_clone_str(base.output_path),
@@ -200,7 +200,7 @@ pub fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOp
         compiler_hooks_enabled: base.compiler_hooks_enabled,
     }
 
-pub fn build_graph_command_options_default -> BuildGraphCommandOptions:
+fn build_graph_command_options_default -> BuildGraphCommandOptions:
     BuildGraphCommandOptions {
         selected_target: "",
         selected_targets: List.new(),
@@ -211,7 +211,7 @@ pub fn build_graph_command_options_default -> BuildGraphCommandOptions:
         explain_target: "",
     }
 
-pub fn migrate_command_options_default -> MigrateCommandOptions:
+fn migrate_command_options_default -> MigrateCommandOptions:
     MigrateCommandOptions {
         source_path: "",
         output_path: "",
@@ -263,7 +263,7 @@ fn driver_flag_values(argc: i32, flag: &str) -> List[str]:
 
 // D39: `--link-bundle <prefix>` values, for every command that compiles
 // (build, check, analyze).
-pub fn driver_link_bundle_args(argc: i32) -> List[str]:
+fn driver_link_bundle_args(argc: i32) -> List[str]:
     driver_flag_values(argc, "--link-bundle")
 
 fn driver_first_flag_value(argc: i32, flag: &str) -> str:
@@ -273,10 +273,10 @@ fn driver_first_flag_value(argc: i32, flag: &str) -> str:
 // D39: `--bundle-corpus <rel>` and `--bundle-fingerprint <path>` — the
 // fingerprint pass runs on a source root and on an emitted .wi root through
 // `check`, so both are read outside the build option parse too.
-pub fn driver_bundle_corpus_arg(argc: i32) -> str:
+fn driver_bundle_corpus_arg(argc: i32) -> str:
     driver_first_flag_value(argc, "--bundle-corpus")
 
-pub fn driver_bundle_fingerprint_arg(argc: i32) -> str:
+fn driver_bundle_fingerprint_arg(argc: i32) -> str:
     driver_first_flag_value(argc, "--bundle-fingerprint")
 
 fn driver_build_source_arg(argc: i32) -> str:
@@ -327,7 +327,7 @@ fn driver_explain_arg(argc: i32) -> str:
 // Target triples accepted by --target (§18.5). Returns the
 // std.build.BuildTarget kind, or -1 for a triple this compiler
 // cannot represent.
-pub fn driver_target_triple_kind(triple: &str) -> i32:
+fn driver_target_triple_kind(triple: &str) -> i32:
     if triple == "native":
         return 0
     if triple == "x86_64-unknown-linux-gnu" or triple == "x86_64-linux-gnu" or triple == "linux_x86_64":
@@ -353,14 +353,14 @@ pub fn driver_target_triple_kind(triple: &str) -> i32:
         return 8
     -1
 
-pub type DriverTargetParseResult {
+type DriverTargetParseResult {
     ok: bool,
     kind: i32,
     explicit: bool,
     error_msg: str,
 }
 
-pub fn driver_parse_build_target(argc: i32) -> DriverTargetParseResult:
+fn driver_parse_build_target(argc: i32) -> DriverTargetParseResult:
     var kind: i32 = 0
     var explicit = false
     var i = 2
@@ -485,7 +485,7 @@ fn driver_parse_overflow_mode(argc: i32) -> DriverOverflowParseResult:
         i = i + 1
     DriverOverflowParseResult { true, mode, "" }
 
-pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
+fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
     var build = build_command_options_default()
     var graph = build_graph_command_options_default()
     build.source_path = driver_build_source_arg(argc)

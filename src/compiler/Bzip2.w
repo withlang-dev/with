@@ -106,7 +106,7 @@ fn bz_bytes_to_str(v: &List[u8]) -> str:
 
 // The decompressed contents of the .bz2 file `data`, and "" — or "" and the
 // reason.
-pub fn bzip2_decompress(data: &str) -> List[str]:
+fn bzip2_decompress(data: &str) -> List[str]:
     let result: List[str] = List.new()
     var bits = BzBits { data: data.to_owned(), at: 0, buffer: 0, count: 0, problem: "" }
     let crc_table = bz_crc_table()

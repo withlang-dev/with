@@ -46,7 +46,7 @@ fn ecr_cache_root() -> str:
         base = if home.len() == 0: "/tmp/with-cache" else: home ++ "/.cache"
     base ++ "/with/clang-resource/" ++ embedded_clang_resource_version() ++ "-" ++ f"{with_str_hash(ecr_identity_text())}"
 
-pub fn ensure_clang_resource_dir() -> str:
+fn ensure_clang_resource_dir() -> str:
     let root = ecr_cache_root()
     let include_dir = root ++ "/include"
     let stamp = root ++ "/.with-resource-ready"
@@ -73,7 +73,7 @@ pub fn ensure_clang_resource_dir() -> str:
     let _stamp = with_fs_write_file(stamp, "ok\n")
     root
 
-pub fn ensure_clang_resource_identity_file() -> str:
+fn ensure_clang_resource_identity_file() -> str:
     let root = ensure_clang_resource_dir()
     if root.len() == 0:
         return ""

@@ -22,13 +22,13 @@ extern fn with_sysinfo_arch() -> str
 
 var target_spec_active: i32 = 0
 
-pub fn target_spec_set_active(kind: i32) -> Unit:
+fn target_spec_set_active(kind: i32) -> Unit:
     target_spec_active = kind
 
-pub fn target_spec_active_kind() -> i32:
+fn target_spec_active_kind() -> i32:
     target_spec_active
 
-pub fn target_spec_is_native() -> bool:
+fn target_spec_is_native() -> bool:
     if target_spec_active == 0:
         return true
     target_spec_active == target_spec_host_kind()
@@ -36,24 +36,24 @@ pub fn target_spec_is_native() -> bool:
 // True for both WebAssembly kinds; the wasm-specific branches in the
 // link stage, the entry wrapper, and the runtime object selection key
 // on this rather than on a kind number.
-pub fn target_spec_is_wasm() -> bool:
+fn target_spec_is_wasm() -> bool:
     target_spec_active == 7 or target_spec_active == 8
 
 // Bytes in a pointer on the active target. Every host today is 64-bit;
 // wasm32 is the one 32-bit target.
-pub fn target_spec_ptr_bytes() -> i64:
+fn target_spec_ptr_bytes() -> i64:
     if target_spec_active == 7: 4 else: 8
 
 // D114: bytes in `isize`/`usize`, the target's size width (C's size_t and
 // ptrdiff_t). It equals the pointer width on every target today and is kept
 // apart from it, as C keeps size_t apart from uintptr_t.
-pub fn target_spec_size_bytes() -> i64:
+fn target_spec_size_bytes() -> i64:
     if target_spec_active == 7: 4 else: 8
 
 // Host kind in the shared 0-8 numbering. Mirrors
 // build_graph_host_target_kind (BuildGraphKinds.w); kept extern-only
 // here so TargetSpec stays import-free for early pipeline stages.
-pub fn target_spec_host_kind() -> i32:
+fn target_spec_host_kind() -> i32:
     let os = with_sysinfo_os()
     let arch = with_sysinfo_arch()
     if os == "Macos":
@@ -74,7 +74,7 @@ pub fn target_spec_host_kind() -> i32:
     0
 
 // Resolved target OS in host-sysinfo spelling: "Macos"/"Linux"/"Windows"/"Wasi".
-pub fn target_spec_os() -> str:
+fn target_spec_os() -> str:
     let kind = target_spec_active
     if kind == 1 or kind == 2:
         return "Linux"
@@ -89,11 +89,11 @@ pub fn target_spec_os() -> str:
 // The variants of std.os's OsKind and ArchKind, one per target the compiler
 // has and no other (§17.5): the names a module-level `comptime match` on
 // `Target.os` or `Target.arch` must cover.
-pub fn target_spec_os_kinds() -> List[str]: ["Macos", "Linux", "Windows", "Wasi"]
-pub fn target_spec_arch_kinds() -> List[str]: ["Aarch64", "X86_64", "Wasm32", "Wasm64"]
+fn target_spec_os_kinds() -> List[str]: ["Macos", "Linux", "Windows", "Wasi"]
+fn target_spec_arch_kinds() -> List[str]: ["Aarch64", "X86_64", "Wasm32", "Wasm64"]
 
 // The active target's ArchKind variant.
-pub fn target_spec_arch_kind() -> str:
+fn target_spec_arch_kind() -> str:
     let a = target_spec_arch()
     if a == "aarch64": return "Aarch64"
     if a == "x86_64" or a == "amd64": return "X86_64"
@@ -104,7 +104,7 @@ pub fn target_spec_arch_kind() -> str:
 // Resolved target arch. Cross targets and the host now share one canonical
 // spelling ("x86_64"/"aarch64"/"wasm32"/"wasm64"), so a native target
 // returns exactly what the host sysinfo reports.
-pub fn target_spec_arch() -> str:
+fn target_spec_arch() -> str:
     let kind = target_spec_active
     if kind == 1 or kind == 3 or kind == 5:
         return "x86_64"
@@ -118,7 +118,7 @@ pub fn target_spec_arch() -> str:
 
 // LLVM triple for the active target; "" means "use the host default"
 // (llvm_object_triple keeps its historical host behavior for that).
-pub fn target_spec_llvm_triple() -> str:
+fn target_spec_llvm_triple() -> str:
     let kind = target_spec_active
     if kind == 1:
         return "x86_64-unknown-linux-gnu"
@@ -142,10 +142,10 @@ pub fn target_spec_llvm_triple() -> str:
 // The active target's name; "native" for kind 0 (a native build names no
 // platform). A .wo bundle is keyed by the platform it was compiled for, so
 // its manifest and fingerprint spell the resolved name instead.
-pub fn target_spec_name() -> str:
+fn target_spec_name() -> str:
     target_spec_kind_name(target_spec_active)
 
-pub fn target_spec_resolved_name() -> str:
+fn target_spec_resolved_name() -> str:
     target_spec_kind_name(if target_spec_active == 0: target_spec_host_kind() else: target_spec_active)
 
 fn target_spec_kind_name(kind: i32) -> str:
@@ -172,5 +172,5 @@ fn target_spec_kind_name(kind: i32) -> str:
 // non-native must fail loudly (§18.5: never fall back to native).
 // wasm64 (kind 8) is modeled but has no runtime yet (rt/wasm.w is the
 // wasm32 flavour), so it stays refused here rather than failing later.
-pub fn target_spec_cross_supported(kind: i32) -> bool:
+fn target_spec_cross_supported(kind: i32) -> bool:
     kind == 1 or kind == 2 or kind == 5 or kind == 6 or kind == 7

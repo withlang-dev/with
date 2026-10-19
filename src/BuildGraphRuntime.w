@@ -40,108 +40,108 @@ extern fn wl_assemble_to_object(source_path: &str, output_path: &str) -> i32
 extern fn wl_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple: &str) -> i32
 extern fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32
 
-pub fn build_graph_rt_exec_argv(args: &str) -> i32:
+fn build_graph_rt_exec_argv(args: &str) -> i32:
     with_exec_argv(args)
 
-pub fn build_graph_rt_arg_at(idx: i32) -> str:
+fn build_graph_rt_arg_at(idx: i32) -> str:
     with_arg_at(idx)
 
-pub fn build_graph_rt_exec_binary(path: &str) -> i32:
+fn build_graph_rt_exec_binary(path: &str) -> i32:
     with_exec_binary(path)
 
-pub fn build_graph_rt_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32:
+fn build_graph_rt_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32:
     with_exec_argv_capture(args, stdout_path, stderr_path, timeout_ms)
 
-pub fn build_graph_rt_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32:
+fn build_graph_rt_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32:
     with_exec_argv_capture_cwd(args, stdout_path, stderr_path, timeout_ms, cwd)
 
-pub fn build_graph_rt_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32:
+fn build_graph_rt_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32:
     with_exec_argv_capture_spawn(args, stdout_path, stderr_path)
 
-pub fn build_graph_rt_child_maxrss() -> i64: with_exec_child_maxrss()
+fn build_graph_rt_child_maxrss() -> i64: with_exec_child_maxrss()
 
-pub fn build_graph_rt_self_maxrss() -> i64: with_self_maxrss()
+fn build_graph_rt_self_maxrss() -> i64: with_self_maxrss()
 
-pub fn build_graph_rt_exec_wait(pid: i32, timeout_ms: i32) -> i32:
+fn build_graph_rt_exec_wait(pid: i32, timeout_ms: i32) -> i32:
     with_exec_wait(pid, timeout_ms)
 
 // #921: nonblocking reap probe — -2 while the child still runs.
-pub fn build_graph_rt_exec_try_wait(pid: i32) -> i32:
+fn build_graph_rt_exec_try_wait(pid: i32) -> i32:
     with_exec_try_wait(pid)
 
-pub fn build_graph_rt_usleep(usecs: i32) -> i32: with_usleep(usecs)
+fn build_graph_rt_usleep(usecs: i32) -> i32: with_usleep(usecs)
 
-pub fn build_graph_rt_getenv(name: &str) -> str:
+fn build_graph_rt_getenv(name: &str) -> str:
     with_getenv_str(name)
 
-pub fn build_graph_rt_setenv(name: &str, value: &str) -> i32:
+fn build_graph_rt_setenv(name: &str, value: &str) -> i32:
     with_setenv_str(name, value)
 
-pub fn build_graph_rt_file_exists(path: &str) -> i32:
+fn build_graph_rt_file_exists(path: &str) -> i32:
     with_fs_file_exists(path)
 
-pub fn build_graph_rt_file_mode(path: &str) -> i32:
+fn build_graph_rt_file_mode(path: &str) -> i32:
     with_fs_file_mode(path)
 
-pub fn build_graph_rt_is_dir(path: &str) -> i32:
+fn build_graph_rt_is_dir(path: &str) -> i32:
     with_fs_is_dir(path)
 
-pub fn build_graph_rt_mkdir_p(path: &str) -> i32:
+fn build_graph_rt_mkdir_p(path: &str) -> i32:
     with_fs_mkdir_p(path)
 
-pub fn build_graph_rt_read_file(path: &str) -> str:
+fn build_graph_rt_read_file(path: &str) -> str:
     with_fs_read_file(path)
 
 // The file's text with the OS status (0, or the negated errno) — the read a
 // graph operation must not confuse with an empty file (#953).
-pub fn build_graph_rt_read_file_status(path: &str, status: *mut i32) -> str:
+fn build_graph_rt_read_file_status(path: &str, status: *mut i32) -> str:
     with_fs_read_file_status(path, status)
 
-pub fn build_graph_rt_readlink(path: &str) -> str:
+fn build_graph_rt_readlink(path: &str) -> str:
     with_fs_readlink(path)
 
-pub fn build_graph_rt_remove_file(path: &str) -> i32:
+fn build_graph_rt_remove_file(path: &str) -> i32:
     with_fs_remove_file(path)
 
-pub fn build_graph_rt_remove_dir(path: &str) -> i32:
+fn build_graph_rt_remove_dir(path: &str) -> i32:
     with_fs_remove_dir(path)
 
-pub fn build_graph_rt_remove_tree(path: &str) -> i32:
+fn build_graph_rt_remove_tree(path: &str) -> i32:
     with_fs_remove_tree(path)
 
 // Recursive copy: a file with its mode, a directory with its entries.
-pub fn build_graph_rt_copy_tree(src: &str, dst: &str) -> i32:
+fn build_graph_rt_copy_tree(src: &str, dst: &str) -> i32:
     with_fs_copy_tree(src, dst)
 
 // Wall-clock seconds since the epoch.
-pub fn build_graph_rt_time_now() -> i64: with_time_now()
+fn build_graph_rt_time_now() -> i64: with_time_now()
 
-pub fn build_graph_rt_list_files(path: &str) -> str:
+fn build_graph_rt_list_files(path: &str) -> str:
     with_fs_list_files(path)
 
 // The entries of one directory, names only, no descent.
-pub fn build_graph_rt_list_dir(path: &str) -> str:
+fn build_graph_rt_list_dir(path: &str) -> str:
     with_fs_list_dir(path)
 
-pub fn build_graph_rt_rename_file(old_path: &str, new_path: &str) -> i32:
+fn build_graph_rt_rename_file(old_path: &str, new_path: &str) -> i32:
     with_fs_rename_file(old_path, new_path)
 
-pub fn build_graph_rt_write_file(path: &str, data: &str) -> i32:
+fn build_graph_rt_write_file(path: &str, data: &str) -> i32:
     with_fs_write_file(path, data)
 
-pub fn build_graph_rt_assemble_to_object(source_path: &str, output_path: &str) -> i32:
+fn build_graph_rt_assemble_to_object(source_path: &str, output_path: &str) -> i32:
     wl_assemble_to_object(source_path, output_path)
 
-pub fn build_graph_rt_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple: &str) -> i32:
+fn build_graph_rt_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple: &str) -> i32:
     wl_assemble_to_object_for_triple(source_path, output_path, triple)
 
-pub fn build_graph_rt_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
+fn build_graph_rt_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
     wl_compile_ir_to_object(source_path, output_path)
 
-pub fn build_graph_rt_chmod(path: &str, mode: i32) -> i32:
+fn build_graph_rt_chmod(path: &str, mode: i32) -> i32:
     with_fs_chmod(path, mode)
 
-pub fn build_graph_rt_getpid() -> i32:
+fn build_graph_rt_getpid() -> i32:
     with_getpid()
 
 // Same out-param layout with_sysinfo fills for codegen units.
@@ -152,19 +152,19 @@ type BuildGraphSysInfo {
 }
 extern fn with_sysinfo(out: *mut u8) -> i32
 
-pub fn build_graph_rt_cpu_cores() -> i32:
+fn build_graph_rt_cpu_cores() -> i32:
     var info = BuildGraphSysInfo { cpu_cores: 0, memory_total: 0, page_size: 0 }
     let _ = with_sysinfo(&info as *mut u8)
     info.cpu_cores
 
-pub fn build_graph_rt_clock_nanos() -> i64:
+fn build_graph_rt_clock_nanos() -> i64:
     with_clock_nanos()
 
-pub fn build_graph_rt_write(s: &str):
+fn build_graph_rt_write(s: &str):
     with_write(s)
 
-pub fn build_graph_rt_eprint(s: &str):
+fn build_graph_rt_eprint(s: &str):
     with_eprint(s)
 
 // This process's id (unique temp names for the install kind).
-pub fn build_graph_rt_pid() -> i32: with_getpid()
+fn build_graph_rt_pid() -> i32: with_getpid()

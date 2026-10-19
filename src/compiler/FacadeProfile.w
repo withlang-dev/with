@@ -35,7 +35,7 @@ use compiler.FacadeRender
 extern fn with_str_clone_ref(s: &str) -> str
 
 // `*` matches any run of characters; everything else matches itself.
-pub fn facade_profile_glob(pattern: &str, name: &str) -> bool:
+fn facade_profile_glob(pattern: &str, name: &str) -> bool:
     facade_profile_glob_at(pattern, 0, name, 0)
 
 fn facade_profile_glob_at(pattern: &str, pi: i32, name: &str, ni: i32) -> bool:
@@ -52,7 +52,7 @@ fn facade_profile_glob_at(pattern: &str, pi: i32, name: &str, ni: i32) -> bool:
     facade_profile_glob_at(pattern, pi + 1, name, ni + 1)
 
 // The `c convention` block named `dotted`, or 0.
-pub fn facade_profile_find(pool: &AstPool, intern: &InternPool, dotted: &str) -> i32:
+fn facade_profile_find(pool: &AstPool, intern: &InternPool, dotted: &str) -> i32:
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_C_CONVENTION: continue
@@ -60,7 +60,7 @@ pub fn facade_profile_find(pool: &AstPool, intern: &InternPool, dotted: &str) ->
         if have == dotted: return decl as i32
     0
 
-pub fn facade_profile_dotted(pool: &AstPool, intern: &InternPool, item: i32) -> str:
+fn facade_profile_dotted(pool: &AstPool, intern: &InternPool, item: i32) -> str:
     let start = pool.get_data0(item as NodeId)
     var dotted = ""
     for i in 0..pool.get_data1(item as NodeId):
@@ -176,7 +176,7 @@ fn facade_profile_append_extras(pool: &AstPool, node: i32, head_start: i32, head
 
 // Applies `profile` to `facade` for its `use convention` item `at`: states
 // every uniquely matched rule and records every outcome on the item.
-pub fn facade_profile_apply(pool: AstPool, intern: &InternPool, ci: &List[i32], facade: i32, at: i32, profile: i32) -> AstPool:
+fn facade_profile_apply(pool: AstPool, intern: &InternPool, ci: &List[i32], facade: i32, at: i32, profile: i32) -> AstPool:
     var p = pool
     let records: List[i32] = List.new()
     let (names, decls) = facade_profile_imported_fns(p, intern, ci)

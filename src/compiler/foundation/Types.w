@@ -7,22 +7,22 @@ extern fn with_str_clone_ref(s: &str) -> str
 
 // (int_to_string removed — using f-strings)
 
-pub fn TYPE_KEY_INVALID -> i32: 0
-pub fn TYPE_KEY_NAMED -> i32: 1
-pub fn TYPE_KEY_PTR -> i32: 2
-pub fn TYPE_KEY_SLICE -> i32: 3
-pub fn TYPE_KEY_ARRAY -> i32: 4
-pub fn TYPE_KEY_TUPLE2 -> i32: 5
-pub fn TYPE_KEY_OPTIONAL -> i32: 6
-pub fn TYPE_KEY_RESULT2 -> i32: 7
-pub fn TYPE_KEY_REF -> i32: 8
-pub fn TYPE_KEY_FN_SIG -> i32: 9
-pub fn TYPE_KEY_TRAIT_OBJECT -> i32: 10
-pub fn TYPE_KEY_GENERIC_PARAM -> i32: 11
-pub fn TYPE_KEY_GENERIC_APPLY2 -> i32: 12
-pub fn TYPE_KEY_TUPLEN -> i32: 13
+fn TYPE_KEY_INVALID -> i32: 0
+fn TYPE_KEY_NAMED -> i32: 1
+fn TYPE_KEY_PTR -> i32: 2
+fn TYPE_KEY_SLICE -> i32: 3
+fn TYPE_KEY_ARRAY -> i32: 4
+fn TYPE_KEY_TUPLE2 -> i32: 5
+fn TYPE_KEY_OPTIONAL -> i32: 6
+fn TYPE_KEY_RESULT2 -> i32: 7
+fn TYPE_KEY_REF -> i32: 8
+fn TYPE_KEY_FN_SIG -> i32: 9
+fn TYPE_KEY_TRAIT_OBJECT -> i32: 10
+fn TYPE_KEY_GENERIC_PARAM -> i32: 11
+fn TYPE_KEY_GENERIC_APPLY2 -> i32: 12
+fn TYPE_KEY_TUPLEN -> i32: 13
 
-pub type TypeKey {
+type TypeKey {
     tag: i32,
     name: str,
     arg0: i32,
@@ -31,7 +31,7 @@ pub type TypeKey {
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
-pub fn type_key_invalid -> TypeKey:
+fn type_key_invalid -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_INVALID(),
         name: "",
@@ -40,7 +40,7 @@ pub fn type_key_invalid -> TypeKey:
         flags: 0,
     }
 
-pub fn type_key_named(name: &str) -> TypeKey:
+fn type_key_named(name: &str) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_NAMED(),
         name: with_str_clone_ref(name),
@@ -49,7 +49,7 @@ pub fn type_key_named(name: &str) -> TypeKey:
         flags: 0,
     }
 
-pub fn type_key_ptr(inner: TypeId, is_mut: bool) -> TypeKey:
+fn type_key_ptr(inner: TypeId, is_mut: bool) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_PTR(),
         name: "",
@@ -58,7 +58,7 @@ pub fn type_key_ptr(inner: TypeId, is_mut: bool) -> TypeKey:
         flags: if is_mut: 1 else: 0,
     }
 
-pub fn type_key_ref(inner: TypeId, is_mut: bool) -> TypeKey:
+fn type_key_ref(inner: TypeId, is_mut: bool) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_REF(),
         name: "",
@@ -67,7 +67,7 @@ pub fn type_key_ref(inner: TypeId, is_mut: bool) -> TypeKey:
         flags: if is_mut: 1 else: 0,
     }
 
-pub fn type_key_slice(inner: TypeId) -> TypeKey:
+fn type_key_slice(inner: TypeId) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_SLICE(),
         name: "",
@@ -76,7 +76,7 @@ pub fn type_key_slice(inner: TypeId) -> TypeKey:
         flags: 0,
     }
 
-pub fn type_key_array(inner: TypeId, count: i32) -> TypeKey:
+fn type_key_array(inner: TypeId, count: i32) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_ARRAY(),
         name: "",
@@ -85,7 +85,7 @@ pub fn type_key_array(inner: TypeId, count: i32) -> TypeKey:
         flags: 0,
     }
 
-pub fn type_key_tuple2(a: TypeId, b: TypeId) -> TypeKey:
+fn type_key_tuple2(a: TypeId, b: TypeId) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_TUPLE2(),
         name: "",
@@ -94,7 +94,7 @@ pub fn type_key_tuple2(a: TypeId, b: TypeId) -> TypeKey:
         flags: 0,
     }
 
-pub fn type_key_optional(inner: TypeId) -> TypeKey:
+fn type_key_optional(inner: TypeId) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_OPTIONAL(),
         name: "",
@@ -103,7 +103,7 @@ pub fn type_key_optional(inner: TypeId) -> TypeKey:
         flags: 0,
     }
 
-pub fn type_key_result2(ok_ty: TypeId, err_ty: TypeId) -> TypeKey:
+fn type_key_result2(ok_ty: TypeId, err_ty: TypeId) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_RESULT2(),
         name: "",
@@ -112,16 +112,16 @@ pub fn type_key_result2(ok_ty: TypeId, err_ty: TypeId) -> TypeKey:
         flags: 0,
     }
 
-pub fn type_key_pack1(a: TypeId) -> str:
+fn type_key_pack1(a: TypeId) -> str:
     f"{type_id_raw(a)}"
 
-pub fn type_key_pack2(a: TypeId, b: TypeId) -> str:
+fn type_key_pack2(a: TypeId, b: TypeId) -> str:
     f"{type_id_raw(a)},{type_id_raw(b)}"
 
-pub fn type_key_pack3(a: TypeId, b: TypeId, c: TypeId) -> str:
+fn type_key_pack3(a: TypeId, b: TypeId, c: TypeId) -> str:
     f"{type_id_raw(a)},{type_id_raw(b)},{type_id_raw(c)}"
 
-pub fn type_key_tuplen(elem_pack: &str, count: i32) -> TypeKey:
+fn type_key_tuplen(elem_pack: &str, count: i32) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_TUPLEN(),
         name: with_str_clone_ref(elem_pack),
@@ -130,7 +130,7 @@ pub fn type_key_tuplen(elem_pack: &str, count: i32) -> TypeKey:
         flags: 0,
     }
 
-pub fn type_key_fn_sig(param_pack: &str, ret: TypeId, arity: i32, is_variadic: bool) -> TypeKey:
+fn type_key_fn_sig(param_pack: &str, ret: TypeId, arity: i32, is_variadic: bool) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_FN_SIG(),
         name: with_str_clone_ref(param_pack),
@@ -139,7 +139,7 @@ pub fn type_key_fn_sig(param_pack: &str, ret: TypeId, arity: i32, is_variadic: b
         flags: if is_variadic: 1 else: 0,
     }
 
-pub fn type_key_trait_object(trait_name: &str) -> TypeKey:
+fn type_key_trait_object(trait_name: &str) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_TRAIT_OBJECT(),
         name: with_str_clone_ref(trait_name),
@@ -148,7 +148,7 @@ pub fn type_key_trait_object(trait_name: &str) -> TypeKey:
         flags: 0,
     }
 
-pub fn type_key_generic_param(param_name: &str, index: i32) -> TypeKey:
+fn type_key_generic_param(param_name: &str, index: i32) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_GENERIC_PARAM(),
         name: with_str_clone_ref(param_name),
@@ -157,7 +157,7 @@ pub fn type_key_generic_param(param_name: &str, index: i32) -> TypeKey:
         flags: 0,
     }
 
-pub fn type_key_generic_apply2(base_name: &str, a0: TypeId, a1: TypeId, arg_count: i32) -> TypeKey:
+fn type_key_generic_apply2(base_name: &str, a0: TypeId, a1: TypeId, arg_count: i32) -> TypeKey:
     TypeKey {
         tag: TYPE_KEY_GENERIC_APPLY2(),
         name: with_str_clone_ref(base_name),
@@ -166,7 +166,7 @@ pub fn type_key_generic_apply2(base_name: &str, a0: TypeId, a1: TypeId, arg_coun
         flags: arg_count,
     }
 
-pub fn type_key_to_string(key: &TypeKey) -> str:
+fn type_key_to_string(key: &TypeKey) -> str:
     if key.tag == TYPE_KEY_NAMED():
         return f"named:{key.name}"
     if key.tag == TYPE_KEY_PTR():
@@ -196,5 +196,5 @@ pub fn type_key_to_string(key: &TypeKey) -> str:
     "invalid"
 
 // #747: explicit owned copy — TypeKey's name is an owned str now.
-pub fn type_key_clone(key: &TypeKey) -> TypeKey:
+fn type_key_clone(key: &TypeKey) -> TypeKey:
     TypeKey { tag: key.tag, name: with_str_clone_ref(key.name), arg0: key.arg0, arg1: key.arg1, flags: key.flags }

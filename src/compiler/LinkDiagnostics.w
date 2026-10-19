@@ -6,7 +6,7 @@ fn link_diagnostic_name_byte(ch: i32):
 
 // Read the linker's verdict instead of duplicating its search algorithm.
 // This preserves -L, sysroots, linker scripts, and static/shared selection.
-pub fn link_missing_libraries(diagnostics: &str) -> List[str]:
+fn link_missing_libraries(diagnostics: &str) -> List[str]:
     let missing: List[str] = List.new()
     for line in diagnostics.split("\n"):
         for marker in ["unable to find library -l", "cannot find -l"]:
@@ -43,7 +43,7 @@ fn link_debian_library_package(name: &str) -> str:
         "sqlite3" => "libsqlite3-dev"
         _ => ""
 
-pub fn link_missing_library_help(diagnostics: &str) -> str:
+fn link_missing_library_help(diagnostics: &str) -> str:
     let missing = link_missing_libraries(diagnostics)
     if missing.len() == 0: return ""
     var help = "error: required link libraries are unavailable:\n"
@@ -66,7 +66,7 @@ pub fn link_missing_library_help(diagnostics: &str) -> str:
         help = help ++ "\n"
     help
 
-pub fn link_run_with_diagnostics(argv: &str, cwd: &str) -> i32:
+fn link_run_with_diagnostics(argv: &str, cwd: &str) -> i32:
     let temp = runtime_temp_dir()
     if temp.len() == 0:
         runtime_eprint("error: no temporary directory configured for linker diagnostics (set TMP or TEMP)")

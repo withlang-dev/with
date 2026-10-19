@@ -596,7 +596,7 @@ fn contract_collect_conventions(report: &AnalysisReport, sema: &Sema, source_pat
             else:
                 contract_row(report, sema, &site, subject, CONTRACT_CONVENTION, recs[m], rule, 0, -1, "rule", f"{rname} ({template}) matched nothing" ++ (if subject_node != 0 and not sema.facade_rule_is_fn(rule): " for " ++ what else: ""), prov)
 
-pub fn analysis_collect_foreign_contracts(report: &AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
+fn analysis_collect_foreign_contracts(report: &AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     for di in 0..sema.facade_domain_list.len():
         contract_collect_domain(report, sema, di as i32, source_path, source_text)
     for ri in 0..sema.facade_resources.len():
@@ -640,7 +640,7 @@ fn contract_name_resembles_destroyer(name: &str) -> str:
 
 fn contract_where(site: &ContractSite, sema: &Sema, node: i32) -> str: f"{site.path}:{contract_node_line(sema, site, node)}"
 
-pub fn analysis_audit_contract(report: &AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
+fn analysis_audit_contract(report: &AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     var advisories = 0
     for ri in 0..sema.facade_resources.len():
         let r = &sema.facade_resources[ri]
@@ -800,7 +800,7 @@ pub fn analysis_audit_contract(report: &AnalysisReport, sema: &Sema, source_path
 // its fact rows indented beneath it. What a reader sees is exactly the row
 // text a `select:kind=foreign-contract` query returns.
 
-pub fn contract_view_render(report: &AnalysisReport) -> str:
+fn contract_view_render(report: &AnalysisReport) -> str:
     let lines: List[str] = List.new()
     lines.push("foreign-contract view\tv1\n")
     var subjects = 0

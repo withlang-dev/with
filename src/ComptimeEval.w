@@ -338,7 +338,7 @@ type ComptimeEvaluator {
     pending_diag: Diagnostic,
 }
 
-pub type ComptimeEvalResult {
+type ComptimeEvalResult {
     value: ComptimeValue,
     extras: List[ComptimeValue],
     error_msg: str,
@@ -473,7 +473,7 @@ fn comptime_hex_digit_value(ch: i32) -> i32:
 // strings (#2043) read it too. Decoding never grows the input, so one
 // buffer of the payload's length holds it (a part per byte was a string
 // per byte of an embedded source literal).
-pub fn comptime_decode_string_escapes(text: &str) -> str:
+fn comptime_decode_string_escapes(text: &str) -> str:
     let raw_prefix = "\x01raw\x01"
     if text.starts_with(raw_prefix):
         return text.slice(raw_prefix.len(), text.len())
@@ -1542,7 +1542,7 @@ unsafe fn comptime_plan_deserialize(plan_out: *mut ComptimeWorkspaceCompilePlan,
     0
 
 // Child entry for `with __workspace-compile <plan> <result>` (D24, #729).
-pub fn comptime_workspace_compile_subprocess(plan_path: &str, result_path: &str) -> i32:
+fn comptime_workspace_compile_subprocess(plan_path: &str, result_path: &str) -> i32:
     let text = with_fs_read_file(plan_path)
     if text.len() == 0:
         with_eprint("error: __workspace-compile: missing or empty plan file: " ++ plan_path)
@@ -1666,29 +1666,29 @@ unsafe fn comptime_take_sema(sema_ptr: *mut Sema, ast: &AstPool) -> Sema:
     taken.ast = ast.clone()
     taken
 
-pub unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeEvalResult:
+unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeEvalResult:
     var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 0)
     let value = evaluator.eval_root(node)
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-pub unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeEvalResult:
+unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeEvalResult:
     var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 1)
     let value = evaluator.eval_root(node)
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-pub unsafe fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeValue:
+unsafe fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeValue:
     var result = comptime_try_eval_expr_result(sema_ptr, ast, pool, node)
     return move result.value
 
-pub unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeValue:
+unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeValue:
     var result = comptime_force_eval_expr_result(sema_ptr, ast, pool, node)
     return move result.value
 
-pub unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, strict_effects: i32, suppress_side_effects: i32) -> ComptimeEvalResult:
+unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, strict_effects: i32, suppress_side_effects: i32) -> ComptimeEvalResult:
     var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 1)
@@ -1715,7 +1715,7 @@ pub unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: &AstPool
             comptime_value_invalid()
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-pub unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: List[str], output: &str, extra_outputs: &List[str], args_values: List[str], write_scopes: &List[str], timeout_ms: i32, cwd: &str, env: List[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
+unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: List[str], output: &str, extra_outputs: &List[str], args_values: List[str], write_scopes: &List[str], timeout_ms: i32, cwd: &str, env: List[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
     var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 1)

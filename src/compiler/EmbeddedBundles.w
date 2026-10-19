@@ -16,17 +16,17 @@ use compiler.EmbeddedBundlesData
 use TargetSpec
 extern fn with_str_clone_ref(s: &str) -> str
 
-pub fn embedded_bundle_count() -> i32:
+fn embedded_bundle_count() -> i32:
     embedded_bundles_count_data()
 
-pub fn embedded_bundle_name(index: i32) -> str:
+fn embedded_bundle_name(index: i32) -> str:
     embedded_bundles_name_data(index)
 // The target a slot's bundle was built for: "" is this compiler's own, a
 // platform name (`wasm32`) is a second target this binary carries beside
 // it (#2131). A bundle is consulted only for the target being compiled.
-pub fn embedded_bundle_target(index: i32) -> str:
+fn embedded_bundle_target(index: i32) -> str:
     embedded_bundles_target_data(index)
-pub fn embedded_bundle_for_this_target(index: i32) -> bool:
+fn embedded_bundle_for_this_target(index: i32) -> bool:
     let target = embedded_bundle_target(index)
     if target.len() == 0: target_spec_is_native() else: target == target_spec_resolved_name()
 
@@ -43,21 +43,21 @@ fn embedded_blob_view(start: i64, end: i64) -> str:
         *((sp + 8u64) as *mut i64) = len
     out
 
-pub fn embedded_bundle_manifest_text(index: i32) -> str:
+fn embedded_bundle_manifest_text(index: i32) -> str:
     embedded_blob_view(embedded_bundles_manifest_start_data(index), embedded_bundles_manifest_end_data(index))
 
-pub fn embedded_bundle_interface_text(index: i32) -> str:
+fn embedded_bundle_interface_text(index: i32) -> str:
     embedded_blob_view(embedded_bundles_interface_start_data(index), embedded_bundles_interface_end_data(index))
 
 // A named slot this binary fills: its manifest blob has content.
-pub fn embedded_bundle_present(index: i32) -> bool:
+fn embedded_bundle_present(index: i32) -> bool:
     embedded_bundle_manifest_text(index).len() > 0
 
 // The module link-name prefixes (`__with_mod_<hash>__`) a manifest lists —
 // its `prefix <p> <path>` lines. Codegen emits declarations only for
 // functions whose module carries one of these; the link stage selects the
 // bundle when an undefined symbol does.
-pub fn bundle_manifest_prefixes(manifest: &str) -> List[str]:
+fn bundle_manifest_prefixes(manifest: &str) -> List[str]:
     let out: List[str] = List.new()
     var start: i64 = 0
     while start < manifest.len():
@@ -77,7 +77,7 @@ pub fn bundle_manifest_prefixes(manifest: &str) -> List[str]:
 
 // The canonical module paths a manifest lists — the `<path>` of its
 // `prefix <p> <path>` lines.
-pub fn bundle_manifest_paths(manifest: &str) -> List[str]:
+fn bundle_manifest_paths(manifest: &str) -> List[str]:
     let out: List[str] = List.new()
     var start: i64 = 0
     while start < manifest.len():
@@ -96,7 +96,7 @@ pub fn bundle_manifest_paths(manifest: &str) -> List[str]:
     out
 
 // Every prefix any embedded bundle for the active target provides.
-pub fn embedded_bundle_prefixes() -> List[str]:
+fn embedded_bundle_prefixes() -> List[str]:
     let out: List[str] = List.new()
     for bi in 0..embedded_bundle_count():
         if not embedded_bundle_present(bi):
@@ -109,14 +109,14 @@ pub fn embedded_bundle_prefixes() -> List[str]:
     out
 
 // Blob address pairs; the link stage turns them into byte slices.
-pub fn embedded_bundle_manifest_start(index: i32) -> i64:
+fn embedded_bundle_manifest_start(index: i32) -> i64:
     embedded_bundles_manifest_start_data(index)
 
-pub fn embedded_bundle_manifest_end(index: i32) -> i64:
+fn embedded_bundle_manifest_end(index: i32) -> i64:
     embedded_bundles_manifest_end_data(index)
 
-pub fn embedded_bundle_object_start(index: i32) -> i64:
+fn embedded_bundle_object_start(index: i32) -> i64:
     embedded_bundles_object_start_data(index)
 
-pub fn embedded_bundle_object_end(index: i32) -> i64:
+fn embedded_bundle_object_end(index: i32) -> i64:
     embedded_bundles_object_end_data(index)

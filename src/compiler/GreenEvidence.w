@@ -40,7 +40,7 @@ fn green_first_line(text: &str) -> str:
 /// ls-tree HEAD:benchmarks`) with the goose entry left out.
 /// build/retention.w applies the same rule; the two must agree byte for
 /// byte.
-pub fn green_identity_inputs(top_level: &str, bench_level: &str) -> str:
+fn green_identity_inputs(top_level: &str, bench_level: &str) -> str:
     var kept = ""
     for line in top_level.split("\n"):
         if line.len() == 0: continue
@@ -84,7 +84,7 @@ fn green_inputs_identity(root: &str) -> str:
 /// install 2026-10-04; an untracked benchmarks/goose/ refused its reseed
 /// 2026-10-13) — or a user's own untracked program under examples/. A
 /// rename is judged an input: its line names two paths.
-pub fn green_status_is_not_input(status_line: &str) -> bool:
+fn green_status_is_not_input(status_line: &str) -> bool:
     if status_line.len() < 4 or status_line.contains(" -> "): return false
     let path = status_line.slice(3, status_line.len())
     if path.starts_with("docs/") or path == "benchmarks/goose" or path.starts_with("benchmarks/goose/") or (path.ends_with(".md") and not path.contains("/")): return true
@@ -104,7 +104,7 @@ fn green_worktree_is_clean(root: &str) -> bool:
 /// The commit at which the sources under `root` were recorded green, or "":
 /// the worktree is clean, its stage chain was seeded by a compiler seed.lock
 /// pins, and the store has a green for this tree, that seed and this host.
-pub fn green_by_source_identity(root: &str) -> str:
+fn green_by_source_identity(root: &str) -> str:
     let seed_input = runtime_read_file(green_join(root, "out/.build-state/seed-input.json"))
     let marker = "\"sha256\": \""
     let at = seed_input.find(marker)

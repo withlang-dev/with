@@ -6,7 +6,7 @@
 
 // `urls` are the archive's mirrors in the recipe's order; the first is the
 // canonical one, the rest are tried when it does not answer.
-pub type ConanSource { urls: List[str], sha256: str }
+type ConanSource { urls: List[str], sha256: str }
 
 fn cr_unquote(text: &str) -> str:
     let t = text.trim()
@@ -35,7 +35,7 @@ fn cr_version_block(data: &str, section: &str, version: &str) -> List[str]:
         else if in_version: out.push(line.to_owned())
     out
 
-pub fn conan_data_source(data: &str, version: &str) -> ConanSource:
+fn conan_data_source(data: &str, version: &str) -> ConanSource:
     let urls: List[str] = List.new()
     var sha256 = ""
     var in_url_list = false
@@ -54,9 +54,9 @@ pub fn conan_data_source(data: &str, version: &str) -> ConanSource:
 // The archive a build uses: the recipe's mirrors in order, the first that
 // downloads and has the recipe's digest. `path` is "" when none did, and
 // `tried` says what happened to each.
-pub type ConanArchivePick { path: str, tried: str }
+type ConanArchivePick { path: str, tried: str }
 
-pub fn conan_pick_archive(source: &ConanSource, dir: &str, download: fn(&str, &str) -> i32, digest_of: fn(&str) -> str) -> ConanArchivePick:
+fn conan_pick_archive(source: &ConanSource, dir: &str, download: fn(&str, &str) -> i32, digest_of: fn(&str) -> str) -> ConanArchivePick:
     var tried = ""
     for url in source.urls:
         var slash = -1
@@ -78,14 +78,14 @@ pub fn conan_pick_archive(source: &ConanSource, dir: &str, download: fn(&str, &s
 // path components to drop (`strip`). ConanPatch applies at the source root
 // with one component dropped; anything else would land in the wrong place
 // without a word, so it is named. "" when the version's patches need neither.
-pub fn conan_data_patch_problem(data: &str, version: &str) -> str:
+fn conan_data_patch_problem(data: &str, version: &str) -> str:
     for line in cr_version_block(data, "patches", version):
         let entry = if line.starts_with("-"): line.slice(1, line.len()).trim() else: line.trim()
         if entry.starts_with("base_path:") or entry.starts_with("strip:"): return "its patches use `" ++ entry ++ "`, which this build does not apply yet"
     ""
 
 // Paths of the version's patch files, relative to the recipe folder, in order.
-pub fn conan_data_patches(data: &str, version: &str) -> List[str]:
+fn conan_data_patches(data: &str, version: &str) -> List[str]:
     let out: List[str] = List.new()
     for line in cr_version_block(data, "patches", version):
         let at = line.find("patch_file:")

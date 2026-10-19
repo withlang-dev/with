@@ -7,7 +7,7 @@ use DiagnosticRender
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_str_clone_ref(s: &str) -> str
 
-pub enum DiagSeverity: i32:
+enum DiagSeverity: i32:
     Error = 1
     Warning = 2
     Note = 3
@@ -24,7 +24,7 @@ type DiagnosticLabel {
 // Legacy alias kept for existing callers.
 type Label = DiagnosticLabel
 
-pub type Diagnostic {
+type Diagnostic {
     severity: i32,
     code: str,
     message: str,
@@ -160,7 +160,7 @@ impl Diagnostic:
             let help: str = with_str_clone_ref(self.helps[i])
             with_eprint(render_diag_help_line(help))
 
-pub type DiagnosticList {
+type DiagnosticList {
     items: List[Diagnostic],
 }
 

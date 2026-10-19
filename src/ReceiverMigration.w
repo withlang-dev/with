@@ -455,7 +455,7 @@ impl RelocationFacts:
     mut fn reset_matches():
         for i in 0..self.matched.len(): self.matched[i] = 0
 
-pub fn run_receiver_migration -> i32:
+fn run_receiver_migration -> i32:
     let argv = args()
     if argv.len() < 2:
         print("usage: with migrate-receivers [--report|--list|--apply] [--exclude path ...] <entry.w>")

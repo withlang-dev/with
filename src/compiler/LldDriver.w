@@ -34,13 +34,13 @@ extern fn with_llvm_errs() -> *mut u8
 
 // Whether this compiler links lld's `flavor` driver: an SDK without that
 // archive leaves the name aliased to a stand-in that must never be called.
-pub fn lld_flavor_linked(flavor: &str) -> bool:
+fn lld_flavor_linked(flavor: &str) -> bool:
     for linked in embedded_lld_flavors().split(" "):
         if linked == flavor: return true
     false
 
 // The lld flavor of a native link on this host.
-pub fn lld_host_flavor() -> str:
+fn lld_host_flavor() -> str:
     let os = runtime_sysinfo_os()
     if os == "Macos": "macho" else if os == "Windows": "coff" else: "elf"
 
@@ -74,7 +74,7 @@ unsafe fn ld_c_string(s: &str) -> *mut u8:
 
 // Runs lld's `flavor` driver over `args` (args[0] is the tool name) in this
 // process; 0 when the link succeeded. lld prints its own diagnostics.
-pub fn lld_link(flavor: &str, args: &List[str]) -> i32:
+fn lld_link(flavor: &str, args: &List[str]) -> i32:
     if not lld_flavor_linked(flavor):
         runtime_eprint("error: this build of `with` has no " ++ lld_tool_name(flavor) ++ " linker: the LLVM SDK it was linked against has no lld " ++ flavor ++ " driver archive")
         return 127
@@ -99,7 +99,7 @@ pub fn lld_link(flavor: &str, args: &List[str]) -> i32:
         if ok: 0 else: 1
 
 // argv[0] is `with`, argv[1] is `__ld`.
-pub fn with_ld_main() -> i32:
+fn with_ld_main() -> i32:
     var first = 2
     var flavor = lld_host_flavor()
     if with_arg_count() > 3 and with_arg_at(2) == "-flavor":
@@ -119,7 +119,7 @@ pub fn with_ld_main() -> i32:
 
 // This executable, to run `with __ld` as a child: argv[0] when it names a
 // path, else argv[0] found on PATH.
-pub fn with_self_exe() -> str:
+fn with_self_exe() -> str:
     let argv0 = with_arg_at(0)
     if argv0.contains("/") or argv0.contains("\\"): return argv0
     let windows = runtime_sysinfo_os() == "Windows"
@@ -132,7 +132,7 @@ pub fn with_self_exe() -> str:
 // Run as one of lld's own tool names (a link named ld64.lld to this binary,
 // the way clang's driver finds its linker, src/compiler/ClangDriver.w), the
 // flavor that name selects; "" for any other name.
-pub fn lld_flavor_for_tool_name(argv0: &str) -> str:
+fn lld_flavor_for_tool_name(argv0: &str) -> str:
     var start = 0
     for i in 0..argv0.len():
         if argv0[i] == '/' or argv0[i] == '\\':
@@ -141,7 +141,7 @@ pub fn lld_flavor_for_tool_name(argv0: &str) -> str:
     if base == "ld64.lld": "macho" else if base == "ld.lld" or base == "ld.lld.exe": "elf" else if base == "lld-link" or base == "lld-link.exe": "coff" else if base == "wasm-ld": "wasm" else: ""
 
 // argv[0] is the tool name; every other argument is lld's.
-pub fn with_ld_tool_main(flavor: &str) -> i32:
+fn with_ld_tool_main(flavor: &str) -> i32:
     let args: List[str] = List.new()
     args.push(lld_tool_name(flavor))
     for i in 1..with_arg_count(): args.push(with_arg_at(i))

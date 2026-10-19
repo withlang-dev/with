@@ -18,7 +18,7 @@ use std.collections.HashMap
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_getenv_str(name: &str) -> str
 
-pub type CompilerAnalysisResult {
+type CompilerAnalysisResult {
     text: str,
     status: i32,
     needs_codegen: bool,
@@ -2610,7 +2610,7 @@ fn analysis_help() -> str:
         "symbol, owner, index, type, effects, flags, source-file, start, end, line,\n" ++
         "column, path, name, and detail.\n"
 
-pub fn compiler_analysis_render(report: &AnalysisReport, request: &str) -> str:
+fn compiler_analysis_render(report: &AnalysisReport, request: &str) -> str:
     if request == "help": return analysis_help()
     if request == "" or request == "facts" or request == "snapshot": return report.render_facts("")
     if request.starts_with("select:"): return report.render_facts(analysis_slice(request, 7, request.len() as i32))
@@ -2644,7 +2644,7 @@ pub fn compiler_analysis_render(report: &AnalysisReport, request: &str) -> str:
     if request.starts_with("lldb:"): return analysis_lldb_recipe(report, analysis_slice(request, 5, request.len() as i32))
     "error: unknown analysis request '" ++ request ++ "'\n"
 
-pub fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str, request: &str, diagnostics: &DiagnosticList) -> CompilerAnalysisResult:
+fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str, request: &str, diagnostics: &DiagnosticList) -> CompilerAnalysisResult:
     let report = AnalysisReport.init()
     analysis_collect_sema(&report, sema, source_path, source_text)
     // The frontend moved the diagnostics out of Sema. Read the current

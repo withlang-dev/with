@@ -2433,7 +2433,7 @@ impl Sema:
             return fn_sym
         target
 
-pub fn facade_clause_name(kind: i32) -> str:
+fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_FROM: return "from"
     if kind == FACADE_CLAUSE_INIT: return "init"
     if kind == FACADE_CLAUSE_PREINIT: return "preinit"
@@ -5420,7 +5420,7 @@ impl Sema:
 // The resource a deprecated `owns: ["ctor -> dtor"]` c_import entry spells
 // (compiler/Frontend.w project_owned_annotations_frontend): the producer's
 // name in UpperCamelCase — `getcwd` → `Getcwd`, `my_buf_new` → `MyBufNew`.
-pub fn facade_owns_resource_name(ctor: &str) -> str:
+fn facade_owns_resource_name(ctor: &str) -> str:
     var out = ""
     var upper = true
     for i in 0..ctor.len():

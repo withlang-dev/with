@@ -17,11 +17,11 @@
 // methods are MathBuiltins' and take every operand. A builtin method called
 // with arguments must resolve to a row; MirLower refuses one that did not.
 
-pub type BuiltinSigRow { owner: str, method: str, params: str }
+type BuiltinSigRow { owner: str, method: str, params: str }
 
 fn sig(owner: str, method: str, params: str) -> BuiltinSigRow: BuiltinSigRow { owner, method, params }
 
-pub fn builtin_sig_table() -> List[BuiltinSigRow]:
+fn builtin_sig_table() -> List[BuiltinSigRow]:
     var t: List[BuiltinSigRow] = List.new()
     t.push(sig("str", "byte_at", "index: i64"))
     t.push(sig("str", "slice", "start: i64, end: i64"))
@@ -156,7 +156,7 @@ fn builtin_param_type_span(params: &str, index: isize) -> (isize, isize):
 // trailing run of `Ordering` parameters, which an Atomic method's caller
 // may omit (§14.17.1, #1861; MirLower materializes each omitted one as
 // SeqCst). Sema refuses a call outside required..=total (#2358).
-pub fn builtin_required_param_count(params: &str) -> i32:
+fn builtin_required_param_count(params: &str) -> i32:
     var total: i32 = 0
     while true:
         let (start, _) = builtin_param_type_span(params, total)
@@ -171,7 +171,7 @@ pub fn builtin_required_param_count(params: &str) -> i32:
 
 // Each parameter's mode as one letter: `o` observed (`&T`), `s` stored
 // (taken as one of the receiver's type parameters `T`, `K`, `V`), `t` taken.
-pub fn builtin_param_modes(params: &str) -> str:
+fn builtin_param_modes(params: &str) -> str:
     var modes = ""
     var index: i32 = 0
     while true:

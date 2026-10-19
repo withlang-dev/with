@@ -97,7 +97,7 @@ type InternPoolState {
     value_map: HashMap[str, i32],
 }
 
-pub type InternPool {
+type InternPool {
     state: *mut InternPoolState,
 }
 

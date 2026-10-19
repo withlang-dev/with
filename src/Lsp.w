@@ -1891,7 +1891,7 @@ fn lsp_extract_position(msg: &str, tokens: *mut JsonToken, params_idx: i32, line
 
 let LSP_MAX_TOKENS: i32 = 256
 
-pub fn run_lsp() -> i32:
+fn run_lsp() -> i32:
     var state = LspState.new()
     let tokens = with_alloc((LSP_MAX_TOKENS * 20) as i64) as *mut JsonToken
 

@@ -21,7 +21,7 @@ type DlltoolArgs { data: *const *mut u8, len: i64 }
 
 extern fn with_dlltool_main(args: DlltoolArgs) -> i32
 
-pub fn with_dlltool_available() -> bool: embedded_dlltool_linked()
+fn with_dlltool_available() -> bool: embedded_dlltool_linked()
 
 unsafe fn dt_c_string(s: &str) -> *mut u8:
     let out = with_alloc(s.len() + 1)
@@ -31,7 +31,7 @@ unsafe fn dt_c_string(s: &str) -> *mut u8:
     out
 
 // argv[0] is `with`, argv[1] is `__dlltool`; the rest is dlltool's.
-pub fn with_dlltool_cli_main() -> i32:
+fn with_dlltool_cli_main() -> i32:
     if not with_dlltool_available():
         runtime_eprint("error: this build of `with` has no dlltool: only a Windows compiler linked against a windows-gnu LLVM SDK carries one (#1915)")
         return 127

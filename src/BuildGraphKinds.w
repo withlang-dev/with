@@ -18,13 +18,13 @@ fn build_graph_kind_is_standard(kind: i32) -> bool:
 fn build_graph_kind_is_project(kind: i32) -> bool:
     false
 
-pub fn build_graph_kind_removed(kind: i32) -> bool:
+fn build_graph_kind_removed(kind: i32) -> bool:
     kind == 5 or kind == 6 or kind == 1000 or kind == 1001 or kind == 1002 or kind == 1003 or kind == 1004 or kind == 1005 or kind == 1006 or kind == 1007 or kind == 1008 or kind == 1009 or kind == 1010 or kind == 1011 or kind == 1012 or kind == 1013 or kind == 1014 or kind == 1015 or kind == 1016 or kind == 1017 or kind == 1018 or kind == 1019 or kind == 1020 or kind == 1021 or kind == 1022 or kind == 1023 or kind == 1024 or kind == 1025 or kind == 1026 or kind == 1027
 
-pub fn build_graph_kind_valid(kind: i32) -> bool:
+fn build_graph_kind_valid(kind: i32) -> bool:
     build_graph_kind_is_standard(kind) or build_graph_kind_is_project(kind)
 
-pub fn build_graph_kind_name(kind: i32) -> str:
+fn build_graph_kind_name(kind: i32) -> str:
     if kind == 0: return "executable"
     if kind == 1: return "library"
     if kind == 2: return "test"
@@ -80,17 +80,17 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 1027: return "removed_emit_c_roundtrip"
     f"unknown({kind})"
 
-pub fn build_graph_kind_implemented(kind: i32) -> bool:
+fn build_graph_kind_implemented(kind: i32) -> bool:
     if build_graph_kind_is_standard(kind):
         return true
     if build_graph_kind_is_project(kind):
         return true
     false
 
-pub fn build_graph_target_valid(kind: i32) -> bool:
+fn build_graph_target_valid(kind: i32) -> bool:
     kind >= BUILD_GRAPH_TARGET_MIN and kind <= BUILD_GRAPH_TARGET_MAX
 
-pub fn build_graph_target_name(kind: i32) -> str:
+fn build_graph_target_name(kind: i32) -> str:
     if kind == 0:
         return "native"
     if kind == 1:
@@ -111,7 +111,7 @@ pub fn build_graph_target_name(kind: i32) -> str:
         return "wasm64"
     f"unknown({kind})"
 
-pub fn build_graph_host_target_kind() -> i32:
+fn build_graph_host_target_kind() -> i32:
     let os = with_sysinfo_os()
     let arch = with_sysinfo_arch()
     if os == "Macos":
@@ -131,7 +131,7 @@ pub fn build_graph_host_target_kind() -> i32:
             return 5
     0
 
-pub fn build_graph_target_is_host(kind: i32) -> bool:
+fn build_graph_target_is_host(kind: i32) -> bool:
     if kind == 0:
         return true
     kind == build_graph_host_target_kind()

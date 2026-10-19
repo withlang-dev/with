@@ -7,7 +7,7 @@
 use Span
 
 // All token kinds produced by the lexer.
-pub enum TokenKind: i32:
+enum TokenKind: i32:
     // Literals
     TK_INT_LIT = 0
     TK_FLOAT_LIT = 1
@@ -165,7 +165,7 @@ pub enum TokenKind: i32:
     TK_PLUS_PLUS_EQ = 141
 
 // Lookup table: keyword string -> tag. Returns -1 if not a keyword.
-pub fn tag_from_keyword(s: &str) -> i32:
+fn tag_from_keyword(s: &str) -> i32:
     if s == "fn": return TokenKind.TK_KW_FN
     if s == "let": return TokenKind.TK_KW_LET
     if s == "var": return TokenKind.TK_KW_VAR
@@ -226,7 +226,7 @@ pub fn tag_from_keyword(s: &str) -> i32:
     -1
 
 // Returns a human-readable name for a token tag (for diagnostics).
-pub fn tag_name(tag: i32) -> str:
+fn tag_name(tag: i32) -> str:
     if tag == TokenKind.TK_INT_LIT: return "integer literal"
     if tag == TokenKind.TK_FLOAT_LIT: return "float literal"
     if tag == TokenKind.TK_STRING_LIT: return "string literal"
@@ -362,7 +362,7 @@ pub fn tag_name(tag: i32) -> str:
 
 // A growable list of tokens stored as parallel arrays for
 // cache-friendly iteration over tags alone.
-pub type TokenList {
+type TokenList {
     tags: List[i32],
     starts: List[i32],
     ends: List[i32],
@@ -406,5 +406,5 @@ impl TokenList:
         }
 
 // Also expose a keyword_lookup alias for the lexer.
-pub fn keyword_lookup(text: &str) -> i32:
+fn keyword_lookup(text: &str) -> i32:
     tag_from_keyword(text)

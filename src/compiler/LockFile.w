@@ -8,7 +8,7 @@ use compiler.ConanClient
 use std.crypto.sha256
 extern fn with_str_clone_ref(s: &str) -> str
 
-pub type LockEntry {
+type LockEntry {
     name: str,
     source: str,
     version: str,
@@ -28,11 +28,11 @@ pub type LockEntry {
 fn lock_entry_none() -> LockEntry:
     LockEntry { name: "", source: "", version: "", recipe_rev: "", package_id: "", package_rev: "", sha256: "", registry: "", facts_sha256: "" }
 
-pub type LockFile {
+type LockFile {
     entries: List[LockEntry],
 }
 
-pub fn lock_file_path(project_root: &str) -> str:
+fn lock_file_path(project_root: &str) -> str:
     project_root ++ "/.with/lock.json"
 
 fn lock_empty -> LockFile:
@@ -214,7 +214,7 @@ fn lock_line_entry_name(line: &str) -> str:
         return ""
     name
 
-pub fn lock_load(project_root: &str) -> LockFile:
+fn lock_load(project_root: &str) -> LockFile:
     let path = lock_file_path(project_root)
     if runtime_file_exists(path) == 0:
         return lock_empty()
@@ -267,7 +267,7 @@ pub fn lock_load(project_root: &str) -> LockFile:
             current = lock_entry_none()
     lock
 
-pub fn lock_upsert(lock: &LockFile, entry: LockEntry) -> LockFile:
+fn lock_upsert(lock: &LockFile, entry: LockEntry) -> LockFile:
     let out_entries: List[LockEntry] = List.new()
     var inserted = false
     for i in 0..lock.entries.len():
@@ -286,7 +286,7 @@ pub fn lock_upsert(lock: &LockFile, entry: LockEntry) -> LockFile:
         out_entries.push(entry)
     LockFile { entries: out_entries }
 
-pub fn lock_remove(lock: &LockFile, name: &str) -> LockFile:
+fn lock_remove(lock: &LockFile, name: &str) -> LockFile:
     let out_entries: List[LockEntry] = List.new()
     for i in 0..lock.entries.len():
         let entry = lock.entries[i]
@@ -294,7 +294,7 @@ pub fn lock_remove(lock: &LockFile, name: &str) -> LockFile:
             out_entries.push(lock_entry_clone(entry))
     LockFile { entries: out_entries }
 
-pub fn lock_write(project_root: &str, lock: &LockFile) -> i32:
+fn lock_write(project_root: &str, lock: &LockFile) -> i32:
     let dir = project_root ++ "/.with"
     if runtime_mkdir_p(dir) != 0:
         runtime_eprint("error: failed to create .with directory")
@@ -326,12 +326,12 @@ pub fn lock_write(project_root: &str, lock: &LockFile) -> i32:
     text = text ++ "}\n"
     runtime_write_file(lock_file_path(project_root), text)
 
-pub fn lock_sha256_text(data: &str) -> str:
+fn lock_sha256_text(data: &str) -> str:
     var digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(data, &raw mut digest[0] as *mut u8)
     sha256_hex(&digest[0] as *const u8)
 
-pub fn lock_sha256_file(path: &str) -> str:
+fn lock_sha256_file(path: &str) -> str:
     if runtime_file_exists(path) == 0:
         return ""
     lock_sha256_text(runtime_read_file(path))
@@ -413,7 +413,7 @@ fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, 
             return out
     out
 
-pub fn lock_upsert_installed_c_dep_tree(lock: LockFile, project_root: &str, name: &str, version: &str) -> LockFile:
+fn lock_upsert_installed_c_dep_tree(lock: LockFile, project_root: &str, name: &str, version: &str) -> LockFile:
     let walk = LockDepWalk { lock, seen: List.new() }
     var done = lock_upsert_installed_c_dep_tree_seen(move walk, project_root, name, version)
     return move done.lock
@@ -476,7 +476,7 @@ fn lock_restore_entry(project_root: &str, entry: &LockEntry) -> i32:
         return 0
     1
 
-pub fn lock_restore(project_root: &str) -> i32:
+fn lock_restore(project_root: &str) -> i32:
     let path = lock_file_path(project_root)
     if runtime_file_exists(path) == 0:
         runtime_eprint("error: no lock file at .with/lock.json; run 'with get c.<name>' to add dependencies first")

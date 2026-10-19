@@ -220,7 +220,7 @@ fn flatten_nested_arrays_once(source: &str) -> str:
         return source.slice(0, tokens.get_start(i)) ++ flat ++ source.slice(tokens.get_end(outer_close), source.len())
     source
 
-pub fn format_source_styled(input: &str, style: i32) -> str:
+fn format_source_styled(input: &str, style: i32) -> str:
     let source = flatten_nested_arrays(input)
     var lexer = Lexer.init(source, 0)
     let tokens = lexer.tokenize_with_comments()
@@ -441,7 +441,7 @@ pub fn format_source_styled(input: &str, style: i32) -> str:
         out = out ++ "\n"
     out
 
-pub fn format_source(source: &str) -> str:
+fn format_source(source: &str) -> str:
     format_source_styled(source, 0)
 
 // Decide whether to emit a space before `cur` given `prev`.

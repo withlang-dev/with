@@ -235,7 +235,7 @@ impl BuildGraphMaterializer:
         out.generated_sources.push(BuildGraphGeneratedSource { path: path.text.clone(), contents: contents.text.clone() })
         out
 
-pub type BuildGraphMaterializeResult {
+type BuildGraphMaterializeResult {
     graph: BuildGraph,
     sema: Sema,
 }
@@ -295,7 +295,7 @@ impl BuildGraphMaterializer:
 // Returns the materialized graph alongside the Sema handed in: the
 // materializer stores the Sema (refs cannot be struct fields), so the
 // caller gets it back instead of reusing a moved value (§3.8).
-pub fn materialize_build_graph_from_comptime(sema: Sema, value: &ComptimeValue, extras: List[ComptimeValue]) -> BuildGraphMaterializeResult:
+fn materialize_build_graph_from_comptime(sema: Sema, value: &ComptimeValue, extras: List[ComptimeValue]) -> BuildGraphMaterializeResult:
     var mat = build_graph_materializer(move sema, move extras)
     let graph = mat.materialize_build(value)
     BuildGraphMaterializeResult { graph, sema: move mat.sema }

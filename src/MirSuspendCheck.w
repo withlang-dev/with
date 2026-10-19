@@ -1285,7 +1285,7 @@ fn last_use_quick_after_verdict(body: &MirBody, bb: i32, stmt_index: i32, local:
 // collection buffer stays unique across the handoff. Earlier borrows, field
 // projections, or mutations of the local qualify as long as no view derived
 // from the local is read at or after the take point.
-pub fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
+fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
     var out = body
     if out.operand_holds.len() == 0:
         return out
@@ -1436,7 +1436,7 @@ pub fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
                 out.mark_local_ever_moved(local)
     out
 
-pub fn check_no_await_guard_suspends(mir_mod: &MirModule, ast: &AstPool, sema: &Sema, diags: DiagnosticList) -> DiagnosticList:
+fn check_no_await_guard_suspends(mir_mod: &MirModule, ast: &AstPool, sema: &Sema, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
     let body_by_fn = suspend_build_body_index(mir_mod)
     let body_may_suspend = suspend_compute_may_suspend(mir_mod, body_by_fn)

@@ -41,7 +41,7 @@ fn sema_profile_report(name: &str, t0: i64):
     with_eprint(f"[profile] sema.{name}  {ns / 1000000}.{(ns % 1000000) / 1000} ms")
 extern fn abort() -> Never
 
-pub fn sema_phase_bug(message: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
+fn sema_phase_bug(message: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
     with_eprint(f"{message} [{origin_file}:{origin_line} {origin_fn}]")
     abort()
 
@@ -60,11 +60,11 @@ type FieldMovePath {
 }
 impl Copy for FieldMovePath
 
-pub enum VarState: i32:
+enum VarState: i32:
     LIVE = 0
     MOVED = 1
 
-pub type BindingProvenance {
+type BindingProvenance {
     view_origin_mask: i32,
     // The subset of view_origin_mask whose parameters' OWN storage the
     // binding may point into (SemaCheck.compute_expr_storage_origin_mask);
@@ -95,14 +95,14 @@ pub const DECLARED_ORIGIN_AMBIGUOUS: i32 = -1
 // parameter entry (-1 - index).
 pub const FROM_STATIC_ENTRY: i32 = -1048576
 
-pub fn sema_param_origin_bit(pi: i32) -> i32:
+fn sema_param_origin_bit(pi: i32) -> i32:
     if pi < 0:
         return 0
     if pi >= 31:
         return -1
     ((1 as i64) << (pi as u32)) as i32
 
-pub fn sema_param_origin_mask_contains(mask: i32, pi: i32) -> i32:
+fn sema_param_origin_mask_contains(mask: i32, pi: i32) -> i32:
     if mask == 0 or pi < 0:
         return 0
     if mask < 0:
@@ -111,14 +111,14 @@ pub fn sema_param_origin_mask_contains(mask: i32, pi: i32) -> i32:
         return 0
     if (mask & sema_param_origin_bit(pi)) != 0: 1 else: 0
 
-pub enum LabelFrameKind: i32:
+enum LabelFrameKind: i32:
     LFK_BOUNDARY = 0
     LFK_WHILE = 1
     LFK_FOR = 2
     LFK_BLOCK = 3
     LFK_LOOP = 4
 
-pub type LabelRegistryState {
+type LabelRegistryState {
     label_syms: List[i32],
     label_nodes: List[i32],
     label_paths: List[str],
@@ -147,7 +147,7 @@ enum DeriveReq: i32:
     DISPLAY = 7
     BUILDER = 8
 
-pub enum SemaMagicIdentKind: i32:
+enum SemaMagicIdentKind: i32:
     NONE = 0
     FILE = 1
     LINE = 2
@@ -352,7 +352,7 @@ pub const EFF_CAPTURE_BY_PLACE: i32 = 64
 // container to its element.
 pub const EFF_STORE_IN_RECEIVER: i32 = 128
 
-pub enum ReceiverMode: i32:
+enum ReceiverMode: i32:
     None = 0
     Read = 1
     Mut = 2
@@ -361,7 +361,7 @@ pub enum ReceiverMode: i32:
 
 impl Copy for ReceiverMode
 
-pub enum WithFormKind: i32:
+enum WithFormKind: i32:
     Binding = 0
     Guarded = 1
     GuardedMut = 2
@@ -370,7 +370,7 @@ pub enum WithFormKind: i32:
 // to, recorded by check_call. MirLower dispatches on it in one ordered
 // switch and never re-derives it from the name (a local lookup, a variant
 // or type table hit, symbol text).
-pub enum CallCalleeKind: i32:
+enum CallCalleeKind: i32:
     None = 0
     Function = 1
     Callable = 2
@@ -390,7 +390,7 @@ impl Copy for CallCalleeKind
 // D65 phase 5 (#2043): which builtin a builtin call is, recorded by Sema
 // where it checks the call; codegen's builtin dispatch switches on it and
 // never on the callee's spelling.
-pub enum CallBuiltin: i32:
+enum CallBuiltin: i32:
     None = 0
     Src = 1
     Transmute = 2
@@ -423,7 +423,7 @@ pub enum CallBuiltin: i32:
 
 impl Copy for CallBuiltin
 
-pub enum AllocConstructKind: i32:
+enum AllocConstructKind: i32:
     EXPLICIT_API = 1
     LIST_NEW = 2
     TO_OWNED = 3
@@ -436,7 +436,7 @@ pub enum AllocConstructKind: i32:
 
 impl Copy for AllocConstructKind
 
-pub fn sema_effect_bits_text(bits: i32) -> str:
+fn sema_effect_bits_text(bits: i32) -> str:
     let public_bits = bits & EFF_DECLARED_MASK
     var out = ""
     if (public_bits & EFF_READ) != 0:
@@ -467,7 +467,7 @@ pub fn sema_effect_bits_text(bits: i32) -> str:
 // remains &T. `owned_value_type` is T, and `target_type` is the destination
 // after any ordinary value coercion. A differing `post_copy_type` records that
 // final coercion explicitly for later MIR/backend consumption.
-pub type ContextualCopyAdjustment {
+type ContextualCopyAdjustment {
     context_sig: i32,
     source_node: i32,
     exact_source_type: i32,
@@ -483,7 +483,7 @@ impl Copy for ContextualCopyAdjustment
 // and diagnostics consume the same classification instead of re-running type
 // inference. `origin_mask`/origin deps record the origins visible at this
 // stage; Stage 4 makes transparent-carrier propagation complete.
-pub type ContextualJoinDecision {
+type ContextualJoinDecision {
     context_sig: i32,
     join_node: i32,
     expected_type: i32,
@@ -505,7 +505,7 @@ impl Copy for ContextualJoinDecision
 // D51 §16.2b stage 2: a facade's facts, each with the node that stated it.
 // Parameter positions are zero-based indices into the fn's signature; -1 is
 // "none". Consumed by stage 3 (raw classification) and later stages.
-pub type FacadeResource {
+type FacadeResource {
     name: i32,
     facade: i32,
     node: i32,
@@ -534,7 +534,7 @@ pub type FacadeResource {
     handle: i32,          // 1 for a callback-scope `handle Name wraps *mut T` (§16.2b.9): no producer, destroyer or Drop; borrowed for the callback's invocation
 }
 
-pub type ForeignContract {
+type ForeignContract {
     decl: i32,            // the `c facade` block's declaration index: diagnostics name its file
     fn_sym: i32,
     facade: i32,
@@ -599,7 +599,7 @@ pub const FACADE_VARIADIC_CALLBACK: i32 = 3
 pub const FACADE_VARIADIC_RETAINED: i32 = 4
 pub const FACADE_VARIADIC_USERDATA: i32 = 5 // the userdata setter a callback case implies (§16.2b.5): `&U`, the borrow the resource holds
 
-pub type ForeignVariadicSlot {
+type ForeignVariadicSlot {
     case_index: i32,
     clause: i32,
     resource: i32,
@@ -616,7 +616,7 @@ pub type ForeignVariadicSlot {
 // — in the rendered signature, `self` excluded — of the userdata parameter
 // (-1: none typed), for the checks the rendered generic method cannot state
 // itself: the userdata type is Send and Sync under `callback_thread any`.
-pub type FacadeCallbackMethod {
+type FacadeCallbackMethod {
     contract: i32,
     receiver_params: i32,
     userdata_param: i32,
@@ -633,7 +633,7 @@ pub type FacadeCallbackMethod {
 // signature MIR records on the call (SemaFacade.w facade_index_pair_ops,
 // facade_note_pair_op_sig). MIR proves the pair's state per place along
 // every path (MirForeignPairs.w); Sema decides what each call means.
-pub type FacadePairOp {
+type FacadePairOp {
     contract: i32,      // foreign_contracts index
     resource: i32,      // facade_resources index
     action: i32,        // FOREIGN_PAIR_CALLBACK / _USERDATA / _RESET / _DESTROY / _INVOKE (ForeignPairState.w)
@@ -647,7 +647,7 @@ pub type FacadePairOp {
 
 // Context shared by free and receiver callback calls. Userdata is checked
 // first so its type can give the callback its concrete C signature.
-pub type FacadeCallbackCall {
+type FacadeCallbackCall {
     userdata_node: i32,
     userdata_type: i32,
     nullable: bool,
@@ -659,7 +659,7 @@ pub type FacadeCallbackCall {
 // they depend on a binding; `files` are the `<c_import …>` translations of
 // the functions the declaring facade describes — the coarse library whose
 // every operation touches the domain unless it `preserves` it (§34, §38).
-pub type FacadeDomain {
+type FacadeDomain {
     name: i32,
     kind: i32,          // process | thread | resource | static (sym)
     facade: i32,        // the facade that declared it first
@@ -675,7 +675,7 @@ pub type FacadeDomain {
 // parameter; every received resource unless `preserves param N`), the
 // domains it invalidates (its library's, unless `preserves domain D`), and
 // the domain its result borrows from (`returns borrow CStr from domain D`).
-pub type FacadeCallEffect {
+type FacadeCallEffect {
     sig: i32,
     fn_sym: i32,             // the C function (its facade fn item is `contract`)
     contract: i32,           // foreign_contracts index, or -1
@@ -689,7 +689,7 @@ pub type FacadeCallEffect {
     param_sources: List[i32],
 }
 
-pub type Sema {
+type Sema {
     pool: InternPool,
     diags: DiagnosticList,
     ast: AstPool,
@@ -2443,7 +2443,7 @@ fn sema_debug_stage1_enabled -> i32:
         return 0
     1
 
-pub fn sema_debug_move_enabled -> i32:
+fn sema_debug_move_enabled -> i32:
     let raw = with_getenv_str("WITH_DEBUG_MOVE")
     if raw.len() == 0:
         return 0
@@ -2451,7 +2451,7 @@ pub fn sema_debug_move_enabled -> i32:
 
 // WITH_DEBUG_BORROWS=1: the borrow table at every read and mutation check
 // (SemaCheck.w check_read_against_views, register_view_binding_borrows).
-pub fn sema_debug_borrows_enabled -> i32:
+fn sema_debug_borrows_enabled -> i32:
     if with_getenv_str("WITH_DEBUG_BORROWS").len() == 0: 0 else: 1
 
 // WITH_DEBUG_PERMUTE_TAGS=1: a plain enum's variants get their tags in
@@ -2459,7 +2459,7 @@ pub fn sema_debug_borrows_enabled -> i32:
 // assumptions"). Meaning is unchanged: matching, Ord and every lookup go
 // through the variant, so a program behaves the same, unless some code
 // assumed a tag ("Some is 0", "the tag is the index") instead of asking.
-pub fn sema_permute_tags_enabled -> bool: with_getenv_str("WITH_DEBUG_PERMUTE_TAGS").len() > 0
+fn sema_permute_tags_enabled -> bool: with_getenv_str("WITH_DEBUG_PERMUTE_TAGS").len() > 0
 
 impl Sema:
     fn debug_unknown_type(sym: i32, node: i32, context: &str):
@@ -2503,7 +2503,7 @@ impl Sema:
         self.pool.state.symbol_texts.push(owned)
         id
 
-pub fn sema_tier_path_is_std_implementation(path: &str) -> i32:
+fn sema_tier_path_is_std_implementation(path: &str) -> i32:
     if path.starts_with("lib/std/") or path.starts_with("<embedded-std>/"):
         return 1
     if path.contains("/lib/std/"):
@@ -2583,14 +2583,14 @@ fn sema_prelude_gate_allows_name(name: &str) -> i32:
         return 1
     0
 
-pub fn sema_path_is_std_box_module(path: &str) -> i32:
+fn sema_path_is_std_box_module(path: &str) -> i32:
     if path == "lib/std/box.w" or path == "<embedded-std>/std/box.w":
         return 1
     if path.ends_with("/lib/std/box.w") or path.ends_with("\\lib\\std\\box.w"):
         return 1
     0
 
-pub fn sema_path_is_std_rc_module(path: &str) -> i32:
+fn sema_path_is_std_rc_module(path: &str) -> i32:
     if path == "lib/std/rc.w" or path == "<embedded-std>/std/rc.w":
         return 1
     if path.ends_with("/lib/std/rc.w") or path.ends_with("\\lib\\std\\rc.w"):
@@ -2627,7 +2627,7 @@ impl Sema:
             return 0
         sema_path_is_std_rc_module(self.type_decl_source_path(sym))
 
-pub fn sema_tier_std_only_module(path: &str) -> i32:
+fn sema_tier_std_only_module(path: &str) -> i32:
     if path == "std.io" or path.starts_with("std.io."):
         return 1
     if path == "std.fs" or path.starts_with("std.fs."):
@@ -2719,7 +2719,7 @@ impl Sema:
         self.emit_error(name ++ " requires std", node)
         0
 
-pub fn sema_new_map_i32_i32 -> HashMap[i32, i32]:
+fn sema_new_map_i32_i32 -> HashMap[i32, i32]:
     HashMap.new()
 
 fn sema_new_map_i32_str -> HashMap[i32, str]:
@@ -2728,29 +2728,29 @@ fn sema_new_map_i32_str -> HashMap[i32, str]:
 fn sema_new_map_str_i32 -> HashMap[str, i32]:
     HashMap.new()
 
-pub fn sema_new_map_i64_i32 -> HashMap[i64, i32]:
+fn sema_new_map_i64_i32 -> HashMap[i64, i32]:
     HashMap.new()
 
-pub fn sema_new_list_str -> List[str]:
+fn sema_new_list_str -> List[str]:
     let out: List[str] = List.new()
     out
 
-pub fn sema_new_list_i32 -> List[i32]:
+fn sema_new_list_i32 -> List[i32]:
     let out: List[i32] = List.new()
     out
 
-pub fn sema_owned_text(text: &str) -> str:
+fn sema_owned_text(text: &str) -> str:
     if text.len() == 0:
         return ""
     with_str_clone_ref(text)
 
-pub fn sema_clone_str_list(values: &List[str]) -> List[str]:
+fn sema_clone_str_list(values: &List[str]) -> List[str]:
     let out = sema_new_list_str()
     for i in 0..values.len():
         out.push(sema_owned_text(values[i]))
     out
 
-pub fn sema_clone_i32_list(values: &List[i32]) -> List[i32]:
+fn sema_clone_i32_list(values: &List[i32]) -> List[i32]:
     let out: List[i32] = List.new()
     for i in 0..values.len():
         out.push(values[i])
@@ -2761,13 +2761,13 @@ pub fn sema_clone_i32_list(values: &List[i32]) -> List[i32]:
 // map header, leaving both maps pointing at one buffer — two owners that
 // double-free at teardown (Zcu.c_import_omitted_symbols aliased into the round's
 // Sema was exactly this bug). Mirrors sema_clone_str_vec's owned-text policy.
-pub fn sema_clone_str_str_hashmap(src: &HashMap[str, str]) -> HashMap[str, str]:
+fn sema_clone_str_str_hashmap(src: &HashMap[str, str]) -> HashMap[str, str]:
     var out: HashMap[str, str] = HashMap.new()
     for (k, v) in src: out.insert(sema_owned_text(k), sema_owned_text(v))
     out
 
 impl Sema:
-    pub move fn prepare_comptime_eval_copy() -> Sema:
+    move fn prepare_comptime_eval_copy() -> Sema:
         // Comptime callers replace `ast` before copying Sema. Rebuild this
         // owning map for that AST instead of sharing the source map header.
         self.rebuild_decl_index()
@@ -2800,7 +2800,7 @@ impl Sema:
         // text on every comptime eval leaked ~8.5 MB × N evals = GBs of dead copies.
         self
 
-pub fn sema_pair_key(a: i32, b: i32) -> i64:
+fn sema_pair_key(a: i32, b: i32) -> i64:
     (a as i64) * 4294967296 + (b as i64)
 
 fn sema_exact_type_hash(kind: i32, d0: i32, d1: i32, d2: i32) -> i64:
@@ -2817,15 +2817,15 @@ fn sema_pair_lo(key: i64): (key % 4294967296) as i32
 // Key = (sig, pi, bit_idx) with pi < 2^16, bit_idx < 2^8; value = (kind, a, b)
 // with a, b < 2^28. These fns are the only place the field widths appear;
 // encode and decode both live here so they cannot drift apart.
-pub fn effect_prov_key(sig: i32, pi: i32, bit_idx: i32) -> i64:
+fn effect_prov_key(sig: i32, pi: i32, bit_idx: i32) -> i64:
     (sig as i64) * 16777216 + (pi as i64) * 256 + bit_idx as i64
 
 fn effect_prov_val(kind: i64, a: i32, b: i32) -> i64:
     kind * 72057594037927936 + (a as i64) * 268435456 + b as i64
 
-pub fn effect_prov_val_kind(v: i64): v / 72057594037927936
-pub fn effect_prov_val_a(v: i64): ((v / 268435456) % 268435456) as i32
-pub fn effect_prov_val_b(v: i64): (v % 268435456) as i32
+fn effect_prov_val_kind(v: i64): v / 72057594037927936
+fn effect_prov_val_a(v: i64): ((v / 268435456) % 268435456) as i32
+fn effect_prov_val_b(v: i64): (v % 268435456) as i32
 
 impl Sema:
     mut fn copy_module_graph_from(source: &Sema):
@@ -4572,7 +4572,7 @@ impl Sema:
     // types — with its module, package, engine id, prelude-closure and
     // corpus-private marks, then the verdict and every rule and walk edge it
     // passed through. A hunt that was "toggle a rule and rebuild" is one run.
-    pub mut fn explain_visibility(name: &str) -> str:
+    mut fn explain_visibility(name: &str) -> str:
         let sym = self.pool_lookup_symbol(name)
         if sym == 0: return "explain:visible " ++ name ++ "\n  no declaration or use of that name anywhere in the compilation\n"
         var out = "explain:visible " ++ name ++ "\n"
@@ -4627,7 +4627,7 @@ impl Sema:
     // corpus-private marks, and the modules that import it (the chain that
     // pulled it in). The loaded set is what two compiler generations
     // disagreed on (#2248).
-    pub fn explain_modules() -> str:
+    fn explain_modules() -> str:
         var out = "explain:modules\n"
         for mi in 0..self.module_paths.len():
             let path = with_str_clone_ref(self.module_paths[mi])
@@ -6195,7 +6195,7 @@ impl Sema:
             return self.types_identical(self.get_type_d2(ar as TypeId), self.get_type_d2(br as TypeId))
         false
 
-pub fn sema_generic_inst_hash(base_sym: i32, args: &List[i32], arg_count: i32) -> i64:
+fn sema_generic_inst_hash(base_sym: i32, args: &List[i32], arg_count: i32) -> i64:
     var h: i64 = base_sym as i64
     for ai in 0..arg_count:
         h = (h *% 31) +% (args[ai] as i64)
@@ -6809,7 +6809,7 @@ impl Sema:
             return expected as i32
         0
 
-pub fn sema_node_is_numeric_literal(ast: &AstPool, node: i32) -> bool:
+fn sema_node_is_numeric_literal(ast: &AstPool, node: i32) -> bool:
     if node == 0:
         return false
     let kind = ast.kind(node)
@@ -6818,7 +6818,7 @@ pub fn sema_node_is_numeric_literal(ast: &AstPool, node: i32) -> bool:
 // A bitwise operand written as an int literal under grouping and `~` wrappers
 // (`(~1)`, `~0x3c`) adapts to the other operand's integer type exactly like a
 // bare literal; the mixed-signedness rule is for concretely typed operands.
-pub fn sema_node_is_bitwise_adaptable_literal(ast: &AstPool, node: i32) -> bool:
+fn sema_node_is_bitwise_adaptable_literal(ast: &AstPool, node: i32) -> bool:
     var cur = node
     while cur != 0:
         let kind = ast.kind(cur)
@@ -9462,7 +9462,7 @@ impl Sema:
             else if declared == ReceiverMode.Mut and required_mode == "move":
                 self.emit_error(f"mut receiver is too weak; compiler effects require `move fn` for '{name}'", node)
 
-pub fn receiver_required_mode_text(eff: i32) -> str:
+fn receiver_required_mode_text(eff: i32) -> str:
     if (eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0: return "move"
     if (eff & EFF_WRITE) != 0: return "mut"
     "read"
@@ -10000,13 +10000,13 @@ impl Sema:
 // ── Utility functions ────────────────────────────────────────────
 
 // §18.2: the standard library's prelude module, std.builtins.
-pub fn sema_path_is_std_builtins(path: &str) -> bool:
+fn sema_path_is_std_builtins(path: &str) -> bool:
     path == "lib/std/builtins.w" or path == "<embedded-std>/std/builtins.w" or path.ends_with("/lib/std/builtins.w")
 
 // §18.1: a module without a `module` header names itself by its file's
 // stem, each character that cannot appear in an identifier replaced by `_`
 // and a leading digit prefixed with `_`.
-pub fn sema_module_stem_self_name(path: &str) -> str:
+fn sema_module_stem_self_name(path: &str) -> str:
     var start = 0
     for i in 0..path.len():
         if path[i] == '/': start = (i + 1) as i32
@@ -10024,7 +10024,7 @@ pub fn sema_module_stem_self_name(path: &str) -> str:
         out = "_" ++ out
     out
 
-pub fn sema_str_has_data(text: &str) -> i32:
+fn sema_str_has_data(text: &str) -> i32:
 
     if text.len() <= 0:
         return 0
@@ -10033,7 +10033,7 @@ pub fn sema_str_has_data(text: &str) -> i32:
         return 0
     1
 
-pub fn sema_str_contains_char(text: &str, needle: i32) -> i32:
+fn sema_str_contains_char(text: &str, needle: i32) -> i32:
     if sema_str_has_data(text) == 0:
         return 0
     var i = 0
@@ -10984,4 +10984,4 @@ impl Sema:
                 return " (a bundle interface global)"
         " (bound earlier in this scope)"
 
-pub fn sema_field_key(decl_node: i32, field: i32) -> i64: (decl_node as i64) * 4294967296 + field as i64
+fn sema_field_key(decl_node: i32, field: i32) -> i64: (decl_node as i64) * 4294967296 + field as i64

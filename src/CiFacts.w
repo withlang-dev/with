@@ -27,7 +27,7 @@
 use std.fs
 use std.string
 
-pub type FactsEntry {
+type FactsEntry {
     pub fn_name: str,
     // Ownership: `owned`, `drop`, `destroys`, `consumes:N`, `borrow:N`,
     // `lend`. Presentation: `nullable:N`, `text_param:N`, `text_return:F`.
@@ -38,7 +38,7 @@ pub type FactsEntry {
     pub cite: str,
 }
 
-pub type Facts {
+type Facts {
     pub package: str,
     pub entries: List[FactsEntry],
     // The citation of a facade-level `text utf8` (D134 §16.2b.8: every
@@ -49,37 +49,37 @@ pub type Facts {
 
 /// Whether `kind` is a presentation fact (a parameter's or a return's
 /// shape) rather than an ownership fact.
-pub fn facts_is_presentation(kind: &str) -> bool:
+fn facts_is_presentation(kind: &str) -> bool:
     kind.starts_with("nullable:") or kind.starts_with("text_param:") or kind.starts_with("text_return:")
 
 impl Facts:
     /// The ownership fact for the C function `name` as `kind|record|cite`,
     /// or "".
-    pub fn of(name: &str) -> str:
+    fn of(name: &str) -> str:
         for e in self.entries:
             if e.fn_name == name and not facts_is_presentation(e.kind): return e.kind ++ "|" ++ e.record ++ "|" ++ e.cite
         ""
 
     /// The presentation facts for `name`, one `kind|record|cite` per line,
     /// in the file's order; "" when it states none.
-    pub fn presentation(name: &str) -> str:
+    fn presentation(name: &str) -> str:
         var out = ""
         for e in self.entries:
             if e.fn_name == name and facts_is_presentation(e.kind): out = out ++ e.kind ++ "|" ++ e.record ++ "|" ++ e.cite ++ "\n"
         out
 
 /// The `kind` of a fact string `of` gave.
-pub fn facts_kind(fact: &str) -> str:
+fn facts_kind(fact: &str) -> str:
     let bar = fact.find("|")
     if bar < 0: "" else: fact.slice(0, bar)
 
 /// The record of a fact string `of` gave.
-pub fn facts_record(fact: &str) -> str:
+fn facts_record(fact: &str) -> str:
     let parts = fact.split("|")
     if parts.len() < 3: "" else: parts[1]
 
 /// The citation of a fact string `of` gave.
-pub fn facts_cite(fact: &str) -> str:
+fn facts_cite(fact: &str) -> str:
     let parts = fact.split("|")
     if parts.len() < 3: "" else: parts[2]
 
@@ -98,13 +98,13 @@ fn facts_split_cite(text: &str) -> List[str]:
     out
 
 /// Reads the facts file at `path`.
-pub fn facts_read_file(path: &str) -> Result[Facts, str]:
+fn facts_read_file(path: &str) -> Result[Facts, str]:
     let source = match read_file(path):
         Ok(s) => s
         Err(_) => return Err("cannot read " ++ path)
     facts_read(path, source)
 
-pub fn facts_read(path: &str, source: str) -> Result[Facts, str]:
+fn facts_read(path: &str, source: str) -> Result[Facts, str]:
     var facts = Facts { package: "", entries: List.new(), utf8_cite: "" }
     var current_fn = ""
     var in_resource = false

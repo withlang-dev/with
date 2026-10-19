@@ -14,7 +14,7 @@ extern fn with_eprint(s: &str) -> Unit
 extern fn with_str_clone_ref(s: &str) -> str
 
 // `foo.wasm` -> `foo.js`; a bare `foo` -> `foo.js`.
-pub fn wasm_host_js_path(bin_path: &str) -> str:
+fn wasm_host_js_path(bin_path: &str) -> str:
     if bin_path.ends_with(".wasm"):
         return bin_path.slice(0, bin_path.len() - 5) ++ ".js"
     bin_path ++ ".js"
@@ -28,7 +28,7 @@ fn wasm_host_basename(path: &str) -> str:
         i = i - 1
     path.slice(i as i64, path.len())
 
-pub fn wasm_host_emit(bin_path: &str) -> i32:
+fn wasm_host_emit(bin_path: &str) -> i32:
     let js_path = wasm_host_js_path(bin_path)
     let text = wasm_host_js_text(wasm_host_basename(bin_path))
     if runtime_write_file(js_path, text) != 0:
