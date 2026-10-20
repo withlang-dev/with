@@ -656,12 +656,25 @@ fn build_cache_test_surface_text(root: &str, test_path: &str) -> str:
     let dir = if slash > 0: rel.slice(0, slash as i64) else: "."
     "dir:" ++ dir ++ ":" ++ build_cache_tree_fingerprint(root, dir, false) ++ "\nsrc:" ++ build_cache_tree_fingerprint(root, "src", true) ++ "\nlib:" ++ build_cache_tree_fingerprint(root, "lib", true) ++ "\n"
 
+// The environment that changes what the compiler a test runs produces, set
+// in the harness's own environment (a `//! env:` line is in the file and
+// keys it already). `WITH_RT_IN_UNIT=1 with test` was served the verdicts of
+// runs without it: 1367 of a lane sweep's 1695 files passed from cache.
+const BUILD_CACHE_TEST_ENV_KEYS: [str; 9] = ["WITH_RT_IN_UNIT", "WITH_CODEGEN_UNITS", "WITH_DEBUG_PERMUTE_TAGS", "WITH_FILE_PREFIX_MAP", "WITH_RUNTIME_ROOT", "WITH_LINUX_SYSROOT", "WITH_WINDOWS_LIBC_DIR", "WITH_LLVM_LD", "WITH_WASM_STACK_SIZE"]
+
+fn build_cache_test_env_text() -> str:
+    var out = ""
+    for name in BUILD_CACHE_TEST_ENV_KEYS:
+        let value = build_graph_rt_getenv(name)
+        if value.len() > 0: out = out ++ "env:" ++ name ++ "=" ++ value ++ "\n"
+    out
+
 // `argv_shape` is the harness argv without the compiler and test paths.
 fn build_cache_test_verdict_key(root: &str, target: &BuildGraphTarget, compiler_fp: &str, argv_shape: &str, test_path: &str) -> str:
     // The relative path is part of the key: content-identical files are
     // *almost* behavior-identical, but tests resolve siblings (c_import
     // headers) relative to their own location.
-    build_cache_sha256_text("test-verdict v2\n" ++ build_cache_test_target_sig_text(target) ++ "argv:" ++ argv_shape ++ "\ncompiler:" ++ compiler_fp ++ "\npath:" ++ build_cache_project_relative(root, test_path) ++ "\nfile:" ++ build_cache_fingerprint_file(test_path) ++ "\n" ++ build_cache_test_surface_text(root, test_path))
+    build_cache_sha256_text("test-verdict v2\n" ++ build_cache_test_target_sig_text(target) ++ "argv:" ++ argv_shape ++ "\ncompiler:" ++ compiler_fp ++ "\npath:" ++ build_cache_project_relative(root, test_path) ++ "\nfile:" ++ build_cache_fingerprint_file(test_path) ++ "\n" ++ build_cache_test_env_text() ++ build_cache_test_surface_text(root, test_path))
 
 fn build_cache_load_test_verdicts(root: &str, compiler_fp: &str, target_name: &str) -> HashMap[str, i32]:
     let out: HashMap[str, i32] = HashMap.new()
