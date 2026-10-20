@@ -627,8 +627,6 @@ impl Compilation:
     // its source: that is how the wo-drift lane rebuilds an embedded bundle
     // from the tree.
     fn register_embedded_bundle_interfaces() -> bool:
-        if self.emit_c_in_unit:
-            return true
         var rt_registered = false
         for bi in 0..embedded_bundle_count():
             if not embedded_bundle_present(bi):
@@ -638,6 +636,14 @@ impl Compilation:
             if not embedded_bundle_for_this_target(bi):
                 continue
             let name = embedded_bundle_name(bi)
+            // The emit-C lane compiles every module in-unit and links no
+            // corpus bundle (--emit-c refuses --link-bundle), so a corpus
+            // interface would make its modules declared-only; the runtime's
+            // interface it reads as every lane does (D30 step 3: std imports
+            // `rt.*`), and the C it emits declares the runtime's functions
+            // for the C runtime to define, as the externs it replaced did.
+            if self.emit_c_in_unit and name != "rt":
+                continue
             if name == "rt":
                 rt_registered = true
             let manifest = embedded_bundle_manifest_text(bi)
