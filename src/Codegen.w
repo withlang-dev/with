@@ -402,6 +402,10 @@ type Codegen {
     // ("<canonical module>\t<name>"): omitted from the interface and the
     // object (CodegenTraits.gen_module_constant).
     bundle_unlowered_globals: List[str],
+    // D138: the canonical paths of the non-corpus modules this bundle
+    // object carries copies of (decl_path_is_bundle_carried): the manifest's
+    // `carried` lines, so a change to one rebuilds the bundle.
+    bundle_carried_paths: List[str],
     // #2219: why each of those did not fold — keyed by the global's name
     // symbol, the sub-expression `try_eval_const_llvm` stopped at — so a
     // body that reads the global is refused naming it (mir_bind_global_locals).
@@ -1238,6 +1242,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         bundle_prefixes: embedded_bundle_prefixes(),
         bundle_corpus: "",
         bundle_unlowered_globals: List.new(),
+        bundle_carried_paths: List.new(),
         unlowered_global_reasons: HashMap.new(),
         const_fold_unfolded_node: 0,
         loop_break_bbs: List.new(),
@@ -5596,6 +5601,12 @@ impl Codegen:
             return false
         not self.decl_path_is_bundle_owned(source_path) and not self.path_is_bundle_provided(source_path)
 
+    // D138: the current declaration's module is carried in this object.
+    mut fn note_bundle_carried_path():
+        let canonical = codegen_canonical_module_path(self.current_decl_source_file)
+        if not self.bundle_carried_paths.contains(canonical):
+            self.bundle_carried_paths.push(canonical)
+
     // D38: does an embedded .wo bundle provide this module? Then this unit
     // declares its functions and the bundle's object defines them.
     fn path_is_bundle_provided(source_path: &str) -> bool:
@@ -5904,6 +5915,7 @@ impl Codegen:
             // A carried declaration (the runtime's interface, D30 step 3) stays
             // external: its definition is the runtime's object.
             wl_set_linkage(function, wl_internal_linkage())
+            self.note_bundle_carried_path()
 
         // @[weak] — set weak linkage (LLVMWeakAnyLinkage = 5)
         // Must be checked before c_export which also sets linkage.
@@ -6262,6 +6274,7 @@ impl Codegen:
             // a carried declaration stays external (its definition is the
             // runtime's object, D30 step 3).
             wl_set_linkage(function, wl_internal_linkage())
+            self.note_bundle_carried_path()
 
         self.fn_values.insert(cg_sym, function)
         self.fn_fn_types.insert(cg_sym, fn_type)

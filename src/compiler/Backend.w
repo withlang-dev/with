@@ -69,6 +69,7 @@ impl Zcu:
         var tracked_paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &cg.tracked_input_paths)
         self.last_bundle_unlowered_globals = sema_clone_str_list(&cg.bundle_unlowered_globals)
+        self.last_bundle_carried_paths = sema_clone_str_list(&cg.bundle_carried_paths)
         if result != 0:
             self.last_sema = cg.take_sema()
             runtime_eprint(codegen_failure_message("error: code generation failed", &cg.codegen_error_detail))

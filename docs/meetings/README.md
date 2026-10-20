@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D138 — A `.wo` bundle is durable: rebuilt when its sources or the contracts it imports change, never because the compiler did](2026-10-20-D138-a-wo-bundle-is-durable.md)
 - [D137 — The windows-aarch64 lane is non-gating: dispatch it, never wait for it, and file each failure as a new issue](2026-10-19-D137-windows-aarch64-is-non-gating.md)
 - [D136 — The package registry is `registry/c/<package>/facts.w` in the toolchain's repository: a facade fragment in the draft's own spelling, every fact cited, landing by pull request](2026-10-15-D136-the-package-registry-is-a-cited-facade-fragment-in-the-toolchain-repository.md)
 - [D135 — `std.encoding.xml` is a strict native tree reader (`XmlDocument.parse`), not an expat facade or a token stream (delegated)](2026-10-15-D135-std-encoding-xml-is-a-native-tree-reader.md)

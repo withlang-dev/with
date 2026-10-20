@@ -117,6 +117,9 @@ type Zcu {
     // The owned globals the last bundle build could not fold to data
     // (Codegen.bundle_unlowered_globals), for the interface emitter.
     last_bundle_unlowered_globals: List[str],
+    // D138: the non-corpus modules the last bundle object carries copies
+    // of (Codegen.bundle_carried_paths), for the manifest's `carried` lines.
+    last_bundle_carried_paths: List[str],
     project_config: ProjectConfig,
     trace_c_import_cache: i32,
     // Analysis commands preserve diagnostics but may continue past preliminary
@@ -193,6 +196,7 @@ fn Zcu.init -> Zcu:
         pending_iface_texts: zcu_new_list_str(),
         import_path_memo: HashMap.new(),
         last_bundle_unlowered_globals: zcu_new_list_str(),
+        last_bundle_carried_paths: zcu_new_list_str(),
         project_config: project_config_default(),
         trace_c_import_cache: 0,
         analysis_partial_semantics: 0,

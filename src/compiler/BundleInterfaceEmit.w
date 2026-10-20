@@ -1437,3 +1437,51 @@ fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> BundleI
             // a section must be non-empty to count as bundle-provided
             out.push_str("// no exported declarations\n")
     BundleInterfaceText { text: out.to_str(), errors }
+
+// ── Symbol contracts at the bundle boundary (durable .wo, D138) ─────────
+// The contract of one symbol: every parameter's canonical type spelling and
+// finalized effect, variadicity, and the return type — what a bundle object
+// compiled its calls to the symbol against (its manifest's `import` rows)
+// and what a runtime bundle declares it provides (its `provides` rows). A
+// bundle links against any runtime whose contract for each imported symbol
+// is this text; the link stage compares the two rows bytewise and refuses
+// the bundle otherwise, so the text carries nothing that varies between
+// two Semas of one declaration (no ids, no spans). "" when this unit
+// declares no such symbol.
+fn bundle_symbol_contract(sema: &Sema, name: &str) -> str:
+    let name_sym = sema.pool_lookup_symbol(name)
+    if name_sym == 0:
+        return ""
+    let sig = sema.get_sig(name_sym)
+    if sig < 0:
+        return ""
+    let no_globals: List[str] = List.new()
+    var emitter = bx_new_emitter("", &no_globals)
+    // The DECLARED effect of each parameter — its `@[effect]` pin, else the
+    // effect its type declares (emit_fn's rule) — never the body-inferred
+    // one: a definition's body reads its parameter and its extern twin
+    // declares nothing, and the two must spell one contract.
+    let ast = sema.ast
+    let node = if sema.fn_decl_nodes.contains(name_sym): sema.fn_decl_nodes.get(name_sym).unwrap() else: -1
+    let meta = if node >= 0: ast.find_fn_meta(node) else: -1
+    let param_start = if meta >= 0: ast.fn_meta_param_start(meta) else: 0
+    let receiver_mode = sema.sig_receiver_mode(sig)
+    var out = "("
+    let count = sema.sig_get_param_count(sig)
+    for pi in 0..count:
+        let ptid = sema.sig_param_type(sig, pi)
+        let spelling = emitter.spell(sema, ptid)
+        if emitter.failed:
+            return ""
+        if pi > 0:
+            out = out ++ ", "
+        var eff = if meta >= 0: bx_effect_pin_bits_of(ast, node, ast.fn_param_name(param_start, pi)) else: -1
+        if eff < 0:
+            eff = sema.declared_param_effect(pi, ptid, receiver_mode, sema.is_copy_frozen(ptid))
+        out = out ++ spelling ++ f":{eff}"
+    if sema.sig_is_variadic(sig) != 0:
+        out = out ++ (if count > 0: ", ..." else: "...")
+    let ret = emitter.spell(sema, sema.sig_return_type(sig))
+    if emitter.failed:
+        return ""
+    out ++ ") -> " ++ ret

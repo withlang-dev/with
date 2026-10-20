@@ -91,6 +91,11 @@ pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
     let _ = fiber_id
     0
 
+// No fiber completes here: the sequence of a completion that never was.
+pub fn with_runtime_fiber_completion_sequence(fiber_id: i32) -> i64:
+    let _ = fiber_id
+    0
+
 pub fn with_fiber_yield():
     let _ = 0
 
@@ -195,3 +200,34 @@ pub fn with_fiber_coro_finish(co: i64):
 pub fn with_fiber_coro_free(co: i64):
     let _ = co
     with_fiber_coro_unavailable()
+
+// On WebAssembly this module stands in for the fiber runtime and the channel
+// runtime too (EmbeddedRuntime.embedded_rt_real_path): the standard library's
+// task, sync and channel modules import them, so every name they reach is
+// defined here. No fiber is ever cancelled; a channel handle is never made
+// (the channel runtime is absent), so a release or retain of one is a
+// program that reached a channel without the fiber runtime, and stops as the
+// coroutine stubs do.
+pub fn with_fiber_is_cancelled() -> i32:
+    0
+
+fn with_channel_unavailable() -> Never:
+    let _ = rt_write(2, "fatal: channels need the fiber runtime, which this program was linked without\n" as *const u8, 78)
+    rt_libc_abort()
+    loop:
+        let _ = 0
+
+pub fn with_channel_retain_sender(ch_handle: i64) -> Unit:
+    if ch_handle == 0:
+        return
+    with_channel_unavailable()
+
+pub fn with_channel_release_sender(ch_handle: i64) -> Unit:
+    if ch_handle == 0:
+        return
+    with_channel_unavailable()
+
+pub fn with_channel_release_receiver(ch_handle: i64) -> Unit:
+    if ch_handle == 0:
+        return
+    with_channel_unavailable()

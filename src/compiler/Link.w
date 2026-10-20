@@ -1861,7 +1861,9 @@ fn link_stage_runtime_root_bundle_dir() -> str:
     candidates.push(compiler_dir ++ "/runtime")
     candidates.push(compiler_dir ++ "/../lib")
     for i in 0..candidates.len():
-        let dir = candidates[i]
+        // A cross target's bundle sits in the root's cross/<target>/
+        // (link_stage_runtime_variant_dir's shape).
+        let dir = if target_spec_is_native(): with_str_clone_ref(candidates[i]) else: candidates[i] ++ "/cross/" ++ target_spec_name()
         let manifest = runtime_read_file(dir ++ "/rt.manifest")
         if manifest.len() == 0:
             continue
@@ -1869,7 +1871,56 @@ fn link_stage_runtime_root_bundle_dir() -> str:
             continue
         if compiler_generation_is_stamped() and link_stage_bundle_manifest_field(manifest, "generation") != compiler_generation():
             continue
-        return with_str_clone_ref(dir)
+        return dir
+    ""
+
+// ── Import contracts (durable .wo, D138) ───────────────────────────────
+// The manifest of this compiler's runtime bundle for the active target: the
+// embedded `rt` slot when it is this generation's, else this generation's
+// bundle beside the runtime root ("" when neither exists). Its `provides`
+// rows are the contracts a corpus bundle's `import` rows are checked
+// against, at the bundle's build and at every link.
+fn link_stage_runtime_manifest_text() -> str:
+    for bi in 0..embedded_bundle_count():
+        if embedded_bundle_name(bi) != "rt" or not embedded_bundle_present(bi) or not embedded_bundle_for_this_target(bi):
+            continue
+        if link_stage_embedded_runtime_is_this_generation():
+            return embedded_bundle_manifest_text(bi)
+    let dir = link_stage_runtime_root_bundle_dir()
+    if dir.len() > 0:
+        return runtime_read_file(dir ++ "/rt.manifest")
+    ""
+
+// Why this compiler cannot link the bundle `name` whose manifest this is
+// ("" when it can): a runtime symbol the bundle imports that this
+// compiler's runtime no longer provides, or provides under another
+// contract. A bundle is rebuilt for that, and for nothing else about the
+// compiler (D138: a .wo is keyed by its corpus, its target, the ABI and the
+// contracts it imports — never by the compiler that built it). A bundle or
+// a runtime from before the contract rows is judged as before: it must be
+// this compiler's own generation.
+fn link_stage_bundle_import_drift(name: &str, manifest: &str) -> str:
+    let imports = bundle_manifest_rows(manifest, "import")
+    let provides = bundle_manifest_rows(link_stage_runtime_manifest_text(), "provides")
+    if imports.len() == 0 or provides.len() == 0:
+        if not compiler_generation_is_stamped():
+            return ""
+        let generation = link_stage_bundle_manifest_field(manifest, "generation")
+        if generation == compiler_generation():
+            return ""
+        let why = if imports.len() == 0: "records no import contracts" else: "cannot be checked against this compiler's runtime, whose manifest records no contracts"
+        return "error: bundle '" ++ name ++ "' " ++ why ++ ", and it was built by compiler generation " ++ (if generation.len() > 0: generation else: "(unrecorded)") ++ ", not this one (" ++ compiler_generation() ++ "); rebuild the bundle"
+    for ii in 0..imports.len():
+        let row = imports[ii]
+        if bundle_row_field(row, 1) != "rt":
+            continue
+        let symbol = bundle_row_field(row, 0)
+        let wanted = bundle_row_field(row, 2)
+        let provided = bundle_provided_contract(&provides, symbol)
+        if provided.len() == 0:
+            return "error: bundle '" ++ name ++ "' imports the runtime symbol `" ++ symbol ++ "`, which this compiler's runtime no longer provides; rebuild the bundle"
+        if provided != wanted:
+            return "error: bundle '" ++ name ++ "' calls the runtime symbol `" ++ symbol ++ "` as `" ++ symbol ++ wanted ++ "`, but this compiler's runtime declares it `" ++ symbol ++ provided ++ "`; rebuild the bundle"
     ""
 
 fn link_stage_runtime_root_bundle_object() -> str:
@@ -1930,6 +1981,14 @@ fn link_stage_select_embedded_bundles(undef: &str) -> List[str]:
         let bundle_target = link_stage_bundle_manifest_field(manifest, "target")
         if bundle_target != target_spec_resolved_name():
             with_eprint("error: embedded bundle '" ++ name ++ "' was built for target " ++ bundle_target ++ " but this link targets " ++ target_spec_resolved_name() ++ " (this compiler embeds no " ++ name ++ " bundle for that target)")
+            let failed: List[str] = List.new()
+            failed.push(LINK_BUNDLE_FAILED())
+            return failed
+        // D138: every runtime symbol the bundle imports is provided under
+        // the contract it was compiled against.
+        let drift = link_stage_bundle_import_drift(name, manifest)
+        if drift.len() > 0:
+            with_eprint(drift)
             let failed: List[str] = List.new()
             failed.push(LINK_BUNDLE_FAILED())
             return failed
@@ -2408,7 +2467,7 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
         if bundle_objects[boi].ends_with("/wo_rt.o") or bundle_objects[boi].ends_with("/rt.o"):
             rt_bundle_joined = true
         extras.push(with_str_clone_ref(bundle_objects[boi]))
-    if (needs_fiber_runtime != 0 or rt_bundle_joined) and link_stage_rt_in_unit() != 0:
+    if (needs_fiber_runtime != 0 or (rt_bundle_joined and not target_spec_is_wasm())) and link_stage_rt_in_unit() != 0:
         // Runtime emitted in-unit: the asm-defined with_fiber_* symbols
         // still trip the predicate, but only fiber_asm.o may link — the
         // .w-derived trio would duplicate the in-unit definitions. The

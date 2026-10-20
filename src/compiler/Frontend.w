@@ -1865,15 +1865,9 @@ impl Zcu:
         if platform.len() == 0:
             self.diagnostics.emit(Diagnostic.err("rt-in-unit: no runtime platform source for target '" ++ target_spec_name() ++ "'", Span { file: 0, start: 0, end: 0 }))
             return merged_pool
-        let fiber_core = embedded_rt_fiber_core_file()
-        let files: List[str] = List.new()
-        files.push("rt/rt_core.w")
-        files.push(with_str_clone_ref(platform))
-        files.push("rt/panic_runtime.w")
-        files.push("rt/channel_runtime.w")
-        files.push("rt/fiber_runtime.w")
-        files.push(with_str_clone_ref(fiber_core))
-        files.push("rt/compat_runtime.w")
+        // The target's module set, owned by EmbeddedRuntime (on wasm the
+        // fiber stubs stand in for the fiber and channel runtimes).
+        let files = embedded_rt_unit_files()
         for i in 0..files.len():
             let rel = files[i]
             let path = embedded_rt_resolve_path(rel)
