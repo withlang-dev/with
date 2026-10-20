@@ -2013,14 +2013,6 @@ fn link_stage_runtime_dir_is_this_generation(dir: &str) -> bool:
     let on_disk = runtime_read_file(dir ++ "/rt_core.o")
     on_disk.len() == embedded.len() and on_disk == embedded
 
-// A root whose .producer names another generation: the fallback root
-// (compiler_dir/runtime) is returned without passing the candidate check.
-fn link_stage_runtime_root_is_foreign(root: &str) -> bool:
-    if not compiler_generation_is_stamped():
-        return false
-    let producer = link_stage_runtime_dir_producer(root)
-    producer.len() > 0 and producer != compiler_generation()
-
 fn link_stage_embedded_runtime_is_this_generation() -> bool:
     not compiler_generation_is_stamped() or compiler_runtime_generation() == compiler_generation()
 
@@ -2042,10 +2034,28 @@ fn link_stage_runtime_variant_dir() -> str:
         return root
     root ++ "/cross/" ++ target_spec_name()
 
+// A root whose LLVM bridge this compiler may link: the bridges are compiled
+// by the root's producer and nothing embeds them, so byte-identical runtime
+// objects (link_stage_runtime_dir_matches_embedded) do not vouch for them —
+// the producer must be this generation. The build asks this before naming
+// the action runner's root (main.w build_runner_link_root): a stage2 whose
+// embedded runtime matched the seed's out/bootstrap-lib byte for byte was
+// handed that root and then refused its bridge ("missing LLVM static
+// bridge"), and every action fell back to comptime evaluation.
+fn link_stage_runtime_root_links_bridge(dir: &str) -> bool:
+    not compiler_generation_is_stamped() or link_stage_runtime_dir_producer(dir) == compiler_generation()
+
 fn link_stage_find_llvm_static_bridge() -> str:
     let root = link_stage_resolve_runtime_root()
     // The bridges' wl_* functions are this generation's ABI too (#1815).
-    if root.len() == 0 or link_stage_runtime_root_is_foreign(root):
+    if root.len() == 0:
+        return ""
+    if not link_stage_runtime_root_links_bridge(root):
+        // A root with a producer says whose bridge it holds; the fallback
+        // root of a cold worktree has none and no bridge either, and the
+        // caller's "missing LLVM static bridge" says all there is.
+        if link_stage_runtime_dir_producer(root).len() > 0:
+            with_eprint("error: runtime root " ++ root ++ " holds the runtime objects this compiler embeds, but its LLVM bridge was compiled by generation " ++ link_stage_runtime_dir_producer(root) ++ ", not this compiler's (" ++ compiler_generation() ++ "), and nothing embeds a bridge: a link of the compiler's modules needs a root this generation produced (D30, #1815)")
         return ""
     let variant = link_stage_runtime_variant_dir()
     let bridge_o = variant ++ "/llvm_bridge.o"
@@ -2105,8 +2115,12 @@ fn link_stage_find_runtime_object_path(name: &str) -> str:
         return ""
     let p = root ++ "/" ++ name
     // The fallback root (compiler_dir/runtime) was not a candidate that
-    // passed: a .producer naming another generation keeps its objects out.
-    if (not link_stage_runtime_root_is_foreign(root) or link_stage_runtime_dir_matches_embedded(root)) and runtime_read_file(p).len() > 0:
+    // passed: only a root this generation produced, or one whose objects
+    // are the ones this compiler embeds, is linked. A root with no
+    // .producer is no exception (#2491: a stale, producer-less
+    // <compiler_dir>/runtime of 2026-08 was linked by a current compiler
+    // and every current runtime symbol came up undefined).
+    if link_stage_runtime_dir_is_this_generation(root) and runtime_read_file(p).len() > 0:
         return p
     // Fall back to embedded runtime objects (self-contained binary) — when
     // they are this compiler's generation (#1815).

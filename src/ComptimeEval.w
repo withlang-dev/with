@@ -1820,7 +1820,10 @@ impl ComptimeEvaluator:
         let type_sym = self.pool.intern(type_name) as i32
         let tid = self.sema.lookup_named_type_ambient(type_sym)
         if tid == 0:
-            let _ = self.fail(node, "capability type is not visible to comptime evaluator")
+            // Names the type: "capability type is not visible" alone left
+            // #2493 (every object action refused by a fresh-clone driver)
+            // without its first fact.
+            let _ = self.fail(node, "capability type '" ++ type_name ++ "' is not visible to the comptime evaluator from module '" ++ self.sema.current_module_path ++ "' (no type of that name resolves ambiently)")
             return 0
         tid
 

@@ -1856,8 +1856,12 @@ fn build_runner_link_root(root: &str) -> str:
         let dir = resolve_join(root, dirs[i])
         if with_fs_file_exists(dir ++ "/cimport_stubs.o") == 0: continue
         if platform_object.len() > 0 and with_fs_file_exists(dir ++ "/" ++ platform_object) == 0: continue
-        // The link's own test for a root it is named (#1899).
-        if link_stage_named_runtime_root_is_this_generation(dir): return dir
+        // The link's own tests for a root it is named (#1899), and for the
+        // bridge the runner links: build.w reaches the compiler's modules,
+        // so the root's producer must be this generation — runtime objects
+        // that merely match the embedded ones (a seed's out/bootstrap-lib
+        // under a stage2 of the same rt/) do not carry its bridge.
+        if link_stage_named_runtime_root_is_this_generation(dir) and link_stage_runtime_root_links_bridge(dir): return dir
     ""
 
 // A project with no runtime directory at all links its runner from the
@@ -2569,7 +2573,15 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     let worker_name = with_getenv_str("WITH_BUILD_ACTION_WORKER")
     let cached = build_cache_graph_try_read(root, graph_cache_key)
     if cached.ok:
-        var cache_admitted = worker_name.len() == 0
+        // A cached graph carries no Sema. The driver evaluates an action
+        // itself only when no runner can be spawned — a cold worktree before
+        // its bootstrap root exists — and then needs the live Sema the real
+        // eval produces: a placeholder refused every object action after
+        // `:deps` had written the cache ("capability type is not visible",
+        // #2493, every CI lane's first `build`). The cache is admitted only
+        // when the runner already exists, so an action never meets the
+        // placeholder; a worker admits it for the graph data alone.
+        var cache_admitted = worker_name.len() == 0 and build_runner_built(root, options)
         if not cache_admitted:
             let wi = build_graph_find_target_index_by_name(&cached, worker_name)
             cache_admitted = wi >= 0 and (&cached.targets[wi]).kind != 23
