@@ -1854,6 +1854,9 @@ fn rt_thread_entry(arg: *mut u8) -> *mut u8:
     rt_closure_env_release(ctx)
     arg
 
+// The thread keeps the closure: what a raw pointer retains is declared,
+// never inferred (D30 step 2); the runtime bundle's interface carries it.
+@[effect(fn_ptr: escape_value, ctx: escape_value)]
 pub fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64:
     if fn_ptr as i64 == 0:
         return -1
@@ -3392,6 +3395,7 @@ pub fn with_vec_shrink_to_fit_es(v: *mut u8, es: i64):
 // interpreted steps per byte under the comptime evaluator). Grow to
 // fit once, memcpy once. Byte semantics only: a non-u8 element size is
 // a caller bug and fails loudly.
+@[effect(v: write)]
 pub fn with_vec_append_bytes(v: *mut u8, s: &str) -> Unit:
     let n = str_length(s)
     if n <= 0:
@@ -3688,6 +3692,7 @@ pub fn with_vec_get_i64(v: *mut u8, idx: i64) -> i64:
         return unsafe *(p as *const i64)
     0
 
+@[effect(val: escape_value)]
 pub fn with_vec_push_str(v: *mut u8, val: str):
     with_vec_push_es(v, &val as *const u8, 16)
     // with_vec_push bit-copies raw element bytes. The List now owns this str

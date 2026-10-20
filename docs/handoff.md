@@ -501,17 +501,17 @@ first (`seed-driver` goes red, the rest measures), then cut.
 - Every host's `src/main` falls behind the lock after a merge that bumps
   `seed.lock`: check its digest against the lock before `build`; install by
   `curl` + digest (`:seed` from an old seed may not compile the fetcher).
-- studio128 has no `SDKROOT`; the facade tests read `sqlite3.h`, `bzlib.h`,
-  `curl/curl.h` from the host SDK: run `:test` there with
-  `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk`.
+- The darwin host is the laptop (studio128 is gone, Eric 2026-10-20): the
+  cut runs in `~/.local/with-staging/reseed-main` with `SDKROOT` exported
+  (`xcrun --show-sdk-path`); the facade tests read `sqlite3.h`, `bzlib.h`,
+  `curl/curl.h` from the host SDK.
 - `screen -X quit` leaves the stage compiles running; `pkill` them and check
   `uptime` before `:test`, or tests time out (exit 124) under the load.
 - Never run tests from a checkout whose `out/lib` is stale (`~/with` after a
   reseed elsewhere): the child compilers find no runtime of their generation.
-- ssh to studio128 drops about one connection in three: retry loops, work in
-  `screen -dmS`, poll a file for `rc=`. Sequencer: `~/seedcut` on studio128
-  and eric-5090 (source `~/.local/with-staging/seedcut.w`); Windows uses
-  `C:/ws7f81-launch.exe W:/ws7f81 …` over a held ssh.
+- Remote work runs in `screen -dmS`, polling a file for `rc=`. Sequencer:
+  `~/seedcut` on eric-5090 (source `~/.local/with-staging/seedcut.w`);
+  Windows uses `C:/Users/Eric/wsb.w` in the `wtr` checkout over a held ssh.
 - Publish from `~/.local/with-staging/reseed-main` with
   `:publish-release-asset`, darwin first; zsh does not word-split
   `set -- $p`.

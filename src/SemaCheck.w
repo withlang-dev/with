@@ -4932,9 +4932,9 @@ impl Sema:
             var eff: i32 = self.current_fn_param_effs[pi]
             if facade_declared and sig_idx >= 0:
                 eff = eff | self.sig_param_effect(sig_idx, pi)
-            // A runtime definition's declared contract (D30, the extern it
-            // replaced) survives the inference it is checked by, including
-            // the pointer masking below: retention through a raw pointer is
+            // A runtime definition's declared contract (D30 step 2, its own
+            // pin) survives the inference it is checked by, including the
+            // pointer masking below: retention through a raw pointer is
             // never inferred, only declared.
             let declared_contract = if sig_idx >= 0 and self.runtime_contract_sigs.contains(sig_idx): self.sig_param_effect(sig_idx, pi) & EFF_DECLARED_MASK else: 0
             if eff != 0:
@@ -5012,15 +5012,12 @@ impl Sema:
                 let param_name: str = with_str_clone_ref(self.pool_resolve(pin_param_sym))
                 if pin_pi < 0:
                     self.emit_error("@[effect] names unknown parameter '" ++ param_name ++ "'", node)
-                else if self.current_module_is_runtime() and sema_name_is_compiler_abi_extern(self.pool_resolve(self.ast.get_data0(node))) != 0:
-                    // A runtime ABI definition's pin is its declared contract,
-                    // as the extern's is in the object world (D30 step 2):
-                    // what it retains through a raw pointer (with_thread_spawn's
-                    // fn_ptr and ctx, run later by the thread) is never
-                    // inferred — a pointer parameter's inferred effects are
-                    // read-only by design — so the definition declares it, and
-                    // the runtime bundle's interface carries it.
-                    self.set_sig_param_effect(sig_idx, pin_pi, self.sig_param_effect(sig_idx, pin_pi) | pin_bits)
+                else if self.runtime_contract_sigs.contains(sig_idx):
+                    // A runtime ABI definition's pin is its declared contract
+                    // (D30 step 2), applied at declaration and kept through
+                    // the flush above: what it retains through a raw pointer
+                    // is never inferred, so there is nothing to compare.
+                    continue
                 else:
                     let inferred = self.sig_param_effect(sig_idx, pin_pi) & EFF_DECLARED_MASK
                     if inferred != pin_bits:
