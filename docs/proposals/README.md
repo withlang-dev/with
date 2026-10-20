@@ -13,6 +13,7 @@ folder. A finished phase is archived in [docs/completed](../completed).
 
 ## Active
 
+- [The With Steam Game Development Kit](steam-gdk.md)
 - [D21 Mutator Pipeline Implementation Plan](d21-mutator-pipeline-implementation.md)
 - [D22 Implementation Plan — Uniform Keyed Lookup, Contextual Copy, and View Origins](d22-implementation-plan.md)
 - [D27 Element-View Implementation Plan (#740)](d27-implementation-plan.md)
