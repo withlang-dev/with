@@ -113,8 +113,6 @@ fn cross_rt_bundle_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, plan
     target = target.input(build_owned_text(root))
     target = target.dep(p ++ "rt-bundle-root")
     target = target.dep("build")
-    for pi in 0..plans.len():
-        target = target_with_link_bundle(target, ctx, plans[pi])
     for stem in cross_rt_bundle_modules(tag).split(","):
         target = target.input("rt/" ++ stem ++ ".w")
     target = target.extra_output(dir ++ "/rt.wi")
@@ -128,7 +126,7 @@ fn cross_rt_bundle_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, plan
     target = target.timeout(600000)
     out.add_target(target)
 
-fn rt_bundle_target(name: &str, compiler: &str, dir: &str, dep: &str, host_runtime: &HostRuntimeSpec, ctx: &BuildCtx, corpus_plans: &List[WoBundle]) -> Target:
+fn rt_bundle_target(name: &str, compiler: &str, dir: &str, dep: &str, host_runtime: &HostRuntimeSpec) -> Target:
     var target = target_new(.Action, build_owned_text(name), "").output(dir ++ "/rt.o")
     target.action = run_rt_bundle_build_action
     target = target.compiler(compiler)
@@ -138,8 +136,6 @@ fn rt_bundle_target(name: &str, compiler: &str, dir: &str, dep: &str, host_runti
     target = target.arg("root=out/gen/rt_bundle.w")
     target = target.input("out/gen/rt_bundle.w")
     target = target.dep("rt-bundle-root")
-    for pi in 0..corpus_plans.len():
-        target = target_with_link_bundle(target, ctx, corpus_plans[pi])
     target = target.input("rt/rt_core.w")
     target = target.input(build_owned_text(host_runtime.platform_source))
     target = target.input("rt/panic_runtime.w")
@@ -542,38 +538,41 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
 // link; out/bootstrap-lib is the seed's generation and serves stage1 only.
 // Group `stage1-runtime`, part of `:dev` so stage1 run by hand links through
 // it (Link.w's <compiler_dir>/../lib candidate).
+// stage1's runtime objects and corpus bundles compile after stage1-rt-bundle:
+// their std imports read the runtime's interface from it (D30 step 3), the
+// bundle being the one unit that reads the runtime's source.
 fn add_stage1_runtime_targets(out0: Build, ctx: &BuildCtx, host_runtime: &HostRuntimeSpec, corpus_plans: &List[WoBundle], wasm_plans: &List[WoBundle]) -> Build:
     var out = out0
     let dir = "out/bootstrap/lib"
     let stage1 = bootstrap_compiler_bin("with-stage1")
     let objects: List[str] = List.new()
-    out = out.add_target(with_object_target("stage1-rt-core-object", stage1, "rt/rt_core.w", dir ++ "/rt_core.o", "-O1", "stage1"))
+    out = out.add_target(with_object_target("stage1-rt-core-object", stage1, "rt/rt_core.w", dir ++ "/rt_core.o", "-O1", "stage1-rt-bundle"))
     objects.push("stage1-rt-core-object")
-    out = out.add_target(with_object_target("stage1-rt-platform-object", stage1, host_runtime.platform_source, dir ++ "/" ++ host_runtime.platform_install_object, "-O1", "stage1"))
+    out = out.add_target(with_object_target("stage1-rt-platform-object", stage1, host_runtime.platform_source, dir ++ "/" ++ host_runtime.platform_install_object, "-O1", "stage1-rt-bundle"))
     objects.push("stage1-rt-platform-object")
-    out = out.add_target(with_object_target("stage1-cimport-stubs-object", stage1, "rt/cimport_stubs.w", dir ++ "/cimport_stubs.o", "-O1", "stage1"))
+    out = out.add_target(with_object_target("stage1-cimport-stubs-object", stage1, "rt/cimport_stubs.w", dir ++ "/cimport_stubs.o", "-O1", "stage1-rt-bundle"))
     objects.push("stage1-cimport-stubs-object")
     var compat = with_object_target("stage1-compat-runtime-object", stage1, "out/gen/compat_runtime.w", dir ++ "/compat_runtime.o", "-O1", "stage1")
     compat = compat.dep("compat-runtime-source")
     out = out.add_target(compat)
     objects.push("stage1-compat-runtime-object")
-    out = out.add_target(with_object_target("stage1-panic-runtime-object", stage1, "rt/panic_runtime.w", dir ++ "/panic_runtime.o", "-O1", "stage1"))
+    out = out.add_target(with_object_target("stage1-panic-runtime-object", stage1, "rt/panic_runtime.w", dir ++ "/panic_runtime.o", "-O1", "stage1-rt-bundle"))
     objects.push("stage1-panic-runtime-object")
-    out = out.add_target(with_object_target("stage1-fiber-stubs-object", stage1, "rt/fiber_stubs.w", dir ++ "/fiber_stubs.o", "-O1", "stage1"))
+    out = out.add_target(with_object_target("stage1-fiber-stubs-object", stage1, "rt/fiber_stubs.w", dir ++ "/fiber_stubs.o", "-O1", "stage1-rt-bundle"))
     objects.push("stage1-fiber-stubs-object")
-    out = out.add_target(with_object_target("stage1-channel-runtime-object", stage1, "rt/channel_runtime.w", dir ++ "/channel_runtime.o", "-O1", "stage1"))
+    out = out.add_target(with_object_target("stage1-channel-runtime-object", stage1, "rt/channel_runtime.w", dir ++ "/channel_runtime.o", "-O1", "stage1-rt-bundle"))
     objects.push("stage1-channel-runtime-object")
-    out = out.add_target(with_object_target("stage1-fiber-runtime-object", stage1, "rt/fiber_runtime.w", dir ++ "/fiber_runtime.o", "-O1", "stage1"))
+    out = out.add_target(with_object_target("stage1-fiber-runtime-object", stage1, "rt/fiber_runtime.w", dir ++ "/fiber_runtime.o", "-O1", "stage1-rt-bundle"))
     objects.push("stage1-fiber-runtime-object")
-    out = out.add_target(with_object_target("stage1-fiber-core-object", stage1, host_runtime.fiber_core_source, dir ++ "/fiber.o", "-O1", "stage1"))
+    out = out.add_target(with_object_target("stage1-fiber-core-object", stage1, host_runtime.fiber_core_source, dir ++ "/fiber.o", "-O1", "stage1-rt-bundle"))
     objects.push("stage1-fiber-core-object")
     out = out.add_target(target_new(.CompileAsmObject, "stage1-fiber-asm-object", build_owned_text(host_runtime.fiber_asm_source)).output(dir ++ "/fiber_asm.o"))
     objects.push("stage1-fiber-asm-object")
-    out = out.add_target(rt_bundle_target("stage1-rt-bundle", stage1, dir, "stage1", host_runtime, ctx, corpus_plans))
+    out = out.add_target(rt_bundle_target("stage1-rt-bundle", stage1, dir, "stage1", host_runtime))
     objects.push("stage1-rt-bundle")
-    out = out.add_target(with_object_target("stage1-llvm-bridge-object", stage1, "src/compiler/LlvmBridge.w", dir ++ "/llvm_bridge.o", "-O1", "stage1"))
+    out = out.add_target(with_object_target("stage1-llvm-bridge-object", stage1, "src/compiler/LlvmBridge.w", dir ++ "/llvm_bridge.o", "-O1", "stage1-rt-bundle"))
     objects.push("stage1-llvm-bridge-object")
-    out = out.add_target(with_object_target("stage1-clang-bridge-object", stage1, "src/compiler/ClangBridge.w", dir ++ "/clang_bridge.o", "-O1", "stage1"))
+    out = out.add_target(with_object_target("stage1-clang-bridge-object", stage1, "src/compiler/ClangBridge.w", dir ++ "/clang_bridge.o", "-O1", "stage1-rt-bundle"))
     objects.push("stage1-clang-bridge-object")
 
     var metadata = target_new(.Action, "stage1-llvm-link-metadata", "").output(dir ++ "/.llvm-link-ready")
@@ -3760,7 +3759,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = add_stage1_runtime_targets(move out, ctx, &host_runtime, &corpus_plans, &corpus_plans_wasm32)
 
     for pi in 0..corpus_plans.len():
-        out = wo_bundle_targets(move out, ctx, corpus_plans[pi], bootstrap_compiler_bin("with-stage1"), "stage1")
+        out = wo_bundle_targets(move out, ctx, corpus_plans[pi], bootstrap_compiler_bin("with-stage1"), "stage1-rt-bundle")
 
     // Dev tier (D14): the sanctioned iterate loop. One self-compile —
     // seed → stage1 — yields a testable compiler at out/bootstrap/bin/
@@ -3994,7 +3993,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     fiber_asm = fiber_asm.dep("stage1")
     out = out.add_target(fiber_asm)
     out = out.add_target(rt_bundle_root_target(&host_runtime))
-    out = out.add_target(rt_bundle_target("rt-bundle", stage_compiler_bin("with-stage2"), "out/lib", "stage2", host_runtime, ctx, &corpus_plans))
+    out = out.add_target(rt_bundle_target("rt-bundle", stage_compiler_bin("with-stage2"), "out/lib", "stage2", host_runtime))
 
     var embedded_objects = target_new(.EmbedObjectFiles, "embedded-objects-asm", "").output("out/lib/embedded_objects.s")
     embedded_objects = embedded_objects.input("out/lib/cimport_stubs.o")
