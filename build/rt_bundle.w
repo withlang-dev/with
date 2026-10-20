@@ -80,7 +80,7 @@ pub fn run_rt_bundle_build_action(ctx: ActionCtx) -> i32:
     for i in 0..args.len():
         if args[i] == "--link-bundle" and i + 1 < args.len():
             link_bundles.push("--link-bundle")
-            link_bundles.push(args[i + 1].clone())
+            link_bundles.push(args[i + 1])
     let obj = dir ++ "/rt.o"
     let wi = dir ++ "/rt.wi"
     let manifest = dir ++ "/rt.manifest"
@@ -91,7 +91,7 @@ pub fn run_rt_bundle_build_action(ctx: ActionCtx) -> i32:
     build_args.push("build")
     build_args.push(rb_abs(root, root_path))
     build_args.push("--emit-obj")
-    for lb in link_bundles: build_args.push(lb.clone())
+    for lb in link_bundles: build_args.push(lb)
     build_args.push("--bundle-corpus")
     build_args.push("rt")
     build_args.push("--emit-bundle-interface")
@@ -114,7 +114,7 @@ pub fn run_rt_bundle_build_action(ctx: ActionCtx) -> i32:
     check_args.push(rb_abs(root, compiler))
     check_args.push("check")
     check_args.push(rb_abs(root, wi))
-    for lb in link_bundles: check_args.push(lb.clone())
+    for lb in link_bundles: check_args.push(lb)
     check_args.push("--bundle-corpus")
     check_args.push("rt")
     check_args.push("--bundle-fingerprint")
