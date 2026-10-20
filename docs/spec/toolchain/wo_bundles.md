@@ -458,6 +458,15 @@ genuinely needs to state an origin, With's source language gains a way
 to say it (conceptually `-> &Foo from a`): a real language feature for
 authors, never an interface-only annotation of inferred Sema facts. If a
 caller must know it for correctness, it belongs in the contract.
+A declared `@[effect]` pin is declaration, not inference (D30 step 2,
+2026-10-20): the interface prints it on the declaration exactly as the
+parser reads it (`@[effect(ctx: escape_value)]`), the fingerprint row
+carries the pinned bits in place of the type's declared effect, and the
+interface twin applies it as an extern's pin. It is the one spelling of
+what a raw-pointer parameter retains — the runtime keeps
+`with_thread_spawn`'s `fn_ptr` and `ctx` — which no type spells and the
+runtime bundle must carry; on a runtime ABI definition the pin is that
+declared contract, on any other bodied function a checked one (§16.3d).
 
 **Global writes are the declaration — D79.** A call writes every global
 its callee writes (§21.1 rule 1), so for a function that crosses a bundle
@@ -557,12 +566,13 @@ align, default) and variants (name, discriminant, payloads); const,
 global, extern and fn rows, the fn rows carrying the receiver mode,
 unsafe-ness, per-parameter spelling, share-place verdict and DECLARED
 effect (SemaCheck's `declared_param_effect`/`declared_view_origin`, the
-rule C1's interface Sema applies, so source and interface agree), the
+rule C1's interface Sema applies, so source and interface agree, or the
+parameter's `@[effect]` pin where one is declared), the
 return spelling and the declared view origin. The source pass warns when
 a plain `T` parameter's body only reads it — the D39 "declare it `&T`"
 signal. The harness `bundle-interface-tests` regenerates
 `test/bundle_interface/wi_demo.wi` byte for byte, requires
-fingerprint equality, checks three interface mutations change it, runs
+fingerprint equality, checks that five interface mutations (a pin dropped among them) change it, runs
 the consumer against the emitted interface, and fires each refusal.
 Measured on pcre2 (2026-09-02, stage1): a 4.3k-line `.wi`, source and
 interface fingerprints equal, and a tiny `std.re` consumer's `check`
