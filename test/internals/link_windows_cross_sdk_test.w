@@ -43,6 +43,9 @@ fn main:
     assert(command.linker == "lld-link")
     assert(has_arg(&command, target ++ "/libc/windows/"))
     assert(not has_arg(&command, host ++ "/libc/windows/"))
+    // The image names its PDB by file name, not by the absolute path it was
+    // linked at: the same inputs link to the same bytes in any directory.
+    assert(has_arg(&command, "/pdbaltpath:%_PDB%"))
 
     // The c_import parse reads the same SDK libc as the link: on aarch64
     // too when the SDK carries it (run 39296788835 parsed mingw-w64's

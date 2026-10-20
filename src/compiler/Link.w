@@ -961,6 +961,10 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_p
     args.push("/subsystem:console")
     args.push("/debug")
     args.push("/pdb:" ++ bin_path ++ ".pdb")
+    // The image's debug directory names the PDB by file name (a debugger
+    // finds it beside the image); the absolute link path made one tool's
+    // bytes differ per directory, so the build store never served it (#2016).
+    args.push("/pdbaltpath:%_PDB%")
     args.push("/stack:8388608")
     args.push("/opt:ref")
     args.push("/opt:icf")
