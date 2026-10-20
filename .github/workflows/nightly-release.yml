@@ -63,16 +63,16 @@ jobs:
         include:
           - arch: x86_64
             runner: windows-latest
-            seed_version: nightly-20261020-local-1-e1d2b25e6d04
+            seed_version: nightly-20261020-local-2-4d6d960d6ed0
             seed_asset: with-windows-x86_64.exe
-            seed_sha256: 04daff68db5274da426758c10ae7bccf693e8844d82a164a22de863e1bf3718e
+            seed_sha256: 4b5093d79210e3eddc6ec136eb1f38d739427fcc41f8fddd50b632cabb21c0d6
             mesa_arch: x64
             mesa_sha256: 418f1938dc48d401538cf6440d3c718e2f456ef2023e44133105263f483e903f
           - arch: aarch64
             runner: windows-11-arm
-            seed_version: nightly-20261015-local-1-efcb91c30a6a
+            seed_version: nightly-20261020-local-1-e1d2b25e6d04
             seed_asset: with-windows-aarch64.exe
-            seed_sha256: f27e7459c0039682e6b228e60abfbbcc750eb2a1dd61531269f08cb65380c967
+            seed_sha256: 384d8a0b0ffd3335cadf43df710f3b9ef47720f80c349c1f1e5d4916836a67c0
             mesa_arch: arm64
             mesa_sha256: bd1c00a49504b3efe20037cf29fa437380cfb5cbe73f196272624b94938330f1
     steps:
@@ -233,9 +233,9 @@ jobs:
             runner: ubuntu-latest
             sdk_host_tag: linux-x86_64
             seed_repo: withlang-dev/with
-            seed_version: nightly-20261020-local-1-e1d2b25e6d04
+            seed_version: nightly-20261020-local-2-4d6d960d6ed0
             seed_asset: with-linux-x86_64
-            seed_sha256: 6c5e8a643409b962f3b8d9ef4da3e32b7c013df359fe463d6a5ce06aa0718acb
+            seed_sha256: 7adb7e9653a13875ec02e693d59f822780529b9a8dc4834e589d47790ed9be69
             sdk_version: nightly-sdk-20261004-c4ddb7ddbef2
             sdk_asset: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
             sdk_sha256: 89751749724afcd2cd26f4022201797d310dc77c74f4b49689a0d2768db74785
@@ -452,9 +452,9 @@ jobs:
             runner: macos-latest
             sdk_host_tag: darwin-arm64
             seed_repo: withlang-dev/with
-            seed_version: nightly-20261020-local-1-e1d2b25e6d04
+            seed_version: nightly-20261020-local-2-4d6d960d6ed0
             seed_asset: with-darwin-aarch64
-            seed_sha256: 3a92ac0e3a8b32467e2f88591e1b2271dd151f7757fdb07098d18593a0384dea
+            seed_sha256: 5998cfebed4fe44ae2afe464c975b1005d39aaaecea22ea793199e456a4403eb
             sdk_version: nightly-sdk-20261004-8b0595267bb0
             sdk_asset: with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz
             sdk_sha256: d3abcdfd6f6ccc8094929e4053a15c28c45d1672108d5755460cd51607bd9406
@@ -651,9 +651,9 @@ jobs:
       # predated that fix; a compiler bootstrapped from it self-perpetuates the
       # miscompile and crashes (0xC0000005) compiling any regex literal at comptime.
       # build and :fixpoint never compile a regex, so that poison shipped green.
-      WITH_SEED_VERSION: nightly-20261020-local-1-e1d2b25e6d04
+      WITH_SEED_VERSION: nightly-20261020-local-2-4d6d960d6ed0
       WITH_SEED_ASSET: with-windows-x86_64.exe
-      WITH_SEED_SHA256: 04daff68db5274da426758c10ae7bccf693e8844d82a164a22de863e1bf3718e
+      WITH_SEED_SHA256: 4b5093d79210e3eddc6ec136eb1f38d739427fcc41f8fddd50b632cabb21c0d6
       # The windows-gnu SDK of sdk.lock (#1915): its own C runtime, so the
       # job reads no Visual Studio and no Windows SDK. The archive digest is
       # pinned here; the release republishes the verified archive as is.
@@ -892,9 +892,9 @@ jobs:
       # The seed.lock pin (#1915): a self-contained compiler that embeds its
       # runtime, sysroot and lld, so it needs no runtime bundle, linker shim
       # or host libxml2.
-      WITH_SEED_VERSION: nightly-20261015-local-1-efcb91c30a6a
+      WITH_SEED_VERSION: nightly-20261020-local-2-4d6d960d6ed0
       WITH_SEED_ASSET: with-linux-aarch64
-      WITH_SEED_SHA256: 8b31429cacb68995ef60c62410aea416e801a0ff007111a73a001919af3b425d
+      WITH_SEED_SHA256: b7a87f919fb474aea0fbe84a1b9da2809c56350ff00460c5a113eb5ae58ba689
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: nightly-sdk-20260930-e997223d40ce
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
@@ -1053,9 +1053,9 @@ jobs:
       WITH_SEED_REPO: withlang-dev/with
       # CI-produced by seed-windows-aarch64.yml (cross-built on Linux, published
       # to the seed-windows-aarch64 prerelease) -- never a hand-uploaded asset.
-      WITH_SEED_VERSION: nightly-20261015-local-1-efcb91c30a6a
+      WITH_SEED_VERSION: nightly-20261020-local-1-e1d2b25e6d04
       WITH_SEED_ASSET: with-windows-aarch64.exe
-      WITH_SEED_SHA256: f27e7459c0039682e6b228e60abfbbcc750eb2a1dd61531269f08cb65380c967
+      WITH_SEED_SHA256: 384d8a0b0ffd3335cadf43df710f3b9ef47720f80c349c1f1e5d4916836a67c0
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: sdk-windows-aarch64
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-aarch64.tar.gz
