@@ -2730,6 +2730,13 @@ impl Sema:
     mut fn record_global_concurrency_evidence(node: i32, reason: &str):
         if node == 0:
             return
+        // The runtime is not the program's evidence (D30): its foreign
+        // entry points (`__isPlatformVersionAtLeast`, for clang's
+        // @available) touch no program global, and compiled in-unit they
+        // made every program's globals "may race" though the same runtime
+        // linked as an object never did.
+        if sema_path_is_runtime_implementation(self.current_module_path) != 0:
+            return
         if self.global_race_concurrency_node != 0:
             return
         self.global_race_concurrency_node = node
