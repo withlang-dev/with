@@ -30,12 +30,18 @@ fn bundle_text_sha256(text: &str) -> str:
 fn bundle_corpus_contains(corpus: &str, canonical_path: &str) -> bool:
     if corpus.len() == 0:
         return false
-    let base = "<embedded-std>/" ++ corpus
+    let base = bundle_corpus_base(corpus)
     canonical_path == base ++ ".w" or canonical_path.starts_with(base ++ "/")
 
-// `<embedded-std>/std/re/defs.w` → `std.re.defs`; "" for any other path.
+// The embedded tree a corpus lives in: the runtime's (D30 R3, `rt`) is
+// `<embedded-rt>/rt`, every migrated corpus's `<embedded-std>/<rel>`.
+fn bundle_corpus_base(corpus: &str) -> str:
+    if corpus == "rt": "<embedded-rt>/rt" else: "<embedded-std>/" ++ corpus
+
+// `<embedded-std>/std/re/defs.w` → `std.re.defs`, `<embedded-rt>/rt/rt_core.w`
+// → `rt.rt_core`; "" for any other path.
 fn bundle_module_dotted_name(canonical_path: &str) -> str:
-    let prefix = "<embedded-std>/"
+    let prefix = if canonical_path.starts_with("<embedded-rt>/"): "<embedded-rt>/" else: "<embedded-std>/"
     if not canonical_path.starts_with(prefix) or not canonical_path.ends_with(".w"):
         return ""
     let rel = canonical_path.slice(prefix.len(), canonical_path.len() - 2)

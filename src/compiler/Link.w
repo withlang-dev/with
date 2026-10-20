@@ -1852,9 +1852,22 @@ fn link_stage_select_embedded_bundles(undef: &str) -> List[str]:
         if not embedded_bundle_for_this_target(bi):
             continue
         let manifest = link_stage_embedded_obj_slice(embedded_bundle_manifest_start(bi) as *const u8, embedded_bundle_manifest_end(bi) as *const u8)
-        if link_stage_bundle_provided_explicitly(manifest) or not link_stage_bundle_needed(manifest, undef):
-            continue
         let name = embedded_bundle_name(bi)
+        // D30 R3: the runtime bundle joins every link of a unit compiled
+        // against its interface (the lane) and no other: its symbols are the
+        // flat `with_*` names, not module prefixes, and the object world
+        // links the rt objects instead. Like them it must be this
+        // compiler's own generation (D132).
+        if name == "rt":
+            if link_stage_rt_in_unit() == 0 or link_stage_bundle_provided_explicitly(manifest):
+                continue
+            if not link_stage_embedded_runtime_is_this_generation():
+                with_eprint(link_stage_runtime_generation_refusal())
+                let failed: List[str] = List.new()
+                failed.push(LINK_BUNDLE_FAILED())
+                return failed
+        else if link_stage_bundle_provided_explicitly(manifest) or not link_stage_bundle_needed(manifest, undef):
+            continue
         let bundle_abi = link_stage_bundle_manifest_field(manifest, "abi-sha")
         if abi_identity_refuses_bundle(compiler_abi_sha(), bundle_abi):
             with_eprint("error: embedded bundle '" ++ name ++ "' was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")

@@ -8238,8 +8238,15 @@ impl ComptimeEvaluator:
                 return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
             return comptime_control_value(self.empty_string_builder_value(result_type, comptime_value_intlike(arg_values[0])))
         let fn_node = self.find_fn_decl_node(fn_sym)
+        // D91 (§17.1a): the target's OS and architecture are a declared
+        // build input, readable by any compile-time code. Whether the
+        // runtime symbol is an extern, an interface declaration (the runtime
+        // bundle's, D30 R3) or, with the runtime in-unit (D30), its body:
+        // that body reads the host (rt_sysinfo_os), never the target, and
+        // its c"..." literal is not comptime-evaluable.
+        let reads_target = fn_name == "with_sysinfo_os" or fn_name == "with_sysinfo_arch"
         // D39: an interface declaration has no body to evaluate.
-        if fn_node != 0 and self.ast.fn_decl_body_is_interface(fn_node):
+        if fn_node != 0 and self.ast.fn_decl_body_is_interface(fn_node) and not reads_target:
             return self.fail(node, "cannot evaluate '" ++ fn_name ++ "' at comptime: an interface declaration has no body (D39)")
         if fn_node != 0:
             let fn_decl_path = self.decl_path(fn_node)
@@ -8266,12 +8273,6 @@ impl ComptimeEvaluator:
                     if comptime_value_is_intlike(arg_values[0]) == 0:
                         return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
                     return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor, comptime_value_intlike(arg_values[0])))
-        // D91 (§17.1a): the target's OS and architecture are a declared
-        // build input, readable by any compile-time code. Whether the
-        // runtime symbol is an extern or, with the runtime in-unit (D30),
-        // its body: that body reads the host (rt_sysinfo_os), never the
-        // target, and its c"..." literal is not comptime-evaluable.
-        let reads_target = fn_name == "with_sysinfo_os" or fn_name == "with_sysinfo_arch"
         // A runtime ABI function compiled in-unit (D30) has, to the
         // evaluator, the body the object-linked runtime gives it: none. Its
         // in-unit body is the runtime's (raw memory, syscalls), and walking

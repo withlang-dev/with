@@ -1282,9 +1282,11 @@ impl BundleEmitter:
                 self.context = mod_path ++ ": c_import"
                 self.refuse("a bundle module cannot c_import (compiler-owned code uses extern)")
                 continue
-            if kind == NodeKind.NK_EXTERN_VAR:
-                self.context = mod_path ++ ": extern var " ++ sema.pool_resolve(ast.get_data0(decl))
-                self.refuse("extern storage has no interface spelling (Level 0)")
+            // A module's own foreign seam is the object's, never a surface a
+            // consumer names: its extern storage (the runtime's libc stdio
+            // pointers) and its `c facade` blocks (the contracts of its own
+            // foreign calls) stay in the object and out of the interface.
+            if kind == NodeKind.NK_EXTERN_VAR or kind == NodeKind.NK_C_FACADE:
                 continue
             self.context = mod_path ++ ": declaration"
             self.refuse(bx_node_kind_name(kind) ++ " has no interface spelling")
