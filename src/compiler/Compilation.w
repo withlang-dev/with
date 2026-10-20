@@ -714,6 +714,11 @@ impl Compilation:
         taken_zcu.tool_mode_entry_path = with_str_clone_ref(path)
         self.zcu = taken_zcu
 
+    mut fn set_import_root_dir(dir: &str):
+        var taken_zcu = move self.zcu
+        taken_zcu.import_root_dir = dir
+        self.zcu = taken_zcu
+
     fn add_cli_diag_mapping(gen_start: i32, gen_end: i32, source_name: &str, source_text: &str) -> Unit:
         self.cli_diag_gen_starts.push(gen_start)
         self.cli_diag_gen_ends.push(gen_end)
@@ -985,14 +990,16 @@ impl Compilation:
         // Hook scratch lives in the system temp dir, never beside the source:
         // rooting it at frontend_dirname scattered pid-stamped runners and
         // dSYM bundles into source test directories (#741). The stamped dir
-        // is removed as one tree on every exit path. Only the runner SOURCE
-        // stays in root — its generated `use` imports resolve from there.
+        // is removed as one tree on every exit path. The runner source is
+        // there too, its `use` imports resolving from root (the import root):
+        // written into root, a concurrent listing of the source directory
+        // read it as a test or found it deleted (#2476).
         let stamp = f"{runtime_getpid()}.{runtime_clock_nanos()}"
         let tmp_dir = runtime_temp_dir() ++ "/with-compiler-hook." ++ stamp
         if runtime_mkdir_p(tmp_dir) != 0:
             runtime_eprint("error: could not create compiler hook temp directory: " ++ tmp_dir)
             return false
-        let runner_path = root ++ "/__with_compiler_hook_runner." ++ stamp ++ ".w"
+        let runner_path = tmp_dir ++ "/__with_compiler_hook_runner." ++ stamp ++ ".w"
         let runner_bin = tmp_dir ++ "/compiler-hook-runner." ++ stamp
         let diag_path = tmp_dir ++ "/compiler-hook-diags." ++ stamp ++ ".txt"
         let emitted_source_path = tmp_dir ++ "/compiler-hook-source." ++ stamp ++ ".w"
@@ -1016,8 +1023,8 @@ impl Compilation:
         runner_comp.set_debug_info(self.config.debug_info)
         runner_comp.set_compiler_hooks_enabled(false)
         runner_comp.set_tool_mode_entry_path(runner_path)
+        runner_comp.set_import_root_dir(root)
         let built_runner = runner_comp.build_binary_to_path(runner_path, runner_bin)
-        let _remove_runner_source = runtime_remove_file(runner_path)
         if built_runner == "":
             let _cleanup_build_fail = runtime_remove_tree(tmp_dir)
             runtime_eprint("error: compiler hook runner compilation failed")
