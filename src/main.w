@@ -3723,18 +3723,23 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
 
 // The installed compiler's debug info: lldb on ~/.local/bin/with gets source
 // lines, arguments and dotted breakpoints only from a dSYM beside it. The
-// release link writes `with.unstamped.dSYM`; stamping patches bytes and
-// keeps the Mach-O UUID, so that dSYM is the stamped binary's. It installs
-// as `with.dSYM` with its DWARF file named after the binary, through a temp
-// sibling and a rename. An old one is removed first either way: a dSYM
-// left from an earlier install describes a different binary.
+// release is stage2's image, stamped (build.w's stage2 target), and stamping
+// patches bytes but keeps the Mach-O UUID, so stage2's `with-stage2.dSYM` is
+// the release's. It installs as `with.dSYM` with its DWARF file named after
+// the binary, through a temp sibling and a rename. An old one is removed
+// first either way: a dSYM left from an earlier install describes a
+// different binary. (This read `out/release/bin/with.unstamped.dSYM`, which
+// no build has written since the release became stage2's image, so every
+// install went without one.)
+const RELEASE_DSYM: str = "out/stage/bin/with-stage2.dSYM"
+
 fn cli_install_compiler_dsym(root: &str, target_name: &str, dest: &str) -> i32:
     let dsym = dest ++ ".dSYM"
     build_graph_rt_remove_tree(dsym)
-    let source = resolve_join(root, "out/release/bin/with.unstamped.dSYM/Contents")
-    let dwarf = with_fs_read_file(source ++ "/Resources/DWARF/with.unstamped")
+    let source = resolve_join(root, RELEASE_DSYM ++ "/Contents")
+    let dwarf = with_fs_read_file(source ++ "/Resources/DWARF/with-stage2")
     if dwarf.len() == 0:
-        with_write(f"[{target_name}] no dSYM beside out/release/bin/with.unstamped: lldb on {dest} has symbols only, no source lines\n")
+        with_write(f"[{target_name}] no {RELEASE_DSYM}: lldb on {dest} has symbols only, no source lines\n")
         return 0
     let tmp = dsym ++ f".install-tmp.{build_graph_rt_pid()}"
     build_graph_rt_remove_tree(tmp)
@@ -3744,7 +3749,7 @@ fn cli_install_compiler_dsym(root: &str, target_name: &str, dest: &str) -> i32:
         build_graph_rt_remove_tree(tmp)
         with_eprint(f"[{target_name}] error: could not install {dsym}")
         return 1
-    with_write(f"[{target_name}] {dsym} <- out/release/bin/with.unstamped.dSYM\n")
+    with_write(f"[{target_name}] {dsym} <- {RELEASE_DSYM}\n")
     0
 
 fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCommandOptions) -> i32:
