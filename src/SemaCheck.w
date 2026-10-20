@@ -5012,6 +5012,15 @@ impl Sema:
                 let param_name: str = with_str_clone_ref(self.pool_resolve(pin_param_sym))
                 if pin_pi < 0:
                     self.emit_error("@[effect] names unknown parameter '" ++ param_name ++ "'", node)
+                else if self.current_module_is_runtime() and sema_name_is_compiler_abi_extern(self.pool_resolve(self.ast.get_data0(node))) != 0:
+                    // A runtime ABI definition's pin is its declared contract,
+                    // as the extern's is in the object world (D30 step 2):
+                    // what it retains through a raw pointer (with_thread_spawn's
+                    // fn_ptr and ctx, run later by the thread) is never
+                    // inferred — a pointer parameter's inferred effects are
+                    // read-only by design — so the definition declares it, and
+                    // the runtime bundle's interface carries it.
+                    self.set_sig_param_effect(sig_idx, pin_pi, self.sig_param_effect(sig_idx, pin_pi) | pin_bits)
                 else:
                     let inferred = self.sig_param_effect(sig_idx, pin_pi) & EFF_DECLARED_MASK
                     if inferred != pin_bits:
@@ -5120,6 +5129,14 @@ impl Sema:
             self.set_sig_param_direct_effect(sig_idx, pi, eff)
             self.set_sig_param_view_origin(sig_idx, pi, 0)
             self.set_sig_param_view_through(sig_idx, pi, 0)
+        // An `@[effect]` pin on the declaration is the contract its
+        // definition declared and the interface carries (D30 step 2: what a
+        // runtime ABI function retains through a raw pointer, which no type
+        // spells); applied as an extern's pin is.
+        if self.ast.fn_effect_pin_count(node as NodeId) > 0:
+            let pin_meta = self.ast.find_fn_meta(node)
+            if pin_meta >= 0:
+                self.apply_declared_effects_to_extern_sig(node, sig_idx, self.ast.fn_meta_param_start(pin_meta), self.ast.fn_meta_param_count(pin_meta))
         // §21.1 rule 6 (#1903): a `from` clause states the origins — the
         // parameters it names; its globals are read at each call
         // (sig_ret_global_origins).

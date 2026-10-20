@@ -28,4 +28,7 @@ fn main:
     let word = "four"
     let once_len = call_once(() => owned_len(word))
     let twice = call_twice(() => 3)
-    print(f"{a} {s} {take(p)} {table_at(2)} {K} {TABLE[1]} {sum_slice(xs)} {level_value(Level.High)} {GREETING.len()} {w} {COUNTER} {packet_word(packet)} {sizeof[Packet]()} {once_len} {twice} {counted}")
+    // D30 step 2: `peek` carries its `@[effect(p: read)]` pin across the
+    // boundary; `p` is observed, and consumed by `take` after.
+    let peeked = peek(p)
+    print(f"{a} {s} {take(p)} {table_at(2)} {K} {TABLE[1]} {sum_slice(xs)} {level_value(Level.High)} {GREETING.len()} {w} {COUNTER} {packet_word(packet)} {sizeof[Packet]()} {once_len} {twice} {counted} {peeked}")

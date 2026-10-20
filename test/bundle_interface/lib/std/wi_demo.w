@@ -62,6 +62,17 @@ pub fn sum_slice(xs: []i32) -> i32:
 pub fn level_value(l: Level) -> u8: l as u8
 pub fn packet_word(p: &Packet) -> i32: p.word
 pub fn va_size(args: &c_va_list) -> i64: sizeof[c_va_list]()
+// D30 step 2: a declared `@[effect]` pin is interface material — the
+// contract no type spells (what a raw-pointer parameter retains: the
+// runtime keeps with_thread_spawn's ctx). The twin carries the pin as an
+// extern's, so a consumer that hands the extern a closure holding a view
+// of its frame is refused (the consumer alone names `wi_demo_keep`, as
+// std.thread names with_thread_spawn; nothing here links it); on a bodied
+// function the pin stays a checked contract.
+@[effect(ctx: escape_value)]
+pub extern fn wi_demo_keep(fn_ptr: *mut u8, ctx: *mut u8)
+@[effect(p: read)]
+pub fn peek(p: &Pair) -> i32: p.a
 // §12.4 (D75): a consuming closure crosses the boundary only to `once`.
 pub fn call_once(f: once fn() -> i32) -> i32: f()
 pub fn call_twice(f: fn() -> i32) -> i32: f() + f()

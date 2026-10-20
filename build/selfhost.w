@@ -9376,16 +9376,20 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     mutation_names |> push("discriminant")
     mutation_names |> push("ref-to-owned")
     mutation_names |> push("once-dropped")
+    // D30 step 2: a dropped `@[effect]` pin is a different contract.
+    mutation_names |> push("pin-dropped")
     var mutation_from: List[str] = List.new()
     mutation_from |> push("pub resource type Pair { pub a: i32, pub b: i32 }")
     mutation_from |> push("High = 200")
     mutation_from |> push("pub fn add(p: &Pair) -> i32")
     mutation_from |> push("pub fn call_once(f: once fn() -> i32) -> i32")
+    mutation_from |> push("@[effect(ctx: escape_value)]\npub extern fn wi_demo_keep(fn_ptr: *mut u8, ctx: *mut u8) -> Unit")
     var mutation_to: List[str] = List.new()
     mutation_to |> push("pub resource type Pair { pub a: i32 }")
     mutation_to |> push("High = 201")
     mutation_to |> push("pub fn add(p: Pair) -> i32")
     mutation_to |> push("pub fn call_once(f: fn() -> i32) -> i32")
+    mutation_to |> push("pub extern fn wi_demo_keep(fn_ptr: *mut u8, ctx: *mut u8) -> Unit")
     for mi in 0..mutation_names.len():
         let mname = mutation_names[mi]
         if not emitted_wi.contains(mutation_from[mi]):
@@ -9432,7 +9436,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     if built.rc != 0: return bs_fail(ctx, f"consumer build against the bundle interface failed with exit code {built.rc}")
     let ran = bs_run_binary_capture(ctx, consumer, "bundle-interface-consumer-run", 120000)
     if ran.rc != 0: return bs_fail(ctx, f"consumer linked against the bundle failed with exit code {ran.rc}")
-    rc = bs_assert_stdout_exact(ctx, ran, "18 7 80 3 7 2 6 200 3 3 6 42 5 4 6 23", "bundle interface consumer")
+    rc = bs_assert_stdout_exact(ctx, ran, "18 7 80 3 7 2 6 200 3 3 6 42 5 4 6 23 10", "bundle interface consumer")
     if rc != 0: return rc
 
     // §21.1 rule 1: a call of a bundle function writes exactly its declared
@@ -9467,6 +9471,18 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     let level_ran = bs_run_binary_capture(ctx, level_bin, "bundle-interface-origin-ok-run", 120000)
     if level_ran.rc != 0: return bs_fail(ctx, f"the origin-global consumer failed with exit code {level_ran.rc}")
     rc = bs_assert_stdout_exact(ctx, level_ran, "3\n4", "origin-global consumer")
+    if rc != 0: return rc
+    // D30 step 2: a declared `@[effect]` pin crosses the boundary as the
+    // declaration's contract. `wi_demo_keep` pins `ctx: escape_value`, as
+    // std.thread's with_thread_spawn does; read from the interface alone,
+    // a consumer's closure holding a view of its frame, handed to it the
+    // way spawn_os hands one, is refused.
+    let keep_src = bs_join(case_dir, "keep_captures_ref.w")
+    rc = bs_write_fixture(ctx, keep_src, "use std.wi_demo\ntype RawFn0I32 { fn_ptr: *mut u8, ctx: *mut u8 }\nfn keep(worker: fn() -> i32) -> Unit:\n    let raw: RawFn0I32 = unsafe transmute[RawFn0I32](worker)\n    wi_demo_keep(raw.fn_ptr, raw.ctx)\nfn bad:\n    let x = 42\n    let r = &x\n    keep(() => *r)\nfn main:\n    bad()\n", "closure holding a view of its frame handed to a bundle extern pinned escape_value")
+    if rc != 0: return rc
+    let keep_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-pin-refused", bs_bundle_build_args(keep_src, bundle, bs_join(case_dir, "keep_captures_ref"), false), 120000)
+    if keep_build.rc == 0: return bs_fail(ctx, "a closure holding a view of its frame, handed to `wi_demo_keep` (pinned `ctx: escape_value` in the interface), was accepted")
+    rc = bs_assert_contains(ctx, keep_build.stderr, "escaping closure cannot capture ephemeral references", "closure refused through the interface's @[effect] pin")
     if rc != 0: return rc
     // §21.1 rule 6 (spec v7.18): `from static` crosses the boundary; the
     // consumer's view of static data lives across a write of any global.
