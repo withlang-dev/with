@@ -10252,6 +10252,11 @@ impl Sema:
         if self.fn_symbol_is_raw_c_import(fn_sym) != 0:
             return "raw c_import function call requires unsafe context"
         if self.fn_symbol_is_manual_extern(fn_sym) != 0:
+            let name = self.pool_resolve(fn_sym)
+            // D30: a program declaring the compiler's runtime by hand is told
+            // what it is and what to call instead.
+            if sema_name_is_compiler_abi_extern(name) != 0 and sema_path_is_user_lint_source(self.current_module_path) != 0:
+                return f"manual extern function call requires unsafe context; '{name}' is the compiler's own runtime (D30), not an interface for programs: call the std API that wraps it"
             return "manual extern function call requires unsafe context"
         ""
 
