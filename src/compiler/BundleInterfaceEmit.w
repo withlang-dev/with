@@ -161,6 +161,32 @@ fn bx_new_emitter(corpus: &str, unlowered_globals: &List[str]) -> BundleEmitter:
 
 fn bx_str_less(a: &str, b: &str) -> bool: with_str_cmp_ref(a, b) < 0
 
+// The declared bits of the `@[effect]` pin naming parameter `name_sym`, or
+// -1 when no pin names it.
+fn bx_effect_pin_bits_of(ast: &AstPool, node: i32, name_sym: i32) -> i32:
+    let count = ast.fn_effect_pin_count(node as NodeId)
+    for i in 0..count:
+        if ast.fn_effect_pin_param(node as NodeId, i) == name_sym:
+            return ast.fn_effect_pin_bits(node as NodeId, i) & EFF_DECLARED_MASK
+    -1
+
+// `@[effect(p: write, q: [read, escape_value])]`: a declaration's pins,
+// spelled as the parser reads them (Parser.parse_effect_bits). A pin is a
+// declared contract, never a body inference (D39), and the one spelling of
+// what a raw-pointer parameter retains (D30 step 2: the runtime keeps
+// with_thread_spawn's fn_ptr and ctx); the interface prints it, and its
+// twin applies it as an extern's pin.
+fn bx_effect_pins_text(sema: &Sema, node: i32) -> str:
+    let ast = sema.ast
+    let count = ast.fn_effect_pin_count(node as NodeId)
+    if count == 0:
+        return ""
+    var out = "@[effect("
+    for i in 0..count:
+        let names = sema_effect_bits_text(ast.fn_effect_pin_bits(node as NodeId, i) & EFF_DECLARED_MASK)
+        out = out ++ (if i > 0: ", " else: "") ++ sema.pool_resolve(ast.fn_effect_pin_param(node as NodeId, i)) ++ ": " ++ (if names.contains(","): "[" ++ names ++ "]" else: names)
+    out ++ ")]\n"
+
 // Insertion-sorted copy (bytewise); the model is small.
 fn bx_sorted_strings(items: &List[str]) -> List[str]:
     var sorted: List[str] = List.new()
@@ -607,7 +633,10 @@ impl BundleEmitter:
                 self.refuse("parameter '" ++ pname ++ "' is an implicit capability parameter; not interface material")
                 return ""
             let ptid = sema.sig_param_type(sig, pi)
-            let eff = sema.declared_param_effect(pi, ptid, receiver_mode, sema.is_copy_frozen(ptid))
+            // A declared `@[effect]` pin is the parameter's contract (D30
+            // step 2): the interface prints it and the row carries it.
+            let pinned = bx_effect_pin_bits_of(ast, node, name_sym)
+            let eff = if pinned >= 0: pinned else: sema.declared_param_effect(pi, ptid, receiver_mode, sema.is_copy_frozen(ptid))
             let vra = sema.sig_param_uses_value_ref_abi(sig, pi)
             if pname == "self":
                 if pi != 0 or fn_param_is_synth_receiver(pflags) == 0:
@@ -634,8 +663,9 @@ impl BundleEmitter:
             params_row = params_row ++ pname ++ ":" ++ spelling ++ f":{vra}:{eff}" ++ (if noalias: ":noalias" else: "") ++ (if once: ":once" else: "") ++ ";"
             printed = printed + 1
             // A `once` callable is consumed by its one invocation: the
-            // declared consume is the contract, not a mistaken `&T`.
-            if not once:
+            // declared consume is the contract, not a mistaken `&T`; a pin
+            // is the contract by declaration.
+            if not once and pinned < 0:
                 self.note_effect_disagreement(sema, node, sig, pi, full, pname, eff, if has_from: (if from_entries.contains(-1 - pi): pi else: DECLARED_ORIGIN_NONE) else: origin)
         if is_variadic:
             params = params ++ (if printed > 0: ", ..." else: "...")
@@ -724,7 +754,7 @@ impl BundleEmitter:
                 printed_name = with_str_clone_ref(full.slice((dot + 1) as i64, full.len()))
         // The `writes` clause is the declaration's last clause (§21.1 rule 1).
         let writes_text = if written_clause.len() > 0: " " ++ written_clause else: ""
-        var head = if must_use: "@[must_use]\n" else: ""
+        var head = bx_effect_pins_text(sema, node) ++ (if must_use: "@[must_use]\n" else: "")
         head = head ++ (if is_pub: "pub " else: "") ++ (if is_unsafe: "unsafe " else: "") ++ receiver ++ "fn " ++ printed_name ++ "(" ++ params ++ ") -> " ++ ret ++ from_text ++ writes_text ++ "\n"
         let vis = if is_pub: "pub" else: "priv"
         let unsafe_text = if is_unsafe: "1" else: "0"
@@ -869,21 +899,18 @@ impl BundleEmitter:
         if meta < 0:
             self.refuse("has no function metadata")
             return
-        if ast.fn_effect_pin_count(node) > 0:
-            self.refuse("carries @[effect] pins; no interface spelling")
-            return
-        var attrs = ""
+        var attrs = bx_effect_pins_text(sema, node)
         var cc_row = "-"
         let cc_sym = ast.fn_meta_tp_start(meta)
         if cc_sym != 0:
             let cc = with_str_clone_ref(sema.pool_resolve(cc_sym))
             if cc.starts_with("link_name:"):
-                attrs = "@[link_name(\"" ++ cc.slice(10, cc.len()) ++ "\")]\n"
+                attrs = attrs ++ "@[link_name(\"" ++ cc.slice(10, cc.len()) ++ "\")]\n"
             else if cc.starts_with("c_export:"):
                 self.refuse("is @[c_export]; not interface material")
                 return
             else:
-                attrs = "@[callconv(\"" ++ cc ++ "\")]\n"
+                attrs = attrs ++ "@[callconv(\"" ++ cc ++ "\")]\n"
             cc_row = cc
         let sig = sema.get_sig(name_sym)
         if sig < 0:
@@ -907,7 +934,11 @@ impl BundleEmitter:
             if pi > 0:
                 params = params ++ ", "
             params = params ++ pname ++ ": " ++ spelling
-            params_row = params_row ++ pname ++ ":" ++ spelling ++ ";"
+            // The row carries the declared pin (0 without one): the
+            // interface twin's row is computed from the same pins.
+            let pinned = bx_effect_pin_bits_of(ast, node, ast.fn_param_name(param_start, pi))
+            let eff = if pinned >= 0: pinned else: 0
+            params_row = params_row ++ pname ++ ":" ++ spelling ++ f":{eff};"
         let variadic = sema.sig_is_variadic(sig) != 0
         if variadic:
             params = params ++ (if param_count > 0: ", ..." else: "...")

@@ -24,6 +24,8 @@ pub const K: i32 = 7
 pub var COUNTER: i32
 var LEVEL: i32
 pub let TABLE: [u8; 4]
+@[effect(ctx: escape_value)]
+pub extern fn wi_demo_keep(fn_ptr: *mut u8, ctx: *mut u8) -> Unit
 pub fn add(p: &Pair) -> i32
 pub fn bump() -> Unit writes COUNTER
 pub fn call_once(f: once fn() -> i32) -> i32
@@ -32,6 +34,8 @@ pub fn greeting() -> &str from static
 pub fn level() -> &i32 from LEVEL
 pub fn level_value(l: Level) -> u8
 pub fn packet_word(p: &Packet) -> i32
+@[effect(p: read)]
+pub fn peek(p: &Pair) -> i32
 pub fn raise() -> Unit writes LEVEL
 pub fn reserve() -> i32 writes COUNTER
 pub unsafe fn set_first(p: *mut Pair, v: i32) -> Unit
