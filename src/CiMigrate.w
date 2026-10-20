@@ -332,6 +332,18 @@ fn ci_migrate_insert_option_use(output: &str) -> str:
     else:
         "use std.option\n\n" ++ output
 
+// D30 step 3: the shared defs reach the runtime (with_alloc, with_memcpy,
+// with_clz, …) through its interface, as the standard library does; the
+// import sits in the header with std.option's.
+fn ci_migrate_insert_rt_use(output: &str) -> str:
+    if ci_find_str(output, "\nuse rt.rt_core\n") >= 0 or ci_starts_with(output, "use rt.rt_core\n"):
+        return with_str_clone_ref(output)
+    let header_end = ci_find_str(output, "\n\n")
+    if header_end >= 0:
+        output.slice(0, header_end as i64) ++ "\nuse rt.rt_core" ++ output.slice(header_end as i64, output.len())
+    else:
+        "use rt.rt_core\n\n" ++ output
+
 // D119: a migrated module names `List` for its local and file-scope arrays;
 // a corpus module has no prelude, so it imports it as std's own modules do.
 fn ci_migrate_insert_collections_use(output: &str) -> str:
@@ -617,7 +629,7 @@ fn ci_migrate_write_shared_defs(output_dir: &str):
             defs.push_str("\n")
         pending_i = pending_i + 1
     let defs_path = output_dir ++ "/defs.w"
-    let rc = with_fs_write_file(defs_path, ci_migrate_insert_collections_use(ci_migrate_insert_option_use(ci_migrate_publicize_shared_defs(ci_migrate_normalize_output(defs.to_str())))))
+    let rc = with_fs_write_file(defs_path, ci_migrate_insert_rt_use(ci_migrate_insert_collections_use(ci_migrate_insert_option_use(ci_migrate_publicize_shared_defs(ci_migrate_normalize_output(defs.to_str()))))))
     if rc != 0:
         eprint("migrate: failed to write shared defs: " ++ defs_path)
     else:
@@ -789,34 +801,13 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ ci_migrate_render_overflow_helpers("u64", false)
     p = p ++ ci_migrate_render_overflow_helpers("i128", true)
     p = p ++ ci_migrate_render_overflow_helpers("u128", false)
-    // Builtin and runtime wrappers
-    p = p ++ "extern fn with_clz(x: i32) -> i32\n"
-    p = p ++ "extern fn with_ctz(x: i32) -> i32\n"
-    p = p ++ "extern fn with_popcount(x: i32) -> i32\n"
-    p = p ++ "extern fn with_bswap16(x: u16) -> u16\n"
-    p = p ++ "extern fn with_bswap32(x: u32) -> u32\n"
-    p = p ++ "extern fn with_bswap64(x: u64) -> u64\n"
-    // (bswap: unsigned like __builtin_bswapN; rt/rt_core.w defines them so.)
-    p = p ++ "extern fn with_clzl(x: i64) -> i32\n"
-    p = p ++ "extern fn with_clzll(x: i64) -> i32\n"
-    p = p ++ "extern fn with_ctzl(x: i64) -> i32\n"
-    p = p ++ "extern fn with_ctzll(x: i64) -> i32\n"
-    p = p ++ "extern fn with_abs(x: i32) -> i32\n"
-    let pm = ci_rt_ptr_mut()
-    let pc = ci_rt_ptr_const()
-    p = p ++ "extern fn with_alloc(size: i64) -> " ++ pm ++ "\n"
-    p = p ++ "extern fn with_alloc_zeroed(count: i64, size: i64) -> " ++ pm ++ "\n"
-    p = p ++ "extern fn with_realloc(ptr: " ++ pm ++ ", old_size: i64, new_size: i64) -> " ++ pm ++ "\n"
-    p = p ++ "extern fn with_free(ptr: " ++ pm ++ ")\n"
-    p = p ++ "extern fn with_memcpy(dst: " ++ pm ++ ", src: " ++ pc ++ ", n: i64) -> " ++ pm ++ "\n"
-    p = p ++ "extern fn with_memmove(dst: " ++ pm ++ ", src: " ++ pc ++ ", n: i64) -> " ++ pm ++ "\n"
-    p = p ++ "extern fn with_memset(dst: " ++ pm ++ ", c: i32, n: i64) -> " ++ pm ++ "\n"
-    p = p ++ "extern fn with_memcmp(a: " ++ pc ++ ", b: " ++ pc ++ ", n: i64) -> i32\n\n"
     p
 
-// The with_* runtime externs the preamble above declares. A C prototype for
-// one of these names is a redeclaration of the same flat-namespace symbol —
-// the preamble's spelling is the one every migrator-generated call matches.
+// The with_* runtime functions migrated code calls by their flat names; the
+// shared defs import them from the runtime's interface (`use rt.rt_core`,
+// ci_migrate_insert_rt_use, D30 step 3). A C prototype for one of these
+// names is a redeclaration of the same flat-namespace symbol — the runtime's
+// spelling is the one every migrator-generated call matches.
 fn ci_migrate_preamble_declares_runtime_extern(name: &str) -> bool:
     name == "with_clz" or name == "with_ctz" or name == "with_popcount" or
     name == "with_bswap16" or name == "with_bswap32" or name == "with_bswap64" or
