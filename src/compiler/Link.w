@@ -1839,15 +1839,43 @@ fn link_stage_bundle_provided_explicitly(manifest: &str) -> bool:
             return false
     true
 
+// The runtime bundle beside this compiler's runtime objects, for a compiler
+// whose `rt` slot is empty: a `:dev` stage1 builds the bundle itself into
+// out/bootstrap/lib, and its lane links that object, as the release links
+// the embedded one, instead of compiling the runtime into every program
+// (#2485). The root is this generation's by link_stage_resolve_runtime_root;
+// the manifest must name this target.
+fn link_stage_runtime_root_bundle_object() -> str:
+    let root = link_stage_resolve_runtime_root()
+    if root.len() == 0 or link_stage_runtime_dir_producer(root).len() == 0:
+        return ""
+    let manifest = runtime_read_file(root ++ "/rt.manifest")
+    if manifest.len() == 0 or runtime_read_file(root ++ "/rt.o").len() == 0:
+        return ""
+    if link_stage_bundle_manifest_field(manifest, "target") != target_spec_resolved_name():
+        return ""
+    if link_stage_bundle_provided_explicitly(manifest):
+        return ""
+    root ++ "/rt.o"
+
 fn link_stage_select_embedded_bundles(undef: &str) -> List[str]:
     let out: List[str] = List.new()
     let count = embedded_bundle_count()
     if count == 0:
         return out
     let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
+    var rt_present = false
     for bi in 0..count:
         if not embedded_bundle_present(bi):
+            // An empty `rt` slot under the lane: the runtime root's bundle.
+            if embedded_bundle_name(bi) == "rt" and link_stage_rt_in_unit() != 0 and not rt_present:
+                let from_root = link_stage_runtime_root_bundle_object()
+                if from_root.len() > 0:
+                    out.push(from_root)
+                    rt_present = true
             continue
+        if embedded_bundle_name(bi) == "rt" and embedded_bundle_for_this_target(bi):
+            rt_present = true
         // #2131: a slot carried for another target is not this link's.
         if not embedded_bundle_for_this_target(bi):
             continue
@@ -2354,7 +2382,8 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
         return link_stage_plan_fail()
     var rt_bundle_joined = false
     for boi in 0..bundle_objects.len():
-        if bundle_objects[boi].ends_with("/wo_rt.o"):
+        // The embedded slot's extraction, or the runtime root's own rt.o.
+        if bundle_objects[boi].ends_with("/wo_rt.o") or bundle_objects[boi].ends_with("/rt.o"):
             rt_bundle_joined = true
         extras.push(with_str_clone_ref(bundle_objects[boi]))
     if (needs_fiber_runtime != 0 or rt_bundle_joined) and link_stage_rt_in_unit() != 0:

@@ -24,6 +24,7 @@ use compiler.BundleInterfaces
 use compiler.BundleInterfaceEmit
 use compiler.BundleFingerprint
 use compiler.EmbeddedBundles
+use compiler.EmbeddedRuntime
 use FnAbi
 use compiler.Zcu
 use compiler.Runtime
@@ -621,6 +622,7 @@ impl Compilation:
     fn register_embedded_bundle_interfaces() -> bool:
         if self.emit_c_in_unit:
             return true
+        var rt_registered = false
         for bi in 0..embedded_bundle_count():
             if not embedded_bundle_present(bi):
                 continue
@@ -629,6 +631,8 @@ impl Compilation:
             if not embedded_bundle_for_this_target(bi):
                 continue
             let name = embedded_bundle_name(bi)
+            if name == "rt":
+                rt_registered = true
             let manifest = embedded_bundle_manifest_text(bi)
             if self.bundle_corpus.len() > 0 and self.manifest_lies_under_bundle_corpus(manifest):
                 continue
@@ -641,6 +645,23 @@ impl Compilation:
             if bundle_interfaces_register_wi(wi_text) == 0:
                 with_eprint("error: embedded bundle '" ++ name ++ "': no `module <path>` sections in its interface")
                 return false
+        // A compiler whose `rt` slot is empty (a `:dev` stage1 builds the
+        // bundle itself) reads the runtime root's rt.wi, the one the build
+        // left beside the objects it links; the root is this generation's
+        // (Link.link_stage_resolve_runtime_root). Not while building the
+        // bundle: then the runtime's modules are the corpus, from source.
+        if not rt_registered and self.bundle_corpus != "rt":
+            let root = link_stage_resolve_runtime_root()
+            if root.len() > 0 and link_stage_runtime_dir_producer(root).len() > 0:
+                let wi_text = runtime_read_file(root ++ "/rt.wi")
+                let manifest = runtime_read_file(root ++ "/rt.manifest")
+                if wi_text.len() > 0 and manifest.len() > 0 and link_stage_bundle_manifest_field(manifest, "target") == target_spec_resolved_name():
+                    if bundle_text_sha256(wi_text) != link_stage_bundle_manifest_field(manifest, "interface-sha"):
+                        with_eprint("error: runtime root " ++ root ++ ": rt.wi (sha256 " ++ bundle_text_sha256(wi_text) ++ ") is not the one rt.manifest was built with; rebuild the root (`with build :dev`)")
+                        return false
+                    if bundle_interfaces_register_wi(wi_text) == 0:
+                        with_eprint("error: runtime root " ++ root ++ ": rt.wi has no `module <path>` sections")
+                        return false
         true
 
     fn manifest_lies_under_bundle_corpus(manifest: &str) -> bool:
