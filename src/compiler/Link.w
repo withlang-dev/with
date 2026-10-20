@@ -1845,18 +1845,40 @@ fn link_stage_bundle_provided_explicitly(manifest: &str) -> bool:
 // the embedded one, instead of compiling the runtime into every program
 // (#2485). The root is this generation's by link_stage_resolve_runtime_root;
 // the manifest must name this target.
+// The directory holding this generation's runtime bundle for this target,
+// judged by rt.manifest's `generation` line (the bundle precedes the root's
+// objects — they compile against its interface — so the root's .producer
+// cannot vouch for it): the build's named root, then the same candidates
+// link_stage_resolve_runtime_root probes. "" when none.
+fn link_stage_runtime_root_bundle_dir() -> str:
+    let candidates: List[str] = List.new()
+    let explicit = runtime_getenv("WITH_RUNTIME_ROOT") ++ ""
+    if explicit.len() > 0:
+        candidates.push(explicit)
+    candidates.push(link_stage_artifact_root() ++ "/lib")
+    candidates.push(link_stage_artifact_root() ++ "/bootstrap-lib")
+    let compiler_dir = link_stage_compiler_dir()
+    candidates.push(compiler_dir ++ "/runtime")
+    candidates.push(compiler_dir ++ "/../lib")
+    for i in 0..candidates.len():
+        let dir = candidates[i]
+        let manifest = runtime_read_file(dir ++ "/rt.manifest")
+        if manifest.len() == 0:
+            continue
+        if link_stage_bundle_manifest_field(manifest, "target") != target_spec_resolved_name():
+            continue
+        if compiler_generation_is_stamped() and link_stage_bundle_manifest_field(manifest, "generation") != compiler_generation():
+            continue
+        return with_str_clone_ref(dir)
+    ""
+
 fn link_stage_runtime_root_bundle_object() -> str:
-    let root = link_stage_resolve_runtime_root()
-    if root.len() == 0 or link_stage_runtime_dir_producer(root).len() == 0:
+    let dir = link_stage_runtime_root_bundle_dir()
+    if dir.len() == 0 or runtime_read_file(dir ++ "/rt.o").len() == 0:
         return ""
-    let manifest = runtime_read_file(root ++ "/rt.manifest")
-    if manifest.len() == 0 or runtime_read_file(root ++ "/rt.o").len() == 0:
+    if link_stage_bundle_provided_explicitly(runtime_read_file(dir ++ "/rt.manifest")):
         return ""
-    if link_stage_bundle_manifest_field(manifest, "target") != target_spec_resolved_name():
-        return ""
-    if link_stage_bundle_provided_explicitly(manifest):
-        return ""
-    root ++ "/rt.o"
+    dir ++ "/rt.o"
 
 fn link_stage_select_embedded_bundles(undef: &str) -> List[str]:
     let out: List[str] = List.new()

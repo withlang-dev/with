@@ -5899,8 +5899,10 @@ impl Codegen:
                     wl_set_value_name(function, promoted)
                 else:
                     wl_set_linkage(function, wl_internal_linkage())
-        else if self.decl_path_is_bundle_carried(self.current_decl_source_file):
+        else if self.decl_path_is_bundle_carried(self.current_decl_source_file) and not self.fn_node_is_declared_only(fn_node):
             // A carried copy of a non-corpus function (decl_path_is_bundle_carried).
+            // A carried declaration (the runtime's interface, D30 step 3) stays
+            // external: its definition is the runtime's object.
             wl_set_linkage(function, wl_internal_linkage())
 
         // @[weak] — set weak linkage (LLVMWeakAnyLinkage = 5)
@@ -6255,8 +6257,10 @@ impl Codegen:
                     wl_set_value_name(function, promoted_mo)
                 else:
                     wl_set_linkage(function, wl_internal_linkage())
-        else if self.decl_path_is_bundle_carried(self.current_decl_source_file):
-            // A carried copy of a non-corpus function (decl_path_is_bundle_carried).
+        else if self.decl_path_is_bundle_carried(self.current_decl_source_file) and not self.fn_is_bundle_provided(fn_sym):
+            // A carried copy of a non-corpus function (decl_path_is_bundle_carried);
+            // a carried declaration stays external (its definition is the
+            // runtime's object, D30 step 3).
             wl_set_linkage(function, wl_internal_linkage())
 
         self.fn_values.insert(cg_sym, function)

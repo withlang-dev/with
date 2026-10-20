@@ -651,11 +651,11 @@ impl Compilation:
         // (Link.link_stage_resolve_runtime_root). Not while building the
         // bundle: then the runtime's modules are the corpus, from source.
         if not rt_registered and self.bundle_corpus != "rt":
-            let root = link_stage_resolve_runtime_root()
-            if root.len() > 0 and link_stage_runtime_dir_producer(root).len() > 0:
+            let root = link_stage_runtime_root_bundle_dir()
+            if root.len() > 0:
                 let wi_text = runtime_read_file(root ++ "/rt.wi")
                 let manifest = runtime_read_file(root ++ "/rt.manifest")
-                if wi_text.len() > 0 and manifest.len() > 0 and link_stage_bundle_manifest_field(manifest, "target") == target_spec_resolved_name():
+                if wi_text.len() > 0:
                     if bundle_text_sha256(wi_text) != link_stage_bundle_manifest_field(manifest, "interface-sha"):
                         with_eprint("error: runtime root " ++ root ++ ": rt.wi (sha256 " ++ bundle_text_sha256(wi_text) ++ ") is not the one rt.manifest was built with; rebuild the root (`with build :dev`)")
                         return false
@@ -1466,6 +1466,12 @@ impl Compilation:
             return false
         var text = "abi-sha " ++ compiler_abi_sha() ++ "\n"
         text = text ++ "target " ++ target_spec_resolved_name() ++ "\n"
+        // The compiler generation that built it: a runtime bundle is linked
+        // only by its own generation (D30, D132), and a root's bundle is
+        // judged by this line before the root's objects have their
+        // .producer (the objects are compiled against the bundle's interface).
+        if compiler_generation_is_stamped():
+            text = text ++ "generation " ++ compiler_generation() ++ "\n"
         text = text ++ "object " ++ link_stage_basename(obj_path) ++ "\n"
         if fingerprint.len() > 0:
             text = text ++ "fingerprint " ++ fingerprint ++ "\n"

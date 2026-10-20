@@ -561,7 +561,12 @@ impl BundleEmitter:
         let mod_path = with_str_clone_ref(self.decl_modules[di])
         let parsed = ast.get_data0(node)
         let fn_sym = sema.fn_decl_semantic_symbol_at(node, parsed, di)
-        let full = with_str_clone_ref(sema.pool_resolve(fn_sym))
+        // A fn the merge displaced (`name$in$<module>`, #1350) is printed by
+        // its own name: the identity is the merge's, the interface is the
+        // module's (two runtime modules each define str_data).
+        let resolved_name = with_str_clone_ref(sema.pool_resolve(fn_sym))
+        let displaced_at = resolved_name.index_of("$in$")
+        let full = if displaced_at >= 0: resolved_name.slice(0, displaced_at as i64) else: resolved_name
         let flags = ast.get_data2(node)
         let is_pub = flags % 2 != 0
         self.context = mod_path ++ ": fn " ++ full

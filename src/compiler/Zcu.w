@@ -106,6 +106,8 @@ type Zcu {
     // D39: a .wi root compile — the interface emitter and the fingerprint
     // read Sema's full tables, so every interface declaration is collected.
     interface_eager: bool,
+    // D30 step 3: runtime modules refused as source this compile, once each.
+    refused_runtime_sources: List[str],
     // The symbols the source names — the on-demand interface merge's S —
     // and the interface sections whose declarations wait for it.
     iface_mentioned: HashMap[i32, i32],
@@ -185,6 +187,7 @@ fn Zcu.init -> Zcu:
         link_bundle_prefixes: zcu_new_list_str(),
         bundle_corpus: "",
         interface_eager: false,
+        refused_runtime_sources: zcu_new_list_str(),
         iface_mentioned: HashMap.new(),
         pending_iface_paths: zcu_new_list_str(),
         pending_iface_texts: zcu_new_list_str(),

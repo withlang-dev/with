@@ -211,13 +211,7 @@ impl Zcu:
             let dotted = self.use_path_name_frontend(pool, ps, pc)
             let target = self.resolve_module_path_frontend(dotted, self.decl_source_dir_frontend(di))
             if target.len() == 0: continue
-            var refusal = resolve_internal_import_refusal(self.decl_source_path_frontend(di), target, dotted.replace("/", "."))
-            // D30 step 3: outside the lane a runtime module reaches a unit only
-            // as its interface (the rt bundle's, embedded or beside this
-            // compiler's runtime root); from source its bodies would join a
-            // program that links the runtime objects, every symbol twice.
-            if refusal.len() == 0 and target.starts_with(EMBEDDED_RT_PREFIX()) and frontend_rt_in_unit_enabled() == 0 and not self.interface_eager and not bundle_interface_registered(target):
-                refusal = "module '" ++ dotted.replace("/", ".") ++ "' has no interface in this compiler for target " ++ target_spec_resolved_name() ++ " (no runtime bundle: a stage1 without `with build :dev`, or a cross target without one); the runtime's bodies cannot join a program that links the runtime objects (D30)"
+            let refusal = resolve_internal_import_refusal(self.decl_source_path_frontend(di), target, dotted.replace("/", "."))
             if refusal.len() == 0: continue
             let span = Span { file: self.decl_source_file_id_frontend(di), start: pool.get_start(decl), end: pool.get_end(decl) }
             self.diagnostics.emit(Diagnostic.err(refusal, span))
@@ -2330,6 +2324,8 @@ impl Zcu:
 
     mut fn merge_resolved_modules_frontend(root_pool: AstPool, root_path: &str) -> AstPool:
         var merged_pool = root_pool
+        // Noted after the loop: `mod` is a view into self.last_resolved.
+        var refused_runtime: List[str] = List.new()
 
         for mi in 0..self.last_resolved.modules.len():
             let mod = self.last_resolved.modules[mi]
@@ -2341,6 +2337,9 @@ impl Zcu:
                 continue
 
             let src = module_source_read(path)
+            if self.runtime_source_is_refused(path, &src):
+                refused_runtime.push(frontend_owned_text(path))
+                continue
             let text = frontend_normalize_source_text(src.text)
             if text.len() == 0:
                 let span = Span { file: 0, start: 0, end: 0 }
@@ -2358,6 +2357,8 @@ impl Zcu:
             self.add_source_text_mapping(mod.file_id, path, text)
             self.append_decl_source_paths(merged_pool.decl_count() - before, path, mod.file_id)
 
+        for ri in 0..refused_runtime.len():
+            self.note_refused_runtime_source(refused_runtime[ri])
         self.strip_use_decls_frontend(merged_pool)
 
     // ── D39 on-demand interface sections ─────────────────────────────
@@ -3429,8 +3430,30 @@ impl Zcu:
                 return frontend_resolve_module_rel(self.source_dir, rel_fallback)
         ""
 
+    // D30 step 3: outside the lane a runtime module reaches a unit only as
+    // its interface — the rt bundle's, embedded or beside this compiler's
+    // runtime root. Parsed from source, its bodies would join a program that
+    // links the runtime objects, every symbol twice (the duplicate-symbol
+    // flood of a stage1 without its bundle). Refused by name, once per
+    // module, at every parse of an imported module; the lane and the rt
+    // bundle's own build read the source on purpose.
+    fn runtime_source_is_refused(path: &str, src: &ModuleSource) -> bool:
+        if src.interface or embedded_rt_rel_path(path).len() == 0:
+            return false
+        frontend_rt_in_unit_enabled() == 0 and self.bundle_corpus != "rt"
+
+    mut fn note_refused_runtime_source(path: &str):
+        for i in 0..self.refused_runtime_sources.len():
+            if self.refused_runtime_sources[i] == path:
+                return
+        self.refused_runtime_sources.push(frontend_owned_text(path))
+        self.diagnostics.emit(Diagnostic.err("module '" ++ bundle_module_dotted_name(path) ++ "' has no interface in this compiler for target " ++ target_spec_resolved_name() ++ " (no runtime bundle: a stage1 without `with build :dev`, or a cross target without one); the runtime's bodies cannot join a program that links the runtime objects (D30)", Span { file: 0, start: 0, end: 0 }))
+
     mut fn parse_imported_file_frontend(path: &str, target_pool: AstPool) -> AstPool:
         let src = module_source_read(path)
+        if self.runtime_source_is_refused(path, &src):
+            self.note_refused_runtime_source(path)
+            return target_pool
         let full_text = frontend_normalize_source_text(src.text)
         if full_text.len() == 0:
             return target_pool
