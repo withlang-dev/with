@@ -775,8 +775,21 @@ impl Sema:
             return base ++ f" — '{dn}' is process-global state: an effect the runtime audit records, not a domain, until a facade presents a safe view whose validity it decides; this view does, so the facade declares it a domain (spec §16.2b.14, D76)"
         base ++ f" — '{dn}' is process-global state no safe view reaches: an effect the runtime audit records, and no domain to preserve until a facade presents a view over it (spec §16.2b.14, D76)"
 
+    // A domain a facade item may name: one a program facade declares, or,
+    // from the runtime's own facades, any (D30). Compiled in-unit, the
+    // runtime's `libc` blocks declare errno, environ and locale; a program
+    // facade naming `locale` without declaring it was told it exists, where
+    // the object-linked runtime it never sees left it unknown. Declared in
+    // both, it is one domain (ruling §35, below).
+    fn facade_domain_visible(d: i32) -> bool:
+        if self.current_module_is_runtime():
+            return self.facade_domains.contains(d)
+        self.facade_program_domains.contains(d)
+
     mut fn collect_facade_domain(item: i32):
         let name = self.ast.get_data0(item)
+        if not self.current_module_is_runtime():
+            self.facade_program_domains.insert(name, 1)
         if self.facade_domains.contains(name):
             let dn: str = self.pool_resolve(name)
             // Ruling §35: a facade "may also merge domains from distinct
@@ -1388,7 +1401,7 @@ impl Sema:
                     self.emit_error(f"fn '{fname}' returns {rt}, not a C string ('char *' or 'unsigned char *'); 'returns borrow CStr' describes a NUL-terminated foreign string (§16.2b.8)", clause)
                     return c
                 if domain != 0:
-                    if not self.facade_domains.contains(domain):
+                    if not self.facade_domain_visible(domain):
                         let dn: str = self.pool_resolve(domain)
                         self.emit_error(self.facade_unknown_domain_message(fname, dn, true), clause)
                         return c
@@ -1421,7 +1434,7 @@ impl Sema:
                     self.emit_error(f"fn '{fname}' returns {rt}, not a pointer to '{rn}'; 'returns borrow {rn}' describes the record C points at (§16.2b.6, §16.2b.13)", clause)
                     return c
                 if domain != 0:
-                    if not self.facade_domains.contains(domain):
+                    if not self.facade_domain_visible(domain):
                         let dn: str = self.pool_resolve(domain)
                         self.emit_error(self.facade_unknown_domain_message(fname, dn, true), clause)
                         return c
@@ -1492,7 +1505,7 @@ impl Sema:
                     c.preserves_params.push(pi)
                 return c
             let d = self.ast.get_extra(ops + 1)
-            if not self.facade_domains.contains(d):
+            if not self.facade_domain_visible(d):
                 let dn: str = self.pool_resolve(d)
                 self.emit_error(self.facade_unknown_domain_message(fname, dn, false), clause)
                 return c
