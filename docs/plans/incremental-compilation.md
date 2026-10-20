@@ -49,10 +49,13 @@ What the profile says:
    the translator deduplicates declarations shared between imports and a
    cached expansion would make that table wrong. WIPE has nineteen files
    that `c_import`.
-2. **Sema checks every body, twice.** The first `sema.bodies` pass reports
-   `added types=123 symbols=33 sigs=22`; the second reports `symbols=0`
-   and costs the same 4.3 s. Why the second pass covers every body rather
-   than what the first added has not been investigated.
+2. **Sema checks every body, twice, by design.** A program with a field
+   whose numeric type its uses decide (D89, §4.3) or a literal typed by
+   its uses (D93, §4.3c) is checked twice: the first pass hears the
+   demands and reports nothing, the second has every such type decided
+   (`src/compiler/Frontend.w:2253-2282`). WIPE has both, so both 4.3 s
+   passes run over all 917 bodies. The second pass re-checks every body,
+   not only the bodies whose types the demands changed.
 3. **LLVM redoes every unit.** Codegen units exist (#681,
    `src/compiler/CodegenUnits.w`) and are emitted in parallel, but every
    unit is regenerated, optimized and emitted on every build.
@@ -112,10 +115,11 @@ holds the fixpoint and the battery.
    (`c_import_fs_cache_deps_manifest`) already records every header a
    translation read. Expected saving: the measured 3.4 s, less the cost of
    reading the entry back.
-2. **Find why `sema.bodies` runs twice over every body.** If the second
-   pass exists to check bodies that the first pass's additions affect, it
-   should run over those bodies only. Expected saving: up to the measured
-   4.3 s; the real number depends on what the pass needs.
+2. **Confine the second Sema pass (D89/D93) to what the demands changed.**
+   The first pass knows which fields and literals it retyped; the second
+   need only re-check bodies that mention them, plus what those bodies'
+   signatures reach. Expected saving: up to the measured 4.3 s; how much
+   depends on how widely WIPE's inferred numerics are used.
 3. **`-O0` for dev builds.** `llvm.optimize` is 1.1 s of a rebuild, and
    debugging needs `-O0` anyway (Steam Dev §6). `with dev` passes it;
    nothing changes for `with build`.

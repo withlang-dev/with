@@ -173,13 +173,13 @@ under `lldb-server`, the dev channel port) and `exec`s the game. The
 shortcut never changes between runs, so Steam's controller configuration
 for it persists.
 
-The mechanism is the one the Devkit Client uses, read from its
-`devkit-utils`: a line `devkit-1 steam://devkit-1/create-shortcut?...`
-written to the Steam client's IPC pipe `~/.steam/steam.pipe`, with the
-reply arriving as a file the client writes. The same pipe carries the
-launch and `dumpcontrollerconfig`. Whether the toolchain drives the pipe
-itself or installs Valve's helper scripts is open item 5 of Milestone 0;
-both work without Desktop Mode, and neither writes `shortcuts.vdf`.
+The mechanism is the one the Devkit Client uses, driven by the toolchain
+itself over SSH: the game and its `-argv.json` under `~/devkit-game/`, a
+`create-shortcut` line on Steam's IPC pipe `~/.steam/steam.pipe`, the
+reply as a file, then `steam://rungameid/<id>` on the same pipe. Verified
+on a retail Deck in Game Mode with none of Valve's scripts installed; the
+exact rules Steam enforces are in Milestone 0, item 7. Nothing writes
+`shortcuts.vdf`; Steam owns it.
 
 ### 3.4 The link
 
@@ -294,12 +294,11 @@ package that links it.
   verified on the Mac at `-O0`. So the only build change for debugging is
   the optimization level: `with dev debug` builds `-O0`, and `with dev run`
   keeps the default so the Deck's frame rate is the real one.
-- **The server**: `lldb-server` for Linux x86_64 from the LLVM release the
-  compiler already uses (22.1.6), installed by `pair` into the device
-  directory, so both ends are one LLVM version. SteamOS's preinstalled
-  `/usr/bin/gdbserver` is the fallback; LLDB speaks its protocol
-  (`gdb-remote`). Whether the Deck's With LLVM tree includes `lldb-server`
-  was not checked; if not, `pair` copies it.
+- **The server**: SteamOS's preinstalled `/usr/bin/gdbserver` (GDB 16.3),
+  which LLDB on the Mac drives over `gdb-remote` through an SSH port
+  forward. Verified end to end (Milestone 0, item 5). `pair` installs
+  nothing; With's LLVM SDK ships no `lldb-server`, and the upstream LLVM
+  release that does is 1.94 GB.
 - **The session**: `with dev debug` forwards the server's port over SSH,
   then runs LLDB here with `platform select remote-linux`, the executable
   with its DWARF, and `settings set target.source-map <builder path>
@@ -349,9 +348,10 @@ layout change, so rule 6 holds without schema migration. `snapshot` /
 `restore` shortens long sessions when the snapshot's type hash matches;
 otherwise replay from the start, and say so.
 
-Costs: the build is measured (§4.1): 18 s plus a push on the Mac, 65 s on
-the Deck, for WIPE. Still to measure in Milestone 3: Steam relaunch time
-in Game Mode, and replay speed for a ten-minute session. At these build
+Costs, all measured: the build (§4.1), 18 s plus a push on the Mac or
+65 s on the Deck; Steam's relaunch in Game Mode, 0.59 s (Milestone 0,
+item 8); replay, 0.08 s for an 18-minute session (item 6). The tier 2
+loop is the build and nothing else. At these build
 times tier 2 is a 20-30 s loop; tier 1 and the dev channel's `pause` /
 `step N` are what make tuning feel instant.
 
@@ -382,16 +382,76 @@ Answered 2026-10-18 on Eric's Deck:
 3. Build times: **measured** (§4.1).
 4. Debug info: **works** on the Mac at `-O0` (§1.1).
 
+5. Remote debugging: **works, with SteamOS's own `gdbserver`.** A `-O0`
+   With program built on the Deck, started under `/usr/bin/gdbserver
+   127.0.0.1:2345`, port-forwarded over SSH; LLDB on the Mac
+   (`gdb-remote 127.0.0.1:2345`) with the same executable copied back for
+   symbols set a breakpoint at `d.w:3`, stopped there, printed `a = 2`,
+   `b = 3`, `s = 5` and a backtrace in With source. No `lldb-server` is
+   needed: With's LLVM SDK does not ship one, and the upstream LLVM 22.1.6
+   Linux release that does is a 1.94 GB download. `pair` installs nothing
+   for debugging.
+6. Replay speed: **a 1,063 s recording (65,574 ticks) replays in 0.08 s**
+   on the Mac (`runs replay`), 13,000× real time. A ten-minute session is
+   not a cost. Recordings made on 2026-09-26 to 10-07 no longer land where
+   they ended, because the rules changed on 10-15; that is the tier 2
+   contract: same build, exact; new rules, honest.
+   `test/record_contracts.w` holds the same-build case.
+
 Still open:
 
-5. Launching in Game Mode over Steam's IPC pipe (§3.3) from the toolchain's
-   own code, without Valve's helper scripts installed.
-6. `lldb-server` from LLVM 22.1.6 runs from `~` on SteamOS, and LLDB on the
-   Mac attaches to a WIPE Linux build through an SSH forward, with source
-   lines.
-7. A one-shot manual cross-build: WIPE's object files from the Mac with
+7. Launching in Game Mode over Steam's IPC pipe (§3.3): **works, from the
+   toolchain's own code, with none of Valve's helper scripts on the Deck.**
+   Verified 2026-10-19 with WIPE. The protocol, as Steam enforces it:
+   - The game under `~/devkit-game/<gameid>/`. Beside it,
+     `<gameid>-argv.json` holds the command as a JSON list whose first
+     element is **relative to the game directory** (`["wipe"]`); an
+     absolute path is refused with `file doesn't exist:
+     <dir>/<absolute path>`. `<gameid>-settings.json` holds a JSON object
+     (`{"steam_play": "0"}`).
+   - One line on `~/.steam/steam.pipe`:
+     `devkit-1 steam://devkit-1/<token>/create-shortcut?response=<path>&gameid=<gameid>`,
+     `<token>` being `~/.steam/steam.token`, `<path>` URL-encoded. The
+     reply path must be a file inside a directory the user owns
+     (`mktemp -d /tmp/create-shortcutXXXXXX` + `/registered`, as Valve's
+     helper does); a file directly under `/tmp` is refused with
+     `devkit-1 command is invalid, bad response path` in Steam's
+     `console_log.txt`, and no reply file.
+   - Steam answers in 0.5 s: `<path>` on success, `<path>.error` with
+     the message on failure, `<path>.lock` while writing. It adds a
+     non-Steam shortcut "Devkit Game: <gameid>" with `DevkitGameID` set,
+     the game directory as `StartDir`, and an app id it chooses
+     (3988715174 for WIPE). Re-sending updates the shortcut in place.
+   - Launch: `steam://rungameid/<(appid << 32) | 0x02000000>` on the same
+     pipe. The app id is read from
+     `userdata/<account>/config/shortcuts.vdf` (binary VDF; the `appid`
+     key is a uint32).
+   - Stop: the devkit client has no stop command; `pkill` of the game
+     works, and Steam notices the exit.
+8. Steam's launch time in Game Mode: **3.7 s to a process on the first
+   launch of a new shortcut, 0.59 s on each relaunch** (measured to Steam's
+   `reaper` wrapper appearing; the game process follows it). Measured
+   with WIPE on 2026-10-19, three launches, the previous instance killed
+   2 s before each relaunch. Relaunch is not a cost in the tier 2 loop;
+   the build is.
+9. A one-shot manual cross-build: WIPE's object files from the Mac with
    `c_import` pointed by hand at the steamrt4 sysroot, linked with `ld.lld`,
    run on the Deck. It shows how far issue 1 of §4.2 really is.
+
+Two things seen along the way that the tool must handle:
+
+- **Networks that isolate clients.** On a shared Wi-Fi with client
+  isolation (2026-10-19), the router's DHCP and DNS knew the Deck but no
+  packet from the Mac reached it: no mDNS, no ARP reply, nothing on a scan
+  of the whole /16. `with dev status` can name that state exactly (the
+  router resolves the Deck's name, the Deck answers nothing) and say the
+  fix: a network without isolation, or a tunnel such as `bore`, which
+  Eric already uses. It cannot fix it.
+- **SSH sessions drop.** Twice during the launch tests the SSH session
+  from the Mac died mid-command, with no sshd or Wi-Fi event in the
+  Deck's journal. Long-running device work (launch, build, timing) runs
+  detached on the device with its output in a file, and the tool
+  reattaches; it never depends on one SSH session staying up.
 
 ### Milestone 1: deploy and run
 
