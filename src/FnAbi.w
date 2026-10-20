@@ -14,6 +14,7 @@
 // cannot drift into an unhashed file unnoticed.
 use Resolve
 use compiler.Runtime.runtime_cwd
+use compiler.Runtime.runtime_path_is_absolute
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_str_hash(s: &str) -> u64
@@ -186,7 +187,9 @@ fn codegen_canonical_module_path(path: &str) -> str:
     let std_rel = fn_abi_std_tree_relative(path)
     if std_rel.len() > 0:
         return "<embedded-std>/" ++ std_rel
-    if path[0] == '/':
+    // `C:\x\y.w` is as absolute as `/x/y.w`; joining it onto the cwd named
+    // a path that does not exist.
+    if runtime_path_is_absolute(path):
         return fn_abi_file_prefix_mapped(resolve_normalize_path(path))
     let cwd = runtime_cwd()
     if cwd.len() == 0:
