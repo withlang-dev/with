@@ -164,11 +164,13 @@ fn fn_abi_std_tree_relative(path: &str) -> str:
 // compiler's own build maps its project root to /with-src; a debugger maps it
 // back (`settings set target.source-map /with-src <checkout>`). The mapping
 // applies at a path boundary only: /a/with never rewrites /a/with-staging.
+// <from> is normalized as the canonical path is, so `C:\a\with` maps
+// `C:/a/with/src/x.w`.
 fn fn_abi_file_prefix_mapped(path: &str) -> str:
     let mapping = with_getenv_str("WITH_FILE_PREFIX_MAP")
     let eq = mapping.find("=")
     if eq <= 0: return with_str_clone_ref(path)
-    let from = mapping.slice(0, eq)
+    let from = resolve_normalize_path(mapping.slice(0, eq))
     let to = mapping.slice(eq + 1, mapping.len())
     if path == from: return to.clone()
     if path.starts_with(from) and path.len() > from.len() and path[from.len()] == '/':
