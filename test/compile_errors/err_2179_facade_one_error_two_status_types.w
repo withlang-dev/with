@@ -3,13 +3,14 @@
 // #2179 (D97, spec §16.2b.4): `c facade kv error KvError` gives every `ok`
 // operation of the facade one error, whose `Failed(status)` holds one status
 // type. A producer whose status is an `int` and an operation whose status is
-// a `long` cannot share it; the error names both.
+// a `long long` cannot share it; the error names both. (Not `long`: on an
+// LLP64 target such as Windows it is the same i32 as `int`.)
 
 use c_import("typedef struct kv kv;
 #define KV_OK 0
 int kv_open(const char* path, kv** out);
 void kv_close(kv* k);
-long kv_flush(kv* k);
+long long kv_flush(kv* k);
 ")
 
 c facade kv error KvError:
