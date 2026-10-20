@@ -9,15 +9,9 @@
 // test come from the runtime's seams. (std.libc imports this module for
 // `Target`, so the isatty seam is declared here, not imported from it.)
 use std.sysinfo
+use rt.rt_core
+use rt.compat_runtime
 
-extern fn with_libc_isatty(fd: i32) -> i32
-extern fn with_sysinfo_os() -> str
-extern fn with_sysinfo_arch() -> str
-extern fn with_getpid() -> i32
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_setenv_str(name: &str, value: &str) -> i32
-extern fn with_fs_file_exists(path: &str) -> i32
-extern fn with_str_len(s: &str) -> i64
 
 /// The operating systems With compiles for: one variant per target and no
 /// other (§17.5, D91), so a `match` on it is checked against every target.

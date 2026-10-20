@@ -4,8 +4,7 @@
 // A str is an aggregate value; casting the str itself to *const u8 points at
 // the aggregate, not at the payload.
 
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+use rt.rt_core
 
 pub unsafe fn str_copy_bytes(s: &str) -> *mut u8:
     let out = with_alloc(s.len() + 1)

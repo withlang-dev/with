@@ -14,6 +14,7 @@ use std.crypto.x509
 use std.crypto.endian
 use std.net
 use std.internal.str_abi
+use rt.rt_core
 
 // ── TLS constants ──────────────────────────────────────────────────
 
@@ -353,8 +354,6 @@ unsafe fn tls_recv(conn: *mut TlsConn, buf: *mut u8, buf_cap: i32) -> i32:
 
 // ── Random bytes ───────────────────────────────────────────────────
 
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fill_random(buf: *mut u8, len: i64) -> Unit
 
 unsafe fn fill_random(buf: *mut u8, len: i32):
     with_fill_random(buf, len as i64)

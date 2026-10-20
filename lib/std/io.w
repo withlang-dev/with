@@ -5,14 +5,8 @@
 
 use std.collections
 use std.string
+use rt.rt_core
 
-extern fn with_print_str(s: &str) -> Unit
-extern fn with_println_str(s: &str) -> Unit
-extern fn with_println_i32(n: i32) -> Unit
-extern fn with_read_line_stdin() -> str
-extern fn with_read_bytes_stdin(count: i32) -> str
-extern fn with_write_stdout(s: &str) -> Unit
-extern fn with_flush_stdout() -> Unit
 
 pub type Stdin {
     __tag: i32,

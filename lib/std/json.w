@@ -4,8 +4,7 @@
 // Single-pass tokenizer. Tokens store byte offsets into the source string.
 // Always includes parent links. Non-strict mode.
 
-extern fn with_str_from_byte(b: i32) -> str
-extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8
+use rt.rt_core
 
 pub type JsonWriter {
     text: str,

@@ -3,9 +3,7 @@
 // Pure With module backed by runtime exports.
 // No direct external dependencies.
 
-extern fn with_sysinfo_os() -> str
-extern fn with_sysinfo_arch() -> str
-extern fn with_sysinfo_hostname() -> str
+use rt.rt_core
 
 // Returns the operating system name.
 // "Macos" on macOS, "Linux" on Linux, "Windows" on Windows.

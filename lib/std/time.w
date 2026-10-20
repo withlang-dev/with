@@ -3,11 +3,8 @@
 // Provides time operations via the runtime interface.
 // No c_import — uses with_* runtime functions.
 
-extern fn with_time_now() -> i64
-extern fn with_clock_nanos() -> i64
-extern fn with_nanosleep(ns: i64) -> i32
-extern fn with_usleep(usecs: i32) -> i32
-extern fn with_fiber_sleep_until(wake_at: i64) -> i32
+use rt.rt_core
+use rt.fiber_core
 
 /// A duration in milliseconds.
 pub type Duration = i32

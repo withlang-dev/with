@@ -3,12 +3,8 @@
 // Helper functions for common iterator patterns.
 
 use std.collections
+use rt.rt_core
 
-extern fn with_vec_len(v: *mut u8) -> i64
-extern fn with_vec_get_i32(v: *mut u8, index: i64) -> i32
-extern fn with_vec_get_str(v: *mut u8, index: i64) -> str
-extern fn with_vec_push_i32(v: *mut u8, val: i32) -> Unit
-extern fn with_vec_new_out(v: *mut u8, elem_size: i64) -> Unit
 
 /// Sum all elements in a List[i32].
 pub fn sum(arr: List[i32]) -> i32:

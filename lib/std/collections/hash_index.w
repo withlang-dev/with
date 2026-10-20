@@ -14,10 +14,8 @@ use std.option
 use std.traits
 use std.tommyds.defs
 use std.tommyds.tommyhashdyn
+use rt.rt_core
 
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 
 /// The head of every slot: the engine's node first, so the node pointer
 /// the engine hands back IS the slot, then the With key comparator at a

@@ -5,8 +5,8 @@
 use std.tls
 use std.net
 use std.internal.str_abi
+use rt.rt_core
 
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
 
 pub type HttpUrl { host: str, path: str, port: i32 }
 

@@ -1,10 +1,8 @@
 // std.box — single-owner heap allocation.
 
 use std.traits
+use rt.rt_core
 
-extern fn with_alloc_aligned(size: i64, align: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 
 /// `Box[T]` owns one heap-allocated `T`.
 pub type Box[T] { ptr: *mut T }

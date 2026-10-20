@@ -18,12 +18,8 @@ use std.re.pcre2_match_data
 use std.re.pcre2_pattern_info
 use std.re.pcre2_substitute
 use std.re.pcre2_substring
+use rt.rt_core
 
-extern fn with_str_slice_ref(s: &str, start: i64, end: i64) -> str
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_str_from_byte(b: i32) -> str
-extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
-extern fn with_free(ptr: *mut u8) -> Unit
 
 const REGEX_FLAG_GLOBAL: i32 = 1
 

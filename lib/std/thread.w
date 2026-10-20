@@ -1,8 +1,6 @@
 // std.thread — OS-thread facade.
 
-@[effect(fn_ptr: escape_value, ctx: escape_value)]
-extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
-extern fn with_thread_join(handle: i64) -> i32
+use rt.rt_core
 
 type RawFn0I32 {
     fn_ptr: *mut u8,

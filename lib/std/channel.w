@@ -9,14 +9,7 @@
 // chan[T](capacity) is a compiler builtin that returns (Sender[T], Receiver[T]).
 // Sender and Receiver enforce directionality at compile time.
 
-extern fn with_channel_create(capacity: i32, elem_size: i32, drop_fn: *const fn(*mut u8) -> Unit) -> i64
-extern fn with_channel_send(ch: i64, value_ptr: *const u8) -> Unit
-extern fn with_channel_recv(ch: i64, out_ptr: *mut u8) -> i32
-extern fn with_channel_close(ch: i64) -> Unit
-extern fn with_channel_destroy(ch: i64) -> Unit
-extern fn with_channel_retain_sender(ch: i64) -> Unit
-extern fn with_channel_release_sender(ch: i64) -> Unit
-extern fn with_channel_release_receiver(ch: i64) -> Unit
+use rt.channel_runtime
 
 // chan[T](capacity) is a compiler builtin — defined in CodegenDispatch.w.
 // It returns (Sender[T], Receiver[T]).

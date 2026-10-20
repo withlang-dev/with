@@ -12,9 +12,8 @@ use std.c_algorithms.defs
 use std.c_algorithms.trie
 use std.collections.engine_slot.Slot
 use std.collections.engine_slot.slot_unordered
+use rt.rt_core
 
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
 
 /// A map from string keys to `V` with prefix traversal. `get` observes,
 /// `remove` transfers (D27); `insert` returns the value it replaced.

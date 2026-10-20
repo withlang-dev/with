@@ -8,26 +8,13 @@
 // it is callable: a `--no-prelude` bundle reaches this module through
 // std.libc and nothing else, so the traits travel with it.
 use std.traits
+use rt.rt_core
+use rt.panic_runtime
 
 // Opaque C void type for pointer interop (void * → *mut c_void).
 // Provided here so c_import users don't depend on symbol scoping.
 pub type c_void = opaque
 
-extern fn with_println_str(s: &str) -> Unit
-extern fn with_println_i32(n: i32) -> Unit
-extern fn with_println_i64(n: i64) -> Unit
-extern fn with_println_bool(v: bool) -> Unit
-extern fn with_print_str(s: &str) -> Unit
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_write(s: &str) -> Unit
-extern fn with_ewrite(s: &str) -> Unit
-extern fn with_panic(msg: str, file: str, line: i32) -> Never
-extern fn with_panic_ref(msg: &str, file: &str, line: i32) -> Never
-extern fn with_i32_to_str(n: i32) -> str
-extern fn with_i64_to_str(n: i64) -> str
-extern fn with_fmt_u32(n: u32) -> str
-extern fn with_fmt_u64(n: u64) -> str
-extern fn with_bool_to_str(b: bool) -> str
 
 /// Print any Display value to stdout followed by a newline (§18.2, D55).
 /// A plain generic that observes (§3.8): the `str` instance hands the bytes

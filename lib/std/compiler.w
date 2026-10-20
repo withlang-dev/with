@@ -1,9 +1,6 @@
 // std.compiler — compiler-hook introspection and tool capabilities.
 
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-extern fn with_eprint(s: &str) -> Unit
+use rt.rt_core
 extern fn exit(code: i32) -> Unit
 
 pub enum CompilerHookPhase: i32:
