@@ -39,11 +39,15 @@ cause and fix that, not the symptom.
 you. If `grep`, `nm`, `otool`, `lldb`, or reading code can answer it, do that.
 
 **Use the debugger.** One `lldb` breakpoint answers in seconds what
-print-and-rebuild takes minutes to. The installed `with` has
-`~/.local/bin/with.dSYM` beside it (`:install-user` installs it). For source you
-changed, debug `out/bootstrap/bin/with-stage1` (after `with build :dev`; it has
-a `.dSYM` too). A program any compiler builds carries debug info for its own
-code and the runtime.
+print-and-rebuild takes minutes to. The installed `with` has full debug info:
+`~/.local/bin/with.dSYM` beside it (`:install-user` installs stage2's dSYM,
+the release's; released assets stay stripped). Any question about what the
+installed compiler does — a wrong diagnostic, an ICE, a hang, a bad value in
+Sema or MIR — starts with `lldb` on `~/.local/bin/with`, before a trace print
+or a rebuild (recipes: Stage Debugging > LLDB). For source you changed, debug
+`out/bootstrap/bin/with-stage1` (after `with build :dev`; it has a `.dSYM`
+too). A program any compiler builds carries debug info for its own code and
+the runtime.
 
 **"Root cause" means the exact line** — the exact function, branch, and
 condition producing the wrong state, observed in `lldb` or the debug allocator.
@@ -900,12 +904,31 @@ the whole region is untested; a cell is red only when the verdicts DIFFER
 (#693's enum cells and #608's POD-leak pins read as `same`).
 
 ### LLDB (preferred)
-The compiler's objects name their sources under `/with-src` (D50), so map it:
+The compiler's objects name their sources under `/with-src` (D50), so map it
+to a checkout of the commit the binary was built from: for
+`~/.local/bin/with`, the tree you reseeded from (`:install-user` prints its
+green commit; `~/with` once fast-forwarded). A different checkout lists the
+wrong lines.
 ```
 lldb -o "settings set target.source-map /with-src $PWD" -- out/bootstrap/bin/with-stage1 check src/main.w
 (lldb) run
 (lldb) bt all
 ```
+The installed compiler, scripted (verified 2026-10-19). Breakpoints take
+With's dotted names (`Type.method`, or a free function's name);
+`frame variable` shows a frame's locals and `source list` its code:
+```
+lldb --batch -o "settings set target.source-map /with-src $HOME/with" \
+  -o "b Sema.source_path_text" -o run -o "bt 8" -o "frame variable" -o kill \
+  -- ~/.local/bin/with build repro.w -o repro
+lldb --batch -o "image lookup -n Sema.source_path_text -v" -- ~/.local/bin/with   # where a function lives
+llvm-dwarfdump --uuid ~/.local/bin/with ~/.local/bin/with.dSYM   # the dSYM is this binary's (UUIDs equal)
+```
+Everything is built at `-O1`, so some locals read `<variable not
+available>`; step to where the value is used, or read the argument in the
+caller's frame (`frame select 1`). lldb does not expand `~` in a
+source-map path: spell `$HOME`. `llvm-dwarfdump` is the SDK's
+(`.deps/llvm-<ver>-<host>/bin`). A hang: `lldb -p <pid>` then `bt all`.
 
 ### Native Debug Allocator
 ```
