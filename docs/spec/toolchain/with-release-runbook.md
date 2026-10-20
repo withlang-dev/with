@@ -240,7 +240,10 @@ redone before upload.
 `:release-uat` is mandatory for every release, and the nightly release
 workflow runs it on every platform it publishes (darwin-aarch64,
 linux-x86_64, linux-aarch64, windows-x86_64, windows-aarch64) after fixpoint
-and before packaging, so a red UAT blocks that platform's asset. The gate
+and before packaging, so a red UAT blocks that platform's asset. The
+windows-aarch64 job is non-gating (D137): the release never waits on it, and a
+red one leaves that platform without an asset and is filed as a new issue.
+The gate
 needs the last-green manifest (`with build :last-green`, which requires the
 test-green evidence `with build :test` records, so each job runs the battery
 first) and a display the spiral can draw on: the macOS runner's session

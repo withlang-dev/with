@@ -1003,6 +1003,12 @@ not a merge signal (a lane takes hours; they run nightly and on dispatch,
 post-hoc); a PR is a draft until its seed-driven battery is green and posted,
 then marked ready. The SDK is built only on release (`sdk-release.yml`).
 
+**windows-aarch64 is non-gating (D137, Eric 2026-10-19).** Dispatch its jobs
+(`selfhost-windows-aarch64`, `seed-windows-aarch64`, its SDK and release
+jobs) and move on: never wait for one, never hold a merge, reseed, seed cut,
+release, PR or issue for its verdict. A red run seen later is filed as a new
+issue (run ID, failing targets, captures) and fixed like any other bug.
+
 ### Dependent PRs are a `gh stack`, never hand-chained bases
 Dependent PRs are a GitHub stack via the `gh stack` extension (`gh extension
 install github/gh-stack`; exit code 9 means stacks are not enabled). Never
