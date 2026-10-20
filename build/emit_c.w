@@ -594,11 +594,8 @@ fn emitc_expect_same_version(ctx: &ActionCtx, expected_compiler: &str, actual_co
     0
 
 fn emitc_compile_runtime_args(root: &str, argv: List[str], platform_obj: &str) -> List[str]:
-    argv |> push(emitc_abs(root, "out/lib/rt_core.o"))
-    argv |> push(emitc_abs(root, "out/lib/" ++ platform_obj))
-    argv |> push(emitc_abs(root, "out/lib/compat_runtime.o"))
-    argv |> push(emitc_abs(root, "out/lib/panic_runtime.o"))
-    argv |> push(emitc_abs(root, "out/lib/fiber_stubs.o"))
+    argv |> push(emitc_abs(root, "out/lib/rt.o"))
+    argv |> push(emitc_abs(root, "out/lib/fiber_asm.o"))
     argv |> push(emitc_abs(root, "out/lib/cimport_stubs.o"))
     argv
 

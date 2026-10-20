@@ -434,8 +434,8 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
     let ran_same = ctx.process_runner().run_capture(same_bytes_run, bs_abs(root, bs_join(output_dir, "same-bytes-run.stdout")), bs_abs(root, bs_join(output_dir, "same-bytes-run.stderr")), 60000)
     if ran_same.rc != 0 or bs_trim_trailing_line_endings(ran_same.stdout) != "hello":
         return bs_fail(ctx, f"the program linked through the same-bytes root exited {ran_same.rc} printing '" ++ ran_same.stdout ++ "'")
-    if fs.copy_file("out/lib/cimport_stubs.o", bs_join(same_bytes_root, "rt_core.o")) != 0:
-        return bs_fail(ctx, "could not overwrite " ++ same_bytes_root ++ "/rt_core.o")
+    if fs.copy_file("out/lib/cimport_stubs.o", bs_join(same_bytes_root, "rt.o")) != 0:
+        return bs_fail(ctx, "could not overwrite " ++ same_bytes_root ++ "/rt.o")
     let differs_bin = bs_join(output_dir, "differs")
     var differs_args: List[str] = List.new()
     differs_args |> push(bs_abs(root, compiler))
@@ -446,9 +446,9 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
     let differs_env = process_env().set("WITH_RUNTIME_ROOT", bs_abs(root, same_bytes_root))
     let differs = ctx.process_runner().run_capture_with_env(differs_args, bs_abs(root, bs_join(output_dir, "differs.stdout")), bs_abs(root, bs_join(output_dir, "differs.stderr")), 300000, differs_env)
     if differs.rc == 0 or fs.exists(differs_bin):
-        return bs_fail(ctx, "a root of another generation whose rt_core.o is not this compiler's linked (exit 0)")
+        return bs_fail(ctx, "a root of another generation whose rt.o is not this compiler's linked (exit 0)")
     if not differs.stderr.contains("would mix compiler generations"):
-        return bs_fail(ctx, "a root of another generation whose rt_core.o is not this compiler's failed without saying why: " ++ differs.stderr)
+        return bs_fail(ctx, "a root of another generation whose rt.o is not this compiler's failed without saying why: " ++ differs.stderr)
     0
 
 fn bs_run_cli_expect_success(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
@@ -3502,15 +3502,8 @@ fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, platform_obj: &str, li
     cc_args.push("-o")
     cc_args.push(bs_abs(root, bin))
     cc_args.push(bs_abs(root, c_path))
-    cc_args.push(bs_abs(root, "out/lib/rt_core.o"))
-    cc_args.push(bs_abs(root, "out/lib/" ++ platform_obj))
-    for obj in ["compat_runtime.o", "panic_runtime.o"]:
-        cc_args.push(bs_abs(root, "out/lib/" ++ obj))
-    if fibers:
-        for obj in ["channel_runtime.o", "fiber_runtime.o", "fiber.o", "fiber_asm.o"]:
-            cc_args.push(bs_abs(root, "out/lib/" ++ obj))
-    else:
-        cc_args.push(bs_abs(root, "out/lib/fiber_stubs.o"))
+    cc_args.push(bs_abs(root, "out/lib/rt.o"))
+    cc_args.push(bs_abs(root, "out/lib/fiber_asm.o"))
     for obj in ["cimport_stubs.o", "embedded_objects.o"]:
         cc_args.push(bs_abs(root, "out/lib/" ++ obj))
     cc_args.push("-I")
@@ -3959,11 +3952,8 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
     link_args |> push(bs_abs(root, bin))
     link_args |> push(bs_abs(root, with_obj))
     link_args |> push(bs_abs(root, helper_obj))
-    link_args |> push(bs_abs(root, "out/lib/rt_core.o"))
-    link_args |> push(bs_abs(root, "out/lib/" ++ platform_obj))
-    link_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
-    link_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
-    link_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
+    link_args |> push(bs_abs(root, "out/lib/rt.o"))
+    link_args |> push(bs_abs(root, "out/lib/fiber_asm.o"))
     link_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
     link_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
     let link_result = ctx.process_runner().run_capture(link_args, link_stdout, link_stderr, 120000)

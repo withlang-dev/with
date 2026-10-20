@@ -16,45 +16,8 @@ extern fn with_str_clone_ref(s: &str) -> str
 
 extern let with_embedded_cimport_stubs_o_start: u8
 extern let with_embedded_cimport_stubs_o_end: u8
-extern let with_embedded_compat_runtime_o_start: u8
-extern let with_embedded_compat_runtime_o_end: u8
-extern let with_embedded_panic_runtime_o_start: u8
-extern let with_embedded_panic_runtime_o_end: u8
-extern let with_embedded_fiber_stubs_o_start: u8
-extern let with_embedded_fiber_stubs_o_end: u8
-extern let with_embedded_channel_runtime_o_start: u8
-extern let with_embedded_channel_runtime_o_end: u8
-extern let with_embedded_fiber_runtime_o_start: u8
-extern let with_embedded_fiber_runtime_o_end: u8
-extern let with_embedded_fiber_o_start: u8
-extern let with_embedded_fiber_o_end: u8
 extern let with_embedded_fiber_asm_o_start: u8
 extern let with_embedded_fiber_asm_o_end: u8
-extern let with_embedded_rt_core_o_start: u8
-extern let with_embedded_rt_core_o_end: u8
-extern let with_embedded_rt_darwin_aarch64_o_start: u8
-extern let with_embedded_rt_darwin_aarch64_o_end: u8
-extern let with_embedded_rt_linux_aarch64_o_start: u8
-extern let with_embedded_rt_linux_aarch64_o_end: u8
-extern let with_embedded_rt_linux_x86_64_o_start: u8
-extern let with_embedded_rt_linux_x86_64_o_end: u8
-extern let with_embedded_rt_windows_x86_64_o_start: u8
-extern let with_embedded_rt_windows_x86_64_o_end: u8
-extern let with_embedded_rt_windows_aarch64_o_start: u8
-extern let with_embedded_rt_windows_aarch64_o_end: u8
-// #2131: the wasm32 program runtime a native compiler carries, so
-// `--target wasm32` links outside the repository (empty in a compiler that
-// carries none: stage1, the cross compilers).
-extern let with_embedded_wasm32_rt_core_o_start: u8
-extern let with_embedded_wasm32_rt_core_o_end: u8
-extern let with_embedded_wasm32_rt_wasm_o_start: u8
-extern let with_embedded_wasm32_rt_wasm_o_end: u8
-extern let with_embedded_wasm32_compat_runtime_o_start: u8
-extern let with_embedded_wasm32_compat_runtime_o_end: u8
-extern let with_embedded_wasm32_panic_runtime_o_start: u8
-extern let with_embedded_wasm32_panic_runtime_o_end: u8
-extern let with_embedded_wasm32_fiber_stubs_o_start: u8
-extern let with_embedded_wasm32_fiber_stubs_o_end: u8
 
 type LinkStageEnvVar {
     name: str,
@@ -1213,46 +1176,14 @@ fn link_stage_embedded_obj_slice(start: *const u8, end: *const u8) -> str:
         return ""
     link_stage_str_from_raw_parts(start, len)
 
+// The two platform objects a compiler still carries beside its runtime
+// bundle: the on-demand cimport_stubs archive and the fiber assembly
+// (D30 step 4: the .w-derived runtime objects are the bundle's).
 fn link_stage_embedded_runtime_object(name: &str) -> str:
     if name == "cimport_stubs.o":
         return link_stage_embedded_obj_slice(&with_embedded_cimport_stubs_o_start as *const u8, &with_embedded_cimport_stubs_o_end as *const u8)
-    if name == "compat_runtime.o":
-        return link_stage_embedded_obj_slice(&with_embedded_compat_runtime_o_start as *const u8, &with_embedded_compat_runtime_o_end as *const u8)
-    if name == "panic_runtime.o":
-        return link_stage_embedded_obj_slice(&with_embedded_panic_runtime_o_start as *const u8, &with_embedded_panic_runtime_o_end as *const u8)
-    if name == "fiber_stubs.o":
-        return link_stage_embedded_obj_slice(&with_embedded_fiber_stubs_o_start as *const u8, &with_embedded_fiber_stubs_o_end as *const u8)
-    if name == "channel_runtime.o":
-        return link_stage_embedded_obj_slice(&with_embedded_channel_runtime_o_start as *const u8, &with_embedded_channel_runtime_o_end as *const u8)
-    if name == "fiber_runtime.o":
-        return link_stage_embedded_obj_slice(&with_embedded_fiber_runtime_o_start as *const u8, &with_embedded_fiber_runtime_o_end as *const u8)
-    if name == "fiber.o":
-        return link_stage_embedded_obj_slice(&with_embedded_fiber_o_start as *const u8, &with_embedded_fiber_o_end as *const u8)
     if name == "fiber_asm.o":
         return link_stage_embedded_obj_slice(&with_embedded_fiber_asm_o_start as *const u8, &with_embedded_fiber_asm_o_end as *const u8)
-    if name == "rt_core.o":
-        return link_stage_embedded_obj_slice(&with_embedded_rt_core_o_start as *const u8, &with_embedded_rt_core_o_end as *const u8)
-    if name == "rt_darwin_aarch64.o":
-        return link_stage_embedded_obj_slice(&with_embedded_rt_darwin_aarch64_o_start as *const u8, &with_embedded_rt_darwin_aarch64_o_end as *const u8)
-    if name == "rt_linux_aarch64.o":
-        return link_stage_embedded_obj_slice(&with_embedded_rt_linux_aarch64_o_start as *const u8, &with_embedded_rt_linux_aarch64_o_end as *const u8)
-    if name == "rt_linux_x86_64.o":
-        return link_stage_embedded_obj_slice(&with_embedded_rt_linux_x86_64_o_start as *const u8, &with_embedded_rt_linux_x86_64_o_end as *const u8)
-    if name == "rt_windows_x86_64.o":
-        return link_stage_embedded_obj_slice(&with_embedded_rt_windows_x86_64_o_start as *const u8, &with_embedded_rt_windows_x86_64_o_end as *const u8)
-    if name == "rt_windows_aarch64.o":
-        return link_stage_embedded_obj_slice(&with_embedded_rt_windows_aarch64_o_start as *const u8, &with_embedded_rt_windows_aarch64_o_end as *const u8)
-    // #2131: the wasm32 runtime, named by its cross path.
-    if name == "cross/wasm32/rt_core.o":
-        return link_stage_embedded_obj_slice(&with_embedded_wasm32_rt_core_o_start as *const u8, &with_embedded_wasm32_rt_core_o_end as *const u8)
-    if name == "cross/wasm32/rt_wasm.o":
-        return link_stage_embedded_obj_slice(&with_embedded_wasm32_rt_wasm_o_start as *const u8, &with_embedded_wasm32_rt_wasm_o_end as *const u8)
-    if name == "cross/wasm32/compat_runtime.o":
-        return link_stage_embedded_obj_slice(&with_embedded_wasm32_compat_runtime_o_start as *const u8, &with_embedded_wasm32_compat_runtime_o_end as *const u8)
-    if name == "cross/wasm32/panic_runtime.o":
-        return link_stage_embedded_obj_slice(&with_embedded_wasm32_panic_runtime_o_start as *const u8, &with_embedded_wasm32_panic_runtime_o_end as *const u8)
-    if name == "cross/wasm32/fiber_stubs.o":
-        return link_stage_embedded_obj_slice(&with_embedded_wasm32_fiber_stubs_o_start as *const u8, &with_embedded_wasm32_fiber_stubs_o_end as *const u8)
     ""
 
 fn link_stage_extract_runtime_obj(name: &str, path: &str) -> i32:
@@ -2023,7 +1954,6 @@ fn link_stage_resolve_runtime_root() -> str:
             return ""
         return explicit
     let compiler_dir = link_stage_compiler_dir()
-    let platform_object = link_stage_host_platform_runtime_object()
     let candidates: List[str] = List.new()
     candidates.push(link_stage_artifact_root() ++ "/lib")
     // Seed-built bootstrap runtime: the seed's generation, so only a seed
@@ -2037,8 +1967,7 @@ fn link_stage_resolve_runtime_root() -> str:
     for i in 0..candidates.len():
         let dir = candidates[i]
         let probe = dir ++ "/cimport_stubs.o"
-        let platform_probe = if platform_object.len() > 0: dir ++ "/" ++ platform_object else: ""
-        if runtime_read_file(probe).len() == 0 or (platform_probe.len() > 0 and runtime_read_file(platform_probe).len() == 0):
+        if runtime_read_file(probe).len() == 0:
             continue
         if link_stage_runtime_dir_is_this_generation(dir):
             return with_str_clone_ref(dir)
@@ -2069,8 +1998,17 @@ fn link_stage_named_runtime_root_is_this_generation(dir: &str) -> bool:
 fn link_stage_runtime_dir_matches_embedded(dir: &str) -> bool:
     if not link_stage_embedded_runtime_is_this_generation():
         return false
-    let names = ["rt_core.o", "cimport_stubs.o", "compat_runtime.o", "panic_runtime.o", "fiber_stubs.o", "channel_runtime.o", "fiber_runtime.o", "fiber.o", "fiber_asm.o", link_stage_host_platform_runtime_object()]
     var compared = 0
+    // The runtime bundle: the root's rt.o is the bytes the `rt` slot holds.
+    for bi in 0..embedded_bundle_count():
+        if embedded_bundle_name(bi) != "rt" or not embedded_bundle_present(bi) or not embedded_bundle_for_this_target(bi):
+            continue
+        let on_disk = runtime_read_file(dir ++ "/rt.o")
+        if on_disk.len() == 0: continue
+        let embedded = link_stage_embedded_obj_slice(embedded_bundle_object_start(bi) as *const u8, embedded_bundle_object_end(bi) as *const u8)
+        if embedded.len() != on_disk.len() or embedded != on_disk: return false
+        compared += 1
+    let names = ["cimport_stubs.o", "fiber_asm.o"]
     for name in names:
         let on_disk = runtime_read_file(dir ++ "/" ++ name)
         if on_disk.len() == 0: continue
@@ -2091,11 +2029,11 @@ fn link_stage_runtime_dir_producer(dir: &str) -> str:
 fn link_stage_runtime_dir_is_this_generation(dir: &str) -> bool:
     if compiler_generation_is_stamped():
         return link_stage_runtime_dir_producer(dir) == compiler_generation() or link_stage_runtime_dir_matches_embedded(dir)
-    let embedded = link_stage_embedded_runtime_object("rt_core.o")
+    let embedded = link_stage_embedded_runtime_object("cimport_stubs.o")
     // A binary that carries no runtime can only link from disk.
     if embedded.len() == 0:
         return true
-    let on_disk = runtime_read_file(dir ++ "/rt_core.o")
+    let on_disk = runtime_read_file(dir ++ "/cimport_stubs.o")
     on_disk.len() == embedded.len() and on_disk == embedded
 
 fn link_stage_embedded_runtime_is_this_generation() -> bool:
@@ -2184,18 +2122,6 @@ fn link_stage_find_runtime_object_path(name: &str) -> str:
         let cross_path = root ++ "/cross/" ++ target_spec_name() ++ "/" ++ name
         if runtime_read_file(cross_path).len() > 0:
             return cross_path
-        // #2131: a native compiler carries the wasm32 runtime it was built
-        // with; outside a tree that holds the objects, extract them, under
-        // the same generation check as the native fallback.
-        if target_spec_is_wasm():
-            let embedded_name = "cross/" ++ target_spec_name() ++ "/" ++ name
-            if link_stage_embedded_runtime_object(embedded_name).len() > 0 and link_stage_embedded_runtime_is_this_generation():
-                let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime/cross/" ++ target_spec_name()
-                if runtime_mkdir_p(tmp_dir) != 0:
-                    return ""
-                let tmp_path = tmp_dir ++ "/" ++ name
-                if link_stage_extract_runtime_obj(embedded_name, tmp_path) == 0:
-                    return tmp_path
         with_eprint("error: missing " ++ target_spec_name() ++ " runtime object: " ++ cross_path ++ " (run `with build :cross-rt-wasm` first, or use a release compiler, which carries it)")
         return ""
     let p = root ++ "/" ++ name
@@ -2218,42 +2144,6 @@ fn link_stage_find_runtime_object_path(name: &str) -> str:
     let tmp_path = tmp_dir ++ "/" ++ name
     if link_stage_extract_runtime_obj(name, tmp_path) == 0:
         return tmp_path
-    ""
-
-// The platform runtime object for the ACTIVE target (native resolves
-// to the host's, exactly as before cross targets existed).
-fn link_stage_platform_runtime_object() -> str:
-    if not target_spec_is_native():
-        if target_spec_active_kind() == 1:
-            return "rt_linux_x86_64.o"
-        if target_spec_active_kind() == 2:
-            return "rt_linux_aarch64.o"
-        if target_spec_active_kind() == 5:
-            return "rt_windows_x86_64.o"
-        if target_spec_active_kind() == 6:
-            return "rt_windows_aarch64.o"
-        if target_spec_is_wasm():
-            return "rt_wasm.o"
-        with_eprint("error: unsupported cross runtime platform: " ++ target_spec_name())
-        return ""
-    link_stage_host_platform_runtime_object()
-
-fn link_stage_host_platform_runtime_object() -> str:
-    let os = runtime_sysinfo_os()
-    let arch = runtime_sysinfo_arch()
-    if os == "Linux" and arch == "x86_64":
-        return "rt_linux_x86_64.o"
-    if os == "Linux" and arch == "aarch64":
-        // No embedded slot yet — resolved from the on-disk runtime root
-        // only (see link_stage_embedded_runtime_object).
-        return "rt_linux_aarch64.o"
-    if os == "Macos" and arch == "aarch64":
-        return "rt_darwin_aarch64.o"
-    if os == "Windows" and arch == "x86_64":
-        return "rt_windows_x86_64.o"
-    if os == "Windows" and arch == "aarch64":
-        return "rt_windows_aarch64.o"
-    with_eprint("error: unsupported host runtime platform: " ++ os ++ "/" ++ arch)
     ""
 
 fn link_stage_make_archive(obj_path: &str) -> str:
@@ -2454,27 +2344,6 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
             with_eprint("error: missing runtime/fiber_asm.o")
             return link_stage_plan_fail()
         extras.push(fa_path)
-    else if needs_fiber_runtime != 0:
-        let channel_runtime_path = link_stage_find_runtime_object_path("channel_runtime.o")
-        if channel_runtime_path.len() == 0:
-            with_eprint("error: missing runtime/channel_runtime.o")
-            return link_stage_plan_fail()
-        extras.push(channel_runtime_path)
-        let fiber_runtime_path = link_stage_find_runtime_object_path("fiber_runtime.o")
-        if fiber_runtime_path.len() == 0:
-            with_eprint("error: missing runtime/fiber_runtime.o")
-            return link_stage_plan_fail()
-        extras.push(fiber_runtime_path)
-        let fiber_path = link_stage_find_runtime_object_path("fiber.o")
-        if fiber_path.len() == 0:
-            with_eprint("error: missing runtime/fiber.o")
-            return link_stage_plan_fail()
-        extras.push(fiber_path)
-        let fiber_asm_path = link_stage_find_runtime_object_path("fiber_asm.o")
-        if fiber_asm_path.len() == 0:
-            with_eprint("error: missing runtime/fiber_asm.o")
-            return link_stage_plan_fail()
-        extras.push(fiber_asm_path)
 
     // D30 step 4: the runtime is the bundle that joined above (the program's
     // own objects and the bundle hold every with_*/rt_* definition; no

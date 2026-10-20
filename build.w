@@ -297,101 +297,12 @@ fn cross_platform_symbol(tag: &str) -> str:
 // No fiber core (no stack switching in WebAssembly), no cimport stubs (no
 // libc), no compiler link inputs (the compiler itself is not a wasm
 // target). `with build :cross-rt-wasm` populates out/lib/cross/wasm32/.
-// The five objects of the wasm32 program runtime: rt_core, the platform,
-// compat, panic and the fiber stubs. Three parallel lists (target name
-// suffix, source, object name), read by every producer and every embed
-// (#2131). Parallel lists built with push rather than tuples or literals:
-// the build layer runs on the pinned seed, whose evaluator predates
-// destructuring in a `for` and `len()` on a collection literal (#1122).
-fn wasm32_runtime_suffixes() -> List[str]:
-    let out: List[str] = List.new()
-    out.push("rt-core-object")
-    out.push("rt-platform-object")
-    out.push("compat-runtime-object")
-    out.push("panic-runtime-object")
-    out.push("fiber-stubs-object")
-    out
-
-fn wasm32_runtime_sources() -> List[str]:
-    let out: List[str] = List.new()
-    out.push("rt/rt_core.w")
-    out.push("rt/wasm.w")
-    out.push("out/gen/compat_runtime.w")
-    out.push("rt/panic_runtime.w")
-    out.push("rt/fiber_stubs.w")
-    out
-
-fn wasm32_runtime_obj_names() -> List[str]:
-    let out: List[str] = List.new()
-    out.push("rt_core.o")
-    out.push("rt_wasm.o")
-    out.push("compat_runtime.o")
-    out.push("panic_runtime.o")
-    out.push("fiber_stubs.o")
-    out
-
-// The blob symbol a wasm32 runtime object is embedded under:
-// `with_embedded_wasm32_<stem>_o` (src/compiler/Link.w).
-fn wasm32_runtime_blob_symbol(obj_name: &str) -> str:
-    "wasm32_" ++ obj_name.slice(0, obj_name.len() - 2) ++ "_o"
-
-// Registers the five wasm32 runtime objects compiled by `compiler` into
-// `dir`, named `<p><suffix>`; the compat object depends on its generated
-// source.
-fn add_wasm32_runtime_object_targets(out0: Build, p: &str, dir: &str, compiler: &str, dep: &str) -> Build:
-    var out = out0
-    let suffixes = wasm32_runtime_suffixes()
-    let sources = wasm32_runtime_sources()
-    let names = wasm32_runtime_obj_names()
-    for i in 0..suffixes.len():
-        var target = cross_object_target_with("wasm32", p ++ suffixes[i], sources[i], dir ++ "/" ++ names[i], "-O1", compiler, dep)
-        if sources[i] == "out/gen/compat_runtime.w": target = target.dep("compat-runtime-source")
-        out = out.add_target(target)
-    out
-
-// An embed carries the wasm32 runtime objects under `dir` as
-// `wasm32_<stem>_o` blobs, produced by the `<p><suffix>` targets.
-fn target_with_wasm32_runtime_blobs(target: Target, p: &str, dir: &str) -> Target:
-    var out = target
-    let suffixes = wasm32_runtime_suffixes()
-    let names = wasm32_runtime_obj_names()
-    for i in 0..suffixes.len():
-        out = out.input(dir ++ "/" ++ names[i])
-        out = out.arg(wasm32_runtime_blob_symbol(names[i]))
-        out = out.dep(p ++ suffixes[i])
-    out
-
-// A compiler that carries no wasm32 runtime (stage1, the cross compilers)
-// still defines the symbols the link stage names: empty blobs.
-fn add_empty_wasm32_runtime_blob_targets(out0: Build, prefix: &str, dir: &str) -> Build:
-    var out = out0
-    let names = wasm32_runtime_obj_names()
-    for i in 0..names.len():
-        let sym = wasm32_runtime_blob_symbol(names[i])
-        out = out.add_target(empty_file_target(empty_platform_blob_target(prefix, sym), empty_platform_blob_path(dir, sym)))
-    out
-
-fn target_with_empty_wasm32_runtime_blobs(target: Target, prefix: &str, dir: &str) -> Target:
-    var out = target
-    let names = wasm32_runtime_obj_names()
-    for i in 0..names.len():
-        let sym = wasm32_runtime_blob_symbol(names[i])
-        out = out.input(empty_platform_blob_path(dir, sym))
-        out = out.dep(empty_platform_blob_target(prefix, sym))
-        out = out.arg(sym)
-    out
-
 fn add_cross_wasm_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str, plans: &List[WoBundle]) -> Build:
     var out = out0
-    // Compiled by stage2 (not the release) so the release binary can embed
-    // them: the release's own native runtime objects are stage2's too.
-    out = add_wasm32_runtime_object_targets(move out, p, cross_dir(tag), stage_compiler_bin("with-stage2"), "rt-bundle-wasm32")
+    // The wasm32 runtime is the bundle stage2 builds (`rt-bundle-wasm32`),
+    // which the release embeds as its `rt@wasm32` slot (D30 step 4).
     var cross_rt = target_new(.Group, build_owned_text(group_name), "")
-    cross_rt = cross_rt.dep(p ++ "rt-core-object")
-    cross_rt = cross_rt.dep(p ++ "rt-platform-object")
-    cross_rt = cross_rt.dep(p ++ "compat-runtime-object")
-    cross_rt = cross_rt.dep(p ++ "panic-runtime-object")
-    cross_rt = cross_rt.dep(p ++ "fiber-stubs-object")
+    cross_rt = cross_rt.dep("rt-bundle-wasm32")
     // #2131: the target's bundles (out/wo/<tag>/<name>.{o,wi,manifest}).
     for pi in 0..plans.len():
         cross_rt = cross_rt.dep(wo_build_target_name(plans[pi]))
@@ -446,17 +357,7 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     var out = out0
     let dir = cross_dir(tag)
     let triple = cross_triple(tag)
-    out = out.add_target(cross_object_target(tag, p ++ "rt-core-object", "rt/rt_core.w", "-O1"))
-    out = out.add_target(cross_object_target_named(tag, p ++ "rt-platform-object", cross_platform_source(tag), cross_platform_obj(tag), "-O1"))
     out = out.add_target(cross_object_target(tag, p ++ "cimport-stubs-object", "rt/cimport_stubs.w", "-O1"))
-    var cross_compat = cross_object_target_named(tag, p ++ "compat-runtime-object", "out/gen/compat_runtime.w", "compat_runtime.o", "-O1")
-    cross_compat = cross_compat.dep("compat-runtime-source")
-    out = out.add_target(cross_compat)
-    out = out.add_target(cross_object_target(tag, p ++ "panic-runtime-object", "rt/panic_runtime.w", "-O1"))
-    out = out.add_target(cross_object_target(tag, p ++ "fiber-stubs-object", "rt/fiber_stubs.w", "-O1"))
-    out = out.add_target(cross_object_target(tag, p ++ "channel-runtime-object", "rt/channel_runtime.w", "-O1"))
-    out = out.add_target(cross_object_target(tag, p ++ "fiber-runtime-object", "rt/fiber_runtime.w", "-O1"))
-    out = out.add_target(cross_object_target_named(tag, p ++ "fiber-core-object", "rt/fiber_core_darwin.w", "fiber.o", "-O1"))
     out = out.add_target(cross_object_target_named(tag, p ++ "llvm-bridge-object", "src/compiler/LlvmBridge.w", "llvm_bridge.o", "-O1"))
     out = out.add_target(cross_object_target_named(tag, p ++ "clang-bridge-object", "src/compiler/ClangBridge.w", "clang_bridge.o", "-O1"))
 
@@ -467,42 +368,16 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     var cross_embedded = target_new(.EmbedObjectFiles, p ++ "embedded-objects-asm", build_owned_text(tag)).output(dir ++ "/embedded_objects.s")
     cross_embedded = cross_embedded.input(dir ++ "/cimport_stubs.o")
     cross_embedded = cross_embedded.arg("cimport_stubs_o")
-    cross_embedded = cross_embedded.input(dir ++ "/compat_runtime.o")
-    cross_embedded = cross_embedded.arg("compat_runtime_o")
-    cross_embedded = cross_embedded.input(dir ++ "/panic_runtime.o")
-    cross_embedded = cross_embedded.arg("panic_runtime_o")
-    cross_embedded = cross_embedded.input(dir ++ "/fiber_stubs.o")
-    cross_embedded = cross_embedded.arg("fiber_stubs_o")
-    cross_embedded = cross_embedded.input(dir ++ "/channel_runtime.o")
-    cross_embedded = cross_embedded.arg("channel_runtime_o")
-    cross_embedded = cross_embedded.input(dir ++ "/fiber_runtime.o")
-    cross_embedded = cross_embedded.arg("fiber_runtime_o")
-    cross_embedded = cross_embedded.input(dir ++ "/fiber.o")
-    cross_embedded = cross_embedded.arg("fiber_o")
     cross_embedded = cross_embedded.input(dir ++ "/fiber_asm.o")
     cross_embedded = cross_embedded.arg("fiber_asm_o")
-    cross_embedded = cross_embedded.input(dir ++ "/rt_core.o")
-    cross_embedded = cross_embedded.arg("rt_core_o")
-    cross_embedded = cross_embedded.input(dir ++ "/" ++ cross_platform_obj(tag))
-    cross_embedded = cross_embedded.arg(cross_platform_symbol(tag))
     cross_embedded = cross_embedded.dep(p ++ "cimport-stubs-object")
-    cross_embedded = cross_embedded.dep(p ++ "compat-runtime-object")
-    cross_embedded = cross_embedded.dep(p ++ "panic-runtime-object")
-    cross_embedded = cross_embedded.dep(p ++ "fiber-stubs-object")
-    cross_embedded = cross_embedded.dep(p ++ "channel-runtime-object")
-    cross_embedded = cross_embedded.dep(p ++ "fiber-runtime-object")
-    cross_embedded = cross_embedded.dep(p ++ "fiber-core-object")
     cross_embedded = cross_embedded.dep(p ++ "fiber-asm-object")
-    cross_embedded = cross_embedded.dep(p ++ "rt-core-object")
-    cross_embedded = cross_embedded.dep(p ++ "rt-platform-object")
     // Each cross compiler embeds every corpus bundle compiled for its own
     // target by the release compiler (#946).
     for pi in 0..plans.len():
         out = cross_wo_bundle_targets(move out, ctx, plans[pi])
         cross_embedded = target_with_wo_blobs(move cross_embedded, plans[pi])
     // A cross compiler carries no wasm32 runtime yet (#2131: empty slots).
-    out = add_empty_wasm32_runtime_blob_targets(move out, p ++ "empty-", dir)
-    cross_embedded = target_with_empty_wasm32_runtime_blobs(move cross_embedded, p ++ "empty-", dir)
     // The bundle index names the wasm32 bundle slots in every compiler
     // (#2390): empty here, as in the bootstrap embedding.
     for pi in 0..plans.len():
@@ -550,11 +425,13 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     out = out.add_target(cross_ld_rsp)
 
     var objects: List[str] = List.new()
-    for suffix in "rt-core-object rt-platform-object cimport-stubs-object compat-runtime-object panic-runtime-object fiber-stubs-object channel-runtime-object fiber-runtime-object fiber-core-object fiber-asm-object llvm-bridge-object clang-bridge-object embedded-objects-object llvm-link-metadata".split(" "):
+    for suffix in "cimport-stubs-object fiber-asm-object llvm-bridge-object clang-bridge-object embedded-objects-object llvm-link-metadata".split(" "):
         objects.push(p ++ suffix)
+    objects.push("rt-bundle-" ++ tag)
     out = out.add_target(runtime_producer_target(p ++ "runtime-producer", release_compiler_bin("with"), dir, &objects))
 
     var cross_rt = target_new(.Group, build_owned_text(group_name), "")
+    cross_rt = cross_rt.dep("rt-bundle-wasm32")
     cross_rt = cross_rt.dep(p ++ "embedded-objects-object")
     cross_rt = cross_rt.dep(p ++ "llvm-bridge-object")
     cross_rt = cross_rt.dep(p ++ "clang-bridge-object")
@@ -612,26 +489,8 @@ fn add_stage1_runtime_targets(out0: Build, ctx: &BuildCtx, host_runtime: &HostRu
     let dir = "out/bootstrap/lib"
     let stage1 = bootstrap_compiler_bin("with-stage1")
     let objects: List[str] = List.new()
-    out = out.add_target(with_object_target("stage1-rt-core-object", stage1, "rt/rt_core.w", dir ++ "/rt_core.o", "-O1", "stage1-rt-bundle"))
-    objects.push("stage1-rt-core-object")
-    out = out.add_target(with_object_target("stage1-rt-platform-object", stage1, host_runtime.platform_source, dir ++ "/" ++ host_runtime.platform_install_object, "-O1", "stage1-rt-bundle"))
-    objects.push("stage1-rt-platform-object")
     out = out.add_target(with_object_target("stage1-cimport-stubs-object", stage1, "rt/cimport_stubs.w", dir ++ "/cimport_stubs.o", "-O1", "stage1-rt-bundle"))
     objects.push("stage1-cimport-stubs-object")
-    var compat = with_object_target("stage1-compat-runtime-object", stage1, "out/gen/compat_runtime.w", dir ++ "/compat_runtime.o", "-O1", "stage1")
-    compat = compat.dep("compat-runtime-source")
-    out = out.add_target(compat)
-    objects.push("stage1-compat-runtime-object")
-    out = out.add_target(with_object_target("stage1-panic-runtime-object", stage1, "rt/panic_runtime.w", dir ++ "/panic_runtime.o", "-O1", "stage1-rt-bundle"))
-    objects.push("stage1-panic-runtime-object")
-    out = out.add_target(with_object_target("stage1-fiber-stubs-object", stage1, "rt/fiber_stubs.w", dir ++ "/fiber_stubs.o", "-O1", "stage1-rt-bundle"))
-    objects.push("stage1-fiber-stubs-object")
-    out = out.add_target(with_object_target("stage1-channel-runtime-object", stage1, "rt/channel_runtime.w", dir ++ "/channel_runtime.o", "-O1", "stage1-rt-bundle"))
-    objects.push("stage1-channel-runtime-object")
-    out = out.add_target(with_object_target("stage1-fiber-runtime-object", stage1, "rt/fiber_runtime.w", dir ++ "/fiber_runtime.o", "-O1", "stage1-rt-bundle"))
-    objects.push("stage1-fiber-runtime-object")
-    out = out.add_target(with_object_target("stage1-fiber-core-object", stage1, host_runtime.fiber_core_source, dir ++ "/fiber.o", "-O1", "stage1-rt-bundle"))
-    objects.push("stage1-fiber-core-object")
     out = out.add_target(target_new(.CompileAsmObject, "stage1-fiber-asm-object", build_owned_text(host_runtime.fiber_asm_source)).output(dir ++ "/fiber_asm.o"))
     objects.push("stage1-fiber-asm-object")
     out = out.add_target(rt_bundle_target("stage1-rt-bundle", stage1, dir, "stage1", host_runtime))
@@ -674,30 +533,13 @@ fn add_stage1_runtime_targets(out0: Build, ctx: &BuildCtx, host_runtime: &HostRu
     var embedded = target_new(.EmbedObjectFiles, "stage-embedded-objects-asm", "").output("out/stage/lib/embedded_objects.s")
     let names: List[str] = List.new()
     names.push("cimport_stubs")
-    names.push("compat_runtime")
-    names.push("panic_runtime")
-    names.push("fiber_stubs")
-    names.push("channel_runtime")
-    names.push("fiber_runtime")
-    names.push("fiber")
     names.push("fiber_asm")
-    names.push("rt_core")
     for ni in 0..names.len():
         embedded = embedded.input(dir ++ "/" ++ names[ni] ++ ".o")
         embedded = embedded.arg(names[ni] ++ "_o")
     embedded = target_with_rt_bundle_blobs(embedded, dir, "stage1-rt-bundle")
     for tag in stage_rt_bundle_tags():
         embedded = target_with_rt_bundle_blobs_as(embedded, dir ++ "/cross/" ++ tag, "stage1-rt-bundle-" ++ tag, "rt_" ++ tag)
-    embedded = embedded.input(dir ++ "/" ++ host_runtime.platform_install_object)
-    embedded = embedded.arg(build_owned_text(host_runtime.platform_symbol))
-    let empty_syms = embedded_platform_symbols()
-    for ei in 0..empty_syms.len():
-        let esym = empty_syms[ei]
-        if esym != host_runtime.platform_symbol:
-            out = out.add_target(empty_file_target(empty_platform_blob_target("stage1-empty-", esym), empty_platform_blob_path(dir, esym)))
-            objects.push(empty_platform_blob_target("stage1-empty-", esym))
-            embedded = embedded.input(empty_platform_blob_path(dir, esym))
-            embedded = embedded.arg(build_owned_text(esym))
     for oi in 0..objects.len():
         embedded = embedded.dep(build_owned_text(objects[oi]))
     for pi in 0..corpus_plans.len():
@@ -706,8 +548,6 @@ fn add_stage1_runtime_targets(out0: Build, ctx: &BuildCtx, host_runtime: &HostRu
     // and the wasm32 runtime objects stage1 compiles beside the native ones.
     for pi in 0..wasm_plans.len():
         embedded = target_with_wo_blobs_as(move embedded, wasm_plans[pi], wasm_plans[pi].name ++ "_wasm32")
-    out = add_wasm32_runtime_object_targets(move out, "stage1-wasm32-", dir ++ "/cross/wasm32", stage1, "stage1-rt-bundle-wasm32")
-    embedded = target_with_wasm32_runtime_blobs(move embedded, "stage1-wasm32-", dir ++ "/cross/wasm32")
     embedded = target_with_darwin_sysroot_blob(move embedded)
     let embedded_obj = embedded_objects_object("stage-embedded-objects-object", &embedded, "")
     out = out.add_target(embedded)
@@ -964,8 +804,6 @@ fn embedded_platform_symbols() -> List[str]:
     out.push("rt_darwin_aarch64_o")
     out.push("rt_linux_x86_64_o")
     out.push("rt_linux_aarch64_o")
-    out.push("rt_windows_x86_64_o")
-    out.push("rt_windows_aarch64_o")
     out
 
 // #1915: the darwin sysroot (build/sdk.w run_darwin_sysroot_action) is a
@@ -1308,9 +1146,6 @@ type HostRuntimeSpec:
     platform_source: str
     compat_source: str
     bootstrap_platform_object: str
-    platform_object: str
-    platform_install_object: str
-    platform_symbol: str
     fiber_core_source: str
     fiber_asm_source: str
 
@@ -1364,9 +1199,6 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             platform_source: "rt/linux_aarch64.w",
             compat_source: "rt/compat_runtime.w",
             bootstrap_platform_object: "out/bootstrap-lib/rt_linux_aarch64.o",
-            platform_object: "out/lib/rt_linux_aarch64.o",
-            platform_install_object: "rt_linux_aarch64.o",
-            platform_symbol: "rt_linux_aarch64_o",
             fiber_core_source: "rt/fiber_core_darwin.w",
             fiber_asm_source: "runtime/fiber_asm_linux_aarch64.s",
         }
@@ -1375,31 +1207,22 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             platform_source: "rt/linux_x86_64.w",
             compat_source: "rt/compat_runtime.w",
             bootstrap_platform_object: "out/bootstrap-lib/rt_linux_x86_64.o",
-            platform_object: "out/lib/rt_linux_x86_64.o",
-            platform_install_object: "rt_linux_x86_64.o",
-            platform_symbol: "rt_linux_x86_64_o",
             fiber_core_source: "rt/fiber_core_darwin.w",
             fiber_asm_source: "runtime/fiber_asm_linux_x86_64.s",
         }
     if os() == "Windows" and arch() == "x86_64":
         return HostRuntimeSpec {
             platform_source: "rt/windows_x86_64.w",
-            compat_source: "rt/compat_runtime.w",
             bootstrap_platform_object: "out/bootstrap-lib/rt_windows_x86_64.o",
-            platform_object: "out/lib/rt_windows_x86_64.o",
-            platform_install_object: "rt_windows_x86_64.o",
-            platform_symbol: "rt_windows_x86_64_o",
+            compat_source: "rt/compat_runtime.w",
             fiber_core_source: "rt/fiber_core_windows.w",
             fiber_asm_source: "runtime/fiber_asm_windows_x86_64.s",
         }
     if os() == "Windows" and arch() == "aarch64":
         return HostRuntimeSpec {
             platform_source: "rt/windows_aarch64.w",
-            compat_source: "rt/compat_runtime.w",
             bootstrap_platform_object: "out/bootstrap-lib/rt_windows_aarch64.o",
-            platform_object: "out/lib/rt_windows_aarch64.o",
-            platform_install_object: "rt_windows_aarch64.o",
-            platform_symbol: "rt_windows_aarch64_o",
+            compat_source: "rt/compat_runtime.w",
             fiber_core_source: "rt/fiber_core_windows.w",
             fiber_asm_source: "runtime/fiber_asm_windows_aarch64.s",
         }
@@ -1407,9 +1230,6 @@ fn host_runtime_spec() -> HostRuntimeSpec:
         platform_source: "rt/darwin_aarch64.w",
         compat_source: "rt/compat_runtime.w",
         bootstrap_platform_object: "out/bootstrap-lib/rt_darwin_aarch64.o",
-        platform_object: "out/lib/rt_darwin_aarch64.o",
-        platform_install_object: "rt_darwin_aarch64.o",
-        platform_symbol: "rt_darwin_aarch64_o",
         fiber_core_source: "rt/fiber_core_darwin.w",
         fiber_asm_source: "runtime/fiber_asm_aarch64.s",
     }
@@ -3638,11 +3458,6 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     out = out.add_target(with_object_target("bootstrap-rt-core-object", "seed", "rt/rt_core.w", "out/bootstrap-lib/rt_core.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-rt-platform-object", "seed", host_runtime.platform_source, host_runtime.bootstrap_platform_object, "-O1", ""))
-    let bootstrap_empty_syms = embedded_platform_symbols()
-    for bi in 0..bootstrap_empty_syms.len():
-        let bsym = bootstrap_empty_syms[bi]
-        if bsym != host_runtime.platform_symbol:
-            out = out.add_target(empty_file_target(empty_platform_blob_target("bootstrap-empty-", bsym), empty_platform_blob_path("out/bootstrap-lib", bsym)))
     out = out.add_target(with_object_target("bootstrap-cimport-stubs-object", "seed", "rt/cimport_stubs.w", "out/bootstrap-lib/cimport_stubs.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-compat-runtime-object", "seed", "out/gen/compat_runtime.w", "out/bootstrap-lib/compat_runtime.o", "-O1", "compat-runtime-source"))
     out = out.add_target(with_object_target("bootstrap-panic-runtime-object", "seed", "rt/panic_runtime.w", "out/bootstrap-lib/panic_runtime.o", "-O1", ""))
@@ -3656,48 +3471,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     var bootstrap_embedded_objects = target_new(.EmbedObjectFiles, "bootstrap-embedded-objects-asm", "").output("out/bootstrap-lib/embedded_objects.s")
     bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/cimport_stubs.o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg("cimport_stubs_o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/compat_runtime.o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("compat_runtime_o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/panic_runtime.o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("panic_runtime_o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/fiber_stubs.o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("fiber_stubs_o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/channel_runtime.o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("channel_runtime_o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/fiber_runtime.o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("fiber_runtime_o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/fiber.o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("fiber_o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/fiber_asm.o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg("fiber_asm_o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/rt_core.o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("rt_core_o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input(build_owned_text(host_runtime.bootstrap_platform_object))
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.platform_symbol))
-    for bi2 in 0..bootstrap_empty_syms.len():
-        let bsym2 = bootstrap_empty_syms[bi2]
-        if bsym2 != host_runtime.platform_symbol:
-            bootstrap_embedded_objects = bootstrap_embedded_objects.input(empty_platform_blob_path("out/bootstrap-lib", bsym2))
-            bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(bsym2))
     out = add_empty_wo_blob_targets(out, "bootstrap-", "out/bootstrap-lib", "rt")
     bootstrap_embedded_objects = target_with_empty_wo_blobs(bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", "rt")
     out = add_empty_rt_bundle_slot_targets(out, "bootstrap-", "out/bootstrap-lib")
     bootstrap_embedded_objects = target_with_empty_rt_bundle_slots(bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib")
     // Every consumed object's producer, declared (#680 edge audit).
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-cimport-stubs-object")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-compat-runtime-object")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-panic-runtime-object")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-fiber-stubs-object")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-channel-runtime-object")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-fiber-runtime-object")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-fiber-core-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-fiber-asm-object")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-rt-core-object")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-rt-platform-object")
-    for bi3 in 0..bootstrap_empty_syms.len():
-        let bsym3 = bootstrap_empty_syms[bi3]
-        if bsym3 != host_runtime.platform_symbol:
-            bootstrap_embedded_objects = bootstrap_embedded_objects.dep(empty_platform_blob_target("bootstrap-empty-", bsym3))
     // Stage1 precedes the tree's bundle, so only its embedding keeps empty
     // slots. The populated stage object has its own producer and output.
     for pi in 0..corpus_plans.len():
@@ -3708,8 +3490,6 @@ pub fn build(ctx: BuildCtx) -> Build:
         let slot = corpus_plans_wasm32[pi].name ++ "_wasm32"
         out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", slot)
         bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", slot)
-    out = add_empty_wasm32_runtime_blob_targets(move out, "bootstrap-empty-", "out/bootstrap-lib")
-    bootstrap_embedded_objects = target_with_empty_wasm32_runtime_blobs(move bootstrap_embedded_objects, "bootstrap-empty-", "out/bootstrap-lib")
     // stage1 links programs (the stage1 tests, `:dev`): it carries the sysroot.
     bootstrap_embedded_objects = target_with_darwin_sysroot_blob(move bootstrap_embedded_objects)
     let bootstrap_embedded_objects_obj = embedded_objects_object("bootstrap-embedded-objects-object", &bootstrap_embedded_objects, "")
@@ -3720,10 +3500,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-llvm-link-metadata")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-core-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-platform-object")
-    for bi4 in 0..bootstrap_empty_syms.len():
-        let bsym4 = bootstrap_empty_syms[bi4]
-        if bsym4 != host_runtime.platform_symbol:
-            bootstrap_runtime = bootstrap_runtime.dep(empty_platform_blob_target("bootstrap-empty-", bsym4))
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-cimport-stubs-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-compat-runtime-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-panic-runtime-object")
@@ -4050,22 +3826,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // by-value local (with_vec_push_str), never returns (with_panic), or is
     // an unreachable weak stub, so both compiler generations emit the same
     // ownership behavior for every reachable body.
-    out = out.add_target(with_object_target("rt-core-object", stage_compiler_bin("with-stage2"), "rt/rt_core.w", "out/lib/rt_core.o", "-O1", "stage2"))
-    out = out.add_target(with_object_target("rt-platform-object", stage_compiler_bin("with-stage2"), host_runtime.platform_source, host_runtime.platform_object, "-O1", "stage2"))
-    let empty_syms = embedded_platform_symbols()
-    for ei in 0..empty_syms.len():
-        let esym = empty_syms[ei]
-        if esym != host_runtime.platform_symbol:
-            out = out.add_target(empty_file_target(empty_platform_blob_target("empty-", esym), empty_platform_blob_path("out/lib", esym)).dep("stage1"))
     out = out.add_target(with_object_target("cimport-stubs-object", stage_compiler_bin("with-stage2"), "rt/cimport_stubs.w", "out/lib/cimport_stubs.o", "-O1", "stage2"))
-    var compat_runtime_obj = with_object_target("compat-runtime-object", stage_compiler_bin("with-stage2"), "out/gen/compat_runtime.w", "out/lib/compat_runtime.o", "-O1", "stage2")
-    compat_runtime_obj = compat_runtime_obj.dep("compat-runtime-source")
-    out = out.add_target(compat_runtime_obj)
-    out = out.add_target(with_object_target("panic-runtime-object", stage_compiler_bin("with-stage2"), "rt/panic_runtime.w", "out/lib/panic_runtime.o", "-O1", "stage2"))
-    out = out.add_target(with_object_target("fiber-stubs-object", stage_compiler_bin("with-stage2"), "rt/fiber_stubs.w", "out/lib/fiber_stubs.o", "-O1", "stage2"))
-    out = out.add_target(with_object_target("channel-runtime-object", stage_compiler_bin("with-stage2"), "rt/channel_runtime.w", "out/lib/channel_runtime.o", "-O1", "stage2"))
-    out = out.add_target(with_object_target("fiber-runtime-object", stage_compiler_bin("with-stage2"), "rt/fiber_runtime.w", "out/lib/fiber_runtime.o", "-O1", "stage2"))
-    out = out.add_target(with_object_target("fiber-core-object", stage_compiler_bin("with-stage2"), host_runtime.fiber_core_source, "out/lib/fiber.o", "-O1", "stage2"))
 
     var fiber_asm = target_new(.CompileAsmObject, "fiber-asm-object", host_runtime.fiber_asm_source.clone()).output("out/lib/fiber_asm.o")
     fiber_asm = fiber_asm.dep("stage1")
@@ -4079,29 +3840,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     var embedded_objects = target_new(.EmbedObjectFiles, "embedded-objects-asm", "").output("out/lib/embedded_objects.s")
     embedded_objects = embedded_objects.input("out/lib/cimport_stubs.o")
     embedded_objects = embedded_objects.arg("cimport_stubs_o")
-    embedded_objects = embedded_objects.input("out/lib/compat_runtime.o")
-    embedded_objects = embedded_objects.arg("compat_runtime_o")
-    embedded_objects = embedded_objects.input("out/lib/panic_runtime.o")
-    embedded_objects = embedded_objects.arg("panic_runtime_o")
-    embedded_objects = embedded_objects.input("out/lib/fiber_stubs.o")
-    embedded_objects = embedded_objects.arg("fiber_stubs_o")
-    embedded_objects = embedded_objects.input("out/lib/channel_runtime.o")
-    embedded_objects = embedded_objects.arg("channel_runtime_o")
-    embedded_objects = embedded_objects.input("out/lib/fiber_runtime.o")
-    embedded_objects = embedded_objects.arg("fiber_runtime_o")
-    embedded_objects = embedded_objects.input("out/lib/fiber.o")
-    embedded_objects = embedded_objects.arg("fiber_o")
     embedded_objects = embedded_objects.input("out/lib/fiber_asm.o")
     embedded_objects = embedded_objects.arg("fiber_asm_o")
-    embedded_objects = embedded_objects.input("out/lib/rt_core.o")
-    embedded_objects = embedded_objects.arg("rt_core_o")
-    embedded_objects = embedded_objects.input(build_owned_text(host_runtime.platform_object))
-    embedded_objects = embedded_objects.arg(build_owned_text(host_runtime.platform_symbol))
-    for ei2 in 0..empty_syms.len():
-        let esym2 = empty_syms[ei2]
-        if esym2 != host_runtime.platform_symbol:
-            embedded_objects = embedded_objects.input(empty_platform_blob_path("out/lib", esym2))
-            embedded_objects = embedded_objects.arg(build_owned_text(esym2))
     // The release binary embeds the tree's bundles (D38), and the wasm32
     // ones beside them under their own symbols (#2131).
     for pi in 0..corpus_plans.len():
@@ -4110,26 +3850,13 @@ pub fn build(ctx: BuildCtx) -> Build:
         embedded_objects = target_with_wo_blobs_as(move embedded_objects, corpus_plans_wasm32[pi], corpus_plans_wasm32[pi].name ++ "_wasm32")
     // ...and the wasm32 runtime objects (`:cross-rt-wasm`, compiled by
     // stage2), so `--target wasm32` links outside the repository (#2131).
-    embedded_objects = target_with_wasm32_runtime_blobs(move embedded_objects, "cross-wasm-", cross_dir("wasm32"))
     embedded_objects = target_with_darwin_sysroot_blob(move embedded_objects)
     // Every consumed object's producer, declared (#680 edge audit).
     embedded_objects = embedded_objects.dep("cimport-stubs-object")
-    embedded_objects = embedded_objects.dep("compat-runtime-object")
-    embedded_objects = embedded_objects.dep("panic-runtime-object")
-    embedded_objects = embedded_objects.dep("fiber-stubs-object")
-    embedded_objects = embedded_objects.dep("channel-runtime-object")
-    embedded_objects = embedded_objects.dep("fiber-runtime-object")
-    embedded_objects = embedded_objects.dep("fiber-core-object")
     embedded_objects = embedded_objects.dep("fiber-asm-object")
-    embedded_objects = embedded_objects.dep("rt-core-object")
-    embedded_objects = embedded_objects.dep("rt-platform-object")
     embedded_objects = target_with_rt_bundle_blobs(embedded_objects, "out/lib", "rt-bundle")
     for tag in stage_rt_bundle_tags():
         embedded_objects = target_with_rt_bundle_blobs_as(embedded_objects, "out/lib/cross/" ++ tag, "rt-bundle-" ++ tag, "rt_" ++ tag)
-    for ei3 in 0..empty_syms.len():
-        let esym3 = empty_syms[ei3]
-        if esym3 != host_runtime.platform_symbol:
-            embedded_objects = embedded_objects.dep(empty_platform_blob_target("empty-", esym3))
     let embedded_objects_obj = embedded_objects_object("embedded-objects-object", &embedded_objects, "")
     out = out.add_target(embedded_objects)
     out = out.add_target(embedded_objects_obj)
@@ -4146,10 +3873,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     var runtime = target_new(.Group, "runtime", "")
     runtime = runtime.dep("embedded-objects-object")
     runtime = runtime.dep("runtime-producer")
-    for ei4 in 0..empty_syms.len():
-        let esym4 = empty_syms[ei4]
-        if esym4 != host_runtime.platform_symbol:
-            runtime = runtime.dep(empty_platform_blob_target("empty-", esym4))
     out = out.add_target(runtime)
 
     // ── Cross-target runtime (linux) ────────────────────────────────
@@ -4186,17 +3909,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // (COFF objects, windows triple) so a `--target x86_64-w64-windows-gnu`
     // link resolves entirely from that directory (§18.5). Mirrors the
     // linux cross-rt set; fiber core/asm are the windows variants.
-    out = out.add_target(cross_windows_object_target("cross-win-rt-core-object", "rt/rt_core.w", "-O1"))
-    out = out.add_target(cross_windows_object_target_named("cross-win-rt-platform-object", "rt/windows_x86_64.w", "rt_windows_x86_64.o", "-O1"))
     out = out.add_target(cross_windows_object_target("cross-win-cimport-stubs-object", "rt/cimport_stubs.w", "-O1"))
-    var cross_win_compat = cross_windows_object_target_named("cross-win-compat-runtime-object", "out/gen/compat_runtime.w", "compat_runtime.o", "-O1")
-    cross_win_compat = cross_win_compat.dep("compat-runtime-source")
-    out = out.add_target(cross_win_compat)
-    out = out.add_target(cross_windows_object_target("cross-win-panic-runtime-object", "rt/panic_runtime.w", "-O1"))
-    out = out.add_target(cross_windows_object_target("cross-win-fiber-stubs-object", "rt/fiber_stubs.w", "-O1"))
-    out = out.add_target(cross_windows_object_target("cross-win-channel-runtime-object", "rt/channel_runtime.w", "-O1"))
-    out = out.add_target(cross_windows_object_target("cross-win-fiber-runtime-object", "rt/fiber_runtime.w", "-O1"))
-    out = out.add_target(cross_windows_object_target_named("cross-win-fiber-core-object", "rt/fiber_core_windows.w", "fiber.o", "-O1"))
     out = out.add_target(cross_windows_object_target_named("cross-win-llvm-bridge-object", "src/compiler/LlvmBridge.w", "llvm_bridge.o", "-O1"))
     out = out.add_target(cross_windows_object_target_named("cross-win-clang-bridge-object", "src/compiler/ClangBridge.w", "clang_bridge.o", "-O1"))
 
@@ -4207,40 +3920,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     var cross_win_embedded = target_new(.EmbedObjectFiles, "cross-win-embedded-objects-asm", "windows_x86_64").output(cross_windows_dir() ++ "/embedded_objects.s")
     cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/cimport_stubs.o")
     cross_win_embedded = cross_win_embedded.arg("cimport_stubs_o")
-    cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/compat_runtime.o")
-    cross_win_embedded = cross_win_embedded.arg("compat_runtime_o")
-    cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/panic_runtime.o")
-    cross_win_embedded = cross_win_embedded.arg("panic_runtime_o")
-    cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/fiber_stubs.o")
-    cross_win_embedded = cross_win_embedded.arg("fiber_stubs_o")
-    cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/channel_runtime.o")
-    cross_win_embedded = cross_win_embedded.arg("channel_runtime_o")
-    cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/fiber_runtime.o")
-    cross_win_embedded = cross_win_embedded.arg("fiber_runtime_o")
-    cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/fiber.o")
-    cross_win_embedded = cross_win_embedded.arg("fiber_o")
     cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/fiber_asm.o")
     cross_win_embedded = cross_win_embedded.arg("fiber_asm_o")
-    cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/rt_core.o")
-    cross_win_embedded = cross_win_embedded.arg("rt_core_o")
-    cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/rt_windows_x86_64.o")
-    cross_win_embedded = cross_win_embedded.arg("rt_windows_x86_64_o")
     cross_win_embedded = cross_win_embedded.dep("cross-win-cimport-stubs-object")
-    cross_win_embedded = cross_win_embedded.dep("cross-win-compat-runtime-object")
-    cross_win_embedded = cross_win_embedded.dep("cross-win-panic-runtime-object")
-    cross_win_embedded = cross_win_embedded.dep("cross-win-fiber-stubs-object")
-    cross_win_embedded = cross_win_embedded.dep("cross-win-channel-runtime-object")
-    cross_win_embedded = cross_win_embedded.dep("cross-win-fiber-runtime-object")
-    cross_win_embedded = cross_win_embedded.dep("cross-win-fiber-core-object")
     cross_win_embedded = cross_win_embedded.dep("cross-win-fiber-asm-object")
-    cross_win_embedded = cross_win_embedded.dep("cross-win-rt-core-object")
-    cross_win_embedded = cross_win_embedded.dep("cross-win-rt-platform-object")
     let corpus_plans_windows_x86_64 = cross_wo_plans(ctx, &corpus_plans, "windows_x86_64")
     for pi in 0..corpus_plans_windows_x86_64.len():
         out = cross_wo_bundle_targets(move out, ctx, corpus_plans_windows_x86_64[pi])
         cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, corpus_plans_windows_x86_64[pi])
-    out = add_empty_wasm32_runtime_blob_targets(move out, "cross-win-empty-", cross_windows_dir())
-    cross_win_embedded = target_with_empty_wasm32_runtime_blobs(move cross_win_embedded, "cross-win-empty-", cross_windows_dir())
     // The bundle index names the wasm32 bundle slots in every compiler
     // (#2390): empty here, as in the bootstrap embedding.
     for pi in 0..corpus_plans_windows_x86_64.len():
@@ -4276,17 +3963,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // `--target aarch64-pc-windows-msvc` link resolves entirely from that
     // directory (§18.5). Mirrors the windows_x86_64 cross-rt set; fiber
     // core is the windows variant, fiber asm the arm64 windows variant.
-    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-rt-core-object", "rt/rt_core.w", "-O1"))
-    out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-rt-platform-object", "rt/windows_aarch64.w", "rt_windows_aarch64.o", "-O1"))
     out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-cimport-stubs-object", "rt/cimport_stubs.w", "-O1"))
-    var cross_winarm_compat = cross_windows_aarch64_object_target_named("cross-winarm-compat-runtime-object", "out/gen/compat_runtime.w", "compat_runtime.o", "-O1")
-    cross_winarm_compat = cross_winarm_compat.dep("compat-runtime-source")
-    out = out.add_target(cross_winarm_compat)
-    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-panic-runtime-object", "rt/panic_runtime.w", "-O1"))
-    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-fiber-stubs-object", "rt/fiber_stubs.w", "-O1"))
-    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-channel-runtime-object", "rt/channel_runtime.w", "-O1"))
-    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-fiber-runtime-object", "rt/fiber_runtime.w", "-O1"))
-    out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-fiber-core-object", "rt/fiber_core_windows.w", "fiber.o", "-O1"))
     out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-llvm-bridge-object", "src/compiler/LlvmBridge.w", "llvm_bridge.o", "-O1"))
     out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-clang-bridge-object", "src/compiler/ClangBridge.w", "clang_bridge.o", "-O1"))
 
@@ -4297,40 +3974,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     var cross_winarm_embedded = target_new(.EmbedObjectFiles, "cross-winarm-embedded-objects-asm", "windows_aarch64").output(cross_windows_aarch64_dir() ++ "/embedded_objects.s")
     cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/cimport_stubs.o")
     cross_winarm_embedded = cross_winarm_embedded.arg("cimport_stubs_o")
-    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/compat_runtime.o")
-    cross_winarm_embedded = cross_winarm_embedded.arg("compat_runtime_o")
-    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/panic_runtime.o")
-    cross_winarm_embedded = cross_winarm_embedded.arg("panic_runtime_o")
-    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/fiber_stubs.o")
-    cross_winarm_embedded = cross_winarm_embedded.arg("fiber_stubs_o")
-    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/channel_runtime.o")
-    cross_winarm_embedded = cross_winarm_embedded.arg("channel_runtime_o")
-    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/fiber_runtime.o")
-    cross_winarm_embedded = cross_winarm_embedded.arg("fiber_runtime_o")
-    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/fiber.o")
-    cross_winarm_embedded = cross_winarm_embedded.arg("fiber_o")
     cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/fiber_asm.o")
     cross_winarm_embedded = cross_winarm_embedded.arg("fiber_asm_o")
-    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/rt_core.o")
-    cross_winarm_embedded = cross_winarm_embedded.arg("rt_core_o")
-    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/rt_windows_aarch64.o")
-    cross_winarm_embedded = cross_winarm_embedded.arg("rt_windows_aarch64_o")
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-cimport-stubs-object")
-    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-compat-runtime-object")
-    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-panic-runtime-object")
-    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-stubs-object")
-    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-channel-runtime-object")
-    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-runtime-object")
-    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-core-object")
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-asm-object")
-    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-rt-core-object")
-    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-rt-platform-object")
     let corpus_plans_windows_aarch64 = cross_wo_plans(ctx, &corpus_plans, "windows_aarch64")
     for pi in 0..corpus_plans_windows_aarch64.len():
         out = cross_wo_bundle_targets(move out, ctx, corpus_plans_windows_aarch64[pi])
         cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, corpus_plans_windows_aarch64[pi])
-    out = add_empty_wasm32_runtime_blob_targets(move out, "cross-winarm-empty-", cross_windows_aarch64_dir())
-    cross_winarm_embedded = target_with_empty_wasm32_runtime_blobs(move cross_winarm_embedded, "cross-winarm-empty-", cross_windows_aarch64_dir())
     // The bundle index names the wasm32 bundle slots in every compiler
     // (#2390): empty here, as in the bootstrap embedding.
     for pi in 0..corpus_plans_windows_aarch64.len():
@@ -5169,15 +4820,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(install_compiler_target("install-user", release_compiler_bin("with"), "$HOME/.local/bin/with", "require-last-green").dep("ceremony-bar-publish"))
 
     out = out.add_target(install_compiler_target("install-compiler", release_compiler_bin("with"), "$INSTALL_BINDIR/with" ++ host_exe_suffix(), "build"))
-    out = out.add_target(install_file_target("install-rt-core", "out/lib/rt_core.o", "$INSTALL_LIBDIR/rt_core.o", "0644", "runtime"))
-    out = out.add_target(install_file_target("install-rt-platform", host_runtime.platform_object, "$INSTALL_LIBDIR/" ++ host_runtime.platform_install_object, "0644", "runtime"))
     out = out.add_target(install_file_target("install-cimport-stubs", "out/lib/cimport_stubs.o", "$INSTALL_LIBDIR/cimport_stubs.o", "0644", "runtime"))
-    out = out.add_target(install_file_target("install-compat-runtime", "out/lib/compat_runtime.o", "$INSTALL_LIBDIR/compat_runtime.o", "0644", "runtime"))
-    out = out.add_target(install_file_target("install-panic-runtime", "out/lib/panic_runtime.o", "$INSTALL_LIBDIR/panic_runtime.o", "0644", "runtime"))
-    out = out.add_target(install_file_target("install-fiber-stubs", "out/lib/fiber_stubs.o", "$INSTALL_LIBDIR/fiber_stubs.o", "0644", "runtime"))
-    out = out.add_target(install_file_target("install-channel-runtime", "out/lib/channel_runtime.o", "$INSTALL_LIBDIR/channel_runtime.o", "0644", "runtime"))
-    out = out.add_target(install_file_target("install-fiber-runtime", "out/lib/fiber_runtime.o", "$INSTALL_LIBDIR/fiber_runtime.o", "0644", "runtime"))
-    out = out.add_target(install_file_target("install-fiber-core", "out/lib/fiber.o", "$INSTALL_LIBDIR/fiber.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-rt-bundle", "out/lib/rt.o", "$INSTALL_LIBDIR/rt.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-rt-bundle-interface", "out/lib/rt.wi", "$INSTALL_LIBDIR/rt.wi", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-rt-bundle-manifest", "out/lib/rt.manifest", "$INSTALL_LIBDIR/rt.manifest", "0644", "runtime"))
     out = out.add_target(install_file_target("install-fiber-asm", "out/lib/fiber_asm.o", "$INSTALL_LIBDIR/fiber_asm.o", "0644", "runtime"))
     out = out.add_target(install_file_target("install-embedded-objects", "out/lib/embedded_objects.o", "$INSTALL_LIBDIR/embedded_objects.o", "0644", "runtime"))
     out = out.add_target(install_file_target("install-embedded-objects-asm", "out/lib/embedded_objects.s", "$INSTALL_LIBDIR/embedded_objects.s", "0644", "runtime"))
@@ -5189,15 +4835,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(install_file_target("install-llvm-ld", "out/lib/llvm_ld", "$INSTALL_LIBDIR/llvm_ld", "0644", "llvm-link-metadata"))
     var install = target_new(.Group, "install", "")
     install = install.dep("install-compiler")
-    install = install.dep("install-rt-core")
-    install = install.dep("install-rt-platform")
     install = install.dep("install-cimport-stubs")
-    install = install.dep("install-compat-runtime")
-    install = install.dep("install-panic-runtime")
-    install = install.dep("install-fiber-stubs")
-    install = install.dep("install-channel-runtime")
-    install = install.dep("install-fiber-runtime")
-    install = install.dep("install-fiber-core")
+    install = install.dep("install-rt-bundle")
+    install = install.dep("install-rt-bundle-interface")
+    install = install.dep("install-rt-bundle-manifest")
     install = install.dep("install-fiber-asm")
     install = install.dep("install-embedded-objects")
     install = install.dep("install-embedded-objects-asm")
