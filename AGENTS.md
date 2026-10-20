@@ -401,23 +401,30 @@ on the previous commit — never with `git stash`; use `git worktree` or a clone
 
 ## Runtime Architecture
 
-**TRANSITIONAL — D30 (`docs/meetings/2026-08-09-D30-retire-the-internal-runtime-abi-remaining-boundaries-speak-c.md`)
-retires this object-boundary design.** Destination: the runtime compiles
-in-unit like the embedded stdlib; rt objects survive only as a
-(compiler-version, target)-keyed cache whose hits are byte-identical to the
-in-unit result. A runtime object that is not the linking compiler's own (its
-generation's, or byte for byte what it embeds, D132) must never be linked —
-that mixed-world link is #761's corruption class. Until then:
-
-```
-rt_core.o    (With)  = core runtime. All runtime functions live here.
-```
+**D30 landed (steps 1–4, 2026-10-20;
+`docs/meetings/2026-08-09-D30-retire-the-internal-runtime-abi-remaining-boundaries-speak-c.md`).**
+The runtime is a bundle: `rt/*.w` compiled as one unit per (compiler
+generation, target) at compiler build time into `rt.{o,wi,manifest}`
+(`build/rt_bundle.w`), embedded in the compiler's `rt` slot (the host's) and
+`rt@<tag>` slots (wasm32, the cross tags), and found beside a runtime root
+(`out/bootstrap/lib`, `out/lib`, `<compiler_dir>/../lib`) when the slot is
+empty (a `:dev` stage1). Every unit with a prelude parses the runtime's
+*interface* (`rt.wi`) — the standard library imports it (`use rt.rt_core`,
+`rt.platform`, `rt.fiber_core`) — and every link whose undefined symbols
+reach the runtime joins the bundle's object, `fiber_asm.o` with it off wasm,
+and the on-demand `cimport_stubs.o` archive when the unit reaches libc or
+c_import symbols. A runtime that is not the linking compiler's own generation
+(the bundle's `generation` line, or bytes equal to the embedded slot, D132)
+is never linked: that mixed-world link is #761's corruption class. The
+`.w`-derived runtime objects (`rt_core.o`, the platform object, panic,
+compat, fiber stubs, channel, fiber runtime, fiber core) no longer exist;
+`WITH_RT_IN_UNIT` is gone (the lane is the only path). The seed-built
+`out/bootstrap-lib` objects remain until a post-flip seed is cut: the pinned
+seed links stage1 in the object world.
 
 Two link paths: **cc (Apple ld64)** for user programs, **lld (LLVM ld64)** for
-the compiler build. Pure With programs link `rt_core.o` only; user programs
-with c_import link `rt_core.o` first, then `cimport_stubs.o` as an archive.
-Compiler-owned runtime behavior is ordinary With code behind normal
-module/private-function boundaries.
+the compiler build. Compiler-owned runtime behavior is ordinary With code
+behind normal module/private-function boundaries.
 
 ### `@[c_export]` is foreign ABI only
 
@@ -430,22 +437,25 @@ not rename them into another internal export mechanism.
 
 ### `with_*` is compiler-internal — user programs never call it
 
-**DEPRECATED TIER — D30 retires the internal runtime ABI** the same way
-(in-unit compilation, ordinary module functions, rt objects only as a cache);
-until then do not build NEW machinery on it, and see §16.3e for the
-boundary-type rule. Two surfaces, never conflated: user programs use exactly
-the language syntax and the `std.*` APIs (`lib/std/`); `with_*` symbols and
-everything in `rt/*.w` are the compiler's own runtime — user source never names
-one; the compiler emits those calls (`std.regex` is a facade over the pcre2
-`.wo` bundle, `std.re`, D38/D39; the old `with_regex_*` shim is gone). If you
-catch yourself asking "how does a user program get the `with_*` symbols?", the
-question is malformed. Since D30 step 3 the standard library reaches the
-runtime as a module, never an extern: `use rt.rt_core`, and by role `use
-rt.platform` / `use rt.fiber_core` (the active target's modules); the
-runtime is internal to the standard library, and `use rt.*` from a program
-is refused ("a program reaches it through std"). A new `extern fn with_*`
-in `lib/std` is a regression; the compiler's own `src/` modules keep theirs
-until step 4.
+Two surfaces, never conflated: user programs use exactly the language
+syntax and the `std.*` APIs (`lib/std/`); `with_*` symbols and everything in
+`rt/*.w` are the compiler's own runtime — user source never names one; the
+compiler emits those calls (`std.regex` is a facade over the pcre2 `.wo`
+bundle, `std.re`, D38/D39). If you catch yourself asking "how does a user
+program get the `with_*` symbols?", the question is malformed. The standard
+library reaches the runtime as a module, never an extern: `use rt.rt_core`,
+and by role `use rt.platform` / `use rt.fiber_core` (the active target's
+modules; on wasm `rt.fiber_runtime` and `rt.channel_runtime` resolve to the
+fiber stubs). The runtime is internal to the standard library and the
+compiler: `use rt.*` from a program is refused ("a program reaches it
+through std"). A new `extern fn with_*` in `lib/std` is a regression. A
+runtime function is safe by its declaration; an `unsafe` block whose only
+content is a call of one is ceremony, refused once the migrator stops
+writing them into the corpora (R4c, pending). The compiler's own
+`src/` modules still declare their runtime externs (agreeing duplicates of
+the interface): they become `use rt.*` once a seed carrying the step-4
+resolver rule is pinned, since the pinned seed refuses that import from
+`src/`.
 
 ---
 

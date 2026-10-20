@@ -1,4 +1,3 @@
-//! env: WITH_RT_IN_UNIT=1
 //! expect-check-fail: is not comptime-callable: it reaches print -> with_println_str (an extern)
 
 // D104 (§17.1) under D30: a runtime ABI function compiled in-unit is, to

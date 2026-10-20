@@ -1,4 +1,3 @@
-//! env: WITH_RT_IN_UNIT=1
 //! expect-stdout: 0.5
 //! expect-stdout: ok
 

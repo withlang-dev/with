@@ -1419,11 +1419,12 @@ fn embedded_bundle_providing(dotted: &str) -> str:
 // Returns the refusal, or "" when `importer` may import `target`.
 fn resolve_internal_import_refusal(importer: &str, target: &str, dotted: &str) -> str:
     // D30 step 3: the runtime is internal to the standard library — `with_*`
+    // — and to the compiler, whose own sources import it (step 4)
     // was never user-facing (plan §9 open question 3, answered as predicted)
     // — and a program reaches it through std. Its own modules and the build's
     // generated roots (out/gen) import it too.
     if target.starts_with("<embedded-rt>/"):
-        if resolve_path_is_std(importer) or resolve_path_is_runtime(importer): return ""
+        if resolve_path_is_std(importer) or resolve_path_is_runtime(importer) or resolve_path_is_compiler_source(importer): return ""
         return f"module '{dotted}' is the compiler's runtime, internal to the standard library (D30): a program reaches it through std"
     let target_std = resolve_path_is_std(target)
     let target_norm = resolve_normalize_path(target)
@@ -1761,3 +1762,9 @@ fn dump_resolved(result: &ResolveResult, pool: &InternPool, root_path: &str) -> 
         out = out ++ "\n"
 
     out
+
+// The compiler's own sources (the tree's src/, as Sema's
+// sema_path_is_compiler_source_implementation judges them): they import
+// the runtime as the standard library does (D30 step 4).
+fn resolve_path_is_compiler_source(path: &str) -> bool:
+    path.starts_with("src/") or path.starts_with("src\\") or path.contains("/src/") or path.contains("\\src\\")

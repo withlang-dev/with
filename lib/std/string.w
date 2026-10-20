@@ -46,7 +46,7 @@ impl StringBuilder:
     // ~100x slower natively and interpreted per byte under the comptime
     // evaluator (the test-green 77s anomaly's core).
     pub mut fn push_str(s: &str):
-        unsafe { with_vec_append_bytes((&raw mut self.bytes) as *mut u8, s) }
+        with_vec_append_bytes((&raw mut self.bytes) as *mut u8, s)
         return
 
     /// Append one byte.

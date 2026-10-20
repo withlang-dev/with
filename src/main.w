@@ -196,7 +196,7 @@ type TestDirectives {
     known_issue: str,
     // `//! env: NAME=VALUE` pairs, set for the test's compile+run and
     // restored after (the harness compiles in-process, so env-gated
-    // compiler modes like WITH_RT_IN_UNIT are testable per file).
+    // compiler modes like WITH_CODEGEN_UNITS are testable per file).
     env_pairs: List[str],
 }
 
@@ -1851,11 +1851,9 @@ fn build_runner_link_root(root: &str) -> str:
     let dirs: List[str] = List.new()
     dirs.push("out/bootstrap-lib")
     dirs.push("out/lib")
-    let platform_object = link_stage_host_platform_runtime_object()
     for i in 0..dirs.len():
         let dir = resolve_join(root, dirs[i])
         if with_fs_file_exists(dir ++ "/cimport_stubs.o") == 0: continue
-        if platform_object.len() > 0 and with_fs_file_exists(dir ++ "/" ++ platform_object) == 0: continue
         // The link's own tests for a root it is named (#1899), and for the
         // bridge the runner links: build.w reaches the compiler's modules,
         // so the root's producer must be this generation — runtime objects

@@ -603,3 +603,27 @@ shared defs importing likewise and the four corpora re-promoted; every
 cross compiler embeds its target's rt bundle; a `:dev` stage1 reads the
 bundle beside its runtime root (#2485 fixed by it); an extern's fingerprint
 row is per symbol. The compiler's own `src/` externs remain for step 4.
+
+**Step 4 landed (2026-10-20): the flip.** The runtime joins every unit by
+default — the frontend parses the runtime interface into every unit with a
+prelude and the link joins the bundle whenever the unit's undefined symbols
+reach the runtime — and `WITH_RT_IN_UNIT` is read nowhere (the lane
+fixtures run as every test does; the test-verdict key dropped it; the lane
+sweep tool is gone). Link.w's three object-world branches are gone with the
+per-compile lane flag; the `.w`-derived runtime objects are no longer
+produced, embedded, installed or compared anywhere (build.w, the emit-C and
+selfhost C links, the stale-root fixture), and a runtime root's identity is
+its `rt.o` against the embedded `rt` slot plus `cimport_stubs.o` and
+`fiber_asm.o`. R4c is pending: a runtime function is safe by declaration
+and the eight `unsafe` blocks in std and src that only called one are
+unwrapped, but the migrator still writes `unsafe { with_alloc(...) }` into
+every corpus (40 such blocks in c_algorithms alone, never edited by hand,
+D112), so the transition branch that counts such a call as an unsafe
+operation stays until the migrator stops and the corpora re-promote — its
+own stack. Two things wait for a seed cut from this tree: the
+seed-built `out/bootstrap-lib` objects (the pinned seed links stage1 in the
+object world) and the compiler's own `src/` externs becoming `use rt.*`
+(the resolver now admits the compiler's sources, but the pinned seed's
+refuses them; `with run tools/sweep_rt_externs.w out/lib/rt.wi src` does it,
+keeping the ten LLVM/clang bridge
+externs the interface does not provide).

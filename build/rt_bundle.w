@@ -10,7 +10,7 @@ module build.rt_bundle
 //
 // The root is written here (`use rt.<module>` per module of this host's
 // runtime, Frontend.parse_runtime_modules_frontend's set), and the compile
-// runs under WITH_RT_IN_UNIT=1 so the runtime joins the unit; the emitted
+// compiles the runtime as its own unit (D30 step 4: in-unit is the default); the emitted
 // interface is checked against the source's declaration fingerprint, as a
 // .wo build checks its own.
 
@@ -24,7 +24,7 @@ fn rb_fail(ctx: &ActionCtx, message: &str) -> i32:
 fn rb_abs(root: &str, path: &str) -> str:
     if path.len() > 0 and path[0] == '/': path ++ "" else: root ++ "/" ++ path
 
-// `lane`: the compile runs under WITH_RT_IN_UNIT=1 so the runtime joins the
+// `lane`: the compile joins the runtime to the
 // unit; the interface check does not (a `.wi` root supplies the runtime
 // modules itself, as its own sections).
 fn rb_run(ctx: &ActionCtx, label: &str, argv: &List[str], lane: bool) -> ToolProcessResult:
@@ -35,7 +35,6 @@ fn rb_run(ctx: &ActionCtx, label: &str, argv: &List[str], lane: bool) -> ToolPro
     // D50: the root's path enters the object's debug info; mapped, the
     // bundle is the same bytes from every checkout.
     process_env = process_env.set("WITH_FILE_PREFIX_MAP", root ++ "=/with-src")
-    if lane: process_env = process_env.set("WITH_RT_IN_UNIT", "1")
     ctx.process_runner().run_capture_with_env(argv, rb_abs(root, capture_dir ++ "/" ++ label ++ ".stdout"), rb_abs(root, capture_dir ++ "/" ++ label ++ ".stderr"), ctx.timeout(), process_env)
 
 fn rb_first_line(text: &str) -> str:

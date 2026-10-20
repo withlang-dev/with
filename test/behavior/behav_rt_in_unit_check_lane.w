@@ -1,4 +1,3 @@
-//! env: WITH_RT_IN_UNIT=1
 //! check-only
 
 // D30 R2b lane pin: with the runtime parsed into the unit (embedded rt

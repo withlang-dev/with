@@ -1,4 +1,3 @@
-//! env: WITH_RT_IN_UNIT=1
 //! check-only
 
 // D91 (§17.1a) under D30: compile-time code reads the target's OS and

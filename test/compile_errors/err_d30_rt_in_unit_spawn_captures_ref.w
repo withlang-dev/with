@@ -1,4 +1,3 @@
-//! env: WITH_RT_IN_UNIT=1
 //! expect-check-fail: escaping closure cannot capture ephemeral references
 
 // D30 step 2: compiled in-unit, the runtime's with_thread_spawn replaces

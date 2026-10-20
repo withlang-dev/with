@@ -882,3 +882,37 @@ none of its store (docs/proposals/d30-implementation-plan.md §10):
   merge keeps depends on who imports the module. A runtime ABI symbol's
   interface declaration beside a same-named `extern fn with_*` is never
   displaced to `name$in$<module>`.
+
+### Step 4: the flip (2026-10-20)
+
+- **The only path.** Every unit with a prelude parses the runtime's
+  interface (Frontend.parse_runtime_modules_frontend, the module set
+  `EmbeddedRuntime.embedded_rt_unit_files` owns per target), and every
+  link whose undefined symbols reach the runtime joins the bundle's object
+  — the embedded `rt` slot of the link's target, or this generation's
+  `<runtime root>/rt.o` when the slot is empty — with `fiber_asm.o` off
+  wasm and the on-demand `cimport_stubs.o` archive when the unit reaches
+  libc or c_import symbols. `WITH_RT_IN_UNIT` is read nowhere; a `--no-std`
+  unit (no prelude) gets no runtime, as before.
+- **No `.w`-derived runtime object.** rt_core.o, the platform object,
+  panic_runtime.o, compat_runtime.o, fiber_stubs.o, channel_runtime.o,
+  fiber_runtime.o and fiber.o are not produced, embedded, installed or
+  linked by anything: not the stages, the cross tags, wasm32, the emit-C
+  smoke's C link, the selfhost C links. The install set carries
+  `rt.{o,wi,manifest}`, `cimport_stubs.o` and `fiber_asm.o`.
+- **A runtime root's identity.** A directory is this compiler's runtime
+  when its `.producer` names this generation, or when its `rt.o` is the
+  bytes of the embedded `rt` slot (and its `cimport_stubs.o` /
+  `fiber_asm.o` the embedded ones), D132. The stale-root fixture plants a
+  stale `rt.o` and `rt.manifest` and proves neither links.
+- **R4c, pending.** A runtime function is safe by its declaration (the
+  interface's, the definition's), and the eight `unsafe` blocks in std and
+  src that only called one are unwrapped; the transition branch that counts
+  such a call as an unsafe operation stays until the migrator stops writing
+  `unsafe { with_alloc(...) }` into every corpus and the corpora re-promote
+  (D112), its own stack.
+- **Waiting for a seed cut from this tree.** The seed-built
+  `out/bootstrap-lib` objects (the pinned seed links stage1 in the object
+  world), and the compiler's own `src/` externs becoming `use rt.*`
+  (`tools/sweep_rt_externs.w`; the resolver admits the compiler's sources,
+  the pinned seed's does not).

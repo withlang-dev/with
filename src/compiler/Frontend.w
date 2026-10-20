@@ -233,7 +233,7 @@ impl Zcu:
         self.diagnostics.emit(Diagnostic.err(import_not_found_message(dotted), span))
 
 fn frontend_rt_in_unit_enabled() -> i32:
-    if runtime_getenv("WITH_RT_IN_UNIT").len() > 0: 1 else: 0
+    1
 
 fn c_import_str_contains(text: &str, needle: &str) -> bool:
     if needle.len() == 0:
@@ -1853,12 +1853,12 @@ impl Zcu:
             pi = pi + 1
         merged_pool
 
-    // D30 R2b (dark): with WITH_RT_IN_UNIT set, the runtime module set
+    // D30 (the flip, step 4): the runtime module set
     // parses into the unit right after the prelude closure, from the
     // embedded sources. The nm-driven link then self-suppresses the
     // .w-derived rt objects (their symbols are defined in-unit); only
     // fiber_asm.o still comes from the object world (platform assembly).
-    // Off by default until R2c retargets codegen and the flip is ruled.
+    // On by default since step 4; a --no-std unit gets none.
     mut fn parse_runtime_modules_frontend(pool: AstPool) -> AstPool:
         var merged_pool = pool
         let platform = embedded_rt_platform_file()
@@ -2573,7 +2573,7 @@ impl Zcu:
             // D30: a c_import translation's `extern fn with_alloc` declares
             // the in-unit runtime's own symbol, not another C function; the
             // definition keeps its flat name and the extern binds to it.
-            // Displaced, every c_import program under WITH_RT_IN_UNIT linked
+            // Displaced, every c_import program under the lane linked
             // against a with_alloc no object defined.
             if frontend_is_runtime_abi_def(path, self.pool, name):
                 continue
@@ -2919,7 +2919,7 @@ impl Zcu:
         // never decl-dropped by a bodiless extern in a higher tier — the
         // extern is the redundant one (its symbol resolves in-unit) and is
         // dropped from the higher tier instead. Higher-tier BODIED fns
-        // still shadow normally. Empty outside the WITH_RT_IN_UNIT lane.
+        // still shadow normally. Empty for a --no-std unit.
         var embedded_rt_fn_names: List[i32] = List.new()
         var higher_bodied_fn_names: List[i32] = List.new()
         for oi in 0..prelude_ordered.len():

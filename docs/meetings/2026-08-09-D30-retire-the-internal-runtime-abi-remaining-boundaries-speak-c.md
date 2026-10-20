@@ -14,7 +14,7 @@ and is marked accordingly. Status 2026-09-04: the regex seam
 (`rt/regex_runtime.w`, `with_regex_*`) is retired — `std.regex` calls the
 pcre2 bundle through its interface and the compiler's own regex-literal
 validation goes through the facade (batch C4, docs/wo_bundles.md "Shim
-retired"); the `with_*` runtime objects remain.
+retired"); the `with_*` runtime objects remain. Status 2026-10-20: D30 landed — the runtime is a bundle (R3, steps 1–4, docs/proposals/d30-implementation-plan.md §10): the interface joins every unit, the bundle every link, the `.w`-derived runtime objects and `WITH_RT_IN_UNIT` are gone, R4c retired; the compiler's own `src/` externs and the seed-built bootstrap objects go with the next seed.
 
 **Ruling (blessed wording):**
 

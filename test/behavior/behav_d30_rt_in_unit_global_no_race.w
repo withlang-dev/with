@@ -1,4 +1,3 @@
-//! env: WITH_RT_IN_UNIT=1
 //! check-only
 
 // §9.1c under D30: a program that never runs concurrently mutates its

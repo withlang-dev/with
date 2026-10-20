@@ -9076,7 +9076,6 @@ impl Sema:
         if self.task_param_consumed_summary(callee_sym, param_i) != 0:
             return
         if self.in_unsafe != 0:
-            self.note_unsafe_operation()
             return
         let callee_name = if callee_sym != 0: self.safe_symbol_text(callee_sym) else: "callable value"
         self.emit_error("ephemeral Task may escape: callee '" ++ callee_name ++ "' is not proven to consume it; await it in scope, pass by reference, or make the callee consume it", arg_node)
@@ -26455,11 +26454,11 @@ impl Sema:
             if self.require_unsafe_operation(unsafe_call_reason, node) == 0:
                 return 0
         else if self.in_unsafe != 0 and sema_name_is_compiler_abi_extern(self.pool_resolve(fn_sym)) != 0:
-            // D30 transition: a runtime-ABI call (with_/rt_/wl_) is
-            // world-dependent — an exempt extern in the object world, a
-            // possibly-safe real definition in-unit. An unsafe block a
-            // caller wrote for the extern world stays honest in both, so
-            // it never counts as vacuous. Dies with the seam.
+            // D30 R4c, pending: a runtime function is safe by declaration,
+            // so an `unsafe` block that only calls one is vacuous — but the
+            // migrator still writes `unsafe { with_alloc(...) }` into every
+            // corpus (D112: never edited by hand), so such a block counts as
+            // honest until the migrator stops and the corpora re-promote.
             self.note_unsafe_operation()
         else if self.fn_symbol_is_manual_extern_value_abi(fn_sym) != 0:
             if self.in_unsafe != 0:
