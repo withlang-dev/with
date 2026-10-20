@@ -4765,11 +4765,12 @@ impl Parser:
             self.advance()
             let name = self.expect_ident()
             if name == 0: return 0
+            let head_end = self.prev_end()
             let (clauses, ok) = self.parse_facade_clauses(col, false)
             if not ok: return 0
             let extra_start = self.pool.extra_len()
             for i in 0..clauses.len(): self.pool.add_extra(clauses[i])
-            return self.pool.add_node(NodeKind.NK_FACADE_FN, start, self.prev_end(), name, extra_start, clauses.len() as i32) as i32
+            return self.pool.add_node(NodeKind.NK_FACADE_FN, start, self.facade_item_end(head_end, &clauses), name, extra_start, clauses.len() as i32) as i32
         if self.current_ident_is("resource"):
             self.advance()
             let name = self.expect_ident()
@@ -4780,12 +4781,13 @@ impl Parser:
             self.advance()
             let repr = self.parse_type_expr()
             if repr == 0: return 0
+            let head_end = self.prev_end()
             let (clauses, ok) = self.parse_facade_clauses(col, true)
             if not ok: return 0
             let extra_start = self.pool.extra_len()
             self.pool.add_extra(repr as i32)
             for i in 0..clauses.len(): self.pool.add_extra(clauses[i])
-            return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.prev_end(), name, extra_start, clauses.len() as i32) as i32
+            return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.facade_item_end(head_end, &clauses), name, extra_start, clauses.len() as i32) as i32
         if self.current_ident_is("handle"):
             // `handle Name wraps *mut T` (§16.2b.9, ruling Amendment 1): a
             // callback-scope representation. It is a resource item whose one
@@ -4838,6 +4840,14 @@ impl Parser:
     // The clauses indented deeper than their item. Collected first and written
     // to extra by the caller: a clause operand may be a type expression, whose
     // own extras must not interleave with the clause list.
+    // An item ends with its last clause (or its head without one), never
+    // with the layout newlines the clause loop skipped after it: those end
+    // past the comments that follow, and the item's words (SemaFacade
+    // facade_item_words, which decides whether two blocks restate one
+    // contract) would differ by a comment.
+    fn facade_item_end(head_end: i32, clauses: &List[i32]) -> i32:
+        if clauses.len() == 0: head_end else: self.pool.get_end(clauses[clauses.len() - 1] as NodeId)
+
     mut fn parse_facade_clauses(item_col: i32, in_resource: bool) -> (List[i32], bool):
         self.skip_newlines()
         let clauses: List[i32] = List.new()
