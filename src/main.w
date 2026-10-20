@@ -2569,7 +2569,15 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     let worker_name = with_getenv_str("WITH_BUILD_ACTION_WORKER")
     let cached = build_cache_graph_try_read(root, graph_cache_key)
     if cached.ok:
-        var cache_admitted = worker_name.len() == 0
+        // A cached graph carries no Sema. The driver evaluates an action
+        // itself only when no runner can be spawned — a cold worktree before
+        // its bootstrap root exists — and then needs the live Sema the real
+        // eval produces: a placeholder refused every object action after
+        // `:deps` had written the cache ("capability type is not visible",
+        // #2493, every CI lane's first `build`). The cache is admitted only
+        // when the runner already exists, so an action never meets the
+        // placeholder; a worker admits it for the graph data alone.
+        var cache_admitted = worker_name.len() == 0 and build_runner_built(root, options)
         if not cache_admitted:
             let wi = build_graph_find_target_index_by_name(&cached, worker_name)
             cache_admitted = wi >= 0 and (&cached.targets[wi]).kind != 23
