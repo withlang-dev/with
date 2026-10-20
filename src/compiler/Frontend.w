@@ -2019,7 +2019,9 @@ impl Zcu:
             self.diagnostics = move pparser.diags
             self.seed_decl_source_paths(pool, name, file_id)
             pool = self.expand_prelude_closure_frontend(pool)
-            if frontend_rt_in_unit_enabled() != 0:
+            // The in-unit runtime is written against std: a --no-std program
+            // (core/alloc prelude, its own panic handler and entry) gets none.
+            if frontend_rt_in_unit_enabled() != 0 and not self.project_config.no_std:
                 pool = self.parse_runtime_modules_frontend(pool)
             self.prelude_prefix_decls = pool.decl_count()
             self.prelude_prefix_non_use = count_non_use_decls_frontend(pool)
