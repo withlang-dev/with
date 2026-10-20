@@ -2695,10 +2695,17 @@ impl Sema:
         let body_file = self.ast.file(decl as NodeId)
         let owner = if owner_dotted.contains("."): owner_dotted[0..owner_dotted.find(".")].to_owned() else: "".to_owned()
         var blocks: List[i32] = List.new()
+        // The body's `let`s and the blocks that scope them: a local named like
+        // a function shadows it from its `let` to its block's end.
+        var scopes: List[i32] = List.new()
+        var lets: List[i32] = List.new()
         for n in 1..self.ast.node_count():
-            if self.ast.kind(n) != NodeKind.NK_UNSAFE_BLOCK or self.ast.file(n as NodeId) != body_file: continue
+            if self.ast.file(n as NodeId) != body_file: continue
             if self.ast.get_start(n) < body_start or self.ast.get_end(n) > body_end: continue
-            blocks.push(n)
+            let kind = self.ast.kind(n)
+            if kind == NodeKind.NK_UNSAFE_BLOCK: blocks.push(n)
+            else if kind == NodeKind.NK_BLOCK: scopes.push(n)
+            else if kind == NodeKind.NK_LET_BINDING: lets.push(n)
         let meta = self.ast.find_fn_meta(decl)
         for n in 1..self.ast.node_count():
             if self.ast.kind(n) != NodeKind.NK_CALL or self.ast.file(n as NodeId) != body_file: continue
@@ -2713,6 +2720,17 @@ impl Sema:
                 if meta >= 0:
                     for pi in 0..self.ast.fn_meta_param_count(meta):
                         if self.ast.fn_param_name(self.ast.fn_meta_param_start(meta), pi) == sym: shadowed = true
+                // A local: rt_core.w's `let release = transmute(...)` then
+                // `release(0)` read as a call to a c_import's raw `release`.
+                for l in lets:
+                    if shadowed or self.ast.get_data0(l) != sym or self.ast.get_start(l) >= self.ast.get_start(n): continue
+                    var scope_start = body_start
+                    var scope_end = body_end
+                    for b in scopes:
+                        if self.ast.get_start(b) <= self.ast.get_start(l) and self.ast.get_end(l) <= self.ast.get_end(b) and self.ast.get_start(b) >= scope_start:
+                            scope_start = self.ast.get_start(b)
+                            scope_end = self.ast.get_end(b)
+                    if self.ast.get_end(n) <= scope_end: shadowed = true
                 if not shadowed:
                     target = self.fn_symbol_decl_node(sym)
             else if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and owner.len() > 0:
@@ -26394,7 +26412,10 @@ impl Sema:
         // facade item as a covered return is: the pointer C hands back never
         // reaches the program, only the `Option[CStr]` made of it — the
         // translated inline body's `unsafe` marking is about that pointer.
-        let unsafe_call_reason = self.fn_symbol_unsafe_call_reason(fn_sym, self.facade_call_is_presented(fn_sym))
+        // A call through a callable local is that value's call (its own
+        // unsafety is checked above); the free function its name shares
+        // (`unsafe fn danger` beside `let danger = ...`) is not called.
+        let unsafe_call_reason = if callable_value_tid != 0: "" else: self.fn_symbol_unsafe_call_reason(fn_sym, self.facade_call_is_presented(fn_sym))
         if unsafe_call_reason.len() > 0:
             if self.require_unsafe_operation(unsafe_call_reason, node) == 0:
                 return 0
