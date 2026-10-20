@@ -167,15 +167,21 @@ fn fn_abi_std_tree_relative(path: &str) -> str:
 // <from> is normalized as the canonical path is, so `C:\a\with` maps
 // `C:/a/with/src/x.w`.
 fn fn_abi_file_prefix_mapped(path: &str) -> str:
+    if not fn_abi_file_prefix_map_names(path): return with_str_clone_ref(path)
     let mapping = with_getenv_str("WITH_FILE_PREFIX_MAP")
     let eq = mapping.find("=")
-    if eq <= 0: return with_str_clone_ref(path)
     let from = resolve_normalize_path(mapping.slice(0, eq))
-    let to = mapping.slice(eq + 1, mapping.len())
-    if path == from: return to.clone()
-    if path.starts_with(from) and path.len() > from.len() and path[from.len()] == '/':
-        return to ++ path.slice(from.len(), path.len())
-    with_str_clone_ref(path)
+    let p = resolve_normalize_path(path)
+    mapping.slice(eq + 1, mapping.len()) ++ p.slice(from.len(), p.len())
+
+// Whether WITH_FILE_PREFIX_MAP's <from> names `path` (both normalized).
+fn fn_abi_file_prefix_map_names(path: &str) -> bool:
+    let mapping = with_getenv_str("WITH_FILE_PREFIX_MAP")
+    let eq = mapping.find("=")
+    if eq <= 0: return false
+    let from = resolve_normalize_path(mapping.slice(0, eq))
+    let p = resolve_normalize_path(path)
+    p == from or (p.starts_with(from) and p.len() > from.len() and p[from.len()] == '/')
 
 fn codegen_canonical_module_path(path: &str) -> str:
     if path.len() == 0 or path == "<unknown>":

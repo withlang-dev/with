@@ -5746,12 +5746,14 @@ impl Sema:
     // unwrap message, so identical sources gave a different compiler in
     // every worktree and the machine-wide stores served one worktree's paths
     // to the others (2026-10-14). A user's program keeps the path as it was
-    // spelled: `test/behavior/x.w:24:10` stays relative.
+    // spelled: `test/behavior/x.w:24:10` stays relative, and an absolute
+    // path the map does not name stays byte for byte (`C:\a\t\b.w`, #1953).
     fn source_path_text() -> str:
         let path = &self.current_module_path
         if path.len() == 0: return "<unknown>"
         let canonical = codegen_canonical_module_path(path)
-        if canonical.starts_with("<embedded-std>/") or runtime_path_is_absolute(path): return canonical
+        if canonical.starts_with("<embedded-std>/"): return canonical
+        if runtime_path_is_absolute(path) and fn_abi_file_prefix_map_names(path): return canonical
         path.clone()
 
     fn source_location_for_file_id(file_id: i32, offset: i32) -> SemaSourceLocation:
