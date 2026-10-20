@@ -5006,6 +5006,15 @@ impl Sema:
                 let param_name: str = with_str_clone_ref(self.pool_resolve(pin_param_sym))
                 if pin_pi < 0:
                     self.emit_error("@[effect] names unknown parameter '" ++ param_name ++ "'", node)
+                else if self.current_module_is_runtime() and sema_name_is_compiler_abi_extern(self.pool_resolve(self.ast.get_data0(node))) != 0:
+                    // A runtime ABI definition's pin is its declared contract,
+                    // as the extern's is in the object world: what it retains
+                    // through a raw pointer (with_thread_spawn's fn_ptr and
+                    // ctx, run later by the thread) is never inferred (a
+                    // pointer parameter's inferred effects are read-only by
+                    // design), so in-unit (D30) a closure holding a view of
+                    // its frame reached another thread unrefused.
+                    self.set_sig_param_effect(sig_idx, pin_pi, self.sig_param_effect(sig_idx, pin_pi) | pin_bits)
                 else:
                     let inferred = self.sig_param_effect(sig_idx, pin_pi) & EFF_DECLARED_MASK
                     if inferred != pin_bits:
@@ -16026,7 +16035,7 @@ impl Sema:
             return if self.comptime_callable_memo.get(fn_sym).unwrap() != 0: "" else: self.comptime_callable_chain.get(fn_sym).unwrap().clone()
         if self.comptime_callable_visiting.contains(fn_sym): return ""
         let name: str = self.pool_resolve(fn_sym)
-        if self.extern_fn_names.contains(fn_sym):
+        if self.extern_fn_names.contains(fn_sym) or self.fn_is_in_unit_runtime_abi_def(fn_sym):
             return if name == "with_sysinfo_os" or name == "with_sysinfo_arch": "" else: name ++ " (an extern)"
         if self.is_intrinsic_fn_sym(fn_sym) != 0:
             return if fn_sym == self.syms.src or fn_sym == self.syms.embed_file: "" else: name ++ " (a runtime intrinsic)"
@@ -16064,7 +16073,7 @@ impl Sema:
                 let callee_node = self.ast.get_data0(n)
                 if callee_node != 0 and self.ast.kind(callee_node) == NodeKind.NK_IDENT:
                     let spelled = self.ast.get_data0(callee_node)
-                    if self.extern_fn_names.contains(spelled) or self.is_intrinsic_fn_sym(spelled) != 0: callee = spelled
+                    if self.extern_fn_names.contains(spelled) or self.is_intrinsic_fn_sym(spelled) != 0 or self.fn_is_in_unit_runtime_abi_def(spelled): callee = spelled
             if callee == 0: continue
             if callee == fn_sym: continue
             let inner = self.comptime_callable_chain(callee)
@@ -16158,6 +16167,17 @@ impl Sema:
             return 0
         let m = name.slice(4, name.len())
         if m.starts_with("push") or m.starts_with("pop") or m.starts_with("get") or m.starts_with("set") or m.starts_with("clear") or m.starts_with("len") or m.starts_with("is_empty"): 1 else: 0
+
+    // A runtime ABI function (`with_*`, `rt_*`) whose body the runtime
+    // compiled in-unit (D30) is, to compile-time code, what the
+    // object-linked runtime gives it: no With body the evaluator runs. Its
+    // body is the runtime's, mostly never checked (so a walk of it found no
+    // callees and called `print` comptime-safe); the evaluator answers only
+    // the runtime calls it implements (with_sysinfo_os/arch, D91).
+    fn current_module_is_runtime() -> bool: sema_path_is_runtime_implementation(self.current_module_path) != 0
+
+    fn fn_is_in_unit_runtime_abi_def(fn_sym: i32) -> bool:
+        sema_name_is_compiler_abi_extern(self.pool_resolve(fn_sym)) != 0 and sema_path_is_runtime_implementation(self.fn_symbol_source_path(fn_sym)) != 0
 
     mut fn check_comptime_call_restriction(fn_sym: i32, node: i32) -> i32:
         if self.in_comptime_fn == 0 or fn_sym == 0:

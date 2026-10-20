@@ -1761,6 +1761,7 @@ type Sema {
     foreign_contract_index: HashMap[i32, i32],  // fn sym -> foreign_contracts index
     foreign_contracts: List[ForeignContract],
     facade_domains: HashMap[i32, i32],          // domain sym -> kind sym
+    facade_program_domains: HashMap[i32, i32],  // the domains a program facade declares (D30)
     // Stage 7 (ruling §33-§38, spec §16.2b.7): the declared foreign-state
     // domains with their origin symbols, and per signature — a rendered
     // facade operation, or the raw C function itself — what a call
@@ -3637,6 +3638,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         foreign_contract_index: sema_new_map_i32_i32(),
         foreign_contracts: List.new(),
         facade_domains: sema_new_map_i32_i32(),
+        facade_program_domains: sema_new_map_i32_i32(),
         facade_domain_list: List.new(),
         facade_domain_index: sema_new_map_i32_i32(),
         facade_domain_origin_index: sema_new_map_i32_i32(),
