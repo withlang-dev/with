@@ -2566,6 +2566,13 @@ impl Zcu:
             let from_import = di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0
             let name = pool.get_data0(decl)
             let path = self.decl_source_path_frontend(di)
+            // D30: a c_import translation's `extern fn with_alloc` declares
+            // the in-unit runtime's own symbol, not another C function; the
+            // definition keeps its flat name and the extern binds to it.
+            // Displaced, every c_import program under WITH_RT_IN_UNIT linked
+            // against a with_alloc no object defined.
+            if frontend_is_runtime_abi_def(path, self.pool, name):
+                continue
             for e in 0..extern_names.len():
                 // A header's extern also must not overwrite another source
                 // module's ordinary With function (e.g. clock(seconds)).
@@ -3116,6 +3123,11 @@ fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: &AstPool,
                 return if displaceable and paths[idx] != paths[j]: FRONTEND_FN_DISPLACE else: FRONTEND_FN_DROP
         j = j + 1
     FRONTEND_FN_KEEP
+
+// A definition from the in-unit runtime of a symbol the compiler calls by
+// its flat name (FnAbi.codegen_is_runtime_abi_symbol).
+fn frontend_is_runtime_abi_def(path: &str, intern: &InternPool, name: i32) -> bool:
+    path.starts_with("<embedded-rt>/") and codegen_is_runtime_abi_symbol(intern.resolve(name))
 
 fn frontend_fn_decl_is_displaceable(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
     pool.kind(decl) == NodeKind.NK_FN_DECL and not pool.fn_decl_body_is_interface(decl as NodeId) and not frontend_fn_decl_is_c_export(pool, intern, decl)
