@@ -8,7 +8,7 @@
 use c_import("../behavior/c_facade_text.h")
 
 c facade notes:
-    domain errno process
+    domain errno thread
     fn strerror
         returns borrow CStr from domain errno
     fn note_fail
