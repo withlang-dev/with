@@ -155,6 +155,8 @@ in the project. A device named on the command line that is not in
 | `with dev watch <name>` | `run`, then watches sources and assets; on save, reloads by the strongest correct tier (§7) and prints which one it used. |
 | `with dev logs <name>` | Re-attaches the stream to a running game. |
 | `with dev shell <name>` | SSH into the device in the game's directory. |
+| `with dev screenshot <name> [path]` | The Deck's screen as players see it, gamescope-composited, as a PNG on the developer's machine. Half a second (§6a). |
+| `with dev view <name>` | The Deck's screen live in a window on the developer's machine, 60 fps; `--port N` serves it as MJPEG over HTTP on localhost instead, for an editor panel (§6a, §6b). |
 | `with dev pull <name> <what>` | Copies back saves, recordings, crash dumps, screenshots. `with dev pull deck recording` is how a Deck-only bug becomes a desktop replay. |
 | `with dev unpair <name>` | Rule 4. |
 
@@ -318,6 +320,67 @@ package that links it.
   device directory; `with dev pull deck crash` brings the core and LLDB
   opens it against the local symbols.
 
+## 6a. Seeing the screen
+
+Verified on the Deck, 2026-10-19, with WIPE running in Game Mode:
+
+- **The source is gamescope's own output.** gamescope (3.16.23.6 on this
+  SteamOS) publishes its composited frame as a PipeWire `Video/Source`
+  node named `gamescope`, the stream Steam's Remote Play reads. It is the
+  final image: overlay, Steam Input prompts and the game, at the output
+  resolution (1920×1080 while docked). Its node id changes between
+  launches (65, then 72), so it is addressed by name:
+  `pipewiresrc target-object=gamescope`.
+- **Screenshot**: `gst-launch-1.0 pipewiresrc target-object=gamescope
+  num-buffers=1 ! videoconvert ! pngenc ! filesink` on the Deck took
+  483 ms for a 1920×1080 PNG; `gamescopectl screenshot <path>` (with
+  `DISPLAY=:0`) is the equivalent at 523 ms. `with dev screenshot` runs
+  the first and copies the file back; `with dev pull deck screenshots`
+  also fetches the ones Steam took from the Steam button.
+- **Live view**: the same source, encoded on the Deck and sent down the
+  SSH session's stdout, decoded on the developer's machine. Two encodings
+  measured over Wi-Fi for 8 s each:
+
+  | Encoding | Deck pipeline | Result |
+  |---|---|---|
+  | MJPEG 960×540, quality 70 | GStreamer `jpegenc` | 60 fps, 24 Mbit/s |
+  | H.264 1920×1080, 10 Mbit/s | GStreamer raw NV12 into `ffmpeg -c:v h264_vaapi` (the APU's encoder) | 60 fps, 10 Mbit/s |
+
+  SteamOS ships `gst-launch-1.0` with `pipewiresrc` and `jpegenc`, and
+  `ffmpeg` with `h264_vaapi`, `libx264` and `mjpeg`; it ships no
+  `x264enc` for GStreamer and no `xwd` or `grim`. The developer's machine
+  needs a decoder: `ffplay` or `mpv` on the Mac, or the editor's own
+  viewer (§6b). Glass-to-glass latency is unmeasured; both pipelines
+  delivered every frame at 60 fps.
+- **Not the X server.** `DISPLAY=:0` inside gamescope is the game's
+  Xwayland, not the composited output, so an X11 grab would miss the
+  overlay and the scaling. The PipeWire node is the only correct source.
+
+## 6b. In the editors
+
+The CLI is the one implementation (`with dev`); every editor is a thin
+client of it, so the Deck works the same in all three and in a terminal.
+Each editor needs three things: a way to run `with dev` verbs, a debugger
+that speaks to the Deck's `gdbserver`, and a panel for the screen.
+
+| | Run and deploy | Debug | Screen |
+|---|---|---|---|
+| **VS Code** (`with-vscode`, today language and grammar only, v0.1.0: no commands, no debuggers, no views) | Tasks and commands that call `with dev run`, `deploy`, `watch`, with the output stream in a terminal | A `with` debug type backed by `lldb-dap` (Xcode's is LLVM 22.1.6, the compiler's own version) attaching through `gdb-remote-port` to the SSH-forwarded `gdbserver`, with the source map set; `with dev debug --dap` prints the configuration | A webview fed by `with dev view --port N`, with a screenshot button |
+| **Visual Studio Professional** (Windows) | `with dev` from the Developer PowerShell, or as External Tools; a VSIX later | Built in: Debug → Attach to Process, connection type SSH, code type Native (GDB). VS drives the Deck's `gdb` (16.3 on SteamOS) over SSH in "gdb mode", or a local Windows gdb against `gdbserver`. VS assumes the source is on the Windows file system, which it is. DWARF is what its engine reads, so With source lines, locals and stepping work without a With language service; syntax colouring needs a VSIX | No built-in panel: `with dev view` opens its own window, `with dev screenshot` writes the file |
+| **IntelliJ IDEA** | Run configurations calling `with dev` | No native debugger in IDEA. Route 1: the Red Hat LSP4IJ plugin's "Debug Adapter Protocol" run configuration (launch and attach both supported; its documented adapters include codelldb and Swift's lldb), pointed at `lldb-dap` with the same attach parameters as VS Code. Route 2: CLion 2025.3's built-in DAP debuggers (stdio only, local toolchains only), for developers who use CLion. A With plugin registers the language server (`with lsp`) and the DAP configuration through LSP4IJ's extension points | A tool window showing the MJPEG stream from `with dev view --port N` |
+
+Consequences for the CLI:
+
+- `with dev debug --dap` emits the attach configuration once, as JSON, so
+  each editor's configuration is generated, not hand-written.
+- `with dev` must run on Windows, where VS lives. The toolchain already
+  builds there; the device transport cannot assume `rsync` on the host,
+  so the sync is the toolchain's own (SSH plus a content-addressed file
+  list), with `rsync` as an optimization where present.
+- `with dev view --port N` is the editor interface for the screen:
+  one HTTP endpoint on localhost serving `multipart/x-mixed-replace`
+  JPEG, which every webview and tool window renders with an `<img>` tag.
+
 ## 7. Hot reload
 
 Three tiers, strongest correct one first. `watch` decides per change and
@@ -437,6 +500,10 @@ Still open:
 9. A one-shot manual cross-build: WIPE's object files from the Mac with
    `c_import` pointed by hand at the steamrt4 sysroot, linked with `ld.lld`,
    run on the Deck. It shows how far issue 1 of §4.2 really is.
+10. Screen capture: **works, from gamescope's PipeWire source** (§6a).
+    Screenshot in 0.5 s; live view at 60 fps as MJPEG (24 Mbit/s at
+    960×540) or hardware H.264 (10 Mbit/s at 1080p). Verified 2026-10-19.
+    Glass-to-glass latency is still unmeasured.
 
 Two things seen along the way that the tool must handle:
 
@@ -463,13 +530,18 @@ Two things seen along the way that the tool must handle:
 4. Tests: a fake device (a Linux container with SSH) in the battery, so
    every verb runs without hardware; the Deck acceptance is a UAT.
 
-### Milestone 2: debug
+### Milestone 2: debug and see
 
 1. `with dev debug`, `--attach`, crash pull, the source map.
-2. The `with-vscode` launch configuration over `lldb-dap`.
-3. WIPE: a breakpoint in `src/game.w` hit on the Deck, a local variable
+2. `with dev screenshot` and `with dev view` (window and `--port`).
+3. The `with-vscode` debug type over `lldb-dap`, the `with dev` tasks and
+   the screen webview (§6b).
+4. WIPE: a breakpoint in `src/game.w` hit on the Deck, a local variable
    printed, a step over, from the Mac. Every value LLDB cannot show
    usefully is filed.
+5. Visual Studio: Attach to Process over SSH to WIPE on the Deck from a
+   Windows machine, in gdb mode; what works and what does not, recorded
+   here. IntelliJ IDEA: the LSP4IJ DAP configuration, the same test.
 
 ### Milestone 3: the dev channel and reload tiers 1 and 2
 
@@ -500,6 +572,12 @@ each a private backend implementing the same four verbs.
   same simulation step it left, and the terminal says which tier ran.
 - `with dev pull deck recording` followed by a desktop replay reproduces
   the Deck session exactly.
+- `with dev screenshot deck` writes the gamescope-composited frame as a
+  PNG within a second; `with dev view deck` shows the Deck's screen at
+  60 fps, and `--port` serves the same to an editor panel.
+- From VS Code, Visual Studio and IntelliJ IDEA, a developer can run the
+  game on the Deck, stop at a breakpoint in a `.w` file, and see the
+  Deck's screen, each through `with dev`.
 - `with dev unpair deck` leaves nothing of the toolchain on the Deck.
 - A release package built by the same project contains no `game.dev`.
 - Every verb runs in the battery against the fake device.
@@ -540,6 +618,14 @@ each a private backend implementing the same four verbs.
   `client/devkit-utils/` (`steam-client-create-shortcut`, `steam-devkit-rpc`,
   the `steam.pipe` protocol in `devkit_utils/__init__.py`).
 - Steam Linux Runtime 4 images: `https://repo.steampowered.com/steamrt4/images/`.
+- lldb-dap README (`gdb-remote-port`, `attachCommands`):
+  https://llvm.googlesource.com/llvm-project/lldb/+/refs/heads/main/tools/lldb-dap
+- Visual Studio, "Deploy, run, and debug your Linux MSBuild C++ project"
+  (gdb and gdbserver modes, Attach to Process over SSH):
+  https://learn.microsoft.com/en-us/cpp/linux/deploy-run-and-debug-your-linux-project
+- Red Hat LSP4IJ, DAP support for IntelliJ IDEA:
+  https://github.com/redhat-developer/lsp4ij/tree/main/docs/dap
+- JetBrains, CLion 2025.3 DAP debuggers: https://blog.jetbrains.com/clion/2025/10/dap-debuggers/
 - Godot DeployToSteamOS: a third-party deploy riding the Devkit Client.
 - On the USB gadget path: `dafta/DeckMTP`, `jmedina21/deck-as-controller`,
   and Valve's `usbhid-gadget-passthru` (on SteamOS).
