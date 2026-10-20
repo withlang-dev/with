@@ -462,3 +462,25 @@ Still to measure before R2c's erasures: the process-spawning behavior
 files with the lane confined to the program under test (not its nested
 builds), test/spec, test/compile_errors, test/internals and the
 compiler-self lane.
+
+**The other corpora, measured 2026-10-19** (release of branch
+`d30-lane-equivalence`, all fresh): test/spec 210 of 210, test/internals
+72 of 72, and `with check src/main.w` clean under the lane (the
+self-lane flip-blocker recorded in August is gone). test/compile_errors
+had three real failures, each a way the in-unit runtime showed through
+where the object-linked one never did: a program facade saw the runtime
+facade's domains (fixed: it sees only program-declared ones), D104's
+check and the evaluator walked into runtime bodies (fixed: a runtime ABI
+fn is bodiless to compile time), and with_thread_spawn's retention went
+unseen. That last one needs the runtime's definition to carry
+std.thread's `@[effect(fn_ptr: escape_value, ctx: escape_value)]` pin as
+a declared contract; this branch teaches Sema that rule, but
+bootstrap-rt-core-object compiles rt/ with the pinned seed, which checks
+the pin against inference and refuses it. So the pin lands after the
+next seed cut (err_thread_spawn_closure_captures_ref is the lane cell
+that stays red until then).
+
+Still to measure: the process-spawning behavior files with the lane
+confined to the program under test, and building (not just checking)
+the compiler under the lane, which needs a driver that keeps the
+variable out of build.w's own evaluation.
