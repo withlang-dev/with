@@ -2338,12 +2338,18 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     let bundle_objects = link_stage_select_embedded_bundles(undef)
     if bundle_objects.len() == 1 and bundle_objects[0] == LINK_BUNDLE_FAILED():
         return link_stage_plan_fail()
+    var rt_bundle_joined = false
     for boi in 0..bundle_objects.len():
+        if bundle_objects[boi].ends_with("/wo_rt.o"):
+            rt_bundle_joined = true
         extras.push(with_str_clone_ref(bundle_objects[boi]))
-    if needs_fiber_runtime != 0 and link_stage_rt_in_unit() != 0:
+    if (needs_fiber_runtime != 0 or rt_bundle_joined) and link_stage_rt_in_unit() != 0:
         // Runtime emitted in-unit: the asm-defined with_fiber_* symbols
         // still trip the predicate, but only fiber_asm.o may link — the
-        // .w-derived trio would duplicate the in-unit definitions.
+        // .w-derived trio would duplicate the in-unit definitions. The
+        // runtime bundle (D30 R3) is the whole runtime, fiber core
+        // included: its own reference to with_fiber_switch is not among the
+        // program's undefined symbols, so fiber_asm.o joins with it.
         let fa_path = link_stage_find_runtime_object_path("fiber_asm.o")
         if fa_path.len() == 0:
             with_eprint("error: missing runtime/fiber_asm.o")
