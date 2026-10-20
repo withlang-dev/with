@@ -6447,11 +6447,16 @@ fn bs_build_w_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
         ctx.diagnostics().error(ctx.target_name() ++ ": build.w selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
 
-fn bs_build_w_tool_from_env(env_name: &str, fallback: &str) -> str:
-    let value = env(selfhost_owned_text(env_name))
-    if value.len() > 0:
-        return value
-    selfhost_owned_text(fallback)
+// The nm an object check reads with: $NM, else the SDK's llvm-nm, else
+// `fallback`. The SDK's reads every target's object format, where a host's
+// binutils nm cannot parse COFF-ARM64 and a Windows host need have no nm at
+// all (win10, #2476): a check never depends on the host's toolchain.
+fn bs_nm_tool(ctx: &ActionCtx, fallback: &str) -> str:
+    let from_env = env("NM")
+    if from_env.len() > 0: return from_env
+    let exe = if os() == "Windows": "/bin/llvm-nm.exe" else: "/bin/llvm-nm"
+    let sdk_nm = comp_llvm_prefix_for_root(ctx.project_info().project_root()) ++ exe
+    if ctx.fs().host_exists(sdk_nm): sdk_nm else: selfhost_owned_text(fallback)
 
 fn bs_build_w_nm_smoke(ctx: &ActionCtx, obj_path: &str, label: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -6459,7 +6464,7 @@ fn bs_build_w_nm_smoke(ctx: &ActionCtx, obj_path: &str, label: &str) -> i32:
     let stdout_rel = bs_join(output_dir, label ++ ".nm.stdout")
     let stderr_rel = bs_join(output_dir, label ++ ".nm.stderr")
     var args: List[str] = List.new()
-    args |> push(bs_build_w_tool_from_env("NM", "nm"))
+    args |> push(bs_nm_tool(ctx, "nm"))
     args |> push(bs_abs(root, obj_path))
     let result = ctx.process_runner().run_capture(args, bs_abs(root, stdout_rel), bs_abs(root, stderr_rel), 120000)
     if result.rc != 0:
@@ -9646,11 +9651,8 @@ pub fn run_bundle_interface_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
 
-    // nm resolves as in run_cli_selfhost_object_symbol_action: $NM, else the
-    // target's arg.
     let args = ctx.args()
-    let nm_arg = if args.len() > 0: selfhost_owned_text(args[0]) else: "nm"
-    let nm_tool = bs_build_w_tool_from_env("NM", nm_arg)
+    let nm_tool = bs_nm_tool(&ctx, if args.len() > 0: args[0] else: "nm")
     bs_check_bundle_interface(ctx, compiler_path, nm_tool, bs_join(output_dir, "cases"))
 
 pub fn run_cli_selfhost_object_symbol_action(ctx: ActionCtx) -> i32:
@@ -9673,12 +9675,7 @@ pub fn run_cli_selfhost_object_symbol_action(ctx: ActionCtx) -> i32:
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
 
     let args = ctx.args()
-    // Resolve nm env-aware (mirrors bs_build_w_nm_smoke): honour $NM when set,
-    // else the target's arg ("nm"). The arm64-Windows lane sets NM to the SDK's
-    // llvm-nm.exe because the runner's ambient MSYS binutils nm cannot parse
-    // COFF-ARM64 ("file format not recognized").
-    let nm_arg = if args.len() > 0: selfhost_owned_text(args[0]) else: "nm"
-    let nm_tool = bs_build_w_tool_from_env("NM", nm_arg)
+    let nm_tool = bs_nm_tool(&ctx, if args.len() > 0: args[0] else: "nm")
     bs_check_object_symbols(ctx, compiler_path, nm_tool, bs_join(output_dir, "cases"))
 
 // #2449: the server's footprint stays flat across reparses. Every edit once
