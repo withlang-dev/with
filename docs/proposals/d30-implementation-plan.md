@@ -614,10 +614,13 @@ per-compile lane flag; the `.w`-derived runtime objects are no longer
 produced, embedded, installed or compared anywhere (build.w, the emit-C and
 selfhost C links, the stale-root fixture), and a runtime root's identity is
 its `rt.o` against the embedded `rt` slot plus `cimport_stubs.o` and
-`fiber_asm.o`. R4c: the unsafe-call transition branch is retired — a runtime
-function is safe by declaration, so the eight `unsafe` blocks that only
-called one (std.string, std.libc, the tar/xz/bzip2 readers, the framework
-stubs) are unwrapped. Two things wait for a seed cut from this tree: the
+`fiber_asm.o`. R4c is pending: a runtime function is safe by declaration
+and the eight `unsafe` blocks in std and src that only called one are
+unwrapped, but the migrator still writes `unsafe { with_alloc(...) }` into
+every corpus (40 such blocks in c_algorithms alone, never edited by hand,
+D112), so the transition branch that counts such a call as an unsafe
+operation stays until the migrator stops and the corpora re-promote — its
+own stack. Two things wait for a seed cut from this tree: the
 seed-built `out/bootstrap-lib` objects (the pinned seed links stage1 in the
 object world) and the compiler's own `src/` externs becoming `use rt.*`
 (the resolver now admits the compiler's sources, but the pinned seed's

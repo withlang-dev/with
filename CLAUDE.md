@@ -449,8 +449,9 @@ modules; on wasm `rt.fiber_runtime` and `rt.channel_runtime` resolve to the
 fiber stubs). The runtime is internal to the standard library and the
 compiler: `use rt.*` from a program is refused ("a program reaches it
 through std"). A new `extern fn with_*` in `lib/std` is a regression. A
-runtime function is safe by its declaration: an `unsafe` block whose only
-content is a call of one is vacuous and refused (R4c). The compiler's own
+runtime function is safe by its declaration; an `unsafe` block whose only
+content is a call of one is ceremony, refused once the migrator stops
+writing them into the corpora (R4c, pending). The compiler's own
 `src/` modules still declare their runtime externs (agreeing duplicates of
 the interface): they become `use rt.*` once a seed carrying the step-4
 resolver rule is pinned, since the pinned seed refuses that import from
