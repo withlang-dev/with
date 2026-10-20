@@ -502,3 +502,51 @@ that compile) and the compiler so built passes 1700/1700 behavior files
 in default mode. rt_decl_audit: 0 divergent of 1216 defs / 1750 decls.
 Next: the process-spawning behavior files with the lane confined to the
 program under test, then (3) the flip.
+
+## 10. R3 and the flip: rulings of 2026-10-20
+
+**Rulings (Eric, 2026-10-20).** (1) R3's cache lands before the flip, so
+no release pays the in-unit cost (measured 2026-10-20 on hello world:
+0.17 s → 1.52 s; the profile is Sema over the runtime bodies plus LLVM
+over the whole runtime per compile). (2) R3's shape is the runtime as an
+embedded bundle: an object and an emitted interface, one per
+(compiler generation, target), built at compiler build time, linked on
+every compile; std imports the interface, and the hand-written
+`extern fn with_*` declarations go.
+
+**Three corrections to that shape, from the ruling's own words.**
+
+1. *Byte-identity.* D30 says a cache hit is "byte-identical to the
+   in-unit result". The lane today prunes the runtime to the program's
+   demand closure, so no two programs share runtime bytes and no cache
+   can match. The in-unit result is therefore defined as the runtime
+   compiled as its own codegen unit, in full (link-time dead-strip does
+   the pruning, as it does for rt_core.o today, and runtime code is not
+   inlined into user code in either world). The bundle is that unit's
+   object by construction, and the fixpoint proves it: stage2 embeds the
+   runtime stage1 compiled, stage3 what stage2 compiled, stage2 == stage3.
+2. *Not the .wo store.* The `.wo` store is keyed by ABI hash and links
+   objects across compiler generations; D30 and D132 forbid exactly that
+   for the runtime (#761). The runtime bundle shares the artifact shape
+   (object + interface, BundleInterfaceEmit) and nothing of the store:
+   keyed by compiler generation, embedded, never fetched.
+3. *The seed cut returns.* Section 9's "no seed cut needed" held for the
+   lane, where the in-unit definition inherits std.thread's pinned extern
+   (#2482). A bundle compiles the runtime alone: a contract must be on the
+   definition for the interface to carry it. That needs the declared-pin
+   rule #2482 removed as unused, restored, and a seed carrying it (the
+   seed compiles rt/ for stage1). rt_decl_audit compares types only; an
+   effects audit (each extern's pins against the interface's) gates the
+   deletion of the externs, or hand-written contracts vanish silently.
+
+**Order.** Each its own stack with a battery:
+1. The runtime as its own full codegen unit under the lane; the bundle
+   built at compiler build time, embedded and linked; fixpoint checks the
+   bytes. Still behind `WITH_RT_IN_UNIT`.
+2. Restore the declared-contract rule; cut a seed; move the pins onto the
+   definitions; the effects audit.
+3. std imports the interface (runtime module under an `internal` path,
+   open question 3 answered as predicted); delete the externs.
+4. The flip: bundle path by default, `WITH_RT_IN_UNIT` deleted, the
+   legacy rt_core.o link paths deleted (Link.w-only commit, bootstrap
+   rules), the `with_*` Sema exemptions retired (R4c).
