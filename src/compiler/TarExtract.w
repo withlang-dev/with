@@ -167,7 +167,7 @@ fn tar_gz_extract_data(packed: &str, dest: &str, strip: i32) -> str:
     match decompress_gzip_with_limit(&te_bytes(packed), 8589934592):
         .Ok(tar) =>
             if tar.len() == 0: return "an empty embedded archive"
-            let text = unsafe { with_str_from_bytes(&tar[0] as *const u8, tar.len()) }
+            let text = with_str_from_bytes(&tar[0] as *const u8, tar.len())
             tar_extract_text(text, dest, strip)
         .Err(e) => "an embedded archive: " ++ e.message
 
@@ -178,7 +178,7 @@ fn tar_gz_extract_keep(archive: &str, dest: &str, strip: i32, keep: &List[str]) 
     match decompress_gzip_with_limit(&te_bytes(packed), 8589934592):
         .Ok(tar) =>
             if tar.len() == 0: return "an empty archive: " ++ archive
-            let text = unsafe { with_str_from_bytes(&tar[0] as *const u8, tar.len()) }
+            let text = with_str_from_bytes(&tar[0] as *const u8, tar.len())
             tar_extract_text_keep(text, dest, strip, keep)
         .Err(e) => archive ++ ": " ++ e.message
 

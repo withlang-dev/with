@@ -346,7 +346,7 @@ fn xz_vli(data: &str, at: i64) -> List[i64]:
 
 fn xz_bytes_to_str(v: &List[u8]) -> str:
     if v.len() == 0: return ""
-    unsafe { with_str_from_bytes(&v[0] as *const u8, v.len()) }
+    with_str_from_bytes(&v[0] as *const u8, v.len())
 
 // The decompressed contents of the .xz file `data`; "" and the reason in
 // the second element on failure. Concatenated streams are read in turn.

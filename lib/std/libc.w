@@ -104,9 +104,9 @@ pub fn __assert_fail(expression: *const i8, file: *const i8, line: u32, function
 pub fn _assert(expression: *const i8, file: *const i8, line: u32) -> Never:
     libc_assert_failed(expression, c"".ptr, file, line as i64)
 fn libc_assert_failed(expression: *const i8, function: *const i8, file: *const i8, line: i64) -> Never:
-    let function_name = unsafe { with_str_from_cstr(function as *const u8) }
+    let function_name = with_str_from_cstr(function as *const u8)
     let site = if function_name.len() > 0: ", function " ++ function_name else: ""
-    let text = unsafe { f"Assertion failed: ({with_str_from_cstr(expression as *const u8)}){site}, file {with_str_from_cstr(file as *const u8)}, line {line}." }
+    let text = f"Assertion failed: ({with_str_from_cstr(expression as *const u8)}){site}, file {with_str_from_cstr(file as *const u8)}, line {line}."
     eprint(text)
     abort()
 pub extern fn exit(code: i32) -> Never

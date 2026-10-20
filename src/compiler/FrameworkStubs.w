@@ -83,17 +83,16 @@ fn fs_open(path: &str) -> i32:
 // `len` bytes of `fd` at `offset`; fewer only at the end of the file.
 fn fs_read_at(fd: i32, offset: i64, len: i64) -> str:
     if len <= 0: return ""
-    unsafe:
-        if rt_seek(fd, offset, 0) != offset: return ""
-        let buf = with_alloc(len)
-        var got: i64 = 0
-        while got < len:
-            let n = rt_read(fd, (buf as i64 + got) as *mut u8, len - got)
-            if n <= 0: break
-            got = got + n
-        let out = with_str_from_bytes(buf as *const u8, got)
-        with_free(buf)
-        out
+    if rt_seek(fd, offset, 0) != offset: return ""
+    let buf = with_alloc(len)
+    var got: i64 = 0
+    while got < len:
+        let n = rt_read(fd, (buf as i64 + got) as *mut u8, len - got)
+        if n <= 0: break
+        got = got + n
+    let out = with_str_from_bytes(buf as *const u8, got)
+    with_free(buf)
+    out
 
 // The shared cache of this machine: the Cryptex copy (macOS 13 and later),
 // else the one under /System/Library/dyld.

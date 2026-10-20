@@ -102,7 +102,7 @@ impl BzBits:
 
 fn bz_bytes_to_str(v: &List[u8]) -> str:
     if v.len() == 0: return ""
-    unsafe { with_str_from_bytes(&v[0] as *const u8, v.len()) }
+    with_str_from_bytes(&v[0] as *const u8, v.len())
 
 // The decompressed contents of the .bz2 file `data`, and "" — or "" and the
 // reason.
