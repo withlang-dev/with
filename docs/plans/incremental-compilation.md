@@ -121,8 +121,9 @@ holds the fixpoint and the battery.
    signatures reach. Expected saving: up to the measured 4.3 s; how much
    depends on how widely WIPE's inferred numerics are used.
 3. **`-O0` for dev builds.** `llvm.optimize` is 1.1 s of a rebuild, and
-   debugging needs `-O0` anyway (Steam Dev §6). `with dev` passes it;
-   nothing changes for `with build`.
+   debugging needs `-O0` anyway (Steam Dev §6). `with dev` passes it for
+   the game's build; nothing changes for `with build`, and the compiler's
+   own build stays `-O1` (AGENTS.md).
 
 Stage 1 is done when WIPE's one-file rebuild is measured again with each
 change separately.

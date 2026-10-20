@@ -36,7 +36,7 @@ Paths are relative to the `with` repository unless they name WIPE.
 
 | Need | State | Where |
 |---|---|---|
-| Source-level debug info | **Emitted by default; no `-g` flag exists or is needed.** Verified on macOS arm64 (v0.15.3.0, 2026-10-18): `with build -O0` gives a `.dSYM`, line breakpoints in `.w` files, `frame variable` with parameters and locals, and a backtrace in With source. The default build optimizes, so small functions are inlined and a breakpoint on their lines has no location; a dev build is `-O0`. `--release` writes no `.dSYM`. | `docs/completed/debug.md`, `test/behavior/behav_debug_info_variables.w` |
+| Source-level debug info | **Emitted by default; nothing to pass (`-g0` or `--release` turns it off).** Verified on macOS arm64 (v0.15.3.0, 2026-10-18): `with build -O0` gives a `.dSYM`, line breakpoints in `.w` files, `frame variable` with parameters and locals, and a backtrace in With source. The default build optimizes, so small functions are inlined and a breakpoint on their lines has no location; a dev build is `-O0`. `--release` writes no `.dSYM`. | `docs/completed/debug.md`, `test/behavior/behav_debug_info_variables.w` |
 | Build for `linux_x86_64` from a Mac | **Not possible for a game yet.** `BuildTarget.linux_x86_64` exists, and the link stage already takes a Linux sysroot (`WITH_LINUX_SYSROOT`, `src/compiler/Link.w:385-412`) and the bundled `ld.lld`. What refuses is `c_import` under `--target` (`src/CImport.w:754`: it would parse the host's headers), and Conan selection uses the host OS. `with build :cross` fails loudly. | `src/CImport.w`, `src/compiler/Link.w`, `docs/spec/toolchain/with-build.md` §Cross-Platform Targets |
 | A Linux build that runs on the Deck | Proven by WIPE: built **on the Deck** with the Deck's own With install, `libsteam_api.so` beside the executable with an `$ORIGIN` rpath. This is the only deployment path used so far. | WIPE `build.w`, `docs/steam-and-steam-deck-support.md` §8 |
 | Shared-library output and a loader | None | — |
@@ -147,11 +147,11 @@ in the project. A device named on the command line that is not in
 
 | Command | Does |
 |---|---|
-| `with dev pair [<name>]` | Finds every Deck advertising `_steamos-devkit._tcp`; with one, uses it, with several, asks which. If the service does not answer, says exactly where the toggle is (Settings → System → Developer Mode, then Developer → Development host pairing). Posts the toolchain's RSA key to `/register`, prints "Approve the pairing on your Deck", and waits for the tap. Then checks SteamOS on x86_64, installs `lldb-server` into `~/.local/share/with-dev/`, records the device. Idempotent; a second run on a paired Deck is silent. |
+| `with dev pair [<name>]` | Finds every Deck advertising `_steamos-devkit._tcp`; with one, uses it, with several, asks which. If the service does not answer, says exactly where the toggle is (Settings → System → Developer Mode, then Developer → Development host pairing). Posts the toolchain's RSA key to `/register`, prints "Approve the pairing on your Deck", and waits for the tap. Then checks SteamOS on x86_64 and records the device; it installs nothing for debugging (SteamOS ships `gdbserver`, §6). Idempotent; a second run on a paired Deck is silent. |
 | `with dev status <name>` | Reachable? Game Mode or Desktop? Free space, battery, the installed tool versions, the last build pushed. |
 | `with dev deploy <name>` | Builds the Linux package (§4), `rsync`s it by content hash into `~/.local/share/with-dev/games/<project>/`, creates or updates the Game Mode shortcut. Prints bytes sent. |
 | `with dev run <name> [-- args]` | `deploy`, then launches through Steam, then streams stdout, stderr and the game's log to the terminal until the game exits; Ctrl-C stops the game, not just the stream. Exit status is the game's. |
-| `with dev debug <name>` | `run` with the game started under `lldb-server`, stopped before `main`; starts LLDB here connected through an SSH port forward, with the source map and symbols set (§6). `--attach` attaches to the running game instead. |
+| `with dev debug <name>` | `run` with the game started under SteamOS's `gdbserver`, stopped before `main`; starts LLDB here connected through an SSH port forward, with the source map and symbols set (§6). `--attach` attaches to the running game instead. |
 | `with dev watch <name>` | `run`, then watches sources and assets; on save, reloads by the strongest correct tier (§7) and prints which one it used. |
 | `with dev logs <name>` | Re-attaches the stream to a running game. |
 | `with dev shell <name>` | SSH into the device in the game's directory. |
@@ -295,7 +295,8 @@ package that links it.
   line breakpoints, parameters, locals and backtraces in With source,
   verified on the Mac at `-O0`. So the only build change for debugging is
   the optimization level: `with dev debug` builds `-O0`, and `with dev run`
-  keeps the default so the Deck's frame rate is the real one.
+  keeps the default so the Deck's frame rate is the real one. (`-O0` here
+  is the game's build; the compiler's own build stays `-O1`, AGENTS.md.)
 - **The server**: SteamOS's preinstalled `/usr/bin/gdbserver` (GDB 16.3),
   which LLDB on the Mac drives over `gdb-remote` through an SSH port
   forward. Verified end to end (Milestone 0, item 5). `pair` installs
