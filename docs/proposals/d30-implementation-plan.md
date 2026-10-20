@@ -571,3 +571,20 @@ empty `rt` slot and compiles the runtime in-unit per program under the
 lane (#2485 is its c_import crash; the `<runtime root>/rt.*` link-bundle
 fallback is the follow-up), cross targets embed empty `rt` slots, and the
 user `use rt.*` refusal is step 3's.
+
+**Step 2 landed (2026-10-20).** Part 1 (#2488): a declared `@[effect]`
+pin is interface material — the emitter prints it as the parser reads it,
+the fingerprint row carries the pinned bits, the twin applies it as an
+extern's pin — and on a runtime ABI definition in a runtime module the pin
+is the declared contract (#2481's rule, back). Part 2: a seed carrying
+that rule (`seed.lock`), the pins moved from `lib/std`'s and `src/`'s
+externs onto the `rt/` definitions (with_thread_spawn's fn_ptr/ctx
+escape_value, with_vec_push_str's val, with_vec_append_bytes's v),
+#2482's extern-inheritance deleted (one fact, one place: the definition),
+and `tools/rt_decl_audit.w` comparing pins beside types — on the tree
+before the move it reports the five pinned externs against their unpinned
+definitions, which is the gate on deleting the externs (correction 3).
+The runtime bundle's interface now reads `@[effect(fn_ptr: escape_value,
+ctx: escape_value)]` on with_thread_spawn, and the lane fixture
+err_d30_rt_in_unit_spawn_captures_ref is refused through the definition's
+own pin.
