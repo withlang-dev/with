@@ -825,3 +825,33 @@ none of its store (docs/proposals/d30-implementation-plan.md §10):
   prefix predicate does not apply); in the object world it never joins.
   Its interface is registered like every embedded bundle's, so a lane
   compile parses declarations instead of runtime bodies.
+
+### Step 3: the standard library imports the runtime (2026-10-20)
+
+- **Imports, not externs.** A `lib/std` module writes `use rt.rt_core`
+  (and `use rt.fiber_runtime`, `rt.channel_runtime`, `rt.compat_runtime`,
+  `rt.panic_runtime`); the migrator's shared defs do the same. The 227
+  `extern fn with_*` declarations of the standard library are gone, and
+  the three `@[effect]` pins they carried live on the definitions.
+- **By role, never by host.** `rt/platform.w` and `rt/fiber_core.w` resolve
+  to the active target's platform module and fiber core
+  (`EmbeddedRuntime.embedded_rt_platform_file`, the one owner the in-unit
+  parse reads too): `std.net` writes `use rt.platform`, `std.task` writes
+  `use rt.fiber_core`.
+- **Internal.** The runtime is internal to the standard library (plan §9
+  open question 3, answered as predicted): `use rt.*` from a program is
+  refused in the §18.3 pass — "a program reaches it through std". The
+  runtime's own tree and the build's generated roots import it.
+- **An interface everywhere.** Outside the lane a runtime module reaches a
+  unit only as its interface: the embedded `rt` slot (host), the target's
+  slot in a cross compiler (`cross_rt_bundle_targets` builds one per cross
+  tag), or `<runtime root>/rt.wi` beside the objects a compiler links (a
+  `:dev` stage1, whose slot is empty — its lane links `<runtime root>/rt.o`
+  too, #2485). With none, `use rt.<module>` is refused by name rather than
+  compiling the runtime's bodies into a program that links the objects.
+- **One symbol, one contract.** An extern's fingerprint row is its symbol's
+  (no module column; every corpus module declaring it must agree): the
+  runtime's modules each declare rt_libc_exit, and which declaration the
+  merge keeps depends on who imports the module. A runtime ABI symbol's
+  interface declaration beside a same-named `extern fn with_*` is never
+  displaced to `name$in$<module>`.

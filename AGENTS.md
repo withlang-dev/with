@@ -439,7 +439,13 @@ everything in `rt/*.w` are the compiler's own runtime — user source never name
 one; the compiler emits those calls (`std.regex` is a facade over the pcre2
 `.wo` bundle, `std.re`, D38/D39; the old `with_regex_*` shim is gone). If you
 catch yourself asking "how does a user program get the `with_*` symbols?", the
-question is malformed.
+question is malformed. Since D30 step 3 the standard library reaches the
+runtime as a module, never an extern: `use rt.rt_core`, and by role `use
+rt.platform` / `use rt.fiber_core` (the active target's modules); the
+runtime is internal to the standard library, and `use rt.*` from a program
+is refused ("a program reaches it through std"). A new `extern fn with_*`
+in `lib/std` is a regression; the compiler's own `src/` modules keep theirs
+until step 4.
 
 ---
 

@@ -594,3 +594,12 @@ and the reseed gate refused a same-`rt/`-generation stage2's runner root
 (#2491's class); both fixed in #2495 and every seed re-cut from it as
 `nightly-20261020-local-2-4d6d960d6ed0`, each verified to bootstrap a fresh
 clone with no build store and no runner cache.
+
+**Step 3 landed (2026-10-20).** The standard library imports the runtime's
+interface (`use rt.rt_core`; `rt.platform` / `rt.fiber_core` name the
+target's modules by role; `use rt.*` elsewhere refused: open question 3
+answered as predicted, internal), its 227 externs deleted, the migrator's
+shared defs importing likewise and the four corpora re-promoted; every
+cross compiler embeds its target's rt bundle; a `:dev` stage1 reads the
+bundle beside its runtime root (#2485 fixed by it); an extern's fingerprint
+row is per symbol. The compiler's own `src/` externs remain for step 4.
