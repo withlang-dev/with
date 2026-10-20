@@ -3421,6 +3421,10 @@ impl Zcu:
         let rel_primary = module_rel ++ ".w"
         let rel_fallback = if frontend_parent_module_rel(module_rel).len() > 0: frontend_parent_module_rel(module_rel) ++ ".w" else: ""
 
+        if embedded_rt_is_module_rel(module_rel):
+            let embedded_rt = embedded_rt_resolve_path(rel_primary)
+            if embedded_rt.len() > 0:
+                return embedded_rt
         if embedded_std_is_module_rel(module_rel):
             let embedded_primary = embedded_std_resolve_path(rel_primary)
             if embedded_primary.len() > 0:

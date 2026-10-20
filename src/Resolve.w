@@ -1205,6 +1205,12 @@ impl ResolveState:
             if dotted[i] == '.':
                 last_dot = i as i32
         let rel_fallback = if last_dot > 0: dotted.slice(0, last_dot).replace(".", "/") ++ ".w" else: ""
+        // D30 R3: `use rt.<module>` names the embedded runtime module
+        // (<embedded-rt>/rt/<module>.w), the bundle root's spelling.
+        if rel_primary.starts_with("rt/"):
+            let embedded_rt = embedded_rt_resolve_path(rel_primary)
+            if embedded_rt.len() > 0:
+                return embedded_rt
         if rel_primary.starts_with("std/"):
             let embedded_primary = embedded_std_resolve_path(rel_primary)
             if embedded_primary.len() > 0:
@@ -1247,6 +1253,12 @@ impl ResolveState:
         // If not found, fall through to normal filesystem resolution.
         // This decouples the std/ namespace from the embedded storage —
         // modules like std.re can live on the filesystem without embedding.
+        // D30 R3: `use rt.<module>` names the embedded runtime module
+        // (<embedded-rt>/rt/<module>.w), the bundle root's spelling.
+        if rel_primary.starts_with("rt/"):
+            let embedded_rt = embedded_rt_resolve_path(rel_primary)
+            if embedded_rt.len() > 0:
+                return embedded_rt
         if rel_primary.starts_with("std/"):
             let embedded_primary = embedded_std_resolve_path(rel_primary)
             if embedded_primary.len() > 0:

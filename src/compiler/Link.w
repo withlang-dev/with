@@ -1852,9 +1852,22 @@ fn link_stage_select_embedded_bundles(undef: &str) -> List[str]:
         if not embedded_bundle_for_this_target(bi):
             continue
         let manifest = link_stage_embedded_obj_slice(embedded_bundle_manifest_start(bi) as *const u8, embedded_bundle_manifest_end(bi) as *const u8)
-        if link_stage_bundle_provided_explicitly(manifest) or not link_stage_bundle_needed(manifest, undef):
-            continue
         let name = embedded_bundle_name(bi)
+        // D30 R3: the runtime bundle joins every link of a unit compiled
+        // against its interface (the lane) and no other: its symbols are the
+        // flat `with_*` names, not module prefixes, and the object world
+        // links the rt objects instead. Like them it must be this
+        // compiler's own generation (D132).
+        if name == "rt":
+            if link_stage_rt_in_unit() == 0 or link_stage_bundle_provided_explicitly(manifest):
+                continue
+            if not link_stage_embedded_runtime_is_this_generation():
+                with_eprint(link_stage_runtime_generation_refusal())
+                let failed: List[str] = List.new()
+                failed.push(LINK_BUNDLE_FAILED())
+                return failed
+        else if link_stage_bundle_provided_explicitly(manifest) or not link_stage_bundle_needed(manifest, undef):
+            continue
         let bundle_abi = link_stage_bundle_manifest_field(manifest, "abi-sha")
         if abi_identity_refuses_bundle(compiler_abi_sha(), bundle_abi):
             with_eprint("error: embedded bundle '" ++ name ++ "' was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")
@@ -2325,12 +2338,18 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     let bundle_objects = link_stage_select_embedded_bundles(undef)
     if bundle_objects.len() == 1 and bundle_objects[0] == LINK_BUNDLE_FAILED():
         return link_stage_plan_fail()
+    var rt_bundle_joined = false
     for boi in 0..bundle_objects.len():
+        if bundle_objects[boi].ends_with("/wo_rt.o"):
+            rt_bundle_joined = true
         extras.push(with_str_clone_ref(bundle_objects[boi]))
-    if needs_fiber_runtime != 0 and link_stage_rt_in_unit() != 0:
+    if (needs_fiber_runtime != 0 or rt_bundle_joined) and link_stage_rt_in_unit() != 0:
         // Runtime emitted in-unit: the asm-defined with_fiber_* symbols
         // still trip the predicate, but only fiber_asm.o may link — the
-        // .w-derived trio would duplicate the in-unit definitions.
+        // .w-derived trio would duplicate the in-unit definitions. The
+        // runtime bundle (D30 R3) is the whole runtime, fiber core
+        // included: its own reference to with_fiber_switch is not among the
+        // program's undefined symbols, so fiber_asm.o joins with it.
         let fa_path = link_stage_find_runtime_object_path("fiber_asm.o")
         if fa_path.len() == 0:
             with_eprint("error: missing runtime/fiber_asm.o")

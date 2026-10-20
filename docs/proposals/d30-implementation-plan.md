@@ -550,3 +550,24 @@ every compile; std imports the interface, and the hand-written
 4. The flip: bundle path by default, `WITH_RT_IN_UNIT` deleted, the
    legacy rt_core.o link paths deleted (Link.w-only commit, bootstrap
    rules), the `with_*` Sema exemptions retired (R4c).
+
+**Step 1 landed (2026-10-20).** The runtime is a bundle corpus:
+`--bundle-corpus rt`, `use rt.<module>` resolving to the embedded runtime,
+`build/rt_bundle.w` compiling the generated root under the lane into
+`out/bootstrap/lib/rt.{o,wi,manifest}` (stage1) and `out/lib/` (stage2),
+the stage compilers embedding the blobs in the `rt` slot, and
+`rt-bundle-fixpoint` in `:fixpoint` comparing the two bundles' sha256
+(docs/spec/toolchain/wo_bundles.md "The runtime bundle"). Under the lane
+the bundle joins every link of this compiler's generation, fiber_asm.o
+with it; hello world under the lane with the release is 0.20 s against
+0.19 s in the object world (it was 1.52 s). Two things the bytes taught:
+the generated root is one target at one path and the compile runs under
+the D50 prefix map, or the root's path enters the debug info; and the
+bundle builds take the stage compiles' `--link-bundle` pairs, or stage1's
+empty `.wo` slots make the prelude's std.regex compile pcre2 into the
+unit — pruned functions, but a literal counter that leaves every
+`l_str.N` renumbered. Not in this step: stage1 at the dev tier has an
+empty `rt` slot and compiles the runtime in-unit per program under the
+lane (#2485 is its c_import crash; the `<runtime root>/rt.*` link-bundle
+fallback is the follow-up), cross targets embed empty `rt` slots, and the
+user `use rt.*` refusal is step 3's.
