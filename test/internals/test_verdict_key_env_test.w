@@ -7,7 +7,7 @@ use std.fs
 use std.process
 
 // A cached test verdict is keyed on the environment that changes what the
-// compiler produces: `WITH_RT_IN_UNIT=1 with test` was served the passes of
+// compiler produces: `WITH_CODEGEN_UNITS=1 with test` was served the passes of
 // runs without it (1367 of 1695 files in a D30 lane sweep), and a variable
 // that shapes no compile leaves the key alone.
 fn main:
@@ -15,12 +15,12 @@ fn main:
     assert(graph.ok)
     let target = &graph.targets[0]
     let test = "test/internals/test_verdict_key_env_test.w"
-    let saved = env("WITH_RT_IN_UNIT")
-    assert(set_env("WITH_RT_IN_UNIT", "") == 0)
+    let saved = env("WITH_CODEGEN_UNITS")
+    assert(set_env("WITH_CODEGEN_UNITS", "") == 0)
     let plain = build_cache_test_verdict_key(".", target, "fp", "argv", test)
-    assert(set_env("WITH_RT_IN_UNIT", "1") == 0)
+    assert(set_env("WITH_CODEGEN_UNITS", "2") == 0)
     let lane = build_cache_test_verdict_key(".", target, "fp", "argv", test)
-    assert(set_env("WITH_RT_IN_UNIT", saved) == 0)
+    assert(set_env("WITH_CODEGEN_UNITS", saved) == 0)
     assert(plain != lane)
     let saved_jobs = env("WITH_BUILD_JOBS")
     assert(set_env("WITH_BUILD_JOBS", "3") == 0)

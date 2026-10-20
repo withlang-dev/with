@@ -658,9 +658,9 @@ fn build_cache_test_surface_text(root: &str, test_path: &str) -> str:
 
 // The environment that changes what the compiler a test runs produces, set
 // in the harness's own environment (a `//! env:` line is in the file and
-// keys it already). `WITH_RT_IN_UNIT=1 with test` was served the verdicts of
-// runs without it: 1367 of a lane sweep's 1695 files passed from cache.
-const BUILD_CACHE_TEST_ENV_KEYS: [str; 9] = ["WITH_RT_IN_UNIT", "WITH_CODEGEN_UNITS", "WITH_DEBUG_PERMUTE_TAGS", "WITH_FILE_PREFIX_MAP", "WITH_RUNTIME_ROOT", "WITH_LINUX_SYSROOT", "WITH_WINDOWS_LIBC_DIR", "WITH_LLVM_LD", "WITH_WASM_STACK_SIZE"]
+// keys it already). A lane variable once served the verdicts of
+// runs without it: 1367 of a sweep's 1695 files passed from cache (D30 R2c).
+const BUILD_CACHE_TEST_ENV_KEYS: [str; 8] = ["WITH_CODEGEN_UNITS", "WITH_DEBUG_PERMUTE_TAGS", "WITH_FILE_PREFIX_MAP", "WITH_RUNTIME_ROOT", "WITH_LINUX_SYSROOT", "WITH_WINDOWS_LIBC_DIR", "WITH_LLVM_LD", "WITH_WASM_STACK_SIZE"]
 
 fn build_cache_test_env_text() -> str:
     var out = ""

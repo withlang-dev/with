@@ -1,4 +1,3 @@
-//! env: WITH_RT_IN_UNIT=1
 //! expect-stdout: ordinary-app
 //! expect-stdout: ok
 

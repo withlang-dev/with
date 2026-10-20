@@ -1,4 +1,3 @@
-//! env: WITH_RT_IN_UNIT=1
 //! expect-check-fail: unknown domain 'locale'
 
 // D30: compiled in-unit, the runtime's own `libc` facade declares errno,

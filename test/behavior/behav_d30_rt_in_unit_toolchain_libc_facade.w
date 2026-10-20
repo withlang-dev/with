@@ -1,4 +1,3 @@
-//! env: WITH_RT_IN_UNIT=1
 //! expect-stdout: two values: true true
 //! expect-stdout: ok
 

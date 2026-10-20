@@ -1,4 +1,3 @@
-//! env: WITH_RT_IN_UNIT=1
 //! check-only
 
 // D30 ruling 4 (§18.2, D70): the in-unit runtime's modules bind by their

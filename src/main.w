@@ -196,7 +196,7 @@ type TestDirectives {
     known_issue: str,
     // `//! env: NAME=VALUE` pairs, set for the test's compile+run and
     // restored after (the harness compiles in-process, so env-gated
-    // compiler modes like WITH_RT_IN_UNIT are testable per file).
+    // compiler modes like WITH_CODEGEN_UNITS are testable per file).
     env_pairs: List[str],
 }
 

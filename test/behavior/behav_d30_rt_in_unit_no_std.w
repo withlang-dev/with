@@ -1,4 +1,3 @@
-//! env: WITH_RT_IN_UNIT=1
 //! check-only
 //! args: --no-std
 

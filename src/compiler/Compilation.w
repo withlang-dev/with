@@ -1312,7 +1312,7 @@ impl Compilation:
             unit_objects.push(with_str_clone_ref(self.link_objects[loi]))
         // D30 R2c: this compile emitted the runtime in-unit iff the lane is
         // on AND the frontend actually parsed the rt prefix (prelude on).
-        let rt_in_unit: i32 = if runtime_getenv("WITH_RT_IN_UNIT").len() > 0 and self.config.prelude_mode != PRELUDE_NONE(): 1 else: 0
+        let rt_in_unit: i32 = if self.config.prelude_mode != PRELUDE_NONE(): 1 else: 0
         link_stage_set_rt_in_unit(rt_in_unit)
         var link_plan = link_stage_link_object_to_binary_plan_with_units(obj_path, unit_objects, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, move _sp_dla, requires_async_runtime)
         if not link_plan.ok:
