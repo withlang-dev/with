@@ -8267,9 +8267,12 @@ impl ComptimeEvaluator:
                         return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
                     return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor, comptime_value_intlike(arg_values[0])))
         // D91 (§17.1a): the target's OS and architecture are a declared
-        // build input, readable by any compile-time code.
-        let reads_target = fn_node == 0 and (fn_name == "with_sysinfo_os" or fn_name == "with_sysinfo_arch")
-        if fn_node == 0 and (self.allow_runtime_calls != 0 or reads_target):
+        // build input, readable by any compile-time code. Whether the
+        // runtime symbol is an extern or, with the runtime in-unit (D30),
+        // its body: that body reads the host (rt_sysinfo_os), never the
+        // target, and its c"..." literal is not comptime-evaluable.
+        let reads_target = fn_name == "with_sysinfo_os" or fn_name == "with_sysinfo_arch"
+        if reads_target or (fn_node == 0 and self.allow_runtime_calls != 0):
             let runtime_signal = self.eval_allowed_runtime_call(fn_sym, arg_values, node)
             if runtime_signal.kind != ComptimeControlKind.CTL_ERROR or self.had_error != 0:
                 return runtime_signal
