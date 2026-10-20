@@ -82,6 +82,11 @@ type BundleEmitter {
     unlowered_globals: List[str],
     errors: List[str],
     warnings: List[str],
+    // An extern's contract is its symbol's, however many corpus modules
+    // declare it (the runtime's modules each declare rt_libc_exit): one
+    // fingerprint row per name, every duplicate held to the same row. The
+    // interface text still carries each module's own declaration.
+    extern_rows: HashMap[str, str],
     // canonical module path per decl index ("" outside the corpus)
     decl_modules: List[str],
     modules: List[str],
@@ -136,6 +141,7 @@ fn bx_new_emitter(corpus: &str, unlowered_globals: &List[str]) -> BundleEmitter:
         unlowered_globals: sema_clone_str_list(unlowered_globals),
         errors: List.new(),
         warnings: List.new(),
+        extern_rows: HashMap.new(),
         decl_modules: List.new(),
         modules: List.new(),
         module_sources: List.new(),
@@ -946,7 +952,20 @@ impl BundleEmitter:
         if self.failed:
             return
         let variadic_text = if variadic: "1" else: "0"
-        self.push_export(BX_EXTERN, mod_path, name, attrs ++ "pub extern fn " ++ name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n", "extern\t" ++ mod_path ++ "\t" ++ name ++ "\t" ++ variadic_text ++ "\t" ++ cc_row ++ "\tparams:" ++ params_row ++ "\tret:" ++ ret ++ "\n")
+        // The row names no module: which of several same-named declarations
+        // the merge keeps depends on who imports what (a module the standard
+        // library imports sits in the prelude tier, whose externs yield to a
+        // higher tier's), and the contract is the symbol's either way.
+        let row = "extern\t" ++ name ++ "\t" ++ variadic_text ++ "\t" ++ cc_row ++ "\tparams:" ++ params_row ++ "\tret:" ++ ret ++ "\n"
+        let text = attrs ++ "pub extern fn " ++ name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
+        if self.extern_rows.contains(name):
+            if (self.extern_rows.get(name) ?? &"") != row:
+                self.refuse("declares the symbol with another contract than an earlier module of this corpus does: one symbol, one contract (#761)")
+                return
+            self.push_export(BX_EXTERN, mod_path, name, text, "")
+            return
+        self.extern_rows.insert(name ++ "", row ++ "")
+        self.push_export(BX_EXTERN, mod_path, name, text, row)
 
     // The impl blocks of an exported type, printed with their methods nested
     // (impl→method association is span-based in Sema; nesting reproduces it).

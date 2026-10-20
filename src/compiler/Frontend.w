@@ -2506,7 +2506,12 @@ impl Zcu:
             if not taken.contains(name):
                 taken.insert(name, frontend_owned_text(path))
                 continue
-            if taken.get(name).unwrap() != path and not frontend_fn_decl_is_c_export(pool, self.pool, decl):
+            // A runtime ABI symbol's interface declaration (the runtime
+            // bundle's, D30 step 3) beside an `extern fn with_*` of the same
+            // name is the same symbol twice, not a collision: it stays flat,
+            // and the tier verdict drops it where a higher tier declares the
+            // symbol (the compiler's own modules do, until step 4).
+            if taken.get(name).unwrap() != path and not frontend_fn_decl_is_c_export(pool, self.pool, decl) and not codegen_is_runtime_abi_symbol(self.pool.resolve(name)):
                 frontend_displace_fn_decl(pool, self.pool, decl, path)
 
     // #1703 (§18.2, §18.3): a module's top-level values are its own, as its
