@@ -12,10 +12,8 @@ use std.c_algorithms.defs
 use std.c_algorithms.sortedarray
 use std.collections.engine_slot.Slot
 use std.collections.engine_slot.slot_compare
+use rt.rt_core
 
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8)
-extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 
 /// Values kept in ascending `Ord` order (D41: `cmp` backs the `<`/`>` the
 /// comparator applies to views). `get(i)` observes the i-th value;

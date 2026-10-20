@@ -2,17 +2,7 @@
 //
 // Provides TCP and UDP socket operations wrapping POSIX APIs.
 
-extern fn with_net_tcp_listen(port: i32, backlog: i32) -> i32
-extern fn with_net_tcp_accept(listen_fd: i32) -> i32
-extern fn with_net_tcp_connect(host: &str, port: i32) -> i32
-extern fn with_net_tcp_connect_timeout(host: &str, port: i32, timeout_ms: i32) -> i32
-extern fn with_net_set_timeout(fd: i32, timeout_ms: i32) -> i32
-extern fn with_net_send(fd: i32, data: &str) -> i64
-extern fn with_net_recv(fd: i32, max_len: i64) -> str
-extern fn with_net_close(fd: i32) -> i32
-extern fn with_net_udp_bind(port: i32) -> i32
-extern fn with_net_udp_connect(host: &str, port: i32) -> i32
-extern fn with_net_sock_port(fd: i32) -> i32
+use rt.platform
 
 /// Create a TCP listener on the given port (0 picks an ephemeral port;
 /// discover it with sock_port). Returns fd >= 0 on success, -errno on failure.

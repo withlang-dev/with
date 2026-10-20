@@ -58,17 +58,21 @@ pub fn run_rt_bundle_root_action(ctx: ActionCtx) -> i32:
         return rb_fail(ctx, "could not write " ++ ctx.output())
     0
 
-// args: compiler=<path> dir=<dir> root=<path>, and the stage compiles'
-// `--link-bundle <prefix>` pairs: the unit then holds what a compiler that
-// embeds the bundles holds. stage1's slots are empty, so without them the
-// prelude's std.regex compiles pcre2 into the unit; its literals are pruned
-// but the literal counter is not, and stage1's object differs from stage2's
-// in nothing but `l_str.N` numbering.
+// args: compiler=<path> dir=<dir> root=<path> [target=<triple>]. The unit is
+// the runtime alone (--no-prelude): the runtime does not use the prelude,
+// and with it the prelude's std.regex pulled pcre2 in — from source on a
+// stage1 whose .wo slots are empty, from the bundle on stage2, and the two
+// objects differed in nothing but `l_str.N` numbering. Without it the
+// bundle depends on nothing but the compiler, which the stage's own runtime
+// objects and corpus bundles need: their std imports read its interface.
 pub fn run_rt_bundle_build_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     let compiler = wo_arg_value(args, "compiler=")
     let dir = wo_arg_value(args, "dir=")
     let root_path = wo_arg_value(args, "root=")
+    // A cross target's bundle: compiled and checked for that triple, as
+    // its runtime objects are (cross_object_target_with).
+    let triple = wo_arg_value(args, "target=")
     if compiler.len() == 0 or dir.len() == 0 or root_path.len() == 0:
         return rb_fail(ctx, "requires compiler=, dir= and root= arguments")
     let fs = ctx.fs()
@@ -76,11 +80,6 @@ pub fn run_rt_bundle_build_action(ctx: ActionCtx) -> i32:
     let capture_dir = "out/command/" ++ ctx.target_name()
     if fs.mkdir_all(dir) != 0 or fs.mkdir_all(capture_dir) != 0:
         return rb_fail(ctx, "could not create " ++ dir)
-    var link_bundles: List[str] = List.new()
-    for i in 0..args.len():
-        if args[i] == "--link-bundle" and i + 1 < args.len():
-            link_bundles.push("--link-bundle")
-            link_bundles.push(args[i + 1])
     let obj = dir ++ "/rt.o"
     let wi = dir ++ "/rt.wi"
     let manifest = dir ++ "/rt.manifest"
@@ -91,7 +90,8 @@ pub fn run_rt_bundle_build_action(ctx: ActionCtx) -> i32:
     build_args.push("build")
     build_args.push(rb_abs(root, root_path))
     build_args.push("--emit-obj")
-    for lb in link_bundles: build_args.push(lb)
+    build_args.push("--no-prelude")
+    if triple.len() > 0: build_args.push("--target=" ++ triple)
     build_args.push("--bundle-corpus")
     build_args.push("rt")
     build_args.push("--emit-bundle-interface")
@@ -114,7 +114,8 @@ pub fn run_rt_bundle_build_action(ctx: ActionCtx) -> i32:
     check_args.push(rb_abs(root, compiler))
     check_args.push("check")
     check_args.push(rb_abs(root, wi))
-    for lb in link_bundles: check_args.push(lb)
+    check_args.push("--no-prelude")
+    if triple.len() > 0: check_args.push("--target=" ++ triple)
     check_args.push("--bundle-corpus")
     check_args.push("rt")
     check_args.push("--bundle-fingerprint")

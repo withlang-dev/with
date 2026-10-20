@@ -6,13 +6,10 @@
 
 use std.collections
 use std.result
+use rt.fiber_core
+use rt.fiber_runtime
+use rt.rt_core
 
-extern fn with_fiber_in_fiber() -> i32
-extern fn with_fiber_is_cancelled() -> i32
-extern fn with_fiber_yield() -> Unit
-extern fn with_runtime_fiber_completion_sequence(fiber_id: i32) -> i64
-extern fn with_runtime_has_fibers() -> i32
-extern fn with_runtime_run_one_step() -> Unit
 
 /// Opaque handle to a running fiber. Returned by async fn calls.
 /// The result_buf points to a heap-allocated buffer where the fiber
@@ -240,13 +237,6 @@ pub fn with_concurrency[T](tasks: impl IntoIter[Task[T]], n: i32) -> impl IntoIt
 // generator value to gen_pull and rejects a generator that yields views of
 // its own locals or may suspend.
 
-extern fn with_alloc_aligned(size: i64, align: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8)
-extern fn with_fiber_coro_new(entry: *const u8, arg: *mut u8) -> i64
-extern fn with_fiber_coro_resume(co: i64)
-extern fn with_fiber_coro_suspend(co: i64)
-extern fn with_fiber_coro_finish(co: i64)
-extern fn with_fiber_coro_free(co: i64)
 
 // A pulled generator's state, on the heap so the coroutine's pointer to it
 // stays valid while the Pulled that owns it moves. The header is what the

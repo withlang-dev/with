@@ -4,29 +4,13 @@
 // No c_import — uses with_* runtime functions.
 
 use std.collections
+use rt.rt_core
+use rt.compat_runtime
 
-extern fn with_str_clone_ref(s: &str) -> str
 extern fn rt_exit(code: i32) -> Never
-extern fn with_getpid() -> i32
-extern fn with_exec_argv(args: &str) -> i32
-extern fn with_arg_count() -> i32
-extern fn with_arg_at(idx: isize) -> str
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_setenv_str(name: &str, value: &str) -> i32
-extern fn with_vec_new_out(v: *mut u8, elem_size: i64) -> Unit
 // The vec RETAINS the pushed header — ownership transfers, unlike every
 // read-only str extern (§16.3d declared effect; the bit-copy default would
 // leave two owners).
-@[effect(val: escape_value)]
-extern fn with_vec_push_str(v: *mut u8, val: str) -> Unit
-extern fn with_str_len(s: &str) -> i64
-extern fn with_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32
-extern fn with_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32
-extern fn with_exec_try_wait(pid: i32) -> i32
-extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
-extern fn with_exec_child_maxrss() -> i64
-extern fn with_clock_nanos() -> i64
-extern fn with_nanosleep(ns: i64) -> i32
 
 /// Exit the process with the given status code.
 pub fn exit_code(code: i32) -> Never:

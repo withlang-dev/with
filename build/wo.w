@@ -20,6 +20,17 @@ module build.wo
 // the comptime evaluator, which serves ToolFs.sha256_file natively and
 // nothing else, so the slot path uses just that and the plan never hashes.)
 //
+// A slot is durable (D138, Eric 2026-10-20): it is never rebuilt because
+// the compiler changed. It is rebuilt when what the object is made of
+// changed — the corpus, or a non-corpus module the object carries a copy
+// of (the manifest's `carried` lines, hashed into `carried-sha`) — or when
+// what it links against changed: the ABI identity, or the contract of a
+// runtime symbol it imports (its `import` rows against the runtime
+// bundle's `provides` rows, the compiler's own check at every link,
+// src/compiler/Link.w link_stage_bundle_import_drift). The compiler that
+// built the slot is provenance in the manifest (`generation`), never a
+// key: fifty thousand bundles cannot recompile on every commit.
+//
 // Per bundle and target: `<name>-wo-build` writes out/wo/<name>.{o,wi,
 // manifest} — copied from the slot when it holds this corpus (nothing
 // compiles), else compiled by the stage whose ABI stamp equals abi_sha
@@ -222,7 +233,12 @@ pub fn wo_group_target_name(plan: &WoBundle) -> str:
 // (with the target label for a cross plan). `compiler` builds the bundle
 // when the slot lacks this corpus: the stage whose ABI stamp is abi_sha
 // (compiler_dep produces it) — the release compiler for a cross target.
-pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: &str, compiler_dep: &str) -> Build:
+// `rt_manifest` is the manifest of the runtime bundle built for the plan's
+// target by the same compiler (`<dir>/rt.manifest`, written by
+// run_rt_bundle_build_action): its `provides` rows are the contracts a
+// stored slot's `import` rows are checked against before the slot is
+// reused (D138), and the bundle build reads them through the compiler.
+pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: &str, compiler_dep: &str, rt_manifest: &str) -> Build:
     var graph = out
     let fs_prefix = wo_prefix(plan)
     let store_prefix = plan.install_slot ++ "/" ++ plan.name
@@ -241,7 +257,9 @@ pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: 
     build_target = build_target.arg("abi-sha=" ++ plan.abi_sha)
     build_target = build_target.arg("slot=" ++ plan.slot)
     build_target = build_target.arg("prefix=" ++ fs_prefix)
+    build_target = build_target.arg("rt-manifest=" ++ rt_manifest)
     build_target = build_target.input(wo_owned_text(compiler))
+    build_target = build_target.input(wo_owned_text(rt_manifest))
     build_target = build_target.input("docs/with-abi.sha256")
     build_target = target_with_wo_corpus_inputs(move build_target, ctx, plan)
     build_target = build_target.write_scope(wo_owned_text(plan.tree_dir))
@@ -416,7 +434,7 @@ pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
     if identical:
         print("[" ++ ctx.target_name() ++ "] " ++ scratch ++ ".o is byte-identical to " ++ stored ++ ".o; " ++ harness_bin ++ " links the bundle and runs")
     else:
-        print("[" ++ ctx.target_name() ++ "] " ++ stored ++ ".o was built by an earlier compiler generation: " ++ scratch ++ ".o differs (same interface, fingerprint, ABI and target) and both pass the harness; remove the store slot to converge on the current bytes")
+        print("[" ++ ctx.target_name() ++ "] " ++ stored ++ ".o was built by another compiler generation: " ++ scratch ++ ".o differs (same interface, fingerprint, ABI, target and contracts) and both pass the harness; the slot stays (D138: a bundle is never rebuilt because the compiler changed)")
     0
 
 // Builds `harness` against the bundle — the embedded one, or `<bundle>` via
@@ -446,8 +464,100 @@ fn wo_drift_run_harness(ctx: &ActionCtx, compiler: &str, harness: &str, harness_
         return wo_fail(ctx, f"harness linked against the {label} bundle failed with exit code {ran.rc}; captures under {capture_dir}" ++ wo_captured_output(&ran))
     0
 
+// The rows of one tab-keyed manifest line kind (`import\t…`, `provides\t…`),
+// each without the key: the compiler's format (src/compiler/EmbeddedBundles.w
+// bundle_manifest_rows), read here as data.
+fn wo_manifest_rows(manifest: &str, key: &str) -> List[str]:
+    let out: List[str] = List.new()
+    let want = key ++ "\t"
+    var start: i64 = 0
+    while start < manifest.len():
+        var end = start
+        while end < manifest.len() and manifest[end] != '\n':
+            end = end + 1
+        let line = manifest.slice(start, end)
+        if line.starts_with(want):
+            out.push(wo_owned_text(line.slice(want.len(), line.len())))
+        start = end + 1
+    out
+
+fn wo_row_field(row: &str, index: i32) -> str:
+    var field = 0
+    var start: i64 = 0
+    while start <= row.len():
+        var end = start
+        while end < row.len() and row[end] != '\t':
+            end = end + 1
+        if field == index:
+            return wo_owned_text(row.slice(start, end))
+        field = field + 1
+        start = end + 1
+    ""
+
+// Every `carried <canonical path>` line of a manifest as the tree file it
+// names (<embedded-std>/std/x.w is lib/std/x.w; <embedded-rt>/rt/x.w is
+// rt/x.w), sorted bytewise by the manifest's order.
+fn wo_carried_tree_paths(manifest: &str) -> List[str]:
+    let out: List[str] = List.new()
+    var start: i64 = 0
+    while start < manifest.len():
+        var end = start
+        while end < manifest.len() and manifest[end] != '\n':
+            end = end + 1
+        let line = manifest.slice(start, end)
+        start = end + 1
+        if not line.starts_with("carried "):
+            continue
+        let canonical = line.slice(8, line.len())
+        if canonical.starts_with("<embedded-std>/"):
+            out.push("lib/" ++ canonical.slice(15, canonical.len()))
+        else if canonical.starts_with("<embedded-rt>/"):
+            out.push(wo_owned_text(canonical.slice(14, canonical.len())))
+        else:
+            out.push(wo_owned_text(canonical))
+    out
+
+// sha256 over "<path>:<sha256(file)>\n" for the carried modules, the
+// corpus hash's shape; "" when nothing is carried.
+fn wo_carried_sha(fs: &ToolFs, manifest: &str) -> str:
+    let paths = wo_carried_tree_paths(manifest)
+    if paths.len() == 0:
+        return ""
+    var listing = ""
+    for pi in 0..paths.len():
+        listing = listing ++ paths[pi] ++ ":" ++ fs.sha256_file(paths[pi]) ++ "\n"
+    compiler_sha256_text(fs, listing)
+
+// "" when the runtime manifest provides every runtime symbol `manifest`'s
+// bundle imports under the contract it was built against, else why not —
+// the rule the compiler applies at every link (Link.w
+// link_stage_bundle_import_drift), applied here before a slot is reused so
+// the compiler never embeds a bundle it would refuse.
+fn wo_import_drift(manifest: &str, rt_manifest: &str) -> str:
+    let imports = wo_manifest_rows(manifest, "import")
+    if imports.len() == 0:
+        return "the manifest records no import contracts (built before D138)"
+    let provides = wo_manifest_rows(rt_manifest, "provides")
+    if provides.len() == 0:
+        return "the runtime manifest records no contracts"
+    for ii in 0..imports.len():
+        let row = imports[ii]
+        if wo_row_field(row, 1) != "rt":
+            continue
+        let symbol = wo_row_field(row, 0)
+        let wanted = wo_row_field(row, 2)
+        var provided = ""
+        for pi in 0..provides.len():
+            if wo_row_field(provides[pi], 0) == symbol:
+                provided = wo_row_field(provides[pi], 1)
+        if provided.len() == 0:
+            return "the runtime no longer provides `" ++ symbol ++ "`, which the bundle imports"
+        if provided != wanted:
+            return "the bundle calls `" ++ symbol ++ wanted ++ "` but the runtime now declares `" ++ symbol ++ provided ++ "`"
+    ""
+
 // "" when the slot holds a coherent bundle of this corpus, else why not.
-fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &str, abi_sha: &str, compiler_src_sha: &str) -> str:
+fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &str, abi_sha: &str, rt_manifest: &str) -> str:
     let exts: List[str] = List.new()
     exts.push("o")
     exts.push("wi")
@@ -461,14 +571,14 @@ fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &st
         return store_prefix ++ ".manifest was built from corpus " ++ wo_manifest_field(manifest, "corpus-sha") ++ ", the tree's is " ++ corpus_sha
     if wo_manifest_field(manifest, "target") != target or wo_manifest_field(manifest, "abi-sha") != abi_sha:
         return store_prefix ++ ".manifest names target " ++ wo_manifest_field(manifest, "target") ++ " and ABI " ++ wo_manifest_field(manifest, "abi-sha") ++ ", not this slot's"
-    // The object is what this compiler generation's codegen makes of the
-    // corpus, not only what the ABI fixes (D30: a compiler-generated
-    // object is a (compiler, target)-keyed cache): a slot built by other
-    // compiler sources is stale even when corpus, target and ABI agree —
-    // battery #2 of the zlib bundle linked a stored object that predated
-    // the carried-copy rule and failed on symbols the new codegen defines.
-    if wo_manifest_field(manifest, "compiler-src-sha") != compiler_src_sha:
-        return store_prefix ++ ".manifest was built by compiler sources " ++ wo_manifest_field(manifest, "compiler-src-sha") ++ ", the tree's are " ++ compiler_src_sha
+    // D138: what the object is made of beyond the corpus, and what it
+    // links against — never which compiler made it.
+    let carried = wo_carried_sha(fs, manifest)
+    if wo_manifest_field(manifest, "carried-sha") != carried:
+        return store_prefix ++ ".manifest carried modules hashing to " ++ wo_manifest_field(manifest, "carried-sha") ++ ", the tree's hash to " ++ carried
+    let drift = wo_import_drift(manifest, rt_manifest)
+    if drift.len() > 0:
+        return store_prefix ++ ".manifest: " ++ drift
     let wi_sha = compiler_sha256_text(fs, fs.host_read_text(store_prefix ++ ".wi"))
     if wo_manifest_field(manifest, "interface-sha") != wi_sha:
         return store_prefix ++ ".wi (sha256 " ++ wi_sha ++ ") is not the interface the stored manifest was built with"
@@ -496,8 +606,9 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     let slot = wo_arg_value(args, "slot=")
     let prefix = wo_arg_value(args, "prefix=")
     let compiler = wo_arg_value(args, "compiler=")
-    if name.len() == 0 or corpus.len() == 0 or corpus_dir.len() == 0 or root_path.len() == 0 or target.len() == 0 or abi_sha.len() != 64 or slot.len() == 0 or prefix.len() == 0 or compiler.len() == 0:
-        return wo_fail(ctx, "requires name=, corpus=, corpus-dir=, root=, target=, triple=, abi-sha=, slot=, prefix= and compiler= arguments")
+    let rt_manifest_path = wo_arg_value(args, "rt-manifest=")
+    if name.len() == 0 or corpus.len() == 0 or corpus_dir.len() == 0 or root_path.len() == 0 or target.len() == 0 or abi_sha.len() != 64 or slot.len() == 0 or prefix.len() == 0 or compiler.len() == 0 or rt_manifest_path.len() == 0:
+        return wo_fail(ctx, "requires name=, corpus=, corpus-dir=, root=, target=, triple=, abi-sha=, slot=, prefix=, rt-manifest= and compiler= arguments")
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let tree_dir = wo_dirname(prefix)
@@ -516,14 +627,13 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     if fs.exists(same_named_module):
         return wo_fail(ctx, "corpus " ++ corpus ++ " shares its package name with the module " ++ same_named_module ++ "; the frontend would load that module into the bundle. Name the corpus package apart from its facade (pcre2's facade std.regex sits over the std.re corpus).")
     let corpus_sha = compiler_tree_sha(fs, corpus_dir)
-    // The compiler generation that makes the object: the tree's compiler
-    // sources (the same for every stage of one build; a stage binary's
-    // bytes are not, the seed builds stage1).
-    let compiler_src_sha = compiler_tree_sha(fs, "src")
-    let key = compiler_sha256_text(fs, corpus_sha ++ "|" ++ target ++ "|" ++ abi_sha ++ "|" ++ compiler_src_sha)
+    let key = compiler_sha256_text(fs, corpus_sha ++ "|" ++ target ++ "|" ++ abi_sha)
+    let rt_manifest = fs.read_text(rt_manifest_path)
+    if rt_manifest.len() == 0:
+        return wo_fail(ctx, "no runtime bundle manifest at " ++ rt_manifest_path ++ "; the runtime bundle for " ++ target ++ " precedes every corpus bundle (D138)")
 
     // Present: the slot holds this corpus, coherently — copy it in.
-    let missing = wo_slot_status(fs, store_prefix, corpus_sha, target, abi_sha, compiler_src_sha)
+    let missing = wo_slot_status(fs, store_prefix, corpus_sha, target, abi_sha, rt_manifest)
     if missing.len() == 0:
         let exts: List[str] = List.new()
         exts.push("o")
@@ -533,7 +643,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
             let ext = exts[ei]
             if fs.write_text(prefix ++ "." ++ ext, fs.host_read_text(store_prefix ++ "." ++ ext)) != 0:
                 return wo_fail(ctx, "could not copy " ++ store_prefix ++ "." ++ ext ++ " into " ++ tree_dir)
-        print("[" ++ ctx.target_name() ++ "] " ++ store_prefix ++ ".{o,wi,manifest} holds key " ++ key ++ " (corpus, target, ABI and compiler sources unchanged): compiled nothing")
+        print("[" ++ ctx.target_name() ++ "] " ++ store_prefix ++ ".{o,wi,manifest} holds key " ++ key ++ " (corpus, carried modules, target, ABI and imported contracts unchanged): compiled nothing")
         return 0
     print("[" ++ ctx.target_name() ++ "] " ++ missing ++ "; building " ++ name ++ " for " ++ target ++ " key " ++ key ++ " with " ++ compiler)
 
@@ -622,10 +732,16 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
         return wo_fail(ctx, "the manifest's interface-sha is not the sha256 of " ++ tmp_wi)
     if wo_manifest_field(manifest, "fingerprint") != source_fp:
         return wo_fail(ctx, "the manifest's fingerprint is not the source fingerprint")
+    // D138: the bundle's imports are checked against the runtime it was
+    // built beside, by the compiler's own rule; a bundle the compiler would
+    // refuse at a consumer's link is refused here.
+    let drift = wo_import_drift(manifest, rt_manifest)
+    if drift.len() > 0:
+        return wo_fail(ctx, "the fresh bundle does not link against " ++ rt_manifest_path ++ ": " ++ drift)
     manifest = manifest ++ "name " ++ name ++ "\n"
     manifest = manifest ++ "key " ++ key ++ "\n"
     manifest = manifest ++ "corpus-sha " ++ corpus_sha ++ "\n"
-    manifest = manifest ++ "compiler-src-sha " ++ compiler_src_sha ++ "\n"
+    manifest = manifest ++ "carried-sha " ++ wo_carried_sha(fs, manifest) ++ "\n"
     manifest = manifest ++ "object-sha " ++ compiler_sha256_text(fs, fs.read_text(tmp_o)) ++ "\n"
 
     // Into the tree copy: object, interface, then the manifest.

@@ -6,6 +6,7 @@
 // resolve through normal imports instead of hardcoded sema allowlists.
 
 use std.option
+use rt.rt_core
 
 /// A growable array. Create with `List.new()`, add with `.push()`,
 /// read with `.get()`. Supports iteration via `.iter()`.
@@ -18,7 +19,6 @@ pub type List[T]  {
     start: i64,
 }
 
-extern fn with_vec_shrink_to_fit_es(v: *mut u8, es: i64)
 
 impl[T] List[T]:
     /// §9.7: a small remainder keeps the whole original buffer alive;

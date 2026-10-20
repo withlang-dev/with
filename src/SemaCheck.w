@@ -2,6 +2,7 @@
 
 use Sema
 use Ast
+use Resolve
 use BorrowCfg
 
 extern fn with_getenv_str(name: &str) -> str
@@ -181,14 +182,10 @@ fn sema_path_is_std_module(path: &str, name: &str) -> bool:
     let file = name ++ ".w"
     path == "lib/std/" ++ file or path == "<embedded-std>/std/" ++ file or path.ends_with("/lib/std/" ++ file) or path.ends_with("\\lib\\std\\" ++ file)
 
+// The resolver owns the judgment (Resolve.resolve_path_is_runtime): the same
+// paths it lets import the runtime are the ones Sema treats as its own.
 fn sema_path_is_runtime_implementation(path: &str) -> i32:
-    if path.starts_with("rt/") or path.starts_with("rt\\") or
-        path.starts_with("out/gen/") or path.starts_with("out\\gen\\"):
-        return 1
-    if path.contains("/rt/") or path.contains("\\rt\\") or
-        path.contains("/out/gen/") or path.contains("\\out\\gen\\"):
-        return 1
-    0
+    if resolve_path_is_runtime(path): 1 else: 0
 
 fn sema_path_is_migrated_regex_implementation(path: &str) -> i32:
     if path.starts_with("lib/std/re/") or path.starts_with("<embedded-std>/std/re/"):

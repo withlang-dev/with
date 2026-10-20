@@ -2,7 +2,7 @@
 //
 // No c_import — uses with_* runtime functions.
 
-extern fn with_raise(sig: i32) -> i32
+use rt.rt_core
 
 /// SIGINT signal number (interrupt, Ctrl+C).
 pub fn sigint -> i32:

@@ -4,15 +4,7 @@
 // No c_import — all operations go through with_* runtime functions
 // backed by the freelist allocator in rt_core.
 
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8
-extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_free_sized(ptr: *mut u8, size: i64) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
-extern fn with_memmove(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
-extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> *mut u8
-extern fn with_memcmp(a: *const u8, b: *const u8, n: i64) -> i32
+use rt.rt_core
 
 /// Allocate `size` bytes on the heap. Returns pointer (0 on failure).
 pub fn alloc(size: i32) -> *i8:

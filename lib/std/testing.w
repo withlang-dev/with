@@ -1,6 +1,6 @@
 // std.testing — stable testing helpers.
 
-extern fn with_panic(msg: str, file: str, line: i32) -> Never
+use rt.panic_runtime
 
 // `assert`, `require` and `check` are compiler-known forms, not functions
 // (§18.2, D86): a call evaluates `cond`, and only when it is false

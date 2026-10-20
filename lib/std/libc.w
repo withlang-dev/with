@@ -12,8 +12,8 @@
 
 use std.builtins.eprint
 use std.os.Target
+use rt.rt_core
 
-extern fn with_str_from_cstr(s: *const u8) -> str
 
 pub type rlimit {
     pub rlim_cur: u64,
@@ -23,9 +23,6 @@ pub type rlimit {
 // The stdio streams. C reaches them through a per-libc macro (Darwin
 // `__stderrp`, glibc `stderr`, UCRT `__acrt_iob_func(2)`); migrated code
 // calls these instead, on every target.
-extern fn with_libc_stdin() -> *mut c_void
-extern fn with_libc_stdout() -> *mut c_void
-extern fn with_libc_stderr() -> *mut c_void
 
 pub fn libc_stdin() -> *mut c_void: with_libc_stdin()
 pub fn libc_stdout() -> *mut c_void: with_libc_stdout()
@@ -37,7 +34,6 @@ pub fn libc_stderr() -> *mut c_void: with_libc_stderr()
 // reap), so it means the same on every target — unlike C's clock(), which
 // leaves children out and on the UCRT counts wall time. A timing that must
 // not count the rest of a loaded machine reads this, not a wall clock.
-extern fn with_libc_cpu_time_ns() -> i64
 pub fn cpu_time_ns() -> i64: with_libc_cpu_time_ns()
 // The UCRT's stream table by index (`__acrt_iob_func`), for code migrated on Windows.
 pub fn libc_iob(index: i32) -> *mut c_void:
@@ -70,13 +66,10 @@ pub extern fn ferror(stream: *mut c_void) -> i32
 pub extern fn fread(ptr: *mut c_void, size: u64, count: u64, stream: *mut c_void) -> u64
 pub extern fn fwrite(ptr: *const c_void, size: u64, count: u64, stream: *mut c_void) -> u64
 // POSIX fileno (UCRT `_fileno`): a seam.
-extern fn with_libc_fileno(stream: *mut c_void) -> i32
 pub fn fileno(stream: *mut c_void) -> i32: with_libc_fileno(stream)
 // Stream positions are 64-bit on every target: C's `long` is 32 bits on
 // Windows, so fseek/ftell and the host's wide spellings (fseeko, ftello,
 // _fseeki64, _ftelli64) are one seam.
-extern fn with_libc_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32
-extern fn with_libc_ftell(stream: *mut c_void) -> i64
 pub fn fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32: with_libc_fseek(stream, offset, whence)
 pub fn ftell(stream: *mut c_void) -> i64: with_libc_ftell(stream)
 
@@ -94,7 +87,6 @@ pub extern fn setlocale(category: i32, locale: *const i8) -> *mut i8
 
 // errno: C's lvalue macro reaches a per-libc accessor (Darwin `__error()`,
 // glibc `__errno_location()`, UCRT `_errno()`); migrated code derefs this.
-extern fn with_libc_errno() -> *mut i32
 pub fn errno_ptr() -> *mut i32: with_libc_errno()
 
 // process / time
@@ -123,15 +115,6 @@ pub extern fn time(tloc: *mut i64) -> i64
 
 // POSIX file descriptors, temp files and paths: seams (UCRT spells them
 // `_isatty`, `_open`, ...; Windows has no mkstemp or realpath).
-extern fn with_libc_isatty(fd: i32) -> i32
-extern fn with_libc_mkstemp(template_path: *mut i8) -> i32
-extern fn with_libc_realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8
-extern fn with_libc_open(path: *const i8, flags: i32, mode: i32) -> i32
-extern fn with_libc_read(fd: i32, buf: *mut u8, count: u64) -> i64
-extern fn with_libc_write(fd: i32, buf: *const u8, count: u64) -> i64
-extern fn with_libc_close(fd: i32) -> i32
-extern fn with_libc_lseek(fd: i32, offset: i64, whence: i32) -> i64
-extern fn with_libc_unlink(path: *const i8) -> i32
 pub fn isatty(fd: i32) -> i32: with_libc_isatty(fd)
 pub fn mkstemp(template_path: *mut i8) -> i32: with_libc_mkstemp(template_path)
 pub fn realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8: with_libc_realpath(path, resolved_path)
@@ -160,7 +143,6 @@ pub type kern_return_t = i32
 pub type mach_timebase_info { pub numer: u32 = 0, pub denom: u32 = 0 }
 impl Copy for mach_timebase_info
 pub type mach_timebase_info_data_t = mach_timebase_info
-extern fn with_libc_mach_absolute_time() -> u64
 pub fn mach_absolute_time() -> u64: with_libc_mach_absolute_time()
 pub unsafe fn mach_timebase_info(info: *mut mach_timebase_info) -> kern_return_t:
     (*info).numer = 1 as u32
@@ -172,13 +154,10 @@ pub unsafe fn mach_timebase_info(info: *mut mach_timebase_info) -> kern_return_t
 // O_NONBLOCK/O_CLOEXEC resolved — calls it from the bundle on every
 // target). POSIX forwards to libc; Windows returns -1, unsupported, which
 // is what zlib's own Windows build would have compiled around.
-extern fn with_libc_fcntl(fd: i32, cmd: i32, arg: i32) -> i32
 pub fn fcntl(fd: i32, cmd: i32, arg: i32 = 0) -> i32:
     with_libc_fcntl(fd, cmd, arg)
 // rlimit: POSIX forwards to libc (the two-u64 layout is Darwin's and
 // glibc's); Windows reads RLIMIT_STACK as unlimited and accepts a set.
-extern fn with_libc_getrlimit(resource: i32, lim: *mut u8) -> i32
-extern fn with_libc_setrlimit(resource: i32, lim: *const u8) -> i32
 pub fn getrlimit(resource: i32, rlp: *mut rlimit) -> i32: with_libc_getrlimit(resource, rlp as *mut u8)
 pub fn setrlimit(resource: i32, rlp: *const rlimit) -> i32: with_libc_setrlimit(resource, rlp as *const u8)
 

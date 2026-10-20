@@ -4,22 +4,8 @@
 // No c_import — all operations go through with_fs_* runtime functions
 // which are backed by rt_* platform calls.
 
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-extern fn with_fs_read_file_status(path: &str, status: *mut i32) -> str
-extern fn with_str_from_cstr(s: *const u8) -> str
+use rt.rt_core
 extern fn strerror(errnum: i32) -> *mut i8
-extern fn with_fs_file_exists(path: &str) -> i32
-extern fn with_fs_remove_file(path: &str) -> i32
-extern fn with_fs_rename_file(old_path: &str, new_path: &str) -> i32
-extern fn with_fs_create_dir(path: &str) -> i32
-extern fn with_fs_remove_dir(path: &str) -> i32
-extern fn with_fs_remove_tree(path: &str) -> i32
-extern fn with_fs_copy_tree(src: &str, dst: &str) -> i32
-extern fn with_fs_symlink(target: &str, link_path: &str) -> i32
-extern fn with_fs_list_files(path: &str) -> str
-extern fn with_fs_list_dir(path: &str) -> str
-extern fn with_fs_mkdir_p(path: &str) -> i32
-extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 
 /// Check if a file exists at the given path.
 pub fn file_exists(path: &str) -> bool:

@@ -106,6 +106,8 @@ type Zcu {
     // D39: a .wi root compile — the interface emitter and the fingerprint
     // read Sema's full tables, so every interface declaration is collected.
     interface_eager: bool,
+    // D30 step 3: runtime modules refused as source this compile, once each.
+    refused_runtime_sources: List[str],
     // The symbols the source names — the on-demand interface merge's S —
     // and the interface sections whose declarations wait for it.
     iface_mentioned: HashMap[i32, i32],
@@ -115,6 +117,9 @@ type Zcu {
     // The owned globals the last bundle build could not fold to data
     // (Codegen.bundle_unlowered_globals), for the interface emitter.
     last_bundle_unlowered_globals: List[str],
+    // D138: the non-corpus modules the last bundle object carries copies
+    // of (Codegen.bundle_carried_paths), for the manifest's `carried` lines.
+    last_bundle_carried_paths: List[str],
     project_config: ProjectConfig,
     trace_c_import_cache: i32,
     // Analysis commands preserve diagnostics but may continue past preliminary
@@ -185,11 +190,13 @@ fn Zcu.init -> Zcu:
         link_bundle_prefixes: zcu_new_list_str(),
         bundle_corpus: "",
         interface_eager: false,
+        refused_runtime_sources: zcu_new_list_str(),
         iface_mentioned: HashMap.new(),
         pending_iface_paths: zcu_new_list_str(),
         pending_iface_texts: zcu_new_list_str(),
         import_path_memo: HashMap.new(),
         last_bundle_unlowered_globals: zcu_new_list_str(),
+        last_bundle_carried_paths: zcu_new_list_str(),
         project_config: project_config_default(),
         trace_c_import_cache: 0,
         analysis_partial_semantics: 0,

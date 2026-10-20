@@ -3,8 +3,7 @@
 // No c_import — uses a xorshift64 PRNG seeded from the runtime's
 // cryptographic random source (arc4random_buf on macOS).
 
-extern fn with_fill_random(buf: *mut u8, len: i64) -> Unit
-extern fn with_clock_nanos() -> i64
+use rt.rt_core
 
 var rng_state: i64 = 0
 

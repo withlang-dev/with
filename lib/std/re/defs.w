@@ -1,6 +1,7 @@
 // std.re.defs — shared definitions for migrated PCRE2
 use std.option
 use std.collections
+use rt.rt_core
 
 pub fn is_alpha(__with_c: i32) -> bool {
     (__with_c >= 65 and __with_c <= 90) or (__with_c >= 97 and __with_c <= 122)
@@ -252,26 +253,6 @@ pub unsafe fn __with_builtin_mul_overflow_u128(__with_a: u128, __with_b: u128, _
     unsafe { (*__with_out = __with_a *% __with_b) }
     u128_mul_would_overflow(__with_a, __with_b)
 }
-pub extern fn with_clz(x: i32) -> i32
-pub extern fn with_ctz(x: i32) -> i32
-pub extern fn with_popcount(x: i32) -> i32
-pub extern fn with_bswap16(x: u16) -> u16
-pub extern fn with_bswap32(x: u32) -> u32
-pub extern fn with_bswap64(x: u64) -> u64
-pub extern fn with_clzl(x: i64) -> i32
-pub extern fn with_clzll(x: i64) -> i32
-pub extern fn with_ctzl(x: i64) -> i32
-pub extern fn with_ctzll(x: i64) -> i32
-pub extern fn with_abs(x: i32) -> i32
-pub extern fn with_alloc(size: i64) -> *mut u8
-pub extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8
-pub extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8
-pub extern fn with_free(ptr: *mut u8)
-pub extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
-pub extern fn with_memmove(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
-pub extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> *mut u8
-pub extern fn with_memcmp(a: *const u8, b: *const u8, n: i64) -> i32
-
 
 pub type BOOL = c_int
 

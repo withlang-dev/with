@@ -11,33 +11,11 @@ use std.libc.fread
 use std.libc.fwrite
 use std.zl.defs
 use std.zl.deflate
+use rt.rt_core
+use rt.compat_runtime
 
-extern fn with_eprint(s: &str) -> Unit
 extern fn exit(code: i32) -> Never
 extern fn ferror(stream: *mut c_void) -> i32
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_setenv_str(name: &str, value: &str) -> i32
-extern fn with_str_clone_ref(value: &str) -> str
-extern fn with_sysinfo_os() -> str
-extern fn with_fs_file_exists(path: &str) -> i32
-extern fn with_fs_is_dir(path: &str) -> i32
-extern fn with_fs_mkdir_p(path: &str) -> i32
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_read_file_status(path: &str, status: *mut i32) -> str
-extern fn with_fs_chmod(path: &str, mode: i32) -> i32
-extern fn with_fs_copy_tree(src: &str, dst: &str) -> i32
-extern fn with_fs_list_files(path: &str) -> str
-extern fn with_fs_remove_file(path: &str) -> i32
-extern fn with_fs_remove_tree(path: &str) -> i32
-extern fn with_fs_rename_file(old_path: &str, new_path: &str) -> i32
-extern fn with_fs_symlink(target: &str, link_path: &str) -> i32
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-extern fn with_exec_argv(args: &str) -> i32
-extern fn with_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
-extern fn with_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32
-extern fn with_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> i32
-extern fn with_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32
-extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
 
 pub enum BuildKind: i32:
     Executable = 0
@@ -3123,7 +3101,6 @@ pub fn __driver_workspace_plan_deserialize(text: &str) -> WorkspaceCompilePlan:
 // `with __workspace-compile` child (D24) via WITH_BUILD_COMPILER.
 // Migrate and intercept surfaces still exit 97 (evaluator fallback).
 
-extern fn with_getpid() -> i32
 
 fn ws_root() -> str:
     let root = with_getenv_str("WITH_BUILD_RUNNER_ROOT")

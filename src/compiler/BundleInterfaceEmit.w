@@ -82,6 +82,11 @@ type BundleEmitter {
     unlowered_globals: List[str],
     errors: List[str],
     warnings: List[str],
+    // An extern's contract is its symbol's, however many corpus modules
+    // declare it (the runtime's modules each declare rt_libc_exit): one
+    // fingerprint row per name, every duplicate held to the same row. The
+    // interface text still carries each module's own declaration.
+    extern_rows: HashMap[str, str],
     // canonical module path per decl index ("" outside the corpus)
     decl_modules: List[str],
     modules: List[str],
@@ -136,6 +141,7 @@ fn bx_new_emitter(corpus: &str, unlowered_globals: &List[str]) -> BundleEmitter:
         unlowered_globals: sema_clone_str_list(unlowered_globals),
         errors: List.new(),
         warnings: List.new(),
+        extern_rows: HashMap.new(),
         decl_modules: List.new(),
         modules: List.new(),
         module_sources: List.new(),
@@ -555,7 +561,12 @@ impl BundleEmitter:
         let mod_path = with_str_clone_ref(self.decl_modules[di])
         let parsed = ast.get_data0(node)
         let fn_sym = sema.fn_decl_semantic_symbol_at(node, parsed, di)
-        let full = with_str_clone_ref(sema.pool_resolve(fn_sym))
+        // A fn the merge displaced (`name$in$<module>`, #1350) is printed by
+        // its own name: the identity is the merge's, the interface is the
+        // module's (two runtime modules each define str_data).
+        let resolved_name = with_str_clone_ref(sema.pool_resolve(fn_sym))
+        let displaced_at = resolved_name.index_of("$in$")
+        let full = if displaced_at >= 0: resolved_name.slice(0, displaced_at as i64) else: resolved_name
         let flags = ast.get_data2(node)
         let is_pub = flags % 2 != 0
         self.context = mod_path ++ ": fn " ++ full
@@ -946,7 +957,20 @@ impl BundleEmitter:
         if self.failed:
             return
         let variadic_text = if variadic: "1" else: "0"
-        self.push_export(BX_EXTERN, mod_path, name, attrs ++ "pub extern fn " ++ name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n", "extern\t" ++ mod_path ++ "\t" ++ name ++ "\t" ++ variadic_text ++ "\t" ++ cc_row ++ "\tparams:" ++ params_row ++ "\tret:" ++ ret ++ "\n")
+        // The row names no module: which of several same-named declarations
+        // the merge keeps depends on who imports what (a module the standard
+        // library imports sits in the prelude tier, whose externs yield to a
+        // higher tier's), and the contract is the symbol's either way.
+        let row = "extern\t" ++ name ++ "\t" ++ variadic_text ++ "\t" ++ cc_row ++ "\tparams:" ++ params_row ++ "\tret:" ++ ret ++ "\n"
+        let text = attrs ++ "pub extern fn " ++ name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
+        if self.extern_rows.contains(name):
+            if (self.extern_rows.get(name) ?? &"") != row:
+                self.refuse("declares the symbol with another contract than an earlier module of this corpus does: one symbol, one contract (#761)")
+                return
+            self.push_export(BX_EXTERN, mod_path, name, text, "")
+            return
+        self.extern_rows.insert(name ++ "", row ++ "")
+        self.push_export(BX_EXTERN, mod_path, name, text, row)
 
     // The impl blocks of an exported type, printed with their methods nested
     // (impl→method association is span-based in Sema; nesting reproduces it).
@@ -1413,3 +1437,51 @@ fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> BundleI
             // a section must be non-empty to count as bundle-provided
             out.push_str("// no exported declarations\n")
     BundleInterfaceText { text: out.to_str(), errors }
+
+// ── Symbol contracts at the bundle boundary (durable .wo, D138) ─────────
+// The contract of one symbol: every parameter's canonical type spelling and
+// finalized effect, variadicity, and the return type — what a bundle object
+// compiled its calls to the symbol against (its manifest's `import` rows)
+// and what a runtime bundle declares it provides (its `provides` rows). A
+// bundle links against any runtime whose contract for each imported symbol
+// is this text; the link stage compares the two rows bytewise and refuses
+// the bundle otherwise, so the text carries nothing that varies between
+// two Semas of one declaration (no ids, no spans). "" when this unit
+// declares no such symbol.
+fn bundle_symbol_contract(sema: &Sema, name: &str) -> str:
+    let name_sym = sema.pool_lookup_symbol(name)
+    if name_sym == 0:
+        return ""
+    let sig = sema.get_sig(name_sym)
+    if sig < 0:
+        return ""
+    let no_globals: List[str] = List.new()
+    var emitter = bx_new_emitter("", no_globals)
+    // The DECLARED effect of each parameter — its `@[effect]` pin, else the
+    // effect its type declares (emit_fn's rule) — never the body-inferred
+    // one: a definition's body reads its parameter and its extern twin
+    // declares nothing, and the two must spell one contract.
+    let ast = sema.ast
+    let node = if sema.fn_decl_nodes.contains(name_sym): sema.fn_decl_nodes.get(name_sym).unwrap() else: -1
+    let meta = if node >= 0: ast.find_fn_meta(node) else: -1
+    let param_start = if meta >= 0: ast.fn_meta_param_start(meta) else: 0
+    let receiver_mode = sema.sig_receiver_mode(sig)
+    var out = "("
+    let count = sema.sig_get_param_count(sig)
+    for pi in 0..count:
+        let ptid = sema.sig_param_type(sig, pi)
+        let spelling = emitter.spell(sema, ptid)
+        if emitter.failed:
+            return ""
+        if pi > 0:
+            out = out ++ ", "
+        var eff = if meta >= 0: bx_effect_pin_bits_of(ast, node, ast.fn_param_name(param_start, pi)) else: -1
+        if eff < 0:
+            eff = sema.declared_param_effect(pi, ptid, receiver_mode, sema.is_copy_frozen(ptid))
+        out = out ++ spelling ++ f":{eff}"
+    if sema.sig_is_variadic(sig) != 0:
+        out = out ++ (if count > 0: ", ..." else: "...")
+    let ret = emitter.spell(sema, sema.sig_return_type(sig))
+    if emitter.failed:
+        return ""
+    out ++ ") -> " ++ ret

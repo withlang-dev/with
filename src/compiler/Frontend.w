@@ -17,6 +17,7 @@ use CImport
 use render
 use compiler.EmbeddedStdlib
 use compiler.EmbeddedRuntime
+use compiler.BundleInterfaces
 use compiler.EmbeddedClangResource
 use compiler.ModuleSource
 use compiler.FacadeRender
@@ -233,17 +234,6 @@ impl Zcu:
 
 fn frontend_rt_in_unit_enabled() -> i32:
     if runtime_getenv("WITH_RT_IN_UNIT").len() > 0: 1 else: 0
-
-fn frontend_rt_in_unit_platform_file() -> str:
-    var kind = target_spec_active_kind()
-    if kind == 0:
-        kind = target_spec_host_kind()
-    if kind == 1: return "rt/linux_x86_64.w"
-    if kind == 2: return "rt/linux_aarch64.w"
-    if kind == 4: return "rt/darwin_aarch64.w"
-    if kind == 5: return "rt/windows_x86_64.w"
-    if kind == 6: return "rt/windows_aarch64.w"
-    ""
 
 fn c_import_str_contains(text: &str, needle: &str) -> bool:
     if needle.len() == 0:
@@ -1871,19 +1861,13 @@ impl Zcu:
     // Off by default until R2c retargets codegen and the flip is ruled.
     mut fn parse_runtime_modules_frontend(pool: AstPool) -> AstPool:
         var merged_pool = pool
-        let platform = frontend_rt_in_unit_platform_file()
+        let platform = embedded_rt_platform_file()
         if platform.len() == 0:
             self.diagnostics.emit(Diagnostic.err("rt-in-unit: no runtime platform source for target '" ++ target_spec_name() ++ "'", Span { file: 0, start: 0, end: 0 }))
             return merged_pool
-        let fiber_core = if platform.starts_with("rt/windows"): "rt/fiber_core_windows.w" else: "rt/fiber_core_darwin.w"
-        let files: List[str] = List.new()
-        files.push("rt/rt_core.w")
-        files.push(with_str_clone_ref(platform))
-        files.push("rt/panic_runtime.w")
-        files.push("rt/channel_runtime.w")
-        files.push("rt/fiber_runtime.w")
-        files.push(with_str_clone_ref(fiber_core))
-        files.push("rt/compat_runtime.w")
+        // The target's module set, owned by EmbeddedRuntime (on wasm the
+        // fiber stubs stand in for the fiber and channel runtimes).
+        let files = embedded_rt_unit_files()
         for i in 0..files.len():
             let rel = files[i]
             let path = embedded_rt_resolve_path(rel)
@@ -2334,6 +2318,8 @@ impl Zcu:
 
     mut fn merge_resolved_modules_frontend(root_pool: AstPool, root_path: &str) -> AstPool:
         var merged_pool = root_pool
+        // Noted after the loop: `mod` is a view into self.last_resolved.
+        var refused_runtime: List[str] = List.new()
 
         for mi in 0..self.last_resolved.modules.len():
             let mod = self.last_resolved.modules[mi]
@@ -2345,6 +2331,9 @@ impl Zcu:
                 continue
 
             let src = module_source_read(path)
+            if self.runtime_source_is_refused(path, &src):
+                refused_runtime.push(frontend_owned_text(path))
+                continue
             let text = frontend_normalize_source_text(src.text)
             if text.len() == 0:
                 let span = Span { file: 0, start: 0, end: 0 }
@@ -2362,6 +2351,8 @@ impl Zcu:
             self.add_source_text_mapping(mod.file_id, path, text)
             self.append_decl_source_paths(merged_pool.decl_count() - before, path, mod.file_id)
 
+        for ri in 0..refused_runtime.len():
+            self.note_refused_runtime_source(refused_runtime[ri])
         self.strip_use_decls_frontend(merged_pool)
 
     // ── D39 on-demand interface sections ─────────────────────────────
@@ -2510,7 +2501,12 @@ impl Zcu:
             if not taken.contains(name):
                 taken.insert(name, frontend_owned_text(path))
                 continue
-            if taken.get(name).unwrap() != path and not frontend_fn_decl_is_c_export(pool, self.pool, decl):
+            // A runtime ABI symbol's interface declaration (the runtime
+            // bundle's, D30 step 3) beside an `extern fn with_*` of the same
+            // name is the same symbol twice, not a collision: it stays flat,
+            // and the tier verdict drops it where a higher tier declares the
+            // symbol (the compiler's own modules do, until step 4).
+            if taken.get(name).unwrap() != path and not frontend_fn_decl_is_c_export(pool, self.pool, decl) and not codegen_is_runtime_abi_symbol(self.pool.resolve(name)):
                 frontend_displace_fn_decl(pool, self.pool, decl, path)
 
     // #1703 (§18.2, §18.3): a module's top-level values are its own, as its
@@ -3428,8 +3424,30 @@ impl Zcu:
                 return frontend_resolve_module_rel(self.source_dir, rel_fallback)
         ""
 
+    // D30 step 3: outside the lane a runtime module reaches a unit only as
+    // its interface — the rt bundle's, embedded or beside this compiler's
+    // runtime root. Parsed from source, its bodies would join a program that
+    // links the runtime objects, every symbol twice (the duplicate-symbol
+    // flood of a stage1 without its bundle). Refused by name, once per
+    // module, at every parse of an imported module; the lane and the rt
+    // bundle's own build read the source on purpose.
+    fn runtime_source_is_refused(path: &str, src: &ModuleSource) -> bool:
+        if src.interface or embedded_rt_rel_path(path).len() == 0:
+            return false
+        frontend_rt_in_unit_enabled() == 0 and self.bundle_corpus != "rt"
+
+    mut fn note_refused_runtime_source(path: &str):
+        for i in 0..self.refused_runtime_sources.len():
+            if self.refused_runtime_sources[i] == path:
+                return
+        self.refused_runtime_sources.push(frontend_owned_text(path))
+        self.diagnostics.emit(Diagnostic.err("module '" ++ bundle_module_dotted_name(path) ++ "' has no interface in this compiler for target " ++ target_spec_resolved_name() ++ " (no runtime bundle: a stage1 without `with build :dev`, or a cross target without one); the runtime's bodies cannot join a program that links the runtime objects (D30)", Span { file: 0, start: 0, end: 0 }))
+
     mut fn parse_imported_file_frontend(path: &str, target_pool: AstPool) -> AstPool:
         let src = module_source_read(path)
+        if self.runtime_source_is_refused(path, &src):
+            self.note_refused_runtime_source(path)
+            return target_pool
         let full_text = frontend_normalize_source_text(src.text)
         if full_text.len() == 0:
             return target_pool

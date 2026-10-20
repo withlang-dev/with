@@ -1163,10 +1163,14 @@ impl CCodegen:
             return ""
         cc_name.slice(9, cc_name.len())
 
+    // Does this unit DEFINE the C function `name`? A declaration with an
+    // interface body (the runtime's interface, D30 step 3) defines nothing:
+    // its prototype still comes from the fixed block below or the extern
+    // walk, and the C runtime defines it.
     fn module_exports_c_name(name: &str) -> i32:
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) != NodeKind.NK_FN_DECL:
+            if self.ast.kind(decl) != NodeKind.NK_FN_DECL or self.ast.fn_decl_body_is_interface(decl):
                 continue
             let sym = self.ast.get_data0(decl)
             if self.fn_c_name(sym) == name:
@@ -10292,7 +10296,12 @@ impl CCodegen:
             if self.sema.decl_is_lazy_skipped(di):
                 continue
             let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) != NodeKind.NK_EXTERN_FN:
+            // A runtime function the unit knows through the runtime's
+            // interface (D30 step 3: std imports `rt.*`; the declaration has
+            // an interface body) is a prototype here, as the `extern fn` it
+            // replaced was: the C runtime defines it.
+            let interface_fn = self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.ast.fn_decl_body_is_interface(decl)
+            if self.ast.kind(decl) != NodeKind.NK_EXTERN_FN and not interface_fn:
                 continue
             if self.should_emit_extern_fn_decl(self.ast.get_data0(decl), referenced) == 0:
                 continue

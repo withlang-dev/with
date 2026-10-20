@@ -2,10 +2,8 @@
 
 use std.collections
 use std.traits
+use rt.rt_core
 
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 
 type RcControl {
     strong: i64,

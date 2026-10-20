@@ -3,10 +3,7 @@
 // Provides formatted output helpers via the runtime interface.
 // No c_import — all formatting goes through with_fmt_* runtime functions.
 
-extern fn with_fmt_i32(n: i32) -> str
-extern fn with_fmt_i64(n: i64) -> str
-extern fn with_fmt_f64(x: f64) -> str
-extern fn with_fmt_bool(v: i32) -> str
+use rt.rt_core
 
 /// Format an integer to a string.
 pub fn fmt_int(n: i32) -> str:

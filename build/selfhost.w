@@ -9232,6 +9232,21 @@ fn bs_check_wi_fingerprint(ctx: &ActionCtx, compiler_path: &str, label: &str, wi
     args |> push(selfhost_owned_text(fingerprint_path))
     bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
 
+// The rows of a manifest's tab-keyed lines (`import\t…`, `provides\t…`,
+// D138), each without the key; and a field of such a row.
+fn bs_manifest_rows(manifest: &str, key: &str) -> List[str]:
+    let out: List[str] = List.new()
+    let lines = bs_split_nonempty_lines(manifest)
+    for i in 0..lines.len():
+        let line = lines[i]
+        if line.starts_with(key ++ "\t"):
+            out.push(selfhost_owned_text(line.slice(key.len() + 1, line.len())))
+    out
+
+fn bs_row_field(row: &str, index: i32) -> str:
+    let fields = row.split("\t")
+    if index < fields.len(): selfhost_owned_text(fields[index]) else: ""
+
 // The value of a manifest's `<key> <value>` line ("" if absent).
 fn bs_manifest_field(manifest: &str, key: &str) -> str:
     let lines = bs_split_nonempty_lines(manifest)
@@ -9437,6 +9452,32 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     let ran = bs_run_binary_capture(ctx, consumer, "bundle-interface-consumer-run", 120000)
     if ran.rc != 0: return bs_fail(ctx, f"consumer linked against the bundle failed with exit code {ran.rc}")
     rc = bs_assert_stdout_exact(ctx, ran, "18 7 80 3 7 2 6 200 3 3 6 42 5 4 6 23 10", "bundle interface consumer")
+    if rc != 0: return rc
+
+    // D138: the manifest records what the object imports — every runtime
+    // symbol with the contract it was compiled against — and a bundle
+    // whose recorded contract this compiler's runtime no longer declares is
+    // refused at --link-bundle, naming the symbol and both contracts.
+    let import_rows = bs_manifest_rows(manifest, "import")
+    var rt_import = ""
+    for ri in 0..import_rows.len():
+        if bs_row_field(import_rows[ri], 1) == "rt" and rt_import.len() == 0: rt_import = selfhost_owned_text(import_rows[ri])
+    if rt_import.len() == 0: return bs_fail(ctx, "the manifest records no `import … rt …` row: the bundle calls the runtime, and D138 records each call's contract")
+    let rt_symbol = bs_row_field(rt_import, 0)
+    let rt_contract = bs_row_field(rt_import, 2)
+    let drifted_dir = bs_join(case_dir, "drifted")
+    if ctx.fs().mkdir_all(drifted_dir) != 0: return bs_fail(ctx, "could not create " ++ drifted_dir)
+    let drifted = bs_join(drifted_dir, "wi_demo")
+    let drifted_row = "import\t" ++ rt_symbol ++ "\trt\t(drifted: i32:1" ++ rt_contract.slice(1, rt_contract.len())
+    let drifted_manifest = manifest.replace("import\t" ++ rt_import, drifted_row)
+    if drifted_manifest == manifest: return bs_fail(ctx, "could not rewrite the import row of `" ++ rt_symbol ++ "`")
+    if ctx.fs().write_text(drifted ++ ".manifest", drifted_manifest) != 0 or ctx.fs().write_text(drifted ++ ".wi", ctx.fs().read_text(wi_path)) != 0 or ctx.fs().write_text(drifted ++ ".o", ctx.fs().read_text(obj_path)) != 0:
+        return bs_fail(ctx, "could not write the drifted bundle under " ++ drifted_dir)
+    let drifted_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-import-drift", bs_bundle_build_args(main_src, drifted, bs_join(case_dir, "consumer_drift"), false), 120000)
+    if drifted_build.rc == 0: return bs_fail(ctx, "a bundle whose recorded contract for `" ++ rt_symbol ++ "` is not this runtime's was linked")
+    rc = bs_assert_contains(ctx, drifted_build.stderr, "calls the runtime symbol `" ++ rt_symbol ++ "` as `" ++ rt_symbol ++ "(drifted: i32:1", "import drift refused, naming the bundle's contract")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, drifted_build.stderr, "rebuild the bundle", "import drift refusal tells the fix")
     if rc != 0: return rc
 
     // §21.1 rule 1: a call of a bundle function writes exactly its declared

@@ -21,8 +21,8 @@
 // raw-pointer-to-reference boundary).
 
 use std.box
+use rt.rt_core
 
-extern fn with_free(ptr: *mut u8) -> Unit
 
 /// Heap-allocate `value` and return a type-erased context pointer suitable for
 /// a C callback's `void *ctx` slot. `value`'s `Drop` is deferred until

@@ -1,13 +1,8 @@
 // std.sync — synchronization primitives.
 
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_alloc_aligned(size: i64, align: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
-extern fn with_fiber_in_fiber() -> i32
-extern fn with_fiber_yield() -> Unit
-extern fn with_runtime_has_fibers() -> i32
-extern fn with_runtime_run_one_step() -> Unit
+use rt.rt_core
+use rt.fiber_core
+use rt.fiber_runtime
 
 /// Memory ordering for atomic operations.
 pub enum Order: i32:

@@ -12,9 +12,8 @@ use std.c_algorithms.binary_heap
 
 use std.collections.engine_slot.Slot
 use std.collections.engine_slot.slot_compare
+use rt.rt_core
 
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
 
 // The engine's BINARY_HEAP_TYPE_MIN / BINARY_HEAP_TYPE_MAX (std.c_algorithms.defs),
 // spelled here until #1136 lets a nested module import a corpus global.

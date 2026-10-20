@@ -120,3 +120,53 @@ fn embedded_bundle_object_start(index: i32) -> i64:
 
 fn embedded_bundle_object_end(index: i32) -> i64:
     embedded_bundles_object_end_data(index)
+
+// ── Import contracts (durable .wo, D138) ───────────────────────────────
+// A corpus bundle's manifest records every symbol its object references
+// and does not define — `import\t<symbol>\t<rt|foreign>\t<contract>` — and
+// the runtime bundle's records every runtime symbol it defines —
+// `provides\t<symbol>\t<contract>` (the contract text:
+// BundleInterfaceEmit.bundle_symbol_contract). The rows of one key, each
+// without the key and its tab.
+fn bundle_manifest_rows(manifest: &str, key: &str) -> List[str]:
+    let out: List[str] = List.new()
+    let want = key ++ "\t"
+    var start: i64 = 0
+    while start < manifest.len():
+        var end = start
+        while end < manifest.len() and manifest[end] != '\n':
+            end = end + 1
+        let line = manifest.slice(start, end)
+        if line.starts_with(want):
+            out.push(with_str_clone_ref(line.slice(want.len(), line.len())))
+        start = end + 1
+    out
+
+// Field `index` of a tab-separated row ("" past the end).
+fn bundle_row_field(row: &str, index: i32) -> str:
+    var field = 0
+    var start: i64 = 0
+    while start <= row.len():
+        var end = start
+        while end < row.len() and row[end] != '\t':
+            end = end + 1
+        if field == index:
+            return with_str_clone_ref(row.slice(start, end))
+        field = field + 1
+        start = end + 1
+    ""
+
+// The contract a `provides` row set declares for `symbol` ("" when none).
+fn bundle_provided_contract(provides: &List[str], symbol: &str) -> str:
+    for i in 0..provides.len():
+        if bundle_row_field(provides[i], 0) == symbol:
+            return bundle_row_field(provides[i], 1)
+    ""
+
+// The runtime bundle's manifest: its modules are the embedded runtime's.
+fn bundle_manifest_is_runtime(manifest: &str) -> bool:
+    let paths = bundle_manifest_paths(manifest)
+    for pi in 0..paths.len():
+        if paths[pi].starts_with("<embedded-rt>/"):
+            return true
+    false

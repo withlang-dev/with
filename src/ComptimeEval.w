@@ -8248,8 +8248,10 @@ impl ComptimeEvaluator:
         // that body reads the host (rt_sysinfo_os), never the target, and
         // its c"..." literal is not comptime-evaluable.
         let reads_target = fn_name == "with_sysinfo_os" or fn_name == "with_sysinfo_arch"
-        // D39: an interface declaration has no body to evaluate.
-        if fn_node != 0 and self.ast.fn_decl_body_is_interface(fn_node) and not reads_target:
+        // D39: an interface declaration has no body to evaluate. A runtime ABI
+        // function's (the runtime bundle's interface, D30 step 3) is judged
+        // below as the extern it is to compile time, by D104's wording.
+        if fn_node != 0 and self.ast.fn_decl_body_is_interface(fn_node) and not reads_target and not self.sema.fn_is_in_unit_runtime_abi_def(fn_sym):
             return self.fail(node, "cannot evaluate '" ++ fn_name ++ "' at comptime: an interface declaration has no body (D39)")
         if fn_node != 0:
             let fn_decl_path = self.decl_path(fn_node)

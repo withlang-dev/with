@@ -304,27 +304,54 @@ module another bundle provides stays declared-only. A carried module's
 globals are never duplicated (that would fork state per bundle): they
 stay declared-only, and a corpus reaching one fails at link naming it.
 
-**Key.** `key = sha256(corpus_sha | target | abi_sha | compiler_src_sha)`
-where `corpus_sha` is the content hash of the bundle's `src/` (the build
-cache's `build_cache_hash_directory_w_files` shape), `target` the triple,
+**Key.** `key = sha256(corpus_sha | target | abi_sha)` where `corpus_sha`
+is the content hash of the bundle's `src/` (the build cache's
+`build_cache_hash_directory_w_files` shape), `target` the triple, and
 `abi_sha = sha256(docs/with-abi.sha256)`, the recorded hashes of the
-ABI-defining sources, and `compiler_src_sha` the same content hash over
-the tree's `src/` — the compiler generation whose codegen made the
-object (D30: a compiler-generated object is a (compiler, target)-keyed
-cache). The ABI identity alone is not enough: a codegen rule that changes
-what the object *contains* without touching a signature (the carried
-copies above) left a store slot stale under an unchanged ABI, and the
-zlib drift harness linked it. The manifest records `compiler-src-sha`;
-a slot built by other compiler sources is rebuilt. The compiler bakes
-its own `abi_sha` in at link time (a second post-link sentinel beside the
-version stamp; `with version --abi-sha` prints it), so a bundle built by
-compiler X carries X's ABI identity, and a compiler that links a bundle
-checks the manifest's `abi_sha` against its own — a mismatch is a hard
-error, never a silent link (#761). An unstamped image — linked as a
-program (`with build main.w`), so `with version --abi-sha` prints the
-placeholder — has no identity to compare and links its embedded bundles
-and an explicit `--link-bundle` unchecked, as a hand-linked compiler keeps
-no generation (#1815, #1330).
+ABI-defining sources. The compiler bakes its own `abi_sha` in at link time
+(a second post-link sentinel beside the version stamp; `with version
+--abi-sha` prints it), so a bundle built by compiler X carries X's ABI
+identity, and a compiler that links a bundle checks the manifest's
+`abi_sha` against its own — a mismatch is a hard error, never a silent
+link (#761). An unstamped image — linked as a program (`with build
+main.w`), so `with version --abi-sha` prints the placeholder — has no
+identity to compare and links its embedded bundles and an explicit
+`--link-bundle` unchecked, as a hand-linked compiler keeps no generation
+(#1815, #1330).
+
+**Durability (D138, Eric 2026-10-20).** A stored bundle is never rebuilt
+because the compiler changed; the compiler that built it is provenance
+(the manifest's `generation`), not a key. It is rebuilt when what it is
+made of changed — the corpus, or a non-corpus module the object carries a
+copy of (the manifest's `carried <module>` lines, which the build hashes
+into `carried-sha`) — or when what it links against changed: the ABI
+identity, or a contract it imports. Between 2026-09-09 and 2026-10-20 the
+key also carried a hash of the tree's `src/`, after a stored object built
+before the carried-copy rule referenced `std.libc` wrappers the new codegen
+no longer defined; that is the import rule's refusal below, not a reason to
+recompile every bundle on every commit (the store held 43 generations of one
+unchanged zlib object; at fifty thousand bundles nothing per-commit may
+touch them).
+
+**Imports.** `--emit-bundle-manifest` records every symbol the object
+references and does not define, one `import\t<symbol>\t<rt|foreign>\t<contract>`
+row each, and the runtime bundle (D30) records every runtime symbol it
+defines, one `provides\t<symbol>\t<contract>` row each. The contract is the
+declaration's parameter types and effects, variadicity and return type,
+spelled canonically (`BundleInterfaceEmit.bundle_symbol_contract`): `rt`
+when this compiler's runtime provides the symbol — and then under the same
+contract the corpus declared, or the build refuses the bundle (one symbol,
+one contract, #761) — `foreign` when the platform does (libc). An undefined
+symbol no declaration of the unit names (a module-link-named reference to
+a module the object should have carried) is refused at the bundle build:
+nothing at a consumer's link could define it. Every link — an embedded
+bundle, `--link-bundle` — refuses a bundle whose `rt` imports this
+compiler's runtime no longer provides as declared
+(`Link.link_stage_bundle_import_drift`, naming the symbol and both
+contracts), and the store applies the same rule before reusing a slot
+(`build/wo.w wo_slot_status`), so a compiler never embeds a bundle it would
+refuse. A bundle or a runtime from before the rows is judged as before: it
+must be the compiler's own generation.
 
 **Who builds a bundle.** The compiler whose baked `abi_sha` equals the
 key's. In the bootstrap chain that is stage1 (the first compiler carrying
@@ -825,3 +852,33 @@ none of its store (docs/proposals/d30-implementation-plan.md §10):
   prefix predicate does not apply); in the object world it never joins.
   Its interface is registered like every embedded bundle's, so a lane
   compile parses declarations instead of runtime bodies.
+
+### Step 3: the standard library imports the runtime (2026-10-20)
+
+- **Imports, not externs.** A `lib/std` module writes `use rt.rt_core`
+  (and `use rt.fiber_runtime`, `rt.channel_runtime`, `rt.compat_runtime`,
+  `rt.panic_runtime`); the migrator's shared defs do the same. The 227
+  `extern fn with_*` declarations of the standard library are gone, and
+  the three `@[effect]` pins they carried live on the definitions.
+- **By role, never by host.** `rt/platform.w` and `rt/fiber_core.w` resolve
+  to the active target's platform module and fiber core
+  (`EmbeddedRuntime.embedded_rt_platform_file`, the one owner the in-unit
+  parse reads too): `std.net` writes `use rt.platform`, `std.task` writes
+  `use rt.fiber_core`.
+- **Internal.** The runtime is internal to the standard library (plan §9
+  open question 3, answered as predicted): `use rt.*` from a program is
+  refused in the §18.3 pass — "a program reaches it through std". The
+  runtime's own tree and the build's generated roots import it.
+- **An interface everywhere.** Outside the lane a runtime module reaches a
+  unit only as its interface: the embedded `rt` slot (host), the target's
+  slot in a cross compiler (`cross_rt_bundle_targets` builds one per cross
+  tag), or `<runtime root>/rt.wi` beside the objects a compiler links (a
+  `:dev` stage1, whose slot is empty — its lane links `<runtime root>/rt.o`
+  too, #2485). With none, `use rt.<module>` is refused by name rather than
+  compiling the runtime's bodies into a program that links the objects.
+- **One symbol, one contract.** An extern's fingerprint row is its symbol's
+  (no module column; every corpus module declaring it must agree): the
+  runtime's modules each declare rt_libc_exit, and which declaration the
+  merge keeps depends on who imports the module. A runtime ABI symbol's
+  interface declaration beside a same-named `extern fn with_*` is never
+  displaced to `name$in$<module>`.

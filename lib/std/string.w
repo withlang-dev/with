@@ -19,15 +19,7 @@
 // No c_import — uses with_* runtime functions.
 
 use std.collections
-extern fn with_lines_out_ref(out: *mut u8, s: &str) -> Unit
-extern fn with_str_len(s: &str) -> i64
-@[effect(v: write)]
-extern fn with_vec_append_bytes(v: *mut u8, s: &str) -> Unit
-extern fn with_str_eq_ref(a: &str, b: &str) -> i32
-extern fn with_str_from_vec_u8(bytes: *const u8) -> str
-extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+use rt.rt_core
 
 /// Amortized string builder for code that appends in loops.
 ///

@@ -24,6 +24,7 @@ use compiler.BundleInterfaces
 use compiler.BundleInterfaceEmit
 use compiler.BundleFingerprint
 use compiler.EmbeddedBundles
+use compiler.EmbeddedRuntime
 use FnAbi
 use compiler.Zcu
 use compiler.Runtime
@@ -533,10 +534,13 @@ impl Compilation:
         for si in 0..sections.len():
             let dotted = bundle_module_dotted_name(sections[si])
             if dotted.len() == 0:
-                runtime_eprint("error: " ++ wi_path ++ ": section path '" ++ sections[si] ++ "' is not under <embedded-std>/")
+                runtime_eprint("error: " ++ wi_path ++ ": section path '" ++ sections[si] ++ "' is not under <embedded-std>/ or <embedded-rt>/")
                 return AstPool.new()
             root_text = root_text ++ "use " ++ dotted ++ "\n"
-        let root_path = wi_path ++ ".root.w"
+        // The root is the interface's own: the runtime bundle's lives in the
+        // runtime's tree, so its imports of `rt.*` are the runtime importing
+        // itself, not a program's (Resolve.resolve_internal_import_refusal).
+        let root_path = if sections[0].starts_with(EMBEDDED_RT_PREFIX()): EMBEDDED_RT_PREFIX() ++ "rt.wi.root.w" else: wi_path ++ ".root.w"
         taken_zcu = move self.zcu
         let source_dir = frontend_dirname(root_path)
         taken_zcu.reset_for_new_invocation(source_dir, root_path, "")
@@ -576,6 +580,13 @@ impl Compilation:
             if abi_identity_refuses_bundle(compiler_abi_sha(), bundle_abi):
                 with_eprint("error: --link-bundle: " ++ manifest_path ++ " was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")
                 return false
+            // D138: its runtime imports under the contracts it was built
+            // against (the runtime bundle itself is judged by generation).
+            if not bundle_manifest_is_runtime(manifest):
+                let drift = link_stage_bundle_import_drift(prefix_path, manifest)
+                if drift.len() > 0:
+                    with_eprint(drift)
+                    return false
             let prefixes = bundle_manifest_prefixes(manifest)
             if prefixes.len() == 0:
                 with_eprint("error: --link-bundle: no `prefix` lines in " ++ manifest_path)
@@ -616,8 +627,7 @@ impl Compilation:
     // its source: that is how the wo-drift lane rebuilds an embedded bundle
     // from the tree.
     fn register_embedded_bundle_interfaces() -> bool:
-        if self.emit_c_in_unit:
-            return true
+        var rt_registered = false
         for bi in 0..embedded_bundle_count():
             if not embedded_bundle_present(bi):
                 continue
@@ -626,6 +636,16 @@ impl Compilation:
             if not embedded_bundle_for_this_target(bi):
                 continue
             let name = embedded_bundle_name(bi)
+            // The emit-C lane compiles every module in-unit and links no
+            // corpus bundle (--emit-c refuses --link-bundle), so a corpus
+            // interface would make its modules declared-only; the runtime's
+            // interface it reads as every lane does (D30 step 3: std imports
+            // `rt.*`), and the C it emits declares the runtime's functions
+            // for the C runtime to define, as the externs it replaced did.
+            if self.emit_c_in_unit and name != "rt":
+                continue
+            if name == "rt":
+                rt_registered = true
             let manifest = embedded_bundle_manifest_text(bi)
             if self.bundle_corpus.len() > 0 and self.manifest_lies_under_bundle_corpus(manifest):
                 continue
@@ -638,6 +658,23 @@ impl Compilation:
             if bundle_interfaces_register_wi(wi_text) == 0:
                 with_eprint("error: embedded bundle '" ++ name ++ "': no `module <path>` sections in its interface")
                 return false
+        // A compiler whose `rt` slot is empty (a `:dev` stage1 builds the
+        // bundle itself) reads the runtime root's rt.wi, the one the build
+        // left beside the objects it links; the root is this generation's
+        // (Link.link_stage_resolve_runtime_root). Not while building the
+        // bundle: then the runtime's modules are the corpus, from source.
+        if not rt_registered and self.bundle_corpus != "rt":
+            let root = link_stage_runtime_root_bundle_dir()
+            if root.len() > 0:
+                let wi_text = runtime_read_file(root ++ "/rt.wi")
+                let manifest = runtime_read_file(root ++ "/rt.manifest")
+                if wi_text.len() > 0:
+                    if bundle_text_sha256(wi_text) != link_stage_bundle_manifest_field(manifest, "interface-sha"):
+                        with_eprint("error: runtime root " ++ root ++ ": rt.wi (sha256 " ++ bundle_text_sha256(wi_text) ++ ") is not the one rt.manifest was built with; rebuild the root (`with build :dev`)")
+                        return false
+                    if bundle_interfaces_register_wi(wi_text) == 0:
+                        with_eprint("error: runtime root " ++ root ++ ": rt.wi has no `module <path>` sections")
+                        return false
         true
 
     fn manifest_lies_under_bundle_corpus(manifest: &str) -> bool:
@@ -1392,7 +1429,7 @@ impl Compilation:
         // Sema codegen handed back (layouts frozen); the manifest records both.
         var interface_sha = ""
         var fingerprint = ""
-        var omitted: List[str] = List.new()
+
         if self.bundle_interface_path.len() > 0 or self.bundle_fingerprint_path.len() > 0 or self.bundle_manifest_path.len() > 0:
             let model = self.bundle_model(if self.bundle_interface_path.len() > 0: "--emit-bundle-interface" else if self.bundle_fingerprint_path.len() > 0: "--bundle-fingerprint" else: "--emit-bundle-manifest")
             if not model.ok:
@@ -1408,10 +1445,9 @@ impl Compilation:
                 if fingerprint.len() == 0:
                     compilation_remove_file_best_effort(obj_path)
                     return ""
-            omitted = driver_clone_str_list(&model.omitted)
-        if self.bundle_manifest_path.len() > 0 and not self.write_bundle_manifest(obj_path, fingerprint, interface_sha, &omitted):
-            compilation_remove_file_best_effort(obj_path)
-            return ""
+            if self.bundle_manifest_path.len() > 0 and not self.write_bundle_manifest(obj_path, fingerprint, interface_sha, model):
+                compilation_remove_file_best_effort(obj_path)
+                return ""
         with_str_clone_ref(obj_path)
 
     // D39: write the bundle's `.wi` (docs/spec/toolchain/wo_bundles.md) to
@@ -1436,12 +1472,19 @@ impl Compilation:
     // interface check; never a prelude or std module the object happens to
     // contain). build.w adds the bundle name, the key, and the corpus hash
     // it computed.
-    mut fn write_bundle_manifest(obj_path: &str, fingerprint: &str, interface_sha: &str, omitted: &List[str]) -> bool:
+    mut fn write_bundle_manifest(obj_path: &str, fingerprint: &str, interface_sha: &str, model: &BundleInterfaceModel) -> bool:
         if not compiler_abi_sha_is_stamped():
             with_eprint("error: --emit-bundle-manifest: this compiler carries no ABI stamp (unstamped binary); a bundle key needs one")
             return false
+        let omitted = &model.omitted
         var text = "abi-sha " ++ compiler_abi_sha() ++ "\n"
         text = text ++ "target " ++ target_spec_resolved_name() ++ "\n"
+        // The compiler generation that built it: a runtime bundle is linked
+        // only by its own generation (D30, D132), and a root's bundle is
+        // judged by this line before the root's objects have their
+        // .producer (the objects are compiled against the bundle's interface).
+        if compiler_generation_is_stamped():
+            text = text ++ "generation " ++ compiler_generation() ++ "\n"
         text = text ++ "object " ++ link_stage_basename(obj_path) ++ "\n"
         if fingerprint.len() > 0:
             text = text ++ "fingerprint " ++ fingerprint ++ "\n"
@@ -1467,10 +1510,100 @@ impl Compilation:
         if seen.len() == 0:
             with_eprint("error: --emit-bundle-manifest: no module under corpus '" ++ self.bundle_corpus ++ "' in " ++ obj_path)
             return false
+        // D138: the non-corpus modules the object carries copies of (the
+        // build hashes their sources into the slot's validity: a carried
+        // module's change rebuilds the bundle, as a corpus change does).
+        for ci in 0..self.zcu.last_bundle_carried_paths.len():
+            text = text ++ "carried " ++ self.zcu.last_bundle_carried_paths[ci] ++ "\n"
+        let contracts = self.bundle_contract_rows(obj_path, model)
+        if contracts == "<failed>":
+            return false
+        text = text ++ contracts
         if runtime_write_file(self.bundle_manifest_path, text) != 0:
             with_eprint("error: could not write bundle manifest: " ++ self.bundle_manifest_path)
             return false
         true
+
+    // D138 (docs/spec/toolchain/wo_bundles.md "Imports"): the contract rows
+    // of the manifest. The runtime bundle records every runtime symbol it
+    // defines — `provides\t<symbol>\t<contract>` — and a corpus bundle
+    // records every symbol its object references and does not define —
+    // `import\t<symbol>\t<rt|foreign>\t<contract>`: `rt` when this
+    // compiler's runtime provides it (and then under the same contract the
+    // corpus declared, or the bundle would call it wrong, #761), `foreign`
+    // when the platform does (libc). An undefined symbol no declaration of
+    // the unit names — a module-link-named reference to a module the object
+    // should have carried — is refused: nothing could define it at a
+    // consumer's link. "<failed>" after printing why.
+    fn bundle_contract_rows(obj_path: &str, model: &BundleInterfaceModel) -> str:
+        let sema = &self.zcu.last_sema
+        var text = ""
+        var is_runtime = false
+        for mi in 0..model.modules.len():
+            if model.modules[mi].starts_with(EMBEDDED_RT_PREFIX()):
+                is_runtime = true
+        if is_runtime:
+            for ei in 0..model.exports.len():
+                let export = &model.exports[ei]
+                if export.kind != BX_FN or not codegen_is_runtime_abi_symbol(export.name) or export.name.contains("."):
+                    continue
+                let contract = bundle_symbol_contract(sema, export.name)
+                if contract.len() == 0:
+                    with_eprint("error: --emit-bundle-manifest: the runtime symbol `" ++ export.name ++ "` has no contract spelling")
+                    return "<failed>"
+                text = text ++ "provides\t" ++ export.name ++ "\t" ++ contract ++ "\n"
+            return text
+        let undef = link_stage_undefined_symbols_for_object(obj_path)
+        if undef == "<probe-failed>":
+            with_eprint("error: --emit-bundle-manifest: cannot read the undefined symbols of " ++ obj_path ++ "; a bundle records the contracts it imports")
+            return "<failed>"
+        let provides = bundle_manifest_rows(link_stage_runtime_manifest_text(), "provides")
+        if provides.len() == 0:
+            with_eprint("error: --emit-bundle-manifest: no runtime bundle of this compiler's generation for target " ++ target_spec_resolved_name() ++ " records its contracts; the runtime bundle precedes every corpus bundle")
+            return "<failed>"
+        let strips_underscore = target_spec_os() == "Macos"
+        var start: i64 = 0
+        while start < undef.len():
+            var end = start
+            while end < undef.len() and undef[end] != '\n':
+                end = end + 1
+            let line = undef.slice(start, end)
+            start = end + 1
+            // The in-process readers print one bare name per line; an
+            // `nm -u` fallback prints `U <name>`: the name is the last field.
+            var last: i64 = line.len()
+            while last > 0 and (line[last - 1] == ' ' or line[last - 1] == '\t' or line[last - 1] == '\r'):
+                last = last - 1
+            var first = last
+            while first > 0 and line[first - 1] != ' ' and line[first - 1] != '\t':
+                first = first - 1
+            var symbol = line.slice(first, last)
+            if symbol.len() == 0:
+                continue
+            if strips_underscore and symbol[0] == '_':
+                symbol = symbol.slice(1, symbol.len())
+            // A module-link-named With symbol: a module the object should
+            // have carried, which nothing at a consumer's link defines.
+            if symbol.starts_with("__with_mod_"):
+                with_eprint("error: --emit-bundle-manifest: " ++ obj_path ++ " references `" ++ symbol ++ "`, a module-link-named symbol of a module the object does not carry: nothing at a consumer's link defines it (docs/spec/toolchain/wo_bundles.md, carried copies)")
+                return "<failed>"
+            let contract = bundle_symbol_contract(sema, symbol)
+            let provided = bundle_provided_contract(provides, symbol)
+            if provided.len() == 0:
+                // The platform's (libc, compiler-rt, the wasm linker's
+                // tables): a declaration gives its contract for the record;
+                // one codegen reached without a declaration (LLVM's
+                // libcalls: bzero, memcpy) has none.
+                text = text ++ "import\t" ++ symbol ++ "\tforeign\t" ++ (if contract.len() > 0: contract else: "-") ++ "\n"
+                continue
+            if contract.len() == 0:
+                with_eprint("error: --emit-bundle-manifest: " ++ obj_path ++ " references the runtime symbol `" ++ symbol ++ "` without a declaration in the bundle's unit; a bundle calls the runtime through its interface")
+                return "<failed>"
+            if provided != contract:
+                with_eprint("error: --emit-bundle-manifest: the corpus declares the runtime symbol `" ++ symbol ++ "` as `" ++ symbol ++ contract ++ "`, but this compiler's runtime provides it as `" ++ symbol ++ provided ++ "` (one symbol, one contract, #761): the object would call it wrong")
+                return "<failed>"
+            text = text ++ "import\t" ++ symbol ++ "\trt\t" ++ contract ++ "\n"
+        text
 
     mut fn emit_object_to_path_with_build_settings(source_path: &str, obj_path: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str]) -> str:
         let output_dir = link_stage_dirname(obj_path)
