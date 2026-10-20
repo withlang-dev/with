@@ -456,7 +456,7 @@ impl Zcu:
     // A named import root (Compilation.set_import_root_dir) is where a `use`
     // falls back to, in place of the entry's own directory.
     mut fn set_current_source(dir: &str, path: &str, text: &str):
-        self.source_dir = if self.import_root_dir.len() > 0: self.import_root_dir.clone() else: dir
+        self.source_dir = if self.import_root_dir.len() > 0: self.import_root_dir else: dir
         self.current_source_path = with_str_clone_ref(path)
         self.current_source_text = with_str_clone_ref(text)
 
