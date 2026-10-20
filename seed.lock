@@ -17,10 +17,9 @@ with-darwin-aarch64=5998cfebed4fe44ae2afe464c975b1005d39aaaecea22ea793199e456a44
 # darwin on the laptop (and a green :release-checks), linux-x86_64 on
 # eric-5090, windows-x86_64 on win10, linux-aarch64 in tools/docker/linux-
 # aarch64 — and each verified to bootstrap a fresh clone (`:deps` then
-# `build`, no build store, no runner cache). windows-aarch64 stays on the
-# local-1 cross seed until run 39469556520 (dispatched from 4d6d960d6, D137)
-# is pinned.
-with-windows-aarch64.exe.version=nightly-20261020-local-1-e1d2b25e6d04
+# `build`, no build store, no runner cache). windows-aarch64 is the cross
+# seed run 39469556520 built from 4d6d960d6 (D137: an intermediate seed the
+# native lane bootstraps and verifies), copied onto this release.
 # Before them, the local-1 seeds were cut from main e1d2b25e6 the same day:
 # the first whose Sema takes an @[effect] pin on a runtime ABI definition as
 # its declared contract (D30 step 2, #2488), which rt/'s pins need.
@@ -71,4 +70,4 @@ with-linux-aarch64=b7a87f919fb474aea0fbe84a1b9da2809c56350ff00460c5a113eb5ae58ba
 # 39288117180 against the windows-gnu SDK, an intermediate seed the native
 # windows-aarch64 lane bootstraps and verifies.
 with-windows-x86_64.exe=4b5093d79210e3eddc6ec136eb1f38d739427fcc41f8fddd50b632cabb21c0d6
-with-windows-aarch64.exe=384d8a0b0ffd3335cadf43df710f3b9ef47720f80c349c1f1e5d4916836a67c0
+with-windows-aarch64.exe=945487c8402f31bac0adeea3cbb388b9912b33918683585aed5646e946b4cf92
