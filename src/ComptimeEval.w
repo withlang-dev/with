@@ -8272,7 +8272,12 @@ impl ComptimeEvaluator:
         // its body: that body reads the host (rt_sysinfo_os), never the
         // target, and its c"..." literal is not comptime-evaluable.
         let reads_target = fn_name == "with_sysinfo_os" or fn_name == "with_sysinfo_arch"
-        if reads_target or (fn_node == 0 and self.allow_runtime_calls != 0):
+        // A runtime ABI function compiled in-unit (D30) has, to the
+        // evaluator, the body the object-linked runtime gives it: none. Its
+        // in-unit body is the runtime's (raw memory, syscalls), and walking
+        // into it reported the runtime's internals instead of the call.
+        let bodiless = fn_node == 0 or self.sema.fn_is_in_unit_runtime_abi_def(fn_sym)
+        if reads_target or (bodiless and self.allow_runtime_calls != 0):
             let runtime_signal = self.eval_allowed_runtime_call(fn_sym, arg_values, node)
             if runtime_signal.kind != ComptimeControlKind.CTL_ERROR or self.had_error != 0:
                 return runtime_signal
@@ -8281,7 +8286,7 @@ impl ComptimeEvaluator:
         // inside is refused with the chain of calls that led there. Only a
         // callee with no With body (an extern, a runtime-only intrinsic) is
         // refused at the call.
-        if fn_node == 0:
+        if bodiless:
             return self.fail(node, "'" ++ self.pool.resolve(fn_sym) ++ "' has no With body to evaluate at compile time (an extern or a runtime intrinsic)")
         // D104: a `comptime fn` is a checked promise, kept by Sema at the
         // declaration (check_comptime_call_restriction over its body); the
