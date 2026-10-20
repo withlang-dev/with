@@ -2247,6 +2247,13 @@ impl Sema:
         if interface_yields and prior_sig >= 0:
             self.sig_lookup.insert(fn_name, prior_sig)
         if fn_sig_idx >= 0:
+            // D30: an in-unit runtime definition takes the declared contract
+            // of the extern it replaced (Zcu.note_runtime_contract_extern),
+            // applied as that extern's pins are.
+            if self.runtime_contract_externs.contains(fn_name):
+                let contract_extern: i32 = self.runtime_contract_externs.get(fn_name) ?? &0
+                self.apply_declared_effects_to_extern_sig(contract_extern, fn_sig_idx, param_start, param_count)
+                self.runtime_contract_sigs.insert(fn_sig_idx, 1)
             self.set_sig_receiver_mode(fn_sig_idx, self.receiver_mode_from_param(param_start, param_count))
             for pi in 0..param_count:
                 if self.fn_param_uses_value_ref_abi(param_start, pi, method_owner_sym, self_type_id) != 0:

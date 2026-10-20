@@ -196,6 +196,17 @@ fn count_non_use_decls_frontend(pool: &AstPool) -> i32:
     count
 
 impl Zcu:
+    // D30: an extern a program module declares for a runtime symbol is
+    // dropped for the in-unit definition (def wins), but it is that
+    // definition's contract: std.thread's `@[effect(fn_ptr: escape_value,
+    // ctx: escape_value)] extern fn with_thread_spawn` states what the
+    // runtime retains through a raw pointer, which inference never sees (a
+    // pointer parameter's inferred effects are read-only by design). Its
+    // pins are kept for Sema to apply to the definition as declared.
+    mut fn note_runtime_contract_extern(pool: &AstPool, extern_node: i32):
+        if pool.fn_effect_pin_count(extern_node as NodeId) > 0:
+            self.runtime_contract_externs.insert(pool.get_data0(extern_node), extern_node)
+
     // §18.3 (D100): every `use` of the merged program, once the module graph
     // is loaded: a target under an `internal` path segment is importable only
     // from inside its parent's tree (resolve_internal_import_refusal). One
@@ -646,7 +657,13 @@ impl Zcu:
             let decl = out.get_decl(i)
             let kind = out.kind(decl)
             if kind == NodeKind.NK_C_FACADE:
-                claimed = self.collect_facade_claims_frontend(out, decl as i32, move claimed)
+                // The runtime's own `libc` blocks (in-unit under D30) are not
+                // the program's facades: as with the object-linked runtime,
+                // they leave the toolchain facade its names. Claimed, they
+                // took `domain environ` out of its text while its getenv row
+                // still named it ("unknown domain 'environ'").
+                if not self.decl_source_path_frontend(i).starts_with("<embedded-rt>/"):
+                    claimed = self.collect_facade_claims_frontend(out, decl as i32, move claimed)
                 continue
             if i >= self.decl_is_c_import.len() or self.decl_is_c_import[i] == 0:
                 continue
@@ -1973,6 +1990,10 @@ impl Zcu:
         sema.source_texts = sema_clone_str_list(&self.source_texts)
         sema.ci_omitted_symbols = sema_clone_str_str_hashmap(&self.c_import_omitted_symbols)
         sema.tool_mode_entry_path = frontend_owned_text(self.tool_mode_entry_path)
+        for (rt_name, rt_extern) in self.runtime_contract_externs:
+            let contract_name: i32 = rt_name
+            let contract_extern: i32 = rt_extern
+            sema.runtime_contract_externs.insert(contract_name, contract_extern)
         sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
         sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
         sema.runtime_fiber_pool_size = self.project_config.runtime_fiber_pool_size
@@ -2173,6 +2194,10 @@ impl Zcu:
             // a shared header is a teardown double-free.
             pre_sema.ci_omitted_symbols = sema_clone_str_str_hashmap(&self.c_import_omitted_symbols)
             pre_sema.tool_mode_entry_path = frontend_owned_text(self.tool_mode_entry_path)
+            for (rt_name, rt_extern) in self.runtime_contract_externs:
+                let contract_name: i32 = rt_name
+                let contract_extern: i32 = rt_extern
+                pre_sema.runtime_contract_externs.insert(contract_name, contract_extern)
             pre_sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
             // The pre-sema collects every declaration the comptime transform
             // demands and diagnoses them with the same tier flags as the
@@ -2974,6 +2999,10 @@ impl Zcu:
                 // calls bound to a program's same-named fn (`make_str`, `ptr`;
                 // D30 ruling 4).
                 if prelude_verdict == FRONTEND_FN_DROP or (rt_def and codegen_is_runtime_abi_symbol(self.pool.resolve(merged_pool.get_data0(id)))):
+                    // A std module's extern of a runtime symbol (std.thread's
+                    // with_thread_spawn) drops here, in its own tier.
+                    if ik == NodeKind.NK_EXTERN_FN and frontend_list_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
+                        self.note_runtime_contract_extern(merged_pool, id)
                     continue
                 frontend_displace_fn_decl(merged_pool, self.pool, id, prelude_path)
             if ik == NodeKind.NK_EXTERN_VAR:
@@ -2987,6 +3016,7 @@ impl Zcu:
             let id = user_import_ordered[oi]
             let ik = merged_pool.kind(id)
             if ik == NodeKind.NK_EXTERN_FN and frontend_list_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
+                self.note_runtime_contract_extern(merged_pool, id)
                 continue
             let user_verdict = if ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN: frontend_fn_tier_verdict(user_import_ordered, user_import_paths, merged_pool, self.pool, oi, root_fn_names) else: FRONTEND_FN_KEEP
             if user_verdict == FRONTEND_FN_DROP:
@@ -3004,6 +3034,7 @@ impl Zcu:
             let id = root_ordered[oi]
             let ik = merged_pool.kind(id)
             if ik == NodeKind.NK_EXTERN_FN and frontend_list_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
+                self.note_runtime_contract_extern(merged_pool, id)
                 continue
             if ik == NodeKind.NK_EXTERN_VAR and frontend_extern_var_shadowed_in_tier(root_ordered, merged_pool, self.pool, oi as i32):
                 continue

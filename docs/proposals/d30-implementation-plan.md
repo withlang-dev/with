@@ -484,3 +484,21 @@ Still to measure: the process-spawning behavior files with the lane
 confined to the program under test, and building (not just checking)
 the compiler under the lane, which needs a driver that keeps the
 variable out of build.w's own evaluation.
+
+**No seed cut needed for the spawn contract (2026-10-20).** Instead of
+pinning the runtime's with_thread_spawn (seed-compiled source), the
+in-unit definition takes the declared contract of the extern it replaces
+(std.thread's `@[effect(...)] extern fn with_thread_spawn`): one fact in
+one place, and the seed-gated rule from #2481 is removed. The full
+re-sweep after that change also caught a regression #2481's partial sweep
+missed: the runtime's `libc` blocks counted as the program's facade
+claims, so the toolchain libc facade lost `domain environ` (61 lane
+files). Fixed. Every lane sweep from here covers all four corpora.
+
+Lane state: behavior (non-spawning) 1701/1701, compile_errors 1790/1790,
+spec + internals 282/282, `with check src/main.w` clean, the compiler
+builds under the lane (stage2 replayed with the variable confined to
+that compile) and the compiler so built passes 1700/1700 behavior files
+in default mode. rt_decl_audit: 0 divergent of 1216 defs / 1750 decls.
+Next: the process-spawning behavior files with the lane confined to the
+program under test, then (3) the flip.

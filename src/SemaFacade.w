@@ -782,13 +782,13 @@ impl Sema:
     // the object-linked runtime it never sees left it unknown. Declared in
     // both, it is one domain (ruling §35, below).
     fn facade_domain_visible(d: i32) -> bool:
-        if self.current_module_is_runtime():
+        if self.current_facade_is_runtime():
             return self.facade_domains.contains(d)
         self.facade_program_domains.contains(d)
 
     mut fn collect_facade_domain(item: i32):
         let name = self.ast.get_data0(item)
-        if not self.current_module_is_runtime():
+        if not self.current_facade_is_runtime():
             self.facade_program_domains.insert(name, 1)
         if self.facade_domains.contains(name):
             let dn: str = self.pool_resolve(name)

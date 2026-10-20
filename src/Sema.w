@@ -2362,6 +2362,10 @@ type Sema {
     source_line_offsets: List[List[i32]], // root first, then one index per source_texts entry
     current_module_path: str,        // module path being checked right now
     tool_mode_entry_path: str,        // compiler-generated tool runner allowed to mint capabilities
+    // D30: an in-unit runtime fn name -> the dropped extern declaring its
+    // contract (`@[effect]` pins), applied to the definition as declared.
+    runtime_contract_externs: HashMap[i32, i32],
+    runtime_contract_sigs: HashMap[i32, i32],      // the sigs those contracts apply to
     module_paths: List[str],          // resolved module graph paths
     module_import_starts: List[i32],  // per-module start into module_import_targets
     module_import_counts: List[i32],  // per-module import edge count
@@ -3968,6 +3972,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         source_line_offsets: List.new(),
         current_module_path: "",
         tool_mode_entry_path: "",
+        runtime_contract_externs: sema_new_map_i32_i32(),
+        runtime_contract_sigs: sema_new_map_i32_i32(),
         module_paths: sema_new_list_str(),
         module_import_starts: List.new(),
         module_import_counts: List.new(),
