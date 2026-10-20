@@ -2958,9 +2958,13 @@ impl Zcu:
                         let sname: str = self.pool.resolve(shadowed_name)
                         self.diagnostics.emit(Diagnostic.err(f"extern fn '{sname}' shadows prelude function '{sname}'", Span { file: 0, start: merged_pool.get_start(id), end: merged_pool.get_end(id) }))
                         continue
-                // A runtime definition is a flat ABI symbol the compiler emits
-                // calls to; it keeps the pre-#1350 decl-drop.
-                if prelude_verdict == FRONTEND_FN_DROP or rt_def:
+                // A runtime ABI symbol (FnAbi's codegen_is_runtime_abi_symbol:
+                // `with_*`, `rt_*`, ...) is a flat name the compiler emits
+                // calls to; it keeps the pre-#1350 decl-drop. Any other runtime
+                // fn is displaced like any prelude fn: dropped, its module's
+                // calls bound to a program's same-named fn (`make_str`, `ptr`;
+                // D30 ruling 4).
+                if prelude_verdict == FRONTEND_FN_DROP or (rt_def and codegen_is_runtime_abi_symbol(self.pool.resolve(merged_pool.get_data0(id)))):
                     continue
                 frontend_displace_fn_decl(merged_pool, self.pool, id, prelude_path)
             if ik == NodeKind.NK_EXTERN_VAR:
