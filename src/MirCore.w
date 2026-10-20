@@ -340,6 +340,9 @@ type MirModule {
     sema_bitpacked_types: HashMap[i32, i32],
     sema_disc_repr_types: HashMap[i32, i32],
     sema_distinct_type_names: HashMap[i32, i32],
+    // The type ids Sema reads as void-like pointees (is_c_void_like_type):
+    // a raw pointer to anything converts to a pointer to one.
+    sema_c_void_like_types: HashMap[i32, i32],
     // std Box's name sym when the std-box module verdict holds (else 0) —
     // lets the typed validator mirror sema's Box[Concrete] -> Box[dyn Trait]
     // coercion arm exactly instead of approximating it.
@@ -410,6 +413,7 @@ fn MirModule.init -> MirModule:
         sema_bitpacked_types: HashMap.new(),
         sema_disc_repr_types: HashMap.new(),
         sema_distinct_type_names: HashMap.new(),
+        sema_c_void_like_types: HashMap.new(),
         sema_box_sym: 0,
         sema_option_sym: 0,
         sema_result_sym: 0,
@@ -3863,6 +3867,17 @@ fn mir_validate_use_assign_compatible(mir_mod: &MirModule, expected: i32, actual
             let opt_pk = mir_mod.mir_get_type_kind(opt_payload)
             if opt_pk == TypeKind.TY_PTR or opt_pk == TypeKind.TY_EXTERN_FN:
                 return true
+    // §16.3b: a raw pointer use into a pointer-to-c_void destination — the
+    // vetted pointee erasure (sema's pointer_pointees_compatible arm; one
+    // representation for every raw pointer, codegen stores the bits). Mirror
+    // sema's rule, mutability included: a `*const T` never becomes `*mut`.
+    // `let q: *mut c_void = p` was refused here while the call argument and
+    // the field initializer of the same conversion passed (#2476).
+    if expected_kind == TypeKind.TY_PTR and actual_kind == TypeKind.TY_PTR:
+        let ptr_exp_r = mir_mod.mir_resolve_alias(expected)
+        let ptr_act_r = mir_mod.mir_resolve_alias(actual)
+        let mut_ok = mir_mod.mir_get_type_d1(ptr_exp_r) == 0 or mir_mod.mir_get_type_d1(ptr_act_r) != 0
+        if mut_ok and mir_mod.sema_c_void_like_types.contains(mir_mod.mir_get_type_d0(ptr_exp_r)): return true
     let expected_numeric = expected_kind == TypeKind.TY_INT or expected_kind == TypeKind.TY_FLOAT
     let actual_numeric = actual_kind == TypeKind.TY_INT or actual_kind == TypeKind.TY_FLOAT
     expected_numeric and actual_numeric
