@@ -1856,8 +1856,12 @@ fn build_runner_link_root(root: &str) -> str:
         let dir = resolve_join(root, dirs[i])
         if with_fs_file_exists(dir ++ "/cimport_stubs.o") == 0: continue
         if platform_object.len() > 0 and with_fs_file_exists(dir ++ "/" ++ platform_object) == 0: continue
-        // The link's own test for a root it is named (#1899).
-        if link_stage_named_runtime_root_is_this_generation(dir): return dir
+        // The link's own tests for a root it is named (#1899), and for the
+        // bridge the runner links: build.w reaches the compiler's modules,
+        // so the root's producer must be this generation — runtime objects
+        // that merely match the embedded ones (a seed's out/bootstrap-lib
+        // under a stage2 of the same rt/) do not carry its bridge.
+        if link_stage_named_runtime_root_is_this_generation(dir) and link_stage_runtime_root_links_bridge(dir): return dir
     ""
 
 // A project with no runtime directory at all links its runner from the
