@@ -234,17 +234,6 @@ impl Zcu:
 fn frontend_rt_in_unit_enabled() -> i32:
     if runtime_getenv("WITH_RT_IN_UNIT").len() > 0: 1 else: 0
 
-fn frontend_rt_in_unit_platform_file() -> str:
-    var kind = target_spec_active_kind()
-    if kind == 0:
-        kind = target_spec_host_kind()
-    if kind == 1: return "rt/linux_x86_64.w"
-    if kind == 2: return "rt/linux_aarch64.w"
-    if kind == 4: return "rt/darwin_aarch64.w"
-    if kind == 5: return "rt/windows_x86_64.w"
-    if kind == 6: return "rt/windows_aarch64.w"
-    ""
-
 fn c_import_str_contains(text: &str, needle: &str) -> bool:
     if needle.len() == 0:
         return true
@@ -1871,11 +1860,11 @@ impl Zcu:
     // Off by default until R2c retargets codegen and the flip is ruled.
     mut fn parse_runtime_modules_frontend(pool: AstPool) -> AstPool:
         var merged_pool = pool
-        let platform = frontend_rt_in_unit_platform_file()
+        let platform = embedded_rt_platform_file()
         if platform.len() == 0:
             self.diagnostics.emit(Diagnostic.err("rt-in-unit: no runtime platform source for target '" ++ target_spec_name() ++ "'", Span { file: 0, start: 0, end: 0 }))
             return merged_pool
-        let fiber_core = if platform.starts_with("rt/windows"): "rt/fiber_core_windows.w" else: "rt/fiber_core_darwin.w"
+        let fiber_core = embedded_rt_fiber_core_file()
         let files: List[str] = List.new()
         files.push("rt/rt_core.w")
         files.push(with_str_clone_ref(platform))

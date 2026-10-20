@@ -533,10 +533,13 @@ impl Compilation:
         for si in 0..sections.len():
             let dotted = bundle_module_dotted_name(sections[si])
             if dotted.len() == 0:
-                runtime_eprint("error: " ++ wi_path ++ ": section path '" ++ sections[si] ++ "' is not under <embedded-std>/")
+                runtime_eprint("error: " ++ wi_path ++ ": section path '" ++ sections[si] ++ "' is not under <embedded-std>/ or <embedded-rt>/")
                 return AstPool.new()
             root_text = root_text ++ "use " ++ dotted ++ "\n"
-        let root_path = wi_path ++ ".root.w"
+        // The root is the interface's own: the runtime bundle's lives in the
+        // runtime's tree, so its imports of `rt.*` are the runtime importing
+        // itself, not a program's (Resolve.resolve_internal_import_refusal).
+        let root_path = if sections[0].starts_with(EMBEDDED_RT_PREFIX()): EMBEDDED_RT_PREFIX() ++ "rt.wi.root.w" else: wi_path ++ ".root.w"
         taken_zcu = move self.zcu
         let source_dir = frontend_dirname(root_path)
         taken_zcu.reset_for_new_invocation(source_dir, root_path, "")
