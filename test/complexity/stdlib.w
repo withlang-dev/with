@@ -214,14 +214,22 @@ fn btree_set_descending(n: i32): btree_set_work(n, true)
 // agents, load 36) a wall clock read contention as super-linear growth and
 // failed a linear row. This process's CPU plus its reaped children's (the
 // stdin rows' work is a child) counts only the work measured.
+//
+// A CPU clock can be coarse: Windows counts process time in scheduler ticks
+// (15.6 ms), so one short run read 0. The work repeats until the clock has
+// moved at least SAMPLE_NS, and a sample is the mean run.
+const SAMPLE_NS = 50000000
+
 fn elapsed(work: &fn(i32) -> i32, n: i32):
     let start = cpu_time_ns()
-    let result = work(n)
-    let finish = cpu_time_ns()
-    assert(start >= 0 and finish >= 0, "cpu_time_ns: this platform reports no CPU time")
-    let duration = finish - start
-    assert(result > 0 and duration > 0)
-    duration
+    assert(start >= 0, "cpu_time_ns: this platform reports no CPU time")
+    var runs = 0
+    var finish = start
+    while runs == 0 or finish - start < SAMPLE_NS:
+        assert(work(n) > 0)
+        runs = runs + 1
+        finish = cpu_time_ns()
+    (finish - start) / runs
 
 fn median(a: i64, b: i64, c: i64):
     if a < b:
