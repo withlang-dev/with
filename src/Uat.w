@@ -23,6 +23,7 @@ extern fn with_fs_list_files(path: &str) -> str
 extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 use std.process
 use TargetSpec
+use compiler.Runtime.runtime_path_is_absolute
 use std.time
 use std.builtins.print
 use std.builtins.eprint
@@ -390,7 +391,7 @@ type UatOutcome {
 }
 
 fn uat_join(dir: &str, path: &str) -> str:
-    if path.starts_with("/"): return path.clone()
+    if runtime_path_is_absolute(path): return path.clone()
     if dir.ends_with("/"): dir ++ path else: dir ++ "/" ++ path
 
 fn uat_dirname(path: &str) -> str:
@@ -539,7 +540,7 @@ fn uat_dots(name: &str) -> str:
 // root and a relative toolchain path must survive that. Without PWD it
 // stays as it is.
 fn uat_abs(path: &str) -> str:
-    if path.starts_with("/"): return path.clone()
+    if runtime_path_is_absolute(path): return path.clone()
     let pwd = env("PWD")
     if pwd.len() == 0: return path.clone()
     if path == ".": pwd else: pwd ++ "/" ++ path

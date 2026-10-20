@@ -5751,7 +5751,7 @@ impl Sema:
         let path = &self.current_module_path
         if path.len() == 0: return "<unknown>"
         let canonical = codegen_canonical_module_path(path)
-        if canonical.starts_with("<embedded-std>/") or path[0] == '/': return canonical
+        if canonical.starts_with("<embedded-std>/") or runtime_path_is_absolute(path): return canonical
         path.clone()
 
     fn source_location_for_file_id(file_id: i32, offset: i32) -> SemaSourceLocation:
