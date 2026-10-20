@@ -76,11 +76,57 @@ fn rt_bundle_modules(host_runtime: &HostRuntimeSpec) -> str:
     "rt_core," ++ rt_module_stem(host_runtime.platform_source) ++ ",panic_runtime,channel_runtime,fiber_runtime," ++ rt_module_stem(host_runtime.fiber_core_source) ++ ",compat_runtime"
 
 fn rt_bundle_root_target(host_runtime: &HostRuntimeSpec) -> Target:
-    var target = target_new(.Action, "rt-bundle-root", "").output("out/gen/rt_bundle.w")
+    rt_bundle_root_target_named("rt-bundle-root", "out/gen/rt_bundle.w", rt_bundle_modules(host_runtime))
+
+fn rt_bundle_root_target_named(name: &str, output: &str, modules: &str) -> Target:
+    var target = target_new(.Action, build_owned_text(name), "").output(build_owned_text(output))
     target.action = run_rt_bundle_root_action
-    target = target.arg("modules=" ++ rt_bundle_modules(host_runtime))
+    target = target.arg("modules=" ++ modules)
     target = target.input("build/rt_bundle.w")
     target.write_scope("out/gen")
+
+// A cross tag's runtime module set: the tag's platform module and its
+// fiber core (fiber_core_darwin serves every POSIX target), the rest shared
+// — the set the compiler's own in-unit parse uses for that target
+// (EmbeddedRuntime.embedded_rt_platform_file / embedded_rt_fiber_core_file).
+fn cross_rt_bundle_modules(tag: &str) -> str:
+    let fiber_core = if tag.starts_with("windows"): "fiber_core_windows" else: "fiber_core_darwin"
+    "rt_core," ++ tag ++ ",panic_runtime,channel_runtime,fiber_runtime," ++ fiber_core ++ ",compat_runtime"
+
+// The runtime bundle of a cross tag, compiled by the release compiler for
+// that triple into the tag's cross dir (rt.{o,wi,manifest}), linked against
+// the tag's corpus bundles; the cross compiler embeds it in its `rt` slot
+// (target_with_rt_bundle_blobs), as the release embeds the host's.
+fn cross_rt_bundle_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, plans: &List[WoBundle]) -> Build:
+    var out = out0
+    let dir = cross_dir(tag)
+    let root = "out/gen/rt_bundle_" ++ tag ++ ".w"
+    out = out.add_target(rt_bundle_root_target_named(p ++ "rt-bundle-root", root, cross_rt_bundle_modules(tag)))
+    var target = target_new(.Action, p ++ "rt-bundle", "").output(dir ++ "/rt.o")
+    target.action = run_rt_bundle_build_action
+    target = target.compiler(release_compiler_bin("with"))
+    target = target.input(release_compiler_bin("with"))
+    target = target.arg("compiler=" ++ release_compiler_bin("with"))
+    target = target.arg("dir=" ++ dir)
+    target = target.arg("root=" ++ root)
+    target = target.arg("target=" ++ cross_triple(tag))
+    target = target.input(build_owned_text(root))
+    target = target.dep(p ++ "rt-bundle-root")
+    target = target.dep("build")
+    for pi in 0..plans.len():
+        target = target_with_link_bundle(target, ctx, plans[pi])
+    for stem in cross_rt_bundle_modules(tag).split(","):
+        target = target.input("rt/" ++ stem ++ ".w")
+    target = target.extra_output(dir ++ "/rt.wi")
+    target = target.extra_output(dir ++ "/rt.manifest")
+    target = target.extra_output(dir ++ "/rt.fp")
+    target = target.extra_output(dir ++ "/rt.fp.tsv")
+    target = target.extra_output(dir ++ "/rt.wi.fp")
+    target = target.extra_output(dir ++ "/rt.wi.fp.tsv")
+    target = target.write_scope(dir)
+    target = target.write_scope("out/command/" ++ p ++ "rt-bundle")
+    target = target.timeout(600000)
+    out.add_target(target)
 
 fn rt_bundle_target(name: &str, compiler: &str, dir: &str, dep: &str, host_runtime: &HostRuntimeSpec, ctx: &BuildCtx, corpus_plans: &List[WoBundle]) -> Target:
     var target = target_new(.Action, build_owned_text(name), "").output(dir ++ "/rt.o")
@@ -407,8 +453,8 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
         let slot = plans[pi].name ++ "_wasm32"
         out = add_empty_wo_blob_targets(move out, p, dir, slot)
         cross_embedded = target_with_empty_wo_blobs(move cross_embedded, p, dir, slot)
-    out = add_empty_wo_blob_targets(out, p, dir, "rt")
-    cross_embedded = target_with_empty_wo_blobs(cross_embedded, p, dir, "rt")
+    out = cross_rt_bundle_targets(out, ctx, tag, p, plans)
+    cross_embedded = target_with_rt_bundle_blobs(cross_embedded, dir, p ++ "rt-bundle")
     out = add_empty_darwin_sysroot_blob_target(move out, p, dir)
     // #1915 (D81): the target's sysroot, compiler-rt and libc++ (a pack the
     // cross compiler embeds, and an unpacked copy the cross links read) and
@@ -4117,8 +4163,8 @@ pub fn build(ctx: BuildCtx) -> Build:
         let slot = corpus_plans_windows_x86_64[pi].name ++ "_wasm32"
         out = add_empty_wo_blob_targets(move out, "cross-win-", cross_windows_dir(), slot)
         cross_win_embedded = target_with_empty_wo_blobs(move cross_win_embedded, "cross-win-", cross_windows_dir(), slot)
-    out = add_empty_wo_blob_targets(out, "cross-win-", cross_windows_dir(), "rt")
-    cross_win_embedded = target_with_empty_wo_blobs(cross_win_embedded, "cross-win-", cross_windows_dir(), "rt")
+    out = cross_rt_bundle_targets(out, ctx, "windows_x86_64", "cross-win-", &corpus_plans_windows_x86_64)
+    cross_win_embedded = target_with_rt_bundle_blobs(cross_win_embedded, cross_windows_dir(), "cross-win-rt-bundle")
     out = add_empty_darwin_sysroot_blob_target(move out, "cross-win-", cross_windows_dir())
     cross_win_embedded = target_with_empty_darwin_sysroot_blob(move cross_win_embedded, "cross-win-", cross_windows_dir())
     let cross_win_embedded_obj = embedded_objects_object("cross-win-embedded-objects-object", &cross_win_embedded, cross_windows_triple())
@@ -4206,8 +4252,8 @@ pub fn build(ctx: BuildCtx) -> Build:
         let slot = corpus_plans_windows_aarch64[pi].name ++ "_wasm32"
         out = add_empty_wo_blob_targets(move out, "cross-winarm-", cross_windows_aarch64_dir(), slot)
         cross_winarm_embedded = target_with_empty_wo_blobs(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir(), slot)
-    out = add_empty_wo_blob_targets(out, "cross-winarm-", cross_windows_aarch64_dir(), "rt")
-    cross_winarm_embedded = target_with_empty_wo_blobs(cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir(), "rt")
+    out = cross_rt_bundle_targets(out, ctx, "windows_aarch64", "cross-winarm-", &corpus_plans_windows_aarch64)
+    cross_winarm_embedded = target_with_rt_bundle_blobs(cross_winarm_embedded, cross_windows_aarch64_dir(), "cross-winarm-rt-bundle")
     out = add_empty_darwin_sysroot_blob_target(move out, "cross-winarm-", cross_windows_aarch64_dir())
     cross_winarm_embedded = target_with_empty_darwin_sysroot_blob(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir())
     let cross_winarm_embedded_obj = embedded_objects_object("cross-winarm-embedded-objects-object", &cross_winarm_embedded, cross_windows_aarch64_triple())

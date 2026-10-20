@@ -58,7 +58,7 @@ pub fn run_rt_bundle_root_action(ctx: ActionCtx) -> i32:
         return rb_fail(ctx, "could not write " ++ ctx.output())
     0
 
-// args: compiler=<path> dir=<dir> root=<path>, and the stage compiles'
+// args: compiler=<path> dir=<dir> root=<path> [target=<triple>], and the stage compiles'
 // `--link-bundle <prefix>` pairs: the unit then holds what a compiler that
 // embeds the bundles holds. stage1's slots are empty, so without them the
 // prelude's std.regex compiles pcre2 into the unit; its literals are pruned
@@ -69,6 +69,9 @@ pub fn run_rt_bundle_build_action(ctx: ActionCtx) -> i32:
     let compiler = wo_arg_value(args, "compiler=")
     let dir = wo_arg_value(args, "dir=")
     let root_path = wo_arg_value(args, "root=")
+    // A cross target's bundle: compiled and checked for that triple, as
+    // its runtime objects are (cross_object_target_with).
+    let triple = wo_arg_value(args, "target=")
     if compiler.len() == 0 or dir.len() == 0 or root_path.len() == 0:
         return rb_fail(ctx, "requires compiler=, dir= and root= arguments")
     let fs = ctx.fs()
@@ -91,6 +94,7 @@ pub fn run_rt_bundle_build_action(ctx: ActionCtx) -> i32:
     build_args.push("build")
     build_args.push(rb_abs(root, root_path))
     build_args.push("--emit-obj")
+    if triple.len() > 0: build_args.push("--target=" ++ triple)
     for lb in link_bundles: build_args.push(lb)
     build_args.push("--bundle-corpus")
     build_args.push("rt")
@@ -114,6 +118,7 @@ pub fn run_rt_bundle_build_action(ctx: ActionCtx) -> i32:
     check_args.push(rb_abs(root, compiler))
     check_args.push("check")
     check_args.push(rb_abs(root, wi))
+    if triple.len() > 0: check_args.push("--target=" ++ triple)
     for lb in link_bundles: check_args.push(lb)
     check_args.push("--bundle-corpus")
     check_args.push("rt")
