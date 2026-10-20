@@ -657,7 +657,13 @@ impl Zcu:
             let decl = out.get_decl(i)
             let kind = out.kind(decl)
             if kind == NodeKind.NK_C_FACADE:
-                claimed = self.collect_facade_claims_frontend(out, decl as i32, move claimed)
+                // The runtime's own `libc` blocks (in-unit under D30) are not
+                // the program's facades: as with the object-linked runtime,
+                // they leave the toolchain facade its names. Claimed, they
+                // took `domain environ` out of its text while its getenv row
+                // still named it ("unknown domain 'environ'").
+                if not self.decl_source_path_frontend(i).starts_with("<embedded-rt>/"):
+                    claimed = self.collect_facade_claims_frontend(out, decl as i32, move claimed)
                 continue
             if i >= self.decl_is_c_import.len() or self.decl_is_c_import[i] == 0:
                 continue

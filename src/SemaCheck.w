@@ -16173,6 +16173,13 @@ impl Sema:
     // the runtime calls it implements (with_sysinfo_os/arch, D91).
     fn current_module_is_runtime() -> bool: sema_path_is_runtime_implementation(self.current_module_path) != 0
 
+    // The facade block being collected comes from the runtime (rt/), by the
+    // block's own file: facade items are collected outside the module walk,
+    // where current_module_path still names whatever module was last checked
+    // (the toolchain's `libc` facade read as the runtime's and lost its own
+    // `domain environ`).
+    fn current_facade_is_runtime() -> bool: sema_path_is_runtime_implementation(self.decl_source_path_for_node(self.current_facade_node)) != 0
+
     fn fn_is_in_unit_runtime_abi_def(fn_sym: i32) -> bool:
         sema_name_is_compiler_abi_extern(self.pool_resolve(fn_sym)) != 0 and sema_path_is_runtime_implementation(self.fn_symbol_source_path(fn_sym)) != 0
 
