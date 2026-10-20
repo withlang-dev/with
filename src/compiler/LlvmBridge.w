@@ -1259,6 +1259,11 @@ fn wl_delete_function_body(f: i64) -> Unit:
         while bb as i64 != 0:
             LLVMDeleteBasicBlock(bb)
             bb = LLVMGetFirstBasicBlock(f as *mut u8)
+        // A declaration carries no definition subprogram (the verifier:
+        // "function declaration may only have a unique !dbg attachment"):
+        // a codegen unit that demoted a foreign c_export it had emitted
+        // (rt's __isPlatformVersionAtLeast, in-unit under D30) failed.
+        LLVMSetSubprogram(f as *mut u8, 0 as *mut u8)
 
 fn wl_get_first_global(m: i64) -> i64: unsafe { LLVMGetFirstGlobal(m as *mut u8) as i64 }
 fn wl_get_next_global(g: i64) -> i64: unsafe { LLVMGetNextGlobal(g as *mut u8) as i64 }

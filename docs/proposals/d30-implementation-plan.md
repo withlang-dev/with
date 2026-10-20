@@ -423,3 +423,42 @@ primitives, then ListView places, then &str pairs), lane-green at each
 step. (3) The flip, and R3's deletion of the legacy link, as separate
 commits per the bootstrap rules (runtime exports and Link.w never in
 the same commit).
+
+**Steps (0) and (1), done 2026-10-19 (branch `d30-module-identity`).**
+The sweep driver is now per-file `WITH_RT_IN_UNIT=1 <release> test` over
+the behavior files that spawn no compiler or process: a test that runs
+a nested `with build` inherits the variable, evaluates build.w under the
+lane, and rewrote the tree's runtime objects mid-sweep (the "generation
+f932…" link failures that made two sweeps of one tree disagree). A
+second tool lied the same way: the test-verdict cache did not key on the
+variable, so a lane sweep was served 1367 of 1695 passes recorded
+without it (fixed, `test_verdict_key_env_test.w`).
+
+Re-measured on main `13a81f9c1`: 202 of 1695 such files failed under the
+lane (fresh), in these classes, each now fixed at its line with a lane
+fixture (`behav_d30_*`, `//! env: WITH_RT_IN_UNIT=1`):
+
+| Class | Files | Root cause (the exact line) |
+|---|---|---|
+| c_import program link | 188 | `displace_c_import_wrappers` displaced the runtime's `with_alloc`/`free`/`memcpy`/`memset` beside a translation's extern of the same symbol |
+| global "may race" (E0921) | ~45 | the runtime's own `@[c_export] __isPlatformVersionAtLeast` counted as the program's concurrency evidence |
+| comptime `Target.os` | 16 | the evaluator's D91 target intercept required a bodiless `with_sysinfo_os`; in-unit it has a body that asks the host |
+| LLVM verify under codegen units | 8 | `unit_demote_foreign_definitions` keyed a c_export by its C name (no unit owned it) and left its subprogram on the demoted declaration; not lane-only |
+| compiler-module programs | 6 | the lld/compiler link branch added rt_core.o beside the in-unit runtime |
+| `--no-std` | 2 | the runtime joined a no-std unit |
+| errno domain scope | 1 | four fixtures declared `domain errno process` against ruling §33/§37's `thread` |
+| local callable vs unsafe fn | 1 | `check_call` (and #2235's walk) asked the free `unsafe fn` about a call through a same-named local |
+
+Module identity (ruling 4): a runtime fn a program's fn shadows is now
+displaced like any prelude fn instead of dropped, so rt_core.w's
+`make_str`, fiber_runtime.w's, panic_runtime.w's `str_data` and the
+program's own are distinct; only a runtime ABI symbol
+(`codegen_is_runtime_abi_symbol`) keeps the drop. The "named-remedy
+diagnostic" had no August text to restore (830018de carried the generic
+wording); a program's hand-declared `extern fn with_*` call now names the
+remedy. After these, all 1700 such behavior files pass under the lane.
+
+Still to measure before R2c's erasures: the process-spawning behavior
+files with the lane confined to the program under test (not its nested
+builds), test/spec, test/compile_errors, test/internals and the
+compiler-self lane.

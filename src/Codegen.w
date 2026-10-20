@@ -592,6 +592,9 @@ type Codegen {
     unit_index: i32,
     unit_assign: HashMap[i32, i32],
     unit_rename_index: HashMap[i32, i32],
+    // A `@[c_export("name")]` C symbol's With function: the unit plan is
+    // keyed by the function, the module holds the C name.
+    c_export_owner_syms: HashMap[str, i32],
     mir_local_ptrs: HashMap[i32, i64],
     mir_local_values: HashMap[i32, i64],
     mir_memory_locals: HashMap[i32, i32],
@@ -1332,6 +1335,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         unit_index: 0,
         unit_assign: HashMap.new(),
         unit_rename_index: HashMap.new(),
+        c_export_owner_syms: HashMap.new(),
         mir_local_ptrs: HashMap.new(),
         mir_local_values: HashMap.new(),
         mir_memory_locals: HashMap.new(),
@@ -1893,7 +1897,10 @@ impl Codegen:
             if wl_fn_is_declaration(f) == 0 and wl_get_linkage(f) == wl_external_linkage():
                 let nm = wl_get_value_name(f)
                 if not nm.starts_with("__wcu$") and nm != "main":
-                    let nm_sym = self.intern.intern(nm)
+                    // A c_export's C name is no With symbol: its owner is the
+                    // function it exports (every unit demoted it, and the link
+                    // found the C symbol defined nowhere).
+                    let nm_sym = self.c_export_owner_syms.get(nm) ?? self.intern.intern(nm)
                     if not self.unit_owns(nm_sym):
                         wl_delete_function_body(f)
             f = wl_get_next_function(f)
@@ -5849,6 +5856,7 @@ impl Codegen:
         // C code calls undefined at link.
         let c_export_symbol = if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:": cc_name.slice(9, cc_name.len()) else: ""
         let defined_symbol = if c_export_symbol.len() > 0: c_export_symbol.clone() else: effective_name.clone()
+        if c_export_symbol.len() > 0: self.c_export_owner_syms.insert(c_export_symbol, name_sym)
         var ast_existing = wl_get_named_function(self.llmod, defined_symbol)
         if ast_existing != 0 and c_export_symbol.len() == 0 and not codegen_is_runtime_abi_symbol(effective_name):
             ast_existing = 0

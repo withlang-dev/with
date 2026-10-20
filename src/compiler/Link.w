@@ -2404,8 +2404,12 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
                     return link_stage_plan_fail()
                 let fiber_stubs_ar = link_stage_make_archive(fiber_stubs_path)
                 extras.push(if fiber_stubs_ar.len() > 0: fiber_stubs_ar else: fiber_stubs_path)
-        else if not use_rt_core and needs_llvm:
+        else if not use_rt_core and needs_llvm and not rt_in_unit:
             // Compiler build (lld path) — rt_core.o provides the runtime,
+            // unless it is in-unit (D30): then the branch below links no
+            // .w-derived rt object, as for any program (a program importing
+            // compiler modules linked rt_core.o beside its own in-unit
+            // runtime: 20 duplicate rt_* symbols).
             // compat_runtime.o has libc-dependent functions (system, signals),
             // cimport_stubs.o has c_import/fiber weak stubs.
             let rt_core_path = link_stage_find_runtime_object_path("rt_core.o")

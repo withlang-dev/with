@@ -2019,7 +2019,9 @@ impl Zcu:
             self.diagnostics = move pparser.diags
             self.seed_decl_source_paths(pool, name, file_id)
             pool = self.expand_prelude_closure_frontend(pool)
-            if frontend_rt_in_unit_enabled() != 0:
+            // The in-unit runtime is written against std: a --no-std program
+            // (core/alloc prelude, its own panic handler and entry) gets none.
+            if frontend_rt_in_unit_enabled() != 0 and not self.project_config.no_std:
                 pool = self.parse_runtime_modules_frontend(pool)
             self.prelude_prefix_decls = pool.decl_count()
             self.prelude_prefix_non_use = count_non_use_decls_frontend(pool)
@@ -2566,6 +2568,13 @@ impl Zcu:
             let from_import = di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0
             let name = pool.get_data0(decl)
             let path = self.decl_source_path_frontend(di)
+            // D30: a c_import translation's `extern fn with_alloc` declares
+            // the in-unit runtime's own symbol, not another C function; the
+            // definition keeps its flat name and the extern binds to it.
+            // Displaced, every c_import program under WITH_RT_IN_UNIT linked
+            // against a with_alloc no object defined.
+            if frontend_is_runtime_abi_def(path, self.pool, name):
+                continue
             for e in 0..extern_names.len():
                 // A header's extern also must not overwrite another source
                 // module's ordinary With function (e.g. clock(seconds)).
@@ -2958,9 +2967,13 @@ impl Zcu:
                         let sname: str = self.pool.resolve(shadowed_name)
                         self.diagnostics.emit(Diagnostic.err(f"extern fn '{sname}' shadows prelude function '{sname}'", Span { file: 0, start: merged_pool.get_start(id), end: merged_pool.get_end(id) }))
                         continue
-                // A runtime definition is a flat ABI symbol the compiler emits
-                // calls to; it keeps the pre-#1350 decl-drop.
-                if prelude_verdict == FRONTEND_FN_DROP or rt_def:
+                // A runtime ABI symbol (FnAbi's codegen_is_runtime_abi_symbol:
+                // `with_*`, `rt_*`, ...) is a flat name the compiler emits
+                // calls to; it keeps the pre-#1350 decl-drop. Any other runtime
+                // fn is displaced like any prelude fn: dropped, its module's
+                // calls bound to a program's same-named fn (`make_str`, `ptr`;
+                // D30 ruling 4).
+                if prelude_verdict == FRONTEND_FN_DROP or (rt_def and codegen_is_runtime_abi_symbol(self.pool.resolve(merged_pool.get_data0(id)))):
                     continue
                 frontend_displace_fn_decl(merged_pool, self.pool, id, prelude_path)
             if ik == NodeKind.NK_EXTERN_VAR:
@@ -3112,6 +3125,11 @@ fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: &AstPool,
                 return if displaceable and paths[idx] != paths[j]: FRONTEND_FN_DISPLACE else: FRONTEND_FN_DROP
         j = j + 1
     FRONTEND_FN_KEEP
+
+// A definition from the in-unit runtime of a symbol the compiler calls by
+// its flat name (FnAbi.codegen_is_runtime_abi_symbol).
+fn frontend_is_runtime_abi_def(path: &str, intern: &InternPool, name: i32) -> bool:
+    path.starts_with("<embedded-rt>/") and codegen_is_runtime_abi_symbol(intern.resolve(name))
 
 fn frontend_fn_decl_is_displaceable(pool: &AstPool, intern: &InternPool, decl: i32) -> bool:
     pool.kind(decl) == NodeKind.NK_FN_DECL and not pool.fn_decl_body_is_interface(decl as NodeId) and not frontend_fn_decl_is_c_export(pool, intern, decl)
