@@ -1456,7 +1456,7 @@ fn bundle_symbol_contract(sema: &Sema, name: &str) -> str:
     if sig < 0:
         return ""
     let no_globals: List[str] = List.new()
-    var emitter = bx_new_emitter("", &no_globals)
+    var emitter = bx_new_emitter("", no_globals)
     // The DECLARED effect of each parameter — its `@[effect]` pin, else the
     // effect its type declares (emit_fn's rule) — never the body-inferred
     // one: a definition's body reads its parameter and its extern twin

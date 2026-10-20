@@ -4770,7 +4770,7 @@ impl Parser:
             if not ok: return 0
             let extra_start = self.pool.extra_len()
             for i in 0..clauses.len(): self.pool.add_extra(clauses[i])
-            return self.pool.add_node(NodeKind.NK_FACADE_FN, start, self.facade_item_end(head_end, &clauses), name, extra_start, clauses.len() as i32) as i32
+            return self.pool.add_node(NodeKind.NK_FACADE_FN, start, self.facade_item_end(head_end, clauses), name, extra_start, clauses.len() as i32) as i32
         if self.current_ident_is("resource"):
             self.advance()
             let name = self.expect_ident()
@@ -4787,7 +4787,7 @@ impl Parser:
             let extra_start = self.pool.extra_len()
             self.pool.add_extra(repr as i32)
             for i in 0..clauses.len(): self.pool.add_extra(clauses[i])
-            return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.facade_item_end(head_end, &clauses), name, extra_start, clauses.len() as i32) as i32
+            return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.facade_item_end(head_end, clauses), name, extra_start, clauses.len() as i32) as i32
         if self.current_ident_is("handle"):
             // `handle Name wraps *mut T` (§16.2b.9, ruling Amendment 1): a
             // callback-scope representation. It is a resource item whose one

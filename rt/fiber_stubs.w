@@ -5,6 +5,7 @@
 @[link_name("abort")]
 extern fn rt_libc_abort() -> Unit
 extern fn with_debug_alloc_report_leaks() -> Unit
+extern fn with_ewrite(s: &str)
 extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 extern fn rt_nanosleep(ns: i64) -> i32
 extern fn rt_clock_ns() -> i64
@@ -212,22 +213,22 @@ pub fn with_fiber_is_cancelled() -> i32:
     0
 
 fn with_channel_unavailable() -> Never:
-    let _ = rt_write(2, "fatal: channels need the fiber runtime, which this program was linked without\n" as *const u8, 78)
+    with_ewrite("fatal: channels need the fiber runtime, which this program was linked without\n")
     rt_libc_abort()
     loop:
-        let _ = 0
+        rt_libc_abort()
 
-pub fn with_channel_retain_sender(ch_handle: i64) -> Unit:
+pub fn with_channel_retain_sender(ch_handle: i64):
     if ch_handle == 0:
         return
     with_channel_unavailable()
 
-pub fn with_channel_release_sender(ch_handle: i64) -> Unit:
+pub fn with_channel_release_sender(ch_handle: i64):
     if ch_handle == 0:
         return
     with_channel_unavailable()
 
-pub fn with_channel_release_receiver(ch_handle: i64) -> Unit:
+pub fn with_channel_release_receiver(ch_handle: i64):
     if ch_handle == 0:
         return
     with_channel_unavailable()

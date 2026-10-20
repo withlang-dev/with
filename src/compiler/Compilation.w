@@ -1439,7 +1439,7 @@ impl Compilation:
                 if fingerprint.len() == 0:
                     compilation_remove_file_best_effort(obj_path)
                     return ""
-            if self.bundle_manifest_path.len() > 0 and not self.write_bundle_manifest(obj_path, fingerprint, interface_sha, &model):
+            if self.bundle_manifest_path.len() > 0 and not self.write_bundle_manifest(obj_path, fingerprint, interface_sha, model):
                 compilation_remove_file_best_effort(obj_path)
                 return ""
         with_str_clone_ref(obj_path)
@@ -1582,7 +1582,7 @@ impl Compilation:
                 with_eprint("error: --emit-bundle-manifest: " ++ obj_path ++ " references `" ++ symbol ++ "`, a module-link-named symbol of a module the object does not carry: nothing at a consumer's link defines it (docs/spec/toolchain/wo_bundles.md, carried copies)")
                 return "<failed>"
             let contract = bundle_symbol_contract(sema, symbol)
-            let provided = bundle_provided_contract(&provides, symbol)
+            let provided = bundle_provided_contract(provides, symbol)
             if provided.len() == 0:
                 // The platform's (libc, compiler-rt, the wasm linker's
                 // tables): a declaration gives its contract for the record;

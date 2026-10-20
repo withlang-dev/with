@@ -1916,7 +1916,7 @@ fn link_stage_bundle_import_drift(name: &str, manifest: &str) -> str:
             continue
         let symbol = bundle_row_field(row, 0)
         let wanted = bundle_row_field(row, 2)
-        let provided = bundle_provided_contract(&provides, symbol)
+        let provided = bundle_provided_contract(provides, symbol)
         if provided.len() == 0:
             return "error: bundle '" ++ name ++ "' imports the runtime symbol `" ++ symbol ++ "`, which this compiler's runtime no longer provides; rebuild the bundle"
         if provided != wanted:

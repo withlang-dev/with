@@ -93,39 +93,6 @@ fn cross_rt_bundle_modules(tag: &str) -> str:
     let fiber_core = if tag.starts_with("windows"): "fiber_core_windows" else: "fiber_core_darwin"
     "rt_core," ++ tag ++ ",panic_runtime,channel_runtime,fiber_runtime," ++ fiber_core ++ ",compat_runtime"
 
-// The runtime bundle of a cross tag, compiled by the release compiler for
-// that triple into the tag's cross dir (rt.{o,wi,manifest}), linked against
-// the tag's corpus bundles; the cross compiler embeds it in its `rt` slot
-// (target_with_rt_bundle_blobs), as the release embeds the host's.
-fn cross_rt_bundle_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, plans: &List[WoBundle]) -> Build:
-    var out = out0
-    let dir = cross_dir(tag)
-    let root = "out/gen/rt_bundle_" ++ tag ++ ".w"
-    out = out.add_target(rt_bundle_root_target_named(p ++ "rt-bundle-root", root, cross_rt_bundle_modules(tag)))
-    var target = target_new(.Action, p ++ "rt-bundle", "").output(dir ++ "/rt.o")
-    target.action = run_rt_bundle_build_action
-    target = target.compiler(release_compiler_bin("with"))
-    target = target.input(release_compiler_bin("with"))
-    target = target.arg("compiler=" ++ release_compiler_bin("with"))
-    target = target.arg("dir=" ++ dir)
-    target = target.arg("root=" ++ root)
-    target = target.arg("target=" ++ cross_triple(tag))
-    target = target.input(build_owned_text(root))
-    target = target.dep(p ++ "rt-bundle-root")
-    target = target.dep("build")
-    for stem in cross_rt_bundle_modules(tag).split(","):
-        target = target.input("rt/" ++ stem ++ ".w")
-    target = target.extra_output(dir ++ "/rt.wi")
-    target = target.extra_output(dir ++ "/rt.manifest")
-    target = target.extra_output(dir ++ "/rt.fp")
-    target = target.extra_output(dir ++ "/rt.fp.tsv")
-    target = target.extra_output(dir ++ "/rt.wi.fp")
-    target = target.extra_output(dir ++ "/rt.wi.fp.tsv")
-    target = target.write_scope(dir)
-    target = target.write_scope("out/command/" ++ p ++ "rt-bundle")
-    target = target.timeout(600000)
-    out.add_target(target)
-
 fn rt_bundle_target(name: &str, compiler: &str, dir: &str, dep: &str, host_runtime: &HostRuntimeSpec) -> Target:
     var target = target_new(.Action, build_owned_text(name), "").output(dir ++ "/rt.o")
     target.action = run_rt_bundle_build_action
@@ -181,8 +148,30 @@ fn target_with_rt_bundle_blobs_as(target: Target, dir: &str, dep: &str, symbol: 
 fn wasm32_rt_bundle_modules() -> str:
     "rt_core,wasm,panic_runtime,fiber_stubs,compat_runtime"
 
-fn wasm32_rt_bundle_target(name: &str, compiler: &str, dir: &str, dep: &str) -> Target:
-    let root = "out/gen/rt_bundle_wasm32.w"
+// Every target beside the host whose runtime bundle each stage builds and
+// the next stage embeds as its `rt@<tag>` slot: a `--target <tag>` check or
+// link of a unit compiled against the runtime interface needs the runtime
+// of its target (every-target-check, D91 §17.5), as the wasm32 corpus
+// bundles need a wasm32 runtime manifest to record their contracts against.
+fn stage_rt_bundle_tags() -> List[str]:
+    let tags: List[str] = List.new()
+    for tag in "wasm32 linux_x86_64 linux_aarch64 windows_x86_64 windows_aarch64".split(" "):
+        tags.push(build_owned_text(tag))
+    tags
+
+fn tag_rt_bundle_modules(tag: &str) -> str:
+    if tag == "wasm32": wasm32_rt_bundle_modules() else: cross_rt_bundle_modules(tag)
+
+// The tag's runtime bundle root a stage compiles (its own file: the cross
+// compilers' roots, `<p>rt-bundle-root`, are the release's).
+fn tag_rt_bundle_root(tag: &str) -> str:
+    "out/gen/rt_bundle_" ++ tag ++ "_stage.w"
+
+fn tag_rt_bundle_root_target(tag: &str) -> Target:
+    rt_bundle_root_target_named("rt-bundle-root-" ++ tag, tag_rt_bundle_root(tag), tag_rt_bundle_modules(tag))
+
+fn tag_rt_bundle_target(tag: &str, name: &str, compiler: &str, dir: &str, dep: &str) -> Target:
+    let root = tag_rt_bundle_root(tag)
     var target = target_new(.Action, build_owned_text(name), "").output(dir ++ "/rt.o")
     target.action = run_rt_bundle_build_action
     target = target.compiler(compiler)
@@ -190,10 +179,10 @@ fn wasm32_rt_bundle_target(name: &str, compiler: &str, dir: &str, dep: &str) -> 
     target = target.arg("compiler=" ++ compiler)
     target = target.arg("dir=" ++ dir)
     target = target.arg("root=" ++ root)
-    target = target.arg("target=" ++ cross_triple("wasm32"))
+    target = target.arg("target=" ++ cross_triple(tag))
     target = target.input(build_owned_text(root))
-    target = target.dep("rt-bundle-root-wasm32")
-    for stem in wasm32_rt_bundle_modules().split(","):
+    target = target.dep("rt-bundle-root-" ++ tag)
+    for stem in tag_rt_bundle_modules(tag).split(","):
         target = target.input("rt/" ++ stem ++ ".w")
     target = target.extra_output(dir ++ "/rt.wi")
     target = target.extra_output(dir ++ "/rt.manifest")
@@ -206,16 +195,32 @@ fn wasm32_rt_bundle_target(name: &str, compiler: &str, dir: &str, dep: &str) -> 
     target = target.timeout(1800000)
     target.dep(build_owned_text(dep))
 
-// The stage1 and stage2 wasm32 runtime bundles are the same bytes (the
-// host's rule, rt-bundle-fixpoint).
-fn wasm32_rt_bundle_fixpoint_target() -> Target:
-    var target = target_new(.Action, "rt-bundle-wasm32-fixpoint", "").output("out/.build-state/rt-bundle-wasm32-fixpoint.txt")
+// The stage1 and stage2 bundles of a tag are the same bytes (the host's
+// rule, rt-bundle-fixpoint).
+fn tag_rt_bundle_fixpoint_target(tag: &str) -> Target:
+    let left = "out/bootstrap/lib/cross/" ++ tag
+    let right = "out/lib/cross/" ++ tag
+    var target = target_new(.Action, "rt-bundle-" ++ tag ++ "-fixpoint", "").output("out/.build-state/rt-bundle-" ++ tag ++ "-fixpoint.txt")
     target.action = run_rt_bundle_fixpoint_action
-    target = target.arg("left=out/bootstrap/lib/cross/wasm32").arg("right=out/lib/cross/wasm32")
+    target = target.arg("left=" ++ left).arg("right=" ++ right)
     for kind in "o,wi,manifest".split(","):
-        target = target.input("out/bootstrap/lib/cross/wasm32/rt." ++ kind).input("out/lib/cross/wasm32/rt." ++ kind)
+        target = target.input(left ++ "/rt." ++ kind).input(right ++ "/rt." ++ kind)
     target = target.write_scope("out/.build-state")
-    target.dep("stage1-rt-bundle-wasm32").dep("rt-bundle-wasm32")
+    target.dep("stage1-rt-bundle-" ++ tag).dep("rt-bundle-" ++ tag)
+
+// The empty `rt@<tag>` slots of a compiler that carries no other target's
+// runtime bundle (the bootstrap embedding, the cross compilers).
+fn add_empty_rt_bundle_slot_targets(out0: Build, prefix: &str, dir: &str) -> Build:
+    var out = out0
+    for tag in stage_rt_bundle_tags():
+        out = add_empty_wo_blob_targets(out, prefix, dir, "rt_" ++ tag)
+    out
+
+fn target_with_empty_rt_bundle_slots(target: Target, prefix: &str, dir: &str) -> Target:
+    var out = target
+    for tag in stage_rt_bundle_tags():
+        out = target_with_empty_wo_blobs(out, prefix, dir, "rt_" ++ tag)
+    out
 
 fn run_cross_unsupported_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
@@ -259,11 +264,11 @@ fn cross_wo_plan(ctx: &BuildCtx, host_plan: &WoBundle, tag: &str) -> WoBundle:
 
 // A cross compiler's bundle targets: none for a host plan, which the host
 // graph already builds and installs.
-fn cross_wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, p: &str) -> Build:
+fn cross_wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle) -> Build:
     if plan.triple.len() == 0: return out
-    // After the target's runtime bundle (`<p>rt-bundle`, cross_rt_bundle_targets):
-    // its manifest holds the contracts the corpus bundle imports (D138).
-    wo_bundle_targets(move out, ctx, plan, release_compiler_bin("with"), p ++ "rt-bundle", cross_dir(plan.target) ++ "/rt.manifest")
+    // After the target's runtime bundle (`rt-bundle-<tag>`, stage2's): its
+    // manifest holds the contracts the corpus bundle imports (D138).
+    wo_bundle_targets(out, ctx, plan, release_compiler_bin("with"), "rt-bundle-" ++ plan.target, cross_dir(plan.target) ++ "/rt.manifest")
 
 // Every registered corpus's plan for one cross tag, in registry order.
 fn cross_wo_plans(ctx: &BuildCtx, host_plans: &List[WoBundle], tag: &str) -> List[WoBundle]:
@@ -380,7 +385,7 @@ fn add_cross_wasm_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str, 
     var out = out0
     // Compiled by stage2 (not the release) so the release binary can embed
     // them: the release's own native runtime objects are stage2's too.
-    out = add_wasm32_runtime_object_targets(move out, p, cross_dir(tag), stage_compiler_bin("with-stage2"), "stage2")
+    out = add_wasm32_runtime_object_targets(move out, p, cross_dir(tag), stage_compiler_bin("with-stage2"), "rt-bundle-wasm32")
     var cross_rt = target_new(.Group, build_owned_text(group_name), "")
     cross_rt = cross_rt.dep(p ++ "rt-core-object")
     cross_rt = cross_rt.dep(p ++ "rt-platform-object")
@@ -493,7 +498,7 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     // Each cross compiler embeds every corpus bundle compiled for its own
     // target by the release compiler (#946).
     for pi in 0..plans.len():
-        out = cross_wo_bundle_targets(move out, ctx, plans[pi], p)
+        out = cross_wo_bundle_targets(move out, ctx, plans[pi])
         cross_embedded = target_with_wo_blobs(move cross_embedded, plans[pi])
     // A cross compiler carries no wasm32 runtime yet (#2131: empty slots).
     out = add_empty_wasm32_runtime_blob_targets(move out, p ++ "empty-", dir)
@@ -504,12 +509,14 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
         let slot = plans[pi].name ++ "_wasm32"
         out = add_empty_wo_blob_targets(move out, p, dir, slot)
         cross_embedded = target_with_empty_wo_blobs(move cross_embedded, p, dir, slot)
-    out = cross_rt_bundle_targets(out, ctx, tag, p, plans)
-    cross_embedded = target_with_rt_bundle_blobs(cross_embedded, dir, p ++ "rt-bundle")
+    // The target's runtime bundle is the one stage2 built (`rt-bundle-<tag>`,
+    // which the release embeds as its `rt@<tag>` slot): the cross
+    // compiler's `rt` slot carries the same bytes.
+    cross_embedded = target_with_rt_bundle_blobs(cross_embedded, dir, "rt-bundle-" ++ tag)
     // A cross compiler carries no wasm32 runtime bundle (its `rt@wasm32`
     // slot is empty, as its corpus wasm32 slots are).
-    out = add_empty_wo_blob_targets(move out, p, dir, "rt_wasm32")
-    cross_embedded = target_with_empty_wo_blobs(move cross_embedded, p, dir, "rt_wasm32")
+    out = add_empty_rt_bundle_slot_targets(out, p, dir)
+    cross_embedded = target_with_empty_rt_bundle_slots(cross_embedded, p, dir)
     out = add_empty_darwin_sysroot_blob_target(move out, p, dir)
     // #1915 (D81): the target's sysroot, compiler-rt and libc++ (a pack the
     // cross compiler embeds, and an unpacked copy the cross links read) and
@@ -629,8 +636,9 @@ fn add_stage1_runtime_targets(out0: Build, ctx: &BuildCtx, host_runtime: &HostRu
     objects.push("stage1-fiber-asm-object")
     out = out.add_target(rt_bundle_target("stage1-rt-bundle", stage1, dir, "stage1", host_runtime))
     objects.push("stage1-rt-bundle")
-    out = out.add_target(wasm32_rt_bundle_target("stage1-rt-bundle-wasm32", stage1, dir ++ "/cross/wasm32", "stage1"))
-    objects.push("stage1-rt-bundle-wasm32")
+    for tag in stage_rt_bundle_tags():
+        out = out.add_target(tag_rt_bundle_target(tag, "stage1-rt-bundle-" ++ tag, stage1, dir ++ "/cross/" ++ tag, "stage1"))
+        objects.push("stage1-rt-bundle-" ++ tag)
     out = out.add_target(with_object_target("stage1-llvm-bridge-object", stage1, "src/compiler/LlvmBridge.w", dir ++ "/llvm_bridge.o", "-O1", "stage1-rt-bundle"))
     objects.push("stage1-llvm-bridge-object")
     out = out.add_target(with_object_target("stage1-clang-bridge-object", stage1, "src/compiler/ClangBridge.w", dir ++ "/clang_bridge.o", "-O1", "stage1-rt-bundle"))
@@ -678,7 +686,8 @@ fn add_stage1_runtime_targets(out0: Build, ctx: &BuildCtx, host_runtime: &HostRu
         embedded = embedded.input(dir ++ "/" ++ names[ni] ++ ".o")
         embedded = embedded.arg(names[ni] ++ "_o")
     embedded = target_with_rt_bundle_blobs(embedded, dir, "stage1-rt-bundle")
-    embedded = target_with_rt_bundle_blobs_as(embedded, dir ++ "/cross/wasm32", "stage1-rt-bundle-wasm32", "rt_wasm32")
+    for tag in stage_rt_bundle_tags():
+        embedded = target_with_rt_bundle_blobs_as(embedded, dir ++ "/cross/" ++ tag, "stage1-rt-bundle-" ++ tag, "rt_" ++ tag)
     embedded = embedded.input(dir ++ "/" ++ host_runtime.platform_install_object)
     embedded = embedded.arg(build_owned_text(host_runtime.platform_symbol))
     let empty_syms = embedded_platform_symbols()
@@ -697,7 +706,7 @@ fn add_stage1_runtime_targets(out0: Build, ctx: &BuildCtx, host_runtime: &HostRu
     // and the wasm32 runtime objects stage1 compiles beside the native ones.
     for pi in 0..wasm_plans.len():
         embedded = target_with_wo_blobs_as(move embedded, wasm_plans[pi], wasm_plans[pi].name ++ "_wasm32")
-    out = add_wasm32_runtime_object_targets(move out, "stage1-wasm32-", dir ++ "/cross/wasm32", stage1, "stage1")
+    out = add_wasm32_runtime_object_targets(move out, "stage1-wasm32-", dir ++ "/cross/wasm32", stage1, "stage1-rt-bundle-wasm32")
     embedded = target_with_wasm32_runtime_blobs(move embedded, "stage1-wasm32-", dir ++ "/cross/wasm32")
     embedded = target_with_darwin_sysroot_blob(move embedded)
     let embedded_obj = embedded_objects_object("stage-embedded-objects-object", &embedded, "")
@@ -3339,7 +3348,8 @@ pub fn build(ctx: BuildCtx) -> Build:
         compat_runtime = compat_runtime.arg(corpus_plans_wasm32[pi].name ++ "@wasm32")
     // D30 R3: the runtime bundle's slot, and the wasm32 runtime's beside it.
     compat_runtime = compat_runtime.arg("rt")
-    compat_runtime = compat_runtime.arg("rt@wasm32")
+    for tag in stage_rt_bundle_tags():
+        compat_runtime = compat_runtime.arg("rt@" ++ tag)
     // ...and the corpus directories the embedded stdlib leaves out.
     compat_runtime = corpora_exclude_args(move compat_runtime)
     compat_runtime = compat_runtime.input(build_owned_text(host_runtime.compat_source))
@@ -3671,8 +3681,8 @@ pub fn build(ctx: BuildCtx) -> Build:
             bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(bsym2))
     out = add_empty_wo_blob_targets(out, "bootstrap-", "out/bootstrap-lib", "rt")
     bootstrap_embedded_objects = target_with_empty_wo_blobs(bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", "rt")
-    out = add_empty_wo_blob_targets(out, "bootstrap-", "out/bootstrap-lib", "rt_wasm32")
-    bootstrap_embedded_objects = target_with_empty_wo_blobs(bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", "rt_wasm32")
+    out = add_empty_rt_bundle_slot_targets(out, "bootstrap-", "out/bootstrap-lib")
+    bootstrap_embedded_objects = target_with_empty_rt_bundle_slots(bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib")
     // Every consumed object's producer, declared (#680 edge audit).
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-cimport-stubs-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-compat-runtime-object")
@@ -4013,8 +4023,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     var fixpoint = target_new(.Group, "fixpoint", "")
     fixpoint = fixpoint.dep("fixpoint-compare")
     fixpoint = fixpoint.dep("rt-bundle-fixpoint")
-    out = out.add_target(wasm32_rt_bundle_fixpoint_target())
-    fixpoint = fixpoint.dep("rt-bundle-wasm32-fixpoint")
+    for tag in stage_rt_bundle_tags():
+        out = out.add_target(tag_rt_bundle_fixpoint_target(tag))
+        fixpoint = fixpoint.dep("rt-bundle-" ++ tag ++ "-fixpoint")
     fixpoint = fixpoint.dep("stage2-debug-lines")
     fixpoint = fixpoint.dep("bless-manifest")
     fixpoint = fixpoint.dep("fixpoint-evidence")
@@ -4061,8 +4072,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(fiber_asm)
     out = out.add_target(rt_bundle_root_target(&host_runtime))
     out = out.add_target(rt_bundle_target("rt-bundle", stage_compiler_bin("with-stage2"), "out/lib", "stage2", host_runtime))
-    out = out.add_target(rt_bundle_root_target_named("rt-bundle-root-wasm32", "out/gen/rt_bundle_wasm32.w", wasm32_rt_bundle_modules()))
-    out = out.add_target(wasm32_rt_bundle_target("rt-bundle-wasm32", stage_compiler_bin("with-stage2"), "out/lib/cross/wasm32", "stage2"))
+    for tag in stage_rt_bundle_tags():
+        out = out.add_target(tag_rt_bundle_root_target(tag))
+        out = out.add_target(tag_rt_bundle_target(tag, "rt-bundle-" ++ tag, stage_compiler_bin("with-stage2"), "out/lib/cross/" ++ tag, "stage2"))
 
     var embedded_objects = target_new(.EmbedObjectFiles, "embedded-objects-asm", "").output("out/lib/embedded_objects.s")
     embedded_objects = embedded_objects.input("out/lib/cimport_stubs.o")
@@ -4112,7 +4124,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.dep("rt-core-object")
     embedded_objects = embedded_objects.dep("rt-platform-object")
     embedded_objects = target_with_rt_bundle_blobs(embedded_objects, "out/lib", "rt-bundle")
-    embedded_objects = target_with_rt_bundle_blobs_as(embedded_objects, "out/lib/cross/wasm32", "rt-bundle-wasm32", "rt_wasm32")
+    for tag in stage_rt_bundle_tags():
+        embedded_objects = target_with_rt_bundle_blobs_as(embedded_objects, "out/lib/cross/" ++ tag, "rt-bundle-" ++ tag, "rt_" ++ tag)
     for ei3 in 0..empty_syms.len():
         let esym3 = empty_syms[ei3]
         if esym3 != host_runtime.platform_symbol:
@@ -4126,7 +4139,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     lib_objects.push("embedded-objects-object")
     lib_objects.push("llvm-link-metadata")
     lib_objects.push("rt-bundle")
-    lib_objects.push("rt-bundle-wasm32")
+    for tag in stage_rt_bundle_tags():
+        lib_objects.push("rt-bundle-" ++ tag)
     out = out.add_target(runtime_producer_target("runtime-producer", stage_compiler_bin("with-stage2"), "out/lib", &lib_objects))
 
     var runtime = target_new(.Group, "runtime", "")
@@ -4223,7 +4237,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_win_embedded = cross_win_embedded.dep("cross-win-rt-platform-object")
     let corpus_plans_windows_x86_64 = cross_wo_plans(ctx, &corpus_plans, "windows_x86_64")
     for pi in 0..corpus_plans_windows_x86_64.len():
-        out = cross_wo_bundle_targets(move out, ctx, corpus_plans_windows_x86_64[pi], "cross-win-")
+        out = cross_wo_bundle_targets(move out, ctx, corpus_plans_windows_x86_64[pi])
         cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, corpus_plans_windows_x86_64[pi])
     out = add_empty_wasm32_runtime_blob_targets(move out, "cross-win-empty-", cross_windows_dir())
     cross_win_embedded = target_with_empty_wasm32_runtime_blobs(move cross_win_embedded, "cross-win-empty-", cross_windows_dir())
@@ -4233,10 +4247,9 @@ pub fn build(ctx: BuildCtx) -> Build:
         let slot = corpus_plans_windows_x86_64[pi].name ++ "_wasm32"
         out = add_empty_wo_blob_targets(move out, "cross-win-", cross_windows_dir(), slot)
         cross_win_embedded = target_with_empty_wo_blobs(move cross_win_embedded, "cross-win-", cross_windows_dir(), slot)
-    out = cross_rt_bundle_targets(out, ctx, "windows_x86_64", "cross-win-", &corpus_plans_windows_x86_64)
-    cross_win_embedded = target_with_rt_bundle_blobs(cross_win_embedded, cross_windows_dir(), "cross-win-rt-bundle")
-    out = add_empty_wo_blob_targets(move out, "cross-win-", cross_windows_dir(), "rt_wasm32")
-    cross_win_embedded = target_with_empty_wo_blobs(move cross_win_embedded, "cross-win-", cross_windows_dir(), "rt_wasm32")
+    cross_win_embedded = target_with_rt_bundle_blobs(cross_win_embedded, cross_windows_dir(), "rt-bundle-windows_x86_64")
+    out = add_empty_rt_bundle_slot_targets(out, "cross-win-", cross_windows_dir())
+    cross_win_embedded = target_with_empty_rt_bundle_slots(cross_win_embedded, "cross-win-", cross_windows_dir())
     out = add_empty_darwin_sysroot_blob_target(move out, "cross-win-", cross_windows_dir())
     cross_win_embedded = target_with_empty_darwin_sysroot_blob(move cross_win_embedded, "cross-win-", cross_windows_dir())
     let cross_win_embedded_obj = embedded_objects_object("cross-win-embedded-objects-object", &cross_win_embedded, cross_windows_triple())
@@ -4314,7 +4327,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-rt-platform-object")
     let corpus_plans_windows_aarch64 = cross_wo_plans(ctx, &corpus_plans, "windows_aarch64")
     for pi in 0..corpus_plans_windows_aarch64.len():
-        out = cross_wo_bundle_targets(move out, ctx, corpus_plans_windows_aarch64[pi], "cross-winarm-")
+        out = cross_wo_bundle_targets(move out, ctx, corpus_plans_windows_aarch64[pi])
         cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, corpus_plans_windows_aarch64[pi])
     out = add_empty_wasm32_runtime_blob_targets(move out, "cross-winarm-empty-", cross_windows_aarch64_dir())
     cross_winarm_embedded = target_with_empty_wasm32_runtime_blobs(move cross_winarm_embedded, "cross-winarm-empty-", cross_windows_aarch64_dir())
@@ -4324,10 +4337,9 @@ pub fn build(ctx: BuildCtx) -> Build:
         let slot = corpus_plans_windows_aarch64[pi].name ++ "_wasm32"
         out = add_empty_wo_blob_targets(move out, "cross-winarm-", cross_windows_aarch64_dir(), slot)
         cross_winarm_embedded = target_with_empty_wo_blobs(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir(), slot)
-    out = cross_rt_bundle_targets(out, ctx, "windows_aarch64", "cross-winarm-", &corpus_plans_windows_aarch64)
-    cross_winarm_embedded = target_with_rt_bundle_blobs(cross_winarm_embedded, cross_windows_aarch64_dir(), "cross-winarm-rt-bundle")
-    out = add_empty_wo_blob_targets(move out, "cross-winarm-", cross_windows_aarch64_dir(), "rt_wasm32")
-    cross_winarm_embedded = target_with_empty_wo_blobs(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir(), "rt_wasm32")
+    cross_winarm_embedded = target_with_rt_bundle_blobs(cross_winarm_embedded, cross_windows_aarch64_dir(), "rt-bundle-windows_aarch64")
+    out = add_empty_rt_bundle_slot_targets(out, "cross-winarm-", cross_windows_aarch64_dir())
+    cross_winarm_embedded = target_with_empty_rt_bundle_slots(cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir())
     out = add_empty_darwin_sysroot_blob_target(move out, "cross-winarm-", cross_windows_aarch64_dir())
     cross_winarm_embedded = target_with_empty_darwin_sysroot_blob(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir())
     let cross_winarm_embedded_obj = embedded_objects_object("cross-winarm-embedded-objects-object", &cross_winarm_embedded, cross_windows_aarch64_triple())
