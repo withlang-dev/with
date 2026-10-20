@@ -50,9 +50,9 @@ jobs:
       - name: Bootstrap seed
         env:
           WITH_SEED_REPO: withlang-dev/with
-          WITH_SEED_VERSION: nightly-20261015-local-1-efcb91c30a6a
+          WITH_SEED_VERSION: nightly-20261020-local-1-e1d2b25e6d04
           WITH_SEED_ASSET: with-darwin-aarch64
-          WITH_SEED_SHA256: 0bafc9b65804371da93b64d7615e7fc4d8dc0a6d12d314cca9d1eaa333b1a421
+          WITH_SEED_SHA256: 3a92ac0e3a8b32467e2f88591e1b2271dd151f7757fdb07098d18593a0384dea
         run: |
           set -euo pipefail
           curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main \
@@ -149,8 +149,8 @@ jobs:
       # Fixpoint-verified stable release seed for this platform.
       WITH_SEED_REPO: withlang-dev/with
       WITH_SEED_ASSET: with-linux-x86_64
-      WITH_SEED_VERSION: nightly-20261015-local-1-efcb91c30a6a
-      WITH_SEED_SHA256: b64212315b948e39ff5c42e39cd62315c13406dfce5a6d86771a5697e226cbf5
+      WITH_SEED_VERSION: nightly-20261020-local-1-e1d2b25e6d04
+      WITH_SEED_SHA256: 6c5e8a643409b962f3b8d9ef4da3e32b7c013df359fe463d6a5ce06aa0718acb
       WITH_SDK_REPO: withlang-dev/with
       # The same SDK pin nightly-release's linux-x86_64 leg builds with.
       # The v0.15.1 .tar.zst asset predates the packager (dangling bin/clang,
@@ -316,9 +316,9 @@ jobs:
       # regex literal at comptime. build/:fixpoint never compile a regex, so that
       # poison shipped green -- but it reds this job's battery the moment #798/#825
       # un-skip the regex tests. The regex smoke-test step below is the backstop.
-      WITH_SEED_VERSION: nightly-20261015-local-1-efcb91c30a6a
+      WITH_SEED_VERSION: nightly-20261020-local-1-e1d2b25e6d04
       WITH_SEED_ASSET: with-windows-x86_64.exe
-      WITH_SEED_SHA256: 6886e76ed2fdc104d41e82f3d08098676565e9957d2847dfc186b02ef3372504
+      WITH_SEED_SHA256: 04daff68db5274da426758c10ae7bccf693e8844d82a164a22de863e1bf3718e
       WITH_SDK_REPO: withlang-dev/with
       # The windows-gnu SDK of sdk.lock (#1915): it bootstraps the next one
       # with its own clang, lld, cmake and ninja and links against its own C

@@ -47,9 +47,9 @@ jobs:
       - name: Bootstrap seed
         env:
           WITH_SEED_REPO: withlang-dev/with
-          WITH_SEED_VERSION: nightly-20261015-local-1-efcb91c30a6a
+          WITH_SEED_VERSION: nightly-20261020-local-1-e1d2b25e6d04
           WITH_SEED_ASSET: with-darwin-aarch64
-          WITH_SEED_SHA256: 0bafc9b65804371da93b64d7615e7fc4d8dc0a6d12d314cca9d1eaa333b1a421
+          WITH_SEED_SHA256: 3a92ac0e3a8b32467e2f88591e1b2271dd151f7757fdb07098d18593a0384dea
         run: |
           set -euo pipefail
           curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main \

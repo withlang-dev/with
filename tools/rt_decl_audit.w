@@ -6,6 +6,9 @@
 // and each is its own object, so nothing but this audit and the in-unit
 // check lane ever sees the two spellings side by side (rt_mmap's `u64`
 // against the platforms' `i64` sat silent until §4.2.6 refused it in-unit).
+// An `@[effect]` pin is part of the contract (D30 step 2): the definition
+// declares what it retains through a raw pointer, the runtime bundle's
+// interface carries it, and every extern of that name pins the same.
 //
 //   with run tools/rt_decl_audit.w        # from the repo root; exits 1 on any divergence
 //
@@ -97,7 +100,28 @@ fn scan(path: &str, want_extern: bool, aliases: &List[str]) -> List[str]:
                 sig = sig ++ text.slice(toks.get_start(k) as i64, toks.get_end(k) as i64)
                 first_word = false
             k = k + 1
-        found.push(f"{name}|{expand_aliases(sig, aliases)}|{path}:{line_of(text, toks.get_start(i))}")
+        // The declaration's `@[effect(...)]` pins, spaces dropped: a pin is
+        // a declared contract (D30 step 2: what the runtime retains through
+        // a raw pointer, which the interface carries from the definition),
+        // so a decl pinning what the def does not, or the reverse, diverges
+        // as a type would.
+        var pins = ""
+        var b = i - 1
+        while b >= 0 and (toks.get_tag(b) == TokenKind.TK_KW_EXTERN or toks.get_tag(b) == TokenKind.TK_KW_PUB or toks.get_tag(b) == TokenKind.TK_NEWLINE):
+            b = b - 1
+        // An attribute is `@[` ... `]` on one line; a `]` closing the
+        // previous body's last index expression is not one.
+        while b >= 0 and toks.get_tag(b) == TokenKind.TK_R_BRACKET:
+            var a = b
+            while a > 0 and toks.get_tag(a) != TokenKind.TK_NEWLINE and not (toks.get_tag(a) == TokenKind.TK_AT and toks.get_tag(a + 1) == TokenKind.TK_L_BRACKET):
+                a = a - 1
+            if toks.get_tag(a) != TokenKind.TK_AT: break
+            let attr = normalize_type_text(text.slice(toks.get_start(a) as i64, toks.get_end(b) as i64))
+            if attr.starts_with("@[effect("): pins = attr
+            b = a - 1
+            while b >= 0 and toks.get_tag(b) == TokenKind.TK_NEWLINE:
+                b = b - 1
+        found.push(f"{name}|{expand_aliases(sig, aliases)}|{pins}|{path}:{line_of(text, toks.get_start(i))}")
     found
 
 // rt's own `type X = ...` aliases, as "name|expansion" records. A def spelled
@@ -167,11 +191,13 @@ var bad = 0
 for ei in 0..decls.len():
     let ename = field(decls[ei], 0)
     let esig = field(decls[ei], 1)
+    let epins = field(decls[ei], 2)
     for di in 0..defs.len():
         if field(defs[di], 0) != ename: continue
         let dsig = field(defs[di], 1)
-        if esig == dsig: continue
-        print(f"{ename}\n  def  {dsig}   [{field(defs[di], 2)}]\n  decl {esig}   [{field(decls[ei], 2)}]")
+        let dpins = field(defs[di], 2)
+        if esig == dsig and epins == dpins: continue
+        print(f"{ename}\n  def  {dpins} {dsig}   [{field(defs[di], 3)}]\n  decl {epins} {esig}   [{field(decls[ei], 3)}]")
         bad = bad + 1
         break
 print(f"-- {bad} divergent decls / {defs.len()} rt defs / {decls.len()} extern with_*/rt_* decls")

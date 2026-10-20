@@ -8,8 +8,21 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20261015-local-1-efcb91c30a6a
-with-darwin-aarch64=0bafc9b65804371da93b64d7615e7fc4d8dc0a6d12d314cca9d1eaa333b1a421
+version=nightly-20261020-local-1-e1d2b25e6d04
+with-darwin-aarch64=3a92ac0e3a8b32467e2f88591e1b2271dd151f7757fdb07098d18593a0384dea
+# darwin-aarch64, linux-x86_64 and windows-x86_64 are cut from main e1d2b25e6
+# (2026-10-20): darwin on the laptop (studio128 is gone, Eric 2026-10-20)
+# from a stage2 == stage3 fixpoint and a green :release-checks, linux-x86_64
+# on eric-5090 and windows-x86_64 on win10 from a fixpoint: the first seeds
+# whose Sema takes an @[effect] pin on a runtime ABI definition as its
+# declared contract (D30 step 2, #2488), which the pins on rt/'s
+# with_thread_spawn, with_vec_push_str and with_vec_append_bytes need.
+# linux-aarch64 stays on the 10-15 release: its pinned seed cannot bootstrap
+# main (#2490; a cross-built compiler re-cuts it). windows-aarch64 stays
+# there until the cross seed dispatched from e1d2b25e6 (run 39452556233,
+# D137) is pinned.
+with-linux-aarch64.version=nightly-20261015-local-1-efcb91c30a6a
+with-windows-aarch64.exe.version=nightly-20261015-local-1-efcb91c30a6a
 # darwin-aarch64, linux-x86_64 and windows-x86_64 are cut from main efcb91c3
 # (2026-10-15), each on its own host (studio128, eric-5090, win10) from a
 # stage2 == stage3 fixpoint (darwin from a green :release-checks): the first
@@ -44,7 +57,7 @@ with-darwin-aarch64=0bafc9b65804371da93b64d7615e7fc4d8dc0a6d12d314cca9d1eaa333b1
 # linux-aarch64 is cut from main 3d73b98c (#2305, D118), bootstrapped natively
 # in tools/docker/linux-aarch64 to a stage2 == stage3 fixpoint over all 16
 # units and verified against :no-host-toolchain.
-with-linux-x86_64=b64212315b948e39ff5c42e39cd62315c13406dfce5a6d86771a5697e226cbf5
+with-linux-x86_64=6c5e8a643409b962f3b8d9ef4da3e32b7c013df359fe463d6a5ce06aa0718acb
 with-linux-aarch64=8b31429cacb68995ef60c62410aea416e801a0ff007111a73a001919af3b425d
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
 # that carries its own linker (lld), dlltool, C runtime, clang resource
@@ -56,5 +69,5 @@ with-linux-aarch64=8b31429cacb68995ef60c62410aea416e801a0ff007111a73a001919af3b4
 # from main 35afb3a7a (#2305, #2470, #2471) by seed-windows-aarch64 run
 # 39288117180 against the windows-gnu SDK, an intermediate seed the native
 # windows-aarch64 lane bootstraps and verifies.
-with-windows-x86_64.exe=6886e76ed2fdc104d41e82f3d08098676565e9957d2847dfc186b02ef3372504
+with-windows-x86_64.exe=04daff68db5274da426758c10ae7bccf693e8844d82a164a22de863e1bf3718e
 with-windows-aarch64.exe=f27e7459c0039682e6b228e60abfbbcc750eb2a1dd61531269f08cb65380c967

@@ -2247,12 +2247,13 @@ impl Sema:
         if interface_yields and prior_sig >= 0:
             self.sig_lookup.insert(fn_name, prior_sig)
         if fn_sig_idx >= 0:
-            // D30: an in-unit runtime definition takes the declared contract
-            // of the extern it replaced (Zcu.note_runtime_contract_extern),
-            // applied as that extern's pins are.
-            if self.runtime_contract_externs.contains(fn_name):
-                let contract_extern: i32 = self.runtime_contract_externs.get(fn_name) ?? &0
-                self.apply_declared_effects_to_extern_sig(contract_extern, fn_sig_idx, param_start, param_count)
+            // D30 step 2: a runtime ABI definition's `@[effect]` pin is its
+            // declared contract — what it retains through a raw pointer,
+            // which inference never sees — applied here, at declaration, as
+            // an extern's pin is: a caller's body (std.thread's spawn_os) is
+            // checked before the runtime's, and reads the contract then.
+            if self.ast.fn_effect_pin_count(node as NodeId) > 0 and sema_name_is_compiler_abi_extern(self.pool_resolve(fn_name)) != 0 and sema_path_is_runtime_implementation(self.decl_source_path_for_node(node)) != 0:
+                self.apply_declared_effects_to_extern_sig(node, fn_sig_idx, param_start, param_count)
                 self.runtime_contract_sigs.insert(fn_sig_idx, 1)
             self.set_sig_receiver_mode(fn_sig_idx, self.receiver_mode_from_param(param_start, param_count))
             for pi in 0..param_count:
