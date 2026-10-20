@@ -130,6 +130,13 @@ pub fn p7_run_without_out_dir(case_dir: &str, label: &str, args_blob: &str) -> P
     assert(set_env("WITH_OUT_DIR", previous_out) == 0)
     result
 
+// A label names its capture directory. Windows refuses `:` in a file name
+// (a label is often a target, `:plain`) and the other reserved characters.
+fn p7_label_dir(label: &str) -> str:
+    var dir = label.replace(":", "_")
+    for reserved in ["*", "?", "\"", "<", ">", "|"]: dir = dir.replace(reserved, "_")
+    dir
+
 fn p7_run_with_compiler_keeping_env(compiler: &str, case_dir: &str, label: &str, args_blob: &str) -> P7Run:
     // #1899: the build store is machine-wide. This test process's builds
     // share one of their own, made empty on first use: a case asserts what
@@ -140,7 +147,7 @@ fn p7_run_with_compiler_keeping_env(compiler: &str, case_dir: &str, label: &str,
         let store = p7_abs(f"out/tmp/pre-d-p7-store/{pid()}")
         let _clear = remove_tree(store)
         assert(set_env("WITH_BUILD_CACHE_DIR", store) == 0)
-    let capture_dir = p7_join(p7_abs(f"out/tmp/pre-d-p7-capture/{pid()}"), label)
+    let capture_dir = p7_join(p7_abs(f"out/tmp/pre-d-p7-capture/{pid()}"), p7_label_dir(label))
     let _remove = remove_tree(capture_dir)
     assert(mkdir_p(capture_dir) == 0)
     let stdout_path = p7_join(capture_dir, "stdout.txt")

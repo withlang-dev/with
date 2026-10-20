@@ -71,7 +71,7 @@ fn cc_may_link() -> bool:
 // linker.
 fn cc_self_linker(name: &str) -> str:
     var self_exe = with_self_exe()
-    if self_exe.len() > 0 and not self_exe.starts_with("/"):
+    if self_exe.len() > 0 and not runtime_path_is_absolute(self_exe):
         let cwd = runtime_cwd()
         self_exe = if cwd.len() > 0: cwd ++ "/" ++ self_exe else: ""
     if self_exe.len() == 0:

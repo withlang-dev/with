@@ -2077,7 +2077,7 @@ impl Zcu:
         // Wave 4: sidecar resolved artifact.
         let t_resolve = runtime_clock_nanos()
         var _sp_diag = move self.diagnostics
-        var artifacts = resolve_from_root_pool_with_prefix(name, normalized_text, file_id, pool, self.pool, move _sp_diag, false, self.prelude_prefix_decls, self.next_file_id)
+        var artifacts = resolve_from_root_pool_with_prefix(name, normalized_text, file_id, pool, self.pool, move _sp_diag, false, self.prelude_prefix_decls, self.next_file_id, self.import_root_dir)
         if do_profile:
             let resolve_ns = runtime_clock_nanos() - t_resolve
             runtime_eprint(f"[profile] frontend.resolve  {resolve_ns / 1000000}.{(resolve_ns % 1000000) / 1000} ms")

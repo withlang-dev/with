@@ -79,6 +79,7 @@ type Zcu {
     source_text_names: List[str],
     source_texts: List[str],
     tool_mode_entry_path: str,
+    import_root_dir: str,
     pending_warnings: List[str],
     last_resolved: ResolveResult,
     resolved_root_path: str,
@@ -167,6 +168,7 @@ fn Zcu.init -> Zcu:
         source_text_names: zcu_new_list_str(),
         source_texts: zcu_new_list_str(),
         tool_mode_entry_path: "",
+        import_root_dir: "",
         pending_warnings: zcu_new_list_str(),
         last_resolved: ResolveResult.init(),
         resolved_root_path: "",
@@ -451,8 +453,10 @@ impl Zcu:
     mut fn capture_pending_warnings():
         self.reset_pending_warnings()
 
+    // A named import root (Compilation.set_import_root_dir) is where a `use`
+    // falls back to, in place of the entry's own directory.
     mut fn set_current_source(dir: &str, path: &str, text: &str):
-        self.source_dir = with_str_clone_ref(dir)
+        self.source_dir = if self.import_root_dir.len() > 0: self.import_root_dir else: dir
         self.current_source_path = with_str_clone_ref(path)
         self.current_source_text = with_str_clone_ref(text)
 

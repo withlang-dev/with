@@ -2,15 +2,18 @@
 // §17.5 (D94): at module level a comptime match or comptime if on the
 // target selects declarations. The taken arm's declarations are the
 // module's; an arm not taken is parsed and nothing more, so it may name
-// what exists only on its own target.
+// what exists only on its own target. Each arm calls a helper only that arm
+// declares: whichever host runs this, the arm not taken names a function
+// that does not exist there.
 use std.os
 
 comptime match Target.os:
     .Windows =>
-        fn separator(): "\\"
-        fn only_on_windows(): windows_only_function()
+        fn windows_separator(): "\\"
+        fn separator(): windows_separator()
     .Macos | .Linux | .Wasi =>
-        fn separator(): "/"
+        fn posix_separator(): "/"
+        fn separator(): posix_separator()
 
 comptime if Target.arch == .Wasm32 or Target.arch == .Wasm64:
     const WORD_BYTES = 4

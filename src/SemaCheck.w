@@ -20323,10 +20323,14 @@ impl Sema:
                     self.emit_warning("duplicate element in a set literal; a set keeps one, so the second is almost always a typo (D113)", elem)
                     break
 
-    fn same_source_spelling(a: i32, b: i32) -> bool:
-        let text_a = self.source_text_view_for_file_id(self.ast.file(a as NodeId) as i32)
-        let text_b = self.source_text_view_for_file_id(self.ast.file(b as NodeId) as i32)
-        text_a.slice(self.ast.get_start(a), self.ast.get_end(a)) == text_b.slice(self.ast.get_start(b), self.ast.get_end(b))
+    fn same_source_spelling(a: i32, b: i32) -> bool: self.source_spelling(a) == self.source_spelling(b)
+
+    // A node as the programmer wrote it: a diagnostic that quotes their code
+    // quotes this, not the resolved type (`*mut c_long`, not the target's
+    // `*mut i64`).
+    fn source_spelling(node: i32) -> str:
+        let text = self.source_text_view_for_file_id(self.ast.file(node as NodeId) as i32)
+        text.slice(self.ast.get_start(node), self.ast.get_end(node))
 
     mut fn check_map_literal(node: i32) -> i32:
         let extra_start = self.ast.get_data0(node)

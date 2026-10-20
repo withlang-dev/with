@@ -56,13 +56,13 @@ fn d22_join_arm_role_name(role: i32) -> str:
 
 impl Sema:
     fn contextual_join_dump_text(index: i32) -> str:
+        // A builder, not `out = out ++ ...`: one join had enough arms that
+        // re-copying the text per arm was the whole typed dump's cost (#2476).
         let decision = self.contextual_join_decisions[index]
-        var out = f"join[{index}] node={decision.join_node} final={self.type_name(decision.final_type)}"
-        if decision.expected_type != 0:
-            out = out ++ " expected=" ++ self.type_name(decision.expected_type)
-        else:
-            out = out ++ " expected=<inferred>"
-        out = out ++ f" expected-anchor={decision.expected_is_anchor} arms={decision.arm_count} owned-anchors={decision.owned_anchor_count} materialized={decision.materialized_count} views={decision.view_count} diverging={decision.diverging_count} origin-mask={decision.origin_mask} origin-deps={decision.origin_count}\n"
+        var out = StringBuilder.new()
+        out.push_str(f"join[{index}] node={decision.join_node} final={self.type_name(decision.final_type)}")
+        out.push_str(if decision.expected_type != 0: " expected=" ++ self.type_name(decision.expected_type) else: " expected=<inferred>")
+        out.push_str(f" expected-anchor={decision.expected_is_anchor} arms={decision.arm_count} owned-anchors={decision.owned_anchor_count} materialized={decision.materialized_count} views={decision.view_count} diverging={decision.diverging_count} origin-mask={decision.origin_mask} origin-deps={decision.origin_count}\n")
         for ai in 0..decision.arm_count:
             let arm_i = decision.arm_start + ai
             let arm_node = self.contextual_join_arm_nodes[arm_i]
@@ -70,8 +70,8 @@ impl Sema:
             let arm_ty = self.contextual_join_arm_types[arm_i]
             let arm_kind = self.contextual_join_arm_kinds[arm_i]
             let arm_role = self.contextual_join_arm_roles[arm_i]
-            out = out ++ f"  join[{index}].arm[{ai}] role={d22_join_arm_role_name(arm_role)} kind={d22_join_arm_kind_name(arm_kind)} node={arm_node} origin-node={origin_node} exact={self.type_name(arm_ty)}\n"
-        out
+            out.push_str(f"  join[{index}].arm[{ai}] role={d22_join_arm_role_name(arm_role)} kind={d22_join_arm_kind_name(arm_kind)} node={arm_node} origin-node={origin_node} exact={self.type_name(arm_ty)}\n")
+        out.to_str()
 
     fn call_param_name(fn_sym: i32, param_i: isize) -> str:
         if fn_sym <= 0 or param_i < 0:
@@ -392,9 +392,19 @@ fn typed_indent(indent: i32) -> str:
         out = out ++ "  "
     out
 
-fn emit_typed_indent(indent: i32):
-    for i in 0..indent:
-        with_write("  ")
+// The typed dump writes in 64 KB chunks. A write(2) per fragment (one per
+// two spaces of indent) made the compiler modules' dump a syscall storm,
+// past the test timeout on Windows (#2476). A module buffer, not a Sema
+// field: the dump reads Sema through views while it writes.
+var g_typed_dump_out = StringBuilder.new()
+
+fn typed_write(s: &str):
+    g_typed_dump_out.push_str(s)
+    if g_typed_dump_out.len() >= 65536: typed_flush()
+
+fn typed_flush():
+    with_write(g_typed_dump_out.to_str())
+    g_typed_dump_out = StringBuilder.new()
 
 impl Sema:
     fn safe_symbol_text(sym: i32) -> str:
@@ -676,20 +686,20 @@ impl Sema:
         var dump_decl_count = total_decl_count
         if requested_limit > 0 and requested_limit <= total_decl_count:
             dump_decl_count = requested_limit
-        with_write(f"typed module decls={dump_decl_count}\n")
-        with_write(f"typed contextual-copy-adjustments={self.contextual_copy_adjustments.len()}\n")
-        with_write(f"typed contextual-copy-adjustments-outside-std={self.contextual_copy_adjustments_outside_std()}\n")
+        typed_write(f"typed module decls={dump_decl_count}\n")
+        typed_write(f"typed contextual-copy-adjustments={self.contextual_copy_adjustments.len()}\n")
+        typed_write(f"typed contextual-copy-adjustments-outside-std={self.contextual_copy_adjustments_outside_std()}\n")
         for ai in 0..self.contextual_copy_adjustments.len():
             let adjustment = self.contextual_copy_adjustments[ai]
-            with_write(f"adjust[{ai}] node={adjustment.source_node} exact={self.type_name(adjustment.exact_source_type)} owned={self.type_name(adjustment.owned_value_type)} target={self.type_name(adjustment.target_type)}")
+            typed_write(f"adjust[{ai}] node={adjustment.source_node} exact={self.type_name(adjustment.exact_source_type)} owned={self.type_name(adjustment.owned_value_type)} target={self.type_name(adjustment.target_type)}")
             if adjustment.post_copy_type != 0:
-                with_write(" post=" ++ self.type_name(adjustment.post_copy_type))
+                typed_write(" post=" ++ self.type_name(adjustment.post_copy_type))
             else:
-                with_write(" post=identity")
-            with_write("\n")
-        with_write(f"typed contextual-joins={self.contextual_join_decisions.len()}\n")
+                typed_write(" post=identity")
+            typed_write("\n")
+        typed_write(f"typed contextual-joins={self.contextual_join_decisions.len()}\n")
         for ji in 0..self.contextual_join_decisions.len():
-            with_write(self.contextual_join_dump_text(ji as i32))
+            typed_write(self.contextual_join_dump_text(ji as i32))
 
         for di in 0..dump_decl_count:
             let decl = self.ast.get_decl(di)
@@ -697,7 +707,7 @@ impl Sema:
             let start = self.ast.get_start(decl)
             let end = self.ast.get_end(decl)
 
-            with_write(f"decl[{di}] kind={typed_decl_kind_name(kind)} span={start}..{end}\n")
+            typed_write(f"decl[{di}] kind={typed_decl_kind_name(kind)} span={start}..{end}\n")
 
             if kind == NodeKind.NK_FN_DECL:
                 let fn_name_sym = self.ast.get_data0(decl)
@@ -711,9 +721,9 @@ impl Sema:
                         fn_name = owner_type_name ++ "." ++ fn_name
                 let sig_idx = self.get_sig(fn_name_sym)
                 if fn_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
-                    with_write("  fn ")
-                    with_write(fn_name)
-                    with_write("(")
+                    typed_write("  fn ")
+                    typed_write(fn_name)
+                    typed_write("(")
                     let meta = self.ast.find_fn_meta(decl)
                     var param_start: i32 = 0
                     var meta_param_count: i32 = 0
@@ -723,22 +733,22 @@ impl Sema:
                     let param_count = self.clamp_sig_param_count(sig_idx, meta_param_count)
                     for pi in 0..param_count:
                         if pi > 0:
-                            with_write(", ")
+                            typed_write(", ")
                         let p_name_sym = if meta >= 0: self.ast.fn_param_name(param_start, pi) else: 0
                         let p_name = if p_name_sym != 0: self.safe_symbol_text(p_name_sym) else: "_"
-                        with_write(p_name)
-                        with_write(": ")
-                        with_write(self.type_name(self.sig_param_type(sig_idx, pi)))
-                    with_write(") -> ")
-                    with_write(self.type_name(self.sig_return_type(sig_idx)))
-                    with_write("\n")
+                        typed_write(p_name)
+                        typed_write(": ")
+                        typed_write(self.type_name(self.sig_param_type(sig_idx, pi)))
+                    typed_write(") -> ")
+                    typed_write(self.type_name(self.sig_return_type(sig_idx)))
+                    typed_write("\n")
                     let inferred_ret = if meta >= 0 and self.ast.fn_meta_ret(meta) == 0: self.sig_return_type(sig_idx) else: 0
                     let inferred_ret_line = if inferred_ret != 0 and inferred_ret != self.ty_void: "  inferred_return: " ++ self.type_name(inferred_ret) ++ "\n" else: ""
-                    with_write(inferred_ret_line)
+                    typed_write(inferred_ret_line)
                 else:
-                    with_write("  fn ")
-                    with_write(fn_name)
-                    with_write("(<unknown>)\n")
+                    typed_write("  fn ")
+                    typed_write(fn_name)
+                    typed_write("(<unknown>)\n")
                 self.emit_typed_expr_tree(self.ast.get_data1(decl), 2)
                 continue
 
@@ -747,9 +757,9 @@ impl Sema:
                 let ext_name = self.safe_symbol_text(ext_name_sym)
                 let sig_idx = self.get_sig(ext_name_sym)
                 if ext_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
-                    with_write("  extern fn ")
-                    with_write(ext_name)
-                    with_write("(")
+                    typed_write("  extern fn ")
+                    typed_write(ext_name)
+                    typed_write("(")
                     let meta = self.ast.find_fn_meta(decl)
                     var param_start: i32 = 0
                     var meta_param_count: i32 = 0
@@ -759,17 +769,17 @@ impl Sema:
                     let param_count = self.clamp_sig_param_count(sig_idx, meta_param_count)
                     for pi in 0..param_count:
                         if pi > 0:
-                            with_write(", ")
+                            typed_write(", ")
                         let p_name_sym = if meta >= 0: self.ast.fn_param_name(param_start, pi) else: 0
                         let p_name = if p_name_sym != 0: self.safe_symbol_text(p_name_sym) else: "_"
-                        with_write(p_name)
-                        with_write(": ")
-                        with_write(self.type_name(self.sig_param_type(sig_idx, pi)))
-                    with_write(") -> ")
-                    with_write(self.type_name(self.sig_return_type(sig_idx)))
-                    with_write("\n")
+                        typed_write(p_name)
+                        typed_write(": ")
+                        typed_write(self.type_name(self.sig_param_type(sig_idx, pi)))
+                    typed_write(") -> ")
+                    typed_write(self.type_name(self.sig_return_type(sig_idx)))
+                    typed_write("\n")
                 else:
-                    with_write("  extern fn (<unknown>)\n")
+                    typed_write("  extern fn (<unknown>)\n")
                 continue
 
             if kind == NodeKind.NK_LET_DECL:
@@ -778,69 +788,70 @@ impl Sema:
                 if has_resolved:
                     let ty = self.typed_binding_types.get(decl as i32).unwrap()
                     let is_mut = if self.typed_binding_muts.contains(decl as i32): self.typed_binding_muts.get(decl as i32).unwrap() else: 0
-                    with_write("  let ")
-                    with_write(name)
+                    typed_write("  let ")
+                    typed_write(name)
                     if is_mut != 0:
-                        with_write(" (mut)")
-                    with_write(": ")
-                    with_write(self.type_name(ty))
-                    with_write("\n")
+                        typed_write(" (mut)")
+                    typed_write(": ")
+                    typed_write(self.type_name(ty))
+                    typed_write("\n")
                 else:
                     let flags = self.ast.get_data2(decl)
                     let has_ann = self.top_level_let_type_ann_extra(flags) >= 0
-                    with_write("  let ")
-                    with_write(name)
-                    with_write(": ")
-                    with_write(if has_ann: "<annotated>" else: "<inferred>")
-                    with_write("\n")
+                    typed_write("  let ")
+                    typed_write(name)
+                    typed_write(": ")
+                    typed_write(if has_ann: "<annotated>" else: "<inferred>")
+                    typed_write("\n")
                 continue
 
             if kind == NodeKind.NK_TYPE_DECL:
-                with_write("  type ")
-                with_write(self.safe_symbol_text(self.ast.get_data0(decl)))
-                with_write("\n")
+                typed_write("  type ")
+                typed_write(self.safe_symbol_text(self.ast.get_data0(decl)))
+                typed_write("\n")
                 continue
 
             if kind == NodeKind.NK_TRAIT_DECL:
-                with_write("  trait ")
-                with_write(self.safe_symbol_text(self.ast.get_data0(decl)))
-                with_write("\n")
+                typed_write("  trait ")
+                typed_write(self.safe_symbol_text(self.ast.get_data0(decl)))
+                typed_write("\n")
                 continue
 
             if kind == NodeKind.NK_IMPL_DECL:
                 let type_name = self.safe_symbol_text(self.ast.get_data0(decl))
                 let trait_sym = self.ast.get_data2(decl)
                 if trait_sym != 0:
-                    with_write("  impl ")
-                    with_write(self.safe_symbol_text(trait_sym))
-                    with_write(" for ")
-                    with_write(type_name)
-                    with_write("\n")
+                    typed_write("  impl ")
+                    typed_write(self.safe_symbol_text(trait_sym))
+                    typed_write(" for ")
+                    typed_write(type_name)
+                    typed_write("\n")
                 else:
-                    with_write("  impl ")
-                    with_write(type_name)
-                    with_write("\n")
+                    typed_write("  impl ")
+                    typed_write(type_name)
+                    typed_write("\n")
                 continue
 
             if kind == NodeKind.NK_USE_DECL:
                 let extra_start = self.ast.get_data0(decl)
                 let path_count = self.ast.get_data1(decl)
-                with_write("  use ")
+                typed_write("  use ")
                 for pi in 0..path_count:
                     if pi > 0:
-                        with_write(".")
-                    with_write(self.safe_symbol_text(self.ast.get_extra(extra_start + pi)))
-                with_write("\n")
+                        typed_write(".")
+                    typed_write(self.safe_symbol_text(self.ast.get_extra(extra_start + pi)))
+                typed_write("\n")
                 continue
 
             if kind == NodeKind.NK_C_IMPORT:
-                with_write("  c_import \"")
-                with_write(self.safe_symbol_text(self.ast.get_data0(decl)))
-                with_write("\"\n")
+                typed_write("  c_import \"")
+                typed_write(self.safe_symbol_text(self.ast.get_data0(decl)))
+                typed_write("\"\n")
                 continue
 
             if kind == NodeKind.NK_POISONED_DECL:
-                with_write("  <poisoned>\n")
+                typed_write("  <poisoned>\n")
+        typed_flush()
 
     fn dump_typed_expr_tree(node: i32, indent: i32) -> str:
         if node == 0:
@@ -1162,40 +1173,40 @@ impl Sema:
 
         if has_typed_expr:
             let tid = self.typed_expr_types.get(node).unwrap()
-            emit_typed_indent(indent)
-            with_write("expr ")
-            with_write(typed_expr_kind_name(kind))
-            with_write(f" span={start}..{end} : ")
-            with_write(self.type_name(tid))
-            with_write("\n")
+            typed_write(typed_indent(indent))
+            typed_write("expr ")
+            typed_write(typed_expr_kind_name(kind))
+            typed_write(f" span={start}..{end} : ")
+            typed_write(self.type_name(tid))
+            typed_write("\n")
             let adjustment_index = self.latest_contextual_copy_adjustment_index(node)
             if adjustment_index >= 0:
                 let adjustment = self.contextual_copy_adjustments[adjustment_index]
-                emit_typed_indent(indent + 1)
-                with_write("adjust contextual-copy exact=" ++ self.type_name(adjustment.exact_source_type) ++ " owned=" ++ self.type_name(adjustment.owned_value_type) ++ " target=" ++ self.type_name(adjustment.target_type))
+                typed_write(typed_indent(indent + 1))
+                typed_write("adjust contextual-copy exact=" ++ self.type_name(adjustment.exact_source_type) ++ " owned=" ++ self.type_name(adjustment.owned_value_type) ++ " target=" ++ self.type_name(adjustment.target_type))
                 if adjustment.post_copy_type != 0:
-                    with_write(" post=" ++ self.type_name(adjustment.post_copy_type))
+                    typed_write(" post=" ++ self.type_name(adjustment.post_copy_type))
                 else:
-                    with_write(" post=identity")
-                with_write("\n")
+                    typed_write(" post=identity")
+                typed_write("\n")
             let join_index = self.latest_contextual_join_decision_index(node)
             if join_index >= 0:
                 let join = self.contextual_join_decisions[join_index]
-                emit_typed_indent(indent + 1)
-                with_write(f"join contextual final={self.type_name(join.final_type)} owned-anchors={join.owned_anchor_count} materialized={join.materialized_count} views={join.view_count} diverging={join.diverging_count}\n")
+                typed_write(typed_indent(indent + 1))
+                typed_write(f"join contextual final={self.type_name(join.final_type)} owned-anchors={join.owned_anchor_count} materialized={join.materialized_count} views={join.view_count} diverging={join.diverging_count}\n")
 
         if kind == NodeKind.NK_LET_BINDING:
             if self.typed_binding_types.contains(node):
                 let name_sym = if self.typed_binding_names.contains(node): self.typed_binding_names.get(node).unwrap() else: self.ast.get_data0(node)
                 let is_mut = if self.typed_binding_muts.contains(node): self.typed_binding_muts.get(node).unwrap() else: (self.ast.get_data2(node) % 2)
-                emit_typed_indent(indent + 1)
-                with_write("bind ")
-                with_write(self.safe_symbol_text(name_sym))
+                typed_write(typed_indent(indent + 1))
+                typed_write("bind ")
+                typed_write(self.safe_symbol_text(name_sym))
                 if is_mut != 0:
-                    with_write(" (mut)")
-                with_write(": ")
-                with_write(self.type_name(self.typed_binding_types.get(node).unwrap()))
-                with_write("\n")
+                    typed_write(" (mut)")
+                typed_write(": ")
+                typed_write(self.type_name(self.typed_binding_types.get(node).unwrap()))
+                typed_write("\n")
 
         if kind == NodeKind.NK_BINARY:
             self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)

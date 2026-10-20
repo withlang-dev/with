@@ -961,6 +961,10 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_p
     args.push("/subsystem:console")
     args.push("/debug")
     args.push("/pdb:" ++ bin_path ++ ".pdb")
+    // The image's debug directory names the PDB by file name (a debugger
+    // finds it beside the image); the absolute link path made one tool's
+    // bytes differ per directory, so the build store never served it (#2016).
+    args.push("/pdbaltpath:%_PDB%")
     args.push("/stack:8388608")
     args.push("/opt:ref")
     args.push("/opt:icf")
@@ -1053,7 +1057,31 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_p
         args.push("dbghelp.lib")
         args.push("ntdll.lib")
     let cleanup_files = link_stage_collect_cleanup_files(extras)
-    LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
+    let map_root = link_stage_file_prefix_map_root().replace("\\", "/")
+    if map_root.len() == 0:
+        return LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
+    LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args: link_stage_windows_root_relative_args(&args, map_root), cwd: map_root, env, inputs, outputs, cleanup_files }
+
+// Under WITH_FILE_PREFIX_MAP a PDB names nothing under the mapped root:
+// lld-link records its working directory, its command line and each
+// object's absolute path in the PDB, and /Brepro's image hash reads the GUID
+// the PDB was given, so one tool linked in two directories differed (#2016).
+// The link runs from the root with root-relative paths, and /pdbsourcepath
+// names the root as the map's <to>: the -oso_prefix of a Mach-O link.
+fn link_stage_windows_root_relative_args(args: &List[str], root: &str) -> List[str]:
+    var out: List[str] = List.new()
+    for arg in args: out.push(link_stage_root_relative_arg(arg, root))
+    let mapping = runtime_getenv("WITH_FILE_PREFIX_MAP")
+    out.push("/pdbsourcepath:" ++ mapping.slice(mapping.find("=") + 1, mapping.len()))
+    out
+
+// `arg` with a path under `root` (bare or after a `/flag:`) spelled
+// relative to it; any other argument as it is.
+fn link_stage_root_relative_arg(arg: &str, root: &str) -> str:
+    let colon = if arg.starts_with("/"): arg.find(":") else: -1
+    let flag = if colon > 0: arg.slice(0, colon + 1) else: ""
+    let path = arg.slice(flag.len(), arg.len()).replace("\\", "/")
+    if path.starts_with(root ++ "/"): flag ++ path.slice(root.len() + 1, path.len()) else: arg
 
 // The lld flavor for a WebAssembly link: wasm-ld ships beside the host
 // flavor recorded in the llvm_ld metadata.

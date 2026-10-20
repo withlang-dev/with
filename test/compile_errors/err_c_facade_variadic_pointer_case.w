@@ -1,4 +1,4 @@
-//! expect-check-fail: fn 'ulimit': 'case UL_SETFSIZE: *mut i64' — a case states an integer C type ('c_long', 'curl_off_t', an enum) or 'str' (a copied input string, §16.3c); a pointer the callee keeps needs its retention stated, and a callback its userdata pairing — neither is modeled yet (#1652) (§16.2b.5)
+//! expect-check-fail: fn 'ulimit': 'case UL_SETFSIZE: *mut c_long' — a case states an integer C type ('c_long', 'curl_off_t', an enum) or 'str' (a copied input string, §16.3c); a pointer the callee keeps needs its retention stated, and a callback its userdata pairing — neither is modeled yet (#1652) (§16.2b.5)
 
 // D66 (spec §16.2b.5): a case states the presented type AND contract of
 // the variadic argument; a bare pointer states no contract, and the two

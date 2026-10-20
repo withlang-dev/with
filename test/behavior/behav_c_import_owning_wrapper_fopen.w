@@ -36,7 +36,8 @@ fn closed(fd: c_int) -> i32:
 fn fd_of(f: CFile) -> c_int: f.fileno()
 
 fn main:
-    let a = CFile.fopen("/tmp/with_phase8_357.tmp", "w").unwrap()
+    // Under out/, which every host's test run has; Windows has no /tmp.
+    let a = CFile.fopen("out/with_phase8_357.tmp", "w").unwrap()
     let fa = a.fileno()
     drop(a)
     print(f"fopen closed {closed(fa)}")

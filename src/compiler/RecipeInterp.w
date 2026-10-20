@@ -1417,7 +1417,7 @@ impl PyInterp:
                 let part = self.to_text(&args[i])
                 if part.k != V_STR: return pv_unknown()
                 if part.s.len() == 0: continue
-                out = if out.len() == 0 or part.s.starts_with("/"): part.s.clone() else: out ++ "/" ++ part.s
+                out = if out.len() == 0 or runtime_path_is_absolute(part.s): part.s.clone() else: out ++ "/" ++ part.s
             return pv_str(out)
         if name == "os.path.basename" and arg0.k == V_STR:
             let parts = arg0.s.split("/")

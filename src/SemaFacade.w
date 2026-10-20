@@ -1777,7 +1777,7 @@ impl Sema:
                 else if rt == self.ty_str: ckind = FACADE_VARIADIC_STR
                 else if self.get_type_kind(self.numeric_operand_type(rt as i32)) == TypeKind.TY_INT: ckind = FACADE_VARIADIC_SCALAR
                 if ckind == 0:
-                    let tn: str = self.type_name(tid)
+                    let tn = self.source_spelling(self.ast.get_extra(cops + 1))
                     let hint = if self.get_type_kind(rt) == TypeKind.TY_PTR: "; a pointer the callee keeps needs its retention stated, and a callback its userdata pairing — neither is modeled yet (#1652)" else: ""
                     self.emit_error(f"fn '{fname}': 'case {sn}: {tn}' — a case states an integer C type ('c_long', 'curl_off_t', an enum) or 'str' (a copied input string, §16.3c){hint} (§16.2b.5)", case_node)
                     return c

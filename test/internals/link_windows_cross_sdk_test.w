@@ -3,6 +3,7 @@
 use compiler.EmbeddedClangResourceData
 use compiler.Link
 use std.fs
+use std.process
 
 // A cross compiler link runs the host's lld-link, but its LLVM archives and
 // Windows C runtime belong to the target SDK named by llvm_ld.rsp. Deriving
@@ -43,6 +44,23 @@ fn main:
     assert(command.linker == "lld-link")
     assert(has_arg(&command, target ++ "/libc/windows/"))
     assert(not has_arg(&command, host ++ "/libc/windows/"))
+    // The image names its PDB by file name, not by the absolute path it was
+    // linked at: the same inputs link to the same bytes in any directory.
+    assert(has_arg(&command, "/pdbaltpath:%_PDB%"))
+    assert(command.cwd.len() == 0)
+
+    // Under a prefix map the link runs from the mapped root, names what is
+    // under it relative to it, and gives the PDB the map's <to> (#2016).
+    let case_root = "C:\\cases\\a"
+    assert(set_env("WITH_FILE_PREFIX_MAP", case_root ++ "=/mapped") == 0)
+    let mapped = link_stage_make_windows_llvm_link_command("lld-link", host, case_root ++ "\\out\\bin\\tool.o", "C:/cases/a/out/bin/tool", extras, no_libs, no_args)
+    assert(set_env("WITH_FILE_PREFIX_MAP", "") == 0)
+    assert(mapped.cwd == "C:/cases/a")
+    assert(has_arg(&mapped, "/out:out/bin/tool"))
+    assert(has_arg(&mapped, "/pdb:out/bin/tool.pdb"))
+    assert(has_arg(&mapped, "/pdbsourcepath:/mapped"))
+    for arg in mapped.args:
+        assert(not arg.contains("cases"))
 
     // The c_import parse reads the same SDK libc as the link: on aarch64
     // too when the SDK carries it (run 39296788835 parsed mingw-w64's

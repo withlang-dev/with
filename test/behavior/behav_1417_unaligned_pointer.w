@@ -7,8 +7,13 @@
 // and stopped every windows.h import. With has no unaligned pointer — a
 // `*T` read assumes T's alignment — so the address crosses untyped, as
 // `*mut c_void`; reading a Rec through it names the type with a cast.
+//
+// Windows parses as its gnu target (#1915), where `__unaligned` is the
+// target C library's: mingw-w64's _mingw.h, under every system header,
+// defines it empty, so the header includes one as windows.h does. (Under
+// the Visual Studio SDK fallback it stays MSVC's keyword, the branch above.)
 
-use c_import("typedef struct Rec { unsigned int size; unsigned short kind; } Rec;\ntypedef Rec __unaligned *PREC;\nint rec_play(Rec __unaligned *r, int n);\n")
+use c_import("#include <stdio.h>\ntypedef struct Rec { unsigned int size; unsigned short kind; } Rec;\ntypedef Rec __unaligned *PREC;\nint rec_play(Rec __unaligned *r, int n);\n")
 
 fn main:
     let p: PREC = null
