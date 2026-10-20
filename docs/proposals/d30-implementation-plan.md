@@ -588,3 +588,9 @@ The runtime bundle's interface now reads `@[effect(fn_ptr: escape_value,
 ctx: escape_value)]` on with_thread_spawn, and the lane fixture
 err_d30_rt_in_unit_spawn_captures_ref is refused through the definition's
 own pin.
+The local-1 seeds of that cut failed a fresh clone (#2493: a cached build
+graph's placeholder Sema met the actions a cold worktree evaluates itself)
+and the reseed gate refused a same-`rt/`-generation stage2's runner root
+(#2491's class); both fixed in #2495 and every seed re-cut from it as
+`nightly-20261020-local-2-4d6d960d6ed0`, each verified to bootstrap a fresh
+clone with no build store and no runner cache.
