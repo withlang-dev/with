@@ -785,3 +785,33 @@ seed-compatibility battery remains a separate landing requirement.
 - Third-party `.wo` distribution across compiler *releases*: possible
   once `WITH_ABI_VERSION` has been stable for a while, but not a promise
   made now while D22/D27/D30 are still moving pass modes and layouts.
+
+## The runtime bundle (D30 R3, 2026-10-20)
+
+The runtime is a bundle too, with this document's artifact shape and
+none of its store (docs/proposals/d30-implementation-plan.md §10):
+
+- **Corpus.** `--bundle-corpus rt` names the embedded runtime tree
+  `<embedded-rt>/rt` (`bundle_corpus_contains`), and `use rt.<module>`
+  resolves to `<embedded-rt>/rt/<module>.w` as `use std.x` resolves to the
+  embedded stdlib. The root is generated per host by `rt-bundle`
+  (build/rt_bundle.w): one `use` per module of the in-unit lane's set.
+- **Build.** `stage1-rt-bundle` compiles it with stage1 under
+  `WITH_RT_IN_UNIT=1` into `out/bootstrap/lib/rt.{o,wi,manifest}`;
+  `rt-bundle` compiles it with stage2 into `out/lib/`. The interface is
+  checked against the source's declaration fingerprint as a corpus
+  bundle's is. A module's own foreign seam — its `extern var`s and
+  `c facade` blocks — is the object's, not interface material, and is
+  omitted rather than refused.
+- **Key: the compiler generation, never the ABI hash.** The slot is
+  embedded (`wo_rt_*` blobs, `rt` in the bundle index) and consulted only
+  when `link_stage_embedded_runtime_is_this_generation()`; an rt bundle
+  is never fetched from the store and never links across generations
+  (D30, D132, #761). `rt-bundle-fixpoint` (in `:fixpoint`) proves the
+  bundle stage1 built is byte for byte the one stage2 built: the embedded
+  bytes are the in-unit result.
+- **Link.** Under the lane the bundle object joins every link (its
+  symbols are the flat `with_*`/`rt_*` names, not module prefixes, so the
+  prefix predicate does not apply); in the object world it never joins.
+  Its interface is registered like every embedded bundle's, so a lane
+  compile parses declarations instead of runtime bodies.
