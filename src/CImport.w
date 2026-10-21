@@ -10603,6 +10603,12 @@ impl CiExprPool:
 fn ci_migrate_call_requires_unsafe_wrapper(name: &str) -> bool:
     if g_ci_migrate_in_unsafe_function_body:
         return false
+    // D30 R4c: in `with migrate` output a runtime helper is the runtime's own
+    // safe definition whoever declared it — the shim's preamble or the C
+    // source itself (`extern void with_memset(...)`): no wrapper, or the
+    // block is vacuous.
+    if ci_translate_in_migrate_mode() and ci_migrate_preamble_declares_runtime_extern(name):
+        return false
     ci_migrate_extern_fn_call_requires_unsafe(name) or ci_migrate_preamble_extern_call_requires_unsafe(name)
 
 fn ci_migrate_wrap_call_if_needed(name: &str, call_text: &str) -> str:
