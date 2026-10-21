@@ -830,6 +830,105 @@ pub fn iter_collect_btreeset_views[T: Ord, I: Iter[&T]](iter: I) -> BTreeSet[T]:
             Some(x) => out.insert(x)
     out
 
+/// `it.collect[List]()` over `(A, &B)` pairs (`enumerate()` over views):
+/// the List stores `(A, B)` pairs, each Copy view read through (D22 §6.2).
+pub fn iter_collect_pair_views[A, B, I: Iter[(A, &B)]](iter: I) -> List[(A, B)]:
+    var i = iter
+    var out: List[(A, B)] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(p) => out.push((p.0, p.1))
+    out
+
+/// `it.collect[HashMap]()` over `(K, V)` pairs: each pair stored, a later
+/// key replacing an earlier one.
+pub fn iter_collect_hashmap[K: Key, V, I: Iter[(K, V)]](iter: I) -> HashMap[K, V]:
+    var i = iter
+    var out: HashMap[K, V] = HashMap.new()
+    while true:
+        match i.next():
+            None => break
+            Some(p) => out.insert(p.0, p.1)
+    out
+
+pub fn iter_collect_hashmap_views[K: Key, V, I: Iter[&(K, V)]](iter: I) -> HashMap[K, V]:
+    var i = iter
+    var out: HashMap[K, V] = HashMap.new()
+    while true:
+        match i.next():
+            None => break
+            Some(p) => out.insert(p.0, p.1)
+    out
+
+/// `it.collect[BTreeMap]()` over `(K, V)` pairs, in key order.
+pub fn iter_collect_btreemap[K: Ord, V, I: Iter[(K, V)]](iter: I) -> BTreeMap[K, V]:
+    var i = iter
+    var out: BTreeMap[K, V] = BTreeMap.new()
+    while true:
+        match i.next():
+            None => break
+            Some(p) => out.insert(p.0, p.1)
+    out
+
+pub fn iter_collect_btreemap_views[K: Ord, V, I: Iter[&(K, V)]](iter: I) -> BTreeMap[K, V]:
+    var i = iter
+    var out: BTreeMap[K, V] = BTreeMap.new()
+    while true:
+        match i.next():
+            None => break
+            Some(p) => out.insert(p.0, p.1)
+    out
+
+/// `it.flat_map(f)` where `f` builds a collection (`s.split(" ")` is a
+/// `List[str]`): each one moves in and its elements move out (IntoIter).
+/// `f` that yields an iterator is std.traits's FlatMapped.
+/// `it.flat_map(f)`: each element through `f`, which yields an iterator,
+/// those iterators' elements in order.
+// `current` holds the iterator being drained, or nothing: a List of at most
+// one, moved out to advance and moved back while it has more (an `Option`
+// payload matched out of a field is a copy today, #2541).
+pub type FlatMapped[T, U, C, I] { inner: I, f: fn(T) -> C, current: List[C] }
+
+impl[T, U, C: Iter[U], I: Iter[T]] Iter[U] for FlatMapped[T, U, C, I]:
+    mut fn next() -> Option[U]:
+        loop:
+            match self.current.pop():
+                Some(c) =>
+                    var cur = c
+                    match cur.next():
+                        Some(x) =>
+                            self.current.push(cur)
+                            return Some(x)
+                        None => ()
+                None =>
+                    match self.inner.next():
+                        None => return None
+                        Some(x) => self.current.push((self.f)(x))
+
+pub fn iter_flat_map[T, U, C: Iter[U], I: Iter[T]](iter: I, f: fn(T) -> C) -> FlatMapped[T, U, C, I]:
+    let none: List[C] = List.new()
+    FlatMapped { inner: iter, f, current: none }
+
+// The pending elements are the current collection's consuming iterator,
+// a field mutated in place (an `Option` payload matched out of a field is a
+// copy today, #2541).
+pub type FlatMappedInto[T, U, C, I] { inner: I, f: fn(T) -> C, pending: ListIntoIter[U] }
+
+impl[T, U, C: IntoIter[U], I: Iter[T]] Iter[U] for FlatMappedInto[T, U, C, I]:
+    mut fn next() -> Option[U]:
+        loop:
+            match self.pending.next():
+                Some(x) => return Some(x)
+                None =>
+                    match self.inner.next():
+                        None => return None
+                        Some(x) => self.pending = (self.f)(x).into_iter()
+
+pub fn iter_flat_map_into[T, U, C: IntoIter[U], I: Iter[T]](iter: I, f: fn(T) -> C) -> FlatMappedInto[T, U, C, I]:
+    let none: List[U] = List.new()
+    FlatMappedInto { inner: iter, f, pending: none.into_iter() }
+
 /// `it.sum()`: the elements added up from `T.default()`.
 pub fn iter_sum[T: Default, I: Iter[T]](iter: I) -> T:
     var i = iter
@@ -933,7 +1032,10 @@ pub fn iter_min_by[T, I: Iter[T]](iter: I, f: fn(&T, &T) -> i32) -> Option[T]:
                     Some(b) => if f(&x, &b) < 0: best = Some(x)
     best
 
-pub fn iter_min_by_views[T, I: Iter[&T]](iter: I, f: fn(&T, &T) -> i32) -> Option[T]:
+// Over views of Copy values the comparator takes the values (D111: a value
+// has no identity, so it is passed by copy; `cmp(a: i32, b: i32)` is how
+// one is written).
+pub fn iter_min_by_views[T, I: Iter[&T]](iter: I, f: fn(T, T) -> i32) -> Option[T]:
     var i = iter
     var best: Option[T] = None
     while true:
@@ -942,7 +1044,7 @@ pub fn iter_min_by_views[T, I: Iter[&T]](iter: I, f: fn(&T, &T) -> i32) -> Optio
             Some(x) =>
                 match best:
                     None => best = Some(x)
-                    Some(b) => if f(x, &b) < 0: best = Some(x)
+                    Some(b) => if f(x, b) < 0: best = Some(x)
     best
 
 pub fn iter_max_by[T, I: Iter[T]](iter: I, f: fn(&T, &T) -> i32) -> Option[T]:
@@ -957,7 +1059,7 @@ pub fn iter_max_by[T, I: Iter[T]](iter: I, f: fn(&T, &T) -> i32) -> Option[T]:
                     Some(b) => if f(&x, &b) > 0: best = Some(x)
     best
 
-pub fn iter_max_by_views[T, I: Iter[&T]](iter: I, f: fn(&T, &T) -> i32) -> Option[T]:
+pub fn iter_max_by_views[T, I: Iter[&T]](iter: I, f: fn(T, T) -> i32) -> Option[T]:
     var i = iter
     var best: Option[T] = None
     while true:
@@ -966,7 +1068,7 @@ pub fn iter_max_by_views[T, I: Iter[&T]](iter: I, f: fn(&T, &T) -> i32) -> Optio
             Some(x) =>
                 match best:
                     None => best = Some(x)
-                    Some(b) => if f(x, &b) > 0: best = Some(x)
+                    Some(b) => if f(x, b) > 0: best = Some(x)
     best
 
 /// `it.reduce(f)`: `f` folded over the elements from the first, `None` when
@@ -1022,6 +1124,20 @@ pub fn iter_partition_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> (L
 
 /// `it.unzip()`: the pairs' firsts and seconds as two Lists.
 pub fn iter_unzip[A, B, I: Iter[(A, B)]](iter: I) -> (List[A], List[B]):
+    var i = iter
+    var firsts: List[A] = List.new()
+    var seconds: List[B] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(pair) =>
+                firsts.push(pair.0)
+                seconds.push(pair.1)
+    (firsts, seconds)
+
+/// `it.unzip()` over `(&A, &B)` pairs (a zip of two view iterators): the
+/// Lists store the values, each Copy view read through (D22 §6.2).
+pub fn iter_unzip_views[A, B, I: Iter[(&A, &B)]](iter: I) -> (List[A], List[B]):
     var i = iter
     var firsts: List[A] = List.new()
     var seconds: List[B] = List.new()

@@ -7373,6 +7373,20 @@ impl Sema:
             return self.fn_decl_nodes.get(fn_sym).unwrap()
         if self.concrete_specialization_by_sym.contains(fn_sym):
             return self.concrete_specialization_nodes[self.concrete_specialization_by_sym.get(fn_sym).unwrap()]
+        // A generic fn or method resolved by its own symbol (`i.next()` on
+        // an `I: Iter[T]` receiver resolves to `Mapped.next`): its template
+        // declaration carries the fact, as a specialization's does.
+        let template = self.generic_fn_node_for_symbol(fn_sym)
+        if template != 0:
+            return template
+        let text: str = with_str_clone_ref(self.pool_resolve(fn_sym))
+        for ci in 0..text.len():
+            if text[ci] == 46:
+                let owner_sym = self.pool_lookup_symbol(text.slice(0, ci as i64))
+                let method_sym = self.pool_lookup_symbol(text.slice(ci as i64 + 1, text.len()))
+                if owner_sym != 0 and method_sym != 0:
+                    return self.lookup_generic_method_fn(owner_sym, method_sym)
+                break
         0
 
     // #916 (§14.7): settle which fn declarations may suspend the fiber that
@@ -7591,9 +7605,11 @@ impl Sema:
         // #2511: a callable held in a struct field (`(self.f)(x)` in an
         // adapter's `next`) answers from what the program stores in that
         // field, as a parameter answers from what its callers pass.
+        // The body holding the call answers (site or not): no call site hands
+        // the field anything, so a parameter's caller-answers rule has no
+        // caller here — `(self.f)(x)` suspends when a store said so, and
+        // the body's own fact carries it to every caller.
         if kind == NodeKind.NK_FIELD_ACCESS:
-            if not site:
-                return false
             if self.suspend_params_unattributed != 0:
                 return true
             let key = self.callable_field_key(expr)
@@ -7910,8 +7926,13 @@ impl Sema:
             return self.expr_may_suspend(self.ast.get_data2(node))
         if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_LABEL or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND or kind == NodeKind.NK_YIELD:
             return self.expr_may_suspend(self.ast.get_data0(node))
-        if kind == NodeKind.NK_UNARY or kind == NodeKind.NK_RETURN:
+        if kind == NodeKind.NK_UNARY:
             return self.expr_may_suspend(self.ast.get_data1(node))
+        // A return's value is d0 (NK_UNARY's operand is d1): read as d1,
+        // nothing under `return` was walked, so `return (self.f)(x)` left
+        // the body judged never to suspend (#2019's class).
+        if kind == NodeKind.NK_RETURN:
+            return self.expr_may_suspend(self.ast.get_data0(node))
         if kind == NodeKind.NK_PIPELINE:
             // `x |> f` calls its stage (d0 = the piped value, d1 = the stage):
             // the stage's resolved callee may suspend like any call's (#916).
@@ -7971,6 +7992,16 @@ impl Sema:
                 return 1
             return self.expr_may_suspend(self.ast.get_data2(node))
         if kind == NodeKind.NK_WHILE:
+            if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
+                return 1
+            return self.expr_may_suspend(self.ast.get_data1(node))
+        // `loop:` was not walked: a field-held callable invoked inside one
+        // (`FilteredViews.next`) left its body judged never to suspend, so
+        // a cancellation inside the callable resumed the caller past the
+        // call (#2019's class, through every `loop:`).
+        if kind == NodeKind.NK_LOOP:
+            return self.expr_may_suspend(self.ast.get_data0(node))
+        if kind == NodeKind.NK_DO_WHILE:
             if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
                 return 1
             return self.expr_may_suspend(self.ast.get_data1(node))
@@ -8742,8 +8773,11 @@ impl Sema:
             return 0
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_LABEL or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
             return self.expr_creates_ephemeral_task(self.ast.get_data0(node))
-        if kind == NodeKind.NK_UNARY or kind == NodeKind.NK_RETURN:
+        if kind == NodeKind.NK_UNARY:
             return self.expr_creates_ephemeral_task(self.ast.get_data1(node))
+        // A return's value is d0.
+        if kind == NodeKind.NK_RETURN:
+            return self.expr_creates_ephemeral_task(self.ast.get_data0(node))
         if kind == NodeKind.NK_BINARY or kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
             if self.expr_creates_ephemeral_task(self.ast.get_data1(node)) != 0:
                 return 1
@@ -14436,6 +14470,15 @@ impl Sema:
             return vector_result
 
         if op == BinaryOp.OP_IN or op == BinaryOp.OP_NOT_IN:
+            // D139: a view of a Copy value reads through at `in`, every
+            // layer (`*x in [2, 4]` with `x: &&i32` from a filter over views).
+            var in_value = lhs as i32
+            for level in 0..8:
+                let in_resolved = self.resolve_alias(in_value as TypeId)
+                if self.get_type_kind(in_resolved) != TypeKind.TY_REF or self.get_type_d1(in_resolved) != 0: break
+                in_value = self.get_type_d0(in_resolved)
+            if in_value != lhs as i32 and self.is_copy(in_value) != 0 and self.record_contextual_copy_adjustment(lhs_node, in_value, lhs as i32) != 0:
+                return self.check_membership_operator(node, lhs_node, rhs_node, in_value, rhs as i32)
             return self.check_membership_operator(node, lhs_node, rhs_node, lhs as i32, rhs as i32)
 
         // User-defined operator selection sees exact operand types plus ordinary
@@ -23804,6 +23847,13 @@ impl Sema:
         self.deferred_closure_arg_checks.push(consumes)
         self.deferred_closure_arg_checks.push(by_place_sym)
 
+    // Whether a body of this signature writes a global itself (D39's
+    // records; a store through a callee is that callee's own escape).
+    fn sig_writes_global_directly(sig: i32) -> bool:
+        for wi in 0..self.global_write_records.len() / GLOBAL_WRITE_STRIDE:
+            if self.global_write_records[wi * GLOBAL_WRITE_STRIDE] == sig: return true
+        false
+
     // Runs after fixpoint_effect_flow: every recorded closure argument is
     // judged against its callee's final parameter facts.
     mut fn finalize_closure_arg_checks():
@@ -23822,7 +23872,13 @@ impl Sema:
             // Judged after every body: the diagnostic names the closure's own
             // file, not the one checked last.
             self.local_file_id = self.ast.file(closure_node as NodeId) as i32
-            let escapes = (self.sig_param_effect(sig_idx, param_i) & (EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)) != 0
+            // A callee that stores the closure only in its ephemeral result
+            // (`iter_map` builds a `Mapped` over a `ListIter`, a view of this
+            // frame) keeps it in the frame: the result cannot outlive the
+            // captures any more than the ListIter can outlive its list. A
+            // callee that writes a global may have stored it there instead.
+            let kept_in_frame = self.type_is_ephemeral_value(self.sig_return_type(sig_idx)) != 0 and not self.sig_writes_global_directly(sig_idx)
+            let escapes = not kept_in_frame and (self.sig_param_effect(sig_idx, param_i) & (EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)) != 0
             if escapes and self.ast.is_non_escaping_closure(closure_node) != 0:
                 // Direct arguments borrow captures for the call while their
                 // callee is being checked. Revoke that provisional marker and
@@ -23838,7 +23894,7 @@ impl Sema:
                     if not emitted_capability and self.is_tool_capability_type(cap_ty):
                         self.emit_error("capability-bearing closure cannot escape into runtime code", closure_node)
                         emitted_capability = true
-            if by_place_sym != 0 and (self.sig_param_effect(sig_idx, param_i) & EFF_ESCAPE_VALUE) != 0:
+            if by_place_sym != 0 and not kept_in_frame and (self.sig_param_effect(sig_idx, param_i) & EFF_ESCAPE_VALUE) != 0:
                 let cap_name: str = with_str_clone_ref(self.pool_resolve(by_place_sym))
                 self.emit_error("closure argument holds `" ++ cap_name ++ "` by place — a view of this frame — and `" ++ callee_name ++ "` stores or returns its parameter (§12.4); pass an owning closure: `move () => ...`", closure_node)
                 continue
@@ -24370,13 +24426,18 @@ impl Sema:
                     ci = ci + 1
 
         // Use callee return type for partial application closures
+        // The expected function type's result is the closure's (its tail is
+        // a statement under `-> Unit`, D43); the callee's return is only the
+        // guess for a partial application nothing demands. The guess once
+        // outranked the demand, so `each(xs, n => bump(n))` against
+        // `fn(&T) -> Unit` was a closure returning `i32`, refused.
         var closure_ret_ty = if body_ty != 0: body_ty as i32 else: self.ty_i32 as i32
         if declared_ret_ty != 0:
             closure_ret_ty = declared_ret_ty
-        else if partial_sig >= 0:
-            closure_ret_ty = self.sig_return_type(partial_sig)
         else if expected_ret_ty != 0:
             closure_ret_ty = expected_ret_ty
+        else if partial_sig >= 0:
+            closure_ret_ty = self.sig_return_type(partial_sig)
         let closure_kind = if expected_extern_fn != 0: TypeKind.TY_EXTERN_FN else: TypeKind.TY_FN
         let closure_ty = self.add_type(closure_kind, te_start, param_count, closure_ret_ty) as i32
         self.typed_expr_types.insert(node, closure_ty)
@@ -24494,7 +24555,7 @@ impl Sema:
             return 0
         let fn_node = self.generic_fn_node_for_symbol(fn_sym)
         let fn_path = self.fn_symbol_source_path(fn_sym)
-        if fn_node == 0 or not (fn_path.ends_with("std/traits.w") or fn_path.ends_with("std/collections.w")):
+        if fn_node == 0 or not (fn_path.ends_with("std/traits.w") or fn_path.ends_with("std/collections.w") or fn_path.ends_with("std/string.w")):
             return 0
         fn_node
 
@@ -24516,17 +24577,54 @@ impl Sema:
         if field == self.syms.collect:
             if self.user_collect_target == self.syms.hashset: fn_name = "iter_collect_hashset"
             else if self.user_collect_target == self.syms.btreeset: fn_name = "iter_collect_btreeset"
+            else if self.user_collect_target == self.syms.hashmap: fn_name = "iter_collect_hashmap"
+            else if self.user_collect_target == self.syms.btreemap: fn_name = "iter_collect_btreemap"
+            else if self.user_collect_target == self.pool_lookup_symbol("String"): fn_name = "iter_collect_string"
         // #2220 step 2: the terminals that build or return values from an
         // iterator of views dispatch to their `_views` twin, which reads
         // each Copy element through its view (D22 §6.2, D139).
         let name_text: str = with_str_clone_ref(self.pool_resolve(field))
-        let values_from_views = field == self.syms.collect or name_text == "sum" or name_text == "product" or name_text == "min" or name_text == "max" or name_text == "min_by" or name_text == "max_by" or name_text == "reduce" or name_text == "partition"
+        // A predicate adapter over an iterator of views hands the predicate
+        // the view itself (`&T`, as the element access does), never a view
+        // of the view: std's `_views` twins over `Iter[&T]`.
+        let predicate_over_views = name_text == "filter" or name_text == "take_while" or name_text == "drop_while" or name_text == "any" or name_text == "all" or name_text == "none" or name_text == "find" or name_text == "position"
+        if predicate_over_views:
+            var pv_elem = self.iterator_element_type(recv_type)
+            if pv_elem == 0:
+                pv_elem = self.user_iter_element_type(recv_type)
+            if pv_elem != 0:
+                let pv_resolved = self.resolve_alias(pv_elem as TypeId)
+                if self.get_type_kind(pv_resolved) == TypeKind.TY_REF and self.get_type_d1(pv_resolved) == 0:
+                    fn_name = fn_name ++ "_views"
+        let values_from_views = field == self.syms.collect or name_text == "sum" or name_text == "product" or name_text == "min" or name_text == "max" or name_text == "min_by" or name_text == "max_by" or name_text == "reduce" or name_text == "partition" or name_text == "unzip"
         if values_from_views:
             var cv_elem = self.iterator_element_type(recv_type)
             if cv_elem == 0:
                 cv_elem = self.user_iter_element_type(recv_type)
             if cv_elem != 0:
                 let cv_resolved = self.resolve_alias(cv_elem as TypeId)
+                // `(index, &T)` pairs (enumerate over views) collect as
+                // `(index, T)` pairs: the Copy view reads through at the
+                // List's owned store (D22 §6.2), std's iter_collect_pair_views.
+                if field == self.syms.collect and self.user_collect_target == self.syms.list and self.get_type_kind(cv_resolved) == TypeKind.TY_TUPLE and self.get_type_d1(cv_resolved) == 2:
+                    let pair_start = self.get_type_d0(cv_resolved)
+                    let first = self.resolve_alias(self.type_extra[pair_start] as TypeId)
+                    let second = self.resolve_alias(self.type_extra[(pair_start + 1)] as TypeId)
+                    if self.get_type_kind(first) != TypeKind.TY_REF and self.get_type_kind(second) == TypeKind.TY_REF and self.get_type_d1(second) == 0:
+                        let second_pointee = self.get_type_d0(second)
+                        if second_pointee != 0 and self.get_type_kind(self.resolve_alias(second_pointee)) != TypeKind.TY_REF and self.is_copy(second_pointee) != 0:
+                            fn_name = "iter_collect_pair_views"
+                // `unzip` over `(&A, &B)` pairs (a zip of view iterators)
+                // builds Lists of the values, std's iter_unzip_views.
+                if name_text == "unzip" and self.get_type_kind(cv_resolved) == TypeKind.TY_TUPLE and self.get_type_d1(cv_resolved) == 2:
+                    let uz_start = self.get_type_d0(cv_resolved)
+                    let uz_first = self.resolve_alias(self.type_extra[uz_start] as TypeId)
+                    let uz_second = self.resolve_alias(self.type_extra[(uz_start + 1)] as TypeId)
+                    if self.get_type_kind(uz_first) == TypeKind.TY_REF and self.get_type_d1(uz_first) == 0 and self.get_type_kind(uz_second) == TypeKind.TY_REF and self.get_type_d1(uz_second) == 0:
+                        let uz_a = self.get_type_d0(uz_first)
+                        let uz_b = self.get_type_d0(uz_second)
+                        if self.is_copy(uz_a) != 0 and self.is_copy(uz_b) != 0:
+                            fn_name = "iter_unzip_views"
                 if self.get_type_kind(cv_resolved) == TypeKind.TY_REF and self.get_type_d1(cv_resolved) == 0:
                     let cv_pointee = self.get_type_d0(cv_resolved)
                     if cv_pointee != 0 and self.get_type_kind(self.resolve_alias(cv_pointee)) != TypeKind.TY_REF:
@@ -24534,7 +24632,6 @@ impl Sema:
                             self.emit_error(f"`{name_text}` over views of `{self.type_name(cv_pointee)}` cannot copy them out (D22 §6.2 copies a Copy view): spell the copy, `map(it.clone())`", node)
                             return 0
                         fn_name = fn_name ++ "_views"
-        let fn_sym = self.pool_lookup_symbol(fn_name)
         var arg_types: List[i32] = List.new()
         let arg_nodes: List[i32] = List.new()
         let deferred: List[i32] = List.new()
@@ -24548,11 +24645,27 @@ impl Sema:
                 arg_types.push(0)
             else:
                 arg_types.push(self.check_expr_value_context(arg_node) as i32)
-        let fn_node = self.select_generic_fn_node(fn_sym, arg_types, arg_count + 1, node)
+        var fn_sym = self.pool_lookup_symbol(fn_name)
+        var fn_node = self.select_generic_fn_node(fn_sym, arg_types, arg_count + 1, node)
         if fn_node == 0:
             return 0
         if deferred.len() > 0:
             arg_types = self.check_deferred_generic_closure_args(fn_node, fn_sym, &deferred, move arg_types, &arg_nodes, node)
+        // `flat_map` over a function that builds a collection (`s.split(" ")`
+        // is a `List[str]`): the collection moves in and its elements move
+        // out (IntoIter), std's iter_flat_map_into; one that yields an
+        // iterator is iter_flat_map.
+        if name_text == "flat_map" and arg_types.len() >= 2:
+            let f_resolved = self.resolve_alias(arg_types[1] as TypeId)
+            if self.get_type_kind(f_resolved) == TypeKind.TY_FN:
+                let built = self.get_type_d2(f_resolved)
+                let iter_sym = self.pool_lookup_symbol("Iter")
+                let into_sym = self.pool_lookup_symbol("IntoIter")
+                if built != 0 and into_sym != 0 and self.type_implements_trait(built, into_sym) != 0 and (iter_sym == 0 or self.type_implements_trait(built, iter_sym) == 0):
+                    fn_sym = self.pool_lookup_symbol("iter_flat_map_into")
+                    fn_node = self.select_generic_fn_node(fn_sym, arg_types, arg_count + 1, node)
+                    if fn_node == 0:
+                        return 0
         self.resolved_generic_call_nodes.insert(node, fn_node)
         let ret = self.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, arg_count + 1, node)
         if ret == 0:
@@ -24640,6 +24753,49 @@ impl Sema:
         self.typed_expr_types.insert(node, ret)
         ret
 
+    // `it |> collect[Target]()` over an Iter[T] implementor (§13.3): the
+    // target is one std builds, and the elements have the shape it stores
+    // (a map takes `(K, V)` pairs, a String bytes, a BTree an `Ord` key).
+    // Judged here, before the std body, so the mistake is named at the call.
+    // The collection a `collect[Target]` or `collect[Target[..]]` bracket
+    // names, as a symbol; 0 when the bracket names no type.
+    fn collect_bracket_target_sym(callee: i32) -> i32:
+        let target_node = self.ast.get_data1(callee)
+        let target_kind = self.ast.kind(target_node)
+        let target_base = if target_kind == NodeKind.NK_INDEX: self.ast.get_data0(target_node) else: target_node
+        let base_kind = self.ast.kind(target_base)
+        if base_kind == NodeKind.NK_IDENT or base_kind == NodeKind.NK_TYPE_NAMED or base_kind == NodeKind.NK_TYPE_GENERIC: self.ast.get_data0(target_base) else: 0
+
+    mut fn check_user_collect_target(target_sym: i32, lhs_ty: i32, callee: i32) -> i32:
+        let string_sym = self.pool_lookup_symbol("String")
+        if target_sym != self.syms.list and target_sym != self.syms.hashset and target_sym != self.syms.btreeset and target_sym != self.syms.hashmap and target_sym != self.syms.btreemap and target_sym != string_sym:
+            self.emit_error(f"unsupported collect target `{self.pool_resolve(target_sym)}` over a {self.type_name(lhs_ty)}: an Iter[T] implementor collects into a List, a HashSet, a BTreeSet, a HashMap, a BTreeMap or a String (§13.3)", callee)
+            return 0
+        var elem = self.user_iter_element_type(lhs_ty)
+        if elem == 0: return 1
+        // The element a view yields is the value it views (D22 §6.2).
+        let elem_resolved = self.resolve_alias(elem as TypeId)
+        if self.get_type_kind(elem_resolved) == TypeKind.TY_REF and self.get_type_d1(elem_resolved) == 0:
+            elem = self.get_type_d0(elem_resolved)
+        let value = self.resolve_alias(elem as TypeId)
+        let ord_sym = self.pool_lookup_symbol("Ord")
+        if target_sym == self.syms.btreeset:
+            if ord_sym != 0 and self.type_implements_trait(elem, ord_sym) == 0:
+                self.emit_error("collect[BTreeSet[T]] element type must implement Ord", callee)
+                return 0
+        if target_sym == self.syms.hashmap or target_sym == self.syms.btreemap:
+            let name = if target_sym == self.syms.hashmap: "HashMap" else: "BTreeMap"
+            if self.get_type_kind(value) != TypeKind.TY_TUPLE or self.get_type_d1(value) != 2:
+                self.emit_error(f"collect[{name}[K, V]] requires iterator elements of type (K, V)", callee)
+                return 0
+            if target_sym == self.syms.btreemap and ord_sym != 0 and self.type_implements_trait(self.type_extra[self.get_type_d0(value)], ord_sym) == 0:
+                self.emit_error("collect[BTreeMap[K, V]] key type must implement Ord", callee)
+                return 0
+        if target_sym == string_sym and not self.types_identical(elem, self.ty_u8 as i32):
+            self.emit_error("collect[String]() currently supports u8 iterator elements", callee)
+            return 0
+        1
+
     mut fn check_pipeline(node: i32) -> i32:
         let lhs = self.ast.get_data0(node)
         let rhs = self.ast.get_data1(node)
@@ -24669,13 +24825,8 @@ impl Sema:
                         if method == self.syms.collect and self.ast.kind(rhs_callee) == NodeKind.NK_INDEX and self.user_iter_adapter_fn(lhs_ty as i32, method) != 0:
                             // `it |> collect[List]()` over an Iter[T] implementor:
                             // the bracket names what iter_collect builds.
-                            let target_node = self.ast.get_data1(rhs_callee)
-                            let target_kind = self.ast.kind(target_node)
-                            let target_base = if target_kind == NodeKind.NK_INDEX: self.ast.get_data0(target_node) else: target_node
-                            let base_kind = self.ast.kind(target_base)
-                            let target_sym = if base_kind == NodeKind.NK_IDENT or base_kind == NodeKind.NK_TYPE_NAMED or base_kind == NodeKind.NK_TYPE_GENERIC: self.ast.get_data0(target_base) else: 0
-                            if target_sym != self.syms.list and target_sym != self.syms.hashset and target_sym != self.syms.btreeset:
-                                self.emit_error(f"`collect[{self.pool_resolve(target_sym)}]` over a {self.type_name(lhs_ty as i32)} is not available: an Iter[T] implementor collects into a List, a HashSet or a BTreeSet (§13.3)", rhs_callee)
+                            let target_sym = self.collect_bracket_target_sym(rhs_callee)
+                            if self.check_user_collect_target(target_sym, lhs_ty as i32, rhs_callee) == 0:
                                 return 0
                             self.user_collect_target = target_sym
                             ret = self.check_method_call_parts(lhs, method, self.ast.get_data1(rhs), self.ast.get_data2(rhs), node, lhs_ty as i32)
@@ -26329,6 +26480,18 @@ impl Sema:
                     if arg_count != 0:
                         self.emit_error("collect[C]() takes no runtime arguments", node)
                         return 0
+                    // `it.collect[Target]()` over an Iter[T] implementor is
+                    // std's builder, as the pipeline spelling is.
+                    if self.user_iter_adapter_fn(recv_ty2 as i32, recv_field2) != 0:
+                        let target_sym = self.collect_bracket_target_sym(callee)
+                        if self.check_user_collect_target(target_sym, recv_ty2 as i32, callee) == 0:
+                            return 0
+                        self.user_collect_target = target_sym
+                        let user_collect_ret = self.check_method_call_parts(recv_expr2, recv_field2, extra_start, arg_count, node, recv_ty2 as i32)
+                        self.user_collect_target = 0
+                        if user_collect_ret != 0:
+                            self.typed_expr_types.insert(node, user_collect_ret)
+                        return user_collect_ret
                     let collect_ret = self.collect_target_type_from_callee(callee, recv_ty2 as i32, node)
                     if collect_ret != 0:
                         self.typed_expr_types.insert(node, collect_ret)
@@ -27367,12 +27530,21 @@ impl Sema:
         if self.type_has_unresolved_parts(exp_r as i32) != 0:
             return actual
         let act_r = self.resolve_alias(actual)
+        let payload = self.get_generic_inst_arg(exp_r as i32, 0)
         if self.get_type_kind(act_r) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(act_r as i32) == self.syms.option:
-            self.note_some_at_option_demand(node, exp_r as i32)
-            return actual
+            // An Option value at an Option demand is the demanded Option
+            // itself (`Some(x)` written where `x` would do, D103's census),
+            // unless the demanded payload is exactly this Option type: a
+            // `T` at `Option[T]` with `T = Option[i32]` (a generic body's
+            // instance) wraps like any other value. A bare `None` is never
+            // wrapped (D141: `Some(None)` would be a second meaning).
+            if self.types_compatible(expected, actual) != 0 or payload == 0 or not self.types_identical(payload, actual as i32) or self.is_bare_none_type(actual as i32):
+                self.note_some_at_option_demand(node, exp_r as i32)
+                return actual
+            self.value_to_option_nodes.insert(node, expected as i32)
+            return expected
         if self.types_compatible(expected, actual) != 0:
             return actual
-        let payload = self.get_generic_inst_arg(exp_r as i32, 0)
         if payload == 0 or self.types_compatible(payload as TypeId, actual) == 0:
             return actual
         // The node keeps its own type `T` (MIR lowers it at that type and
@@ -35286,7 +35458,7 @@ impl Sema:
 
         let receiver_name = self.type_name(obj_type as i32)
         let method_name: str = with_str_clone_ref(self.pool_resolve(field))
-        if self.iterator_element_type(obj_type as i32) != 0 and self.iterator_operation_known_but_unimplemented(method_name):
+        if (self.iterator_element_type(obj_type as i32) != 0 or self.user_iter_element_type(obj_type as i32) != 0) and self.iterator_operation_known_but_unimplemented(method_name):
             self.emit_error("iterator operation '" ++ method_name ++ "' from §13.3 is not implemented yet", node)
             return 0
         if method_name == "pull" and self.generator_state_yield_types.contains(self.resolve_alias(obj_type) as i32):

@@ -472,3 +472,22 @@ pub fn parse_i128(s: &str) -> i128:
 pub fn parse_u128(s: &str) -> u128:
     if s.len() == 0: return 0
     parse_u128_magnitude(s, if s[0] == 43: 1 else: 0)
+
+/// `it.collect[String]()` over bytes (§13.3): the bytes in order, one str.
+pub fn iter_collect_string[I: Iter[u8]](iter: I) -> str:
+    var i = iter
+    var out = StringBuilder.new()
+    while true:
+        match i.next():
+            None => break
+            Some(b) => out.push_byte(b)
+    out.to_str()
+
+pub fn iter_collect_string_views[I: Iter[&u8]](iter: I) -> str:
+    var i = iter
+    var out = StringBuilder.new()
+    while true:
+        match i.next():
+            None => break
+            Some(b) => out.push_byte(b)
+    out.to_str()
