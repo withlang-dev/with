@@ -1176,6 +1176,8 @@ fn release_platform_asset_bin() -> str:
         return "out/release/with-darwin-aarch64"
     if host_os == "Linux" and host_arch == "x86_64":
         return "out/release/with-linux-x86_64"
+    if host_os == "Linux" and host_arch == "aarch64":
+        return "out/release/with-linux-aarch64"
     if host_os == "Windows" and host_arch == "x86_64":
         return "out/release/with-windows-x86_64.exe"
     if host_os == "Windows" and host_arch == "aarch64":
