@@ -17,18 +17,8 @@ use compiler.LldDriver
 use compiler.Runtime
 use compiler.Link
 use compiler.AbiStamp
+use rt.rt_core
 
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
-extern fn with_arg_count() -> i32
-extern fn with_arg_at(idx: isize) -> str
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_str_hash(s: &str) -> u64
-extern fn with_fs_file_exists(path: &str) -> i32
-extern fn with_fs_mkdir_p(path: &str) -> i32
-extern fn with_fs_symlink(target: &str, link_path: &str) -> i32
-extern fn with_sysinfo_os() -> str
-extern fn with_sysinfo_arch() -> str
 
 // llvm::ToolContext (llvm/Support/LLVMDriver.h).
 type ClangToolContext { path: *const u8, prepend_arg: *const u8, needs_prepend_arg: bool }

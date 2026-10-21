@@ -5,7 +5,7 @@
 // concatenated streams are read in turn. Every block CRC and each stream's
 // combined CRC are verified.
 
-extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
+use rt.rt_core
 
 let BZ_MASK32: i64 = 4294967295
 

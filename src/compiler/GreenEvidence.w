@@ -7,9 +7,8 @@
 
 use compiler.Runtime
 use BuildGraphSupport
+use rt.rt_core
 
-extern fn with_sysinfo_os() -> str
-extern fn with_sysinfo_arch() -> str
 
 fn green_join(dir: &str, name: &str) -> str: if dir.ends_with("/"): dir ++ name else: dir ++ "/" ++ name
 

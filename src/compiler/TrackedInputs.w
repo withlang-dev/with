@@ -1,5 +1,5 @@
 use compiler.Runtime
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 
 type TrackedReadResult {
     ok: bool,

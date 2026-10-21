@@ -8,7 +8,7 @@
 // `with version --abi-sha` prints it; a .wo bundle's key and manifest carry
 // the building compiler's value, and the link stage refuses a bundle whose
 // value differs from this one (#761: never a silent mixed-ABI link).
-extern fn with_str_from_cstr(p: *const u8) -> str
+use rt.rt_core
 
 fn compiler_abi_sha() -> str:
     with_str_from_cstr(c"WITHABISHASTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr)

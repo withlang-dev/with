@@ -2,8 +2,7 @@
 //
 // Root `Source` now follows the foundation implementation shape.
 
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 
 type Source {
     path: str,

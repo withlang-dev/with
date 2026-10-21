@@ -1,9 +1,4 @@
-extern fn with_arg_count() -> i32
-extern fn with_arg_at(idx: isize) -> str
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_list_files(path: &str) -> str
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-extern fn with_eprint(s: &str) -> Unit
+use rt.rt_core
 extern fn exit(code: i32) -> Unit
 
 fn contains_delimiter(text: &str, hashes: &str) -> bool:

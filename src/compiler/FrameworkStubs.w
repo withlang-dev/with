@@ -19,11 +19,8 @@
 
 use compiler.Runtime
 use std.string.StringBuilder
+use rt.rt_core
 
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8)
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
-extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
 extern fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32
 extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
 extern fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64

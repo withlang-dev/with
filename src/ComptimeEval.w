@@ -21,10 +21,9 @@ use std.zlib
 use TargetSpec
 use SemaTypes
 use compiler.Compilation.Config
+use rt.rt_core
+use rt.compat_runtime
 
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_str_from_cstr(s: *const u8) -> str
 extern fn strerror(errnum: i32) -> *mut i8
 extern fn strtod(nptr: *const i8, endptr: *mut *mut i8) -> f64
 
@@ -57,64 +56,11 @@ fn comptime_float_of(value: &ComptimeValue) -> f64:
     if value.kind == ComptimeValueKind.CV_FLOAT:
         return value.real
     value.data0 as f64
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_read_file_status(path: &str, status: *mut i32) -> str
-extern fn with_fs_file_exists(path: &str) -> i32
-extern fn with_fs_is_dir(path: &str) -> i32
-extern fn with_fs_mkdir_p(path: &str) -> i32
-extern fn with_fs_chmod(path: &str, mode: i32) -> i32
-extern fn with_fs_copy_tree(src: &str, dst: &str) -> i32
-extern fn with_fs_list_files(path: &str) -> str
-extern fn with_fs_remove_file(path: &str) -> i32
-extern fn with_fs_remove_tree(path: &str) -> i32
-extern fn with_fs_rename_file(old_path: &str, new_path: &str) -> i32
-extern fn with_fs_symlink(target: &str, link_path: &str) -> i32
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-extern fn with_exec_argv(args: &str) -> i32
-extern fn with_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
-extern fn with_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32
-extern fn with_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> i32
-extern fn with_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32
-extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
-extern fn with_arg_at(idx: isize) -> str
-@[effect(fn_ptr: escape_value, ctx: escape_value)]
-extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
-extern fn with_thread_join(handle: i64) -> i32
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32
 extern fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64
 extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 extern fn rt_close(fd: i32) -> i32
 extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
-extern fn with_println_str(s: &str) -> Unit
-extern fn with_println_i32(n: i32) -> Unit
-extern fn with_println_i64(n: i64) -> Unit
-extern fn with_println_bool(v: bool) -> Unit
-extern fn with_print_str(s: &str) -> Unit
-extern fn with_write(s: &str) -> Unit
-extern fn with_ewrite(s: &str) -> Unit
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_setenv_str(name: &str, value: &str) -> i32
-extern fn with_getpid() -> i32
-extern fn with_parse_i64_ref(s: &str) -> i64
-extern fn with_str_len(s: &str) -> i64
-extern fn with_str_byte_at_ref(s: &str, index: i64) -> i32
-extern fn with_str_slice_ref(s: &str, start: i64, end: i64) -> str
-extern fn with_str_contains_ref(haystack: &str, needle: &str) -> i32
-extern fn with_str_concat_ref(a: &str, b: &str) -> str
-extern fn with_str_concat_n(parts: *const str, count: i64) -> str
-extern fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8
-extern fn with_str_from_byte(byte: i32) -> str
-extern fn with_str_starts_with_ref(s: &str, prefix: &str) -> i32
-extern fn with_str_ends_with_ref(s: &str, suffix: &str) -> i32
-extern fn with_str_replace_ref(s: &str, old: &str, new_s: &str) -> str
-extern fn with_str_to_upper_ref(s: &str) -> str
-extern fn with_str_to_lower_ref(s: &str) -> str
-extern fn with_str_index_of_ref(hay: &str, needle: &str) -> i64
-extern fn with_str_repeat_ref(s: &str, count: i64) -> str
-extern fn with_sysinfo_hostname() -> str
 
 const COMPTIME_RECURSION_LIMIT: i32 = 256
 const COMPTIME_STEP_LIMIT: i32 = 50000

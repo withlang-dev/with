@@ -12,13 +12,8 @@
 use compiler.foundation.Types
 use compiler.foundation.Values
 use std.collections.HashMap
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8)
 
 fn intern_debug_init_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")

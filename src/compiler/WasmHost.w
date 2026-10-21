@@ -9,9 +9,8 @@
 // compiler emits, kept here as the string it is.
 
 use compiler.Runtime
+use rt.rt_core
 
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_str_clone_ref(s: &str) -> str
 
 // `foo.wasm` -> `foo.js`; a bare `foo` -> `foo.js`.
 fn wasm_host_js_path(bin_path: &str) -> str:

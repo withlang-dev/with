@@ -37,8 +37,8 @@ use Sema
 use MirCore
 use SemaTypes
 use std.collections.HashMap
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
 
 fn resolution_line(source: &str, offset: i32) -> i32:
     var line: i32 = 1

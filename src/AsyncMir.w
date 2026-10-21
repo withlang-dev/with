@@ -4,7 +4,7 @@
 // boundaries produced after MIR/borrow phases.
 
 use InternPool
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 
 // Async body flavors.
 enum AsyncBodyKind: i32:

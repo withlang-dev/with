@@ -13,7 +13,7 @@
 // `<embedded-std>/std/<corpus>/<name>.w` path and only its text changes.
 use std.collections.HashMap
 use std.crypto.sha256
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 
 var g_bundle_interface_texts: HashMap[str, str] = HashMap.new()
 

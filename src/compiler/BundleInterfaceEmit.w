@@ -28,9 +28,8 @@ use std.string.StringBuilder
 use std.collections.HashMap
 use SemaTypes
 use render
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_str_cmp_ref(a: &str, b: &str) -> i32
 
 pub const BX_TYPE: i32 = 0
 pub const BX_CONST: i32 = 1

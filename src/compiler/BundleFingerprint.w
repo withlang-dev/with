@@ -14,9 +14,8 @@
 use compiler.BundleInterfaces
 use compiler.BundleInterfaceEmit
 use TargetSpec
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_str_cmp_ref(a: &str, b: &str) -> i32
 
 fn bf_sorted_lines(lines: &List[str]) -> List[str]:
     var sorted: List[str] = List.new()

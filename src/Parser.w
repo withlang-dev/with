@@ -10,9 +10,8 @@ use Lexer
 use InternPool
 use Diagnostic
 use TargetSpec
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_parse_i64_ref(s: &str) -> i64
 extern fn str_from_byte(b: i32) -> str
 
 // Canonical active target architecture for @[target("arch")] guards.

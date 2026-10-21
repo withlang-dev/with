@@ -1,12 +1,8 @@
 use compiler.Compilation
+use rt.rt_core
+use rt.compat_runtime
 
-extern fn with_arg_count() -> i32
-extern fn with_arg_at(idx: isize) -> str
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_write(s: &str) -> Unit
 extern fn exit(code: i32) -> Unit
-extern fn with_raise_stack_limit() -> Unit
-extern fn with_install_interrupt_handlers() -> Unit
 
 fn cli_help_topic(argc: i32) -> str:
     if argc >= 3:

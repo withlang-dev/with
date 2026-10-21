@@ -1,39 +1,7 @@
 // BuildGraphRuntime -- repository runtime-generation support for build.w.
 
-extern fn with_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
-extern fn with_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32
-extern fn with_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32
-extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
-extern fn with_exec_try_wait(pid: i32) -> i32
-extern fn with_usleep(usecs: i32) -> i32
-extern fn with_exec_child_maxrss() -> i64
-extern fn with_self_maxrss() -> i64
-extern fn with_exec_binary(path: &str) -> i32
-extern fn with_exec_argv(args: &str) -> i32
-extern fn with_arg_at(idx: isize) -> str
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_setenv_str(name: &str, value: &str) -> i32
-extern fn with_fs_chmod(path: &str, mode: i32) -> i32
-extern fn with_fs_file_exists(path: &str) -> i32
-extern fn with_fs_file_mode(path: &str) -> i32
-extern fn with_fs_is_dir(path: &str) -> i32
-extern fn with_fs_mkdir_p(path: &str) -> i32
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_read_file_status(path: &str, status: *mut i32) -> str
-extern fn with_fs_readlink(path: &str) -> str
-extern fn with_fs_remove_dir(path: &str) -> i32
-extern fn with_fs_remove_file(path: &str) -> i32
-extern fn with_fs_remove_tree(path: &str) -> i32
-extern fn with_fs_copy_tree(src: &str, dst: &str) -> i32
-extern fn with_time_now() -> i64
-extern fn with_fs_list_files(path: &str) -> str
-extern fn with_fs_list_dir(path: &str) -> str
-extern fn with_fs_rename_file(old_path: &str, new_path: &str) -> i32
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-extern fn with_getpid() -> i32
-extern fn with_clock_nanos() -> i64
-extern fn with_write(s: &str) -> Unit
-extern fn with_eprint(s: &str) -> Unit
+use rt.compat_runtime
+use rt.rt_core
 // #747: the LlvmBridge definitions take &str; a `str` decl here was an ABI
 // mismatch (by-value {ptr,len} pair against a header pointer).
 extern fn wl_assemble_to_object(source_path: &str, output_path: &str) -> i32
@@ -150,7 +118,6 @@ type BuildGraphSysInfo {
     memory_total: i64,
     page_size: i64,
 }
-extern fn with_sysinfo(out: *mut u8) -> i32
 
 fn build_graph_rt_cpu_cores() -> i32:
     var info = BuildGraphSysInfo { cpu_cores: 0, memory_total: 0, page_size: 0 }

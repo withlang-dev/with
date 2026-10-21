@@ -25,22 +25,10 @@ use AnalysisTypes
 use MirCore
 use SemaTypes
 use std.collections.HashMap
+use rt.rt_core
 
 extern fn exit(code: i32) -> Unit
-extern fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_hashmap_free(map: *mut u8) -> Unit
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_str_hash(s: &str) -> u64
-extern fn with_str_clone_ref(s: &str) -> str
 extern fn str_from_byte(b: i32) -> str
-extern fn with_codegen_loop_set_break(idx: i32, bb: i64) -> Unit
-extern fn with_codegen_loop_set_continue(idx: i32, bb: i64) -> Unit
-extern fn with_codegen_loop_set_result(idx: i32, value: i64) -> Unit
-extern fn with_codegen_loop_get_break(idx: i32) -> i64
-extern fn with_codegen_loop_get_continue(idx: i32) -> i64
-extern fn with_codegen_loop_get_result(idx: i32) -> i64
 
 // Atomic operations
 enum AtomicRmwOp: i32:
@@ -82,11 +70,6 @@ const TYPE_BODY_DEFINED: i32 = 3
 // Entry alloca helper
 
 // Debug info (DWARF)
-
-// Runtime helpers
-extern fn with_write(s: &str) -> Unit
-extern fn with_sysinfo_os() -> str
-extern fn with_sysinfo_arch() -> str
 
 // ── Codegen state ─────────────────────────────────────────────────
 

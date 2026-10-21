@@ -1,4 +1,5 @@
 use std.collections.HashMap
+use rt.rt_core
 // CiIR — IR for the C-to-With migrator (`with migrate`).
 //
 // Pipeline:
@@ -25,11 +26,6 @@ use std.collections.HashMap
 // Unsupported constructs fail by returning the null sentinel from
 // lowering, rather than escaping through verbatim raw-string nodes.
 
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_vec_free_es(v: *mut u8, es: i64)
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
 extern fn abort() -> Never
 
 fn ci_ir_phase_bug(message: &str):

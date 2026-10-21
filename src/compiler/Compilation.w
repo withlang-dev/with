@@ -36,11 +36,9 @@ use TargetSpec
 use MirCore
 use AnalysisTypes
 use std.collections.HashMap
+use rt.rt_core
 
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
 extern fn wl_set_active_target_triple(triple: &str) -> Unit
-extern fn with_str_clone_ref(s: &str) -> str
 
 fn profile_enabled() -> bool:
     runtime_getenv("WITH_PROFILE").len() > 0

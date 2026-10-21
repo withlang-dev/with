@@ -15,10 +15,8 @@
 use Resolve
 use compiler.Runtime.runtime_cwd
 use compiler.Runtime.runtime_path_is_absolute
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_str_hash(s: &str) -> u64
-extern fn with_getenv_str(name: &str) -> str
 
 // A label for docs/spec/abi/with-abi.md's version history, not the bundle key; it
 // becomes a frozen, normative major version at Level 1 of the roadmap.

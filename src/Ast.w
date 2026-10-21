@@ -10,12 +10,9 @@ use Span
 use Token
 use InternPool
 use std.collections.HashMap
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
 extern fn str_from_byte(b: i32) -> str
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8)
 extern fn abort() -> Never
 
 fn ast_pool_phase_bug(message: &str):

@@ -27,8 +27,8 @@ use compiler.LldDriver
 use compiler.DlltoolDriver
 use std.http
 use std.crypto.sha256
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
 
 // The value after `<key>: ` on a PROVENANCE line, or "".
 fn wil_field(text: &str, key: &str) -> str:

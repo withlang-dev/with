@@ -18,9 +18,8 @@ use compiler.Link
 use std.crypto.sha256
 use std.string.StringBuilder
 use CiMigrate
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 extern fn str_from_byte(b: i32) -> str
-extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 
 fn CONAN_CENTER_URL -> str: "https://center2.conan.io"
 fn CONAN_INDEX_RAW -> str: "https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes"

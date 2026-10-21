@@ -16,7 +16,7 @@ use MirCore
 use compiler.EmbeddedStdlib
 use compiler.BundleInterfaces
 use FnAbi
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 
 fn zcu_owned_text(text: &str) -> str:
     if text.len() == 0:

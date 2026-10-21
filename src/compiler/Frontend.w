@@ -11,7 +11,7 @@ use ComptimeTransform
 use Resolve
 use Span
 use compiler.Compilation.Config
-extern fn with_getenv_str(name: &str) -> str
+use rt.rt_core
 use Diagnostic
 use CImport
 use render
@@ -26,7 +26,6 @@ use compiler.LibcFacade
 use TargetSpec
 use FnAbi
 
-extern fn with_str_clone_ref(s: &str) -> str
 use compiler.ProjectConfig
 use compiler.Runtime
 use compiler.TrackedInputs

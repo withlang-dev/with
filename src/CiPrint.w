@@ -16,10 +16,8 @@
 use CiIR
 use CiMigrate
 use CImport
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_write(s: &str) -> Unit
-extern fn with_eprint(s: &str) -> Unit
 
 // ── Helpers ────────────────────────────────────────────────────
 

@@ -8,8 +8,8 @@ use BuildGraphModel
 use BuildGraphSupport
 use BuildGraphRuntime
 use std.string.StringBuilder
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
 
 fn build_graph_target_input_path(root: &str, target: &BuildGraphTarget, index: i32) -> str:
     if index == 0:

@@ -6,10 +6,10 @@ use Ast
 use Token
 use InternPool
 use std.string.StringBuilder
+use rt.rt_core
 
 
 extern fn str_from_byte(b: i32) -> str
-extern fn with_str_clone_ref(s: &str) -> str
 
 fn render_module(pool: &AstPool, intern: &InternPool) -> str:
     var out = StringBuilder.new()

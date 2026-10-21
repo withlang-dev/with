@@ -1,8 +1,8 @@
 // Wave 1 foundations: source text + line mapping.
 
 use compiler.foundation.Ids
+use rt.rt_core
 
-extern fn with_fs_read_file(path: &str) -> str
 
 
 pub type Source {

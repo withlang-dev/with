@@ -14,12 +14,8 @@
 // libclang bridge.
 
 use compiler.EmbeddedClangResourceData
+use rt.rt_core
 
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-extern fn with_fs_file_exists(path: &str) -> i32
-extern fn with_fs_mkdir_p(path: &str) -> i32
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_str_hash(s: &str) -> u64
 
 fn ecr_dirname(path: &str) -> str:
     var last = -1

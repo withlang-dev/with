@@ -24,12 +24,8 @@ use SemaVector
 use std.collections.HashMap
 use std.collections.HashSet
 use compiler.Runtime
+use rt.rt_core
 
-extern fn with_write(s: &str) -> Unit
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_clock_nanos() -> i64
-extern fn with_str_clone_ref(s: &str) -> str
 extern fn i64_to_string(n: i64) -> str
 
 // WITH_PROFILE=1: one `[profile] sema.<phase>` line per check_module step,

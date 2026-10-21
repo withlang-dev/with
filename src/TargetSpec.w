@@ -17,8 +17,7 @@
 // two differ only in pointer width; wasm32 is the first target where
 // a pointer is not 8 bytes, so layout code asks target_spec_ptr_bytes.
 
-extern fn with_sysinfo_os() -> str
-extern fn with_sysinfo_arch() -> str
+use rt.rt_core
 
 var target_spec_active: i32 = 0
 

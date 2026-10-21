@@ -4,8 +4,8 @@ use Sema
 use Ast
 use Resolve
 use BorrowCfg
+use rt.rt_core
 
-extern fn with_getenv_str(name: &str) -> str
 use ComptimeEval
 use ComptimeValue
 use CapabilityRegistry
@@ -26,10 +26,6 @@ use TargetSpec
 
 use Overflow
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_write(s: &str) -> Unit
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_getenv_str(name: &str) -> str
 extern fn str_from_byte(b: i32) -> str
 
 // docs/completed/mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.

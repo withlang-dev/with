@@ -9,11 +9,8 @@ use compiler.Runtime
 use compiler.AbiStamp
 use std.crypto.sha256
 use std.collections.HashMap
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_fs_file_stamp(path: &str) -> str
 
 const BUILD_CACHE_S_IFMT: i32 = 61440
 const BUILD_CACHE_S_IFDIR: i32 = 16384

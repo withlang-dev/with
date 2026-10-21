@@ -6,8 +6,8 @@
 // block's check (CRC32, CRC64 or SHA-256) is verified.
 
 use std.crypto.sha256
+use rt.rt_core
 
-extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
 
 let XZ_MASK32: i64 = 4294967295
 

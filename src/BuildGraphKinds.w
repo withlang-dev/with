@@ -1,7 +1,6 @@
 // BuildGraphKinds -- stable build graph kind/platform metadata.
 
-extern fn with_sysinfo_os() -> str
-extern fn with_sysinfo_arch() -> str
+use rt.rt_core
 
 const BUILD_GRAPH_STANDARD_KIND_MIN: i32 = 0
 const BUILD_GRAPH_STANDARD_KIND_MAX: i32 = 23

@@ -7,11 +7,8 @@
 // No C headers needed — all LLVM-C functions declared as extern fn.
 // Enum constants hardcoded from LLVM 22 headers (stable C API contract).
 
-// ── Runtime helpers (from rt_core.w) ────────────────────────────
 extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
-extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
-extern fn with_nanosleep(ns: i64) -> i32
+use rt.rt_core
 extern fn pthread_self() -> i64
 extern fn abort() -> Never
 extern fn rt_sysinfo_os() -> str

@@ -3,7 +3,7 @@
 // Canonical keys are encoded to deterministic strings for HashMap lookups.
 
 use compiler.foundation.Ids
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 
 // (int_to_string removed — using f-strings)
 

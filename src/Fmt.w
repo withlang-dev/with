@@ -5,10 +5,8 @@
 
 use Lexer
 use Token
+use rt.rt_core
 
-extern fn with_str_len(s: &str) -> i64
-extern fn with_str_byte_at_ref(s: &str, index: i64) -> i32
-extern fn with_str_slice_ref(s: &str, start: i64, end: i64) -> str
 
 // ── Spacing classification ──────────────────────────────────────
 

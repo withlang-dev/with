@@ -13,14 +13,8 @@
 // out/uat/<scenario>/tmp/, deleted on pass unless `--keep`. `with` at the
 // head of a `run:` line is the running toolchain, or `WITH_UAT_WITH`.
 
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-extern fn with_fs_mkdir_p(path: &str) -> i32
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_file_exists(path: &str) -> i32
-extern fn with_fs_remove_tree(path: &str) -> i32
-extern fn with_fs_remove_file(path: &str) -> i32
-extern fn with_fs_list_files(path: &str) -> str
-extern fn with_fs_chmod(path: &str, mode: i32) -> i32
+use rt.rt_core
+use rt.compat_runtime
 use std.process
 use TargetSpec
 use compiler.Runtime.runtime_path_is_absolute
@@ -28,8 +22,6 @@ use std.time
 use std.builtins.print
 use std.builtins.eprint
 
-extern fn with_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32
-extern fn with_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> i32
 
 const UAT_RUN_TIMEOUT_MS: i32 = 600000
 

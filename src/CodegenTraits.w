@@ -13,9 +13,8 @@ use MirLower
 use render
 use SemaTypes
 use std.collections.HashMap
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_eprint(s: &str) -> Unit
 
 // ── Collect trait info ────────────────────────────────────────────
 

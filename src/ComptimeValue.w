@@ -1,11 +1,8 @@
 use Sema
 use CapabilityRegistry
 use SemaTypes
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_str_eq_ref(a: &str, b: &str) -> i32
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
 
 enum ComptimeValueKind: i32:
     CV_INVALID = 0

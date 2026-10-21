@@ -4,20 +4,13 @@
 // All libclang types accessed through extern fn declarations.
 // No C headers needed — resolves at link time.
 
-// ── Runtime helpers (from rt_core.w) ────────────────────────────
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
-extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
+use rt.rt_core
 extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 extern fn rt_close(fd: i32) -> i32
 
 // ── libSystem extern fns ────────────────────────────────────────
 // mkstemp and realpath are the runtime's with_libc_* seams (one body per
 // backend; Windows has neither name), never the host's symbols.
-extern fn with_libc_mkstemp(template_path: *mut i8) -> i32
-extern fn with_libc_realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8
 unsafe fn mkstemp(template_path: *mut u8) -> i32: with_libc_mkstemp(template_path as *mut i8)
 unsafe fn realpath(path: *const u8, resolved_name: *mut u8) -> *mut u8:
     with_libc_realpath(path as *const i8, resolved_name as *mut i8) as *mut u8
@@ -30,12 +23,6 @@ extern fn opendir(path: *const u8) -> *mut u8
 extern fn readdir(dirp: *mut u8) -> *mut u8
 extern fn closedir(dirp: *mut u8) -> i32
 extern fn strtod(str: *const u8, endptr: *mut *mut u8) -> f64
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_remove_file(path: &str) -> i32
-extern fn with_fs_file_exists(path: &str) -> i32
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_sysinfo_os() -> str
-extern fn with_sysinfo_arch() -> str
 
 // ── libclang types ──────────────────────────────────────────────
 // Struct layouts match the C ABI exactly.

@@ -11,8 +11,8 @@ use compiler.EmbeddedSysroot
 use std.string.StringBuilder
 use TargetSpec
 use compiler.EmbeddedClangResourceData
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
 
 extern let with_embedded_cimport_stubs_o_start: u8
 extern let with_embedded_cimport_stubs_o_end: u8

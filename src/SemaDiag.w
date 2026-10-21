@@ -10,10 +10,8 @@ use std.string.StringBuilder
 use SemaTypes
 use SemaVector
 use compiler.FacadeRender
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_getenv_str(name: &str) -> str
 
 // Split a structured omission record "location|category|reason" into fields.
 // Field 0 = location, 1 = category, 2 = reason (the remainder, so a reason may

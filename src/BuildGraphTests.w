@@ -5,8 +5,8 @@ use BuildGraphModel
 use BuildGraphRuntime
 use BuildGraphSupport
 use BuildGraphCache
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
 
 type BuildGraphExternalTestJob {
     test_path: str,
@@ -65,7 +65,6 @@ fn build_graph_test_parse_jobs(value: &str) -> i32:
         out = out * 10 + (ch - 48)
     out
 
-extern fn with_fs_symlink(target: &str, link_path: &str) -> i32
 
 // The machine-wide test-process budget the top-level driver hands its lanes
 // (WITH_BUILD_JOBSERVER, a directory; WITH_BUILD_JOBSERVER_SLOTS, its

@@ -1,4 +1,4 @@
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 // Shared compiler-analysis records. Sema, MIR, diagnostics, and codegen all
 // emit this one schema so analysis commands join live compiler state instead
 // of parsing human-oriented dumps.
