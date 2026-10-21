@@ -122,8 +122,11 @@ formatted). `len()` is the outer dimension, not the element count.
 should agree on order: Eric ruled they agree, element first —
 `Vector[T, N]`, the aliases unchanged, the rename one mechanical pass —
 on the array-length-generics brief (#2311). Spec §4.3d carries the new
-spelling from that ruling; the rename and the length-generics stage are
-the implementation, non-compliant until they land. `Mask[N, W]` was not
+spelling from that ruling; the rename and the length-generics stage landed
+with #2311 (closed 2026-10-13): `Vector[N, T]` is retired, the SIMD
+fixtures spell `Vector[f32, N]`, and `fn f[N](xs: [T; N])` infers `N`.
+Still open against this ruling: #2379, a bracket literal takes no
+array-parameter demand in a generic call. `Mask[N, W]` was not
 named in the ruling and keeps its order until ruled. Not ruled here:
 `a[i, j]` as `a[i][j]` through `MultiIndex`, and whether the retired
 `[N]T` becomes an error with a fix-it.
