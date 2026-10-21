@@ -233,10 +233,18 @@ fn main:
         return
     var census = Census { counts: BTreeMap.new() }
     for path in tracked_files(): census.count_lexical(path)
+    // D112 holds for typed sites too: a corpus is generated code. Without
+    // this the count depended on the compiler that recorded it: a release
+    // binary links the corpora as .wo bundles and never checks their source,
+    // a :dev stage1 checks it and counted 40 corpus sites of
+    // some-at-option-demand under lib.
+    let generated = corpus_dirs(&git_listing(&["git", "ls-files"], "ls"))
     for line in typed.split("\n"):
         let cols = line.split("\t")
+        if cols.len() < 3: continue
+        let path = if cols[1].starts_with("<embedded-std>/"): "lib/" ++ cols[1].slice("<embedded-std>/".len(), cols[1].len()) else: cols[1]
         // Build-generated modules (out/gen) are not source anyone writes.
-        if cols.len() >= 3 and not cols[1].starts_with("out/"): census.bump(f"{cols[0]}\t{area_of(cols[1])}")
+        if not path.starts_with("out/") and not under_any(path, &generated): census.bump(f"{cols[0]}\t{area_of(cols[1])}")
     let bar_file = green_dir() ++ "/ceremony-bar.tsv"
     if record_bar_to.len() > 0:
         var text = ""
