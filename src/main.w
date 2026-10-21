@@ -2138,9 +2138,7 @@ fn build_graph_critical_lanes(graph: &BuildGraph, pool: &PoolState, priority: &L
 // green store); a target never measured counts 0.
 fn build_graph_priorities(root: &str, graph: &BuildGraph) -> List[i64]:
     var ledger = with_fs_read_file(resolve_join(root, "out/.build-state/battery-times.tsv"))
-    if ledger.len() == 0:
-        let green = with_getenv_str("WITH_GREEN_DIR")
-        ledger = with_fs_read_file((if green.len() > 0: green else: with_getenv_str("HOME") ++ "/.local/with-green") ++ "/battery-times.tsv")
+    if ledger.len() == 0: ledger = with_fs_read_file(green_store_dir() ++ "/battery-times.tsv")
     var own: List[i64] = List.new()
     for ti in 0..graph.targets.len(): own.push(build_graph_ledger_ms(ledger, graph.targets[ti].name))
     var prio: List[i64] = List.new()
@@ -3576,7 +3574,10 @@ fn build_report_wall(target_name: &str, t0: i64):
 // `<dest> version`). Same guarantee require-last-green enforces, none of the
 // graph machinery. (`:update-seed` is gone: src/main is the seed pinned in
 // seed.lock and only `with build :seed` writes it — the battery is driven by
-// the pinned seed, as CI is.)
+// the pinned seed, as CI is.) Because the graph never runs here, everything
+// a reseed publishes is published by this path: the compiler, its dSYM and
+// the ceremony census bar (green_publish_ceremony_bar).
+
 // #745/#757: during the battery the release candidate only ever runs as a
 // spawned pure-compiler child (workers, tests). It first evaluates build.w
 // as the ORCHESTRATOR — comptime evaluator, action graph, worker/runner
@@ -3677,6 +3678,7 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     let gate_rc = reseed_gate_smoke(root, compiler_path)
     if gate_rc != 0:
         return gate_rc
+    if green_publish_ceremony_bar(root, compiler_path, target_name) != 0: return 1
     // The .Install kind's own placement, never a write into the existing
     // file: truncating the installed, previously-executed binary in place
     // kept its inode, and macOS SIGKILLed the next launch (2026-09-22, after

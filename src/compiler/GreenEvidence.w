@@ -7,10 +7,16 @@
 
 use compiler.Runtime
 use BuildGraphSupport
+use BuildGraphOps
 use rt.rt_core
 
 
 fn green_join(dir: &str, name: &str) -> str: if dir.ends_with("/"): dir ++ name else: dir ++ "/" ++ name
+
+// The green store: $WITH_GREEN_DIR, else ~/.local/with-green.
+fn green_store_dir() -> str:
+    let explicit = runtime_getenv("WITH_GREEN_DIR")
+    if explicit.len() > 0: explicit else: runtime_getenv("HOME") ++ "/.local/with-green"
 
 // What git prints for `args` run in `root`, or "" when git fails.
 fn green_git_output(root: &str, args: &List[str], label: &str) -> str:
@@ -114,12 +120,45 @@ fn green_by_source_identity(root: &str) -> str:
     let tree = green_inputs_identity(root)
     if tree.len() < 40: return ""
     let identity = tree ++ "-" ++ seeded_by ++ "-" ++ with_sysinfo_os() ++ "_" ++ with_sysinfo_arch()
-    let explicit = runtime_getenv("WITH_GREEN_DIR")
-    let store_dir = if explicit.len() > 0: explicit else: runtime_getenv("HOME") ++ "/.local/with-green"
-    let store_lines = runtime_read_file(green_join(store_dir, "green.tsv")).split("\n")
+    let store_lines = runtime_read_file(green_join(green_store_dir(), "green.tsv")).split("\n")
     for i in 0..store_lines.len():
         let line = store_lines[i]
         if line.starts_with(identity ++ "\t"):
             let fields = line.split("\t")
             return if fields.len() > 1: fields[1].clone() else: "recorded"
     ""
+
+// The ceremony census bar (tools/ceremony_census.w): the installed tree's
+// counts, which every later tree is measured against. `:install-user` runs
+// as the driver's fast path and never evaluates build.w's graph, so the
+// bar's old graph route (a dep of install-user) never ran: from #702 on no
+// reseed recorded it, the bar stayed at a hand-published 2026-10-08 copy,
+// and the census gate measured trees against counts 12 days old. The
+// candidate records it before anything is installed; a census that cannot
+// record refuses the install, so a reseed never leaves a stale bar behind
+// a new compiler.
+fn green_publish_ceremony_bar(root: &str, compiler_path: &str, target_name: &str) -> i32:
+    let out_dir = green_join(root, "out/ceremony-bar")
+    if runtime_mkdir_p(out_dir) != 0:
+        runtime_eprint(f"[{target_name}] error: could not create {out_dir}; nothing was installed")
+        return 1
+    let recorded = green_join(out_dir, "ceremony-bar.tsv")
+    runtime_remove_file(recorded)
+    var argv = build_graph_argv_append("", compiler_path)
+    argv = build_graph_argv_append(argv, "run")
+    argv = build_graph_argv_append(argv, green_join(root, "tools/ceremony_census.w"))
+    argv = build_graph_argv_append(argv, "--compiler")
+    argv = build_graph_argv_append(argv, compiler_path)
+    argv = build_graph_argv_append(argv, "--record-bar")
+    argv = build_graph_argv_append(argv, recorded)
+    let err = green_join(out_dir, "census.stderr")
+    let rc = runtime_exec_argv_capture_cwd(argv, green_join(out_dir, "census.stdout"), err, 1200000, root)
+    let bar = runtime_read_file(recorded)
+    if rc != 0 or bar.len() == 0:
+        runtime_eprint(runtime_read_file(err))
+        runtime_eprint(f"[{target_name}] error: the candidate could not record the ceremony census bar (exit {rc}, {bar.len()} bytes in {recorded}); nothing was installed")
+        return 1
+    let dest = green_join(green_store_dir(), "ceremony-bar.tsv")
+    if build_graph_install_path(f"[{target_name}]", recorded, bar, dest, 0o644, "") != 0: return 1
+    print(f"[{target_name}] {dest} <- this tree's ceremony census counts")
+    0
