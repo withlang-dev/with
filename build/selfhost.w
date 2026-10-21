@@ -93,21 +93,6 @@ fn bs_push_c_compiler(argv: List[str]) -> List[str]:
     argv.push(bs_c_compiler())
     argv
 
-fn bs_host_platform_runtime_object() -> str:
-    let host_os = os()
-    let host_arch = arch()
-    if host_os == "Linux" and host_arch == "x86_64":
-        return "rt_linux_x86_64.o"
-    if host_os == "Linux" and host_arch == "aarch64":
-        return "rt_linux_aarch64.o"
-    if host_os == "Macos" and host_arch == "aarch64":
-        return "rt_darwin_aarch64.o"
-    if host_os == "Windows" and host_arch == "x86_64":
-        return "rt_windows_x86_64.o"
-    if host_os == "Windows" and host_arch == "aarch64":
-        return "rt_windows_aarch64.o"
-    ""
-
 fn bs_host_target_triple() -> str:
     let host_os = os()
     let host_arch = arch()
@@ -3466,10 +3451,7 @@ fn bs_check_c_import_names_reset_between_compilations(ctx: &ActionCtx, compiler_
     result.rc
 
 fn bs_compile_emit_c_output(ctx: &ActionCtx, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str) -> i32:
-    let platform_obj = bs_host_platform_runtime_object()
-    if platform_obj.len() == 0:
-        return bs_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
-    let cc_result = bs_run_emit_c_compile(ctx, root, case_dir, c_path, bin, label, platform_obj)
+    let cc_result = bs_run_emit_c_compile(ctx, root, case_dir, c_path, bin, label)
     if cc_result.rc == 0:
         return 0
     ctx.diagnostics().error(ctx.target_name() ++ f": {label} C compile failed with exit code {cc_result.rc}\n" ++ cc_result.stderr)
@@ -3488,7 +3470,7 @@ fn bs_emit_c_needs_fiber_runtime(c_text: &str) -> bool:
         if line.contains("with_fiber_") or line.contains("with_channel_"): return true
     false
 
-fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, platform_obj: &str, libm: bool, fibers: bool) -> List[str]:
+fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, libm: bool, fibers: bool) -> List[str]:
     var cc_args: List[str] = List.new()
     cc_args.push(bs_c_compiler())
     cc_args.push("-O1")
@@ -3513,11 +3495,11 @@ fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, platform_obj: &str, li
     cc_args
 
 // The host C compiler over one emitted unit and the runtime objects.
-fn bs_run_emit_c_compile(ctx: &ActionCtx, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str, platform_obj: &str) -> ToolProcessResult:
+fn bs_run_emit_c_compile(ctx: &ActionCtx, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str) -> ToolProcessResult:
     let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
     let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
     let fibers = bs_emit_c_needs_fiber_runtime(ctx.fs().read_text(c_path))
-    ctx.process_runner().run_capture(bs_emit_c_cc_args(root, c_path, bin, platform_obj, true, fibers), stdout_path, stderr_path, 120000)
+    ctx.process_runner().run_capture(bs_emit_c_cc_args(root, c_path, bin, true, fibers), stdout_path, stderr_path, 120000)
 
 fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -3715,7 +3697,7 @@ fn ec_read(ctx: &ActionCtx, path: &str): ctx.fs().read_text_opt(path).unwrap_or(
 // window (build/par.w); within a case emit precedes compile precedes run.
 // Returns the report of every failing case ("" when all pass) with the
 // number that failed, after every child is reaped.
-fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases: &List[EcCase]) -> (i32, str):
+fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, cases: &List[EcCase]) -> (i32, str):
     let root = ctx.project_info().project_root()
     let fs = ctx.fs()
 
@@ -3777,7 +3759,7 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases:
         // case is 19 MB of C and takes 112 s on the release host with this
         // target running alone; at 120 s it timed out (exit 124) in every
         // battery that ran the other test targets beside it.
-        cc_jobs.push(par_job(bs_emit_c_cc_args(root, c_path, ec_bin(c), platform_obj, c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 600000))
+        cc_jobs.push(par_job(bs_emit_c_cc_args(root, c_path, ec_bin(c), c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 600000))
     let cc_rcs = par_run(ctx, &cc_jobs, par_width(&cc_jobs))
 
     for k in 0..cc_case.len():
@@ -3941,9 +3923,6 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
     if cc_result.rc != 0:
         return bs_fail(ctx, f"direct aggregate ABI C helper compile failed with exit code {cc_result.rc}: " ++ cc_result.stderr)
 
-    let platform_obj = bs_host_platform_runtime_object()
-    if platform_obj.len() == 0:
-        return bs_fail(ctx, "unsupported host runtime object for direct aggregate ABI test: " ++ os() ++ "/" ++ arch())
     let link_stdout = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-link", "stdout")
     let link_stderr = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-link", "stderr")
     var link_args: List[str] = List.new()
@@ -3994,9 +3973,6 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     if not fs.exists(inputs[1]):
         return bs_fail(ctx, "missing source: " ++ inputs[1])
     let compiler_path = bs_abs(root, inputs[0])
-    let platform_obj = bs_host_platform_runtime_object()
-    if platform_obj.len() == 0:
-        return bs_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
     var cases: List[EcCase] = List.new()
 
     var hello = ec_case("hello", bs_join(output_dir, "hello"), inputs[1])
@@ -4068,7 +4044,7 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     if fixtures == 0:
         return bs_fail(ctx, "test/emit_c: no fixtures; the corpus cannot prove the C backend runs")
 
-    let (failed, report) = ec_run_cases(&ctx, compiler_path, platform_obj, &cases)
+    let (failed, report) = ec_run_cases(&ctx, compiler_path, &cases)
     if failed > 0:
         return bs_fail(ctx, f"{failed} of {cases.len()} emit-C cases failed:" ++ report)
     print(f"EMIT-C SMOKE OK ({cases.len()} cases)")

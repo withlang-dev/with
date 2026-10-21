@@ -115,21 +115,6 @@ fn emitc_push_c_source(argv: List[str], path: &str) -> List[str]:
     argv |> push("none")
     argv
 
-fn emitc_host_platform_runtime_object() -> str:
-    let host_os = os()
-    let host_arch = arch()
-    if host_os == "Linux" and host_arch == "x86_64":
-        return "rt_linux_x86_64.o"
-    if host_os == "Linux" and host_arch == "aarch64":
-        return "rt_linux_aarch64.o"
-    if host_os == "Macos" and host_arch == "aarch64":
-        return "rt_darwin_aarch64.o"
-    if host_os == "Windows" and host_arch == "x86_64":
-        return "rt_windows_x86_64.o"
-    if host_os == "Windows" and host_arch == "aarch64":
-        return "rt_windows_aarch64.o"
-    ""
-
 fn emitc_push_host_c_flags(argv: List[str]) -> List[str]:
     if os() == "Linux":
         argv |> push("-no-pie")
@@ -593,7 +578,7 @@ fn emitc_expect_same_version(ctx: &ActionCtx, expected_compiler: &str, actual_co
     fs.remove_file(actual_stderr)
     0
 
-fn emitc_compile_runtime_args(root: &str, argv: List[str], platform_obj: &str) -> List[str]:
+fn emitc_compile_runtime_args(root: &str, argv: List[str]) -> List[str]:
     argv |> push(emitc_abs(root, "out/lib/rt.o"))
     argv |> push(emitc_abs(root, "out/lib/fiber_asm.o"))
     argv |> push(emitc_abs(root, "out/lib/cimport_stubs.o"))
@@ -634,9 +619,6 @@ pub fn run_bootstrap_c_emit_sources_action(ctx: ActionCtx) -> i32:
 fn emitc_compile_c_compiler(ctx: &ActionCtx, main_c: &str, output_path: &str) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
-    let platform_obj = emitc_host_platform_runtime_object()
-    if platform_obj.len() == 0:
-        return emitc_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
     let llvm_rsp = "out/lib/llvm_link.rsp"
     if not fs.exists(llvm_rsp) or fs.read_text(llvm_rsp).len() == 0:
         return emitc_fail(ctx, "missing LLVM link metadata: " ++ llvm_rsp)
@@ -647,7 +629,7 @@ fn emitc_compile_c_compiler(ctx: &ActionCtx, main_c: &str, output_path: &str) ->
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
     argv = emitc_push_c_source(move argv, emitc_abs(root, main_c))
-    argv = emitc_compile_runtime_args(root, move argv, platform_obj)
+    argv = emitc_compile_runtime_args(root, move argv)
     argv |> push(emitc_abs(root, "out/lib/embedded_objects.o"))
     argv |> push("-I")
     argv |> push(emitc_abs(root, "runtime"))
@@ -659,9 +641,6 @@ fn emitc_compile_c_compiler(ctx: &ActionCtx, main_c: &str, output_path: &str) ->
 fn emitc_compile_c_compiler_with_bridges(ctx: &ActionCtx, main_c: &str, output_path: &str) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
-    let platform_obj = emitc_host_platform_runtime_object()
-    if platform_obj.len() == 0:
-        return emitc_fail(ctx, "unsupported host runtime object for full emit-c C compile: " ++ os() ++ "/" ++ arch())
     let cc_raw = if fs.exists("out/lib/llvm_cc"): fs.read_text("out/lib/llvm_cc") else: ""
     let cc_path = emitc_trim(cc_raw)
     if cc_path.len() == 0:
@@ -674,7 +653,7 @@ fn emitc_compile_c_compiler_with_bridges(ctx: &ActionCtx, main_c: &str, output_p
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
     argv = emitc_push_c_source(move argv, emitc_abs(root, main_c))
-    argv = emitc_compile_runtime_args(root, move argv, platform_obj)
+    argv = emitc_compile_runtime_args(root, move argv)
     argv |> push(emitc_abs(root, "out/lib/embedded_objects.o"))
     argv |> push("-I")
     argv |> push(emitc_abs(root, "runtime"))
@@ -773,9 +752,6 @@ fn emitc_build_hello_c(ctx: &ActionCtx, compiler_path: &str, hello_c: &str) -> i
 
 fn emitc_compile_hello(ctx: &ActionCtx, hello_c: &str, output_path: &str) -> i32:
     let root = ctx.project_info().project_root()
-    let platform_obj = emitc_host_platform_runtime_object()
-    if platform_obj.len() == 0:
-        return emitc_fail(ctx, "unsupported host runtime object for emit-c hello compile: " ++ os() ++ "/" ++ arch())
     var argv: List[str] = List.new()
     argv = emitc_push_c_compiler(ctx, move argv)
     argv |> push("-O1")
@@ -783,7 +759,7 @@ fn emitc_compile_hello(ctx: &ActionCtx, hello_c: &str, output_path: &str) -> i32
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
     argv = emitc_push_c_source(move argv, emitc_abs(root, hello_c))
-    argv = emitc_compile_runtime_args(root, move argv, platform_obj)
+    argv = emitc_compile_runtime_args(root, move argv)
     argv |> push("-I")
     argv |> push(emitc_abs(root, "runtime"))
     argv = emitc_push_system_libs(move argv)
