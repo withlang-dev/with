@@ -1966,7 +1966,13 @@ fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[
                     out.push(from_root)
                     rt_present = true
             continue
+        // A host that is also a cross tag carries its runtime twice — the
+        // native `rt` slot and `rt@<tag>` — and both are this target's: the
+        // runtime joins once (a second copy is 20 duplicate symbols at the
+        // Linux stage3 link).
         if embedded_bundle_name(bi) == "rt" and embedded_bundle_for_this_target(bi):
+            if rt_present:
+                continue
             rt_present = true
         // #2131: a slot carried for another target is not this link's.
         if not embedded_bundle_for_this_target(bi):

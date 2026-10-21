@@ -645,6 +645,10 @@ impl Compilation:
             if self.emit_c_in_unit and name != "rt":
                 continue
             if name == "rt":
+                // The native slot and its `rt@<tag>` twin on a host that is
+                // also a cross tag: one registration.
+                if rt_registered:
+                    continue
                 rt_registered = true
             let manifest = embedded_bundle_manifest_text(bi)
             if self.bundle_corpus.len() > 0 and self.manifest_lies_under_bundle_corpus(manifest):
