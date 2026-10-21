@@ -28356,6 +28356,28 @@ impl Sema:
             self.generic_subst_param_syms = saved_generic_call_subst_syms
             self.generic_subst_type_ids = saved_generic_call_subst_tys
             return cached
+        // The instance's own body is being checked and met this call (a
+        // generic function calling itself): checking the body again from
+        // inside it never ends. The call has the declared return type, as
+        // written for this instance, and binds to the signature the body
+        // check added before it began; with no annotation it reads Unit,
+        // exactly as a non-generic function's recursive call does (D43).
+        if self.generic_specializations_in_check.contains(spec_key):
+            let in_flight_gen = (self.ast.fn_meta_flags(meta) / FnFlags.GEN) % 2 == 1
+            let in_flight_ret = if ret_node == 0 or in_flight_gen:
+                self.ty_void as i32
+            else:
+                let declared = self.resolve_generic_return_type_node(ret_node, tp_start, tp_count)
+                self.fn_signature_return_type(self.ast.fn_meta_flags(meta), declared as TypeId) as i32
+            self.typed_expr_types.insert(call_node, in_flight_ret)
+            let in_flight_sig = self.get_sig(mono_sym)
+            if in_flight_sig >= 0:
+                self.resolved_call_sigs.insert(call_node, in_flight_sig)
+                self.resolved_call_mono_syms.insert(call_node, mono_sym)
+                self.check_selected_generic_call_args(fn_sym, in_flight_sig, arg_types, arg_nodes, arg_count, call_node)
+            self.generic_subst_param_syms = saved_generic_call_subst_syms
+            self.generic_subst_type_ids = saved_generic_call_subst_tys
+            return in_flight_ret
 
         let before_errors = self.diags.count_by_severity(DiagSeverity.Error)
         let tp_syms: List[i32] = List.new()
@@ -28367,7 +28389,9 @@ impl Sema:
             tp_syms.push(tp_sym)
             tp_sema_tys.push(self.lookup_generic_subst(tp_sym))
             tp_pos = tp_pos + 2 + bound_count
+        self.generic_specializations_in_check.insert(sema_owned_text(spec_key), 1)
         let concrete_sig = self.check_fn_body_concrete(fn_node, tp_syms, tp_sema_tys, mono_sym, param_concrete_tys)
+        self.generic_specializations_in_check.remove(spec_key)
         if concrete_sig >= 0:
             self.resolved_call_sigs.insert(call_node, concrete_sig)
             self.resolved_call_mono_syms.insert(call_node, mono_sym)
