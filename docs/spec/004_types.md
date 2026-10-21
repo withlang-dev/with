@@ -1683,8 +1683,11 @@ only once the demanded type is known.
 
 Demand propagates into the arms of an `if` and a `match` and into a
 block's tail the way demand already propagates there, so arms may mix `3`
-and `None` under an `Option[i32]` demand. An operator's operands are not
-demand sites: `opt == 3` is an error.
+and `None` under an `Option[i32]` demand; a function's tail and a
+collection literal's elements are demand sites too. An operator's
+operands are not demand sites: `opt == 3` is an error. Where no type is
+demanded because the return type is inferred, §9.1's `None`-beside-a-value
+join (D141) applies instead; it is a join, not this conversion.
 
 The conversion is the second of a demand's two phases (mission.md, law
 2): a demand first binds the unknowns the expression's own signature

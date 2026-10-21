@@ -18902,7 +18902,7 @@ impl Codegen:
             if meta < 0 or self.pool.fn_meta_tp_count(meta) <= 0:
                 continue
             if self.fn_decl_semantic_text_at(decl as i32, di) == want:
-                return Some(decl as i32)
+                return decl as i32
         None
 
     fn lookup_generic_struct_method_decl(sym: i32) -> Option[i32]:
@@ -18927,7 +18927,7 @@ impl Codegen:
                 continue
             let semantic = self.sema.fn_decl_semantic_symbol_at(decl as i32, self.pool.get_data0(decl), di)
             if self.is_method_on_generic_struct(semantic):
-                return Some(decl as i32)
+                return decl as i32
         None
 
     mut fn infer_static_generic_struct_mono_sym(owner_sym: i32, decl: i32, owner_expr_node: i32, arg_tys: &List[i64], arg_nodes: &List[i32], call_sema_ty: i32) -> i32:

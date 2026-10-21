@@ -16663,7 +16663,11 @@ impl MirBuilder:
             // own adjustment: the operand has the adjusted type (§4.3d).
             var sema_ty = self.expr_type(node)
             if node != self.vector_raw_node:
-                if self.sema.vector_splats.contains(node):
+                // §4.9a (D103): the Option Sema demanded is the adjustment;
+                // the node keeps its own type for the leaf checks.
+                if self.sema.value_to_option_nodes.contains(node):
+                    sema_ty = self.concrete_type(self.sema.value_to_option_nodes.get(node).unwrap())
+                else if self.sema.vector_splats.contains(node):
                     sema_ty = self.concrete_type(self.sema.vector_splats.get(node).unwrap())
                 else if self.sema.vector_conversions.contains(node):
                     sema_ty = self.concrete_type(self.sema.vector_conversions.get(node).unwrap())

@@ -10,6 +10,15 @@ impl Show for Point:
     fn show(self: &Point) -> String: "({self.x}, {self.y})"
 ```
 
+**The impl's signature is the trait's (D140).** A method in an impl of a
+trait may omit its parameter and return types; they are the trait's
+declaration, instantiated for the impl (`Self` is the impl type). If
+written, they must match it. `impl One for f64: fn one(): 1.0` is complete
+under `trait One: fn one() -> Self`; `impl Scale for P: fn scale(k):
+self.v * k` takes `k: i32` from `trait Scale: fn scale(self: &Self, k:
+i32) -> i32`. A parameter of a function that is not a trait impl's method
+always writes its type.
+
 ### 11.2 Generic Bounds
 
 Generic type parameters may omit bounds entirely. Unbounded generics

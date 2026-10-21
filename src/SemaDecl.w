@@ -2185,7 +2185,16 @@ impl Sema:
                 self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
             let p_type_node = self.ast.fn_param_type(param_start, pi)
             self.refuse_dyn_by_value_params(p_type_node, true)
-            let p_tid = self.resolve_parameter_type_expr(p_type_node)
+            // D140: a trait impl's method takes an omitted parameter type
+            // from the trait's declaration, instantiated for the impl; a
+            // written one must match it. Any other parameter needs its type
+            // (an untyped one used to reach codegen as a missing FnAbi type).
+            let trait_p_tid = self.trait_impl_param_type(node, fn_name, pi)
+            let p_tid = if p_type_node != 0: self.resolve_parameter_type_expr(p_type_node) else: trait_p_tid as TypeId
+            if p_type_node == 0 and trait_p_tid == 0 and self.pool_resolve(p_name_sym) != "self":
+                self.emit_error("parameter `" ++ self.pool_resolve(p_name_sym) ++ "` needs a type; only a method in an impl of a trait takes it from the trait (D140)", node)
+            else if p_type_node != 0 and trait_p_tid != 0 and p_tid != 0 and not self.types_identical(p_tid as i32, trait_p_tid):
+                self.emit_error("parameter `" ++ self.pool_resolve(p_name_sym) ++ "` is `" ++ self.type_name(p_tid as i32) ++ "`; it must match the trait's `" ++ self.type_name(trait_p_tid) ++ "` (D140)", p_type_node)
             let p_flags = self.ast.fn_param_flags(param_start, pi)
             // A D7 mut receiver spells `Self` but uses the share-place ABI: the
             // caller passes an address, so no opaque value is materialized.
@@ -2633,6 +2642,56 @@ impl Sema:
                 self.put_generic_subst(tp_sym, arg_tid as i32, arg_node)
                 self.impl_trait_arg_type_ids.insert(arg_node, arg_tid as i32)
             ti = ti + 1
+
+    // D140: the type the trait declares for an impl method's parameter `pi`,
+    // instantiated for the impl (`Self` is the impl type); 0 when `fn_name`
+    // is not a trait impl's method or the trait's method has no parameter
+    // there. The trait's list carries its explicit receiver first; the
+    // impl's (D7) does not.
+    mut fn trait_impl_param_type(node: i32, fn_name: i32, pi: i32) -> i32:
+        let contract = self.trait_impl_method_contract(node, fn_name)
+        if contract.ok == 0:
+            return 0
+        let meta = self.ast.find_fn_meta(node)
+        if meta < 0:
+            return 0
+        let impl_name = self.ast.fn_param_name(self.ast.fn_meta_param_start(meta), pi)
+        // The receiver is D7's (its mode and type come from the `fn` prefix
+        // and the impl), never a D140 parameter.
+        if self.pool_resolve(impl_name) == "self":
+            return 0
+        // The trait's parameter of the same name; else the same position
+        // among the non-receiver parameters.
+        var ti = -1
+        var position = -1
+        var impl_position = -1
+        for k in 0..self.ast.fn_meta_param_count(meta):
+            if self.pool_resolve(self.ast.fn_param_name(self.ast.fn_meta_param_start(meta), k)) != "self":
+                impl_position += 1
+            if k == pi: break
+        for k in 0..contract.param_count:
+            let trait_name = self.ast.fn_param_name(contract.param_start, k)
+            if self.pool_resolve(trait_name) == "self":
+                continue
+            position += 1
+            if trait_name == impl_name:
+                ti = k
+                break
+            if position == impl_position and ti < 0:
+                ti = k
+        if ti < 0:
+            return 0
+        let type_node = self.ast.fn_param_type(contract.param_start, ti)
+        if type_node == 0:
+            return 0
+        let impl_type_sym = self.ast.get_data0(contract.impl_node)
+        var impl_type_tid = self.lookup_named_type_visible(impl_type_sym)
+        let target_node = self.ast.find_impl_target_type_node(contract.impl_node as NodeId)
+        if target_node != 0:
+            let target_tid = self.resolve_type_expr(target_node)
+            if target_tid != 0:
+                impl_type_tid = target_tid
+        self.resolve_trait_default_method_type(type_node, impl_type_sym, impl_type_tid, contract.trait_sym, contract.impl_node)
 
     mut fn resolve_trait_default_method_type(type_node: i32, impl_type_sym: i32, impl_type_tid: i32, trait_sym: i32, impl_node: i32) -> i32:
         if type_node == 0:
