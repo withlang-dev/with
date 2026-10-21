@@ -618,10 +618,11 @@ its `rt.o` against the embedded `rt` slot plus `cimport_stubs.o` and
 declaration; the migrator no longer wraps a runtime helper call in `unsafe`
 and the corpora re-promoted without the 85 wrappers (D112 reason 3); the
 transition branch that counted such a call as an unsafe operation is gone,
-and the eight such blocks in std and src are unwrapped. Two things wait for a seed cut from this tree: the
-seed-built `out/bootstrap-lib` objects (the pinned seed links stage1 in the
-object world) and the compiler's own `src/` externs becoming `use rt.*`
-(the resolver now admits the compiler's sources, but the pinned seed's
-refuses them; `with run tools/sweep_rt_externs.w out/lib/rt.wi src` does it,
-keeping the ten LLVM/clang bridge
-externs the interface does not provide).
+and the eight such blocks in std and src are unwrapped. The post-flip seed
+(nightly-20261020-local-3, cut from 763d0e54c) closed the two waits: the
+compiler's own `src/` externs are `use rt.*` (`tools/sweep_rt_externs.w`
+over `out/lib/rt.wi`, keeping the LLVM/clang bridge externs the interface
+does not provide), and the seed-built `out/bootstrap-lib` runtime objects
+are gone — the seed links stage1 against its own embedded bundle, so
+`out/bootstrap-lib` holds only `cimport_stubs.o`, `fiber_asm.o` (what
+stage1 embeds beside the bundle) and the bridge objects the seed links.
