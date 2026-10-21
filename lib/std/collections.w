@@ -707,11 +707,13 @@ pub type FlatMapIter[I, C, J, T, U] ephemeral {
 }
 
 impl[T] Iter[&T] for ListIter[T]:
+    // The tail is the Option (D103). The return stays written until a
+    // generic impl takes it from the trait (D140, #2531).
     mut fn next() -> Option[&T]:
         if self.idx >= self.list.len(): return None
         let i = self.idx
-        self.idx = self.idx + 1
-        Some(&self.list[i])
+        self.idx += 1
+        &self.list[i]
 
 // #2152 (§13.1, §13.5): every adapter is an iterator, so a `for` steps
 // through it. Each `next` is the adapter's own.

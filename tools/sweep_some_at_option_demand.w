@@ -37,7 +37,7 @@ var site_starts = []
 var site_ends = []
 var skipped = []
 
-for ri in 2..argv.len() as i32:
+for ri in 2..argv.len():
     let root = argv[ri]
     let done = run_to_files(&[compiler, "check", root, "--ceremony-census"], "out/sweep-some.txt", "out/sweep-some.err", 600000)
     if done.code != 0:
@@ -57,13 +57,14 @@ for ri in 2..argv.len() as i32:
         site_starts.push(start)
         site_ends.push(end)
 
-var files = []
+// Typed by hand: `[]` fed from another by-use list is refused today (#2532).
+var files: List[str] = List.new()
 for p in site_paths:
     if not files.contains(p): files.push(p)
 var total = 0
 for path in files:
-    var starts = []
-    var ends = []
+    var starts: List[i32] = List.new()
+    var ends: List[i32] = List.new()
     for i in 0..site_paths.len():
         if site_paths[i] == path:
             starts.push(site_starts[i])
@@ -74,11 +75,11 @@ for path in files:
         continue
     // Edits from the end of the file backwards, so earlier offsets hold.
     var order = []
-    for i in 0..starts.len(): order.push(i as i32)
+    for i in 0..starts.len(): order.push(i)
     for a in 0..order.len():
         for b in (a + 1)..order.len():
             if starts[order[b]] > starts[order[a]]:
-                let t: i32 = order[a]
+                let t: isize = order[a]
                 order[a] = order[b]
                 order[b] = t
     var out = text

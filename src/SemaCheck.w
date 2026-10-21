@@ -809,6 +809,40 @@ impl Sema:
     // to select the answer. Numeric widening is commutative; compatible aliases
     // collapse to their common resolved type; a concrete generic instance wins
     // over its erased base declaration.
+    // A bare `None`'s type: an `Option` whose payload is not yet known.
+    fn is_bare_none_type(tid: i32) -> bool:
+        if tid == 0:
+            return false
+        let r = self.resolve_alias(tid as TypeId)
+        if self.get_type_name(r) != self.syms.option:
+            return false
+        // `None` alone is typed at Option's own declaration (the enum with its
+        // parameter unbound), or at an instance whose payload is not known.
+        let tk = self.get_type_kind(r)
+        tk == TypeKind.TY_ENUM or (tk == TypeKind.TY_GENERIC_INST and self.type_has_unresolved_parts(r as i32) != 0)
+
+    fn is_option_type(tid: i32) -> bool:
+        if tid == 0:
+            return false
+        let r = self.resolve_alias(tid as TypeId)
+        self.get_type_kind(r) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(r as i32) == self.syms.option
+
+    // D141: where a return type is inferred, a `T` beside `None` joins to
+    // `Option[T]`. An `Option[T]` beside `None` does not join — `Option[
+    // Option[T]]` would be a second meaning — and the type is written: -1.
+    // 0 when neither side is a bare `None`.
+    mut fn none_value_join(lhs: i32, rhs: i32) -> i32:
+        let lhs_none = self.is_bare_none_type(lhs)
+        let rhs_none = self.is_bare_none_type(rhs)
+        if lhs_none == rhs_none:
+            return 0
+        let other = if lhs_none: rhs else: lhs
+        if other == 0 or other == self.ty_void as i32 or other == self.ty_never as i32:
+            return 0
+        if self.is_option_type(other):
+            return -1
+        self.ensure_option_type_for(other)
+
     mut fn merge_contextual_owned_join_types(lhs: i32, rhs: i32) -> i32:
         if lhs == 0:
             return rhs
@@ -1066,9 +1100,26 @@ impl Sema:
                             deferred = true
                     if deferred: arms_disagree = false
                 owned_candidate = if arms_disagree: 0 else: self.merge_contextual_owned_join_types(owned_candidate, arm_ty)
+                // D141: under an inferred return, `None` beside a `T` arm
+                // joins to Option[T]; beside an `Option[T]` arm it is written.
+                var none_written = false
+                if owned_candidate == 0 and not arms_disagree and self.infer_tail_join != 0 and prior_candidate != 0:
+                    let none_join = self.none_value_join(prior_candidate, arm_ty)
+                    if none_join > 0:
+                        owned_candidate = none_join
+                        // The `T` arm converts to the Option now (§4.9a), as
+                        // under a written `-> Option[T]`.
+                        let prior_is_none = self.is_bare_none_type(prior_candidate)
+                        let t_arm = if prior_is_none: reach_node else: owned_arm_node
+                        let t_ty = if prior_is_none: arm_ty else: prior_candidate
+                        if t_arm > 0:
+                            self.value_to_option_at_demand(t_arm, none_join as TypeId, t_ty as TypeId)
+                    else if none_join < 0: none_written = true
                 if prior_candidate == 0 and owned_candidate != 0: owned_arm_node = reach_node
                 if owned_candidate == 0:
-                    if self.infer_tail_join != 0:
+                    if none_written:
+                        self.emit_error("cannot infer return type: `None` beside an `Option` arm could mean `Option[Option[T]]`; write the return type (D141)", report_node)
+                    else if self.infer_tail_join != 0:
                         // D43: two meanings remain; the programmer spells the choice.
                         let lhs_name = self.type_name(prior_candidate)
                         let rhs_name = self.type_name(arm_ty)
@@ -1235,7 +1286,10 @@ impl Sema:
                     if arm_role == D22_JOIN_ROLE_EXPR and arm_node > 0:
                         let _ = self.record_contextual_copy_adjustment(arm_node, final_type, arm_ty)
                 else:
-                    if self.contextual_join_value_accepts(final_type, arm_ty) == 0:
+                    // D141: an arm the `None` join converted to the Option
+                    // keeps its own type; the record is the conversion.
+                    let arm_converted = arm_node > 0 and (self.value_to_option_nodes.contains(arm_node) or self.value_to_option_nodes.contains(self.join_arm_value_node(arm_node)))
+                    if not arm_converted and self.contextual_join_value_accepts(final_type, arm_ty) == 0:
                         self.emit_contextual_join_mismatch(join_name, final_type, arm_ty, report_node, arm_node)
                         return 0
                     // Under an owned expectation every arm is that demand's
@@ -4834,6 +4888,13 @@ impl Sema:
         // Tail expression bodies participate in effect inference the same way an
         // explicit `return expr` does. Without this, `fn id(x: T) -> T: x` fails
         // to record escape_value/escape_view on `x`.
+        // §4.9a (D103): the return type is a demand on the tail. Convert a
+        // `T` tail under an `Option[T]` return here, before any leaf check
+        // reads the record (a specialization's body meets no demand while
+        // it is checked, so the block-tail propagation did not reach it).
+        if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
+            let early_tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
+            self.value_to_option_at_demand(early_tail, body_expected_ret, body_ty)
         let body_materializes_copy = body_expected_ret != 0 and self.can_contextually_copy_ref(body_expected_ret as i32, body_ty as i32) != 0
         if body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
             if self.is_copy(body_ty) == 0:
@@ -9531,6 +9592,17 @@ impl Sema:
         if out.value_type == 0 or out.value_type == self.ty_never:
             out.value_type = actual
             return out
+        // D141, before compatibility: `return None` beside `return x` (x: T)
+        // infers Option[T]; beside an `Option[U]` it is written (a bare
+        // `None` is compatible with every Option, so the join must decide).
+        let none_join = self.none_value_join(out.value_type, actual)
+        if none_join > 0:
+            out.value_type = none_join
+            return out
+        if none_join < 0:
+            out.mismatch = 1
+            out.mismatch_node = node
+            return out
         if self.types_compatible(out.value_type as TypeId, actual as TypeId) != 0:
             out.value_type = self.preferred_compatible_type(out.value_type as TypeId, actual as TypeId) as i32
             return out
@@ -9541,6 +9613,38 @@ impl Sema:
         out.mismatch = 1
         out.mismatch_node = node
         out
+
+    // D141: once an inferred return is `Option[T]`, every value the body
+    // returns — a `return`'s value, a block's tail, an `if`/`match` arm —
+    // that is a `T` converts to it (§4.9a), as it would under a written
+    // `-> Option[T]`. Mirrors check_body_explicit_value_results' walk.
+    mut fn convert_body_values_to_option(node: i32, value_path: i32, opt: i32):
+        if node == 0 or opt == 0:
+            return
+        match self.ast.kind(node):
+            NodeKind.NK_CLOSURE | NodeKind.NK_FN_DECL => ()
+            NodeKind.NK_RETURN => self.convert_body_values_to_option(self.ast.get_data0(node), 1, opt)
+            NodeKind.NK_BLOCK =>
+                let extra_start = self.ast.get_data0(node)
+                for si in 0..self.ast.get_data1(node):
+                    self.convert_body_values_to_option(self.ast.get_extra(extra_start + si), 0, opt)
+                self.convert_body_values_to_option(self.ast.get_data2(node), value_path, opt)
+            NodeKind.NK_IF_EXPR =>
+                self.convert_body_values_to_option(self.ast.get_data1(node), value_path, opt)
+                self.convert_body_values_to_option(self.ast.get_data2(node), value_path, opt)
+            NodeKind.NK_MATCH =>
+                let arm_start = self.ast.get_data1(node)
+                for ai in 0..self.ast.get_data2(node):
+                    self.convert_body_values_to_option(self.ast.get_extra(arm_start + ai), value_path, opt)
+            NodeKind.NK_MATCH_ARM => self.convert_body_values_to_option(self.ast.get_data1(node), value_path, opt)
+            NodeKind.NK_LOOP | NodeKind.NK_DO_WHILE => self.convert_body_values_to_option(self.ast.get_data0(node), 0, opt)
+            NodeKind.NK_WHILE => self.convert_body_values_to_option(self.ast.get_data1(node), 0, opt)
+            NodeKind.NK_FOR => self.convert_body_values_to_option(self.ast.get_data2(node), 0, opt)
+            _ =>
+                if value_path != 0:
+                    let actual = self.recorded_expr_type_or_zero(node)
+                    if actual != 0 and actual != self.ty_void and actual != self.ty_never:
+                        self.value_to_option_at_demand(node, opt as TypeId, actual as TypeId)
 
     mut fn combine_body_return_type_info(lhs: BodyReturnTypeInfo, rhs: &BodyReturnTypeInfo) -> BodyReturnTypeInfo:
         var out = lhs
@@ -9857,7 +9961,16 @@ impl Sema:
         let place = render_expr(self.ast, self.pool, self.ast.get_data0(n) as NodeId, 0)
         self.emit_error_with_help(msg, n, "the tail assignment yields a read of `" ++ place ++ "` after the store (§9.1); the implicit default applies only to a `Unit` tail (§4.10)")
 
+    // D141: when the inferred return is an `Option[T]` that some branch met
+    // as a bare `T` (a `None` joined it), those branches convert now, as
+    // they would under a written `-> Option[T]` (§4.9a).
     mut fn infer_unannotated_function_return_type(body: i32, body_ty: TypeId, entry_point: i32) -> i32:
+        let inferred = self.infer_unannotated_function_return_type_raw(body, body_ty, entry_point)
+        if inferred != 0 and self.is_option_type(inferred) and not self.is_bare_none_type(inferred):
+            self.convert_body_values_to_option(body, 1, inferred)
+        inferred
+
+    mut fn infer_unannotated_function_return_type_raw(body: i32, body_ty: TypeId, entry_point: i32) -> i32:
         let info = self.body_return_type_info(body)
         if info.mismatch != 0:
             self.emit_error("return type mismatch", info.mismatch_node)
@@ -9875,6 +9988,18 @@ impl Sema:
             let falls_off = body_ty == 0 or body_ty == self.ty_void
             if falls_off and entry_point == 0 and self.body_can_fall_through(body) != 0 and self.type_is_result_of_unit(info.value_type) == 0:
                 self.emit_error("missing return", body)
+            // D141: the tail joins the explicit returns as another return
+            // would (`return None` … `n` is Option[i32]; `return None` beside
+            // an `Option[T]` tail is written).
+            if not falls_off and body_ty != self.ty_never and info.value_type != 0 and info.literal_type == 0:
+                let had_mismatch: i32 = info.mismatch
+                let joined = self.merge_body_return_type_info(info, body_ty as i32, body)
+                if joined.mismatch != 0 and had_mismatch == 0:
+                    if self.none_value_join(info.value_type, body_ty as i32) < 0:
+                        self.emit_error("cannot infer return type: `None` beside an `Option` could mean `Option[Option[T]]`; write the return type (D141)", body)
+                    else:
+                        self.emit_error("return type mismatch", body)
+                return joined.value_type
             if info.literal_type == 0:
                 return info.value_type
             // §4.2.1: untyped literal returns take the type of the typed

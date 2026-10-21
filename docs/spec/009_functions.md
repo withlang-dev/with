@@ -46,6 +46,13 @@ type; a value on one path and fall-off on another is a missing return
 (§4.10). A closure with no expected function type infers its result the
 same way.
 
+**`None` beside a value (D141).** Where a return type is inferred,
+branches of type `T` and `None` join to `Option[T]`, whether the branches
+are arms, `return` statements or the tail. A branch already of type
+`Option[T]` beside `None` does not join, since `Option[Option[T]]` would
+be a second meaning, and the type is written. The value-to-Option
+conversion (§4.9a) still never solves a type variable.
+
 An assignment `place = value` is an expression; its value is a read of
 `place` after the store (C's rule, C11 §6.5.16, under With's view semantics:
 a read of a place yields a view of it, §3.8, D22). In statement position the
