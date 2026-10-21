@@ -632,6 +632,13 @@ impl Sema:
         let pointee = self.contextual_copy_value_type(expected, actual)
         if pointee == 0:
             return 0
+        // D139: `take_i32(&first)` with `first: &i32` reads the value through
+        // both layers; the written `&` adds nothing (Law 1), so it is named.
+        if sk == NodeKind.NK_UNARY and self.ast.get_data0(source_node) == UnaryOp.UOP_REF:
+            let operand = self.unwrap_address_place_expr(self.ast.get_data1(source_node))
+            let operand_ty = self.recorded_expr_type_or_zero(operand)
+            if operand_ty != 0 and self.get_type_kind(self.resolve_alias(operand_ty as TypeId)) == TypeKind.TY_REF:
+                self.emit_warning("redundant `&`: the operand is already a view, and the value is read through it", source_node)
         let context_sig = self.current_fn_sig_idx
         let context_key = sema_pair_key(context_sig, source_node)
         var post_copy_type: i32 = 0

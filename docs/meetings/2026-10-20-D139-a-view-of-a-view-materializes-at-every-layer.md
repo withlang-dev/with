@@ -1,9 +1,9 @@
-# D139 — A view of a view of a Copy value satisfies an owned-value demand at every layer (D22 §7.4 applied as written) (delegated)
+# D139 — A view of a view of a Copy value satisfies an owned-value demand at every layer (D22 §7.4 applied as written)
 
 **Laws:** 1, 2 (docs/mission.md).
 
-**Date:** 2026-10-20. **Status:** delegated (D98): implemented on the
-agent's prediction; Eric vetoes by revert. **Issue:** #2220 (step 2).
+**Date:** 2026-10-20. **Status:** ruled by Eric 2026-10-20 (first implemented as
+delegated; the battery surfaced two older fixtures, and Eric ruled every layer). **Issue:** #2220 (step 2).
 
 **Decision.** D22 §7.4 ("a projected reference may later satisfy an
 independently established owned-value demand when its pointee is `Copy`")
@@ -37,8 +37,28 @@ iterator campaign (#2220 Option 2) makes `ListIter` a view that yields
 `&T`, so without this every `filter` over a list of integers would grow a
 `*it`.
 
-**Prediction.** Eric rules for it, 90%: "don't make the user write what the
-compiler already knows" is the first law, and D22's text already says it.
+**Ruling (Eric, 2026-10-20).** Every layer. The two fixtures lose: a view of
+a view of a Copy value carries no information beyond the value; making the
+user write `**rr == 42` spells a dereference the compiler can see through,
+which the first law rules out, and D22 is the later and more specific rule
+about views. Both fixtures predate it and neither cites a ruling: they
+encoded Rust's habit at the time. **Principle recorded with this ruling: a
+test that encodes behavior no ruling made gives way to a later ruling that
+contradicts it.** What each fixture becomes: `rr == 42` with `rr: &&i32`
+compiles and compares the values; `take_i32(&first)` with `first: &i32`
+compiles, and the explicit `&` is redundant, so it gets a redundant-`&`
+warning, not an error. Two edges so the rule does not leak: it is for reads
+of Copy values (writing through nested views, and anything not Copy, keep
+their rules); generics must agree (a `T` instantiated with `&i32` compares
+values under `==`, as concrete `&i32 == &i32` does — one fixture covers it).
+Then `filter` over a view iterator takes its predicate without a `*it`, the
+case that surfaced this.
+
+**Prediction (before the ruling).** Eric rules for it, 90%: "don't make the
+user write what the compiler already knows" is the first law, and D22's text
+already says it. The battery then surfaced two older compile-error fixtures
+pointing the other way, so the delegation was withdrawn and the question
+brought to Eric.
 
 **What would reopen it.** A case where reading through two layers changes
 which program is accepted in a way a person would not expect, or a
