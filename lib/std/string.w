@@ -133,7 +133,7 @@ impl CStr:
 /// the facade clause is what vouches for the pointer, so the conversion is
 /// `unsafe`: its caller guarantees `p` is NULL or a live C string (#1473).
 pub unsafe fn cstr_option_from_ptr(p: *const i8) -> Option[CStr]:
-    if p == null: None else: Some(CStr.from_ptr(p))
+    if p == null: None else: CStr.from_ptr(p)
 
 /// Why a `CStr` is not With text.
 pub enum Utf8Error:

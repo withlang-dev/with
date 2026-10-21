@@ -411,7 +411,7 @@ impl Regex:
         let number = unsafe { regex_group_index(self.ptr, name) }
         if number < 0:
             return None
-        Some(number)
+        number
 
     pub fn capture_names() -> List[str]:
         let out: List[str] = List.new()
@@ -437,11 +437,11 @@ impl Regex:
             return None
         // Captures is owned output: named lookup must remain valid after
         // the Regex dies, including when it was a temporary (#1098).
-        Some(Captures {
+        Captures {
             regex_ptr: unsafe { regex_copy_code(self.ptr, "Regex.captures") },
             subject: with_str_clone_ref(text),
             spans: spans,
-        })
+        }
 
     pub fn is_match(text: &str) -> bool:
         self.captures(text).is_some()
@@ -718,11 +718,11 @@ impl Captures:
         let end = self.spans[(base + 1)]
         if start < 0 or end < 0:
             return None
-        Some(Match {
+        Match {
             text: with_str_slice_ref(self.subject, start as i64, end as i64),
             start: start,
             end: end,
-        })
+        }
 
     pub fn len() -> isize:
         self.spans.len() / 2

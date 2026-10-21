@@ -496,7 +496,7 @@ impl[T] Iter[T] for ListIntoIter[T]:
     // cost stands until a front-cursor variant earns its unsafe.
     mut fn next() -> Option[T]:
         if self.list.len() == 0: return None
-        Some(self.list.remove(0))
+        self.list.remove(0)
 
 // ── Map traversal (D44) ───────────────────────────────────────────
 // The observing traversals of a keyed map: concrete ephemeral structs over a
