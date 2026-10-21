@@ -2387,6 +2387,32 @@ fn run_unit_return_review_action(ctx: ActionCtx) -> i32:
 // recompiles, and reports the ones whose removal changes no type; a finding
 // is a red. The UAT fixtures join the list when their one finding
 // (libcurl_main.w `fetch_bytes`) is approved.
+// D100 (#2211): `pub` the compiler proves nothing outside the package uses
+// is refused — the sweep that removed 1,763 of them (#2463) never grows
+// back. The lint asks the compiler (`with analyze src/main.w facts`); the
+// standard library is not swept (Eric, 2026-10-19: its `pub` is its API to
+// consumers outside this compilation).
+fn run_pub_lint_check_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0: return 1
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, ctx.inputs()[0])
+    var args: List[str] = List.new()
+    args.push(compiler)
+    args.push("run")
+    args.push("tools/pub_lint.w")
+    args.push("src/main.w")
+    let stdout_rel = build_project_join(out_dir, "lint.stdout")
+    let stderr_rel = build_project_join(out_dir, "lint.stderr")
+    var process_env = process_env()
+    process_env = process_env.set("WITH", build_project_abs(root, ctx.inputs()[0]))
+    let result = ctx.process_runner().run_capture_with_env(args, build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 1200000, process_env)
+    print(fs.read_text(stdout_rel))
+    if result.rc != 0:
+        ctx.diagnostics().error("pub-lint-check: a `pub` nothing outside the compiler's package uses (D100): `with run tools/pub_lint.w src/main.w --apply` removes it\n" ++ fs.read_text(stderr_rel))
+    0
+
 fn run_ceremony_check_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let out_dir = ctx.output()
@@ -4159,6 +4185,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     unit_review = unit_review.dep("build")
     unit_review = unit_review.write_scope("out/unit-return-review")
     out = out.add_target(unit_review)
+    var pub_lint_check = target_new(.Action, "pub-lint-check", "").output("out/pub-lint-check")
+    pub_lint_check.action = run_pub_lint_check_action
+    pub_lint_check = pub_lint_check.input(release_compiler_bin("with"))
+    pub_lint_check = pub_lint_check.input("tools/pub_lint.w")
+    pub_lint_check = pub_lint_check.input("src")
+    pub_lint_check = pub_lint_check.dep("build")
+    pub_lint_check = pub_lint_check.write_scope("out/pub-lint-check")
+    pub_lint_check = pub_lint_check.write_scope("out/tmp")
+    pub_lint_check = pub_lint_check.timeout(1200000)
+    out = out.add_target(pub_lint_check)
+
     var ceremony_check = target_new(.Action, "ceremony-check", "").output("out/ceremony-check")
     ceremony_check.action = run_ceremony_check_action
     ceremony_check = ceremony_check.input(release_compiler_bin("with"))
@@ -4737,6 +4774,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // last-green-record) declare edges on what they read, so the readiness
     // scheduler records each after what it blesses.
     var battery_checks = target_new(.Group, "battery-checks", "")
+    battery_checks = battery_checks.dep("pub-lint-check")
     battery_checks = battery_checks.dep("seed-driver")
     battery_checks = battery_checks.dep("test-with-audits")
     battery_checks = battery_checks.dep("user-programs-safe")
