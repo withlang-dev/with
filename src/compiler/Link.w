@@ -1532,6 +1532,100 @@ fn link_stage_read_u64_le_small(data: &str, offset: i32) -> i64:
 // `nm -u` prints. "<not-elf>" when the file is no ELF object at all,
 // "<probe-failed>" when it is one this reader cannot read. Read in-process,
 // so a Linux link needs no host nm (#1915, D81).
+// The symbols a wasm object imports, one per line, read in-process like the
+// ELF, Mach-O and COFF readers (#1915, D81): a Linux host has no nm that
+// reads wasm, and the SDK's llvm-nm sits beside lld only once a runtime root
+// of this generation exists, so the wasm32 corpus bundles' manifests
+// (D138: a bundle records what it imports) failed on both Linux seed cuts.
+// The import section (id 2) lists every function, table, memory, global
+// and tag the object takes from its environment; each field name is an
+// undefined symbol of the link. "<not-wasm>" when the file is not a wasm
+// object, "<probe-failed>" when its sections cannot be read.
+fn link_stage_wasm_undefined_symbols(path: &str) -> str:
+    let data = runtime_read_file(path)
+    if data.len() < 8 or data[0] != 0 or data[1] != 'a' or data[2] != 's' or data[3] != 'm':
+        return "<not-wasm>"
+    let size = data.len()
+    var offset: i64 = 8
+    var out = StringBuilder.new()
+    while offset < size:
+        let id = data[offset] as i32
+        let (section_len, after_len) = link_stage_read_uleb(data, offset + 1)
+        if section_len < 0 or after_len + section_len > size:
+            return "<probe-failed>"
+        if id != 2:
+            offset = after_len + section_len
+            continue
+        let section_end = after_len + section_len
+        let (count, after_count) = link_stage_read_uleb(data, after_len)
+        if count < 0:
+            return "<probe-failed>"
+        offset = after_count
+        for _ in 0..count:
+            let (module_len, after_module_len) = link_stage_read_uleb(data, offset)
+            if module_len < 0 or after_module_len + module_len > section_end:
+                return "<probe-failed>"
+            let (field_len, after_field_len) = link_stage_read_uleb(data, after_module_len + module_len)
+            if field_len < 0 or after_field_len + field_len > section_end:
+                return "<probe-failed>"
+            let field = data.slice(after_field_len, after_field_len + field_len)
+            offset = after_field_len + field_len
+            if offset >= section_end:
+                return "<probe-failed>"
+            let kind = data[offset] as i32
+            offset = offset + 1
+            // A memory import (`__linear_memory`) is the module's address space,
+            // not a symbol; nm lists the functions, tables and globals.
+            if kind != 2:
+                out.push_str(field)
+                out.push_str("\n")
+            if kind == 0 or kind == 4:
+                // function: a type index; tag: an attribute byte then a type index
+                if kind == 4: offset = offset + 1
+                let (_, after_type) = link_stage_read_uleb(data, offset)
+                if after_type < 0: return "<probe-failed>"
+                offset = after_type
+            else if kind == 1:
+                // table: a reference type byte, then limits
+                offset = link_stage_skip_wasm_limits(data, offset + 1)
+            else if kind == 2:
+                offset = link_stage_skip_wasm_limits(data, offset)
+            else if kind == 3:
+                // global: a value type byte and a mutability byte
+                offset = offset + 2
+            else:
+                return "<probe-failed>"
+            if offset < 0 or offset > section_end:
+                return "<probe-failed>"
+        return out.to_str()
+    out.to_str()
+
+// An unsigned LEB128 at `offset`: (value, offset after it); (-1, -1) when it
+// runs off the data.
+fn link_stage_read_uleb(data: &str, offset: i64) -> (i64, i64):
+    var result: i64 = 0
+    var shift: u64 = 0
+    var at = offset
+    while at < data.len() and shift < 64:
+        let byte = data[at] as i64
+        at = at + 1
+        result = result | ((byte & 0x7f) << shift)
+        if (byte & 0x80) == 0:
+            return (result, at)
+        shift = shift + 7
+    (-1, -1)
+
+// wasm limits at `offset`: a flags byte, a minimum, and a maximum when flag
+// bit 0 is set; the offset after them, -1 when they run off the data.
+fn link_stage_skip_wasm_limits(data: &str, offset: i64) -> i64:
+    if offset < 0 or offset >= data.len(): return -1
+    let flags = data[offset] as i64
+    let (_, after_min) = link_stage_read_uleb(data, offset + 1)
+    if after_min < 0: return -1
+    if (flags & 1) == 0: return after_min
+    let (_, after_max) = link_stage_read_uleb(data, after_min)
+    after_max
+
 fn link_stage_elf_undefined_symbols(path: &str) -> str:
     let data = runtime_read_file(path)
     if data.len() < 64 or data[0] != 0x7f or data[1] != 'E' or data[2] != 'L' or data[3] != 'F':
@@ -1599,6 +1693,13 @@ fn link_stage_undefined_symbols_for_object(obj_path: &str) -> str:
         if symbols == "<probe-failed>":
             with_eprint(f"warning: link: {obj_path} is not a COFF object this compiler can read for undefined symbols; linking every embedded bundle\n")
         return symbols
+    // A wasm object: its import section, read in-process (no host nm reads
+    // wasm; the SDK's llvm-nm needs a runtime root of this generation).
+    let wasm = link_stage_wasm_undefined_symbols(obj_path)
+    if wasm == "<probe-failed>":
+        with_eprint(f"warning: link: {obj_path} is a wasm object whose import section this compiler cannot read; linking every embedded bundle\n")
+    if wasm != "<not-wasm>":
+        return wasm
     // An ELF object, native or cross, is read in-process too (#1915, D81):
     // a Linux host without binutils has no nm, its probe failed, and the
     // compiler's own link then left out LLVM and libclang.
