@@ -48,7 +48,7 @@ impl[T: Ord] BinaryHeap[T]:
     pub fn is_empty() -> bool: self.len() == 0
 
     pub mut fn push(value: T) -> Unit:
-        let slot = unsafe { with_alloc(sizeof[Slot[T]]() as i64) } as *mut Slot[T]
+        let slot = with_alloc(sizeof[Slot[T]]() as i64) as *mut Slot[T]
         unsafe { *slot = Slot { compare: self.comparator(), value: value } }
         assert(unsafe { binary_heap_insert(self.heap, slot as *mut c_void) } != 0)
 
@@ -57,7 +57,7 @@ impl[T: Ord] BinaryHeap[T]:
         var slot = unsafe { binary_heap_pop(self.heap) } as *mut Slot[T]
         if slot as i64 == 0: return None
         let value: T = unsafe { move slot.value }
-        unsafe { with_free(slot as *mut u8) }
+        with_free(slot as *mut u8)
         Some(value)
 
     /// Observes the top value, or `None` when empty.
@@ -75,5 +75,5 @@ impl[T] Drop for BinaryHeap[T]:
             var slot = unsafe { (*self.heap).values[index] } as *mut Slot[T]
             let value: T = unsafe { move slot.value }
             drop(value)
-            unsafe { with_free(slot as *mut u8) }
+            with_free(slot as *mut u8)
         unsafe { binary_heap_free(self.heap) }

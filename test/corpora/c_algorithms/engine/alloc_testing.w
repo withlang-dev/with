@@ -12,7 +12,7 @@ pub fn alloc_test_malloc(__param_bytes: c_ulong) -> *mut c_void writes allocatio
 
     }
 
-    (__local_header = (((unsafe { with_alloc(((((sizeof[_BlockHeader]() as c_ulong) +% (__param_bytes as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut _BlockHeader)))
+    (__local_header = (((with_alloc(((((sizeof[_BlockHeader]() as c_ulong) +% (__param_bytes as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut _BlockHeader)))
 
     if ((if __local_header == null: 1 else: 0) != 0) {
         return null
@@ -114,7 +114,7 @@ pub fn alloc_test_calloc(__param_nmemb: c_ulong, __param_bytes: c_ulong) -> *mut
 
     }
 
-    unsafe { with_memset((__local_result as *mut u8), (0 as c_int), (__local_total_bytes as i64)) }
+    with_memset((__local_result as *mut u8), (0 as c_int), (__local_total_bytes as i64))
 
     return __local_result
 

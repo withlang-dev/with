@@ -905,12 +905,12 @@ none of its store (docs/proposals/d30-implementation-plan.md §10):
   bytes of the embedded `rt` slot (and its `cimport_stubs.o` /
   `fiber_asm.o` the embedded ones), D132. The stale-root fixture plants a
   stale `rt.o` and `rt.manifest` and proves neither links.
-- **R4c, pending.** A runtime function is safe by its declaration (the
-  interface's, the definition's), and the eight `unsafe` blocks in std and
-  src that only called one are unwrapped; the transition branch that counts
-  such a call as an unsafe operation stays until the migrator stops writing
-  `unsafe { with_alloc(...) }` into every corpus and the corpora re-promote
-  (D112), its own stack.
+- **R4c.** A runtime function is safe by its declaration (the interface's,
+  the definition's): the migrator writes no `unsafe` around a runtime
+  helper call, the corpora re-promoted without the 85 wrappers they carried
+  (D112), the transition branch that counted such a call as an unsafe
+  operation is gone, and an `unsafe` block whose only content is such a
+  call is refused as vacuous.
 - **Waiting for a seed cut from this tree.** The seed-built
   `out/bootstrap-lib` objects (the pinned seed links stage1 in the object
   world), and the compiler's own `src/` externs becoming `use rt.*`

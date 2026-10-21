@@ -375,7 +375,7 @@ pub fn test_hash() writes compare_counter {
 
     stop()
 
-    unsafe { with_memset(((&__local_buffer[0] as *mut u8) as *mut u8), (170 as c_int), (((16 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+    with_memset(((&__local_buffer[0] as *mut u8) as *mut u8), (170 as c_int), (((16 * (sizeof[u8]() as usize)) as c_ulong) as i64))
 
     (__local_buffer[(((16 * (sizeof[u8]() as usize)) as c_ulong) -% (1 as c_ulong))] = ((0 as u8)))
 
@@ -439,7 +439,7 @@ pub fn test_alloc() writes compare_counter {
 
     var __local_PTR: *mut *mut c_void
 
-    (__local_PTR = (((unsafe { with_alloc(((((10000000 as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut *mut c_void)))
+    (__local_PTR = (((with_alloc(((((10000000 as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut *mut c_void)))
 
     unsafe { tommy_allocator_init((&raw mut __local_alloc as *mut tommy_allocator_struct), (8 as c_ulonglong), (1 as c_ulonglong)) }
 
@@ -499,7 +499,7 @@ pub fn test_alloc() writes compare_counter {
 
     unsafe { tommy_allocator_done((&raw mut __local_alloc as *mut tommy_allocator_struct)) }
 
-    unsafe { with_free(((__local_PTR as *mut c_void) as *mut u8)) }
+    with_free(((__local_PTR as *mut c_void) as *mut u8))
 
 }
 
@@ -548,9 +548,9 @@ pub fn test_list() writes SEED, compare_counter {
 
     var __local_size: c_uint = ((1000000 as c_uint))
 
-    (__local_LIST = (((unsafe { with_alloc(((((1000000 as c_ulong) *% (sizeof[object]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut object)))
+    (__local_LIST = (((with_alloc(((((1000000 as c_ulong) *% (sizeof[object]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut object)))
 
-    (__local_VECTOR = (((unsafe { with_alloc(((((1000000 as c_ulong) *% (sizeof[object_vector]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut object_vector)))
+    (__local_VECTOR = (((with_alloc(((((1000000 as c_ulong) *% (sizeof[object_vector]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut object_vector)))
 
     (__local_i = ((0 as c_uint)))
 
@@ -755,9 +755,9 @@ pub fn test_list() writes SEED, compare_counter {
 
     unsafe { test_list_order(__local_list) }
 
-    unsafe { with_free(((__local_LIST as *mut c_void) as *mut u8)) }
+    with_free(((__local_LIST as *mut c_void) as *mut u8))
 
-    unsafe { with_free(((__local_VECTOR as *mut c_void) as *mut u8)) }
+    with_free(((__local_VECTOR as *mut c_void) as *mut u8))
 
 }
 
@@ -770,7 +770,7 @@ pub fn test_tree() writes compare_counter {
 
     var __local_size: c_uint = ((250000 as c_uint))
 
-    (__local_OBJ = (((unsafe { with_alloc(((((250000 as c_ulong) *% (sizeof[object_tree]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut object_tree)))
+    (__local_OBJ = (((with_alloc(((((250000 as c_ulong) *% (sizeof[object_tree]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut object_tree)))
 
     unsafe { start(c"tree".ptr) }
 
@@ -1285,7 +1285,7 @@ pub fn test_hashtable() writes compare_counter {
 
     var __local_module_: c_uint = ((250000 as c_uint))
 
-    (__local_HASH = (((unsafe { with_alloc(((((1000000 as c_ulong) *% (sizeof[object_hash]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut object_hash)))
+    (__local_HASH = (((with_alloc(((((1000000 as c_ulong) *% (sizeof[object_hash]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut object_hash)))
 
     (__local_i = ((0 as c_uint)))
 
@@ -1480,7 +1480,7 @@ pub fn test_hashdyn() writes compare_counter {
 
     var __local_module_: c_uint = ((250000 as c_uint))
 
-    (__local_HASH = (((unsafe { with_alloc(((((1000000 as c_ulong) *% (sizeof[object_hash]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut object_hash)))
+    (__local_HASH = (((with_alloc(((((1000000 as c_ulong) *% (sizeof[object_hash]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut object_hash)))
 
     (__local_i = ((0 as c_uint)))
 
@@ -1669,7 +1669,7 @@ pub fn test_hashlin() writes compare_counter {
 
     var __local_bucket: *mut tommy_node_struct
 
-    (__local_HASH = (((unsafe { with_alloc(((((1000000 as c_ulong) *% (sizeof[object_hash]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut object_hash)))
+    (__local_HASH = (((with_alloc(((((1000000 as c_ulong) *% (sizeof[object_hash]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut object_hash)))
 
     (__local_i = ((0 as c_uint)))
 
@@ -1871,7 +1871,7 @@ pub fn test_trie() writes compare_counter {
 
     var __local_size: c_uint = ((4000000 as c_uint))
 
-    (__local_OBJ = (((unsafe { with_alloc(((((4000000 as c_ulong) *% (sizeof[object_trie]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut object_trie)))
+    (__local_OBJ = (((with_alloc(((((4000000 as c_ulong) *% (sizeof[object_trie]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut object_trie)))
 
     (__local_i = ((0 as c_uint)))
 
@@ -2011,7 +2011,7 @@ pub fn test_trie_inplace() writes compare_counter {
 
     var __local_size: c_uint = ((4000000 as c_uint))
 
-    (__local_OBJ = (((unsafe { with_alloc(((((4000000 as c_ulong) *% (sizeof[object_trie_inplace]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut object_trie_inplace)))
+    (__local_OBJ = (((with_alloc(((((4000000 as c_ulong) *% (sizeof[object_trie_inplace]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut object_trie_inplace)))
 
     (__local_i = ((0 as c_uint)))
 

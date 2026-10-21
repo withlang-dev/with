@@ -6,7 +6,7 @@ use std.collections
 pub fn hash_table_new(__param_hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_uint], __param_equal_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _HashTable {
     var __local_hash_table: *mut _HashTable
 
-    (__local_hash_table = (((unsafe { with_alloc(((sizeof[_HashTable]() as c_ulong) as i64)) } as *mut c_void) as *mut _HashTable)))
+    (__local_hash_table = (((with_alloc(((sizeof[_HashTable]() as c_ulong) as i64)) as *mut c_void) as *mut _HashTable)))
 
     if ((if __local_hash_table == null: 1 else: 0) != 0) {
         return ((null as *mut _HashTable))
@@ -26,7 +26,7 @@ pub fn hash_table_new(__param_hash_func: Option[unsafe extern "C" fn(*mut c_void
     ((unsafe *__local_hash_table).prime_index = ((0 as c_uint)))
 
     if ((if not (unsafe { hash_table_allocate_table(__local_hash_table) } != 0): 1 else: 0) != 0) {
-        unsafe { with_free(((__local_hash_table as *mut c_void) as *mut u8)) }
+        with_free(((__local_hash_table as *mut c_void) as *mut u8))
 
         return ((null as *mut _HashTable))
 

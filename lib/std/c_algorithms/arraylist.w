@@ -11,7 +11,7 @@ pub fn arraylist_new(__param_length: c_uint) -> *mut _ArrayList {
 
     }
 
-    (__local_new_arraylist = (((unsafe { with_alloc(((sizeof[_ArrayList]() as c_ulong) as i64)) } as *mut c_void) as *mut _ArrayList)))
+    (__local_new_arraylist = (((with_alloc(((sizeof[_ArrayList]() as c_ulong) as i64)) as *mut c_void) as *mut _ArrayList)))
 
     if ((if __local_new_arraylist == null: 1 else: 0) != 0) {
         return ((null as *mut _ArrayList))
@@ -22,10 +22,10 @@ pub fn arraylist_new(__param_length: c_uint) -> *mut _ArrayList {
 
     ((unsafe *__local_new_arraylist).length = ((0 as c_uint)))
 
-    ((unsafe *__local_new_arraylist).data = (((unsafe { with_alloc(((((__local_length as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut *mut c_void)))
+    ((unsafe *__local_new_arraylist).data = (((with_alloc(((((__local_length as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut *mut c_void)))
 
     if ((if (unsafe *__local_new_arraylist).data == null: 1 else: 0) != 0) {
-        unsafe { with_free(((__local_new_arraylist as *mut c_void) as *mut u8)) }
+        with_free(((__local_new_arraylist as *mut c_void) as *mut u8))
 
         return ((null as *mut _ArrayList))
 

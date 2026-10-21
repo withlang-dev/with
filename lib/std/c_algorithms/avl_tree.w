@@ -5,7 +5,7 @@ use std.option
 pub fn avl_tree_new(__param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _AVLTree {
     var __local_new_tree: *mut _AVLTree
 
-    (__local_new_tree = (((unsafe { with_alloc(((sizeof[_AVLTree]() as c_ulong) as i64)) } as *mut c_void) as *mut _AVLTree)))
+    (__local_new_tree = (((with_alloc(((sizeof[_AVLTree]() as c_ulong) as i64)) as *mut c_void) as *mut _AVLTree)))
 
     if ((if __local_new_tree == null: 1 else: 0) != 0) {
         return ((null as *mut _AVLTree))

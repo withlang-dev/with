@@ -3542,9 +3542,9 @@ unsafe fn pchar(__param_c: c_uint, __param_utf: c_int, __param_f: *mut c_void) -
 fn expand_input_buffers() {
     var __local_new_pbuffer8_size: c_ulong = ((((2 as c_ulong) *% (pbuffer8_size as c_ulong)) as c_ulong))
 
-    var __local_new_buffer: *mut u8 = (((unsafe { with_alloc((__local_new_pbuffer8_size as i64)) } as *mut c_void) as *mut u8))
+    var __local_new_buffer: *mut u8 = (((with_alloc((__local_new_pbuffer8_size as i64)) as *mut c_void) as *mut u8))
 
-    var __local_new_pbuffer8: *mut u8 = (((unsafe { with_alloc((__local_new_pbuffer8_size as i64)) } as *mut c_void) as *mut u8))
+    var __local_new_pbuffer8: *mut u8 = (((with_alloc((__local_new_pbuffer8_size as i64)) as *mut c_void) as *mut u8))
 
     var __ci_expr_logic_0: c_int
 
@@ -3567,15 +3567,15 @@ fn expand_input_buffers() {
     }
 
 
-    unsafe { with_memcpy(((__local_new_buffer as *mut c_void) as *mut u8), ((buffer as *const c_void) as *const u8), (pbuffer8_size as i64)) }
+    with_memcpy(((__local_new_buffer as *mut c_void) as *mut u8), ((buffer as *const c_void) as *const u8), (pbuffer8_size as i64))
 
-    unsafe { with_memcpy(((__local_new_pbuffer8 as *mut c_void) as *mut u8), ((pbuffer8 as *const c_void) as *const u8), (pbuffer8_size as i64)) }
+    with_memcpy(((__local_new_pbuffer8 as *mut c_void) as *mut u8), ((pbuffer8 as *const c_void) as *const u8), (pbuffer8_size as i64))
 
     (pbuffer8_size = __local_new_pbuffer8_size)
 
-    unsafe { with_free(((buffer as *mut c_void) as *mut u8)) }
+    with_free(((buffer as *mut c_void) as *mut u8))
 
-    unsafe { with_free(((pbuffer8 as *mut c_void) as *mut u8)) }
+    with_free(((pbuffer8 as *mut c_void) as *mut u8))
 
     (buffer = __local_new_buffer)
 
@@ -7962,7 +7962,7 @@ fn process_command_8() -> c_int {
                 }
 
 
-                (__local_serial = (((unsafe { with_alloc((__local_serial_size as i64)) } as *mut c_void) as *mut u8)))
+                (__local_serial = (((with_alloc((__local_serial_size as i64)) as *mut c_void) as *mut u8)))
 
                 if ((if __local_serial == null: 1 else: 0) != 0) {
                     unsafe { colour_begin(31, outfile) }
@@ -8035,7 +8035,7 @@ fn process_command_8() -> c_int {
 
                 }
 
-                unsafe { with_free(((__local_serial as *mut c_void) as *mut u8)) }
+                with_free(((__local_serial as *mut c_void) as *mut u8))
 
             },
             4 => {
@@ -8051,7 +8051,7 @@ fn process_command_8() -> c_int {
                     (__local_r = ((unsafe { pcre2_config_8((15 as c_uint), ((&raw mut loadtables_length as *mut c_uint) as *mut c_void)) } as c_int)))
 
                     if ((if __local_r >= 0: 1 else: 0) != 0) {
-                        (tables3 = (((unsafe { with_alloc(((loadtables_length as c_ulong) as i64)) } as *mut c_void) as *mut u8)))
+                        (tables3 = (((with_alloc(((loadtables_length as c_ulong) as i64)) as *mut c_void) as *mut u8)))
                     }
 
                 }
@@ -8418,8 +8418,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_2 {
-        unsafe { with_memcpy(((pat_context_8 as *mut c_void) as *mut u8), ((default_pat_context_8 as *const c_void) as *const u8), ((sizeof[pcre2_real_compile_context_8]() as c_ulong) as i64)) }
-        unsafe { with_memcpy((((&raw mut pat_patctl as *mut patctl) as *mut c_void) as *mut u8), (((&raw mut def_patctl as *mut patctl) as *const c_void) as *const u8), ((sizeof[patctl]() as c_ulong) as i64)) }
+        with_memcpy(((pat_context_8 as *mut c_void) as *mut u8), ((default_pat_context_8 as *const c_void) as *const u8), ((sizeof[pcre2_real_compile_context_8]() as c_ulong) as i64))
+        with_memcpy((((&raw mut pat_patctl as *mut patctl) as *mut c_void) as *mut u8), (((&raw mut def_patctl as *mut patctl) as *const c_void) as *const u8), ((sizeof[patctl]() as c_ulong) as i64))
         goto '__ci_bb_3
     }
 
@@ -9026,7 +9026,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_88 {
-        unsafe { with_memcpy(((__local_pt__goto_2195_17 as *mut c_void) as *mut u8), ((__local_pc__goto_2200_14 as *const c_void) as *const u8), (__local_length__goto_2202_12 as i64)) }
+        with_memcpy(((__local_pt__goto_2195_17 as *mut c_void) as *mut u8), ((__local_pc__goto_2200_14 as *const c_void) as *const u8), (__local_length__goto_2202_12 as i64))
         (__local_pt__goto_2195_17 = __local_pt__goto_2195_17 + (__local_length__goto_2202_12 as usize))
         goto '__ci_bb_89
     }
@@ -9745,7 +9745,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_186 {
         (__local_converted_length__goto_2566_14 = (((unsafe *(&raw const pat_patctl as *const patctl)).convert_length as c_ulong)))
-        (__local_converted_pattern__goto_2565_16 = (((unsafe { with_alloc((((if __local_converted_length__goto_2566_14 != 0: (((__local_converted_length__goto_2566_14 as c_ulong) *% (1 as c_ulong)) as c_ulong) else: (1 as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut u8)))
+        (__local_converted_pattern__goto_2565_16 = (((with_alloc((((if __local_converted_length__goto_2566_14 != 0: (((__local_converted_length__goto_2566_14 as c_ulong) *% (1 as c_ulong)) as c_ulong) else: (1 as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut u8)))
         if ((if __local_converted_pattern__goto_2565_16 == null: 1 else: 0) != 0) {
             goto '__ci_bb_189
         } else {
@@ -9796,7 +9796,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_194 {
-        unsafe { with_memcpy(((con_context_8 as *mut c_void) as *mut u8), ((default_con_context_8 as *const c_void) as *const u8), ((sizeof[pcre2_real_convert_context_8]() as c_ulong) as i64)) }
+        with_memcpy(((con_context_8 as *mut c_void) as *mut u8), ((default_con_context_8 as *const c_void) as *const u8), ((sizeof[pcre2_real_convert_context_8]() as c_ulong) as i64))
         if ((if (unsafe *(&raw const pat_patctl as *const patctl)).convert_glob_escape != 0: 1 else: 0) != 0) {
             goto '__ci_bb_195
         } else {
@@ -9919,7 +9919,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_210 {
-        unsafe { with_memcpy(((pbuffer8 as *mut c_void) as *mut u8), ((__local_converted_pattern__goto_2565_16 as *const c_void) as *const u8), ((((((__local_converted_length__goto_2566_14 as c_ulong) +% (1 as c_ulong)) as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) }
+        with_memcpy(((pbuffer8 as *mut c_void) as *mut u8), ((__local_converted_pattern__goto_2565_16 as *const c_void) as *const u8), ((((((__local_converted_length__goto_2566_14 as c_ulong) +% (1 as c_ulong)) as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64))
         (__local_patlen__goto_2019_12 = __local_converted_length__goto_2566_14)
         goto '__ci_bb_211
     }
@@ -9929,7 +9929,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_212 {
-        unsafe { with_free(((__local_converted_pattern__goto_2565_16 as *mut c_void) as *mut u8)) }
+        with_free(((__local_converted_pattern__goto_2565_16 as *mut c_void) as *mut u8))
         goto '__ci_bb_214
     }
 
@@ -12624,8 +12624,8 @@ fn process_data_8() -> c_int {
         (__local_ovecsave__goto_3848_12 = [((null) as *const u8), ((null) as *const u8)])
         (__local_q__goto_3851_14 = ((null as *mut u8)))
         (__local_subject_literal__goto_3845_6 = (((if (((unsafe *(&raw const pat_patctl as *const patctl)).control2 as c_uint) & (256 as c_uint)) != 0: 1 else: 0) as c_int)))
-        unsafe { with_memcpy(((dat_context_8 as *mut c_void) as *mut u8), ((default_dat_context_8 as *const c_void) as *const u8), ((sizeof[pcre2_real_match_context_8]() as c_ulong) as i64)) }
-        unsafe { with_memcpy((((&raw mut dat_datctl as *mut datctl) as *mut c_void) as *mut u8), (((&raw mut def_datctl as *mut datctl) as *const c_void) as *const u8), ((sizeof[datctl]() as c_ulong) as i64)) }
+        with_memcpy(((dat_context_8 as *mut c_void) as *mut u8), ((default_dat_context_8 as *const c_void) as *const u8), ((sizeof[pcre2_real_match_context_8]() as c_ulong) as i64))
+        with_memcpy((((&raw mut dat_datctl as *mut datctl) as *mut c_void) as *mut u8), (((&raw mut def_datctl as *mut datctl) as *const c_void) as *const u8), ((sizeof[datctl]() as c_ulong) as i64))
         (dat_datctl.control = ((unsafe *(&raw const dat_datctl as *const datctl)).control as c_uint) | ((((unsafe *(&raw const pat_patctl as *const patctl)).control as c_uint) & (((((((((((((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (4 as c_uint)) as c_uint) | (8 as c_uint)) as c_uint) | (16 as c_uint)) as c_uint) | (32768 as c_uint)) as c_uint) | (1048576 as c_uint)) as c_uint) | (268435456 as c_uint)) as c_uint) | (1073741824 as c_uint)) as c_uint)) as c_uint))
         (dat_datctl.control2 = ((unsafe *(&raw const dat_datctl as *const datctl)).control2 as c_uint) | ((((unsafe *(&raw const pat_patctl as *const patctl)).control2 as c_uint) & (((((((((((((((((((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (4 as c_uint)) as c_uint) | (8 as c_uint)) as c_uint) | (16 as c_uint)) as c_uint) | (32 as c_uint)) as c_uint) | (64 as c_uint)) as c_uint) | (128 as c_uint)) as c_uint) | (2048 as c_uint)) as c_uint) | (65536 as c_uint)) as c_uint) | (131072 as c_uint)) as c_uint) | (536870912 as c_uint)) as c_uint)) as c_uint))
         (dat_datctl.replacement[0] = (((unsafe *(&raw const pat_patctl as *const patctl)).replacement[0] as u8)))
@@ -12637,7 +12637,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_1 {
-        unsafe { with_memcpy(((((&(*(&raw const dat_datctl as *const datctl)).replacement[0] as *mut u8) + ((1 as isize) as usize)) as *mut c_void) as *mut u8), ((((&(*(&raw const pat_patctl as *const patctl)).replacement[0] as *mut u8) + ((1 as isize) as usize)) as *const c_void) as *const u8), (((((*(&raw const pat_patctl as *const patctl)).replacement[0] as c_int) + 1) as c_ulong) as i64)) }
+        with_memcpy(((((&(unsafe *(&raw const dat_datctl as *const datctl)).replacement[0] as *mut u8) + ((1 as isize) as usize)) as *mut c_void) as *mut u8), ((((&(unsafe *(&raw const pat_patctl as *const patctl)).replacement[0] as *mut u8) + ((1 as isize) as usize)) as *const c_void) as *const u8), (((((unsafe *(&raw const pat_patctl as *const patctl)).replacement[0] as c_int) + 1) as c_ulong) as i64))
         goto '__ci_bb_2
     }
 
@@ -12820,7 +12820,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_27 {
-        (dbuffer = (((unsafe { with_realloc(((dbuffer as *mut c_void) as *mut u8), (0 as i64), (dbuffer_size as i64)) } as *mut c_void) as *mut u8)))
+        (dbuffer = (((with_realloc(((dbuffer as *mut c_void) as *mut u8), (0 as i64), (dbuffer_size as i64)) as *mut c_void) as *mut u8)))
         if ((if dbuffer == null: 1 else: 0) != 0) {
             goto '__ci_bb_31
         } else {
@@ -13025,7 +13025,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_52 {
-        (dbuffer = (((unsafe { with_realloc(((dbuffer as *mut c_void) as *mut u8), (0 as i64), (dbuffer_size as i64)) } as *mut c_void) as *mut u8)))
+        (dbuffer = (((with_realloc(((dbuffer as *mut c_void) as *mut u8), (0 as i64), (dbuffer_size as i64)) as *mut c_void) as *mut u8)))
         if ((if dbuffer == null: 1 else: 0) != 0) {
             goto '__ci_bb_56
         } else {
@@ -13071,7 +13071,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_59 {
-        unsafe { with_memcpy(((__local_q__goto_3851_14 as *mut c_void) as *mut u8), ((__local_start_rep__goto_3852_14 as *const c_void) as *const u8), (__local_replen__goto_3956_10 as i64)) }
+        with_memcpy(((__local_q__goto_3851_14 as *mut c_void) as *mut u8), ((__local_start_rep__goto_3852_14 as *const c_void) as *const u8), (__local_replen__goto_3956_10 as i64))
         (__local_q__goto_3851_14 = __local_q__goto_3851_14 + (((__local_replen__goto_3956_10 as c_ulong) / (1 as c_ulong)) as usize))
         goto '__ci_bb_58
     }
@@ -13554,7 +13554,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_128 {
         (__ci_expr_logic_28 = 0)
-        if ((if unsafe { with_memcmp(((__local_p__goto_3840_10 as *const c_void) as *const u8), (("{U+" as *const c_void) as *const u8), ((3 as c_ulong) as i64)) } == 0: 1 else: 0) != 0) {
+        if ((if with_memcmp(((__local_p__goto_3840_10 as *const c_void) as *const u8), (("{U+" as *const c_void) as *const u8), ((3 as c_ulong) as i64)) == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_28 = (if isxdigit(((unsafe __local_p__goto_3840_10[3]) as c_int)) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_28 != 0) {
@@ -14108,7 +14108,7 @@ fn process_data_8() -> c_int {
             (__ci_expr_ternary_42 = ((0 as c_int)))
         }
         (__local_c__goto_3838_10 = ((__ci_expr_ternary_42 as c_uint)))
-        (__local_pp__goto_3853_14 = ((unsafe { with_memmove(((((dbuffer + (dbuffer_size as usize)) - (((__local_len__goto_3841_8 as c_ulong) +% (__local_c__goto_3838_10 as c_ulong)) as usize)) as *mut c_void) as *mut u8), ((dbuffer as *const c_void) as *const u8), ((((__local_len__goto_3841_8 as c_ulong) +% (__local_c__goto_3838_10 as c_ulong)) as c_ulong) as i64)) } as *mut u8)))
+        (__local_pp__goto_3853_14 = ((with_memmove(((((dbuffer + (dbuffer_size as usize)) - (((__local_len__goto_3841_8 as c_ulong) +% (__local_c__goto_3838_10 as c_ulong)) as usize)) as *mut c_void) as *mut u8), ((dbuffer as *const c_void) as *const u8), ((((__local_len__goto_3841_8 as c_ulong) +% (__local_c__goto_3838_10 as c_ulong)) as c_ulong) as i64)) as *mut u8)))
         if ((if (((unsafe *(&raw const dat_datctl as *const datctl)).control2 as c_uint) & (8192 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_203
         } else {
@@ -14322,7 +14322,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_225 {
-        (__local_pmatch__goto_4394_15 = (((unsafe { with_alloc(((((sizeof[regmatch_t]() as c_ulong) *% ((*(&raw const dat_datctl as *const datctl)).oveccount as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut regmatch_t)))
+        (__local_pmatch__goto_4394_15 = (((with_alloc(((((sizeof[regmatch_t]() as c_ulong) *% ((unsafe *(&raw const dat_datctl as *const datctl)).oveccount as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut regmatch_t)))
         if ((if __local_pmatch__goto_4394_15 == null: 1 else: 0) != 0) {
             goto '__ci_bb_227
         } else {
@@ -14579,7 +14579,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_262 {
-        unsafe { with_free(((__local_pmatch__goto_4394_15 as *mut c_void) as *mut u8)) }
+        with_free(((__local_pmatch__goto_4394_15 as *mut c_void) as *mut u8))
         goto '__ci_bb_263
     }
 
@@ -14933,7 +14933,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_309 {
-        (dfa_workspace = (((unsafe { with_alloc(((((1000 as c_ulong) *% (sizeof[c_int]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut c_int)))
+        (dfa_workspace = (((with_alloc(((((1000 as c_ulong) *% (sizeof[c_int]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut c_int)))
         goto '__ci_bb_310
     }
 
@@ -15093,7 +15093,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_330 {
-        unsafe { with_memcpy(((__local_pp__goto_3853_14 as *mut c_void) as *mut u8), ((&__local_sbuffer__goto_4648_15[0] as *mut u8) as *const u8), ((((__local_slen__goto_4653_54 as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) }
+        with_memcpy(((__local_pp__goto_3853_14 as *mut c_void) as *mut u8), ((&__local_sbuffer__goto_4648_15[0] as *mut u8) as *const u8), ((((__local_slen__goto_4653_54 as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64))
         if ((if __local_slen__goto_4653_54 < __local_ulen__goto_3836_12: 1 else: 0) != 0) {
             goto '__ci_bb_332
         } else {
@@ -15554,7 +15554,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_392 {
-        (dfa_workspace = (((unsafe { with_alloc(((((1000 as c_ulong) *% (sizeof[c_int]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut c_int)))
+        (dfa_workspace = (((with_alloc(((((1000 as c_ulong) *% (sizeof[c_int]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut c_int)))
         goto '__ci_bb_393
     }
 
@@ -15799,7 +15799,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_426 {
-        (dfa_workspace = (((unsafe { with_alloc(((((1000 as c_ulong) *% (sizeof[c_int]() as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut c_int)))
+        (dfa_workspace = (((with_alloc(((((1000 as c_ulong) *% (sizeof[c_int]() as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut c_int)))
         goto '__ci_bb_427
     }
 
@@ -16160,7 +16160,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_474 {
-        if ((if unsafe { with_memcmp((((*match_data_8).subject as *const c_void) as *const u8), ((__local_pp__goto_3853_14 as *const c_void) as *const u8), (__local_ulen__goto_3836_12 as i64)) } != 0: 1 else: 0) != 0) {
+        if ((if with_memcmp((((unsafe *match_data_8).subject as *const c_void) as *const u8), ((__local_pp__goto_3853_14 as *const c_void) as *const u8), (__local_ulen__goto_3836_12 as i64)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_475
         } else {
             goto '__ci_bb_476
@@ -17101,9 +17101,9 @@ fn init_globals_8() -> Unit {
 
     (match_data_8 = unsafe { pcre2_match_data_create_8(max_oveccount, general_context_8) })
 
-    (rep_in_buffer_8 = (((unsafe { with_alloc(((((sizeof[u8]() as c_ulong) *% (rep_in_buffer_size_8 as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut u8)))
+    (rep_in_buffer_8 = (((with_alloc(((((sizeof[u8]() as c_ulong) *% (rep_in_buffer_size_8 as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut u8)))
 
-    (rep_out_buffer_8 = (((unsafe { with_alloc(((((sizeof[u8]() as c_ulong) *% (rep_out_buffer_size_8 as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut u8)))
+    (rep_out_buffer_8 = (((with_alloc(((((sizeof[u8]() as c_ulong) *% (rep_out_buffer_size_8 as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut u8)))
 
     unsafe { pcre2_set_parens_nest_limit_8(default_pat_context_8, (220 as c_uint)) }
 
@@ -17154,9 +17154,9 @@ fn free_globals_8() {
 
     unsafe { pcre2_convert_context_free_8(con_context_8) }
 
-    unsafe { with_free(((rep_in_buffer_8 as *mut c_void) as *mut u8)) }
+    with_free(((rep_in_buffer_8 as *mut c_void) as *mut u8))
 
-    unsafe { with_free(((rep_out_buffer_8 as *mut c_void) as *mut u8)) }
+    with_free(((rep_out_buffer_8 as *mut c_void) as *mut u8))
 
 }
 
@@ -19556,7 +19556,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_369 {
-        (__local_invalid_code__goto_5664_7 = ((unsafe { with_alloc(((1024 as c_ulong) as i64)) } as *mut c_void)))
+        (__local_invalid_code__goto_5664_7 = ((with_alloc(((1024 as c_ulong) as i64)) as *mut c_void)))
         goto '__ci_bb_372
     }
 
@@ -19586,7 +19586,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_374 {
-        unsafe { with_memset((__local_invalid_code__goto_5664_7 as *mut u8), (0 as c_int), ((1024 as c_ulong) as i64)) }
+        with_memset((__local_invalid_code__goto_5664_7 as *mut u8), (0 as c_int), ((1024 as c_ulong) as i64))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_pattern_info_8((__local_invalid_code__goto_5664_7 as *const pcre2_real_code_8), (20 as c_uint), ((&raw mut __local_uval__goto_5629_10 as *mut c_uint) as *mut c_void)) } as c_int)))
         goto '__ci_bb_377
     }
@@ -19707,7 +19707,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_394 {
-        unsafe { with_memset(((&__local_errorbuffer8__goto_5661_6[0] as *mut c_char) as *mut u8), (0 as c_int), (((256 * (sizeof[c_char]() as usize)) as c_ulong) as i64)) }
+        with_memset(((&__local_errorbuffer8__goto_5661_6[0] as *mut c_char) as *mut u8), (0 as c_int), (((256 * (sizeof[c_char]() as usize)) as c_ulong) as i64))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_regerror(REG_ASSERT, (null as *const regex_t), (&__local_errorbuffer8__goto_5661_6[0] as *mut c_char), ((256 * (sizeof[c_char]() as usize)) as c_ulong)) } as c_int)))
         goto '__ci_bb_397
     }
@@ -19882,7 +19882,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_419 {
-        unsafe { with_memset(((&__local_errorbuffer__goto_5659_13[0] as *mut u8) as *mut u8), (0 as c_int), (((256 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        with_memset(((&__local_errorbuffer__goto_5659_13[0] as *mut u8) as *mut u8), (0 as c_int), (((256 * (sizeof[u8]() as usize)) as c_ulong) as i64))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_get_error_message_8((-29 as c_int), (&__local_errorbuffer__goto_5659_13[0] as *mut u8), (0 as c_ulong)) } as c_int)))
         goto '__ci_bb_422
     }
@@ -21158,7 +21158,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_614 {
-        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_match_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), (&__local_substitute_subject__goto_5651_13[0] as *mut u8), ((~(0 as c_ulong)) as c_ulong), (0 as c_ulong), (0 as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8)) } as c_int)))
         goto '__ci_bb_617
     }
@@ -21189,7 +21189,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_619 {
-        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64))
         (__local_sizeval__goto_5630_12 = ((__local_replace_buf__goto_5669_13.len() as c_ulong)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_substitute_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), (&__local_substitute_subject__goto_5651_13[0] as *mut u8), ((~(0 as c_ulong)) as c_ulong), (0 as c_ulong), (65536 as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8), (null as *const u8), (0 as c_ulong), (&__local_replace_buf__goto_5669_13[0] as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)) } as c_int)))
         goto '__ci_bb_622
@@ -21221,7 +21221,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_624 {
-        unsafe { with_memcpy(((((&__local_substitute_subject__goto_5651_13[0] as *mut u8) + ((1 as isize) as usize)) as *mut c_void) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        with_memcpy(((((&__local_substitute_subject__goto_5651_13[0] as *mut u8) + ((1 as isize) as usize)) as *mut c_void) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64))
         (__local_sizeval__goto_5630_12 = ((__local_replace_buf__goto_5669_13.len() as c_ulong)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_substitute_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), (((&__local_substitute_subject__goto_5651_13[0] as *mut u8) + ((1 as isize) as usize)) as *const u8), ((~(0 as c_ulong)) as c_ulong), (0 as c_ulong), (65536 as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8), (null as *const u8), (0 as c_ulong), (&__local_replace_buf__goto_5669_13[0] as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)) } as c_int)))
         goto '__ci_bb_627
@@ -21253,7 +21253,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_629 {
-        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64))
         (__local_substitute_subject__goto_5651_13[4] = ((89 as u8)))
         (__local_substitute_subject__goto_5651_13[5] = ((0 as u8)))
         (__local_sizeval__goto_5630_12 = ((__local_replace_buf__goto_5669_13.len() as c_ulong)))
@@ -21287,7 +21287,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_634 {
-        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64))
         (__local_sizeval__goto_5630_12 = ((__local_replace_buf__goto_5669_13.len() as c_ulong)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_substitute_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), (&__local_substitute_subject__goto_5651_13[0] as *mut u8), ((~(0 as c_ulong)) as c_ulong), (1 as c_ulong), (65536 as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8), (null as *const u8), (0 as c_ulong), (&__local_replace_buf__goto_5669_13[0] as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)) } as c_int)))
         goto '__ci_bb_637
@@ -21319,7 +21319,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_639 {
-        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64))
         (__local_sizeval__goto_5630_12 = ((__local_replace_buf__goto_5669_13.len() as c_ulong)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_substitute_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), (&__local_substitute_subject__goto_5651_13[0] as *mut u8), ((~(0 as c_ulong)) as c_ulong), (0 as c_ulong), (((65536 as c_uint) | (4 as c_uint)) as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8), (null as *const u8), (0 as c_ulong), (&__local_replace_buf__goto_5669_13[0] as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)) } as c_int)))
         goto '__ci_bb_642
@@ -21351,7 +21351,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_644 {
-        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64))
         (__local_sizeval__goto_5630_12 = ((__local_replace_buf__goto_5669_13.len() as c_ulong)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_substitute_8((__local_subs_other_code__goto_5670_13 as *const pcre2_real_code_8), (&__local_substitute_subject__goto_5651_13[0] as *mut u8), ((~(0 as c_ulong)) as c_ulong), (0 as c_ulong), (65536 as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8), (null as *const u8), (0 as c_ulong), (&__local_replace_buf__goto_5669_13[0] as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)) } as c_int)))
         goto '__ci_bb_647
@@ -21531,7 +21531,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_673 {
-        unsafe { with_free((__local_invalid_code__goto_5664_7 as *mut u8)) }
+        with_free((__local_invalid_code__goto_5664_7 as *mut u8))
         if ((if __local_failure__goto_5632_13 != null: 1 else: 0) != 0) {
             goto '__ci_bb_674
         } else {

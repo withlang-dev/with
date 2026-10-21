@@ -370,7 +370,7 @@ fn test_trie_free_long() {
 
     (__local_long_string = ((alloc_test_malloc((4096 as c_ulong)) as *mut c_char)))
 
-    unsafe { with_memset(((__local_long_string as *mut c_void) as *mut u8), (65 as c_int), ((4096 as c_ulong) as i64)) }
+    with_memset(((__local_long_string as *mut c_void) as *mut u8), (65 as c_int), ((4096 as c_ulong) as i64))
 
     ((unsafe __local_long_string[(4096 - 1)]) = ((0 as c_char)))
 

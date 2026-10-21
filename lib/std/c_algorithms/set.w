@@ -6,7 +6,7 @@ use std.collections
 pub fn set_new(__param_hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_uint], __param_equal_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _Set {
     var __local_new_set: *mut _Set
 
-    (__local_new_set = (((unsafe { with_alloc(((sizeof[_Set]() as c_ulong) as i64)) } as *mut c_void) as *mut _Set)))
+    (__local_new_set = (((with_alloc(((sizeof[_Set]() as c_ulong) as i64)) as *mut c_void) as *mut _Set)))
 
     if ((if __local_new_set == null: 1 else: 0) != 0) {
         return ((null as *mut _Set))
@@ -24,7 +24,7 @@ pub fn set_new(__param_hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_
     ((unsafe *__local_new_set).free_func = null)
 
     if ((if not (unsafe { set_allocate_table(__local_new_set) } != 0): 1 else: 0) != 0) {
-        unsafe { with_free(((__local_new_set as *mut c_void) as *mut u8)) }
+        with_free(((__local_new_set as *mut c_void) as *mut u8))
 
         return ((null as *mut _Set))
 
