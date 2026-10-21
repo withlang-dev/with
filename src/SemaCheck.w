@@ -466,16 +466,18 @@ impl Sema:
         if expected_kind == TypeKind.TY_REF:
             return 0
         var view = self.resolve_alias(actual as TypeId)
-        for level in 0..2:
+        // D22 §7.4 applies at every layer: a view's pointee that is Copy (a
+        // view is Copy, so a view of a view qualifies) may satisfy the
+        // demand, and the read continues through it until the demand is
+        // met or a layer is not Copy. A list iterator that yields `&T`
+        // hands a `filter` predicate `&&i64`, and `it % 2 == 1` reads the
+        // i64 through both layers as `total + x` reads through one (#2220
+        // step 2); `&&str` copies into `str` the same way (D111).
+        for level in 0..8:
             if self.get_type_kind(view) != TypeKind.TY_REF or self.get_type_d1(view) != 0:
                 return 0
             let pointee = self.get_type_d0(view)
             if pointee == 0 or self.is_copy(pointee as TypeId) == 0:
-                return 0
-            // The second level is D111's: `str` is a value, so `&&str` copies
-            // into `str`; `&&i32` keeps its explicit deref (D22 §6.2 is one
-            // level).
-            if level == 1 and self.get_type_kind(self.resolve_alias(pointee as TypeId)) != TypeKind.TY_STR:
                 return 0
             // A pointer-typed demand is a strict pointee match: `&*mut u8`
             // supplies `*mut u8`. builtin_arg_type_compatible's arithmetic
@@ -630,6 +632,13 @@ impl Sema:
         let pointee = self.contextual_copy_value_type(expected, actual)
         if pointee == 0:
             return 0
+        // D139: `take_i32(&first)` with `first: &i32` reads the value through
+        // both layers; the written `&` adds nothing (Law 1), so it is named.
+        if sk == NodeKind.NK_UNARY and self.ast.get_data0(source_node) == UnaryOp.UOP_REF:
+            let operand = self.unwrap_address_place_expr(self.ast.get_data1(source_node))
+            let operand_ty = self.recorded_expr_type_or_zero(operand)
+            if operand_ty != 0 and self.get_type_kind(self.resolve_alias(operand_ty as TypeId)) == TypeKind.TY_REF:
+                self.emit_warning("redundant `&`: the operand is already a view, and the value is read through it", source_node)
         let context_sig = self.current_fn_sig_idx
         let context_key = sema_pair_key(context_sig, source_node)
         var post_copy_type: i32 = 0
