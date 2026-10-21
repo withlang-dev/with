@@ -261,14 +261,17 @@ for item in my_list.iter():    // explicit (also valid)
 
 // For place-based or consuming iteration, be explicit:
 for item in my_list.iter_place():  // yields ListSlot handles for in-place mutation
-for item in my_list.iter_ref():    // yields &T references (zero-copy)
 for item in my_list.into_iter():   // consuming (moves elements)
 ```
 
 `for pattern in expr: body` desugars to calling `next()` in a loop.
 The implicit `.iter()` insertion means `for x in collection:`
 borrows the collection immutably — the collection remains valid
-after the loop.
+after the loop. A list's `iter()` is `ListIter[T]`, a view of the list
+and a position whose `next()` yields `&T` through the element place
+(§2.3: traversal observes); a Copy element reads through the view
+wherever a value is demanded (§3, D139), so `for x in xs.iter()`,
+`map(it * 2)` and `filter(it % 2 == 1)` see the value.
 
 For a keyed map, `for (k, v) in map:` is `for (k, v) in map.iter():`, so
 `k: &K` and `v: &V`. `for (k, v) in map.into_iter():` consumes the map and

@@ -96,8 +96,6 @@ enum CcBuiltin: i32:
     STR_ENDS_WITH
     STR_FIND
     MAP_CLEAR
-    VECITER_NEXT
-    LIST_ITER
     OPT_IS_NONE
     STR_SPLIT
     STR_TO_UPPER
@@ -201,7 +199,6 @@ fn cc_builtin_uses_list_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.LIST_EXTEND: return true
     if kind == CcBuiltin.LIST_TAKE_FRONT: return true
     if kind == CcBuiltin.LIST_RESTORE_FRONT: return true
-    if kind == CcBuiltin.LIST_ITER: return true
     if kind == CcBuiltin.LIST_MAP: return true
     if kind == CcBuiltin.LIST_FILTER: return true
     if kind == CcBuiltin.LIST_FOLD: return true
@@ -5936,22 +5933,6 @@ impl CCodegen:
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.LIST_ULEN32:
             return self.sema.ty_u32 as i32
-        if kind == CcBuiltin.LIST_ITER:
-            let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
-                return hinted
-            let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == 0:
-                return dst
-            return CC_PSEUDO_TID_LIST
-        if kind == CcBuiltin.VECITER_NEXT:
-            let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
-                return hinted
-            let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == 0:
-                return dst
-            return self.sema.ty_i64 as i32
         if kind == CcBuiltin.LIST_CONTAINS:
             return self.sema.ty_bool as i32
         if kind == CcBuiltin.LIST_JOIN:
@@ -6807,8 +6788,6 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.STR_ENDS_WITH: return CcBuiltin.STR_ENDS_WITH
     if intrinsic == MirIntrinsic.STR_FIND: return CcBuiltin.STR_FIND
     if intrinsic == MirIntrinsic.MAP_CLEAR: return CcBuiltin.MAP_CLEAR
-    if intrinsic == MirIntrinsic.VECITER_NEXT: return CcBuiltin.VECITER_NEXT
-    if intrinsic == MirIntrinsic.LIST_ITER: return CcBuiltin.LIST_ITER
     if intrinsic == MirIntrinsic.OPT_IS_NONE: return CcBuiltin.OPT_IS_NONE
     if intrinsic == MirIntrinsic.STR_SPLIT: return CcBuiltin.STR_SPLIT
     if intrinsic == MirIntrinsic.STR_TO_UPPER: return CcBuiltin.STR_TO_UPPER
@@ -7850,37 +7829,6 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.LIST_ITER:
-            // List is its own iterator in C — return the vec as the iterator value
-            if argc < 1:
-                self.fail("vec.iter expects one argument")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            var out = ""
-            if has_ret != 0:
-                let dst = self.place_text(body, dest_place)
-                out = out ++ "    " ++ dst ++ " = " ++ recv ++ ";\n"
-            else:
-                out = out ++ "    (void)0;\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.VECITER_NEXT:
-            // Advance iterator: returns Option (0 = None, value+1 = Some(value))
-            // args: recv = {vec, index_i64} — treat as vec + separate index local
-            if argc < 1:
-                self.fail("veciter.next expects one argument")
-                return "    abort();"
-            let recv_ptr = self.list_recv_ptr_text(body, args_id)
-            let dst = self.place_text(body, dest_place)
-            var out = "    " ++ cc_lbrace() ++ " int64_t __with_n = with_vec_len(" ++ recv_ptr ++ "); int64_t __with_i = 0;"
-            out = out ++ " if (__with_i < __with_n) " ++ cc_lbrace()
-            out = out ++ " int64_t __with_elem = 0; memcpy(&__with_elem, with_vec_get_ptr_es(" ++ recv_ptr ++ ", __with_i, " ++ self.list_recv_elem_sizeof_text(body, args_id) ++ "), sizeof(int64_t));"
-            out = out ++ " " ++ dst ++ " = __with_elem + 1; " ++ cc_rbrace()
-            out = out ++ " else " ++ cc_lbrace() ++ " " ++ dst ++ " = 0; " ++ cc_rbrace()
-            out = out ++ " " ++ cc_rbrace() ++ "\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
 
         if kind == CcBuiltin.LIST_CONTAINS:
             if argc < 2:
@@ -9852,7 +9800,7 @@ impl CCodegen:
                     out = out ++ "    " ++ cc_rbrace() ++ ";\n"
                 out = out ++ cc_rbrace() ++ ";\n\n"
                 continue
-            if generic_base_name == "ListIter" or generic_base_name == "ListIterPlace":
+            if generic_base_name == "ListIterPlace":
                 out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
                 out = out ++ "    int64_t data_ptr;\n"
                 out = out ++ "    int64_t len;\n"

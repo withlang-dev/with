@@ -7,7 +7,9 @@
 // that ends the line. Form 3: braces, members separated by newlines or
 // semicolons. A bodyless impl (§2.3) ends at its newline.
 
-trait One: fn one(self: &Self) -> i32
+// `PlusTwo`, not `One`: std.traits has a prelude trait `One` (`it.product()`), and a
+// same-named user trait rebinds std's impls (#2520); the name reverts when that is fixed.
+trait PlusTwo: fn one(self: &Self) -> i32
 
 trait Wide: fn wide(self: &Self,
     k: i32) -> i32
@@ -22,7 +24,7 @@ trait Marker {}
 
 type X { v: i32 }
 
-impl One for X: fn one(): self.v + 2
+impl PlusTwo for X: fn one(): self.v + 2
 
 impl Wide for X: fn wide(
     k: i32): self.v + k

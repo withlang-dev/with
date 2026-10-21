@@ -40,6 +40,26 @@ pub trait Sub[Rhs, Output]:
 pub trait Mul[Rhs, Output]:
     fn mul(self: &Self, rhs: &Rhs) -> Output
 
+/// The multiplicative identity, what `it.product()` starts from (§13.3), as
+/// `Default` is the additive one `it.sum()` starts from.
+pub trait One:
+    fn one() -> Self
+
+impl One for i8: fn one(): 1
+impl One for i16: fn one(): 1
+impl One for i32: fn one(): 1
+impl One for i64: fn one(): 1
+impl One for i128: fn one(): 1
+impl One for isize: fn one(): 1
+impl One for usize: fn one(): 1
+impl One for u8: fn one(): 1
+impl One for u16: fn one(): 1
+impl One for u32: fn one(): 1
+impl One for u64: fn one(): 1
+impl One for u128: fn one(): 1
+impl One for f32: fn one(): 1.0
+impl One for f64: fn one(): 1.0
+
 /// Division. Available for explicit generic bounds; `/` dispatches by the
 /// fixed method name `div` on concrete operand types.
 pub trait Div[Rhs, Output]:
@@ -181,41 +201,21 @@ pub trait ScopedMut[T]:
 
 // Core trait impls for primitive types
 
-impl Eq for i32:
-    fn eq(other: &i32) -> bool: *self == *other
-
-impl Eq for bool:
-    fn eq(other: &bool) -> bool: *self == *other
-
-impl Eq for u8:
-    fn eq(other: &u8) -> bool: *self == *other
-
-impl Default for i32:
-    fn default() -> i32:
-        0
-
-impl Default for i64:
-    fn default() -> i64:
-        0
-
-impl Default for u8:
-    fn default() -> u8:
-        0
-
-impl Default for bool:
-    fn default() -> bool:
-        false
-
-impl Default for str:
-    fn default() -> str:
-        ""
+impl Eq for i32: fn eq(other: &i32): *self == *other
+impl Eq for bool: fn eq(other: &bool): *self == *other
+impl Eq for u8: fn eq(other: &u8): *self == *other
+impl Default for i32: fn default(): 0
+impl Default for i64: fn default(): 0
+impl Default for u8: fn default(): 0
+impl Default for bool: fn default(): false
+impl Default for str: fn default(): ""
 
 impl Clone for str:
     // Self-contained materialization (`++ ""`): .to_owned() lives in
     // std.string (absent under --no-std) and &str method dispatch to str
     // impls is #762; concat lowers through the emitted intrinsics in
     // every mode.
-    fn clone() -> str: self ++ ""
+    fn clone(): self ++ ""
 
 // Primitive clones: generic code (e.g. the SoA derive's row rebuild)
 // spells materialization uniformly as .clone(); for Copy primitives the
@@ -236,22 +236,21 @@ impl Clone for f32:  fn clone(): *self
 impl Clone for f64:  fn clone(): *self
 impl Clone for bool: fn clone(): *self
 
-impl Eq for str:
-    fn eq(other: &str) -> bool: *self == other
-
-impl Eq for i64:
-    fn eq(other: &i64) -> bool: *self == *other
+impl Eq for str: fn eq(other: &str): *self == other
+impl Eq for i64: fn eq(other: &i64): *self == *other
 
 // D114: isize is the literal default and the length type (D108), and usize
 // its unsigned twin; each has what i64 has.
-impl Eq for isize: fn eq(other: &isize) -> bool: *self == *other
-impl Eq for usize: fn eq(other: &usize) -> bool: *self == *other
-impl Default for isize: fn default() -> isize: 0
-impl Default for usize: fn default() -> usize: 0
-impl Eq for i128: fn eq(other: &i128) -> bool: *self == *other
-impl Eq for u128: fn eq(other: &u128) -> bool: *self == *other
-impl Default for i128: fn default() -> i128: 0
-impl Default for u128: fn default() -> u128: 0
+impl Eq for isize: fn eq(other: &isize): *self == *other
+impl Eq for usize: fn eq(other: &usize): *self == *other
+impl Default for isize: fn default(): 0
+impl Default for f32: fn default(): 0.0
+impl Default for f64: fn default(): 0.0
+impl Default for usize: fn default(): 0
+impl Eq for i128: fn eq(other: &i128): *self == *other
+impl Eq for u128: fn eq(other: &u128): *self == *other
+impl Default for i128: fn default(): 0
+impl Default for u128: fn default(): 0
 
 impl Ord for isize:
     fn cmp(other: &isize) -> i32:
@@ -576,6 +575,39 @@ impl[T, I: Iter[T]] Iter[T] for Stepped[T, I]:
         self.inner.next()
 
 pub fn iter_step_by[T, I: Iter[T]](iter: I, n: i64) -> Stepped[T, I]: Stepped { inner: iter, step: n, started: false }
+
+/// `it.flat_map(f)`: each element through `f`, which yields an iterator,
+/// those iterators' elements in order.
+pub type FlatMapped[T, U, C, I] { inner: I, f: fn(T) -> C, current: Option[C] }
+
+impl[T, U, C: Iter[U], I: Iter[T]] Iter[U] for FlatMapped[T, U, C, I]:
+    mut fn next() -> Option[U]:
+        loop:
+            match self.current:
+                Some(c) =>
+                    match c.next():
+                        Some(x) => return Some(x)
+                        None => self.current = None
+                None =>
+                    match self.inner.next():
+                        None => return None
+                        Some(x) => self.current = Some((self.f)(x))
+
+pub fn iter_flat_map[T, U, C: Iter[U], I: Iter[T]](iter: I, f: fn(T) -> C) -> FlatMapped[T, U, C, I]: FlatMapped { inner: iter, f, current: None }
+
+/// `l.zip_with(r, f)`: `f` over the pairs, as long as both have elements.
+pub type ZippedWith[A, B, V, L, R] { l: L, r: R, f: fn(A, B) -> V }
+
+impl[A, B, V, L: Iter[A], R: Iter[B]] Iter[V] for ZippedWith[A, B, V, L, R]:
+    mut fn next() -> Option[V]:
+        match self.l.next():
+            None => None
+            Some(a) =>
+                match self.r.next():
+                    None => None
+                    Some(b) => Some((self.f)(a, b))
+
+pub fn iter_zip_with[A, B, V, L: Iter[A], R: Iter[B]](l: L, r: R, f: fn(A, B) -> V) -> ZippedWith[A, B, V, L, R]: ZippedWith { l, r, f }
 
 /// `it.fold(init, f)`.
 pub fn iter_fold[T, U, I: Iter[T]](iter: I, init: U, f: fn(U, T) -> U) -> U:
