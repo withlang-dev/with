@@ -216,7 +216,6 @@ type SemaBuiltinSymbols {
     listslot: i32,
     listiterplace: i32,
     listrange: i32,
-    listiterref: i32,
     range_type: i32,
     range_inclusive_type: i32,
     iter_place: i32,
@@ -2948,7 +2947,6 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         listslot: 0,
         listiterplace: 0,
         listrange: 0,
-        listiterref: 0,
         range_type: 0,
         range_inclusive_type: 0,
         iter_place: 0,
@@ -5451,7 +5449,6 @@ impl Sema:
         self.syms.listslot = self.pool_intern("ListSlot")
         self.syms.listiterplace = self.pool_intern("ListIterPlace")
         self.syms.listrange = self.pool_intern("ListRange")
-        self.syms.listiterref = self.pool_intern("ListIterRef")
         self.syms.range_type = self.pool_intern("Range")
         self.syms.range_inclusive_type = self.pool_intern("RangeInclusive")
         self.syms.iter_place = self.pool_intern("iter_place")

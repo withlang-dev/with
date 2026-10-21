@@ -18092,7 +18092,7 @@ type LoweredFunction {
 // §4.3c (D119): the List intrinsics that read a list or write an element in
 // place. A literal they alone touch keeps its elements where they were built.
 fn stack_literal_reads(kind: MirIntrinsic) -> bool:
-    kind == MirIntrinsic.LIST_GET or kind == MirIntrinsic.LIST_LEN or kind == MirIntrinsic.LIST_LEN32 or kind == MirIntrinsic.LIST_LEN64 or kind == MirIntrinsic.LIST_ULEN32 or kind == MirIntrinsic.LIST_IS_EMPTY or kind == MirIntrinsic.LIST_SET or kind == MirIntrinsic.LIST_CLEAR or kind == MirIntrinsic.LIST_ITER or kind == MirIntrinsic.LIST_ITER_REF or kind == MirIntrinsic.LIST_ITER_PLACE or kind == MirIntrinsic.LIST_MAP or kind == MirIntrinsic.LIST_FILTER or kind == MirIntrinsic.LIST_FOLD or kind == MirIntrinsic.LIST_CONTAINS or kind == MirIntrinsic.LIST_JOIN or kind == MirIntrinsic.LIST_SLOT or kind == MirIntrinsic.LIST_GET_DISJOINT or kind == MirIntrinsic.LIST_RANGE or kind == MirIntrinsic.LIST_GET_REF
+    kind == MirIntrinsic.LIST_GET or kind == MirIntrinsic.LIST_LEN or kind == MirIntrinsic.LIST_LEN32 or kind == MirIntrinsic.LIST_LEN64 or kind == MirIntrinsic.LIST_ULEN32 or kind == MirIntrinsic.LIST_IS_EMPTY or kind == MirIntrinsic.LIST_SET or kind == MirIntrinsic.LIST_CLEAR or kind == MirIntrinsic.LIST_ITER_PLACE or kind == MirIntrinsic.LIST_MAP or kind == MirIntrinsic.LIST_FILTER or kind == MirIntrinsic.LIST_FOLD or kind == MirIntrinsic.LIST_CONTAINS or kind == MirIntrinsic.LIST_JOIN or kind == MirIntrinsic.LIST_SLOT or kind == MirIntrinsic.LIST_GET_DISJOINT or kind == MirIntrinsic.LIST_RANGE or kind == MirIntrinsic.LIST_GET_REF
 
 // The local holding what `local` was moved into, through every move.
 fn stack_literal_final(fwd: &List[i32], local: i32) -> i32:

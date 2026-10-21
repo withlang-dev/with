@@ -159,8 +159,6 @@ enum MirIntrinsic: i32:
     STR_ENDS_WITH
     STR_FIND
     MAP_CLEAR
-    VECITER_NEXT
-    LIST_ITER
     OPT_IS_NONE
     STR_SPLIT
     STR_TO_UPPER
@@ -298,8 +296,6 @@ enum MirIntrinsic: i32:
     VECRANGE_GET
     VECRANGE_SET
     VECRANGE_LEN
-    LIST_ITER_REF
-    VECITERREF_NEXT
     LIST_GET_REF
     DYN_CALL
     SLOTMAP_NEW

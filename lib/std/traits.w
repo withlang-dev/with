@@ -45,20 +45,20 @@ pub trait Mul[Rhs, Output]:
 pub trait One:
     fn one() -> Self
 
-impl One for i8:    fn one() -> i8: 1
-impl One for i16:   fn one() -> i16: 1
-impl One for i32:   fn one() -> i32: 1
-impl One for i64:   fn one() -> i64: 1
-impl One for i128:  fn one() -> i128: 1
-impl One for isize: fn one() -> isize: 1
-impl One for usize: fn one() -> usize: 1
-impl One for u8:    fn one() -> u8: 1
-impl One for u16:   fn one() -> u16: 1
-impl One for u32:   fn one() -> u32: 1
-impl One for u64:   fn one() -> u64: 1
-impl One for u128:  fn one() -> u128: 1
-impl One for f32:   fn one() -> f32: 1.0
-impl One for f64:   fn one() -> f64: 1.0
+impl One for i8: fn one(): 1
+impl One for i16: fn one(): 1
+impl One for i32: fn one(): 1
+impl One for i64: fn one(): 1
+impl One for i128: fn one(): 1
+impl One for isize: fn one(): 1
+impl One for usize: fn one(): 1
+impl One for u8: fn one(): 1
+impl One for u16: fn one(): 1
+impl One for u32: fn one(): 1
+impl One for u64: fn one(): 1
+impl One for u128: fn one(): 1
+impl One for f32: fn one(): 1.0
+impl One for f64: fn one(): 1.0
 
 /// Division. Available for explicit generic bounds; `/` dispatches by the
 /// fixed method name `div` on concrete operand types.
@@ -201,41 +201,21 @@ pub trait ScopedMut[T]:
 
 // Core trait impls for primitive types
 
-impl Eq for i32:
-    fn eq(other: &i32) -> bool: *self == *other
-
-impl Eq for bool:
-    fn eq(other: &bool) -> bool: *self == *other
-
-impl Eq for u8:
-    fn eq(other: &u8) -> bool: *self == *other
-
-impl Default for i32:
-    fn default() -> i32:
-        0
-
-impl Default for i64:
-    fn default() -> i64:
-        0
-
-impl Default for u8:
-    fn default() -> u8:
-        0
-
-impl Default for bool:
-    fn default() -> bool:
-        false
-
-impl Default for str:
-    fn default() -> str:
-        ""
+impl Eq for i32: fn eq(other: &i32): *self == *other
+impl Eq for bool: fn eq(other: &bool): *self == *other
+impl Eq for u8: fn eq(other: &u8): *self == *other
+impl Default for i32: fn default(): 0
+impl Default for i64: fn default(): 0
+impl Default for u8: fn default(): 0
+impl Default for bool: fn default(): false
+impl Default for str: fn default(): ""
 
 impl Clone for str:
     // Self-contained materialization (`++ ""`): .to_owned() lives in
     // std.string (absent under --no-std) and &str method dispatch to str
     // impls is #762; concat lowers through the emitted intrinsics in
     // every mode.
-    fn clone() -> str: self ++ ""
+    fn clone(): self ++ ""
 
 // Primitive clones: generic code (e.g. the SoA derive's row rebuild)
 // spells materialization uniformly as .clone(); for Copy primitives the
@@ -256,24 +236,21 @@ impl Clone for f32:  fn clone(): *self
 impl Clone for f64:  fn clone(): *self
 impl Clone for bool: fn clone(): *self
 
-impl Eq for str:
-    fn eq(other: &str) -> bool: *self == other
-
-impl Eq for i64:
-    fn eq(other: &i64) -> bool: *self == *other
+impl Eq for str: fn eq(other: &str): *self == other
+impl Eq for i64: fn eq(other: &i64): *self == *other
 
 // D114: isize is the literal default and the length type (D108), and usize
 // its unsigned twin; each has what i64 has.
-impl Eq for isize: fn eq(other: &isize) -> bool: *self == *other
-impl Eq for usize: fn eq(other: &usize) -> bool: *self == *other
-impl Default for isize: fn default() -> isize: 0
-impl Default for f32: fn default() -> f32: 0.0
-impl Default for f64: fn default() -> f64: 0.0
-impl Default for usize: fn default() -> usize: 0
-impl Eq for i128: fn eq(other: &i128) -> bool: *self == *other
-impl Eq for u128: fn eq(other: &u128) -> bool: *self == *other
-impl Default for i128: fn default() -> i128: 0
-impl Default for u128: fn default() -> u128: 0
+impl Eq for isize: fn eq(other: &isize): *self == *other
+impl Eq for usize: fn eq(other: &usize): *self == *other
+impl Default for isize: fn default(): 0
+impl Default for f32: fn default(): 0.0
+impl Default for f64: fn default(): 0.0
+impl Default for usize: fn default(): 0
+impl Eq for i128: fn eq(other: &i128): *self == *other
+impl Eq for u128: fn eq(other: &u128): *self == *other
+impl Default for i128: fn default(): 0
+impl Default for u128: fn default(): 0
 
 impl Ord for isize:
     fn cmp(other: &isize) -> i32:

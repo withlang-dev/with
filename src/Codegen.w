@@ -175,7 +175,6 @@ type Codegen {
     sym_slotmapslot: i32,
     sym_listslot: i32,
     sym_listrange: i32,
-    sym_listiterref: i32,
     sym_listiterplace: i32,
     sym_box: i32,
     sym_context_error: i32,
@@ -662,7 +661,6 @@ fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: I
     cg.sym_slotmapslot = cg.intern.intern("SlotMapSlot")
     cg.sym_listslot = cg.intern.intern("ListSlot")
     cg.sym_listrange = cg.intern.intern("ListRange")
-    cg.sym_listiterref = cg.intern.intern("ListIterRef")
     cg.sym_listiterplace = cg.intern.intern("ListIterPlace")
     cg.sym_box = cg.intern.intern("Box")
     cg.sym_context_error = cg.intern.intern("ContextError")
@@ -1115,7 +1113,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         option_some_index: -1, option_none_index: -1, option_some_tag: -1, option_none_tag: -1, result_ok_tag: -1, result_err_tag: -1,
         sym_list: 0, sym_option: 0, sym_result: 0, sym_hashmap: 0,
         sym_hashset: 0, sym_btreemap: 0, sym_btreeset: 0, sym_handle: 0, sym_slotmap: 0, sym_slotmapslot: 0,
-        sym_listslot: 0, sym_listrange: 0, sym_listiterref: 0, sym_listiterplace: 0,
+        sym_listslot: 0, sym_listrange: 0, sym_listiterplace: 0,
         sym_box: 0, sym_context_error: 0,
         sym_Self: 0, sym_self: 0, sym_unit: 0,
         sym_bool: 0, sym_usize: 0, sym_isize: 0, sym_void: 0,
@@ -4039,13 +4037,6 @@ impl Codegen:
                 vr_fields.push(wl_i64_type(self.context))
                 vr_fields.push(wl_i64_type(self.context))
                 return wl_struct_type(self.context, list_data_i64(&vr_fields), 3, 0)
-            // ListIterRef[T] = { data_ptr: i64, len: i64, idx: i64 }
-            if cg_base_sym == self.sym_listiterref:
-                let vir_fields: List[i64] = List.new()
-                vir_fields.push(wl_i64_type(self.context))
-                vir_fields.push(wl_i64_type(self.context))
-                vir_fields.push(wl_i64_type(self.context))
-                return wl_struct_type(self.context, list_data_i64(&vir_fields), 3, 0)
             // ListIterPlace[T] = { data_ptr: i64, len: i64, idx: i64 }
             if cg_base_sym == self.sym_listiterplace:
                 let vip_fields: List[i64] = List.new()

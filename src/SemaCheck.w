@@ -33311,15 +33311,6 @@ impl Sema:
             if owned_twin != 0 and self.receiver_owned_by_syntax(expr, known_recv_ty) and self.type_has_method_named(known_recv_ty, owned_twin):
                 field = owned_twin
         let ret = self.check_method_call_parts_inner(expr, field, extra_start, arg_count, node, known_recv_ty)
-        // §15.3: `next()` advances the iterator, so it needs a place. The
-        // view iterator's `next` is a builtin with no declaration to carry
-        // `mut fn`; `ListIter.next` gets the same rule through its trait
-        // (check_trait_receiver_mode).
-        if field == self.syms.next and ret != 0 and self.ast.kind(node) != NodeKind.NK_PIPELINE:
-            let stepped: i32 = self.typed_expr_types.get(expr) ?? 0
-            let stepped_ty = if stepped != 0: self.resolve_alias(stepped as TypeId) as i32 else: 0
-            if stepped_ty != 0 and self.get_type_kind(stepped_ty as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(stepped_ty) == self.syms.listiterref and unpack_place_kind(self.classify_place(expr)) == PlaceKind.PK_NotPlace:
-                self.emit_error("mutating method requires a place receiver (§15.3)", node)
         // D93: a method called on the binding of an empty literal, which has
         // no type until a use gives it one (`var xs = []`, `xs.push(1)`).
         if ret == 0 and arg_count >= 1 and extra_start >= 0 and self.literal_binding_let(expr) != 0:
@@ -37787,7 +37778,7 @@ impl Sema:
             return seq_elem
         if tk == TypeKind.TY_REF:
             // #607: `for w in &vec` / `for w in &h.field` borrow-iterates — the loop var
-            // is `&T` (each element borrowed, no copy/move). Mirrors ListIterRef[T] below.
+            // is `&T` (each element borrowed, no copy/move).
             let ref_pointee = self.get_type_d0(resolved)
             let ref_pointee_resolved = self.resolve_alias(ref_pointee as TypeId)
             if self.get_type_kind(ref_pointee_resolved) == TypeKind.TY_GENERIC_INST:

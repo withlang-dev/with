@@ -223,15 +223,15 @@ impl Sema:
         self.get_type_kind(self.resolve_alias(template as TypeId))
 
     // The generic records the compiler builds with no declaration
-    // (Codegen.sema_type_to_llvm): `ListRange[T]` and `ListIterRef[T]` are
-    // `{ data_ptr: i64, offset|len: i64, len|idx: i64 }`; `chan[T]`'s
+    // (Codegen.sema_type_to_llvm): `ListRange[T]` is
+    // `{ data_ptr: i64, offset: i64, len: i64 }`; `chan[T]`'s
     // `Sender[T]` and `Receiver[T]` are `{ handle: i64 }`. Size -1 for any
     // other instance.
     fn type_layout_builtin_generic(tid: i32) -> SizeAlign:
         let base_sym = self.get_generic_inst_base(tid)
         if base_sym == 0:
             return SizeAlign { size: -1, align: 1 }
-        if base_sym == self.syms.listrange or base_sym == self.syms.listiterref:
+        if base_sym == self.syms.listrange:
             return SizeAlign { size: 24, align: 8 }
         let base_name = self.pool_resolve(base_sym)
         if base_name == "Sender" or base_name == "Receiver":
