@@ -63,3 +63,11 @@ that; a file-private level would be a new ruling.
 `tools/pub_lint.w <root.w> [--apply]` reports every `pub` declaration of the program's package that no call, method resolution or name reference from another package names — from the analyzer's facts (`reference` facts carry both packages), never from the text — and `--apply` removes exactly that `pub ` token. A library whose consumers are outside the compilation keeps its `pub`: run it from a program that uses the library.
 
 Run over the compiler (`src/main.w`) it reports 1507 `pub` declarations used by nothing outside the compiler's package. They are not removed yet: the pinned seed still enforces per-module privacy (`symbol 'helper' is private to module 'Helper.w'`, probed 2026-10-07), so a tree without them is unbuildable by the seed. The apply lands after a seed that implements D100 is published and pinned, the way every build-layer change that needs a newer seed does.
+
+**Status (2026-10-20).** Done for the compiler: #2463 swept `src/` (1,763
+`pub` removed; the lint reports 0 of its declarations), the generators
+emit no `pub` for the `Embedded*Data` modules, and `pub-lint-check` (in
+`:battery-checks`) runs the lint over `src/main.w` so none grows back.
+The standard library is not swept, by ruling (Eric, 2026-10-19): its `pub`
+is its API to consumers outside any one compilation; a lint can only prove
+non-use inside the compilation it runs in.
