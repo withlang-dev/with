@@ -14472,11 +14472,15 @@ impl Sema:
         if op == BinaryOp.OP_IN or op == BinaryOp.OP_NOT_IN:
             // D139: a view of a Copy value reads through at `in`, every
             // layer (`*x in [2, 4]` with `x: &&i32` from a filter over views).
+            // Only where `in` compares values itself (an array literal, a
+            // range, a str): `x in list` is `list.contains(x)`, whose
+            // parameter observes the key (§13.3), and a view is that already.
             var in_value = lhs as i32
-            for level in 0..8:
-                let in_resolved = self.resolve_alias(in_value as TypeId)
-                if self.get_type_kind(in_resolved) != TypeKind.TY_REF or self.get_type_d1(in_resolved) != 0: break
-                in_value = self.get_type_d0(in_resolved)
+            if self.membership_rhs_uses_special_lowering(rhs_node, rhs as i32) != 0:
+                for level in 0..8:
+                    let in_resolved = self.resolve_alias(in_value as TypeId)
+                    if self.get_type_kind(in_resolved) != TypeKind.TY_REF or self.get_type_d1(in_resolved) != 0: break
+                    in_value = self.get_type_d0(in_resolved)
             if in_value != lhs as i32 and self.is_copy(in_value) != 0 and self.record_contextual_copy_adjustment(lhs_node, in_value, lhs as i32) != 0:
                 return self.check_membership_operator(node, lhs_node, rhs_node, in_value, rhs as i32)
             return self.check_membership_operator(node, lhs_node, rhs_node, lhs as i32, rhs as i32)
