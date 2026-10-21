@@ -4693,6 +4693,8 @@ impl Sema:
 
         // Effect tracking: save outer state and populate for this function
         let saved_eff_sig_idx: i32 = self.current_fn_sig_idx
+        let saved_fn_decl_node: i32 = self.current_fn_decl_node
+        self.current_fn_decl_node = node
         let saved_fn_variadic: i32 = self.current_fn_variadic
         // #1819: this body's writes and calls are its own, not those of a
         // closure being checked when it was instantiated.
@@ -5103,6 +5105,7 @@ impl Sema:
 
         // Restore state
         self.current_fn_sig_idx = saved_eff_sig_idx
+        self.current_fn_decl_node = saved_fn_decl_node
         self.current_fn_variadic = saved_fn_variadic
         self.fn_param_invocations = saved_invocations
         self.fn_param_many_nodes = saved_many_nodes
@@ -7387,6 +7390,8 @@ impl Sema:
         while changed:
             changed = false
             self.settle_dyn_suspend_methods()
+            if self.settle_callable_param_facts():
+                changed = true
             for node in 1..self.ast.node_count():
                 let kind = self.ast.kind(node)
                 if self.suspend_fact_nodes.contains(node):
@@ -7423,6 +7428,115 @@ impl Sema:
     // reaches a callable that may suspend the calling fiber, beyond the
     // direct callee #916 checks: Sema's settled answer, read by MIR.
     fn call_site_may_suspend(node: i32) -> bool: self.suspend_call_sites.contains(node)
+
+    // #2511 (§14.3 INVARIANT 5): what the callers hand each callable
+    // parameter. Every call Sema can attribute to a declared fn (a direct
+    // call, a resolved generic or std.traits adapter call, a pipeline stage)
+    // marks (fn, index) for each argument that is a callable value which
+    // may suspend; a call that passes such a value and cannot be attributed
+    // sets suspend_params_unattributed, and every parameter then answers
+    // "may" (the answer before this record existed). Monotone: true when a
+    // pass added something, so the fixpoint runs once more.
+    // The (owner type, field) key of a field access whose owner Sema typed;
+    // -1 when it did not (the field then answers "may").
+    fn callable_field_key(expr: i32) -> i64:
+        let recv = self.ast.get_data0(expr)
+        if not self.typed_expr_types.contains(recv):
+            return -1
+        let recv_ty = self.auto_deref_ref_ptr_type(self.resolve_alias(self.typed_expr_types.get(recv).unwrap() as TypeId))
+        let owner = self.method_owner_symbol_for_type(recv_ty as i32)
+        if owner == 0:
+            return -1
+        sema_pair_key(owner, self.ast.get_data1(expr))
+
+    // A callable value stored into a struct field: by a struct literal's
+    // field, or an assignment to a field place.
+    mut fn note_callable_field_store(owner: i32, field: i32, value: i32) -> bool:
+        if not self.expr_is_callable_value(value) or not self.callable_value_may_suspend(value, true):
+            return false
+        if owner == 0:
+            if self.suspend_params_unattributed != 0:
+                return false
+            self.suspend_params_unattributed = 1
+            return true
+        let key = sema_pair_key(owner, field)
+        if self.callable_field_may_suspend.contains(key):
+            return false
+        self.callable_field_may_suspend.insert(key, 1)
+        true
+
+    mut fn settle_callable_param_facts() -> bool:
+        var added = false
+        for node in 1..self.ast.node_count():
+            let kind = self.ast.kind(node)
+            if kind == NodeKind.NK_STRUCT_LIT:
+                let lit_owner = if self.typed_expr_types.contains(node): self.method_owner_symbol_for_type(self.auto_deref_ref_ptr_type(self.resolve_alias(self.typed_expr_types.get(node).unwrap() as TypeId)) as i32) else: 0
+                let lit_start = self.ast.get_data1(node)
+                for fi in 0..self.ast.get_data2(node):
+                    if self.note_callable_field_store(lit_owner, self.ast.get_extra(lit_start + fi * 2), self.ast.get_extra(lit_start + fi * 2 + 1)):
+                        added = true
+                continue
+            if kind == NodeKind.NK_ASSIGN:
+                let target = self.ast.get_data0(node)
+                if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
+                    let key = self.callable_field_key(target)
+                    let owner_sym = if key >= 0: (key / 4294967296) as i32 else: 0
+                    if self.note_callable_field_store(owner_sym, self.ast.get_data1(target), self.ast.get_data1(node)):
+                        added = true
+                continue
+            if kind != NodeKind.NK_CALL and kind != NodeKind.NK_PIPELINE:
+                continue
+            var fn_node: i32 = 0
+            var arg_start: i32 = -1
+            var arg_count: i32 = 0
+            var shift: i32 = 0
+            var piped: i32 = 0
+            if kind == NodeKind.NK_CALL:
+                let callee = self.ast.get_data0(node)
+                if self.comp_resolved.contains(node):
+                    fn_node = self.fn_decl_node_for_suspend(self.comp_resolved.get(node).unwrap())
+                else if self.ast.kind(callee) == NodeKind.NK_IDENT and self.fn_decl_nodes.contains(self.ast.get_data0(callee)):
+                    fn_node = self.fn_decl_nodes.get(self.ast.get_data0(callee)).unwrap()
+                arg_start = self.ast.get_data1(node)
+                arg_count = self.ast.get_data2(node)
+                if self.receiver_arg_call_nodes.contains(node):
+                    shift = 1
+                    piped = if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS: self.ast.get_data0(callee) else: 0
+            else:
+                let stage = self.ast.get_data1(node)
+                if self.comp_resolved.contains(node):
+                    fn_node = self.fn_decl_node_for_suspend(self.comp_resolved.get(node).unwrap())
+                else if self.ast.kind(stage) == NodeKind.NK_CALL and self.comp_resolved.contains(stage):
+                    fn_node = self.fn_decl_node_for_suspend(self.comp_resolved.get(stage).unwrap())
+                else if self.ast.kind(stage) == NodeKind.NK_CALL and self.ast.kind(self.ast.get_data0(stage)) == NodeKind.NK_IDENT and self.fn_decl_nodes.contains(self.ast.get_data0(self.ast.get_data0(stage))):
+                    fn_node = self.fn_decl_nodes.get(self.ast.get_data0(self.ast.get_data0(stage))).unwrap()
+                piped = self.ast.get_data0(node)
+                shift = 1
+                if self.ast.kind(stage) == NodeKind.NK_CALL:
+                    arg_start = self.ast.get_data1(stage)
+                    arg_count = self.ast.get_data2(stage)
+            if piped != 0 and self.expr_is_callable_value(piped) and self.callable_value_may_suspend(piped, true):
+                if fn_node == 0:
+                    if self.suspend_params_unattributed == 0:
+                        self.suspend_params_unattributed = 1
+                        added = true
+                else if not self.callable_param_may_suspend.contains(sema_pair_key(fn_node, 0)):
+                    self.callable_param_may_suspend.insert(sema_pair_key(fn_node, 0), 1)
+                    added = true
+            for ai in 0..arg_count:
+                let arg = self.ast.get_extra(arg_start + ai)
+                if not self.expr_is_callable_value(arg) or not self.callable_value_may_suspend(arg, true):
+                    continue
+                if fn_node == 0:
+                    if self.suspend_params_unattributed == 0:
+                        self.suspend_params_unattributed = 1
+                        added = true
+                    continue
+                let key = sema_pair_key(fn_node, ai + shift)
+                if not self.callable_param_may_suspend.contains(key):
+                    self.callable_param_may_suspend.insert(key, 1)
+                    added = true
+        added
 
     // The (trait, method) pairs a `dyn` call of which may suspend: some
     // implementation's body may, or the trait's default body may, or an
@@ -7474,10 +7588,34 @@ impl Sema:
             if kind == NodeKind.NK_PIPELINE and self.ast.kind(self.ast.get_data1(expr)) == NodeKind.NK_CALL:
                 let stage = self.ast.get_data1(expr)
                 return self.adapter_parts_may_suspend(self.ast.get_data0(expr), self.ast.get_data1(stage), self.ast.get_data2(stage), site)
+        // #2511: a callable held in a struct field (`(self.f)(x)` in an
+        // adapter's `next`) answers from what the program stores in that
+        // field, as a parameter answers from what its callers pass.
+        if kind == NodeKind.NK_FIELD_ACCESS:
+            if not site:
+                return false
+            if self.suspend_params_unattributed != 0:
+                return true
+            let key = self.callable_field_key(expr)
+            return key < 0 or self.callable_field_may_suspend.contains(key)
         if kind != NodeKind.NK_IDENT:
             return true
         if self.callable_param_idents.contains(expr):
-            return site
+            // #2511 (§14.3): for the body's own fact the caller answers
+            // (false); at a call site the answer is what the callers hand
+            // this parameter — "may" only when some caller passes a
+            // callable that may suspend, or when the fn's callers are not
+            // all visible (its name escapes as a value, or a call Sema could
+            // not attribute passed a may-suspend callable).
+            if not site:
+                return false
+            if self.suspend_params_unattributed != 0:
+                return true
+            let fn_node: i32 = self.callable_param_fn_nodes.get(expr) ?? 0
+            if fn_node == 0 or self.fn_escapes_as_value.contains(fn_node):
+                return true
+            let key: i64 = self.callable_param_keys.get(expr) ?? -1
+            return key >= 0 and self.callable_param_may_suspend.contains(key)
         if self.callable_opaque_idents.contains(expr):
             return true
         if self.callable_ident_decls.contains(expr):
@@ -7559,9 +7697,10 @@ impl Sema:
                 let trait_sym = self.dyn_trait_symbol_for_type(self.typed_expr_types.get(recv).unwrap())
                 if trait_sym != 0 and self.dyn_suspend_methods.contains(sema_pair_key(trait_sym, self.ast.get_data1(callee))):
                     return true
-            // A callable field called with method syntax (`h.f(x)`).
+            // A callable field called with method syntax (`h.f(x)`): what
+            // the program stores in the field (#2511).
             if self.typed_expr_types.contains(callee) and self.type_is_with_callable(self.typed_expr_types.get(callee).unwrap()):
-                return true
+                return self.callable_value_may_suspend(callee, site)
             // #2019: a method driven on a lazy adapter that holds a
             // may-suspend closure (`it.collect()`, `it.fold(..)`, `it.next()`).
             if self.typed_expr_types.contains(recv) and self.iterator_type_holds_callable(self.typed_expr_types.get(recv).unwrap()) and self.callable_value_may_suspend(recv, site):
@@ -7623,6 +7762,13 @@ impl Sema:
             self.callable_ident_decls.insert(node, decl)
         else if local and self.closure_body_depth == 0 and self.symbol_is_current_fn_param(sym):
             self.callable_param_idents.insert(node, 1)
+            // #2511: which parameter of which fn, for the callers' answer.
+            if self.current_fn_decl_node > 0:
+                for pi in 0..self.current_fn_param_syms.len():
+                    if self.current_fn_param_syms[pi] == sym:
+                        self.callable_param_keys.insert(node, sema_pair_key(self.current_fn_decl_node, pi as i32))
+                        self.callable_param_fn_nodes.insert(node, self.current_fn_decl_node)
+                        break
         else:
             self.callable_opaque_idents.insert(node, 1)
 
@@ -10670,6 +10816,12 @@ impl Sema:
 
         if kind == NodeKind.NK_IDENT:
             self.note_callable_ident(node)
+            // #2511: a fn's name read as a value (not the callee of a direct
+            // call) escapes: its callers are not all visible here.
+            if node != self.callee_ident_node:
+                let value_sym = self.ast.get_data0(node)
+                if self.fn_decl_nodes.contains(value_sym) and not self.scope_binding_is_local(value_sym):
+                    self.fn_escapes_as_value.insert(self.fn_decl_nodes.get(value_sym).unwrap(), 1)
             let ident_ty = self.check_ident(self.ast.get_data0(node), node)
             // D88: an untyped numeric constant takes its type from this use.
             let untyped_init = if ident_ty != 0: self.untyped_const_init(self.ast.get_data0(node)) else: 0
@@ -26014,6 +26166,7 @@ impl Sema:
         let arg_count = self.ast.get_data2(node)
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
             self.note_callable_ident(callee)
+            self.callee_ident_node = callee
         // D70: `math.sqrt(x)` / `raylib.DrawText(...)` call the member the
         // import namespace names — resolved before the callee is read as a
         // method or a qualified extension call.
