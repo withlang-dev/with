@@ -8,8 +8,17 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20261020-local-2-4d6d960d6ed0
-with-darwin-aarch64=5998cfebed4fe44ae2afe464c975b1005d39aaaecea22ea793199e456a4403eb
+version=nightly-20261020-local-3-763d0e54c82a
+with-darwin-aarch64=0c6a2afd69b55cbc0d134d00a36796828682df89e2c40bfd7765bfb4bfc46a29
+# All five are cut from main 763d0e54c (2026-10-20): the first seeds built
+# after the D30 step 4 flip (#2500: the runtime bundle is the only link path,
+# no .w-derived runtime objects) and R4c (#2504), with the wasm import
+# reader (#2506) and the twin rt-slot join (#2507). darwin on the laptop
+# (:release-checks green), linux-x86_64 on eric-5090, windows-x86_64 on
+# win10, linux-aarch64 in tools/docker/linux-aarch64 (asset copied from
+# out/release/bin/with, #2494), each from a stage2 == stage3 fixpoint.
+# windows-aarch64 is the cross seed run 39537985417 (D137), copied onto the
+# release. The seed before them:
 # darwin-aarch64, linux-x86_64, windows-x86_64 and linux-aarch64 are cut from
 # main 4d6d960d6 (2026-10-20, #2495): the local-1 seeds below it failed a
 # fresh clone (#2493: a cached build graph's placeholder Sema met the actions
@@ -57,8 +66,8 @@ with-darwin-aarch64=5998cfebed4fe44ae2afe464c975b1005d39aaaecea22ea793199e456a44
 # linux-aarch64 is cut from main 3d73b98c (#2305, D118), bootstrapped natively
 # in tools/docker/linux-aarch64 to a stage2 == stage3 fixpoint over all 16
 # units and verified against :no-host-toolchain.
-with-linux-x86_64=7adb7e9653a13875ec02e693d59f822780529b9a8dc4834e589d47790ed9be69
-with-linux-aarch64=b7a87f919fb474aea0fbe84a1b9da2809c56350ff00460c5a113eb5ae58ba689
+with-linux-x86_64=6e40ec0d4e037a1f53bac7f8732ae71dca1c44bad089760f7a650e192b66c9d8
+with-linux-aarch64=0cf98a17047fd6b01fb92fa56c85f2da0b9bbd6f530870393895d2288a2ad1aa
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
 # that carries its own linker (lld), dlltool, C runtime, clang resource
 # directory and cmake/ninja, so a fresh Windows checkout runs :seed, :deps
@@ -69,5 +78,5 @@ with-linux-aarch64=b7a87f919fb474aea0fbe84a1b9da2809c56350ff00460c5a113eb5ae58ba
 # from main 35afb3a7a (#2305, #2470, #2471) by seed-windows-aarch64 run
 # 39288117180 against the windows-gnu SDK, an intermediate seed the native
 # windows-aarch64 lane bootstraps and verifies.
-with-windows-x86_64.exe=4b5093d79210e3eddc6ec136eb1f38d739427fcc41f8fddd50b632cabb21c0d6
-with-windows-aarch64.exe=945487c8402f31bac0adeea3cbb388b9912b33918683585aed5646e946b4cf92
+with-windows-x86_64.exe=da61df5be6c9525bae7465a451aa1249f1dd1b7a392d99fb2e9a1f5c73af5dcb
+with-windows-aarch64.exe=d729f1bb45a018cb7cb285fe257dd9798d0c9f9bf2fafac2ba2c168158a509ce
