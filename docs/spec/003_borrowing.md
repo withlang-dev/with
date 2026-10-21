@@ -266,8 +266,11 @@ projections and collection element access.
 When `T: Copy`, an expression of type `&T` may satisfy an independently
 established owned-value demand. The compiler copies the pointee, then applies
 ordinary value coercions. Thus an `&i32` may satisfy an owned `i32` or `i64`
-demand. The produced value is independent of the reference's origin; the
-source reference remains borrowed if it is used again.
+demand. The rule applies at every reference layer: a view is `Copy`, so a
+`&&i32` satisfies the same demand by reading through both layers (D139; an
+iterator that yields `&T` hands a predicate `&&i64`, and `it % 2 == 1`
+reads the `i64`). The produced value is independent of the reference's
+origin; the source reference remains borrowed if it is used again.
 
 An owned-value demand is established independently by:
 

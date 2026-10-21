@@ -466,16 +466,18 @@ impl Sema:
         if expected_kind == TypeKind.TY_REF:
             return 0
         var view = self.resolve_alias(actual as TypeId)
-        for level in 0..2:
+        // D22 §7.4 applies at every layer: a view's pointee that is Copy (a
+        // view is Copy, so a view of a view qualifies) may satisfy the
+        // demand, and the read continues through it until the demand is
+        // met or a layer is not Copy. A list iterator that yields `&T`
+        // hands a `filter` predicate `&&i64`, and `it % 2 == 1` reads the
+        // i64 through both layers as `total + x` reads through one (#2220
+        // step 2); `&&str` copies into `str` the same way (D111).
+        for level in 0..8:
             if self.get_type_kind(view) != TypeKind.TY_REF or self.get_type_d1(view) != 0:
                 return 0
             let pointee = self.get_type_d0(view)
             if pointee == 0 or self.is_copy(pointee as TypeId) == 0:
-                return 0
-            // The second level is D111's: `str` is a value, so `&&str` copies
-            // into `str`; `&&i32` keeps its explicit deref (D22 §6.2 is one
-            // level).
-            if level == 1 and self.get_type_kind(self.resolve_alias(pointee as TypeId)) != TypeKind.TY_STR:
                 return 0
             // A pointer-typed demand is a strict pointee match: `&*mut u8`
             // supplies `*mut u8`. builtin_arg_type_compatible's arithmetic
