@@ -48,7 +48,7 @@ impl[T: Ord] BinaryHeap[T]:
     pub fn is_empty() -> bool: self.len() == 0
 
     pub mut fn push(value: T) -> Unit:
-        let slot = unsafe { with_alloc(sizeof[Slot[T]]() as i64) } as *mut Slot[T]
+        let slot = with_alloc(sizeof[Slot[T]]() as i64) as *mut Slot[T]
         unsafe { *slot = Slot { compare: self.comparator(), value: value } }
         assert(unsafe { binary_heap_insert(self.heap, slot as *mut c_void) } != 0)
 

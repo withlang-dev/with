@@ -37,7 +37,7 @@ impl[V] Trie[V]:
     /// Stores `value` under `key`; returns the previous value, if any.
     pub mut fn insert(key: &str, value: V) -> Option[V]:
         var previous = unsafe { self.lookup(key) }
-        let slot = unsafe { with_alloc(sizeof[Slot[V]]() as i64) } as *mut Slot[V]
+        let slot = with_alloc(sizeof[Slot[V]]() as i64) as *mut Slot[V]
         unsafe { *slot = Slot { compare: slot_unordered, value: value } }
         assert(unsafe { trie_insert_binary(self.trie, trie_key_bytes(key), key.len() as c_int, slot as *mut c_void) } != 0)
         if previous as i64 == 0: return None

@@ -41,7 +41,7 @@ impl[T: Ord] SortedList[T]:
 
     /// Inserts `value` at its sorted position, after any equal values.
     pub mut fn insert(value: T):
-        let slot = unsafe { with_alloc(sizeof[Slot[T]]() as i64) } as *mut Slot[T]
+        let slot = with_alloc(sizeof[Slot[T]]() as i64) as *mut Slot[T]
         unsafe { *slot = Slot { compare: self.comparator(), value: value } }
         assert(unsafe { sortedarray_insert(self.array, slot as *mut c_void) } != 0)
 
@@ -62,9 +62,10 @@ impl[T: Ord] SortedList[T]:
         // The engine compares the probe against stored slots through the
         // probe's comparator, so the probe is a slot too: the comparator
         // and a byte image of `value` that is never read back as owned.
-        let probe = unsafe { with_alloc(sizeof[Slot[T]]() as i64) } as *mut Slot[T]
+        let probe = with_alloc(sizeof[Slot[T]]() as i64) as *mut Slot[T]
         unsafe { (*probe).compare = self.comparator() }
-        with_memcpy(&raw mut (*probe).value as *mut u8, &raw const *value as *const u8, sizeof[T]() as i64)
+        let dst = unsafe { &raw mut (*probe).value as *mut u8 }
+        with_memcpy(dst, &raw const *value as *const u8, sizeof[T]() as i64)
         let found = unsafe { sortedarray_index_of(self.array, probe as *mut c_void) }
         with_free(probe as *mut u8)
         if found < 0: None else: Some(found as i32)

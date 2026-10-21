@@ -48,9 +48,9 @@ pub unsafe fn hash_slot_compare(probe: *const c_void, data: *const c_void) -> c_
 pub type HashIndex[K, V] { map: *mut tommy_hashdyn_struct, probe: *mut HashSlot[K, V] }
 
 pub fn HashIndex.new[K: Key, V]() -> HashIndex[K, V]:
-    let map = unsafe { with_alloc(sizeof[tommy_hashdyn_struct]() as i64) } as *mut tommy_hashdyn_struct
+    let map = with_alloc(sizeof[tommy_hashdyn_struct]() as i64) as *mut tommy_hashdyn_struct
     unsafe { tommy_hashdyn_init(map) }
-    let probe = unsafe { with_alloc(sizeof[HashSlot[K, V]]() as i64) } as *mut HashSlot[K, V]
+    let probe = with_alloc(sizeof[HashSlot[K, V]]() as i64) as *mut HashSlot[K, V]
     HashIndex { map: map, probe: probe }
 
 impl[K, V] HashIndex[K, V]:
@@ -120,7 +120,7 @@ impl[K: Key, V] HashIndex[K, V]:
     pub mut fn insert(key: K, value: V) -> Option[V]:
         let previous = self.remove(&key)
         let hash = self.key_hash(&key)
-        let slot = unsafe { with_alloc(sizeof[HashSlot[K, V]]() as i64) } as *mut HashSlot[K, V]
+        let slot = with_alloc(sizeof[HashSlot[K, V]]() as i64) as *mut HashSlot[K, V]
         let node = tommy_node_struct { next: null, prev: null, data: null, index: 0 }
         unsafe { *slot = HashSlot { head: HashSlotHead { node: node, compare: self.comparator() }, key: key, value: value } }
         unsafe { tommy_hashdyn_insert(self.map, &raw mut (*slot).head.node, slot as *mut c_void, hash) }
