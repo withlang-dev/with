@@ -5775,8 +5775,23 @@ fn bs_check_migrate_builtin_overflow(ctx: &ActionCtx, compiler_path: &str, case_
     // object cannot resolve); the narrower helpers still may.
     rc = bs_assert_contains(ctx, out_text, "u128_mul_would_overflow(__with_a, __with_b)", "builtin_overflow_u128_limb_helper")
     if rc != 0: return rc
+    // The region runs from the i128 helper to the first migrated function
+    // of the program: the shim's own helpers are `__with_`- or `u128_`-named
+    // (the `with_clz` extern that once ended it is gone — the shim imports
+    // the runtime, D30 step 3).
     let wide_start = bs_index_of(out_text, "fn __with_builtin_mul_overflow_i128")
-    let wide_end = bs_index_of(out_text, "with_clz")
+    var wide_end: isize = -1
+    if wide_start >= 0:
+        var at = wide_start
+        while at < out_text.len():
+            let line_end = bs_index_of(out_text.slice(at, out_text.len()), "\n")
+            if line_end < 0: break
+            let next = at + line_end + 1
+            let rest = out_text.slice(next, out_text.len())
+            if rest.starts_with("fn ") and not rest.starts_with("fn __with_") and not rest.starts_with("fn u128_"):
+                wide_end = next
+                break
+            at = next
     if wide_start < 0 or wide_end <= wide_start:
         return bs_fail(ctx, "builtin_overflow: the 128-bit helper region was not found in the migrated output")
     rc = bs_assert_not_contains(ctx, out_text.slice(wide_start as i64, wide_end as i64), " / ", "builtin_overflow_128_division_free")
