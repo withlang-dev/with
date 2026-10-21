@@ -98,10 +98,21 @@ fn conan_https_to_file(url: &str, path: &str, timeout_ms: i32) -> i32:
         return 1
     let connect_ms = if timeout_ms > 0 and timeout_ms < 20000: timeout_ms else: 20000
     let idle_ms = if timeout_ms > 0 and timeout_ms < 30000: timeout_ms else: 30000
-    for attempt in 1..4:
-        if https_download_timeout(url.to_owned(), path.to_owned(), connect_ms, idle_ms) == 0: return 0
-        if attempt < 3: let _ = runtime_nanosleep(attempt as i64 * 1000000000)
-    runtime_eprint("error: Conan download failed after 3 attempts: " ++ url ++ " -> " ++ path)
+    // #2517: five attempts with a growing pause (2, 4, 6, 8 s: 20 s in all,
+    // build/https_fetch.w's budget) outlast a resolver or connection blip of
+    // a few seconds, which three attempts over three seconds did not — two
+    // UAT batteries went red on it. The last answer is named: a transport
+    // failure (no connection, no response) reads differently from a server
+    // that answered with a status.
+    var last_status: i32 = -1
+    for attempt in 1..6:
+        let response = https_get_response_timeout(url.to_owned(), 5, connect_ms, idle_ms)
+        if response.status == 200:
+            return if runtime_write_file(path, response.body) == 0: 0 else: 1
+        last_status = response.status
+        if attempt < 5: runtime_nanosleep(2 * attempt as i64 * 1000000000)
+    let why = if last_status < 0: "no connection or no response (a resolver or network failure)" else: f"the server answered status {last_status}"
+    runtime_eprint("error: Conan download failed after 5 attempts: " ++ url ++ " -> " ++ path ++ " (" ++ why ++ ")")
     1
 
 // The local path a file:// URL names: percent-escapes decoded, and a Windows
