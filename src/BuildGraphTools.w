@@ -1,9 +1,6 @@
 // BuildGraphTools -- typed host tool resolution for build graph nodes.
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_sysinfo_os() -> str
-extern fn with_sysinfo_arch() -> str
+use rt.rt_core
 
 const BUILD_GRAPH_LLVM_VERSION: str = "22.1.6"
 const BUILD_GRAPH_FALLBACK_LLVM_PREFIX: str = "/usr/local/llvm"

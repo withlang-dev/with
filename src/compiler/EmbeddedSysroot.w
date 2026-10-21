@@ -13,11 +13,8 @@
 
 use compiler.Runtime
 use compiler.TarExtract
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-extern fn with_fs_file_exists(path: &str) -> i32
-extern fn with_str_hash(s: &str) -> u64
 
 extern let with_embedded_darwin_sysroot_start: u8
 extern let with_embedded_darwin_sysroot_end: u8
@@ -37,7 +34,6 @@ extern let with_embedded_windows_sysroot_end: u8
 // run_linux_link_pack_action). Empty in every other host's compiler.
 extern let with_embedded_linux_sysroot_start: u8
 extern let with_embedded_linux_sysroot_end: u8
-extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 
 // with.toml [c_import] sdk_path (§16.1), set by the frontend.
 var g_darwin_configured_sdk: str = ""

@@ -1,8 +1,8 @@
 use Resolve
 use compiler.Runtime
 use Overflow
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
 
 type ProjectConfig {
     root_dir: str,

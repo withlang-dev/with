@@ -3,9 +3,8 @@
 use Span
 use Source
 use DiagnosticRender
+use rt.rt_core
 
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_str_clone_ref(s: &str) -> str
 
 enum DiagSeverity: i32:
     Error = 1

@@ -33,9 +33,8 @@ use CImport
 use CiGir
 use CiFacts
 use std.string.parse
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_getenv_str(name: &str) -> str
 
 // `R` for `*mut R` / `*const R` when R is a record; "" for anything else
 // (a pointer to a pointer, to a scalar, to `c_void`, a function pointer).

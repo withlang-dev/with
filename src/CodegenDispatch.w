@@ -15,9 +15,8 @@ use SemaTypes
 use CodegenVector
 use TypeLayout
 use std.string.StringBuilder
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_eprint(s: &str) -> Unit
 
 // ── gen_function_dispatch: MIR-first, AST fallback for unsupported patterns ──
 
@@ -539,7 +538,6 @@ fn mir_scan_list_fill(count: i32, value: i32) -> List[i32]:
         out.push(value)
     out
 
-extern fn with_alloc(size: i64) -> *mut u8
 
 // Worklist handle for the block-reachability walk: copies share state by
 // design (AstPool pattern, truthfully Copy) so the successor helpers can

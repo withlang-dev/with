@@ -31,8 +31,8 @@ use Ast
 use InternPool
 use render
 use compiler.FacadeRender
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
 
 // `*` matches any run of characters; everything else matches itself.
 fn facade_profile_glob(pattern: &str, name: &str) -> bool:

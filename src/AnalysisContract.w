@@ -26,8 +26,8 @@ use InternPool
 use Sema
 use SemaFacade
 use SemaTypes
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
 
 const CONTRACT_RESOURCE: i32 = 1
 const CONTRACT_FN: i32 = 2

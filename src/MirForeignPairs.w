@@ -30,8 +30,8 @@ use std.collections.HashMap
 use std.builtins.eprint
 use MirCore
 use SemaTypes
+use rt.rt_core
 
-extern fn with_getenv_str(name: &str) -> str
 
 // One report per violating step: the step's block and span source, and
 // what to say.

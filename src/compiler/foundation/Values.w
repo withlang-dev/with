@@ -1,7 +1,7 @@
 // Wave 1 foundations: internable value keys.
 
 use compiler.foundation.Ids
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 
 fn VALUE_KEY_INVALID -> i32: 0
 fn VALUE_KEY_INT -> i32: 1

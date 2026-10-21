@@ -6,8 +6,7 @@ use Span
 use std.collections.HashMap
 use MirCore
 use SemaTypes
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_eprint(s: &str)
+use rt.rt_core
 
 fn suspend_bit_index(local_count: i32, bb: i32, local: i32) -> i32:
     bb * local_count + local
@@ -30,8 +29,6 @@ type SuspendBits {
 }
 impl Copy for SuspendBits
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_alloc(size: i64) -> *mut u8
 
 impl SuspendBits:
     fn vget(idx: i64) -> i32:

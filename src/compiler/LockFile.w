@@ -6,7 +6,7 @@
 use compiler.Runtime
 use compiler.ConanClient
 use std.crypto.sha256
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 
 type LockEntry {
     name: str,

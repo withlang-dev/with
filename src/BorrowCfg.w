@@ -30,6 +30,7 @@
 
 use Ast
 use Span
+use rt.rt_core
 
 // Node kinds for CFG nodes
 enum CfgNodeKind: i32:
@@ -65,7 +66,6 @@ type CfgGraph {
 }
 impl Copy for CfgGraph
 
-extern fn with_alloc(size: i64) -> *mut u8
 
 fn CfgGraph.init -> CfgGraph:
     // Two List headers plus two i32s; allocate generously like the other

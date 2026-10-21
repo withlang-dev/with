@@ -6,8 +6,8 @@
 
 use Token
 use Span
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
 
 // Named character constants for readability.
 enum CharCode: i32:

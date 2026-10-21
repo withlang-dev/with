@@ -58,46 +58,10 @@ use AnalysisTypes
 use compiler.ConanClient
 use compiler.LockFile
 use std.string.StringBuilder
+use rt.rt_core
+use rt.compat_runtime
 
-extern fn with_arg_count() -> i32
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_arg_at(idx: isize) -> str
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-extern fn with_fs_mkdir_p(path: &str) -> i32
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_file_exists(path: &str) -> i32
-extern fn with_fs_is_dir(path: &str) -> i32
-extern fn with_read_bytes_stdin(count: i32) -> str
-extern fn with_str_from_cstr(s: *const u8) -> str
-extern fn with_str_len(s: &str) -> i64
-extern fn with_str_byte_at_ref(s: &str, index: i64) -> i32
-extern fn with_str_contains_ref(s: &str, needle: &str) -> i32
-extern fn with_str_slice_ref(s: &str, start: i64, end: i64) -> str
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_ewrite(s: &str) -> Unit
-extern fn with_exec_argv(args: &str) -> i32
-extern fn with_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
-extern fn with_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32
-extern fn with_fs_remove_file(path: &str) -> i32
-extern fn with_fs_remove_dir(path: &str) -> i32
-extern fn with_fs_remove_tree(path: &str) -> i32
-extern fn with_fs_rename_file(old_path: &str, new_path: &str) -> i32
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_setenv_str(name: &str, value: &str) -> i32
-extern fn with_set_memory_limit_bytes(limit: i64) -> Unit
-// Used for unique temp paths in one-liners, build.w runner binaries,
-// graph-tool captures, and native test captures.
-extern fn with_clock_nanos() -> i64
-extern fn with_getpid() -> i32
-extern fn with_process_alive(pid: i32) -> i32
-extern fn with_fs_mkdir(path: &str) -> i32
-extern fn with_write(s: &str) -> Unit
-extern fn with_read_line_stdin() -> str
 extern fn exit(code: i32) -> Unit
-extern fn with_install_interrupt_handlers() -> Unit
-extern fn with_raise_stack_limit() -> Unit
-extern fn with_sysinfo_os() -> str
-extern fn with_sysinfo_arch() -> str
 
 enum PreludeMode: i32:
     FullMode = 0

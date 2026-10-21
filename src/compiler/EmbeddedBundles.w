@@ -14,7 +14,7 @@
 // bundle exists): it is not present, and nothing consults it.
 use compiler.EmbeddedBundlesData
 use TargetSpec
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 
 fn embedded_bundle_count() -> i32:
     embedded_bundles_count_data()

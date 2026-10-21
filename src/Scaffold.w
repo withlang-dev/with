@@ -2,7 +2,7 @@
 //
 // Validates that all required logical modules exist in the project.
 
-extern fn with_fs_read_file(path: &str) -> str
+use rt.rt_core
 
 type ModuleSpec {
     logical_name: str,

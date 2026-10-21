@@ -17,12 +17,8 @@ use Lexer
 use Token
 use Parser
 use std.string.StringBuilder
+use rt.rt_core
 
-extern fn with_write_stdout(s: &str) -> Unit
-extern fn with_flush_stdout() -> Unit
-extern fn with_fs_list_files(path: &str) -> str
-extern fn with_fs_file_exists(path: &str) -> i32
-extern fn with_str_clone_ref(s: &str) -> str
 
 // Width-slice mode: when > 0, skip declarations belonging to
 // non-target PCRE2 width families during migration.

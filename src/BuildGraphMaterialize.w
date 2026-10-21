@@ -5,10 +5,8 @@ use BuildGraphModel
 use BuildGraphRuntime
 use ComptimeValue
 use Sema
+use rt.rt_core
 
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_eprint(s: &str) -> Unit
-extern fn with_str_clone_ref(s: &str) -> str
 
 type BuildGraphMaterializer {
     sema: Sema,

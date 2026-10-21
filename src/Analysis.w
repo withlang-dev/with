@@ -14,9 +14,8 @@ use Sema
 use MirCore
 use SemaTypes
 use std.collections.HashMap
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_getenv_str(name: &str) -> str
 
 type CompilerAnalysisResult {
     text: str,

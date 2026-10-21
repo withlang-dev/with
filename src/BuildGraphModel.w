@@ -1,6 +1,4 @@
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_eprint(s: &str) -> Unit
+use rt.rt_core
 // BuildGraphModel -- parsed build.w graph data and serialization.
 
 type BuildGraphTarget {

@@ -9,10 +9,8 @@ use std.zlib
 use std.zip
 use compiler.Xz
 use compiler.Bzip2
+use rt.rt_core
 
-extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
-extern fn with_fs_chmod(path: &str, mode: i32) -> i32
-extern fn with_fs_symlink(target: &str, link_path: &str) -> i32
 
 fn te_octal(data: &str, at: i64, width: i64) -> i64:
     var value: i64 = 0

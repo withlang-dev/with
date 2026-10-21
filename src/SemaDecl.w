@@ -12,9 +12,8 @@ use std.collections.HashMap
 use compiler.BundleInterfaces
 use SemaTypes
 use SemaVector
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_eprint(s: &str) -> Unit
 
 // ── Discriminant values (§4.4a) ──────────────────────────────────
 // A discriminant is held as the 64 bits of its repr value; an unsigned

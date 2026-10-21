@@ -17,11 +17,8 @@ use compiler.ModuleSource
 use compiler.Runtime
 use std.collections.HashMap
 use std.string.StringBuilder
+use rt.rt_core
 
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_write(s: &str) -> Unit
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_str_clone_ref(s: &str) -> str
 
 fn resolve_owned_text(text: &str) -> str:
     if text.len() == 0:
@@ -1336,7 +1333,6 @@ impl ResolveState:
 
         resolve_own_tree_candidate(rel_path)
 
-extern fn with_fs_is_dir(path: &str) -> i32
 
 // Strategy 7: a stage compiler's own tree — its out/gen, then its lib — as
 // strategies 4b and 6 read them from the tree root, so the compiler resolves

@@ -1,4 +1,4 @@
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 use Ast
 use Sema
 use Codegen

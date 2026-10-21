@@ -24,12 +24,8 @@ use compiler.CodegenUnitsPolicy
 use Mir
 use std.string.parse
 use MirCore
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8
-@[effect(fn_ptr: escape_value, ctx: escape_value)]
-extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
-extern fn with_thread_join(handle: i64) -> i32
 
 // Explicit override; 0 means "unset — use the host-aware default".
 fn codegen_units_env_count() -> i32:
@@ -44,7 +40,6 @@ type CodegenUnitsSysInfo {
     memory_total: i64,
     page_size: i64,
 }
-extern fn with_sysinfo(out: *mut u8) -> i32
 
 // Partition compiler-sized inputs independently of the available workers.
 fn codegen_units_default_count(mir_body_count: i32) -> i32: codegen_units_count_for(mir_body_count)

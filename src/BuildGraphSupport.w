@@ -4,8 +4,8 @@ use Resolve
 use BuildGraphModel
 use BuildGraphRuntime
 use compiler.Runtime
+use rt.rt_core
 
-extern fn with_str_clone_ref(s: &str) -> str
 
 fn build_graph_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: i32) -> str:
     if output_path.len() > 0:

@@ -1,6 +1,6 @@
 use compiler.EmbeddedStdlibData
 use compiler.BundleInterfaces
-extern fn with_str_clone_ref(s: &str) -> str
+use rt.rt_core
 
 fn EMBEDDED_STD_PREFIX -> str: "<embedded-std>/"
 

@@ -8,6 +8,7 @@ use InternPool
 use SemaTypes
 use std.collections.HashMap
 use std.string.StringBuilder
+use rt.rt_core
 
 // D111: MirBody.operand_holds values.
 pub const MIR_HOLD_RETAIN: i32 = 1
@@ -22,13 +23,7 @@ type BlockId = distinct i32
 impl Copy for BlockId
 impl Copy for TermKind
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_i64_to_str(n: i64) -> str
-extern fn with_getenv_str(name: &str) -> str
-extern fn with_eprint(s: &str) -> Unit
 extern fn str_from_byte(b: i32) -> str
-extern fn with_write(s: &str) -> Unit
-extern fn with_alloc(size: i64) -> *mut u8
 
 fn lbrace -> str:
     str_from_byte(123)

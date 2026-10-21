@@ -18,17 +18,10 @@ use MathBuiltins
 use MirCore
 use MirLower
 use SemaTypes
+use rt.rt_core
+use rt.compat_runtime
 
-extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
-extern fn with_interrupt_requested() -> i32
-extern fn with_fmt_buf_new() -> *mut u8
-extern fn with_fmt_buf_write_str_ref(buf: *mut u8, s: &str)
-extern fn with_fmt_buf_finish(buf: *mut u8) -> str
-extern fn with_str_hash(s: &str) -> u64
 
 type COut {
     buf: *mut u8,
