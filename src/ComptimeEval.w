@@ -318,6 +318,10 @@ type ComptimeEvaluator {
     // typed_expr_types is empty and `List.new()` under `var v: List[i32] =`
     // saw only the generic base; the annotation is the demand that binds it.
     expected_types: List[i32],
+    // #2220: the functions whose bodies are being evaluated, innermost last:
+    // a `collection.new()` the fold reaches before Sema typed its body has
+    // Sema type that body on demand, so the uses (D93) give the element type.
+    body_fn_nodes: List[i32],
     // Top-level comptime folding precedes Sema, so D21 carrier roots cannot
     // rely only on Sema.pipeline_carrier_kinds. Record the root established by
     // each evaluated carrier stage for the next stage in the same chain.
@@ -417,6 +421,7 @@ fn ComptimeEvaluator.init(sema: Sema, ast: &AstPool, pool: &InternPool, require_
         tool_identity_values: List.new(),
         strict_effects: 0,
         pipeline_receiver_carrier_depth: 0,
+        body_fn_nodes: List.new(),
         expected_types: List.new(),
         pipeline_receiver_carrier_roots: HashMap.new(),
         last_call_has_mut_receiver: 0,
@@ -7887,6 +7892,14 @@ impl ComptimeEvaluator:
                         if base.len() > 0 and demanded != 0 and self.sema.get_type_kind(self.sema.resolve_alias(demanded)) == TypeKind.TY_GENERIC_INST and comptime_type_name_has_base(self.sema.type_name(self.sema.resolve_alias(demanded)), base) != 0:
                             result_type = demanded
                             type_source = "demand"
+                        else if base.len() > 0 and self.body_fn_nodes.len() > 0 and not self.sema.typed_expr_types.contains(node):
+                            // #2220: no annotation and no demand — the uses
+                            // decide (D93), which needs the body typed: Sema
+                            // types it now, once, and the node has its type.
+                            self.sema.check_fn_body_on_demand(self.body_fn_nodes[self.body_fn_nodes.len() - 1])
+                            if self.sema.typed_expr_types.contains(node):
+                                result_type = self.node_type_or(node, recv_type)
+                                type_source = "sema-on-demand"
                     if with_getenv_str("WITH_TRACE_COMPTIME").len() > 0:
                         with_eprint(f"[ct] static_new node={node} recv='{self.sema.type_name(recv_type)}' result='{self.sema.type_name(result_type)}' from={type_source}")
                     if result_type != 0:
@@ -8394,7 +8407,9 @@ impl ComptimeEvaluator:
                                 self.restore_generic_substitutions(generic_snapshot)
                             return self.fail(ppat, "comptime argument did not match parameter pattern")
 
+        self.body_fn_nodes.push(fn_node)
         let body_signal = self.eval_expr(self.ast.get_data1(fn_node))
+        self.body_fn_nodes.pop()
         var has_mut_receiver: i32 = 0
         var final_mut_receiver = comptime_value_invalid()
         if param_count > 0 and fn_param_is_mut_self(self.ast.fn_param_flags(param_start, 0)) != 0:

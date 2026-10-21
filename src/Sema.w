@@ -2188,6 +2188,10 @@ type Sema {
     // Calls checked against such a placeholder: (node, sig, callee symbol, file)
     // in fours. Whether the placeholder was wrong is known once every body is typed.
     untyped_callee_calls: List[i32],
+    // #2220: bodies the comptime evaluator had Sema type on demand (a const
+    // initializer's call reaches them before check_bodies), by declaration
+    // index; check_bodies does not check them a second time.
+    bodies_checked_on_demand: HashMap[i32, i32],
     // The statement a block is checking: its value is discarded, so a callee
     // that is not typed yet costs a call in that position nothing.
     discarded_stmt_node: i32,
@@ -3885,6 +3889,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         body_typed_sigs: sema_new_map_i32_i32(),
         body_decl_by_fn: sema_new_map_i32_i32(),
         untyped_callee_calls: List.new(),
+        bodies_checked_on_demand: HashMap.new(),
         discarded_stmt_node: 0,
         body_order_state: List.new(),
         body_order_lower: List.new(),
