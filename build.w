@@ -1145,7 +1145,6 @@ fn run_gate_shape_action(ctx: ActionCtx) -> i32:
 type HostRuntimeSpec:
     platform_source: str
     compat_source: str
-    bootstrap_platform_object: str
     fiber_core_source: str
     fiber_asm_source: str
 
@@ -1200,7 +1199,6 @@ fn host_runtime_spec() -> HostRuntimeSpec:
         return HostRuntimeSpec {
             platform_source: "rt/linux_aarch64.w",
             compat_source: "rt/compat_runtime.w",
-            bootstrap_platform_object: "out/bootstrap-lib/rt_linux_aarch64.o",
             fiber_core_source: "rt/fiber_core_darwin.w",
             fiber_asm_source: "runtime/fiber_asm_linux_aarch64.s",
         }
@@ -1208,14 +1206,12 @@ fn host_runtime_spec() -> HostRuntimeSpec:
         return HostRuntimeSpec {
             platform_source: "rt/linux_x86_64.w",
             compat_source: "rt/compat_runtime.w",
-            bootstrap_platform_object: "out/bootstrap-lib/rt_linux_x86_64.o",
             fiber_core_source: "rt/fiber_core_darwin.w",
             fiber_asm_source: "runtime/fiber_asm_linux_x86_64.s",
         }
     if os() == "Windows" and arch() == "x86_64":
         return HostRuntimeSpec {
             platform_source: "rt/windows_x86_64.w",
-            bootstrap_platform_object: "out/bootstrap-lib/rt_windows_x86_64.o",
             compat_source: "rt/compat_runtime.w",
             fiber_core_source: "rt/fiber_core_windows.w",
             fiber_asm_source: "runtime/fiber_asm_windows_x86_64.s",
@@ -1223,7 +1219,6 @@ fn host_runtime_spec() -> HostRuntimeSpec:
     if os() == "Windows" and arch() == "aarch64":
         return HostRuntimeSpec {
             platform_source: "rt/windows_aarch64.w",
-            bootstrap_platform_object: "out/bootstrap-lib/rt_windows_aarch64.o",
             compat_source: "rt/compat_runtime.w",
             fiber_core_source: "rt/fiber_core_windows.w",
             fiber_asm_source: "runtime/fiber_asm_windows_aarch64.s",
@@ -1231,7 +1226,6 @@ fn host_runtime_spec() -> HostRuntimeSpec:
     HostRuntimeSpec {
         platform_source: "rt/darwin_aarch64.w",
         compat_source: "rt/compat_runtime.w",
-        bootstrap_platform_object: "out/bootstrap-lib/rt_darwin_aarch64.o",
         fiber_core_source: "rt/fiber_core_darwin.w",
         fiber_asm_source: "runtime/fiber_asm_aarch64.s",
     }
@@ -3484,15 +3478,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("bootstrap-clang-bridge-object")
     out = out.add_target(bootstrap_llvm_link_metadata)
 
-    out = out.add_target(with_object_target("bootstrap-rt-core-object", "seed", "rt/rt_core.w", "out/bootstrap-lib/rt_core.o", "-O1", ""))
-    out = out.add_target(with_object_target("bootstrap-rt-platform-object", "seed", host_runtime.platform_source, host_runtime.bootstrap_platform_object, "-O1", ""))
+    // D30 step 4: the seed links stage1 against its own embedded runtime
+    // bundle; out/bootstrap-lib holds only what stage1 embeds beside it
+    // (cimport_stubs.o, fiber_asm.o) and the bridge objects the seed links.
     out = out.add_target(with_object_target("bootstrap-cimport-stubs-object", "seed", "rt/cimport_stubs.w", "out/bootstrap-lib/cimport_stubs.o", "-O1", ""))
-    out = out.add_target(with_object_target("bootstrap-compat-runtime-object", "seed", "out/gen/compat_runtime.w", "out/bootstrap-lib/compat_runtime.o", "-O1", "compat-runtime-source"))
-    out = out.add_target(with_object_target("bootstrap-panic-runtime-object", "seed", "rt/panic_runtime.w", "out/bootstrap-lib/panic_runtime.o", "-O1", ""))
-    out = out.add_target(with_object_target("bootstrap-fiber-stubs-object", "seed", "rt/fiber_stubs.w", "out/bootstrap-lib/fiber_stubs.o", "-O1", ""))
-    out = out.add_target(with_object_target("bootstrap-channel-runtime-object", "seed", "rt/channel_runtime.w", "out/bootstrap-lib/channel_runtime.o", "-O1", ""))
-    out = out.add_target(with_object_target("bootstrap-fiber-runtime-object", "seed", "rt/fiber_runtime.w", "out/bootstrap-lib/fiber_runtime.o", "-O1", ""))
-    out = out.add_target(with_object_target("bootstrap-fiber-core-object", "seed", host_runtime.fiber_core_source, "out/bootstrap-lib/fiber.o", "-O1", ""))
     var bootstrap_fiber_asm = target_new(.CompileAsmObject, "bootstrap-fiber-asm-object", build_owned_text(host_runtime.fiber_asm_source)).output("out/bootstrap-lib/fiber_asm.o")
     out = out.add_target(bootstrap_fiber_asm)
 
@@ -3526,15 +3515,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var bootstrap_runtime = target_new(.Group, "bootstrap-runtime", "")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-llvm-link-metadata")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-core-object")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-platform-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-cimport-stubs-object")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-compat-runtime-object")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-panic-runtime-object")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-fiber-stubs-object")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-channel-runtime-object")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-fiber-runtime-object")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-fiber-core-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-fiber-asm-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-embedded-objects-object")
     // #1815: the seed's generation compiled out/bootstrap-lib, so it links
