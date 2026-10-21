@@ -4861,7 +4861,10 @@ impl Sema:
             // §4.9 / D111: the tail may be a Copy view of the Ok payload.
             let tail_copies = self.can_contextually_copy_ref(self.tail_ok_payload(body_expected_ret as i32, body_ty as i32), body_ty as i32) != 0
             let tail_demand = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
-            if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0 and body_materializes_copy == 0 and not tail_copies and not self.note_int_local_arg_demand(tail_demand, body_expected_ret as i32, body_ty as i32):
+            // §4.9a (D103): the return type is a demand on the tail; a `T`
+            // tail under an `Option[T]` return is `Some(tail)`.
+            let tail_to_option = self.value_to_option_at_demand(tail_demand, body_expected_ret, body_ty) != body_ty
+            if not tail_to_option and self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0 and body_materializes_copy == 0 and not tail_copies and not self.note_int_local_arg_demand(tail_demand, body_expected_ret as i32, body_ty as i32):
                 self.emit_error("return type mismatch", body)
         if not has_ret_annotation:
             // §14.4: calling an `async fn` returns a `Task[T]` handle; the body
@@ -4911,9 +4914,12 @@ impl Sema:
                                 // payload by a copy, as it meets a plain `-> str`.
                                 let tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
                                 ok_wrapped = self.record_contextual_copy_adjustment(tail, ok_type, body_ty as i32) != 0
+                    let tail_leaf = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
+                    // §4.9a (D103): a `T` tail under an `Option[T]` return.
+                    let tail_to_option = not ok_wrapped and self.value_to_option_at_demand(tail_leaf, body_expected_ret, body_ty) != body_ty
                     if ok_wrapped:
                         self.implicit_ok_tail_sigs.insert(sig_idx, 1)
-                    else if not self.note_int_local_arg_demand(if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body, body_expected_ret as i32, body_ty as i32):
+                    else if not tail_to_option and not self.note_int_local_arg_demand(tail_leaf, body_expected_ret as i32, body_ty as i32):
                         self.emit_return_mismatch("return type mismatch", body, body_expected_ret as i32)
 
         // @[tailrec] enforcement: verify all recursive calls are in tail position
@@ -20297,10 +20303,13 @@ impl Sema:
         let checks = if fill_count_node != 0 and array_len >= 2: 2 else: elem_count
         for i in 0..checks:
             let elem = self.ast.get_extra(extra_start + (if fill_count_node != 0: 0 else: i))
-            let et = if expected_elem != 0:
+            let et0 = if expected_elem != 0:
                 self.check_expr_with_expected(elem, expected_elem as TypeId)
             else:
                 self.check_expr(elem)
+            // §4.9a (D103): a known element type is a demand; a `T` element
+            // where `Option[T]` elements are demanded is `Some(element)`.
+            let et = if expected_elem != 0 and et0 != 0: self.value_to_option_at_demand(elem, expected_elem as TypeId, et0) else: et0
             // An element is an owned demand of the element type (#1803).
             if expected_elem != 0 and et != 0:
                 let _ = self.reject_implicit_numeric_narrowing(elem, expected_elem, et as i32)

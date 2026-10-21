@@ -12,6 +12,8 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D141 — An inferred return type joins `None` with `T` into `Option[T]`; `None` beside an `Option[T]` is written (amends D43, carves a case out of D103)](2026-10-21-D141-an-inferred-return-joins-none-with-t-into-option-t.md)
+- [D140 — Impl methods take their signature from the trait: parameter and return types may be omitted and are the trait's, instantiated for the impl; written ones must match](2026-10-21-D140-impl-methods-take-their-signature-from-the-trait.md)
 - [D139 — A view of a view of a Copy value satisfies an owned-value demand at every layer (D22 §7.4 applied as written)](2026-10-20-D139-a-view-of-a-view-materializes-at-every-layer.md)
 - [D138 — A `.wo` bundle is durable: rebuilt when its sources or the contracts it imports change, never because the compiler did](2026-10-20-D138-a-wo-bundle-is-durable.md)
 - [D137 — The windows-aarch64 lane is non-gating: dispatch it, never wait for it, and file each failure as a new issue](2026-10-19-D137-windows-aarch64-is-non-gating.md)
