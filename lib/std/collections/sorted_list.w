@@ -54,7 +54,7 @@ impl[T: Ord] SortedList[T]:
         var slot = unsafe { self.slot_at(index) }
         assert(unsafe { sortedarray_remove(self.array, index as c_uint) } != 0)
         let value: T = unsafe { move slot.value }
-        unsafe { with_free(slot as *mut u8) }
+        with_free(slot as *mut u8)
         value
 
     /// The index of a value equal to `value`, if any (binary search).
@@ -64,9 +64,9 @@ impl[T: Ord] SortedList[T]:
         // and a byte image of `value` that is never read back as owned.
         let probe = unsafe { with_alloc(sizeof[Slot[T]]() as i64) } as *mut Slot[T]
         unsafe { (*probe).compare = self.comparator() }
-        unsafe { with_memcpy(&raw mut (*probe).value as *mut u8, &raw const *value as *const u8, sizeof[T]() as i64) }
+        with_memcpy(&raw mut (*probe).value as *mut u8, &raw const *value as *const u8, sizeof[T]() as i64)
         let found = unsafe { sortedarray_index_of(self.array, probe as *mut c_void) }
-        unsafe { with_free(probe as *mut u8) }
+        with_free(probe as *mut u8)
         if found < 0: None else: Some(found as i32)
 
     pub fn contains(value: &T) -> bool: self.index_of(value).is_some()
@@ -77,7 +77,7 @@ impl[T: Ord] SortedList[T]:
             var slot = unsafe { self.slot_at(index) }
             let value: T = unsafe { move slot.value }
             drop(value)
-            unsafe { with_free(slot as *mut u8) }
+            with_free(slot as *mut u8)
         unsafe { sortedarray_clear(self.array) }
 
     /// An ephemeral cursor over the values in order, yielding views.
@@ -91,7 +91,7 @@ impl[T] Drop for SortedList[T]:
             var slot = unsafe { sortedarray_get(self.array, index as c_uint) } as *mut Slot[T]
             let value: T = unsafe { move slot.value }
             drop(value)
-            unsafe { with_free(slot as *mut u8) }
+            with_free(slot as *mut u8)
         unsafe { sortedarray_free(self.array) }
 
 /// Cursor over a SortedList; obtain via `sorted.iter()`. `next()` yields

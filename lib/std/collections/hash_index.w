@@ -71,7 +71,7 @@ impl[K, V] HashIndex[K, V]:
                 drop(stored_key)
                 let value: V = unsafe { move slot.value }
                 drop(value)
-                unsafe { with_free(slot as *mut u8) }
+                with_free(slot as *mut u8)
                 node = next
             b = b + 1
 
@@ -89,8 +89,8 @@ impl[K, V] Drop for HashIndex[K, V]:
     move fn drop():
         self.release_all()
         unsafe { tommy_hashdyn_done(self.map) }
-        unsafe { with_free(self.map as *mut u8) }
-        unsafe { with_free(self.probe as *mut u8) }
+        with_free(self.map as *mut u8)
+        with_free(self.probe as *mut u8)
 
 impl[K: Key, V] HashIndex[K, V]:
     fn comparator() -> fn(*const u8, *const u8) -> i32:
@@ -105,7 +105,7 @@ impl[K: Key, V] HashIndex[K, V]:
     unsafe fn find(key: &K) -> *mut HashSlot[K, V]:
         let slot = self.probe
         unsafe { (*slot).head.compare = self.comparator() }
-        unsafe { with_memcpy(&raw mut (*slot).key as *mut u8, &raw const *key as *const u8, sizeof[K]() as i64) }
+        with_memcpy(&raw mut (*slot).key as *mut u8, &raw const *key as *const u8, sizeof[K]() as i64)
         unsafe { tommy_hashdyn_search(self.map, hash_slot_compare, slot as *const c_void, self.key_hash(key)) } as *mut HashSlot[K, V]
 
     /// Observes the value stored under `key`.
@@ -134,7 +134,7 @@ impl[K: Key, V] HashIndex[K, V]:
         let stored_key: K = unsafe { move slot.key }
         drop(stored_key)
         let value: V = unsafe { move slot.value }
-        unsafe { with_free(slot as *mut u8) }
+        with_free(slot as *mut u8)
         Some(value)
 
 /// One entry seen through a cursor: views of its key and value.

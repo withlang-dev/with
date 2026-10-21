@@ -10631,8 +10631,13 @@ fn ci_migrate_preamble_extern_call_requires_unsafe(name: &str) -> bool:
     // D30 R4c: a runtime function the shared defs reach through the runtime
     // interface (`use rt.rt_core`: with_alloc, with_memcpy, with_clz, …) is
     // safe by its declaration, and an `unsafe` block that only calls one is
-    // vacuous. The variadic pair stays wrapped: it writes through its list.
+    // vacuous. A `c_import` translation still declares them as externs of
+    // its own unit (raw c_import functions), so there the wrapper stays, as
+    // for the modeled libc names. The variadic pair stays wrapped everywhere:
+    // it writes through its list.
     if name == "with_va_start" or name == "with_va_end": return true
+    if ci_migrate_preamble_declares_runtime_extern(name):
+        return not (ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_std_zone())
     // std.libc models this one as `unsafe fn` (it writes through its pointer).
     if name == "mach_timebase_info": return true
     false

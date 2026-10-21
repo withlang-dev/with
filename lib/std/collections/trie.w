@@ -42,7 +42,7 @@ impl[V] Trie[V]:
         assert(unsafe { trie_insert_binary(self.trie, trie_key_bytes(key), key.len() as c_int, slot as *mut c_void) } != 0)
         if previous as i64 == 0: return None
         let old: V = unsafe { move previous.value }
-        unsafe { with_free(previous as *mut u8) }
+        with_free(previous as *mut u8)
         Some(old)
 
     /// Observes the value under `key`.
@@ -59,7 +59,7 @@ impl[V] Trie[V]:
         if slot as i64 == 0: return None
         assert(unsafe { trie_remove_binary(self.trie, trie_key_bytes(key), key.len() as c_int) } != 0)
         let value: V = unsafe { move slot.value }
-        unsafe { with_free(slot as *mut u8) }
+        with_free(slot as *mut u8)
         Some(value)
 
     /// The node at the end of `prefix`, or null when no key starts with it.
@@ -90,7 +90,7 @@ impl[V] Trie[V]:
         if slot as i64 != 0:
             let value: V = unsafe { move slot.value }
             drop(value)
-            unsafe { with_free(slot as *mut u8) }
+            with_free(slot as *mut u8)
         for child in 0..256:
             unsafe { self.drop_subtree((*node).next[child]) }
 
