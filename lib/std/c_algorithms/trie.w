@@ -4,7 +4,7 @@ use std.c_algorithms.defs
 pub fn trie_new() -> *mut _Trie {
     var __local_new_trie: *mut _Trie
 
-    (__local_new_trie = (((unsafe { with_alloc(((sizeof[_Trie]() as c_ulong) as i64)) } as *mut c_void) as *mut _Trie)))
+    (__local_new_trie = (((with_alloc(((sizeof[_Trie]() as c_ulong) as i64)) as *mut c_void) as *mut _Trie)))
 
     if ((if __local_new_trie == null: 1 else: 0) != 0) {
         return ((null as *mut _Trie))

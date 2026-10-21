@@ -11,17 +11,17 @@ pub fn bloom_filter_new(__param_table_size: c_uint, __param_hash_func: Option[un
 
     }
 
-    (__local_filter = (((unsafe { with_alloc(((sizeof[_BloomFilter]() as c_ulong) as i64)) } as *mut c_void) as *mut _BloomFilter)))
+    (__local_filter = (((with_alloc(((sizeof[_BloomFilter]() as c_ulong) as i64)) as *mut c_void) as *mut _BloomFilter)))
 
     if ((if __local_filter == null: 1 else: 0) != 0) {
         return ((null as *mut _BloomFilter))
 
     }
 
-    ((unsafe *__local_filter).table = (((unsafe { with_alloc_zeroed(((((((__param_table_size as c_uint) +% (7 as c_uint)) as c_uint) / (8 as c_uint)) as c_ulong) as i64), ((1 as c_ulong) as i64)) } as *mut c_void) as *mut u8)))
+    ((unsafe *__local_filter).table = (((with_alloc_zeroed(((((((__param_table_size as c_uint) +% (7 as c_uint)) as c_uint) / (8 as c_uint)) as c_ulong) as i64), ((1 as c_ulong) as i64)) as *mut c_void) as *mut u8)))
 
     if ((if (unsafe *__local_filter).table == null: 1 else: 0) != 0) {
-        unsafe { with_free(((__local_filter as *mut c_void) as *mut u8)) }
+        with_free(((__local_filter as *mut c_void) as *mut u8))
 
         return ((null as *mut _BloomFilter))
 

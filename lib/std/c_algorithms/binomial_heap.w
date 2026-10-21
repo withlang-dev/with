@@ -6,7 +6,7 @@ use std.collections
 pub fn binomial_heap_new(__param_heap_type: i32, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _BinomialHeap {
     var __local_new_heap: *mut _BinomialHeap
 
-    (__local_new_heap = (((unsafe { with_alloc_zeroed(((1 as c_ulong) as i64), ((sizeof[_BinomialHeap]() as c_ulong) as i64)) } as *mut c_void) as *mut _BinomialHeap)))
+    (__local_new_heap = (((with_alloc_zeroed(((1 as c_ulong) as i64), ((sizeof[_BinomialHeap]() as c_ulong) as i64)) as *mut c_void) as *mut _BinomialHeap)))
 
     if ((if __local_new_heap == null: 1 else: 0) != 0) {
         return ((null as *mut _BinomialHeap))

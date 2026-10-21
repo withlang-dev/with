@@ -42,17 +42,17 @@ pub fn sortedarray_new(__param_length: c_uint, __param_cmp_func: Option[unsafe e
 
     }
 
-    (__local_array = (((unsafe { with_alloc(((((sizeof[usize]() as c_ulong) *% (__local_length as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut *mut c_void)))
+    (__local_array = (((with_alloc(((((sizeof[usize]() as c_ulong) *% (__local_length as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut *mut c_void)))
 
     if ((if __local_array == null: 1 else: 0) != 0) {
         return ((null as *mut _SortedArray))
 
     }
 
-    (__local_sortedarray = (((unsafe { with_alloc(((sizeof[_SortedArray]() as c_ulong) as i64)) } as *mut c_void) as *mut _SortedArray)))
+    (__local_sortedarray = (((with_alloc(((sizeof[_SortedArray]() as c_ulong) as i64)) as *mut c_void) as *mut _SortedArray)))
 
     if ((if __local_sortedarray == null: 1 else: 0) != 0) {
-        unsafe { with_free(((__local_array as *mut c_void) as *mut u8)) }
+        with_free(((__local_array as *mut c_void) as *mut u8))
 
         return ((null as *mut _SortedArray))
 

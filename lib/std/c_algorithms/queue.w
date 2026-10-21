@@ -4,7 +4,7 @@ use std.c_algorithms.defs
 pub fn queue_new() -> *mut _Queue {
     var __local_queue: *mut _Queue
 
-    (__local_queue = (((unsafe { with_alloc(((sizeof[_Queue]() as c_ulong) as i64)) } as *mut c_void) as *mut _Queue)))
+    (__local_queue = (((with_alloc(((sizeof[_Queue]() as c_ulong) as i64)) as *mut c_void) as *mut _Queue)))
 
     if ((if __local_queue == null: 1 else: 0) != 0) {
         return ((null as *mut _Queue))

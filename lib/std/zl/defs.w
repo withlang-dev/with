@@ -375,8 +375,8 @@ pub let MIN_MATCH: c_int = 3
 pub let MAX_MATCH: c_int = 258
 pub let PRESET_DICT: c_int = 0x20
 pub let OS_CODE: c_int = 19
-pub fn zmemzero[T](dest: T, len: T) -> T {
-    unsafe { with_memset(dest as *mut u8, 0, len as i64) }
+pub fn zmemzero[T](dest: T, len: T) -> i64 {
+    with_memset(dest as *mut u8, 0, len as i64)
 }
 pub fn Assert(cond: i32, msg: i32) {
     return
@@ -722,7 +722,7 @@ pub let unz_copyright: List[c_char] = [32, 117, 110, 122, 105, 112, 32, 49, 46, 
 pub let UNZ_BUFSIZE: c_int = 16384
 pub let UNZ_MAXFILENAMEINZIP: c_int = 256
 pub fn ALLOC[T](size: T) -> *mut c_void {
-    (unsafe { with_alloc((size) as i64) } as *mut c_void)
+    (with_alloc((size) as i64) as *mut c_void)
 }
 pub let SIZECENTRALDIRITEM: c_int = 0x2e
 pub let SIZEZIPLOCALHEADER: c_int = 0x1e
