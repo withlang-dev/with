@@ -2591,6 +2591,8 @@ impl Sema:
     mut fn check_decl_body_in_order(di: i32):
         if self.body_order_state[di] != 0: return
         self.body_order_state[di] = 1
+        // #2220: already typed on the evaluator's demand.
+        if self.bodies_checked_on_demand.contains(di): return
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NodeKind.NK_FN_DECL and not self.decl_is_lazy_skipped(di):
             var n: i32 = self.body_order_lower[di] + 1
@@ -5093,6 +5095,25 @@ impl Sema:
         self.current_specialization_sym = 0
         self.check_fn_body_with_sig(node, sig_idx)
         self.current_specialization_sym = saved_specialization_sym
+
+    // #2220: the comptime evaluator reaches a body before check_bodies
+    // does (a const initializer's call): type it now, in its module's
+    // context, so `var v = List.new()` takes its element type from its uses
+    // (D93) exactly as at runtime. Once per declaration; check_bodies skips
+    // it afterwards.
+    mut fn check_fn_body_on_demand(fn_node: i32):
+        let di = self.find_decl_index(fn_node)
+        if di < 0 or self.bodies_checked_on_demand.contains(di): return
+        if self.ast.fn_decl_body_is_interface(fn_node): return
+        self.bodies_checked_on_demand.insert(di, 1)
+        if with_getenv_str("WITH_TRACE_COMPTIME").len() > 0: with_eprint("[ct] body typed on demand: " ++ self.pool_resolve(self.ast.get_data0(fn_node)) ++ "\n")
+        let saved_module_path = move self.current_module_path
+        let saved_module_has_ci: i32 = self.current_module_has_ci
+        self.update_module_context(di)
+        self.resolve_declared_global_writes(fn_node, false)
+        self.check_fn_body_at(fn_node, di)
+        self.current_module_path = saved_module_path
+        self.current_module_has_ci = saved_module_has_ci
 
     mut fn check_fn_body_at(node: i32, decl_index: i32):
         let fn_name = self.fn_decl_semantic_symbol_at(node, self.ast.get_data0(node), decl_index)
