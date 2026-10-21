@@ -440,17 +440,7 @@ pub type HashMapEntry[K, V] ephemeral { map_ptr: i64, key: K }
 /// the value; an owning element is observed, never copied (§2.3).
 pub type ListIter[T] ephemeral { list: &List[T], idx: isize }
 
-impl[T] ListIter[T]:
-    pub mut fn next() -> Option[&T]:
-        if self.idx >= self.list.len(): return None
-        let i = self.idx
-        self.idx = self.idx + 1
-        Some(&self.list[i])
-
 impl[T] List[T]:
-    /// The observing iterator over the elements.
-    @[iter_of_self]
-    pub fn iter() -> ListIter[T]: ListIter { list: self, idx: 0 }
     /// The same iterator under the name the #2145 rewrite used; every
     /// `iter()` now yields views.
     pub fn iter_ref() -> ListIter[T]: self.iter()
@@ -464,10 +454,12 @@ impl[T] List[T]:
 pub trait Iterable[T]:
     fn iter(self: &Self) -> ListIter[T]
 
-// Iterable for List — explicit borrow-iteration trait dispatch over
-// List-backed collections.
+// Iterable for List: the observing iterator over the elements, a view of
+// the list at position 0 (the trait impl is the one definition; an
+// inherent twin of the same name would register twice, D65).
 impl[T] Iterable[T] for List[T]:
-    fn iter() -> ListIter[T]: self.iter()
+    @[iter_of_self]
+    fn iter() -> ListIter[T]: ListIter { list: self, idx: 0 }
 
 /// Each element with its index (§13.5): `for (i, x) in xs.enumerate():`.
 impl[T] List[T]:
@@ -715,7 +707,11 @@ pub type FlatMapIter[I, C, J, T, U] ephemeral {
 }
 
 impl[T] Iter[&T] for ListIter[T]:
-    mut fn next() -> Option[&T]: self.next()
+    mut fn next() -> Option[&T]:
+        if self.idx >= self.list.len(): return None
+        let i = self.idx
+        self.idx = self.idx + 1
+        Some(&self.list[i])
 
 // #2152 (§13.1, §13.5): every adapter is an iterator, so a `for` steps
 // through it. Each `next` is the adapter's own.
