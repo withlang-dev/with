@@ -7964,7 +7964,7 @@ impl Sema:
         self.builtin_sig_modes.push("tttt")
         self.builtin_sig_required.push(-1)
         let iter = self.pool_intern("Iter")
-        for name in "ListIter ListIterRef MappedIter FilterIter FilterMapIter TakeIter DropIter TakeWhileIter DropWhileIter ZipIter EnumerateIter ChainIter ZipWithIter StepByIter FlatMapIter".split(" "):
+        for name in "MappedIter FilterIter FilterMapIter TakeIter DropIter TakeWhileIter DropWhileIter ZipIter EnumerateIter ChainIter ZipWithIter StepByIter FlatMapIter".split(" "):
             self.builtin_sig_owner_alias.insert(self.pool_intern(name), iter)
         self.builtin_sig_owner_alias.insert(self.pool_intern("ScopedTask"), self.pool_intern("Task"))
         self.builtin_sig_owner_alias.insert(-(TypeKind.TY_STR as i32), self.pool_intern("str"))
@@ -8127,8 +8127,6 @@ impl Sema:
             if method_name == "remove": return MirIntrinsic.LIST_REMOVE
             if method_name == "clear": return MirIntrinsic.LIST_CLEAR
             if method_name == "pop": return MirIntrinsic.LIST_POP
-            if method_name == "iter": return MirIntrinsic.LIST_ITER
-            if method_name == "iter_ref": return MirIntrinsic.LIST_ITER_REF
             if method_name == "slot": return MirIntrinsic.LIST_SLOT
             if method_name == "get_disjoint": return MirIntrinsic.LIST_GET_DISJOINT
             if method_name == "range": return MirIntrinsic.LIST_RANGE
@@ -8154,42 +8152,9 @@ impl Sema:
             if method_name == "as_view": return MirIntrinsic.FIXED_STRING_AS_VIEW
             if method_name == "equals": return MirIntrinsic.FIXED_STRING_EQUALS
             return MirIntrinsic.NONE
-        if type_name == "ListIter" or type_name == "ListIterRef":
-            if method_name == "next":
-                if type_name == "ListIterRef": return MirIntrinsic.VECITERREF_NEXT
-                return MirIntrinsic.VECITER_NEXT
-            if method_name == "map": return MirIntrinsic.ITER_MAP
-            if method_name == "filter": return MirIntrinsic.ITER_FILTER
-            if method_name == "filter_map": return MirIntrinsic.ITER_FILTER_MAP
-            if method_name == "take": return MirIntrinsic.ITER_TAKE
-            if method_name == "drop": return MirIntrinsic.ITER_DROP
-            if method_name == "take_while": return MirIntrinsic.ITER_TAKE_WHILE
-            if method_name == "drop_while": return MirIntrinsic.ITER_DROP_WHILE
-            if method_name == "zip": return MirIntrinsic.ITER_ZIP
-            if method_name == "enumerate": return MirIntrinsic.ITER_ENUMERATE
-            if method_name == "chain": return MirIntrinsic.ITER_CHAIN
-            if method_name == "zip_with": return MirIntrinsic.ITER_ZIP_WITH
-            if method_name == "step_by": return MirIntrinsic.ITER_STEP_BY
-            if method_name == "flat_map": return MirIntrinsic.ITER_FLAT_MAP
-            if method_name == "fold": return MirIntrinsic.ITER_FOLD
-            if method_name == "reduce": return MirIntrinsic.ITER_REDUCE
-            if method_name == "sum": return MirIntrinsic.ITER_SUM
-            if method_name == "product": return MirIntrinsic.ITER_PRODUCT
-            if method_name == "min": return MirIntrinsic.ITER_MIN
-            if method_name == "max": return MirIntrinsic.ITER_MAX
-            if method_name == "min_by": return MirIntrinsic.ITER_MIN_BY
-            if method_name == "max_by": return MirIntrinsic.ITER_MAX_BY
-            if method_name == "find": return MirIntrinsic.ITER_FIND
-            if method_name == "position": return MirIntrinsic.ITER_POSITION
-            if method_name == "any": return MirIntrinsic.ITER_ANY
-            if method_name == "all": return MirIntrinsic.ITER_ALL
-            if method_name == "none": return MirIntrinsic.ITER_NONE
-            if method_name == "for_each": return MirIntrinsic.ITER_FOR_EACH
-            if method_name == "count": return MirIntrinsic.ITER_COUNT
-            if method_name == "collect": return MirIntrinsic.ITER_COLLECT
-            if method_name == "partition": return MirIntrinsic.ITER_PARTITION
-            if method_name == "unzip": return MirIntrinsic.ITER_UNZIP
-            return MirIntrinsic.NONE
+        // #2220 step 2: `ListIter` is std's view iterator (collections.w);
+        // its `next` is a With body and its adapters are std.traits', so it
+        // has no intrinsic rows.
         if type_name == "MappedIter" or type_name == "FilterIter" or type_name == "FilterMapIter" or type_name == "TakeIter" or type_name == "DropIter" or type_name == "TakeWhileIter" or type_name == "DropWhileIter" or type_name == "ZipIter" or type_name == "EnumerateIter" or type_name == "ChainIter" or type_name == "ZipWithIter" or type_name == "StepByIter" or type_name == "FlatMapIter":
             if method_name == "next":
                 if type_name == "MappedIter": return MirIntrinsic.MAPITER_NEXT
@@ -24247,7 +24212,17 @@ impl Sema:
         // non-Copy value has no implicit copy to store; say so here
         // instead of inside std's push.
         var fn_name: str = "iter_" ++ self.pool_resolve(field)
+        // `collect[HashSet]` / `collect[BTreeSet]` name their own builders
+        // (check_pipeline recorded the bracket's target).
         if field == self.syms.collect:
+            if self.user_collect_target == self.syms.hashset: fn_name = "iter_collect_hashset"
+            else if self.user_collect_target == self.syms.btreeset: fn_name = "iter_collect_btreeset"
+        // #2220 step 2: the terminals that build or return values from an
+        // iterator of views dispatch to their `_views` twin, which reads
+        // each Copy element through its view (D22 §6.2, D139).
+        let name_text: str = with_str_clone_ref(self.pool_resolve(field))
+        let values_from_views = field == self.syms.collect or name_text == "sum" or name_text == "product" or name_text == "min" or name_text == "max" or name_text == "min_by" or name_text == "max_by" or name_text == "reduce" or name_text == "partition"
+        if values_from_views:
             var cv_elem = self.iterator_element_type(recv_type)
             if cv_elem == 0:
                 cv_elem = self.user_iter_element_type(recv_type)
@@ -24257,9 +24232,9 @@ impl Sema:
                     let cv_pointee = self.get_type_d0(cv_resolved)
                     if cv_pointee != 0 and self.get_type_kind(self.resolve_alias(cv_pointee)) != TypeKind.TY_REF:
                         if self.is_copy(cv_pointee) == 0:
-                            self.emit_error(f"`collect[List]()` over views of `{self.type_name(cv_pointee)}` cannot copy them into the List (D22 §6.2 copies a Copy view): spell the copy, `map(it.clone())`", node)
+                            self.emit_error(f"`{name_text}` over views of `{self.type_name(cv_pointee)}` cannot copy them out (D22 §6.2 copies a Copy view): spell the copy, `map(it.clone())`", node)
                             return 0
-                        fn_name = "iter_collect_views"
+                        fn_name = fn_name ++ "_views"
         let fn_sym = self.pool_lookup_symbol(fn_name)
         var arg_types: List[i32] = List.new()
         let arg_nodes: List[i32] = List.new()
@@ -24396,11 +24371,16 @@ impl Sema:
                             // `it |> collect[List]()` over an Iter[T] implementor:
                             // the bracket names what iter_collect builds.
                             let target_node = self.ast.get_data1(rhs_callee)
-                            let target_sym = if self.ast.kind(target_node) == NodeKind.NK_IDENT: self.ast.get_data0(target_node) else: 0
-                            if target_sym != self.syms.list:
-                                self.emit_error(f"`collect[{self.pool_resolve(target_sym)}]` over a {self.type_name(lhs_ty as i32)} is not available: an Iter[T] implementor collects into a List (§13.3)", rhs_callee)
+                            let target_kind = self.ast.kind(target_node)
+                            let target_base = if target_kind == NodeKind.NK_INDEX: self.ast.get_data0(target_node) else: target_node
+                            let base_kind = self.ast.kind(target_base)
+                            let target_sym = if base_kind == NodeKind.NK_IDENT or base_kind == NodeKind.NK_TYPE_NAMED or base_kind == NodeKind.NK_TYPE_GENERIC: self.ast.get_data0(target_base) else: 0
+                            if target_sym != self.syms.list and target_sym != self.syms.hashset and target_sym != self.syms.btreeset:
+                                self.emit_error(f"`collect[{self.pool_resolve(target_sym)}]` over a {self.type_name(lhs_ty as i32)} is not available: an Iter[T] implementor collects into a List, a HashSet or a BTreeSet (§13.3)", rhs_callee)
                                 return 0
+                            self.user_collect_target = target_sym
                             ret = self.check_method_call_parts(lhs, method, self.ast.get_data1(rhs), self.ast.get_data2(rhs), node, lhs_ty as i32)
+                            self.user_collect_target = 0
                         else if method == self.syms.collect and self.ast.kind(rhs_callee) == NodeKind.NK_INDEX:
                             ret = self.collect_target_type_from_callee(rhs_callee, lhs_ty as i32, node)
                             if ret != 0: self.record_method_lowering(lhs, method, self.ast.get_data2(rhs), node, ret, lhs_ty as i32)
@@ -24631,14 +24611,9 @@ impl Sema:
         if owner_sym == self.syms.listslot or owner_sym == self.syms.listrange:
             if field == self.syms.get or self.pool_resolve(field) == "set" or self.is_collection_len_method(field):
                 return 1
-        if owner_sym == self.syms.listiter or owner_sym == self.syms.listiterref or owner_sym == self.syms.listiterplace:
+        if owner_sym == self.syms.listiterplace:
             if field == self.syms.next:
                 return 1
-            if owner_sym == self.syms.listiter or owner_sym == self.syms.listiterref:
-                if field == self.syms.map or field == self.syms.filter or field == self.syms.take or field == self.syms.zip or field == self.syms.flat_map:
-                    return 1
-                if field == self.syms.fold or field == self.syms.reduce or field == self.syms.sum or field == self.syms.count or field == self.syms.partition or field == self.syms.collect:
-                    return 1
         if owner_sym == self.syms.mapiter or owner_sym == self.syms.filteriter or owner_sym == self.syms.takeiter or owner_sym == self.syms.zipiter or owner_sym == self.syms.flatmapiter:
             if field == self.syms.next:
                 return 1
@@ -31047,7 +31022,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
         let owner = self.get_generic_inst_base(resolved as i32)
-        if owner == self.syms.listiter or owner == self.syms.listiterref or owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.filtermapiter or owner == self.syms.takeiter or owner == self.syms.dropiter or owner == self.syms.takewhileiter or owner == self.syms.dropwhileiter or owner == self.syms.zipiter or owner == self.syms.enumerateiter or owner == self.syms.chainiter or owner == self.syms.zipwithiter or owner == self.syms.stepbyiter or owner == self.syms.flatmapiter:
+        if owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.filtermapiter or owner == self.syms.takeiter or owner == self.syms.dropiter or owner == self.syms.takewhileiter or owner == self.syms.dropwhileiter or owner == self.syms.zipiter or owner == self.syms.enumerateiter or owner == self.syms.chainiter or owner == self.syms.zipwithiter or owner == self.syms.stepbyiter or owner == self.syms.flatmapiter:
             return owner
         0
 
@@ -31091,11 +31066,6 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
         let owner = self.get_generic_inst_base(resolved as i32)
-        if owner == self.syms.listiter:
-            return self.get_generic_inst_arg(resolved as i32, 0)
-        if owner == self.syms.listiterref:
-            let ref_elem_ty = self.get_generic_inst_arg(resolved as i32, 0)
-            return self.ensure_exact_type(TypeKind.TY_REF, ref_elem_ty, 0, 0) as i32
         if owner == self.syms.mapiter:
             return self.get_generic_inst_arg(resolved as i32, 2)
         if owner == self.syms.filtermapiter:
@@ -33330,22 +33300,6 @@ impl Sema:
         let expr = expr0
         var field = field0
         var known_recv_ty = known_recv_ty0
-        // #2145 (§2.3, §13.1: "List[i32]'s iterator yields &i32"): `v.iter()`
-        // on a vector whose elements own something is the view iterator.
-        // The by-value `ListIter[T]` handed each element out as a byte copy,
-        // a second owner, and every `.iter() |> filter/map/collect` over a
-        // `List[str]` double-freed. A Copy element keeps the by-value
-        // iterator until D22's contextual Copy reaches pipelines, and a
-        // loop's own iterable is the loop's to lower (it binds views).
-        if field == self.syms.iter and arg_count == 0 and node != self.loop_iterable_node and self.static_receiver_type_is_known(expr) == 0:
-            if known_recv_ty == 0: known_recv_ty = self.check_expr(expr) as i32
-            let list_ty = if known_recv_ty != 0: self.auto_deref_ref_ptr_type(self.resolve_alias(known_recv_ty as TypeId)) as i32 else: 0
-            // Where the by-value iterator is what is asked for (std's own
-            // `Iterable.iter`, declared `-> ListIter[T]`), it is what is made.
-            let wanted = if self.has_expected_type != 0 and self.expected_expr_type != 0: self.resolve_alias(self.expected_expr_type) as i32 else: 0
-            let wants_by_value = wanted != 0 and self.get_type_kind(wanted as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(wanted) == self.syms.listiter
-            if not wants_by_value and list_ty != 0 and self.std_generic_of(list_ty) == StdGeneric.List and not self.copy_is_bits(self.get_generic_inst_arg(list_ty, 0)):
-                field = self.syms.iter_ref
         // D117 (§9.5): where a name has an observing and an owned form, a
         // call on an owned receiver (a temporary, or a place spelled `move`)
         // selects the `move fn`; a call on a place selects the `fn`. Read from
@@ -34671,14 +34625,6 @@ impl Sema:
                     return self.ty_bool as i32
                 if field == self.syms.join:
                     return self.ty_str as i32
-                if field == self.syms.iter:
-                    let iter_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let iter_tid = self.find_generic_inst(self.syms.listiter, iter_elem_ty)
-                    if iter_tid != 0:
-                        return iter_tid
-                    let iter_args: List[i32] = List.new()
-                    iter_args.push(iter_elem_ty)
-                    return self.ensure_generic_inst_type(self.syms.listiter, iter_args, 1) as i32
                 if field == self.syms.slot:
                     let slot_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                     let slot_tid = self.find_generic_inst(self.syms.listslot, slot_elem_ty)
@@ -34703,14 +34649,6 @@ impl Sema:
                     return self.ensure_listrange_type_for(vr_elem_ty)
                 if field == self.syms.split_at or field == self.syms.split_at_mut:
                     return self.ensure_listrange_pair_type_for(self.get_generic_inst_arg(recv_type, 0))
-                if field == self.syms.iter_ref:
-                    let iref_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let iref_tid = self.find_generic_inst(self.syms.listiterref, iref_elem_ty)
-                    if iref_tid != 0:
-                        return iref_tid
-                    let iref_args: List[i32] = List.new()
-                    iref_args.push(iref_elem_ty)
-                    return self.ensure_generic_inst_type(self.syms.listiterref, iref_args, 1) as i32
                 if field == self.syms.iter_place:
                     let ip_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                     let ip_tid = self.find_generic_inst(self.syms.listiterplace, ip_elem_ty)
@@ -34769,133 +34707,6 @@ impl Sema:
                     let opt_args: List[i32] = List.new()
                     opt_args.push(vs_tid)
                     return self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
-            if type_name_sym == self.syms.listiter:
-                if field == self.syms.next:
-                    let next_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let next_tid = self.find_generic_inst(self.syms.option, next_elem_ty)
-                    if next_tid != 0:
-                        return next_tid
-                    let next_args: List[i32] = List.new()
-                    next_args.push(next_elem_ty)
-                    return self.ensure_generic_inst_type(self.syms.option, next_args, 1) as i32
-            if self.is_iterator_type(recv_type) != 0:
-                let iter_elem_ty = self.iterator_element_type(recv_type)
-                if iter_elem_ty != 0:
-                    if field == self.syms.next:
-                        return self.ensure_option_type_for(iter_elem_ty)
-                    if field == self.syms.map:
-                        if arg_count >= 1:
-                            let mapper_ty = self.resolve_alias(arg_types[0] as TypeId)
-                            if self.get_type_kind(mapper_ty) == TypeKind.TY_FN:
-                                let mapped_elem_ty = self.get_type_d2(mapper_ty)
-                                return self.ensure_mapiter_type_for(recv_type, iter_elem_ty, mapped_elem_ty)
-                        return self.ensure_mapiter_type_for(recv_type, iter_elem_ty, iter_elem_ty)
-                    if field == self.syms.filter:
-                        return self.ensure_filteriter_type_for(recv_type, iter_elem_ty)
-                    if field == self.syms.take:
-                        return self.ensure_takeiter_type_for(recv_type, iter_elem_ty)
-                    if field == self.syms.drop_items:
-                        return self.ensure_dropiter_type_for(recv_type, iter_elem_ty)
-                    if field == self.syms.take_while:
-                        return self.ensure_takewhileiter_type_for(recv_type, iter_elem_ty)
-                    if field == self.syms.drop_while:
-                        return self.ensure_dropwhileiter_type_for(recv_type, iter_elem_ty)
-                    if field == self.syms.filter_map:
-                        if arg_count >= 1:
-                            let fm_filter_ty = self.resolve_alias(arg_types[0] as TypeId)
-                            if self.get_type_kind(fm_filter_ty) == TypeKind.TY_FN:
-                                let opt_ty = self.resolve_alias(self.get_type_d2(fm_filter_ty) as TypeId)
-                                if self.get_type_kind(opt_ty) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(opt_ty as i32) == self.syms.option:
-                                    return self.ensure_filtermapiter_type_for(recv_type, iter_elem_ty, self.get_generic_inst_arg(opt_ty as i32, 0))
-                        return 0
-                    if field == self.syms.enumerate:
-                        return self.ensure_enumerateiter_type_for(recv_type, iter_elem_ty)
-                    if field == self.syms.chain:
-                        if arg_count >= 1:
-                            let other_chain_ty = arg_types[0]
-                            let other_chain_elem = self.iterator_element_type(other_chain_ty)
-                            if other_chain_elem != 0 and self.types_compatible(iter_elem_ty as TypeId, other_chain_elem as TypeId) != 0:
-                                return self.ensure_chainiter_type_for(recv_type, other_chain_ty, iter_elem_ty)
-                        return 0
-                    if field == self.syms.zip_with:
-                        if arg_count >= 2:
-                            let zw_other_ty = arg_types[0]
-                            let zw_other_elem = self.iterator_element_type(zw_other_ty)
-                            let zw_fn_ty = self.resolve_alias(arg_types[1] as TypeId)
-                            if zw_other_elem != 0 and self.get_type_kind(zw_fn_ty) == TypeKind.TY_FN:
-                                return self.ensure_zipwithiter_type_for(recv_type, zw_other_ty, iter_elem_ty, zw_other_elem, self.get_type_d2(zw_fn_ty))
-                        return 0
-                    if field == self.syms.step_by:
-                        return self.ensure_stepbyiter_type_for(recv_type, iter_elem_ty)
-                    if field == self.syms.zip:
-                        if arg_count >= 1:
-                            let other_iter_ty = arg_types[0]
-                            let other_elem_ty = self.iterator_element_type(other_iter_ty)
-                            if other_elem_ty != 0:
-                                return self.ensure_zipiter_type_for(recv_type, other_iter_ty, iter_elem_ty, other_elem_ty)
-                        return 0
-                    if field == self.syms.flat_map:
-                        if arg_count >= 1:
-                            let fm_ty = self.resolve_alias(arg_types[0] as TypeId)
-                            if self.get_type_kind(fm_ty) == TypeKind.TY_FN:
-                                let fm_inner_ty = self.get_type_d2(fm_ty)
-                                var fm_iter_ty = fm_inner_ty
-                                var fm_elem_ty = self.iterator_element_type(fm_inner_ty)
-                                if fm_elem_ty == 0:
-                                    let fm_inner_resolved = self.resolve_alias(fm_inner_ty as TypeId)
-                                    if self.get_type_kind(fm_inner_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(fm_inner_resolved as i32) == self.syms.list:
-                                        fm_elem_ty = self.get_generic_inst_arg(fm_inner_resolved as i32, 0)
-                                        fm_iter_ty = self.ensure_listiter_type_for(fm_elem_ty)
-                                if fm_elem_ty != 0:
-                                    return self.ensure_flatmapiter_type_for(recv_type, fm_inner_ty, fm_iter_ty, iter_elem_ty, fm_elem_ty)
-                        return 0
-                    if field == self.syms.fold:
-                        if arg_count >= 1:
-                            return arg_types[0]
-                        return iter_elem_ty
-                    if field == self.syms.reduce:
-                        return self.ensure_option_type_for(iter_elem_ty)
-                    if field == self.syms.sum or field == self.syms.product:
-                        return self.summed_type(iter_elem_ty)
-                    if field == self.syms.min or field == self.syms.max or field == self.syms.min_by or field == self.syms.max_by or field == self.syms.find:
-                        return self.ensure_option_type_for(iter_elem_ty)
-                    if field == self.syms.position:
-                        return self.ensure_option_type_for(self.ty_isize as i32)
-                    if field == self.syms.any or field == self.syms.all or field == self.syms.none_pred:
-                        return self.ty_bool as i32
-                    if field == self.syms.for_each:
-                        return self.ty_void as i32
-                    if field == self.syms.count:
-                        return self.ty_isize as i32
-                    if field == self.syms.collect:
-                        return self.ensure_list_type_for(iter_elem_ty)
-                    if field == self.syms.partition:
-                        let part_list_ty = self.ensure_list_type_for(iter_elem_ty)
-                        let part_elems: List[i32] = List.new()
-                        part_elems.push(part_list_ty)
-                        part_elems.push(part_list_ty)
-                        return self.ensure_tuple_type(part_elems, 2) as i32
-                    if field == self.syms.unzip:
-                        let uz_iter_resolved = self.resolve_alias(iter_elem_ty as TypeId)
-                        if self.get_type_kind(uz_iter_resolved) == TypeKind.TY_TUPLE and self.get_type_d1(uz_iter_resolved) == 2:
-                            let uz_iter_start = self.get_type_d0(uz_iter_resolved)
-                            let uz_vecs: List[i32] = List.new()
-                            uz_vecs.push(self.ensure_list_type_for(self.type_extra[uz_iter_start]))
-                            uz_vecs.push(self.ensure_list_type_for(self.type_extra[(uz_iter_start + 1)]))
-                            return self.ensure_tuple_type(uz_vecs, 2) as i32
-                        return 0
-            if type_name_sym == self.syms.listiterref:
-                if field == self.syms.next:
-                    let ref_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let ref_ty = self.ensure_exact_type(TypeKind.TY_REF, ref_elem_ty, 0, 0) as i32
-                    if ref_ty == 0:
-                        return 0
-                    let ref_opt_tid = self.find_generic_inst(self.syms.option, ref_ty)
-                    if ref_opt_tid != 0:
-                        return ref_opt_tid
-                    let ref_opt_args: List[i32] = List.new()
-                    ref_opt_args.push(ref_ty)
-                    return self.ensure_generic_inst_type(self.syms.option, ref_opt_args, 1) as i32
             if type_name_sym == self.syms.hashmap:
                 if field == self.syms.insert or field == self.syms.clear:
                     return self.ty_void as i32
@@ -38022,9 +37833,6 @@ impl Sema:
                     rx_args.push(rx_elem)
                     let _ = self.ensure_generic_inst_type(self.syms.option, rx_args, 1)
                 return rx_elem
-            if base_name == "ListIterRef" and self.get_generic_inst_arg_count(resolved as i32) > 0:
-                let iref_elem = self.get_generic_inst_arg(resolved as i32, 0)
-                return self.ensure_exact_type(TypeKind.TY_REF, iref_elem, 0, 0) as i32
             if base_name == "ListIterPlace" and self.get_generic_inst_arg_count(resolved as i32) > 0:
                 let vip_elem = self.get_generic_inst_arg(resolved as i32, 0)
                 var vip_slot = self.find_generic_inst(self.syms.listslot, vip_elem)
@@ -38917,14 +38725,19 @@ impl Sema:
     mut fn for_loop_element_type(iterable: i32, iter_type: i32) -> i32:
         if self.ast.kind(iterable) == NodeKind.NK_CALL:
             let callee = self.ast.get_data0(iterable)
-            if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and self.pool_resolve(self.ast.get_data1(callee)) == "iter":
+            let callee_name = if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS: self.pool_resolve(self.ast.get_data1(callee)) else: ""
+            if callee_name == "iter" or callee_name == "iter_ref":
                 let recv_node = self.ast.get_data0(callee)
                 if self.typed_expr_types.contains(recv_node):
                     let recv_resolved = self.resolve_alias(self.typed_expr_types.get(recv_node).unwrap() as TypeId)
                     if self.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(recv_resolved as i32) > 0:
                         if self.pool_resolve(self.get_type_d0(recv_resolved)) == "List":
+                            // The loop over `xs.iter()` is the implicit form's
+                            // counter loop (§13); MirLower reads this record
+                            // (D65: Sema decides, MIR lowers).
+                            self.for_list_iter_recvs.insert(iterable, recv_node)
                             let list_elem = self.get_generic_inst_arg(recv_resolved as i32, 0)
-                            if self.type_needs_drop(list_elem) != 0:
+                            if self.type_needs_drop(list_elem) != 0 or callee_name == "iter_ref":
                                 return self.ensure_exact_type(TypeKind.TY_REF, list_elem, 0, 0) as i32
                             return list_elem
         self.infer_for_element_type(iter_type)
@@ -39199,7 +39012,7 @@ impl Sema:
 // §13.3 (#1746): the operations std.traits defines over any Iter[T], by
 // their method names.
 fn sema_iter_adapter_name(name: &str) -> bool:
-    name == "zip" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "drop" or name == "take_while" or name == "drop_while" or name == "enumerate" or name == "chain" or name == "step_by" or name == "collect" or name == "fold" or name == "count" or name == "for_each" or name == "any" or name == "all" or name == "none" or name == "find" or name == "position"
+    name == "zip" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "drop" or name == "take_while" or name == "drop_while" or name == "enumerate" or name == "chain" or name == "step_by" or name == "collect" or name == "fold" or name == "count" or name == "for_each" or name == "any" or name == "all" or name == "none" or name == "find" or name == "position" or name == "sum" or name == "product" or name == "min" or name == "max" or name == "min_by" or name == "max_by" or name == "reduce" or name == "partition" or name == "unzip" or name == "flat_map" or name == "zip_with"
 
 impl Sema:
     // D93's second check exists to retype a literal's binding at the type

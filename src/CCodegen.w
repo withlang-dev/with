@@ -9852,7 +9852,7 @@ impl CCodegen:
                     out = out ++ "    " ++ cc_rbrace() ++ ";\n"
                 out = out ++ cc_rbrace() ++ ";\n\n"
                 continue
-            if generic_base_name == "ListIter" or generic_base_name == "ListIterPlace":
+            if generic_base_name == "ListIterPlace":
                 out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
                 out = out ++ "    int64_t data_ptr;\n"
                 out = out ++ "    int64_t len;\n"

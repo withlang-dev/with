@@ -2188,6 +2188,13 @@ type Sema {
     // initializer's call reaches them before check_bodies), by declaration
     // index; check_bodies does not check them a second time.
     bodies_checked_on_demand: HashMap[i32, i32],
+    // #2220 step 2: the `xs.iter()` / `xs.iter_ref()` calls that are a
+    // `for` loop's iterable over a List (iterable node -> receiver node):
+    // MirLower lowers those as the implicit form's counter loop.
+    for_list_iter_recvs: HashMap[i32, i32],
+    // The collection `collect[C]()` names while its Iter[T]-implementor
+    // call is checked (List, HashSet or BTreeSet; 0 outside one).
+    user_collect_target: i32,
     // The statement a block is checking: its value is discarded, so a callee
     // that is not typed yet costs a call in that position nothing.
     discarded_stmt_node: i32,
@@ -3886,6 +3893,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         body_decl_by_fn: sema_new_map_i32_i32(),
         untyped_callee_calls: List.new(),
         bodies_checked_on_demand: HashMap.new(),
+        for_list_iter_recvs: HashMap.new(),
+        user_collect_target: 0,
         discarded_stmt_node: 0,
         body_order_state: List.new(),
         body_order_lower: List.new(),

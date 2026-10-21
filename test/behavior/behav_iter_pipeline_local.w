@@ -1,7 +1,6 @@
 //! expect-stdout: ok
 
 use std.collections.ListIter
-use std.collections.FilterIter
 
 fn make_iter(xs: &List[i32]) -> ListIter[i32]:
     xs.iter()
@@ -17,7 +16,7 @@ fn sum_iter(iter: ListIter[i32]) -> i32:
             done = true
     total
 
-fn make_filtered(xs: &List[i32]) -> FilterIter[ListIter[i32], i32]:
+fn make_filtered(xs: &List[i32]) -> Filtered[&i32, ListIter[i32]]:
     xs.iter().filter(x => x % 2 == 0)
 
 fn main:

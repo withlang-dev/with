@@ -432,9 +432,28 @@ pub type HashMapEntry[K, V] ephemeral { map_ptr: i64, key: K }
 
 // ── Iterators ─────────────────────────────────────────────────────
 
-/// Iterator over List[T]. Obtain via `vec.iter()`.
-/// Call `.next()` to get `Option[T]` — `Some(val)` or `None`.
-pub type ListIter[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
+/// The observing iterator over a `List[T]` (§13.1, #2220 step 2): a view of
+/// the list and a position, whose `next()` yields `&T` through the element
+/// place — bounds-checked by `len()` and `xs[i]`, no raw address. A Copy
+/// element reads through the view where a value is demanded (D22, D139),
+/// so `for x in xs.iter()`, `map(it * 2)` and `filter(it % 2 == 1)` see
+/// the value; an owning element is observed, never copied (§2.3).
+pub type ListIter[T] ephemeral { list: &List[T], idx: isize }
+
+impl[T] ListIter[T]:
+    pub mut fn next() -> Option[&T]:
+        if self.idx >= self.list.len(): return None
+        let i = self.idx
+        self.idx = self.idx + 1
+        Some(&self.list[i])
+
+impl[T] List[T]:
+    /// The observing iterator over the elements.
+    @[iter_of_self]
+    pub fn iter() -> ListIter[T]: ListIter { list: self, idx: 0 }
+    /// The same iterator under the name the #2145 rewrite used; every
+    /// `iter()` now yields views.
+    pub fn iter_ref() -> ListIter[T]: self.iter()
 
 /// Borrow-iteration capability for allocation-backed collection types
 /// (D33 naming: formerly misnamed `IntoIter`).
@@ -695,9 +714,8 @@ pub type FlatMapIter[I, C, J, T, U] ephemeral {
     has_current: bool,
 }
 
-impl[T] Iter[T] for ListIter[T]:
-    mut fn next() -> Option[T]:
-        self.next()
+impl[T] Iter[&T] for ListIter[T]:
+    mut fn next() -> Option[&T]: self.next()
 
 // #2152 (§13.1, §13.5): every adapter is an iterator, so a `for` steps
 // through it. Each `next` is the adapter's own.
@@ -771,4 +789,249 @@ pub fn iter_collect_views[T, I: Iter[&T]](iter: I) -> List[T]:
             None => break
             Some(x) => out.push(x)
     out
+
+// #2220 step 2 (§13.3): the terminal operations over any Iter[T]
+// implementor, as With bodies. Each has a `_views` twin over an iterator of
+// views (`ListIter` yields `&T`): a Copy value reads through the view where
+// the body demands a value (D22, D139), so the twin's result holds values.
+/// `it.collect[HashSet]()`.
+pub fn iter_collect_hashset[T: Key, I: Iter[T]](iter: I) -> HashSet[T]:
+    var i = iter
+    var out: HashSet[T] = HashSet.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.insert(x)
+    out
+
+pub fn iter_collect_hashset_views[T: Key, I: Iter[&T]](iter: I) -> HashSet[T]:
+    var i = iter
+    var out: HashSet[T] = HashSet.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.insert(x)
+    out
+
+/// `it.collect[BTreeSet]()`.
+pub fn iter_collect_btreeset[T: Ord, I: Iter[T]](iter: I) -> BTreeSet[T]:
+    var i = iter
+    var out: BTreeSet[T] = BTreeSet.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.insert(x)
+    out
+
+pub fn iter_collect_btreeset_views[T: Ord, I: Iter[&T]](iter: I) -> BTreeSet[T]:
+    var i = iter
+    var out: BTreeSet[T] = BTreeSet.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.insert(x)
+    out
+
+/// `it.sum()`: the elements added up from `T.default()`.
+pub fn iter_sum[T: Default, I: Iter[T]](iter: I) -> T:
+    var i = iter
+    var acc = T.default()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => acc = acc + x
+    acc
+
+pub fn iter_sum_views[T: Default, I: Iter[&T]](iter: I) -> T:
+    var i = iter
+    var acc = T.default()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => acc = acc + x
+    acc
+
+/// `it.product()`: the elements multiplied up from `T.one()`.
+pub fn iter_product[T: One, I: Iter[T]](iter: I) -> T:
+    var i = iter
+    var acc = T.one()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => acc = acc * x
+    acc
+
+pub fn iter_product_views[T: One, I: Iter[&T]](iter: I) -> T:
+    var i = iter
+    var acc = T.one()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => acc = acc * x
+    acc
+
+/// `it.min()` / `it.max()`: the least / greatest element, `None` when empty;
+/// the first of equals wins.
+pub fn iter_min[T: Ord, I: Iter[T]](iter: I) -> Option[T]:
+    var i = iter
+    var best: Option[T] = None
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                match best:
+                    None => best = Some(x)
+                    Some(b) => if x.cmp(&b) < 0: best = Some(x)
+    best
+
+pub fn iter_min_views[T: Ord, I: Iter[&T]](iter: I) -> Option[T]:
+    var i = iter
+    var best: Option[T] = None
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                match best:
+                    None => best = Some(x)
+                    Some(b) => if x.cmp(&b) < 0: best = Some(x)
+    best
+
+pub fn iter_max[T: Ord, I: Iter[T]](iter: I) -> Option[T]:
+    var i = iter
+    var best: Option[T] = None
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                match best:
+                    None => best = Some(x)
+                    Some(b) => if x.cmp(&b) > 0: best = Some(x)
+    best
+
+pub fn iter_max_views[T: Ord, I: Iter[&T]](iter: I) -> Option[T]:
+    var i = iter
+    var best: Option[T] = None
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                match best:
+                    None => best = Some(x)
+                    Some(b) => if x.cmp(&b) > 0: best = Some(x)
+    best
+
+/// `it.min_by(f)` / `it.max_by(f)`: by a comparison `f(a, b)` that is
+/// negative, zero or positive as `a` is less than, equal to or greater
+/// than `b`; the first of equals wins.
+pub fn iter_min_by[T, I: Iter[T]](iter: I, f: fn(&T, &T) -> i32) -> Option[T]:
+    var i = iter
+    var best: Option[T] = None
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                match best:
+                    None => best = Some(x)
+                    Some(b) => if f(&x, &b) < 0: best = Some(x)
+    best
+
+pub fn iter_min_by_views[T, I: Iter[&T]](iter: I, f: fn(&T, &T) -> i32) -> Option[T]:
+    var i = iter
+    var best: Option[T] = None
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                match best:
+                    None => best = Some(x)
+                    Some(b) => if f(x, &b) < 0: best = Some(x)
+    best
+
+pub fn iter_max_by[T, I: Iter[T]](iter: I, f: fn(&T, &T) -> i32) -> Option[T]:
+    var i = iter
+    var best: Option[T] = None
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                match best:
+                    None => best = Some(x)
+                    Some(b) => if f(&x, &b) > 0: best = Some(x)
+    best
+
+pub fn iter_max_by_views[T, I: Iter[&T]](iter: I, f: fn(&T, &T) -> i32) -> Option[T]:
+    var i = iter
+    var best: Option[T] = None
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                match best:
+                    None => best = Some(x)
+                    Some(b) => if f(x, &b) > 0: best = Some(x)
+    best
+
+/// `it.reduce(f)`: `f` folded over the elements from the first, `None` when
+/// empty.
+pub fn iter_reduce[T, I: Iter[T]](iter: I, f: fn(T, T) -> T) -> Option[T]:
+    var i = iter
+    var acc: Option[T] = None
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                match acc:
+                    None => acc = Some(x)
+                    Some(a) => acc = Some(f(a, x))
+    acc
+
+pub fn iter_reduce_views[T, I: Iter[&T]](iter: I, f: fn(T, T) -> T) -> Option[T]:
+    var i = iter
+    var acc: Option[T] = None
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                match acc:
+                    None => acc = Some(x)
+                    Some(a) => acc = Some(f(a, x))
+    acc
+
+/// `it.partition(p)`: the elements for which `p` holds, then the rest.
+pub fn iter_partition[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> (List[T], List[T]):
+    var i = iter
+    var yes: List[T] = List.new()
+    var no: List[T] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                if pred(&x): yes.push(x)
+                else: no.push(x)
+    (yes, no)
+
+pub fn iter_partition_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> (List[T], List[T]):
+    var i = iter
+    var yes: List[T] = List.new()
+    var no: List[T] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                if pred(x): yes.push(x)
+                else: no.push(x)
+    (yes, no)
+
+/// `it.unzip()`: the pairs' firsts and seconds as two Lists.
+pub fn iter_unzip[A, B, I: Iter[(A, B)]](iter: I) -> (List[A], List[B]):
+    var i = iter
+    var firsts: List[A] = List.new()
+    var seconds: List[B] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(pair) =>
+                firsts.push(pair.0)
+                seconds.push(pair.1)
+    (firsts, seconds)
 

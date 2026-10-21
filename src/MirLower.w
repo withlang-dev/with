@@ -8495,18 +8495,18 @@ impl MirBuilder:
                 let recv = self.ast.get_data0(call_callee)
                 // Which iterator the call makes is Sema's record for it (#2043).
                 let iter_intrinsic = self.sema.method_intrinsic_in_body(self.body.instance_sym, iter_expr)
-                if iter_intrinsic == MirIntrinsic.LIST_ITER:
+                // `for x in xs.iter()` over a List is the implicit form's
+                // counter loop (§13), Sema's for_list_iter_recvs record
+                // (#2220 step 2: `ListIter` itself is std's view iterator).
+                if self.sema.for_list_iter_recvs.contains(iter_expr):
                     let recv_resolved = self.sema.resolve_alias(self.expr_type(recv))
                     if self.sema.std_generic_of(recv_resolved as i32) == StdGeneric.List:
-                        // .iter() ≡ the implicit form (§13): same
-                        // borrow split as the bare-List dispatch.
                         self.body.note_elided_call_node(iter_expr)
                         let it_elem = self.sema.get_generic_inst_arg(recv_resolved as i32, 0)
-                        if self.sema.type_needs_drop_frozen(it_elem) != 0:
+                        let elem_ty = self.loop_element_type(for_node)
+                        if self.sema.type_needs_drop_frozen(it_elem) != 0 or self.sema.get_type_kind(self.sema.resolve_alias(elem_ty as TypeId)) == TypeKind.TY_REF:
                             return self.lower_for_iter_ref(for_node, pat_or_sym, recv, body_expr)
                         return self.lower_for_list(for_node, pat_or_sym, recv, body_expr)
-                if iter_intrinsic == MirIntrinsic.LIST_ITER_REF and self.sema.std_generic_of(self.expr_type(recv)) == StdGeneric.List:
-                    return self.lower_for_iter_ref(for_node, pat_or_sym, recv, body_expr)
                 if iter_intrinsic == MirIntrinsic.LIST_ITER_PLACE and self.sema.std_generic_of(self.expr_type(recv)) == StdGeneric.List:
                     return self.lower_for_iter_place(for_node, pat_or_sym, recv, body_expr)
 
@@ -9572,8 +9572,7 @@ impl MirBuilder:
                 // `v.iter()` and `v.iter_ref()` both step through the
                 // vector's elements as views (#2152: the second failed to
                 // lower here).
-                let clause_iter = self.sema.method_intrinsic_in_body(self.body.instance_sym, iter_expr)
-                if clause_iter == MirIntrinsic.LIST_ITER or clause_iter == MirIntrinsic.LIST_ITER_REF:
+                if self.sema.for_list_iter_recvs.contains(iter_expr):
                     let recv_ty = self.expr_type(recv)
                     if recv_ty != 0:
                         let recv_resolved = self.sema.resolve_alias(recv_ty)
