@@ -9446,6 +9446,10 @@ impl Sema:
             let value = self.ast.get_data0(node)
             if value == 0:
                 return 1
+            // §4.9a (D103): a value the return demand converted keeps its own
+            // type on the node; the record is the conversion.
+            if self.value_to_option_nodes.contains(value):
+                return 1
             let actual = self.recorded_expr_type_or_zero(value)
             if actual != 0 and actual != self.ty_void and actual != self.ty_never:
                 if self.return_value_type_compatible(expected, actual) == 0 and self.record_contextual_copy_adjustment(value, expected, actual) == 0 and not self.note_int_local_arg_demand(value, expected, actual):
@@ -17765,7 +17769,16 @@ impl Sema:
             // (unrecorded), was misclassified as a bare `return`, and the
             // function silently finalized Unit (#653, #659).
             if val_type != 0:
-                self.typed_expr_types.insert(value, val_type as i32)
+                // §4.9a (D103): a value the return demand converted keeps its
+                // own type; the record is the conversion, and MIR builds the
+                // Option around the lowered value. Recording the Option here
+                // made a cast or a `++` lower at the Option (an ICE, "unsupported
+                // cast in MIR", on `return raw.unwrap() as Kind`).
+                if self.value_to_option_nodes.contains(value):
+                    if self.recorded_expr_type_or_zero(value) == 0:
+                        self.typed_expr_types.insert(value, self.option_demand_payload(val_type) as i32)
+                else:
+                    self.typed_expr_types.insert(value, val_type as i32)
             self.check_returned_field_move(value, self.current_return_type as i32)
             // If returned value originates from a parameter, record effects:
             // - EFF_ESCAPE_VALUE: a non-Copy owned value escaping via return
