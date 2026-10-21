@@ -5299,7 +5299,14 @@ impl MirBuilder:
         // via lower_expr was moved into the temp and reset-blanked, so a
         // later `x == "..."` compared "" (same class as the =~ subject fix;
         // the helper reads named places in place, rvalues still materialize).
-        let lhs_place = self.lower_regex_subject_place(lhs_expr)
+        // D139: a view of a Copy value Sema adjusted reads through as the
+        // value (lower_expr applies the adjustment); that read is a copy.
+        let lhs_place = if self.has_contextual_copy_adjustment(lhs_expr) != 0:
+            let lhs_read = self.lower_expr(lhs_expr)
+            let lhs_read_ty = self.operand_type(lhs_read)
+            self.materialize_operand(lhs_read, lhs_read_ty, self.ast.get_start(lhs_expr))
+        else:
+            self.lower_regex_subject_place(lhs_expr)
         var acc: i32 = 0
         var has_acc = 0
         for i in 0..elem_count:

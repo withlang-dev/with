@@ -2197,6 +2197,25 @@ type Sema {
     // The collection `collect[C]()` names while its Iter[T]-implementor
     // call is checked (List, HashSet or BTreeSet; 0 outside one).
     user_collect_target: i32,
+    // #2511 (§14.3 INVARIANT 5): a callable parameter's may_suspend is what
+    // its callers hand it. callable_param_keys: a callable parameter's
+    // ident node -> (its fn's node, its index) key; callable_param_fn_nodes:
+    // the same ident -> the fn node; callable_param_may_suspend: the keys
+    // some call passes a may-suspend callable to; fn_escapes_as_value: the
+    // fns whose name is used as a value (callers Sema cannot see, so their
+    // callable parameters stay "may"); current_fn_decl_node: the fn whose
+    // body is being checked (-1 outside one).
+    callable_param_keys: HashMap[i32, i64],
+    callable_param_fn_nodes: HashMap[i32, i32],
+    callable_param_may_suspend: HashMap[i64, i32],
+    fn_escapes_as_value: HashMap[i32, i32],
+    current_fn_decl_node: i32,
+    callee_ident_node: i32,
+    suspend_params_unattributed: i32,
+    // #2511: a callable struct field's may_suspend is what the program stores
+    // in it: (owner type symbol, field symbol) -> 1 when some struct literal
+    // or assignment stores a callable that may suspend.
+    callable_field_may_suspend: HashMap[i64, i32],
     // The statement a block is checking: its value is discarded, so a callee
     // that is not typed yet costs a call in that position nothing.
     discarded_stmt_node: i32,
@@ -3898,6 +3917,14 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         bodies_checked_on_demand: HashMap.new(),
         for_list_iter_recvs: HashMap.new(),
         user_collect_target: 0,
+        callable_param_keys: HashMap.new(),
+        callable_param_fn_nodes: HashMap.new(),
+        callable_param_may_suspend: HashMap.new(),
+        fn_escapes_as_value: HashMap.new(),
+        current_fn_decl_node: -1,
+        callee_ident_node: 0,
+        suspend_params_unattributed: 0,
+        callable_field_may_suspend: HashMap.new(),
         discarded_stmt_node: 0,
         body_order_state: List.new(),
         body_order_lower: List.new(),

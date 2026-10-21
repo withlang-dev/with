@@ -532,6 +532,101 @@ impl[T, I: Iter[T]] Iter[T] for DroppedWhile[T, I]:
 
 pub fn iter_drop_while[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> DroppedWhile[T, I]: DroppedWhile { inner: iter, pred, dropping: true }
 
+// The predicate adapters over an iterator of views (`ListIter` yields
+// `&T`): the predicate reads the view itself, as element access hands it,
+// never a view of the view. The compiler dispatches `filter`, `take_while`,
+// `drop_while`, `any`, `all`, `none`, `find` and `position` over `Iter[&T]`
+// here (check_user_iter_method).
+pub type FilteredViews[T, I] { inner: I, pred: fn(&T) -> bool }
+
+impl[T, I: Iter[&T]] Iter[&T] for FilteredViews[T, I]:
+    mut fn next() -> Option[&T]:
+        loop:
+            match self.inner.next():
+                None => return None
+                Some(x) =>
+                    if (self.pred)(x):
+                        return x
+
+pub fn iter_filter_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> FilteredViews[T, I]: FilteredViews { inner: iter, pred }
+
+pub type TakenWhileViews[T, I] { inner: I, pred: fn(&T) -> bool, done: bool }
+
+impl[T, I: Iter[&T]] Iter[&T] for TakenWhileViews[T, I]:
+    mut fn next() -> Option[&T]:
+        if self.done:
+            return None
+        match self.inner.next():
+            None => None
+            Some(x) =>
+                if (self.pred)(x):
+                    x
+                else:
+                    self.done = true
+                    None
+
+pub fn iter_take_while_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> TakenWhileViews[T, I]: TakenWhileViews { inner: iter, pred, done: false }
+
+pub type DroppedWhileViews[T, I] { inner: I, pred: fn(&T) -> bool, dropping: bool }
+
+impl[T, I: Iter[&T]] Iter[&T] for DroppedWhileViews[T, I]:
+    mut fn next() -> Option[&T]:
+        if not self.dropping:
+            return self.inner.next()
+        loop:
+            match self.inner.next():
+                None => return None
+                Some(x) =>
+                    if not (self.pred)(x):
+                        self.dropping = false
+                        return x
+
+pub fn iter_drop_while_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> DroppedWhileViews[T, I]: DroppedWhileViews { inner: iter, pred, dropping: true }
+
+pub fn iter_any_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> bool:
+    var i = iter
+    while true:
+        match i.next():
+            None => return false
+            Some(x) =>
+                if pred(x):
+                    return true
+    false
+
+pub fn iter_all_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> bool:
+    var i = iter
+    while true:
+        match i.next():
+            None => return true
+            Some(x) =>
+                if not pred(x):
+                    return false
+    true
+
+pub fn iter_none_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> bool: not iter_any_views(iter, pred)
+
+pub fn iter_find_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> Option[&T]:
+    var i = iter
+    while true:
+        match i.next():
+            None => return None
+            Some(x) =>
+                if pred(x):
+                    return x
+    None
+
+pub fn iter_position_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> Option[i64]:
+    var i = iter
+    var at: i64 = 0
+    while true:
+        match i.next():
+            None => return None
+            Some(x) =>
+                if pred(x):
+                    return at
+                at = at + 1
+    None
+
 /// `it.enumerate()`: `(index, element)` pairs.
 pub type Enumerated[T, I] { inner: I, index: i64 }
 
@@ -576,24 +671,9 @@ impl[T, I: Iter[T]] Iter[T] for Stepped[T, I]:
 
 pub fn iter_step_by[T, I: Iter[T]](iter: I, n: i64) -> Stepped[T, I]: Stepped { inner: iter, step: n, started: false }
 
-/// `it.flat_map(f)`: each element through `f`, which yields an iterator,
-/// those iterators' elements in order.
-pub type FlatMapped[T, U, C, I] { inner: I, f: fn(T) -> C, current: Option[C] }
-
-impl[T, U, C: Iter[U], I: Iter[T]] Iter[U] for FlatMapped[T, U, C, I]:
-    mut fn next() -> Option[U]:
-        loop:
-            match self.current:
-                Some(c) =>
-                    match c.next():
-                        Some(x) => return Some(x)
-                        None => self.current = None
-                None =>
-                    match self.inner.next():
-                        None => return None
-                        Some(x) => self.current = Some((self.f)(x))
-
-pub fn iter_flat_map[T, U, C: Iter[U], I: Iter[T]](iter: I, f: fn(T) -> C) -> FlatMapped[T, U, C, I]: FlatMapped { inner: iter, f, current: None }
+// `it.flat_map(f)` lives in std.collections (FlatMapped, FlatMappedInto):
+// it holds the iterator being drained in a List, which the core prelude
+// that loads this module does not have.
 
 /// `l.zip_with(r, f)`: `f` over the pairs, as long as both have elements.
 pub type ZippedWith[A, B, V, L, R] { l: L, r: R, f: fn(A, B) -> V }

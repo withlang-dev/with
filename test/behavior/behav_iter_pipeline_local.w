@@ -16,7 +16,7 @@ fn sum_iter(iter: ListIter[i32]) -> i32:
             done = true
     total
 
-fn make_filtered(xs: &List[i32]) -> Filtered[&i32, ListIter[i32]]:
+fn make_filtered(xs: &List[i32]) -> FilteredViews[i32, ListIter[i32]]:
     xs.iter().filter(x => x % 2 == 0)
 
 fn main:
