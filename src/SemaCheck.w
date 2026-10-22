@@ -184,9 +184,9 @@ fn sema_path_is_runtime_implementation(path: &str) -> i32:
     if resolve_path_is_runtime(path): 1 else: 0
 
 fn sema_path_is_migrated_regex_implementation(path: &str) -> i32:
-    if path.starts_with("lib/std/re/") or path.starts_with("<embedded-std>/std/re/"):
+    if path.starts_with("lib/std/engines/pcre2/") or path.starts_with("<embedded-std>/std/engines/pcre2/"):
         return 1
-    if path.contains("/lib/std/re/") or path.contains("\\lib\\std\\re\\"):
+    if path.contains("/lib/std/engines/pcre2/") or path.contains("\\lib\\std\\engines\\pcre2\\"):
         return 1
     0
 

@@ -15,8 +15,8 @@ const ZLIB_SHA256: str = "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de
 
 pub fn zlib_corpus() -> Corpus:
     Corpus {
-        name: "zlib", stem: "zlib", package: "std.zl",
-        corpus_rel: "std/zl", corpus_dir: "lib/std/zl",
+        name: "zlib", stem: "zlib", package: "std.engines.zlib",
+        corpus_rel: "std/engines/zlib", corpus_dir: "lib/std/engines/zlib",
         upstream: upstream_release("zlib", ZLIB_RELEASE, "https://zlib.net/fossils/" ++ ZLIB_RELEASE ++ ".tar.gz", ZLIB_SHA256),
         license: "",
         // example and minigzip are the harness, never the bundle; example.w
@@ -93,7 +93,7 @@ pub fn run_zlib_build_action(ctx: ActionCtx) -> i32:
     let output = ctx.output()
     if not fs.is_dir(migrated): return corpus_fail(ctx, "missing migrated zlib directory: " ++ migrated ++ " - run zlib-migrate deliberately")
     let tmp = corpus_scratch(ctx) ++ "/build"
-    let zl = tmp ++ "/lib/std/zl"
+    let zl = tmp ++ "/lib/std/engines/zlib"
     let bin = tmp ++ "/bin"
     if corpus_reset_dir(ctx, tmp) != 0: return 1
     if fs.mkdir_all(zl) != 0 or fs.mkdir_all(bin) != 0: return corpus_fail(ctx, "could not create temp build directories under " ++ tmp)

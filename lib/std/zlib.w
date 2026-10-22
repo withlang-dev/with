@@ -2,11 +2,11 @@
 
 use std.collections
 use std.result
-use std.zl.defs
-use std.zl.compress
-use std.zl.deflate
-use std.zl.uncompr
-use std.zl.inflate
+use std.engines.zlib.defs
+use std.engines.zlib.compress
+use std.engines.zlib.deflate
+use std.engines.zlib.uncompr
+use std.engines.zlib.inflate
 
 const ZLIB_DEFAULT_MAX_OUTPUT: i64 = 64 * 1024 * 1024
 const ZLIB_MAX_CHUNK = (0 as c_uint) -% 1

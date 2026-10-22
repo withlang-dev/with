@@ -2026,7 +2026,13 @@ fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[
             let failed: List[str] = List.new()
             failed.push(LINK_BUNDLE_FAILED())
             return failed
-        let obj_path = tmp_dir ++ "/wo_" ++ name ++ ".o"
+        // The extracted object is named by the bundle it is (its interface
+        // sha): every compiler process shares this directory, two generations
+        // included (the drop audit runs the seed beside the candidate), and one
+        // path for both handed a link the other generation's object (#761's
+        // mixed-generation class; on one layout the module hashes agreed and
+        // hid it).
+        let obj_path = tmp_dir ++ "/wo_" ++ name ++ "_" ++ manifest_wi_sha.slice(0, 16) ++ ".o"
         let data = link_stage_embedded_obj_slice(embedded_bundle_object_start(bi) as *const u8, embedded_bundle_object_end(bi) as *const u8)
         if runtime_mkdir_p(tmp_dir) != 0 or link_stage_extract_blob(data, obj_path) != 0:
             with_eprint("error: could not extract embedded bundle '" ++ name ++ "' to " ++ obj_path)
@@ -2248,7 +2254,11 @@ fn link_stage_find_runtime_object_path(name: &str) -> str:
     let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
     if runtime_mkdir_p(tmp_dir) != 0:
         return ""
-    let tmp_path = tmp_dir ++ "/" ++ name
+    // Named by this compiler's generation: the directory is shared by every
+    // compiler process (see the bundle extraction above).
+    let generation = compiler_generation()
+    let generation_key = if generation.len() > 16: generation.slice(0, 16) else: generation
+    let tmp_path = tmp_dir ++ "/" ++ generation_key ++ "_" ++ name
     if link_stage_extract_runtime_obj(name, tmp_path) == 0:
         return tmp_path
     ""
@@ -2436,7 +2446,10 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     var rt_bundle_joined = false
     for boi in 0..bundle_objects.len():
         // The embedded slot's extraction, or the runtime root's own rt.o.
-        if bundle_objects[boi].ends_with("/wo_rt.o") or bundle_objects[boi].ends_with("/rt.o"):
+        // The extracted runtime bundle is `wo_rt_<interface sha>.o` (named by
+        // the bundle it is); a runtime root's is `rt.o`.
+        let bundle_name = link_stage_basename(bundle_objects[boi])
+        if (bundle_name.starts_with("wo_rt_") and bundle_name.ends_with(".o")) or bundle_name == "rt.o":
             rt_bundle_joined = true
         extras.push(with_str_clone_ref(bundle_objects[boi]))
     if needs_fiber_runtime != 0 or (rt_bundle_joined and not target_spec_is_wasm()):

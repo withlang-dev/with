@@ -142,7 +142,7 @@ fn codegen_hash_name_component(value: i64) -> str:
         return "n" ++ f"{0 - value}"
     f"{value}"
 
-// "lib/std/re/x.w" or ".../lib/std/re/x.w" → "std/re/x.w"; "" for any other
+// "lib/std/engines/pcre2/x.w" or ".../lib/std/engines/pcre2/x.w" → "std/engines/pcre2/x.w"; "" for any other
 // path. The same three spellings Sema's module naming accepts.
 fn fn_abi_std_tree_relative(path: &str) -> str:
     if path.starts_with("lib/std/"):

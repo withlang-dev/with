@@ -1,0 +1,234 @@
+// Migrated from C
+use std.engines.pcre2.defs
+use std.engines.pcre2.pcre2_config
+use std.engines.pcre2.pcre2_context
+use std.engines.pcre2.pcre2_convert
+use std.engines.pcre2.pcre2_compile
+use std.engines.pcre2.pcre2_pattern_info
+use std.engines.pcre2.pcre2_match_data
+use std.engines.pcre2.pcre2_dfa_match
+use std.engines.pcre2.pcre2_match
+use std.engines.pcre2.pcre2_match_next
+use std.engines.pcre2.pcre2_substring
+use std.engines.pcre2.pcre2_serialize
+use std.engines.pcre2.pcre2_substitute
+use std.engines.pcre2.pcre2_jit_compile
+use std.engines.pcre2.pcre2_error
+use std.engines.pcre2.pcre2_maketables
+use std.engines.pcre2.pcre2_tables
+use std.engines.pcre2.pcre2_chartables
+use std.engines.pcre2.pcre2_ucd
+use std.engines.pcre2.pcre2_auto_possess
+use std.engines.pcre2.pcre2_chkdint
+use std.engines.pcre2.pcre2_extuni
+use std.engines.pcre2.pcre2_find_bracket
+use std.engines.pcre2.pcre2_newline
+use std.engines.pcre2.pcre2_ord2utf
+use std.engines.pcre2.pcre2_script_run
+use std.engines.pcre2.pcre2_study
+use std.engines.pcre2.pcre2_valid_utf
+use std.engines.pcre2.pcre2_xclass
+
+pub unsafe fn _pcre2_strcmp_8(__param_str1: *const u8, __param_str2: *const u8) -> c_int {
+    var __local_str1 = __param_str1
+    var __local_str2 = __param_str2
+    var __local_c1: u8
+
+    var __local_c2: u8
+
+
+    while true {
+        var __ci_expr_logic_0: c_int
+
+        if ((if (*__local_str1) != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_0 = (if (if (*__local_str2) != 0: 1 else: 0) != 0: 1 else: 0))
+        }
+
+        if (not (__ci_expr_logic_0 != 0)) {
+            break
+        }
+
+        var __ci_expr_old_1: *const u8 = __local_str1
+
+        (__local_str1 = __local_str1 + 1)
+
+        (__local_c1 = (*__ci_expr_old_1))
+
+        var __ci_expr_old_2: *const u8 = __local_str2
+
+        (__local_str2 = __local_str2 + 1)
+
+        (__local_c2 = (*__ci_expr_old_2))
+
+        if ((if __local_c1 != __local_c2: 1 else: 0) != 0) {
+            return ((((if __local_c1 > __local_c2: 1 else: 0) as c_int) << (1 as c_uint)) - 1)
+        }
+
+    }
+
+    return 0
+
+}
+
+pub unsafe fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) -> c_int {
+    var __local_str1 = __param_str1
+    var __local_str2 = __param_str2
+    var __local_c1: u8
+
+    var __local_c2: u8
+
+
+    while true {
+        var __ci_expr_logic_0: c_int
+
+        if ((if (*__local_str1) != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_0 = (if (if (*__local_str2) != 0: 1 else: 0) != 0: 1 else: 0))
+        }
+
+        if (not (__ci_expr_logic_0 != 0)) {
+            break
+        }
+
+        var __ci_expr_old_1: *const u8 = __local_str1
+
+        (__local_str1 = __local_str1 + 1)
+
+        (__local_c1 = (*__ci_expr_old_1))
+
+        var __ci_expr_old_2: *const i8 = __local_str2
+
+        (__local_str2 = __local_str2 + 1)
+
+        (__local_c2 = (((*__ci_expr_old_2) as u8)))
+
+        if ((if __local_c1 != __local_c2: 1 else: 0) != 0) {
+            return ((((if __local_c1 > __local_c2: 1 else: 0) as c_int) << (1 as c_uint)) - 1)
+        }
+
+    }
+
+    return 0
+
+}
+
+pub unsafe fn _pcre2_strcpy_c8_8(__param_str1: *mut u8, __param_str2: *const i8) -> c_ulong {
+    var __local_str2 = __param_str2
+    var __local_t: *mut u8 = __param_str1
+
+    while ((if (*__local_str2) != 0: 1 else: 0) != 0) {
+        var __ci_expr_old_0: *mut u8 = __local_t
+
+        (__local_t = __local_t + 1)
+
+        var __ci_expr_old_1: *const i8 = __local_str2
+
+        (__local_str2 = __local_str2 + 1)
+
+        ((*__ci_expr_old_0) = (((*__ci_expr_old_1) as u8)))
+
+    }
+
+    ((*__local_t) = ((0 as u8)))
+
+    return ((((((__local_t as usize) -% (__param_str1 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong))
+
+}
+
+pub unsafe fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong {
+    var __local_str = __param_str
+    var __local_c: c_ulong = ((0 as c_ulong))
+
+    while true {
+        var __ci_expr_old_0: *const u8 = __local_str
+
+        (__local_str = __local_str + 1)
+
+        if (not ((if (*__ci_expr_old_0) != 0: 1 else: 0) != 0)) {
+            break
+        }
+
+        (__local_c = (__local_c +% 1))
+
+    }
+
+    return __local_c
+
+}
+
+pub unsafe fn _pcre2_strncmp_8(__param_str1: *const u8, __param_str2: *const u8, __param_len: c_ulong) -> c_int {
+    var __local_str1 = __param_str1
+    var __local_str2 = __param_str2
+    var __local_len = __param_len
+    var __local_c1: u8
+
+    var __local_c2: u8
+
+
+    while ((if __local_len > 0: 1 else: 0) != 0) {
+        var __ci_expr_old_0: *const u8 = __local_str1
+
+        (__local_str1 = __local_str1 + 1)
+
+        (__local_c1 = (*__ci_expr_old_0))
+
+
+        var __ci_expr_old_1: *const u8 = __local_str2
+
+        (__local_str2 = __local_str2 + 1)
+
+        (__local_c2 = (*__ci_expr_old_1))
+
+
+        if ((if __local_c1 != __local_c2: 1 else: 0) != 0) {
+            return ((((if __local_c1 > __local_c2: 1 else: 0) as c_int) << (1 as c_uint)) - 1)
+        }
+
+
+        (__local_len = (__local_len -% 1))
+
+    }
+
+    return 0
+
+}
+
+pub unsafe fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const i8, __param_len: c_ulong) -> c_int {
+    var __local_str1 = __param_str1
+    var __local_str2 = __param_str2
+    var __local_len = __param_len
+    var __local_c1: u8
+
+    var __local_c2: u8
+
+
+    while ((if __local_len > 0: 1 else: 0) != 0) {
+        var __ci_expr_old_0: *const u8 = __local_str1
+
+        (__local_str1 = __local_str1 + 1)
+
+        (__local_c1 = (*__ci_expr_old_0))
+
+
+        var __ci_expr_old_1: *const i8 = __local_str2
+
+        (__local_str2 = __local_str2 + 1)
+
+        (__local_c2 = (((*__ci_expr_old_1) as u8)))
+
+
+        if ((if __local_c1 != __local_c2: 1 else: 0) != 0) {
+            return ((((if __local_c1 > __local_c2: 1 else: 0) as c_int) << (1 as c_uint)) - 1)
+        }
+
+
+        (__local_len = (__local_len -% 1))
+
+    }
+
+    return 0
+
+}

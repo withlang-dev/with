@@ -10,7 +10,7 @@ use std.zip
 // std.zip reads an archive another implementation wrote: Info-ZIP's
 // `zip -X -r t.zip top` over a directory, a stored file, an executable
 // script and a deflated 9490-byte file (300 lines). Reading goes through
-// the migrated minizip reader (std.zl.unzip), which checks each CRC-32.
+// the migrated minizip reader (std.engines.zlib.unzip), which checks each CRC-32.
 fn fixture() -> List[u8]:
     [
      80, 75, 3, 4, 10, 0, 0, 0, 0, 0, 7, 153, 51, 93, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

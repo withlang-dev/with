@@ -4,9 +4,9 @@
 // interface fns. The interface declaration used to share the user fn's flat
 // symbol, so the codegen audit checked the interface signature against the
 // user's function ("finalized source type or LLVM parameter disagrees with
-// FnAbi") and codegen failed. `collide` pulls std.re and std.zl (the
-// behavior fixture itself, audited clean); `corpora` pulls std.c_algorithms
-// (SortedList) and std.tommyds (hash_index) as well. `corpora` still carries
+// FnAbi") and codegen failed. `collide` pulls std.engines.pcre2 and std.engines.zlib (the
+// behavior fixture itself, audited clean); `corpora` pulls std.engines.c_algorithms
+// (SortedList) and std.engines.tommyds (hash_index) as well. `corpora` still carries
 // the "receiver requirement" violation every program reaching std.box
 // reports (#1300), so it asserts only that no FnAbi or codegen violation
 // names a declaration.
@@ -26,7 +26,7 @@ fn main:
     let collide = read_file(p7_abs("test/behavior/behav_1362_user_fns_named_like_bundle_interface_fns.w")).unwrap()
     p7_write(case_dir, "src/collide.w", collide)
     let audited = p7_run(case_dir, "collide_audit", "analyze\0src/collide.w\0audit:all\0")
-    p7_assert_success(audited, "audit:all over user fns named like std.re/std.zl interface fns")
+    p7_assert_success(audited, "audit:all over user fns named like std.engines.pcre2/std.engines.zlib interface fns")
     assert(audited.stdout.contains("violations=0"))
 
     let corpora = "use std.collections.sorted_list.SortedList\nuse std.collections.hash_index\n" ++ helpers_text() ++
@@ -40,7 +40,7 @@ fn main:
         "    print(\"corpora ok\")\n"
     p7_write(case_dir, "src/corpora.w", corpora)
     let ran = p7_run(case_dir, "corpora_run", "run\0src/corpora.w\0")
-    p7_assert_success(ran, "user fns named like std.c_algorithms/std.tommyds interface fns")
+    p7_assert_success(ran, "user fns named like std.engines.c_algorithms/std.engines.tommyds interface fns")
     assert(ran.stdout.contains("corpora ok"))
     let corpora_audit = p7_run(case_dir, "corpora_audit", "analyze\0src/corpora.w\0audit:all\0")
     let report = corpora_audit.stdout ++ corpora_audit.stderr

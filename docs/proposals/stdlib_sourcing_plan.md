@@ -8,7 +8,7 @@ Status: PLAN (2026-09-01), with engine selections ruled on 2026-09-12.
 `Trie[V]`, `SortedVec[T]`, `BinaryHeap[T]`, `engine_slot`). Phase 2 TommyDS
 landed in the same merge (fourth bundle, `check.c` green, `HashIndex[K, V]`
 over `hashdyn`, the hash-engine benchmark below). **Phase 3 STC — not
-started**: no `build/stc.w`, no `lib/std/stc/`, no `std.algorithms`; the
+started**: no `build/stc.w`, no `lib/std/engines/stc/`, no `std.algorithms`; the
 `Vec` engine, `Deque`/`Stack`/`Queue`/`PriorityQueue`/`List`, the default
 `HashMap`/`HashSet`, `OrderedMap`/`OrderedSet`, `BitSet`, spans, `sort` and
 the searches all wait on it, and #937/#938/#939/#940 stay open. **Phase 4
@@ -199,7 +199,7 @@ object and interface (never the source: Sema on a corpus costs seconds
 per program); user programs automatically link the ones they reference.
 
 Layout: each bundle's source is checked in under `lib/std/<corpus>/`
-exactly as pcre2's (`lib/std/re/`) and zlib's (`lib/std/zl/`) are —
+exactly as pcre2's (`lib/std/engines/pcre2/`) and zlib's (`lib/std/engines/zlib/`) are —
 generated, never hand-edited, and under the stdlib tree because a bundle's
 symbols hash the module's canonical `<embedded-std>/…` path, which that
 location names whether or not the source is embedded
@@ -237,12 +237,12 @@ those two do; nothing is a new mechanism.
 **The pattern, as zlib and regex do it today**
 
 1. *Import the raw modules directly.* `std.zlib` is
-   `use std.zl.defs / compress / deflate / uncompr / inflate` — the
+   `use std.engines.zlib.defs / compress / deflate / uncompr / inflate` — the
    migrated corpus as ordinary With modules. The corpus package never
-   shares its dotted path with the facade (`std.zl` / `std.zlib`,
-   `std.re` / `std.regex`): the frontend's parent-module import fallback
+   shares its dotted path with the facade (`std.engines.zlib` / `std.zlib`,
+   `std.engines.pcre2` / `std.regex`): the frontend's parent-module import fallback
    would otherwise pull the facade into the `--no-prelude` bundle build
-   (`docs/spec/toolchain/wo_bundles.md`). `std.regex` imports `std.re` through the
+   (`docs/spec/toolchain/wo_bundles.md`). `std.regex` imports `std.engines.pcre2` through the
    bundle interface; C4 retired the `with_regex_*` runtime shims in #1101.
 2. *A With error type over engine codes.* `ZlibError { code, message }`
    with `zlib_code_error(Z_DATA_ERROR) -> "invalid or corrupt zlib data"`;
@@ -308,7 +308,7 @@ This illustrates ownership for a comparison engine. The selected public
 `OrderedMap` uses STC's `smap`; `BTreeMap` uses M*LIB's B+ tree.
 
 ```
-use std.c_algorithms.rb_tree        // raw: RBTree, rb_tree_new(cmp), rb_tree_insert(tree, key, value), rb_tree_lookup, rb_tree_remove, rb_tree_free …
+use std.engines.c_algorithms.rb_tree        // raw: RBTree, rb_tree_new(cmp), rb_tree_insert(tree, key, value), rb_tree_lookup, rb_tree_remove, rb_tree_free …
 
 type RbTree[K, V] {
     tree: *mut RBTree,              // engine handle (raw)
@@ -411,7 +411,7 @@ by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
 **Phase 1 status (2026-09-13, branch `c-algorithms-phase1`).**
 - Corpus: pinned (`build/c_algorithms.w`, revision `23d45379`), migrated
   raw with `with migrate` (19 engine modules + `defs.w`), promoted to
-  `lib/std/c_algorithms/` as the third `.wo` bundle (`c_algorithms.wo`;
+  `lib/std/engines/c_algorithms/` as the third `.wo` bundle (`c_algorithms.wo`;
   `bundle.w` root, `c-algorithms-bundle-root-check`, drift lane with
   upstream's `test-cpp` as the harness). The build wires it exactly as
   zlib's bundle at every site (since 2026-09-14 through the corpus registry).
@@ -469,7 +469,7 @@ adapters have complexity and drop evidence. #939 remains a Phase 3 gate.
 - Corpus: pinned (`build/tommyds.w`, amadvance/tommyds `1f3727fc`),
   migrated raw with `with migrate` (the 13 units as modules + `defs.w`;
   `tommy.c`, upstream's amalgamation of those units, is excluded),
-  promoted to `lib/std/tommyds/` as the fourth `.wo` bundle (`tommyds.wo`;
+  promoted to `lib/std/engines/tommyds/` as the fourth `.wo` bundle (`tommyds.wo`;
   `bundle.w` root, `tommyds-bundle-root-check`, drift lane with upstream's
   `check.c` as the harness — module `check_`, since `check` is a prelude
   name). Wired as c-algorithms is at every site (through the corpus registry).
@@ -559,7 +559,7 @@ contract before exposing it.
 - Corpus: pinned (`build/stc.w`, stclib/STC `fc5c0587`), the `src/` library
   units migrated whole in STC_HEADER linkage against the header tree
   (`Corpus.include_dirs`), plus a staged `ucd` unit for the Unicode tables
-  upstream compiles only into cregex; promoted to `lib/std/stc/` as the
+  upstream compiles only into cregex; promoted to `lib/std/engines/stc/` as the
   fifth `.wo` bundle (drift harness: `examples/strings/replace.c`). Out,
   loudly: `cregex` (setjmp) and `stc_core` (the coroutine runtime: its
   records carry bitfields); the same rule keeps `hmap_test` migrated but

@@ -5,7 +5,7 @@
 // heap slot per value, and translates between With ownership and the
 // engine's calls.
 
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 
 /// One engine pointer target. The With comparator sits at offset 0 so the
 /// engine's comparison callback can find it without knowing `T`; the value

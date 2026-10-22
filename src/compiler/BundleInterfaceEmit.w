@@ -1270,7 +1270,7 @@ impl BundleEmitter:
             if bundle_corpus_contains(self.corpus, canonical):
                 self.add_module(canonical, path)
         if self.modules.len() == 0:
-            self.refuse_global("bundle interface: no module under corpus '" ++ self.corpus ++ "' in this compilation (--bundle-corpus names a path under the embedded std tree, e.g. std/re)")
+            self.refuse_global("bundle interface: no module under corpus '" ++ self.corpus ++ "' in this compilation (--bundle-corpus names a path under the embedded std tree, e.g. std/engines/pcre2)")
             return
         // The storage first: a function's write contract is checked against
         // the exported globals (check_declared_global_writes), so every

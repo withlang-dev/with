@@ -1,5 +1,5 @@
 // Migrated from C
-use std.calg_testing.defs
+use std.engines.c_algorithms_testing.defs
 
 pub unsafe fn int_equal(__param_vlocation1: *mut c_void, __param_vlocation2: *mut c_void) -> c_int {
     var __local_location1: *mut c_int

@@ -7,15 +7,15 @@
 
 use std.option
 use std.traits
-use std.c_algorithms.defs
-use std.c_algorithms.binary_heap
+use std.engines.c_algorithms.defs
+use std.engines.c_algorithms.binary_heap
 
 use std.collections.engine_slot.Slot
 use std.collections.engine_slot.slot_compare
 use rt.rt_core
 
 
-// The engine's BINARY_HEAP_TYPE_MIN / BINARY_HEAP_TYPE_MAX (std.c_algorithms.defs),
+// The engine's BINARY_HEAP_TYPE_MIN / BINARY_HEAP_TYPE_MAX (std.engines.c_algorithms.defs),
 // spelled here until #1136 lets a nested module import a corpus global.
 const HEAP_TYPE_MIN: c_uint = 0
 const HEAP_TYPE_MAX: c_uint = 1

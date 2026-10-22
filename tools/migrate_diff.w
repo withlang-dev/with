@@ -1,7 +1,7 @@
 // migrate_diff: the migration differential (#2230, part 2, v1).
 //
 //   with run tools/migrate_diff.w <old-dir> <new-dir> <main.w> <lib-subdir>
-//   with run tools/migrate_diff.w lib/std/re out/pcre2_migrated pcre2test.w re
+//   with run tools/migrate_diff.w lib/std/engines/pcre2 out/pcre2_migrated pcre2test.w re
 //
 // Two migrations of the same C differ by the migrator's rewrites; this
 // names every function whose lowered MIR differs between them, so "which of
@@ -73,7 +73,7 @@ fn dump_side(label: &str, src_dir: &str, main: &str, sub: &str) -> str:
     // The corpus on its source and without the prelude, as its bundle
     // builds: with the embedded interface answering `use std.<sub>.X` the
     // dump holds no corpus body at all, and with the prelude on its
-    // std.regex reaches the checkout's lib/std/re beside this tree (refused:
+    // std.regex reaches the checkout's lib/std/engines/pcre2 beside this tree (refused:
     // one std module, one source).
     let argv: List[str] = ["with", "check", "lib/std/" ++ sub ++ "/" ++ main, "--dump-mir", "--bundle-corpus", "std/" ++ sub, "--no-prelude"]
     let out_path = root ++ "/mir.txt"

@@ -8,8 +8,8 @@
 
 use std.option
 use std.traits
-use std.c_algorithms.defs
-use std.c_algorithms.trie
+use std.engines.c_algorithms.defs
+use std.engines.c_algorithms.trie
 use std.collections.engine_slot.Slot
 use std.collections.engine_slot.slot_unordered
 use rt.rt_core

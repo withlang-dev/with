@@ -35,11 +35,11 @@ pub type Corpus ephemeral {
     // target-name stem: <stem>-migrate, -check-generated, -promote,
     // -bundle-root, -bundle-root-check, -test: c-algorithms
     stem: str,
-    // the migrated modules' package: std.c_algorithms
+    // the migrated modules' package: std.engines.c_algorithms
     package: str,
-    // the `--bundle-corpus` spelling under the embedded std tree: std/c_algorithms
+    // the `--bundle-corpus` spelling under the embedded std tree: std/engines/c_algorithms
     corpus_rel: str,
-    // the tree directory: lib/std/c_algorithms
+    // the tree directory: lib/std/engines/c_algorithms
     corpus_dir: str,
     upstream: Upstream,
     // the license file in the reference tree, copied beside the migration ("" = none)

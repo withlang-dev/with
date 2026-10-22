@@ -20,13 +20,13 @@ const CALG_SHA256 = "c2e9f3ba13d5373f79a70fa27d93730de98af314f2476190b156eee2a63
 // programs/<name>/ holds the program's own defs.w and test module. Generated
 // by c-algorithms-promote-tests, never hand-edited. The programs migrate
 // under their own package: a compiler that embeds the c_algorithms bundle
-// resolves `std.c_algorithms.*` to the bundle interface before any local
+// resolves `std.engines.c_algorithms.*` to the bundle interface before any local
 // module, so a program could never supply its own defs there. It stays a
 // std package: under --no-prelude, std.libc reaches c_void through the
 // std tier's view of the corpus defs (exactly as the bundle builds do), and
 // a user package cannot provide that.
 const CALG_TESTS_DIR = "test/corpora/c_algorithms"
-const CALG_TESTS_PACKAGE = "std.calg_testing"
+const CALG_TESTS_PACKAGE = "std.engines.c_algorithms_testing"
 fn calg_tests_package_dir(): "lib/" ++ CALG_TESTS_PACKAGE.replace(".", "/")
 
 fn calg_modules() -> List[str]:
@@ -44,8 +44,8 @@ fn calg_test_module(name: &str): "test_" ++ name.replace("-", "_") ++ ".w"
 
 pub fn c_algorithms_corpus() -> Corpus:
     Corpus {
-        name: "c_algorithms", stem: "c-algorithms", package: "std.c_algorithms",
-        corpus_rel: "std/c_algorithms", corpus_dir: "lib/std/c_algorithms",
+        name: "c_algorithms", stem: "c-algorithms", package: "std.engines.c_algorithms",
+        corpus_rel: "std/engines/c_algorithms", corpus_dir: "lib/std/engines/c_algorithms",
         upstream: upstream_github("c_algorithms", "fragglet/c-algorithms", CALG_REVISION, CALG_SHA256),
         license: "COPYING.md",
         // upstream's test framework and its smoke program (test-cpp

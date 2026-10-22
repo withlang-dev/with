@@ -12,8 +12,8 @@
 use std.hash
 use std.option
 use std.traits
-use std.tommyds.defs
-use std.tommyds.tommyhashdyn
+use std.engines.tommyds.defs
+use std.engines.tommyds.tommyhashdyn
 use rt.rt_core
 
 

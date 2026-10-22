@@ -10,15 +10,15 @@ use std.collections
 use std.collections.hash_index.HashIndex
 use std.time
 use std.builtins
-use std.tommyds.defs
-use std.tommyds.tommyhash
-use std.tommyds.tommyhashdyn
-use std.tommyds.tommyhashlin
-use std.tommyds.tommyhashtbl
-use std.c_algorithms.defs
-use std.c_algorithms.hash_table
-use std.c_algorithms.hash_int
-use std.c_algorithms.compare_int
+use std.engines.tommyds.defs
+use std.engines.tommyds.tommyhash
+use std.engines.tommyds.tommyhashdyn
+use std.engines.tommyds.tommyhashlin
+use std.engines.tommyds.tommyhashtbl
+use std.engines.c_algorithms.defs
+use std.engines.c_algorithms.hash_table
+use std.engines.c_algorithms.hash_int
+use std.engines.c_algorithms.compare_int
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit

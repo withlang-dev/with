@@ -6,7 +6,7 @@ use std.fs
 // A header's `static inline` definitions are that header's API: the unit
 // of the same name publishes them once, includers import them instead of
 // keeping private copies (TommyDS's tommy_hashdyn_search lives in
-// tommyhashdyn.h; the facade calls it through std.tommyds.tommyhashdyn).
+// tommyhashdyn.h; the facade calls it through std.engines.tommyds.tommyhashdyn).
 // A header no unit owns keeps a private copy per includer; only one unit
 // includes util.h here because two private copies of one name in one
 // package do not compile yet (#1139).

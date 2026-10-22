@@ -8751,7 +8751,7 @@ fn bs_pcre2_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str,
     result
 
 fn bs_check_pcre2_defs_prune_ebcdic_tables(ctx: &ActionCtx) -> i32:
-    let defs = "lib/std/re/defs.w"
+    let defs = "lib/std/engines/pcre2/defs.w"
     var rc = bs_file_forbids(ctx, defs, "_pcre2_ebcdic_1047_to_ascii_8", "ebcdic table externs")
     if rc != 0: return rc
     bs_file_forbids(ctx, defs, "_pcre2_ascii_to_ebcdic_1047_8", "ebcdic table externs")
@@ -8759,13 +8759,13 @@ fn bs_check_pcre2_defs_prune_ebcdic_tables(ctx: &ActionCtx) -> i32:
 fn bs_check_pcre2_prepare_shared_externs(ctx: &ActionCtx, base_dir: &str) -> i32:
     let raw_dir = bs_join(base_dir, "raw")
     let generated_dir = bs_join(base_dir, "generated")
-    var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\nextern fn preamble_helper() -> Unit\n", "shared externs defs")
+    var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.engines.pcre2.defs - shared definitions\nextern fn preamble_helper() -> Unit\n", "shared externs defs")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_tables.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nvar _pcre2_utf8_table1: *c_int\nvar _pcre2_OP_lengths_8: *u8\n", "shared externs tables")
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_tables.w"), "// Migrated from PCRE2\nuse std.engines.pcre2.defs\n\ntype BOOL = c_int\nvar _pcre2_utf8_table1: *c_int\nvar _pcre2_OP_lengths_8: *u8\n", "shared externs tables")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_compile.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nextern var _pcre2_utf8_table1: *c_int\nvar _pcre2_posix_class_maps8: *c_int\n", "shared externs compile")
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_compile.w"), "// Migrated from PCRE2\nuse std.engines.pcre2.defs\n\ntype BOOL = c_int\nextern var _pcre2_utf8_table1: *c_int\nvar _pcre2_posix_class_maps8: *c_int\n", "shared externs compile")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_compile_class.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nextern var _pcre2_utf8_table1: *c_int\nextern var _pcre2_posix_class_maps8: *c_int\n", "shared externs compile class")
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_compile_class.w"), "// Migrated from PCRE2\nuse std.engines.pcre2.defs\n\ntype BOOL = c_int\nextern var _pcre2_utf8_table1: *c_int\nextern var _pcre2_posix_class_maps8: *c_int\n", "shared externs compile class")
     if rc != 0: return rc
 
     let files: List[str] = List.new()
@@ -8794,8 +8794,8 @@ fn bs_check_pcre2_prepare_width_prunes(ctx: &ActionCtx, compiler_path: &str, bas
     let root = ctx.project_info().project_root()
     let raw_dir = bs_join(base_dir, "raw")
     let generated_dir = bs_join(base_dir, "generated")
-    let compile_text = "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nextern fn _pcre2_keep_8(ch: c_uint) -> c_uint\nfn keep_body(flag: c_int) -> c_int {\n    var c__goto_6350_16: c_uint = 0\n    if flag != 0 {\n        (c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))\n    } else {\n        (c__goto_6350_16 = 1)\n    }\n    (c__goto_6350_16 as c_int)\n}\n"
-    var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\ntype c_void = opaque\ntype c_int = i32\ntype c_uint = u32\ntype c_ushort = u16\nextern fn strlen(s: *const i8) -> i64\nextern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void\n", "width prune defs")
+    let compile_text = "// Migrated from PCRE2\nuse std.engines.pcre2.defs\n\ntype BOOL = c_int\nextern fn _pcre2_keep_8(ch: c_uint) -> c_uint\nfn keep_body(flag: c_int) -> c_int {\n    var c__goto_6350_16: c_uint = 0\n    if flag != 0 {\n        (c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))\n    } else {\n        (c__goto_6350_16 = 1)\n    }\n    (c__goto_6350_16 as c_int)\n}\n"
+    var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.engines.pcre2.defs - shared definitions\ntype c_void = opaque\ntype c_int = i32\ntype c_uint = u32\ntype c_ushort = u16\nextern fn strlen(s: *const i8) -> i64\nextern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void\n", "width prune defs")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_compile.w"), compile_text, "width prune compile")
     if rc != 0: return rc
@@ -8822,13 +8822,13 @@ fn bs_check_pcre2_prepare_width_prunes(ctx: &ActionCtx, compiler_path: &str, bas
 fn bs_check_pcre2_prepare_shared_lets(ctx: &ActionCtx, base_dir: &str) -> i32:
     let raw_dir = bs_join(base_dir, "raw")
     let generated_dir = bs_join(base_dir, "generated")
-    var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\nlet ucp_C: c_uint = 0\nlet ucp_L: c_uint = 1\n", "shared lets defs")
+    var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.engines.pcre2.defs - shared definitions\nlet ucp_C: c_uint = 0\nlet ucp_L: c_uint = 1\n", "shared lets defs")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_tables.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nlet LOCAL_TABLE_ONLY: c_uint = 99\n", "shared lets tables")
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_tables.w"), "// Migrated from PCRE2\nuse std.engines.pcre2.defs\n\ntype BOOL = c_int\nlet LOCAL_TABLE_ONLY: c_uint = 99\n", "shared lets tables")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_compile.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nlet COMPILE_ONLY: c_uint = 7\n", "shared lets compile")
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_compile.w"), "// Migrated from PCRE2\nuse std.engines.pcre2.defs\n\ntype BOOL = c_int\nlet COMPILE_ONLY: c_uint = 7\n", "shared lets compile")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_match.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nlet MATCH_ONLY: c_uint = 8\n", "shared lets match")
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_match.w"), "// Migrated from PCRE2\nuse std.engines.pcre2.defs\n\ntype BOOL = c_int\nlet MATCH_ONLY: c_uint = 8\n", "shared lets match")
     if rc != 0: return rc
 
     let files: List[str] = List.new()
@@ -8860,7 +8860,7 @@ fn bs_check_pcre2_prepare_shared_lets(ctx: &ActionCtx, base_dir: &str) -> i32:
 fn bs_check_std_re_shared_dependency_imports(ctx: &ActionCtx, compiler_path: &str, base_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(base_dir, "main.w")
-    var rc = bs_write_fixture(ctx, src, "use std.re.defs\nuse std.re.pcre2_compile\nuse std.re.pcre2_match\n\nfn main:\n    print(\"ok\")\n", "std re dependency imports")
+    var rc = bs_write_fixture(ctx, src, "use std.engines.pcre2.defs\nuse std.engines.pcre2.pcre2_compile\nuse std.engines.pcre2.pcre2_match\n\nfn main:\n    print(\"ok\")\n", "std re dependency imports")
     if rc != 0: return rc
     var args: List[str] = List.new()
     args |> push("check")
@@ -8884,7 +8884,7 @@ fn bs_check_opaque_field_access_rejected(ctx: &ActionCtx, compiler_path: &str, b
 
 fn bs_check_pcre2_match_heapframe(ctx: &ActionCtx, compiler_path: &str, base_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
-    let match_path = "lib/std/re/pcre2_match.w"
+    let match_path = "lib/std/engines/pcre2/pcre2_match.w"
     let match_text = ctx.fs().read_text(match_path)
     var rc = bs_assert_not_contains(ctx, match_text, "type heapframe = opaque", "pcre2 match heapframe")
     if rc != 0: return rc
@@ -8907,7 +8907,7 @@ fn bs_check_pcre2_compile_builds(ctx: &ActionCtx, compiler_path: &str, base_dir:
     let root = ctx.project_info().project_root()
     let src = bs_join(base_dir, "pcre2_compile_builds.w")
     let bin = bs_join(base_dir, "pcre2_compile_builds")
-    var rc = bs_write_fixture(ctx, src, "use std.re.defs\nuse std.re.pcre2_compile\n\nfn main:\n    let _ = unsafe { pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8)) }\n    print(\"ok\")\n", "pcre2 compile builds")
+    var rc = bs_write_fixture(ctx, src, "use std.engines.pcre2.defs\nuse std.engines.pcre2.pcre2_compile\n\nfn main:\n    let _ = unsafe { pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8)) }\n    print(\"ok\")\n", "pcre2 compile builds")
     if rc != 0: return rc
     var args: List[str] = List.new()
     args |> push("build")
@@ -8928,7 +8928,7 @@ fn bs_check_pcre2_jit_no_support(ctx: &ActionCtx, compiler_path: &str, base_dir:
     let root = ctx.project_info().project_root()
     let src = bs_join(base_dir, "pcre2_jit_no_support.w")
     let bin = bs_join(base_dir, "pcre2_jit_no_support")
-    let text = "use std.re.defs\nuse std.re.pcre2_jit_compile\n\nfn main() -> i32:\n    unsafe {\n        let rc_null = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), 0)\n        if rc_null != PCRE2_ERROR_NULL: return 1\n\n        let rc_test_alloc = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), PCRE2_JIT_TEST_ALLOC)\n        if rc_test_alloc != PCRE2_ERROR_JIT_UNSUPPORTED: return 2\n\n        let stack = pcre2_jit_stack_create_8(1, 1024, (null as *mut pcre2_real_general_context_8))\n        if stack != null: return 3\n\n        pcre2_jit_stack_assign_8((null as *mut pcre2_real_match_context_8), null, (null as *mut c_void))\n        pcre2_jit_stack_free_8(stack)\n        pcre2_jit_free_unused_memory_8((null as *mut pcre2_real_general_context_8))\n        _pcre2_jit_free_rodata_8((null as *mut c_void), (null as *mut c_void))\n        _pcre2_jit_free_8((null as *mut c_void), (null as *mut pcre2_memctl))\n\n        if _pcre2_jit_get_size_8((null as *mut c_void)) != 0: return 4\n        if _pcre2_jit_get_target_8() == null: return 5\n        return 0\n    }\n"
+    let text = "use std.engines.pcre2.defs\nuse std.engines.pcre2.pcre2_jit_compile\n\nfn main() -> i32:\n    unsafe {\n        let rc_null = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), 0)\n        if rc_null != PCRE2_ERROR_NULL: return 1\n\n        let rc_test_alloc = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), PCRE2_JIT_TEST_ALLOC)\n        if rc_test_alloc != PCRE2_ERROR_JIT_UNSUPPORTED: return 2\n\n        let stack = pcre2_jit_stack_create_8(1, 1024, (null as *mut pcre2_real_general_context_8))\n        if stack != null: return 3\n\n        pcre2_jit_stack_assign_8((null as *mut pcre2_real_match_context_8), null, (null as *mut c_void))\n        pcre2_jit_stack_free_8(stack)\n        pcre2_jit_free_unused_memory_8((null as *mut pcre2_real_general_context_8))\n        _pcre2_jit_free_rodata_8((null as *mut c_void), (null as *mut c_void))\n        _pcre2_jit_free_8((null as *mut c_void), (null as *mut pcre2_memctl))\n\n        if _pcre2_jit_get_size_8((null as *mut c_void)) != 0: return 4\n        if _pcre2_jit_get_target_8() == null: return 5\n        return 0\n    }\n"
     var rc = bs_write_fixture(ctx, src, text, "pcre2 jit no support")
     if rc != 0: return rc
     // The jit-unsupported contract of the migrated pcre2 (SUPPORT_JIT off):
@@ -8948,10 +8948,10 @@ fn bs_check_pcre2_jit_no_support(ctx: &ActionCtx, compiler_path: &str, base_dir:
         return bs_fail(ctx, f"pcre2 jit-unsupported contract failed with exit code {ran.rc}: " ++ ran.stderr)
     0
 
-// One std module, one source: a harness under its own lib/std/re tree,
+// One std module, one source: a harness under its own lib/std/engines/pcre2 tree,
 // compiled with the prelude on and the corpus on source, has its `use
-// std.re.defs` reach its tree while the prelude's std.regex reaches the
-// checkout's lib/std/re. Two module instances of one source is refused,
+// std.engines.pcre2.defs` reach its tree while the prelude's std.regex reaches the
+// checkout's lib/std/engines/pcre2. Two module instances of one source is refused,
 // never compiled into two sets of globals (the pcre2test panic that found
 // it). The same harness compiles with --no-prelude.
 fn bs_check_std_module_two_sources(ctx: &ActionCtx, compiler_path: &str, base_dir: &str) -> i32:
@@ -8960,23 +8960,23 @@ fn bs_check_std_module_two_sources(ctx: &ActionCtx, compiler_path: &str, base_di
     var rc = bs_write_fixture(ctx, bs_join(re_dir, "defs.w"), "pub type c_int = i32\n", "std module two sources defs")
     if rc != 0: return rc
     let src = bs_join(re_dir, "harness.w")
-    rc = bs_write_fixture(ctx, src, "use std.re.defs\n\nfn main -> i32:\n    let n: c_int = 0\n    n\n", "std module two sources harness")
+    rc = bs_write_fixture(ctx, src, "use std.engines.pcre2.defs\n\nfn main -> i32:\n    let n: c_int = 0\n    n\n", "std module two sources harness")
     if rc != 0: return rc
     var args: List[str] = List.new()
     args |> push("check")
     args |> push(bs_abs(root, src))
     args |> push("--bundle-corpus")
-    args |> push("std/re")
+    args |> push("std/engines/pcre2")
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, "std-module-two-sources", args, 120000, root)
     if result.rc == 0:
-        return bs_fail(ctx, "compiled std.re.defs from two files in one compilation")
-    rc = bs_assert_contains(ctx, result.stderr, "module 'std.re.defs' is loaded from two files in one compilation", "std_module_two_sources")
+        return bs_fail(ctx, "compiled std.engines.pcre2.defs from two files in one compilation")
+    rc = bs_assert_contains(ctx, result.stderr, "module 'std.engines.pcre2.defs' is loaded from two files in one compilation", "std_module_two_sources")
     if rc != 0: return rc
     var ok_args: List[str] = List.new()
     ok_args |> push("check")
     ok_args |> push(bs_abs(root, src))
     ok_args |> push("--bundle-corpus")
-    ok_args |> push("std/re")
+    ok_args |> push("std/engines/pcre2")
     ok_args |> push("--no-prelude")
     let ok = bs_run_cli_capture_cwd(ctx, compiler_path, "std-module-one-source", ok_args, 120000, root)
     if ok.rc != 0:
@@ -8985,11 +8985,11 @@ fn bs_check_std_module_two_sources(ctx: &ActionCtx, compiler_path: &str, base_di
 
 fn bs_check_pcre2_generated_existing_main(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let generated_dir = bs_join(case_dir, "generated")
-    var rc = bs_write_fixture(ctx, bs_join(generated_dir, "defs.w"), "// std.re.defs\ntype c_int = i32\n", "pcre2 generated defs")
+    var rc = bs_write_fixture(ctx, bs_join(generated_dir, "defs.w"), "// std.engines.pcre2.defs\ntype c_int = i32\n", "pcre2 generated defs")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(generated_dir, "pcre2_helper.w"), "// Migrated from PCRE2\nuse std.re.defs\n\nfn helper_value() -> c_int:\n    7\n", "pcre2 generated helper")
+    rc = bs_write_fixture(ctx, bs_join(generated_dir, "pcre2_helper.w"), "// Migrated from PCRE2\nuse std.engines.pcre2.defs\n\nfn helper_value() -> c_int:\n    7\n", "pcre2 generated helper")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(generated_dir, "pcre2test.w"), "// Migrated from PCRE2\nuse std.re.defs\n\nfn main() -> i32:\n    0\n", "pcre2 generated existing main")
+    rc = bs_write_fixture(ctx, bs_join(generated_dir, "pcre2test.w"), "// Migrated from PCRE2\nuse std.engines.pcre2.defs\n\nfn main() -> i32:\n    0\n", "pcre2 generated existing main")
     if rc != 0: return rc
     let errors = pcre2_count_generated_errors(ctx, generated_dir, compiler_path, true)
     if errors < 0:
@@ -9261,9 +9261,9 @@ fn bs_check_object_symbols(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str, 
         let pcre_src = bs_join(case_dir, label ++ ".w")
         let pcre_obj = bs_join(case_dir, label ++ ".o")
         let imports = if pi == 0:
-            "use std.re.defs\nuse std.re.pcre2_compile\n"
+            "use std.engines.pcre2.defs\nuse std.engines.pcre2.pcre2_compile\n"
         else:
-            "use std.re.defs\nuse std.re.pcre2_compile\nuse std.re.pcre2_match\n"
+            "use std.engines.pcre2.defs\nuse std.engines.pcre2.pcre2_compile\nuse std.engines.pcre2.pcre2_match\n"
         let pcre_text = imports ++ "\n@[c_export(\"call_compile\")]\nfn call_compile() -> *mut pcre2_real_code_8:\n    unsafe { pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8)) }\n"
         rc = bs_write_fixture(ctx, pcre_src, pcre_text, label)
         if rc != 0: return rc

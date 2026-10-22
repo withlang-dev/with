@@ -9,8 +9,8 @@
 // `to_upper`, a bundle function that declares no global write (Eric,
 // 2026-09-29: a bundle function's global writes are its declared, checked
 // contract, and none declared means none).
-use std.c_algorithms.defs
-use std.c_algorithms.alloc_testing
+use std.engines.c_algorithms.defs
+use std.engines.c_algorithms.alloc_testing
 
 fn main:
     let r = &allocation_limit

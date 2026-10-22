@@ -4751,10 +4751,10 @@ impl Sema:
     //      std-internal references (user `type Regex` rebound regex.w).
     //   2. engine corpora are never ambient (§18.2: "Engine packages are
     //      ordinary explicit dependencies and are never ambient") — a
-    //      migrated corpus a .wo bundle provides (std.re, std.zl,
-    //      std.tommyds, std.c_algorithms: engine_corpus_id) resolves from
+    //      migrated corpus a .wo bundle provides (std.engines.pcre2, std.engines.zlib,
+    //      std.engines.tommyds, std.engines.c_algorithms: engine_corpus_id) resolves from
     //      user code only through the user's own `use` of one of its
-    //      modules. The prelude's std.regex importing std.re.* made
+    //      modules. The prelude's std.regex importing std.engines.pcre2.* made
     //      u128_mul_would_overflow and c_int callable with no import, and a
     //      facade the user imports (std.zlib) re-exports nothing (#1362).
     //   3. prelude gate — a prelude-closure declaration is ambient only for
@@ -4863,7 +4863,7 @@ impl Sema:
         // #2248 (D39 §3.4): a corpus presents its surface, never its
         // body-only imports. A std module that only corpus modules (or
         // other such modules) import is loaded for the corpus's sake —
-        // stage1 compiles the corpus from source and loads std.re's
+        // stage1 compiles the corpus from source and loads std.engines.pcre2's
         // std.libc and its std.os; the release compiler, serving the corpus
         // as an interface, loads neither — and is private to it: never
         // visible to user code, so both generations resolve the same names.
@@ -4968,7 +4968,7 @@ impl Sema:
                             // whether it came as an interface (which never
                             // loads them) or from source (stage1 has no
                             // bundle slot). From inside a corpus the walk
-                            // continues only within it: std.re's std.libc
+                            // continues only within it: std.engines.pcre2's std.libc
                             // import pulled std.os into every program's bare
                             // names on stage1 and not on the release compiler
                             // (#2248).
@@ -5014,7 +5014,7 @@ impl Sema:
 
     // #1362 bridge, until the §18.2 fallback tier lands (#752): a name that
     // resolved from user code only because an engine corpus declared it too
-    // (std.string's is_alnum beside std.re.defs', reached over the prelude
+    // (std.string's is_alnum beside std.engines.pcre2.defs', reached over the prelude
     // edge) keeps resolving — to the unique public declaration of a
     // non-engine std module, the declaration §18.2's tier 5 names. Closing
     // the engine leak never turns such a program into an error; a name
@@ -5220,7 +5220,7 @@ impl Sema:
                         // body-only imports — from inside a corpus the walk
                         // stays within it, and it never enters one from
                         // outside, the same whether the corpus came as an
-                        // interface or from source (#2248: on stage1 std.re's
+                        // interface or from source (#2248: on stage1 std.engines.pcre2's
                         // std.libc import reached std.os for every program).
                         if current != start_idx and target >= 0 and target < self.module_paths.len():
                             if self.engine_corpus_id(self.module_paths[target]) != self.engine_corpus_id(self.module_paths[current]):
@@ -7259,7 +7259,7 @@ impl Sema:
     // pass reports a true same-module shadowing. Every other collision — a
     // local, or a global the module imports — is shadowing.
     fn binding_is_unseen_global(idx: i32, sym: i32) -> bool:
-        // A bundle interface's global (a corpus' `pub let`, std.re's PACKAGE)
+        // A bundle interface's global (a corpus' `pub let`, std.engines.pcre2's PACKAGE)
         // is another module's declaration by construction.
         if self.interface_global_index.contains(sym) and self.interface_global_index.get(sym).unwrap() == idx:
             return true
@@ -7272,7 +7272,7 @@ impl Sema:
         // §18.2 name precedence: a current-module declaration (tier 2) beats
         // an explicit import (tier 3), so a global another module declared —
         // seen or not — is shadowed by this module's own declaration of the
-        // name (#1703: std.re's `pub let PACKAGE` vs a program's
+        // name (#1703: std.engines.pcre2's `pub let PACKAGE` vs a program's
         // `const PACKAGE`), never a "shadowing is not allowed" error.
         self.current_module_path.len() == 0 or path != self.current_module_path
 

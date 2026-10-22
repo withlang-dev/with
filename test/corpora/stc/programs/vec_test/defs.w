@@ -1,4 +1,4 @@
-// std.stc_testing.defs — shared definitions for migrated PCRE2
+// std.engines.stc_testing.defs — shared definitions for migrated PCRE2
 use std.option
 use std.collections
 use rt.rt_core
@@ -360,20 +360,20 @@ impl Copy for csview
 pub type csview_iter_u8 { chr: csview, end: *mut i8 = null, dec: cutf8_decode_t }
 impl Copy for csview_iter_u8
 @[repr(C)]
-pub type csview_iter = union { pub u8_: csview_iter_u8, pub chr: csview, pub ref: *mut i8 = null }
+pub type csview_iter = union { pub u8: csview_iter_u8, pub chr: csview, pub ref: *mut i8 = null }
 impl Copy for csview_iter
 
 pub type zsview_value = c_char
 
 @[repr(C)]
-pub type zsview { pub str_: *mut i8 = null, pub size: c_long = 0 }
+pub type zsview { pub str: *mut i8 = null, pub size: c_long = 0 }
 impl Copy for zsview
 
 @[repr(C)]
 pub type zsview_iter_u8 { chr: csview, dec: cutf8_decode_t }
 impl Copy for zsview_iter_u8
 @[repr(C)]
-pub type zsview_iter = union { pub u8_: zsview_iter_u8, pub chr: csview, pub ref: *mut i8 = null }
+pub type zsview_iter = union { pub u8: zsview_iter_u8, pub chr: csview, pub ref: *mut i8 = null }
 impl Copy for zsview_iter
 
 pub type cstr_value = c_char
@@ -396,7 +396,7 @@ impl Copy for cstr
 pub type cstr_iter_u8 { chr: csview, dec: cutf8_decode_t }
 impl Copy for cstr_iter_u8
 @[repr(C)]
-pub type cstr_iter = union { pub u8_: cstr_iter_u8, pub chr: csview, pub ref: *const i8 = null }
+pub type cstr_iter = union { pub u8: cstr_iter_u8, pub chr: csview, pub ref: *const i8 = null }
 impl Copy for cstr_iter
 
 pub type cstr_raw = *const i8

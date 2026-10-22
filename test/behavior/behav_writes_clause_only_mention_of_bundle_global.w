@@ -5,7 +5,7 @@
 // has to load its declaration: both the frontend's .wi merge and Sema's
 // lazy interface collection count writes-clause names as mentions. (The
 // parent compiler refused this with "is no global".)
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 
 pub fn touch() writes allocation_limit:
     print("x")

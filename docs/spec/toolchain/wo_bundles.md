@@ -11,6 +11,13 @@ descriptions below explain the transition. Ruled in direction by Eric
 (runtime objects as a cache), #761 (the mixed-generation corruption
 class this design must never reintroduce).
 
+Status (2026-10-22, D146): every migrated corpus is an **engine** under one
+namespace, `std.engines.<library>` (`lib/std/engines/<library>/`), named for
+the library it is; the facades over them (`std.regex`, `std.zlib`,
+`std.collections.*`) are named for their function and compose from any
+engines they need. Bundle names (`pcre2.wo`, `zlib.wo`, …) are the corpus
+names and did not move.
+
 ## The requirement, verbatim
 
 > I do not wanna compile the migrated code over and over when there's no
@@ -110,7 +117,7 @@ compiler.
 
 ## How a user program uses `.wo`s
 
-`use std.zlib` (or `use std.stc.deque` through its facade) resolves against
+`use std.zlib` (or `use std.engines.stc.deque` through its facade) resolves against
 the embedded bundle interface; Sema checks the program with full ownership
 knowledge. At link time the compiler extracts from its embedded store
 exactly the `.wo` objects the program referenced and static-links them;
@@ -139,7 +146,7 @@ linked by G+k), so two checks replace it:
    `compute_fn_abi`, the layout tables, and the header types do today (no
    new rules — the version stamps the current convention); the ABI-hash
    check added to the battery.
-2. pcre2 converted first: `lib/std/re` becomes the `pcre2.wo` source,
+2. pcre2 converted first: `lib/std/engines/pcre2` becomes the `pcre2.wo` source,
    the object replaces the per-stage `regex_runtime.o` build, and the
    `with_regex_*` shim retires (D30). Measured: compiler build time before
    and after.
@@ -151,10 +158,10 @@ linked by G+k), so two checks replace it:
 
 ## Conforming pcre2 and zlib (the first two bundles)
 
-(c-algorithms is the third bundle, 2026-09-13: `lib/std/c_algorithms/`,
-package `std.c_algorithms`, root `bundle.w`, harness `test_cpp.w`. See
+(c-algorithms is the third bundle, 2026-09-13: `lib/std/engines/c_algorithms/`,
+package `std.engines.c_algorithms`, root `bundle.w`, harness `test_cpp.w`. See
 `docs/proposals/stdlib_sourcing_plan.md`, "Phase 1 status". TommyDS is the fourth,
-2026-09-14: `lib/std/tommyds/`, package `std.tommyds`, root `bundle.w`,
+2026-09-14: `lib/std/engines/tommyds/`, package `std.engines.tommyds`, root `bundle.w`,
 harness `check_.w` (upstream's `check.c`; `check` collides with the
 prelude name), corpora lane `tommyds-test`. See "Phase 2 status" in the
 same plan. Since 2026-09-14 every corpus is one entry in the registry
@@ -223,7 +230,7 @@ written by the generic generator (`with build :<stem>-bundle-root`).
 What each is today, and what changes. Both follow the one pattern; every
 later corpus follows it from day one.
 
-**pcre2 today.** `lib/std/re/` holds the migrated modules. A 297-line
+**pcre2 today.** `lib/std/engines/pcre2/` holds the migrated modules. A 297-line
 shim, `rt/regex_runtime.w`, imports all of them and exports `with_regex_*`;
 it is compiled whole-module to IR and then to `regex_runtime.o` three
 times per build (`bootstrap-`, `stage2-`, `cross-` targets), embedded
@@ -234,30 +241,30 @@ program's undefined symbols need it (`Link.w`'s
 compiler itself (SemaCheck 12 call sites, CCodegen 10, CiMigrate 3,
 CodegenDispatch 1) call the shim.
 
-**zlib today.** `lib/std/zl/` holds the migrated modules (package
-`std.zl`); `std.zlib` imports them directly (the model facade). Nothing
+**zlib today.** `lib/std/engines/zlib/` holds the migrated modules (package
+`std.engines.zlib`); `std.zlib` imports them directly (the model facade). Nothing
 prebuilt: every consumer (`std.build`, `build/zlib_gzip.w`,
 `build/zlib_gunzip.w`) compiles the corpus in-unit.
 
-The corpus package and the facade never share a dotted path (`std.re` /
-`std.regex`, `std.zl` / `std.zlib`): the frontend resolves a dotted
+The corpus package and the facade never share a dotted path (`std.engines.pcre2` /
+`std.regex`, `std.engines.zlib` / `std.zlib`): the frontend resolves a dotted
 import's parent module as a fallback, so a `lib/std/zlib.w` beside a
 `lib/std/zlib/` corpus would be pulled into the `--no-prelude` bundle build
 and fail there. `build/wo.w` refuses such a corpus by name.
 
 **After.**
-- `pcre2.wo` = `lib/std/re/` (source) + its migrated tests + one object per
+- `pcre2.wo` = `lib/std/engines/pcre2/` (source) + its migrated tests + one object per
   target × ABI version, built by a `pcre2-wo` target from a bundle root that
   imports every module (today that root is the shim's `use` list), keyed
   and stored per §"How the compiler build uses `.wo`s", built only when
-  absent. `zlib.wo` likewise from `lib/std/zl/`.
+  absent. `zlib.wo` likewise from `lib/std/engines/zlib/`.
 - The embed generator and `Link.w`'s name→slice table become data-driven
   over the set of bundles instead of three hardcoded objects; on-demand
   linking generalizes from "needs regex runtime" to "an undefined symbol
   belongs to bundle X" using each bundle's manifest symbol list (this is
   also the link-time interface check).
-- `std.regex` imports `std.re` directly, exactly as `std.zlib` imports
-  `std.zl.*`; the compiler's internal callers move onto `std.regex`;
+- `std.regex` imports `std.engines.pcre2` directly, exactly as `std.zlib` imports
+  `std.engines.zlib.*`; the compiler's internal callers move onto `std.regex`;
   `rt/regex_runtime.w` and the `with_regex_*` seam are deleted (D30).
 - Each bootstrap stage links the store's objects; stage1 (built by the
   seed) receives them as plain link inputs from `build.w`, stage2 and the
@@ -268,7 +275,7 @@ into `src/FnAbi.w` beside `TypeLayout.w`, add `WITH_ABI_VERSION`, record
 the ABI-source hash, add the battery check — alone in its battery
 (codegen-touching). (B) the `.wo` mechanism: store, key, manifest,
 data-driven embed and link tables, on-demand linking. (C) pcre2: bundle
-target, `std.regex` over `std.re`, compiler callers off the shim, shim
+target, `std.regex` over `std.engines.pcre2`, compiler callers off the shim, shim
 deleted. (D) zlib: bundle target, consumers link it. (A) comes first so
 the key is narrow from the first bundle; without it the only correct key
 includes the whole of `Codegen.w`, which recompiles the corpora on most
@@ -429,17 +436,17 @@ alone in a battery because both touch symbol naming):
   The three `module_object_mode != 0` naming guards in `Codegen` become
   one predicate — this path uses module link names — true in
   module-object mode or when an embedded bundle provides the path.
-- `codegen_canonical_module_path` joins a tree-resolved `lib/std/re/x.w`
+- `codegen_canonical_module_path` joins a tree-resolved `lib/std/engines/pcre2/x.w`
   with `$PWD`, so a bundle built from a checkout would hash an absolute
   path into every symbol. The rule maps `lib/std/<rest>` (and
   `…/lib/std/<rest>`) to `<embedded-std>/std/<rest>`, the identity Sema's
   module naming already applies. ABI-defining: re-record
   `docs/with-abi.sha256`. Verified by `--emit-bundle-manifest` on the
-  corpus root printing `<embedded-std>/std/re/…` prefixes.
+  corpus root printing `<embedded-std>/std/engines/pcre2/…` prefixes.
 
-**The measured constraint.** `with check lib/std/re/pcre2test.w` takes
+**The measured constraint.** `with check lib/std/engines/pcre2/pcre2test.w` takes
 6.06 s; hello world 0.03 s. `std.regex` is imported by the prelude, so
-"the facade imports `std.re.*` directly" would put six seconds of Sema on
+"the facade imports `std.engines.pcre2.*` directly" would put six seconds of Sema on
 every program. Batch B's declarations-only rule saves codegen, not Sema.
 So a bundle ships its interface, and the compiler embeds interfaces,
 never corpus sources.
@@ -548,7 +555,7 @@ registered, a synthesized root importing each) and writes the
 interface-side fingerprint; the bundle build requires `a == b`. The
 manifest records `fingerprint` and `interface-sha` (sha256 of the `.wi`
 bytes); `--link-bundle` refuses an interface whose sha is not the
-manifest's. `--bundle-corpus std/re` selects `<embedded-std>/std/re/…`;
+manifest's. `--bundle-corpus std/engines/pcre2` selects `<embedded-std>/std/engines/pcre2/…`;
 `std/wi_demo` selects the single module `<embedded-std>/std/wi_demo.w`.
 The emitter (`src/compiler/BundleInterfaceEmit.w`) prints from Sema's
 finalized tables only, never source text, never a placeholder: a
@@ -602,7 +609,7 @@ signal. The harness `bundle-interface-tests` regenerates
 fingerprint equality, checks that five interface mutations (a pin dropped among them) change it, runs
 the consumer against the emitted interface, and fires each refusal.
 Measured on pcre2 (2026-09-02, stage1): a 4.3k-line `.wi`, source and
-interface fingerprints equal, and a tiny `std.re` consumer's `check`
+interface fingerprints equal, and a tiny `std.engines.pcre2` consumer's `check`
 drops from 5.2 s through the source to 0.26 s through the interface.
 Corpus findings for batch C3: `defs.w` exports 46 generic functions
 (migrated C macros such as `INT8_C[T]`, `PCRE2_GLUE[T]`, `MAX_255[T]`);
@@ -610,9 +617,9 @@ they stay corpus-internal and are omitted from the interface (above);
 `pcre2_chartables.w`, `pcre2_tables.w` and `pcre2_ucd.w` carry only
 `use` lines.
 
-**Resolver.** `use std.re.X` on a compiler whose bundle index provides
-`<embedded-std>/std/re/X.w` reads that module's interface section;
-otherwise the source, as today. `lib/std/re/` stays out of
+**Resolver.** `use std.engines.pcre2.X` on a compiler whose bundle index provides
+`<embedded-std>/std/engines/pcre2/X.w` reads that module's interface section;
+otherwise the source, as today. `lib/std/engines/pcre2/` stays out of
 `EmbeddedStdlibData.w` (it is excluded today), and that exclusion becomes
 the rule for every corpus: three blobs per bundle (object, manifest,
 interface), never the 5.5 MB of source.
@@ -623,7 +630,7 @@ interface), never the 5.5 MB of source.
 compiler with an empty index (stage1) compiles exactly what a compiler
 with the bundle embedded compiles.
 
-**Bootstrap chain.** `wo_bundle("pcre2", "lib/std/re", <root>)` registers
+**Bootstrap chain.** `wo_bundle("pcre2", "lib/std/engines/pcre2", <root>)` registers
 `pcre2-wo`: key = sha256(corpus_sha | target | abi_sha) with `corpus_sha`
 from `build_cache_hash_directory_w_files` over the root's closure; store
 `$WITH_WO_DIR` (default `~/.local/with-wo/`); present → nothing runs;
@@ -662,11 +669,11 @@ is a hard link failure. See [the cold-build diagnosis](macos-stage-bundle-debug.
 
 **Root.** `rt/regex_runtime.w`'s `use` list (32 modules; `pcre2test` and
 `pcre2posix` are harness, not bundle) is the bundle root, moved to
-`lib/std/re/bundle.w` and written by the migrate action, which already
+`lib/std/engines/pcre2/bundle.w` and written by the migrate action, which already
 post-patches `use` lines into three modules
 (`pcre2_ensure_generated_dependencies`).
 
-**Retiring the shim (D30).** `std.regex` imports `std.re.*` through the
+**Retiring the shim (D30).** `std.regex` imports `std.engines.pcre2.*` through the
 interface and calls pcre2 directly, as `std.zlib` does; `Regex.__literal_code`
 stays the regex-literal entry and gains `Regex.__capture_count`, so
 codegen's `gen_regex_literal_value` calls facade functions only;
@@ -695,7 +702,7 @@ separate-compilation origin rule) and §18.5c (bundles and interfaces).
 ## Shim retired (batch C4, 2026-09-04)
 
 `rt/regex_runtime.w` and every `with_regex_*` hook are gone (D30's
-regex seam). `std.regex` imports ten `std.re` modules through the
+regex seam). `std.regex` imports ten `std.engines.pcre2` modules through the
 embedded interface and calls pcre2 directly; `Regex.__literal_code` and
 `Regex.__capture_count` are the regex-literal entry points codegen calls
 (`CodegenDispatch.regex_facade_fn`); `SemaCheck.validate_regex_literal`
@@ -710,7 +717,7 @@ CCodegen's prototypes, CiMigrate's borrowed-str mask, emit_c.w's harvest
 and `package.w`'s `regex_runtime.c`. The emit-C lane compiles every
 embedded bundle's corpus in-unit: `--emit-c` registers no interface
 (`Compilation.emit_c_in_unit`), the compiler's own C is emitted by the
-release compiler with `--bundle-corpus std/re` (#955, option a), and the
+release compiler with `--bundle-corpus std/engines/pcre2` (#955, option a), and the
 C backend no longer redeclares a name the included libc headers own
 (`strchr`, `__stdinp`…) while emitting `with_libc_*` prototypes from
 std.libc's declarations.

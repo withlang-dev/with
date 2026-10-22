@@ -583,11 +583,11 @@ These round out the standard library for production use.
 
 #### 3.1 `std.compress` — Compression
 
-**Resolved by the corpus sourcing plan — landed (`1ca0beac`, `b509e340`).** `lib/std/zlib.w` is the facade over migrated zlib (`lib/std/zl/`, the second `.wo` bundle): `compress`, `compress_level`, `decompress`, `decompress_with_limit`, `compress_gzip`, `compress_gzip_level`, `decompress_gzip`, `decompress_gzip_with_limit`, `ZlibError`; `&List[u8]` in, `Result[List[u8], ZlibError]` out. The pure-With deflate this section demanded is superseded by the hardenedness rule. Not yet facaded: streaming `Inflater`/`Deflater` (the in-place `z_stream` resource — modeled-C stage 4b/D54 pinned resources are the mechanism) and raw-deflate entry points.
+**Resolved by the corpus sourcing plan — landed (`1ca0beac`, `b509e340`).** `lib/std/zlib.w` is the facade over migrated zlib (`lib/std/engines/zlib/`, the second `.wo` bundle): `compress`, `compress_level`, `decompress`, `decompress_with_limit`, `compress_gzip`, `compress_gzip_level`, `decompress_gzip`, `decompress_gzip_with_limit`, `ZlibError`; `&List[u8]` in, `Result[List[u8], ZlibError]` out. The pure-With deflate this section demanded is superseded by the hardenedness rule. Not yet facaded: streaming `Inflater`/`Deflater` (the in-place `z_stream` resource — modeled-C stage 4b/D54 pinned resources are the mechanism) and raw-deflate entry points.
 
 #### 3.2 `std.archive` — Tar
 
-**Status (2026-09-22): tar not started; ZIP landed instead.** `lib/std/zip.w` (`ZipArchive.open`, `ZipEntry`, `extract`, `ZipError`) reads ZIP archives over minizip in the zlib corpus (`lib/std/zl/`); the minizip writer waits on `setjmp` (#1217). Tar: the format is small enough for native With; the sourcing rule does not demand a corpus for it.
+**Status (2026-09-22): tar not started; ZIP landed instead.** `lib/std/zip.w` (`ZipArchive.open`, `ZipEntry`, `extract`, `ZipError`) reads ZIP archives over minizip in the zlib corpus (`lib/std/engines/zlib/`); the minizip writer waits on `setjmp` (#1217). Tar: the format is small enough for native With; the sourcing rule does not demand a corpus for it.
 
 ```
 // std.archive.tar
@@ -662,7 +662,7 @@ DNS resolution requires system configuration awareness
 
 #### 3.4 `std.regex` — Regular expressions
 
-**Resolved — landed (`b0291d9f`), specified in `docs/regex-spec.md`.** `lib/std/regex.w` is the facade over migrated PCRE2 (`lib/std/re/`, the first `.wo` bundle): `Regex.compile`/`compile_flags`, `is_match`, `find`/`find_at`/`find_all`, `captures`/`captures_at`/`captures_all`, `replace`/`replace_all`/`replace_fn`, `split`/`splitn`, `Captures.get/by_name/text`, regex literals `/…/` with `=~`. Complete per its spec.
+**Resolved — landed (`b0291d9f`), specified in `docs/regex-spec.md`.** `lib/std/regex.w` is the facade over migrated PCRE2 (`lib/std/engines/pcre2/`, the first `.wo` bundle): `Regex.compile`/`compile_flags`, `is_match`, `find`/`find_at`/`find_all`, `captures`/`captures_at`/`captures_all`, `replace`/`replace_all`/`replace_fn`, `split`/`splitn`, `Captures.get/by_name/text`, regex literals `/…/` with `=~`. Complete per its spec.
 
 #### 3.5 `std.encoding.csv` — CSV reader/writer
 

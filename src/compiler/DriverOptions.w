@@ -569,7 +569,7 @@ fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
     if build.bundle_corpus.len() == 0 and (build.bundle_interface_path.len() > 0 or build.bundle_fingerprint_path.len() > 0 or build.bundle_manifest_path.len() > 0):
         return BuildCommandParseResult {
             ok: false,
-            error_msg: "--emit-bundle-interface, --emit-bundle-manifest and --bundle-fingerprint require --bundle-corpus <rel> (the bundle's modules under the embedded std tree, e.g. std/re)",
+            error_msg: "--emit-bundle-interface, --emit-bundle-manifest and --bundle-fingerprint require --bundle-corpus <rel> (the bundle's modules under the embedded std tree, e.g. std/engines/pcre2)",
             build,
             graph,
         }

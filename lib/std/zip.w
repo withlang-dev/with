@@ -1,13 +1,13 @@
 // std.zip - reading ZIP archives, over the migrated minizip reader
-// (zlib's contrib/minizip, in the zlib bundle as std.zl.unzip).
+// (zlib's contrib/minizip, in the zlib bundle as std.engines.zlib.unzip).
 
 use std.collections
 use std.result
 use std.string
 use std.fs
 use std.libc
-use std.zl.defs
-use std.zl.unzip
+use std.engines.zlib.defs
+use std.engines.zlib.unzip
 
 const ZIP_NAME_MAX: i32 = 4096
 const ZIP_CHUNK: i32 = 65536

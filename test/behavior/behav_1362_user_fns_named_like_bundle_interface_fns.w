@@ -1,14 +1,14 @@
 //! expect-stdout: ok
 
 // #1362: a user fn named like a bundle interface fn keeps its own signature.
-// Every non-generic fn the migrated corpora's defs.w export (std.re,
-// std.zl; std.tommyds and std.c_algorithms export the same helper set) is
+// Every non-generic fn the migrated corpora's defs.w export (std.engines.pcre2,
+// std.engines.zlib; std.engines.tommyds and std.engines.c_algorithms export the same helper set) is
 // declared here with a different signature. The interface declaration of
 // the same name used to share the user's flat symbol: analyze audit:all
 // reported "finalized source type or LLVM parameter disagrees with FnAbi",
 // and codegen failed ("declaration check_match has no finalized FnAbi
 // signature"). The interface fn is displaced to its module-qualified
-// identity; regex (std.re) and zlib (std.zl) still call their own.
+// identity; regex (std.engines.pcre2) and zlib (std.engines.zlib) still call their own.
 // behav_1362_bundle_interface_collision_audit runs audit:all on this file.
 use std.collections.HashMap
 use std.zlib

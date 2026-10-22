@@ -176,7 +176,7 @@ fn runtime_program_path(path: &str) -> str:
 // stdlib and the bundles. Module resolution tries its out/gen and lib last,
 // so a stage compiler compiles a program in any directory the way it does
 // from the tree root (stage1 driven from a test's case directory could not
-// find std.re, a bundle corpus the embedded stdlib leaves out).
+// find std.engines.pcre2, a bundle corpus the embedded stdlib leaves out).
 var g_own_tree_resolved: bool = false
 var g_own_tree: str = ""
 

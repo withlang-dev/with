@@ -1,4 +1,4 @@
-// std.calg_testing.defs — shared definitions for migrated PCRE2
+// std.engines.c_algorithms_testing.defs — shared definitions for migrated PCRE2
 use std.option
 use rt.rt_core
 

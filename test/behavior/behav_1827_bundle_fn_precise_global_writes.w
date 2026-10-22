@@ -9,7 +9,7 @@
 // call. (The parent compiler refused this as a call that "counts as writing
 // every global its bundle exports"; err_1827_bundle_fn_writes_bundle_globals.w
 // is a call that does write it.)
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 
 fn main:
     let r = &allocation_limit

@@ -253,7 +253,7 @@ with migrate .reference/pcre2/src/ \
     --no-c-export \
     --prefer-brace \
     --width-slice 8 \
-    --shared-defs std.re.defs \
+    --shared-defs std.engines.pcre2.defs \
     --exclude pcre2demo.c --exclude pcre2grep.c \
     --exclude pcre2posix.c --exclude pcre2posix_test.c \
     --exclude pcre2_jit_test.c --exclude pcre2_dftables.c \
@@ -452,7 +452,7 @@ Everything PCRE2 supports, which is everything Perl supports:
 |---|---|
 | Run `with migrate` on PCRE2 source | DONE — 32/32 files, 287/287 functions, ~160K lines |
 | Fix compilation errors in migrated output | DONE — all errors fixed in migrator (978 + 893 + 3) |
-| Prepare and promote to `lib/std/re/` | DONE — 0 errors, 0 stubs |
+| Prepare and promote to `lib/std/engines/pcre2/` | DONE — 0 errors, 0 stubs |
 | Build migrated library as object files | DONE — wired into stdlib/runtime paths |
 | Verify against system pcre2test | DONE — full migrated `pcre2test` corpus runs through `make regex-test` |
 | Run full PCRE2 test suite | DONE — all tests run, no skipped corpus |

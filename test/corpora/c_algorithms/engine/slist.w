@@ -1,6 +1,6 @@
 // Migrated from C
-use std.calg_testing.defs
-use std.calg_testing.alloc_testing
+use std.engines.c_algorithms_testing.defs
+use std.engines.c_algorithms_testing.alloc_testing
 use std.option
 
 pub unsafe fn slist_free(__param_list: *mut _SListEntry) {

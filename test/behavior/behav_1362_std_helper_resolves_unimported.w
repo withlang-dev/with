@@ -2,7 +2,7 @@
 
 // #1362: a public std declaration keeps resolving with no import when a
 // program named it before the engine leak closed. is_alnum resolved only
-// because the pcre2 corpus's interface (std.re.defs) declared it too and was
+// because the pcre2 corpus's interface (std.engines.pcre2.defs) declared it too and was
 // reachable over the prelude edge. Engine corpora are never ambient (§18.2),
 // so that twin is gone; the call binds std.string's is_alnum, the unique
 // public std declaration §18.2's fallback tier names (the bridge until

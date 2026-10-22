@@ -340,7 +340,7 @@ impl Sema:
             // The ambient tier is the prelude's enumerated list (§18.2, D29):
             // the prelude modules and the modules they name. What those
             // modules import for themselves stays theirs — std.regex reaches
-            // the pcre2 interface through its own `use std.re.*`, and pcre2's
+            // the pcre2 interface through its own `use std.engines.pcre2.*`, and pcre2's
             // three thousand names are not every program's namespace.
             let seen_global: HashMap[i32, i32] = HashMap.new()
             while global_frontier.len() > 0:
@@ -2521,7 +2521,7 @@ impl Zcu:
 
     // #1703 (§18.2, §18.3): a module's top-level values are its own, as its
     // fns are (#1350). When another owner's declaration already holds a
-    // value's name — std.re's `pub let PACKAGE` beside a program's `const
+    // value's name — std.engines.pcre2's `pub let PACKAGE` beside a program's `const
     // PACKAGE`, a header's `PI` beside std.math's — this one is displaced to
     // its module-qualified identity (frontend_displace_fn_decl) instead of
     // colliding in the flat global table, and Sema binds each reference by
@@ -2554,7 +2554,7 @@ impl Zcu:
     // #1663: a c_import's modeled wrapper — the safe `fn` CImport renders
     // over a renamed raw extern for a curated contract (#379: `memchr(__s:
     // []u8, __c)`) — has its C function's name, and another module may
-    // declare that function as an extern of its own (std.re.defs's `memchr`,
+    // declare that function as an extern of its own (std.engines.pcre2.defs's `memchr`,
     // which pcre2_match calls with a pointer and a length). They are two
     // With declarations with two signatures, not one C symbol declared
     // twice, but the flat function table held one of them — the wrapper —
@@ -2562,7 +2562,7 @@ impl Zcu:
     // displaced to its importer's module-qualified identity and the extern
     // keeps the flat name; Sema binds each module's calls by §18.2
     // precedence (resolve_displaced_fn_ident: the importer's to its wrapper,
-    // std.re's to its own import).
+    // std.engines.pcre2's to its own import).
     fn displace_c_import_wrappers(pool: &AstPool):
         var extern_names: List[i32] = List.new()
         var extern_paths: List[str] = List.new()
@@ -2600,7 +2600,7 @@ impl Zcu:
     // header DEFINES — a `static inline` body, a rendered wrapper — is its
     // importer's import, not a global declaration. When another owner
     // already holds its short name — a bundle's private
-    // `u128_mul_would_overflow` (lib/std/re/defs.w, reached over the prelude
+    // `u128_mul_would_overflow` (lib/std/engines/pcre2/defs.w, reached over the prelude
     // edge), a user module's own fn, another import's definition — the flat
     // table bound that owner's calls to the header's function ("expects 1
     // argument(s), found 2" from inside the bundle) or gave two bodies one
@@ -3077,7 +3077,7 @@ const FRONTEND_FN_DISPLACE = 2
 // keeps its own module-qualified identity (frontend_displace_fn_decl), and
 // Sema binds its module's own references (and its importers') to it. Dropping
 // it bound them to the other module's function — a user `fn is_digit(u8)`
-// silently became std.string's is_alnum's callee, and std.re's own
+// silently became std.string's is_alnum's callee, and std.engines.pcre2's own
 // `is_digit` call became "not visible". A same-module duplicate, an extern
 // (one global C symbol in every tier), an interface decl (displaced by the
 // on-demand interface merge instead: displace_colliding_interface_fns,

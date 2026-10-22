@@ -1,5 +1,5 @@
 //! check-only
-//! args: --emit-c --bundle-corpus std/re
+//! args: --emit-c --bundle-corpus std/engines/pcre2
 
 // D39 §3.4 / #955: the emit-C lane compiles a bundle corpus in-unit. The
 // corpus's body-only imports (pcre2's `use std.libc`, which declares the

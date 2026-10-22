@@ -25,7 +25,7 @@ fn bundle_text_sha256(text: &str) -> str:
     sha256_hex(&digest[0] as *const u8)
 
 // `--bundle-corpus <rel>` names the module `<embedded-std>/<rel>.w` or the
-// directory `<embedded-std>/<rel>/` — `std/re` is pcre2's corpus, `std/wi_demo`
+// directory `<embedded-std>/<rel>/` — `std/engines/pcre2` is pcre2's corpus, `std/wi_demo`
 // the one-module demo.
 fn bundle_corpus_contains(corpus: &str, canonical_path: &str) -> bool:
     if corpus.len() == 0:
@@ -38,7 +38,7 @@ fn bundle_corpus_contains(corpus: &str, canonical_path: &str) -> bool:
 fn bundle_corpus_base(corpus: &str) -> str:
     if corpus == "rt": "<embedded-rt>/rt" else: "<embedded-std>/" ++ corpus
 
-// `<embedded-std>/std/re/defs.w` → `std.re.defs`, `<embedded-rt>/rt/rt_core.w`
+// `<embedded-std>/std/engines/pcre2/defs.w` → `std.engines.pcre2.defs`, `<embedded-rt>/rt/rt_core.w`
 // → `rt.rt_core`; "" for any other path.
 fn bundle_module_dotted_name(canonical_path: &str) -> str:
     let prefix = if canonical_path.starts_with("<embedded-rt>/"): "<embedded-rt>/" else: "<embedded-std>/"

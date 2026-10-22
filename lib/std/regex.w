@@ -1,23 +1,23 @@
 // std.regex — high-level regex facade over the migrated PCRE2 engine.
 //
 // The engine is the pcre2 .wo bundle (docs/spec/toolchain/wo_bundles.md, decisions.md D38,
-// D39): `use std.re.*` resolves to the bundle's interface, the calls below
+// D39): `use std.engines.pcre2.*` resolves to the bundle's interface, the calls below
 // are ordinary With calls, and the link selects the bundle on demand.
 
 use std.builtins
 use std.collections
 use std.option
 use std.result
-use std.re.defs
-use std.re.pcre2_compile
-use std.re.pcre2_context
-use std.re.pcre2_error
-use std.re.pcre2_maketables
-use std.re.pcre2_match
-use std.re.pcre2_match_data
-use std.re.pcre2_pattern_info
-use std.re.pcre2_substitute
-use std.re.pcre2_substring
+use std.engines.pcre2.defs
+use std.engines.pcre2.pcre2_compile
+use std.engines.pcre2.pcre2_context
+use std.engines.pcre2.pcre2_error
+use std.engines.pcre2.pcre2_maketables
+use std.engines.pcre2.pcre2_match
+use std.engines.pcre2.pcre2_match_data
+use std.engines.pcre2.pcre2_pattern_info
+use std.engines.pcre2.pcre2_substitute
+use std.engines.pcre2.pcre2_substring
 use rt.rt_core
 
 
@@ -66,7 +66,7 @@ pub type Captures {
 fn regex_make_flags(options: i32, flags: i32) -> RegexFlags:
     RegexFlags { options: options, flags: flags, }
 
-// ── The engine (pcre2 through std.re) ────────────────────────────────
+// ── The engine (pcre2 through std.engines.pcre2) ────────────────────────────────
 
 fn regex_engine_malloc(size: c_ulong, data: *mut c_void) -> *mut c_void:
     with_alloc(size as i64) as *mut c_void

@@ -1249,7 +1249,7 @@ impl ResolveState:
         // Try embedded stdlib first (fast path for built-in modules).
         // If not found, fall through to normal filesystem resolution.
         // This decouples the std/ namespace from the embedded storage —
-        // modules like std.re can live on the filesystem without embedding.
+        // modules like std.engines.pcre2 can live on the filesystem without embedding.
         // D30 R3: `use rt.<module>` names the embedded runtime module
         // (<embedded-rt>/rt/<module>.w), the bundle root's spelling.
         if rel_primary.starts_with("rt/"):

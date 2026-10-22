@@ -8,7 +8,7 @@ use std.string.StringBuilder
 
 extern fn with_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
 
-// #1358: `with ast lib/std/tommyds/check_.w` (72 KB) ran for more than 36
+// #1358: `with ast lib/std/engines/tommyds/check_.w` (72 KB) ran for more than 36
 // minutes. The file declares `var the_cache: [16777216]u8 = [0 as u8;
 // 16777216]`; the parser desugars a fill into N copies of one element node,
 // and the dump printed every copy (150 MB), each appended by copying the

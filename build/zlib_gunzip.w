@@ -2,8 +2,8 @@ use std.fs
 use std.libc
 use std.process
 use std.string
-use std.zl.defs
-use std.zl.inflate
+use std.engines.zlib.defs
+use std.engines.zlib.inflate
 
 const ZLIB_MAX_OUTPUT: i64 = 8589934592
 const ZLIB_CHUNK_SIZE: i64 = 4 * 1024 * 1024

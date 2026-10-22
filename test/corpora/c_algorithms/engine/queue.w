@@ -1,6 +1,6 @@
 // Migrated from C
-use std.calg_testing.defs
-use std.calg_testing.alloc_testing
+use std.engines.c_algorithms_testing.defs
+use std.engines.c_algorithms_testing.alloc_testing
 
 pub fn queue_new() -> *mut _Queue writes allocation_limit {
     var __local_queue: *mut _Queue
